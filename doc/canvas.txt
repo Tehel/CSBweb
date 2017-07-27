@@ -1,0 +1,128 @@
+// --------------- snippets ---------------
+
+// create a canvas
+
+<body onload="draw();">
+	...
+	<canvas id="canvas" width="150" height="150"></canvas>
+
+// get its 2d context and draw something on it
+
+function draw() {
+	let canvas = document.getElementById("canvas");
+	if (canvas.getContext) {
+		let ctx = canvas.getContext("2d");
+
+		ctx.fillStyle = "rgb(200,0,0)";
+		ctx.fillRect (10, 10, 55, 50);
+
+		ctx.fillStyle = "rgba(0, 0, 200, 0.5)";
+		ctx.fillRect (30, 30, 55, 50);
+	}
+}
+
+
+// paste a downloaded image on a canvas
+
+let canvas = document.getElementById('viewport'),
+context = canvas.getContext('2d');
+
+make_base();
+
+function make_base()
+{
+	let img = new Image();
+	img.src = 'img/base.png';
+	// delayed paste since we need to download the image first
+	img.onload = function(){
+		ctx.drawImage(img, 100, 100);
+	}
+}
+
+// filled triangle
+    ctx.beginPath();
+    ctx.moveTo(75, 50);
+    ctx.lineTo(100, 75);
+    ctx.lineTo(100, 25);
+    ctx.fill();
+
+// smiley
+    ctx.beginPath();
+    ctx.arc(75, 75, 50, 0, Math.PI * 2, true);  // Cercle extérieur
+    ctx.moveTo(110,75);
+    ctx.arc(75, 75, 35, 0, Math.PI, false);  // Bouche (sens horaire)
+    ctx.moveTo(65, 65);
+    ctx.arc(60, 65, 5, 0, Math.PI * 2, true);  // Oeil gauche
+    ctx.moveTo(95, 65);
+    ctx.arc(90, 65, 5, 0, Math.PI * 2, true);  // Oeil droite
+    ctx.stroke();
+
+// bulle
+    ctx.beginPath();
+    ctx.moveTo(75, 25);
+    ctx.quadraticCurveTo(25, 25, 25, 62.5);
+    ctx.quadraticCurveTo(25, 100, 50, 100);
+    ctx.quadraticCurveTo(50, 120, 30, 125);
+    ctx.quadraticCurveTo(60, 120, 65, 100);
+    ctx.quadraticCurveTo(125, 100, 125, 62.5);
+    ctx.quadraticCurveTo(125, 25, 75, 25);
+    ctx.stroke();
+
+// heart
+    ctx.beginPath();
+    ctx.moveTo(75, 40);
+    ctx.bezierCurveTo(75, 37, 70, 25, 50, 25);
+    ctx.bezierCurveTo(20, 25, 20, 62.5, 20, 62.5);
+    ctx.bezierCurveTo(20, 80, 40, 102, 75, 120);
+    ctx.bezierCurveTo(110, 102, 130, 80, 130, 62.5);
+    ctx.bezierCurveTo(130, 62.5, 130, 25, 100, 25);
+    ctx.bezierCurveTo(85, 25, 75, 37, 75, 40);
+    ctx.fill();
+
+// colors
+	// palette
+	for (let i=0; i<6; i++){
+		for (let j=0; j<6; j++){
+			ctx.fillStyle = `rgb(${Math.floor(255-42.5*i)}, ${Math.floor(255-42.5*j)},0)`;
+			ctx.fillRect(j*25, i*25, 25, 25);
+		}
+	}
+
+	// blue circles
+    for (var i=0;i<6;i++){
+      	for (var j=0;j<6;j++){
+        	ctx.strokeStyle = `rgb(0, ${Math.floor(255-42.5*i)}, ${Math.floor(255-42.5*j)})`;
+        	ctx.beginPath();
+        	ctx.arc(12.5 + j*25, 12.5 + i*25, 10, 0, Math.PI*2, true);
+        	ctx.stroke();
+      	}
+    }
+
+// --------------- references ---------------
+
+https://developer.mozilla.org/fr/docs/Tutoriel_canvas/Formes_g%C3%A9om%C3%A9triques
+
+coordinates start (0,0) upper-left by default
+
+// rectangles
+
+fillRect(x, y, largeur, hauteur)
+    filled rectangle
+
+strokeRect(x, y, largeur, hauteur)
+    only the border
+
+clearRect(x, y, largeur, hauteur)
+    clear a rectangular zone back to transparency
+
+// paths
+
+beginPath / closePath pour commencer/conclure la description d'un path
+stroke / fill: dessiner le chemin ou remplir la forme. fill fait un closePath implicite.
+
+lineTo(finalX, finalY)
+arc(centerX, centerY, rayon, angleInitial, angleFinal, antihoraire)   // angles en radians: Math.PI *2 pour un cercle
+arcTo(x1, y1, x2, y2, rayon)
+
+quadraticCurveTo(cp1x, cp1y, x, y)
+bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y)

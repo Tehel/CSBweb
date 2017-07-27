@@ -1,0 +1,24 @@
+{
+  "name": "DMjs",
+  "version": "0.0.1",
+  "description": "Dungeon Master for web browser",
+  "scripts": {
+    "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
+    "start": "bin/start.sh",
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tehel/dmjs.git"
+  },
+  "author": {
+    "name": "Thomas Looten <github@looten.net>"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Tehel/dmjs/issues"
+  },
+  "dependencies": {
+    "express": ">=4.15.3",
+    "serve-favicon": ">=2.4.3"
+  }
+}
