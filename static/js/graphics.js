@@ -41,11 +41,11 @@ class Screen {
 		this.setPalette(defaultPalette);
 		await this.readGraphics();
 		this.extractPortraits();
-		this.extractMainFont();
-		this.extractPalettes();
+		// this.extractPalettes();
+		// this.extractMainFont();
 
-		let arrows = this.graphicsFile.read(this.locateNthItem(13), this.itemsCompressedSizes[13]);
-		dumpArray(arrows);
+		// let arrows = this.graphicsFile.read(this.locateNthItem(13), this.itemsCompressedSizes[13]);
+		// dumpArray(arrows);
 	}
 
 	//--------------------------------  Palette ------------------------------------
@@ -69,7 +69,7 @@ class Screen {
 	// Palette552
 
 	extractPalettes() {
-		let data = this.getRawItem(552);
+		let data = this.getRawItem(562);
 		let palettes = Array.from(data.slice(0x4FE, 0x5FE));
 		this.palettes = [];
 		for (let i=0; i<8; i++) {
@@ -140,20 +140,7 @@ class Screen {
 		//this.compressedGraphic0 = ReadGraphic(0);
 	}
 
-	getRawItem(num) {
-		let data = this.graphicsFile.read(this.locateNthItem(num), this.itemsCompressedSizes[num]);
-
-		// uncompress data and check size, if needed
-		if (this.itemsCompressedSizes[num] !== this.itemsDecompressedSizes[num]) {
-			throw new Error(`Compressed item ${num} !`);
-			data = LZWExpand(data);
-			if (data.length !== this.itemsDecompressedSizes[num]) {
-				throw new Error(`Wrong uncompressed size for item ${num}`);
-			}
-		}
-		return data;
-	}
-
+	// gives the position of an "image" byte sequence
 	locateNthItem(num) {
 		if (!this.itemsCompressedSizes) {
 			throw new Error("!?!");
@@ -164,24 +151,24 @@ class Screen {
 		return offset;
 	}
 
-	// 'expand' used to be the 0x8000 flag in the graph number. expand = false if the flag is set
-	readAndExpandGraphic(num, destX, destY, expand, format) {
+	//---------------- low-level buffer and bitmap decoding
 
-		let img = this.getImage(num, format);
-		this.drawarea.putImageData(img, destX, destY);
-/*
-		if (expand) {
-			ExpandGraphic(graphclear, dest, destX, destY);
-		} else {
-			// copy data to dest ?
+	// extracts an "image" data from graphics file, uncompressing it if needed
+	getRawItem(num) {
+		let data = this.graphicsFile.read(this.locateNthItem(num), this.itemsCompressedSizes[num]);
+
+		// uncompress data and check size, if needed
+		if (this.itemsCompressedSizes[num] !== this.itemsDecompressedSizes[num]) {
+			// throw new Error(`Compressed item ${num} !`);
+			data = LZWExpand(data);
+			if (data.length !== this.itemsDecompressedSizes[num]) {
+				throw new Error(`Wrong uncompressed size for item ${num} (expected ${this.itemsDecompressedSizes[num]}, got ${data.length})`);
+			}
 		}
-*/
+		return data;
 	}
 
-	drawPortrait(num, destX, destY) {
-		this.drawarea.putImageData(this.portraits[num], destX, destY);
-	}
-
+	// returns the image from cache or extracts and decode it from file
 	getImage(num, format) {
 		if (!this.imagescache[num]) {
 			// presume IMG1 format
@@ -206,7 +193,7 @@ class Screen {
 					// first bit tells if we'll need to read further (1) of if it's a simple 1-8 nib2 repetition (0)
 					if (nib1 & 0x8) {
 						let nb = 0;
-						// second bit tells if we read a byte (0) or a word (1)
+						// second bit tells if we read a word (1) or a byte (0)
 						if (nib1 & 0x4) {
 							nb = (img[offset] << 8) + img[offset+1];
 							offset += 2;
@@ -224,6 +211,7 @@ class Screen {
 							pixels.push(...pixels.slice(0-imgW, nb+1-imgW));
 							pixels.push(nib2);
 						} else if (bits2 === 2) {
+							// A and D (transparent pixels) are only used for animation files
 							throw new Error(`unsupported IMG2 code (${nib1}) before offset ${offset}`);
 						} else if (bits2 === 1) {
 							if (nb & 1) {
@@ -255,11 +243,11 @@ class Screen {
 
 			// decoding is finished
 			if (pixels.length !== imgW * imgH) {
-				throw new Error(`image decoding error, wrong pixel count: expected ${imgW}*${imgH}, got ${pixels.length}`);
+				// throw new Error(`image decoding error, wrong pixel count: expected ${imgW}*${imgH}, got ${pixels.length}`);
 			}
 			// dumpArray(pixels, imgW);
 
-			// copy data into a new image
+			// copy data into a new image, applying current palette
 			let newImage = new ImageData(imgW, imgH);
 			pixels.forEach((color, idx) => {
 				for (let j=0; j<4; j++)
@@ -271,6 +259,27 @@ class Screen {
 		return this.imagescache[num];
 	}
 
+	//---------------- high-level image manipulations
+
+	// draw an image at a coordinates
+	// 'expand' used to be the 0x8000 flag in the graph number. expand = false if the flag is set
+	readAndExpandGraphic(num, destX, destY, expand, format) {
+
+		let img = this.getImage(num, format);
+		this.drawarea.putImageData(img, destX, destY);
+		// if (expand) {
+		// 	ExpandGraphic(graphclear, dest, destX, destY);
+		// } else {
+		// 	// copy data to dest ?
+		// }
+	}
+
+	// draw a portrait at coordinates
+	drawPortrait(num, destX, destY) {
+		this.drawarea.putImageData(this.portraits[num], destX, destY);
+	}
+
+	// builds a new ImageData from a box in the source image
 	extractImage(src, posX, posY, width, height) {
 		let newImage = new ImageData(width, height);
 		let imgW = src.width;
@@ -287,6 +296,7 @@ class Screen {
 		return newImage;
 	}
 
+	// builds a table by extracting portraits from image 26
 	extractPortraits() {
 		let pW = 32;
 		let pH = 29;
@@ -297,11 +307,12 @@ class Screen {
 				this.portraits.push(this.extractImage(baseImage, x*pW, y*pH, pW, pH));
 	}
 
+	// builds a font table by extracting chars from image 557
 	extractMainFont() {
 		let pW = 32;
 		let pH = 29;
-		// image is compressed...
-		// let baseImage = this.getImage(557);
+		let baseImage = this.getImage(557);
+		// ...
 	}
 
 	//--------------------------------  Display ------------------------------------
@@ -605,225 +616,4 @@ class Screen {
 		return 1;
 	}
 */
-}
-
-
-// ---------------------- uncompress -------------------------
-let	LZWrepeatFlag;
-let	LZWlastChar;
-let	LZWCodeSize;
-let	LZWMaxCode;
-let	LZWNextCode;
-let LZWResetDict;
-// n rightmost bit at 1
-const RightOneMask = [0, 1, 3, 7, 15, 31, 63, 127, 255];
-
-//i32 LZWExpand(i16 fileHandle, i32 graphicSize, ui8 *dest, ui8 *scratch, ui8 *stack) // TAG022f64
-function LZWExpand(data, scratch) {
-/*
-	// dictionary
-	i16 *WordArray;
-	WordArray = (i16 *)scratch;
-	memset(WordArray, 0, 512);
-
-	i8  *ByteArray;
-	ByteArray = (i8 *)scratch+10006;
-	for (let i=0; i<256; i++) {
-		ByteArray[i] = (i8)i;
-	};
-
-	// we probably get a Uint8Array array that cannot be used as a queue, so copy it
-	let indata = [];
-	data.forEach(b => indata.push(b));
-
-	let outdata = [];
-	let stack = [];
-
-	dReg D0, D4, D6, D7;
-	pnt LOCAL_12;
-	i16 prevCodeWord;
-	LOCAL_12 = (pnt)dest;
-	LZWrepeatFlag = 0;
-	LZWResetDict = false;
-
-	// start with 9-bits codes (dict keys)
-	LZWCodeSize = 9;
-	// compute the current max allocable code with that code size
-	LZWMaxCode = (1<<LZWCodeSize) - 1;
-	// code 256 is reserved for a "clean dict" command
-	LZWNextCode = 257;
-
-	prevCodeWord = LZWGetNextCodeword(indata);
-	if (prevCodeWord === null) {
-		throw new Error("LZW decoding error");
-	}
-	ProcessChar(prevCodeWord, outdata);
-
-	D7W = prevCodeWord;
-	while ((D6W = LZWGetNextCodeword(indata)) > -1) {
-		// 256 => clear dictionary
-		if(D6W==256) {
-			ClearMemory((ui8 *)WordArray, 512);
-			LZWResetDict = true;
-			LZWNextCode = 256; // ?!? should probably be 257
-			D0W = LZWGetNextCodeword(indata);
-			D6W = D0W;
-			if(D0W === null)
-				break;
-		}
-		D4W = D6W;
-		if (D6W >= LZWNextCode) {
-			// that's a code that we don't have yet in the dict
-			// put this value on the stack
-			stack.push(D7B);
-			D6W = prevCodeWord;
-		}
-		// > 256 => dictionary entry, replace D6W with the value from dict
-		while (D6W >= 256) {
-			// put this value on the stack
-			stack.push(ByteArray[D6W]);
-			D6W = WordArray[D6W];
-		}
-		D7W = 0;
-		D7B = ByteArray[D6W];
-		stack.push(D7B);
-		while (stack.length) {
-			let val = stack.pop() & 0xff;
-			ProcessChar(val, outdata);
-		}
-
-		D6W = LZWNextCode;
-		if (D6W < 4096) {
-			WordArray[D6W] = prevCodeWord;
-			ByteArray[D6W] = D7B;
-			LZWNextCode = (i16)(D6W + 1);
-		}
-		prevCodeWord = D4W;
-	}
-	return outdata;
-
-}
-
-let	LZWBitNumber = 0;
-let bitNumber0 = 0; //
-let bytesToRead = 0;
-let	bytesBuffer = null;
-
-// size 
-function LZWGetNextCodeword(data) {
-/*
-	dReg D0, D3, D5, bitOffset, D7;
-	let A3;
-
-	// dictionary is full, we need bigger codes
-	if (LZWNextCode > LZWMaxCode) {
-		LZWCodeSize++;
-		LZWMaxCode = (1 << LZWCodeSize) - 1;
-		if (LZWCodeSize == 12) {
-			LZWMaxCode++
-		}
-	}
-	if (LZWResetDict) {
-		LZWResetDict = false;
-		LZWCodeSize = 9;
-		LZWMaxCode = (1 << LZWCodeSize) - 1;
-		// LZWNextCode is set in parent, to 256
-	}
-
-	let bitsLeft = 0;
-	let currentByte = null;
-
-	// we need a new code.
-	let code = 0;
-	let bitsNeeded = LZWCodeSize;
-	// while we're not satisfied
-	while (bitsNeeded > 0) {
-		// if we don't have any bits available, read a new char
-		if (bitsLeft === 0)
-			currentByte = data.shift();
-
-		// read as many bits from current byte as we have left
-		code = (currentByte & RightOneMask[bitsLeft]) << (LZWCodeSize - bitsLeft);
-		bitsLeft = 0;
-
-	}
-
-	// 
-
-
-
-	// check if we need some maintenance (dict reset, extension or data feed)
-	if (LZWBitNumber >= bitNumber0) {
-
-		// ?!? comparing length in bytes to codesize in bits, means we will read 9-12 bytes
-		bytesToRead = LZWCodeSize < data.length ? LZWCodeSize : data.length;
-
-		if (bytesToRead === 0) {
-			return null;
-		}
-		// get n bytes in the decode buffer and remove them from input
-		bytesBuffer = data.splice(0, bytesToRead);
-
-		LZWBitNumber = 0;
-		bitNumber0 = (bytesToRead<<3) - LZWCodeSize + 1;
-	}
-	LZWBitNumber += LZWCodeSize;
-	bitOffset = LZWBitNumber;
-	D5 = LZWCodeSize;
-
-	// 
-	A3 = bytesBuffer;
-	A3 += (bitOffset>>3);
-	bitOffset &= 7;
-	D7 = 0;
-	D7 = *(A3++);
-	D7 >>= D6;
-	D6 = 8 - D6;
-	D5 -= D6;
-	if (D5 >= 8) {
-		D0 = 0;
-		D0 = *(A3++);
-		D0 <<= D6;
-		D7 |= D0;
-		D6 += 8;
-		D5 -=8;
-	}
-	D0 = *A3;
-
-	//return ((D0W & RightOneMask[D5W]) << D6W) | D7W;
-
-	// take the lowest D5 bits, shift left D6, add bits from D7, return that
-	D0 &= RightOneMask[D5];
-	D0 <<= D6;
-	D0 |= D7;
-	return D0;
-*/
-}
-
-// code is a byte we've just read, out is the output string
-function ProcessChar(code, out) {
-
-	if(LZWrepeatFlag === 0) {
-		// we're not in repeat mode. if next char is 0x90, switch to repeat
-		// else simply copy it to destination and memorize it
-		if (code === 0x90) {
-			LZWrepeatFlag = 1;
-		} else {
-			LZWlastChar = code; // In case repeat sequence follows
-			out.push(code);
-		}
-	} else {
-		// we are in repeat mode, get the count.
-		// if it is 0, we actually wanted a 0x90, not a repeat :)
-		// else repeat the char n times
-		LZWrepeatFlag = 0;
-		if (code > 0) {
-			// we already copied it once before reading the 0x90
-			for (let i=0; i<code-1; i++) {
-				out.push(LZWlastChar);
-			}
-		} else {
-			out.push(0x90)
-		}
-	}
 }

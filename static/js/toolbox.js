@@ -7,7 +7,7 @@ class Server {
 	}
 
 	// headers: a hash, like: {Accept: 'application/json'}
-	sendRequest(method, url, content, headers, progresscb) {
+	sendRequest(method, url, content, headers) {
 		return new Promise((resolve, reject) => {
 			let request = new XMLHttpRequest();
 			request.open(method, url, true);
@@ -17,7 +17,7 @@ class Server {
 				content = undefined;
 			}
 			let contentStr = null;
-			switch(typeof content) {
+			switch (typeof content) {
 				case 'string':
 					contentStr = new TextEncoder('utf-8').encode(content);
 					request.setRequestHeader('Content-type', 'text/plain');
@@ -55,48 +55,29 @@ class Server {
 			request.onerror = (evnt) => {
 				reject(`query to ${url} failed with status ${evnt.type}`);
 			};
-/*
-			request.onreadystatechange = event => {
-
-				if (request.readyState === 4) {
-					if (request.status === 200) {
-						resolve(request.response);
-					} else {
-						reject(`query to ${url} failed with status ${request.status}`);
-					}
-				} else if (request.readyState === 3 && progresscb) {
-					// loading: if a progress callback is supplied, give it the byte count
-					progresscb(request.responseText.length);
-				}
-				// ignore states other than 3 and 4
-			};
-*/
 			request.send(contentStr);
 		});
 	}
-	get(url, headers, progress) { return this.sendRequest('GET', url, null, headers, progress); }
-	delete(url, headers) { return this.sendRequest('DELETE', url, null, headers, null); }
-	options(url, headers) { return this.sendRequest('OPTIONS', url, null, headers, null); }
-	post(url, content, headers) { return this.sendRequest('POST', url, content, headers, null); }
-	put(url, content, headers) { return this.sendRequest('PUT', url, content, headers, null); }
-	patch(url, content, headers) { return this.sendRequest('PATCH', url, content, headers, null); }
+	get(url, headers) { return this.sendRequest('GET', url, null, headers); }
+	delete(url, headers) { return this.sendRequest('DELETE', url, null, headers); }
+	options(url, headers) { return this.sendRequest('OPTIONS', url, null, headers); }
+	post(url, content, headers) { return this.sendRequest('POST', url, content, headers); }
+	put(url, content, headers) { return this.sendRequest('PUT', url, content, headers); }
+	patch(url, content, headers) { return this.sendRequest('PATCH', url, content, headers); }
 }
 
 //--------------------------- page data access ---------------------------
 
 function $(id) {
-	var it = window[ id ];
-	if( it )
-	{
-		//alert( id + ' exists in window' );
-		var type = typeof it;
-		if( type == 'object' )
-		{
-			//alert( id + ' is an Object' );
-			var str = it.toString();
-			if( str != '[object Window]' )
-			{
-				//alert( id + ' and not a window' );
+	let it = window[id];
+	if (it) {
+		//alert(id + ' exists in window');
+		let type = typeof it;
+		if (type == 'object') {
+			//alert(id + ' is an Object');
+			let str = it.toString();
+			if (str != '[object Window]') {
+				//alert(id + ' and not a window');
 				return it;
 			}
 		}
@@ -104,19 +85,17 @@ function $(id) {
 	return document.getElementById(id);
 }
 
-function getEvent(evnt) { if(evnt == undefined) return window.event; return evnt; }
+function getEvent(evnt) { if (evnt == undefined) return window.event; return evnt; }
 function getTarget(evnt) { if (evnt.target) return evnt.target; return evnt.srcElement; }
 
 //--------------------------- debug tracer ---------------------------
 
-function trace( text )
-{
+function trace(text) {
 	var elem = $('trace')
-	if( elem == null )
-	{
-		elem = document.createElement( 'div' )
+	if (elem == null) {
+		elem = document.createElement('div')
 		elem.id = 'trace'
-		document.body.appendChild( elem )
+		document.body.appendChild(elem)
 		elem.innerHTML = '<input id="trace_toggle" type="button" value=" "><div id="trace_block"><input id="trace_clear" type="button" value="Clear"><input id="trace_remove" type="button" value="Remove"><br><textarea id="trace_text" cols="160" rows="30" spellcheck="false"></textarea></div>'
 		$('trace_clear').addEventListener('click', trace_clear)
 		$('trace_remove').addEventListener('click', trace_remove)
@@ -126,33 +105,29 @@ function trace( text )
 	$('trace_block').style.display = 'none'
 }
 
-function trace_toggle()
-{
+function trace_toggle() {
 	var state = $('trace_block').style.display
 	var newstate = state == 'none' ? 'inherit' : 'none'
 	$('trace_block').style.display = newstate
 }
 
-function trace_clear()
-{
+function trace_clear() {
 	$('trace').lastChild.textContent = '';
 }
 
-function trace_remove()
-{
-	document.body.removeChild( $('trace') );
+function trace_remove() {
+	document.body.removeChild($('trace'));
 }
 
 /* This is much faster than using (el.innerHTML = str) when there are many
 existing descendants, because in some browsers, innerHTML spends much longer
 removing existing elements than it does creating new ones.
-syntax: el = replaceHtml( el, html )
+syntax: el = replaceHtml(el, html)
 
 source:  http://blog.stevenlevithan.com/archives/faster-than-innerhtml
 */
 
-function replaceHtml( el, html )
-{
+function replaceHtml(el, html) {
 	var oldEl = typeof el === "string" ? document.getElementById(el) : el;
 	var newEl = oldEl.cloneNode(false);
 	// Replace the old with the new
@@ -163,24 +138,23 @@ function replaceHtml( el, html )
 	return newEl;
 }
 
-function emptyElement( el )
-{
-	while( el.firstChild != null )
-		el.removeChild( el.firstChild );
+function emptyElement(el) {
+	while (el.firstChild != null)
+		el.removeChild(el.firstChild);
 }
 
 //--------------------------- events management ---------------------------
 /*
-function addListener( obj, type, func )
+function addListener(obj, type, func)
 {
-	if( obj.eventsFunc == null ) obj.eventsFunc = {};
+	if (obj.eventsFunc == null) obj.eventsFunc = {};
 	obj.eventsFunc.type = func;
-	obj.addEventListener( type, func, false );
+	obj.addEventListener(type, func, false);
 }
 
-function removeListener( obj, type )
+function removeListener(obj, type)
 {
-	obj.removeEventListener( type, obj.eventsFunc.type, false );
+	obj.removeEventListener(type, obj.eventsFunc.type, false);
 	delete obj.eventsFunc.type;
 }
 */
@@ -188,31 +162,31 @@ function removeListener( obj, type )
 
 class Store {
 	show(prefix) {
-		if(!prefix) prefix = '';
+		if (!prefix) prefix = '';
 		let prefixlen = prefix.length;
 
 		let store = localStorage;
 		let str = '';
-		for(let i=0; i<store.length; i++) {
+		for (let i=0; i<store.length; i++) {
 			let key = store.key(i);
-			if(key.substr(0, prefixlen) === prefix)
+			if (key.substr(0, prefixlen) === prefix)
 				str += key + ' : ' + store.getItem(key).length + '\n';
 		}
 		return str;
 	}
 	clear(prefix) {
-		if(!prefix) prefix = '';
+		if (!prefix) prefix = '';
 		let prefixlen = prefix.length;
 
 		let store = localStorage;
-		for(let i=store.length-1; i>= 0; i--) {
+		for (let i=store.length-1; i>= 0; i--) {
 			let key = store.key(i);
-			if(key.substr(0, prefixlen) === prefix)
+			if (key.substr(0, prefixlen) === prefix)
 				store.removeItem(key);
 		}
 	}
 	clearall() {
-		if(confirm('Really completely empty LocalStorage ?'))
+		if (confirm('Really completely empty LocalStorage ?'))
 			localStorage.clear();
 	}
 };
@@ -221,11 +195,11 @@ class Store {
 
 // returns -1 if a < b, +1 if a > b, 0 if equal. Try to compare numerically if both are numbers, or strings containing numbers
 function cmp(a, b) {
-	if(a == undefined) a = '';		// replace undefined (not sortable) by an empty string
-	if(b == undefined) b = '';
+	if (a == undefined) a = '';		// replace undefined (not sortable) by an empty string
+	if (b == undefined) b = '';
 	let ai = (a.constructor === Number) ? a : parseInt(a);	// try to extract a numerical value
 	let bi = (a.constructor === Number) ? b : parseInt(b);
-	if(!isNaN(ai) && !isNaN(bi)){
+	if (!isNaN(ai) && !isNaN(bi)){
 		return ai < bi ? -1 : ai > bi ? 1 : 0;
 	} else {
 		return a < b ? -1 : a > b ? 1 : 0;
@@ -258,45 +232,44 @@ function deepCopy(obj) {
 }
 
 // simple json-like serialization for trace dump (no handling of embedded ")
-function toStr( obj, pretty, maxdepth, path, refs )
-{
+function toStr(obj, pretty, maxdepth, path, refs) {
 	let extarr = (arr, arg) => {
 		let newa = deepCopy(arr);
 		newa.push(arg);
 		return newa;
 	}
 
-	if(maxdepth == undefined) maxdepth = 2;
-	if(path == undefined) path = [];
-	if(refs == undefined) refs = {};
-	if(refs[obj]) return refs[ obj ];
-	if(path.length > maxdepth) return '* too deep *';
+	if (maxdepth == undefined) maxdepth = 2;
+	if (path == undefined) path = [];
+	if (refs == undefined) refs = {};
+	if (refs[obj]) return refs[obj];
+	if (path.length > maxdepth) return '* too deep *';
 	refs[obj] = `*${path.join('>')}*`;
 
 	let tabs = '\t'.repeat(path.length);
 	let str = '';
-	if(obj.constructor === Array) {
+	if (obj.constructor === Array) {
 		let out = [];
-		for(let i = 0; i < obj.length; i++)
+		for (let i = 0; i < obj.length; i++)
 			out.push(toStr(obj[i], pretty, maxdepth, extarr(path, i), refs));
-		if(pretty) {
+		if (pretty) {
 			str += `[\n\t${tabs}${out.join(`,\n\t${tabs}\t`)}\n${tabs}]`;
 		} else {
 			str += `[${out.join(',')}]`;
 		}
-	} else if(typeof obj === 'object') {
+	} else if (typeof obj === 'object') {
 		let out = []
 		for (let i in obj) {
 			out.push(`"${i}":${toStr(obj[i], pretty, maxdepth, extarr(path, i), refs)}`);
 		}
-		if(pretty){
+		if (pretty){
 			str += `{\n\t${tabs}${out.join(`,\n\t${tabs}`)}\n${tabs}}`;
 		} else {
 			str += `{${out.join(',')}}`;
 		}
-	} else if(typeof obj === 'function') {
+	} else if (typeof obj === 'function') {
 		str += '* function *';
-	} else if(obj == undefined) {
+	} else if (obj == undefined) {
 		str += 'undefined';
 	} else {
 		str += obj.toString();

@@ -24,7 +24,8 @@ The original authors of Dungeon Master at FTL Games / Software Heaven, Inc. Doug
 [Paul R. Stevens](http://www.dianneandpaul.net/CSBwin/) for the crazy work of making CSBWin.
 
 Awsome [DMweb community](http://dmweb.free.fr) for the continuous love for the original game over all these years.
-People at [Swoosh Construction Kit](http://greatstone.free.fr/dm) for detailed reverse-engineering of `all` the data file structures.
+
+People at [Swoosh Construction Kit](http://greatstone.free.fr/dm) for detailed reverse-engineering of *all* the data file structures.
 
 [List of all contributors](https://github.com/expressjs/express/graphs/contributors). Mostly me, I'm afraid.
 

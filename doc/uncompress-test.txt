@@ -23,6 +23,15 @@ line 3:
 
 276 => 310
 
+000000000 0
+001100000 60
+000000000 0
+000101101 2d
+010000000 80
+000001000 08
+010000100 84
+001010110 56
+
 00000000 11000000 00000000 01101000 00000001 00001000 00000001 00100001
 00101011 10110000 00010010 00000000 11010010 01000000 01100000 01100001
 11000011 00001101 10110100 00101000 11010001 11101010 01000010 10000001
@@ -37,3 +46,585 @@ eb 04 09 10 19 a9 c0 92 00 01 63 07 18 24 a0 d0 8a 40 07 16 05 08 24 60 10 a0 75
 82 28 84 56 06 5a 44 36 6b d8 4a 4b 43 4f 58 b3 1d 40 81 55 21 29 6e 42 0c e0 0a ce f0 5b 2c ac
 09 b0 36 fc 46 50 70 24 ac 0e b8 c9 00 e2 19 01 d6 07 12 80 18 c0 52 40 e4 6a 43 06 d8 91 5a c0
 1d 1e 16 d7 11 b8 bf c3 72 00 ab 04 6e dc b4 f0 10 9a 42 00
+
+00 60 00 2d dimensions
+80 08	=> 9 pixels 0
+84 56	=> 87 pixels 4
+
+b0 09	=> copy 10 pixels from above plus 0
+80 1a	=> 27 pixels 0
+04		=> 1 pixel 4
+80 1a	=> 27 pixels 0
+04		=> 1 pixel 4
+80 10	=> 17 pixels 0 (??? should be 27, probably bad reference to above)
+b4 94	=> copy 148 pixels from above plus 4 (!?! wtf)
+b4 5d	=> copy 93 pixels from above plus 4
+14		
+b4 43 34 b4 12 34 b4 12 34 
+b4 27 24 20 b4 12 54 b0 12 10 34 b4 10 30 24 50 b4 11 74 b0 14 10 24 30 04 b4 17 10 14 70 b4 10 
+84 09 b0 16 00 14 10 14 b4 18 14 80 08 b4 0f 84 0b b0 17 44 b0 17 14 80 09 b4 0e 84 0d b0 17 14
+00 b0 19 80 0a b4 0d 84 0f b0 17 10 b0 33 10 84 0a 70 b4 f5 54 b4 2b 54 b0 25 14 80 0a b0 23 30
+14 60 b0 20 14 b4 31 04 70 b4 18 84 0a b0 11 80 11 b4 0a 84 0a b0 16 80 14 b0 26 80 10 b4 ca 84
+54 b0 09 80 1a 04 80 1a 04 80 1b b4 78 b4 36 b4 25 b4 38 b4 23 b4 17 84 09 b4 17 b4 21 84 08 b4
+2a 84 08 b4 1f b4 3e b4 1d b4 40 b4 1b b4 42 b4 19 b4 44 b4 17 b4 1a 84 0f b4 1a b0 16 b0 1a 84
+0e 50 b0 15 b0 17 b0 1a 84 0c 60 b0 14 b0 19 b0 1a 84 0a 70 b0 13 b0 1b b0 1a 84 08 80 08 b0 12
+b0 1d b0 1a 64 80 09 b0 11 b0 1f 24 80 0c b0 0a 44 80 0a 04 80 0c 24 80 0b b0 16 b0 1a 24 80 0b
+b0 0f b0 23 b0 1a 04 80 0c b0 0e b0 25 b0 1a b0 1a b4 78 84 53 04
+
+
+read code 0
+read code 60
+new dict entry: code 257, 0/60
+read code 0
+new dict entry: code 258, 60/0
+read code 2d
+new dict entry: code 259, 0/2d
+read code 80
+new dict entry: code 260, 2d/80
+read code 8
+new dict entry: code 261, 80/8
+read code 84
+new dict entry: code 262, 8/84
+read code 56
+new dict entry: code 263, 84/56
+read code b0
+new dict entry: code 264, 56/b0
+read code 9
+new dict entry: code 265, b0/9
+read code 80
+new dict entry: code 266, 9/80
+read code 1a
+new dict entry: code 267, 80/1a
+read code 4
+new dict entry: code 268, 1a/4
+read code 10b
+reference to dict entry 267
+new dict entry: code 269, 4/80
+read code 10d
+reference to dict entry 269
+new dict entry: code 270, 10b/4
+read code 1b
+new dict entry: code 271, 10d/1b
+read code b4
+new dict entry: code 272, 1b/b4
+read code 94
+new dict entry: code 273, b4/94
+read code b4
+new dict entry: code 274, 94/b4
+read code 5d
+new dict entry: code 275, b4/5d
+read code 14
+new dict entry: code 276, 5d/14
+read code b4
+new dict entry: code 277, 14/b4
+read code 43
+new dict entry: code 278, b4/43
+read code 34
+new dict entry: code 279, 43/34
+read code b4
+new dict entry: code 280, 34/b4
+read code 12
+new dict entry: code 281, b4/12
+read code 118
+reference to dict entry 280
+new dict entry: code 282, 12/34
+read code 11a
+reference to dict entry 282
+new dict entry: code 283, 118/12
+read code b4
+new dict entry: code 284, 11a/b4
+read code 27
+new dict entry: code 285, b4/27
+read code 24
+new dict entry: code 286, 27/24
+read code 20
+new dict entry: code 287, 24/20
+read code 119
+reference to dict entry 281
+new dict entry: code 288, 20/b4
+read code 54
+new dict entry: code 289, 119/54
+read code b0
+new dict entry: code 290, 54/b0
+read code 12
+new dict entry: code 291, b0/12
+read code 10
+new dict entry: code 292, 12/10
+read code 118
+reference to dict entry 280
+new dict entry: code 293, 10/34
+read code 1d
+new dict entry: code 294, 118/1d
+read code 30
+new dict entry: code 295, 1d/30
+read code 24
+new dict entry: code 296, 30/24
+read code 50
+new dict entry: code 297, 24/50
+read code b4
+new dict entry: code 298, 50/b4
+read code 11
+new dict entry: code 299, b4/11
+read code 74
+new dict entry: code 300, 11/74
+read code b0
+new dict entry: code 301, 74/b0
+read code 14
+new dict entry: code 302, b0/14
+read code 10
+new dict entry: code 303, 14/10
+read code 24
+new dict entry: code 304, 10/24
+read code 30
+new dict entry: code 305, 24/30
+read code 4
+new dict entry: code 306, 30/4
+read code b4
+new dict entry: code 307, 4/b4
+read code 17
+new dict entry: code 308, b4/17
+read code 10
+new dict entry: code 309, 17/10
+read code 14
+new dict entry: code 310, 10/14
+read code 70
+new dict entry: code 311, 14/70
+read code b4
+new dict entry: code 312, 70/b4
+read code 10
+new dict entry: code 313, b4/10
+read code 84
+new dict entry: code 314, 10/84
+read code 9
+new dict entry: code 315, 84/9
+read code b0
+new dict entry: code 316, 9/b0
+read code 16
+new dict entry: code 317, b0/16
+read code 0
+new dict entry: code 318, 16/0
+read code 12f
+reference to dict entry 303
+new dict entry: code 319, 0/14
+read code 115
+reference to dict entry 277
+new dict entry: code 320, 12f/14
+read code 18
+new dict entry: code 321, 115/18
+read code 14
+new dict entry: code 322, 18/14
+read code 105
+reference to dict entry 261
+new dict entry: code 323, 14/80
+read code b4
+new dict entry: code 324, 105/b4
+read code f
+new dict entry: code 325, b4/f
+read code 84
+new dict entry: code 326, f/84
+read code b
+new dict entry: code 327, 84/b
+read code b0
+new dict entry: code 328, b/b0
+read code 17
+new dict entry: code 329, b0/17
+read code 44
+new dict entry: code 330, 17/44
+read code 149
+reference to dict entry 329
+new dict entry: code 331, 44/b0
+read code 143
+reference to dict entry 323
+new dict entry: code 332, 149/14
+read code 9
+new dict entry: code 333, 143/9
+read code b4
+new dict entry: code 334, 9/b4
+read code e
+new dict entry: code 335, b4/e
+read code 84
+new dict entry: code 336, e/84
+read code d
+new dict entry: code 337, 84/d
+read code 14c
+reference to dict entry 332
+reference to dict entry 329
+new dict entry: code 338, d/b0
+read code 0
+new dict entry: code 339, 14c/0
+read code b0
+new dict entry: code 340, 0/b0
+read code 19
+new dict entry: code 341, b0/19
+read code 80
+new dict entry: code 342, 19/80
+read code a
+new dict entry: code 343, 80/a
+read code b4
+new dict entry: code 344, a/b4
+read code d
+new dict entry: code 345, b4/d
+read code 84
+new dict entry: code 346, d/84
+read code f
+new dict entry: code 347, 84/f
+read code 149
+reference to dict entry 329
+new dict entry: code 348, f/b0
+read code 10
+new dict entry: code 349, 149/10
+read code b0
+new dict entry: code 350, 10/b0
+read code 33
+new dict entry: code 351, b0/33
+read code 13a
+reference to dict entry 314
+new dict entry: code 352, 33/10
+read code a
+new dict entry: code 353, 13a/a
+read code 138
+reference to dict entry 312
+new dict entry: code 354, a/70
+read code f5
+new dict entry: code 355, 138/f5
+read code 54
+new dict entry: code 356, f5/54
+read code b4
+new dict entry: code 357, 54/b4
+read code 2b
+new dict entry: code 358, b4/2b
+read code 122
+reference to dict entry 290
+new dict entry: code 359, 2b/54
+read code 25
+new dict entry: code 360, 122/25
+read code 143
+reference to dict entry 323
+new dict entry: code 361, 25/14
+read code a
+new dict entry: code 362, 143/a
+read code b0
+new dict entry: code 363, a/b0
+read code 23
+new dict entry: code 364, b0/23
+read code 30
+new dict entry: code 365, 23/30
+read code 14
+new dict entry: code 366, 30/14
+read code 60
+new dict entry: code 367, 14/60
+read code b0
+new dict entry: code 368, 60/b0
+read code 20
+new dict entry: code 369, b0/20
+read code 115
+reference to dict entry 277
+new dict entry: code 370, 20/14
+read code 31
+new dict entry: code 371, 115/31
+read code 4
+new dict entry: code 372, 31/4
+read code 138
+reference to dict entry 312
+new dict entry: code 373, 4/70
+read code 18
+new dict entry: code 374, 138/18
+read code 84
+new dict entry: code 375, 18/84
+read code 16b
+reference to dict entry 363
+new dict entry: code 376, 84/a
+read code 11
+new dict entry: code 377, 16b/11
+read code 80
+new dict entry: code 378, 11/80
+read code 11
+new dict entry: code 379, 80/11
+read code b4
+new dict entry: code 380, 11/b4
+read code a
+new dict entry: code 381, b4/a
+read code 178
+reference to dict entry 376
+new dict entry: code 382, a/84
+read code 13d
+reference to dict entry 317
+new dict entry: code 383, 178/b0
+read code 80
+new dict entry: code 384, 13d/80
+read code 14
+new dict entry: code 385, 80/14
+read code b0
+new dict entry: code 386, 14/b0
+read code 26
+new dict entry: code 387, b0/26
+read code 80
+new dict entry: code 388, 26/80
+read code 10
+new dict entry: code 389, 80/10
+read code b4
+new dict entry: code 390, 10/b4
+read code ca
+new dict entry: code 391, b4/ca
+read code 84
+new dict entry: code 392, ca/84
+read code 122
+reference to dict entry 290
+new dict entry: code 393, 84/54
+read code 10a
+reference to dict entry 266
+new dict entry: code 394, 122/9
+read code 10c
+reference to dict entry 268
+new dict entry: code 395, 10a/1a
+read code 10e
+reference to dict entry 270
+reference to dict entry 267
+new dict entry: code 396, 10c/80
+read code 80
+new dict entry: code 397, 10e/80
+read code 110
+reference to dict entry 272
+new dict entry: code 398, 80/1b
+read code 78
+new dict entry: code 399, 110/78
+read code b4
+new dict entry: code 400, 78/b4
+read code 36
+new dict entry: code 401, b4/36
+read code b4
+new dict entry: code 402, 36/b4
+read code 25
+new dict entry: code 403, b4/25
+read code b4
+new dict entry: code 404, 25/b4
+read code 38
+new dict entry: code 405, b4/38
+read code b4
+new dict entry: code 406, 38/b4
+read code 23
+new dict entry: code 407, b4/23
+read code 134
+reference to dict entry 308
+new dict entry: code 408, 23/b4
+read code 13b
+reference to dict entry 315
+new dict entry: code 409, 134/84
+read code 134
+reference to dict entry 308
+new dict entry: code 410, 13b/b4
+read code b4
+new dict entry: code 411, 134/b4
+read code 21
+new dict entry: code 412, b4/21
+read code 84
+new dict entry: code 413, 21/84
+read code 8
+new dict entry: code 414, 84/8
+read code b4
+new dict entry: code 415, 8/b4
+read code 2a
+new dict entry: code 416, b4/2a
+read code 19e
+reference to dict entry 414
+new dict entry: code 417, 2a/84
+read code b4
+new dict entry: code 418, 19e/b4
+read code 1f
+new dict entry: code 419, b4/1f
+read code b4
+new dict entry: code 420, 1f/b4
+read code 3e
+new dict entry: code 421, b4/3e
+read code b4
+new dict entry: code 422, 3e/b4
+read code 1d
+new dict entry: code 423, b4/1d
+read code b4
+new dict entry: code 424, 1d/b4
+read code 40
+new dict entry: code 425, b4/40
+read code b4
+new dict entry: code 426, 40/b4
+read code 110
+reference to dict entry 272
+new dict entry: code 427, b4/1b
+read code 42
+new dict entry: code 428, 110/42
+read code b4
+new dict entry: code 429, 42/b4
+read code 19
+new dict entry: code 430, b4/19
+read code b4
+new dict entry: code 431, 19/b4
+read code 44
+new dict entry: code 432, b4/44
+read code 19b
+reference to dict entry 411
+reference to dict entry 308
+new dict entry: code 433, 44/b4
+read code 1a
+new dict entry: code 434, 19b/1a
+read code 15b
+reference to dict entry 347
+new dict entry: code 435, 1a/84
+read code b4
+new dict entry: code 436, 15b/b4
+read code 1a
+new dict entry: code 437, b4/1a
+read code 13d
+reference to dict entry 317
+new dict entry: code 438, 1a/b0
+read code b0
+new dict entry: code 439, 13d/b0
+read code 1b3
+reference to dict entry 435
+new dict entry: code 440, b0/1a
+read code e
+new dict entry: code 441, 1b3/e
+read code 50
+new dict entry: code 442, e/50
+read code b0
+new dict entry: code 443, 50/b0
+read code 15
+new dict entry: code 444, b0/15
+read code 149
+reference to dict entry 329
+new dict entry: code 445, 15/b0
+read code 1b8
+reference to dict entry 440
+new dict entry: code 446, 149/b0
+read code 84
+new dict entry: code 447, 1b8/84
+read code c
+new dict entry: code 448, 84/c
+read code 170
+reference to dict entry 368
+new dict entry: code 449, c/60
+read code 182
+reference to dict entry 386
+new dict entry: code 450, 170/14
+read code 19
+new dict entry: code 451, 182/19
+read code 1bf
+reference to dict entry 447
+reference to dict entry 440
+new dict entry: code 452, 19/b0
+read code 162
+reference to dict entry 354
+new dict entry: code 453, 1bf/a
+read code b0
+new dict entry: code 454, 162/b0
+read code 13
+new dict entry: code 455, b0/13
+read code b0
+new dict entry: code 456, 13/b0
+read code 1b
+new dict entry: code 457, b0/1b
+read code 1bf
+reference to dict entry 447
+reference to dict entry 440
+new dict entry: code 458, 1b/b0
+read code 8
+new dict entry: code 459, 1bf/8
+read code 105
+reference to dict entry 261
+new dict entry: code 460, 8/80
+read code 123
+reference to dict entry 291
+new dict entry: code 461, 105/b0
+read code b0
+new dict entry: code 462, 123/b0
+read code 1d
+new dict entry: code 463, b0/1d
+read code 1b8
+reference to dict entry 440
+new dict entry: code 464, 1d/b0
+read code 64
+new dict entry: code 465, 1b8/64
+read code 80
+new dict entry: code 466, 64/80
+read code 13c
+reference to dict entry 316
+new dict entry: code 467, 80/9
+read code 11
+new dict entry: code 468, 13c/11
+read code b0
+new dict entry: code 469, 11/b0
+read code 1f
+new dict entry: code 470, b0/1f
+read code 24
+new dict entry: code 471, 1f/24
+read code 80
+new dict entry: code 472, 24/80
+read code c
+new dict entry: code 473, 80/c
+read code b0
+new dict entry: code 474, c/b0
+read code a
+new dict entry: code 475, b0/a
+read code 44
+new dict entry: code 476, a/44
+read code 157
+reference to dict entry 343
+new dict entry: code 477, 44/80
+read code 10d
+reference to dict entry 269
+new dict entry: code 478, 157/4
+read code c
+new dict entry: code 479, 10d/c
+read code 1d8
+reference to dict entry 472
+new dict entry: code 480, c/24
+read code 148
+reference to dict entry 328
+new dict entry: code 481, 1d8/b
+read code 16
+new dict entry: code 482, 148/16
+read code 1b8
+reference to dict entry 440
+new dict entry: code 483, 16/b0
+read code 1e1
+reference to dict entry 481
+reference to dict entry 472
+new dict entry: code 484, 1b8/24
+read code b0
+new dict entry: code 485, 1e1/b0
+read code 15c
+reference to dict entry 348
+new dict entry: code 486, b0/f
+read code 23
+new dict entry: code 487, 15c/23
+read code 1b8
+reference to dict entry 440
+new dict entry: code 488, 23/b0
+read code 1df
+reference to dict entry 479
+reference to dict entry 269
+new dict entry: code 489, 1b8/4
+read code b0
+new dict entry: code 490, 1df/b0
+read code e
+new dict entry: code 491, b0/e
+read code b0
+new dict entry: code 492, e/b0
+read code 25
+new dict entry: code 493, b0/25
+read code 1b8
+reference to dict entry 440
+new dict entry: code 494, 25/b0
+read code 1b8
+reference to dict entry 440
+new dict entry: code 495, 1b8/b0
+read code b4
+new dict entry: code 496, 1b8/b4
+read code 78
+new dict entry: code 497, b4/78
+read code 84
+new dict entry: code 498, 78/84
+read code 53
+new dict entry: code 499, 84/53
+read code 4
+new dict entry: code 500, 53/4
+
+
