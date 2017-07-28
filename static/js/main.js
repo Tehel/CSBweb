@@ -22,7 +22,9 @@ async function start() {
 	screen.readAndExpandGraphic(13, 10, 35);
 	screen.readAndExpandGraphic(192, 100, 5, 0);
 	screen.readAndExpandGraphic(381, 180, 5, 0);
-	screen.readAndExpandGraphic(475, 180, 35, 0);
+	screen.readAndExpandGraphic(481, 180, 35, 0);
+
+	screen.playSound(535);
 
 	// screen.readAndExpandGraphic(26, 0, 40);
 	// screen.readAndExpandGraphic(22, 0, 180);

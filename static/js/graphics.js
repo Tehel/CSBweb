@@ -9,7 +9,8 @@ const palettesInterface = [0];
 const palettesMainView = [0, 1, 2, 3, 4, 5];
 const palettesEntrance = [6];
 const palettesCredits = [7];
-const imagesMeta = {
+// IMG1: 532 (0-20, 22-532). Empty images 16x4: 22, 24
+const imagesIndex = {
 	2: {name: 'dungeon entrance', palettes: palettesEntrance},
 	3: {name: 'black door left', palettes: palettesEntrance},
 	4: {name: 'black door right', palettes: palettesEntrance},
@@ -25,7 +26,16 @@ const imagesMeta = {
 	48: {name: 'items 6', nopreload: true},
 	192: {name: 'fountain', palettes: palettesMainView, transparency: 10},
 	381: {name: 'plate armor torso', palettes: palettesMainView, transparency: 10},
-	475: {name: 'mummy walks', palettes: palettesMainView, transparency: 4},
+	459: {name: 'creature 4 - pain rat - side', palettes: palettesMainView, transparency: 4},
+	471: {name: 'creature 9 - stone golem - front', palettes: palettesMainView, transparency: 4},
+	475: {name: 'creature 10 - mummy - front', palettes: palettesMainView, transparency: 4},
+	481: {name: 'creature 12 - skeleton - front', palettes: palettesMainView, transparency: 4},
+};
+
+// SND1: 21 (533-537, 539-547, 549-555)
+// PCM (Pulse Code Modulation) 4 bits mono unsigned. Frequencies: 5486 Hz except front door (4237 Hz)
+const soundsIndex = {
+	535: {name: 'door'},
 };
 
 // image cache needs to also store different ImageBitmap for images that can be used with different palettes
@@ -52,10 +62,6 @@ function dumpArray(arr, width) {
 }
 
 // items formats (AtariST graphics.dat file)
-// IMG1: 532 (0-20, 22-532). Empty images 16x4: 22, 24
-// COD1: 3 (21, 538, 548)
-// SND1: 21 (533-537, 539-547, 549-555)
-// TXT1: 1 (556)
 // FNT1: 1 (557)
 // I558: 1 (558)
 // I559: 1 (559)
@@ -73,6 +79,8 @@ class Screen {
 		this.imagescache = {};
 		// stores for extracted data.
 		this.collections = {portraits:[], items:[], itemnames:[], font:[]};
+
+		this.soundscache = {};
 	}
 
 	async init() {
@@ -85,13 +93,15 @@ class Screen {
 		this.extractItemNames();
 		// await this.extractMainFont();
 
-		for (let num in imagesMeta) {
-			let imageMeta = imagesMeta[num];
-			for (let palette of imageMeta.palettes || palettesInterface) {
-				if (!imageMeta.nopreload)
+		for (let num in imagesIndex) {
+			let info = imagesIndex[num];
+			for (let palette of info.palettes || palettesInterface) {
+				if (!info.nopreload)
 					await this.preloadImage(num, palette);
 			}
 		}
+		for (let num in soundsIndex)
+			this.preloadSound(num);
 	}
 
 	//--------------------------------  Palette ------------------------------------
@@ -310,7 +320,7 @@ class Screen {
 		// REFACTOR: we should be able to directly use the right palette without globally loading it
 		this.setPalette(palette);
 
-		let transparency = imagesMeta[num].transparency;
+		let transparency = imagesIndex[num].transparency;
 
 		// copy data into a new image, applying current palette
 		let newImage = new ImageData(imgW, imgH);
@@ -758,4 +768,17 @@ class Screen {
 		return 1;
 	}
 */
+	//--------------------------------  Sound ------------------------------------
+	preloadSound(num) {
+
+		let data = this.getRawItem(num);
+		// dumpArray(data);
+		data = SNDexpand(data);
+
+		this.soundscache[num] = 5;
+	}
+
+	playSound(num) {
+
+	}
 }

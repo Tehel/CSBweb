@@ -36,8 +36,7 @@ function LZWexpand(datatodecode) {
 	let LZWNextCode = 257;
 	let LZWresetDict = false;
 
-	while (1) {
-
+	while (true) {
 		if (LZWresetDict || LZWBitNumber >= LZWvar1 || LZWNextCode > LZWMaxCode) {
 			// need dictionary extension
 			if (LZWNextCode > LZWMaxCode) {
@@ -172,5 +171,47 @@ function RLEexpand(chars) {
 			}
 		}
 	});
+	return out;
+}
+
+// source: http://dmweb.free.fr/?q=node/220#toc133
+function SNDexpand(buffer) {
+	let size = (buffer[0] << 8) + buffer[1];
+
+	let out = [];
+	let offset = 2;
+	let odd = false;
+	function getnibble() {
+		let nib = odd ? buffer[offset++] & 0xf : buffer[offset] >> 4;
+		odd = !odd;
+		// console.log(`nibble ${nib}`);
+		return nib;
+	}
+
+	let lastSample = null;
+	while (offset < buffer.length) {
+		let nib = getnibble();
+		if (nib !== 0) {
+			lastSample = nib * 17;
+			out.push(lastSample);
+			// console.log(`push single sample ${lastSample}`);
+		} else {
+			// repeat !
+			let nb = 0;
+			while (true) {
+				nib = getnibble();
+				nb <<= 3;
+				nb += (nib & 0x7);
+				if (!(nib & 0x8))
+					break;
+			}
+			nb += 3;
+			// console.log("repetition: " + nb);
+			for (let i=0; i<nb; i++)
+				out.push(lastSample);
+		}
+	}
+	if (out.length !== size)
+		throw new Error(`Sound has ${out.length} samples, expected ${size}`);
 	return out;
 }
