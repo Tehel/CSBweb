@@ -55,14 +55,14 @@ function LZWExpand(datatodecode) {
 		}
 		D4 = D6;
 		if (D6 >= LZWNextCode) {
-			console.log(`reference to future dict entry ${D6}`);
+			// console.log(`reference to future dict entry ${D6}`);
 			// that's a code that we don't have yet in the dict
 			// put this value on the stack
 			stack.push(D7);
 			D6 = prevCodeWord;
 		}
 		while (D6 >= 256) {
-			console.log(`reference to dict entry ${D6}`);
+			// console.log(`reference to dict entry ${D6}`);
 			stack.push(byteArray[D6]);
 			D6 = wordArray[D6];
 		}
@@ -74,14 +74,14 @@ function LZWExpand(datatodecode) {
 		if (LZWNextCode < 4096) {
 			// check: wordArray and byteArray are probably the lists of positions/lengths of dict entries in the string
 			// we don't store nor use them correctly
-			console.log(`new dict entry: code ${LZWNextCode}, ${prevCodeWord.toString(16)}/${D7.toString(16)}`);
+			// console.log(`new dict entry: code ${LZWNextCode}, ${prevCodeWord.toString(16)}/${D7.toString(16)}`);
 			wordArray[LZWNextCode] = prevCodeWord;
 			byteArray[LZWNextCode] = D7;
 			LZWNextCode += 1;
 		}
 		prevCodeWord = D4;
-		if (buffer.position > 400)
-			break;
+		// if (buffer.position > 400)
+		// 	break;
 	}
 	return out;
 }
@@ -104,8 +104,6 @@ function LZWGetNextCodeword(buffer) {
 				LZWMaxCode = 4096;
 			else
 				LZWMaxCode = (1 << LZWCodeSize) - 1;
-			console.log(`dict extension ! we'll now use ${LZWCodeSize} bytes (max code ${LZWMaxCode})`);
-			// !! have serious doubt about this working. wordArray is 512 bytes long and byteArray 256
 		}
 		// dictionary reset requested
 		if (LZWresetDict) {
@@ -123,11 +121,8 @@ function LZWGetNextCodeword(buffer) {
 		let nbtoread = remain < LZWCodeSize ? remain : LZWCodeSize;
 
 		// reads LZWvar1 bytes from buffer to iOBuffer
-		// console.log(`reading ${nbtoread} bytes at ${buffer.position}`);
 		ioBuffer = Array.from(buffer.data.slice(buffer.position, buffer.position + nbtoread));
 		buffer.position += nbtoread;
-		// console.log(`new buffer is: ${JSON.stringify(iOBuffer)}`);
-		// console.log(`new position is ${buffer.position}`);
 
 		LZWBitNumber = 0;
 		LZWvar1 = (nbtoread<<3) - LZWCodeSize + 1;
@@ -155,7 +150,7 @@ function LZWGetNextCodeword(buffer) {
 	code |= (ioBuffer[offset] & rightBits[LZWCodeSize - bitswehave]) << bitswehave;
 	// point position to next code
 	LZWBitNumber += LZWCodeSize;
-	console.log(`read code ${code.toString(16)}`);
+	// console.log(`read code ${code.toString(16)}`);
 	return code;
 }
 

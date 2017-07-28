@@ -40,8 +40,8 @@ class Screen {
 		this.buildUnpackTable()
 		this.setPalette(defaultPalette);
 		await this.readGraphics();
+		this.extractPalettes();
 		this.extractPortraits();
-		// this.extractPalettes();
 		// this.extractMainFont();
 
 		// let arrows = this.graphicsFile.read(this.locateNthItem(13), this.itemsCompressedSizes[13]);
@@ -57,8 +57,7 @@ class Screen {
 			newPalette = this.palettes[newPalette];
 		}
 		this.paletteRGBA = newPalette.map((col) => [((col >> 8) & 0x7) * 36, ((col >> 4) & 0x7) * 36, (col & 0x7) * 36, 255]);
-		this.paletteStr = newPalette.map((col) => `rgba(${((col >> 8) & 0x7) * 36}, ${((col >> 4) & 0x7) * 36}, ${(col & 0x7) * 36}, 1)`);
-		// console.log(JSON.stringify(this.paletteRGBA, null, 4));
+		this.paletteStr = this.paletteRGBA.map((col) => `rgba(${col[0]}, ${col[1]}, ${col[2]}, 1)`);
 	}
 
 	// Palette11914
@@ -72,8 +71,14 @@ class Screen {
 		let data = this.getRawItem(562);
 		let palettes = Array.from(data.slice(0x4FE, 0x5FE));
 		this.palettes = [];
+		let pos = 0;
 		for (let i=0; i<8; i++) {
-			this.palettes.push(palettes.slice(i*32, (i+1)*32));
+			let newPal = [];
+			for (let j=0; j<16; j++) {
+				newPal.push((palettes[pos] << 8) + palettes[pos+1]);
+				pos += 2;
+			}
+			this.palettes.push(newPal);
 		}
 	}
 
@@ -208,7 +213,12 @@ class Screen {
 								pixels.push(nib2);
 						} else if (bits2 === 3) {
 							// paste nb+1 pixels of the previous line, and a nib2 pixel
-							pixels.push(...pixels.slice(0-imgW, nb+1-imgW));
+							// the copy may include pixels that are not there yet (nb+1 > imgW)
+							let cpnb = nb+1;
+							let pos = pixels.length-imgW;
+							while (cpnb-- > 0) {
+								pixels.push(pixels[pos++]);
+							}
 							pixels.push(nib2);
 						} else if (bits2 === 2) {
 							// A and D (transparent pixels) are only used for animation files
@@ -300,6 +310,7 @@ class Screen {
 	extractPortraits() {
 		let pW = 32;
 		let pH = 29;
+		this.setPalette(0);
 		let baseImage = this.getImage(26);
 		this.portraits = [];
 		for (let y=0; y<3; y++)

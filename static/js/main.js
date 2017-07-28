@@ -13,18 +13,25 @@ async function start() {
 	screen = new Screen(canvas.getContext("2d"));
 	await screen.init();
 
-	// screen.setPalette(0);
+	screen.setPalette(6);
 	screen.readAndExpandGraphic(4, 0, 0);
 
-	screen.readAndExpandGraphic(13, 100, 50);
+	screen.setPalette(0);
+	screen.readAndExpandGraphic(13, 10, 140);
+	screen.readAndExpandGraphic(13, 10, 140);
 
 	// screen.readAndExpandGraphic(26, 0, 40);
 	// screen.readAndExpandGraphic(22, 0, 180);
 
 	// put all portraits, BECAUSE WE CAN
-	// for (let y=0; y<3; y++)
-	// 	for (let x=0; x<8; x++)
-	// 		screen.drawPortrait((2-y)*8+(7-x), 40*x+5, 35+y*35);
+	for (let y=0; y<3; y++)
+		for (let x=0; x<8; x++)
+			screen.drawPortrait(y*8+x, 40*x+5, 35+y*35);
+
+	// draw items
+	// for (let i=0; i<7; i++)
+	// 	screen.readAndExpandGraphic(42+i, 10, 30*i);
+
 	draw(screen.paletteStr);
 }
 

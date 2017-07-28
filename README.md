@@ -7,15 +7,15 @@ Make Dungeon Master (Original Atari ST version) playable on any support, through
 
 ### How
 
-This port is based on the awsome CSBWin version, itself done by unassembling the Atari ST binary and making it a C++ version.
+This port is based on the awsome CSBWin version, itself done by Paul R. Stevens by unassembling the Atari ST binary and making a C++ version from it.
 
-So this is a Javascript rewriting of the C++ version. Datafile are still the original ones (with a door opened using custom ones later).
+So this is a Javascript rewriting of the C++ version. Datafiles are still the original ones (with a door opened using custom ones later).
 
-### Making it work
+### Running it
 
-This is a web project, so it needs to be served by a server. Currently there's no server-side code, so any will do.
+Since there is currently no server-side code, simply open the static/index.html file in a web browser.
 
-I use a Node.js one, with Express framework. Just install Node.js, "npm install" in root dir, "node server.js" and open your web brower on port 9000.
+Eventually, there may be some hosted service, like network saved game, custom dungeon rating, screenshot sharing, and so on. That will go to server.js which must be run with Node.js/Express: install Node.js, "npm install" in repository dir, "node server.js" and open your web brower on port 9000.
 
 ## People
 
@@ -27,7 +27,7 @@ Awsome [DMweb community](http://dmweb.free.fr) for the continuous love for the o
 
 People at [Swoosh Construction Kit](http://greatstone.free.fr/dm) for detailed reverse-engineering of *all* the data file structures.
 
-[List of all contributors](https://github.com/expressjs/express/graphs/contributors). Mostly me, I'm afraid.
+[List of all contributors](https://github.com/Tehel/dmjs/graphs/contributors). Mostly me, I'm afraid.
 
 ## License
 
