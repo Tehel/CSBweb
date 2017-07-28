@@ -1,6 +1,7 @@
+body {
+	margin: 0px;
+}
+
 canvas#mainscreen {
-	width: 640px;
-	heigth: 400px;
-	/*image-rendering: crisp-edges;*/
-	/*image-rendering: pixelated;*/
+	/*width: 100%;*/
 }

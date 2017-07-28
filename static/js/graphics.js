@@ -2,6 +2,41 @@
 
 const defaultPalette = [0x777, 0x700, 0x070, 0x007, 0x111, 0x222, 0x333, 0x444, 0x555, 0x000, 0x001, 0x010, 0x100, 0x200, 0x020, 0x002];
 
+// properties for every image
+// maybe extend this to include for each image: actual size (left black door), transparent color, palettes, format?
+// fields: nopreload (false), palette (palettesInterface), transparency (null), format (IMG1), width (null)
+const palettesInterface = [0];
+const palettesMainView = [0, 1, 2, 3, 4, 5];
+const palettesEntrance = [6];
+const palettesCredits = [7];
+const imagesMeta = {
+	2: {name: 'dungeon entrance', palettes: palettesEntrance},
+	3: {name: 'black door left', palettes: palettesEntrance},
+	4: {name: 'black door right', palettes: palettesEntrance},
+	// 5: {name: 'credits', palettes: palettesCredits}, // unsupported IMG2 code (0xA) before offset 1400
+	13: {name: 'arrows pad'},
+	26: {name: 'portraits', nopreload: true},
+	42: {name: 'items 0', nopreload: true},
+	43: {name: 'items 1', nopreload: true},
+	44: {name: 'items 2', nopreload: true},
+	45: {name: 'items 3', nopreload: true},
+	46: {name: 'items 4', nopreload: true},
+	47: {name: 'items 5', nopreload: true},
+	48: {name: 'items 6', nopreload: true},
+	192: {name: 'fountain', palettes: palettesMainView, transparency: 10},
+	381: {name: 'plate armor torso', palettes: palettesMainView, transparency: 10},
+	475: {name: 'mummy walks', palettes: palettesMainView, transparency: 4},
+};
+
+// image cache needs to also store different ImageBitmap for images that can be used with different palettes
+
+const imagesToPreload = [
+	{
+		palette: 6,
+		images: [2, 3, 4],
+	}
+];
+
 function dumpArray(arr, width) {
 	if (width) {
 		let arrhex = Array.from(arr).map(v => v.toString(16));
@@ -29,11 +64,15 @@ function dumpArray(arr, width) {
 // I562: 1 (562)
 
 class Screen {
-	constructor(canvasctxt) {
+	constructor(canvasctxt, zoom) {
 		this.drawarea = canvasctxt;
 		this.drawarea.imageSmoothingEnabled = false;
+		this.zoom = zoom || 1;
 
+		// each cache stores the raw pixels and renderings for each palette
 		this.imagescache = {};
+		// stores for extracted data.
+		this.collections = {portraits:[], items:[], itemnames:[], font:[]};
 	}
 
 	async init() {
@@ -41,11 +80,18 @@ class Screen {
 		this.setPalette(defaultPalette);
 		await this.readGraphics();
 		this.extractPalettes();
-		this.extractPortraits();
-		// this.extractMainFont();
+		await this.extractPortraits();
+		await this.extractItems();
+		this.extractItemNames();
+		// await this.extractMainFont();
 
-		// let arrows = this.graphicsFile.read(this.locateNthItem(13), this.itemsCompressedSizes[13]);
-		// dumpArray(arrows);
+		for (let num in imagesMeta) {
+			let imageMeta = imagesMeta[num];
+			for (let palette of imageMeta.palettes || palettesInterface) {
+				if (!imageMeta.nopreload)
+					await this.preloadImage(num, palette);
+			}
+		}
 	}
 
 	//--------------------------------  Palette ------------------------------------
@@ -59,13 +105,6 @@ class Screen {
 		this.paletteRGBA = newPalette.map((col) => [((col >> 8) & 0x7) * 36, ((col >> 4) & 0x7) * 36, (col & 0x7) * 36, 255]);
 		this.paletteStr = this.paletteRGBA.map((col) => `rgba(${col[0]}, ${col[1]}, ${col[2]}, 1)`);
 	}
-
-	// Palette11914
-	// Palette11946
-	// Palette11978
-	// Palette328
-	// Palette360
-	// Palette552
 
 	extractPalettes() {
 		let data = this.getRawItem(562);
@@ -164,8 +203,8 @@ class Screen {
 
 		// uncompress data and check size, if needed
 		if (this.itemsCompressedSizes[num] !== this.itemsDecompressedSizes[num]) {
-			// throw new Error(`Compressed item ${num} !`);
-			data = LZWExpand(data);
+			data = LZWexpand(data);
+			data = RLEexpand(data);
 			if (data.length !== this.itemsDecompressedSizes[num]) {
 				throw new Error(`Wrong uncompressed size for item ${num} (expected ${this.itemsDecompressedSizes[num]}, got ${data.length})`);
 			}
@@ -174,20 +213,28 @@ class Screen {
 	}
 
 	// returns the image from cache or extracts and decode it from file
-	getImage(num, format) {
-		if (!this.imagescache[num]) {
+	// if we ask for raw data, it is never taken from cache and we get an ImageData
+	// else we get a (maybe cached) ImageBitmap
+	getImage(num, palette, nocache, format) {
+		let pixels;
+		let imgW;
+		let imgH;
+		if (this.imagescache[num] && this.imagescache[num].pixels) {
+			pixels = this.imagescache[num].pixels;
+			imgW = this.imagescache[num].width;
+			imgH = this.imagescache[num].height;
+		} else {
 			// presume IMG1 format
 			format = format || 'IMG1';
 
 			let img = this.getRawItem(num);
-			const imgW = (img[0] << 8) + img[1];
-			const imgH = (img[2] << 8) + img[3];
+			imgW = (img[0] << 8) + img[1];
+			imgH = (img[2] << 8) + img[3];
+			pixels = [];
 			// console.log(`width: ${imgW}, height: ${imgH}, length: ${img.length}`);
 			// dumpArray(img);
 
 			// fully decode image format into a buffer
-			const pixels = [];
-
 			if (format === 'IMG1') {
 				let offset = 4;
 				while (offset < img.length) {
@@ -214,11 +261,11 @@ class Screen {
 						} else if (bits2 === 3) {
 							// paste nb+1 pixels of the previous line, and a nib2 pixel
 							// the copy may include pixels that are not there yet (nb+1 > imgW)
+							// OPTIMIZE: this could be faster by copying slices of max imgW pixels
 							let cpnb = nb+1;
 							let pos = pixels.length-imgW;
-							while (cpnb-- > 0) {
+							while (cpnb-- > 0)
 								pixels.push(pixels[pos++]);
-							}
 							pixels.push(nib2);
 						} else if (bits2 === 2) {
 							// A and D (transparent pixels) are only used for animation files
@@ -253,30 +300,54 @@ class Screen {
 
 			// decoding is finished
 			if (pixels.length !== imgW * imgH) {
-				// throw new Error(`image decoding error, wrong pixel count: expected ${imgW}*${imgH}, got ${pixels.length}`);
+				throw new Error(`image decoding error, wrong pixel count: expected ${imgW}*${imgH}, got ${pixels.length}`);
 			}
-			// dumpArray(pixels, imgW);
 
-			// copy data into a new image, applying current palette
-			let newImage = new ImageData(imgW, imgH);
-			pixels.forEach((color, idx) => {
-				for (let j=0; j<4; j++)
-					newImage.data[idx*4+j] = this.paletteRGBA[color][j];
-			});
-
-			this.imagescache[num] = newImage;
+			if (!nocache)
+				this.imagescache[num] = {pixels: pixels, width: imgW, height: imgH, renders: {}};
 		}
-		return this.imagescache[num];
+
+		// REFACTOR: we should be able to directly use the right palette without globally loading it
+		this.setPalette(palette);
+
+		let transparency = imagesMeta[num].transparency;
+
+		// copy data into a new image, applying current palette
+		let newImage = new ImageData(imgW, imgH);
+		pixels.forEach((color, idx) => {
+			for (let j=0; j<3; j++)
+				newImage.data[idx*4+j] = this.paletteRGBA[color][j];
+			newImage.data[idx*4+3] = color === transparency ? 0 : 255;
+		});
+		return newImage;
+	}
+
+	async preloadImage(num, palette) {
+		// console.log(`preloading ${num} for palette ${palette}`);
+		let img = await createImageBitmap(this.getImage(num, palette));
+		this.imagescache[num].renders[palette] = img;
 	}
 
 	//---------------- high-level image manipulations
 
 	// draw an image at a coordinates
 	// 'expand' used to be the 0x8000 flag in the graph number. expand = false if the flag is set
-	readAndExpandGraphic(num, destX, destY, expand, format) {
+	readAndExpandGraphic(num, destX, destY, palette, expand) {
+		// console.log(`'read and expand: ${num} / ${palette}`);
+		if (!this.imagescache[num])
+			throw new Error(`Image ${num} was not preloaded !`);
 
-		let img = this.getImage(num, format);
-		this.drawarea.putImageData(img, destX, destY);
+		let availablePalettes = Object.keys(this.imagescache[num].renders);
+		if (palette === undefined) {
+			if (availablePalettes.length > 1)
+				throw new Error(`Image ${num} has more than one palette (${availablePalettes.join(',')}) !`);
+			palette = availablePalettes[0];
+		}
+
+		if (palette && !this.imagescache[num].renders[palette])
+			throw new Error(`Image ${num} was not preloaded for palette ${palette} !`);
+
+		this.drawImage(this.imagescache[num].renders[palette], destX, destY);
 		// if (expand) {
 		// 	ExpandGraphic(graphclear, dest, destX, destY);
 		// } else {
@@ -284,13 +355,44 @@ class Screen {
 		// }
 	}
 
-	// draw a portrait at coordinates
-	drawPortrait(num, destX, destY) {
-		this.drawarea.putImageData(this.portraits[num], destX, destY);
+	// draw an image from a collection
+	drawCollectionImage(collection, num, destX, destY) {
+		this.drawImage(this.collections[collection][num], destX, destY);
+	}
+
+	// takes an ImageBitmap
+	drawImage(img, destX, destY) {
+		this.drawarea.drawImage(img, destX*this.zoom, destY*this.zoom, img.width*this.zoom, img.height*this.zoom);
+/*
+		if (this.zoom === 1){
+			// faster
+		} else {
+			let z = this.zoom;
+			let dest = this.drawarea.getImageData();
+			// iterate over all image pixels
+			for (let y=0; y<img.height; y++) {
+				if ((destY+y)*z >= dest.height)
+					break;
+				for (let x=0; x<img.width; x++) {
+					// check if we're out of the target
+					if ((destX+x)*z >= dest.width)
+						break;
+					let pos = (destY+y)*z*dest.width*4 + (destX+x)*z*4;
+					for (let j=0; j<z; j++) {
+						for (let i=0; i<z; i++) {
+							for (let k=0; k<4; k++)
+								dest.data[pos + i*4 + k] = img.data[(y*img.width+x)*4 + k];
+						}
+						pos += dest.width*4;
+					}
+				}
+			}
+		}
+*/
 	}
 
 	// builds a new ImageData from a box in the source image
-	extractImage(src, posX, posY, width, height) {
+	async extractImage(src, posX, posY, width, height) {
 		let newImage = new ImageData(width, height);
 		let imgW = src.width;
 		let imgH = src.height;
@@ -303,26 +405,55 @@ class Screen {
 			posSrc += imgW;
 			posDst += width;
 		}
-		return newImage;
+		let img = await createImageBitmap(newImage);
+		return img;
 	}
 
-	// builds a table by extracting portraits from image 26
-	extractPortraits() {
+	// builds a table by extracting portraits from entry 26
+	async extractPortraits() {
 		let pW = 32;
 		let pH = 29;
 		this.setPalette(0);
-		let baseImage = this.getImage(26);
+		let baseImage = this.getImage(26, 0);
 		this.portraits = [];
 		for (let y=0; y<3; y++)
 			for (let x=0; x<8; x++)
-				this.portraits.push(this.extractImage(baseImage, x*pW, y*pH, pW, pH));
+				this.collections.portraits.push(await this.extractImage(baseImage, x*pW, y*pH, pW, pH));
 	}
 
-	// builds a font table by extracting chars from image 557
+	// item names are in entry 556
+	extractItemNames() {
+		let data = this.getRawItem(556);
+		this.itemNames = [];
+		let newName = [];
+		while(data.length > 0) {
+			let c = data.shift();
+			newName.push(String.fromCharCode(c & 0x7f));
+			if (c & 0x80) {
+				// last word char
+				this.collections.itemnames.push(newName.join(''));
+				newName = [];
+			}
+		}
+	}
+
+	// items are in images 42 to 48
+	async extractItems() {
+		this.items = [];
+		screen.setPalette(0);
+		for (let i=42; i<=48; i++) {
+			let img = this.getImage(i, 0);
+			for (let y=0; y<2; y++)
+				for (let x=0; x<16; x++)
+					this.collections.items.push(await this.extractImage(img, x*16, y*16, 16, 16))
+		}
+	}
+
+	// builds a font table by extracting chars from entry 557
 	extractMainFont() {
 		let pW = 32;
 		let pH = 29;
-		let baseImage = this.getImage(557);
+		let baseImage = this.getImage(557, 0);
 		// ...
 	}
 
