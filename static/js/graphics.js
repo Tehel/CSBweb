@@ -34,18 +34,33 @@ const imagesIndex = {
 
 // SND1: 21 (533-537, 539-547, 549-555)
 // PCM (Pulse Code Modulation) 4 bits mono unsigned. Frequencies: 5486 Hz except front door (4237 Hz)
+const ratesDefault = [5486];
+const ratesDoors = [5486, 4237];
 const soundsIndex = {
-	535: {name: 'door'},
+	533: {name: 'falling item'},
+	534: {name: 'switch'},
+	535: {name: 'door', rates: ratesDoors},
+	536: {name: 'trolin attack / stone golem attack / touch wall'},
+	537: {name: 'exploding fireball'},
+
+	539: {name: 'falling and dying'},
+	540: {name: 'swallowing'},
+	541: {name: 'champion wounded 1'},
+	542: {name: 'champion wounded 2'},
+	543: {name: 'champion wounded 3'},
+	544: {name: 'champion wounded 4'},
+	545: {name: 'exploding spell'},
+	546: {name: 'skeleton attack / armour attack / slash'},
+	547: {name: 'teleport'},
+
+	549: {name: 'running into a wall'},
+	550: {name: 'rat attack / dragon attack'},
+	551: {name: 'mummy attack / ghost attack'},
+	552: {name: 'screamer attack / oitu attack'},
+	553: {name: 'scorpion attack'},
+	554: {name: 'worm attack'},
+	555: {name: 'giggler'},
 };
-
-// image cache needs to also store different ImageBitmap for images that can be used with different palettes
-
-const imagesToPreload = [
-	{
-		palette: 6,
-		images: [2, 3, 4],
-	}
-];
 
 function dumpArray(arr, width) {
 	if (width) {
@@ -80,7 +95,10 @@ class Screen {
 		// stores for extracted data.
 		this.collections = {portraits:[], items:[], itemnames:[], font:[]};
 
+		// each sound can be at different frequency rate
 		this.soundscache = {};
+
+		this.audioctx = new AudioContext();
 	}
 
 	async init() {
@@ -101,7 +119,7 @@ class Screen {
 			}
 		}
 		for (let num in soundsIndex)
-			this.preloadSound(num);
+			this.preloadSound(num, soundsIndex[num]);
 	}
 
 	//--------------------------------  Palette ------------------------------------
@@ -769,16 +787,55 @@ class Screen {
 	}
 */
 	//--------------------------------  Sound ------------------------------------
-	preloadSound(num) {
-
+	preloadSound(num, info) {
+		let rateTarget = this.audioctx.sampleRate;
 		let data = this.getRawItem(num);
 		// dumpArray(data);
 		data = SNDexpand(data);
 
-		this.soundscache[num] = 5;
+		console.log(`preloading sound ${num}`);
+		this.soundscache[num] = [];
+		for (let rate of info.rates || ratesDefault) {
+			let duration = data.length / ratesDefault[0];
+			let newBuffer = this.audioctx.createBuffer(1, duration * rateTarget, rateTarget);
+			let channel = newBuffer.getChannelData(0);
+			// fill the channel
+			let factor = this.audioctx.sampleRate / rate;
+			for (let i=0; i<duration*rateTarget; i++)
+				channel[i] = (data[Math.floor(i/factor)] - 127.5) / 127.5;
+
+			// console.log(JSON.stringify(channel));
+
+			this.soundscache[num].push({
+				duration: duration,
+				buffer: newBuffer,
+			});
+		}
 	}
 
-	playSound(num) {
+	playSound(num, rateIdx) {
+		return new Promise((resolve, reject) => {
+			if (!this.soundscache[num])
+				throw new Error(`Sound ${num} was not preloaded !`);
+			let data = this.soundscache[num][rateIdx || 0];
+			if (!data)
+				throw new Error(`Sound ${num} has no ${rateIdx} rate !`);
 
+			// console.log(`Playing sound ${num}`);
+
+			let source = this.audioctx.createBufferSource();
+			// set the buffer in the AudioBufferSourceNode
+			source.buffer = data.buffer;
+			// connect the AudioBufferSourceNode to the
+			// destination so we can hear the sound
+			source.connect(this.audioctx.destination);
+			// start the source playing
+			source.start();
+			setTimeout(() => resolve(), data.duration * 1000);
+		});
 	}
+
+	// preloading sound 533, Sound has 99 samples, expected 100
+	// preloading sound 543, Sound has 1018 samples, expected 1019
+	// preloading sound 545, Sound has 961 samples, expected 962
 }

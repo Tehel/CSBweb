@@ -211,7 +211,13 @@ function SNDexpand(buffer) {
 				out.push(lastSample);
 		}
 	}
+	out = out.slice(0, size);
+
+	// ignore last sample if size is odd
+	// if (out.length === size + 1)
+	// 	out.pop();
+
 	if (out.length !== size)
-		throw new Error(`Sound has ${out.length} samples, expected ${size}`);
+		console.log(`Sound has ${out.length} samples, expected ${size}`);
 	return out;
 }

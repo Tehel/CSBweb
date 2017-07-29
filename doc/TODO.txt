@@ -1,0 +1,17 @@
++ play sounds
+- investigate why some sounds are missing a sample. Pad ?
+- list all images
+- check that all graphic files are correctly decoded
+- find out why credits screen is buggy
+- start decoding levels.dat
+- simplified screen display
+- keybindings
+- full storing of graphics fields 558-562
+
+- debug feature:
+	browse all
+		portraits
+		inventory items
+		dungeon items
+		dungeon walls
+		sounds
