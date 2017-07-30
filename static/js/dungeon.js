@@ -1,3 +1,71 @@
+'use strict';
+
+class Dungeon {
+	constructor() {
+	}
+
+	async init() {
+		await this.readLevels();
+	}
+
+	async readLevels() {
+		this.dungeonFile = new RemoteBinaryFile();
+		await this.dungeonFile.get('gamefiles/dungeon.dat');
+
+		this.seed = this.dungeonFile.read16();
+		this.totalMapsSize = this.dungeonFile.read16();
+		this.mapNumber = this.dungeonFile.read();
+		this.dungeonFile.read();
+		this.textListSize = this.dungeonFile.read16() * 2;
+		let tmp = this.dungeonFile.read16();
+		this.startPos = {
+			level: 0,
+			x: (tmp & 0x3e0) >> 5,
+			y: tmp & 0x1f,
+			direction: ['North', 'East', 'South', 'West'][(tmp & 0xc00)>>10],
+		};
+		this.objectListSize = this.dungeonFile.read16() * 2;
+		this.objectNb = {
+			doors: this.dungeonFile.read16(),
+			teleporters: this.dungeonFile.read16(),
+			texts: this.dungeonFile.read16(),
+			actuators: this.dungeonFile.read16(),
+			creatures: this.dungeonFile.read16(),
+			weapons: this.dungeonFile.read16(),
+			cloths: this.dungeonFile.read16(),
+			scrolls: this.dungeonFile.read16(),
+			potions: this.dungeonFile.read16(),
+			containers: this.dungeonFile.read16(),
+			miscellaneous: this.dungeonFile.read16(),
+			dummy1: this.dungeonFile.read16(),
+			dummy2: this.dungeonFile.read16(),
+			dummy3: this.dungeonFile.read16(),
+			missiles: this.dungeonFile.read16(),
+			clouds: this.dungeonFile.read16(),
+		};
+		this.maps = [];
+		for (let i=0; i<this.mapNumber; i++) {
+			let newlevel = {};
+			newlevel.dataOffset = this.dungeonFile.read16();
+			this.dungeonFile.skip(4);
+			newlevel.offsetX = this.dungeonFile.read();
+			newlevel.offsetY = this.dungeonFile.read();
+			tmp = this.dungeonFile.read16();
+			newlevel.height = (tmp & 0xf800) >> 11;
+			newlevel.width = (tmp & 0x7c0) >> 6;
+			newlevel.floor = tmp & 0x3f;
+			tmp = this.dungeonFile.read16();
+			newlevel.nbFloorDecoration = (tmp & 0xf000) > 12; 
+			newlevel.nbFloor = (tmp & 0xf00) > 8; 
+			newlevel.nbWallDecoration = (tmp & 0xf0) > 4; 
+			newlevel.nbWall = tmp & 0xf; 
+
+			this.maps.push(newlevel);
+		}
+	}
+}
+
+/*
 RESTARTABLE _ReadEntireGame(void)
 {//i16
   static dReg D0, D1, D5, D6, D7;
@@ -744,16 +812,15 @@ i16 ReadDatabases(void)
       //else A0 = NULL;
       //d.misc1052eight[D6W] = (UNKNOWN *)A0;
       db.Allocate(D6W, d.dungeonDatIndex->DBSize(D6W));
-      /*
-      if (d.dungeonDatIndex[D6W+6] != 0)
-      {
-        d.misc10528[D6W] = db.GetCommonAddress(RN(0,D6W,0));
-      }
-      else
-      {
-        d.misc10528[D6W] = NULL;
-      };
-      */
+
+      // if (d.dungeonDatIndex[D6W+6] != 0)
+      // {
+      //   d.misc10528[D6W] = db.GetCommonAddress(RN(0,D6W,0));
+      // }
+      // else
+      // {
+      //   d.misc10528[D6W] = NULL;
+      // };
     };
     if (d.dungeonDatIndex->DBSize(D6W) != 0)
     {
@@ -773,32 +840,30 @@ i16 ReadDatabases(void)
         D0W = d.dungeonDatIndex->DBSize(D6W);
         gameTimers.Allocate(sw(gameTimers.MaxTimer() + D0W));
       };
-      /*
-      All the enclosed code is to clear the extra
-      entries that we allocated but did not initialize
-      by reading from the file.
-      But the new db.Allocate clears all the entries.
-      Therefore, this code is not needed.  And that is
-      nice because it is quite ugly.
-      D1W = D4W >> 1;
-      D4W = D1W;
-      LOCAL_30 = D1W;
-      D1L = D5UW * (ui16)LOCAL_30;
-      //D1 <<= 1;
-      pwA3 += D1L;
-      D5W = (UI8)(d.Byte7302[D6W]); //# additional entries
-      while (D5W != 0)
-      {
-        pwA3[0] = -1;
-  //      D0W = D5W;
-        D5W--;
-        D1W = D4W;
-        D1H1 = 0;
-        //D1 <<= 1;
-        pwA3 += D1L;
-
-      };
-      */
+      
+      // All the enclosed code is to clear the extra
+      // entries that we allocated but did not initialize
+      // by reading from the file.
+      // But the new db.Allocate clears all the entries.
+      // Therefore, this code is not needed.  And that is
+      // nice because it is quite ugly.
+      // D1W = D4W >> 1;
+      // D4W = D1W;
+      // LOCAL_30 = D1W;
+      // D1L = D5UW * (ui16)LOCAL_30;
+      // //D1 <<= 1;
+      // pwA3 += D1L;
+      // D5W = (UI8)(d.Byte7302[D6W]); //# additional entries
+      // while (D5W != 0)
+      // {
+      //   pwA3[0] = -1;
+      //   //      D0W = D5W;
+      //   D5W--;
+      //   D1W = D4W;
+      //   D1H1 = 0;
+      //   //D1 <<= 1;
+      //   pwA3 += D1L;
+      // };
     };
 
   }; //for
@@ -1105,3 +1170,4 @@ void ConvertCharacters() {
         d.CH16482[i].SetPossession(j, temp, true);
       }
 }
+*/

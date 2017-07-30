@@ -276,3 +276,17 @@ function toStr(obj, pretty, maxdepth, path, refs) {
 	}
 	return str;
 }		
+
+function dumpArray(arr, width) {
+	if (width) {
+		let arrhex = Array.from(arr).map(v => v.toString(16));
+		while(arrhex.length) {
+			console.log(arrhex.splice(0, width).join(''));
+		}
+	} else {
+		let arrhex = Array.from(arr).map(v => ('0' + v.toString(16)).substr(-2));
+		while(arrhex.length) {
+			console.log(arrhex.splice(0, 32).join(' '));
+		}
+	}
+}

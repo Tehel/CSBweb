@@ -37,6 +37,9 @@ class RemoteBinaryFile {
 	seek(newpos) {
 		this.pos = newpos;
 	}
+	skip(bytenumber) {
+		this.pos += bytenumber;
+	}
 	// Can be called with only length, or position+length. returns a subarray
 	read(position, length) {
 		// if length is undefined, it is actually in the first arg, and we read from the current position

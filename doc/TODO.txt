@@ -1,14 +1,35 @@
 + play sounds
-- investigate why some sounds are missing a sample. Pad ?
-- list all images
-- check that all graphic files are correctly decoded
++ investigate why some sounds are missing a sample. Pad ?
++ list all images
++ check that all graphic files are correctly decoded
 - find out why credits screen is buggy
-- start decoding levels.dat
+- minimal decode levels.dat
+- full decode levels.dat (many data are about sizing memory can be ignored)
 - simplified screen display
 - keybindings
 - full storing of graphics fields 558-562
 
-- debug feature:
+
+
+- debug:
+
+	menu:
+		- resources
+			- graphics
+				- portraits
+					- [name]
+						select shows the portrait, name, character sheet, inventory ?
+				- inventory
+					- [name]
+						select shows the item
+				- fonts
+			- sounds
+				select shows data
+				enter plays the sound
+
+
+
+
 	browse all
 		portraits
 		inventory items

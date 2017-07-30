@@ -1,81 +1,5 @@
 'use strict';
 
-const defaultPalette = [0x777, 0x700, 0x070, 0x007, 0x111, 0x222, 0x333, 0x444, 0x555, 0x000, 0x001, 0x010, 0x100, 0x200, 0x020, 0x002];
-
-// properties for every image
-// maybe extend this to include for each image: actual size (left black door), transparent color, palettes, format?
-// fields: nopreload (false), palette (palettesInterface), transparency (null), format (IMG1), width (null)
-const palettesInterface = [0];
-const palettesMainView = [0, 1, 2, 3, 4, 5];
-const palettesEntrance = [6];
-const palettesCredits = [7];
-// IMG1: 532 (0-20, 22-532). Empty images 16x4: 22, 24
-const imagesIndex = {
-	2: {name: 'dungeon entrance', palettes: palettesEntrance},
-	3: {name: 'black door left', palettes: palettesEntrance},
-	4: {name: 'black door right', palettes: palettesEntrance},
-	// 5: {name: 'credits', palettes: palettesCredits}, // unsupported IMG2 code (0xA) before offset 1400
-	13: {name: 'arrows pad'},
-	26: {name: 'portraits', nopreload: true},
-	42: {name: 'items 0', nopreload: true},
-	43: {name: 'items 1', nopreload: true},
-	44: {name: 'items 2', nopreload: true},
-	45: {name: 'items 3', nopreload: true},
-	46: {name: 'items 4', nopreload: true},
-	47: {name: 'items 5', nopreload: true},
-	48: {name: 'items 6', nopreload: true},
-	192: {name: 'fountain', palettes: palettesMainView, transparency: 10},
-	381: {name: 'plate armor torso', palettes: palettesMainView, transparency: 10},
-	459: {name: 'creature 4 - pain rat - side', palettes: palettesMainView, transparency: 4},
-	471: {name: 'creature 9 - stone golem - front', palettes: palettesMainView, transparency: 4},
-	475: {name: 'creature 10 - mummy - front', palettes: palettesMainView, transparency: 4},
-	481: {name: 'creature 12 - skeleton - front', palettes: palettesMainView, transparency: 4},
-};
-
-// SND1: 21 (533-537, 539-547, 549-555)
-// PCM (Pulse Code Modulation) 4 bits mono unsigned. Frequencies: 5486 Hz except front door (4237 Hz)
-const ratesDefault = [5486];
-const ratesDoors = [5486, 4237];
-const soundsIndex = {
-	533: {name: 'falling item'},
-	534: {name: 'switch'},
-	535: {name: 'door', rates: ratesDoors},
-	536: {name: 'trolin attack / stone golem attack / touch wall'},
-	537: {name: 'exploding fireball'},
-
-	539: {name: 'falling and dying'},
-	540: {name: 'swallowing'},
-	541: {name: 'champion wounded 1'},
-	542: {name: 'champion wounded 2'},
-	543: {name: 'champion wounded 3'},
-	544: {name: 'champion wounded 4'},
-	545: {name: 'exploding spell'},
-	546: {name: 'skeleton attack / armour attack / slash'},
-	547: {name: 'teleport'},
-
-	549: {name: 'running into a wall'},
-	550: {name: 'rat attack / dragon attack'},
-	551: {name: 'mummy attack / ghost attack'},
-	552: {name: 'screamer attack / oitu attack'},
-	553: {name: 'scorpion attack'},
-	554: {name: 'worm attack'},
-	555: {name: 'giggler'},
-};
-
-function dumpArray(arr, width) {
-	if (width) {
-		let arrhex = Array.from(arr).map(v => v.toString(16));
-		while(arrhex.length) {
-			console.log(arrhex.splice(0, width).join(''));
-		}
-	} else {
-		let arrhex = Array.from(arr).map(v => ('0' + v.toString(16)).substr(-2));
-		while(arrhex.length) {
-			console.log(arrhex.splice(0, 32).join(' '));
-		}
-	}
-}
-
 // items formats (AtariST graphics.dat file)
 // FNT1: 1 (557)
 // I558: 1 (558)
@@ -185,7 +109,6 @@ class Screen {
 	async readGraphics() {
 		this.graphicsFile = new RemoteBinaryFile();
 		await this.graphicsFile.get('gamefiles/graphics.dat');
-		// this.graphicsFile.data.forEach(byte => console.log(byte));
 
 		this.nbItems = this.graphicsFile.read16();
 		if (this.nbItems === 0) {
@@ -793,7 +716,7 @@ class Screen {
 		// dumpArray(data);
 		data = SNDexpand(data);
 
-		console.log(`preloading sound ${num}`);
+		// console.log(`preloading sound ${num}`);
 		this.soundscache[num] = [];
 		for (let rate of info.rates || ratesDefault) {
 			let duration = data.length / ratesDefault[0];

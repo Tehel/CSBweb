@@ -1,8 +1,12 @@
+'use strict';
+
 // used for all queries to the server
 let server = new Server();
 
 // all access to data from graphics.dat and display
 let screen = null;
+let dungeon = null;
+let keys = null;
 
 async function start() {
 	let canvas = document.getElementById("mainscreen");
@@ -12,6 +16,9 @@ async function start() {
 	// screen holds all the graphic data files and methods to draw on canvas
 	screen = new Screen(canvas.getContext("2d"), 2);
 	await screen.init();
+
+	dungeon = new Dungeon();
+	await dungeon.init();
 
 	screen.setPalette(6);
 	await screen.readAndExpandGraphic(4, 0, 0);
@@ -24,29 +31,32 @@ async function start() {
 	screen.readAndExpandGraphic(381, 180, 5, 0);
 	screen.readAndExpandGraphic(481, 180, 35, 0);
 
-	await screen.playSound(533);
-	await screen.playSound(534);
-	await screen.playSound(535);
-	await screen.playSound(535, 1);
+	keys = new Keys();
+	keys.setup(['menu']);
 
-	await screen.playSound(536);
-	await screen.playSound(537);
-	await screen.playSound(539);
-	await screen.playSound(540);
-	await screen.playSound(541);
-	await screen.playSound(542);
-	await screen.playSound(543);
-	await screen.playSound(544);
-	await screen.playSound(545);
-	await screen.playSound(546);
-	await screen.playSound(547);
-	await screen.playSound(549);
-	await screen.playSound(550);
-	await screen.playSound(551);
-	await screen.playSound(552);
-	await screen.playSound(553);
-	await screen.playSound(554);
-	await screen.playSound(555);
+	// await screen.playSound(533);
+	// await screen.playSound(534);
+	// await screen.playSound(535);
+	// await screen.playSound(535, 1);
+
+	// await screen.playSound(536);
+	// await screen.playSound(537);
+	// await screen.playSound(539);
+	// await screen.playSound(540);
+	// await screen.playSound(541);
+	// await screen.playSound(542);
+	// await screen.playSound(543);
+	// await screen.playSound(544);
+	// await screen.playSound(545);
+	// await screen.playSound(546);
+	// await screen.playSound(547);
+	// await screen.playSound(549);
+	// await screen.playSound(550);
+	// await screen.playSound(551);
+	// await screen.playSound(552);
+	// await screen.playSound(553);
+	// await screen.playSound(554);
+	// await screen.playSound(555);
 
 	// screen.readAndExpandGraphic(26, 0, 40);
 	// screen.readAndExpandGraphic(22, 0, 180);

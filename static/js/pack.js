@@ -184,7 +184,6 @@ function SNDexpand(buffer) {
 	function getnibble() {
 		let nib = odd ? buffer[offset++] & 0xf : buffer[offset] >> 4;
 		odd = !odd;
-		// console.log(`nibble ${nib}`);
 		return nib;
 	}
 
@@ -192,9 +191,8 @@ function SNDexpand(buffer) {
 	while (offset < buffer.length) {
 		let nib = getnibble();
 		if (nib !== 0) {
-			lastSample = nib * 17;
+			lastSample = nib;// * 17;
 			out.push(lastSample);
-			// console.log(`push single sample ${lastSample}`);
 		} else {
 			// repeat !
 			let nb = 0;
@@ -206,18 +204,16 @@ function SNDexpand(buffer) {
 					break;
 			}
 			nb += 3;
-			// console.log("repetition: " + nb);
 			for (let i=0; i<nb; i++)
 				out.push(lastSample);
 		}
 	}
+
+	// size is sometimes 1-2 samples off. truncate to expected size and ignore missing samples
 	out = out.slice(0, size);
 
-	// ignore last sample if size is odd
-	// if (out.length === size + 1)
-	// 	out.pop();
-
-	if (out.length !== size)
-		console.log(`Sound has ${out.length} samples, expected ${size}`);
+	// if (out.length !== size) {
+	// 	console.log(`Sound has ${out.length} samples, expected ${size}`);
+	// }
 	return out;
 }
