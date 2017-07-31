@@ -110,35 +110,40 @@ const keyNames = {
 }
 
 const keyActions = {
-	'move forward': 104,
-	'move back': 98,
-	'strafe left': 100,
-	'strafe right': 102,
-	'turn left': 103,
-	'turn right': 105,
-	'spell char 1': 112,
-	'spell char 2': 113,
-	'spell char 3': 114,
-	'spell char 4': 115,
-	'spell symbol 1': 49,
-	'spell symbol 2': 50,
-	'spell symbol 3': 51,
-	'spell symbol 4': 52,
-	'spell symbol 5': 53,
-	'spell symbol 6': 54,
+	'move forward': 'num pad 8',
+	'move back': 'num pad 2',
+	'strafe left': 'num pad 4',
+	'strafe right': 'num pad 6',
+	'turn left': 'num pad 7',
+	'turn right': 'num pad 9',
+	'spell char 1': 'F1',
+	'spell char 2': 'F2',
+	'spell char 3': 'F3',
+	'spell char 4': 'F4',
+	'spell symbol 1': '1',
+	'spell symbol 2': '2',
+	'spell symbol 3': '3',
+	'spell symbol 4': '4',
+	'spell symbol 5': '5',
+	'spell symbol 6': '6',
+	'to debug': 'esc',
+	'debug up': 'arrow up',
+	'debug down': 'arrow down',
+	'debug left': 'arrow left',
+	'debug right': 'arrow right',
+	'debug exit': 'esc',
 };
 
 const keyGroups = {
-	'menu': [
-		'switch debug',
-	],
 	'debug': [
 		'debug up',
 		'debug down',
-		'debug enter',
-		'debug leave',
-		'debug next',
-		'debug previous',
+		'debug left',
+		'debug right',
+		'debug exit',
+	],
+	'meta': [
+		'to debug',
 	],
 	'movement':[
 		'move forward',
@@ -171,6 +176,7 @@ class Keys {
 
 		this.activekeys = [];
 		this.keyBindings = {};
+		this.queue = [];
 
 		let keylist = this.activekeys;
 		window.onkeydown = event => {
@@ -178,18 +184,56 @@ class Keys {
 		};
 	}
 
-	readKeySetup() {
+	readKeyActions() {
 		// localStorage read
 	}
-	saveKeySetup() {
+	saveKeyActions() {
 		// localStorage store this.keyBindings
 	}
 
-	setup(template) {
+	loadBindings(name) {
+		// console.log(`Loading bindings for ${name}`);
+		let group = keyGroups[name];
+		if (!group)
+			throw new Error(`Unknown keybiding group ${name}`);
+		for (let action of group) {
+			let key = keyActions[action];
+			if (key) {
+				// check for conflicts
+				if (this.keyBindings[key])
+					throw new Error(`Can't bind key ${key} to ${action}, already used for ${this.keyBindings[key]}`);
+				// console.log(`\tkey ${key} to action ${action}`);
+				this.keyBindings[key] = action;
+			} // else no key defined for this action
+		}
+	}
+	unloadBindings(name) {
+		// console.log(`Unloading bindings for ${name}`);
+		let group = keyGroups[name];
+		for (let action of group || []) {
+			let key = keyActions[action];
+			if (key)
+				delete this.keyBindings[key];
+		}
+	}
+
+	clearQueue() {
+		this.queue = [];
 	}
 
 	processKey(event) {
-		console.log(event.keyCode);
-		event.preventDefault();
+		let code = event.keyCode;
+		let keyname = keyNames[code];
+		if (!keyname) {
+			console.log(`Key ${code} has no name ?!?`);
+			return;
+		}
+
+		// check if the key was assigned, if not, let it go through
+		if (this.keyBindings[keyname]) {
+			this.queue.push(this.keyBindings[keyname]);
+			event.preventDefault();
+			// console.log(`Key ${code} (${keyname}) is assigned to ${this.keyBindings[keyname]}`);
+		}
 	}
 }

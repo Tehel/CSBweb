@@ -191,7 +191,7 @@ function SNDexpand(buffer) {
 	while (offset < buffer.length) {
 		let nib = getnibble();
 		if (nib !== 0) {
-			lastSample = nib;// * 17;
+			lastSample = nib * 17;
 			out.push(lastSample);
 		} else {
 			// repeat !

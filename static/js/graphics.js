@@ -36,11 +36,7 @@ class Screen {
 		// await this.extractMainFont();
 
 		for (let num in imagesIndex) {
-			let info = imagesIndex[num];
-			for (let palette of info.palettes || palettesInterface) {
-				if (!info.nopreload)
-					await this.preloadImage(num, palette);
-			}
+			await this.preloadImage(num, imagesIndex[num]);
 		}
 		for (let num in soundsIndex)
 			this.preloadSound(num, soundsIndex[num]);
@@ -273,13 +269,45 @@ class Screen {
 		return newImage;
 	}
 
-	async preloadImage(num, palette) {
-		// console.log(`preloading ${num} for palette ${palette}`);
-		let img = await createImageBitmap(this.getImage(num, palette));
-		this.imagescache[num].renders[palette] = img;
+	async preloadImage(num, info) {
+		for (let palette of info.palettes || palettesInterface) {
+			if (!info.nopreload) {
+				// console.log(`preloading ${num} for palette ${palette}`);
+				let img = await createImageBitmap(this.getImage(num, palette));
+				this.imagescache[num].renders[palette] = img;
+				this.imagescache[num].name = info.name;
+			}
+		}
 	}
 
 	//---------------- high-level image manipulations
+
+	clear() {
+		this.fillRect(0, 0, 320, 200);
+	}
+
+	writeText(text, destX, destY, color, fontsize, fontface) {
+		this.drawarea.font = `${fontsize*this.zoom || 10*this.zoom}px ${fontface || 'Arial'}`;
+		this.drawarea.fillStyle = color || 'black';
+		this.drawarea.fillText(text, destX*this.zoom, destY*this.zoom);
+	}
+
+	fillRect(startX, startY, width, height, color) {
+		if (color) {
+			this.drawarea.fillStyle = color;
+			this.drawarea.fillRect(startX*this.zoom, startY*this.zoom, width*this.zoom, height*this.zoom);
+		} else
+			this.drawarea.clearRect(startX*this.zoom, startY*this.zoom, width*this.zoom, height*this.zoom);
+	}
+
+	fillTriangle(p1, p2, p3, color) {
+		this.drawarea.fillStyle = color || 'black';
+		this.drawarea.beginPath();
+		this.drawarea.moveTo(p1[0]*this.zoom, p1[1]*this.zoom);
+		this.drawarea.lineTo(p2[0]*this.zoom, p2[1]*this.zoom);
+		this.drawarea.lineTo(p3[0]*this.zoom, p3[1]*this.zoom);
+		this.drawarea.fill();
+	}
 
 	// draw an image at a coordinates
 	// 'expand' used to be the 0x8000 flag in the graph number. expand = false if the flag is set
@@ -728,8 +756,13 @@ class Screen {
 				channel[i] = (data[Math.floor(i/factor)] - 127.5) / 127.5;
 
 			// console.log(JSON.stringify(channel));
+			let name = info.name;
+			if (info.rates)
+				name += ` (${rate} Hz)`;
 
 			this.soundscache[num].push({
+				name: name,
+				rate: rate,
 				duration: duration,
 				buffer: newBuffer,
 			});
@@ -757,8 +790,4 @@ class Screen {
 			setTimeout(() => resolve(), data.duration * 1000);
 		});
 	}
-
-	// preloading sound 533, Sound has 99 samples, expected 100
-	// preloading sound 543, Sound has 1018 samples, expected 1019
-	// preloading sound 545, Sound has 961 samples, expected 962
 }
