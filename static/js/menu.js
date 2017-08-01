@@ -13,9 +13,10 @@ class ZoneMenu extends Zone {
 				title: 'Main menu',
 				subtitle: 'Choose what to do',
 				items: [
-					{text: 'Game', actionEnter: ['goZone', 'game']},
+					// {text: 'Game', actionEnter: ['goZone', 'game']},
 					{submenu: 'resources'},
 					{submenu: 'runtime'},
+					{submenu: 'keys'},
 				]
 			},
 			resources: {
@@ -36,23 +37,11 @@ class ZoneMenu extends Zone {
 					{submenu: 'imgWallOrnate'},
 					{submenu: 'imgItemOnFloor'},
 					{submenu: 'imgInventoryitems'},
+					{submenu: 'imgExplosions'},
+					{submenu: 'imgMissiles'},
 					{submenu: 'imgCreatures'},
 					{submenu: 'imgFonts'},
 				],
-			},
-			imgPortraits: {
-				title: 'Heroes',
-				items: () => {
-					let newItems = [];
-					// build items from portraits list
-					screen.collections.portraits.forEach((entry, idx) => {
-						newItems.push({
-							text: `hero ${idx}`,
-							actionSelect: ['showImage', {collection: 'portraits', idx: idx}],
-						});
-					});
-					return newItems;
-				},
 			},
 			imgDungeonGraphics: {
 				title: 'Dungeon Graphics',
@@ -94,6 +83,26 @@ class ZoneMenu extends Zone {
 					};
 				}),
 			},
+			imgExplosions: {
+				title: 'Explosions',
+				items: () => this.filterImageList(/^Explosion /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
+			},
+			imgMissiles: {
+				title: 'Missiles',
+				items: () => this.filterImageList(/^Missile /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
+			},
 			imgCreatures: {
 				title: 'Creatures',
 				items: () => this.filterImageList(/^Creature /).map(num => {
@@ -104,15 +113,27 @@ class ZoneMenu extends Zone {
 					};
 				}),
 			},
-			// Explosion
-			// Missile
+			imgPortraits: {
+				title: 'Heroes',
+				items: () => screen.collections.portraits.map((entry, idx) => {
+					return {
+						text: `hero ${idx}`,
+						actionSelect: ['showImage', {collection: 'portraits', idx: idx}],
+					};
+				}),
+			},
 			imgInventoryitems: {
 				title: 'Inventory items',
-				items: [],
+				items: () => screen.collections.items.map((entry, idx) => {
+					return {
+						text: `item ${idx}`,
+						actionSelect: ['showImage', {collection: 'items', idx: idx}],
+					};
+				}),
 			},
 			imgFonts: {
 				title: 'Fonts',
-				items: [],
+				items: [{text: 'nothing'}],
 			},
 			sounds: {
 				title: 'Sounds',
@@ -133,7 +154,7 @@ class ZoneMenu extends Zone {
 			},
 			maps: {
 				title: 'Maps',
-				items: [],
+				items: [{text: 'nothing'}],
 			},
 			runtime: {
 				title: 'Runtime',
@@ -144,9 +165,12 @@ class ZoneMenu extends Zone {
 			},
 			characters: {
 				title: 'Characters data',
-				items: [],
-			}
-
+				items: [{text: 'nothing'}],
+			},
+			keys: {
+				title: 'Key setup',
+				items: [{text: 'nothing'}],
+			},
 		};
 		this.menuStack = [];
 		this.menuGoto('main');
@@ -313,9 +337,9 @@ class ZoneMenu extends Zone {
 
 		if (this.showImage) {
 			if (this.showImage.collection) {
-				screen.drawCollectionImage(this.showImage.collection, this.showImage.idx, 200, 80);
+				screen.drawCollectionImage(this.showImage.collection, this.showImage.idx, 160, 10);
 			} else if (this.showImage.num) {
-				screen.readAndExpandGraphic(this.showImage.num, 200, 80, this.showImage.palettes[this.currentMenu.paletteIdx % this.showImage.palettes.length]);
+				screen.readAndExpandGraphic(this.showImage.num, 160, 10, this.showImage.palettes[this.currentMenu.paletteIdx % this.showImage.palettes.length]);
 			}
 		}
 	}

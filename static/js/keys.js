@@ -222,17 +222,22 @@ class Keys {
 	}
 
 	processKey(event) {
-		let code = event.keyCode;
-		let keyname = keyNames[code];
-		if (!keyname) {
-			console.log(`Key ${code} has no name ?!?`);
-			return;
+		let keyname = null;
+		if (typeof event === 'object') {
+			keyname = keyNames[event.keyCode];
+			if (!keyname) {
+				console.log(`Key ${code} has no name ?!?`);
+				return;
+			}
+		} else {
+			keyname = event;
 		}
 
 		// check if the key was assigned, if not, let it go through
 		if (this.keyBindings[keyname]) {
 			this.queue.push(this.keyBindings[keyname]);
-			event.preventDefault();
+			if (event.preventDefault)
+				event.preventDefault();
 			// console.log(`Key ${code} (${keyname}) is assigned to ${this.keyBindings[keyname]}`);
 		}
 	}

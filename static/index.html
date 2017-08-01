@@ -20,6 +20,15 @@
 <body onload="start();">
 
 	<canvas id="mainscreen" width="640" height="400"></canvas>
+    <table><tr>
+        <td><!--<button onclick='keys.queue.push("arrow up")'>turn left</button>--></td>
+        <td><button onclick='keys.processKey("arrow up")'>up</button></td>
+        <td><!--<button onclick='keys.queue.push("arrow up")'>turn right</button>--></td>
+    </tr><tr>
+        <td><button onclick='keys.processKey("arrow left")'>left</button></td>
+        <td><button onclick='keys.processKey("arrow down")'>down</button></td>
+        <td><button onclick='keys.processKey("arrow right")'>right</button></td>
+    </tr></table>
     <p><a target="_blank" href="gamefiles/DM-Scan-Manual-OriginalRelease-English.pdf">Manual</a></p>
 </body>
 </html>
