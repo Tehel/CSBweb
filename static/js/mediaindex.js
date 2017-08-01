@@ -17,7 +17,7 @@ const imagesIndex = {
 	2: {name: 'Interface - Main Menu Left Door', palettes: palettesEntrance},
 	3: {name: 'Interface - Main Menu Right Door', palettes: palettesEntrance},
 	4: {name: 'Interface - Main Menu Screen', palettes: palettesEntrance},
-	// 5: {name: 'Interface - Credits', palettes: palettesCredits}, // unsupported IMG2 code (0xA) before offset 1400
+	5: {name: 'Interface - Credits', palettes: palettesCredits}, // unsupported IMG2 code (0xA) before offset 1400
 	6: {name: 'Interface - "The End" Label'},
 	7: {name: 'Interface - Champion Information'},
 	8: {name: 'Interface - Dead Champion Information'},

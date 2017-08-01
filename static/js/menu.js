@@ -11,7 +11,7 @@ class ZoneMenu extends Zone {
 		this.menus = {
 			main: {
 				title: 'Main menu',
-				subtitle: 'Choose what to do',
+				subtitle: 'Maintenance, resource browsing, data inspection...',
 				items: [
 					// {text: 'Game', actionEnter: ['goZone', 'game']},
 					{submenu: 'resources'},

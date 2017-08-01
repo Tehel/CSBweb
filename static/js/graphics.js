@@ -175,11 +175,11 @@ class Screen {
 			format = format || 'IMG1';
 
 			let img = this.getRawItem(num);
+
 			imgW = (img[0] << 8) + img[1];
 			imgH = (img[2] << 8) + img[3];
 			pixels = [];
 			// console.log(`width: ${imgW}, height: ${imgH}, length: ${img.length}`);
-			// dumpArray(img);
 
 			// fully decode image format into a buffer
 			if (format === 'IMG1') {
@@ -216,7 +216,11 @@ class Screen {
 							pixels.push(nib2);
 						} else if (bits2 === 2) {
 							// A and D (transparent pixels) are only used for animation files
-							throw new Error(`unsupported IMG2 code (${nib1}) before offset ${offset}`);
+							// throw new Error(`unsupported IMG2 code (nib1:${nib1}, nib2:${nib2}, nb:${nb}) before offset ${offset}`);
+							// actually, credit screen has a few occurences of 0xa
+							// add nb+2 pixels of color nib2
+							for (let i=0; i<nb+2; i++)
+								pixels.push(nib2);
 						} else if (bits2 === 1) {
 							if (nb & 1) {
 								// Nibble2 is equal to 0 and is ignored.

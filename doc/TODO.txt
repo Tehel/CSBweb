@@ -2,37 +2,9 @@
 + investigate why some sounds are missing a sample. Pad ?
 + list all images
 + check that all graphic files are correctly decoded
-- find out why credits screen is buggy
 - minimal decode levels.dat
 - full decode levels.dat (many data are about sizing memory can be ignored)
-- simplified screen display
-- keybindings
+- simplified screen display (main view, keys)
++ keybindings
+- capture and cast mouse events
 - full storing of graphics fields 558-562
-
-
-
-- debug:
-
-	menu:
-		- resources
-			- graphics
-				- portraits
-					- [name]
-						select shows the portrait, name, character sheet, inventory ?
-				- inventory
-					- [name]
-						select shows the item
-				- fonts
-			- sounds
-				select shows data
-				enter plays the sound
-
-
-
-
-	browse all
-		portraits
-		inventory items
-		dungeon items
-		dungeon walls
-		sounds
