@@ -32,9 +32,11 @@ class ZoneMenu extends Zone {
 				items: [
 					{submenu: 'imgPortraits'},
 					{submenu: 'imgDungeonGraphics'},
-					{submenu: 'imgCreatures'},
+					{submenu: 'imgDoor'},
+					{submenu: 'imgWallOrnate'},
+					{submenu: 'imgItemOnFloor'},
 					{submenu: 'imgInventoryitems'},
-					{submenu: 'imgMainviewitems'},
+					{submenu: 'imgCreatures'},
 					{submenu: 'imgFonts'},
 				],
 			},
@@ -54,42 +56,58 @@ class ZoneMenu extends Zone {
 			},
 			imgDungeonGraphics: {
 				title: 'Dungeon Graphics',
-				items: [],
-				items: () => {
-					let newItems = [];
-					for(let num=49; num<=107; num++) {
-						let img = imagesIndex[num];
-						newItems.push({
-							text: img.name,
-							actionSelect: ['showImage', {num:num, palettes: img.palettes || palettesInterface}],
-							actionEnter: ['nextPalette'],
-						});
-					}
-					return newItems;
-				},
+				items: () => this.filterImageList(/^Dungeon Graphics - /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
+			},
+			imgDoor: {
+				title: 'Doors',
+				items: () => this.filterImageList(/^Door /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
+			},
+			imgWallOrnate: {
+				title: 'Wall ornate',
+				items: () => this.filterImageList(/^Wall Ornate /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
+			},
+			imgItemOnFloor: {
+				title: 'Items on floor',
+				items: () => this.filterImageList(/^Item on floor /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
 			},
 			imgCreatures: {
 				title: 'Creatures',
-				items: () => {
-					let newItems = [];
-					// build items from portraits list
-					for(let num=446; num<=532; num++) {
-						let img = imagesIndex[num];
-						newItems.push({
-							text: img.name,
-							actionSelect: ['showImage', {num:num, palettes: img.palettes || palettesInterface}],
-							actionEnter: ['nextPalette'],
-						});
-					}
-					return newItems;
-				},
+				items: () => this.filterImageList(/^Creature /).map(num => {
+					return {
+						text: imagesIndex[num].name,
+						actionSelect: ['showImage', {num:num, palettes: imagesIndex[num].palettes || palettesInterface}],
+						actionEnter: ['nextPalette'],
+					};
+				}),
 			},
+			// Explosion
+			// Missile
 			imgInventoryitems: {
 				title: 'Inventory items',
-				items: [],
-			},
-			imgMainviewitems: {
-				title: 'Main view items',
 				items: [],
 			},
 			imgFonts: {
@@ -132,17 +150,26 @@ class ZoneMenu extends Zone {
 		};
 		this.menuStack = [];
 		this.menuGoto('main');
-		this.menuGoto('resources');
 		// swoosh ?
 	}
 
-	init() {
-		keys.loadBindings('debug');
+	init(runner) {
+		keys.loadBindings('menu');
+		runner.refreshTime = 10;	// 100 refreshs per second, to have reactive menus
 	}
 
 	exit() {
-		keys.unloadBindings('debug');
+		keys.unloadBindings('menu');
 	}
+
+	filterImageList(regexp) {
+		let out = [];
+		for (let num in imagesIndex)
+			if (imagesIndex[num].name.match(regexp))
+				out.push(num);
+		return out;
+	}
+
 
 	menuGoto(name) {
 		if (!this.menus[name])
@@ -205,12 +232,12 @@ class ZoneMenu extends Zone {
 		let key = keyqueue.shift();
 		// console.log(`got key input ${key}`);
 		switch(key) {
-			case 'debug left':
+			case 'menu left':
 				// left goes back one level
 				this.menuBack();
 				redraw = true;
 				break;
-			case 'debug right':
+			case 'menu right':
 				// right runs the action for the current item
 				// console.log(JSON.stringify(this.menuItems));
 				let item = this.menuItems[this.currentMenu.idx];
@@ -236,19 +263,19 @@ class ZoneMenu extends Zone {
 					}
 				}
 				break;
-			case 'debug up':
+			case 'menu up':
 				// move up menu entry
 				this.currentMenu.idx = (this.currentMenu.idx-1 + this.menuItems.length) % this.menuItems.length;
 				this.actionSelect();
 				redraw = true;
 				break;
-			case 'debug down':
+			case 'menu down':
 				// move down menu entry
 				this.currentMenu.idx = (this.currentMenu.idx+1 + this.menuItems.length) % this.menuItems.length;
 				this.actionSelect();
 				redraw = true;
 				break;
-			case 'debug exit':
+			case 'menu exit':
 				runner.select('game');
 				break;
 			default:

@@ -257,14 +257,16 @@ class Screen {
 		// REFACTOR: we should be able to directly use the right palette without globally loading it
 		this.setPalette(palette);
 
-		let transparency = imagesIndex[num].transparency;
+		let transparency = imagesIndex[num].transparency || [];
+		if (transparency.constructor === Number)
+			transparency = [transparency];
 
 		// copy data into a new image, applying current palette
 		let newImage = new ImageData(imgW, imgH);
 		pixels.forEach((color, idx) => {
 			for (let j=0; j<3; j++)
 				newImage.data[idx*4+j] = this.paletteRGBA[color][j];
-			newImage.data[idx*4+3] = color === transparency ? 0 : 255;
+			newImage.data[idx*4+3] = transparency.indexOf(color) !== -1 ? 0 : 255;
 		});
 		return newImage;
 	}

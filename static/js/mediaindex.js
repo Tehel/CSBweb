@@ -4,7 +4,8 @@ const defaultPalette = [0x777, 0x700, 0x070, 0x007, 0x111, 0x222, 0x333, 0x444, 
 
 // properties for every image
 // maybe extend this to include for each image: actual size (left black door), transparent color, palettes, format?
-// fields: nopreload (false), palette (palettesInterface), transparency (null), format (IMG1), width (null)
+// fields: nopreload (false), palette (palettesInterface), transparency ([]), format (IMG1), width (null)
+// transparency can be absent, a number (color index) or a list of numbers.
 const palettesInterface = [0];
 const palettesMainView = [0, 1, 2, 3, 4, 5];
 const palettesEntrance = [6];
@@ -51,7 +52,7 @@ const imagesIndex = {
 	38: {name: 'Interface - Green Border Around Champion Information (Fire Shield Spell ( Fireshield Action))'},
 	39: {name: 'Interface - Cyan Border Around Champion Information (Spellshield Action)'},
 	40: {name: 'Interface - Character Sheet - Resurrect And Reincarnate'},
-	41: {name: 'Dungeon Graphics - Hole In Wall While Using "See Through Walls" Spell'},
+	41: {name: 'Dungeon Graphics - Hole In Wall While Using "See Through Walls" Spell', palettes: palettesMainView, transparency: [9, 10]},
 	42: {name: 'Items Graphics 0 (32 Items)', nopreload: true},
 	43: {name: 'Items Graphics 1 (32 Items)', nopreload: true},
 	44: {name: 'Items Graphics 2 (32 Items)', nopreload: true},

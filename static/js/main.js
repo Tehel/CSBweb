@@ -22,46 +22,14 @@ async function start() {
 	dungeon = new Dungeon();
 	await dungeon.init();
 
-	// screen.setPalette(6);
-	// screen.readAndExpandGraphic(4, 0, 0);
-	// screen.readAndExpandGraphic(2, 0, 30);
-	// screen.readAndExpandGraphic(3, 104, 30);
-
-	// screen.setPalette(0);
-	// screen.readAndExpandGraphic(13, 10, 35);
-	// screen.readAndExpandGraphic(192, 100, 5, 0);
-	// screen.readAndExpandGraphic(381, 180, 5, 0);
-	// screen.readAndExpandGraphic(481, 180, 35, 0);
-
-	// for (let id in soundsIndex)
-	// 	for (let i in soundsIndex[id].rates || [0])
-	// 		await screen.playSound(id, i);
-
-	// await screen.playSound(535, 1);
-	// for (let i=533; i<=555; i++)
-	// 	await screen.playSound(i);
-
-	// screen.readAndExpandGraphic(26, 0, 40);
-	// screen.readAndExpandGraphic(22, 0, 180);
-
-	// put all portraits, BECAUSE WE CAN
-	// for (let y=0; y<3; y++)
-	// 	for (let x=0; x<8; x++)
-	// 		screen.drawCollectionImage('portraits', y*8+x, 5+35*x, 92+32*y);
-
 	// draw random items
 	// for (let y=0; y<9; y++)
 	// 	for (let x=0; x<15; x++)
 	// 		screen.drawCollectionImage('items', Math.floor(Math.random()*screen.collections.items.length), 5+20*x, 5+20*y);
 
-	// console.log(screen.collections.itemnames);
-
-	// draw(screen.paletteStr);
-
 	zonerunner = new ZoneRunner();
 	zonerunner.load('menu', new ZoneMenu());
 	zonerunner.load('game', new ZoneGame());
-	// zonerunner.load('debug', new ZoneDebug());
 	zonerunner.select('menu');
 }
 
@@ -76,10 +44,11 @@ async function start() {
 
 class ZoneRunner {
 	constructor() {
+		this.refreshTime = 100;
 		this.zones = {};
 		this.currentZone = null;
 		let self = this;
-		this.timer = setInterval(() => self.run(self), 100);
+		this.timer = setInterval(() => self.run(self), 10);
 	}
 	load(name, zone) {
 		this.zones[name] = zone;
@@ -99,10 +68,12 @@ class ZoneRunner {
 				if (this.currentZone)
 				this.currentZone.exit();
 			this.currentZone = this.zones[self.changeToZone];
-			this.currentZone.init();
+			this.currentZone.init(self);
 			self.changeToZone = null;
 			keys.clearQueue();
 			screen.clear();
+			clearInterval(self.timer);
+			self.timer = setInterval(() => self.run(self), self.refreshTime);
 			redraw = true;
 		}
 
@@ -128,19 +99,11 @@ class Zone {
 	runWorld() { throw new Error('Missing world run ?'); }
 	// draw the screen
 	drawView() { throw new Error('Missing draw function ?'); }
-	// called when entering zone. setup key bindings.
+	// called when entering zone. setup key bindings, refresh time.
 	init() {}
 	// called when leaving. unset key bindings
 	exit() {}
 }
-
-
-// ---------------- debug ----------------
-// class ZoneDebug extends Zone {
-// 	constructor() {
-// 		// setup menu tree
-// 	}
-// }
 
 // ---------------- game ----------------
 class ZoneGame extends Zone {
@@ -148,12 +111,13 @@ class ZoneGame extends Zone {
 		super();
 		// setup game
 	}
-	init() {
+	init(runner) {
 		keys.loadBindings('meta');
 		keys.loadBindings('movement');
 		keys.loadBindings('spells');
 		keys.loadBindings('attack');
 		keys.loadBindings('inventories');
+		runner.refreshTime = 100;	// 10 refreshs per second
 	}
 
 	exit() {
@@ -167,9 +131,9 @@ class ZoneGame extends Zone {
 		let redraw = false;
 		if (keyqueue.length > 0) {
 			let action = keyqueue.shift();
-			console.log(`got key input '${action}'`);
+			// console.log(`got key input '${action}'`);
 			switch(action) {
-				case 'to debug':
+				case 'to menu':
 					runner.select('menu');
 					break;
 				default:

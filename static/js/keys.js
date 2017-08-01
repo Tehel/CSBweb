@@ -126,24 +126,24 @@ const keyActions = {
 	'spell symbol 4': '4',
 	'spell symbol 5': '5',
 	'spell symbol 6': '6',
-	'to debug': 'esc',
-	'debug up': 'arrow up',
-	'debug down': 'arrow down',
-	'debug left': 'arrow left',
-	'debug right': 'arrow right',
-	'debug exit': 'esc',
+	'to menu': 'esc',
+	'menu up': 'arrow up',
+	'menu down': 'arrow down',
+	'menu left': 'arrow left',
+	'menu right': 'arrow right',
+	'menu exit': 'esc',
 };
 
 const keyGroups = {
-	'debug': [
-		'debug up',
-		'debug down',
-		'debug left',
-		'debug right',
-		'debug exit',
+	'menu': [
+		'menu up',
+		'menu down',
+		'menu left',
+		'menu right',
+		'menu exit',
 	],
 	'meta': [
-		'to debug',
+		'to menu',
 	],
 	'movement':[
 		'move forward',
