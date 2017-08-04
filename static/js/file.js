@@ -51,16 +51,22 @@ class RemoteBinaryFile {
 		}
 		return sub;
 	}
-	read8() {
+	read8(position) {
+		if (position)
+			this.pos = position;
 		let value = this.data[this.pos];
 		this.pos += 1;
 		return value;
 	}
 	// implicitely presume big-endianism.
-	read16() {
+	read16(position) {
+		if (position)
+			this.pos = position;
 		return (this.read8() << 8) + this.read8();
 	}
-	read32() {
+	read32(position) {
+		if (position)
+			this.pos = position;
 		return (this.read16() << 16) + this.read16();
 	}
 }
