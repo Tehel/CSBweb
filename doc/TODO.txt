@@ -2,8 +2,8 @@
 + investigate why some sounds are missing a sample. Pad ?
 + list all images
 + check that all graphic files are correctly decoded
-- minimal decode levels.dat
-- full decode levels.dat (many data are about sizing memory can be ignored)
+- minimal decode dungeon.dat
+- full decode dungeon.dat (many data are about sizing memory can be ignored)
 - simplified screen display (main view, keys)
 + keybindings
 - capture and cast mouse events

@@ -40,6 +40,7 @@ class Dungeon {
 			missiles: this.dungeonFile.read16(0x28),
 			clouds: this.dungeonFile.read16(0x2a),
 		};
+		console.log(JSON.stringify(this.objectNb));
 
 		const mapsOffset = 0x2c;
 
@@ -87,14 +88,25 @@ class Dungeon {
 		const objectsOnTileOffset = tilesWithItemsOffset + columnNb * 2;
 		const textDataOffset = objectsOnTileOffset + this.objectListSize * 2;
 		const doorListOffset = textDataOffset + this.textListSize * 2;
+		const teleportListOffset = doorListOffset + this.objectNb.doors * 4;
+		const textListOffset = teleportListOffset + this.objectNb.teleporters * 6;
+		const actuatorListOffset = textListOffset + this.objectNb.texts * 4;
+		const creatureListOffset = actuatorListOffset + this.objectNb.actuators * 8;
+		const weaponListOffset = creatureListOffset + this.objectNb.creatures * 16;
+		const clothListOffset = weaponListOffset + this.objectNb.weapons * 4;
+		const scrollListOffset = clothListOffset + this.objectNb.cloths * 4;
+		const potionListOffset = scrollListOffset + this.objectNb.scrolls * 4;
+		const containerListOffset = potionListOffset + this.objectNb.potions * 4;
+		const miscellaneousListOffset = containerListOffset + this.objectNb.containers * 8;
+		const missileListOffset = miscellaneousListOffset + this.objectNb.miscellaneous * 4;
+		const cloudListOffset = missileListOffset + this.objectNb.missiles * 8;
+		const mapDataOffset = cloudListOffset + this.objectNb.clouds * 4;
 
-		// dumpArray(this.dungeonFile.read(textDataOffset, this.textListSize * 2))
+
 
 		// text data
 		this.dungeonFile.seek(textDataOffset);
 		let chars = [];
-		this.texts = [];
-		this.heroes = [];
 		tmp = '';
 		let txts = [];
 		for (let i=0; i<this.textListSize; i++) {
@@ -122,10 +134,13 @@ class Dungeon {
 				tmp += c;
 			}
 		}
-		// console.log(JSON.stringify(txts));
 
-		let charsToNumber = (s) => parseInt(s.split('').reduce((s, c) => s+(c.charCodeAt(0) - 65).toString(16), ''), 16);
+		let statNumbers = (s) => parseInt(s.split('').reduce((s, c) => s+(c.charCodeAt(0) - 65).toString(16), ''), 16);
+		let skillNumbers = (s, n) => s.split('').reduce((h, c, i) => { h[n[i]] = c.charCodeAt(0) - 65; return h; }, {});
 
+		// sort the texts into hero definitions and display texts
+		this.texts = [];
+		this.heroes = [];
 		txts.forEach((s, idx) => {
 			let e = s.split('|');
 			if (e.length === 7 && e[2] === '') { // relies on title 2nd part to be empty :(
@@ -134,18 +149,21 @@ class Dungeon {
 					name: e[0],
 					title: e[1],
 					gender: e[3],
-					health: charsToNumber(e[4].substr(0, 4)),
-					stamina: charsToNumber(e[4].substr(4, 4)),
-					mana: charsToNumber(e[4].substr(8, 4)),
-					luck: charsToNumber(e[5].substr(0, 2)),
-					strength: charsToNumber(e[5].substr(2, 2)),
-					dexterity: charsToNumber(e[5].substr(4, 2)),
-					wisdom: charsToNumber(e[5].substr(6, 2)),
-					vitality: charsToNumber(e[5].substr(8, 2)),
-					antimagic: charsToNumber(e[5].substr(10, 2)),
-					antifire: charsToNumber(e[5].substr(12, 2)),
+					health: statNumbers(e[4].substr(0, 4)),
+					stamina: statNumbers(e[4].substr(4, 4)),
+					mana: statNumbers(e[4].substr(8, 4)),
+					luck: statNumbers(e[5].substr(0, 2)),
+					strength: statNumbers(e[5].substr(2, 2)),
+					dexterity: statNumbers(e[5].substr(4, 2)),
+					wisdom: statNumbers(e[5].substr(6, 2)),
+					vitality: statNumbers(e[5].substr(8, 2)),
+					antimagic: statNumbers(e[5].substr(10, 2)),
+					antifire: statNumbers(e[5].substr(12, 2)),
+					fighter: skillNumbers(e[6].substr(0, 4), ['Swing', 'Thrust', 'Club', 'Parry']),
+					ninja: skillNumbers(e[6].substr(4, 4), ['Steal', 'Fight', 'Throw', 'Shoot']),
+					priest: skillNumbers(e[6].substr(8, 4), ['Identify', 'Heal', 'Influence', 'Defend']),
+					wizard: skillNumbers(e[6].substr(12, 4), ['Fire', 'Air', 'Earth', 'Water']),
 				};
-
 				this.heroes.push(newHero);
 			} else {
 				this.texts.push({
@@ -154,9 +172,66 @@ class Dungeon {
 				});
 			}
 		});
-		console.log(JSON.stringify(this.texts));
-		console.log(JSON.stringify(this.heroes));
+		// console.log(JSON.stringify(this.texts));
+		// console.log(JSON.stringify(this.heroes));
 		// dumpArray(chars);
+
+		// Doors
+		this.dungeonFile.seek(doorListOffset);
+		// each door is 4 bytes
+
+		// Teleports
+		this.dungeonFile.seek(teleportListOffset);
+		// each teleport is 6 bytes
+
+		// Texts
+		this.dungeonFile.seek(textListOffset);
+		// each teleport is 4 bytes
+
+		// Actuators
+		this.dungeonFile.seek(actuatorListOffset);
+		// each actuator is 8 bytes
+
+		// Creatures
+		this.dungeonFile.seek(creatureListOffset);
+		// each creature is 16 bytes
+
+		// Weapons
+		this.dungeonFile.seek(weaponListOffset);
+		// each weapon is 4 bytes
+
+		// Clothes
+		this.dungeonFile.seek(clothListOffset);
+		// each cloth is 4 bytes
+
+		// Scrolls
+		this.dungeonFile.seek(scrollListOffset);
+		// each scroll is 4 bytes
+
+		// Potions
+		this.dungeonFile.seek(potionListOffset);
+		// each potion is 4 bytes
+
+		// Containers
+		this.dungeonFile.seek(containerListOffset);
+		// each container is 8 bytes
+
+		// Miscellaneous
+		this.dungeonFile.seek(miscellaneousListOffset);
+		// each miscellaneous object is 4 bytes
+
+		// Missiles
+		this.dungeonFile.seek(missileListOffset);
+		// each missile is 8 bytes
+
+		// Clouds
+		this.dungeonFile.seek(cloudListOffset);
+		// each cloud is 4 bytes
+
+		// MAPS
+		this.dungeonFile.seek(mapDataOffset);
+
+
 	}
 
 
