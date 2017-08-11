@@ -40,6 +40,8 @@ class Screen {
 		}
 		for (let num in soundsIndex)
 			this.preloadSound(num, soundsIndex[num]);
+
+		this.extract558();
 	}
 
 	//--------------------------------  Palette ------------------------------------
@@ -440,6 +442,276 @@ class Screen {
 		let pH = 29;
 		let baseImage = this.getImage(557, 0);
 		// ...
+	}
+
+	readWord(buff, pos) {
+		return (buff[pos] << 8) + buff[pos+1];
+	}
+
+	// Coordinates   http://dmweb.free.fr/?q=node/1394
+	extract558() {
+		this.data558 = this.getRawItem(558);
+		let data = this.getRawItem(558);
+		let subdata = null;
+		// Coordinates to display Clouds: Lightning bolts for Rebirth step 1
+		this.Word7246 = [];
+		subdata = data.slice(0, 42);
+		for(let i=0; i<7; i++)
+			this.Word7246.push({
+				x: readWord(subdata, i*3),
+				y: readWord(subdata, i*3 + 2),
+				xscale: readWord(subdata, i*3 + 4),
+			});
+		// Coordinates to display Clouds: Explosion for Rebirth step 2
+		this.Word7222 = [];
+		subdata = data.slice(42, 84);
+		for(let i=0; i<7; i++)
+			this.Word7222.push({
+				x: readWord(subdata, i*3),
+				y: readWord(subdata, i*3 + 2),
+				xscale: readWord(subdata, i*3 + 4),
+			});
+		// Coordinates to display Clouds
+		this.Word7162 = [];
+		subdata = data.slice(84, 204);
+		for(let i=0; i<15; i++)
+			this.Word7162.push({
+				x1: readWord(subdata, i*4),
+				y1: readWord(subdata, i*4 + 2),
+				x2: readWord(subdata, i*4 + 4),
+				y2: readWord(subdata, i*4 + 6),
+			});
+		// Coordinates to display centered Clouds
+		this.Word7042 = [];
+		subdata = data.slice(204, 264);
+		for(let i=0; i<15; i++)
+			this.Word7042.push({
+				x: readWord(subdata, i*2),
+				y: readWord(subdata, i*2 + 2),
+			});
+		// Coordinates to display creature graphics
+		this.creaturesPositions = [];
+		for(let i=0; i<3; i++) {
+			let newgroup = [];
+			for (let j=0; j<11; j++) {
+				newgroup.push(data.slice(264 + 10 * (i * 11 + j), 264 + 10 * (i * 11 + j) + 10));
+			}
+			this.creaturesPositions.push(newgroup);
+		}
+		// Creature images shifts for animations
+		this.creatureShifts = data.slice(594, 618);
+
+		// Palette changes for creatures
+		this.creaturePaletteChanges = data.slice(618, 650);
+
+		// Special colors for creatures
+		this.creaturesSpecialColors = [];
+		subdata = data.slice(650, 832);
+		for(let i=0; i<13; i++) {
+			let newgroup = [];
+			for (let j=0; j<6; j++) {
+				let color = readWord(subdata, i*14 + j*2);
+				newgroup.push([ // RGB, normalized to 0-252
+					((color & 0xf00) >> 8) * 36,
+					((color & 0xf0) >> 4) * 36,
+					(color & 0xf) * 36,
+				]);
+			}
+			newgroup.push(subdata[i*14 + 12]);
+			newgroup.push(subdata[i*14 + 13]);
+			this.creaturesSpecialColors.push(newgroup);
+		}
+
+		// Creatures graphics definitions
+		this.creaturesGraphics = [];
+		subdata = data.slice(832, 1156);
+		for(let i=0; i<27; i++) {
+			// TODO better decoding of data
+			// subdata.slice(i*12, (i+1)*12));
+			this.creaturesGraphics.push({
+				imgbase: 446 + readWord(subdata, i*12),
+				imgFrontW: subdata[i*12 + 4] * 2,
+				imgFrontH: subdata[i*12 + 5],
+				imgSideW: subdata[i*12 + 6] * 2,
+				imgSideH: subdata[i*12 + 7],
+				imgAttackW: subdata[i*12 + 8] * 2,
+				imgAttackH: subdata[i*12 + 9],
+				positionGroup: subdata[i*12 + 10] >> 4,
+				transparencyColor: subdata[i*12 + 10] & 0xf,
+				colorReplace10: subdata[i*12 + 11] >> 4,
+				colorReplace09: subdata[i*12 + 11] >> 0xf,
+			});
+		}
+
+		//  Coordinates to display items
+		this.itemPositions = data.slice(1156, 1456);
+
+		// Coordinates to display stacks of items
+		this.itemStackPositions = data.slice(1456, 1488);
+
+		// Unknown
+		this.Byte5758 = data.slice(1488, 1494); // Explosion sizes? Maybe cloud sizes... not sure.
+		this.Byte5752 = data.slice(1494, 1502); // Missiles scaling ?
+
+		// Palette changes for floor decorations
+		this.Byte5744 = data.slice(1502, 1518); // D2 Floor item graphic palette modifier?
+		this.Byte5728 = data.slice(1518, 1534); // D3 Floor item graphic palette modifier
+
+		// Unknown
+		this.Byte5712 = data.slice(1534, 1550); // palette for graphics 351-359 ?
+
+		// Unknown
+		this.Byte5696 = data.slice(1550, 1558); // 4 groups of width/height combinations
+
+		// Missile graphics definitions
+		this.missilesGraphics = data.slice(1558, 1642);
+
+		// Missile graphics definitions
+		subdata = data.slice(1642, 2152);
+		this.itemGraphics = [];
+		for (let i=0; i<85; i++) {
+			let newgroup = {
+				imgNum: 360 + subdata[i*6],
+				idx: subdata[i*6+1],
+				imgW: subdata[i*6+2]*2,
+				imgH: subdata[i*6+3],
+				hasNicheImg: (subdata[i*6+4] & 0x10) !== 0,
+				mirrorLeftRight: (subdata[i*6+4] & 0x1) !== 0,
+				coordGroup: subdata[i*6+5],
+			};
+			this.itemGraphics.push(newgroup);
+		}
+
+		// Coordinates to display door decorations
+		this.doorPositions = data.slice(2152, 2248);
+
+		// Coordinates to display floor decorations
+		this.floorDecorationPositions = data.slice(2248, 2410);
+
+		// Coordinates to display wall decorations
+		this.wallDecorationPositions = data.slice(2410, 3034);
+
+		// Unreadable text display information
+		this.unreadableText = data.slice(3034, 3050);
+
+		// 3050 / 4 bytes, Y coordinates to display wall texts
+		// 3054 / 4 bytes, Wall part to display in middle of wall texts
+		// 3058 / 32 bytes, Palette changes for door decorations
+		// 3090 / 32 bytes, Palette changes for wall decorations
+		// 3122 / 2 bytes, Coordinates set for door buttons
+		// 3124 / 12 bytes, Coordinates set for door decorations
+		// 3136 / 10 bytes, Coordinates set for floor decorations
+		// 3146 / 60 bytes, Coordinates set for wall decorations
+		// 3206 / 2 bytes, Unknown data (graphic number of 'water' giving wall decoration)
+		// 3208 / 4 bytes, Alcove graphics indices
+		// 3212 / 10 bytes, Floor decoration offsets
+		// 3222 / 12 bytes, Unknown data (illegibletextgroups ?)
+		// 3234 / 2 bytes, Unknown data
+		// 3236 / 96 bytes, Teleporter graphic descriptors
+		// 3332 / 720 bytes, Unknown data (door graphic information)
+		// 4052 / 648 bytes, Unknown data (wall graphic information) { byte x1, y1, x2, y2, width, height, offsetx, offsety }
+		// 4700  20 bytes, Unknown data
+	}
+
+		//dumpArray(subdata);
+		// console.log(JSON.stringify(this.creaturesGraphics));
+
+	extract559() {
+		this.data559 = this.getRawItem(559);
+		// 0000 / 4 bytes, Creature facing bytes
+		// 0004 / 256 bytes, Extended strings for escape character 1Eh in dungeon.dat texts for wall texts only
+		// 0260 / 64 bytes, Extended strings for escape character 1Dh in dungeon.dat
+		// 0324 / 256 bytes, Extended strings for escape character 1Eh in dungeon.dat texts other than wall texts
+		// 0580 / 8 bytes, Door characteristics
+		// 0588 / 80 bytes, Creature droppings definitions
+		// 0668 / 8 bytes, Creature attack sound definitions
+		// 0676 / 702 bytes, Creature descriptors
+		// 1378 / 16 bytes, Food values of consumable items
+		// 1394 / 54 bytes, Miscellaneous items descriptors
+		// 1448 / 2 bytes, Value for copy protection
+		// 1450 / 232 bytes, Clothe items descriptors
+		// 1682 / 276 bytes, Weapons items descriptors
+		// 1958 / 1080 bytes, Item descriptors
+		// 3038 / 16 bytes, Additional object entries created when loading dungeon.dat
+		// 3054 / 16 bytes, Size of object types in dungeon.dat
+		// 3070 / 8 bytes, Coordinates delta for Y movement
+		// 3078 / 8 bytes, Coordinates delta for X movement
+	}
+
+	// actions and spells
+	extract560() {
+		this.data560 = this.getRawItem(560);
+		// 0000 / 48 bytes, Rectangle areas for actions
+		// 0048 / 16 bytes, Palette changes to display object icons in action area
+		// 0064 / 44 bytes, Actions experience gain
+		// 0108 / 44 bytes, Actions improved skill number
+		// 0152 / 44 bytes, Actions defense modifier
+		// 0196 / 44 bytes, Actions stamina
+		// 0240 / 44 bytes, Actions hit probability
+		// 0284 / 44 bytes, Actions damage
+		// 0328 / 44 bytes, Actions fatigue
+		// 0372 / 300 or 400 bytes, Actions names
+		// 0672 or 0772 / 352 bytes, Actions Combos
+		// 1024 or 1124 / 2 bytes, Copy protection variable
+		// 1026 or 1126 / 200 bytes, Spells
+		// 1226 or 1326 / 6 bytes, Spell difficulty multipliers
+		// 1232 or 1332 / 24 bytes, Base mana cost of symbols
+	}
+
+	// keyboard and mouse input
+	extract561() {
+		this.data561 = this.getRawItem(561);
+		// 0000 / 336 bytes, Buttons for dialog boxes
+		// 0336 / 32 bytes, Rectangle areas
+		// 0368 / 8 bytes, Steps to the right for movement
+		// 0376 / 8 bytes, Steps forward for movement
+		// 0384 / 56 bytes, Rectangle areas for spell casting
+		// 0440 / 32 bytes, Rectangle areas for movement
+		// 0472 / 16 bytes, Drop areas on floor
+		// 0488 / 76 bytes, Keyboard commands
+		// 0564 / 1488 bytes, Other buttons
+	}
+
+	extract562() {
+		this.data562 = this.getRawItem(562);
+		// 0000 / 2 bytes, 'Line Feed' character
+		// 0002 / 32 bytes, Masks to print text
+		// 0034 / 24 bytes, Rectangle areas
+		// 0058 / 176 bytes,
+		// 0234 / 8 bytes, Tile type to timer type conversion table
+		// 0242 / 2 bytes, Unused, Copy protection variable
+		// 0244 / 60 bytes, Possessions drop order
+		// 0304 / 24 bytes, Bar graphs offsets
+		// 0328 / 48 bytes, Bar graphs masks
+		// 0376 / 32 bytes, Rectangles for champion position icons
+		// 0408 / 6 bytes, Special characters when reincarnating
+		// 0414 / 4 bytes, Strings used when reincarnating
+		// 0418 / 6 bytes, Resistance to injuries multipliers
+		// 0424 / 16 bytes, Rectangles for Eye and Mouth
+		// 0440 / 4 bytes, Rectangle for champion portraits
+		// 0444 / 4 bytes, Champion colors
+		// 0448 / 32 bytes, Palette changes for mouse cursor icon
+		// 0480 / 128 bytes, Hand cursor
+		// 0608 / 128 bytes, Arrow cursor
+		// 0736 / 8 bytes, Rectangle to hide icons in viewport
+		// 0744 / 12 bytes, Palette index to total luminance
+		// 0756 / 32 bytes, Luminous Power To Luminance
+		// 0788 / 76 bytes, Carry Locations Masks
+		// 0864 / 48 bytes, Rectangles for champion panel
+		// 0912 / 2 bytes, Copy protection
+		// 0914 / 276 bytes, Icon display descriptors
+		// 1190 / 16 bytes, Torch Type Per Charges Count
+		// 1206 / 8 bytes, Rectangle to clear held object name
+		// 1214 / 4 bytes, Unused data
+		// 1218 / 14 bytes, First icon index in icon graphics
+		// 1232 / 8 bytes, Unused data
+		// 1240 / 4 bytes, Creature injury masks
+		// 1244 / 32 bytes, Ordered positions to attack
+		// 1276 / 2 bytes, Copy protection
+		// 1278 / 256 bytes, Color palettes
+		// 1534 / 140 bytes, Graphic items to always load
+		// 1674 / 16 bytes, Palette changes for no changes
+		// 1690 / 136 bytes, Rectangles
 	}
 
 	//--------------------------------  Display ------------------------------------

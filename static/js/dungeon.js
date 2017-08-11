@@ -40,7 +40,7 @@ class Dungeon {
 			missiles: this.dungeonFile.read16(0x28),
 			clouds: this.dungeonFile.read16(0x2a),
 		};
-		console.log(JSON.stringify(this.objectNb));
+		// console.log(JSON.stringify(this.objectNb));
 
 		const mapsOffset = 0x2c;
 

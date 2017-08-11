@@ -290,3 +290,5 @@ function dumpArray(arr, width) {
 		}
 	}
 }
+
+const readWord = (buff, pos) => (buff[pos] << 8) + buff[pos+1];

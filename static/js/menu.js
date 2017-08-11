@@ -339,7 +339,9 @@ class ZoneMenu extends Zone {
 			if (this.showImage.collection) {
 				screen.drawCollectionImage(this.showImage.collection, this.showImage.idx, 160, 10);
 			} else if (this.showImage.num) {
-				screen.readAndExpandGraphic(this.showImage.num, 160, 10, this.showImage.palettes[this.currentMenu.paletteIdx % this.showImage.palettes.length]);
+				screen.readAndExpandGraphic(this.showImage.num, 160, 20, this.showImage.palettes[this.currentMenu.paletteIdx % this.showImage.palettes.length]);
+				let img = screen.imagescache[this.showImage.num];
+				screen.writeText(`Width: ${img.width}, Height: ${img.height}`, 160, 10, null, 6);
 			}
 		}
 	}
