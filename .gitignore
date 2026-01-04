@@ -1,5 +1,7 @@
 node_modules
 md5.js
 
+tools/output
+
 # CSBWin's source, fetched by npm run fetch-csbwin-src
 doc/CSBwin-src/

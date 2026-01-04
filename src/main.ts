@@ -13,13 +13,13 @@ import {
 } from './core';
 import { DungeonLoader, GraphicsLoader, drawImage } from './data';
 import { Game, MovementAction } from './engine';
-import { ViewportRenderer, directionToAngle, type ViewState } from './renderer';
+import { MinimalRenderer } from './renderer/MinimalRenderer';
 
 console.log('Dungeon Master Web - Initializing...');
 
 // Global game instance
 let game: Game | null = null;
-let renderer: ViewportRenderer | null = null;
+let renderer: MinimalRenderer | null = null;
 let graphicsLoader: GraphicsLoader | null = null;
 
 // Get canvas and context
@@ -47,16 +47,11 @@ function renderView() {
     if (!game || !renderer) return;
 
     const party = game.getParty();
-    const viewState: ViewState = {
-        position: party.getPosition(),
-        facing: party.getFacing(),
-        angle: directionToAngle(party.getFacing()),
-        offsetX: 0,
-        offsetY: 0,
-        mapIndex: party.getMapIndex(),
-    };
-
-    renderer.render(viewState);
+    renderer.render(
+        party.getPosition(),
+        party.getFacing(),
+        party.getMapIndex()
+    );
 }
 
 // Initialize the game
@@ -103,8 +98,8 @@ async function init() {
             game = new Game(dungeon);
 
             // Initialize renderer
-            console.log('Initializing 3D renderer...');
-            renderer = new ViewportRenderer(
+            console.log('Initializing minimal renderer (proven facts only)...');
+            renderer = new MinimalRenderer(
                 canvas,
                 game.getDungeonState(),
                 graphicsLoader
@@ -156,8 +151,8 @@ async function init() {
 
             updateDebug(
                 `Phase 4 Complete!<br>` +
-                `✓ 3D renderer initialized<br>` +
-                `✓ Ray-casting viewport active<br>` +
+                `✓ Cell-based 2.5D renderer initialized<br>` +
+                `✓ 21-cell viewport system active<br>` +
                 `✓ Party at: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y})<br>` +
                 `✓ Facing: ${Direction[dungeon.header.startPosition.facing]}<br>` +
                 `✓ Use WASD/Arrows to move, Q/E to turn!`
