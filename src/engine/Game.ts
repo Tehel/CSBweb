@@ -1,0 +1,264 @@
+/**
+ * Main game class
+ *
+ * Ties together all game systems and implements game loop
+ * Based on CSBWin's VBL-driven game loop
+ */
+
+import type { DungeonData } from '../data/dungeonTypes';
+import type { GameState, Champion } from './gameTypes';
+import { GAME_TIMING, MovementAction } from './gameTypes';
+import { Party } from './Party';
+import { DungeonState } from './DungeonState';
+import { MovementSystem } from './MovementSystem';
+
+/**
+ * Game event callback types
+ */
+export type GameEventCallback = (game: Game) => void;
+export type MovementCallback = (success: boolean, message?: string) => void;
+
+/**
+ * Game class - main game controller
+ */
+export class Game {
+    private state: GameState;
+    private party: Party;
+    private dungeonState: DungeonState;
+    private movementSystem: MovementSystem;
+
+    // Game loop
+    private running: boolean = false;
+    private lastTickTime: number = 0;
+    private animationFrameId: number | null = null;
+
+    // Event callbacks
+    private onTickCallbacks: GameEventCallback[] = [];
+    private onMoveCallbacks: MovementCallback[] = [];
+
+    constructor(dungeonData: DungeonData) {
+        // Initialize dungeon state
+        this.dungeonState = new DungeonState(dungeonData);
+
+        // Initialize party at starting position
+        const startPos = this.dungeonState.getStartPosition();
+        const startFacing = this.dungeonState.getStartFacing();
+        const startMap = this.dungeonState.getStartMapIndex();
+
+        this.party = new Party(startPos, startFacing, startMap);
+
+        // Initialize movement system
+        this.movementSystem = new MovementSystem(this.party, this.dungeonState);
+
+        // Initialize game state
+        this.state = {
+            dungeon: dungeonData,
+            party: this.party.getState(),
+            running: false,
+            paused: false,
+            startTime: Date.now(),
+            currentTime: Date.now(),
+            tickCount: 0,
+        };
+
+        console.log('Game initialized at position:', startPos, 'facing:', startFacing);
+    }
+
+    /**
+     * Start the game loop
+     */
+    start(): void {
+        if (this.running) {
+            return;
+        }
+
+        this.running = true;
+        this.state.running = true;
+        this.state.startTime = Date.now();
+        this.lastTickTime = Date.now();
+
+        console.log('Game started');
+
+        // Start game loop
+        this.gameLoop();
+    }
+
+    /**
+     * Stop the game loop
+     */
+    stop(): void {
+        this.running = false;
+        this.state.running = false;
+
+        if (this.animationFrameId !== null) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+
+        console.log('Game stopped');
+    }
+
+    /**
+     * Pause/unpause the game
+     */
+    setPaused(paused: boolean): void {
+        this.state.paused = paused;
+    }
+
+    /**
+     * Main game loop (VBL-style at 60Hz)
+     */
+    private gameLoop = (): void => {
+        if (!this.running) {
+            return;
+        }
+
+        const currentTime = Date.now();
+        this.state.currentTime = currentTime;
+
+        // Calculate time since last tick
+        const timeSinceLastTick = currentTime - this.lastTickTime;
+        const tickInterval = 1000 / GAME_TIMING.TICKS_PER_SECOND;
+
+        // Process game ticks
+        if (timeSinceLastTick >= tickInterval) {
+            if (!this.state.paused) {
+                this.gameTick();
+            }
+            this.lastTickTime = currentTime;
+        }
+
+        // Schedule next frame (60 FPS)
+        this.animationFrameId = requestAnimationFrame(this.gameLoop);
+    };
+
+    /**
+     * Process one game tick (~4 times per second)
+     */
+    private gameTick(): void {
+        this.state.tickCount++;
+
+        // Reset movement flags from previous tick
+        this.party.resetMovementFlags();
+
+        // Call tick callbacks
+        for (const callback of this.onTickCallbacks) {
+            callback(this);
+        }
+
+        // Update party state in game state
+        this.state.party = this.party.getState();
+    }
+
+    /**
+     * Attempt to move the party
+     */
+    move(action: MovementAction): boolean {
+        const result = this.movementSystem.move(action);
+
+        if (result.success) {
+            this.party.applyMovement(result);
+
+            // Update party state in game state
+            this.state.party = this.party.getState();
+
+            // Notify callbacks
+            for (const callback of this.onMoveCallbacks) {
+                callback(true, result.message);
+            }
+
+            return true;
+        } else {
+            // Notify callbacks of failure
+            for (const callback of this.onMoveCallbacks) {
+                callback(false, result.message);
+            }
+
+            return false;
+        }
+    }
+
+    /**
+     * Add a champion to the party
+     */
+    addChampion(champion: Champion): boolean {
+        return this.party.addChampion(champion);
+    }
+
+    /**
+     * Get current game state (read-only)
+     */
+    getState(): Readonly<GameState> {
+        return this.state;
+    }
+
+    /**
+     * Get party
+     */
+    getParty(): Party {
+        return this.party;
+    }
+
+    /**
+     * Get dungeon state
+     */
+    getDungeonState(): DungeonState {
+        return this.dungeonState;
+    }
+
+    /**
+     * Get movement system
+     */
+    getMovementSystem(): MovementSystem {
+        return this.movementSystem;
+    }
+
+    /**
+     * Register callback for game tick
+     */
+    onTick(callback: GameEventCallback): void {
+        this.onTickCallbacks.push(callback);
+    }
+
+    /**
+     * Register callback for movement
+     */
+    onMove(callback: MovementCallback): void {
+        this.onMoveCallbacks.push(callback);
+    }
+
+    /**
+     * Get position info for debugging
+     */
+    getPositionInfo(): string {
+        return this.movementSystem.getPositionInfo();
+    }
+
+    /**
+     * Check if game is running
+     */
+    isRunning(): boolean {
+        return this.running;
+    }
+
+    /**
+     * Check if game is paused
+     */
+    isPaused(): boolean {
+        return this.state.paused;
+    }
+
+    /**
+     * Get tick count
+     */
+    getTickCount(): number {
+        return this.state.tickCount;
+    }
+
+    /**
+     * Get elapsed time in seconds
+     */
+    getElapsedTime(): number {
+        return (this.state.currentTime - this.state.startTime) / 1000;
+    }
+}

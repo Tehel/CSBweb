@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dungeon Master Web - Classic dungeon crawler in your browser">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Dungeon Master Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        #app {
+            text-align: center;
+        }
+
+        #viewport {
+            border: 2px solid #666;
+            background-color: #222;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #controls {
+            margin-top: 20px;
+        }
+
+        button {
+            background-color: #444;
+            color: #fff;
+            border: 2px solid #666;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        button:active {
+            background-color: #333;
+        }
+
+        #debug {
+            margin-top: 20px;
+            text-align: left;
+            max-width: 640px;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h1>Dungeon Master Web</h1>
+        <canvas id="viewport" width="640" height="400"></canvas>
+
+        <div id="controls">
+            <div>
+                <button id="btn-esc">ESC</button>
+                <button id="btn-up">▲ Forward</button>
+            </div>
+            <div>
+                <button id="btn-left">◄ Left</button>
+                <button id="btn-down">▼ Back</button>
+                <button id="btn-right">► Right</button>
+            </div>
+        </div>
+
+        <div id="debug">
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

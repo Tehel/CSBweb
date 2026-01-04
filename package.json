@@ -1,18 +1,19 @@
 {
-  "name": "DMjs",
+  "name": "dmjs",
   "version": "0.0.1",
   "description": "Dungeon Master for web browser",
   "scripts": {
     "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "start": "node server.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Tehel/dmjs.git"
+    "url": "git+https://github.com/Tehel/dmjs.git"
   },
-  "author": {
-    "name": "Thomas Looten <github@looten.net>"
-  },
+  "author": "Thomas Looten <github@looten.net>",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Tehel/dmjs/issues"
@@ -20,5 +21,17 @@
   "dependencies": {
     "express": ">=4.15.3",
     "serve-favicon": ">=2.4.3"
-  }
+  },
+  "main": "server.js",
+  "directories": {
+    "doc": "doc"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.0"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "homepage": "https://github.com/Tehel/dmjs#readme"
 }
