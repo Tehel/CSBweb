@@ -4,7 +4,7 @@
   "description": "Dungeon Master for web browser",
   "scripts": {
     "fetch-csbwin-src": "node tools/fetch-csbwin-src.mjs",
-    "start": "bin/start.sh",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",
