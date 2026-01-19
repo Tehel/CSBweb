@@ -112,6 +112,7 @@ class Screen {
 		if (this.nbItems === 0) {
 			throw new Error('Empty graphics file ?');
 		}
+		console.log("graphics.dat: found ", this.nbItems);
 
 		this.itemsCompressedSizes = [];
 		this.itemsDecompressedSizes = [];
@@ -121,9 +122,9 @@ class Screen {
 		for (let i=0; i<this.nbItems; i++) {
 			this.itemsDecompressedSizes.push(this.graphicsFile.read16());
 		}
-		// console.log("GraphicCompressedSizes: " + JSON.stringify(this.itemsCompressedSizes));
-		// console.log("GraphicDecompressedSizes: " + JSON.stringify(this.itemsDecompressedSizes));
-		// console.log("img data start at: " + this.locateNthItem(0).toString(16));
+		console.log("GraphicCompressedSizes: " + JSON.stringify(this.itemsCompressedSizes));
+		console.log("GraphicDecompressedSizes: " + JSON.stringify(this.itemsDecompressedSizes));
+		console.log("img data start at: " + this.locateNthItem(0).toString(16));
 
 		this.unExpandedGraphics = new Uint32Array(this.nbItems);
 		this.graphicIndex0 = new Uint16Array(this.nbItems);
@@ -526,7 +527,7 @@ class Screen {
 		this.creaturesGraphics = [];
 		subdata = data.slice(832, 1156);
 		for(let i=0; i<27; i++) {
-			// TODO better decoding of data
+			// LATER: better decoding of data
 			// subdata.slice(i*12, (i+1)*12));
 			this.creaturesGraphics.push({
 				imgbase: 446 + readWord(subdata, i*12),

@@ -1,0 +1,677 @@
+# CSBWin Graphics Rendering Reference
+
+Complete reference for how CSBWin (the C++ Dungeon Master port) implements graphics rendering, with direct references to source code locations.
+
+## Table of Contents
+1. [Graphics System Initialization](#graphics-system-initialization)
+2. [Memory Architecture](#memory-architecture)
+3. [Graphics Loading](#graphics-loading)
+4. [DrawViewport: The Main Render Loop](#drawviewport-the-main-render-loop)
+5. [Floor and Ceiling Rendering](#floor-and-ceiling-rendering)
+6. [Wall Rendering](#wall-rendering)
+7. [Bytecode System](#bytecode-system)
+8. [Blitting Operations](#blitting-operations)
+9. [Screen Output](#screen-output)
+
+---
+
+## Graphics System Initialization
+
+### Startup Sequence
+
+**Location**: `CSBCode.cpp` lines 10104-10160
+
+```cpp
+// Allocate memory for bitmaps
+d.pCeilingBitmap = allocateMemory(CEILING_BITMAP_SIZE, 1);
+d.pFloorBitmap = allocateMemory(FLOOR_BITMAP_SIZE, 1);
+
+// Allocate memory for wall bitmaps
+d.pWallBitmaps[5] = allocateMemory(392, 1);
+d.pWallBitmaps[6] = allocateMemory(392, 1);
+d.pWallBitmaps[4] = allocateMemory(3264, 1);
+d.pWallBitmaps[3] = allocateMemory(5112, 1);
+d.pWallBitmaps[2] = allocateMemory(14208, 1);
+d.pWallBitmaps[1] = allocateMemory(2176, 1);
+d.pWallBitmaps[0] = allocateMemory(2176, 1);
+
+// Allocate unified viewport buffer (15232 bytes)
+d.pViewportBMP = allocateMemory(15232, 1);
+d.pViewportBlack = d.pViewportBMP + 3248;    // Offset for black area
+d.pViewportFloor = d.pViewportBlack + 4144;  // Offset for floor area
+```
+
+**Key Points**:
+- All graphics memory allocated at startup
+- Viewport buffer is a **single contiguous block** divided into sections
+- Pointers used to reference different sections
+
+### Memory Sizes
+
+```cpp
+// From the allocations:
+CEILING_BITMAP_SIZE = 3248 bytes  // 29 scanlines at 112 bytes/line
+FLOOR_BITMAP_SIZE   = 7840 bytes  // 70 scanlines at 112 bytes/line
+Black area          = 4144 bytes  // 37 scanlines at 112 bytes/line
+
+// Wall bitmap sizes:
+Bitmaps 0-1: 2176 bytes each (closest walls)
+Bitmap 2:    14208 bytes
+Bitmap 3:    5112 bytes
+Bitmap 4:    3264 bytes
+Bitmaps 5-6: 392 bytes each (far corners; 6 is a mirror buffer)
+```
+
+---
+
+## Memory Architecture
+
+### Viewport Buffer Layout
+
+**Location**: `CSBCode.cpp` lines 10121-10123
+
+```
+Address          Size    Section           Purpose
+═══════════════════════════════════════════════════════════
+d.pViewportBMP   3248    Ceiling section   Top 29 scanlines
+                                           (224 pixels × 29 lines)
+───────────────────────────────────────────────────────────
++3248            4144    Black section     Middle 37 scanlines
+d.pViewportBlack                           (cleared to black)
+───────────────────────────────────────────────────────────
++7392            7840    Floor section     Bottom 70 scanlines
+d.pViewportFloor                           (224 pixels × 70 visible)
+═══════════════════════════════════════════════════════════
+Total: 15232 bytes
+```
+
+### Atari ST Bitmap Format
+
+**Bitplane Organization**:
+```
+Width: 224 pixels (0x70 bytes per scanline)
+Bitplanes: 4 (for 16 colors)
+Bytes per scanline: (224 / 16) × 2 × 4 = 112 bytes
+
+Pixel encoding: Interleaved bitplanes
+  For each 16-pixel group: 4 words (one per plane), interleaved
+```
+
+**Reference**: `Mirror()` is called with `0x70` which is **bytes per scanline** (112), not pixels:
+- `Viewport.cpp` line 6743: `Mirror(d.pViewportFloor, 0x0070, 0x0046)`
+- `Viewport.cpp` line 6753: `Mirror(d.pViewportBMP, 0x0070, 0x001d)`
+
+---
+
+## Graphics Loading
+
+### ReadFloorAndCeilingBitmaps()
+
+**Location**: `CSBCode.cpp` lines 2858-2867
+
+```cpp
+void ReadFloorAndCeilingBitmaps(i16 P1)
+{
+  if (P1 != d.CurrentFloorAndCeilingGraphic)
+  {
+    d.CurrentFloorAndCeilingGraphic = P1;
+    ReadAndExpandGraphic(P1 * 2 + 75, d.pFloorBitmap, 0, 0, FLOOR_BITMAP_SIZE);
+    ReadAndExpandGraphic(P1 * 2 + 76, d.pCeilingBitmap, 0, 0, CEILING_BITMAP_SIZE);
+  };
+}
+```
+
+**Logic**:
+- Only loads if set has changed (caching)
+- Floor graphic = `P1 * 2 + 75` (typically 75 for set 0)
+- Ceiling graphic = `P1 * 2 + 76` (typically 76 for set 0)
+- Decompresses and stores in dedicated buffers
+
+### ReadWallBitmaps()
+
+**Location**: `CSBCode.cpp` lines 2870-2905
+
+```cpp
+void ReadWallBitmaps(i16 newWallGraphicSet)
+{
+  i32 i;
+  i32 firstWallGraphic;
+  if ( (newWallGraphicSet != d.CurrentWallGraphic) || (d.PartyHasDied != 0) )
+  {
+    d.CurrentWallGraphic = newWallGraphicSet;
+    firstWallGraphic = sw(77 + 13 * newWallGraphicSet);
+
+    // Load door graphics (7 graphics)
+    for (i=0; i<7; i++)
+    {
+      ReadAndExpandGraphic(firstWallGraphic + i, d.pDoorBitmaps[i+1], 0, 0);
+    };
+
+    // Load wall graphics (6 graphics: 84-89)
+    for (i=0; i<6; i++)
+    {
+      ReadAndExpandGraphic(firstWallGraphic + 7 + i, d.pWallBitmaps[i], 0, 0);
+    };
+
+    // Create mirrored door graphic
+    MakeMirror(d.pDoorBitmaps[2],
+               d.pDoorBitmaps[0],
+               d.DoorFrameRect[0].b.uByte4,
+               d.DoorFrameRect[0].b.uByte5);
+
+    // Create mirrored wall bitmap (pWallBitmaps[6] from pWallBitmaps[5])
+    MakeMirror(d.pWallBitmaps[5],
+               d.pWallBitmaps[6],
+               d.wallRectangles[12].b.uByte4,
+               d.wallRectangles[12].b.uByte5);
+  };
+}
+```
+
+**Wall Graphics Mapping** (set 0):
+```
+firstWallGraphic = 77 + 13 * 0 = 77
+
+Graphics 77-83: Door graphics (7 graphics)
+Graphics 84-89: Wall graphics (6 graphics)
+  pWallBitmaps[0] = graphic 84  // F0R1 - closest right
+  pWallBitmaps[1] = graphic 85  // F0L1 - closest left
+  pWallBitmaps[2] = graphic 86  // F1 - distance 1
+  pWallBitmaps[3] = graphic 87  // F2 - distance 2
+  pWallBitmaps[4] = graphic 88  // F3 - distance 3
+  pWallBitmaps[5] = graphic 89  // F3L2 - far corner
+  pWallBitmaps[6] = mirrored copy of pWallBitmaps[5] (not read from graphics.dat)
+```
+
+**Key Points**:
+- Only loads when wall set changes (caching)
+- Creates mirrored versions dynamically (saves memory)
+- Door and wall graphics loaded together
+
+---
+
+## DrawViewport: The Main Render Loop
+
+### Function Signature
+
+**Location**: `Viewport.cpp` line 6694
+
+```cpp
+void DrawViewport(i32 facing, i32 x, i32 y)
+```
+
+**Parameters**:
+- `facing`: Direction party is facing (0=N, 1=E, 2=S, 3=W)
+- `x`, `y`: Party position in dungeon coordinates
+
+### Execution Flow
+
+```cpp
+void DrawViewport(i32 facing, i32 x, i32 y)
+{
+  SUMMARIZEROOMDATA roomData[21];
+
+  // 1. FLOOR AND CEILING (Conditional)
+  if (d.Word11684 != 0)
+  {
+    FloorAndCeilingOnly();  // Line 6732
+  };
+
+  // 2. MIRROR SELECTION
+  d.UseMirrorImages = (I16)((x + y + facing)&1);
+  if (d.UseMirrorImages != 0)
+  {
+    // Mirror Floor
+    if (!skipDrawing) Mirror(d.pViewportFloor, 0x0070, 0x0046);  // Line 6743
+    // ... setup mirrored wall bitmap pointers
+  }
+  else
+  {
+    // Mirror Ceiling
+    if (!skipDrawing) Mirror(d.pViewportBMP, 0x0070, 0x001d);  // Line 6753
+  };
+
+  // 3. GATHER ROOM DATA FOR ALL 21 CELLS
+  for (userCellNum = 0; userCellNum < 21; userCellNum++)
+  {
+    roomData[userCellNum].x = x;
+    roomData[userCellNum].y = y;
+
+    // Calculate absolute position
+    RelativeXY(facing,
+               relativeY[userCellNum],
+               relativeX[userCellNum],
+               &roomData[userCellNum].x,
+               &roomData[userCellNum].y);  // Line 6770
+
+    // Get skin (custom graphics set)
+    roomData[userCellNum].skinNumber =
+      skinCache.GetSkin(d.LoadedLevel,
+                        roomData[userCellNum].x,
+                        roomData[userCellNum].y);
+
+    // Analyze cell contents
+    SummarizeRoomInfo(&roomData[userCellNum], facing);  // Line 6780
+
+    roomData[userCellNum].relativeCellNumber = userCellNum;
+  };
+
+  // 4. EXECUTE BYTECODE FOR ALL 21 CELLS
+  for (userCellNum = 0; userCellNum < 21; userCellNum++)
+  {
+    if (roomData[userCellNum].skinNumber != 0)
+    {
+      // Execute custom skin code
+      pCode = backgroundLib.GetCode(roomData[userCellNum].skinNumber);
+      if (pCode != NULL)
+      {
+        mainOffset = pCode[0];
+        startOffset = pCode[mainOffset + 8*userCellNum +
+                           roomData[userCellNum].graphicRoomType];
+        Interpret(pCode, startOffset, roomData, userCellNum, facing);  // Line 6803
+      };
+    }
+    else
+    {
+      // Execute standard bytecode
+      Interpret(pStdDrawCode[userCellNum][roomData[userCellNum].graphicRoomType],
+                0,
+                roomData,
+                userCellNum,
+                facing);  // Line 6810
+    };
+  };
+
+  // ... additional rendering for corners (RF3L2, RF3R2)
+}
+```
+
+### Key Control Variables
+
+**d.Word11684**: Floor/ceiling redraw flag
+- **Location**: Set throughout codebase when screen needs refresh
+- **Line 3330**: Cleared to 0 by `FloorAndCeilingOnly()`
+- **Lines**: Set to 1 by menu operations, graphics changes
+- **Purpose**: Caching mechanism - only redraw floor/ceiling when needed
+
+**d.UseMirrorImages**: Mirror selection flag
+- **Line 6741**: `d.UseMirrorImages = (I16)((x + y + facing)&1);`
+- **Purpose**: Alternates which surface (floor/ceiling) gets mirrored
+- **Effect**: Creates visual variety by flipping textures
+
+---
+
+## Floor and Ceiling Rendering
+
+### FloorAndCeilingOnly()
+
+**Location**: `Viewport.cpp` lines 3322-3330
+
+```cpp
+void FloorAndCeilingOnly(void)
+{
+  static i32 count=0;
+  if ((VBLMultiplier!=1) && (((count++)%1) != 0) && (VBLMultiplier!=99)) return;
+
+  Instrumentation(icntFloorAndCeiling);
+
+  ClearMemory(d.pViewportBlack, 4144);                  // Clear black area
+  MemMove(d.pCeilingBitmap, d.pViewportBMP, 3248);     // Copy ceiling
+  MemMove(d.pFloorBitmap, d.pViewportFloor, 7840);     // Copy floor
+
+  d.Word11684 = 0;  // Clear flag - don't redraw until needed
+}
+```
+
+**MemMove Parameters**: `MemMove(source, destination, size)`
+- **Source**: Template bitmap buffer (pCeilingBitmap, pFloorBitmap)
+- **Destination**: Section of viewport buffer (pViewportBMP, pViewportFloor)
+- **Size**: Number of bytes to copy
+
+**Process**:
+1. Clear the black middle section (4144 bytes)
+2. Copy ceiling template → viewport ceiling section (3248 bytes)
+3. Copy floor template → viewport floor section (7840 bytes)
+4. Clear redraw flag (caching)
+
+**Result**: Viewport buffer now contains floor and ceiling, ready for walls to be drawn on top
+
+### Mirror Operations
+
+**Location**: `Viewport.cpp` lines 6743, 6753
+
+```cpp
+// Floor mirroring
+Mirror(d.pViewportFloor, 0x0070, 0x0046);
+// Parameters: (buffer, width=112 bytes/scanline, height=70 scanlines)
+
+// Ceiling mirroring
+Mirror(d.pViewportBMP, 0x0070, 0x001d);
+// Parameters: (buffer, width=112 bytes/scanline, height=29 scanlines)
+```
+
+**Mirror Function**:
+- Horizontally flips the bitmap in-place
+- Width: 0x70 = 112 bytes/scanline (224 pixels wide in 4-plane ST format)
+- Height: Number of scanlines to mirror
+
+**Purpose**: Creates visual variety without storing multiple versions
+
+---
+
+## Wall Rendering
+
+### Wall Rectangle Definitions
+
+**Location**:
+- The rectangle *usage mapping* is in `Viewport.cpp` (`StdRectanglePointers`), e.g. `RECT_StdWallRectangleF3` returns `&d.wallRectangles[0]` (`Viewport.cpp:2304-2317`).
+- The rectangle coordinate values and source parameters live in the `DATA` structure as part of the tables loaded from `graphics.dat` at startup:
+  - `CSBCode.cpp:10125` loads “graphic `0x22e`” into `d.Byte7248+2`
+  - `Data.h:1109+` labels this region “Start of graphic 0x22e” and includes `RectPos wallRectangles[14];` within it (`Data.h:1238`).
+
+### Standard bitmap/rectangle selection
+
+The interpreter resolves “standard” bitmap and rectangle selectors via:
+- `StdBitmapPointers()` (`Viewport.cpp:2261-2296`)
+- `StdRectanglePointers()` (`Viewport.cpp:2298-2409`)
+
+For exact opcode numeric values, see `doc/CSBWIN_VIEWPORT_REFERENCE.md` (it is generated directly from `Viewport.cpp`’s `enum OPCODE`).
+
+---
+
+## Bytecode System
+
+### The Interpret Function
+
+**Location**: `Viewport.cpp` line 6794 (estimated based on call sites)
+
+```cpp
+void Interpret(
+  ui16 *pCode,              // Bytecode program
+  i16 startOffset,          // Starting position in program
+  SUMMARIZEROOMDATA *roomData,  // Data for all 21 cells
+  i32 userCellNum,          // Current cell being drawn
+  i32 facing                // Party facing direction
+)
+```
+
+**Purpose**: Stack-based virtual machine that executes bytecode programs to render cells
+
+### Bytecode Program Structure
+
+**Location**: `Viewport.cpp` lines 1005-1200+ (example programs)
+
+Example: Stone wall at F3 center (distance 3, front)
+```cpp
+// Drawing cell F3 (cell #4), room type STONE
+ui16 pStdDrawCode[21][8][...] = {
+  ...
+  // Cell 4 (RF3 - distance 3 center)
+  {
+    // RoomType: STONE (0)
+    StdWallBitmapF3,      // Push bitmap index 4 (graphic 88)
+    StdWallRectangleF3,   // Push rectangle index 0 (64,20,160,71)
+    StdBltShape,          // Pop both, blit bitmap to rectangle
+    Return,               // End program
+  },
+  ...
+};
+```
+
+### Key Opcodes
+
+**Control Flow**:
+```cpp
+Return                = 65535,  // End execution
+JumpZ                 = 60029,  // Jump if top of stack is zero
+JumpNZ                = 60030,  // Jump if top of stack is non-zero
+Literal               = 60031,  // Push immediate value
+```
+
+**Drawing Operations**:
+```cpp
+StdBltShape              = 60000,  // Blit bitmap to rectangle
+StdDrawWallText          = 60001,  // Draw text on wall
+StdDrawRoomObjects       = 60003,  // Draw objects in room
+StdDrawFloorDecoration   = 60004,  // Draw floor decorations
+StdDrawCeilingPit        = 60005,  // Draw ceiling pits
+StdDrawDoor              = 60006,  // Draw door
+StdDrawDoorSwitch        = 60007,  // Draw door switch
+```
+
+**Data Query Opcodes** (examples):
+```cpp
+F3                    = 60112,  // Push cell F3 number
+F3L1                  = 60111,  // Push cell F3L1 number
+Alcove                = 60214,  // Check if alcove present
+HasDecoration         = 60215,  // Check if decoration present
+```
+
+### Opcode Handler Pattern
+
+Each opcode type has an internal handler function that:
+1. **Data opcodes**: Push values onto the stack
+2. **Condition opcodes**: Evaluate conditions, push 0 or 1
+3. **Action opcodes**: Pop arguments from stack, perform action
+4. **Control opcodes**: Modify program counter
+
+---
+
+## Blitting Operations
+
+### BltShapeToViewport()
+
+**Location**: `CSBCode.cpp` line 2930 (TAG00437e)
+
+```cpp
+void BltShapeToViewport(ui8 *P1, RectPos *P2)
+{
+  dReg D0;
+  ASSERT(verifyRectPos(P2),"rectpos");
+  D0W = (UI8)(P2->b.uByte4);
+  if (D0B != 0)
+  {
+    TAG0088b2((ui8 *)P1,                   // src
+              (ui8 *)d.pViewportBMP,       // dst (viewport buffer)
+              P2,                          // destination RectPos
+              (UI8)(P2->b.uByte6),         // srcX (pixels)
+              (UI8)(P2->b.uByte7),         // srcY (pixels)
+              (UI8)(P2->b.uByte4),         // src bytes/line
+              112,                         // dst bytes/line (224 pixels wide)
+              10);                         // transparent color index
+  };
+}
+```
+
+**Key Points**:
+- `TAG0088b2()` is the core blitter; `10` is used as a color-key (transparent color index)
+- `112` is **bytes per scanline**, not pixels
+
+### RectPos Structure
+
+**Location**: `CSB.h` line 1366
+
+```cpp
+struct wordRectPos { i16 x1; i16 x2; i16 y1; i16 y2; };
+struct byteRectPos { ui8 x1; ui8 x2; ui8 y1; ui8 y2; ui8 uByte4; ui8 uByte5; ui8 uByte6; ui8 uByte7; };
+union RectPos { wordRectPos w; byteRectPos b; };
+```
+
+**Usage**:
+- `x1, y1`: Top-left corner
+- `x2, y2`: Bottom-right corner (inclusive in CSBWin screen usage, e.g. `Menu.cpp:452-455`)
+- Width = `x2 - x1 + 1`
+- Height = `y2 - y1 + 1`
+
+---
+
+## Screen Output
+
+### BLT2Screen()
+
+**Location**: `Menu.cpp` line 457
+
+```cpp
+BLT2Screen(d.pViewportBMP, &rectpos, 112, -1);
+```
+
+**Parameters**:
+- `d.pViewportBMP`: Source buffer (viewport)
+- `&rectpos`: Rectangle defining screen area
+  - `x1=47, y1=33, x2=270, y2=168` (line 452-455)
+- `112`: Source **bytes per scanline** (224 pixels wide in Atari ST 4-plane format; see `CSBCode.cpp:1117-1131`)
+- `-1`: “no transparency” color-key (passed through to `TAG0088b2()` as `transparentColor`)
+
+**Purpose**: Copy viewport buffer to actual screen memory at position (47, 33)
+
+### Screen Rectangle
+
+**Location**: `Menu.cpp` lines 452-455
+
+```cpp
+rectpos.w.y1 = 33;   // Top of viewport on screen
+rectpos.w.y2 = 168;  // Bottom of viewport on screen
+rectpos.w.x1 = 47;   // Left edge of viewport on screen
+rectpos.w.x2 = 270;  // Right edge of viewport on screen
+```
+
+**Viewport on Screen**:
+- Position: (47, 33)
+- Size: 224×136 pixels (inclusive coordinates)
+- Full screen: 320×200 pixels
+
+---
+
+## Data Flow Summary
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ 1. INITIALIZATION                                       │
+│    - Allocate viewport buffer (15232 bytes)             │
+│    - Load floor/ceiling bitmaps                         │
+│    - Load wall bitmaps                                  │
+│    - Create mirrored versions                           │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│ 2. FLOOR/CEILING (Cached - only when d.Word11684 != 0) │
+│    FloorAndCeilingOnly():                               │
+│    - Clear black section                                │
+│    - MemMove ceiling → pViewportBMP                     │
+│    - MemMove floor → pViewportFloor                     │
+│    - Clear d.Word11684 flag                             │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│ 3. MIRROR (Every frame)                                 │
+│    Based on (x + y + facing) & 1:                       │
+│    - Mirror floor OR ceiling                            │
+│    - Updates wall bitmap pointers if mirroring          │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│ 4. ROOM DATA GATHERING (Loop 1: cells 0-20)            │
+│    For each cell:                                       │
+│    - RelativeXY() → absolute coordinates                │
+│    - GetSkin() → custom graphics set                    │
+│    - SummarizeRoomInfo() → analyze tile type            │
+│    - Store in roomData array                            │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│ 5. BYTECODE EXECUTION (Loop 2: cells 0-20)             │
+│    For each cell:                                       │
+│    - Get bytecode program for cell + room type          │
+│    - Interpret(program, roomData, cell, facing)         │
+│      ├─ Execute opcodes (push/pop stack)                │
+│      ├─ StdBltShape → BltShapeToViewport()             │
+│      │   ├─ Get bitmap + rectangle from stack           │
+│      │   ├─ Loop through pixels                         │
+│      │   ├─ Skip if color == 10 (transparent)           │
+│      │   └─ Write to viewport buffer                    │
+│      └─ Other drawing operations (doors, objects, etc.) │
+└─────────────────────────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────┐
+│ 6. SCREEN OUTPUT                                        │
+│    BLT2Screen():                                        │
+│    - Copy viewport buffer → screen memory               │
+│    - Position at (47, 33)                               │
+│    - Size 224×136 pixels                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Key Architectural Patterns
+
+### 1. Memory Buffer System
+- **Single unified buffer** for viewport (ceiling + black + floor)
+- **Separate template buffers** for floor/ceiling sources
+- **Direct memory operations** (MemMove, ClearMemory)
+
+### 2. Caching Strategy
+- Floor/ceiling only redrawn when flag set
+- Wall graphics loaded once per set
+- Mirrored versions created dynamically
+
+### 3. Data-Driven Rendering
+- Bytecode programs define all drawing
+- Custom skins can override default programs
+- Room type determines which program executes
+
+### 4. Transparency Model
+- **Color index 10 = transparent**
+- Skip drawing these pixels (color-key transparency)
+- No alpha blending - simple skip logic
+
+### 5. Coordinate Systems
+- **Viewport space**: 224×136 pixels (render target)
+- **Screen space**: 320×200 pixels (full display)
+- **Dungeon space**: Grid coordinates (x, y)
+- **Relative space**: Distance/direction from party
+
+---
+
+## Critical Code References
+
+### Primary Rendering
+- `Viewport.cpp:6694` - DrawViewport() main loop
+- `Viewport.cpp:3322` - FloorAndCeilingOnly() cached rendering
+- `Viewport.cpp:6794` - Interpret() bytecode execution
+- `CSBCode.cpp:2930` - BltShapeToViewport() (calls `TAG0088b2`)
+
+### Graphics Loading
+- `CSBCode.cpp:10104-10160` - Memory allocation
+- `CSBCode.cpp:2858-2867` - ReadFloorAndCeilingBitmaps()
+- `CSBCode.cpp:2870-2905` - ReadWallBitmaps()
+
+### Screen Output
+- `Menu.cpp:452-457` - BLT2Screen() viewport to screen
+
+### Opcode Definitions
+- `Viewport.cpp:375-720` - Opcode enum definitions
+- `Viewport.cpp:1005+` - Standard bytecode programs
+
+### Constants
+- `Viewport.cpp:6743` - Floor mirror width (0x70 = 112 bytes/scanline)
+- `Viewport.cpp:6753` - Ceiling mirror width (0x70 = 112 bytes/scanline)
+- `Viewport.cpp:2947` - Transparent color index (10)
+
+---
+
+## Differences from Atari ST Original
+
+CSBWin is a **port**, not the original Atari ST code. Key differences:
+
+1. **Memory Management**: Uses Windows/Mac memory allocation instead of fixed Atari ST memory
+2. **Screen Resolution**: Supports higher resolutions (scaled up from 320×200)
+3. **Graphics Format**: Converts Atari ST bitplane format to platform-specific format
+4. **File Paths**: Modern filesystem instead of Atari ST file system
+5. **Performance**: Optimizations for modern CPUs
+
+However, the **rendering logic** is preserved from the original, making CSBWin an accurate reference for understanding Dungeon Master's graphics system.
+
+---
+
+*This document is based on analysis of CSBWin source code (C++ port of Dungeon Master) and serves as a reference for mechanical porting efforts.*

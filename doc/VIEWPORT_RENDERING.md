@@ -11,9 +11,9 @@ Dungeon Master uses a **2.5D sprite-based rendering system**, NOT true 3D ray-ca
 The viewport is divided into **21 cells** representing relative positions from the party:
 
 ```
-Distance 4:  [L2]           [L1]      [Center]      [R1]           [R2]
+Distance 4:  [L2]     [L1]        [Center]        [R1]     [R2]
 Distance 3:       [L2]  [L1]      [Center]      [R1]  [R2]
-Distance 2:            [L2]  [L1]  [Center]  [R1]  [R2]
+Distance 2:           [L2]  [L1]  [Center]  [R1]  [R2]
 Distance 1:                 [L1]  [Center]  [R1]
 Distance 0:                 [L1]  [Center]  [R1]
 ```
@@ -31,13 +31,15 @@ i8 relativeY[21] = {
 ```
 
 Cell numbering constants (lines 323-346):
-- RF4L2=0, RF4R2=1 (distance 4, left/right 2)
-- RF3L2=2, RF3R2=3 (distance 3, left/right 2)
-- RF3L1=7, RF3=6, RF3R1=8 (distance 3)
-- RF2L2=10, RF2R2=11 (distance 2, left/right 2)
-- RF2L1=12, RF2=14, RF2R1=13 (distance 2)
-- RF1L1=15, RF1=17, RF1R1=16 (distance 1)
-- RF0L1=18, RF0=20, RF0R1=19 (distance 0 - party position)
+- RF4L2=0, RF4R2=1
+- RF3L2=2, RF2L2=3
+- RF4L1=4, RF4R1=5, RF4=6
+- RF3L1=7, RF3R1=8, RF3=9, RF3R2=10
+- RF2R2=11, RF2L1=12, RF2R1=13, RF2=14
+- RF1L1=15, RF1R1=16, RF1=17
+- RF0L1=18, RF0R1=19, RF0=20
+
+Note: some of these macro *names* don’t match the distance implied by `relativeY[]`; for a port, the authoritative mapping is the `userCellNum` index plus `relativeX[]/relativeY[]` (see `Viewport.cpp` lines 323-355).
 
 ### 2. Rendering Algorithm (DrawViewport function, line 6694)
 
@@ -148,13 +150,13 @@ To properly port this system:
 - `doc/CSBwin-src/CSB.h` - Function declarations
 - `doc/CSBwin-src/Data.h` - Data structures
 
-## Graphics.dat Structure (for viewport)
+## Graphics Indices Used by CSBWin (selected)
 
-Based on typical DM structure:
-- Graphics 0-100: Wall bitmaps at various distances/angles
-- Graphics 100-200: Floor/ceiling decorations
-- Graphics 200-300: Door graphics
-- Graphics 300-400: Object/creature sprites
-- Graphics 400-500: UI elements
+These are CSBWin-specific and source-backed:
 
-Exact indices need to be determined by examining graphics.dat or CSBWin lookup tables.
+- Wall/door set base: `firstWallGraphic = 77 + 13 * newWallGraphicSet` (`CSBCode.cpp:2877`)
+- Door bitmaps loaded from `firstWallGraphic + 0..6` (`CSBCode.cpp:2878-2881`)
+- Wall bitmaps loaded from `firstWallGraphic + 7..12` (`CSBCode.cpp:2882-2885`)
+- `pWallBitmaps[6]` is created by mirroring `pWallBitmaps[5]` (`CSBCode.cpp:2893-2896`)
+- Floor/Ceiling templates loaded as `P1*2 + 75` and `P1*2 + 76` (`CSBCode.cpp:2864-2865`)
+- Viewport coordinate tables (including `wallRectangles[14]`) are loaded from `graphics.dat` “graphic `0x22e`” into `d.Byte7248+2` (`CSBCode.cpp:10125`, `Data.h:1109+`)

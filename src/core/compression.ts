@@ -25,11 +25,9 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
     // Dictionary: wordArray stores chain of codes, byteArray stores bytes
     let wordArray = new Array<ui16>(512).fill(0);
     let byteArray = new Array<ui8>(256);
-    for (let i = 0; i < 256; i++) {
-        byteArray[i] = i;
-    }
+    for (let i = 0; i < 256; i++) byteArray[i] = i;
 
-    let D4: ui16, D7: ui8;
+    let D4: ui16, D7: ui8 = 0;
     let prevCodeWord: ui16 = 0;
     let newCode: ui16;
 
@@ -154,9 +152,7 @@ export function LZWexpand(compressedData: Uint8Array): Uint8Array {
         prevCodeWord = D4;
     }
 
-    if (out.length === 0) {
-        throw new Error('LZW decompression produced no output');
-    }
+    if (out.length === 0) throw new Error('LZW decompression produced no output');
 
     return new Uint8Array(out);
 }
@@ -289,17 +285,13 @@ export function decompressGraphics(
     compressedSize: ui16,
     decompressedSize: ui16
 ): Uint8Array {
-    if (!isCompressed(compressedSize, decompressedSize)) {
-        return data;
-    }
+    if (!isCompressed(compressedSize, decompressedSize)) return data;
 
     const lzwExpanded = LZWexpand(data);
     const rleExpanded = RLEexpand(lzwExpanded);
 
     if (rleExpanded.length !== decompressedSize) {
-        throw new Error(
-            `Decompression size mismatch: expected ${decompressedSize}, got ${rleExpanded.length}`
-        );
+        throw new Error(`Decompression size mismatch: expected ${decompressedSize}, got ${rleExpanded.length}`);
     }
 
     return rleExpanded;

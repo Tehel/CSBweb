@@ -5,18 +5,34 @@
  * Based on CSBWin's VBL-driven game loop
  */
 
-import type { DungeonData } from '../data/dungeonTypes';
-import type { GameState, Champion } from './gameTypes';
+import type { DungeonData, Item16Record, TimerRecord } from '../data/dungeonTypes';
+import type { GameState, Champion, PartyState } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Party } from './Party';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
+import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 
 /**
  * Game event callback types
  */
 export type GameEventCallback = (game: Game) => void;
 export type MovementCallback = (success: boolean, message?: string) => void;
+
+export interface RuntimeSaveState {
+    version: 1;
+    savedAt: number;
+    party: PartyState;
+    game: {
+        tickCount: number;
+        paused: boolean;
+        elapsedTimeMs: number;
+    };
+    dungeon: {
+        item16?: Item16Record[];
+        timers?: TimerRecord[];
+    };
+}
 
 /**
  * Game class - main game controller
@@ -260,5 +276,62 @@ export class Game {
      */
     getElapsedTime(): number {
         return (this.state.currentTime - this.state.startTime) / 1000;
+    }
+
+    /**
+     * Snapshot runtime state for quick-save.
+     */
+    getRuntimeSaveState(): RuntimeSaveState {
+        const item16 = this.state.dungeon.item16
+            ? this.state.dungeon.item16.map((r) => ({
+                  facings: r.facings,
+                  positions: r.positions,
+                  singleMonsterStatus: [...r.singleMonsterStatus],
+              }))
+            : undefined;
+        const timers = this.state.dungeon.timers
+            ? this.state.dungeon.timers.map((t) => ({ timerWord8: t.timerWord8 }))
+            : undefined;
+
+        return {
+            version: 1,
+            savedAt: Date.now(),
+            party: this.party.getState(),
+            game: {
+                tickCount: this.state.tickCount,
+                paused: this.state.paused,
+                elapsedTimeMs: this.state.currentTime - this.state.startTime,
+            },
+            dungeon: {
+                item16,
+                timers,
+            },
+        };
+    }
+
+    /**
+     * Restore runtime state from quick-save.
+     */
+    applyRuntimeSaveState(save: RuntimeSaveState): void {
+        this.party.setState(save.party);
+        this.state.party = this.party.getState();
+
+        this.state.paused = save.game.paused;
+        this.state.tickCount = save.game.tickCount;
+        const now = Date.now();
+        this.state.currentTime = now;
+        this.state.startTime = now - save.game.elapsedTimeMs;
+
+        const item16 = save.dungeon.item16 ?? [];
+        const timers = save.dungeon.timers ?? [];
+        const saveGameState: SaveGameState = {
+            item16,
+            timers,
+            maxItem16: item16.length,
+            maxTimers: timers.length,
+            sequencedTimers: false,
+            extendedTimers: false,
+        };
+        applySaveGameState(this.state.dungeon, saveGameState);
     }
 }

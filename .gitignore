@@ -1,6 +1,12 @@
+dist
 node_modules
 md5.js
 
+tools/output
+
+doc/CSBwin*
+doc/old
+doc/dubious
 tools/output
 
 # CSBWin's source, fetched by npm run fetch-csbwin-src

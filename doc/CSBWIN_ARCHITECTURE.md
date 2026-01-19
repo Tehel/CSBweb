@@ -2,7 +2,7 @@
 
 This document provides a comprehensive overview of the CSBWin (Dungeon Master) source code architecture, intended as a reference for porting to TypeScript/Web.
 
-**Source**: CSBWin C++ codebase in `doc/CSBwin-src/` (111,330 total lines of code)
+**Source**: CSBWin C++ codebase in `doc/CSBwin-src/` (≈131k lines in this checkout; `wc -l doc/CSBwin-src/*`)
 **Date**: 2026-01-04
 **Purpose**: Reference for TypeScript web port implementation
 
@@ -157,7 +157,11 @@ Handles:
 
 ### Overview
 
-The viewport uses **column-based ray-casting** similar to original Dungeon Master, rendering a 112×136 pixel first-person view.
+The CSBWin viewport renderer is **data-driven bitmap blitting**, not ray-casting.
+
+At runtime, `DrawViewport()` builds a 21-cell visibility summary, selects a bytecode program per cell (standard tables or per-skin custom code), and executes it via `Interpret()` to blit pre-rendered graphics into a viewport buffer using `TAG0088b2()` (the low-level blitter).
+
+The viewport image is **224×136 pixels** stored in Atari ST 4-bitplane format with a stride of **112 bytes per scanline**.
 
 ### Main Files
 - **Viewport.cpp** (7,290 lines)
@@ -222,10 +226,10 @@ Uses **skin system** for texture mapping:
 
 #### Viewport Output
 
-- Renders to `d.pViewportBMP` (112×136 pixels)
-- Uses 4-bitplane format (16 colors, Atari ST heritage)
-- VBL interrupt copies viewport to screen buffer
-- Final display at `d.LogicalScreenBase`
+- Renders into `d.pViewportBMP` (buffer size 15232 bytes = 3248 + 4144 + 7840; see `CSBCode.cpp` allocation)
+- Uses Atari ST 4-bitplane format (16 colors): 224 pixels wide ⇒ 112 bytes/line
+- `BLT2Screen()` copies `d.pViewportBMP` into screen memory at `x=47..270`, `y=33..168` (inclusive) ⇒ 224×136 pixels
+- Final display target is `d.LogicalScreenBase`
 
 #### Object Rendering
 
@@ -803,7 +807,7 @@ while (obj != RNeof) {
 
 #### Phase 3: Basic Rendering
 1. Canvas-based viewport:
-   - 112×136 pixel rendering area (scale up for modern screens)
+   - 224×136 pixel viewport image (112 bytes/scanline in ST planar format; scale up for modern screens)
    - HTML5 Canvas 2D context
 2. Wall rendering:
    - Distance layers (D1-D4)
@@ -886,7 +890,7 @@ CSBWin is a well-architected port of Dungeon Master with clear separation of con
 
 - **Game Loop**: VBL-based timing at ~60Hz
 - **Movement**: Tile-based with collision detection
-- **Rendering**: Column-based ray-casting viewport
+- **Rendering**: Data-driven bitmap blitting (bytecode/interpreter-driven)
 - **Data**: Indirect RN object system with 16 specialized databases
 - **Storage**: Binary files (dungeon.dat, graphics.dat) with optional compression
 

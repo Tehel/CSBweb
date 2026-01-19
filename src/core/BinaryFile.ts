@@ -102,40 +102,14 @@ export class BinaryFile {
         }
     }
 
-    /**
-     * Read bytes into a new Uint8Array
-     * Can be called as:
-     * - read(length) - read from current position
-     * - read(position, length) - read from specific position
-     */
-    read(positionOrLength: number, length?: number): Uint8Array {
-        const startPos = length !== undefined ? positionOrLength : this.pos;
-        const numBytes = length !== undefined ? length : positionOrLength;
-
-        if (!this.data) {
-            throw new Error('No data loaded');
+    read(position: number, length: number): Uint8Array {
+        if (!this.data) throw new Error('No data loaded');
+        if (position < 0 || position + length > this.data.length) {
+            throw new Error(`Invalid read: position ${position}, length ${length}, file size ${this.data.length}`);
         }
-
-        if (startPos < 0 || startPos + numBytes > this.data.length) {
-            throw new Error(
-                `Invalid read: position ${startPos}, length ${numBytes}, ` +
-                `file size ${this.data.length}`
-            );
-        }
-
-        const result = this.data.subarray(startPos, startPos + numBytes);
-
-        // Only advance position if reading from current position
-        if (length === undefined) {
-            this.pos += numBytes;
-        }
-
-        return result;
+        return this.data.subarray(position, position + length);
     }
 
-    /**
-     * Read unsigned 8-bit integer
-     */
     readU8(position?: number): ui8 {
         if (position !== undefined) {
             this.seek(position);
@@ -146,17 +120,6 @@ export class BinaryFile {
         return value;
     }
 
-    /**
-     * Read signed 8-bit integer
-     */
-    readI8(position?: number): i8 {
-        const value = this.readU8(position);
-        return value > 127 ? value - 256 : value;
-    }
-
-    /**
-     * Read unsigned 16-bit integer
-     */
     readU16(position?: number): ui16 {
         if (position !== undefined) {
             this.seek(position);
@@ -174,17 +137,6 @@ export class BinaryFile {
         return value;
     }
 
-    /**
-     * Read signed 16-bit integer
-     */
-    readI16(position?: number): i16 {
-        const value = this.readU16(position);
-        return value > 32767 ? value - 65536 : value;
-    }
-
-    /**
-     * Read unsigned 32-bit integer
-     */
     readU32(position?: number): ui32 {
         if (position !== undefined) {
             this.seek(position);
@@ -208,67 +160,32 @@ export class BinaryFile {
         return value >>> 0; // Ensure unsigned
     }
 
-    /**
-     * Read signed 32-bit integer
-     */
+    readI8(position?: number): i8 {
+        const value = this.readU8(position);
+        return value > 127 ? value - 256 : value;
+    }
+
+    readI16(position?: number): i16 {
+        const value = this.readU16(position);
+        return value > 32767 ? value - 65536 : value;
+    }
+
     readI32(position?: number): i32 {
         return this.readU32(position) | 0; // Convert to signed
     }
 
-    /**
-     * Peek at next byte without advancing position
-     */
-    peek(): ui8 {
-        this.checkAvailable(1);
-        return this.data![this.pos];
-    }
-
-    /**
-     * Check if at end of file
-     */
-    eof(): boolean {
-        return this.data ? this.pos >= this.data.length : true;
-    }
-
-    /**
-     * Get remaining bytes
-     */
-    remaining(): number {
-        return this.data ? this.data.length - this.pos : 0;
-    }
-
-    /**
-     * Set endianness
-     */
-    setEndianness(endianness: Endianness): void {
-        this.endianness = endianness;
-    }
-
-    /**
-     * Get endianness
-     */
-    getEndianness(): Endianness {
-        return this.endianness;
-    }
+    // Peek at next byte without advancing position
+    peek(): ui8 { this.checkAvailable(1); return this.data![this.pos]; }
+    eof(): boolean { return this.data ? this.pos >= this.data.length : true; }
+    remaining(): number { return this.data ? this.data.length - this.pos : 0; }
+    setEndianness(endianness: Endianness): void { this.endianness = endianness; }
+    getEndianness(): Endianness { return this.endianness; }
 }
 
-/**
- * Convenience aliases matching CSBWin and original JS naming
- */
+// Convenience aliases matching CSBWin and original JS naming
 export class RemoteBinaryFile extends BinaryFile {
-    async get(url: string): Promise<void> {
-        return this.load(url);
-    }
-
-    read8(position?: number): ui8 {
-        return this.readU8(position);
-    }
-
-    read16(position?: number): ui16 {
-        return this.readU16(position);
-    }
-
-    read32(position?: number): ui32 {
-        return this.readU32(position);
-    }
+    async get(url: string): Promise<void> { return this.load(url); }
+    read8(position?: number): ui8 { return this.readU8(position); }
+    read16(position?: number): ui16 { return this.readU16(position); }
+    read32(position?: number): ui32 { return this.readU32(position); }
 }

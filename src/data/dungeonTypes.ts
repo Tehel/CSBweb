@@ -6,7 +6,7 @@
  */
 
 import type {
-    ui8, ui16, i16,
+    ui8, ui16, ui32,
     ObjectID,
     CellFlag,
     StartPosition,
@@ -76,6 +76,12 @@ export interface MapData {
     descriptor: MapDescriptor;
     tiles: TileData[][];        // [x][y] 2D array
     cellFlags: CellFlag[][];    // [x][y] raw cell flags for fast access
+
+    // Extra per-level tables stored after CELLFLAGs in dungeon.dat (CSBWin `SetPartyLevel`, CSBCode.cpp:5778+).
+    monsterTypes?: ui8[];           // LEVELDESC.numMonsterType() entries
+    wallDecorationTOC?: ui8[];      // LEVELDESC.NumWallDecoration() entries (+1 implicit "far text" in CSBWin)
+    floorDecorationTOC?: ui8[];     // LEVELDESC.NumFloorDecorations() entries
+    doorDecorationTOC?: ui8[];      // LEVELDESC.NumDoorDecorations() entries
 }
 
 /**
@@ -112,6 +118,7 @@ export interface TextRecord {
     nextObject: ObjectID;       // +0x00
     textOffset: ui16;           // +0x02 bits 15-3 (offset in words)
     visible: boolean;           // bit 0
+    textIndex?: ui16;           // CSBWin indirect text index (post-conversion)
 }
 
 /**
@@ -121,6 +128,7 @@ export interface ActuatorRecord {
     nextObject: ObjectID;       // +0x00
     sensorType: ui8;            // +0x02 bits 6-0
     data: ui16;                 // bits 15-7 (type-specific)
+    portraitState: ui8;         // bits 11-9 (PORTRAIT_* flags for type 127)
     decorationOrdinal: ui8;     // +0x04 bits 15-12
     targetLocal: boolean;       // bit 11: 0=remote, 1=local
     delay: ui8;                 // bits 10-7
@@ -129,6 +137,8 @@ export interface ActuatorRecord {
     actionType: ui8;            // bits 4-3: 0=set, 1=clear, 2=toggle, 3=hold
     onceOnly: boolean;          // bit 2
     targetData: ui16;           // +0x06: target location or action
+    rawBehavior: ui16;          // original word4 (needed for DSA ParameterA/B)
+    rawTarget: ui16;            // original word6 (needed for DSA ParameterA/B)
 }
 
 /**
@@ -143,6 +153,7 @@ export interface CreatureRecord {
     important: boolean;         // +0x0E bit 10
     facing: ui8;                // bits 9-8: direction
     count: ui8;                 // bits 6-5: count-1 (0-3)
+    groupIndex?: ui8;           // Item16 index (runtime, save games only)
 }
 
 /**
@@ -225,6 +236,23 @@ export interface CloudRecord {
     nextObject: ObjectID;       // +0x00
     value: ui8;                 // +0x02 bits 15-8
     cloudType: ui8;             // bits 6-0
+    bit7: boolean;              // bit 7
+}
+
+/**
+ * Save-game Item16 record (runtime monster state)
+ */
+export interface Item16Record {
+    facings: ui8;               // 2 bits per creature (facing)
+    positions: ui8;             // 2 bits per creature, 0xFF=centered
+    singleMonsterStatus: ui8[]; // 4 bytes (attacking/mirror/offset nibbles)
+}
+
+/**
+ * Save-game timer record (runtime)
+ */
+export interface TimerRecord {
+    timerWord8: ui16;           // bits 0-4 x, 5-9 y, 10-11 direction, 12-15 delta energy
 }
 
 /**
@@ -287,8 +315,14 @@ export interface DungeonData {
     header: DungeonHeader;
     maps: MapData[];
     databases: Databases;
-    textData: string[];         // Decoded text strings
+    textWords?: ui16[];         // Raw 5-bit encoded text words
+    indirectTextIndex?: ui32[]; // Word offsets into compressedText (CSBWin indirect text)
+    compressedText?: ui16[];    // Packed text words after ConvertToIndirectText
     objectList: ObjectID[];     // Object list by tile
     columnIndex: ui16[];        // Column index for object lookup
     levelIndex: ui16[];         // Level index for object lookup
+    item16?: Item16Record[];    // Save-game runtime monster state
+    timers?: TimerRecord[];     // Save-game timer table
+    dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
+    extendedWallDecorations?: boolean; // Extended-feature flag
 }

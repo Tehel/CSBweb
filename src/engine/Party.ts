@@ -191,6 +191,10 @@ export class Party {
             this.state.moving = true;
         }
 
+        if (result.newMapIndex !== undefined) {
+            this.state.mapIndex = result.newMapIndex;
+        }
+
         // Update facing if turned
         if (result.newFacing !== undefined) {
             this.state.facing = result.newFacing;
@@ -224,6 +228,24 @@ export class Party {
      */
     setFacing(facing: Direction): void {
         this.state.facing = facing;
+    }
+
+    /**
+     * Replace full party state (used for save/load).
+     */
+    setState(state: PartyState): void {
+        this.state = {
+            champions: state.champions.map((c) => ({
+                ...c,
+                attributes: { ...c.attributes },
+            })),
+            position: { ...state.position },
+            mapIndex: state.mapIndex,
+            facing: state.facing,
+            moving: state.moving,
+            turning: state.turning,
+            lastMoveTime: state.lastMoveTime,
+        };
     }
 
     /**

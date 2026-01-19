@@ -5,22 +5,27 @@
  */
 
 import {
-    BinaryFile,
     DEFAULT_PALETTE,
     atariToRGB,
     Direction,
     RoomType
 } from './core';
-import { DungeonLoader, GraphicsLoader, drawImage } from './data';
-import { Game, MovementAction } from './engine';
-import { MinimalRenderer } from './renderer/MinimalRenderer';
+import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader, drawImage } from './data';
+import { loadSaveGameState, applySaveGameState } from './data/SaveGameLoader';
+import { Game, MovementAction, type RuntimeSaveState } from './engine';
+import { ViewportRenderer } from './renderer/ViewportRenderer';
 
 console.log('Dungeon Master Web - Initializing...');
 
 // Global game instance
 let game: Game | null = null;
-let renderer: MinimalRenderer | null = null;
+let renderer: ViewportRenderer | null = null;
 let graphicsLoader: GraphicsLoader | null = null;
+let dungeonLoader: DungeonLoader | null = null;
+let csbGraphicsLoader: CSBGraphicsLoader | null = null;
+
+const QUICK_SAVE_KEY = 'dmweb_quicksave_v1';
+const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
 
 // Get canvas and context
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
@@ -32,6 +37,7 @@ const ctx = canvas.getContext('2d');
 if (!ctx) {
     throw new Error('Could not get 2D context');
 }
+const viewportCtx: CanvasRenderingContext2D = ctx;
 
 // Debug output element
 const debugEl = document.getElementById('debug');
@@ -42,16 +48,59 @@ function updateDebug(message: string) {
     }
 }
 
+function decodeBase64ToBytes(data: string): Uint8Array {
+    const bin = atob(data);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) {
+        out[i] = bin.charCodeAt(i) & 0xff;
+    }
+    return out;
+}
+
+function quickSave(): void {
+    if (!game) return;
+    const state = game.getRuntimeSaveState();
+    localStorage.setItem(QUICK_SAVE_KEY, JSON.stringify(state));
+    updateDebug('Quick-saved');
+}
+
+function quickLoad(): void {
+    if (!game) return;
+    const raw = localStorage.getItem(QUICK_SAVE_KEY);
+    if (!raw) {
+        updateDebug('No quick-save found');
+        return;
+    }
+    try {
+        const state = JSON.parse(raw) as RuntimeSaveState;
+        game.applyRuntimeSaveState(state);
+        renderView();
+        updateDebug('Quick-loaded');
+    } catch (error) {
+        console.warn('Failed to quick-load:', error);
+        updateDebug('Quick-load failed (see console)');
+    }
+}
+
 // Render the 3D view
 function renderView() {
     if (!game || !renderer) return;
 
     const party = game.getParty();
-    renderer.render(
-        party.getPosition(),
-        party.getFacing(),
-        party.getMapIndex()
-    );
+    const pos = party.getPosition();
+    const facing = party.getFacing();
+    const mapIndex = party.getMapIndex();
+
+    // ViewportRenderer.render(facing, x, y, mapIndex)
+    console.log(`Rendering viewport: pos=(${pos.x},${pos.y}) facing=${facing} map=${mapIndex}`);
+    renderer.render(facing, pos.x, pos.y, mapIndex);
+
+    // Debug: log execution
+    const log = renderer.getExecutionLog();
+    if (log.length > 0) {
+        console.log(`Bytecode executed: ${log.length} operations`);
+        console.log('First 5 ops:', log.slice(0, 5));
+    }
 }
 
 // Initialize the game
@@ -61,7 +110,7 @@ async function init() {
 
         // Test DungeonLoader
         console.log('Testing DungeonLoader...');
-        const dungeonLoader = new DungeonLoader();
+        dungeonLoader = new DungeonLoader();
         try {
             updateDebug('Loading dungeon.dat...');
             const dungeon = await dungeonLoader.load('/gamefiles/dungeon.dat');
@@ -70,22 +119,11 @@ async function init() {
             console.log(`  - Seed: ${dungeon.header.randomSeed}`);
             console.log(`  - Maps: ${dungeon.maps.length}`);
             console.log(`  - Total objects: ${dungeon.header.objectCounts.reduce((a, b) => a + b, 0)}`);
-            console.log(`  - Texts: ${dungeon.textData.length}`);
             console.log(`  - Start: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y}) facing ${Direction[dungeon.header.startPosition.facing]}`);
 
             // Display first map info
             const firstMap = dungeon.maps[0];
             console.log(`  - First map: ${firstMap.descriptor.width}×${firstMap.descriptor.height}, level ${firstMap.descriptor.level}`);
-
-            updateDebug(
-                `Phase 2 Complete!<br>` +
-                `✓ DungeonLoader: Full parser working<br>` +
-                `✓ Loaded ${dungeon.maps.length} maps<br>` +
-                `✓ Parsed ${dungeon.header.objectCounts.reduce((a, b) => a + b, 0)} objects across 16 databases<br>` +
-                `✓ Decoded ${dungeon.textData.length} text entries<br>` +
-                `✓ Start position: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y})<br>` +
-                `✓ First map: ${firstMap.descriptor.width}×${firstMap.descriptor.height} tiles`
-            );
 
             // Load graphics
             console.log('Loading graphics.dat...');
@@ -93,18 +131,57 @@ async function init() {
             await graphicsLoader.load('/gamefiles/graphics.dat');
             console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
+            // Optional CSBgraphics.dat overlay (extended decorations, portraits, etc.)
+            csbGraphicsLoader = new CSBGraphicsLoader();
+            const csbLoaded = await csbGraphicsLoader.tryLoad('/gamefiles/CSBgraphics.dat');
+            if (csbLoaded) {
+                console.log('✓ Loaded CSBgraphics.dat overlay');
+            } else {
+                console.log('CSBgraphics.dat not found; extended decorations disabled');
+                csbGraphicsLoader = null;
+            }
+
+            const rawSave = localStorage.getItem(QUICK_SAVEGAME_RAW_KEY);
+            if (rawSave) {
+                try {
+                    const saveBytes = decodeBase64ToBytes(rawSave);
+                    const saveState = loadSaveGameState(saveBytes);
+                    applySaveGameState(dungeon, saveState);
+                    console.log('✓ Applied savegame state from localStorage');
+                } catch (error) {
+                    console.warn('Failed to apply savegame state:', error);
+                }
+            }
+
             // Initialize game engine
             console.log('Initializing game engine...');
             game = new Game(dungeon);
 
-            // Initialize renderer
-            console.log('Initializing minimal renderer (proven facts only)...');
-            renderer = new MinimalRenderer(
-                canvas,
-                game.getDungeonState(),
-                graphicsLoader
-            );
-            console.log('✓ Renderer initialized');
+            // Initialize viewport renderer
+            console.log('Initializing viewport renderer (CSBWin bytecode system)...');
+            const dungeonState = game.getDungeonState();
+            renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
+            await renderer.initialize();
+            console.log('✓ Viewport renderer initialized');
+
+            // Replace the main canvas with the full screen canvas
+            const screenCanvas = renderer.getCanvas();
+            const oldCanvas = document.getElementById('viewport');
+            if (oldCanvas && oldCanvas.parentNode) {
+                screenCanvas.id = 'viewport';
+
+                // Scale the full screen canvas using CSS
+                // Use integer scaling (3x) to maintain pixel-perfect rendering
+                // Full screen: 320×200 @ 3x = 960×600
+                screenCanvas.style.width = '960px';   // 320 * 3
+                screenCanvas.style.height = '600px';  // 200 * 3
+                screenCanvas.style.imageRendering = 'pixelated';
+                screenCanvas.style.imageRendering = '-moz-crisp-edges';
+                screenCanvas.style.imageRendering = 'crisp-edges';
+
+                oldCanvas.parentNode.replaceChild(screenCanvas, oldCanvas);
+                console.log('✓ Replaced canvas with full screen (320×200 @ 3x scale)');
+            }
 
             // Register movement callback
             game.onMove((success, message) => {
@@ -185,32 +262,32 @@ async function init() {
 
 // Helper: Draw palette test
 function drawPaletteTest() {
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    viewportCtx.fillStyle = '#000';
+    viewportCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '20px "Courier New"';
-    ctx.textAlign = 'center';
-    ctx.fillText('Phase 2: Data Loaders ✓', canvas.width / 2, 30);
+    viewportCtx.fillStyle = '#fff';
+    viewportCtx.font = '20px "Courier New"';
+    viewportCtx.textAlign = 'center';
+    viewportCtx.fillText('Phase 2: Data Loaders ✓', canvas.width / 2, 30);
 
     // Draw palette colors
-    ctx.font = '12px "Courier New"';
-    ctx.textAlign = 'left';
-    ctx.fillText('Default Palette:', 20, 70);
+    viewportCtx.font = '12px "Courier New"';
+    viewportCtx.textAlign = 'left';
+    viewportCtx.fillText('Default Palette:', 20, 70);
 
     for (let i = 0; i < DEFAULT_PALETTE.length; i++) {
         const color = atariToRGB(DEFAULT_PALETTE[i]);
         const x = 20 + (i % 8) * 75;
         const y = 90 + Math.floor(i / 8) * 50;
 
-        ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        ctx.fillRect(x, y, 60, 30);
+        viewportCtx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+        viewportCtx.fillRect(x, y, 60, 30);
 
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(x, y + 30, 60, 15);
-        ctx.fillStyle = '#000';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${i}`, x + 30, y + 41);
+        viewportCtx.fillStyle = '#fff';
+        viewportCtx.fillRect(x, y + 30, 60, 15);
+        viewportCtx.fillStyle = '#000';
+        viewportCtx.textAlign = 'center';
+        viewportCtx.fillText(`${i}`, x + 30, y + 41);
     }
 }
 
@@ -228,16 +305,16 @@ function drawMapPreview(dungeon: any) {
         18 // Max scale for readability
     ));
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    viewportCtx.fillStyle = '#000';
+    viewportCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = '20px "Courier New"';
-    ctx.textAlign = 'center';
-    ctx.fillText(`Phase 3: Game Engine ✓`, canvas.width / 2, 25);
+    viewportCtx.fillStyle = '#fff';
+    viewportCtx.font = '20px "Courier New"';
+    viewportCtx.textAlign = 'center';
+    viewportCtx.fillText(`Phase 3: Game Engine ✓`, canvas.width / 2, 25);
 
-    ctx.font = '12px "Courier New"';
-    ctx.fillText(`Map 0: ${map.descriptor.width}×${map.descriptor.height} tiles`, canvas.width / 2, 45);
+    viewportCtx.font = '12px "Courier New"';
+    viewportCtx.fillText(`Map 0: ${map.descriptor.width}×${map.descriptor.height} tiles`, canvas.width / 2, 45);
 
     // Draw map tiles
     const offsetX = (canvas.width - map.descriptor.width * scale) / 2;
@@ -252,46 +329,46 @@ function drawMapPreview(dungeon: any) {
             // Color by room type
             switch (tile.roomType) {
                 case RoomType.STONE:
-                    ctx.fillStyle = '#444'; // Wall
+                    viewportCtx.fillStyle = '#444'; // Wall
                     break;
                 case RoomType.OPEN:
-                    ctx.fillStyle = '#888'; // Floor
+                    viewportCtx.fillStyle = '#888'; // Floor
                     break;
                 case RoomType.DOOR:
-                    ctx.fillStyle = '#aa6'; // Door
+                    viewportCtx.fillStyle = '#aa6'; // Door
                     break;
                 case RoomType.STAIRS:
-                    ctx.fillStyle = '#6a6'; // Stairs
+                    viewportCtx.fillStyle = '#6a6'; // Stairs
                     break;
                 case RoomType.PIT:
-                    ctx.fillStyle = '#222'; // Pit
+                    viewportCtx.fillStyle = '#222'; // Pit
                     break;
                 case RoomType.TELEPORTER:
-                    ctx.fillStyle = '#66a'; // Teleporter
+                    viewportCtx.fillStyle = '#66a'; // Teleporter
                     break;
                 case RoomType.FALSEWALL:
-                    ctx.fillStyle = '#a66'; // False wall
+                    viewportCtx.fillStyle = '#a66'; // False wall
                     break;
                 default:
-                    ctx.fillStyle = '#f0f'; // Unknown
+                    viewportCtx.fillStyle = '#f0f'; // Unknown
             }
 
-            ctx.fillRect(px, py, scale - 1, scale - 1);
+            viewportCtx.fillRect(px, py, scale - 1, scale - 1);
 
             // Mark start position
             if (x === dungeon.header.startPosition.x && y === dungeon.header.startPosition.y) {
-                ctx.fillStyle = '#ff0';
-                ctx.fillRect(px + scale / 4, py + scale / 4, scale / 2, scale / 2);
+                viewportCtx.fillStyle = '#ff0';
+                viewportCtx.fillRect(px + scale / 4, py + scale / 4, scale / 2, scale / 2);
             }
         }
     }
 
     // Legend
-    ctx.fillStyle = '#fff';
-    ctx.font = '10px "Courier New"';
-    ctx.textAlign = 'left';
+    viewportCtx.fillStyle = '#fff';
+    viewportCtx.font = '10px "Courier New"';
+    viewportCtx.textAlign = 'left';
     const legendY = offsetY + map.descriptor.height * scale + 20;
-    ctx.fillText(`Wall █ Floor █ Door █ Stairs █ Start █`, 20, legendY);
+    viewportCtx.fillText(`Wall █ Floor █ Door █ Stairs █ Start █`, 20, legendY);
 }
 
 // Helper: Test graphics loader and display images
@@ -304,14 +381,14 @@ async function testGraphicsLoader() {
         console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
         // Clear canvas
-        ctx.fillStyle = '#000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        viewportCtx.fillStyle = '#000';
+        viewportCtx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Title
-        ctx.fillStyle = '#fff';
-        ctx.font = '20px "Courier New"';
-        ctx.textAlign = 'center';
-        ctx.fillText('Phase 2: Graphics Decoder Test', canvas.width / 2, 30);
+        viewportCtx.fillStyle = '#fff';
+        viewportCtx.font = '20px "Courier New"';
+        viewportCtx.textAlign = 'center';
+        viewportCtx.fillText('Phase 2: Graphics Decoder Test', canvas.width / 2, 30);
 
         // Get palette
         const palette = graphicsLoader.getPalette(0);
@@ -335,25 +412,25 @@ async function testGraphicsLoader() {
 
                 // Draw image using our helper function
                 const scale = 1;
-                drawImage(ctx, image, palette, test.x, test.y, scale);
+                drawImage(viewportCtx, image, palette, test.x, test.y, scale);
 
                 // Draw label
-                ctx.fillStyle = '#ff0';
-                ctx.font = '10px "Courier New"';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${test.index}: ${test.label} (${image.width}×${image.height})`, test.x, test.y - 5);
+                viewportCtx.fillStyle = '#ff0';
+                viewportCtx.font = '10px "Courier New"';
+                viewportCtx.textAlign = 'left';
+                viewportCtx.fillText(`${test.index}: ${test.label} (${image.width}×${image.height})`, test.x, test.y - 5);
 
                 successCount++;
             } catch (error) {
                 console.warn(`  ✗ Could not decode image ${test.index} (${test.label}):`, error);
 
                 // Draw error marker
-                ctx.fillStyle = '#f00';
-                ctx.fillRect(test.x, test.y, 50, 50);
-                ctx.fillStyle = '#fff';
-                ctx.font = '10px "Courier New"';
-                ctx.textAlign = 'left';
-                ctx.fillText(`${test.index}: ERROR`, test.x, test.y - 5);
+                viewportCtx.fillStyle = '#f00';
+                viewportCtx.fillRect(test.x, test.y, 50, 50);
+                viewportCtx.fillStyle = '#fff';
+                viewportCtx.font = '10px "Courier New"';
+                viewportCtx.textAlign = 'left';
+                viewportCtx.fillText(`${test.index}: ERROR`, test.x, test.y - 5);
 
                 failCount++;
             }
@@ -374,15 +451,15 @@ async function testGraphicsLoader() {
         );
 
         // Draw palette at bottom
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px "Courier New"';
-        ctx.textAlign = 'left';
-        ctx.fillText('Palette 0:', 20, canvas.height - 35);
+        viewportCtx.fillStyle = '#fff';
+        viewportCtx.font = '10px "Courier New"';
+        viewportCtx.textAlign = 'left';
+        viewportCtx.fillText('Palette 0:', 20, canvas.height - 35);
 
         for (let i = 0; i < 16; i++) {
             const color = atariToRGB(palette[i]);
-            ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-            ctx.fillRect(90 + i * 25, canvas.height - 40, 20, 20);
+            viewportCtx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+            viewportCtx.fillRect(90 + i * 25, canvas.height - 40, 20, 20);
         }
 
     } catch (error) {
@@ -394,6 +471,10 @@ async function testGraphicsLoader() {
         );
     }
 }
+
+// Keep debug helpers in the module without enabling them by default
+void drawMapPreview;
+void testGraphicsLoader;
 
 // Button handlers
 document.getElementById('btn-up')?.addEventListener('click', () => {
@@ -431,6 +512,14 @@ document.getElementById('btn-esc')?.addEventListener('click', () => {
         game.setPaused(paused);
         updateDebug(paused ? 'Game paused' : 'Game resumed');
     }
+});
+
+document.getElementById('btn-qsave')?.addEventListener('click', () => {
+    quickSave();
+});
+
+document.getElementById('btn-qload')?.addEventListener('click', () => {
+    quickLoad();
 });
 
 // Keyboard handler
@@ -485,6 +574,14 @@ document.addEventListener('keydown', (e) => {
             const paused = !game.isPaused();
             game.setPaused(paused);
             updateDebug(paused ? 'Game paused' : 'Game resumed');
+            handled = true;
+            break;
+        case 'F5':
+            quickSave();
+            handled = true;
+            break;
+        case 'F9':
+            quickLoad();
             handled = true;
             break;
     }

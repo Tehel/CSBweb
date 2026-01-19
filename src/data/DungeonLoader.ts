@@ -7,8 +7,8 @@
  */
 
 import { BinaryFile, Endianness } from '../core/BinaryFile';
-import { Direction, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../core/types';
-import type { ui8, ui16, ObjectID, CellFlag } from '../core/types';
+import { Direction, DBType, OBJECT_ID_NULL } from '../core/types';
+import type { ui8, ui16, ui32, ObjectID, CellFlag } from '../core/types';
 import type {
     DungeonData,
     DungeonHeader,
@@ -32,8 +32,7 @@ import type {
 } from './dungeonTypes';
 import {
     DUNGEON_HEADER_SIZE,
-    MAP_DESCRIPTOR_SIZE,
-    DB_RECORD_SIZE
+    MAP_DESCRIPTOR_SIZE
 } from '../core/constants';
 
 /**
@@ -86,9 +85,8 @@ export class DungeonLoader {
         // Parse object list
         const objectList = this.parseObjectList(offsets.objectList, header.objectListSize);
 
-        // Parse text data
-        const textData = this.parseTextData(offsets.textData, header.textDataSize);
-        console.log(`Parsed ${textData.length} text entries`);
+        // Parse text data (raw words + debug decode)
+        const textWords = this.parseTextWords(offsets.textData, header.textDataSize);
 
         // Parse all databases
         const databases = this.parseDatabases(offsets.databases, header.objectCounts);
@@ -101,14 +99,20 @@ export class DungeonLoader {
         // Build level index
         const levelIndex = this.buildLevelIndex(mapDescriptors);
 
+        const { indirectTextIndex, compressedText } = this.buildIndirectText(textWords, databases.texts.records);
+
         this.data = {
             header,
             maps,
             databases,
-            textData,
+            textWords,
+            indirectTextIndex,
+            compressedText,
             objectList,
             columnIndex,
-            levelIndex
+            levelIndex,
+            item16: [],
+            timers: []
         };
 
         return this.data;
@@ -166,8 +170,8 @@ export class DungeonLoader {
 
         for (let i = 0; i < numMaps; i++) {
             const dataOffset = this.file.readU16();
-            const _componentFlags = this.file.readU16(); // Component flags (DM2 only)
-            const _unused = this.file.readU16(); // Unused word
+            this.file.readU16(); // Component flags (DM2 only)
+            this.file.readU16(); // Unused word
 
             const offsetX = this.file.readU8();
             const offsetY = this.file.readU8();
@@ -292,7 +296,7 @@ export class DungeonLoader {
      * Parse text data (5-bit encoded)
      * Reference: DUNGEON_DAT_FORMAT.md section "Text Encoding"
      */
-    private parseTextData(offset: number, sizeInWords: ui16): string[] {
+    private parseTextWords(offset: number, sizeInWords: ui16): ui16[] {
         this.file.seek(offset);
         const words: ui16[] = [];
 
@@ -300,46 +304,53 @@ export class DungeonLoader {
             words.push(this.file.readU16());
         }
 
-        return this.decodeTextData(words);
+        return words;
     }
 
-    /**
-     * Decode 5-bit text encoding
-     * Each word contains 3 characters (5 bits each, bit 15 unused)
-     */
-    private decodeTextData(words: ui16[]): string[] {
-        const texts: string[] = [];
-        let currentText = '';
-
-        for (const word of words) {
-            const char1 = (word >> 10) & 0x1F;
-            const char2 = (word >> 5) & 0x1F;
-            const char3 = word & 0x1F;
-
-            for (const charCode of [char1, char2, char3]) {
-                if (charCode === 31) {
-                    // End of text
-                    if (currentText.length > 0) {
-                        texts.push(currentText);
-                        currentText = '';
-                    }
-                } else if (charCode <= 25) {
-                    // A-Z
-                    currentText += String.fromCharCode(65 + charCode);
-                } else if (charCode === 26) {
-                    currentText += ' ';
-                } else if (charCode === 27) {
-                    currentText += '.';
-                } else if (charCode === 28) {
-                    currentText += '\n'; // Separator
-                } else if (charCode === 29 || charCode === 30) {
-                    // Escape codes - not fully implemented yet
-                    // TODO: Implement escape code tables
-                }
+    private computeTextLength(words: ui16[], startWord: number): number {
+        let len = 0;
+        let idx = startWord;
+        for (;;) {
+            const word = words[idx++] ?? 0;
+            const c1 = (word >> 10) & 0x1f;
+            const c2 = (word >> 5) & 0x1f;
+            const c3 = word & 0x1f;
+            len++;
+            if (c1 === 31 || c2 === 31 || c3 === 31) {
+                return len;
             }
         }
+    }
 
-        return texts;
+    private buildIndirectText(words: ui16[], textRecords: TextRecord[]): {
+        indirectTextIndex: ui32[];
+        compressedText: ui16[];
+    } {
+        const indirectTextIndex: ui32[] = [];
+        const compressedText: ui16[] = [];
+        let sizeOfCompressedText = 0;
+
+        for (let i = 0; i < textRecords.length; i++) {
+            const rec = textRecords[i];
+            if (rec.nextObject === OBJECT_ID_NULL) continue;
+
+            const oldIndex = rec.textOffset;
+            if (oldIndex >= words.length) {
+                rec.textIndex = 0;
+                continue;
+            }
+
+            const len = this.computeTextLength(words, oldIndex);
+            const newIndex = indirectTextIndex.length;
+            indirectTextIndex.push(sizeOfCompressedText);
+            for (let w = 0; w < len; w++) {
+                compressedText.push(words[oldIndex + w]);
+            }
+            sizeOfCompressedText += len;
+            rec.textIndex = newIndex;
+        }
+
+        return { indirectTextIndex, compressedText };
     }
 
     /**
@@ -443,6 +454,7 @@ export class DungeonLoader {
                 nextObject,
                 sensorType: typeData & 0x7F,
                 data: (typeData >> 7) & 0x1FF,
+                portraitState: (behavior >> 9) & 0x7,
                 decorationOrdinal: (behavior >> 12) & 0xF,
                 targetLocal: (behavior & 0x800) !== 0,
                 delay: (behavior >> 7) & 0xF,
@@ -450,7 +462,9 @@ export class DungeonLoader {
                 revertEffect: (behavior & 0x20) !== 0,
                 actionType: (behavior >> 3) & 0x3,
                 onceOnly: (behavior & 0x4) !== 0,
-                targetData: target
+                targetData: target,
+                rawBehavior: behavior,
+                rawTarget: target
             });
         }
 
@@ -641,7 +655,8 @@ export class DungeonLoader {
             records.push({
                 nextObject,
                 value: (attributes >> 8) & 0xFF,
-                cloudType: attributes & 0x7F
+                cloudType: attributes & 0x7F,
+                bit7: (attributes & 0x80) !== 0
             });
         }
 
@@ -678,10 +693,33 @@ export class DungeonLoader {
                 }
             }
 
+            // Extra per-level tables follow immediately after the CELLFLAG array in dungeon.dat.
+            // CSBWin: `SetPartyLevel()` reads them from `EndOfCELLFLAGS + numMonsterType` (CSBCode.cpp:5778+).
+            const numMonsterType = descriptor.creatureTypesAllowed;
+            const numWallDecoration = descriptor.wallGraphicsCount; // LEVELDESC.NumWallDecoration()
+            const numFloorDecorations = descriptor.floorGraphicsCount; // LEVELDESC.NumFloorDecorations()
+            const numDoorDecorations = descriptor.doorDecorationCount; // LEVELDESC.NumDoorDecorations()
+
+            const monsterTypes: ui8[] = [];
+            for (let i = 0; i < numMonsterType; i++) monsterTypes.push(this.file.readU8());
+
+            const wallDecorationTOC: ui8[] = [];
+            for (let i = 0; i < numWallDecoration; i++) wallDecorationTOC.push(this.file.readU8());
+
+            const floorDecorationTOC: ui8[] = [];
+            for (let i = 0; i < numFloorDecorations; i++) floorDecorationTOC.push(this.file.readU8());
+
+            const doorDecorationTOC: ui8[] = [];
+            for (let i = 0; i < numDoorDecorations; i++) doorDecorationTOC.push(this.file.readU8());
+
             maps.push({
                 descriptor,
                 tiles,
-                cellFlags
+                cellFlags,
+                monsterTypes,
+                wallDecorationTOC,
+                floorDecorationTOC,
+                doorDecorationTOC
             });
         }
 

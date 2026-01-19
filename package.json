@@ -19,7 +19,6 @@
     "url": "https://github.com/Tehel/dmjs/issues"
   },
   "dependencies": {
-    "canvas": "^3.2.0",
     "express": ">=4.15.3",
     "serve-favicon": ">=2.4.3"
   },

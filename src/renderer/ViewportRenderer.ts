@@ -1,326 +1,425 @@
 /**
- * First-person viewport renderer
+ * Viewport Renderer - Integration module
  *
- * Renders the 3D view using ray-casting results
- * Based on CSBWin's column-based renderer
+ * This module connects all the pieces together:
+ * - Graphics loading
+ * - Bytecode interpreter
+ * - DrawViewport main loop
+ * - Canvas rendering
  */
 
-import type { DungeonState } from '../engine/DungeonState';
-import type { GraphicsLoader } from '../data/GraphicsLoader';
-import type { Palette } from '../core/types';
-import type { ViewState, RayColumn, RenderOptions } from './rendererTypes';
-import { RayCaster } from './RayCaster';
+import { GraphicsLoader } from '../data/GraphicsLoader';
+import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
+import { InterpreterContext } from './bytecode/BytecodeInterpreter';
+import { DrawViewport } from './DrawViewport';
+import { DungeonState } from '../engine/DungeonState';
+import type { IndexedBitmap } from './csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, tag0088b2Index, updateImageDataFromIndex } from './csbwin/CanvasBlitter';
+import { extractViewportTables } from './csbwin/ViewportTables';
+import { extractObjectTables } from './csbwin/ObjectTables';
+import { ImageFormat } from '../core/imageDecoder';
 import {
-    VIEWPORT,
-    calculateShading,
-    DEFAULT_RENDER_OPTIONS,
-    directionToAngle,
-} from './rendererTypes';
+  initializeFloorCeilingIndexed,
+  initializeDoorBitmapsIndexed,
+  initializeWallBitmapsIndexed,
+  createViewportCanvas,
+  VIEWPORT_WIDTH,
+  VIEWPORT_HEIGHT,
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
+  VIEWPORT_X,
+  VIEWPORT_Y,
+} from './ViewportGraphics';
 
 /**
- * ViewportRenderer - renders first-person 3D view
+ * Main ViewportRenderer class
+ * Manages viewport rendering state and provides API for rendering
  */
 export class ViewportRenderer {
-    private canvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D;
-    private rayCaster: RayCaster;
-    private dungeon: DungeonState;
-    private graphics: GraphicsLoader;
-    private options: RenderOptions;
+  private graphicsLoader: GraphicsLoader;
+  private dungeonState: DungeonState;
+  private csbGraphicsLoader?: CSBGraphicsLoader;
+  private context: InterpreterContext | null = null;
+  private canvas: HTMLCanvasElement | null = null;
+  private screenCtx: CanvasRenderingContext2D | null = null;
+  private viewportImageData: ImageData | null = null; // RGBA staging for present
+  private palette: number[] | null = null;
+  private initialized: boolean = false;
 
-    // Off-screen canvas for rendering at native resolution
-    private offscreenCanvas: HTMLCanvasElement;
-    private offscreenCtx: CanvasRenderingContext2D;
+  private wallBitmapSets: Map<number, { normal: IndexedBitmap[]; mirrorMode: IndexedBitmap[] }> = new Map();
+  private doorBitmapSets: Map<number, IndexedBitmap[]> = new Map();
+  private basicGraphicCache: Map<number, IndexedBitmap> = new Map();
+  private derivedGraphicCache: Map<string, IndexedBitmap> = new Map();
+  private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
+  private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
+  private floorCeilingCache: Map<
+    number,
+    {
+      // Full-viewport (224×136) palette-index templates.
+      // `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6752-6754).
+      // `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6741-6744).
+      ceilingMirrored: Uint8Array;
+      floorMirrored: Uint8Array;
+    }
+  > = new Map();
 
-    constructor(
-        canvas: HTMLCanvasElement,
-        dungeon: DungeonState,
-        graphics: GraphicsLoader,
-        options: RenderOptions = DEFAULT_RENDER_OPTIONS
-    ) {
-        this.canvas = canvas;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            throw new Error('Could not get 2D context');
-        }
-        this.ctx = ctx;
+  constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
+    this.graphicsLoader = graphicsLoader;
+    this.dungeonState = dungeonState;
+    this.csbGraphicsLoader = csbGraphicsLoader;
+  }
 
-        this.dungeon = dungeon;
-        this.graphics = graphics;
-        this.options = { ...options };
-        this.rayCaster = new RayCaster(dungeon);
-
-        // Create off-screen canvas at native viewport resolution
-        this.offscreenCanvas = document.createElement('canvas');
-        this.offscreenCanvas.width = VIEWPORT.WIDTH;
-        this.offscreenCanvas.height = VIEWPORT.HEIGHT;
-        const offscreenCtx = this.offscreenCanvas.getContext('2d');
-        if (!offscreenCtx) {
-            throw new Error('Could not get off-screen 2D context');
-        }
-        this.offscreenCtx = offscreenCtx;
+  /**
+   * Initialize the viewport renderer
+   * Loads all necessary graphics and sets up the rendering context
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
     }
 
-    /**
-     * Render the viewport
-     *
-     * @param viewState - Current camera/view state
-     */
-    render(viewState: ViewState): void {
-        // Clear off-screen canvas
-        this.offscreenCtx.fillStyle = '#000';
-        this.offscreenCtx.fillRect(0, 0, VIEWPORT.WIDTH, VIEWPORT.HEIGHT);
+    console.log('Initializing viewport renderer...');
 
-        // Cast all rays
-        const rays = this.rayCaster.castAllRays(viewState);
+    // Create full screen canvas (320×200)
+    this.canvas = createViewportCanvas();
+    this.screenCtx = this.canvas.getContext('2d');
+    if (!this.screenCtx) throw new Error('Failed to create screen 2D context');
+    this.viewportImageData = this.screenCtx.createImageData(VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
-        // Render ceiling and floor first (if enabled)
-        if (this.options.drawCeiling) {
-            this.renderCeiling();
-        }
-        if (this.options.drawFloor) {
-            this.renderFloor();
-        }
+    // Get palette
+    const palette = this.graphicsLoader.getPalette(0);
+    this.palette = palette;
+    console.log('Got palette from graphics loader');
 
-        // Render walls column by column
-        if (this.options.drawWalls) {
-            this.renderWalls(rays, viewState);
-        }
+    // Extract CSBWin viewport tables from graphics.dat item 0x22e
+    const viewportTables = extractViewportTables(this.graphicsLoader);
+    console.log(`Extracted wallRectangles[14] from 0x22e at offset 0x${viewportTables.wallRectanglesOffset.toString(16)}`);
+    const objectTables = extractObjectTables(this.graphicsLoader, viewportTables.wallRectanglesOffset);
+    this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
+    this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
 
-        // Scale and draw to main canvas
-        this.ctx.imageSmoothingEnabled = false;
-        this.ctx.drawImage(
-            this.offscreenCanvas,
-            0, 0, VIEWPORT.WIDTH, VIEWPORT.HEIGHT,
-            0, 0, VIEWPORT.WIDTH * this.options.scale, VIEWPORT.HEIGHT * this.options.scale
-        );
+    const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
+
+    // Create interpreter context
+    this.context = {
+      wallBitmaps: [],
+      doorBitmaps: [],
+      wallRectangles: viewportTables.wallRectangles,
+      floorPitRectangles: viewportTables.floorPitRect,
+      ceilingPitRectangles: viewportTables.ceilingPit,
+      teleporterRectangles: viewportTables.teleporterRectangles,
+      stairEdgeRectangles: viewportTables.stairEdgeRect,
+      stairFacingDownRectangles: viewportTables.stairFacingDownRect,
+      stairFacingUpRectangles: viewportTables.stairFacingUpRect,
+      doorTrackTopRectangles: viewportTables.doorTrackTopRect,
+      doorFrameRectangles: viewportTables.doorFrameRect,
+      doorRects: viewportTables.doorRects,
+      seeThruWallsRect: viewportTables.seeThruWallsRect,
+      seeThruWallsRect2: viewportTables.seeThruWallsRect2,
+      seeThruDoorEdgeRect: viewportTables.seeThruDoorEdgeRect,
+      wallGraphicSet: 0,
+      backgroundGraphicSet: 0,
+      getBasicGraphicBitmap: (n: number) => this.getBasicGraphicBitmap(n),
+      derivedGraphicCache: this.derivedGraphicCache,
+      objectTables,
+      csbGraphics: this.csbGraphicsLoader,
+      dungeonState: this.dungeonState,
+      viewportContext: this.screenCtx,
+      viewportIndexBuffer,
+      roomData: [],
+      executionLog: [],
+    };
+
+    this.initialized = true;
+    console.log('Viewport renderer initialized successfully');
+  }
+
+  /**
+   * Render the viewport for a given party position and facing
+   */
+  render(facing: number, x: number, y: number, mapIndex: number = 0): void {
+    if (!this.initialized || !this.context || !this.canvas || !this.screenCtx || !this.viewportImageData || !this.palette) {
+      throw new Error('Renderer not initialized. Call initialize() first.');
     }
 
-    /**
-     * Render ceiling (simple solid color for now)
-     */
-    private renderCeiling(): void {
-        this.offscreenCtx.fillStyle = '#1a1a1a'; // Dark gray
-        this.offscreenCtx.fillRect(0, 0, VIEWPORT.WIDTH, VIEWPORT.HORIZON_Y);
+    if (!this.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
+
+    // Clear execution log
+    this.context.executionLog = [];
+
+    // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
+    const map = this.dungeonState.getMap(mapIndex);
+    const wallGraphicSet = map?.descriptor.mapGraphicsStyle ?? 0;
+    const backgroundGraphicSet = map?.descriptor.floorCeilingStyle ?? 0;
+    this.context.wallGraphicSet = wallGraphicSet;
+    this.context.backgroundGraphicSet = backgroundGraphicSet;
+    this.context.frameMapIndex = mapIndex;
+    this.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
+
+    // CSBWin `ReadGraphicsForLevel()` (Code390e.cpp:180-199): DoorGraphic[3][2] is derived from Door1Type/Door2Type.
+    const doorType0 = map?.descriptor.doorType0Index ?? 0;
+    const doorType1 = map?.descriptor.doorType1Index ?? 0;
+    const base0 = 108 + 3 * doorType0;
+    const base1 = 108 + 3 * doorType1;
+    // DoorGraphic[0]=F1 (nearness=2) = base+2; DoorGraphic[1]=F2 = base+1; DoorGraphic[2]=F3 = base+0
+    this.context.doorGraphics = [
+      [base0 + 2, base1 + 2],
+      [base0 + 1, base1 + 1],
+      [base0 + 0, base1 + 0],
+    ];
+
+    // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6740)
+    const useMirrorImages = ((x + y + facing) & 1) !== 0;
+    this.context.useMirrorImages = useMirrorImages;
+
+    // Compose floor/ceiling background (CSBWin: FloorAndCeilingOnly + conditional Mirror).
+    this.ensureFloorCeilingCache(backgroundGraphicSet);
+    const fc = this.floorCeilingCache.get(backgroundGraphicSet)!;
+    this.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.floorMirrored : fc.ceilingMirrored);
+
+    // Select wall bitmaps for this frame (CSBWin: mirrors swap some pointers when `UseMirrorImages != 0`).
+    this.ensureWallBitmaps(wallGraphicSet);
+    const wb = this.wallBitmapSets.get(wallGraphicSet)!;
+    this.context.wallBitmaps = useMirrorImages ? wb.mirrorMode : wb.normal;
+
+    // Door bitmaps (CSBWin ReadWallBitmaps loads these per wall set)
+    this.ensureDoorBitmaps(wallGraphicSet);
+    this.context.doorBitmaps = this.doorBitmapSets.get(wallGraphicSet)!;
+
+    // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
+    this.context.frameFacing = facing;
+
+    // Execute the main viewport drawing function (writes to index buffer via interpreter)
+    DrawViewport(this.context, this.dungeonState, mapIndex, facing, x, y);
+
+    this.presentViewport();
+  }
+
+  private ensureWallBitmaps(wallGraphicSet: number): void {
+    if (this.wallBitmapSets.has(wallGraphicSet)) return;
+    const normal = initializeWallBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+    const mirrorMode = this.createMirrorModeWallBitmaps(normal);
+    this.wallBitmapSets.set(wallGraphicSet, { normal, mirrorMode });
+  }
+
+  private ensureDoorBitmaps(wallGraphicSet: number): void {
+    if (this.doorBitmapSets.has(wallGraphicSet)) return;
+    const door = initializeDoorBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+    this.doorBitmapSets.set(wallGraphicSet, door);
+  }
+
+  private ensureFloorCeilingCache(backgroundGraphicSet: number): void {
+    if (this.floorCeilingCache.has(backgroundGraphicSet)) return;
+    const { floor, ceiling } = initializeFloorCeilingIndexed(this.graphicsLoader, backgroundGraphicSet);
+    const ceilingMirrored = this.buildFloorCeilingTemplate(ceiling, floor, true, false);
+    const floorMirrored = this.buildFloorCeilingTemplate(ceiling, floor, false, true);
+    this.floorCeilingCache.set(backgroundGraphicSet, { ceilingMirrored, floorMirrored });
+  }
+
+  private getBasicGraphicBitmap(graphicNum: number): IndexedBitmap | null {
+    if (graphicNum < 0) return null;
+    if (this.basicGraphicCache.has(graphicNum)) return this.basicGraphicCache.get(graphicNum)!;
+    try {
+      const decoded = this.graphicsLoader.getImage(graphicNum, ImageFormat.IMG1);
+      const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
+      const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
+      this.basicGraphicCache.set(graphicNum, bmp);
+      return bmp;
+    } catch {
+      return null;
+    }
+  }
+
+  private createMirrorModeWallBitmaps(normal: IndexedBitmap[]): IndexedBitmap[] {
+    if (normal.length < 7) {
+      throw new Error(`Expected 7 wall bitmaps, got ${normal.length}`);
     }
 
-    /**
-     * Render floor (simple solid color for now)
-     */
-    private renderFloor(): void {
-        this.offscreenCtx.fillStyle = '#2a2a2a'; // Slightly lighter gray
-        this.offscreenCtx.fillRect(0, VIEWPORT.HORIZON_Y, VIEWPORT.WIDTH, VIEWPORT.HEIGHT - VIEWPORT.HORIZON_Y);
+    // CSBWin behavior (Viewport.cpp:6741-6750 + Code390e.cpp:104-113):
+    // - When `UseMirrorImages != 0`, F0L1/F0R1 are swapped by using mirrored copies of the opposite side.
+    // - Other distances use mirrored copies of their own bitmaps.
+    // - Corner bitmaps (index 5/6) are not swapped here.
+    const mirror = (b: IndexedBitmap) => this.mirrorIndexedBitmap(b);
+
+    const out = normal.slice();
+    out[0] = mirror(normal[1]); // F0R1 becomes mirror of original F0L1
+    out[1] = mirror(normal[0]); // F0L1 becomes mirror of original F0R1
+    out[2] = mirror(normal[2]); // F1
+
+    const wallRects = this.context?.wallRectangles;
+    if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
+      const derivedF3 = this.buildMirrorWallBitmap(normal[4], wallRects[0], this.mirrorWallRectF3, 11);
+      const derivedF2 = this.buildMirrorWallBitmap(normal[3], wallRects[3], this.mirrorWallRectF2, 8);
+      out[4] = derivedF3 ?? mirror(normal[4]);
+      out[3] = derivedF2 ?? mirror(normal[3]);
+    } else {
+      out[4] = mirror(normal[4]);
+      out[3] = mirror(normal[3]);
     }
+    // out[5]/out[6] remain as-is (F3L2 + its mirror).
+    return out;
+  }
 
-    /**
-     * Render walls using ray-casting results
-     */
-    private renderWalls(rays: RayColumn[], viewState: ViewState): void {
-        // Get palette (use palette 0 for now)
-        const palette = this.graphics.getPalette(0);
-
-        // Render each column (every 2 pixels wide)
-        for (let i = 0; i < rays.length; i++) {
-            const ray = rays[i];
-            const x = i * 2; // Each column is 2 pixels wide
-
-            if (ray.distance >= VIEWPORT.FAR_PLANE) {
-                continue; // Too far to render
-            }
-
-            // Calculate shading
-            let shading = 1.0;
-            if (this.options.enableShading) {
-                shading = calculateShading(ray.distance);
-            }
-
-            if (this.options.enableTextures) {
-                // Render textured wall
-                this.renderTexturedWallColumn(ray, x, palette, shading);
-            } else {
-                // Render solid color wall (fallback)
-                const wallColor = this.getWallColor(ray.wallType, ray.wallSide);
-                const shadedColor = this.applyShading(wallColor, shading);
-                this.offscreenCtx.fillStyle = shadedColor;
-                this.offscreenCtx.fillRect(
-                    x,
-                    ray.wallTop,
-                    2, // Column width
-                    ray.wallBottom - ray.wallTop + 1
-                );
-            }
-        }
+  private mirrorIndexedBitmap(source: IndexedBitmap): IndexedBitmap {
+    const { width, height, pixels } = source;
+    const out = new Uint8Array(width * height);
+    for (let y = 0; y < height; y++) {
+      const row = y * width;
+      for (let x = 0; x < width; x++) {
+        out[row + (width - 1 - x)] = pixels[row + x];
+      }
     }
+    return { width, height, pixels: out };
+  }
 
-    /**
-     * Render a textured wall column
-     */
-    private renderTexturedWallColumn(
-        ray: RayColumn,
-        screenX: number,
-        palette: Palette,
-        shading: number
-    ): void {
-        // Get wall texture based on room type
-        const textureIndex = this.getWallTextureIndex(ray.wallType, ray.wallSide);
+  private buildMirrorWallBitmap(
+    source: IndexedBitmap,
+    rect: { srcWidth?: number; srcHeight?: number },
+    mirrorRect: { x1: number; x2: number; y1: number; y2: number },
+    srcOffsetXBytes: number
+  ): IndexedBitmap | null {
+    const srcWidth = rect.srcWidth ?? source.width;
+    const srcHeight = rect.srcHeight ?? source.height;
+    if (srcWidth <= 0 || srcHeight <= 0) return null;
 
-        try {
-            const texture = this.graphics.getImage(textureIndex);
+    const cropped = this.cropIndexedBitmap(source, srcWidth, srcHeight);
+    const mirrored = this.mirrorIndexedBitmap(cropped);
 
-            // Calculate texture column (0 to texture.width-1)
-            const textureX = Math.floor(ray.textureX * texture.width);
+    const dstPixels = new Uint8Array(srcWidth * srcHeight);
+    dstPixels.fill(10);
+    const dst = { width: srcWidth, height: srcHeight, pixels: dstPixels };
 
-            // Calculate wall height in pixels
-            const wallHeight = ray.wallBottom - ray.wallTop;
+    const srcOffsetX = srcOffsetXBytes;
+    const rectPos = {
+      x1: mirrorRect.x1,
+      y1: mirrorRect.y1,
+      x2: mirrorRect.x2,
+      y2: mirrorRect.y2,
+      srcX: srcOffsetX,
+      srcY: 0,
+      srcWidth,
+      srcHeight,
+    };
 
-            // Draw vertical stripe from texture
-            for (let y = ray.wallTop; y <= ray.wallBottom && y < VIEWPORT.HEIGHT; y++) {
-                // Calculate texture Y coordinate
-                const textureY = Math.floor(((y - ray.wallTop) / wallHeight) * texture.height);
+    tag0088b2Index(mirrored, dst, rectPos, -1);
+    return dst;
+  }
 
-                // Get pixel from texture
-                const pixelIndex = textureY * texture.width + textureX;
-                if (pixelIndex >= 0 && pixelIndex < texture.pixels.length) {
-                    const colorIndex = texture.pixels[pixelIndex];
-                    const color = palette[colorIndex];
+  private cropIndexedBitmap(source: IndexedBitmap, width: number, height: number): IndexedBitmap {
+    const srcW = source.width;
+    const srcH = source.height;
+    const outW = Math.max(0, width | 0);
+    const outH = Math.max(0, height | 0);
+    const outPixels = new Uint8Array(outW * outH);
+    if (outW === 0 || outH === 0) return { width: outW, height: outH, pixels: outPixels };
 
-                    // Convert Atari ST color to RGB
-                    const r = ((color >> 8) & 0x7) * 36;
-                    const g = ((color >> 4) & 0x7) * 36;
-                    const b = (color & 0x7) * 36;
-
-                    // Apply shading
-                    const shadedR = Math.floor(r * shading);
-                    const shadedG = Math.floor(g * shading);
-                    const shadedB = Math.floor(b * shading);
-
-                    // Draw 2-pixel wide column
-                    this.offscreenCtx.fillStyle = `rgb(${shadedR}, ${shadedG}, ${shadedB})`;
-                    this.offscreenCtx.fillRect(screenX, y, 2, 1);
-                }
-            }
-        } catch (error) {
-            // Fallback to solid color if texture fails
-            const wallColor = this.getWallColor(ray.wallType, ray.wallSide);
-            const shadedColor = this.applyShading(wallColor, shading);
-            this.offscreenCtx.fillStyle = shadedColor;
-            this.offscreenCtx.fillRect(
-                screenX,
-                ray.wallTop,
-                2,
-                ray.wallBottom - ray.wallTop + 1
-            );
-        }
+    const copyW = Math.min(outW, srcW);
+    const copyH = Math.min(outH, srcH);
+    for (let y = 0; y < copyH; y++) {
+      const srcRow = y * srcW;
+      const dstRow = y * outW;
+      for (let x = 0; x < copyW; x++) {
+        outPixels[dstRow + x] = source.pixels[srcRow + x];
+      }
     }
+    return { width: outW, height: outH, pixels: outPixels };
+  }
 
-    /**
-     * Get wall texture index based on room type and side
-     *
-     * Wall graphics in DM typically start around index 0
-     * Different wall types use different texture sets
-     */
-    private getWallTextureIndex(roomType: number, side: number): number {
-        // Base wall texture indices (these are typical DM values)
-        // You may need to adjust these based on your specific graphics.dat
-        const baseIndices = [
-            0,   // STONE (0) - stone walls
-            0,   // OPEN (1) - shouldn't be drawn, use stone as fallback
-            10,  // (2)
-            20,  // STAIRS (3)
-            30,  // DOOR (4)
-            0,   // PIT (5)
-            40,  // TELEPORTER (6)
-            0,   // FALSEWALL (7)
-        ];
+  private buildFloorCeilingTemplate(
+    ceiling: IndexedBitmap,
+    floor: IndexedBitmap,
+    mirrorCeiling: boolean,
+    mirrorFloor: boolean
+  ): Uint8Array {
+    // CSBWin geometry constants from Viewport.cpp:
+    // - Mirror ceiling height = 0x1d (29) (Viewport.cpp:6753)
+    // - Mirror floor height   = 0x46 (70) (Viewport.cpp:6743)
+    // These match the memory sizes set up in CSBCode.cpp:10122-10123:
+    //   3248 (112*29), 4144 (112*37), 7840 (112*70) for (ceiling, black, floor).
+    const CEILING_H = 0x1d;
+    const FLOOR_H = 0x46;
+    const BLACK_H = VIEWPORT_HEIGHT - CEILING_H - FLOOR_H;
+    const FLOOR_Y = CEILING_H + BLACK_H;
 
-        const baseIndex = baseIndices[roomType] || 0;
+    const dst = new Uint8Array(VIEWPORT_WIDTH * VIEWPORT_HEIGHT);
+    this.blitFullWidthBitmap(dst, 0, CEILING_H, ceiling, mirrorCeiling);
+    // Black gap is already 0-filled.
+    this.blitFullWidthBitmap(dst, FLOOR_Y, FLOOR_H, floor, mirrorFloor);
+    return dst;
+  }
 
-        // Add offset for wall side (front, right, back, left)
-        // Each wall type typically has 4 variations
-        return baseIndex + (side % 4);
+  private blitFullWidthBitmap(
+    dst: Uint8Array,
+    dstY: number,
+    dstH: number,
+    src: IndexedBitmap,
+    mirrorX: boolean
+  ): void {
+    const copyW = Math.min(src.width, VIEWPORT_WIDTH);
+    const copyH = Math.min(src.height, dstH);
+
+    for (let y = 0; y < copyH; y++) {
+      const srcRow = y * src.width;
+      const dstRow = (dstY + y) * VIEWPORT_WIDTH;
+      for (let x = 0; x < copyW; x++) {
+        const v = src.pixels[srcRow + x] & 0x0f;
+        const dx = mirrorX ? VIEWPORT_WIDTH - 1 - x : x;
+        dst[dstRow + dx] = v;
+      }
     }
+  }
 
-    /**
-     * Get wall color based on room type and side
-     */
-    private getWallColor(roomType: number, side: number): string {
-        // Different shades for different wall types
-        const baseColors = [
-            '#666666', // STONE (0)
-            '#888888', // OPEN (1) - shouldn't be drawn
-            '#8B4513', // (2)
-            '#996633', // STAIRS (3)
-            '#CC8800', // DOOR (4)
-            '#444444', // PIT (5)
-            '#5555AA', // TELEPORTER (6)
-            '#777777', // FALSEWALL (7)
-        ];
+  private presentViewport(): void {
+    if (!this.context?.viewportIndexBuffer || !this.screenCtx || !this.viewportImageData || !this.palette) return;
 
-        const baseColor = baseColors[roomType] || '#666666';
+    this.screenCtx.fillStyle = '#000000';
+    this.screenCtx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
 
-        // Darken or lighten based on wall side for depth perception
-        if (side === 0 || side === 2) {
-            // North/South walls slightly darker
-            return this.adjustBrightness(baseColor, 0.85);
-        } else {
-            // East/West walls slightly lighter
-            return this.adjustBrightness(baseColor, 1.0);
-        }
+    updateImageDataFromIndex(this.viewportImageData, this.context.viewportIndexBuffer, this.palette);
+    this.screenCtx.putImageData(this.viewportImageData, VIEWPORT_X, VIEWPORT_Y);
+
+    this.screenCtx.strokeStyle = '#333333';
+    this.screenCtx.lineWidth = 1;
+    this.screenCtx.strokeRect(VIEWPORT_X - 1, VIEWPORT_Y - 1, VIEWPORT_WIDTH + 2, VIEWPORT_HEIGHT + 2);
+  }
+
+  /**
+   * Get the viewport canvas element
+   */
+  getCanvas(): HTMLCanvasElement {
+    if (!this.canvas) {
+      throw new Error('Renderer not initialized');
     }
+    return this.canvas;
+  }
 
-    /**
-     * Apply shading factor to color
-     */
-    private applyShading(color: string, shading: number): string {
-        // Parse hex color
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
-
-        // Apply shading
-        const shadedR = Math.floor(r * shading);
-        const shadedG = Math.floor(g * shading);
-        const shadedB = Math.floor(b * shading);
-
-        return `rgb(${shadedR}, ${shadedG}, ${shadedB})`;
+  /**
+   * Get the execution log from the last render
+   */
+  getExecutionLog(): string[] {
+    if (!this.context) {
+      return [];
     }
+    return this.context.executionLog;
+  }
 
-    /**
-     * Adjust brightness of a color
-     */
-    private adjustBrightness(color: string, factor: number): string {
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16);
-        const g = parseInt(hex.substring(2, 4), 16);
-        const b = parseInt(hex.substring(4, 6), 16);
+  /**
+   * Check if renderer is initialized
+   */
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+}
 
-        const adjustedR = Math.min(255, Math.floor(r * factor));
-        const adjustedG = Math.min(255, Math.floor(g * factor));
-        const adjustedB = Math.min(255, Math.floor(b * factor));
-
-        return `#${adjustedR.toString(16).padStart(2, '0')}${adjustedG.toString(16).padStart(2, '0')}${adjustedB.toString(16).padStart(2, '0')}`;
-    }
-
-    /**
-     * Update render options
-     */
-    setOptions(options: Partial<RenderOptions>): void {
-        this.options = { ...this.options, ...options };
-    }
-
-    /**
-     * Get current render options
-     */
-    getOptions(): Readonly<RenderOptions> {
-        return this.options;
-    }
-
-    /**
-     * Resize canvas
-     */
-    resize(width: number, height: number): void {
-        this.canvas.width = width;
-        this.canvas.height = height;
-    }
+/**
+ * Create and initialize a viewport renderer
+ */
+export async function createViewportRenderer(
+  graphicsLoader: GraphicsLoader,
+  dungeonState: DungeonState,
+  csbGraphicsLoader?: CSBGraphicsLoader
+): Promise<ViewportRenderer> {
+  const renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader);
+  await renderer.initialize();
+  return renderer;
 }

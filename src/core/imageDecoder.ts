@@ -7,7 +7,7 @@
  * Reference: CSBWin Bitmaps.cpp, dmweb.free.fr documentation
  */
 
-import type { ui8, ui16, ImageDimensions, Palette, RGBAColor } from './types';
+import type { ui8, ui16, ImageDimensions, Palette } from './types';
 import { atariToRGBA } from './types';
 
 /**

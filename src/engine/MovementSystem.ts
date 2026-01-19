@@ -9,6 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
+import { RoomType } from '../core/types';
 
 /**
  * MovementSystem - handles movement validation and collision detection
@@ -51,6 +52,21 @@ export class MovementSystem {
      * Handle turning
      */
     private handleTurn(action: MovementAction): MovementResult {
+        const mapIndex = this.party.getMapIndex();
+        const position = this.party.getPosition();
+        const cellFlags = this.dungeon.getCellFlag(mapIndex, position.x, position.y);
+        const roomType = (cellFlags >> 5) & 0x7;
+
+        if (roomType === RoomType.STAIRS) {
+            return this.traverseStairway(
+                mapIndex,
+                position.x,
+                position.y,
+                (cellFlags & 0x04) !== 0,
+                true
+            );
+        }
+
         const newFacing = this.party.calculateNewFacing(action);
 
         return {
@@ -63,8 +79,23 @@ export class MovementSystem {
      * Handle movement with collision detection
      */
     private handleMovement(action: MovementAction): MovementResult {
-        const newPosition = this.party.calculateNewPosition(action);
         const mapIndex = this.party.getMapIndex();
+        const position = this.party.getPosition();
+        const cellFlagsFrom = this.dungeon.getCellFlag(mapIndex, position.x, position.y);
+        const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
+        const relDirection = this.getRelativeDirection(action);
+
+        if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
+            return this.traverseStairway(
+                mapIndex,
+                position.x,
+                position.y,
+                (cellFlagsFrom & 0x04) !== 0,
+                true
+            );
+        }
+
+        const newPosition = this.party.calculateNewPosition(action);
 
         // Check if new position is within map bounds
         const dimensions = this.dungeon.getMapDimensions(mapIndex);
@@ -109,6 +140,18 @@ export class MovementSystem {
         // Check for special tiles
         const specialMessage = this.checkSpecialTiles(mapIndex, newPosition.x, newPosition.y);
 
+        const cellFlagsTo = this.dungeon.getCellFlag(mapIndex, newPosition.x, newPosition.y);
+        const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
+        if (roomTypeTo === RoomType.STAIRS) {
+            return this.traverseStairway(
+                mapIndex,
+                newPosition.x,
+                newPosition.y,
+                (cellFlagsTo & 0x04) !== 0,
+                true
+            );
+        }
+
         // Movement is valid
         return {
             success: true,
@@ -141,6 +184,52 @@ export class MovementSystem {
         }
 
         return undefined;
+    }
+
+    private getRelativeDirection(action: MovementAction): number | null {
+        switch (action) {
+            case MovementAction.MOVE_FORWARD:
+                return 0;
+            case MovementAction.STRAFE_RIGHT:
+                return 1;
+            case MovementAction.MOVE_BACKWARD:
+                return 2;
+            case MovementAction.STRAFE_LEFT:
+                return 3;
+            default:
+                return null;
+        }
+    }
+
+    private traverseStairway(
+        mapIndex: number,
+        x: number,
+        y: number,
+        isUp: boolean,
+        setFacing: boolean
+    ): MovementResult {
+        const delta = isUp ? -1 : 1;
+        const next = this.dungeon.incrementLevel(mapIndex, delta, x, y);
+
+        if (!next) {
+            return {
+                success: false,
+                blocked: true,
+                message: 'The stairway does not lead anywhere',
+            };
+        }
+
+        const fallbackFacing = this.party.getFacing();
+        const newFacing = setFacing
+            ? this.dungeon.getExitStairsDirection(next.mapIndex, next.x, next.y, fallbackFacing)
+            : fallbackFacing;
+
+        return {
+            success: true,
+            newPosition: { x: next.x, y: next.y },
+            newMapIndex: next.mapIndex,
+            newFacing,
+        };
     }
 
     /**

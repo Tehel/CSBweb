@@ -83,6 +83,12 @@ export interface Coordinates {
 }
 
 /**
+ * Common position type used by the engine/renderer.
+ * Alias of `Coordinates` (level optional).
+ */
+export type Position = Coordinates;
+
+/**
  * Party starting position
  */
 export interface StartPosition extends Coordinates {

@@ -14,35 +14,35 @@ ReadAndExpandGraphic(firstWallGraphic + 7 + i, d.pWallBitmaps[i], 0, 0);
 
 ### Wall Bitmap Mapping
 
-| pWallBitmaps index | Graphics.dat index | Size (from GRAPHICS_ORGANIZATION.md) |
-|--------------------|-------------------|--------------------------------------|
-| pWallBitmaps[0]    | 84                | 32×136                               |
-| pWallBitmaps[1]    | 85                | 32×136                               |
-| pWallBitmaps[2]    | 86                | 128×200                              |
-| pWallBitmaps[3]    | 87                | 64×111                               |
-| pWallBitmaps[4]    | 88                | 96×62                                |
-| pWallBitmaps[5]    | 89                | 16×49                                |
-| pWallBitmaps[6]    | 90                | 80×46                                |
+| pWallBitmaps index | Loaded via ReadAndExpandGraphic() | Allocated bytes (CSBCode.cpp:10104+) |
+|--------------------|-----------------------------------|--------------------------------------|
+| pWallBitmaps[0]    | graphics.dat index 84             | 2176                                 |
+| pWallBitmaps[1]    | graphics.dat index 85             | 2176                                 |
+| pWallBitmaps[2]    | graphics.dat index 86             | 14208                                |
+| pWallBitmaps[3]    | graphics.dat index 87             | 5112                                 |
+| pWallBitmaps[4]    | graphics.dat index 88             | 3264                                 |
+| pWallBitmaps[5]    | graphics.dat index 89             | 392                                  |
+| pWallBitmaps[6]    | mirrored copy of pWallBitmaps[5]  | 392                                  |
 
 ### Cell to Bitmap Mapping
 
 From Viewport.cpp lines 2267-2279 (StdBitmapPointers function):
 
-| Cell Position | Uses pWallBitmaps | Graphics Index |
-|---------------|-------------------|----------------|
-| F3L2          | [5]               | 89             |
-| F3L1          | [4]               | 88             |
-| F3            | [4]               | 88             |
-| F3R1          | [4]               | 88             |
-| F3R2          | [6]               | 90             |
-| F2L1          | [3]               | 87             |
-| F2            | [3]               | 87             |
-| F2R1          | [3]               | 87             |
-| F1L1          | [2]               | 86             |
-| F1            | [2]               | 86             |
-| F1R1          | [2]               | 86             |
-| F0L1          | [1]               | 85             |
-| F0R1          | [0]               | 84             |
+| Cell Position | Uses pWallBitmaps |
+|---------------|-------------------|
+| F3L2          | [5]               |
+| F3L1          | [4]               |
+| F3            | [4]               |
+| F3R1          | [4]               |
+| F3R2          | [6] (mirror of [5]) |
+| F2L1          | [3]               |
+| F2            | [3]               |
+| F2R1          | [3]               |
+| F1L1          | [2]               |
+| F1            | [2]               |
+| F1R1          | [2]               |
+| F0L1          | [1]               |
+| F0R1          | [0]               |
 
 ## Screen Rectangle Mapping
 
@@ -74,10 +74,13 @@ struct wordRectPos {
 };
 ```
 
-The actual coordinate values are loaded at runtime from game data. We need to either:
-1. Extract them by running CSBWin in a debugger
-2. Reverse-engineer from graphics sizes and viewport layout
-3. Use the exported full viewport graphic (index 17) to measure positions
+CSBWin loads the viewport coordinate/rectangle tables from `graphics.dat` at startup as part of “graphic `0x22e`”:
+
+- `CSBCode.cpp:10125`: `ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0);`
+- `Data.h:1109+`: marks the loaded region as “Start of graphic 0x22e”
+- `Data.h:1238`: `RectPos wallRectangles[14];` (and many related rectangles) are within that region
+
+So the coordinates and source parameters (`RectPos.b.uByte4..uByte7`) exist in the shipped data tables; they are not hard-coded in C++.
 
 ## Door Graphics Indices (for wallSet = 0)
 
@@ -125,54 +128,3 @@ Translation:
 3. `F3, wallDecorationFront, WallF3Front, StdDrawWallDecoration` → Draw decorations
 4. `Alcove, JumpZ, 5` → If has alcove, draw objects inside
 5. `Return` → End
-
-## Implementation Strategy
-
-### Phase 1: Hardcode Basic Graphics (Current Status)
-
-Use the extracted graphics indices for stone walls:
-- Distance 3: Graphics 88, 89, 90
-- Distance 2: Graphic 87
-- Distance 1: Graphic 86
-- Distance 0: Graphics 84, 85
-
-Estimate rectangle positions based on graphics sizes.
-
-### Phase 2: Extract Exact Rectangles
-
-Method A: Visual measurement from viewport_017_224x136.png
-- Export and examine the full rendered viewport
-- Measure pixel positions of each visible wall segment
-
-Method B: Runtime extraction from CSBWin
-- Run CSBWin with dungeon.dat in debugger
-- Break at BltShapeToViewport calls
-- Log rectangle coordinates for each cell
-
-Method C: Search for hardcoded data
-- Rectangles might be in a data segment or resource file
-- Check for arrays of i16 values in Data.h or data.cpp
-
-### Phase 3: Implement Bytecode Interpreter
-
-Create a proper interpreter for the pStdDrawCode programs:
-```typescript
-const pStdDrawCode = [
-  // [cellNum][roomType] → bytecode program
-  [ /* RF4L2 programs */ ],
-  [ /* RF4R2 programs */ ],
-  // ...
-];
-
-function interpret(program: number[], roomData: RoomData[]) {
-  // Execute opcodes
-}
-```
-
-## Next Steps
-
-1. ✅ Extract graphics indices (DONE)
-2. ⏳ Extract or estimate rectangle coordinates
-3. ⏳ Port bytecode programs from CSBWin
-4. ⏳ Implement bytecode interpreter
-5. ⏳ Test with actual dungeon rendering

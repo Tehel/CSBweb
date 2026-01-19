@@ -9,7 +9,7 @@
 import { BinaryFile, Endianness } from '../core/BinaryFile';
 import { decompressGraphics } from '../core/compression';
 import { decodeIMG, ImageFormat, type DecodedImage } from '../core/imageDecoder';
-import type { ui8, ui16, Palette } from '../core/types';
+import type { ui16, Palette } from '../core/types';
 import { DEFAULT_PALETTE } from '../core/constants';
 
 /**
@@ -125,24 +125,15 @@ export class GraphicsLoader {
         return this.data;
     }
 
-    /**
-     * Get raw data for a graphic (decompressed but not decoded)
-     */
+    // Get raw data for a graphic (decompressed but not decoded)
     getRawGraphic(index: ui16): Uint8Array {
-        if (!this.data) {
-            throw new Error('Graphics not loaded');
-        }
-
-        if (index >= this.data.itemCount) {
-            throw new Error(`Invalid graphic index: ${index}`);
-        }
+        if (!this.data) throw new Error('Graphics not loaded');
+        if (index >= this.data.itemCount) throw new Error(`Invalid graphic index: ${index}`);
 
         const entry = this.data.entries[index];
 
         // Return cached if available
-        if (entry.rawData) {
-            return entry.rawData;
-        }
+        if (entry.rawData) return entry.rawData;
 
         // Calculate offset
         const dataStartOffset = 2 + this.data.itemCount * 2 * 2;
@@ -152,15 +143,10 @@ export class GraphicsLoader {
         }
 
         // Read compressed data
-        this.file.seek(offset);
-        const compressedData = this.file.read(entry.compressedSize);
+        const compressedData = this.file.read(offset, entry.compressedSize);
 
         // Decompress if needed
-        const rawData = decompressGraphics(
-            compressedData,
-            entry.compressedSize,
-            entry.decompressedSize
-        );
+        const rawData = decompressGraphics(compressedData, entry.compressedSize, entry.decompressedSize);
 
         // Cache it
         entry.rawData = rawData;
@@ -324,7 +310,8 @@ export function createImageData(
         rgba[i * 4 + 0] = r;
         rgba[i * 4 + 1] = g;
         rgba[i * 4 + 2] = b;
-        rgba[i * 4 + 3] = 255; // Opaque
+        // Color index 10 is transparent (from CSBWin BltShapeToViewport line 2947)
+        rgba[i * 4 + 3] = (colorIndex === 10) ? 0 : 255;
     }
 
     return new ImageData(rgba, image.width, image.height);

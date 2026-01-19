@@ -45,6 +45,14 @@ Output will be in the `dist/` directory.
 npm run preview
 ```
 
+### Mirror CSBwin Website (Offline Browsing)
+
+Downloads everything under `https://www.dianneandpaul.net/CSBwin/` into `tools/output/csbwin-mirror/` and rewrites links for offline browsing:
+
+```bash
+npm run scrape:csbwin
+```
+
 ## Project Structure
 
 ```
@@ -53,8 +61,7 @@ dmweb/
 │   ├── core/              # Core game types and utilities
 │   ├── data/              # Data file parsers (dungeon.dat, graphics.dat)
 │   ├── engine/            # Game engine (movement, collision, state)
-│   ├── renderer/          # 3D viewport rendering
-│   ├── ui/                # User interface components
+│   ├── renderer/          # Viewport rendering (CSBWin-style blitting)
 │   └── main.ts            # Application entry point
 ├── static/                # Static assets (served by Vite)
 │   ├── gamefiles/         # Original game data files
@@ -75,21 +82,10 @@ dmweb/
 - [x] Project setup (TypeScript + Vite)
 - [x] Architecture documentation
 - [x] File format documentation
-- [ ] Data file parsers
-  - [ ] dungeon.dat parser
-  - [ ] graphics.dat parser (port from existing JS)
-- [ ] Core game engine
-  - [ ] Party state management
-  - [ ] Movement system
-  - [ ] Collision detection
-- [ ] Rendering
-  - [ ] First-person viewport
-  - [ ] Wall rendering
-  - [ ] Floor/ceiling rendering
-- [ ] Game loop
-  - [ ] Tick-based timing
-  - [ ] Input handling
-  - [ ] State updates
+- [x] Data file parsers (dungeon.dat, graphics.dat)
+- [x] Core game engine (party state, movement, collision)
+- [x] Viewport renderer (CSBWin-style cell/bytecode drawing)
+- [ ] Game logic (combat, inventory, magic, etc.)
 
 ## Documentation
 

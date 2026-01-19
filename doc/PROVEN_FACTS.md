@@ -31,17 +31,20 @@ Line 2893: Mirror operation creates pWallBitmaps[6] from pWallBitmaps[5]:
 ```cpp
 MakeMirror(d.pWallBitmaps[5], d.pWallBitmaps[6], ...);
 ```
-- `pWallBitmaps[6]` = graphic **90** (mirrored from 89)
+- `pWallBitmaps[6]` = **mirrored copy** of `pWallBitmaps[5]` (CSBWin does not read a separate “graphic 90” into `pWallBitmaps[6]`)
 
-### Graphics Actual Sizes (from inspect-graphics.ts output)
-```
-84: 32×136
-85: 32×136
-86: 256×111  ← SPRITE SHEET
-87: 144×71
-88: 128×51
-89: 16×49
-90: 80×46
+### Wall Bitmap Allocation Sizes (CSBCode.cpp lines 10104-10113)
+
+These are CSBWin’s allocated buffer sizes for the wall bitmaps (Atari ST planar bytes):
+
+```cpp
+d.pWallBitmaps[5] = allocateMemory(392, 1);
+d.pWallBitmaps[6] = allocateMemory(392, 1);
+d.pWallBitmaps[4] = allocateMemory(3264, 1);
+d.pWallBitmaps[3] = allocateMemory(5112, 1);
+d.pWallBitmaps[2] = allocateMemory(14208, 1);
+d.pWallBitmaps[1] = allocateMemory(2176, 1);
+d.pWallBitmaps[0] = allocateMemory(2176, 1);
 ```
 
 ### Cell to Bitmap Mapping (Viewport.cpp lines 2267-2279)
@@ -52,7 +55,7 @@ case BMP_StdWallBitmapF3L2:   return d.pWallBitmaps[5];  // graphic 89
 case BMP_StdWallBitmapF3L1:   return d.pWallBitmaps[4];  // graphic 88
 case BMP_StdWallBitmapF3:     return d.pWallBitmaps[4];  // graphic 88
 case BMP_StdWallBitmapF3R1:   return d.pWallBitmaps[4];  // graphic 88
-case BMP_StdWallBitmapF3R2:   return d.pWallBitmaps[6];  // graphic 90
+case BMP_StdWallBitmapF3R2:   return d.pWallBitmaps[6];  // mirrored copy of pWallBitmaps[5]
 case BMP_StdWallBitmapF2L1:   return d.pWallBitmaps[3];  // graphic 87
 case BMP_StdWallBitmapF2:     return d.pWallBitmaps[3];  // graphic 87
 case BMP_StdWallBitmapF2R1:   return d.pWallBitmaps[3];  // graphic 87
@@ -101,7 +104,7 @@ union RectPos { wordRectPos w; byteRectPos b; };
 ```cpp
 void BltShapeToViewport(ui8 *P1, RectPos *P2)
 {
-  D0W = (UI8)(P2->b.uByte4);  // source width
+  D0W = (UI8)(P2->b.uByte4);  // source bytes/line (stride)
   if (D0B != 0)
   {
     TAG0088b2((ui8 *)P1,                   // src bitmap
@@ -109,18 +112,17 @@ void BltShapeToViewport(ui8 *P1, RectPos *P2)
               P2,                           // destination RectPos
               (UI8)(P2->b.uByte6),          // srcX
               (UI8)(P2->b.uByte7),          // srcY
-              (UI8)(P2->b.uByte4),          // srcWidth
-              112,                          // dstWidth (viewport width/2)
+              (UI8)(P2->b.uByte4),          // src bytes/line
+              112,                          // dst bytes/line (224 pixels wide)
               10);                          // transparent color
   };
 }
 ```
 
 **Key insight**:
-- `P2->b.uByte4` = source width to copy
-- `P2->b.uByte6` = source X offset (for sprite sheets)
-- `P2->b.uByte7` = source Y offset
-- Destination is `P2->w.x1, x2, y1, y2`
+- `P2->b.uByte4` = source bytes/line (stride)
+- `P2->b.uByte6` / `P2->b.uByte7` = source X/Y offsets (pixels)
+- Destination rectangle comes from `RectPos` (`TAG0088b2()` reads `RectPos.b.*` when `d.UseByteCoordinates != 0`)
 
 ### Cell System (Viewport.cpp lines 347-355)
 ```cpp
@@ -135,9 +137,10 @@ i8 relativeY[21] = {
 
 Cell indices (lines 323-346):
 - RF4L2=0, RF4R2=1
-- RF3L2=2, RF3R2=3, RF3L1=4, RF3R1=5, RF3=6
-- ... (7-9 unlabeled)
-- RF2L2=10, RF2R2=11, RF2L1=12, RF2R1=13, RF2=14
+- RF3L2=2, RF2L2=3
+- RF4L1=4, RF4R1=5, RF4=6
+- RF3L1=7, RF3R1=8, RF3=9, RF3R2=10
+- RF2R2=11, RF2L1=12, RF2R1=13, RF2=14
 - RF1L1=15, RF1R1=16, RF1=17
 - RF0L1=18, RF0R1=19, RF0=20
 
@@ -150,12 +153,87 @@ DrawViewport() {
     get room type
   }
 
-  // 2. Render from far to near
-  Interpret(pStdDrawCode[RF3L2][roomType], ...);
-  Interpret(pStdDrawCode[RF3R2][roomType], ...);
-  // ... all cells from D4 to D0
+  // 2. Render in CSBWin's fixed cell order
+  for (userCellNum = 0; userCellNum < 21; userCellNum++) {
+    Interpret(pStdDrawCode[userCellNum][graphicRoomType], ...);
+  }
 }
 ```
+
+### Stairway Traversal (CSBCode.cpp lines 7733-7783, 7905-7910, 8009-8217)
+Turn or movement actions trigger stair traversal in these cases:
+
+```cpp
+if (BITS5_15(cellFlags) == 3) {
+  TraverseStairway(D7W & 4, true); // called from _TurnParty when standing on stairs
+}
+...
+startingInStairwell = rtFrom==roomSTAIRS;
+if (startingInStairwell && (direction==2)) { // backward
+  TraverseStairway(cellFlagsFrom & 4, true);
+}
+...
+if (rtTo == roomSTAIRS) {
+  d.partyX = newX;
+  d.partyY = newY;
+  TraverseStairway(cellFlagsTo & 0x04, true);
+}
+```
+
+`TraverseStairway()` moves the party between levels and can be inhibited by the party-move filter:
+
+```cpp
+newPartyLevel = IncrementLevel(d.partyLevel, UpOrDown == 0 ? 1 : -1, &x, &y);
+newPartyFacing = ExitStairsDirection(x, y, newPartyLevel);
+CallPartyMoveFilter(&partyMoveData);
+if (partyMoveData.flags & PM_INHIBITMOVE) return;
+```
+
+### Exit Stair Facing (Code11f52.cpp lines 290-325)
+`ExitStairsDirection()` searches for a non-blocking adjacent cell on the destination level:
+
+```cpp
+rt = (ROOMTYPE)(cf >> 5);
+if (rt == roomSTONE) continue;
+if (rt == roomSTAIRS) continue;
+if (rt == roomFALSEWALL) {
+  if ((cf & 5) == 0) continue; // false walls passable only if bit 0 or 2 set
+}
+return (ui16)direction;
+```
+
+### Level Mapping for Stairs (CSBCode.cpp lines 4709-4759)
+`IncrementLevel()` converts (x,y) to absolute dungeon coords via the current level's offsets,
+then searches for a level descriptor with matching `level` number and a bounding box that contains
+those absolute coords. If found, it returns the new map index and adjusted (x,y).
+
+### Text Retrieval and Decode (SaveGame.cpp lines 2221-2272, CSBCode.cpp lines 5487-5707)
+CSBWin converts the raw text word array into an “indirect text” table during load:
+
+```cpp
+for each DB2 text record with link != RNnul:
+  oldIndex = pDB2->index(); // word offset into text array
+  len = ComputeTextLength(text + oldIndex); // in 16-bit words
+  d.indirectTextIndex[newIndex] = d.sizeOfCompressedText;
+  copy len words into d.compressedText;
+  pDB2->index(newIndex); // replace word offset with indirect index
+```
+
+`DecodeText()` uses the DB2 index to locate the compressed word stream:
+
+```cpp
+A2 = d.compressedText + d.indirectTextIndex[DB2.index()];
+```
+
+Decoding rules for wall texts (`typeOfText == 0`):
+- Codes 0–25, 26 (space), 27 (period) are output **as raw byte values** (font indices).
+- Separator code 28 outputs byte `0x80` (line break marker).
+- End code 31 terminates; `0x81` is appended as the final terminator.
+
+Escape code tables used by `DecodeText()` live in graphics.dat item `0x22f` (Data.h:1070-1072):
+- `Byte10080[64]`: escape code 1 table (2-byte strings, used for all text types)
+- `Byte10336[256]`: escape code 2 table for wall texts (`typeOfText == 0`)
+- `Byte10016[256]`: escape code 2 table for non-wall texts
 
 ### Bytecode Example (Viewport.cpp line 979)
 ```cpp
@@ -171,32 +249,10 @@ ui16 StdDrawF3Stone[] = {
 
 First 3 instructions: Push bitmap pointer, push rectangle pointer, blit.
 
-## NOT YET FOUND
+## Where the rectangle/offset data lives
 
-❌ **Actual coordinate values** in `d.wallRectangles[]` array
-❌ **Source rectangle offsets** (uByte4, uByte6, uByte7) for each cell
-❌ **Complete bytecode programs** for all 21×8 cell+roomtype combinations
+CSBWin does not hard-code the `RectPos` coordinate tables in C++ source; they are loaded from `graphics.dat` at startup as part of “graphic `0x22e`”:
 
-## WHAT THIS MEANS
-
-We CAN implement the renderer with:
-1. Correct graphics indices ✅
-2. Correct cell system ✅
-3. Correct blitting logic ✅
-
-We CANNOT get pixel-perfect without:
-1. Actual rectangle coordinates
-2. Source offsets for sprite sheet clipping
-
-## MINIMAL VIABLE APPROACH
-
-Since graphic 84 and 85 (32×136) render correctly at F0L1/F0R1:
-1. They're simple full-height images (no clipping needed)
-2. F0L1 must be at x=0, F0R1 at x=192 (224-32)
-
-We can make educated guesses for other cells based on:
-- Graphics sizes (known)
-- Perspective geometry (standard)
-- Visual comparison with viewport_017_224x136.png
-
-But it won't be pixel-perfect without the actual data.
+- `CSBCode.cpp:10125`: `ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0);`
+- `Data.h:1109+`: marks the loaded region as “Start of graphic 0x22e”
+- `Data.h:1238`: `RectPos wallRectangles[14];` (and many related viewport rectangles) are within that region
