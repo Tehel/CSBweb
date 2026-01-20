@@ -137,11 +137,38 @@ Next steps (Phase 5 follow-up):
 4. ✅ Ported `TAG00a4a2` + `RandomWallDecoration` (CSBCode.cpp:5714+ / 5696+) and `SummarizeStoneRoom` actuator wallGraphicOrdinal handling (Codea59a.cpp:44-176).
 5. ✅ DSA gating for wall/floor decorations (`actuatorType==47` with `DSALevelIndex` / `ParameterA/B`) implemented in summarize step (`src/renderer/csbwin/SummarizeRoomInfo.ts`).
 
-### Phase 6 — Custom skins / BACKGROUND_LIB (if required for DM dungeon)
-Goal: support CSBWin’s per-cell “skin” overrides when the dungeon uses them.
+### Phase 6 — Custom skins / BACKGROUND_LIB
+Goal: support CSBWin’s per-cell “skin” overrides even when the base DM dungeon does not use them.
 
 1. Identify whether the shipped DM dungeon uses custom backgrounds.
-2. If yes, port the minimal `BACKGROUND_LIB`/`skinCache` behaviors needed to select and execute custom code per cell.
+2. Port the minimal `BACKGROUND_LIB`/`skinCache` behaviors needed to select and execute custom code per cell.
+
+Status:
+- ✅ Step 1: current `dungeon.dat` has no custom backgrounds; still implementing support for compatibility.
+- ⏳ Step 2: implement `BACKGROUND_LIB`/`skinCache` selection and custom code execution path.
+
+### Phase 7 — UI Rendering (faithful DM layout)
+Goal: render the original Dungeon Master UI (portraits, status bars, hands, controls, and message area) with CSBWin-accurate layout and graphics.
+
+1. **Inventory CSBWin UI entrypoints and tables**:
+   - Identify authoritative draw paths in `doc/CSBwin-src/Character.cpp`, `Menu.cpp`, and `CSBCode.cpp` (UI rectangles, panel bitmaps, font usage).
+   - Record exact source graphics indices and rectangle coordinates used for the UI (avoid guessed positions).
+2. **Introduce a screen-level draw pipeline**:
+   - Add a screen buffer for the full 320×200 frame and render the viewport into it before UI draws.
+   - Port CSBWin blit semantics for UI elements (same `TAG0088b2` behavior and transparency).
+3. **Draw static UI frame**:
+   - Render borders, panel backgrounds, and static widgets exactly as CSBWin does (source graphics and placement).
+4. **Draw dynamic party state**:
+   - Champion portraits + name/health/stamina/mana bars.
+   - Hand slots, active/inactive champion selection, and status icons.
+5. **Message area + text**:
+   - Render the message line(s) and overlay text using the CSBWin font graphic and decoding rules.
+6. **Input hit‑tests (visual only at first)**:
+   - Map mouse/keyboard regions to UI elements for future interaction; draw selection highlights where applicable.
+
+Validation
+- Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).
+- Verify pixel‑perfect alignment of the viewport frame, portraits, and message line.
 
 ## Practical Guidance for Work Organization
 

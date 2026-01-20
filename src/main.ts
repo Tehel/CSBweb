@@ -26,6 +26,7 @@ let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 
 const QUICK_SAVE_KEY = 'dmweb_quicksave_v1';
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
+const GAME_DATA_DIR = '/gamefiles/dm-atari/';
 
 // Get canvas and context
 const canvas = document.getElementById('viewport') as HTMLCanvasElement;
@@ -113,7 +114,7 @@ async function init() {
         dungeonLoader = new DungeonLoader();
         try {
             updateDebug('Loading dungeon.dat...');
-            const dungeon = await dungeonLoader.load('/gamefiles/dungeon.dat');
+            const dungeon = await dungeonLoader.load(`${GAME_DATA_DIR}/dungeon.dat`);
 
             console.log(`✓ Loaded dungeon:`, dungeon);
             console.log(`  - Seed: ${dungeon.header.randomSeed}`);
@@ -128,7 +129,7 @@ async function init() {
             // Load graphics
             console.log('Loading graphics.dat...');
             graphicsLoader = new GraphicsLoader();
-            await graphicsLoader.load('/gamefiles/graphics.dat');
+            await graphicsLoader.load(`${GAME_DATA_DIR}/graphics.dat`);
             console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
             // Optional CSBgraphics.dat overlay (extended decorations, portraits, etc.)
@@ -188,29 +189,23 @@ async function init() {
                 const posInfo = game?.getPositionInfo();
                 console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo, message || '');
 
-                if (message) {
-                    updateDebug(message);
-                } else if (success) {
-                    updateDebug(posInfo || 'Moved');
-                }
+                if (message) updateDebug(message);
+                else if (success) updateDebug(posInfo || 'Moved');
 
                 // Render 3D view after movement
-                if (success && renderer && game) {
-                    renderView();
-                }
+                if (success && renderer && game) renderView();
             });
 
             // Register tick callback to update view
-            game.onTick(() => {
-                if (renderer && game) {
-                    renderView();
-                }
-            });
+            game.onTick(() => { if (renderer && game) renderView(); });
 
             // Start game loop
             game.start();
             console.log('✓ Game engine started');
             console.log('✓ Starting position:', game.getPositionInfo());
+
+            // Test graphics loader
+            // await testGraphicsLoader();
 
             // Initial render
             renderView();
@@ -234,9 +229,6 @@ async function init() {
                 `✓ Facing: ${Direction[dungeon.header.startPosition.facing]}<br>` +
                 `✓ Use WASD/Arrows to move, Q/E to turn!`
             );
-
-            // Test graphics loader
-            // await testGraphicsLoader();
 
         } catch (error) {
             console.warn('Could not load dungeon.dat:', error);
@@ -328,29 +320,21 @@ function drawMapPreview(dungeon: any) {
 
             // Color by room type
             switch (tile.roomType) {
-                case RoomType.STONE:
-                    viewportCtx.fillStyle = '#444'; // Wall
+                case RoomType.STONE:      viewportCtx.fillStyle = '#444'; // Wall
                     break;
-                case RoomType.OPEN:
-                    viewportCtx.fillStyle = '#888'; // Floor
+                case RoomType.OPEN:       viewportCtx.fillStyle = '#888'; // Floor
                     break;
-                case RoomType.DOOR:
-                    viewportCtx.fillStyle = '#aa6'; // Door
+                case RoomType.DOOR:       viewportCtx.fillStyle = '#aa6'; // Door
                     break;
-                case RoomType.STAIRS:
-                    viewportCtx.fillStyle = '#6a6'; // Stairs
+                case RoomType.STAIRS:     viewportCtx.fillStyle = '#6a6'; // Stairs
                     break;
-                case RoomType.PIT:
-                    viewportCtx.fillStyle = '#222'; // Pit
+                case RoomType.PIT:        viewportCtx.fillStyle = '#222'; // Pit
                     break;
-                case RoomType.TELEPORTER:
-                    viewportCtx.fillStyle = '#66a'; // Teleporter
+                case RoomType.TELEPORTER: viewportCtx.fillStyle = '#66a'; // Teleporter
                     break;
-                case RoomType.FALSEWALL:
-                    viewportCtx.fillStyle = '#a66'; // False wall
+                case RoomType.FALSEWALL:  viewportCtx.fillStyle = '#a66'; // False wall
                     break;
-                default:
-                    viewportCtx.fillStyle = '#f0f'; // Unknown
+                default:                  viewportCtx.fillStyle = '#f0f'; // Unknown
             }
 
             viewportCtx.fillRect(px, py, scale - 1, scale - 1);
@@ -371,110 +355,8 @@ function drawMapPreview(dungeon: any) {
     viewportCtx.fillText(`Wall █ Floor █ Door █ Stairs █ Start █`, 20, legendY);
 }
 
-// Helper: Test graphics loader and display images
-async function testGraphicsLoader() {
-    try {
-        console.log('Testing GraphicsLoader...');
-        const graphicsLoader = new GraphicsLoader();
-        await graphicsLoader.load('/gamefiles/graphics.dat');
-
-        console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
-
-        // Clear canvas
-        viewportCtx.fillStyle = '#000';
-        viewportCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Title
-        viewportCtx.fillStyle = '#fff';
-        viewportCtx.font = '20px "Courier New"';
-        viewportCtx.textAlign = 'center';
-        viewportCtx.fillText('Phase 2: Graphics Decoder Test', canvas.width / 2, 30);
-
-        // Get palette
-        const palette = graphicsLoader.getPalette(0);
-        console.log(`✓ Using palette 0:`, palette);
-
-        // Try to decode and display several test images
-        const testImages = [
-            { index: 0, label: 'Credit Screen', x: 20, y: 60 },
-            { index: 1, label: 'Title', x: 20, y: 180 },
-            { index: 2, label: 'Title BG', x: 240, y: 60 },
-            { index: 557, label: 'Font', x: 460, y: 60 }
-        ];
-
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const test of testImages) {
-            try {
-                const image = graphicsLoader.getImage(test.index);
-                console.log(`  ✓ Image ${test.index} (${test.label}): ${image.width}×${image.height}`);
-
-                // Draw image using our helper function
-                const scale = 1;
-                drawImage(viewportCtx, image, palette, test.x, test.y, scale);
-
-                // Draw label
-                viewportCtx.fillStyle = '#ff0';
-                viewportCtx.font = '10px "Courier New"';
-                viewportCtx.textAlign = 'left';
-                viewportCtx.fillText(`${test.index}: ${test.label} (${image.width}×${image.height})`, test.x, test.y - 5);
-
-                successCount++;
-            } catch (error) {
-                console.warn(`  ✗ Could not decode image ${test.index} (${test.label}):`, error);
-
-                // Draw error marker
-                viewportCtx.fillStyle = '#f00';
-                viewportCtx.fillRect(test.x, test.y, 50, 50);
-                viewportCtx.fillStyle = '#fff';
-                viewportCtx.font = '10px "Courier New"';
-                viewportCtx.textAlign = 'left';
-                viewportCtx.fillText(`${test.index}: ERROR`, test.x, test.y - 5);
-
-                failCount++;
-            }
-        }
-
-        // Show cache stats
-        const stats = graphicsLoader.getCacheStats();
-        console.log(`✓ Cache stats: ${stats.cachedImages} images, ${stats.cachedRaw} raw`);
-
-        // Update debug info
-        updateDebug(
-            `Phase 2 Complete + Graphics!<br>` +
-            `✓ GraphicsLoader: ${graphicsLoader.getItemCount()} total graphics<br>` +
-            `✓ Palettes: ${graphicsLoader.getData()?.palettes.length || 0} extracted<br>` +
-            `✓ IMG1/IMG2 decoder: ${successCount}/${testImages.length} images decoded<br>` +
-            `✓ Cache: ${stats.cachedImages} images cached<br>` +
-            (failCount > 0 ? `⚠ ${failCount} images failed to decode` : '')
-        );
-
-        // Draw palette at bottom
-        viewportCtx.fillStyle = '#fff';
-        viewportCtx.font = '10px "Courier New"';
-        viewportCtx.textAlign = 'left';
-        viewportCtx.fillText('Palette 0:', 20, canvas.height - 35);
-
-        for (let i = 0; i < 16; i++) {
-            const color = atariToRGB(palette[i]);
-            viewportCtx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-            viewportCtx.fillRect(90 + i * 25, canvas.height - 40, 20, 20);
-        }
-
-    } catch (error) {
-        console.warn('Graphics loader test failed:', error);
-        updateDebug(
-            `Graphics test failed:<br>` +
-            `${error}<br>` +
-            `Note: Place graphics.dat in static/gamefiles/`
-        );
-    }
-}
-
 // Keep debug helpers in the module without enabling them by default
 void drawMapPreview;
-void testGraphicsLoader;
 
 // Button handlers
 document.getElementById('btn-up')?.addEventListener('click', () => {
