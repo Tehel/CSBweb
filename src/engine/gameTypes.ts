@@ -45,6 +45,10 @@ export interface Champion {
     name: string;
     attributes: ChampionAttributes;
     alive: boolean;
+    portraitGraphic?: ui16;     // Optional portrait graphic index
+    facing?: Direction;         // Optional facing for UI indicator
+    incantation?: number[];     // Magic incantation bytes (ASCII)
+    incantationIndex?: number;  // Next rune index (0-3)
 
     // Inventory slots (simplified for MVP)
     weaponHand: any | null;     // Right hand weapon
@@ -63,6 +67,7 @@ export interface PartyState {
     position: Coordinates;      // Current map position (x, y)
     mapIndex: ui8;              // Current map/level index
     facing: Direction;          // Current facing direction
+    magicCasterIndex: number;   // -1 = none
 
     // Movement state
     moving: boolean;            // Is party currently moving?

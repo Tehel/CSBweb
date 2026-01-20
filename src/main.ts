@@ -12,7 +12,7 @@ import {
 } from './core';
 import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader, drawImage } from './data';
 import { loadSaveGameState, applySaveGameState } from './data/SaveGameLoader';
-import { Game, MovementAction, type RuntimeSaveState } from './engine';
+import { Game, MovementAction, type Champion, type PartyState, type RuntimeSaveState } from './engine';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -47,6 +47,11 @@ function updateDebug(message: string) {
     if (debugEl) {
         debugEl.innerHTML = `<p>${message}</p>`;
     }
+    if (renderer) {
+        const plain = message.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
+        const lines = plain.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+        renderer.setMessageLines(lines);
+    }
 }
 
 function decodeBase64ToBytes(data: string): Uint8Array {
@@ -56,6 +61,82 @@ function decodeBase64ToBytes(data: string): Uint8Array {
         out[i] = bin.charCodeAt(i) & 0xff;
     }
     return out;
+}
+
+const RANDOM_NAMES = [ 'Hawk', 'Leif', 'Tiggy', 'Chani', 'Gothmog', 'Zed', 'Wuuuf', 'Nabi'];
+
+function randomInt(min: number, max: number): number {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function createRandomChampion(partyPosition: number): Champion {
+    const alive = Math.random() > 0.1;
+    const maxHealth = randomInt(60, 180);
+    const maxStamina = randomInt(40, 160);
+    const maxMana = randomInt(20, 120);
+    const name = RANDOM_NAMES[randomInt(0, RANDOM_NAMES.length-1)];
+
+    return {
+        name,
+        attributes: {
+            health: alive ? randomInt(10, maxHealth) : 0,
+            maxHealth,
+            stamina: alive ? randomInt(10, maxStamina) : 0,
+            maxStamina,
+            mana: alive ? randomInt(0, maxMana) : 0,
+            maxMana,
+            luck: randomInt(20, 80),
+            strength: randomInt(20, 80),
+            dexterity: randomInt(20, 80),
+            wisdom: randomInt(20, 80),
+            vitality: randomInt(20, 80),
+            antiMagic: randomInt(20, 80),
+            antiFire: randomInt(20, 80),
+            experience: randomInt(0, 65000),
+            fighter: randomInt(1, 8),
+            ninja: randomInt(1, 8),
+            priest: randomInt(1, 8),
+            wizard: randomInt(1, 8),
+        },
+        alive,
+        incantation: [0, 0, 0, 0],
+        incantationIndex: 0,
+        weaponHand: randomInt(0, 95),
+        shieldHand: Math.random() > 0.5 ? randomInt(0, 95) : null,
+        quiver: null,
+        partyPosition,
+        facing: partyPosition & 3,
+    };
+}
+
+function injectRandomParty(saveSnapshot: boolean): void {
+    if (!game) return;
+    const current = game.getParty().getState();
+    const champions: Champion[] = [];
+    for (let i = 0; i < 4; i++) {
+        champions.push(createRandomChampion(i));
+    }
+    const next: PartyState = {
+        ...current,
+        champions,
+        moving: false,
+        turning: false,
+        lastMoveTime: 0,
+    };
+    game.setPartyState(next);
+    if (saveSnapshot) {
+        quickSave();
+    }
+    renderView();
+    updateDebug(saveSnapshot ? 'Random party injected + quick-saved (F8)' : 'Random party injected');
+}
+
+function toggleAttackPanel(): void {
+    if (!renderer) return;
+    const next = !renderer.isAttackPanelVisible();
+    renderer.setShowAttackPanel(next);
+    updateDebug(next ? 'Attack panel ON' : 'Attack panel OFF');
+    renderView();
 }
 
 function quickSave(): void {
@@ -93,15 +174,17 @@ function renderView() {
     const mapIndex = party.getMapIndex();
 
     // ViewportRenderer.render(facing, x, y, mapIndex)
-    console.log(`Rendering viewport: pos=(${pos.x},${pos.y}) facing=${facing} map=${mapIndex}`);
+    // console.log(`Rendering viewport: pos=(${pos.x},${pos.y}) facing=${facing} map=${mapIndex}`);
+    renderer.setPartyState(party.getState());
+    renderer.processMouseQueue();
     renderer.render(facing, pos.x, pos.y, mapIndex);
 
     // Debug: log execution
-    const log = renderer.getExecutionLog();
-    if (log.length > 0) {
-        console.log(`Bytecode executed: ${log.length} operations`);
-        console.log('First 5 ops:', log.slice(0, 5));
-    }
+    // const log = renderer.getExecutionLog();
+    // if (log.length > 0) {
+    //     console.log(`Bytecode executed: ${log.length} operations`);
+    //     console.log('First 5 ops:', log.slice(0, 5));
+    // }
 }
 
 // Initialize the game
@@ -134,7 +217,7 @@ async function init() {
 
             // Optional CSBgraphics.dat overlay (extended decorations, portraits, etc.)
             csbGraphicsLoader = new CSBGraphicsLoader();
-            const csbLoaded = await csbGraphicsLoader.tryLoad('/gamefiles/CSBgraphics.dat');
+            const csbLoaded = await csbGraphicsLoader.tryLoad(`${GAME_DATA_DIR}/CSBgraphics.dat`);
             if (csbLoaded) {
                 console.log('✓ Loaded CSBgraphics.dat overlay');
             } else {
@@ -184,10 +267,51 @@ async function init() {
                 console.log('✓ Replaced canvas with full screen (320×200 @ 3x scale)');
             }
 
+            screenCanvas.addEventListener('mousemove', (e) => {
+                if (!renderer) return;
+                const rect = screenCanvas.getBoundingClientRect();
+                const scaleX = screenCanvas.width / rect.width;
+                const scaleY = screenCanvas.height / rect.height;
+                const x = Math.floor((e.clientX - rect.left) * scaleX);
+                const y = Math.floor((e.clientY - rect.top) * scaleY);
+                renderer.setHoverPoint({ x, y });
+                renderView();
+            });
+
+            screenCanvas.addEventListener('mousedown', (e) => {
+                if (!renderer) return;
+                const rect = screenCanvas.getBoundingClientRect();
+                const scaleX = screenCanvas.width / rect.width;
+                const scaleY = screenCanvas.height / rect.height;
+                const x = Math.floor((e.clientX - rect.left) * scaleX);
+                const y = Math.floor((e.clientY - rect.top) * scaleY);
+                const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
+                if (buttonMask !== 0) {
+                    renderer.enqueueMouseClick(x, y, buttonMask);
+                    renderView();
+                }
+            });
+
+            screenCanvas.addEventListener('mouseup', () => {
+                if (!renderer) return;
+                renderer.enqueueMouseUnclick();
+                renderView();
+            });
+
+            screenCanvas.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+            });
+
+            screenCanvas.addEventListener('mouseleave', () => {
+                if (!renderer) return;
+                renderer.setHoverPoint(null);
+                renderView();
+            });
+
             // Register movement callback
             game.onMove((success, message) => {
                 const posInfo = game?.getPositionInfo();
-                console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo, message || '');
+                console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo, message ?? ' ');
 
                 if (message) updateDebug(message);
                 else if (success) updateDebug(posInfo || 'Moved');
@@ -464,6 +588,14 @@ document.addEventListener('keydown', (e) => {
             break;
         case 'F9':
             quickLoad();
+            handled = true;
+            break;
+        case 'F8':
+            injectRandomParty(true);
+            handled = true;
+            break;
+        case 'F7':
+            toggleAttackPanel();
             handled = true;
             break;
     }

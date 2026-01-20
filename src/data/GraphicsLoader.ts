@@ -161,18 +161,11 @@ export class GraphicsLoader {
      * @param format - Image format (IMG1 or IMG2), defaults to IMG1
      */
     getImage(index: ui16, format: ImageFormat = ImageFormat.IMG1): DecodedImage {
-        // Check cache first
-        if (this.imageCache.has(index)) {
-            return this.imageCache.get(index)!;
+        let image = this.imageCache.get(index)
+        if (!image) {
+            image = decodeIMG(this.getRawGraphic(index), format);
+            this.imageCache.set(index, image);
         }
-
-        // Get raw data and decode
-        const rawData = this.getRawGraphic(index);
-        const image = decodeIMG(rawData, format);
-
-        // Cache the decoded image
-        this.imageCache.set(index, image);
-
         return image;
     }
 

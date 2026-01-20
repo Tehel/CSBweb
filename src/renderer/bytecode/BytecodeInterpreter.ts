@@ -60,8 +60,8 @@ export interface InterpreterContext {
   backgroundGraphicSet?: number;
 
   // Basic graphics resolver (CSBWin `GetBasicGraphicAddress(n)` used by `GraphicToViewport`)
-  getBasicGraphicBitmap?: (graphicNum: number) => IndexedBitmap | null;
-  derivedGraphicCache?: Map<string, IndexedBitmap>;
+  getGraphicBitmap?: (graphicNum: number) => IndexedBitmap | null;
+  graphicCache?: Map<string, IndexedBitmap>;
 
   // CSBWin object rendering tables (graphics.dat 0x22e + 0x22f)
   objectTables?: ObjectTables;
@@ -860,9 +860,9 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!getGraphic) {
-      this.log(`  ERROR: Missing context.getBasicGraphicBitmap`);
+      this.log(`  ERROR: Missing context.getGraphicBitmap`);
       return true;
     }
 
@@ -1073,7 +1073,7 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     const viewport = this.context.viewportIndexBuffer;
     if (!getGraphic || !viewport) return true;
 
@@ -1149,7 +1149,7 @@ export class BytecodeInterpreter {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     const csbGraphics = this.context.csbGraphics;
     if (!tables || !dungeon || !viewport || !getGraphic) return;
 
@@ -1286,7 +1286,7 @@ export class BytecodeInterpreter {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!tables || !dungeon || !viewport || !getGraphic) return;
 
     // CSBWin draws wall text only on the front wall immediately in front of the party (relativePosition==12).
@@ -1344,7 +1344,7 @@ export class BytecodeInterpreter {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     const csbGraphics = this.context.csbGraphics;
     if (!tables || !dungeon || !viewport || !getGraphic) return;
 
@@ -1492,7 +1492,7 @@ export class BytecodeInterpreter {
 
   private drawTeleporter(teleporterRect: RectPos, wallRect: RectPos): void {
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!viewport || !getGraphic) return;
 
     const overlayGraphic = getGraphic((teleporterRect.x1 | 0) + 73);
@@ -1769,7 +1769,7 @@ export class BytecodeInterpreter {
     baseY2: number
   ): { nextSmallOffset: number } {
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!viewport || !getGraphic) return { nextSmallOffset: currentSmallOffset };
 
     const nearSideOfCell = relativeLocationWithinCell >= 2;
@@ -1875,7 +1875,7 @@ export class BytecodeInterpreter {
   ): void {
     const tables = this.context.objectTables;
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!tables || !viewport || !getGraphic) return;
 
     const mt = monster.creatureType | 0;
@@ -1995,7 +1995,7 @@ export class BytecodeInterpreter {
     middleLeftRight: number,
   ): void {
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!viewport || !getGraphic) return;
 
     const vp = tables.viewportPosition[0]?.[relativeCellNumber]?.[relativeLocation];
@@ -2112,7 +2112,7 @@ export class BytecodeInterpreter {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getBasicGraphicBitmap;
+    const getGraphic = this.context.getGraphicBitmap;
     if (!tables || !dungeon || !viewport || !getGraphic) return false;
 
     let relCell = relativeCellNumber + 3;
@@ -2267,7 +2267,7 @@ export class BytecodeInterpreter {
     distanceFromUs: number,
     mirror: boolean
   ): IndexedBitmap | null {
-    const cache = this.context.derivedGraphicCache;
+    const cache = this.context.graphicCache;
     const key = `obj:${graphicNum}:${distanceFromUs}:${mirror ? 1 : 0}`;
     if (cache) {
       const cached = cache.get(key);

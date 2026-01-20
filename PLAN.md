@@ -143,28 +143,42 @@ Goal: support CSBWin’s per-cell “skin” overrides even when the base DM dun
 1. Identify whether the shipped DM dungeon uses custom backgrounds.
 2. Port the minimal `BACKGROUND_LIB`/`skinCache` behaviors needed to select and execute custom code per cell.
 
-Status:
-- ✅ Step 1: current `dungeon.dat` has no custom backgrounds; still implementing support for compatibility.
-- ⏳ Step 2: implement `BACKGROUND_LIB`/`skinCache` selection and custom code execution path.
+Status: skipped
 
 ### Phase 7 — UI Rendering (faithful DM layout)
 Goal: render the original Dungeon Master UI (portraits, status bars, hands, controls, and message area) with CSBWin-accurate layout and graphics.
 
-1. **Inventory CSBWin UI entrypoints and tables**:
-   - Identify authoritative draw paths in `doc/CSBwin-src/Character.cpp`, `Menu.cpp`, and `CSBCode.cpp` (UI rectangles, panel bitmaps, font usage).
-   - Record exact source graphics indices and rectangle coordinates used for the UI (avoid guessed positions).
-2. **Introduce a screen-level draw pipeline**:
-   - Add a screen buffer for the full 320×200 frame and render the viewport into it before UI draws.
-   - Port CSBWin blit semantics for UI elements (same `TAG0088b2` behavior and transparency).
-3. **Draw static UI frame**:
-   - Render borders, panel backgrounds, and static widgets exactly as CSBWin does (source graphics and placement).
-4. **Draw dynamic party state**:
-   - Champion portraits + name/health/stamina/mana bars.
-   - Hand slots, active/inactive champion selection, and status icons.
-5. **Message area + text**:
-   - Render the message line(s) and overlay text using the CSBWin font graphic and decoding rules.
-6. **Input hit‑tests (visual only at first)**:
-   - Map mouse/keyboard regions to UI elements for future interaction; draw selection highlights where applicable.
+1. ✅ **Inventory CSBWin UI entrypoints and tables**. Use `doc/CSBWIN_UI_REFERENCE.md` as the authoritative UI layout record and extract UI tables from `graphics.dat` (graphic `0x232`: `wRectPos1780/1788/1796`, `wRectPos1454`, `Word12/20/28`, `IconDisplay[46]`, `Word612[7]`; graphic `0x230`: `Word20242`, `wRectPos20202/20210/20218`; graphic `0x231`: `Buttons*` and `MoveButn*` hit-test rectangles).
+2. ✅ **Introduce a screen-level draw pipeline**. Add a 320x200 screen buffer and copy the 224x136 viewport into it at `(0,33)` using the CSBWin stride (112 bytes per row into a 160-byte screen stride); reuse `TAG0088b2`-style blits with palette-index transparency for UI elements.
+3. ✅ **Draw static UI frame**. Fill the top bar, right panel, and scroll area using `wRectPos1780/1788/1796`, and draw movement buttons by blitting basic graphic 13 into `Word28`.
+4. ✅ **Draw dynamic party state (top bar + right panel)**. Implement portrait slots, name strip, inventory portrait, position/dir indicator, attack buttons, and hands/backpack icons using the CSBWin geometry and `IconDisplay[46]`/`Word612[7]` mapping.
+5. ✅ **Attack/spell control UI**. Attack options clear `Word20`, blit basic graphic 10 into `wRectPos20202/20210/20218`, and draw text at `(235,83)` and `(241,93+12*row)`; spell controls now clear `Word20242`, apply `vblFlashButn` rectangles, and draw the caster name at CSBWin coordinates.
+6. ✅ **Message area + text**. Use the font graphic `0x822d` (loaded into `Pointer12926`) with `TextOut_OneLine`; render message rows at 6-pixel char width and 7-pixel line height, base Y = 177.
+7. ✅ **Input hit-tests (visual only at first)**. Map mouse/keyboard regions to UI elements using `Buttons*` and `MoveButn*`, and draw hover/selection highlights (no interaction logic yet).
+8. ⏳ **Portraits**. Wire `portraitGraphic` to champion data, load internal/external portrait graphics, render real portraits in the top bar and inventory, and add shield dots with the correct per-champion offsets and colors.
+9. ⏳ **Status bars**. Implement health/stamina/mana bars in the top bar and inventory view, including thresholds for low/boosted color variants and per-champion scaling and clipping.
+10. ⏳ **Inventory screen**. Build the full inventory layout (paper-doll slots, backpack grid, load readout, eye/mouth overlays) and hook item icons to equipment/backpack state with the correct slot geometry.
+11. ⏳ **Character stats**. Render stat panels (attributes and skill titles/levels) using CSBWin text layout, including base values, modifiers, and any highlight states.
+12. ⏳ **Chests + scrolls**. Implement chest grid view and scroll view layouts, render item slots/scroll pages, and connect them to container/scroll data for selection and paging.
+13. ⏳ **Magic panel**. Render the spell panel contents (rune slots, selected runes, and labels), implement highlight/flash rectangles, and gate visibility by caster state.
+14. ⏳ **Attack panel**. Replace placeholder action labels with real `PossibleAttackTypes`/weapon actions, gate options by attack state, and display the correct action names and availability per champion/hand.
+15. ⏳ **Interaction highlights**. Add button press/selection effects (flash, shading, or invert) across UI regions, and ensure highlight behavior is consistent with hit-test rectangles and current UI mode.
+
+Status:
+- ✅ UI tables extracted from `graphics.dat` (0x230/0x231/0x232) and wired into the renderer (`src/renderer/csbwin/UITables.ts`, `src/renderer/ViewportRenderer.ts`).
+- ✅ Screen-level palette-index buffer added; viewport now blits into the screen buffer before present at (0,33) (`src/renderer/ViewportRenderer.ts`, `src/renderer/ViewportGraphics.ts`).
+- ✅ Static UI frame clearing + movement buttons drawn using CSBWin tables and basic graphic 13 (`src/renderer/ViewportRenderer.ts`).
+- ✅ Message line rendering uses CSBWin font graphic 0x22d with 6x6 glyphs and 7-pixel line height (`src/renderer/csbwin/TextRenderer.ts`, `src/renderer/ViewportRenderer.ts`).
+- ✅ Top-bar dynamic rendering wired to party state (name strip, portrait slot clear, position/dir indicator) with CSBWin geometry (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Debug hotkey injects a randomized party and quick-saves for rapid UI testing (F8) (`src/main.ts`, `src/engine/Game.ts`).
+- ✅ Attack buttons + weapon-ready panel UI drawn with CSBWin geometry and placeholder text (`src/renderer/ViewportRenderer.ts`).
+- ✅ Attack button icons now draw from object icon sheets using CSBWin `Word612` grouping (debug uses randomized `weaponHand` indices) (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Top-bar hand slots draw object icons using `IconDisplay[0..7]` with CSBWin object sheets (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Hover highlights for movement and attack buttons using `MoveButn*` + UI geometry (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Hover highlights now include all `Buttons*` rectangles from UI tables for broad hit-test visualization (`src/renderer/ViewportRenderer.ts`).
+- ✅ Item icon blits now use correct sheet stride (256px) to avoid sliced/interlaced artifacts (`src/renderer/ViewportRenderer.ts`).
+- ✅ Attack panel visibility gated by a debug toggle (F7) instead of always rendering (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Combat panel icons now render using the ShrinkBLT color map logic (Byte20194), producing black mask over cyan (`src/renderer/ViewportRenderer.ts`).
 
 Validation
 - Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).

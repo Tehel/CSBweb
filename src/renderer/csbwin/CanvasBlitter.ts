@@ -49,6 +49,53 @@ export function clearIndex(buffer: PaletteIndexViewportBuffer, index: number = 0
   buffer.pixels.fill(index & 0xff);
 }
 
+export function fillRectIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos, index: number): void {
+  const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
+  if (!normalized) return;
+
+  const value = index & 0xff;
+  const stride = buffer.width;
+  for (let y = normalized.y1; y <= normalized.y2; y++) {
+    const row = y * stride;
+    for (let x = normalized.x1; x <= normalized.x2; x++) {
+      buffer.pixels[row + x] = value;
+    }
+  }
+}
+
+export function drawRectOutlineIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos, index: number): void {
+  const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
+  if (!normalized) return;
+
+  const value = index & 0xff;
+  const stride = buffer.width;
+  const { x1, x2, y1, y2 } = normalized;
+
+  for (let x = x1; x <= x2; x++) {
+    buffer.pixels[y1 * stride + x] = value;
+    buffer.pixels[y2 * stride + x] = value;
+  }
+  for (let y = y1; y <= y2; y++) {
+    buffer.pixels[y * stride + x1] = value;
+    buffer.pixels[y * stride + x2] = value;
+  }
+}
+
+export function flashRectIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos): void {
+  const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
+  if (!normalized) return;
+
+  const stride = buffer.width;
+  const { x1, x2, y1, y2 } = normalized;
+
+  for (let y = y1; y <= y2; y++) {
+    const row = y * stride;
+    for (let x = x1; x <= x2; x++) {
+      buffer.pixels[row + x] ^= 0x0f;
+    }
+  }
+}
+
 export function createRGBAViewportBuffer(
   ctx: CanvasRenderingContext2D,
   width: number,

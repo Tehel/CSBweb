@@ -202,6 +202,14 @@ export class Game {
     }
 
     /**
+     * Replace the current party state (debug/testing).
+     */
+    setPartyState(state: PartyState): void {
+        this.party.setState(state);
+        this.state.party = this.party.getState();
+    }
+
+    /**
      * Get current game state (read-only)
      */
     getState(): Readonly<GameState> {

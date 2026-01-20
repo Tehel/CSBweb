@@ -34,7 +34,7 @@ export const SCREEN_HEIGHT = 200;
  * Viewport position within full screen
  * Port from CSBWin Menu.cpp line 452-455
  */
-export const VIEWPORT_X = 47;
+export const VIEWPORT_X = 0;
 export const VIEWPORT_Y = 33;
 
 /**
@@ -249,12 +249,6 @@ export function createViewportCanvas(): HTMLCanvasElement {
   if (ctx) {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    // Optional: Draw a border around the viewport area for visual reference
-    // This can be removed later when UI elements are implemented
-    ctx.strokeStyle = '#333333';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(VIEWPORT_X - 1, VIEWPORT_Y - 1, VIEWPORT_WIDTH + 2, VIEWPORT_HEIGHT + 2);
   }
 
   return canvas;
