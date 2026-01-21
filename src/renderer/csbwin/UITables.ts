@@ -48,27 +48,27 @@ export interface UITables {
     rect18576: WordRect;
     moveButtons: MoveButton[];
     buttons: {
-      Buttons18936: UIButton[];
-      Buttons18876: UIButton[];
-      Buttons18828: UIButton[];
-      Buttons18792: UIButton[];
-      Buttons18768: UIButton[];
-      Buttons18708: UIButton[];
-      Buttons18660: UIButton[];
-      Buttons18624: UIButton[];
-      Buttons18372: UIButton[];
-      Buttons18324: UIButton[];
-      Buttons18216: UIButton[];
-      Buttons18060: UIButton[];
-      Buttons17952: UIButton[];
-      Buttons17892: UIButton[];
-      Buttons17832: UIButton[];
-      Buttons17796: UIButton[];
-      Buttons17760: UIButton[];
-      Buttons17304: UIButton[];
-      Buttons17196: UIButton[];
-      Buttons16956: UIButton[];
-      Buttons16932: UIButton[];
+      buttons18936: UIButton[];
+      buttons18876: UIButton[];
+      buttons18828: UIButton[];
+      buttons18792: UIButton[];
+      buttons18768: UIButton[];
+      buttons18708: UIButton[];
+      buttons18660: UIButton[];
+      buttons18624: UIButton[];
+      buttons18372: UIButton[];
+      buttons18324: UIButton[];
+      buttons18216: UIButton[];
+      buttons18060: UIButton[];
+      buttons17952: UIButton[];
+      buttons17892: UIButton[];
+      buttons17832: UIButton[];
+      buttons17796: UIButton[];
+      buttons17760: UIButton[];
+      buttons17304: UIButton[];
+      buttons17196: UIButton[];
+      buttons16956: UIButton[];
+      buttons16932: UIButton[];
     };
   };
   graphic232: {
@@ -189,20 +189,14 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
 
   // Word20242[4] (word rect). CSBWin loads graphic 0x230 at d.Byte20244+2.
   requireSize(raw, off, 8, '0x230 Word20242');
-  const word20242 = readWordRect(view, off);
-  off += 8;
+  const word20242 = readWordRect(view, off); off += 8;
 
   requireSize(raw, off, 5 * 8, '0x230 wRectPos20234..20202');
-  const wRectPos20234 = readWordRect(view, off);
-  off += 8;
-  const wRectPos20226 = readWordRect(view, off);
-  off += 8;
-  const wRectPos20218 = readWordRect(view, off);
-  off += 8;
-  const wRectPos20210 = readWordRect(view, off);
-  off += 8;
-  const wRectPos20202 = readWordRect(view, off);
-  off += 8;
+  const wRectPos20234 = readWordRect(view, off); off += 8;
+  const wRectPos20226 = readWordRect(view, off); off += 8;
+  const wRectPos20218 = readWordRect(view, off); off += 8;
+  const wRectPos20210 = readWordRect(view, off); off += 8;
+  const wRectPos20202 = readWordRect(view, off); off += 8;
 
   requireSize(raw, off, 16, '0x230 Byte20194');
   const shrinkColorMap = Array.from(raw.slice(off, off + 16));
@@ -232,40 +226,27 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   let off = 0;
 
   // CSBWin loads graphic 0x231 at d.Byte18938+2 (Byte18938 is not part of the graphic).
-  const buttons18936 = readButtons(view, off, 5);
-  off += 5 * 12;
-  const buttons18876 = readButtons(view, off, 4);
-  off += 4 * 12;
-  const buttons18828 = readButtons(view, off, 3);
-  off += 3 * 12;
-  const buttons18792 = readButtons(view, off, 2);
-  off += 2 * 12;
-  const buttons18768 = readButtons(view, off, 5);
-  off += 5 * 12;
-  const buttons18708 = readButtons(view, off, 4);
-  off += 4 * 12;
-  const buttons18660 = readButtons(view, off, 3);
-  off += 3 * 12;
-  const buttons18624 = readButtons(view, off, 2);
-  off += 2 * 12;
+  const buttons18936 = readButtons(view, off, 5); off += 5 * 12;
+  const buttons18876 = readButtons(view, off, 4); off += 4 * 12;
+  const buttons18828 = readButtons(view, off, 3); off += 3 * 12;
+  const buttons18792 = readButtons(view, off, 2); off += 2 * 12;
+  const buttons18768 = readButtons(view, off, 5); off += 5 * 12;
+  const buttons18708 = readButtons(view, off, 4); off += 4 * 12;
+  const buttons18660 = readButtons(view, off, 3); off += 3 * 12;
+  const buttons18624 = readButtons(view, off, 2); off += 2 * 12;
 
   requireSize(raw, off, 4 * 8, '0x231 Byte18600..Byte18576');
-  const rect18600 = readWordRect(view, off);
-  off += 8;
-  const rect18592 = readWordRect(view, off);
-  off += 8;
-  const rect18584 = readWordRect(view, off);
-  off += 8;
-  const rect18576 = readWordRect(view, off);
-  off += 8;
+  const rect18600 = readWordRect(view, off); off += 8;
+  const rect18592 = readWordRect(view, off); off += 8;
+  const rect18584 = readWordRect(view, off); off += 8;
+  const rect18576 = readWordRect(view, off); off += 8;
 
   // Word18568[4], Word18560[4], Word18552[28]
   off += 4 * 2;
   off += 4 * 2;
   off += 28 * 2;
 
-  const moveButtons = readMoveButtons(view, off, 4);
-  off += 4 * 8;
+  const moveButtons = readMoveButtons(view, off, 4); off += 4 * 8;
 
   // DropAreas[16], Byte18448[8], Byte18440[12], Byte18428[7], Byte18400[28]
   off += 16;
@@ -274,30 +255,18 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   off += 7 * 4;
   off += 28;
 
-  const buttons18372 = readButtons(view, off, 4);
-  off += 4 * 12;
-  const buttons18324 = readButtons(view, off, 9);
-  off += 9 * 12;
-  const buttons18216 = readButtons(view, off, 13);
-  off += 13 * 12;
-  const buttons18060 = readButtons(view, off, 9);
-  off += 9 * 12;
-  const buttons17952 = readButtons(view, off, 5);
-  off += 5 * 12;
-  const buttons17892 = readButtons(view, off, 5);
-  off += 5 * 12;
-  const buttons17832 = readButtons(view, off, 3);
-  off += 3 * 12;
-  const buttons17796 = readButtons(view, off, 3);
-  off += 3 * 12;
-  const buttons17760 = readButtons(view, off, 38);
-  off += 38 * 12;
-  const buttons17304 = readButtons(view, off, 9);
-  off += 9 * 12;
-  const buttons17196 = readButtons(view, off, 20);
-  off += 20 * 12;
-  const buttons16956 = readButtons(view, off, 2);
-  off += 2 * 12;
+  const buttons18372 = readButtons(view, off, 4); off += 4 * 12;
+  const buttons18324 = readButtons(view, off, 9); off += 9 * 12;
+  const buttons18216 = readButtons(view, off, 13); off += 13 * 12;
+  const buttons18060 = readButtons(view, off, 9); off += 9 * 12;
+  const buttons17952 = readButtons(view, off, 5); off += 5 * 12;
+  const buttons17892 = readButtons(view, off, 5); off += 5 * 12;
+  const buttons17832 = readButtons(view, off, 3); off += 3 * 12;
+  const buttons17796 = readButtons(view, off, 3); off += 3 * 12;
+  const buttons17760 = readButtons(view, off, 38); off += 38 * 12;
+  const buttons17304 = readButtons(view, off, 9); off += 9 * 12;
+  const buttons17196 = readButtons(view, off, 20); off += 20 * 12;
+  const buttons16956 = readButtons(view, off, 2); off += 2 * 12;
   const buttons16932 = off + 4 * 12 <= raw.length ? readButtons(view, off, 4) : [];
 
   return {
@@ -307,27 +276,27 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     rect18576,
     moveButtons,
     buttons: {
-      Buttons18936: buttons18936,
-      Buttons18876: buttons18876,
-      Buttons18828: buttons18828,
-      Buttons18792: buttons18792,
-      Buttons18768: buttons18768,
-      Buttons18708: buttons18708,
-      Buttons18660: buttons18660,
-      Buttons18624: buttons18624,
-      Buttons18372: buttons18372,
-      Buttons18324: buttons18324,
-      Buttons18216: buttons18216,
-      Buttons18060: buttons18060,
-      Buttons17952: buttons17952,
-      Buttons17892: buttons17892,
-      Buttons17832: buttons17832,
-      Buttons17796: buttons17796,
-      Buttons17760: buttons17760,
-      Buttons17304: buttons17304,
-      Buttons17196: buttons17196,
-      Buttons16956: buttons16956,
-      Buttons16932: buttons16932,
+      buttons18936,
+      buttons18876,
+      buttons18828,
+      buttons18792,
+      buttons18768,
+      buttons18708,
+      buttons18660,
+      buttons18624,
+      buttons18372,
+      buttons18324,
+      buttons18216,
+      buttons18060,
+      buttons17952,
+      buttons17892,
+      buttons17832,
+      buttons17796,
+      buttons17760,
+      buttons17304,
+      buttons17196,
+      buttons16956,
+      buttons16932,
     },
   };
 }
@@ -340,17 +309,12 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   requireSize(raw, off, 2, '0x232 Byte1830');
   off += 2;
 
-  const long1828 = readI32Array(view, off, 4);
-  off += 4 * 4;
-  const long1812 = readI32Array(view, off, 4);
-  off += 4 * 4;
+  const long1828 = readI32Array(view, off, 4); off += 4 * 4;
+  const long1812 = readI32Array(view, off, 4); off += 4 * 4;
 
-  const wRectPos1796 = readWordRect(view, off);
-  off += 8;
-  const wRectPos1788 = readWordRect(view, off);
-  off += 8;
-  const wRectPos1780 = readWordRect(view, off);
-  off += 8;
+  const wRectPos1796 = readWordRect(view, off); off += 8;
+  const wRectPos1788 = readWordRect(view, off); off += 8;
+  const wRectPos1780 = readWordRect(view, off); off += 8;
 
   // SOUND[22] (8 bytes each), Byte1596[8], Word1588
   off += 22 * 8;
@@ -370,8 +334,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   }
   off += 4 * 6 * 2;
 
-  const wRectPos1454 = readWordRectArray(view, off, 4);
-  off += 4 * 8;
+  const wRectPos1454 = readWordRectArray(view, off, 4); off += 4 * 8;
 
   // SpecialChars[6], Byte1416[2], Byte1414[2], Byte1412[6]
   off += 6;
@@ -379,15 +342,10 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 2;
   off += 6;
 
-  const word1406 = readWordRect(view, off);
-  off += 8;
-  const word1398 = readWordRect(view, off);
-  off += 8;
-
-  const byte1390 = Array.from(raw.slice(off, off + 4));
-  off += 4;
-  const byte1386 = Array.from(raw.slice(off, off + 4));
-  off += 4;
+  const word1406 = readWordRect(view, off); off += 8;
+  const word1398 = readWordRect(view, off); off += 8;
+  const byte1390 = Array.from(raw.slice(off, off + 4)); off += 4;
+  const byte1386 = Array.from(raw.slice(off, off + 4)); off += 4;
 
   // Byte1382[16], Byte1366[16], Byte1350[128], Byte1222[128]
   off += 16;
@@ -395,8 +353,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 128;
   off += 128;
 
-  const byte1094 = readWordRect(view, off);
-  off += 8;
+  const byte1094 = readWordRect(view, off); off += 8;
 
   // PaletteBrightness[6], Word1074[16], CarryLocation[38]
   off += 6 * 2;
@@ -409,8 +366,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // Unused918
   off += 2;
 
-  const iconDisplay = readIconDisplay(view, off, 46);
-  off += 46 * 6;
+  const iconDisplay = readIconDisplay(view, off, 46); off += 46 * 6;
 
   // Byte640[1], FILL(639,624) length 15
   off += 1;
@@ -420,8 +376,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 8;
   off += 4;
 
-  const word612 = readI16Array(view, off, 7);
-  off += 7 * 2;
+  const word612 = readI16Array(view, off, 7); off += 7 * 2;
 
   // FILL(598,590) length 8, uByte590[4], Byte586[8][4], unused554
   off += 8;

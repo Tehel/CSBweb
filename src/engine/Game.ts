@@ -38,9 +38,9 @@ export interface RuntimeSaveState {
  * Game class - main game controller
  */
 export class Game {
-    private state: GameState;
-    private party: Party;
-    private dungeonState: DungeonState;
+    state: GameState;
+    party: Party;
+    dungeonState: DungeonState;
     private movementSystem: MovementSystem;
 
     // Game loop
@@ -69,7 +69,7 @@ export class Game {
         // Initialize game state
         this.state = {
             dungeon: dungeonData,
-            party: this.party.getState(),
+            party: this.party.state,
             running: false,
             paused: false,
             startTime: Date.now(),
@@ -163,7 +163,7 @@ export class Game {
         }
 
         // Update party state in game state
-        this.state.party = this.party.getState();
+        this.state.party = this.party.state;
     }
 
     /**
@@ -176,7 +176,7 @@ export class Game {
             this.party.applyMovement(result);
 
             // Update party state in game state
-            this.state.party = this.party.getState();
+            this.state.party = this.party.state;
 
             // Notify callbacks
             for (const callback of this.onMoveCallbacks) {
@@ -206,35 +206,7 @@ export class Game {
      */
     setPartyState(state: PartyState): void {
         this.party.setState(state);
-        this.state.party = this.party.getState();
-    }
-
-    /**
-     * Get current game state (read-only)
-     */
-    getState(): Readonly<GameState> {
-        return this.state;
-    }
-
-    /**
-     * Get party
-     */
-    getParty(): Party {
-        return this.party;
-    }
-
-    /**
-     * Get dungeon state
-     */
-    getDungeonState(): DungeonState {
-        return this.dungeonState;
-    }
-
-    /**
-     * Get movement system
-     */
-    getMovementSystem(): MovementSystem {
-        return this.movementSystem;
+        this.state.party = this.party.state;
     }
 
     /**
@@ -256,20 +228,6 @@ export class Game {
      */
     getPositionInfo(): string {
         return this.movementSystem.getPositionInfo();
-    }
-
-    /**
-     * Check if game is running
-     */
-    isRunning(): boolean {
-        return this.running;
-    }
-
-    /**
-     * Check if game is paused
-     */
-    isPaused(): boolean {
-        return this.state.paused;
     }
 
     /**
@@ -304,7 +262,7 @@ export class Game {
         return {
             version: 1,
             savedAt: Date.now(),
-            party: this.party.getState(),
+            party: this.party.state,
             game: {
                 tickCount: this.state.tickCount,
                 paused: this.state.paused,
@@ -322,7 +280,7 @@ export class Game {
      */
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         this.party.setState(save.party);
-        this.state.party = this.party.getState();
+        this.state.party = this.party.state;
 
         this.state.paused = save.game.paused;
         this.state.tickCount = save.game.tickCount;

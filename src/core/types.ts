@@ -76,23 +76,23 @@ export enum TilePosition {
 /**
  * Coordinates in dungeon
  */
-export interface Coordinates {
+export class Position {
     x: ui8;
     y: ui8;
-    level?: ui8;
-}
+    z: ui8;
+    constructor(x: ui8, y: ui8, z: ui8) { this.x = x, this.y = y, this.z = z}
 
-/**
- * Common position type used by the engine/renderer.
- * Alias of `Coordinates` (level optional).
- */
-export type Position = Coordinates;
+    clone = () => new Position(this.x, this.y, this.z)
+    get north() { return new Position(this.x, this.y-1, this.z); }
+    get south() { return new Position(this.x, this.y+1, this.z); }
+    get east() { return new Position(this.x+1, this.y, this.z); }
+    get west() { return new Position(this.x-1, this.y, this.z); }
+}
 
 /**
  * Party starting position
  */
-export interface StartPosition extends Coordinates {
-    level: ui8;
+export interface PositionOriented extends Position {
     facing: Direction;
 }
 
@@ -221,4 +221,9 @@ export type Palette = AtariColor[];
 export interface ImageDimensions {
     width: ui16;
     height: ui16;
+}
+
+export function getOrSet<K, V>(map: Map<K,V>, key: K, setter: () => V): V {
+    if (!map.has(key)) map.set(key, setter())
+    return map.get(key)!
 }

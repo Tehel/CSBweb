@@ -1159,8 +1159,7 @@ export class BytecodeInterpreter {
       return;
     }
 
-    const mapIndex = this.context.frameMapIndex ?? 0;
-    const map = dungeon.getMap(mapIndex);
+    const map = dungeon.getMap(this.context.frameMapIndex ?? 0);
     if (!map?.wallDecorationTOC) return;
 
     // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3179-3183)
@@ -1348,8 +1347,7 @@ export class BytecodeInterpreter {
     const csbGraphics = this.context.csbGraphics;
     if (!tables || !dungeon || !viewport || !getGraphic) return;
 
-    const mapIndex = this.context.frameMapIndex ?? 0;
-    const map = dungeon.getMap(mapIndex);
+    const map = dungeon.getMap(this.context.frameMapIndex ?? 0);
     if (!map?.floorDecorationTOC) return;
 
     const drawFootprints = (graphicOrdinal & 0x8000) !== 0;

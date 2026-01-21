@@ -5,7 +5,7 @@
  * Based on CSBWin's party management system
  */
 
-import type { ui8, Direction, Coordinates } from '../core/types';
+import { ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Direction as Dir } from '../core/types';
@@ -14,58 +14,18 @@ import { Direction as Dir } from '../core/types';
  * Party class - manages party state and movement
  */
 export class Party {
-    private state: PartyState;
+    state: PartyState;
 
-    constructor(
-        initialPosition: Coordinates,
-        initialFacing: Direction,
-        mapIndex: ui8 = 0
-    ) {
+    constructor(initialPosition: Position, initialFacing: Direction) {
         this.state = {
             champions: [],
-            position: { ...initialPosition },
-            mapIndex,
+            position: initialPosition.clone(),
             facing: initialFacing,
             magicCasterIndex: -1,
             moving: false,
             turning: false,
             lastMoveTime: 0,
         };
-    }
-
-    /**
-     * Get current party state
-     */
-    getState(): Readonly<PartyState> {
-        return this.state;
-    }
-
-    /**
-     * Get current position
-     */
-    getPosition(): Readonly<Coordinates> {
-        return this.state.position;
-    }
-
-    /**
-     * Get current facing direction
-     */
-    getFacing(): Direction {
-        return this.state.facing;
-    }
-
-    /**
-     * Get current map index
-     */
-    getMapIndex(): ui8 {
-        return this.state.mapIndex;
-    }
-
-    /**
-     * Get champions
-     */
-    getChampions(): ReadonlyArray<Champion> {
-        return this.state.champions;
     }
 
     /**
@@ -85,7 +45,7 @@ export class Party {
      * @param action - Movement action
      * @returns New coordinates (not validated against map)
      */
-    calculateNewPosition(action: MovementAction): Coordinates {
+    calculateNewPosition(action: MovementAction): Position {
         const { position, facing } = this.state;
         let newX = position.x;
         let newY = position.y;
@@ -136,7 +96,7 @@ export class Party {
                 return position;
         }
 
-        return { x: newX, y: newY };
+        return new Position(newX, newY, position.z);
     }
 
     /**
@@ -188,12 +148,8 @@ export class Party {
 
         // Update position if moved
         if (result.newPosition) {
-            this.state.position = { ...result.newPosition };
+            this.state.position = result.newPosition.clone()
             this.state.moving = true;
-        }
-
-        if (result.newMapIndex !== undefined) {
-            this.state.mapIndex = result.newMapIndex;
         }
 
         // Update facing if turned
@@ -217,11 +173,8 @@ export class Party {
     /**
      * Set party position (for teleports, etc.)
      */
-    setPosition(position: Coordinates, mapIndex?: ui8): void {
-        this.state.position = { ...position };
-        if (mapIndex !== undefined) {
-            this.state.mapIndex = mapIndex;
-        }
+    setPosition(position: Position): void {
+        this.state.position = position.clone();
     }
 
     /**
@@ -241,8 +194,7 @@ export class Party {
                 attributes: { ...c.attributes },
                 incantation: c.incantation ? [...c.incantation] : undefined,
             })),
-            position: { ...state.position },
-            mapIndex: state.mapIndex,
+            position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,
             magicCasterIndex: state.magicCasterIndex ?? -1,
             moving: state.moving,

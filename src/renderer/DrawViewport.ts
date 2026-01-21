@@ -13,6 +13,7 @@ import { GraphicRoomType, RoomType, SummarizeRoomData } from './bytecode/Types';
 import { BytecodePrograms } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
+import { Position } from '@/core';
 
 /**
  * Relative X coordinates for each cell
@@ -70,7 +71,6 @@ function RelativeXY(
  *
  * @param context - Interpreter context with graphics and canvas
  * @param dungeonState - Dungeon state for querying cell data
- * @param mapIndex - Current dungeon map index
  * @param facing - Party facing direction (0=N, 1=E, 2=S, 3=W)
  * @param x - Party X position in dungeon
  * @param y - Party Y position in dungeon
@@ -78,10 +78,8 @@ function RelativeXY(
 export function DrawViewport(
   context: InterpreterContext,
   dungeonState: DungeonState,
-  mapIndex: number,
+  position: Position,
   facing: number,
-  x: number,
-  y: number
 ): void {
   // NOTE: CSBWin conditionally calls FloorAndCeilingOnly() here based on d.Word11684
   // This is a caching mechanism - floor/ceiling drawn once then reused
@@ -97,7 +95,7 @@ export function DrawViewport(
   // First pass: Calculate positions and gather room data for all cells
   for (let cellNum = 0; cellNum < 21; cellNum++) {
     // Calculate absolute position for this cell
-    const pos = RelativeXY(facing, relativeY[cellNum], relativeX[cellNum], x, y);
+    const pos = RelativeXY(facing, relativeY[cellNum], relativeX[cellNum], position.x, position.y);
 
     // Initialize room data structure
     roomData[cellNum] = {
@@ -114,7 +112,7 @@ export function DrawViewport(
     };
 
     // Gather room information for this cell
-    summarizeRoomInfoCsbwin(roomData[cellNum], dungeonState, mapIndex, x, y, facing, context.objectTables);
+    summarizeRoomInfoCsbwin(roomData[cellNum], dungeonState, position, facing, context.objectTables);
   }
 
   // Store room data in context for opcodes to access

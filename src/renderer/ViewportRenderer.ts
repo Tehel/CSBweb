@@ -28,7 +28,7 @@ import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables } from './csbwin/ObjectTables';
 import { extractUITables, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData, type FontData } from './csbwin/TextRenderer';
-import { ImageFormat, decodeIMG } from '../core/imageDecoder';
+import { ImageFormat } from '../core/imageDecoder';
 import {
   initializeFloorCeilingIndexed,
   initializeDoorBitmapsIndexed,
@@ -41,11 +41,28 @@ import {
   VIEWPORT_X,
   VIEWPORT_Y,
 } from './ViewportGraphics';
+import { getOrSet, Position } from '@/core';
 
 export enum UIMode {
   Adventure = 'adventure',
   Sleeping = 'sleeping',
   Frozen = 'frozen',
+}
+
+type IndexedBitmapSet = IndexedBitmap[]
+
+export interface WallBitmapSet {
+  wall: IndexedBitmapSet;
+  wallMirrored: IndexedBitmapSet;
+  doors: IndexedBitmapSet;
+}
+
+// Full-viewport (224×136) palette-index templates.
+// `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6752-6754).
+// `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6741-6744).
+export interface FloorCeiling {
+  normal: Uint8Array;
+  mirrored: Uint8Array;
 }
 
 /**
@@ -64,8 +81,7 @@ export class ViewportRenderer {
   private palette: number[] | null = null;
   private initialized: boolean = false;
 
-  private wallBitmapSets: Map<number, { normal: IndexedBitmap[]; mirrorMode: IndexedBitmap[] }> = new Map();
-  private doorBitmapSets: Map<number, IndexedBitmap[]> = new Map();
+  private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
   private graphicCache: Map<string, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
   private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
@@ -86,16 +102,7 @@ export class ViewportRenderer {
   private mouseQEnd: number = 0;
   private lastMagicButtonId: number = 0;
   private uiMode: UIMode = UIMode.Adventure;
-  private floorCeilingCache: Map<
-    number,
-    {
-      // Full-viewport (224×136) palette-index templates.
-      // `ceilingMirrored` corresponds to CSBWin `(x+y+facing)&1 == 0` path (Viewport.cpp:6752-6754).
-      // `floorMirrored` corresponds to CSBWin `(x+y+facing)&1 == 1` path (Viewport.cpp:6741-6744).
-      ceilingMirrored: Uint8Array;
-      floorMirrored: Uint8Array;
-    }
-  > = new Map();
+  private floorCeilingCache: Map<number, FloorCeiling> = new Map();
 
   constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
     this.graphicsLoader = graphicsLoader;
@@ -247,7 +254,8 @@ export class ViewportRenderer {
   /**
    * Render the viewport for a given party position and facing
    */
-  render(facing: number, x: number, y: number, mapIndex: number = 0): void {
+  render(position: Position, facing: number): void {
+    const { x, y, z } = position;
     if (!this.initialized || !this.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
       throw new Error('Renderer not initialized. Call initialize() first.');
     }
@@ -258,12 +266,12 @@ export class ViewportRenderer {
     this.context.executionLog = [];
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
-    const map = this.dungeonState.getMap(mapIndex);
+    const map = this.dungeonState.getMap(z);
     const wallGraphicSet = map?.descriptor.mapGraphicsStyle ?? 0;
     const backgroundGraphicSet = map?.descriptor.floorCeilingStyle ?? 0;
     this.context.wallGraphicSet = wallGraphicSet;
     this.context.backgroundGraphicSet = backgroundGraphicSet;
-    this.context.frameMapIndex = mapIndex;
+    this.context.frameMapIndex = z;
     this.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
 
     // CSBWin `ReadGraphicsForLevel()` (Code390e.cpp:180-199): DoorGraphic[3][2] is derived from Door1Type/Door2Type.
@@ -283,47 +291,39 @@ export class ViewportRenderer {
     this.context.useMirrorImages = useMirrorImages;
 
     // Compose floor/ceiling background (CSBWin: FloorAndCeilingOnly + conditional Mirror).
-    this.ensureFloorCeilingCache(backgroundGraphicSet);
-    const fc = this.floorCeilingCache.get(backgroundGraphicSet)!;
-    this.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.floorMirrored : fc.ceilingMirrored);
+    const fc = this.getFloorCeiling(backgroundGraphicSet);
+    this.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.mirrored : fc.normal);
 
-    // Select wall bitmaps for this frame (CSBWin: mirrors swap some pointers when `UseMirrorImages != 0`).
-    this.ensureWallBitmaps(wallGraphicSet);
-    const wb = this.wallBitmapSets.get(wallGraphicSet)!;
-    this.context.wallBitmaps = useMirrorImages ? wb.mirrorMode : wb.normal;
-
-    // Door bitmaps (CSBWin ReadWallBitmaps loads these per wall set)
-    this.ensureDoorBitmaps(wallGraphicSet);
-    this.context.doorBitmaps = this.doorBitmapSets.get(wallGraphicSet)!;
+    // Select bitmaps set for this frame (CSBWin: mirrors swap some pointers when `UseMirrorImages != 0`).
+    const wb = this.getBitmapsSet(wallGraphicSet);
+    this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
+    this.context.doorBitmaps = wb.doors;
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
-    DrawViewport(this.context, this.dungeonState, mapIndex, facing, x, y);
+    DrawViewport(this.context, this.dungeonState, position, facing);
 
     this.presentViewport();
   }
 
-  private ensureWallBitmaps(wallGraphicSet: number): void {
-    if (this.wallBitmapSets.has(wallGraphicSet)) return;
-    const normal = initializeWallBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
-    const mirrorMode = this.createMirrorModeWallBitmaps(normal);
-    this.wallBitmapSets.set(wallGraphicSet, { normal, mirrorMode });
+  private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
+    return getOrSet(this.wallBitmapSets, wallGraphicSet, () => {
+      const wall = initializeWallBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+      const wallMirrored = this.createMirrorModeWallBitmaps(wall);
+      const doors = initializeDoorBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+      return { wall, wallMirrored, doors }
+    });
   }
 
-  private ensureDoorBitmaps(wallGraphicSet: number): void {
-    if (this.doorBitmapSets.has(wallGraphicSet)) return;
-    const door = initializeDoorBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
-    this.doorBitmapSets.set(wallGraphicSet, door);
-  }
-
-  private ensureFloorCeilingCache(backgroundGraphicSet: number): void {
-    if (this.floorCeilingCache.has(backgroundGraphicSet)) return;
-    const { floor, ceiling } = initializeFloorCeilingIndexed(this.graphicsLoader, backgroundGraphicSet);
-    const ceilingMirrored = this.buildFloorCeilingTemplate(ceiling, floor, true, false);
-    const floorMirrored = this.buildFloorCeilingTemplate(ceiling, floor, false, true);
-    this.floorCeilingCache.set(backgroundGraphicSet, { ceilingMirrored, floorMirrored });
+  private getFloorCeiling(backgroundGraphicSet: number): FloorCeiling {
+    return getOrSet(this.floorCeilingCache, backgroundGraphicSet, () => {
+      const { floor, ceiling } = initializeFloorCeilingIndexed(this.graphicsLoader, backgroundGraphicSet);
+      const normal = this.buildFloorCeilingTemplate(ceiling, floor, true, false);
+      const mirrored = this.buildFloorCeilingTemplate(ceiling, floor, false, true);
+      return { normal, mirrored }
+    });
   }
 
   private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
@@ -342,7 +342,7 @@ export class ViewportRenderer {
     }
   }
 
-  private createMirrorModeWallBitmaps(normal: IndexedBitmap[]): IndexedBitmap[] {
+  private createMirrorModeWallBitmaps(normal: IndexedBitmapSet): IndexedBitmapSet {
     if (normal.length < 7) {
       throw new Error(`Expected 7 wall bitmaps, got ${normal.length}`);
     }
@@ -807,17 +807,14 @@ export class ViewportRenderer {
     if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
     if (!this.showAttackPanel) return;
 
-    const ui230 = this.uiTables.graphic230;
-    const ui232 = this.uiTables.graphic232;
-
-    fillRectIndex(this.screenIndexBuffer, ui232.word20, 0);
+    fillRectIndex(this.screenIndexBuffer, this.uiTables.graphic232.word20, 0);
 
     const active = this.partyState.champions.find((c) => c.alive !== false);
     if (!active) return;
 
     const panelGraphic = this.getGraphicBitmap(10);
     if (panelGraphic) {
-      const rect = ui230.wRectPos20202;
+      const rect = this.uiTables.graphic230.wRectPos20202;
       tag0088b2Index(
         panelGraphic,
         this.screenIndexBuffer,
@@ -845,108 +842,30 @@ export class ViewportRenderer {
   private drawSpellControls(): void {
     if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
 
-    const ui230 = this.uiTables.graphic230;
-    const party = this.partyState;
+    const rect = this.uiTables.graphic230.word20242;
+    fillRectIndex(this.screenIndexBuffer, rect, 0);
 
-    fillRectIndex(this.screenIndexBuffer, ui230.word20242, 0);
-
-    const slots = new Array(4).fill(null).map((_, idx) => {
-      return (
-        party.champions.find((champion) => champion.partyPosition === idx) ??
-        party.champions[idx] ??
-        null
-      );
+    this.partyState.champions.forEach(champion => {
+      if (!champion || !champion.alive || champion.attributes?.maxMana === 0) return;
+      const pos = champion.partyPosition;
+      const isCaster = pos === this.magicCasterIndex;
+      const isAfterCaster = pos > this.magicCasterIndex;
+      const x = rect.x1 + pos * 14 + (isAfterCaster ? 33 : 0);
+      const rct = {
+        x1: x,
+        x2: x + (isCaster ? 44 : 11),
+        y1: rect.y1,
+        y2: rect.y2 - (isCaster ? 0 : 1)
+      };
+      fillRectIndex(this.screenIndexBuffer!, rct, 4);
+      if (isCaster) drawTextLineIndex(this.screenIndexBuffer!, this.fontData!, x + 2, rect.y2-1, 0, 4, champion.name);
     });
-    const numCharacters = slots.filter((champion) => champion !== null).length;
-    if (numCharacters === 0) return;
-
-    let casterIndex = this.magicCasterIndex;
-    if (casterIndex < 0 || casterIndex >= slots.length || slots[casterIndex]?.alive === false) {
-      casterIndex = slots.findIndex((champion) => champion && champion.alive !== false);
-    }
-    if (casterIndex < 0) return;
-    const caster = slots[casterIndex]!;
-
-    const health = slots.map((champion) => {
-      if (!champion || champion.alive === false) return 0;
-      return champion.attributes?.health ?? 0;
-    });
-
-    const flashOn = this.showSpellHighlights && this.getFlashPhase();
-
-    if (casterIndex === 0) {
-      if (flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xe9, x2: 0x115, y1: 0x2a, y2: 0x31 });
-      }
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0xeb, 0x30, 0, 4, caster.name);
-      if (numCharacters > 1 && health[1] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x118, x2: 0x123, y1: 0x2a, y2: 0x30 });
-      }
-      if (numCharacters > 2 && health[2] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x126, x2: 0x131, y1: 0x2a, y2: 0x30 });
-      }
-      if (numCharacters > 3 && health[3] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x134, x2: 0x13f, y1: 0x2a, y2: 0x30 });
-      }
-      return;
-    }
-
-    if (casterIndex === 1) {
-      if (health[0] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xe9, x2: 0xf4, y1: 0x2a, y2: 0x30 });
-      }
-      if (flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xf7, x2: 0x123, y1: 0x2a, y2: 0x31 });
-      }
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0xf9, 0x30, 0, 4, caster.name);
-      if (numCharacters > 2 && health[2] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x126, x2: 0x131, y1: 0x2a, y2: 0x30 });
-      }
-      if (numCharacters > 3 && health[3] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x134, x2: 0x13f, y1: 0x2a, y2: 0x30 });
-      }
-      return;
-    }
-
-    if (casterIndex === 2) {
-      if (health[0] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xe9, x2: 0xf4, y1: 0x2a, y2: 0x30 });
-      }
-      if (health[1] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xf7, x2: 0x102, y1: 0x2a, y2: 0x30 });
-      }
-      if (flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x105, x2: 0x131, y1: 0x2a, y2: 0x31 });
-      }
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0x107, 0x30, 0, 4, caster.name);
-      if (numCharacters > 3 && health[3] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x134, x2: 0x13f, y1: 0x2a, y2: 0x30 });
-      }
-      return;
-    }
-
-    if (casterIndex === 3) {
-      if (health[0] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xe9, x2: 0xf4, y1: 0x2a, y2: 0x30 });
-      }
-      if (health[1] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0xf7, x2: 0x102, y1: 0x2a, y2: 0x30 });
-      }
-      if (health[2] !== 0 && flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x105, x2: 0x110, y1: 0x2a, y2: 0x30 });
-      }
-      if (flashOn) {
-        flashRectIndex(this.screenIndexBuffer, { x1: 0x113, x2: 0x13f, y1: 0x2a, y2: 0x31 });
-      }
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0x115, 0x30, 0, 4, caster.name);
-    }
   }
 
   private drawSpellPanel(): void {
     if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
 
-    const ui232 = this.uiTables.graphic232;
-    const rect = ui232.word12;
+    const rect = this.uiTables.graphic232.word12;
 
     fillRectIndex(this.screenIndexBuffer, rect, 0);
     if (this.magicCasterIndex < 0) return;
@@ -1026,10 +945,9 @@ export class ViewportRenderer {
   }
 
   private drawLifeBars(chIdx: number, champion: PartyState['champions'][number]): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
-    const ui = this.uiTables.graphic232;
-    const offsets = ui.word1526[chIdx];
-    const masks = ui.word1502[chIdx];
+    if (!this.uiTables || !this.screenIndexBuffer || !champion.alive) return;
+    const offsets = this.uiTables.graphic232.word1526[chIdx];
+    const masks = this.uiTables.graphic232.word1502[chIdx];
     if (!offsets || !masks) return;
 
     const heights = [
@@ -1115,7 +1033,7 @@ export class ViewportRenderer {
   }
 
   private searchButtonList(
-    list: UITables['graphic231']['buttons']['Buttons17196'] | null,
+    list: UITables['graphic231']['buttons']['buttons17196'] | null,
     x: number,
     y: number,
     buttons: number
@@ -1139,10 +1057,11 @@ export class ViewportRenderer {
   private handleMagicClick(clickX: number, clickY: number): void {
     if (!this.partyState) return;
 
+    const champions = this.partyState.champions;
     const slots = new Array(4).fill(null).map((_, idx) => {
       return (
-        this.partyState!.champions.find((champion) => champion.partyPosition === idx) ??
-        this.partyState!.champions[idx] ??
+        champions.find((champion) => champion.partyPosition === idx) ??
+        champions[idx] ??
         null
       );
     });
@@ -1188,7 +1107,7 @@ export class ViewportRenderer {
     }
 
     if (!this.uiTables) return;
-    const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.Buttons18060, clickX, clickY, 2);
+    const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
       this.lastMagicButtonId = magicButton;
       this.applyMagicSelection(magicButton);
@@ -1270,17 +1189,17 @@ export class ViewportRenderer {
     const buttons = this.uiTables.graphic231.buttons;
     switch (this.uiMode) {
       case UIMode.Sleeping:
-        this.primaryButtons = buttons.Buttons17796;
+        this.primaryButtons = buttons.buttons17796;
         this.secondaryButtons = null;
         break;
       case UIMode.Frozen:
-        this.primaryButtons = buttons.Buttons17832;
+        this.primaryButtons = buttons.buttons17832;
         this.secondaryButtons = null;
         break;
       case UIMode.Adventure:
       default:
-        this.primaryButtons = buttons.Buttons17196;
-        this.secondaryButtons = buttons.Buttons17304;
+        this.primaryButtons = buttons.buttons17196;
+        this.secondaryButtons = buttons.buttons17304;
         break;
     }
   }
@@ -1288,25 +1207,26 @@ export class ViewportRenderer {
   private drawHoverHighlights(): void {
     if (!this.uiTables || !this.screenIndexBuffer || !this.hoverPoint) return;
     const { x, y } = this.hoverPoint;
-    const ui231 = this.uiTables.graphic231;
 
-    for (const btn of ui231.moveButtons) {
-      if (this.pointInRect(x, y, btn.x1, btn.y1, btn.x2, btn.y2)) {
-        drawRectOutlineIndex(this.screenIndexBuffer, { x1: btn.x1, y1: btn.y1, x2: btn.x2, y2: btn.y2 }, 15);
-      }
-    }
+    // move arrows
+    // for (const btn of this.uiTables.graphic231.moveButtons) {
+    //   if (this.pointInRect(x, y, btn.x1, btn.y1, btn.x2, btn.y2)) {
+    //     drawRectOutlineIndex(this.screenIndexBuffer, { x1: btn.x1, y1: btn.y1, x2: btn.x2, y2: btn.y2 }, 15);
+    //   }
+    // }
 
-    for (let chIdx = 0; chIdx < 4; chIdx++) {
-      const x1 = 22 * chIdx + 233;
-      const x2 = x1 + 19;
-      const y1 = 86;
-      const y2 = 120;
-      if (this.pointInRect(x, y, x1, y1, x2, y2)) {
-        drawRectOutlineIndex(this.screenIndexBuffer, { x1, y1, x2, y2 }, 15);
-      }
-    }
+    // // attack buttons
+    // for (let chIdx = 0; chIdx < 4; chIdx++) {
+    //   const x1 = 22 * chIdx + 233;
+    //   const x2 = x1 + 19;
+    //   const y1 = 86;
+    //   const y2 = 120;
+    //   if (this.pointInRect(x, y, x1, y1, x2, y2)) {
+    //     drawRectOutlineIndex(this.screenIndexBuffer, { x1, y1, x2, y2 }, 8);
+    //   }
+    // }
 
-    const buttonGroups = Object.values(ui231.buttons);
+    const buttonGroups = Object.values(this.uiTables.graphic231.buttons);
     for (const group of buttonGroups) {
       for (const btn of group) {
         if (this.pointInRect(x, y, btn.xMin, btn.yMin, btn.xMax, btn.yMax)) {

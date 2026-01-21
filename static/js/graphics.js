@@ -106,7 +106,7 @@ class Screen {
 	//--------------------------------  Bitmaps ------------------------------------
 	async readGraphics() {
 		this.graphicsFile = new RemoteBinaryFile();
-		await this.graphicsFile.get('gamefiles/graphics.dat');
+		await this.graphicsFile.get('gamefiles/dm-atari/graphics.dat');
 
 		this.nbItems = this.graphicsFile.read16();
 		if (this.nbItems === 0) {

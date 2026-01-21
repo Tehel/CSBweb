@@ -15,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const GRAPHICS_DAT = path.resolve('static/gamefiles/graphics.dat');
+const GRAPHICS_DAT = path.resolve('static/gamefiles/dm-atari/graphics.dat');
 const INDEX_22E = 0x22e; // 558
 
 function be16(buf, off) {

@@ -9,8 +9,8 @@ import type {
     ui8, ui16, ui32,
     ObjectID,
     CellFlag,
-    StartPosition,
-    Coordinates
+    PositionOriented,
+    Position
 } from '../core/types';
 
 /**
@@ -22,7 +22,7 @@ export interface DungeonHeader {
     mapDataSize: ui16;          // 0x02: Total map data size in bytes
     numMaps: ui8;               // 0x04: Number of maps/levels
     textDataSize: ui16;         // 0x06: Text data size in words
-    startPosition: StartPosition; // 0x08: Party start position (decoded)
+    startPosition: PositionOriented; // 0x08: Party start position (decoded)
     objectListSize: ui16;       // 0x0A: Object list size in words
     objectCounts: ui16[];       // 0x0C: Object counts [16] by database
 }
@@ -305,7 +305,7 @@ export interface Databases {
  */
 export interface ObjectListEntry {
     objectID: ObjectID;
-    position: Coordinates;
+    position: Position;
 }
 
 /**

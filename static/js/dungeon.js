@@ -10,7 +10,7 @@ class Dungeon {
 
 	async readLevels() {
 		this.dungeonFile = new RemoteBinaryFile();
-		await this.dungeonFile.get('gamefiles/dungeon.dat');
+		await this.dungeonFile.get('gamefiles/dm-atari/dungeon.dat');
 
 		// read header
 		this.seed = this.dungeonFile.read16(0x0);

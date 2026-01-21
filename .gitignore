@@ -1,13 +1,14 @@
 dist
 node_modules
-md5.js
 
-tools/output
-
+# CSBWin unpacked source code
 doc/CSBwin*
-doc/old
-doc/dubious
+
+# tool output
 tools/output
+
+# temporary
+static/backstory
 
 # CSBWin's source, fetched by npm run fetch-csbwin-src
 doc/CSBwin-src/

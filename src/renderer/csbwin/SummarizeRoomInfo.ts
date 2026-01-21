@@ -1,4 +1,4 @@
-import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID, type ui8 } from '../../core/types';
+import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID, type ui8, Position } from '../../core/types';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { ObjectTables } from './ObjectTables';
@@ -34,8 +34,9 @@ function idxOf(rn: ObjectID): number {
 }
 
 // Port of `GetCellFlags()` boundary behavior used by viewport rendering (CSBCode.cpp:4609-4662).
-function getCellFlagsViewport(dungeon: DungeonState, mapIndex: ui8, x: number, y: number): number {
-  const map = dungeon.getMap(mapIndex);
+function getCellFlagsViewport(dungeon: DungeonState, position: Position): number {
+  const { x, y, z } = position;
+  const map = dungeon.getMap(z);
   if (!map) return 0;
   const w = map.descriptor.width;
   const h = map.descriptor.height;
@@ -168,23 +169,23 @@ function getDsaParameters(word4: number, word6: number): { paramA: number; param
 function summarizeStoneRoom(
   rslt: SummarizeRoomData,
   dungeon: DungeonState,
-  mapIndex: ui8,
-  partyX: number,
-  partyY: number,
+  position: Position,
   facing: number,
   falseStoneWall: boolean,
   tables?: ObjectTables
 ): void {
-  const map = dungeon.getMap(mapIndex);
+  const { x, y, z } = position;
+  const map = dungeon.getMap(z);
   const sentinel = dungeon.getData().header.randomSeed ?? 0;
   const mapWidth = map?.descriptor.width ?? 0;
   const mapHeight = map?.descriptor.height ?? 0;
   const numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
   const numRandomWallDecoration = map?.descriptor.wallDecorationCount ?? 0;
-  const levelNumber = map?.descriptor.level ?? mapIndex;
-  const cellFlags = getCellFlagsViewport(dungeon, mapIndex, rslt.x, rslt.y);
+  const levelNumber = map?.descriptor.level ?? z;
+  const pos = new Position(rslt.x, rslt.y, z)
+  const cellFlags = getCellFlagsViewport(dungeon, pos);
 
-  let local = dungeon.findFirstObject(mapIndex, rslt.x, rslt.y);
+  let local = dungeon.findFirstObject(pos);
 
   rslt.roomType = RoomType.STONE;
   rslt.championPortraitOrdinal = 0;
@@ -232,7 +233,7 @@ function summarizeStoneRoom(
       mapWidth,
       mapHeight,
       30,
-      mapIndex
+      z
     );
     rslt.decorations[1] = randomWallDecorationCsbwin(
       rearCFmask,
@@ -245,7 +246,7 @@ function summarizeStoneRoom(
       mapWidth,
       mapHeight,
       30,
-      mapIndex
+      z
     );
     rslt.decorations[2] = randomWallDecorationCsbwin(
       leftCFmask,
@@ -258,7 +259,7 @@ function summarizeStoneRoom(
       mapWidth,
       mapHeight,
       30,
-      mapIndex
+      z
     );
 
     if (
@@ -334,7 +335,7 @@ function summarizeStoneRoom(
 
   if (falseStoneWall) {
     // Port of CSBWin's visibility restriction for fake stone (Codea59a.cpp:181-193).
-    if (partyX !== rslt.x && partyY !== rslt.y) {
+    if (x !== rslt.x && y !== rslt.y) {
       rslt.rn2 = RN_EOF;
       return;
     }
@@ -346,37 +347,37 @@ function summarizeStoneRoom(
 export function summarizeRoomInfoCsbwin(
   rslt: SummarizeRoomData,
   dungeon: DungeonState,
-  mapIndex: ui8,
-  partyX: number,
-  partyY: number,
+  position: Position,
   facing: number,
   tables?: ObjectTables
 ): void {
+  const { z } = position;
   rslt.text = [RN_EOF, RN_EOF, RN_EOF];
   rslt.decorations = [0, 0, 0];
   rslt.rn2 = RN_EOF;
   rslt.championPortraitOrdinal = 0;
 
-  const map = dungeon.getMap(mapIndex);
+  const map = dungeon.getMap(z);
   const sentinel = dungeon.getData().header.randomSeed ?? 0;
   const mapWidth = map?.descriptor.width ?? 0;
   const mapHeight = map?.descriptor.height ?? 0;
   const numFloorDecorations = map?.descriptor.floorGraphicsCount ?? 0;
   const numRandomFloorDecorations = map?.descriptor.floorDecorationCount ?? 0;
-  const levelNumber = map?.descriptor.level ?? mapIndex;
+  const levelNumber = map?.descriptor.level ?? z;
+  const pos = new Position(rslt.x, rslt.y, z)
 
-  let cellFlags = getCellFlagsViewport(dungeon, mapIndex, rslt.x, rslt.y);
+  let cellFlags = getCellFlagsViewport(dungeon, pos);
   const baseRoomType = ((cellFlags >> 5) & 7) as RoomType;
   rslt.roomType = baseRoomType;
 
-  const firstObject = dungeon.findFirstObject(mapIndex, rslt.x, rslt.y);
+  const firstObject = dungeon.findFirstObject(pos);
   let local = firstObject;
   let skipLowDbForRn2 = true;
   let scanFloorDecorations = false;
 
   switch (baseRoomType) {
     case RoomType.STONE: {
-      summarizeStoneRoom(rslt, dungeon, mapIndex, partyX, partyY, facing, false, tables);
+      summarizeStoneRoom(rslt, dungeon, position, facing, false, tables);
       rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
       return;
     }
@@ -398,7 +399,7 @@ export function summarizeRoomInfoCsbwin(
     case RoomType.FALSEWALL: {
       // Codea59a.cpp:278-297
       if ((cellFlags & 4) === 0) {
-        summarizeStoneRoom(rslt, dungeon, mapIndex, partyX, partyY, facing, true, tables);
+        summarizeStoneRoom(rslt, dungeon, position, facing, true, tables);
         rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
         return;
       }
@@ -414,7 +415,7 @@ export function summarizeRoomInfoCsbwin(
           mapWidth,
           mapHeight,
           30,
-          mapIndex
+          z
         );
       }
       skipLowDbForRn2 = false;
@@ -434,7 +435,7 @@ export function summarizeRoomInfoCsbwin(
           mapWidth,
           mapHeight,
           30,
-          mapIndex
+          z
         );
       }
       cellFlags = 1;
@@ -473,7 +474,7 @@ export function summarizeRoomInfoCsbwin(
       } else {
         rslt.roomType = RoomType.DOOR_FACING;
         rslt.decorations[0] = cellFlags & 7; // door state
-        const doorRN = dungeon.findFirstDoor(mapIndex, rslt.x, rslt.y);
+        const doorRN = dungeon.findFirstDoor(new Position(rslt.x, rslt.y, z));
         rslt.decorations[1] = doorRN === RN_EOF ? 0 : idxOf(doorRN);
       }
       cellFlags = 1;

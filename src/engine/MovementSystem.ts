@@ -9,7 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { RoomType } from '../core/types';
+import { Position, RoomType } from '../core/types';
 
 /**
  * MovementSystem - handles movement validation and collision detection
@@ -52,19 +52,12 @@ export class MovementSystem {
      * Handle turning
      */
     private handleTurn(action: MovementAction): MovementResult {
-        const mapIndex = this.party.getMapIndex();
-        const position = this.party.getPosition();
-        const cellFlags = this.dungeon.getCellFlag(mapIndex, position.x, position.y);
+        const position = this.party.state.position;
+        const cellFlags = this.dungeon.getCellFlag(position);
         const roomType = (cellFlags >> 5) & 0x7;
 
         if (roomType === RoomType.STAIRS) {
-            return this.traverseStairway(
-                mapIndex,
-                position.x,
-                position.y,
-                (cellFlags & 0x04) !== 0,
-                true
-            );
+            return this.traverseStairway(position, (cellFlags & 0x04) !== 0, true);
         }
 
         const newFacing = this.party.calculateNewFacing(action);
@@ -79,26 +72,19 @@ export class MovementSystem {
      * Handle movement with collision detection
      */
     private handleMovement(action: MovementAction): MovementResult {
-        const mapIndex = this.party.getMapIndex();
-        const position = this.party.getPosition();
-        const cellFlagsFrom = this.dungeon.getCellFlag(mapIndex, position.x, position.y);
+        const position = this.party.state.position;
+        const cellFlagsFrom = this.dungeon.getCellFlag(position);
         const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
         const relDirection = this.getRelativeDirection(action);
 
         if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
-            return this.traverseStairway(
-                mapIndex,
-                position.x,
-                position.y,
-                (cellFlagsFrom & 0x04) !== 0,
-                true
-            );
+            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0, true);
         }
 
         const newPosition = this.party.calculateNewPosition(action);
 
         // Check if new position is within map bounds
-        const dimensions = this.dungeon.getMapDimensions(mapIndex);
+        const dimensions = this.dungeon.getMapDimensions(newPosition.z);
         if (!dimensions) {
             return {
                 success: false,
@@ -117,15 +103,15 @@ export class MovementSystem {
         }
 
         // Check if new position is walkable
-        if (!this.dungeon.isWalkable(mapIndex, newPosition.x, newPosition.y)) {
+        if (!this.dungeon.isWalkable(newPosition)) {
             // Get wall type for better message
-            const tile = this.dungeon.getTile(mapIndex, newPosition.x, newPosition.y);
+            const tile = this.dungeon.getTile(newPosition);
             let message = 'A wall blocks your path';
 
             if (tile) {
-                if (this.dungeon.isWall(mapIndex, newPosition.x, newPosition.y)) {
+                if (this.dungeon.isWall(newPosition)) {
                     message = 'A wall blocks your path';
-                } else if (this.dungeon.isDoor(mapIndex, newPosition.x, newPosition.y)) {
+                } else if (this.dungeon.isDoor(newPosition)) {
                     message = 'A closed door blocks your path';
                 }
             }
@@ -138,18 +124,12 @@ export class MovementSystem {
         }
 
         // Check for special tiles
-        const specialMessage = this.checkSpecialTiles(mapIndex, newPosition.x, newPosition.y);
+        const specialMessage = this.checkSpecialTiles(newPosition);
 
-        const cellFlagsTo = this.dungeon.getCellFlag(mapIndex, newPosition.x, newPosition.y);
+        const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         if (roomTypeTo === RoomType.STAIRS) {
-            return this.traverseStairway(
-                mapIndex,
-                newPosition.x,
-                newPosition.y,
-                (cellFlagsTo & 0x04) !== 0,
-                true
-            );
+            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0, true);
         }
 
         // Movement is valid
@@ -165,21 +145,14 @@ export class MovementSystem {
      *
      * Returns a message if there's something special about this tile
      */
-    private checkSpecialTiles(mapIndex: number, x: number, y: number): string | undefined {
-        if (this.dungeon.isPit(mapIndex, x, y)) {
-            return 'You step into a pit!';
-        }
+    private checkSpecialTiles(position: Position): string | undefined {
+        if (this.dungeon.isPit(position)) return 'You step into a pit!';
+        if (this.dungeon.isTeleporter(position)) return 'You feel a strange sensation...';
 
-        if (this.dungeon.isTeleporter(mapIndex, x, y)) {
-            return 'You feel a strange sensation...';
-        }
-
-        if (this.dungeon.isStairs(mapIndex, x, y)) {
-            return 'You find stairs';
-        }
+        if (this.dungeon.isStairs(position)) return 'You find stairs';
 
         // Check for objects
-        if (this.dungeon.hasObjects(mapIndex, x, y)) {
+        if (this.dungeon.hasObjects(position)) {
             // Could return info about objects here
         }
 
@@ -201,15 +174,9 @@ export class MovementSystem {
         }
     }
 
-    private traverseStairway(
-        mapIndex: number,
-        x: number,
-        y: number,
-        isUp: boolean,
-        setFacing: boolean
-    ): MovementResult {
+    private traverseStairway(position: Position, isUp: boolean, setFacing: boolean): MovementResult {
         const delta = isUp ? -1 : 1;
-        const next = this.dungeon.incrementLevel(mapIndex, delta, x, y);
+        const next = this.dungeon.incrementLevel(position, delta);
 
         if (!next) {
             return {
@@ -219,15 +186,14 @@ export class MovementSystem {
             };
         }
 
-        const fallbackFacing = this.party.getFacing();
+        const fallbackFacing = this.party.state.facing;
         const newFacing = setFacing
-            ? this.dungeon.getExitStairsDirection(next.mapIndex, next.x, next.y, fallbackFacing)
+            ? this.dungeon.getExitStairsDirection(next, fallbackFacing)
             : fallbackFacing;
 
         return {
             success: true,
-            newPosition: { x: next.x, y: next.y },
-            newMapIndex: next.mapIndex,
+            newPosition: next.clone(),
             newFacing,
         };
     }
@@ -264,14 +230,13 @@ export class MovementSystem {
      * Get current position info for debugging
      */
     getPositionInfo(): string {
-        const position = this.party.getPosition();
-        const facing = this.party.getFacing();
-        const mapIndex = this.party.getMapIndex();
+        const position = this.party.state.position;
+        const facing = this.party.state.facing;
 
         const dirNames = ['North', 'East', 'South', 'West'];
-        const tile = this.dungeon.getTile(mapIndex, position.x, position.y);
+        const tile = this.dungeon.getTile(position);
         const tileType = tile ? `Type: ${tile.roomType}` : 'Unknown';
 
-        return `Position: (${position.x}, ${position.y}) Map: ${mapIndex} Facing: ${dirNames[facing]} ${tileType}`;
+        return `Position: (${position.x}, ${position.y}) Map: ${position.z} Facing: ${dirNames[facing]} ${tileType}`;
     }
 }

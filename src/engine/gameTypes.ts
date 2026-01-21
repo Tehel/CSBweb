@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, Direction, Coordinates } from '../core/types';
+import type { ui8, ui16, Direction, Position } from '../core/types';
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -64,8 +64,7 @@ export interface Champion {
  */
 export interface PartyState {
     champions: Champion[];      // Up to 4 champions
-    position: Coordinates;      // Current map position (x, y)
-    mapIndex: ui8;              // Current map/level index
+    position: Position;      // Current map position (x, y, z)
     facing: Direction;          // Current facing direction
     magicCasterIndex: number;   // -1 = none
 
@@ -104,8 +103,7 @@ export enum MovementAction {
  */
 export interface MovementResult {
     success: boolean;           // Did the movement succeed?
-    newPosition?: Coordinates;  // New position (if moved)
-    newMapIndex?: ui8;          // New map/level index (if changed)
+    newPosition?: Position;  // New position (if moved)
     newFacing?: Direction;      // New facing (if turned)
     blocked?: boolean;          // Was movement blocked by wall?
     message?: string;           // Optional message (e.g., "A wall blocks your path")

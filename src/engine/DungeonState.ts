@@ -5,7 +5,7 @@
  * Based on CSBWin's dungeon data access
  */
 
-import type { ui8, ui16, Coordinates, CellFlag, ObjectID, Direction } from '../core/types';
+import { ui8, ui16, Position, CellFlag, ObjectID, Direction } from '../core/types';
 import type {
     ClothingRecord,
     ContainerRecord,
@@ -72,17 +72,12 @@ export class DungeonState {
      *
      * Ported from CSBWin `IncrementLevel()` (doc/CSBwin-src/CSBCode.cpp:4709-4759).
      */
-    incrementLevel(
-        mapIndex: ui8,
-        delta: number,
-        x: number,
-        y: number
-    ): { mapIndex: ui8; x: number; y: number } | null {
-        const map = this.getMap(mapIndex);
+    incrementLevel(position: Position, delta: number): Position | null {
+        const map = this.getMap(position.z);
         if (!map) return null;
 
-        const absX = map.descriptor.offsetX + x;
-        const absY = map.descriptor.offsetY + y;
+        const absX = map.descriptor.offsetX + position.x;
+        const absY = map.descriptor.offsetY + position.y;
         const targetLevel = map.descriptor.level + delta;
 
         for (let idx = 0; idx < this.data.maps.length; idx++) {
@@ -95,15 +90,9 @@ export class DungeonState {
             const minY = desc.offsetY;
             const maxY = desc.offsetY + desc.height - 1;
 
-            if (absX < minX || absX > maxX || absY < minY || absY > maxY) {
-                continue;
-            }
+            if (absX < minX || absX > maxX || absY < minY || absY > maxY) continue;
 
-            return {
-                mapIndex: idx as ui8,
-                x: absX - desc.offsetX,
-                y: absY - desc.offsetY,
-            };
+            return new Position(absX - desc.offsetX, absY - desc.offsetY, idx as ui8);
         }
 
         return null;
@@ -114,8 +103,9 @@ export class DungeonState {
      *
      * Ported from CSBWin `ExitStairsDirection()` (doc/CSBwin-src/Code11f52.cpp:290-325).
      */
-    getExitStairsDirection(mapIndex: ui8, x: number, y: number, fallback: Direction): Direction {
-        const map = this.getMap(mapIndex);
+    getExitStairsDirection(position: Position, fallback: Direction): Direction {
+        const { x, y, z } = position;
+        const map = this.getMap(position.z);
         if (!map) return fallback;
 
         const deltaX = [0, 1, 0, -1];
@@ -124,67 +114,45 @@ export class DungeonState {
         for (let direction = 0; direction < 4; direction++) {
             const newX = x + deltaX[direction];
             const newY = y + deltaY[direction];
-            if (newX < 0 || newY < 0 || newX >= map.descriptor.width || newY >= map.descriptor.height) {
-                continue;
-            }
+            if (newX < 0 || newY < 0 || newX >= map.descriptor.width || newY >= map.descriptor.height) continue;
 
-            const cellFlag = this.getCellFlag(mapIndex, newX, newY);
+            const cellFlag = this.getCellFlag(new Position(newX, newY, z));
             const roomType = (cellFlag >> 5) & 0x7;
 
-            if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) {
-                continue;
-            }
-
-            if (roomType === RoomType.FALSEWALL && (cellFlag & 0x05) === 0) {
-                continue;
-            }
+            if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) continue;
+            if (roomType === RoomType.FALSEWALL && (cellFlag & 0x05) === 0) continue;
 
             return direction as Direction;
         }
-
         return fallback;
     }
 
     /**
      * Get tile data at position
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns Tile data or null if out of bounds
      */
-    getTile(mapIndex: ui8, x: number, y: number): TileData | null {
-        const map = this.getMap(mapIndex);
-        if (!map) {
-            return null;
-        }
+    getTile(position: Position): TileData | null {
+        const { x, y, z } = position;
+        const map = this.getMap(z);
+        if (!map) return null;
 
         // Check bounds
-        if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) {
-            return null;
-        }
+        if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return null;
 
         return map.tiles[x][y];
     }
 
     /**
      * Get cell flag at position
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns Cell flag or 0 if out of bounds
      */
-    getCellFlag(mapIndex: ui8, x: number, y: number): CellFlag {
-        const map = this.getMap(mapIndex);
-        if (!map) {
-            return 0;
-        }
+    getCellFlag(position: Position): CellFlag {
+        const { x, y, z } = position;
+        const map = this.getMap(z);
+        if (!map) return 0;
 
         // Check bounds
-        if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) {
-            return 0;
-        }
+        if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return 0;
 
         return map.cellFlags[x][y];
     }
@@ -194,15 +162,16 @@ export class DungeonState {
      *
      * Ported from CSBWin `GetObjectListIndex()` (doc/CSBwin-src/CSBCode.cpp:5103-5127).
      */
-    getObjectListIndex(mapIndex: ui8, x: number, y: number): number {
-        const map = this.getMap(mapIndex);
+    getObjectListIndex(position: Position): number {
+        const { x, y, z } = position;
+        const map = this.getMap(z);
         if (!map) return -1;
         if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return -1;
 
         const cellFlag = map.cellFlags[x][y];
         if ((cellFlag & 0x10) === 0) return -1;
 
-        const baseCol = this.data.levelIndex[mapIndex] + x;
+        const baseCol = this.data.levelIndex[z] + x;
         const colBase = this.data.columnIndex[baseCol];
         let idx = colBase;
 
@@ -218,8 +187,8 @@ export class DungeonState {
      *
      * Ported from CSBWin `FindFirstObject()` (doc/CSBwin-src/CSBCode.cpp:5130-5137).
      */
-    findFirstObject(mapIndex: ui8, x: number, y: number): ObjectID {
-        const idx = this.getObjectListIndex(mapIndex, x, y);
+    findFirstObject(position: Position): ObjectID {
+        const idx = this.getObjectListIndex(position);
         if (idx < 0) return OBJECT_ID_EOF;
         return this.data.objectList[idx] ?? OBJECT_ID_EOF;
     }
@@ -270,8 +239,8 @@ export class DungeonState {
      *
      * Ported from CSBWin `FindFirstDoor()` semantics (doc/CSBwin-src/Code11f52.cpp:579+).
      */
-    findFirstDoor(mapIndex: ui8, x: number, y: number): ObjectID {
-        for (let rn = this.findFirstObject(mapIndex, x, y); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
+    findFirstDoor(position: Position): ObjectID {
+        for (let rn = this.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
             if (decodeObjectID(rn).category === DBType.DOOR) return rn;
         }
         return OBJECT_ID_EOF;
@@ -398,14 +367,10 @@ export class DungeonState {
 
     /**
      * Check if a position is walkable (not a wall)
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is walkable
      */
-    isWalkable(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    isWalkable(position: Position): boolean {
+        const tile = this.getTile(position);
         if (!tile) {
             return false; // Out of bounds = not walkable
         }
@@ -436,92 +401,62 @@ export class DungeonState {
 
     /**
      * Check if a position is a wall
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is a wall
      */
-    isWall(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
-        if (!tile) {
-            return true; // Out of bounds = wall
-        }
-
+    isWall(position: Position): boolean {
+        const tile = this.getTile(position);
+        if (!tile) return true; // Out of bounds = wall
         return tile.roomType === RoomType.STONE || tile.roomType === RoomType.FALSEWALL;
     }
 
     /**
      * Check if a position is a door
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is a door
      */
-    isDoor(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    isDoor(position: Position): boolean {
+        const tile = this.getTile(position);
         return tile?.roomType === RoomType.DOOR;
     }
 
     /**
      * Check if a position is a pit
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is a pit
      */
-    isPit(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    isPit(position: Position): boolean {
+        const tile = this.getTile(position);
         return tile?.roomType === RoomType.PIT;
     }
 
     /**
      * Check if a position is a teleporter
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is a teleporter
      */
-    isTeleporter(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    isTeleporter(position: Position): boolean {
+        const tile = this.getTile(position);
         return tile?.roomType === RoomType.TELEPORTER;
     }
 
     /**
      * Check if a position is stairs
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position is stairs
      */
-    isStairs(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    isStairs(position: Position): boolean {
+        const tile = this.getTile(position);
         return tile?.roomType === RoomType.STAIRS;
     }
 
     /**
      * Check if a position has objects
-     *
-     * @param mapIndex - Map index
-     * @param x - X coordinate
-     * @param y - Y coordinate
      * @returns True if position has objects
      */
-    hasObjects(mapIndex: ui8, x: number, y: number): boolean {
-        const tile = this.getTile(mapIndex, x, y);
+    hasObjects(position: Position): boolean {
+        const tile = this.getTile(position);
         return tile?.hasObjects || false;
     }
 
     // Get start position from dungeon header
-    getStartPosition(): Coordinates {
-        return {
-            x: this.data.header.startPosition.x,
-            y: this.data.header.startPosition.y,
-        };
+    getStartPosition(): Position {
+        return new Position(this.data.header.startPosition.x, this.data.header.startPosition.y, 0);
     }
 
     // Get start facing direction
@@ -531,7 +466,7 @@ export class DungeonState {
 
     // Get start map index (level)
     getStartMapIndex(): ui8 {
-        return this.data.header.startPosition.level || 0;
+        return this.data.header.startPosition.z || 0;
     }
 
     decodeWallTextBytes(record: TextRecord, tables?: TextDecodeTables): Uint8Array | null {
