@@ -234,27 +234,6 @@ export function bltShapeToViewport(
 }
 
 /**
- * Create a full screen canvas with viewport area
- * Port from CSBWin screen layout
- *
- * @returns Canvas element for full game screen (320×200)
- */
-export function createViewportCanvas(): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = SCREEN_WIDTH;
-  canvas.height = SCREEN_HEIGHT;
-
-  // Fill with black background
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-  }
-
-  return canvas;
-}
-
-/**
  * Initialize floor and ceiling graphics
  * Port from CSBWin floor/ceiling initialization
  *

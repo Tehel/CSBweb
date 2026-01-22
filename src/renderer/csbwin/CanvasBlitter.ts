@@ -10,11 +10,9 @@
  * Here we operate on pixel indices (0..15) for faithful transparency (index 10).
  */
 
-export interface RectPos {
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+import { Rect } from "./UITables";
+
+export interface RectPos extends Rect {
   srcX?: number;
   srcY?: number;
   srcStride?: number;
@@ -49,7 +47,7 @@ export function clearIndex(buffer: PaletteIndexViewportBuffer, index: number = 0
   buffer.pixels.fill(index & 0xff);
 }
 
-export function fillRectIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos, index: number): void {
+export function fillRectIndex(buffer: PaletteIndexViewportBuffer, rect: Rect, index: number): void {
   const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
   if (!normalized) return;
 
@@ -63,7 +61,7 @@ export function fillRectIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos,
   }
 }
 
-export function drawRectOutlineIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos, index: number): void {
+export function drawRectOutlineIndex(buffer: PaletteIndexViewportBuffer, rect: Rect, index: number): void {
   const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
   if (!normalized) return;
 
@@ -81,7 +79,7 @@ export function drawRectOutlineIndex(buffer: PaletteIndexViewportBuffer, rect: R
   }
 }
 
-export function flashRectIndex(buffer: PaletteIndexViewportBuffer, rect: RectPos): void {
+export function flashRectIndex(buffer: PaletteIndexViewportBuffer, rect: Rect): void {
   const normalized = normalizeRectInclusive(rect, buffer.width, buffer.height);
   if (!normalized) return;
 

@@ -57,7 +57,7 @@ export class MovementSystem {
         const roomType = (cellFlags >> 5) & 0x7;
 
         if (roomType === RoomType.STAIRS) {
-            return this.traverseStairway(position, (cellFlags & 0x04) !== 0, true);
+            return this.traverseStairway(position, (cellFlags & 0x04) !== 0);
         }
 
         const newFacing = this.party.calculateNewFacing(action);
@@ -78,7 +78,7 @@ export class MovementSystem {
         const relDirection = this.getRelativeDirection(action);
 
         if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
-            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0, true);
+            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0);
         }
 
         const newPosition = this.party.calculateNewPosition(action);
@@ -129,7 +129,7 @@ export class MovementSystem {
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         if (roomTypeTo === RoomType.STAIRS) {
-            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0, true);
+            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0);
         }
 
         // Movement is valid
@@ -161,20 +161,15 @@ export class MovementSystem {
 
     private getRelativeDirection(action: MovementAction): number | null {
         switch (action) {
-            case MovementAction.MOVE_FORWARD:
-                return 0;
-            case MovementAction.STRAFE_RIGHT:
-                return 1;
-            case MovementAction.MOVE_BACKWARD:
-                return 2;
-            case MovementAction.STRAFE_LEFT:
-                return 3;
-            default:
-                return null;
+            case MovementAction.MOVE_FORWARD:  return 0;
+            case MovementAction.STRAFE_RIGHT:  return 1;
+            case MovementAction.MOVE_BACKWARD: return 2;
+            case MovementAction.STRAFE_LEFT:   return 3;
+            default: return null;
         }
     }
 
-    private traverseStairway(position: Position, isUp: boolean, setFacing: boolean): MovementResult {
+    private traverseStairway(position: Position, isUp: boolean): MovementResult {
         const delta = isUp ? -1 : 1;
         const next = this.dungeon.incrementLevel(position, delta);
 
@@ -187,13 +182,11 @@ export class MovementSystem {
         }
 
         const fallbackFacing = this.party.state.facing;
-        const newFacing = setFacing
-            ? this.dungeon.getExitStairsDirection(next, fallbackFacing)
-            : fallbackFacing;
+        const newFacing = this.dungeon.getExitStairsDirection(next, fallbackFacing);
 
         return {
             success: true,
-            newPosition: next.clone(),
+            newPosition: next,
             newFacing,
         };
     }

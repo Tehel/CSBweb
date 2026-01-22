@@ -19,7 +19,7 @@ export class Party {
     constructor(initialPosition: Position, initialFacing: Direction) {
         this.state = {
             champions: [],
-            position: initialPosition.clone(),
+            position: initialPosition,
             facing: initialFacing,
             magicCasterIndex: -1,
             moving: false,
@@ -148,7 +148,7 @@ export class Party {
 
         // Update position if moved
         if (result.newPosition) {
-            this.state.position = result.newPosition.clone()
+            this.state.position = result.newPosition;
             this.state.moving = true;
         }
 
@@ -171,28 +171,14 @@ export class Party {
     }
 
     /**
-     * Set party position (for teleports, etc.)
-     */
-    setPosition(position: Position): void {
-        this.state.position = position.clone();
-    }
-
-    /**
-     * Set party facing
-     */
-    setFacing(facing: Direction): void {
-        this.state.facing = facing;
-    }
-
-    /**
      * Replace full party state (used for save/load).
      */
     setState(state: PartyState): void {
         this.state = {
             champions: state.champions.map((c) => ({
                 ...c,
-                attributes: { ...c.attributes },
-                incantation: c.incantation ? [...c.incantation] : undefined,
+                attributes: c.attributes,
+                incantation: c.incantation,
             })),
             position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,

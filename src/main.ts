@@ -1,12 +1,8 @@
 /**
- * Dungeon Master Web - Main Entry Point
- *
- * TypeScript/Vite-based Dungeon Master web port
+ * Dungeon Master Web
  */
 
 import {
-    DEFAULT_PALETTE,
-    atariToRGB,
     Direction,
     RoomType,
     Position
@@ -27,11 +23,69 @@ let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 
 const QUICK_SAVE_KEY = 'dmweb_quicksave_v1';
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
-const GAME_DATA_DIR = '/gamefiles/dm-atari/';
+const GAME_DATA_DIR = '/gamefiles/dm-atari';
 
 // Debug output element
 const debugEl = document.getElementById('debug');
 const hoverEl = document.getElementById('hover');
+
+const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
+if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
+
+
+const lines = new Image();
+lines.src = '/QPN59-320x200-resized.png';
+
+// window.addEventListener('load', fakeCRT, false);
+function fakeCRT() {
+   
+    console.log('fakeCRT');
+    // Try to create a WebGL canvas (will fail if WebGL isn't supported)
+    let glcanvas;
+    try {
+        glcanvas = fx.canvas();
+    } catch (e) {return;}
+    
+    const srcctx = gameCanvasEl.getContext('2d')!;
+    
+    // This tells glfx what to use as a source image
+    const texture = glcanvas.texture(gameCanvasEl);
+    
+    console.log(lines.width);
+    console.log(lines.height);
+    console.log(gameCanvasEl.width);
+    console.log(gameCanvasEl.height);
+
+    // Just setting up some details to tweak the bulgePinch effect
+
+    // Hide the source 2D canvas and put the WebGL Canvas in its place
+    gameCanvasEl.parentNode!.appendChild(glcanvas);
+    glcanvas.className = gameCanvasEl.className;
+    glcanvas.id = gameCanvasEl.id + '_gl';
+    // gameCanvasEl.id = 'old_' + gameCanvasEl.id;
+    // gameCanvasEl.style.display = 'none';
+    // return;
+    // TODO: should be directly with the "render" call on ticks, not separate
+    setInterval(() => {
+        // adds scanlines to the source
+        const w = gameCanvasEl.width;
+        const h = gameCanvasEl.height;
+        // srcctx.drawImage(lines, 0, 0, w, h);
+        
+        // Load the latest source frame
+        texture.loadContentsOf(gameCanvasEl);
+        
+        // aiming to look like: https://www.dungeon-master.com/forum/viewtopic.php?t=31300
+        // Apply WebGL magic: https://evanw.github.io/glfx.js/docs/
+        const hw = w / 2;
+        const hh = h / 2;
+        const w75 = w * 0.75;
+        glcanvas.draw(texture)
+            .bulgePinch(hw, hh, w75, 0.12)
+            .vignette(0.25, 0.74)
+            .update();
+    }, 1000 / 20);
+}
 
 function updateDebug(message: string) {
     // if (debugEl) {
@@ -43,7 +97,7 @@ function updateDebug(message: string) {
         renderer.setMessageLines(lines);
     }
 }
-function updateHover(message: string) {
+export function updateHover(message: string) {
     if (hoverEl) hoverEl.innerHTML = `<p>${message}</p>`;
 }
 
@@ -92,8 +146,7 @@ function createRandomChampion(partyPosition: number): Champion {
             wizard: randomInt(1, 8),
         },
         alive,
-        incantation: [0, 0, 0, 0],
-        incantationIndex: 0,
+        incantation: [],
         weaponHand: randomInt(0, 95),
         shieldHand: Math.random() > 0.5 ? randomInt(0, 95) : null,
         quiver: null,
@@ -110,7 +163,7 @@ function injectRandomParty(): void {
         champions.push(createRandomChampion(i));
     }
     const magicCasterIndex = champions.findIndex(c => c.attributes.maxMana > 0);
-    const next: PartyState = {
+    const newState: PartyState = {
         ...current,
         champions,
         magicCasterIndex,
@@ -118,7 +171,8 @@ function injectRandomParty(): void {
         turning: false,
         lastMoveTime: 0,
     };
-    game.setPartyState(next);
+    console.log(`new party state: `, newState);
+    game.setPartyState(newState);
     updateDebug('Random party injected');
 }
 
@@ -166,13 +220,6 @@ function renderView() {
     renderer.setPartyState(party.state);
     renderer.processMouseQueue();
     renderer.render(pos, facing);
-
-    // Debug: log execution
-    // const log = renderer.getExecutionLog();
-    // if (log.length > 0) {
-    //     console.log(`Bytecode executed: ${log.length} operations`);
-    //     console.log('First 5 ops:', log.slice(0, 5));
-    // }
 }
 
 function getEventPosition(canvas: HTMLCanvasElement, e: MouseEvent): { x: number, y: number } {
@@ -243,37 +290,19 @@ async function init() {
             console.log('Initializing viewport renderer (CSBWin bytecode system)...');
             const dungeonState = game.dungeonState;
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
-            await renderer.initialize();
+            await renderer.initialize(gameCanvasEl);
             console.log('✓ Viewport renderer initialized');
 
-            // Replace the main canvas with the full screen canvas
-            const app = document.getElementById('app');
-            const screenCanvas = renderer.getCanvas();
-            // const oldCanvas = document.getElementById('viewport');
-            // if (oldCanvas && oldCanvas.parentNode) {
-                screenCanvas.id = 'viewport';
-                // Scale the full screen canvas using CSS
-                // Use scaling to get the original 4/3 ratio (rectangular pixels)
-                // Internal resolution: 320×200, external 960×720
-                screenCanvas.style.width = '960px';   // 320 * 3
-                screenCanvas.style.height = '720px';  // 200 * 3.6
-                screenCanvas.style.imageRendering = 'pixelated';
-
-                app?.appendChild(screenCanvas);
-                // oldCanvas.parentNode.replaceChild(screenCanvas, oldCanvas);
-                console.log('✓ Replaced canvas with full screen (320×200 @ 3x scale)');
-            // }
-
-            screenCanvas.addEventListener('mousemove', (e) => {
+            gameCanvasEl.addEventListener('mousemove', (e) => {
                 if (!renderer) return;
-                const { x, y } = getEventPosition(screenCanvas, e);
+                const { x, y } = getEventPosition(gameCanvasEl, e);
                 renderer.setHoverPoint({ x, y });
                 renderView();
             });
 
-            screenCanvas.addEventListener('mousedown', (e) => {
+            gameCanvasEl.addEventListener('mousedown', (e) => {
                 if (!renderer) return;
-                const { x, y } = getEventPosition(screenCanvas, e);
+                const { x, y } = getEventPosition(gameCanvasEl, e);
                 const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
                 if (buttonMask !== 0) {
                     renderer.enqueueMouseClick(x, y, buttonMask);
@@ -281,17 +310,17 @@ async function init() {
                 }
             });
 
-            screenCanvas.addEventListener('mouseup', () => {
+            gameCanvasEl.addEventListener('mouseup', () => {
                 if (!renderer) return;
                 renderer.enqueueMouseUnclick();
                 renderView();
             });
 
-            screenCanvas.addEventListener('contextmenu', (e) => {
+            gameCanvasEl.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
             });
 
-            screenCanvas.addEventListener('mouseleave', () => {
+            gameCanvasEl.addEventListener('mouseleave', () => {
                 if (!renderer) return;
                 renderer.setHoverPoint(null);
                 renderView();
@@ -338,37 +367,6 @@ async function init() {
     }
 }
 
-// Helper: Draw palette test
-// function drawPaletteTest() {
-//     viewportCtx.fillStyle = '#000';
-//     viewportCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-//     viewportCtx.fillStyle = '#fff';
-//     viewportCtx.font = '20px "Courier New"';
-//     viewportCtx.textAlign = 'center';
-//     viewportCtx.fillText('Phase 2: Data Loaders ✓', canvas.width / 2, 30);
-
-//     // Draw palette colors
-//     viewportCtx.font = '12px "Courier New"';
-//     viewportCtx.textAlign = 'left';
-//     viewportCtx.fillText('Default Palette:', 20, 70);
-
-//     for (let i = 0; i < DEFAULT_PALETTE.length; i++) {
-//         const color = atariToRGB(DEFAULT_PALETTE[i]);
-//         const x = 20 + (i % 8) * 75;
-//         const y = 90 + Math.floor(i / 8) * 50;
-
-//         viewportCtx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-//         viewportCtx.fillRect(x, y, 60, 30);
-
-//         viewportCtx.fillStyle = '#fff';
-//         viewportCtx.fillRect(x, y + 30, 60, 15);
-//         viewportCtx.fillStyle = '#000';
-//         viewportCtx.textAlign = 'center';
-//         viewportCtx.fillText(`${i}`, x + 30, y + 41);
-//     }
-// }
-
 // Helper: Draw map preview
 function drawMapPreview(dungeon: DungeonData, position: Position) {
 
@@ -382,17 +380,17 @@ function drawMapPreview(dungeon: DungeonData, position: Position) {
     const map = dungeon.maps[position.z];
 
     // Calculate scale to fit in available space (canvas height - header - legend)
-    const availableHeight = canvas.height - 80 - 30; // 80 for header, 30 for legend
-    const availableWidth = canvas.width - 40; // 20px margin on each side
+    const availableHeight = canvas.height - 0; // 0px reserved
+    const availableWidth = canvas.width - 4; // 0px reserved
 
-    const scale = Math.floor(Math.min(
+    const cellSize = Math.floor(Math.min(
         availableWidth / map.descriptor.width,
         availableHeight / map.descriptor.height,
-        18 // Max scale for readability
+        12 // Max scale for readability
     ));
 
-    // ctx.fillStyle = '#000';
-    // ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // ctx.fillStyle = '#fff';
     // ctx.textAlign = 'center';
@@ -400,8 +398,8 @@ function drawMapPreview(dungeon: DungeonData, position: Position) {
     // ctx.fillText(`Map 0: ${map.descriptor.width}×${map.descriptor.height} tiles`, canvas.width / 2, 45);
 
     // Draw map tiles
-    const offsetX = (canvas.width - map.descriptor.width * scale) / 2;
-    const offsetY = 65;
+    const offsetX = (canvas.width - map.descriptor.width * cellSize) / 2;
+    const offsetY = (canvas.height - map.descriptor.height * cellSize) / 2;
 
     const colors: Map<RoomType, string> = new Map([
         [ RoomType.STONE,       '#444' ], // Wall
@@ -416,34 +414,27 @@ function drawMapPreview(dungeon: DungeonData, position: Position) {
     for (let x = 0; x < map.descriptor.width; x++) {
         for (let y = 0; y < map.descriptor.height; y++) {
             const tile = map.tiles[x][y];
-            const px = offsetX + x * scale;
-            const py = offsetY + y * scale;
+            const px = offsetX + x * cellSize;
+            const py = offsetY + y * cellSize;
             ctx.fillStyle = colors.get(tile.roomType) ?? '#f0f'; // Unknown
-            ctx.fillRect(px, py, scale - 1, scale - 1);
+            ctx.fillRect(px, py, cellSize - 1, cellSize - 1);
 
             // Mark current position
-            if (x === dungeon.header.startPosition.x && y === dungeon.header.startPosition.y) {
+            if (x === position.x && y === position.y) {
                 ctx.fillStyle = 'red';
-                ctx.fillRect(px + scale / 4, py + scale / 4, scale / 2, scale / 2);
+                ctx.fillRect(px + cellSize / 4, py + cellSize / 4, cellSize / 2, cellSize / 2);
             }
         }
     }
-
-    // Legend
-    // ctx.fillStyle = '#fff';
-    // ctx.font = '10px "Courier New"';
-    // ctx.textAlign = 'left';
-    // const legendY = offsetY + map.descriptor.height * scale + 20;
-    // ctx.fillText(`Wall █ Floor █ Door █ Stairs █ Start █`, 20, legendY);
 }
 
 document.getElementById('btn-qsave')?.addEventListener('click', () => quickSave());
 document.getElementById('btn-qload')?.addEventListener('click', () => quickLoad());
 
-document.getElementById('smooth')?.addEventListener('click', (state: MouseEvent) => {
+document.getElementById('btn-smooth')?.addEventListener('click', () => {
     if (renderer) {
-        const target = state.target as HTMLInputElement;
-        renderer.getCanvas().style.imageRendering = target.checked ? 'smooth' : 'pixelated';
+        const style = renderer.getCanvasStyle();
+        style.imageRendering = (style.imageRendering === 'smooth') ? 'pixelated' : 'smooth';
     }
 });
 

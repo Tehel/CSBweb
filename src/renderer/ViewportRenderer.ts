@@ -9,7 +9,7 @@
  */
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
-import type { PartyState } from '../engine/gameTypes';
+import type { Champion, PartyState } from '../engine/gameTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { DrawViewport } from './DrawViewport';
@@ -26,14 +26,13 @@ import {
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables } from './csbwin/ObjectTables';
-import { extractUITables, type UITables } from './csbwin/UITables';
+import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   initializeFloorCeilingIndexed,
   initializeDoorBitmapsIndexed,
   initializeWallBitmapsIndexed,
-  createViewportCanvas,
   VIEWPORT_WIDTH,
   VIEWPORT_HEIGHT,
   SCREEN_WIDTH,
@@ -42,6 +41,7 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
+import { updateHover } from '@/main';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -64,6 +64,8 @@ export interface FloorCeiling {
   normal: Uint8Array;
   mirrored: Uint8Array;
 }
+
+const charColors = [7, 11, 8, 14];
 
 /**
  * Main ViewportRenderer class
@@ -93,10 +95,9 @@ export class ViewportRenderer {
   private showAttackPanel: boolean = false;
   private lastFlashToggleMs: number = 0;
   private flashOn: boolean = false;
-  private magicCasterIndex: number = -1;
   private showSpellHighlights: boolean = false;
-  private primaryButtons: UITables['graphic231']['buttons']['Buttons17196'] | null = null;
-  private secondaryButtons: UITables['graphic231']['buttons']['Buttons17304'] | null = null;
+  private primaryButtons: UIButton[] | null = null; // graphic231 -> buttons17196
+  private secondaryButtons: UIButton[] | null = null; // graphic231 -> buttons17304
   private mouseQueue: Array<{ num: number; x: number; y: number }> = [];
   private mouseQStart: number = 0;
   private mouseQEnd: number = 0;
@@ -114,15 +115,13 @@ export class ViewportRenderer {
    * Initialize the viewport renderer
    * Loads all necessary graphics and sets up the rendering context
    */
-  async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
+  async initialize(canvas: HTMLCanvasElement): Promise<void> {
+    if (this.initialized) return;
 
     console.log('Initializing viewport renderer...');
 
     // Create full screen canvas (320×200)
-    this.canvas = createViewportCanvas();
+    this.canvas = canvas;
     this.screenCtx = this.canvas.getContext('2d');
     if (!this.screenCtx) throw new Error('Failed to create screen 2D context');
     this.screenImageData = this.screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -176,7 +175,6 @@ export class ViewportRenderer {
       viewportContext: this.screenCtx,
       viewportIndexBuffer,
       roomData: [],
-      executionLog: [],
     };
 
     this.initialized = true;
@@ -193,9 +191,6 @@ export class ViewportRenderer {
 
   setPartyState(state: PartyState | null): void {
     this.partyState = state;
-    if (state) {
-      this.magicCasterIndex = state.magicCasterIndex ?? -1;
-    }
   }
 
   setHoverPoint(point: { x: number; y: number } | null): void {
@@ -261,9 +256,6 @@ export class ViewportRenderer {
     }
 
     if (!this.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
-
-    // Clear execution log
-    this.context.executionLog = [];
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
     const map = this.dungeonState.getMap(z);
@@ -839,27 +831,31 @@ export class ViewportRenderer {
     drawTextLineIndex(this.screenIndexBuffer, this.fontData, 241, 117, 4, 0, 'ATTACK 3');
   }
 
+  private spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
+      const isCaster = chIdx === casterIdx;
+      const isAfterCaster = chIdx > casterIdx;
+      const x = base.x1 + chIdx * 14 + (isAfterCaster ? 33 : 0);
+      return {
+        x1: x,
+        x2: x + (isCaster ? 44 : 11),
+        y1: base.y1,
+        y2: base.y2 - (isCaster ? 0 : 1)
+      };
+  }
+
   private drawSpellControls(): void {
     if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
 
     const rect = this.uiTables.graphic230.word20242;
     fillRectIndex(this.screenIndexBuffer, rect, 0);
 
-    this.partyState.champions.forEach(champion => {
-      if (!champion || !champion.alive || champion.attributes?.maxMana === 0) return;
-      const pos = champion.partyPosition;
-      const isCaster = pos === this.magicCasterIndex;
-      const isAfterCaster = pos > this.magicCasterIndex;
-      const x = rect.x1 + pos * 14 + (isAfterCaster ? 33 : 0);
-      const rct = {
-        x1: x,
-        x2: x + (isCaster ? 44 : 11),
-        y1: rect.y1,
-        y2: rect.y2 - (isCaster ? 0 : 1)
-      };
-      fillRectIndex(this.screenIndexBuffer!, rct, 4);
-      if (isCaster) drawTextLineIndex(this.screenIndexBuffer!, this.fontData!, x + 2, rect.y2-1, 0, 4, champion.name);
-    });
+    for (const champion of this.partyState.champions) {
+      if (!champion || !champion.alive || champion.attributes.maxMana === 0) continue;
+      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.partyState.magicCasterIndex);
+      const isCaster = champion.partyPosition === this.partyState.magicCasterIndex;
+      fillRectIndex(this.screenIndexBuffer, rct, 4);
+      if (isCaster) drawTextLineIndex(this.screenIndexBuffer, this.fontData, rct.x1 + 2, rect.y2-1, 0, 4, champion.name);
+    };
   }
 
   private drawSpellPanel(): void {
@@ -868,7 +864,7 @@ export class ViewportRenderer {
     const rect = this.uiTables.graphic232.word12;
 
     fillRectIndex(this.screenIndexBuffer, rect, 0);
-    if (this.magicCasterIndex < 0) return;
+    if (this.partyState.magicCasterIndex < 0) return;
 
     let panelGraphic = this.getGraphicBitmap(9);
     if (panelGraphic) {
@@ -911,40 +907,35 @@ export class ViewportRenderer {
     }
 
     const caster =
-      this.partyState.champions.find((c) => c.partyPosition === this.magicCasterIndex) ??
-      this.partyState.champions[this.magicCasterIndex];
+      this.partyState.champions.find((c) => c.partyPosition === this.partyState!.magicCasterIndex) ??
+      this.partyState.champions[this.partyState.magicCasterIndex];
     if (!caster || caster.alive === false) return;
 
-    const incantationIndex = caster.incantationIndex ?? 0;
-    this.drawSpellMenuCharacters(incantationIndex);
-    this.drawMagicSelection(caster.incantation ?? []);
+    this.drawSpellMenuCharacters(caster.incantation.length);
+    this.drawMagicIncantation(caster.incantation);
   }
 
-  private drawSpellMenuCharacters(groupIndex: number): void {
+  private drawSpellMenuCharacters(step: number): void {
     if (!this.screenIndexBuffer || !this.fontData) return;
-    const base = 96 + 6 * (groupIndex & 3);
     const y = 58;
-
-    for (let i = 0; i < 6; i++) {
+    for (let i=0; i<6; i++) {
       const x = 224 + 14 * (i + 1);
-      const ch = String.fromCharCode(base + i);
+      const ch = String.fromCharCode(96 + 6 * Math.min(step, 3) + i);
       drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, y, 4, 0, ch);
     }
   }
 
-  private drawMagicSelection(incantation: number[]): void {
+  private drawMagicIncantation(incantation: number[]): void {
     if (!this.screenIndexBuffer || !this.fontData) return;
     const y = 70;
-
-    for (let i = 0; i < 4; i++) {
+    for (let i=0; i<4; i++) {
       const x = 231 + 9 * (i + 1);
-      const code = incantation[i] ?? 0;
-      const ch = code === 0 ? ' ' : String.fromCharCode(code);
+      const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]);
       drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, y, 4, 0, ch);
     }
   }
 
-  private drawLifeBars(chIdx: number, champion: PartyState['champions'][number]): void {
+  private drawLifeBars(chIdx: number, champion: Champion): void {
     if (!this.uiTables || !this.screenIndexBuffer || !champion.alive) return;
     const offsets = this.uiTables.graphic232.word1526[chIdx];
     const masks = this.uiTables.graphic232.word1502[chIdx];
@@ -956,10 +947,6 @@ export class ViewportRenderer {
       this.computeBarHeight(champion.attributes?.mana ?? 0, champion.attributes?.maxMana ?? 0, true),
     ];
 
-    const fillColor = this.getLifeBarColor(chIdx);
-    const emptyColor = 12;
-    const baseY = 2;
-
     for (let bar = 0; bar < 3; bar++) {
       const offsetBytes = offsets[bar] ?? 0;
       const startX = Math.floor(offsetBytes / 8) * 16;
@@ -969,8 +956,8 @@ export class ViewportRenderer {
 
       for (let row = 0; row <= 24; row++) {
         const filled = height > (24 - row);
-        const color = filled ? fillColor : emptyColor;
-        const y = baseY + row;
+        const color = filled ? charColors[chIdx] : 12;
+        const y = 2 + row;
         this.drawMaskedBarRow(startX, y, mask1, color);
         this.drawMaskedBarRow(startX + 16, y, mask2, color);
       }
@@ -1000,29 +987,6 @@ export class ViewportRenderer {
     return Math.min(25, Math.ceil((25 * current) / max));
   }
 
-  private getLifeBarColor(chIdx: number): number {
-    let d6 = 0;
-    let d7 = 0;
-    if (chIdx >= 3) {
-      d6 = 0x80000000 | 0;
-      d7 = (d6 + 1) | 0;
-    } else if (chIdx >= 2) {
-      d6 = 0;
-      d7 = 0x80000000 | 0;
-    } else if (chIdx >= 1) {
-      d6 = 0x80000001 | 0;
-      d7 = (d6 - 1) | 0;
-    } else {
-      d6 = 0x80000001 | 0;
-      d7 = 1;
-    }
-    const bit0 = (d6 & 0xffff) !== 0 ? 1 : 0;
-    const bit1 = d6 < 0 ? 1 : 0;
-    const bit2 = (d7 & 0xffff) !== 0 ? 1 : 0;
-    const bit3 = d7 < 0 ? 1 : 0;
-    return bit0 | (bit1 << 1) | (bit2 << 2) | (bit3 << 3);
-  }
-
   private getFlashPhase(): boolean {
     const now = Date.now();
     if (now - this.lastFlashToggleMs >= 200) {
@@ -1032,16 +996,11 @@ export class ViewportRenderer {
     return this.flashOn;
   }
 
-  private searchButtonList(
-    list: UITables['graphic231']['buttons']['buttons17196'] | null,
-    x: number,
-    y: number,
-    buttons: number
-  ): number {
+  private searchButtonList(list: UIButton[] | null, x: number, y: number, buttons: number): number {
     if (!list || list.length === 0) return 0;
     for (const entry of list) {
       if (entry.word0 === 0) break;
-      if (x >= entry.xMin && x < entry.xMax && y >= entry.yMin && y < entry.yMax) {
+      if (x >= entry.x1 && x < entry.x2 && y >= entry.y1 && y < entry.y2) {
         if ((buttons & entry.button) !== 0) return entry.word0;
       }
     }
@@ -1055,133 +1014,72 @@ export class ViewportRenderer {
   }
 
   private handleMagicClick(clickX: number, clickY: number): void {
-    if (!this.partyState) return;
+    if (!this.uiTables || !this.partyState) return;
 
-    const champions = this.partyState.champions;
-    const slots = new Array(4).fill(null).map((_, idx) => {
-      return (
-        champions.find((champion) => champion.partyPosition === idx) ??
-        champions[idx] ??
-        null
-      );
-    });
-    const numCharacters = slots.filter((champion) => champion !== null).length;
-    if (numCharacters === 0) return;
-
-    let casterIndex = this.magicCasterIndex;
-    if (casterIndex < 0 || casterIndex >= slots.length || slots[casterIndex]?.alive === false) {
-      casterIndex = slots.findIndex((champion) => champion && champion.alive !== false);
-    }
-    if (casterIndex < 0) return;
-
-    if (clickY <= 48) {
-      let target = -1;
-      if (casterIndex === 0) {
-        if ((clickX >= 280 && clickX <= 291) || clickX === 513) target = 1;
-        else if ((clickX >= 294 && clickX <= 305) || clickX === 514) target = 2;
-        else if ((clickX >= 308 && clickX <= 319) || clickX === 515) target = 3;
-      } else if (casterIndex === 1) {
-        if ((clickX >= 233 && clickX <= 244) || clickX === 512) target = 0;
-        else if ((clickX >= 294 && clickX <= 305) || clickX === 514) target = 2;
-        else if ((clickX >= 308 && clickX <= 319) || clickX === 515) target = 3;
-      } else if (casterIndex === 2) {
-        if ((clickX >= 233 && clickX <= 244) || clickX === 512) target = 0;
-        else if ((clickX >= 247 && clickX <= 258) || clickX === 513) target = 1;
-        else if ((clickX >= 308 && clickX <= 319) || clickX === 515) target = 3;
-      } else if (casterIndex === 3) {
-        if ((clickX >= 247 && clickX <= 258) || clickX === 513) target = 1;
-        else if ((clickX >= 261 && clickX <= 272) || clickX === 514) target = 2;
-        else if (clickX <= 244 || clickX === 512) target = 0;
+    const rect = this.uiTables.graphic230.word20242;
+    for (const champion of this.partyState.champions) {
+      if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
+      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.partyState.magicCasterIndex);
+      if (this.pointInRect(clickX, clickY, rct)) {
+        this.partyState.magicCasterIndex = champion.partyPosition;
+        break;
       }
-
-      if (target >= 0 && target < numCharacters) {
-        const next = slots[target];
-        if (next && next.alive !== false) {
-          this.magicCasterIndex = target;
-          if (this.partyState) {
-            this.partyState.magicCasterIndex = target;
-          }
-        }
-      }
-      return;
     }
 
-    if (!this.uiTables) return;
     const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
-      this.lastMagicButtonId = magicButton;
+      this.lastMagicButtonId = magicButton; // used for flashing the button (TODO)
       this.applyMagicSelection(magicButton);
     }
   }
 
   private applyMagicSelection(buttonId: number): void {
     if (!this.partyState || !this.uiTables) return;
+    if (buttonId < 101 || buttonId > 108) return;
 
-    let casterIdx = this.magicCasterIndex;
-    if (casterIdx < 0) {
-      const fallback = this.partyState.champions.find((c) => c.alive !== false);
-      casterIdx = fallback ? fallback.partyPosition : -1;
-      if (casterIdx >= 0) {
-        this.magicCasterIndex = casterIdx;
-        this.partyState.magicCasterIndex = casterIdx;
-      }
-    }
+    const casterIdx = this.partyState.magicCasterIndex;
     if (casterIdx < 0) return;
-    const champion =
-      this.partyState.champions.find((c) => c.partyPosition === casterIdx) ??
-      this.partyState.champions[casterIdx];
+
+    const champion = this.partyState.champions.find((c) => c.partyPosition === casterIdx);
     if (!champion || champion.alive === false) return;
 
-    const incantation = champion.incantation ? [...champion.incantation] : [0, 0, 0, 0];
-    let incantationIndex = champion.incantationIndex ?? 0;
+    // buttons: magic runes (101-106), back (107), cast (108)
 
+    // Back
+    if (buttonId === 107) {
+      if (champion.incantation.length === 0) return;
+      champion.incantation.pop();
+      return;
+    }
+
+    // Cast
     if (buttonId === 108) {
-      if (incantation[0] === 0) return;
-      for (let i = 0; i < incantation.length; i++) {
-        incantation[i] = 0;
-      }
-      incantationIndex = 0;
-      champion.incantation = incantation;
-      champion.incantationIndex = incantationIndex;
+      if (champion.incantation.length === 0) return;
+      // TODO: actually run the spell effect
+      console.log(`casting: `, champion.incantation);
+      champion.incantation = [];
       return;
     }
 
-    const button = buttonId - 101;
-    if (button < 0) return;
+    // baseMana: [ 1, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 7, 9, 2, 2, 3, 4, 6, 7 ]
+    // scaleMana: [ 8, 12, 16, 20, 24, 28 ]
 
-    if (button >= 6) {
-      const length = incantation.findIndex((v) => v === 0);
-      const actualLen = length === -1 ? incantation.length : length;
-      if (actualLen === 0) return;
-      incantationIndex = (incantationIndex + 3) & 3;
-      incantation[incantationIndex] = 0;
-      champion.incantation = incantation;
-      champion.incantationIndex = incantationIndex;
-      return;
-    }
+    // Add rune
+    const step = champion.incantation.length;
+    if (step > 3) return;
 
-    const pos = incantationIndex & 3;
-    const baseMana = this.uiTables.graphic230.spellBaseMana;
-    const scaleMana = this.uiTables.graphic230.spellFirstRuneScale;
-    let manaCost = baseMana[pos * 6 + button] ?? 0;
-    if (pos !== 0) {
-      const firstRune = (incantation[0] ?? 0) - 96;
-      const scale = scaleMana[firstRune] ?? 0;
-      manaCost = (manaCost * scale) >> 3;
-    }
+    const runeId = buttonId - 101;
+    const baseMana = this.uiTables.graphic230.spellBaseMana; // number[24]
+    const scaleMana = this.uiTables.graphic230.spellFirstRuneScale; // number[6]
 
-    const mana = champion.attributes?.mana ?? 0;
-    if (manaCost > mana) return;
-    if (champion.attributes) {
-      champion.attributes.mana = Math.max(0, mana - manaCost);
-    }
+    // compute mana cost: rune base cost * [1, 1.5, 2, 2.5, 3, 3.5][firstRune]
+    let manaCost = baseMana[step * 6 + runeId];
+    if (step > 0) manaCost = (manaCost * scaleMana[(champion.incantation[0] - 96)]) / 8;
+    if (champion.attributes.mana < manaCost) return;
 
-    const runeChar = 96 + pos * 6 + button;
-    incantation[pos] = runeChar;
-    if (pos + 1 < incantation.length) incantation[pos + 1] = 0;
-    incantationIndex = (pos + 1) & 3;
-    champion.incantation = incantation;
-    champion.incantationIndex = incantationIndex;
+    // apply cost en enqueue rune
+    champion.attributes.mana -= manaCost;
+    champion.incantation.push(96 + step * 6 + runeId);
   }
 
   private updateButtonLists(): void {
@@ -1204,44 +1102,31 @@ export class ViewportRenderer {
     }
   }
 
-  private drawHoverHighlights(): void {
+  private drawHoverHighlights() {
     if (!this.uiTables || !this.screenIndexBuffer || !this.hoverPoint) return;
     const { x, y } = this.hoverPoint;
 
-    // move arrows
+    const hovered: string[] = [];
     // for (const btn of this.uiTables.graphic231.moveButtons) {
     //   if (this.pointInRect(x, y, btn.x1, btn.y1, btn.x2, btn.y2)) {
-    //     drawRectOutlineIndex(this.screenIndexBuffer, { x1: btn.x1, y1: btn.y1, x2: btn.x2, y2: btn.y2 }, 15);
-    //   }
-    // }
-
-    // // attack buttons
-    // for (let chIdx = 0; chIdx < 4; chIdx++) {
-    //   const x1 = 22 * chIdx + 233;
-    //   const x2 = x1 + 19;
-    //   const y1 = 86;
-    //   const y2 = 120;
-    //   if (this.pointInRect(x, y, x1, y1, x2, y2)) {
-    //     drawRectOutlineIndex(this.screenIndexBuffer, { x1, y1, x2, y2 }, 8);
+    //     drawRectOutlineIndex(this.screenIndexBuffer, btn, 15);
     //   }
     // }
 
     const buttonGroups = Object.values(this.uiTables.graphic231.buttons);
     for (const group of buttonGroups) {
       for (const btn of group) {
-        if (this.pointInRect(x, y, btn.xMin, btn.yMin, btn.xMax, btn.yMax)) {
-          drawRectOutlineIndex(
-            this.screenIndexBuffer,
-            { x1: btn.xMin, y1: btn.yMin, x2: btn.xMax, y2: btn.yMax },
-            15
-          );
+        if (this.pointInRect(x, y, btn)) {
+          hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
+          drawRectOutlineIndex(this.screenIndexBuffer, btn, 9);
         }
       }
     }
+    updateHover(hovered.join("<br>"));
   }
 
-  private pointInRect(x: number, y: number, x1: number, y1: number, x2: number, y2: number): boolean {
-    return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+  private pointInRect(x: number, y: number, rect: Rect): boolean {
+    return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
   }
 
   private blitViewportToScreen(): void {
@@ -1262,43 +1147,9 @@ export class ViewportRenderer {
     }
   }
 
-  /**
-   * Get the viewport canvas element
-   */
-  getCanvas(): HTMLCanvasElement {
-    if (!this.canvas) {
-      throw new Error('Renderer not initialized');
-    }
-    return this.canvas;
+  // Get the viewport canvas element styling element
+  getCanvasStyle(): CSSStyleDeclaration {
+    if (!this.canvas) throw new Error('Renderer not initialized');
+    return this.canvas.style;
   }
-
-  /**
-   * Get the execution log from the last render
-   */
-  getExecutionLog(): string[] {
-    if (!this.context) {
-      return [];
-    }
-    return this.context.executionLog;
-  }
-
-  /**
-   * Check if renderer is initialized
-   */
-  isInitialized(): boolean {
-    return this.initialized;
-  }
-}
-
-/**
- * Create and initialize a viewport renderer
- */
-export async function createViewportRenderer(
-  graphicsLoader: GraphicsLoader,
-  dungeonState: DungeonState,
-  csbGraphicsLoader?: CSBGraphicsLoader
-): Promise<ViewportRenderer> {
-  const renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader);
-  await renderer.initialize();
-  return renderer;
 }

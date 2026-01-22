@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <title>Dungeon Master Web</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Dungeon Master Web - Classic dungeon crawler in your browser">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <title>Dungeon Master Web</title>
+    <script src="src/lib/glfx-latest-minified.js"></script>
     <style>
         * {
             margin: 0;
@@ -32,7 +33,19 @@
             /* text-align: center; */
             background-color: #222;
         }
+        /* Scale the full screen canvas using CSS to get the original 4/3 ratio (rectangular pixels)
+           Internal resolution: 320×200, external 960×720 */
+        .screen {
+            /* width: 640px;
+            height: 480px; */
+            width: 960px;
+            height: 720px;
+            image-rendering: pixelated;
+        }
         #side {
+            display: flex;
+            flex-direction: column;
+            margin-left: 5px;
             background-color: #444;
         }
         #settings {
@@ -62,7 +75,7 @@
             /* border: 2px solid #666; */
             padding: 3px 5px;
             margin: 3px;
-            /* cursor: pointer; */
+            cursor: pointer;
             /* font-family: inherit; */
             /* font-size: 16px; */
         }
@@ -78,7 +91,9 @@
 </head>
 <body>
     <div id="app">
-        <div id="game"></div>
+        <div id="game">
+            <canvas id="game-canvas" width="320" height="200" class="screen"></canvas>
+        </div>
         <div id="side">
             <div id="settings">
                 <button id="btn-qsave">Quick Save (F5)</button>
@@ -89,8 +104,7 @@
                 <button id="btn-hover">Hover</button>
             </div>
             <div id="map">
-                ...map...
-                <canvas id="map-canvas" width="200" height="200"></canvas>
+                <canvas id="map-canvas" width="360" height="360"></canvas>
             </div>
             <div id="debug">...debug...</div>
             <div id="hover">...hover...</div>

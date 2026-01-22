@@ -1,10 +1,14 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 
-export interface WordRect {
+export interface Rect {
   x1: number;
   x2: number;
   y1: number;
   y2: number;
+}
+
+export interface WordRect extends Rect {
+  name?: string;
 }
 
 export interface IconDisplay {
@@ -13,20 +17,10 @@ export interface IconDisplay {
   objectType: number;
 }
 
-export interface UIButton {
+export interface UIButton extends Rect {
   word0: number;
-  xMin: number;
-  xMax: number;
-  yMin: number;
-  yMax: number;
   button: number;
-}
-
-export interface MoveButton {
-  x1: number;
-  x2: number;
-  y1: number;
-  y2: number;
+  name?: string;
 }
 
 export interface UITables {
@@ -46,7 +40,7 @@ export interface UITables {
     rect18592: WordRect;
     rect18584: WordRect;
     rect18576: WordRect;
-    moveButtons: MoveButton[];
+    moveButtons: WordRect[];
     buttons: {
       buttons18936: UIButton[];
       buttons18876: UIButton[];
@@ -107,19 +101,20 @@ function makeView(raw: Uint8Array): DataView {
   return new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
 }
 
-function readWordRect(view: DataView, off: number): WordRect {
+function readWordRect(view: DataView, off: number, name: string = '?'): WordRect {
   return {
     x1: view.getInt16(off + 0, false),
     x2: view.getInt16(off + 2, false),
     y1: view.getInt16(off + 4, false),
     y2: view.getInt16(off + 6, false),
+    name,
   };
 }
 
-function readWordRectArray(view: DataView, off: number, count: number): WordRect[] {
+function readWordRectArray(view: DataView, off: number, count: number, basename: string = '?'): WordRect[] {
   const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
-    out.push(readWordRect(view, off + i * 8));
+    out.push(readWordRect(view, off + i * 8, `${basename}-${i}`));
   }
   return out;
 }
@@ -140,24 +135,25 @@ function readI32Array(view: DataView, off: number, count: number): number[] {
   return out;
 }
 
-function readButtons(view: DataView, off: number, count: number): UIButton[] {
+function readButtons(view: DataView, off: number, count: number, basename: string): UIButton[] {
   const out: UIButton[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 12;
     out.push({
       word0: view.getInt16(base + 0, false),
-      xMin: view.getInt16(base + 2, false),
-      xMax: view.getInt16(base + 4, false),
-      yMin: view.getInt16(base + 6, false),
-      yMax: view.getInt16(base + 8, false),
+      x1: view.getInt16(base + 2, false),
+      x2: view.getInt16(base + 4, false),
+      y1: view.getInt16(base + 6, false),
+      y2: view.getInt16(base + 8, false),
       button: view.getInt16(base + 10, false),
+      name: `${basename}.${i}`,
     });
   }
   return out;
 }
 
-function readMoveButtons(view: DataView, off: number, count: number): MoveButton[] {
-  const out: MoveButton[] = [];
+function readMoveButtons(view: DataView, off: number, count: number): WordRect[] {
+  const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 8;
     out.push({
@@ -165,6 +161,7 @@ function readMoveButtons(view: DataView, off: number, count: number): MoveButton
       x2: view.getUint16(base + 2, false),
       y1: view.getUint16(base + 4, false),
       y2: view.getUint16(base + 6, false),
+      name: `moveBtn-${i}`,
     });
   }
   return out;
@@ -189,7 +186,8 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
 
   // Word20242[4] (word rect). CSBWin loads graphic 0x230 at d.Byte20244+2.
   requireSize(raw, off, 8, '0x230 Word20242');
-  const word20242 = readWordRect(view, off); off += 8;
+  // magic caster selection tabs zone
+  const word20242 = readWordRect(view, off, 'caster selection'); off += 8;
 
   requireSize(raw, off, 5 * 8, '0x230 wRectPos20234..20202');
   const wRectPos20234 = readWordRect(view, off); off += 8;
@@ -226,20 +224,20 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   let off = 0;
 
   // CSBWin loads graphic 0x231 at d.Byte18938+2 (Byte18938 is not part of the graphic).
-  const buttons18936 = readButtons(view, off, 5); off += 5 * 12;
-  const buttons18876 = readButtons(view, off, 4); off += 4 * 12;
-  const buttons18828 = readButtons(view, off, 3); off += 3 * 12;
-  const buttons18792 = readButtons(view, off, 2); off += 2 * 12;
-  const buttons18768 = readButtons(view, off, 5); off += 5 * 12;
-  const buttons18708 = readButtons(view, off, 4); off += 4 * 12;
-  const buttons18660 = readButtons(view, off, 3); off += 3 * 12;
-  const buttons18624 = readButtons(view, off, 2); off += 2 * 12;
+  const buttons18936 = readButtons(view, off, 5, 'btn18936'); off += 5 * 12;
+  const buttons18876 = readButtons(view, off, 4, 'btn18876'); off += 4 * 12;
+  const buttons18828 = readButtons(view, off, 3, 'btn18828'); off += 3 * 12;
+  const buttons18792 = readButtons(view, off, 2, 'btn18792'); off += 2 * 12;
+  const buttons18768 = readButtons(view, off, 5, 'btn18768'); off += 5 * 12;
+  const buttons18708 = readButtons(view, off, 4, 'btn18708'); off += 4 * 12;
+  const buttons18660 = readButtons(view, off, 3, 'btn18660'); off += 3 * 12;
+  const buttons18624 = readButtons(view, off, 2, 'btn18624'); off += 2 * 12;
 
   requireSize(raw, off, 4 * 8, '0x231 Byte18600..Byte18576');
-  const rect18600 = readWordRect(view, off); off += 8;
-  const rect18592 = readWordRect(view, off); off += 8;
-  const rect18584 = readWordRect(view, off); off += 8;
-  const rect18576 = readWordRect(view, off); off += 8;
+  const rect18600 = readWordRect(view, off, 'rect18600'); off += 8;
+  const rect18592 = readWordRect(view, off, 'rect18592'); off += 8;
+  const rect18584 = readWordRect(view, off, 'rect18584'); off += 8;
+  const rect18576 = readWordRect(view, off, 'rect18576'); off += 8;
 
   // Word18568[4], Word18560[4], Word18552[28]
   off += 4 * 2;
@@ -255,19 +253,34 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   off += 7 * 4;
   off += 28;
 
-  const buttons18372 = readButtons(view, off, 4); off += 4 * 12;
-  const buttons18324 = readButtons(view, off, 9); off += 9 * 12;
-  const buttons18216 = readButtons(view, off, 13); off += 13 * 12;
-  const buttons18060 = readButtons(view, off, 9); off += 9 * 12;
-  const buttons17952 = readButtons(view, off, 5); off += 5 * 12;
-  const buttons17892 = readButtons(view, off, 5); off += 5 * 12;
-  const buttons17832 = readButtons(view, off, 3); off += 3 * 12;
-  const buttons17796 = readButtons(view, off, 3); off += 3 * 12;
-  const buttons17760 = readButtons(view, off, 38); off += 38 * 12;
-  const buttons17304 = readButtons(view, off, 9); off += 9 * 12;
-  const buttons17196 = readButtons(view, off, 20); off += 20 * 12;
-  const buttons16956 = readButtons(view, off, 2); off += 2 * 12;
-  const buttons16932 = off + 4 * 12 <= raw.length ? readButtons(view, off, 4) : [];
+  // 0: resurect (160)
+  // 1: reincarnate (161)
+  const buttons18372 = readButtons(view, off, 4, 'btn18372'); off += 4 * 12;
+  const buttons18324 = readButtons(view, off, 9, 'btn18324'); off += 9 * 12;
+  // 0-3: party blocks name (16-19)
+  // 4-11: party hands (20-27)
+  const buttons18216 = readButtons(view, off, 13, 'btn18216'); off += 13 * 12;
+  // 0-5: runes (101-106), 6: cast (108), 7: back (107) 
+  const buttons18060 = readButtons(view, off, 9, 'btn18060'); off += 9 * 12;
+  const buttons17952 = readButtons(view, off, 5, 'btn17952'); off += 5 * 12;
+  const buttons17892 = readButtons(view, off, 5, 'btn17892'); off += 5 * 12;
+  const buttons17832 = readButtons(view, off, 3, 'btn17832'); off += 3 * 12;
+  const buttons17796 = readButtons(view, off, 3, 'btn17796'); off += 3 * 12;
+  // keyboard ?
+  const buttons17760 = readButtons(view, off, 38, 'btn17760'); off += 38 * 12;
+  // 0-5: direction arrows (1-6), 6-9 ??
+  // 7: everything below partyw (83)
+  const buttons17304 = readButtons(view, off, 9, 'btn17304'); off += 9 * 12;
+  // 0-3: party blocks left (12-15)
+  // 4-7: party disposition (125-128)
+  // 8-11: party blocks complete (7-10)
+  // 12: complete magic block (100),
+  // 18: "enter" (200)
+  // 19: "resume" (201)
+  const buttons17196 = readButtons(view, off, 20, 'btn17196'); off += 20 * 12;
+  // 0: credits (202)
+  const buttons16956 = readButtons(view, off, 2, 'btn16956'); off += 2 * 12;
+  const buttons16932 = off + 4 * 12 <= raw.length ? readButtons(view, off, 4, 'buttons16932') : [];
 
   return {
     rect18600,

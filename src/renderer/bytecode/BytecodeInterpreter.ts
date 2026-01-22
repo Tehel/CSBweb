@@ -79,9 +79,6 @@ export interface InterpreterContext {
 
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
-
-  // Execution state
-  executionLog: string[];  // For debugging/validation
 }
 
 /**
@@ -279,7 +276,7 @@ export class BytecodeInterpreter {
     this.pc = 0;
     this.stack = [];
 
-    this.log(`=== Executing program for cell ${cellNum} ===`);
+    // Executing program for cell ${cellNum}
 
     // Main interpreter loop
     while (this.pc < this.program.length) {
@@ -291,8 +288,6 @@ export class BytecodeInterpreter {
         break;  // Return opcode
       }
     }
-
-    this.log(`=== Execution complete ===\n`);
   }
 
   /**
@@ -413,7 +408,7 @@ export class BytecodeInterpreter {
       case Opcode.FloorDecorationGraphicOrdinalF0R1:
         return this.opFloorDecorationGraphicOrdinal(opcode);
 
-      // Drawing opcodes - for prototype, just log
+      // Drawing opcodes
       case Opcode.StdDrawCeilingPit:
       case Opcode.StdDrawDoorSwitch:
       case Opcode.StdDrawSeeThruDoorEdge:
@@ -690,8 +685,8 @@ export class BytecodeInterpreter {
         return this.opWallPosition(opcode);
 
       default:
-        this.log(`WARNING: Unimplemented opcode ${opcode}`);
-        return true;  // Continue execution
+        console.warn(`WARNING: Unimplemented opcode ${opcode}`)
+        return true;
     }
   }
 
@@ -700,7 +695,6 @@ export class BytecodeInterpreter {
   // ============================================================
 
   private opReturn(): boolean {
-    this.log(`RETURN`);
     return false;  // Stop execution
   }
 
@@ -710,24 +704,24 @@ export class BytecodeInterpreter {
     const bitmapPtr = this.stack.pop();
 
     if (bitmapPtr === undefined || rectanglePtr === undefined) {
-      this.log(`ERROR: StdBltShape - missing arguments`);
+      // ERROR: StdBltShape - missing arguments
       return true;
     }
 
-    this.log(`StdBltShape(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})`);
+    // StdBltShape(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
 
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     if (!bitmap) {
-      this.log(`  ERROR: Unknown StdBitmapPointers(${bitmapPtr})`);
+      // ERROR: Unknown StdBitmapPointers(${bitmapPtr})
       return true;
     }
     if (!rectRef) {
-      this.log(`  ERROR: Unknown StdRectanglePointers(${rectanglePtr})`);
+      // ERROR: Unknown StdRectanglePointers(${rectanglePtr})
       return true;
     }
     if (Array.isArray(rectRef)) {
-      this.log(`  ERROR: StdBltShape expects a single RectPos, got an array`);
+      // ERROR: StdBltShape expects a single RectPos, got an array
       return true;
     }
 
@@ -743,13 +737,9 @@ export class BytecodeInterpreter {
     const offset = this.program[this.pc];
     this.pc++;
 
-    this.log(`JumpZ(condition=${condition}, offset=${offset})`);
-
     if (condition === 0) {
-      this.log(`  -> Jumping ${offset} instructions`);
+      // -> Jumping ${offset} instructions
       this.pc += offset;
-    } else {
-      this.log(`  -> Not jumping (condition != 0)`);
     }
 
     return true;
@@ -760,13 +750,9 @@ export class BytecodeInterpreter {
     const offset = this.program[this.pc];
     this.pc++;
 
-    this.log(`JumpNZ(condition=${condition}, offset=${offset})`);
-
     if (condition !== 0) {
-      this.log(`  -> Jumping ${offset} instructions`);
+      // -> Jumping ${offset} instructions
       this.pc += offset;
-    } else {
-      this.log(`  -> Not jumping (condition == 0)`);
     }
 
     return true;
@@ -776,8 +762,7 @@ export class BytecodeInterpreter {
     const offset = this.program[this.pc];
     this.pc++;
 
-    this.log(`Jump(offset=${offset})`);
-    this.log(`  -> Jumping ${offset} instructions`);
+    // -> Jumping ${offset} instructions
     this.pc += offset;
     return true;
   }
@@ -787,7 +772,7 @@ export class BytecodeInterpreter {
     const value = this.program[this.pc];
     this.pc++;
 
-    this.log(`Literal(${value})`);
+    // Literal(${value})
     this.stack.push(value);
 
     return true;
@@ -811,7 +796,7 @@ export class BytecodeInterpreter {
       [Opcode.StdWallBitmapF0R1]: StdBitmapPtr.BMP_StdWallBitmapF0R1,
     };
     const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdWallBitmapF3;
-    this.log(`WallBitmapPtr[${ptr}]`);
+    // WallBitmapPtr[${ptr}]
     this.stack.push(ptr);
     return true;
   }
@@ -819,7 +804,7 @@ export class BytecodeInterpreter {
   private opWallRectangle(opcode: number): boolean {
     // Push CSBWin RECT_POINTERS value (resolved later by StdRectanglePointers)
     const rectPtr = this.getStdWallRectanglePointer(opcode);
-    this.log(`WallRectanglePtr[${rectPtr}]`);
+    // WallRectanglePtr[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -829,18 +814,18 @@ export class BytecodeInterpreter {
     const rectanglePtr = this.stack.pop();
     const bitmapPtr = this.stack.pop();
     if (bitmapPtr === undefined || rectanglePtr === undefined) {
-      this.log(`ERROR: ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'} - missing arguments`);
+      // ERROR: ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'} - missing arguments
       return true;
     }
 
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     const bitmap = this.resolveStdBitmapPointer(bitmapPtr);
     if (!rectRef || Array.isArray(rectRef) || !bitmap) {
-      this.log(`  ERROR: Invalid args bitmapPtr=${bitmapPtr} rectPtr=${rectanglePtr}`);
+      // ERROR: Invalid args bitmapPtr=${bitmapPtr} rectPtr=${rectanglePtr}
       return true;
     }
 
-    this.log(`${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'}(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})`);
+    // ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'}(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
     this.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
@@ -850,29 +835,29 @@ export class BytecodeInterpreter {
     const rectanglePtr = this.stack.pop();
     const graphicNum = this.stack.pop();
     if (graphicNum === undefined || rectanglePtr === undefined) {
-      this.log(`ERROR: ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'} - missing arguments`);
+      // ERROR: ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'} - missing arguments
       return true;
     }
 
     const rectRef = this.resolveStdRectanglePointer(rectanglePtr);
     if (!rectRef || Array.isArray(rectRef)) {
-      this.log(`  ERROR: Invalid rectanglePtr=${rectanglePtr}`);
+      // ERROR: Invalid rectanglePtr=${rectanglePtr}
       return true;
     }
 
     const getGraphic = this.context.getGraphicBitmap;
     if (!getGraphic) {
-      this.log(`  ERROR: Missing context.getGraphicBitmap`);
+      // ERROR: Missing context.getGraphicBitmap
       return true;
     }
 
     const bitmap = getGraphic(graphicNum);
     if (!bitmap) {
-      this.log(`  ERROR: Could not resolve basic graphic ${graphicNum}`);
+      // ERROR: Could not resolve basic graphic ${graphicNum}
       return true;
     }
 
-    this.log(`${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'}(graphic=${graphicNum}, rectPtr=${rectanglePtr})`);
+    // ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'}(graphic=${graphicNum}, rectPtr=${rectanglePtr})
     this.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
@@ -881,19 +866,19 @@ export class BytecodeInterpreter {
     // CSBWin `GetDecoration0` (Viewport.cpp:2875-2878)
     const relativeCell = this.stack.pop();
     if (relativeCell === undefined) {
-      this.log(`ERROR: GetDecoration0 - missing relativeCell`);
+      // ERROR: GetDecoration0 - missing relativeCell
       this.stack.push(0);
       return true;
     }
     const v = this.context.roomData[relativeCell]?.decorations[0] ?? 0;
-    this.log(`GetDecoration0(cell=${relativeCell}) -> ${v}`);
+    // GetDecoration0(cell=${relativeCell}) -> ${v}
     this.stack.push(v);
     return true;
   }
 
   private opCellNumber(opcode: number): boolean {
     const cell = this.relativeCellFromCellOpcode(opcode);
-    this.log(`CellNumber(${Opcode[opcode]}) -> ${cell}`);
+    // CellNumber(${Opcode[opcode]}) -> ${cell}
     this.stack.push(cell);
     return true;
   }
@@ -901,7 +886,7 @@ export class BytecodeInterpreter {
   private opCondition(opcode: number): boolean {
     // For prototype, all conditions are false (0)
     // Real implementation would check actual game state
-    this.log(`Condition(${Opcode[opcode]}) -> 0`);
+    // Condition(${Opcode[opcode]}) -> 0
     this.stack.push(0);
     return true;
   }
@@ -909,7 +894,7 @@ export class BytecodeInterpreter {
   private opWallDecorationPos(opcode: number): boolean {
     // CSBWin Viewport.cpp:2641-2643
     const v = opcode === Opcode.wallDecorationFront ? 1 : opcode === Opcode.wallDecorationLeft ? 2 : 0;
-    this.log(`WallDecorationPos(${Opcode[opcode]}) -> ${v}`);
+    // WallDecorationPos(${Opcode[opcode]}) -> ${v}
     this.stack.push(v);
     return true;
   }
@@ -919,13 +904,13 @@ export class BytecodeInterpreter {
     const wallDecorationPos = this.stack.pop();
     const relativeCell = this.stack.pop();
     if (wallDecorationPos === undefined || relativeCell === undefined) {
-      this.log(`ERROR: HasDecoration - missing arguments`);
+      // ERROR: HasDecoration - missing arguments
       this.stack.push(0);
       return true;
     }
     const cell = this.context.roomData[relativeCell];
     const has = cell ? (cell.decorations[wallDecorationPos as 0 | 1 | 2] !== 0 ? 1 : 0) : 0;
-    this.log(`HasDecoration(cell=${relativeCell}, pos=${wallDecorationPos}) -> ${has}`);
+    // HasDecoration(cell=${relativeCell}, pos=${wallDecorationPos}) -> ${has}
     this.stack.push(has);
     return true;
   }
@@ -933,7 +918,7 @@ export class BytecodeInterpreter {
   private opFloorDecorationGraphicOrdinal(opcode: number): boolean {
     const cell = this.relativeCellFromFloorDecorationOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[2] ?? 0;
-    this.log(`FloorDecorationGraphicOrdinal(${Opcode[opcode]}) cell=${cell} -> ${v}`);
+    // FloorDecorationGraphicOrdinal(${Opcode[opcode]}) cell=${cell} -> ${v}
     this.stack.push(v);
     return true;
   }
@@ -944,7 +929,7 @@ export class BytecodeInterpreter {
     const relativeCell = this.stack.pop();
 
     if (floorGraphicOrdinal === undefined || relativeCell === undefined) {
-      this.log(`ERROR: StdDrawFloorDecoration - missing arguments`);
+      // ERROR: StdDrawFloorDecoration - missing arguments
       return true;
     }
 
@@ -957,7 +942,7 @@ export class BytecodeInterpreter {
     // Pop arguments (varies by opcode)
     // For prototype, just log the call
     const opcodeName = Opcode[opcode];
-    this.log(`${opcodeName}(stack size: ${this.stack.length})`);
+    // ${opcodeName}(stack size: ${this.stack.length})
 
     // Clear stack for this drawing operation
     this.stack = [];
@@ -995,7 +980,7 @@ export class BytecodeInterpreter {
       mapY === undefined ||
       firstObject === undefined
     ) {
-      this.log(`ERROR: StdDrawRoomObjects - missing arguments`);
+      // ERROR: StdDrawRoomObjects - missing arguments
       return true;
     }
 
@@ -1003,7 +988,7 @@ export class BytecodeInterpreter {
     const idx = relCellRF | 0;
     const relativeCell = BytecodeInterpreter.objectDrawingLocations[idx] ?? 0;
 
-    this.log(`StdDrawRoomObjects(first=${firstObject}, x=${mapX}, y=${mapY}, rf=${relCellRF} -> rel=${relativeCell}, drawOrder=0x${drawOrder.toString(16)})`);
+    // StdDrawRoomObjects(first=${firstObject}, x=${mapX}, y=${mapY}, rf=${relCellRF} -> rel=${relativeCell}, drawOrder=0x${drawOrder.toString(16)})
     this.drawRoomObjects(firstObject as ObjectID, facing, mapX | 0, mapY | 0, relativeCell | 0, drawOrder | 0);
     return true;
   }
@@ -1014,14 +999,14 @@ export class BytecodeInterpreter {
     const teleporterRectPtr = this.stack.pop();
 
     if (wallRectPtr === undefined || teleporterRectPtr === undefined) {
-      this.log(`ERROR: StdDrawTeleporter - missing arguments`);
+      // ERROR: StdDrawTeleporter - missing arguments
       return true;
     }
 
     const wallRect = this.resolveStdRectanglePointer(wallRectPtr);
     const teleporterRect = this.resolveStdRectanglePointer(teleporterRectPtr);
     if (!wallRect || Array.isArray(wallRect) || !teleporterRect || Array.isArray(teleporterRect)) {
-      this.log(`ERROR: StdDrawTeleporter - invalid rectangle pointers`);
+      // ERROR: StdDrawTeleporter - invalid rectangle pointers
       return true;
     }
 
@@ -1042,26 +1027,26 @@ export class BytecodeInterpreter {
       doorState === undefined ||
       doorRecordIndex === undefined
     ) {
-      this.log(`ERROR: StdDrawDoor - missing arguments`);
+      // ERROR: StdDrawDoor - missing arguments
       return true;
     }
 
     const rectRef = this.resolveStdRectanglePointer(rectPtr);
     if (!rectRef || !Array.isArray(rectRef)) {
-      this.log(`ERROR: StdDrawDoor - expected door rect array from rectPtr=${rectPtr}`);
+      // ERROR: StdDrawDoor - expected door rect array from rectPtr=${rectPtr}
       return true;
     }
 
     const doorGraphics = this.context.doorGraphics;
     const dungeon = this.context.dungeonState;
     if (!doorGraphics || !dungeon) {
-      this.log(`  (skip) StdDrawDoor missing doorGraphics/dungeonState`);
+      // (skip) StdDrawDoor missing doorGraphics/dungeonState
       return true;
     }
 
     const record = dungeon.getDoorRecordByIndex(doorRecordIndex | 0);
     if (!record) {
-      this.log(`  (skip) StdDrawDoor invalid doorRecordIndex=${doorRecordIndex}`);
+      // (skip) StdDrawDoor invalid doorRecordIndex=${doorRecordIndex}
       return true;
     }
 
@@ -1069,7 +1054,7 @@ export class BytecodeInterpreter {
     const dg = doorGraphics[doorGraphicIndex | 0];
     const doorGraphicNum = dg?.[doorType] ?? -1;
     if (doorGraphicNum < 0) {
-      this.log(`  (skip) StdDrawDoor invalid doorGraphicIndex=${doorGraphicIndex}`);
+      // (skip) StdDrawDoor invalid doorGraphicIndex=${doorGraphicIndex}
       return true;
     }
 
@@ -1079,7 +1064,7 @@ export class BytecodeInterpreter {
 
     const bitmap = getGraphic(doorGraphicNum);
     if (!bitmap) {
-      this.log(`  (skip) StdDrawDoor could not load door graphic ${doorGraphicNum}`);
+      // (skip) StdDrawDoor could not load door graphic ${doorGraphicNum}
       return true;
     }
 
@@ -1116,7 +1101,7 @@ export class BytecodeInterpreter {
     const relativeCell = this.stack.pop();
 
     if (wallDecorationDrawLocation === undefined || wallDecorationPos === undefined || relativeCell === undefined) {
-      this.log(`ERROR: StdDrawWallDecoration - missing arguments`);
+      // ERROR: StdDrawWallDecoration - missing arguments
       return true;
     }
 
@@ -1133,7 +1118,7 @@ export class BytecodeInterpreter {
     const relativeCell = this.stack.pop();
 
     if (wallDecorationDrawLocation === undefined || wallDecorationPos === undefined || relativeCell === undefined) {
-      this.log(`ERROR: StdDrawWallText - missing arguments`);
+      // ERROR: StdDrawWallText - missing arguments
       return true;
     }
 
@@ -1574,7 +1559,7 @@ export class BytecodeInterpreter {
     const dungeon = this.context.dungeonState;
     const tables = this.context.objectTables;
     if (!dungeon || !tables) {
-      this.log(`  (skip) missing dungeonState/objectTables`);
+      // (skip) missing dungeonState/objectTables
       return;
     }
 
@@ -2635,12 +2620,10 @@ export class BytecodeInterpreter {
   }
 
   private blitShapeBitmapToViewport(bitmap: IndexedBitmap, rect: RectPos, mirror: boolean): void {
-    this.log(
-      `  -> Blitting ${mirror ? 'mirrored ' : ''}bitmap ${bitmap.width}x${bitmap.height} to rect (${rect.x1}, ${rect.y1}, ${rect.x2}, ${rect.y2})`
-    );
+    // -> Blitting ${mirror ? 'mirrored ' : ''}bitmap ${bitmap.width}x${bitmap.height} to rect (${rect.x1}, ${rect.y1}, ${rect.x2}, ${rect.y2}
 
     if (!this.context.viewportIndexBuffer) {
-      this.log(`  ERROR: Missing viewportIndexBuffer (Phase 2 required)`);
+      // ERROR: Missing viewportIndexBuffer
       return;
     }
 
@@ -2664,7 +2647,7 @@ export class BytecodeInterpreter {
       [Opcode.StdFloorPitRectangleF0R1]: StdRectPtr.RECT_StdFloorPitRectangleF0R1,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdFloorPitRectangleF0;
-    this.log(`FloorPitRectanglePtr(${Opcode[opcode]})[${rectPtr}]`);
+    // FloorPitRectanglePtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2685,7 +2668,7 @@ export class BytecodeInterpreter {
       [Opcode.StdTeleporterRectangleF0R1]: StdRectPtr.RECT_StdTeleporterRectangleF0R1,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdTeleporterRectangleF0;
-    this.log(`TeleporterRectanglePtr(${Opcode[opcode]})[${rectPtr}]`);
+    // TeleporterRectanglePtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2719,7 +2702,7 @@ export class BytecodeInterpreter {
       [Opcode.StdStairFacingDownRectangleF0R]: StdRectPtr.RECT_StdStairFacingDownRectangleF0R,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairFacingUpRectangleF0L;
-    this.log(`StairRectanglePtr(${Opcode[opcode]})[${rectPtr}]`);
+    // StairRectanglePtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2786,7 +2769,7 @@ export class BytecodeInterpreter {
         break;
     }
 
-    this.log(`StairGraphic(${Opcode[opcode]}) -> ${graphicIndex}`);
+    // StairGraphic(${Opcode[opcode]}) -> ${graphicIndex}
     this.stack.push(graphicIndex);
     return true;
   }
@@ -2814,7 +2797,7 @@ export class BytecodeInterpreter {
         break;
     }
 
-    this.log(`StairEdgeGraphic(${Opcode[opcode]}) -> ${graphicIndex}`);
+    // StairEdgeGraphic(${Opcode[opcode]}) -> ${graphicIndex}
     this.stack.push(graphicIndex);
     return true;
   }
@@ -2831,7 +2814,7 @@ export class BytecodeInterpreter {
       [Opcode.StdStairEdgeRectF0R1]: StdRectPtr.RECT_StdStairEdgeRectangleF0R,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdStairEdgeRectangleF0L;
-    this.log(`StairEdgeRectanglePtr(${Opcode[opcode]})[${rectPtr}]`);
+    // StairEdgeRectanglePtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2850,7 +2833,7 @@ export class BytecodeInterpreter {
       [Opcode.StdDoorFacingTopTrackBitmapF1]: StdBitmapPtr.BMP_StdDoorFacingTopTrackBitmapF1,
     };
     const ptr = mapping[opcode] ?? StdBitmapPtr.BMP_StdDoorFacingFrameLeftBitmapF1;
-    this.log(`DoorBitmapPtr(${Opcode[opcode]}) -> ${ptr}`);
+    // DoorBitmapPtr(${Opcode[opcode]}) -> ${ptr}
     this.stack.push(ptr);
     return true;
   }
@@ -2858,7 +2841,7 @@ export class BytecodeInterpreter {
   private opDoorRecordIndex(opcode: number): boolean {
     const cell = this.relativeCellFromDoorOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[1] ?? 0;
-    this.log(`DoorRecordIndex(${Opcode[opcode]}) cell=${cell} -> ${v}`);
+    // DoorRecordIndex(${Opcode[opcode]}) cell=${cell} -> ${v}
     this.stack.push(v);
     return true;
   }
@@ -2866,7 +2849,7 @@ export class BytecodeInterpreter {
   private opDoorState(opcode: number): boolean {
     const cell = this.relativeCellFromDoorOpcode(opcode);
     const v = this.context.roomData[cell]?.decorations[0] ?? 0;
-    this.log(`DoorState(${Opcode[opcode]}) cell=${cell} -> ${v}`);
+    // DoorState(${Opcode[opcode]}) cell=${cell} -> ${v}
     this.stack.push(v);
     return true;
   }
@@ -2875,7 +2858,7 @@ export class BytecodeInterpreter {
     // CSBWin Viewport.cpp:2561-2563
     const graphicsIndex =
       opcode === Opcode.StdDoorGraphicsF3 ? 2 : opcode === Opcode.StdDoorGraphicsF2 ? 1 : 0;
-    this.log(`DoorGraphics(${Opcode[opcode]})[${graphicsIndex}]`);
+    // DoorGraphics(${Opcode[opcode]})[${graphicsIndex}]
     this.stack.push(graphicsIndex);
     return true;
   }
@@ -2894,7 +2877,7 @@ export class BytecodeInterpreter {
       [Opcode.StdDoorRectsF0]: StdRectPtr.RECT_StdDoorRectsF0,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorRectsF1;
-    this.log(`DoorRectsPtr(${Opcode[opcode]})[${rectPtr}]`);
+    // DoorRectsPtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2922,7 +2905,7 @@ export class BytecodeInterpreter {
       [Opcode.StdDoorFacingFrameLeftRectF1]: StdRectPtr.RECT_StdDoorFacingFrameLeftRectF1,
     };
     const rectPtr = mapping[opcode] ?? StdRectPtr.RECT_StdDoorFacingFrameRightRectF1;
-    this.log(`DoorFrameRectanglePtr(${Opcode[opcode]})[${rectPtr}]`);
+    // DoorFrameRectanglePtr(${Opcode[opcode]})[${rectPtr}]
     this.stack.push(rectPtr);
     return true;
   }
@@ -2953,7 +2936,7 @@ export class BytecodeInterpreter {
     };
 
     const drawOrder = drawOrderMap[opcode] ?? 0;
-    this.log(`DrawOrder(${drawOrder})`);
+    // DrawOrder(${drawOrder})
     this.stack.push(drawOrder);
     return true;
   }
@@ -2963,7 +2946,7 @@ export class BytecodeInterpreter {
     const rd = this.context.roomData[cell];
     const x = rd?.x ?? 0;
     const y = rd?.y ?? 0;
-    this.log(`CellXY(${Opcode[opcode]}) cell=${cell} -> (x=${x}, y=${y})`);
+    // CellXY(${Opcode[opcode]}) cell=${cell} -> (x=${x}, y=${y})
     this.stack.push(x);
     this.stack.push(y);
     return true;
@@ -2972,7 +2955,7 @@ export class BytecodeInterpreter {
   private opCellContents(opcode: number): boolean {
     const cell = this.relativeCellFromContentsOpcode(opcode);
     const v = this.context.roomData[cell]?.rn2 ?? 0;
-    this.log(`CellContents(${Opcode[opcode]}) cell=${cell} -> ${v}`);
+    // CellContents(${Opcode[opcode]}) cell=${cell} -> ${v}
     this.stack.push(v);
     return true;
   }
@@ -2995,13 +2978,9 @@ export class BytecodeInterpreter {
       [Opcode.WallF1Front]: 12,
     };
     const v = mapping[opcode] ?? 0;
-    this.log(`WallPosition(${Opcode[opcode]}) -> ${v}`);
+    // WallPosition(${Opcode[opcode]}) -> ${v}
     this.stack.push(v);
     return true;
-  }
-
-  private log(message: string): void {
-    this.context.executionLog.push(message);
   }
 
   private relativeCellFromCellOpcode(opcode: number): number {

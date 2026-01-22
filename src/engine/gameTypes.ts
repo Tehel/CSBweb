@@ -47,8 +47,7 @@ export interface Champion {
     alive: boolean;
     portraitGraphic?: ui16;     // Optional portrait graphic index
     facing?: Direction;         // Optional facing for UI indicator
-    incantation?: number[];     // Magic incantation bytes (ASCII)
-    incantationIndex?: number;  // Next rune index (0-3)
+    incantation: number[];     // Magic incantation bytes (ASCII)
 
     // Inventory slots (simplified for MVP)
     weaponHand: any | null;     // Right hand weapon

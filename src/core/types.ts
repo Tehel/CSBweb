@@ -82,7 +82,6 @@ export class Position {
     z: ui8;
     constructor(x: ui8, y: ui8, z: ui8) { this.x = x, this.y = y, this.z = z}
 
-    clone = () => new Position(this.x, this.y, this.z)
     get north() { return new Position(this.x, this.y-1, this.z); }
     get south() { return new Position(this.x, this.y+1, this.z); }
     get east() { return new Position(this.x+1, this.y, this.z); }
