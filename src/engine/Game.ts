@@ -224,6 +224,15 @@ export class Game {
     }
 
     /**
+     * Handle a viewport wall click (lever/switch).
+     */
+    handleWallClick(): boolean {
+        const pos = this.party.state.position;
+        const facing = this.party.state.facing;
+        return this.dungeonState.triggerWallActuators(pos, facing);
+    }
+
+    /**
      * Get position info for debugging
      */
     getPositionInfo(): string {

@@ -132,6 +132,10 @@ export class MovementSystem {
             return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0);
         }
 
+        const facing = this.party.state.facing;
+        this.dungeon.triggerPressurePads(position, facing, false);
+        this.dungeon.triggerPressurePads(newPosition, facing, true);
+
         // Movement is valid
         return {
             success: true,

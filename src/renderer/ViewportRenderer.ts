@@ -41,7 +41,7 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { updateHover } from '@/main';
+import { updateHover } from '@/ui';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -290,6 +290,7 @@ export class ViewportRenderer {
     const wb = this.getBitmapsSet(wallGraphicSet);
     this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
     this.context.doorBitmaps = wb.doors;
+    this.context.wallDecorationRects = [];
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
@@ -298,6 +299,17 @@ export class ViewportRenderer {
     DrawViewport(this.context, this.dungeonState, position, facing);
 
     this.presentViewport();
+  }
+
+  isWallDecorationHit(x: number, y: number): boolean {
+    const rects = this.context?.wallDecorationRects;
+    if (!rects || rects.length === 0) return false;
+    const vx = x - VIEWPORT_X;
+    const vy = y - VIEWPORT_Y;
+    for (const rect of rects) {
+      if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
+    }
+    return false;
   }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {

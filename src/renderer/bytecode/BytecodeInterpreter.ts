@@ -79,6 +79,9 @@ export interface InterpreterContext {
 
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
+
+  // Per-frame wall decoration hit rects (viewport coordinates)
+  wallDecorationRects?: RectPos[];
 }
 
 /**
@@ -1182,6 +1185,10 @@ export class BytecodeInterpreter {
 
     const scaled = this.scaleIndexedBitmap(src, dstW, dstH, colorMap ?? undefined, mirror);
     bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2 });
+
+    if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
+      this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
+    }
   }
 
   private drawExtendedWallDecoration(
@@ -1262,6 +1269,10 @@ export class BytecodeInterpreter {
       srcY: 0,
     };
     bltShapeToViewportIndex(derived, viewport, rect);
+
+    if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
+      this.context.wallDecorationRects.push({ x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 });
+    }
   }
 
   private drawWallText(textRN: ObjectID, relativePosition: number): void {

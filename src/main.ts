@@ -3,14 +3,13 @@
  */
 
 import {
-    Direction,
-    RoomType,
-    Position
+    Direction
 } from './core';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
 import { loadSaveGameState, applySaveGameState } from './data/SaveGameLoader';
-import { Game, MovementAction, type Champion, type PartyState, type RuntimeSaveState } from './engine';
+import { Game, type Champion, type PartyState, type RuntimeSaveState } from './engine';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
+import { bindUIContext, drawMapPreview, updateDebug } from './ui';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -20,14 +19,11 @@ let renderer: ViewportRenderer | null = null;
 let graphicsLoader: GraphicsLoader | null = null;
 let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
+let dungeonData: DungeonData | null = null;
 
 const QUICK_SAVE_KEY = 'dmweb_quicksave_v1';
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
 const GAME_DATA_DIR = '/gamefiles/dm-atari';
-
-// Debug output element
-const debugEl = document.getElementById('debug');
-const hoverEl = document.getElementById('hover');
 
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
@@ -85,20 +81,6 @@ function fakeCRT() {
             .vignette(0.25, 0.74)
             .update();
     }, 1000 / 20);
-}
-
-function updateDebug(message: string) {
-    // if (debugEl) {
-    //     debugEl.innerHTML = `<p>${message}</p>`;
-    // }
-    if (renderer) {
-        const plain = message.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '');
-        const lines = plain.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
-        renderer.setMessageLines(lines);
-    }
-}
-export function updateHover(message: string) {
-    if (hoverEl) hoverEl.innerHTML = `<p>${message}</p>`;
 }
 
 function decodeBase64ToBytes(data: string): Uint8Array {
@@ -222,15 +204,6 @@ function renderView() {
     renderer.render(pos, facing);
 }
 
-function getEventPosition(canvas: HTMLCanvasElement, e: MouseEvent): { x: number, y: number } {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = Math.floor((e.clientX - rect.left) * scaleX);
-    const y = Math.floor((e.clientY - rect.top) * scaleY);
-    return { x, y }
-}
-
 
 // Initialize the game
 async function init() {
@@ -243,6 +216,7 @@ async function init() {
         try {
             updateDebug('Loading dungeon.dat...');
             const dungeon = await dungeonLoader.load(`${GAME_DATA_DIR}/dungeon.dat`);
+            dungeonData = dungeon;
 
             console.log(`✓ Loaded dungeon:`, dungeon);
             console.log(`  - Seed: ${dungeon.header.randomSeed}`);
@@ -292,38 +266,15 @@ async function init() {
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
             console.log('✓ Viewport renderer initialized');
-
-            gameCanvasEl.addEventListener('mousemove', (e) => {
-                if (!renderer) return;
-                const { x, y } = getEventPosition(gameCanvasEl, e);
-                renderer.setHoverPoint({ x, y });
-                renderView();
-            });
-
-            gameCanvasEl.addEventListener('mousedown', (e) => {
-                if (!renderer) return;
-                const { x, y } = getEventPosition(gameCanvasEl, e);
-                const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
-                if (buttonMask !== 0) {
-                    renderer.enqueueMouseClick(x, y, buttonMask);
-                    renderView();
-                }
-            });
-
-            gameCanvasEl.addEventListener('mouseup', () => {
-                if (!renderer) return;
-                renderer.enqueueMouseUnclick();
-                renderView();
-            });
-
-            gameCanvasEl.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-            });
-
-            gameCanvasEl.addEventListener('mouseleave', () => {
-                if (!renderer) return;
-                renderer.setHoverPoint(null);
-                renderView();
+            bindUIContext({
+                renderer,
+                game,
+                dungeonData: dungeon,
+                renderView,
+                onQuickSave: quickSave,
+                onQuickLoad: quickLoad,
+                onInjectRandomParty: injectRandomParty,
+                onToggleAttackPanel: toggleAttackPanel,
             });
 
             // Register movement callback
@@ -337,7 +288,7 @@ async function init() {
                 // Render 3D view after movement
                 if (success && renderer && game) {
                     renderView();
-                    drawMapPreview(dungeon, game.party.state.position);
+                    drawMapPreview(game.party.state.position.z);
                 }
             });
 
@@ -355,7 +306,7 @@ async function init() {
 
             // Initial render
             renderView();
-            drawMapPreview(dungeon, game.party.state.position);
+            drawMapPreview(game.party.state.position.z);
 
         } catch (error) {
             console.warn('Could not load dungeon.dat:', error);
@@ -367,153 +318,6 @@ async function init() {
     }
 }
 
-// Helper: Draw map preview
-function drawMapPreview(dungeon: DungeonData, position: Position) {
-
-    const canvas = document.getElementById('map-canvas') as HTMLCanvasElement;
-    if (!canvas) return;
-
-    const ctx: CanvasRenderingContext2D = canvas.getContext('2d')!;
-    ctx.imageSmoothingEnabled = true;
-
-    console.log(`Drawing map, position:`, position);
-    const map = dungeon.maps[position.z];
-
-    // Calculate scale to fit in available space (canvas height - header - legend)
-    const availableHeight = canvas.height - 0; // 0px reserved
-    const availableWidth = canvas.width - 4; // 0px reserved
-
-    const cellSize = Math.floor(Math.min(
-        availableWidth / map.descriptor.width,
-        availableHeight / map.descriptor.height,
-        12 // Max scale for readability
-    ));
-
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // ctx.fillStyle = '#fff';
-    // ctx.textAlign = 'center';
-    // ctx.font = '12px "Courier New"';
-    // ctx.fillText(`Map 0: ${map.descriptor.width}×${map.descriptor.height} tiles`, canvas.width / 2, 45);
-
-    // Draw map tiles
-    const offsetX = (canvas.width - map.descriptor.width * cellSize) / 2;
-    const offsetY = (canvas.height - map.descriptor.height * cellSize) / 2;
-
-    const colors: Map<RoomType, string> = new Map([
-        [ RoomType.STONE,       '#444' ], // Wall
-        [ RoomType.OPEN,        '#888' ], // Floor
-        [ RoomType.DOOR,        '#aa6' ], // Door
-        [ RoomType.STAIRS,      '#6a6' ], // Stairs
-        [ RoomType.PIT,         '#222' ], // Pit
-        [ RoomType.TELEPORTER,  '#66a' ], // Teleporter
-        [ RoomType.FALSEWALL,   '#a66' ], // False wall
-    ]);
-
-    for (let x = 0; x < map.descriptor.width; x++) {
-        for (let y = 0; y < map.descriptor.height; y++) {
-            const tile = map.tiles[x][y];
-            const px = offsetX + x * cellSize;
-            const py = offsetY + y * cellSize;
-            ctx.fillStyle = colors.get(tile.roomType) ?? '#f0f'; // Unknown
-            ctx.fillRect(px, py, cellSize - 1, cellSize - 1);
-
-            // Mark current position
-            if (x === position.x && y === position.y) {
-                ctx.fillStyle = 'red';
-                ctx.fillRect(px + cellSize / 4, py + cellSize / 4, cellSize / 2, cellSize / 2);
-            }
-        }
-    }
-}
-
-document.getElementById('btn-qsave')?.addEventListener('click', () => quickSave());
-document.getElementById('btn-qload')?.addEventListener('click', () => quickLoad());
-
-document.getElementById('btn-smooth')?.addEventListener('click', () => {
-    if (renderer) {
-        const style = renderer.getCanvasStyle();
-        style.imageRendering = (style.imageRendering === 'smooth') ? 'pixelated' : 'smooth';
-    }
-});
-
-// Keyboard handler
-document.addEventListener('keydown', (e) => {
-    if (!game) return;
-
-    let handled = false;
-
-    switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-            console.log('Move forward');
-            game.move(MovementAction.MOVE_FORWARD);
-            handled = true;
-            break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-            console.log('Move backward');
-            game.move(MovementAction.MOVE_BACKWARD);
-            handled = true;
-            break;
-        case 'ArrowLeft':
-        case 'q':
-        case 'Q':
-            console.log('Turn left');
-            game.move(MovementAction.TURN_LEFT);
-            handled = true;
-            break;
-        case 'ArrowRight':
-        case 'e':
-        case 'E':
-            console.log('Turn right');
-            game.move(MovementAction.TURN_RIGHT);
-            handled = true;
-            break;
-        case 'a':
-        case 'A':
-            console.log('Strafe left');
-            game.move(MovementAction.STRAFE_LEFT);
-            handled = true;
-            break;
-        case 'd':
-        case 'D':
-            console.log('Strafe right');
-            game.move(MovementAction.STRAFE_RIGHT);
-            handled = true;
-            break;
-        case 'Escape':
-            console.log('Toggle pause');
-            const paused = !game.state.paused;
-            game.setPaused(paused);
-            updateDebug(paused ? 'Game paused' : 'Game resumed');
-            handled = true;
-            break;
-        case 'F5':
-            quickSave();
-            handled = true;
-            break;
-        case 'F9':
-            quickLoad();
-            handled = true;
-            break;
-        case 'F8':
-            injectRandomParty();
-            handled = true;
-            break;
-        case 'F7':
-            toggleAttackPanel();
-            handled = true;
-            break;
-    }
-
-    if (handled) {
-        e.preventDefault();
-    }
-});
 
 // Start the application
 init();

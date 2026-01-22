@@ -270,6 +270,49 @@ export class DungeonState {
         return this.data.databases.doors.records[index] ?? null;
     }
 
+    /**
+     * Apply an actuator action to its target door on the current level.
+     * Returns true when a door state changed.
+     */
+    applyActuatorToDoor(actuator: ActuatorRecord, source: Position, pressed: boolean): boolean {
+        if (actuator.targetLocal) return false;
+        const map = this.getMap(source.z);
+        if (!map) return false;
+
+        const targetData = actuator.targetData | 0;
+        const x = (targetData >> 6) & 0x1f;
+        const y = (targetData >> 11) & 0x1f;
+        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
+
+        const cellFlag = map.cellFlags[x][y];
+        if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
+
+        const action = this.resolveActuatorAction(actuator.actionType, actuator.revertEffect, pressed);
+        if (action < 0) return false;
+
+        return this.applyDoorActionAt(map, x, y, cellFlag, action);
+    }
+
+    /**
+     * Trigger wall actuators on the cell in front of the party.
+     */
+    triggerWallActuators(position: Position, facing: number): boolean {
+        const target = this.getForwardPosition(position, facing);
+        if (!target) return false;
+        const touchedPosition = (facing + 2) & 0x3;
+        return this.triggerActuatorsAt(target, touchedPosition, facing, true, 'wall');
+    }
+
+    /**
+     * Trigger floor pressure pads in a cell (party stepping on/off).
+     */
+    triggerPressurePads(position: Position, facing: number, pressed: boolean): boolean {
+        const tile = this.getTile(position);
+        if (!tile) return false;
+        if (tile.roomType !== RoomType.OPEN && tile.roomType !== RoomType.PIT) return false;
+        return this.triggerActuatorsAt(position, 0, facing, pressed, 'floor');
+    }
+
     getWeaponRecord(rn: ObjectID): WeaponRecord | null {
         const { category, index } = decodeObjectID(rn);
         if (category !== DBType.WEAPON) return null;
@@ -382,8 +425,10 @@ export class DungeonState {
             case RoomType.OPEN:
                 return true;  // Floor
             case RoomType.DOOR:
-                // TODO: Check if door is open
-                return true;  // For now, assume doors can be passed
+                {
+                    const doorState = tile.attributes & 0x7;
+                    return doorState <= 1 || doorState === 5;
+                }
             case RoomType.STAIRS:
                 return true;  // Stairs are walkable
             case RoomType.PIT:
@@ -397,6 +442,87 @@ export class DungeonState {
             default:
                 return false;
         }
+    }
+
+    private getForwardPosition(position: Position, facing: number): Position | null {
+        switch (facing & 3) {
+            case 0: return position.north;
+            case 1: return position.east;
+            case 2: return position.south;
+            case 3: return position.west;
+            default: return null;
+        }
+    }
+
+    private triggerActuatorsAt(
+        position: Position,
+        requiredPos: number,
+        facing: number,
+        pressed: boolean,
+        mode: 'wall' | 'floor'
+    ): boolean {
+        let changed = false;
+        for (let rn = this.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
+            const decoded = decodeObjectID(rn);
+            if (decoded.category !== DBType.ACTUATOR) continue;
+            if ((decoded.position & 0x3) !== (requiredPos & 0x3)) continue;
+            const rec = this.data.databases.actuators.records[decoded.index];
+            if (!rec || rec.sensorType === 0) continue;
+            if (mode === 'wall' && !this.isWallClickActuator(rec.sensorType)) continue;
+            if (mode === 'floor' && !this.isPressurePadActuator(rec.sensorType)) continue;
+
+            let pressedNow = pressed;
+            if (rec.sensorType === 3 && rec.data !== 0) {
+                pressedNow = pressedNow && ((facing + 1) & 0x3) === (rec.data & 0x3);
+            }
+
+            if (this.applyActuatorToDoor(rec, position, pressedNow)) changed = true;
+        }
+        return changed;
+    }
+
+    private isWallClickActuator(sensorType: number): boolean {
+        return sensorType === 1 || sensorType === 2;
+    }
+
+    private isPressurePadActuator(sensorType: number): boolean {
+        return sensorType === 1 || sensorType === 2 || sensorType === 3;
+    }
+
+    private resolveActuatorAction(actionType: number, normallyClosed: boolean, pressed: boolean): number {
+        const switchClosed = pressed !== normallyClosed;
+        const action = actionType & 0x3;
+        if (action === 3) return switchClosed ? 0 : 1;
+        if (!switchClosed) return -1;
+        return action;
+    }
+
+    private applyDoorActionAt(map: MapData, x: number, y: number, cellFlag: CellFlag, action: number): boolean {
+        const doorState = cellFlag & 0x7;
+        if (doorState === 5) return false;
+
+        let nextState = doorState;
+        if (action === 0) {
+            if (doorState === 0) return false;
+            nextState = 0;
+        } else if (action === 1) {
+            if (doorState === 4) return false;
+            nextState = 4;
+        } else if (action === 2) {
+            nextState = doorState === 0 ? 4 : 0;
+        } else {
+            return false;
+        }
+
+        if (nextState === doorState) return false;
+
+        const newAttr = (cellFlag & 0x8) | (nextState & 0x7);
+        const newCellFlag = (cellFlag & 0xf0) | newAttr;
+        map.cellFlags[x][y] = newCellFlag;
+        const tile = map.tiles[x][y];
+        tile.cellFlag = newCellFlag;
+        tile.attributes = newAttr;
+        return true;
     }
 
     /**
