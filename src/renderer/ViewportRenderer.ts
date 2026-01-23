@@ -41,7 +41,7 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { updateHover } from '@/ui';
+import { updateDebug, updateHover } from '@/ui';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -66,6 +66,9 @@ export interface FloorCeiling {
 }
 
 const charColors = [7, 11, 8, 14];
+const OBJNI_SPECIAL_F = 204;
+const OBJNI_SPECIAL_J = 208;
+const OBJNI_SPECIAL_N = 212;
 
 /**
  * Main ViewportRenderer class
@@ -85,6 +88,8 @@ export class ViewportRenderer {
 
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
   private graphicCache: Map<string, IndexedBitmap> = new Map();
+  private portraitSheet: IndexedBitmap | null | undefined = undefined;
+  private portraitCache: Map<number, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
   private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
   private uiTables: UITables | null = null;
@@ -490,8 +495,17 @@ export class ViewportRenderer {
 
     clearIndex(this.screenIndexBuffer, 0);
     this.drawStaticUIFrame();
-    this.blitViewportToScreen();
+    const inventoryOpen = (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    if (inventoryOpen) {
+      this.drawInventoryBackground();
+    } else {
+      this.blitViewportToScreen();
+    }
     this.drawPartyStatus();
+    if (inventoryOpen) {
+      this.drawInventoryScreen();
+      if (this.uiTables) this.shadeRectIndex(this.uiTables.graphic232.word28, 0);
+    }
     this.drawAttackButtons();
     this.drawAttackPanel();
     this.drawSpellPanel();
@@ -530,6 +544,111 @@ export class ViewportRenderer {
       },
       -1
     );
+  }
+
+  private drawInventoryBackground(): void {
+    if (!this.screenIndexBuffer) return;
+    const bg = this.getGraphicBitmap(17);
+    if (!bg) return;
+    tag0088b2Index(
+      bg,
+      this.screenIndexBuffer,
+      {
+        x1: VIEWPORT_X,
+        y1: VIEWPORT_Y,
+        x2: VIEWPORT_X + bg.width - 1,
+        y2: VIEWPORT_Y + bg.height - 1,
+        srcX: 0,
+        srcY: 0,
+        srcStride: bg.width,
+        srcWidth: bg.width,
+        srcHeight: bg.height,
+      },
+      -1
+    );
+  }
+
+  private drawFoodWaterPanel(champion: Champion): void {
+    if (!this.uiTables || !this.screenIndexBuffer) return;
+    const ui = this.uiTables.graphic232;
+    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
+    this.blitBasicGraphicToViewport(30, ui.wRectPos950, 48, 12);
+    this.blitBasicGraphicToViewport(31, ui.wRectPos958, 48, 12);
+    if ((champion.poisonCount ?? 0) !== 0) {
+      this.blitBasicGraphicToViewport(32, ui.wRectPos966, 96, 12);
+    }
+
+    this.drawFoodWaterBar(champion.food ?? 0, 69, 5);
+    this.drawFoodWaterBar(champion.water ?? 0, 92, 14);
+  }
+
+  private drawFoodWaterBar(value: number, y: number, color: number): void {
+    let barColor = color;
+    if (value < 0) barColor = 11;
+    if (value < -512) barColor = 8;
+    let width = value + 1024;
+    if (width >= 3072) width = 3071;
+    width = Math.floor(width / 32);
+    this.drawHorzBar(115, y + 2, width, 0);
+    this.drawHorzBar(113, y, width, barColor);
+  }
+
+  private drawHorzBar(x0: number, y0: number, width: number, color: number): void {
+    if (!this.screenIndexBuffer) return;
+    const x1 = VIEWPORT_X + x0;
+    const y1 = VIEWPORT_Y + y0;
+    const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
+    fillRectIndex(this.screenIndexBuffer, rect, color);
+  }
+
+  private blitBasicGraphicToViewport(index: number, rect: Rect, srcStride: number, transparentColor: number): void {
+    if (!this.screenIndexBuffer) return;
+    const graphic = this.getGraphicBitmap(index);
+    if (!graphic) return;
+    const dst = this.offsetViewportRect(rect);
+    tag0088b2Index(
+      graphic,
+      this.screenIndexBuffer,
+      {
+        x1: dst.x1,
+        y1: dst.y1,
+        x2: dst.x2,
+        y2: dst.y2,
+        srcX: 0,
+        srcY: 0,
+        srcStride,
+        srcHeight: graphic.height,
+      },
+      transparentColor
+    );
+  }
+
+  private offsetViewportRect(rect: Rect): Rect {
+    return {
+      x1: rect.x1 + VIEWPORT_X,
+      x2: rect.x2 + VIEWPORT_X,
+      y1: rect.y1 + VIEWPORT_Y,
+      y2: rect.y2 + VIEWPORT_Y,
+    };
+  }
+
+  private shadeRectIndex(rect: Rect, color: number): void {
+    if (!this.screenIndexBuffer) return;
+    const width = this.screenIndexBuffer.width;
+    const height = this.screenIndexBuffer.height;
+    const x1 = Math.max(0, rect.x1 | 0);
+    const y1 = Math.max(0, rect.y1 | 0);
+    const x2 = Math.min(width - 1, rect.x2 | 0);
+    const y2 = Math.min(height - 1, rect.y2 | 0);
+    const fill = color & 0x0f;
+
+    for (let y = y1; y <= y2; y++) {
+      const row = y * width;
+      for (let x = x1; x <= x2; x++) {
+        if (((x + y) & 1) !== 0) continue;
+        this.screenIndexBuffer.pixels[row + x] = fill;
+      }
+    }
   }
 
   private drawMessageLines(): void {
@@ -571,7 +690,8 @@ export class ViewportRenderer {
         null;
 
       if (champion) {
-        drawTextLineIndex(this.screenIndexBuffer, this.fontData, baseX + 1, 5, 13, 1, champion.name);
+        const nameColor = this.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
+        drawTextLineIndex(this.screenIndexBuffer, this.fontData, baseX + 1, 5, nameColor, 1, champion.name);
       }
 
       if (champion && champion.alive === false) {
@@ -601,7 +721,7 @@ export class ViewportRenderer {
       }
 
       if (champion && typeof champion.portraitGraphic === 'number') {
-        const portraitGraphic = this.getGraphicBitmap(champion.portraitGraphic);
+        const portraitGraphic = this.getPortraitBitmap(champion.portraitGraphic);
         if (portraitGraphic) {
           tag0088b2Index(
             portraitGraphic,
@@ -617,9 +737,13 @@ export class ViewportRenderer {
               srcWidth: portraitGraphic.width,
               srcHeight: portraitGraphic.height,
             },
-            -1
+            1
           );
         }
+      }
+
+      if (champion && champion.alive !== false) {
+        this.drawShieldDots(baseX, champion);
       }
 
       const charPos = champion?.partyPosition ?? chIdx;
@@ -652,6 +776,89 @@ export class ViewportRenderer {
     }
 
     this.drawTopBarHandIcons();
+  }
+
+  private drawShieldDots(baseX: number, champion: Champion): void {
+    if (!this.screenIndexBuffer || !this.partyState) return;
+    const shields: number[] = [];
+    const fireShield = this.partyState.fireShield ?? 0;
+    const spellShield = this.partyState.spellShield ?? 0;
+    const partyShield = this.partyState.partyShield ?? 0;
+    const personalShield = champion.shieldStrength ?? 0;
+
+    if (fireShield > 0) shields.push(38);
+    if (spellShield > 0) shields.push(39);
+    if (partyShield > 0 || personalShield > 0) shields.push(37);
+    if (shields.length === 0) return;
+
+    const rect = { x1: baseX, y1: 0, x2: baseX + 66, y2: 28 };
+    for (let i = shields.length - 1; i >= 0; i--) {
+      const graphic = this.getGraphicBitmap(shields[i] ?? -1);
+      if (!graphic) continue;
+      tag0088b2Index(
+        graphic,
+        this.screenIndexBuffer,
+        {
+          x1: rect.x1,
+          y1: rect.y1,
+          x2: rect.x2,
+          y2: rect.y2,
+          srcX: 0,
+          srcY: 0,
+          srcStride: graphic.width,
+          srcWidth: graphic.width,
+          srcHeight: graphic.height,
+        },
+        10
+      );
+    }
+  }
+
+  private getPortraitBitmap(portraitIndex: number): IndexedBitmap | null {
+    if (portraitIndex < 0) return null;
+    const cached = this.portraitCache.get(portraitIndex);
+    if (cached) return cached;
+
+    const sheet = this.getPortraitSheet();
+    if (!sheet) return null;
+
+    const w = 32;
+    const h = 29;
+    const cols = Math.floor(sheet.width / w);
+    const rows = Math.floor(sheet.height / h);
+    if (cols <= 0 || rows <= 0) return null;
+
+    const count = cols * rows;
+    if (portraitIndex >= count) return null;
+
+    const sx = (portraitIndex % cols) * w;
+    const sy = Math.floor(portraitIndex / cols) * h;
+    const outPixels = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const srcRow = (sy + y) * sheet.width + sx;
+      const dstRow = y * w;
+      outPixels.set(sheet.pixels.subarray(srcRow, srcRow + w), dstRow);
+    }
+
+    const bmp: IndexedBitmap = { width: w, height: h, pixels: outPixels };
+    this.portraitCache.set(portraitIndex, bmp);
+    return bmp;
+  }
+
+  private getPortraitSheet(): IndexedBitmap | null {
+    if (this.portraitSheet !== undefined) return this.portraitSheet;
+    const img1 = this.getGraphicBitmap(26, ImageFormat.IMG1);
+    if (img1 && img1.width >= 32 && img1.height >= 29) {
+      this.portraitSheet = img1;
+      return img1;
+    }
+    const img2 = this.getGraphicBitmap(26, ImageFormat.IMG2);
+    if (img2 && img2.width >= 32 && img2.height >= 29) {
+      this.portraitSheet = img2;
+      return img2;
+    }
+    this.portraitSheet = null;
+    return null;
   }
 
   private drawTopBarHandIcons(): void {
@@ -689,6 +896,84 @@ export class ViewportRenderer {
         }
       }
     }
+  }
+
+  private drawInventoryScreen(): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.partyState) return;
+    const selected = this.partyState.selectedCharacterIndex | 0;
+    if (selected < 0) return;
+
+    const champion =
+      this.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.partyState.champions[selected] ??
+      null;
+    if (!champion || champion.alive === false) return;
+
+    const iconSlots = this.uiTables.graphic232.iconDisplay;
+    const word612 = this.uiTables.graphic232.word612;
+
+    if (this.fontData) {
+      const nameColor = this.partyState.cursorOwner === selected ? 9 : 13;
+      drawTextLineIndex(
+        this.screenIndexBuffer,
+        this.fontData,
+        VIEWPORT_X + 3,
+        VIEWPORT_Y + 7,
+        nameColor,
+        12,
+        champion.name
+      );
+    }
+
+    for (let slot = 0; slot < 30; slot++) {
+      const objectIndex = this.getInventoryItemIndex(champion, slot);
+      const rect = this.getInventorySlotRect(iconSlots, slot);
+      if (!rect) continue;
+      if (objectIndex >= 0) {
+        this.drawObjectIcon(rect, objectIndex, word612);
+        continue;
+      }
+      const placeholder = this.getInventoryPlaceholderIndex(champion, slot);
+      if (placeholder >= 0) {
+        this.drawObjectIcon(rect, placeholder, word612);
+      }
+    }
+
+    this.drawFoodWaterPanel(champion);
+  }
+
+  private getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
+    const icon = iconSlots[8 + slot];
+    if (!icon) return null;
+    return {
+      x1: icon.pixelX + VIEWPORT_X,
+      y1: icon.pixelY + VIEWPORT_Y,
+      x2: icon.pixelX + VIEWPORT_X + 15,
+      y2: icon.pixelY + VIEWPORT_Y + 15,
+    };
+  }
+
+  private getInventoryItemIndex(champion: Champion, slot: number): number {
+    const possessions = champion.possessions;
+    if (possessions && slot >= 0 && slot < possessions.length) {
+      const value = possessions[slot];
+      if (typeof value === 'number') return value | 0;
+    }
+    if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand | 0;
+    if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand | 0;
+    return -1;
+  }
+
+  private getInventoryPlaceholderIndex(champion: Champion, slot: number): number {
+    if (slot >= 0 && slot <= 5) {
+      const wounds = champion.wounds ?? 0;
+      const wounded = (wounds & (1 << slot)) !== 0;
+      return OBJNI_SPECIAL_N + 2 * slot + (wounded ? 1 : 0);
+    }
+    if (slot >= 10 && slot <= 13) {
+      return OBJNI_SPECIAL_J + (slot - 10);
+    }
+    return OBJNI_SPECIAL_F;
   }
 
   private drawAttackButtons(): void {
@@ -1020,9 +1305,58 @@ export class ViewportRenderer {
   }
 
   private handleMouseButton(id: number, x: number, y: number): void {
+    updateDebug(`handling click on ${id}`)
     if (id === 100) {
       this.handleMagicClick(x, y);
+      return;
     }
+    if (id === 83) {
+      if (!this.partyState) return;
+      const owner = this.partyState.cursorOwner;
+      if (owner >= 0) this.handleInventoryToggle(owner);
+      return;
+    }
+    if (id >= 7 && id <= 11) {
+      this.handleInventoryToggle(id - 7);
+      return;
+    }
+    if (id >= 12 && id <= 15) {
+      this.handlePartyBlockClick(id - 12, x, y);
+      return;
+    }
+  }
+
+  private handlePartyBlockClick(button: number, x: number, y: number): void {
+    if (!this.uiTables || !this.partyState) return;
+    if (this.partyState.selectedCharacterIndex === button) {
+      const champ =
+        this.partyState.champions.find((c) => c.partyPosition === button) ??
+        this.partyState.champions[button] ??
+        null;
+      if (champ && champ.alive === false) return;
+      this.partyState.cursorOwner = button;
+      return;
+    }
+    const sub = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18216, x, y, 2);
+    if (sub >= 16 && sub <= 19) {
+      this.partyState.cursorOwner = sub - 16;
+    }
+  }
+
+  private handleInventoryToggle(button: number): void {
+    if (!this.partyState) return;
+    if (button === 4) {
+      this.partyState.selectedCharacterIndex = -1;
+      return;
+    }
+    if (button < 0 || button > 3) return;
+    const champ =
+      this.partyState.champions.find((c) => c.partyPosition === button) ??
+      this.partyState.champions[button] ??
+      null;
+    if (!champ || champ.alive === false) return;
+    this.partyState.selectedCharacterIndex =
+      this.partyState.selectedCharacterIndex === button ? -1 : button;
   }
 
   private handleMagicClick(clickX: number, clickY: number): void {

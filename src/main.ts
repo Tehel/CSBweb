@@ -6,7 +6,7 @@ import {
     Direction
 } from './core';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
-import { loadSaveGameState, applySaveGameState } from './data/SaveGameLoader';
+import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
 import { Game, type Champion, type PartyState, type RuntimeSaveState } from './engine';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { bindUIContext, drawMapPreview, updateDebug } from './ui';
@@ -21,7 +21,6 @@ let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 let dungeonData: DungeonData | null = null;
 
-const QUICK_SAVE_KEY = 'dmweb_quicksave_v1';
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
 const GAME_DATA_DIR = '/gamefiles/dm-atari';
 
@@ -92,7 +91,18 @@ function decodeBase64ToBytes(data: string): Uint8Array {
     return out;
 }
 
+function encodeBytesToBase64(data: Uint8Array): string {
+    let bin = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < data.length; i += chunkSize) {
+        const chunk = data.subarray(i, i + chunkSize);
+        bin += String.fromCharCode(...chunk);
+    }
+    return btoa(bin);
+}
+
 const RANDOM_NAMES = [ 'Halk', 'Leif', 'Tiggy', 'Chani', 'Gothmog', 'Zed', 'Wuuuf', 'Nabi'];
+const RANDOM_PORTRAIT_COUNT = 24;
 
 function randomInt(min: number, max: number): number {
     return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -104,6 +114,16 @@ function createRandomChampion(partyPosition: number): Champion {
     const maxStamina = randomInt(40, 160);
     const maxMana = randomInt(20, 120);
     const name = RANDOM_NAMES[randomInt(0, RANDOM_NAMES.length-1)];
+    const weaponHand = randomInt(0, 95);
+    const shieldHand = Math.random() > 0.5 ? randomInt(0, 95) : null;
+    const possessions: Array<number | null> = new Array(30).fill(null);
+    possessions[0] = shieldHand;
+    possessions[1] = weaponHand;
+    for (let slot = 2; slot < possessions.length; slot++) {
+        if (Math.random() < 0.3) {
+            possessions[slot] = randomInt(0, 95);
+        }
+    }
 
     return {
         name,
@@ -128,10 +148,17 @@ function createRandomChampion(partyPosition: number): Champion {
             wizard: randomInt(1, 8),
         },
         alive,
+        portraitGraphic: randomInt(0, RANDOM_PORTRAIT_COUNT - 1),
         incantation: [],
-        weaponHand: randomInt(0, 95),
-        shieldHand: Math.random() > 0.5 ? randomInt(0, 95) : null,
+        food: randomInt(0, 2047),
+        water: randomInt(0, 2047),
+        wounds: randomInt(0, 0x3f),
+        poisonCount: Math.random() < 0.2 ? randomInt(1, 3) : 0,
+        weaponHand,
+        shieldHand,
         quiver: null,
+        shieldStrength: 0,
+        possessions,
         partyPosition,
         facing: partyPosition & 3,
     };
@@ -168,21 +195,39 @@ function toggleAttackPanel(): void {
 
 function quickSave(): void {
     if (!game) return;
-    const state = game.getRuntimeSaveState();
-    localStorage.setItem(QUICK_SAVE_KEY, JSON.stringify(state));
+    const runtime = game.getRuntimeSaveState();
+    const item16 = runtime.dungeon.item16 ?? [];
+    const timers = runtime.dungeon.timers ?? [];
+    const saveGameState: SaveGameState = {
+        item16,
+        timers,
+        maxItem16: item16.length,
+        maxTimers: timers.length,
+        sequencedTimers: false,
+        extendedTimers: false,
+    };
+    const rawBytes = saveSaveGameState(saveGameState);
+    const payload = {
+        runtime,
+        raw: encodeBytesToBase64(rawBytes),
+    };
+    localStorage.setItem(QUICK_SAVEGAME_RAW_KEY, JSON.stringify(payload));
     updateDebug('Quick-saved');
 }
 
 function quickLoad(): void {
     if (!game) return;
-    const raw = localStorage.getItem(QUICK_SAVE_KEY);
+    const raw = localStorage.getItem(QUICK_SAVEGAME_RAW_KEY);
     if (!raw) {
         updateDebug('No quick-save found');
         return;
     }
     try {
-        const state = JSON.parse(raw) as RuntimeSaveState;
-        game.applyRuntimeSaveState(state);
+        const parsed = JSON.parse(raw) as { runtime: RuntimeSaveState; raw: string };
+        const saveBytes = decodeBase64ToBytes(parsed.raw);
+        const saveState = loadSaveGameState(saveBytes);
+        applySaveGameState(game.state.dungeon, saveState);
+        game.applyRuntimeSaveState(parsed.runtime);
         renderView();
         updateDebug('Quick-loaded');
     } catch (error) {
@@ -242,18 +287,6 @@ async function init() {
             } else {
                 console.log('CSBgraphics.dat not found; extended decorations disabled');
                 csbGraphicsLoader = null;
-            }
-
-            const rawSave = localStorage.getItem(QUICK_SAVEGAME_RAW_KEY);
-            if (rawSave) {
-                try {
-                    const saveBytes = decodeBase64ToBytes(rawSave);
-                    const saveState = loadSaveGameState(saveBytes);
-                    applySaveGameState(dungeon, saveState);
-                    console.log('✓ Applied savegame state from localStorage');
-                } catch (error) {
-                    console.warn('Failed to apply savegame state:', error);
-                }
             }
 
             // Initialize game engine

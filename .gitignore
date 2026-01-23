@@ -6,6 +6,7 @@ doc/CSBwin*
 
 # tool output
 tools/output
+static/extracted
 
 # temporary
 static/backstory

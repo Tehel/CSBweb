@@ -155,9 +155,16 @@ Goal: render the original Dungeon Master UI (portraits, status bars, hands, cont
 5. ✅ **Attack/spell control UI**. Attack options clear `Word20`, blit basic graphic 10 into `wRectPos20202/20210/20218`, and draw text at `(235,83)` and `(241,93+12*row)`; spell controls now clear `Word20242`, apply `vblFlashButn` rectangles, and draw the caster name at CSBWin coordinates.
 6. ✅ **Message area + text**. Use the font graphic `0x822d` (loaded into `Pointer12926`) with `TextOut_OneLine`; render message rows at 6-pixel char width and 7-pixel line height, base Y = 177.
 7. ✅ **Input hit-tests (visual only at first)**. Map mouse/keyboard regions to UI elements using `Buttons*` and `MoveButn*`, and draw hover/selection highlights (no interaction logic yet).
-8. ⏳ **Portraits**. Wire `portraitGraphic` to champion data, load internal/external portrait graphics, render real portraits in the top bar and inventory, and add shield dots with the correct per-champion offsets and colors.
-9. ⏳ **Status bars**. Implement health/stamina/mana bars in the top bar and inventory view, including thresholds for low/boosted color variants and per-champion scaling and clipping.
+8. ✅ **Portraits**. Wire `portraitGraphic` to champion data, load internal/external portrait graphics, render real portraits in the top bar and inventory, and add shield dots with the correct per-champion offsets and colors.
+   - Note: shield dot rendering is wired but shield values are not yet populated by gameplay state (`partyShield`, `fireShield`, `spellShield`, `champion.shieldStrength`).
+9. ✅ **Status bars**. Implement health/stamina/mana bars in the top bar using CSBWin masks and height rounding with per‑champion colors.
 10. ⏳ **Inventory screen**. Build the full inventory layout (paper-doll slots, backpack grid, load readout, eye/mouth overlays) and hook item icons to equipment/backpack state with the correct slot geometry.
+   - Remaining inventory UI work:
+     - Character stats panel (skills + attributes)
+     - Load readout (current/max KG)
+     - Eye/mouth overlays + stat-dependent highlight boxes
+     - Chest/scroll subviews
+     - Object-in-hand/selection interactions
 11. ⏳ **Character stats**. Render stat panels (attributes and skill titles/levels) using CSBWin text layout, including base values, modifiers, and any highlight states.
 12. ⏳ **Chests + scrolls**. Implement chest grid view and scroll view layouts, render item slots/scroll pages, and connect them to container/scroll data for selection and paging.
 13. ⏳ **Magic panel**. Render the spell panel contents (rune slots, selected runes, and labels), implement highlight/flash rectangles, and gate visibility by caster state.
@@ -179,10 +186,47 @@ Status:
 - ✅ Item icon blits now use correct sheet stride (256px) to avoid sliced/interlaced artifacts (`src/renderer/ViewportRenderer.ts`).
 - ✅ Attack panel visibility gated by a debug toggle (F7) instead of always rendering (`src/renderer/ViewportRenderer.ts`, `src/main.ts`).
 - ✅ Combat panel icons now render using the ShrinkBLT color map logic (Byte20194), producing black mask over cyan (`src/renderer/ViewportRenderer.ts`).
+- ✅ Status bars now render with CSBWin masks and empty‑bar color 15, filling per‑champion colors at the correct height (`src/renderer/ViewportRenderer.ts`).
+- ✅ Inventory view now toggles via party block buttons and cursor-owner hot area (button 83), hides the dungeon view, draws the inventory background, and renders item icons for slots 0‑29 with CSBWin placeholder/wound icons (`src/renderer/ViewportRenderer.ts`).
+- ✅ Inventory view draws the selected champion name at `(3,7)` in viewport space and renders the food/water panel (graphics 20/30/31/32 with CSBWin bar math/colors) (`src/renderer/ViewportRenderer.ts`).
+- ✅ Champion state extended for inventory and condition flags: `possessions[30]`, `wounds`, `food`, `water`, `poisonCount` (`src/engine/gameTypes.ts`, `src/main.ts`).
+- ⏳ Inventory view still missing: character stats panel (skills + attributes), load readout (current/max KG), eye/mouth overlays + stats-dependent highlight boxes, chest/scroll subviews, and object-in-hand/selection interactions.
 
 Validation
 - Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).
 - Verify pixel‑perfect alignment of the viewport frame, portraits, and message line.
+
+### Phase 8 — CSBWin-Compatible Save/Load (pre‑work checklist)
+Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
+
+1. **Inventory all save file blocks (CSBWin `SaveGame.cpp`)**:
+   - Block1 (512 bytes), Block2 (128 bytes), Item16, Characters, Timers, TimerQueue.
+   - Extended features: DSA blocks, extended wall decorations, sequenced/extended timers.
+2. **Define missing runtime state in TS**:
+   - Global engine state: random seeds, time counters, movement counts, party level/position/facing, UI state flags, object-in-hand, etc.
+   - Timer queue metadata and ordering state (not just Timer table contents).
+3. **Mirror CSBWin database record layouts**:
+   - All DB records (door/teleporter/text/actuator/creature/weapon/clothing/scroll/potion/container/misc/missile/cloud) with correct bitfields, padding, and word sizes.
+   - Include any save‑only fields (Item16 runtime indices, missile/cloud records) not present in base dungeon.dat.
+4. **Add full object list serialization**:
+   - `objectList`, `columnIndex`, `levelIndex`, and per‑cell object chains must be written/read exactly as CSBWin.
+   - Ensure object positions (RN pos bits) and link fields are preserved.
+5. **Persist cell flags and dynamic room state**:
+   - Door/pit/falsewall/teleporter flags in `cellFlags` must be saved (not inferred from dungeon.dat).
+6. **Character/party blocks**:
+   - Implement CSBWin character block layout (3328 bytes) with exact packing of inventory, stats, skills, spells, wounds, and flags.
+7. **Text/indirect text indices**:
+   - Ensure `textWords`, `indirectTextIndex`, and any converted text tables are serialized when required by CSBWin.
+8. **Extended features**:
+   - DSA level index tables and DSA state blocks (if `CSBgraphics.dat`/extended flags present).
+   - Extended wall decorations and related flags in save file header.
+9. **Checksum/scramble parity**:
+   - Implement CSBWin block checksums and scramble/unscramble exactly (endianness + word ordering).
+10. **Round‑trip validation tooling**:
+   - Add a tool to load CSBWin save → re‑serialize → binary‑compare.
+   - Add targeted checks for door/pit state, object chains, and timers after load.
+
+Status: pending.
 
 ## Practical Guidance for Work Organization
 

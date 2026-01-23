@@ -79,6 +79,12 @@ export interface UITables {
     byte1390: number[];
     byte1386: number[];
     byte1094: WordRect;
+    wRectPos966: WordRect;
+    wRectPos958: WordRect;
+    wRectPos950: WordRect;
+    wRectPos942: WordRect;
+    wRectPos934: WordRect;
+    wRectPos926: WordRect;
     iconDisplay: IconDisplay[];
     word612: number[];
     word28: WordRect;
@@ -373,8 +379,12 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 16 * 2;
   off += 38 * 2;
 
-  // wRectPos966..wRectPos926 (6 rects)
-  off += 6 * 8;
+  const wRectPos966 = readWordRect(view, off); off += 8;
+  const wRectPos958 = readWordRect(view, off); off += 8;
+  const wRectPos950 = readWordRect(view, off); off += 8;
+  const wRectPos942 = readWordRect(view, off); off += 8;
+  const wRectPos934 = readWordRect(view, off); off += 8;
+  const wRectPos926 = readWordRect(view, off); off += 8;
 
   // Unused918
   off += 2;
@@ -423,6 +433,12 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     byte1390,
     byte1386,
     byte1094,
+    wRectPos966,
+    wRectPos958,
+    wRectPos950,
+    wRectPos942,
+    wRectPos934,
+    wRectPos926,
     iconDisplay,
     word612,
     word28,

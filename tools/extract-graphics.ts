@@ -181,7 +181,7 @@ async function main(): Promise<void> {
   fs.mkdirSync(portraitDir, { recursive: true });
   fs.mkdirSync(largeDir, { recursive: true });
 
-  const areaThreshold = Math.floor((SCREEN_WIDTH * SCREEN_HEIGHT) / 20);
+  const areaThreshold = 1; Math.floor((SCREEN_WIDTH * SCREEN_HEIGHT) / 20);
   const largeExports: { index: number; width: number; height: number; name: string }[] = [];
 
   const portraitInfo = mediaIndex.imagesIndex[String(PORTRAIT_GRAPHIC_INDEX)];

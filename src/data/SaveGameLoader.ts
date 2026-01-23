@@ -56,6 +56,46 @@ function readU32LE(buf: Uint8Array, off: number): number {
   return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
 }
 
+function writeU16LE(buf: Uint8Array, off: number, value: number): void {
+  buf[off] = value & 0xff;
+  buf[off + 1] = (value >> 8) & 0xff;
+}
+
+function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
+  let result = initialHash & 0xffff;
+  let hash = initialHash & 0xffff;
+  let count = numWords & 0xffff;
+  let off = 0;
+  while (count !== 0) {
+    const word = readU16LE(buf, off);
+    result = (result + word) & 0xffff;
+    result = (result + (word ^ hash)) & 0xffff;
+    hash = (hash + count) & 0xffff;
+    off += 2;
+    count = (count - 1) & 0xffff;
+  }
+  return result & 0xffff;
+}
+
+function scramble(buf: Uint8Array, initialHash: number, numWords: number): number {
+  let d7 = initialHash & 0xffff;
+  let d6 = numWords & 0xffff;
+  let d5 = initialHash & 0xffff;
+  let off = 0;
+  while (d6 !== 0) {
+    const plain = readU16LE(buf, off);
+    const word = plain ^ d7;
+    d5 = (d5 + word) & 0xffff;
+    buf[off] = word & 0xff;
+    buf[off + 1] = (word >> 8) & 0xff;
+    d5 = (d5 + plain) & 0xffff;
+    off += 2;
+    d7 = (d7 + d6) & 0xffff;
+    d6 = (d6 - 1) & 0xffff;
+  }
+  return d5 & 0xffff;
+}
+
 function rc4Simple(buf: Uint8Array, key: Uint8Array): Uint8Array {
   const out = new Uint8Array(buf.length);
   const s = new Uint8Array(256);
@@ -442,4 +482,110 @@ export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): v
   if (save.extendedWallDecorations !== undefined) {
     dungeon.extendedWallDecorations = save.extendedWallDecorations;
   }
+}
+
+export function saveSaveGameState(save: SaveGameState): Uint8Array {
+  const maxItem16 = save.maxItem16;
+  const maxTimers = save.maxTimers;
+  const sequencedTimers = save.sequencedTimers;
+  const extendedTimers = save.extendedTimers;
+  const timerSize = extendedTimers ? 16 : sequencedTimers ? 12 : 10;
+
+  const block2 = new Uint8Array(BLOCK2_SIZE);
+  writeU16LE(block2, 28, maxTimers);
+  writeU16LE(block2, 46, maxItem16);
+
+  const item16 = new Uint8Array(maxItem16 * 16);
+  for (let i = 0; i < maxItem16; i++) {
+    const base = i * 16;
+    const rec = save.item16[i];
+    if (!rec) continue;
+    item16[base + 2] = rec.facings & 0xff;
+    item16[base + 3] = rec.positions & 0xff;
+    item16[base + 12] = rec.singleMonsterStatus[0] ?? 0;
+    item16[base + 13] = rec.singleMonsterStatus[1] ?? 0;
+    item16[base + 14] = rec.singleMonsterStatus[2] ?? 0;
+    item16[base + 15] = rec.singleMonsterStatus[3] ?? 0;
+  }
+
+  const character = new Uint8Array(CHARACTER_SIZE);
+
+  const timers = new Uint8Array(maxTimers * timerSize);
+  for (let i = 0; i < maxTimers; i++) {
+    const base = i * timerSize;
+    const rec = save.timers[i];
+    if (!rec) continue;
+    writeU16LE(timers, base + 8, rec.timerWord8 ?? 0);
+  }
+
+  const timerQueue = new Uint8Array(maxTimers * 2);
+
+  const block2Hash = 0;
+  const item16Hash = 0;
+  const characterHash = 0;
+  const timersHash = 0;
+  const timerQueueHash = 0;
+
+  const block2Checksum = genChecksum(block2, block2Hash, BLOCK2_SIZE / 2);
+  const item16Checksum = genChecksum(item16, item16Hash, item16.length / 2);
+  const characterChecksum = genChecksum(character, characterHash, CHARACTER_SIZE / 2);
+  const timersChecksum = genChecksum(timers, timersHash, timers.length / 2);
+  const timerQueueChecksum = genChecksum(timerQueue, timerQueueHash, timerQueue.length / 2);
+
+  const block1Plain = new Uint8Array(BLOCK1_SIZE);
+  const wordOffset = 256;
+  writeU16LE(block1Plain, wordOffset + 56, block2Hash);
+  writeU16LE(block1Plain, wordOffset + 58, item16Hash);
+  writeU16LE(block1Plain, wordOffset + 60, characterHash);
+  writeU16LE(block1Plain, wordOffset + 62, timersHash);
+  writeU16LE(block1Plain, wordOffset + 64, timerQueueHash);
+  writeU16LE(block1Plain, wordOffset + 88, block2Checksum);
+  writeU16LE(block1Plain, wordOffset + 90, item16Checksum);
+  writeU16LE(block1Plain, wordOffset + 92, characterChecksum);
+  writeU16LE(block1Plain, wordOffset + 94, timersChecksum);
+  writeU16LE(block1Plain, wordOffset + 96, timerQueueChecksum);
+
+  let d6 = 0;
+  let pos = 0;
+  for (let i = 0; i < 32; i++) {
+    d6 = (d6 + readU16LE(block1Plain, pos)) & 0xffff;
+    pos += 2;
+    d6 ^= readU16LE(block1Plain, pos);
+    pos += 2;
+    d6 = (d6 - readU16LE(block1Plain, pos)) & 0xffff;
+    pos += 2;
+    d6 ^= readU16LE(block1Plain, pos);
+    pos += 2;
+  }
+
+  let sum = 0;
+  for (let i = 258; i < BLOCK1_SIZE; i += 2) {
+    sum = (sum + readU16LE(block1Plain, i)) & 0xffff;
+  }
+  writeU16LE(block1Plain, 256, (d6 - sum) & 0xffff);
+
+  const block1Hash = readU16LE(block1Plain, 58);
+  scramble(block1Plain.subarray(256), block1Hash, 128);
+
+  scramble(block2, block2Hash, BLOCK2_SIZE / 2);
+  scramble(item16, item16Hash, item16.length / 2);
+  scramble(character, characterHash, CHARACTER_SIZE / 2);
+  scramble(timers, timersHash, timers.length / 2);
+  scramble(timerQueue, timerQueueHash, timerQueue.length / 2);
+
+  const totalSize = BLOCK1_SIZE + block2.length + item16.length + character.length + timers.length + timerQueue.length;
+  const out = new Uint8Array(totalSize);
+  let offset = 0;
+  out.set(block1Plain, offset);
+  offset += block1Plain.length;
+  out.set(block2, offset);
+  offset += block2.length;
+  out.set(item16, offset);
+  offset += item16.length;
+  out.set(character, offset);
+  offset += character.length;
+  out.set(timers, offset);
+  offset += timers.length;
+  out.set(timerQueue, offset);
+  return out;
 }

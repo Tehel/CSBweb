@@ -5,7 +5,42 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, Direction, Position } from '../core/types';
+import type { ui8, ui16, i16, Direction, Position } from '../core/types';
+
+// Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
+// CSBWin maps these via inventory button ids 8..20 and 21..37 (HandleClothingClick).
+export enum PossessionSlot {
+    ShieldHand = 0,
+    WeaponHand = 1,
+    Head = 2,
+    Body = 3,
+    Legs = 4,
+    Feet = 5,
+    Pouch1 = 6,
+    Pouch2 = 7,
+    Quiver = 8,
+    Quiver2 = 9,
+    Neck = 10,
+    Quiver3 = 11,
+    Quiver4 = 12,
+    Backpack1 = 13,
+    Backpack2 = 14,
+    Backpack3 = 15,
+    Backpack4 = 16,
+    Backpack5 = 17,
+    Backpack6 = 18,
+    Backpack7 = 19,
+    Backpack8 = 20,
+    Backpack9 = 21,
+    Backpack10 = 22,
+    Backpack11 = 23,
+    Backpack12 = 24,
+    Backpack13 = 25,
+    Backpack14 = 26,
+    Backpack15 = 27,
+    Backpack16 = 28,
+    Backpack17 = 29,
+}
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -45,14 +80,20 @@ export interface Champion {
     name: string;
     attributes: ChampionAttributes;
     alive: boolean;
-    portraitGraphic?: ui16;     // Optional portrait graphic index
+    portraitGraphic?: ui16;     // Optional portrait index in graphic 26
     facing?: Direction;         // Optional facing for UI indicator
     incantation: number[];     // Magic incantation bytes (ASCII)
+    food: i16;                 // Signed food level (CSBWin uses negative for starving)
+    water: i16;                // Signed water level (CSBWin uses negative for dehydrated)
+    wounds?: ui16;             // Bitmask of wounded body parts (CSBWin "ouches")
+    poisonCount?: ui8;         // Poison counter for UI and effects
 
     // Inventory slots (simplified for MVP)
     weaponHand: any | null;     // Right hand weapon
     shieldHand: any | null;     // Left hand shield/weapon
     quiver: any | null;         // Quiver slot
+    shieldStrength?: ui16;      // Optional shield strength for UI dots
+    possessions?: Array<number | null>; // Optional 30-slot possessions (CSBWin CHARDESC possessions[30])
 
     // Position in party (0-3: front-left, front-right, back-left, back-right)
     partyPosition: ui8;
@@ -66,6 +107,11 @@ export interface PartyState {
     position: Position;      // Current map position (x, y, z)
     facing: Direction;          // Current facing direction
     magicCasterIndex: number;   // -1 = none
+    cursorOwner: number;        // -1 = none
+    selectedCharacterIndex: number; // -1 = none
+    partyShield?: ui16;         // Optional party shield strength
+    fireShield?: ui16;          // Optional fire shield strength
+    spellShield?: ui16;         // Optional spell shield strength
 
     // Movement state
     moving: boolean;            // Is party currently moving?
