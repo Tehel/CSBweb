@@ -582,17 +582,12 @@ export class DungeonState {
 
     // Get start position from dungeon header
     getStartPosition(): Position {
-        return new Position(this.data.header.startPosition.x, this.data.header.startPosition.y, 0);
+        return new Position(this.data.header.startPosition.x, this.data.header.startPosition.y, this.data.header.startPosition.z);
     }
 
     // Get start facing direction
     getStartFacing(): number {
-        return this.data.header.startPosition.facing;
-    }
-
-    // Get start map index (level)
-    getStartMapIndex(): ui8 {
-        return this.data.header.startPosition.z || 0;
+        return this.data.header.facing;
     }
 
     decodeWallTextBytes(record: TextRecord, tables?: TextDecodeTables): Uint8Array | null {

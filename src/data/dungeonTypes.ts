@@ -9,8 +9,9 @@ import type {
     ui8, ui16, ui32,
     ObjectID,
     CellFlag,
-    PositionOriented,
-    Position
+    Position,
+    Direction,
+    DBType
 } from '../core/types';
 
 /**
@@ -22,7 +23,8 @@ export interface DungeonHeader {
     mapDataSize: ui16;          // 0x02: Total map data size in bytes
     numMaps: ui8;               // 0x04: Number of maps/levels
     textDataSize: ui16;         // 0x06: Text data size in words
-    startPosition: PositionOriented; // 0x08: Party start position (decoded)
+    startPosition: Position;    // 0x08: Party start position (decoded)
+    facing: Direction;
     objectListSize: ui16;       // 0x0A: Object list size in words
     objectCounts: ui16[];       // 0x0C: Object counts [16] by database
 }
@@ -163,6 +165,7 @@ export interface WeaponRecord {
     nextObject: ObjectID;       // +0x00
     broken: boolean;            // +0x02 bit 14
     charges: ui8;               // bits 13-10
+    litTorch: boolean;          // bit 15 (torches)
     poisoned: boolean;          // bit 9
     cursed: boolean;            // bit 8
     important: boolean;         // bit 7
@@ -325,4 +328,39 @@ export interface DungeonData {
     timers?: TimerRecord[];     // Save-game timer table
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
     extendedWallDecorations?: boolean; // Extended-feature flag
+    presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
+}
+
+export interface HeroInventoryItem {
+    rn: ObjectID;
+    position: ui8;
+    category: DBType;
+    index: ui16;
+    record: DatabaseRecord | null;
+    containedItems?: HeroInventoryItem[];
+}
+
+export interface PresetHero {
+    textRecordIndex: ui16;
+    textOffset: ui16;
+    portraitIndex: ui16;
+    name: string;
+    title: string;
+    gender: string;
+    health: ui16;
+    stamina: ui16;
+    mana: ui16;
+    luck: ui8;
+    strength: ui8;
+    dexterity: ui8;
+    wisdom: ui8;
+    vitality: ui8;
+    antiMagic: ui8;
+    antiFire: ui8;
+    fighter: Record<string, ui8>;
+    ninja: Record<string, ui8>;
+    priest: Record<string, ui8>;
+    wizard: Record<string, ui8>;
+    location: { map: ui8; x: ui8; y: ui8; wall: ui8 };
+    inventory: HeroInventoryItem[];
 }

@@ -2,13 +2,14 @@
  * Dungeon Master Web
  */
 
-import {
-    Direction
-} from './core';
-import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
+import { Direction } from './core';
+import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader, type PresetHero } from './data';
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
-import { Game, type Champion, type PartyState, type RuntimeSaveState } from './engine';
+import { Game, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, type AddCharacterTables } from './engine';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
+import { extractObjectTables } from './renderer/csbwin/ObjectTables';
+import { extractUITables } from './renderer/csbwin/UITables';
+import { extractViewportTables } from './renderer/csbwin/ViewportTables';
 import { bindUIContext, drawMapPreview, updateDebug } from './ui';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -20,67 +21,109 @@ let graphicsLoader: GraphicsLoader | null = null;
 let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 let dungeonData: DungeonData | null = null;
+let addCharacterTables: AddCharacterTables | null = null;
+let crtController: CrtController | null = null;
 
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
 const GAME_DATA_DIR = '/gamefiles/dm-atari';
+const CRT_SCANLINES_SRC = '/QPN59-320x200-resized.png';
+const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
 if (!gameCanvasEl) console.log(`Couldn't find game canvas !`);
 
+interface CrtController {
+    isAvailable: () => boolean;
+    isEnabled: () => boolean;
+    setEnabled: (enabled: boolean) => boolean;
+}
 
-const lines = new Image();
-lines.src = '/QPN59-320x200-resized.png';
+function createCrtController(canvas: HTMLCanvasElement): CrtController {
+    let enabled = false;
+    let intervalId: number | null = null;
+    let glcanvas: GLFXCanvas | null = null;
+    let texture: GLFXTexture | null = null;
+    let lines: HTMLImageElement | null = null;
 
-// window.addEventListener('load', fakeCRT, false);
-function fakeCRT() {
-   
-    console.log('fakeCRT');
-    // Try to create a WebGL canvas (will fail if WebGL isn't supported)
-    let glcanvas;
+    const available = !!fx && typeof fx.canvas === 'function';
+    if (!available)
+        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
+
     try {
         glcanvas = fx.canvas();
-    } catch (e) {return;}
-    
-    const srcctx = gameCanvasEl.getContext('2d')!;
-    
-    // This tells glfx what to use as a source image
-    const texture = glcanvas.texture(gameCanvasEl);
-    
-    console.log(lines.width);
-    console.log(lines.height);
-    console.log(gameCanvasEl.width);
-    console.log(gameCanvasEl.height);
+    } catch (e) {
+        console.warn('glfx failed to initialize; CRT effect disabled');
+        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
+    }
 
-    // Just setting up some details to tweak the bulgePinch effect
+    const parent = canvas.parentNode;
+    if (!parent)
+        return { isAvailable: () => false, isEnabled: () => false, setEnabled: () => false };
 
-    // Hide the source 2D canvas and put the WebGL Canvas in its place
-    gameCanvasEl.parentNode!.appendChild(glcanvas);
-    glcanvas.className = gameCanvasEl.className;
-    glcanvas.id = gameCanvasEl.id + '_gl';
-    // gameCanvasEl.id = 'old_' + gameCanvasEl.id;
-    // gameCanvasEl.style.display = 'none';
-    // return;
-    // TODO: should be directly with the "render" call on ticks, not separate
-    setInterval(() => {
-        // adds scanlines to the source
-        const w = gameCanvasEl.width;
-        const h = gameCanvasEl.height;
-        // srcctx.drawImage(lines, 0, 0, w, h);
-        
-        // Load the latest source frame
-        texture.loadContentsOf(gameCanvasEl);
-        
-        // aiming to look like: https://www.dungeon-master.com/forum/viewtopic.php?t=31300
-        // Apply WebGL magic: https://evanw.github.io/glfx.js/docs/
+    glcanvas.width = canvas.width;
+    glcanvas.height = canvas.height;
+    glcanvas.className = canvas.className;
+    glcanvas.id = `${canvas.id}_gl`;
+    glcanvas.style.display = 'none';
+    parent.appendChild(glcanvas);
+
+    lines = new Image();
+    lines.src = CRT_SCANLINES_SRC;
+    texture = glcanvas.texture(canvas);
+
+    const draw = (): void => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx || !glcanvas || !texture || !lines) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        if (lines.complete && lines.naturalWidth > 0) {
+            ctx.drawImage(lines, 0, 0, w, h);
+        }
+        texture.loadContentsOf(canvas);
+
         const hw = w / 2;
         const hh = h / 2;
         const w75 = w * 0.75;
-        glcanvas.draw(texture)
+        glcanvas
+            .draw(texture)
             .bulgePinch(hw, hh, w75, 0.12)
             .vignette(0.25, 0.74)
             .update();
-    }, 1000 / 20);
+    };
+
+    const start = (): void => {
+        if (intervalId !== null) return;
+        intervalId = window.setInterval(draw, CRT_UPDATE_INTERVAL_MS);
+    };
+
+    const stop = (): void => {
+        if (intervalId === null) return;
+        window.clearInterval(intervalId);
+        intervalId = null;
+    };
+
+    return {
+        isAvailable: () => true,
+        isEnabled: () => enabled,
+        setEnabled: (next: boolean) => {
+            if (next === enabled) return enabled;
+            if (!glcanvas) return false;
+            if (next) {
+                start();
+                canvas.style.display = 'none';
+                glcanvas.style.display = '';
+            } else {
+                stop();
+                glcanvas.style.display = 'none';
+                canvas.style.display = '';
+                renderView();
+            }
+            enabled = next;
+            return enabled;
+        },
+    };
 }
+
 
 function decodeBase64ToBytes(data: string): Uint8Array {
     const bin = atob(data);
@@ -164,12 +207,77 @@ function createRandomChampion(partyPosition: number): Champion {
     };
 }
 
+function getAddCharacterTables(): AddCharacterTables | null {
+    if (!graphicsLoader) return null;
+    if (addCharacterTables) return addCharacterTables;
+
+    const uiTables = extractUITables(graphicsLoader);
+    const viewportTables = extractViewportTables(graphicsLoader);
+    const objectTables = extractObjectTables(graphicsLoader, viewportTables.wallRectanglesOffset);
+    addCharacterTables = {
+        carryLocation: uiTables.graphic232.carryLocation,
+        objDescCarryMask: objectTables.objDescCarryMask,
+    };
+    return addCharacterTables;
+}
+
+function shuffle<T>(items: T[]): T[] {
+    for (let i = items.length - 1; i > 0; i--) {
+        const j = randomInt(0, i);
+        [items[i], items[j]] = [items[j], items[i]];
+    }
+    return items;
+}
+
+function pickPresetHeroes(presets: PresetHero[], count: number): PresetHero[] {
+    if (presets.length <= count) return presets.slice();
+    return shuffle(presets.slice()).slice(0, count);
+}
+
+function randomizeChampionVitals(champion: Champion): void {
+    const healthRatio = Math.random() * 0.4 + 0.6;
+    const staminaRatio = Math.random() * 0.35 + 0.55;
+    const manaRatio = Math.random() * 0.5 + 0.5;
+    champion.attributes.health = Math.max(1, Math.floor(champion.attributes.maxHealth * healthRatio));
+    champion.attributes.stamina = Math.max(1, Math.floor(champion.attributes.maxStamina * staminaRatio));
+    champion.attributes.mana = champion.attributes.maxMana > 0
+        ? Math.max(0, Math.floor(champion.attributes.maxMana * manaRatio))
+        : 0;
+    champion.food = randomInt(1200, 2000);
+    champion.water = randomInt(1200, 2000);
+    champion.wounds = Math.random() < 0.15 ? randomInt(1, 0x3f) : 0;
+}
+
+function setCrtEnabled(enabled: boolean): boolean {
+    if (!crtController) return false;
+    return crtController.setEnabled(enabled);
+}
+
+function isCrtEnabled(): boolean {
+    return crtController?.isEnabled() ?? false;
+}
+
 function injectRandomParty(): void {
     if (!game) return;
     const current = game.party.state;
     const champions: Champion[] = [];
-    for (let i = 0; i < 4; i++) {
-        champions.push(createRandomChampion(i));
+    const presets = dungeonData?.presetHeroes ?? [];
+    if (presets.length >= 4) {
+        const tables = getAddCharacterTables();
+        const picks = pickPresetHeroes(presets, 4);
+        for (let i = 0; i < picks.length; i++) {
+            const hero = picks[i];
+            const possessions = tables
+                ? assignPresetHeroPossessions(hero.inventory, tables)
+                : new Array(30).fill(null);
+            const champion = createChampionFromPreset(hero, i, possessions);
+            randomizeChampionVitals(champion);
+            champions.push(champion);
+        }
+    } else {
+        for (let i = 0; i < 4; i++) {
+            champions.push(createRandomChampion(i));
+        }
     }
     const magicCasterIndex = champions.findIndex(c => c.attributes.maxMana > 0);
     const newState: PartyState = {
@@ -261,13 +369,14 @@ async function init() {
         try {
             updateDebug('Loading dungeon.dat...');
             const dungeon = await dungeonLoader.load(`${GAME_DATA_DIR}/dungeon.dat`);
+            console.log('heroes', dungeon.presetHeroes);
             dungeonData = dungeon;
 
             console.log(`✓ Loaded dungeon:`, dungeon);
             console.log(`  - Seed: ${dungeon.header.randomSeed}`);
             console.log(`  - Maps: ${dungeon.maps.length}`);
             console.log(`  - Total objects: ${dungeon.header.objectCounts.reduce((a, b) => a + b, 0)}`);
-            console.log(`  - Start: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y}) facing ${Direction[dungeon.header.startPosition.facing]}`);
+            console.log(`  - Start: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y}) facing ${Direction[dungeon.header.facing]}`);
 
             // Display first map info
             const firstMap = dungeon.maps[0];
@@ -298,6 +407,7 @@ async function init() {
             const dungeonState = game.dungeonState;
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
+            crtController = createCrtController(gameCanvasEl);
             console.log('✓ Viewport renderer initialized');
             bindUIContext({
                 renderer,
@@ -308,6 +418,8 @@ async function init() {
                 onQuickLoad: quickLoad,
                 onInjectRandomParty: injectRandomParty,
                 onToggleAttackPanel: toggleAttackPanel,
+                setCrtEnabled,
+                isCrtEnabled,
             });
 
             // Register movement callback

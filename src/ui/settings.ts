@@ -8,6 +8,7 @@ export interface UISettings {
     hoverVisible: boolean;
     smooth: boolean;
     debug: boolean;
+    crt: boolean;
 }
 
 export function loadUISettings(): UISettings {
@@ -21,6 +22,7 @@ export function loadUISettings(): UISettings {
             hoverVisible: parsed.hoverVisible ?? true,
             smooth: parsed.smooth ?? false,
             debug: parsed.debug ?? false,
+            crt: parsed.crt ?? false,
         };
     } catch {
         return defaultUISettings();
@@ -42,6 +44,7 @@ export function readUISettings(): UISettings {
         hoverVisible,
         smooth,
         debug: isDebugFeaturesEnabled(),
+        crt: getUIContext()?.isCrtEnabled() ?? false,
     };
 }
 
@@ -55,6 +58,7 @@ export function applyUISettings(settings: UISettings): void {
     const logButton = document.getElementById('btn-log') as HTMLButtonElement | null;
     const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
     const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
+    const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
 
     mapEl && (mapEl.style.display = settings.mapVisible ? 'block' : 'none');
     logEl && (logEl.style.display = settings.logVisible ? 'block' : 'none');
@@ -71,8 +75,10 @@ export function applyUISettings(settings: UISettings): void {
         style.imageRendering = settings.smooth ? 'smooth' : 'pixelated';
     }
     smoothButton?.classList.toggle('is-pressed', settings.smooth);
+    const crtEnabled = ctx?.setCrtEnabled(settings.crt) ?? false;
+    crtButton?.classList.toggle('is-pressed', crtEnabled);
 }
 
 function defaultUISettings(): UISettings {
-    return { mapVisible: true, logVisible: true, hoverVisible: true, smooth: false, debug: false };
+    return { mapVisible: true, logVisible: true, hoverVisible: true, smooth: false, debug: false, crt: false };
 }

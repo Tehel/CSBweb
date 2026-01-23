@@ -11,6 +11,8 @@ export interface UIContext {
     onQuickLoad: () => void;
     onInjectRandomParty: () => void;
     onToggleAttackPanel: () => void;
+    setCrtEnabled: (enabled: boolean) => boolean;
+    isCrtEnabled: () => boolean;
 }
 
 let context: UIContext | null = null;

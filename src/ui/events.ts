@@ -1,4 +1,5 @@
 import { MovementAction } from '../engine';
+import type { UIContext } from './context';
 import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from './context';
 import { updateDebug } from './messages';
 import { handleMapCanvasClick } from './mapPreview';
@@ -7,53 +8,64 @@ import { getEventPosition, isViewportPoint } from './utils';
 
 let uiBound = false;
 
-const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement | null;
 const mapCanvasEl = document.getElementById('map-canvas') as HTMLCanvasElement | null;
 const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | null;
 const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
 const logButton = document.getElementById('btn-log') as HTMLButtonElement | null;
 const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
 const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
+const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
+
+function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): void {
+    if (!canvas) return;
+    if (canvas.dataset.uiBound === 'true') return;
+    canvas.dataset.uiBound = 'true';
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!ctx.renderer) return;
+        const { x, y } = getEventPosition(canvas, e);
+        ctx.renderer.setHoverPoint({ x, y });
+        ctx.renderView();
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+        const { x, y } = getEventPosition(canvas, e);
+        const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
+        if (buttonMask !== 0) {
+            ctx.renderer.enqueueMouseClick(x, y, buttonMask);
+            if (buttonMask === 2 && isViewportPoint(x, y)) {
+                if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) ctx.renderView();
+            }
+            ctx.renderView();
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        ctx.renderer.enqueueMouseUnclick();
+        ctx.renderView();
+    });
+
+    canvas.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        ctx.renderer.setHoverPoint(null);
+        ctx.renderView();
+    });
+}
 
 export function bindUIEvents(): void {
     const ctx = getUIContext();
     if (!ctx) return;
 
+    const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement | null;
+    const glCanvasEl = document.getElementById('game-canvas_gl') as HTMLCanvasElement | null;
+    bindCanvasEvents(gameCanvasEl, ctx);
+    bindCanvasEvents(glCanvasEl, ctx);
+
     if (!uiBound) {
         uiBound = true;
-
-        gameCanvasEl?.addEventListener('mousemove', (e) => {
-            if (!ctx.renderer) return;
-            const { x, y } = getEventPosition(gameCanvasEl, e);
-            ctx.renderer.setHoverPoint({ x, y });
-            ctx.renderView();
-        });
-
-        gameCanvasEl?.addEventListener('mousedown', (e) => {
-            const { x, y } = getEventPosition(gameCanvasEl, e);
-            const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
-            if (buttonMask !== 0) {
-                ctx.renderer.enqueueMouseClick(x, y, buttonMask);
-                if (buttonMask === 2 && isViewportPoint(x, y)) {
-                    if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) ctx.renderView();
-                }
-                ctx.renderView();
-            }
-        });
-
-        gameCanvasEl?.addEventListener('mouseup', () => {
-            ctx.renderer.enqueueMouseUnclick();
-            ctx.renderView();
-        });
-
-        gameCanvasEl?.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-        });
-
-        gameCanvasEl?.addEventListener('mouseleave', () => {
-            ctx.renderer.setHoverPoint(null);
-            ctx.renderView();
-        });
 
         document.getElementById('btn-qsave')?.addEventListener('click', () => ctx.onQuickSave());
         document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());
@@ -62,6 +74,15 @@ export function bindUIEvents(): void {
             const style = ctx.renderer.getCanvasStyle();
             style.imageRendering = style.imageRendering === 'smooth' ? 'pixelated' : 'smooth';
             smoothButton.classList.toggle('is-pressed', style.imageRendering === 'smooth');
+            saveUISettings(readUISettings());
+        });
+
+        crtButton?.addEventListener('click', () => {
+            const next = !ctx.isCrtEnabled();
+            const enabled = ctx.setCrtEnabled(next);
+            crtButton.classList.toggle('is-pressed', enabled);
+            if (next && !enabled) updateDebug('CRT effect unavailable');
+            else updateDebug(enabled ? 'CRT effect enabled' : 'CRT effect disabled');
             saveUISettings(readUISettings());
         });
 

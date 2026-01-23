@@ -7,7 +7,7 @@
  */
 
 import { BinaryFile, Endianness } from '../core/BinaryFile';
-import { Direction, DBType, OBJECT_ID_NULL } from '../core/types';
+import { Direction, DBType, OBJECT_ID_NULL, Position } from '../core/types';
 import type { ui8, ui16, ui32, ObjectID, CellFlag } from '../core/types';
 import type {
     DungeonData,
@@ -30,6 +30,7 @@ import type {
     MissileRecord,
     CloudRecord
 } from './dungeonTypes';
+import { extractPresetHeroes } from './HeroExtractor';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -101,7 +102,7 @@ export class DungeonLoader {
 
         const { indirectTextIndex, compressedText } = this.buildIndirectText(textWords, databases.texts.records);
 
-        this.data = {
+        const data: DungeonData = {
             header,
             maps,
             databases,
@@ -114,6 +115,10 @@ export class DungeonLoader {
             item16: [],
             timers: []
         };
+
+        data.presetHeroes = extractPresetHeroes(data);
+
+        this.data = data;
 
         return this.data;
     }
@@ -134,12 +139,12 @@ export class DungeonLoader {
         // Decode starting position (word at 0x08)
         // Bits 11-10: facing, 9-5: Y coord, 4-0: X coord
         const startPosWord = this.file.readU16();
-        const startPosition = {
-            x: startPosWord & 0x1F,              // Bits 4-0
-            y: (startPosWord >> 5) & 0x1F,       // Bits 9-5
-            level: 0, // Will be set from map descriptors
-            facing: ((startPosWord >> 10) & 0x03) as Direction
-        };
+        const startPosition = new Position(
+            startPosWord & 0x1F,              // Bits 4-0
+            (startPosWord >> 5) & 0x1F,       // Bits 9-5
+            0, // Will be set from map descriptors
+        );
+        const facing = ((startPosWord >> 10) & 0x03) as Direction;
 
         const objectListSize = this.file.readU16();
 
@@ -155,6 +160,7 @@ export class DungeonLoader {
             numMaps,
             textDataSize,
             startPosition,
+            facing,
             objectListSize,
             objectCounts
         };
@@ -515,6 +521,7 @@ export class DungeonLoader {
                 nextObject,
                 broken: (attributes & 0x4000) !== 0,
                 charges: (attributes >> 10) & 0xF,
+                litTorch: (attributes & 0x8000) !== 0,
                 poisoned: (attributes & 0x200) !== 0,
                 cursed: (attributes & 0x100) !== 0,
                 important: (attributes & 0x80) !== 0,

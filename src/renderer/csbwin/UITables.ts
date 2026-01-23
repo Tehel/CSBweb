@@ -78,6 +78,8 @@ export interface UITables {
     word1398: WordRect;
     byte1390: number[];
     byte1386: number[];
+    byte640: number[];
+    carryLocation: number[];
     byte1094: WordRect;
     wRectPos966: WordRect;
     wRectPos958: WordRect;
@@ -377,6 +379,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // PaletteBrightness[6], Word1074[16], CarryLocation[38]
   off += 6 * 2;
   off += 16 * 2;
+  const carryLocation = readI16Array(view, off, 38);
   off += 38 * 2;
 
   const wRectPos966 = readWordRect(view, off); off += 8;
@@ -391,9 +394,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   const iconDisplay = readIconDisplay(view, off, 46); off += 46 * 6;
 
-  // Byte640[1], FILL(639,624) length 15
-  off += 1;
-  off += 15;
+  // Byte640[16] (torch charge to frame mapping)
+  const byte640 = Array.from(raw.slice(off, off + 16)); off += 16;
 
   // wRectPos624, FILL(616,612) length 4
   off += 8;
@@ -432,6 +434,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     word1398,
     byte1390,
     byte1386,
+    byte640,
+    carryLocation,
     byte1094,
     wRectPos966,
     wRectPos958,

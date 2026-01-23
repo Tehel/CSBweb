@@ -59,9 +59,8 @@ export class Game {
         // Initialize party at starting position
         const startPos = this.dungeonState.getStartPosition();
         const startFacing = this.dungeonState.getStartFacing();
-        const startMap = this.dungeonState.getStartMapIndex();
 
-        this.party = new Party(startPos, startFacing, startMap);
+        this.party = new Party(startPos, startFacing);
 
         // Initialize movement system
         this.movementSystem = new MovementSystem(this.party, this.dungeonState);

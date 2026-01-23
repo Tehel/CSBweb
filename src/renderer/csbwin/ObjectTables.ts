@@ -71,6 +71,11 @@ export interface ObjectTables {
   cloudPositions7222: Int16Array; // d.Word7222[30]
   cloudPositions7246: Int16Array; // d.Word7246[12]
   objDescGraphicClass: Uint8Array; // d.ObjDesc[180].graphicClass
+  objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
+  objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
+  weaponWeights: Uint8Array; // d.weapons[46].weight
+  clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
+  miscWeights: Uint8Array; // d.Byte8946[54]
 
   // Wall decorations
   wallDecorationRectSets: DecorationDesc[][]; // d.wallDecorationPosition[8][13]
@@ -133,6 +138,9 @@ const ABS_FLOOR_COLOR_MAP_FAR = 4140; // FarColorMapping[16]
 // Absolute offsets in CSBWin's `d` struct for graphic 0x22f (doc/CSBwin-src/Data.h).
 const ABS_22F_START = 10340; // Byte10340[4] - start of graphic 0x22f
 const ABS_OBJDESC = 8382; // ObjDesc[180]
+const ABS_WEAPONS = 8658; // weapons[46]
+const ABS_CLOTHING = 8890; // ClothingDesc[58]
+const ABS_BYTE8946 = 8946; // Byte8946[54]
 const ABS_MONSTER_DESC = 9664; // MonsterDescriptor[27]
 const ABS_BYTE10336 = 10336; // Byte10336[256]
 const ABS_BYTE10080 = 10080; // Byte10080[64]
@@ -283,6 +291,70 @@ function readObjDescGraphicClass22f(raw: Uint8Array): Uint8Array {
     out[i] = raw[start + i * stride + 2] ?? 0; // graphicClass byte
   }
   return out;
+}
+
+function readObjDescObjectType22f(raw: Uint8Array): Uint16Array {
+  const start = ABS_22F_START - ABS_OBJDESC;
+  const count = 180;
+  const stride = 6;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for ObjDesc[180].objectType');
+
+  const out = new Uint16Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = readU16BE(raw, start + i * stride + 0);
+  }
+  return out;
+}
+
+function readObjDescCarryMask22f(raw: Uint8Array): Uint16Array {
+  const start = ABS_22F_START - ABS_OBJDESC;
+  const count = 180;
+  const stride = 6;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for ObjDesc[180].word4');
+
+  const out = new Uint16Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = readU16BE(raw, start + i * stride + 4);
+  }
+  return out;
+}
+
+function readWeaponWeights22f(raw: Uint8Array): Uint8Array {
+  const start = ABS_22F_START - ABS_WEAPONS;
+  const count = 46;
+  const stride = 6;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for weapons[46]');
+
+  const out = new Uint8Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = raw[start + i * stride + 0] ?? 0;
+  }
+  return out;
+}
+
+function readClothingWeights22f(raw: Uint8Array): Uint8Array {
+  const start = ABS_22F_START - ABS_CLOTHING;
+  const count = 58;
+  const stride = 4;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for ClothingDesc[58]');
+
+  const out = new Uint8Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = raw[start + i * stride + 0] ?? 0;
+  }
+  return out;
+}
+
+function readMiscWeights22f(raw: Uint8Array): Uint8Array {
+  const start = ABS_22F_START - ABS_BYTE8946;
+  const count = 54;
+  const end = start + count;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for Byte8946[54]');
+  return raw.slice(start, end);
 }
 
 function readMonsterDesc22f(raw: Uint8Array): MonsterDesc[] {
@@ -456,6 +528,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const cloudPositions7042 = readI16Array(raw22e, word7042Offset, 30);
 
   const objDescGraphicClass = readObjDescGraphicClass22f(raw22f);
+  const objDescObjectType = readObjDescObjectType22f(raw22f);
+  const objDescCarryMask = readObjDescCarryMask22f(raw22f);
+  const weaponWeights = readWeaponWeights22f(raw22f);
+  const clothingWeights = readClothingWeights22f(raw22f);
+  const miscWeights = readMiscWeights22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
   const wallDecorationRectSetIndex = raw22e.slice(wallDecorationRectSetIndexOffset, wallDecorationRectSetIndexOffset + 60);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
@@ -521,6 +598,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     cloudPositions7222,
     cloudPositions7246,
     objDescGraphicClass,
+    objDescCarryMask,
+    objDescObjectType,
+    weaponWeights,
+    clothingWeights,
+    miscWeights,
     wallDecorationRectSets,
     wallDecorationRectSetIndex,
     wallTextLineY2,

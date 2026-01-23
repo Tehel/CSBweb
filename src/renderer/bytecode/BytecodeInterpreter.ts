@@ -279,6 +279,7 @@ export class BytecodeInterpreter {
     this.pc = 0;
     this.stack = [];
 
+    void cellNum;
     // Executing program for cell ${cellNum}
 
     // Main interpreter loop
@@ -887,6 +888,7 @@ export class BytecodeInterpreter {
   }
 
   private opCondition(opcode: number): boolean {
+    void opcode;
     // For prototype, all conditions are false (0)
     // Real implementation would check actual game state
     // Condition(${Opcode[opcode]}) -> 0
@@ -942,9 +944,9 @@ export class BytecodeInterpreter {
   }
 
   private opDrawAction(opcode: number): boolean {
+    void opcode;
     // Pop arguments (varies by opcode)
     // For prototype, just log the call
-    const opcodeName = Opcode[opcode];
     // ${opcodeName}(stack size: ${this.stack.length})
 
     // Clear stack for this drawing operation

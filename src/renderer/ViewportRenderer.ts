@@ -19,13 +19,12 @@ import {
   clearIndex,
   createPaletteIndexViewportBuffer,
   drawRectOutlineIndex,
-  flashRectIndex,
   fillRectIndex,
   tag0088b2Index,
   updateImageDataFromIndex,
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
-import { extractObjectTables } from './csbwin/ObjectTables';
+import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
 import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
@@ -41,6 +40,7 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { updateDebug, updateHover } from '@/ui';
 
 export enum UIMode {
@@ -66,9 +66,31 @@ export interface FloorCeiling {
 }
 
 const charColors = [7, 11, 8, 14];
+const OBJNI_COMPASS_N = 0;
+const OBJNI_TORCH_A = 4;
+const OBJNI_WATERSKIN = 8;
+const OBJNI_WATER = 9;
+const OBJNI_JEWEL_SYMAL_A = 10;
+const OBJNI_ILLUMULET_A = 12;
+const OBJNI_FLAMITT_A = 14;
+const OBJNI_EYE_OF_TIME_A = 16;
+const OBJNI_STORM_RING_A = 18;
+const OBJNI_STAFF_OF_CLAWS_A = 20;
+const OBJNI_STORM_A = 23;
+const OBJNI_RA_BLADE_A = 25;
+const OBJNI_OPEN_SCROLL = 30;
+const OBJNI_SCROLL = 31;
+const OBJNI_FIRST_MODIFIABLE = 0;
+const OBJNI_LAST_MODIFIABLE = 31;
+const OBJNI_ELVEN_BOOTS = 119;
+const OBJNI_FIRST_FULL_FLASK = 148;
+const OBJNI_LAST_FULL_FLASK = 163;
+const OBJNI_EMPTY_FLASK = 195;
 const OBJNI_SPECIAL_F = 204;
 const OBJNI_SPECIAL_J = 208;
 const OBJNI_SPECIAL_N = 212;
+const POTION_EMPTY_FLASK = 20;
+const DEFAULT_CHEST_WEIGHT = 50;
 
 /**
  * Main ViewportRenderer class
@@ -96,17 +118,14 @@ export class ViewportRenderer {
   private fontData: FontData | null = null;
   private messageLines: string[] = [];
   private partyState: PartyState | null = null;
+  private objectTables: ObjectTables | null = null;
   private hoverPoint: { x: number; y: number } | null = null;
   private showAttackPanel: boolean = false;
-  private lastFlashToggleMs: number = 0;
-  private flashOn: boolean = false;
-  private showSpellHighlights: boolean = false;
   private primaryButtons: UIButton[] | null = null; // graphic231 -> buttons17196
   private secondaryButtons: UIButton[] | null = null; // graphic231 -> buttons17304
   private mouseQueue: Array<{ num: number; x: number; y: number }> = [];
   private mouseQStart: number = 0;
   private mouseQEnd: number = 0;
-  private lastMagicButtonId: number = 0;
   private uiMode: UIMode = UIMode.Adventure;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
 
@@ -140,6 +159,7 @@ export class ViewportRenderer {
     const viewportTables = extractViewportTables(this.graphicsLoader);
     console.log(`Extracted wallRectangles[14] from 0x22e at offset 0x${viewportTables.wallRectanglesOffset.toString(16)}`);
     const objectTables = extractObjectTables(this.graphicsLoader, viewportTables.wallRectanglesOffset);
+    this.objectTables = objectTables;
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
     this.uiTables = extractUITables(this.graphicsLoader);
@@ -582,6 +602,93 @@ export class ViewportRenderer {
     this.drawFoodWaterBar(champion.water ?? 0, 92, 14);
   }
 
+  private drawVitalsAndLoad(champion: Champion): void {
+    if (!this.fontData || !this.screenIndexBuffer) return;
+
+    const attrs = champion.attributes;
+    const health = attrs?.health ?? 0;
+    const maxHealth = attrs?.maxHealth ?? 0;
+    const stamina = Math.floor((attrs?.stamina ?? 0) / 10);
+    const maxStamina = Math.floor((attrs?.maxStamina ?? 0) / 10);
+    const mana = attrs?.mana ?? 0;
+    const maxMana = attrs?.maxMana ?? 0;
+
+    const baseX = VIEWPORT_X + 54;
+    const slashX = VIEWPORT_X + 72;
+    const maxX = VIEWPORT_X + 78;
+    const labelX = VIEWPORT_X + 4;
+    const lineHealth = VIEWPORT_Y + 116;
+    const lineStamina = VIEWPORT_Y + 124;
+    const lineMana = VIEWPORT_Y + 132;
+    const vitalsColor = 13;
+
+    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineHealth, vitalsColor, null, 'HEALTH');
+    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineStamina, vitalsColor, null, 'STAMINA');
+    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineMana, vitalsColor, null, 'MANA');
+
+    this.drawLifeForceLine(baseX, slashX, maxX, lineHealth, health, maxHealth, vitalsColor);
+    this.drawLifeForceLine(baseX, slashX, maxX, lineStamina, stamina, maxStamina, vitalsColor);
+    this.drawLifeForceLine(baseX, slashX, maxX, lineMana, mana, maxMana, vitalsColor);
+
+    const loadInfo = this.computeChampionLoad(champion);
+    if (!loadInfo) return;
+    const { load, maxLoad, color } = loadInfo;
+    drawTextLineIndex(
+      this.screenIndexBuffer,
+      this.fontData,
+      VIEWPORT_X + 103,
+      lineMana,
+      color,
+      null,
+      'LOAD'
+    );
+    drawTextLineIndex(
+      this.screenIndexBuffer,
+      this.fontData,
+      VIEWPORT_X + 147,
+      lineMana,
+      color,
+      null,
+      `${this.formatLoad(load)}/${this.formatMaxLoad(maxLoad)} KG`
+    );
+  }
+
+  private drawLifeForceLine(
+    xCurrent: number,
+    xSlash: number,
+    xMax: number,
+    y: number,
+    current: number,
+    max: number,
+    color: number
+  ): void {
+    if (!this.fontData || !this.screenIndexBuffer) return;
+    drawTextLineIndex(
+      this.screenIndexBuffer,
+      this.fontData,
+      xCurrent,
+      y,
+      color,
+      null,
+      this.formatLifeValue(current)
+    );
+    drawTextLineIndex(this.screenIndexBuffer, this.fontData, xSlash, y, color, null, '/');
+    drawTextLineIndex(
+      this.screenIndexBuffer,
+      this.fontData,
+      xMax,
+      y,
+      color,
+      null,
+      this.formatLifeValue(max)
+    );
+  }
+
+  private formatLifeValue(value: number): string {
+    const clamped = Math.max(0, Math.min(9999, Math.floor(value)));
+    return String(clamped).padStart(3, ' ');
+  }
+
   private drawFoodWaterBar(value: number, y: number, color: number): void {
     let barColor = color;
     if (value < 0) barColor = 11;
@@ -914,15 +1021,33 @@ export class ViewportRenderer {
 
     if (this.fontData) {
       const nameColor = this.partyState.cursorOwner === selected ? 9 : 13;
+      const nameBaseX = VIEWPORT_X + 2;
       drawTextLineIndex(
         this.screenIndexBuffer,
         this.fontData,
-        VIEWPORT_X + 3,
+        nameBaseX,
         VIEWPORT_Y + 7,
         nameColor,
         12,
         champion.name
       );
+      const title = champion.title ?? '';
+      if (title.length > 0) {
+        let titleX = nameBaseX + champion.name.length * 6;
+        const firstChar = title.charCodeAt(0);
+        if (firstChar !== 44 && firstChar !== 59 && firstChar !== 45) {
+          titleX += 6;
+        }
+        drawTextLineIndex(
+          this.screenIndexBuffer,
+          this.fontData,
+          titleX,
+          VIEWPORT_Y + 7,
+          nameColor,
+          12,
+          title
+        );
+      }
     }
 
     for (let slot = 0; slot < 30; slot++) {
@@ -940,6 +1065,7 @@ export class ViewportRenderer {
     }
 
     this.drawFoodWaterPanel(champion);
+    this.drawVitalsAndLoad(champion);
   }
 
   private getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
@@ -957,11 +1083,302 @@ export class ViewportRenderer {
     const possessions = champion.possessions;
     if (possessions && slot >= 0 && slot < possessions.length) {
       const value = possessions[slot];
-      if (typeof value === 'number') return value | 0;
+      if (typeof value === 'number') return this.resolveObjectNameIndex(value | 0);
     }
-    if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand | 0;
-    if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand | 0;
+    if (slot === 0 && typeof champion.shieldHand === 'number') {
+      return this.resolveObjectNameIndex(champion.shieldHand | 0);
+    }
+    if (slot === 1 && typeof champion.weaponHand === 'number') {
+      return this.resolveObjectNameIndex(champion.weaponHand | 0);
+    }
     return -1;
+  }
+
+  private resolveObjectNameIndex(value: number): number {
+    if (value < 0) return -1;
+    if (!this.objectTables) return value | 0;
+    const descIndex = this.descIndexForObject(value as ObjectID);
+    if (descIndex === null) return value | 0;
+    let objectType = this.objectTables.objDescObjectType[descIndex];
+    if (typeof objectType !== 'number') return value | 0;
+
+    objectType |= 0;
+    if (
+      objectType > OBJNI_LAST_MODIFIABLE ||
+      objectType < OBJNI_FIRST_MODIFIABLE
+    ) {
+      if (objectType < OBJNI_FIRST_FULL_FLASK || objectType > OBJNI_LAST_FULL_FLASK) {
+        if (objectType !== OBJNI_EMPTY_FLASK) return objectType;
+      }
+    }
+
+    if (objectType === OBJNI_COMPASS_N) {
+      const facing = this.partyState?.facing ?? 0;
+      return (objectType + (facing & 0x3)) | 0;
+    }
+
+    if (objectType === OBJNI_TORCH_A) {
+      const weapon = this.dungeonState.getWeaponRecord(value as ObjectID);
+      if (weapon?.litTorch) {
+        const charge = weapon.charges ?? 0;
+        const byte640 = this.uiTables?.graphic232.byte640 ?? [];
+        const offset = byte640[charge] ?? 0;
+        return (objectType + (offset & 0xff)) | 0;
+      }
+      return objectType;
+    }
+
+    if (objectType === OBJNI_OPEN_SCROLL) {
+      const scroll = this.dungeonState.getScrollRecord(value as ObjectID);
+      if (scroll && !scroll.open) return OBJNI_SCROLL;
+      return objectType;
+    }
+
+    if (
+      objectType === OBJNI_WATERSKIN ||
+      objectType === OBJNI_ILLUMULET_A ||
+      objectType === OBJNI_JEWEL_SYMAL_A
+    ) {
+      const misc = this.dungeonState.getMiscRecord(value as ObjectID);
+      if (misc && misc.specialState !== 0) return objectType + 1;
+      return objectType;
+    }
+
+    if (
+      objectType === OBJNI_STORM_A ||
+      objectType === OBJNI_FLAMITT_A ||
+      objectType === OBJNI_STORM_RING_A ||
+      objectType === OBJNI_RA_BLADE_A ||
+      objectType === OBJNI_EYE_OF_TIME_A ||
+      objectType === OBJNI_STAFF_OF_CLAWS_A
+    ) {
+      const weapon = this.dungeonState.getWeaponRecord(value as ObjectID);
+      if (weapon && weapon.charges > 0) return objectType + 1;
+      return objectType;
+    }
+
+    return objectType;
+  }
+
+  private descIndexForObject(rn: ObjectID): number | null {
+    const { category } = decodeObjectID(rn);
+    switch (category) {
+      case DBType.SCROLL:
+        return 0;
+      case DBType.CHEST: {
+        const rec = this.dungeonState.getContainerRecord(rn);
+        return rec ? 1 + (rec.containerType & 0xff) : null;
+      }
+      case DBType.POTION: {
+        const rec = this.dungeonState.getPotionRecord(rn);
+        return rec ? 2 + (rec.potionType & 0xff) : null;
+      }
+      case DBType.WEAPON: {
+        const rec = this.dungeonState.getWeaponRecord(rn);
+        return rec ? 23 + (rec.weaponType & 0xff) : null;
+      }
+      case DBType.CLOTHING: {
+        const rec = this.dungeonState.getClothingRecord(rn);
+        return rec ? 69 + (rec.clothingType & 0xff) : null;
+      }
+      case DBType.MISC: {
+        const rec = this.dungeonState.getMiscRecord(rn);
+        return rec ? 127 + (rec.miscType & 0xff) : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  private computeChampionLoad(champion: Champion): { load: number; maxLoad: number; color: number } | null {
+    if (!this.objectTables) return null;
+    const load = this.computeLoadWeight(champion);
+    const maxLoad = this.computeMaxLoad(champion);
+    const color = this.getLoadColor(load, maxLoad);
+    return { load, maxLoad, color };
+  }
+
+  private computeLoadWeight(champion: Champion): number {
+    if (!this.objectTables) return 0;
+    const visited = new Set<number>();
+    const items: Array<number | null | undefined> = champion.possessions?.length
+      ? champion.possessions
+      : [champion.shieldHand, champion.weaponHand, champion.quiver];
+    let total = 0;
+    for (const item of items) {
+      if (typeof item !== 'number') continue;
+      total += this.getObjectWeight(item, visited);
+    }
+    return total;
+  }
+
+  private getObjectWeight(value: number, visited: Set<number>): number {
+    if (!this.objectTables) return 0;
+    if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return 0;
+    if (this.isLikelyObjectRecord(value)) {
+      return this.getObjectWeightForRecord(value as ObjectID, visited);
+    }
+    return this.getObjectWeightForObjectType(value | 0);
+  }
+
+  private isLikelyObjectRecord(value: number): boolean {
+    const { category, index } = decodeObjectID(value as ObjectID);
+    switch (category) {
+      case DBType.WEAPON:
+        return index < this.dungeonState.getData().databases.weapons.records.length;
+      case DBType.CLOTHING:
+        return index < this.dungeonState.getData().databases.clothing.records.length;
+      case DBType.SCROLL:
+        return index < this.dungeonState.getData().databases.scrolls.records.length;
+      case DBType.POTION:
+        return index < this.dungeonState.getData().databases.potions.records.length;
+      case DBType.CHEST:
+        return index < this.dungeonState.getData().databases.containers.records.length;
+      case DBType.MISC:
+        return index < this.dungeonState.getData().databases.misc.records.length;
+      default:
+        return false;
+    }
+  }
+
+  private getObjectWeightForRecord(rn: ObjectID, visited: Set<number>): number {
+    if (!this.objectTables) return 0;
+    if (visited.has(rn)) return 0;
+    visited.add(rn);
+
+    const { category } = decodeObjectID(rn);
+    switch (category) {
+      case DBType.WEAPON: {
+        const rec = this.dungeonState.getWeaponRecord(rn);
+        if (!rec) return 0;
+        return this.objectTables.weaponWeights[rec.weaponType] ?? 0;
+      }
+      case DBType.CLOTHING: {
+        const rec = this.dungeonState.getClothingRecord(rn);
+        if (!rec) return 0;
+        return this.objectTables.clothingWeights[rec.clothingType] ?? 0;
+      }
+      case DBType.SCROLL:
+        return 1;
+      case DBType.POTION: {
+        const rec = this.dungeonState.getPotionRecord(rn);
+        if (!rec) return 0;
+        return rec.potionType === POTION_EMPTY_FLASK ? 1 : 3;
+      }
+      case DBType.MISC: {
+        const rec = this.dungeonState.getMiscRecord(rn);
+        if (!rec) return 0;
+        let weight = this.objectTables.miscWeights[rec.miscType] ?? 0;
+        if (rec.miscType === 1) {
+          weight += 2 * (rec.specialState ?? 0);
+        }
+        return weight;
+      }
+      case DBType.CHEST: {
+        const rec = this.dungeonState.getContainerRecord(rn);
+        let total = DEFAULT_CHEST_WEIGHT;
+        let obj = rec?.containedObject ?? OBJECT_ID_EOF;
+        while (obj !== OBJECT_ID_EOF && obj !== OBJECT_ID_NULL) {
+          total += this.getObjectWeight(obj, visited);
+          obj = this.dungeonState.getDBRecordLink(obj);
+        }
+        return total;
+      }
+      default:
+        return 0;
+    }
+  }
+
+  private getObjectWeightForObjectType(objectType: number): number {
+    if (!this.objectTables) return 0;
+    let descIndex = this.getDescIndexForObjectType(objectType);
+    if (descIndex === null) {
+      if (objectType === OBJNI_SCROLL || objectType === OBJNI_OPEN_SCROLL) return 1;
+      if (objectType === OBJNI_WATERSKIN || objectType === OBJNI_WATER) {
+        descIndex = 127 + 1;
+      }
+      if (descIndex === null) {
+        if (objectType === OBJNI_EMPTY_FLASK) return 1;
+        if (objectType >= OBJNI_FIRST_FULL_FLASK && objectType <= OBJNI_LAST_FULL_FLASK) return 3;
+        return 0;
+      }
+    }
+
+    if (descIndex === 0) return 1;
+    if (descIndex === 1) return DEFAULT_CHEST_WEIGHT;
+    if (descIndex >= 2 && descIndex <= 22) {
+      if (objectType === OBJNI_EMPTY_FLASK) return 1;
+      return 3;
+    }
+    if (descIndex >= 23 && descIndex <= 68) {
+      return this.objectTables.weaponWeights[descIndex - 23] ?? 0;
+    }
+    if (descIndex >= 69 && descIndex <= 126) {
+      return this.objectTables.clothingWeights[descIndex - 69] ?? 0;
+    }
+    if (descIndex >= 127 && descIndex <= 179) {
+      let weight = this.objectTables.miscWeights[descIndex - 127] ?? 0;
+      if (objectType === OBJNI_WATER) weight += 6;
+      return weight;
+    }
+    return 0;
+  }
+
+  private getDescIndexForObjectType(objectType: number): number | null {
+    if (!this.objectTables) return null;
+    const table = this.objectTables.objDescObjectType;
+    for (let i = 0; i < table.length; i++) {
+      if (table[i] === objectType) return i;
+    }
+    return null;
+  }
+
+  private computeMaxLoad(champion: Champion): number {
+    const strength = champion.attributes?.strength ?? 0;
+    let maxLoad = 8 * strength + 100;
+    maxLoad = this.staminaAdjustedAttribute(champion, maxLoad);
+
+    const wounds = champion.wounds ?? 0;
+    if (wounds !== 0) {
+      const shift = (wounds & 0x10) !== 0 ? 2 : 3;
+      maxLoad -= maxLoad >> shift;
+    }
+
+    const feetItem = this.getInventoryItemIndex(champion, 5);
+    if (feetItem === OBJNI_ELVEN_BOOTS) {
+      maxLoad += maxLoad >> 4;
+    }
+
+    maxLoad += 9;
+    maxLoad -= maxLoad % 10;
+    return maxLoad;
+  }
+
+  private staminaAdjustedAttribute(champion: Champion, base: number): number {
+    const stamina = champion.attributes?.stamina ?? 0;
+    const maxStamina = champion.attributes?.maxStamina ?? 0;
+    const half = Math.floor(maxStamina / 2);
+    if (half <= 0 || stamina >= half) return base;
+
+    const halfBase = Math.floor(base / 2);
+    return halfBase + Math.floor((halfBase * stamina) / half);
+  }
+
+  private getLoadColor(load: number, maxLoad: number): number {
+    if (maxLoad <= 0) return 13;
+    if (load > maxLoad) return 8;
+    if (load * 8 > maxLoad * 5) return 11;
+    return 13;
+  }
+
+  private formatLoad(value: number): string {
+    const whole = Math.floor(value / 10);
+    const frac = Math.abs(value % 10);
+    return `${String(whole).padStart(3, ' ')}.${frac}`;
+  }
+
+  private formatMaxLoad(value: number): string {
+    return String(Math.floor((value + 5) / 10)).padStart(3, ' ');
   }
 
   private getInventoryPlaceholderIndex(champion: Champion, slot: number): number {
@@ -998,7 +1415,9 @@ export class ViewportRenderer {
 
       if (alive) {
         const iconRect = { x1: x1 + 2, y1: 95, x2: x2 - 2, y2: 110 };
-        const iconIndex = typeof champion?.weaponHand === 'number' ? (champion.weaponHand | 0) : -1;
+        const iconIndex = typeof champion?.weaponHand === 'number'
+          ? this.resolveObjectNameIndex(champion.weaponHand | 0)
+          : -1;
         if (iconIndex >= 0) {
           this.drawObjectIconMask(iconRect, iconIndex, word612, this.uiTables.graphic230.shrinkColorMap);
         } else {
@@ -1284,15 +1703,6 @@ export class ViewportRenderer {
     return Math.min(25, Math.ceil((25 * current) / max));
   }
 
-  private getFlashPhase(): boolean {
-    const now = Date.now();
-    if (now - this.lastFlashToggleMs >= 200) {
-      this.lastFlashToggleMs = now;
-      this.flashOn = !this.flashOn;
-    }
-    return this.flashOn;
-  }
-
   private searchButtonList(list: UIButton[] | null, x: number, y: number, buttons: number): number {
     if (!list || list.length === 0) return 0;
     for (const entry of list) {
@@ -1374,7 +1784,6 @@ export class ViewportRenderer {
 
     const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
-      this.lastMagicButtonId = magicButton; // used for flashing the button (TODO)
       this.applyMagicSelection(magicButton);
     }
   }

@@ -5,7 +5,7 @@
  * Used for extended wall/floor decorations (ReadWallDecoration/ReadFloorDecoration).
  */
 
-import type { ui8, ui16, ui32 } from '../core/types';
+import type { ui16, ui32 } from '../core/types';
 
 export enum CSBGraphicType {
   ViewportOverlay = 0,
