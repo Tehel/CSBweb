@@ -7,6 +7,12 @@
 import { DBType, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
 import type { Champion } from './gameTypes';
+import { createSkillsFromSubskillLevels } from './skills';
+
+const FIGHTER_SUBSKILLS = ['Swing', 'Thrust', 'Club', 'Parry'];
+const NINJA_SUBSKILLS = ['Steal', 'Fight', 'Throw', 'Shoot'];
+const PRIEST_SUBSKILLS = ['Identify', 'Heal', 'Influence', 'Defend'];
+const WIZARD_SUBSKILLS = ['Fire', 'Air', 'Earth', 'Water'];
 
 export interface AddCharacterTables {
   carryLocation: ArrayLike<number>;
@@ -92,6 +98,7 @@ export function createChampionFromPreset(
   const priest = maxSkill(hero.priest);
   const wizard = maxSkill(hero.wizard);
   const slots = possessions ?? new Array(30).fill(null);
+  const skills = createSkillsFromSubskillLevels(getPresetSubskillLevels(hero));
 
   return {
     name: hero.name,
@@ -121,6 +128,7 @@ export function createChampionFromPreset(
     incantation: [],
     food: 1500,
     water: 1500,
+    skills,
     weaponHand: slots[1] ?? null,
     shieldHand: slots[0] ?? null,
     quiver: slots[8] ?? null,
@@ -136,6 +144,22 @@ function maxSkill(skills: Record<string, number>): number {
     if (value > max) max = value;
   }
   return max;
+}
+
+function getPresetSubskillLevels(hero: PresetHero): number[] {
+  return [
+    ...collectLevels(hero.fighter, FIGHTER_SUBSKILLS),
+    ...collectLevels(hero.ninja, NINJA_SUBSKILLS),
+    ...collectLevels(hero.priest, PRIEST_SUBSKILLS),
+    ...collectLevels(hero.wizard, WIZARD_SUBSKILLS),
+  ];
+}
+
+function collectLevels(skills: Record<string, number>, names: string[]): number[] {
+  return names.map((name) => {
+    const value = skills[name];
+    return typeof value === 'number' ? value : 0;
+  });
 }
 
 function getCarryLocation(carryLocation: ArrayLike<number>, slot: number): number {

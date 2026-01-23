@@ -20,6 +20,8 @@ import type { ObjectTables } from '../csbwin/ObjectTables';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 
+const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
+
 /**
  * Execution context - simulates CSBWin's global state
  */
@@ -76,12 +78,14 @@ export interface InterpreterContext {
   // Viewport canvas for drawing
   viewportContext: CanvasRenderingContext2D;
   viewportIndexBuffer?: PaletteIndexViewportBuffer;
+  seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2639)
 
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
 
   // Per-frame wall decoration hit rects (viewport coordinates)
   wallDecorationRects?: RectPos[];
+
 }
 
 /**
@@ -265,6 +269,7 @@ export class BytecodeInterpreter {
   private mirrorCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
   private flipCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
   private graphicRandomState = 12345;
+  private removeMortarJoint = true;
 
   constructor(context: InterpreterContext) {
     this.context = context;
@@ -278,6 +283,7 @@ export class BytecodeInterpreter {
     this.program = program;
     this.pc = 0;
     this.stack = [];
+    this.removeMortarJoint = true;
 
     void cellNum;
     // Executing program for cell ${cellNum}
@@ -332,6 +338,14 @@ export class BytecodeInterpreter {
 
       case Opcode.GetDecoration0:
         return this.opGetDecoration0();
+
+      case Opcode.SeeThroughWalls:
+        this.stack.push(this.context.seeThroughWalls ? 1 : 0);
+        return true;
+
+      case Opcode.LeaveMortarJoint:
+        this.removeMortarJoint = false;
+        return true;
 
       // Bitmap opcodes - push bitmap pointer to stack
       case Opcode.StdWallBitmapF3L2:
@@ -1129,7 +1143,8 @@ export class BytecodeInterpreter {
 
     const rd = this.context.roomData[relativeCell | 0];
     const textRN = rd?.text[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? OBJECT_ID_EOF;
-    this.drawWallText(textRN as ObjectID, wallDecorationDrawLocation | 0);
+    this.drawWallText(textRN as ObjectID, wallDecorationDrawLocation | 0, this.removeMortarJoint);
+    this.removeMortarJoint = true;
     return true;
   }
 
@@ -1158,11 +1173,12 @@ export class BytecodeInterpreter {
     if (graphicIndex < 0 || graphicIndex > numWallDecoration) return;
 
     const decorationIndex = graphicIndex === numWallDecoration ? 0 : (map.wallDecorationTOC[graphicIndex] ?? 0);
-    const rectSet = tables.wallDecorationRectSetIndex[decorationIndex] ?? 0;
-    const rectSetIndex = rectSet & 0xff;
+    const rectSetId = tables.wallDecorationRectSetIndex[decorationIndex] ?? 0;
+    const rectSetIndex = rectSetId & 0xff;
     if (rectSetIndex >= tables.wallDecorationRectSets.length) return;
 
-    const desc = tables.wallDecorationRectSets[rectSetIndex]?.[relativePosition];
+    const rectSet = tables.wallDecorationRectSets[rectSetIndex];
+    const desc = rectSet?.[relativePosition];
     if (!desc) return;
 
     const x1 = desc.x1 | 0;
@@ -1180,12 +1196,42 @@ export class BytecodeInterpreter {
     const src = getGraphic(graphicNum);
     if (!src) return;
 
-    // CSBWin mirrors decorations on right-side walls (F3R1/F2R1/F1R1 left walls).
-    const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
     const distanceBand = Math.floor(relativePosition / 5); // 0=F3, 1=F2, 2=F1
-    const colorMap = distanceBand === 0 ? tables.colorMapFar : distanceBand === 1 ? tables.colorMapMedium : null;
+    const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
 
-    const scaled = this.scaleIndexedBitmap(src, dstW, dstH, colorMap ?? undefined, mirror);
+    if (relativePosition >= 10) {
+      const bitmap = mirror ? this.getMirroredBitmap(src) : src;
+      bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2 });
+      if (this.context.wallDecorationRects && distanceBand === 2) {
+        this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
+      }
+      return;
+    }
+
+    const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
+    let pWidthDescriptor = desc;
+    let pSrcSizeDescriptor = rectSet?.[12];
+    if (relativePosition === 6 || relativePosition === 1) {
+      pSrcSizeDescriptor = rectSet?.[11];
+    } else if (relativePosition === 5 || relativePosition === 0) {
+      pSrcSizeDescriptor = rectSet?.[10];
+    }
+    if (relativePosition === 7 || relativePosition === 9) {
+      pWidthDescriptor = rectSet?.[8] ?? desc;
+    }
+    const finalBitmapWidth = (pWidthDescriptor.x2 | 0) - (pWidthDescriptor.x1 | 0);
+    let widthPixels = src.width | 0;
+    let heightPixels = src.height | 0;
+    widthPixels = (widthPixels + 15) & ~15;
+    let widthBytes = widthPixels >> 1;
+    if (pSrcSizeDescriptor) {
+      if (widthBytes > (pSrcSizeDescriptor.widthBytes | 0)) widthBytes = pSrcSizeDescriptor.widthBytes | 0;
+      if (heightPixels > (pSrcSizeDescriptor.height | 0)) heightPixels = pSrcSizeDescriptor.height | 0;
+    }
+    widthPixels = widthBytes * 2;
+    const cropped = this.cropBitmap(src, widthPixels, heightPixels);
+
+    const scaled = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
     bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2 });
 
     if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
@@ -1220,8 +1266,8 @@ export class BytecodeInterpreter {
 
     if (relativePosition >= 10) {
       const mirror = relativePosition === 11;
-      const scaled = this.scaleIndexedBitmap(srcBitmap, dstW, dstH, undefined, mirror);
-      bltShapeToViewportIndex(scaled, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
+      const bitmap = mirror ? this.getMirroredBitmap(srcBitmap) : srcBitmap;
+      bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
       return;
     }
 
@@ -1250,7 +1296,7 @@ export class BytecodeInterpreter {
 
     const cropped = this.cropBitmap(srcBitmap, widthPixels, heightPixels);
     const distanceBand = relativePosition <= 4 ? 0 : 1;
-    const colorMap = distanceBand === 0 ? tables.colorMapFar : tables.colorMapMedium;
+    const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
     let derived = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
 
     let srcOffsetX = 0;
@@ -1277,7 +1323,7 @@ export class BytecodeInterpreter {
     }
   }
 
-  private drawWallText(textRN: ObjectID, relativePosition: number): void {
+  private drawWallText(textRN: ObjectID, relativePosition: number, removeMortarJoint: boolean): void {
     if (textRN === OBJECT_ID_EOF) return;
 
     const tables = this.context.objectTables;
@@ -1286,8 +1332,12 @@ export class BytecodeInterpreter {
     const getGraphic = this.context.getGraphicBitmap;
     if (!tables || !dungeon || !viewport || !getGraphic) return;
 
-    // CSBWin draws wall text only on the front wall immediately in front of the party (relativePosition==12).
-    if (relativePosition !== 12) return;
+    // CSBWin draws real text only on the front wall immediately in front of the party (relativePosition==12).
+    if (relativePosition !== 12) {
+      const numWallDecoration = this.context.numWallDecoration ?? 0;
+      this.drawWallDecoration(numWallDecoration + 1, relativePosition);
+      return;
+    }
 
     const rec = dungeon.getTextRecord(textRN);
     if (!rec) return;
@@ -1301,6 +1351,26 @@ export class BytecodeInterpreter {
 
     const font = getGraphic(120);
     if (!font) return;
+
+    if (removeMortarJoint) {
+      const wall = this.context.wallBitmaps?.[2];
+      const wallRect = this.context.wallRectangles?.[6];
+      const wallTextRect = tables.wallTextRect;
+      if (wall && wallRect && wallTextRect) {
+        const rect: RectPos = {
+          x1: wallTextRect.x1,
+          x2: wallTextRect.x2,
+          y1: wallTextRect.y1,
+          y2: wallTextRect.y2,
+          srcX: 94,
+          srcY: 28,
+          srcStride: wallRect.srcStride,
+          srcWidth: wallRect.srcWidth,
+          srcHeight: wallRect.srcHeight,
+        };
+        tag0088b2Index(wall, viewport, rect, -1);
+      }
+    }
 
     let idx = 0;
     let lineIdx = 0;
@@ -1531,26 +1601,9 @@ export class BytecodeInterpreter {
     colorMap?: Uint8Array,
     mirror?: boolean
   ): IndexedBitmap {
-    const out = new Uint8Array(dstWidth * dstHeight);
-    const srcW = src.width;
-    const srcH = src.height;
-    const srcPx = src.pixels;
-    const useMap = colorMap && colorMap.length >= 16;
-
-    for (let y = 0; y < dstHeight; y++) {
-      const sy = Math.min(srcH - 1, Math.floor(((y * 2 + 1) * srcH) / (dstHeight * 2)));
-      const dstRow = y * dstWidth;
-      const srcRow = sy * srcW;
-      for (let x = 0; x < dstWidth; x++) {
-        const sx0 = Math.min(srcW - 1, Math.floor(((x * 2 + 1) * srcW) / (dstWidth * 2)));
-        const sx = mirror ? srcW - 1 - sx0 : sx0;
-        const v = srcPx[srcRow + sx] & 0x0f;
-        out[dstRow + x] = useMap ? this.mapColorValue(colorMap!, v) : v;
-      }
-    }
-
-    const bmp = { width: dstWidth, height: dstHeight, pixels: out };
-    return bmp;
+    const map = colorMap && colorMap.length >= 16 ? colorMap : IDENTITY_COLOR_MAP;
+    const scaled = this.shrinkBltIndexedBitmap(src, dstWidth, dstHeight, map);
+    return mirror ? this.getMirroredBitmap(scaled) : scaled;
   }
 
   private mapColorValue(colorMap: Uint8Array, index: number): number {
@@ -2287,20 +2340,46 @@ export class BytecodeInterpreter {
   }
 
   private shrinkChunky(src: IndexedBitmap, dstWidth: number, dstHeight: number, colorMap: Uint8Array): IndexedBitmap {
+    const map = colorMap && colorMap.length >= 16 ? colorMap : IDENTITY_COLOR_MAP;
+    return this.shrinkBltIndexedBitmap(src, dstWidth, dstHeight, map);
+  }
+
+  private shrinkBltIndexedBitmap(
+    src: IndexedBitmap,
+    dstWidth: number,
+    dstHeight: number,
+    colorMap: Uint8Array
+  ): IndexedBitmap {
     const out = new Uint8Array(dstWidth * dstHeight);
-    const srcW = src.width;
-    const srcH = src.height;
+    const srcW = src.width | 0;
+    const srcH = src.height | 0;
     const srcPx = src.pixels;
 
+    if (dstWidth <= 0 || dstHeight <= 0 || srcW <= 0 || srcH <= 0) {
+      return { width: dstWidth, height: dstHeight, pixels: out };
+    }
+
+    const stepX = ((Math.floor(((srcW << 10) >>> 0) / dstWidth) & 0xffff) << 6) >>> 0;
+    const stepY = ((Math.floor(((srcH << 10) >>> 0) / dstHeight) & 0xffff) << 6) >>> 0;
+    const startX = ((stepX >>> 1) + 0x7fff) >>> 0;
+    let accY = ((stepY >>> 1) + 0x7fff) >>> 0;
+
     for (let y = 0; y < dstHeight; y++) {
-      const sy = Math.min(srcH - 1, Math.floor(((y * 2 + 1) * srcH) / (dstHeight * 2)));
+      const srcY = accY >>> 16;
+      const rowY = srcY >= srcH ? srcH - 1 : srcY;
+      const srcRow = rowY * srcW;
       const dstRow = y * dstWidth;
-      const srcRow = sy * srcW;
+      let accX = startX;
+
       for (let x = 0; x < dstWidth; x++) {
-        const sx = Math.min(srcW - 1, Math.floor(((x * 2 + 1) * srcW) / (dstWidth * 2)));
-        const v = srcPx[srcRow + sx] & 0x0f;
+        const srcX = accX >>> 16;
+        const colX = srcX >= srcW ? srcW - 1 : srcX;
+        const v = srcPx[srcRow + colX] & 0x0f;
         out[dstRow + x] = this.mapColorValue(colorMap, v);
+        accX = (accX + stepX) >>> 0;
       }
+
+      accY = (accY + stepY) >>> 0;
     }
 
     return { width: dstWidth, height: dstHeight, pixels: out };

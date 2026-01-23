@@ -104,7 +104,7 @@ export function bindUIEvents(): void {
         });
 
         logButton?.addEventListener('click', () => {
-            const logEl = document.getElementById('debug');
+            const logEl = document.getElementById('log');
             if (!logEl) return;
             const visible = logEl.style.display !== 'none';
             logEl.style.display = visible ? 'none' : 'block';

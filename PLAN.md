@@ -158,16 +158,14 @@ Goal: render the original Dungeon Master UI (portraits, status bars, hands, cont
 8. ✅ **Portraits**. Wire `portraitGraphic` to champion data, load internal/external portrait graphics, render real portraits in the top bar and inventory, and add shield dots with the correct per-champion offsets and colors.
    - Note: shield dot rendering is wired but shield values are not yet populated by gameplay state (`partyShield`, `fireShield`, `spellShield`, `champion.shieldStrength`).
 9. ✅ **Status bars**. Implement health/stamina/mana bars in the top bar using CSBWin masks and height rounding with per‑champion colors.
-10. ⏳ **Inventory screen**. Build the full inventory layout (paper-doll slots, backpack grid, load readout, eye/mouth overlays) and hook item icons to equipment/backpack state with the correct slot geometry.
+10. ⏳ **Inventory screen**. Build the full inventory layout (paper-doll slots, backpack grid, eye/mouth overlays) and hook item icons to equipment/backpack state with the correct slot geometry.
    - Remaining inventory UI work:
-     - Character stats panel (skills + attributes)
-     - Load readout (current/max KG)
      - Eye/mouth overlays + stat-dependent highlight boxes
      - Chest/scroll subviews
      - Object-in-hand/selection interactions
-11. ⏳ **Character stats**. Render stat panels (attributes and skill titles/levels) using CSBWin text layout, including base values, modifiers, and any highlight states.
+11. ✅ **Character stats**. Render stat panels (attributes and skill titles/levels) using CSBWin text layout, including base values, modifiers, and any highlight states.
 12. ⏳ **Chests + scrolls**. Implement chest grid view and scroll view layouts, render item slots/scroll pages, and connect them to container/scroll data for selection and paging.
-13. ⏳ **Magic panel**. Render the spell panel contents (rune slots, selected runes, and labels), implement highlight/flash rectangles, and gate visibility by caster state.
+13. ⏳ **Magic panel**. Render the spell panel contents (rune slots, selected runes, and labels), implement highlight/flash rectangles, and gate visibility by caster state (remaining: rune click flash effect).
 14. ⏳ **Attack panel**. Replace placeholder action labels with real `PossibleAttackTypes`/weapon actions, gate options by attack state, and display the correct action names and availability per champion/hand.
 15. ⏳ **Interaction highlights**. Add button press/selection effects (flash, shading, or invert) across UI regions, and ensure highlight behavior is consistent with hit-test rectangles and current UI mode.
 
@@ -189,8 +187,10 @@ Status:
 - ✅ Status bars now render with CSBWin masks and empty‑bar color 15, filling per‑champion colors at the correct height (`src/renderer/ViewportRenderer.ts`).
 - ✅ Inventory view now toggles via party block buttons and cursor-owner hot area (button 83), hides the dungeon view, draws the inventory background, and renders item icons for slots 0‑29 with CSBWin placeholder/wound icons (`src/renderer/ViewportRenderer.ts`).
 - ✅ Inventory view draws the selected champion name at `(3,7)` in viewport space and renders the food/water panel (graphics 20/30/31/32 with CSBWin bar math/colors) (`src/renderer/ViewportRenderer.ts`).
+- ✅ Character stats panel (skills + attributes) and load readout are now rendered in the inventory view (`src/renderer/ViewportRenderer.ts`).
 - ✅ Champion state extended for inventory and condition flags: `possessions[30]`, `wounds`, `food`, `water`, `poisonCount` (`src/engine/gameTypes.ts`, `src/main.ts`).
-- ⏳ Inventory view still missing: character stats panel (skills + attributes), load readout (current/max KG), eye/mouth overlays + stats-dependent highlight boxes, chest/scroll subviews, and object-in-hand/selection interactions.
+- ✅ Magic panel runes/incantation rendering wired; ⏳ rune click flash effect still missing (`src/renderer/ViewportRenderer.ts`).
+- ⏳ Inventory view still missing: eye/mouth overlays + stats-dependent highlight boxes, chest/scroll subviews, and object-in-hand/selection interactions.
 
 Validation
 - Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).

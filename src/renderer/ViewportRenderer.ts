@@ -87,10 +87,41 @@ const OBJNI_FIRST_FULL_FLASK = 148;
 const OBJNI_LAST_FULL_FLASK = 163;
 const OBJNI_EMPTY_FLASK = 195;
 const OBJNI_SPECIAL_F = 204;
+const OBJNI_SPECIAL_C = 201;
+const OBJNI_SPECIAL_D = 202;
+const OBJNI_SPECIAL_E = 203;
 const OBJNI_SPECIAL_J = 208;
 const OBJNI_SPECIAL_N = 212;
+const OBJNI_THE_FIRESTAFF_A = 28;
+const OBJNI_THE_FIRESTAFF_B = 29;
+const OBJNI_SCEPTRE_OF_LYF = 68;
+const OBJNI_GEM_OF_AGES = 122;
+const OBJNI_EKKHARD_CROSS = 123;
+const OBJNI_MOONSTONE = 124;
+const OBJNI_PENDANT_FERAL = 126;
 const POTION_EMPTY_FLASK = 20;
 const DEFAULT_CHEST_WEIGHT = 50;
+const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+const MASTERY_LABELS = [
+  '',
+  '',
+  'NEOPHYTE',
+  'NOVICE',
+  'APPRENTICE',
+  'JOURNEYMAN',
+  'CRAFTSMAN',
+  'ARTISAN',
+  'ADEPT',
+  'EXPERT',
+  '` MASTER',
+  'A MASTER',
+  'B MASTER',
+  'C MASTER',
+  'D MASTER',
+  'E MASTER',
+  'ARCHMASTER',
+];
+const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 
 /**
  * Main ViewportRenderer class
@@ -119,6 +150,7 @@ export class ViewportRenderer {
   private messageLines: string[] = [];
   private partyState: PartyState | null = null;
   private objectTables: ObjectTables | null = null;
+  private pressingEye: boolean = false;
   private hoverPoint: { x: number; y: number } | null = null;
   private showAttackPanel: boolean = false;
   private primaryButtons: UIButton[] | null = null; // graphic231 -> buttons17196
@@ -199,6 +231,7 @@ export class ViewportRenderer {
       dungeonState: this.dungeonState,
       viewportContext: this.screenCtx,
       viewportIndexBuffer,
+      seeThroughWalls: false,
       roomData: [],
     };
 
@@ -266,7 +299,10 @@ export class ViewportRenderer {
 
     const entry = this.mouseQueue[this.mouseQStart];
     this.mouseQStart = (this.mouseQStart + 1) % mouseQueueLength;
-    if (entry.num === 0xadd) return;
+    if (entry.num === 0xadd) {
+      this.handleMouseUnclick();
+      return;
+    }
 
     this.handleMouseButton(entry.num, entry.x, entry.y);
   }
@@ -602,6 +638,97 @@ export class ViewportRenderer {
     this.drawFoodWaterBar(champion.water ?? 0, 92, 14);
   }
 
+  private drawAttributePanel(champion: Champion): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData) return;
+    const ui = this.uiTables.graphic232;
+    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
+
+    let lineY = 58;
+    for (let role = 0; role < ROLE_LABELS.length; role++) {
+      const mastery = this.getRoleMastery(champion, role);
+      if (mastery <= 1) continue;
+      const masteryLabel = MASTERY_LABELS[mastery] ?? '';
+      if (!masteryLabel) continue;
+      drawTextLineIndex(
+        this.screenIndexBuffer,
+        this.fontData,
+        VIEWPORT_X + 107,
+        VIEWPORT_Y + lineY,
+        13,
+        null,
+        `${masteryLabel} ${ROLE_LABELS[role]}`
+      );
+      lineY += 7;
+    }
+
+    const attrValues = [
+      champion.attributes?.strength ?? 0,
+      champion.attributes?.dexterity ?? 0,
+      champion.attributes?.wisdom ?? 0,
+      champion.attributes?.vitality ?? 0,
+      champion.attributes?.antiMagic ?? 0,
+      champion.attributes?.antiFire ?? 0,
+    ];
+    const attrMax = attrValues.slice();
+    lineY = 86;
+    for (let i = 0; i < ATTRIBUTE_LABELS.length; i++) {
+      const current = attrValues[i] ?? 0;
+      const max = attrMax[i] ?? 0;
+      let valueColor = 13;
+      if (current < max) valueColor = 8;
+      else if (current > max) valueColor = 7;
+
+      drawTextLineIndex(
+        this.screenIndexBuffer,
+        this.fontData,
+        VIEWPORT_X + 107,
+        VIEWPORT_Y + lineY,
+        13,
+        null,
+        ATTRIBUTE_LABELS[i] ?? ''
+      );
+      drawTextLineIndex(
+        this.screenIndexBuffer,
+        this.fontData,
+        VIEWPORT_X + 173,
+        VIEWPORT_Y + lineY,
+        valueColor,
+        null,
+        this.formatLifeValue(current)
+      );
+      drawTextLineIndex(
+        this.screenIndexBuffer,
+        this.fontData,
+        VIEWPORT_X + 191,
+        VIEWPORT_Y + lineY,
+        13,
+        null,
+        `/${this.formatLifeValue(max)}`
+      );
+      lineY += 7;
+    }
+  }
+
+  private drawEyeIcon(): void {
+    if (!this.uiTables || !this.screenIndexBuffer) return;
+    const word612 = this.uiTables.graphic232.word612;
+    const icon = this.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
+    const rect = this.getEyeRect();
+    if (!rect) return;
+    this.drawObjectIcon(rect, icon, word612);
+  }
+
+  private getEyeRect(): Rect | null {
+    if (!this.uiTables) return null;
+    const rect = this.uiTables.graphic232.word1406;
+    return {
+      x1: rect.x1 + VIEWPORT_X + 1,
+      y1: rect.y1 + VIEWPORT_Y + 1,
+      x2: rect.x2 + VIEWPORT_X - 1,
+      y2: rect.y2 + VIEWPORT_Y - 1,
+    };
+  }
+
   private drawVitalsAndLoad(champion: Champion): void {
     if (!this.fontData || !this.screenIndexBuffer) return;
 
@@ -684,6 +811,87 @@ export class ViewportRenderer {
     );
   }
 
+  private getRoleMastery(champion: Champion, roleIndex: number): number {
+    return this.determineMastery(champion, roleIndex);
+  }
+
+  private determineMastery(champion: Champion, skill: number): number {
+    if (this.uiMode === UIMode.Sleeping) return 1;
+
+    const ignoreTempAdjust = (skill & 0x8000) !== 0;
+    const ignorePossessions = (skill & 0x4000) !== 0;
+    const skillIndex = skill & 0x3fff;
+
+    let experience = 0;
+    const skills = champion.skills ?? [];
+    if (skillIndex >= 0 && skillIndex < skills.length) {
+      const entry = skills[skillIndex];
+      experience = entry?.experience ?? 0;
+      if (!ignoreTempAdjust) {
+        experience += entry?.tempAdjust ?? 0;
+      }
+    }
+
+    if (skillIndex > 3) {
+      const baseIndex = Math.floor((skillIndex - 4) / 4);
+      const base = skills[baseIndex];
+      experience += base?.experience ?? 0;
+      if (!ignoreTempAdjust) {
+        experience += base?.tempAdjust ?? 0;
+      }
+      experience = Math.floor(experience / 2);
+    }
+
+    let mastery = 1;
+    let expValue = experience;
+    while (expValue >= 500) {
+      expValue = Math.floor(expValue / 2);
+      mastery++;
+    }
+
+    if (!ignorePossessions) {
+      const weaponNameIndex = this.getPossessionNameIndex(champion, 1);
+      if (weaponNameIndex === OBJNI_THE_FIRESTAFF_A) {
+        mastery++;
+      } else if (weaponNameIndex === OBJNI_THE_FIRESTAFF_B) {
+        mastery += 2;
+      }
+
+      const neckNameIndex = this.getPossessionNameIndex(champion, 10);
+      switch (skillIndex) {
+        case 3:
+          if (neckNameIndex === OBJNI_PENDANT_FERAL) mastery++;
+          break;
+        case 15:
+          if (neckNameIndex === OBJNI_EKKHARD_CROSS) mastery++;
+          break;
+        case 13:
+          if (neckNameIndex === OBJNI_GEM_OF_AGES || weaponNameIndex === OBJNI_SCEPTRE_OF_LYF) {
+            mastery++;
+          }
+          break;
+        case 14:
+          if (neckNameIndex === OBJNI_MOONSTONE) mastery++;
+          break;
+      }
+    }
+
+    return mastery;
+  }
+
+  private getPossessionNameIndex(champion: Champion, slot: number): number | null {
+    let possession: number | null | undefined;
+    if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
+      possession = champion.possessions[slot];
+    }
+    if (possession == null && slot === 1 && typeof champion.weaponHand === 'number') {
+      possession = champion.weaponHand;
+    }
+    if (possession == null || typeof possession !== 'number') return null;
+    if (possession === OBJECT_ID_EOF || possession === OBJECT_ID_NULL) return null;
+    return this.resolveObjectNameIndex(possession | 0);
+  }
+
   private formatLifeValue(value: number): string {
     const clamped = Math.max(0, Math.min(9999, Math.floor(value)));
     return String(clamped).padStart(3, ' ');
@@ -752,8 +960,8 @@ export class ViewportRenderer {
     for (let y = y1; y <= y2; y++) {
       const row = y * width;
       for (let x = x1; x <= x2; x++) {
-        if (((x + y) & 1) !== 0) continue;
-        this.screenIndexBuffer.pixels[row + x] = fill;
+        if ((x + y) & 1)
+          this.screenIndexBuffer.pixels[row + x] = fill;
       }
     }
   }
@@ -779,6 +987,7 @@ export class ViewportRenderer {
     const ui = this.uiTables.graphic232;
     const party = this.partyState;
     const facing = party.facing | 0;
+    const selected = party.selectedCharacterIndex | 0;
 
     for (let chIdx = 0; chIdx < 4; chIdx++) {
       const baseX = 69 * chIdx;
@@ -788,17 +997,18 @@ export class ViewportRenderer {
         12
       );
 
-      const nameRect = { x1: baseX, y1: 0, x2: baseX + 42, y2: 6 };
-      fillRectIndex(this.screenIndexBuffer, nameRect, 1);
-
       const champion =
         party.champions.find((c) => c.partyPosition === chIdx) ??
         party.champions[chIdx] ??
         null;
 
-      if (champion) {
-        const nameColor = this.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
-        drawTextLineIndex(this.screenIndexBuffer, this.fontData, baseX + 1, 5, nameColor, 1, champion.name);
+      if (selected !== chIdx) {
+        const nameRect = { x1: baseX, y1: 0, x2: baseX + 42, y2: 6 };
+        fillRectIndex(this.screenIndexBuffer, nameRect, 1);
+        if (champion) {
+          const nameColor = this.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
+          drawTextLineIndex(this.screenIndexBuffer, this.fontData, baseX + 1, 5, nameColor, 1, champion.name);
+        }
       }
 
       if (champion && champion.alive === false) {
@@ -827,17 +1037,19 @@ export class ViewportRenderer {
         this.drawLifeBars(chIdx, champion);
       }
 
-      if (champion && typeof champion.portraitGraphic === 'number') {
+      if (champion && typeof champion.portraitGraphic === 'number' && selected === chIdx) {
         const portraitGraphic = this.getPortraitBitmap(champion.portraitGraphic);
         if (portraitGraphic) {
+          const portraitRect = { x1: baseX + 7, y1: 0, x2: baseX + 38, y2: 28 };
+          fillRectIndex(this.screenIndexBuffer, portraitRect, 1);
           tag0088b2Index(
             portraitGraphic,
             this.screenIndexBuffer,
             {
-              x1: baseX + 7,
-              y1: 0,
-              x2: baseX + 38,
-              y2: 28,
+              x1: portraitRect.x1,
+              y1: portraitRect.y1,
+              x2: portraitRect.x2,
+              y2: portraitRect.y2,
               srcX: 0,
               srcY: 0,
               srcStride: portraitGraphic.width,
@@ -972,6 +1184,7 @@ export class ViewportRenderer {
     if (!this.uiTables || !this.screenIndexBuffer || !this.partyState) return;
     const iconSlots = this.uiTables.graphic232.iconDisplay;
     const word612 = this.uiTables.graphic232.word612;
+    const selected = this.partyState.selectedCharacterIndex | 0;
 
     for (let chIdx = 0; chIdx < 4; chIdx++) {
       const champion =
@@ -980,6 +1193,7 @@ export class ViewportRenderer {
         null;
       const alive = champion ? champion.alive !== false : false;
       if (!alive) continue;
+      if (selected === chIdx) continue;
 
       for (let hand = 0; hand <= 1; hand++) {
         const slot = 2 * chIdx + hand;
@@ -987,7 +1201,25 @@ export class ViewportRenderer {
         if (!icon) continue;
 
         const rect = { x1: icon.pixelX, y1: icon.pixelY, x2: icon.pixelX + 15, y2: icon.pixelY + 15 };
-        const objectIndex =
+        const frame = this.getGraphicBitmap(33);
+        if (frame) {
+          tag0088b2Index(
+            frame,
+            this.screenIndexBuffer,
+            {
+              x1: rect.x1 - 1,
+              y1: rect.y1 - 1,
+              x2: rect.x2 + 1,
+              y2: rect.y2 + 1,
+              srcX: 0,
+              srcY: 0,
+              srcStride: frame.width,
+              srcHeight: frame.height,
+            },
+            12
+          );
+        }
+        const objectId =
           hand === 1
             ? typeof champion?.weaponHand === 'number'
               ? (champion.weaponHand | 0)
@@ -995,11 +1227,13 @@ export class ViewportRenderer {
             : typeof champion?.shieldHand === 'number'
               ? (champion.shieldHand | 0)
               : -1;
+        const objectNameIndex = objectId >= 0 ? this.resolveObjectNameIndex(objectId) : -1;
 
-        if (objectIndex >= 0) {
-          this.drawObjectIcon(rect, objectIndex, word612);
-        } else {
-          fillRectIndex(this.screenIndexBuffer, rect, 0);
+        if (objectNameIndex >= 0) {
+          this.drawObjectIcon(rect, objectNameIndex, word612);
+        } else if (champion) {
+          const placeholder = this.getInventoryPlaceholderIndex(champion, hand);
+          this.drawObjectIcon(rect, placeholder, word612);
         }
       }
     }
@@ -1064,7 +1298,12 @@ export class ViewportRenderer {
       }
     }
 
-    this.drawFoodWaterPanel(champion);
+    if (this.pressingEye) {
+      this.drawAttributePanel(champion);
+    } else {
+      this.drawFoodWaterPanel(champion);
+    }
+    this.drawEyeIcon();
     this.drawVitalsAndLoad(champion);
   }
 
@@ -1158,6 +1397,31 @@ export class ViewportRenderer {
     }
 
     return objectType;
+  }
+
+  private getBaseObjectNameIndex(value: number): number {
+    if (value < 0) return -1;
+    if (!this.objectTables) return value | 0;
+
+    const descIndex = this.isLikelyObjectRecord(value)
+      ? this.descIndexForObject(value as ObjectID)
+      : this.getDescIndexForObjectType(value | 0);
+    if (descIndex === null) return value | 0;
+
+    const objectType = this.objectTables.objDescObjectType[descIndex];
+    return typeof objectType === 'number' ? objectType | 0 : value | 0;
+  }
+
+  private getAttackClass(value: number): number {
+    if (!this.objectTables) return 0;
+    if (value < 0) return 0;
+
+    const descIndex = this.isLikelyObjectRecord(value)
+      ? this.descIndexForObject(value as ObjectID)
+      : this.getDescIndexForObjectType(value | 0);
+    if (descIndex === null) return 0;
+
+    return this.objectTables.objDescAttackClass[descIndex] ?? 0;
   }
 
   private descIndexForObject(rn: ObjectID): number | null {
@@ -1415,13 +1679,17 @@ export class ViewportRenderer {
 
       if (alive) {
         const iconRect = { x1: x1 + 2, y1: 95, x2: x2 - 2, y2: 110 };
-        const iconIndex = typeof champion?.weaponHand === 'number'
-          ? this.resolveObjectNameIndex(champion.weaponHand | 0)
+        const weaponId = typeof champion?.weaponHand === 'number'
+          ? (champion.weaponHand | 0)
           : -1;
+        let iconIndex = -1;
+        if (weaponId < 0) {
+          iconIndex = OBJNI_SPECIAL_C;
+        } else if (this.getAttackClass(weaponId) !== 0) {
+          iconIndex = this.getBaseObjectNameIndex(weaponId);
+        }
         if (iconIndex >= 0) {
           this.drawObjectIconMask(iconRect, iconIndex, word612, this.uiTables.graphic230.shrinkColorMap);
-        } else {
-          fillRectIndex(this.screenIndexBuffer, iconRect, 8);
         }
       }
     }
@@ -1716,6 +1984,10 @@ export class ViewportRenderer {
 
   private handleMouseButton(id: number, x: number, y: number): void {
     updateDebug(`handling click on ${id}`)
+    if (id === 80 && this.isEyeClick(x, y)) {
+      this.handleEyePress();
+      return;
+    }
     if (id === 100) {
       this.handleMagicClick(x, y);
       return;
@@ -1734,6 +2006,29 @@ export class ViewportRenderer {
       this.handlePartyBlockClick(id - 12, x, y);
       return;
     }
+    if (id === 71) {
+      this.handleEyePress();
+      return;
+    }
+  }
+
+  private isEyeClick(x: number, y: number): boolean {
+    if (!this.partyState || this.partyState.selectedCharacterIndex < 0) return false;
+    const rect = this.getEyeRect();
+    if (!rect) return false;
+    return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
+  }
+
+  private handleMouseUnclick(): void {
+    if (this.pressingEye) {
+      this.pressingEye = false;
+    }
+  }
+
+  private handleEyePress(): void {
+    if (!this.partyState) return;
+    if (this.partyState.selectedCharacterIndex < 0) return;
+    this.pressingEye = true;
   }
 
   private handlePartyBlockClick(button: number, x: number, y: number): void {
@@ -1757,6 +2052,7 @@ export class ViewportRenderer {
     if (!this.partyState) return;
     if (button === 4) {
       this.partyState.selectedCharacterIndex = -1;
+      this.pressingEye = false;
       return;
     }
     if (button < 0 || button > 3) return;
@@ -1767,6 +2063,9 @@ export class ViewportRenderer {
     if (!champ || champ.alive === false) return;
     this.partyState.selectedCharacterIndex =
       this.partyState.selectedCharacterIndex === button ? -1 : button;
+    if (this.partyState.selectedCharacterIndex < 0) {
+      this.pressingEye = false;
+    }
   }
 
   private handleMagicClick(clickX: number, clickY: number): void {

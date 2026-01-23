@@ -5,7 +5,8 @@
 import { Direction } from './core';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader, type PresetHero } from './data';
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
-import { Game, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, type AddCharacterTables } from './engine';
+import { Game, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, createSkillsFromSubskillLevels, type AddCharacterTables } from './engine';
+import { loadGlfx } from './lib/glfx-loader';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { extractObjectTables } from './renderer/csbwin/ObjectTables';
 import { extractUITables } from './renderer/csbwin/UITables';
@@ -167,6 +168,7 @@ function createRandomChampion(partyPosition: number): Champion {
             possessions[slot] = randomInt(0, 95);
         }
     }
+    const skills = createSkillsFromSubskillLevels(randomSkillLevels());
 
     return {
         name,
@@ -197,6 +199,7 @@ function createRandomChampion(partyPosition: number): Champion {
         water: randomInt(0, 2047),
         wounds: randomInt(0, 0x3f),
         poisonCount: Math.random() < 0.2 ? randomInt(1, 3) : 0,
+        skills,
         weaponHand,
         shieldHand,
         quiver: null,
@@ -205,6 +208,14 @@ function createRandomChampion(partyPosition: number): Champion {
         partyPosition,
         facing: partyPosition & 3,
     };
+}
+
+function randomSkillLevels(): number[] {
+    const levels: number[] = [];
+    for (let i = 0; i < 16; i++) {
+        levels.push(randomInt(0, 4));
+    }
+    return levels;
 }
 
 function getAddCharacterTables(): AddCharacterTables | null {
@@ -407,6 +418,9 @@ async function init() {
             const dungeonState = game.dungeonState;
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
+            await loadGlfx().catch((err) => {
+                console.warn('glfx failed to load; CRT effect disabled', err);
+            });
             crtController = createCrtController(gameCanvasEl);
             console.log('✓ Viewport renderer initialized');
             bindUIContext({

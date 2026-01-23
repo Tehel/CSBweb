@@ -344,7 +344,7 @@ export const StdDrawF0R1DoorFacing: number[] = [
 export const StdDrawF1Stone: number[] = [
   Opcode.SeeThroughWalls,
   Opcode.JumpZ,
-  28,
+  11,
   Opcode.Literal,
   1,
   Opcode.StdAllocateDerivedGraphic,

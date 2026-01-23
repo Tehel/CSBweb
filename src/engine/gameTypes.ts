@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, i16, Direction, Position } from '../core/types';
+import type { ui8, ui16, i16, i32, Direction, Position } from '../core/types';
 
 // Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
 // CSBWin maps these via inventory button ids 8..20 and 21..37 (HandleClothingClick).
@@ -73,6 +73,11 @@ export interface ChampionAttributes {
     wizard: ui8;
 }
 
+export interface Skill {
+    tempAdjust: i16;
+    experience: i32;
+}
+
 /**
  * Champion (party member)
  */
@@ -88,6 +93,7 @@ export interface Champion {
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)
     wounds?: ui16;             // Bitmask of wounded body parts (CSBWin "ouches")
     poisonCount?: ui8;         // Poison counter for UI and effects
+    skills: Skill[];           // CSBWin skills92[20]
 
     // Inventory slots (simplified for MVP)
     weaponHand: any | null;     // Right hand weapon

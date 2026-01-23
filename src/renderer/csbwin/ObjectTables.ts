@@ -1,4 +1,5 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
+import type { RectPos } from './CanvasBlitter';
 
 export interface GraphicClass {
   objectGraphicIndex: number; // i8
@@ -71,6 +72,7 @@ export interface ObjectTables {
   cloudPositions7222: Int16Array; // d.Word7222[30]
   cloudPositions7246: Int16Array; // d.Word7246[12]
   objDescGraphicClass: Uint8Array; // d.ObjDesc[180].graphicClass
+  objDescAttackClass: Int8Array; // d.ObjDesc[180].attackClass
   objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
   weaponWeights: Uint8Array; // d.weapons[46].weight
@@ -82,6 +84,7 @@ export interface ObjectTables {
   wallDecorationRectSetIndex: Uint8Array; // d.Byte4100[60]
 
   // Wall text helpers (DrawWallDecoration, CSBCode.cpp:3258+)
+  wallTextRect: RectPos; // d.Byte4192 rect for mortar joint removal
   wallTextLineY2: Uint8Array; // d.Byte4196[4]
 
   // Wall decoration alcove markers (CSBCode.cpp:205-219, Data.h:1174-1177)
@@ -127,6 +130,7 @@ const ABS_STRUCT5688 = 5688; // struct5688[14] (unused for now, but keeps deltas
 const ABS_GRAPHIC_CLASS = 5604; // s5604[85]
 const ABS_WALL_DECORATION_POSITION = 4836; // wallDecorationPosition[8][13] (8*13*6 bytes)
 const ABS_WALL_DECORATION_RECT_SET_INDEX = 4100; // Byte4100[60]
+const ABS_WALL_TEXT_RECT = 4192; // Byte4192 (RectPos x1,x2,y1,y2)
 const ABS_WALL_TEXT_LINE_Y2 = 4196; // Byte4196[4]
 const ABS_BYTE4038 = 4038; // Byte4038[4]
 const ABS_FLOOR_DECOR_DESC = 4998; // floorDecorDesc[3][9]
@@ -182,6 +186,15 @@ function readGraphicClasses22e(raw: Uint8Array, off: number): GraphicClass[] {
   }
 
   return out;
+}
+
+function readRectPosByte4(raw: Uint8Array, off: number): RectPos {
+  return {
+    x1: raw[off + 0] ?? 0,
+    x2: raw[off + 1] ?? 0,
+    y1: raw[off + 2] ?? 0,
+    y2: raw[off + 3] ?? 0,
+  };
 }
 
 function readViewportPosition22e(raw: Uint8Array, off: number): ViewportPositionTable {
@@ -289,6 +302,20 @@ function readObjDescGraphicClass22f(raw: Uint8Array): Uint8Array {
   const out = new Uint8Array(count);
   for (let i = 0; i < count; i++) {
     out[i] = raw[start + i * stride + 2] ?? 0; // graphicClass byte
+  }
+  return out;
+}
+
+function readObjDescAttackClass22f(raw: Uint8Array): Int8Array {
+  const start = ABS_22F_START - ABS_OBJDESC;
+  const count = 180;
+  const stride = 6;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for ObjDesc[180].attackClass');
+
+  const out = new Int8Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = readI8(raw, start + i * stride + 3);
   }
   return out;
 }
@@ -463,6 +490,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const struct5688Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_STRUCT5688);
   const wallDecorationPositionOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_DECORATION_POSITION);
   const wallDecorationRectSetIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_DECORATION_RECT_SET_INDEX);
+  const wallTextRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_RECT);
   const wallTextLineY2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_LINE_Y2);
   const alcoveDecorationIndicesOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4038);
   const floorDecorationDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_FLOOR_DECOR_DESC);
@@ -493,6 +521,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     struct5688Offset < 0 ||
     wallDecorationPositionOffset < 0 ||
     wallDecorationRectSetIndexOffset < 0 ||
+    wallTextRectOffset < 0 ||
     wallTextLineY2Offset < 0 ||
     alcoveDecorationIndicesOffset < 0 ||
     floorDecorationDescOffset < 0 ||
@@ -528,6 +557,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const cloudPositions7042 = readI16Array(raw22e, word7042Offset, 30);
 
   const objDescGraphicClass = readObjDescGraphicClass22f(raw22f);
+  const objDescAttackClass = readObjDescAttackClass22f(raw22f);
   const objDescObjectType = readObjDescObjectType22f(raw22f);
   const objDescCarryMask = readObjDescCarryMask22f(raw22f);
   const weaponWeights = readWeaponWeights22f(raw22f);
@@ -535,6 +565,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const miscWeights = readMiscWeights22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
   const wallDecorationRectSetIndex = raw22e.slice(wallDecorationRectSetIndexOffset, wallDecorationRectSetIndexOffset + 60);
+  const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
   const alcoveDecorationIndices = raw22e.slice(alcoveDecorationIndicesOffset, alcoveDecorationIndicesOffset + 4);
   const floorDecorationDescSets = readFloorDecorationDescTable22e(raw22e, floorDecorationDescOffset);
@@ -598,6 +629,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     cloudPositions7222,
     cloudPositions7246,
     objDescGraphicClass,
+    objDescAttackClass,
     objDescCarryMask,
     objDescObjectType,
     weaponWeights,
@@ -605,6 +637,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     miscWeights,
     wallDecorationRectSets,
     wallDecorationRectSetIndex,
+    wallTextRect,
     wallTextLineY2,
     alcoveDecorationIndices,
     floorDecorationDescSets,

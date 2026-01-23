@@ -35,7 +35,7 @@ export function saveUISettings(settings: UISettings): void {
 
 export function readUISettings(): UISettings {
     const mapVisible = (document.getElementById('map')?.style.display ?? '') !== 'none';
-    const logVisible = (document.getElementById('debug')?.style.display ?? '') !== 'none';
+    const logVisible = (document.getElementById('log')?.style.display ?? '') !== 'none';
     const hoverVisible = (document.getElementById('hover')?.style.display ?? '') !== 'none';
     const smooth = getUIContext()?.renderer.getCanvasStyle().imageRendering === 'smooth';
     return {
@@ -51,7 +51,7 @@ export function readUISettings(): UISettings {
 export function applyUISettings(settings: UISettings): void {
     const ctx = getUIContext();
     const mapEl = document.getElementById('map');
-    const logEl = document.getElementById('debug');
+    const logEl = document.getElementById('log');
     const hoverEl = document.getElementById('hover');
     const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | null;
     const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
