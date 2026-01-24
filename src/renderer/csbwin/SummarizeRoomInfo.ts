@@ -1,6 +1,14 @@
 import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID, type ui8, Position } from '../../core/types';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
 import type { DungeonState } from '../../engine/DungeonState';
+import {
+  getActuatorDsaParameters,
+  getActuatorDsaSelector,
+  getActuatorState,
+  getActuatorType,
+  getActuatorValue,
+  getActuatorWallGraphicOrdinal,
+} from '../../data/actuatorHelpers';
 import type { ObjectTables } from './ObjectTables';
 
 const RN_EOF = OBJECT_ID_EOF;
@@ -151,20 +159,6 @@ function isAlcoveDecorationOrdinal(
   return false;
 }
 
-function getDsaSelector(data: number): number {
-  return data & 0x1f;
-}
-
-function getDsaParameters(word4: number, word6: number): { paramA: number; paramB: number } {
-  let w4 = word4 & 0xffff;
-  let w6 = word6 & 0xffff;
-  const word8 = ((w6 >> 12) & 0xc0) | ((w4 >> 14) & 0x03);
-  w4 &= 0x3fff;
-  w6 &= 0x3fff;
-  const paramA = (w4 | ((word8 & 0x03) << 16)) >>> 0;
-  const paramB = (w6 | ((word8 & 0x0c) << 14)) >>> 0;
-  return { paramA, paramB };
-}
 
 function summarizeStoneRoom(
   rslt: SummarizeRoomData,
@@ -300,24 +294,24 @@ function summarizeStoneRoom(
       } else if (dbType === DBType.ACTUATOR) {
         const rec = dungeon.getActuatorRecord(local);
         if (rec) {
-          if (rec.sensorType === 47) {
-            const selector = getDsaSelector(rec.data);
+          if (getActuatorType(rec) === 47) {
+            const selector = getActuatorDsaSelector(rec);
             const absIndex = dungeon.getDsaLevelIndex(levelNumber, selector);
             if (absIndex === 255) {
-              const { paramA } = getDsaParameters(rec.rawBehavior, rec.rawTarget);
+              const { paramA } = getActuatorDsaParameters(rec);
               rslt.decorations[(relativePosition - 1) as 0 | 1 | 2] = 0x10000 | (paramA & 0xffff);
               realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
             }
-          } else if (rec.sensorType !== 127 || (rec.portraitState & PORTRAIT_HIDE_GRAPHIC) === 0) {
-            const ord = rec.decorationOrdinal | 0;
+          } else if (getActuatorType(rec) !== 127 || (getActuatorState(rec) & PORTRAIT_HIDE_GRAPHIC) === 0) {
+            const ord = getActuatorWallGraphicOrdinal(rec) | 0;
             if (ord > 0 && ord <= numWallDecoration) {
               rslt.decorations[(relativePosition - 1) as 0 | 1 | 2] = ord;
               realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
             }
           }
-          if (rec.sensorType === 127 && relativePosition === 2) {
-            if ((rec.portraitState & PORTRAIT_HIDE_PORTRAIT) === 0) {
-              rslt.championPortraitOrdinal = (rec.data & 0x1ff) + 1;
+          if (getActuatorType(rec) === 127 && relativePosition === 2) {
+            if ((getActuatorState(rec) & PORTRAIT_HIDE_PORTRAIT) === 0) {
+              rslt.championPortraitOrdinal = (getActuatorValue(rec) & 0x1ff) + 1;
             }
           }
         }
@@ -502,16 +496,16 @@ export function summarizeRoomInfoCsbwin(
       if (dbTypeOf(rn) !== DBType.ACTUATOR) continue;
       const rec = dungeon.getActuatorRecord(rn);
       if (!rec) continue;
-      if (rec.sensorType === 47) {
-        const selector = getDsaSelector(rec.data);
+      if (getActuatorType(rec) === 47) {
+        const selector = getActuatorDsaSelector(rec);
         const absIndex = dungeon.getDsaLevelIndex(levelNumber, selector);
         if (absIndex === 255) {
-          const { paramB } = getDsaParameters(rec.rawBehavior, rec.rawTarget);
+          const { paramB } = getActuatorDsaParameters(rec);
           rslt.decorations[2] = 0x4000 | (paramB & 0xffff);
         }
         continue;
       }
-      const decoration = rec.decorationOrdinal | 0;
+      const decoration = getActuatorWallGraphicOrdinal(rec) | 0;
       if (decoration > 0 && decoration <= numFloorDecorations) {
         rslt.decorations[2] = decoration;
       }

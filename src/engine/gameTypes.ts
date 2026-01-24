@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, i16, i32, Direction, Position } from '../core/types';
+import type { ui8, ui16, i16, i32, Direction, Position, ObjectID } from '../core/types';
 
 // Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
 // CSBWin maps these via inventory button ids 8..20 and 21..37 (HandleClothingClick).
@@ -116,6 +116,7 @@ export interface PartyState {
     magicCasterIndex: number;   // -1 = none
     cursorOwner: number;        // -1 = none
     selectedCharacterIndex: number; // -1 = none
+    objectInHand?: ObjectID | null; // Object on cursor (CSBWin d.objectInHand)
     partyShield?: ui16;         // Optional party shield strength
     fireShield?: ui16;          // Optional fire shield strength
     spellShield?: ui16;         // Optional spell shield strength

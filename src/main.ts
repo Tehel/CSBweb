@@ -5,13 +5,13 @@
 import { Direction } from './core';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader, type PresetHero } from './data';
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
-import { Game, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, createSkillsFromSubskillLevels, type AddCharacterTables } from './engine';
+import { Game, type ActuatorTables, type TimerTables, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, createSkillsFromSubskillLevels, type AddCharacterTables } from './engine';
 import { loadGlfx } from './lib/glfx-loader';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { extractObjectTables } from './renderer/csbwin/ObjectTables';
 import { extractUITables } from './renderer/csbwin/UITables';
 import { extractViewportTables } from './renderer/csbwin/ViewportTables';
-import { bindUIContext, drawMapPreview, updateDebug } from './ui';
+import { bindUIContext, drawMapPreview, handleCursorFilter, updateDebug } from './ui';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -23,6 +23,8 @@ let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 let dungeonData: DungeonData | null = null;
 let addCharacterTables: AddCharacterTables | null = null;
+let actuatorTables: ActuatorTables | null = null;
+let timerTables: TimerTables | null = null;
 let crtController: CrtController | null = null;
 
 const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
@@ -245,6 +247,46 @@ function pickPresetHeroes(presets: PresetHero[], count: number): PresetHero[] {
     return shuffle(presets.slice()).slice(0, count);
 }
 
+function findPresetHeroByPortrait(
+    presets: PresetHero[],
+    portraitIndex: number,
+    position: { x: number; y: number; z: number },
+    wall: number,
+): PresetHero | null {
+    const exact = presets.find((hero) =>
+        hero.portraitIndex === portraitIndex
+        && hero.location.map === position.z
+        && hero.location.x === position.x
+        && hero.location.y === position.y
+        && hero.location.wall === wall
+    );
+    if (exact) return exact;
+    return presets.find((hero) => hero.portraitIndex === portraitIndex) ?? null;
+}
+
+function addCharacterFromPortrait(portraitIndex: number, position: { x: number; y: number; z: number }, wall: number): boolean {
+    if (!game || !dungeonData) return false;
+    const party = game.party.state;
+    if (party.objectInHand !== null && party.objectInHand !== undefined) return false;
+    if (party.champions.length >= 4) return false;
+
+    const hero = findPresetHeroByPortrait(dungeonData.presetHeroes ?? [], portraitIndex, position, wall);
+    if (!hero) return false;
+
+    const tables = getAddCharacterTables();
+    const possessions = tables
+        ? assignPresetHeroPossessions(hero.inventory, tables)
+        : new Array(30).fill(null);
+
+    const occupied = new Set(party.champions.map((champ) => champ.partyPosition));
+    let partyPosition = 0;
+    while (occupied.has(partyPosition) && partyPosition < 4) partyPosition += 1;
+    if (partyPosition >= 4) return false;
+
+    const champion = createChampionFromPreset(hero, partyPosition, possessions);
+    return game.addChampion(champion);
+}
+
 function randomizeChampionVitals(champion: Champion): void {
     const healthRatio = Math.random() * 0.4 + 0.6;
     const staminaRatio = Math.random() * 0.35 + 0.55;
@@ -409,9 +451,25 @@ async function init() {
                 csbGraphicsLoader = null;
             }
 
+            const uiTables = extractUITables(graphicsLoader);
+            const viewportTables = extractViewportTables(graphicsLoader);
+            const objectTables = extractObjectTables(graphicsLoader, viewportTables.wallRectanglesOffset);
+            actuatorTables = {
+                roomTimerFunctions: uiTables.graphic232.byte1596,
+                objDescObjectType: objectTables.objDescObjectType,
+                objDescCarryMask: objectTables.objDescCarryMask,
+                carryLocation: uiTables.graphic232.carryLocation,
+                cursorFilter: handleCursorFilter,
+                onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
+                onTextMessage: (text) => updateDebug(text),
+            };
+            timerTables = {
+                monsterDesc: objectTables.monsterDesc,
+            };
+
             // Initialize game engine
             console.log('Initializing game engine...');
-            game = new Game(dungeon);
+            game = new Game(dungeon, actuatorTables, timerTables ?? undefined);
 
             // Initialize viewport renderer
             console.log('Initializing viewport renderer (CSBWin bytecode system)...');

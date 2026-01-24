@@ -452,25 +452,16 @@ export class DungeonLoader {
 
         for (let i = 0; i < count; i++) {
             const nextObject = this.file.readU16();
-            const typeData = this.file.readU16();
-            const behavior = this.file.readU16();
-            const target = this.file.readU16();
+            const word2 = this.file.readU16();
+            const word4 = this.file.readU16();
+            const word6 = this.file.readU16();
 
             records.push({
                 nextObject,
-                sensorType: typeData & 0x7F,
-                data: (typeData >> 7) & 0x1FF,
-                portraitState: (behavior >> 9) & 0x7,
-                decorationOrdinal: (behavior >> 12) & 0xF,
-                targetLocal: (behavior & 0x800) !== 0,
-                delay: (behavior >> 7) & 0xF,
-                soundEffect: (behavior & 0x40) !== 0,
-                revertEffect: (behavior & 0x20) !== 0,
-                actionType: (behavior >> 3) & 0x3,
-                onceOnly: (behavior & 0x4) !== 0,
-                targetData: target,
-                rawBehavior: behavior,
-                rawTarget: target
+                word2,
+                word4,
+                word6,
+                word8: undefined
             });
         }
 

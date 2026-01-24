@@ -5,7 +5,8 @@
  * and expects the standard (non-extended-features) save-game layout.
  */
 
-import type { DungeonData, Item16Record, TimerRecord } from './dungeonTypes';
+import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition } from './dungeonTypes';
+import { getActuatorType } from './actuatorHelpers';
 
 export interface SaveGameState {
   item16: Item16Record[];
@@ -14,7 +15,9 @@ export interface SaveGameState {
   maxTimers: number;
   sequencedTimers: boolean;
   extendedTimers: boolean;
+  bigActuators?: boolean;
   dsaLevelIndex?: number[][];
+  dsaIndex?: DsaIndex;
   extendedWallDecorations?: boolean;
 }
 
@@ -54,6 +57,18 @@ function readU32LE(buf: Uint8Array, off: number): number {
   const b2 = buf[off + 2] ?? 0;
   const b3 = buf[off + 3] ?? 0;
   return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
+}
+
+function applyBigActuators(dungeon: DungeonData): void {
+  if (dungeon.bigActuators) return;
+  for (const rec of dungeon.databases.actuators.records) {
+    rec.word8 = 0;
+    if (getActuatorType(rec) !== 47) continue;
+    rec.word8 = (((rec.word6 >> 12) & 0xc0) | ((rec.word4 >> 14) & 0x03)) & 0xffff;
+    rec.word6 &= 0x3fff;
+    rec.word4 &= 0x3fff;
+  }
+  dungeon.bigActuators = true;
 }
 
 function writeU16LE(buf: Uint8Array, off: number, value: number): void {
@@ -177,27 +192,70 @@ class RcsReader {
   }
 }
 
-function skipDSA(rcs: RcsReader): void {
-  rcs.readBytes(80); // description
-  rcs.readU16(); // m_state
-  rcs.readU8(); // m_localState
-  rcs.readU8(); // m_groupID
+function decodeCString(bytes: Uint8Array): string {
+  let end = bytes.length;
+  for (let i = 0; i < bytes.length; i++) {
+    if (bytes[i] === 0) {
+      end = i;
+      break;
+    }
+  }
+  let out = '';
+  for (let i = 0; i < end; i++) {
+    out += String.fromCharCode(bytes[i] ?? 0);
+  }
+  return out;
+}
+
+function readU16Array(bytes: Uint8Array, count: number): number[] {
+  const out: number[] = new Array(count);
+  let off = 0;
+  for (let i = 0; i < count; i++) {
+    out[i] = (bytes[off] ?? 0) | ((bytes[off + 1] ?? 0) << 8);
+    off += 2;
+  }
+  return out;
+}
+
+function readDsa(rcs: RcsReader): DsaDefinition {
+  const description = decodeCString(rcs.readBytes(80));
+  const state = rcs.readU16();
+  const localState = rcs.readU8();
+  const groupId = rcs.readU8();
   const numStates = rcs.readU32();
-  rcs.readU32(); // m_firstDisplayedState
+  const firstDisplayedState = rcs.readU32();
   const numNonEmptyStates = rcs.readU32();
+  const states: Array<{ actions: Array<{ column: number; program: Uint16Array }> } | null> =
+    Array.from({ length: numStates }, () => null);
 
   for (let i = 0; i < numNonEmptyStates; i++) {
     const stateNum = rcs.readU32();
     if (stateNum >= numStates) throw new Error('savegame DSA state out of range');
     const numActions = rcs.readU32();
+    if (numActions > 12) throw new Error('savegame DSA actions > 12');
+    const actions: Array<{ column: number; program: Uint16Array }> = [];
     for (let j = 0; j < numActions; j++) {
-      rcs.readU32(); // column
+      const column = rcs.readU32();
       const numPgmWords = rcs.readU32();
+      let program = new Uint16Array();
       if (numPgmWords > 0) {
-        rcs.readBytes(numPgmWords * 2);
+        const bytes = rcs.readBytes(numPgmWords * 2);
+        program = Uint16Array.from(readU16Array(bytes, numPgmWords));
       }
+      actions.push({ column, program });
     }
+    states[stateNum] = { actions };
   }
+
+  return {
+    description,
+    state,
+    localState,
+    groupId,
+    numStates,
+    firstDisplayedState,
+    states,
+  };
 }
 
 function readExtendedFeatures(data: Uint8Array): {
@@ -205,10 +263,12 @@ function readExtendedFeatures(data: Uint8Array): {
   sequencedTimers: boolean;
   extendedTimers: boolean;
   extendedWallDecorations: boolean;
+  bigActuators: boolean;
   dsaLevelIndex?: number[][];
+  dsaIndex?: DsaIndex;
 } {
   if (data.length < EXTENDED_FEATURES_SIZE) {
-    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false };
+    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false };
   }
 
   let block = data.subarray(0, EXTENDED_FEATURES_SIZE);
@@ -219,7 +279,7 @@ function readExtendedFeatures(data: Uint8Array): {
     if (hasExtendedSentinel(decoded)) {
       parsed = decoded;
     } else {
-      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false };
+      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false };
     }
   }
 
@@ -232,17 +292,22 @@ function readExtendedFeatures(data: Uint8Array): {
   const sequencedTimers = (extendedFlags & 0x20) !== 0;
   const extendedTimers = (extendedFlags & 0x80) !== 0;
   const extendedWallDecorations = (extendedFlags & 0x10) !== 0;
+  const bigActuators = (flags & 0x80) !== 0;
 
   let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
 
   let dsaLevelIndex: number[][] | undefined;
+  let dsaIndex: DsaIndex | undefined;
 
   if (numDSA > 0) {
     const rcs = new RcsReader(data, offset);
     rcs.resetChecksum();
+    dsaIndex = { entries: new Array<DsaDefinition | null>(256).fill(null) };
     for (let i = 0; i < numDSA; i++) {
-      rcs.readU32(); // dsaNum
-      skipDSA(rcs);
+      const dsaNum = rcs.readU32();
+      if (dsaNum > 255) throw new Error('savegame DSA number > 255');
+      if (dsaIndex.entries[dsaNum]) throw new Error('savegame duplicate DSA');
+      dsaIndex.entries[dsaNum] = readDsa(rcs);
     }
     const computed = rcs.finalizeChecksum();
     const fileChecksum = readU32LE(data, rcs.getOffset());
@@ -269,7 +334,7 @@ function readExtendedFeatures(data: Uint8Array): {
     }
   }
 
-  return { offset, sequencedTimers, extendedTimers, extendedWallDecorations, dsaLevelIndex };
+  return { offset, sequencedTimers, extendedTimers, extendedWallDecorations, bigActuators, dsaLevelIndex, dsaIndex };
 }
 function unscramble(buf: Uint8Array, initialHash: number, numWords: number): number {
   let d7 = initialHash & 0xffff;
@@ -468,7 +533,9 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     maxTimers: block2.maxTimers,
     sequencedTimers,
     extendedTimers,
+    bigActuators: extended.bigActuators,
     dsaLevelIndex: extended.dsaLevelIndex,
+    dsaIndex: extended.dsaIndex,
     extendedWallDecorations: extended.extendedWallDecorations,
   };
 }
@@ -479,8 +546,14 @@ export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): v
   if (save.dsaLevelIndex) {
     dungeon.dsaLevelIndex = save.dsaLevelIndex;
   }
+  if (save.dsaIndex) {
+    dungeon.dsaIndex = save.dsaIndex;
+  }
   if (save.extendedWallDecorations !== undefined) {
     dungeon.extendedWallDecorations = save.extendedWallDecorations;
+  }
+  if (save.bigActuators) {
+    applyBigActuators(dungeon);
   }
 }
 

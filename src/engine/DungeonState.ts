@@ -19,11 +19,22 @@ import type {
     MiscRecord,
     PotionRecord,
     ScrollRecord,
+    TeleporterRecord,
     TileData,
     TimerRecord,
     WeaponRecord,
     ActuatorRecord,
 } from '../data/dungeonTypes';
+import {
+    ActuatorAction,
+    getActuatorAction,
+    getActuatorTargetX,
+    getActuatorTargetY,
+    getActuatorType,
+    getActuatorValue,
+    isActuatorLocalActionOnly,
+    isActuatorNormallyClosed,
+} from '../data/actuatorHelpers';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 
@@ -194,6 +205,120 @@ export class DungeonState {
     }
 
     /**
+     * Update the head object RN for a cell's object list.
+     */
+    setFirstObject(position: Position, rn: ObjectID): void {
+        const idx = this.getObjectListIndex(position);
+        if (idx < 0) return;
+        this.data.objectList[idx] = rn;
+    }
+
+    /**
+     * Append an object to the end of the cell's object list.
+     * Returns false if the cell is out of bounds.
+     */
+    addObjectToCell(position: Position, rn: ObjectID): boolean {
+        const { x, y, z } = position;
+        const map = this.getMap(z);
+        if (!map) return false;
+        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
+
+        const cellFlag = map.cellFlags[x][y];
+        const hasObjects = (cellFlag & 0x10) !== 0;
+        const baseCol = this.data.levelIndex[z] + x;
+
+        if (!hasObjects) {
+            if (baseCol < 0 || baseCol >= this.data.columnIndex.length) return false;
+            let idx = this.data.columnIndex[baseCol] ?? 0;
+            for (let yy = 0; yy < y; yy++) {
+                if ((map.cellFlags[x][yy] & 0x10) !== 0) idx++;
+            }
+            this.data.objectList.splice(idx, 0, rn);
+            for (let col = baseCol + 1; col < this.data.columnIndex.length; col++) {
+                this.data.columnIndex[col] = (this.data.columnIndex[col] + 1) & 0xffff;
+            }
+            this.setCellHasObjects(map, x, y, true);
+            this.data.header.objectListSize = this.data.objectList.length;
+            return true;
+        }
+
+        const idx = this.getObjectListIndex(position);
+        if (idx < 0) return false;
+        let current = this.data.objectList[idx] ?? OBJECT_ID_EOF;
+        if (current === OBJECT_ID_EOF) {
+            this.data.objectList[idx] = rn;
+            return true;
+        }
+        for (;;) {
+            const next = this.getDBRecordLink(current);
+            if (next === OBJECT_ID_EOF) break;
+            current = next;
+        }
+        this.setDBRecordLink(current, rn);
+        this.setDBRecordLink(rn, OBJECT_ID_EOF);
+        return true;
+    }
+
+    /**
+     * Remove an object RN from the cell's object list.
+     * Returns true if removed.
+     */
+    removeObjectFromCell(position: Position, rn: ObjectID): boolean {
+        const { x, y, z } = position;
+        const map = this.getMap(z);
+        if (!map) return false;
+        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
+
+        const idx = this.getObjectListIndex(position);
+        if (idx < 0) return false;
+        let head = this.data.objectList[idx] ?? OBJECT_ID_EOF;
+        if (head === OBJECT_ID_EOF) return false;
+
+        if (head === rn) {
+            const next = this.getDBRecordLink(head);
+            if (next === OBJECT_ID_EOF) {
+                this.data.objectList.splice(idx, 1);
+                const baseCol = this.data.levelIndex[z] + x;
+                for (let col = baseCol + 1; col < this.data.columnIndex.length; col++) {
+                    this.data.columnIndex[col] = (this.data.columnIndex[col] - 1) & 0xffff;
+                }
+                this.setCellHasObjects(map, x, y, false);
+                this.data.header.objectListSize = this.data.objectList.length;
+            } else {
+                this.data.objectList[idx] = next;
+            }
+            this.setDBRecordLink(rn, OBJECT_ID_EOF);
+            return true;
+        }
+
+        let prev = head;
+        let current = this.getDBRecordLink(prev);
+        while (current !== OBJECT_ID_EOF) {
+            if (current === rn) {
+                const next = this.getDBRecordLink(current);
+                this.setDBRecordLink(prev, next);
+                this.setDBRecordLink(current, OBJECT_ID_EOF);
+                return true;
+            }
+            prev = current;
+            current = this.getDBRecordLink(current);
+        }
+
+        return false;
+    }
+
+    private setCellHasObjects(map: MapData, x: number, y: number, hasObjects: boolean): void {
+        let cellFlag = map.cellFlags[x][y];
+        if (hasObjects) cellFlag |= 0x10;
+        else cellFlag &= 0xef;
+        map.cellFlags[x][y] = cellFlag;
+        const tile = map.tiles[x]?.[y];
+        if (!tile) return;
+        tile.cellFlag = cellFlag;
+        tile.hasObjects = hasObjects;
+    }
+
+    /**
      * Return the linked-list next pointer for a record RN, or `OBJECT_ID_EOF`.
      *
      * Ported from CSBWin `GetDBRecordLink()` (doc/CSBwin-src/CSBCode.cpp:5090-5100).
@@ -235,6 +360,177 @@ export class DungeonState {
     }
 
     /**
+     * Update the next link pointer for a database record.
+     */
+    setDBRecordLink(rn: ObjectID, next: ObjectID): void {
+        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
+        const { category, index } = decodeObjectID(rn);
+
+        switch (category) {
+            case DBType.DOOR:
+                if (this.data.databases.doors.records[index]) {
+                    this.data.databases.doors.records[index].nextObject = next;
+                }
+                break;
+            case DBType.TELEPORTER:
+                if (this.data.databases.teleporters.records[index]) {
+                    this.data.databases.teleporters.records[index].nextObject = next;
+                }
+                break;
+            case DBType.TEXT:
+                if (this.data.databases.texts.records[index]) {
+                    this.data.databases.texts.records[index].nextObject = next;
+                }
+                break;
+            case DBType.ACTUATOR:
+                if (this.data.databases.actuators.records[index]) {
+                    this.data.databases.actuators.records[index].nextObject = next;
+                }
+                break;
+            case DBType.CREATURE:
+                if (this.data.databases.creatures.records[index]) {
+                    this.data.databases.creatures.records[index].nextObject = next;
+                }
+                break;
+            case DBType.WEAPON:
+                if (this.data.databases.weapons.records[index]) {
+                    this.data.databases.weapons.records[index].nextObject = next;
+                }
+                break;
+            case DBType.CLOTHING:
+                if (this.data.databases.clothing.records[index]) {
+                    this.data.databases.clothing.records[index].nextObject = next;
+                }
+                break;
+            case DBType.SCROLL:
+                if (this.data.databases.scrolls.records[index]) {
+                    this.data.databases.scrolls.records[index].nextObject = next;
+                }
+                break;
+            case DBType.POTION:
+                if (this.data.databases.potions.records[index]) {
+                    this.data.databases.potions.records[index].nextObject = next;
+                }
+                break;
+            case DBType.CHEST:
+                if (this.data.databases.containers.records[index]) {
+                    this.data.databases.containers.records[index].nextObject = next;
+                }
+                break;
+            case DBType.MISC:
+                if (this.data.databases.misc.records[index]) {
+                    this.data.databases.misc.records[index].nextObject = next;
+                }
+                break;
+            case DBType.MISSILE:
+                if (this.data.databases.missiles.records[index]) {
+                    this.data.databases.missiles.records[index].nextObject = next;
+                }
+                break;
+            case DBType.CLOUD:
+                if (this.data.databases.clouds.records[index]) {
+                    this.data.databases.clouds.records[index].nextObject = next;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    /**
+     * Delete a database record by marking its link as RNnul (CSBWin DeleteDBEntry).
+     *
+     * Ported from CSBWin `DeleteDBEntry()` (doc/CSBwin-src/data.cpp:995-1017).
+     */
+    deleteDBEntry(rn: ObjectID): boolean {
+        if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return false;
+        const { category, index } = decodeObjectID(rn);
+
+        switch (category) {
+            case DBType.DOOR: {
+                const rec = this.data.databases.doors.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.TELEPORTER: {
+                const rec = this.data.databases.teleporters.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.TEXT: {
+                const rec = this.data.databases.texts.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.ACTUATOR: {
+                const rec = this.data.databases.actuators.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.CREATURE: {
+                const rec = this.data.databases.creatures.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.WEAPON: {
+                const rec = this.data.databases.weapons.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.CLOTHING: {
+                const rec = this.data.databases.clothing.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.SCROLL: {
+                const rec = this.data.databases.scrolls.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.POTION: {
+                const rec = this.data.databases.potions.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.CHEST: {
+                const rec = this.data.databases.containers.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.MISC: {
+                const rec = this.data.databases.misc.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.MISSILE: {
+                const rec = this.data.databases.missiles.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            case DBType.CLOUD: {
+                const rec = this.data.databases.clouds.records[index];
+                if (!rec) return false;
+                rec.nextObject = OBJECT_ID_NULL;
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    /**
      * Find the first DOOR record RN in a cell, or `OBJECT_ID_EOF`.
      *
      * Ported from CSBWin `FindFirstDoor()` semantics (doc/CSBwin-src/Code11f52.cpp:579+).
@@ -270,24 +566,41 @@ export class DungeonState {
         return this.data.databases.doors.records[index] ?? null;
     }
 
+    getTeleporterRecord(rn: ObjectID): TeleporterRecord | null {
+        const { category, index } = decodeObjectID(rn);
+        if (category !== DBType.TELEPORTER) return null;
+        return this.data.databases.teleporters.records[index] ?? null;
+    }
+
+    /**
+     * Apply a door action at a specific map coordinate.
+     */
+    applyDoorActionAtPosition(level: number, x: number, y: number, action: number): boolean {
+        const map = this.getMap(level);
+        if (!map) return false;
+        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
+        const cellFlag = map.cellFlags[x][y];
+        if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
+        return this.applyDoorActionAt(map, x, y, cellFlag, action);
+    }
+
     /**
      * Apply an actuator action to its target door on the current level.
      * Returns true when a door state changed.
      */
     applyActuatorToDoor(actuator: ActuatorRecord, source: Position, pressed: boolean): boolean {
-        if (actuator.targetLocal) return false;
+        if (isActuatorLocalActionOnly(actuator)) return false;
         const map = this.getMap(source.z);
         if (!map) return false;
 
-        const targetData = actuator.targetData | 0;
-        const x = (targetData >> 6) & 0x1f;
-        const y = (targetData >> 11) & 0x1f;
+        const x = getActuatorTargetX(actuator);
+        const y = getActuatorTargetY(actuator);
         if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
 
         const cellFlag = map.cellFlags[x][y];
         if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
 
-        const action = this.resolveActuatorAction(actuator.actionType, actuator.revertEffect, pressed);
+        const action = this.resolveActuatorAction(getActuatorAction(actuator), isActuatorNormallyClosed(actuator), pressed);
         if (action < 0) return false;
 
         return this.applyDoorActionAt(map, x, y, cellFlag, action);
@@ -467,13 +780,13 @@ export class DungeonState {
             if (decoded.category !== DBType.ACTUATOR) continue;
             if ((decoded.position & 0x3) !== (requiredPos & 0x3)) continue;
             const rec = this.data.databases.actuators.records[decoded.index];
-            if (!rec || rec.sensorType === 0) continue;
-            if (mode === 'wall' && !this.isWallClickActuator(rec.sensorType)) continue;
-            if (mode === 'floor' && !this.isPressurePadActuator(rec.sensorType)) continue;
+            if (!rec || getActuatorType(rec) === 0) continue;
+            if (mode === 'wall' && !this.isWallClickActuator(getActuatorType(rec))) continue;
+            if (mode === 'floor' && !this.isPressurePadActuator(getActuatorType(rec))) continue;
 
             let pressedNow = pressed;
-            if (rec.sensorType === 3 && rec.data !== 0) {
-                pressedNow = pressedNow && ((facing + 1) & 0x3) === (rec.data & 0x3);
+            if (getActuatorType(rec) === 3 && getActuatorValue(rec) !== 0) {
+                pressedNow = pressedNow && ((facing + 1) & 0x3) === (getActuatorValue(rec) & 0x3);
             }
 
             if (this.applyActuatorToDoor(rec, position, pressedNow)) changed = true;
@@ -489,10 +802,9 @@ export class DungeonState {
         return sensorType === 1 || sensorType === 2 || sensorType === 3;
     }
 
-    private resolveActuatorAction(actionType: number, normallyClosed: boolean, pressed: boolean): number {
+    private resolveActuatorAction(action: ActuatorAction, normallyClosed: boolean, pressed: boolean): number {
         const switchClosed = pressed !== normallyClosed;
-        const action = actionType & 0x3;
-        if (action === 3) return switchClosed ? 0 : 1;
+        if (action === ActuatorAction.CONSTPRESSURE) return switchClosed ? 0 : 1;
         if (!switchClosed) return -1;
         return action;
     }

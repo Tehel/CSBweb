@@ -196,7 +196,62 @@ Validation
 - Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).
 - Verify pixel‑perfect alignment of the viewport frame, portraits, and message line.
 
-### Phase 8 — CSBWin-Compatible Save/Load (pre‑work checklist)
+### Phase 8 — CSBWin-Compatible actuators
+Goal: match CSBWin’s actuator pipeline (trigger evaluation -> queued timers -> room-type effects -> DSA/monster/missile behavior).
+
+1. **Actuator data parity**. Mirror DB3 bitfields and helpers (actuatorType, action, onceOnly, normallyClosed, localActionOnly, targetX/Y/pos, delay, value, DSA selector/state/parameters) per `doc/CSBwin-src/CSB.h:927-1075`.
+2. **Timer core**. Implement a CSBWin-style timer queue with `TIMER` layout (time, level, function, uByte5-9) and ordering rules, including `CreateTimer()` semantics from `doc/CSBwin-src/Mouse.cpp:176-206`.
+3. **Actuator trigger evaluation**. Port `PressurePadOrAlcove()` logic from `doc/CSBwin-src/Code11f52.cpp:3660-3890`:
+   - Floor pads vs wall switches
+   - Party/monster/object/direction checks
+   - `CONSTPRESSURE` behavior and “normally closed” logic
+4. **QueueSwitchAction semantics**. Implement `QueueSwitchAction()` (`doc/CSBwin-src/Code11f52.cpp:3566-3636`) including:
+   - `localActionOnly` → `PerformLocalAction()` (`doc/CSBwin-src/Mouse.cpp:222-260`)
+   - Room-type → timer function mapping via `Byte1596` (graphic `0x232`) and `WarnIllegalTimer()`.
+5. **Timer function handlers**. Port core room-type handlers from `doc/CSBwin-src/Timer.cpp`:
+   - `TT_OPENROOM`, `TT_STONEROOM`, `TT_FALSEWALL`, `TT_TELEPORTER`, `TT_PIT`, `TT_DOOR`
+   - DB2 show/hide text logic, cell-flag bit changes, and DSA/portrait hooks where present.
+6. **Special actuator types**. Implement DB3 actuatorType behavior from `doc/CSBwin-src/CSB.h:927-1045` and `doc/CSBwin-src/Timer.cpp`:
+   - Counters (type 6/48), monster generators (type 6 in open rooms), locks (types 3/4/11)
+   - Missile launchers (types 7-10, 14-15)
+   - `onceOnly` disable semantics.
+7. **DSA runtime**. Add DSA execution engine (stack, variables, operations, filters) and DSA timer/message handling (`doc/CSBwin-src/DSA.cpp`, `doc/CSBwin-src/Timer.cpp:ProcessDSATimer*`).
+8. **Integration points**. Wire actuator triggers into movement/object placement (`PlaceOrRemoveObjectInRoom` path in `doc/CSBwin-src/Code11f52.cpp`) and ensure timers tick via the game loop.
+9. **Extended features**. Support extended timers and big actuators using `ExtendedFeaturesBlock` flags (`doc/CSBwin-src/Chaos.cpp:1747-1765`) and DSALevelIndex when present.
+10. **Validation tooling**. Add a debug “actuator probe” that:
+    - Lists actuators at a cell with decoded fields
+    - Steps timers and logs resulting cell/object changes for compare with CSBWin.
+
+Status:
+- ✅ Timer queue core implemented with CSBWin ordering rules and `CreateTimer()` semantics (`src/engine/TimerQueue.ts`).
+- ✅ `PressurePadOrAlcove()` trigger evaluation ported for party stepping, using CSBWin actuator checks and action selection (`src/engine/ActuatorSystem.ts`, `src/engine/MovementSystem.ts`).
+- ✅ Wall-switch click handling now follows CSBWin `TouchWall()` semantics for core switch/lock types (1/2/3/4/11/12/17) and queues timers via `QueueSwitchAction` (`src/engine/ActuatorSystem.ts`).
+- ✅ Actuator lookup tables wired from graphics (`Byte1596`) + object name index resolution via ObjDesc (`src/renderer/csbwin/UITables.ts`, `src/main.ts`).
+- ✅ `PerformLocalAction()` handles local action type 10 (skill increaser) and delayed actuator rotation markers (`src/engine/ActuatorSystem.ts`).
+- ✅ Delayed actuator rotation now reorders actuator links in-place to mirror `RotateActuatorList()` semantics (`src/engine/ActuatorSystem.ts`, `src/engine/DungeonState.ts`).
+- ⚠️ `PerformLocalAction()` does not yet map `HandChar` precisely; uses partyPosition matching when mapPos is specified.
+- ✅ Timer processing now runs each tick and dispatches TT_OPENROOM/TT_STONEROOM/TT_FALSEWALL/TT_TELEPORTER/TT_PIT/TT_DOOR (`src/engine/TimerSystem.ts`, `src/engine/Game.ts`).
+- ✅ Portrait timer responses are now applied for actuator type 127 using CSBWin response fields (`src/engine/TimerSystem.ts`, `src/data/actuatorHelpers.ts`).
+- ✅ DSA/monster-generator/missile-launcher paths are now wired with hook callbacks + TT_ReactivateGenerator support (`src/engine/TimerSystem.ts`, `src/engine/TimerQueue.ts`).
+- ✅ DSA runtime now loads save-game DSA blocks, resolves DSALevelIndex selectors, and executes DSA programs for timer5/6/7 (`src/data/SaveGameLoader.ts`, `src/engine/DsaSystem.ts`, `src/engine/Game.ts`).
+- ✅ Added DSA ampersand ops for cell fetch/store, false pit toggles, generator delay, type/object-id, copy, and global fetch (`src/engine/DsaSystem.ts`).
+- ✅ Implemented DSA `&ADD`/`&DEL`/`%MOVE` object manipulation with cursor/character/monster/chest locations and MoveObject-style source/destination validation (uses `CarryLocation` + `ObjDesc` carry masks), plus `objectInHand` state (`src/engine/DsaSystem.ts`, `src/engine/gameTypes.ts`, `src/engine/Party.ts`, `src/main.ts`).
+- ⚠️ DSA interpreter still has many unimplemented ampersand subcodes (see TODOs in `src/engine/DsaSystem.ts`).
+- ⚠️ Missile launch, monster creation, and WiggleEverything still require concrete engine hooks (see TODOs in `src/engine/TimerSystem.ts`).
+- ⚠️ DSA object manipulation still skips cloud/missile timer updates and does not free DB records on delete (CSBWin uses deferred DeleteDBEntry).
+
+Remaining implementation steps (detail):
+1. **Big actuators + word8**. Add `word8` to `ActuatorRecord` and loader handling for `BigActuators` saves; mirror `MakeBigActuators()` + `DB3::MakeBig()` conversion and use `word8` for `ParameterA/B` high bits (`doc/CSBwin-src/SaveGame.cpp:2287-2315`, `doc/CSBwin-src/data.cpp:1327-1356`).
+2. **TouchWall parity**. Expand wall actuator handling for types 13 (torch holder), 16 (swap), and 127 (add character) plus cursor filter hooks and DeleteDBEntry semantics for key removal (`doc/CSBwin-src/Mouse.cpp:290-605`).
+3. **Object move triggers**. Implement `PlaceOrRemoveObjectInRoom`-style actuator checks for moved objects/monsters (not just party stepping), including DB2 text print on reveal and proper `movedObjectDBNum`/`movedObjectNameIndex` logic (`doc/CSBwin-src/Code11f52.cpp:3882-3950`).
+4. **TT_OPENROOM gating**. Match `TT_DESSAGE`/`TT_ParameterMessage` behavior so DB2 show/hide only occurs for normal timers, and text prints when a hidden DB2 becomes visible with party on the tile (`doc/CSBwin-src/Timer.cpp:1688-1763`).
+5. **TT_DOOR parity**. Mirror `ProcessTT_DOOR` requeue behavior (TT_1 transitions and door-state guards) instead of direct door-state writes (`doc/CSBwin-src/Timer.cpp:1556-1588`).
+6. **Missile launcher logic**. Implement `TriggerMissileLauncher()` semantics for types 7–10/14/15, including object removal from room, spell construction, and missile launch positions/range (`doc/CSBwin-src/Timer.cpp:1883-2008`).
+7. **Generator/teleporter side effects**. Add missing sound queues and `WiggleEverything()` fall forcing for pit/teleporter toggles (`doc/CSBwin-src/Timer.cpp:1772-1824`, `doc/CSBwin-src/Timer.cpp:2410+`, `doc/CSBwin-src/Timer.cpp:2548+`).
+8. **DSA opcode coverage**. Audit `DSA.cpp` opcode tables vs `src/engine/DsaSystem.ts` and implement remaining `&` subcodes plus any missing stack ops; document coverage after each batch (`doc/CSBwin-src/DSA.cpp`).
+9. **DSA filter wiring**. Add calls to `ProcessDSAFilter` for party move, missile encounters, action-name resolution, and character filters, with correct timer/location parameters (`doc/CSBwin-src/Code11f52.cpp:928-1040`, `doc/CSBwin-src/Character.cpp:4559-4573`, `doc/CSBwin-src/CSBCode.cpp:7792-7840`, `doc/CSBwin-src/CSBCode.cpp:8631-8705`).
+
+### Phase 9 — CSBWin-Compatible Save/Load (pre‑work checklist)
 Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
 
 1. **Inventory all save file blocks (CSBWin `SaveGame.cpp`)**:

@@ -12,6 +12,10 @@ import { Party } from './Party';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
+import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
+import { TimerQueue } from './TimerQueue';
+import { TimerSystem, type TimerTables } from './TimerSystem';
+import { DsaSystem, type DsaTables } from './DsaSystem';
 
 /**
  * Game event callback types
@@ -42,6 +46,10 @@ export class Game {
     party: Party;
     dungeonState: DungeonState;
     private movementSystem: MovementSystem;
+    private timerQueue: TimerQueue;
+    private actuators: ActuatorSystem;
+    private timerSystem: TimerSystem;
+    private dsaSystem: DsaSystem;
 
     // Game loop
     private running: boolean = false;
@@ -52,7 +60,7 @@ export class Game {
     private onTickCallbacks: GameEventCallback[] = [];
     private onMoveCallbacks: MovementCallback[] = [];
 
-    constructor(dungeonData: DungeonData) {
+    constructor(dungeonData: DungeonData, actuatorTables?: ActuatorTables, timerTables?: TimerTables, dsaTables?: DsaTables) {
         // Initialize dungeon state
         this.dungeonState = new DungeonState(dungeonData);
 
@@ -61,9 +69,6 @@ export class Game {
         const startFacing = this.dungeonState.getStartFacing();
 
         this.party = new Party(startPos, startFacing);
-
-        // Initialize movement system
-        this.movementSystem = new MovementSystem(this.party, this.dungeonState);
 
         // Initialize game state
         this.state = {
@@ -75,6 +80,38 @@ export class Game {
             currentTime: Date.now(),
             tickCount: 0,
         };
+
+        this.timerQueue = new TimerQueue();
+        this.actuators = new ActuatorSystem(
+            this.dungeonState,
+            () => this.party.state,
+            this.timerQueue,
+            () => this.state.tickCount,
+            actuatorTables,
+        );
+        this.dsaSystem = new DsaSystem(
+            this.dungeonState,
+            () => this.state.tickCount,
+            this.timerQueue,
+            () => this.party.state,
+            dsaTables ?? actuatorTables,
+            this.actuators,
+        );
+        this.timerSystem = new TimerSystem(
+            this.dungeonState,
+            () => this.party.state,
+            this.timerQueue,
+            this.actuators,
+            timerTables,
+            {
+                onDsaTimer5: (rn, timer, loc) => this.dsaSystem.processTimer5(rn, timer, loc),
+                onDsaTimer6: (rn, timer, loc) => this.dsaSystem.processTimer6(rn, timer, loc),
+                onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
+            },
+        );
+
+        // Initialize movement system
+        this.movementSystem = new MovementSystem(this.party, this.dungeonState, this.actuators);
 
         console.log('Game initialized at position:', startPos, 'facing:', startFacing);
     }
@@ -161,6 +198,8 @@ export class Game {
             callback(this);
         }
 
+        this.timerSystem.processTimers(this.state.tickCount);
+
         // Update party state in game state
         this.state.party = this.party.state;
     }
@@ -228,7 +267,7 @@ export class Game {
     handleWallClick(): boolean {
         const pos = this.party.state.position;
         const facing = this.party.state.facing;
-        return this.dungeonState.triggerWallActuators(pos, facing);
+        return this.actuators.triggerWallSwitch(pos, facing);
     }
 
     /**

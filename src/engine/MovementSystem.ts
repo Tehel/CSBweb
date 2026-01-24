@@ -9,7 +9,8 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { Position, RoomType } from '../core/types';
+import type { ActuatorSystem } from './ActuatorSystem';
+import { OBJECT_ID_NULL, Position, RoomType } from '../core/types';
 
 /**
  * MovementSystem - handles movement validation and collision detection
@@ -17,10 +18,12 @@ import { Position, RoomType } from '../core/types';
 export class MovementSystem {
     private party: Party;
     private dungeon: DungeonState;
+    private actuators?: ActuatorSystem;
 
-    constructor(party: Party, dungeon: DungeonState) {
+    constructor(party: Party, dungeon: DungeonState, actuators?: ActuatorSystem) {
         this.party = party;
         this.dungeon = dungeon;
+        this.actuators = actuators;
     }
 
     /**
@@ -133,8 +136,10 @@ export class MovementSystem {
         }
 
         const facing = this.party.state.facing;
-        this.dungeon.triggerPressurePads(position, facing, false);
-        this.dungeon.triggerPressurePads(newPosition, facing, true);
+        if (this.actuators) {
+            this.actuators.triggerObjectMove(position, OBJECT_ID_NULL, false, false, facing);
+            this.actuators.triggerObjectMove(newPosition, OBJECT_ID_NULL, true, false, facing);
+        }
 
         // Movement is valid
         return {

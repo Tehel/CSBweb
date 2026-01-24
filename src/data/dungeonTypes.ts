@@ -124,23 +124,14 @@ export interface TextRecord {
 }
 
 /**
- * Database record: Actuator/Sensor (8 bytes)
+ * Database record: Actuator/Sensor (8 or 10 bytes with BigActuators)
  */
 export interface ActuatorRecord {
     nextObject: ObjectID;       // +0x00
-    sensorType: ui8;            // +0x02 bits 6-0
-    data: ui16;                 // bits 15-7 (type-specific)
-    portraitState: ui8;         // bits 11-9 (PORTRAIT_* flags for type 127)
-    decorationOrdinal: ui8;     // +0x04 bits 15-12
-    targetLocal: boolean;       // bit 11: 0=remote, 1=local
-    delay: ui8;                 // bits 10-7
-    soundEffect: boolean;       // bit 6
-    revertEffect: boolean;      // bit 5
-    actionType: ui8;            // bits 4-3: 0=set, 1=clear, 2=toggle, 3=hold
-    onceOnly: boolean;          // bit 2
-    targetData: ui16;           // +0x06: target location or action
-    rawBehavior: ui16;          // original word4 (needed for DSA ParameterA/B)
-    rawTarget: ui16;            // original word6 (needed for DSA ParameterA/B)
+    word2: ui16;                // +0x02 raw actuator word2 (type + value)
+    word4: ui16;                // +0x04 raw actuator word4 (behavior)
+    word6: ui16;                // +0x06 raw actuator word6 (target/local)
+    word8?: ui16;               // +0x08 raw actuator word8 (BigActuators only)
 }
 
 /**
@@ -258,6 +249,29 @@ export interface TimerRecord {
     timerWord8: ui16;           // bits 0-4 x, 5-9 y, 10-11 direction, 12-15 delta energy
 }
 
+export interface DsaAction {
+    column: ui32;
+    program: Uint16Array;
+}
+
+export interface DsaState {
+    actions: DsaAction[];
+}
+
+export interface DsaDefinition {
+    description: string;
+    state: ui16;
+    localState: ui8;
+    groupId: ui8;
+    numStates: ui32;
+    firstDisplayedState: ui32;
+    states: Array<DsaState | null>;
+}
+
+export interface DsaIndex {
+    entries: Array<DsaDefinition | null>;
+}
+
 /**
  * Union type for all database records
  */
@@ -327,7 +341,9 @@ export interface DungeonData {
     item16?: Item16Record[];    // Save-game runtime monster state
     timers?: TimerRecord[];     // Save-game timer table
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
+    dsaIndex?: DsaIndex;        // Extended-feature DSA programs (DSAIndex)
     extendedWallDecorations?: boolean; // Extended-feature flag
+    bigActuators?: boolean;     // Extended-feature flag
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }
 

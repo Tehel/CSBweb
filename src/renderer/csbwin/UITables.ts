@@ -71,6 +71,7 @@ export interface UITables {
     wRectPos1796: WordRect;
     wRectPos1788: WordRect;
     wRectPos1780: WordRect;
+    byte1596: number[];
     word1526: number[][];
     word1502: number[][];
     wRectPos1454: WordRect[];
@@ -339,7 +340,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   // SOUND[22] (8 bytes each), Byte1596[8], Word1588
   off += 22 * 8;
-  off += 8;
+  const byte1596 = Array.from(raw.slice(off, off + 8)); off += 8;
   off += 2;
 
   // DropOrder[30], Word1526[4][3], Word1502[4][6]
@@ -427,6 +428,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos1796,
     wRectPos1788,
     wRectPos1780,
+    byte1596,
     word1526,
     word1502,
     wRectPos1454,

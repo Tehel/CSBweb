@@ -5,6 +5,7 @@ import {
   OBJECT_ID_NULL,
 } from '../core/types';
 import type { ObjectID, ui16 } from '../core/types';
+import { getActuatorType, getActuatorValue } from './actuatorHelpers';
 import type {
   ContainerRecord,
   DatabaseRecord,
@@ -36,7 +37,7 @@ export function extractPresetHeroes(data: DungeonData): PresetHero[] {
           const decoded = decodeObjectID(rn);
           if (decoded.category !== DBType.ACTUATOR) continue;
           const actuator = data.databases.actuators.records[decoded.index];
-          if (!actuator || actuator.sensorType !== 127) continue;
+          if (!actuator || getActuatorType(actuator) !== 127) continue;
 
           const pos = decoded.position;
           const textRef = scanTextRecords(data, map, mapIndex, x + DELTA_X[pos], y + DELTA_Y[pos], pos)
@@ -48,7 +49,7 @@ export function extractPresetHeroes(data: DungeonData): PresetHero[] {
           const heroBase = parseHeroDefinition(text);
           if (!heroBase) continue;
 
-          const key = `${actuator.data}:${textRef.index}`;
+          const key = `${getActuatorValue(actuator)}:${textRef.index}`;
           if (seen.has(key)) continue;
           seen.add(key);
 
@@ -58,7 +59,7 @@ export function extractPresetHeroes(data: DungeonData): PresetHero[] {
             ...heroBase,
             textRecordIndex: textRef.index,
             textOffset: textRef.record.textOffset,
-            portraitIndex: actuator.data,
+            portraitIndex: getActuatorValue(actuator),
             location: { map: mapIndex, x, y, wall: decoded.position },
             inventory,
           });
