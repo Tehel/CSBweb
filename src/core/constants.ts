@@ -78,20 +78,31 @@ export const GraphicIndex = {
 } as const;
 
 /**
- * Sound indices
- * Selected subset from mediaindex.js (79 total sounds)
+ * Sound indices (graphics.dat SND1 items)
+ * Based on static/js/mediaindex.js sound table.
  */
 export const SoundIndex = {
-    WALK: 0,
-    OPEN_DOOR: 1,
-    CLOSE_DOOR: 2,
-    BUTTON: 3,
-    HIT: 4,
-    ATTACK: 5,
-    SCREAM: 6,
-    SPELL: 7,
-    FIREBALL: 8,
-    EXPLOSION: 9
+    FALLING_ITEM: 533,
+    SWITCH: 534,
+    DOOR: 535,
+    WALL_SWITCH: 536,
+    FIREBALL_EXPLODE: 537,
+    FALL_AND_DIE: 539,
+    SWALLOW: 540,
+    CHAMP_WOUND_1: 541,
+    CHAMP_WOUND_2: 542,
+    CHAMP_WOUND_3: 543,
+    CHAMP_WOUND_4: 544,
+    SPELL_EXPLODE: 545,
+    SKELETON_ATTACK: 546,
+    TELEPORT: 547,
+    WALL_BUMP: 549,
+    RAT_ATTACK: 550,
+    MUMMY_ATTACK: 551,
+    SCREAMER_ATTACK: 552,
+    SCORPION_ATTACK: 553,
+    WORM_ATTACK: 554,
+    GIGGLER: 555
 } as const;
 
 /**

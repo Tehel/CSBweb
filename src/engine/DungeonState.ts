@@ -25,16 +25,6 @@ import type {
     WeaponRecord,
     ActuatorRecord,
 } from '../data/dungeonTypes';
-import {
-    ActuatorAction,
-    getActuatorAction,
-    getActuatorTargetX,
-    getActuatorTargetY,
-    getActuatorType,
-    getActuatorValue,
-    isActuatorLocalActionOnly,
-    isActuatorNormallyClosed,
-} from '../data/actuatorHelpers';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 
@@ -584,47 +574,6 @@ export class DungeonState {
         return this.applyDoorActionAt(map, x, y, cellFlag, action);
     }
 
-    /**
-     * Apply an actuator action to its target door on the current level.
-     * Returns true when a door state changed.
-     */
-    applyActuatorToDoor(actuator: ActuatorRecord, source: Position, pressed: boolean): boolean {
-        if (isActuatorLocalActionOnly(actuator)) return false;
-        const map = this.getMap(source.z);
-        if (!map) return false;
-
-        const x = getActuatorTargetX(actuator);
-        const y = getActuatorTargetY(actuator);
-        if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
-
-        const cellFlag = map.cellFlags[x][y];
-        if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
-
-        const action = this.resolveActuatorAction(getActuatorAction(actuator), isActuatorNormallyClosed(actuator), pressed);
-        if (action < 0) return false;
-
-        return this.applyDoorActionAt(map, x, y, cellFlag, action);
-    }
-
-    /**
-     * Trigger wall actuators on the cell in front of the party.
-     */
-    triggerWallActuators(position: Position, facing: number): boolean {
-        const target = this.getForwardPosition(position, facing);
-        if (!target) return false;
-        const touchedPosition = (facing + 2) & 0x3;
-        return this.triggerActuatorsAt(target, touchedPosition, facing, true, 'wall');
-    }
-
-    /**
-     * Trigger floor pressure pads in a cell (party stepping on/off).
-     */
-    triggerPressurePads(position: Position, facing: number, pressed: boolean): boolean {
-        const tile = this.getTile(position);
-        if (!tile) return false;
-        if (tile.roomType !== RoomType.OPEN && tile.roomType !== RoomType.PIT) return false;
-        return this.triggerActuatorsAt(position, 0, facing, pressed, 'floor');
-    }
 
     getWeaponRecord(rn: ObjectID): WeaponRecord | null {
         const { category, index } = decodeObjectID(rn);
@@ -755,58 +704,6 @@ export class DungeonState {
             default:
                 return false;
         }
-    }
-
-    private getForwardPosition(position: Position, facing: number): Position | null {
-        switch (facing & 3) {
-            case 0: return position.north;
-            case 1: return position.east;
-            case 2: return position.south;
-            case 3: return position.west;
-            default: return null;
-        }
-    }
-
-    private triggerActuatorsAt(
-        position: Position,
-        requiredPos: number,
-        facing: number,
-        pressed: boolean,
-        mode: 'wall' | 'floor'
-    ): boolean {
-        let changed = false;
-        for (let rn = this.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
-            const decoded = decodeObjectID(rn);
-            if (decoded.category !== DBType.ACTUATOR) continue;
-            if ((decoded.position & 0x3) !== (requiredPos & 0x3)) continue;
-            const rec = this.data.databases.actuators.records[decoded.index];
-            if (!rec || getActuatorType(rec) === 0) continue;
-            if (mode === 'wall' && !this.isWallClickActuator(getActuatorType(rec))) continue;
-            if (mode === 'floor' && !this.isPressurePadActuator(getActuatorType(rec))) continue;
-
-            let pressedNow = pressed;
-            if (getActuatorType(rec) === 3 && getActuatorValue(rec) !== 0) {
-                pressedNow = pressedNow && ((facing + 1) & 0x3) === (getActuatorValue(rec) & 0x3);
-            }
-
-            if (this.applyActuatorToDoor(rec, position, pressedNow)) changed = true;
-        }
-        return changed;
-    }
-
-    private isWallClickActuator(sensorType: number): boolean {
-        return sensorType === 1 || sensorType === 2;
-    }
-
-    private isPressurePadActuator(sensorType: number): boolean {
-        return sensorType === 1 || sensorType === 2 || sensorType === 3;
-    }
-
-    private resolveActuatorAction(action: ActuatorAction, normallyClosed: boolean, pressed: boolean): number {
-        const switchClosed = pressed !== normallyClosed;
-        if (action === ActuatorAction.CONSTPRESSURE) return switchClosed ? 0 : 1;
-        if (!switchClosed) return -1;
-        return action;
     }
 
     private applyDoorActionAt(map: MapData, x: number, y: number, cellFlag: CellFlag, action: number): boolean {

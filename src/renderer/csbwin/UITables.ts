@@ -23,6 +23,16 @@ export interface UIButton extends Rect {
   name?: string;
 }
 
+export interface SoundTableEntry {
+  word0: number;
+  byte2: number;
+  byte3: number;
+  byte4: number;
+  byte5: number;
+  byte6: number;
+  byte7: number;
+}
+
 export interface UITables {
   graphic230: {
     word20242: WordRect;
@@ -71,6 +81,7 @@ export interface UITables {
     wRectPos1796: WordRect;
     wRectPos1788: WordRect;
     wRectPos1780: WordRect;
+    soundTable: SoundTableEntry[];
     byte1596: number[];
     word1526: number[][];
     word1502: number[][];
@@ -339,7 +350,19 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const wRectPos1780 = readWordRect(view, off); off += 8;
 
   // SOUND[22] (8 bytes each), Byte1596[8], Word1588
-  off += 22 * 8;
+  const soundTable: SoundTableEntry[] = [];
+  for (let i = 0; i < 22; i++) {
+    soundTable.push({
+      word0: view.getInt16(off + 0, false),
+      byte2: raw[off + 2] ?? 0,
+      byte3: raw[off + 3] ?? 0,
+      byte4: raw[off + 4] ?? 0,
+      byte5: raw[off + 5] ?? 0,
+      byte6: raw[off + 6] ?? 0,
+      byte7: raw[off + 7] ?? 0,
+    });
+    off += 8;
+  }
   const byte1596 = Array.from(raw.slice(off, off + 8)); off += 8;
   off += 2;
 
@@ -428,6 +451,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos1796,
     wRectPos1788,
     wRectPos1780,
+    soundTable,
     byte1596,
     word1526,
     word1502,

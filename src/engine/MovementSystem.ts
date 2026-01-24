@@ -11,6 +11,7 @@ import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import type { ActuatorSystem } from './ActuatorSystem';
 import { OBJECT_ID_NULL, Position, RoomType } from '../core/types';
+import { SoundIndex } from '../core/constants';
 
 /**
  * MovementSystem - handles movement validation and collision detection
@@ -93,6 +94,7 @@ export class MovementSystem {
                 success: false,
                 blocked: true,
                 message: 'Invalid map',
+                soundId: SoundIndex.WALL_BUMP,
             };
         }
 
@@ -102,6 +104,7 @@ export class MovementSystem {
                 success: false,
                 blocked: true,
                 message: 'The edge of the dungeon blocks your path',
+                soundId: SoundIndex.WALL_BUMP,
             };
         }
 
@@ -123,11 +126,12 @@ export class MovementSystem {
                 success: false,
                 blocked: true,
                 message,
+                soundId: SoundIndex.WALL_BUMP,
             };
         }
 
         // Check for special tiles
-        const specialMessage = this.checkSpecialTiles(newPosition);
+        const special = this.checkSpecialTiles(newPosition);
 
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
@@ -145,7 +149,8 @@ export class MovementSystem {
         return {
             success: true,
             newPosition,
-            message: specialMessage,
+            message: special?.message,
+            soundId: special?.soundId,
         };
     }
 
@@ -154,11 +159,13 @@ export class MovementSystem {
      *
      * Returns a message if there's something special about this tile
      */
-    private checkSpecialTiles(position: Position): string | undefined {
-        if (this.dungeon.isPit(position)) return 'You step into a pit!';
-        if (this.dungeon.isTeleporter(position)) return 'You feel a strange sensation...';
+    private checkSpecialTiles(position: Position): { message?: string; soundId?: number } | undefined {
+        if (this.dungeon.isPit(position)) return { message: 'You step into a pit!' };
+        if (this.dungeon.isTeleporter(position)) {
+            return { message: 'You feel a strange sensation...', soundId: SoundIndex.TELEPORT };
+        }
 
-        if (this.dungeon.isStairs(position)) return 'You find stairs';
+        if (this.dungeon.isStairs(position)) return { message: 'You find stairs' };
 
         // Check for objects
         if (this.dungeon.hasObjects(position)) {

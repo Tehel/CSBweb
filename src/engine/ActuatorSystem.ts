@@ -37,29 +37,12 @@ import {
   setActuatorType,
 } from '../data/actuatorHelpers';
 import { TimerQueue } from './TimerQueue';
+import { SoundIndex } from '../core/constants';
+import { constructPredefinedMissile } from './missileHelpers';
 
 const OBJNI_NOT_AN_OBJECT = 255;
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 const PORTRAIT_INACTIVE = 1;
-const TORCH_NAME_INDEX = 4;
-const MISSILE_TYPE_TORCH_MIN = 4;
-const MISSILE_TYPE_TORCH_MAX = 7;
-const MISSILE_TYPE_DAGGER = 32;
-const MISSILE_TYPE_ARROW = 51;
-const MISSILE_TYPE_SLAYER = 52;
-const MISSILE_TYPE_ROCK = 54;
-const MISSILE_TYPE_POISON_DART = 55;
-const MISSILE_TYPE_THROWING_STAR = 56;
-const MISSILE_TYPE_BOULDER = 128;
-
-const WEAPON_TORCH = 2;
-const WEAPON_DAGGER = 8;
-const WEAPON_ARROW = 27;
-const WEAPON_SLAYER = 28;
-const WEAPON_ROCK = 30;
-const WEAPON_POISON_DART = 31;
-const WEAPON_THROWING_STAR = 32;
-const MISC_BOULDER = 25;
 
 export enum CursorFilterType {
   TakeKey = 'TakeKey',
@@ -91,6 +74,7 @@ export interface ActuatorTables {
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   onTextMessage?: (text: string) => void;
+  playSound?: (soundId: number, rateIdx?: number) => void;
 }
 
 export class ActuatorSystem {
@@ -99,6 +83,7 @@ export class ActuatorSystem {
   private cursorFilter?: CursorFilterHook;
   private onAddCharacter?: AddCharacterHook;
   private onTextMessage?: (text: string) => void;
+  private playSound?: (soundId: number, rateIdx?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
   private delayedActionY = 0;
@@ -117,6 +102,7 @@ export class ActuatorSystem {
     this.cursorFilter = tables?.cursorFilter;
     this.onAddCharacter = tables?.onAddCharacter;
     this.onTextMessage = tables?.onTextMessage;
+    this.playSound = tables?.playSound;
   }
 
   setTables(tables: ActuatorTables): void {
@@ -125,6 +111,7 @@ export class ActuatorSystem {
     if (tables.cursorFilter) this.cursorFilter = tables.cursorFilter;
     if (tables.onAddCharacter) this.onAddCharacter = tables.onAddCharacter;
     if (tables.onTextMessage) this.onTextMessage = tables.onTextMessage;
+    if (tables.playSound) this.playSound = tables.playSound;
   }
 
   queueSwitchActionForActuator(actuator: ActuatorRecord, action: ActuatorAction, level: number, mapPos?: number): void {
@@ -380,7 +367,7 @@ export class ActuatorSystem {
           if (!switchOpen) {
             result = true;
             if (isActuatorAudible(rec)) {
-              // TODO: Queue wall switch sound.
+              this.playSound?.(SoundIndex.SWITCH);
             }
             if (!emptyHanded && (actuatorType === 4 || actuatorType === 11 || actuatorType === 17)) {
               const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand ?? OBJECT_ID_NULL, position, actuatorPos);
@@ -396,7 +383,7 @@ export class ActuatorSystem {
             } else if (emptyHanded && actuatorType === 12) {
               const allow = this.applyCursorFilter(CursorFilterType.GiftFromGod, OBJECT_ID_NULL, position, actuatorPos);
               if (allow) {
-                const gift = this.constructPredefinedMissile(getActuatorValue(rec));
+                const gift = constructPredefinedMissile(this.dungeon.getData(), getActuatorValue(rec));
                 if (gift !== null) {
                   party.objectInHand = gift;
                   objectInHand = gift;
@@ -515,7 +502,7 @@ export class ActuatorSystem {
     }
 
     if (isActuatorAudible(rec)) {
-      // TODO: Queue soundPRESSUREPAD (CSBwin Code11f52.cpp:3843-3864).
+      this.playSound?.(SoundIndex.SWITCH);
     }
 
     this.queueSwitchAction(rec, padAction, position, switchPosition);
@@ -586,53 +573,6 @@ export class ActuatorSystem {
   private getRoomTimerFunction(roomType: number): number {
     const table = this.roomTimerFunctions ?? DEFAULT_ROOM_TIMER_FUNCTIONS;
     return table[roomType] ?? 0;
-  }
-
-  private scanPressurePadContext(
-    position: Position,
-    object: ObjectID,
-    switchPosition: number,
-    unchangedRoom: boolean,
-    movedObjectDBNum: number,
-  ): PressurePadContext {
-    const movedObjectNameIndex = object === OBJECT_ID_NULL ? OBJNI_NOT_AN_OBJECT : this.getBasicObjectType(object);
-    let objectDB5To13Present = false;
-    let monstersPresent = false;
-    let sameTypeObjectPresent = false;
-    let differentTypeObjectPresent = false;
-
-    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const dbType = decodeObjectID(rn).category;
-      if (switchPosition === -1) {
-        if (dbType === DBType.CREATURE) {
-          monstersPresent = true;
-        } else if (dbType > DBType.CREATURE && dbType < DBType.MISSILE) {
-          objectDB5To13Present = true;
-          const objNameIndex = this.getBasicObjectType(rn);
-          if (objNameIndex === movedObjectNameIndex) sameTypeObjectPresent = true;
-          if (objNameIndex !== movedObjectNameIndex) differentTypeObjectPresent = true;
-        } else if (dbType === DBType.TEXT && movedObjectDBNum === -1 && !unchangedRoom) {
-          // Text printing handled in PlaceOrRemoveObjectInRoom in CSBWin; skip here.
-        }
-      } else {
-        if ((decodeObjectID(rn).position & 0x3) !== (switchPosition & 0x3)) continue;
-        if (dbType > DBType.CREATURE) {
-          objectDB5To13Present = true;
-          const objNameIndex = this.getBasicObjectType(rn);
-          if (objNameIndex === movedObjectNameIndex) sameTypeObjectPresent = true;
-          if (objNameIndex !== movedObjectNameIndex) differentTypeObjectPresent = true;
-        }
-      }
-    }
-
-    return {
-      objectDB5To13Present,
-      monstersPresent,
-      sameTypeObjectPresent,
-      differentTypeObjectPresent,
-      movedObjectDBNum,
-      movedObjectNameIndex,
-    };
   }
 
   private scanObjectMoveContext(
@@ -816,19 +756,12 @@ export class ActuatorSystem {
     this.delayedAction = -1;
   }
 
-  private getForwardPosition(position: Position, facing: number): Position | null {
-    switch (facing & 3) {
-      case 0:
-        return new Position(position.x, position.y - 1, position.z);
-      case 1:
-        return new Position(position.x + 1, position.y, position.z);
-      case 2:
-        return new Position(position.x, position.y + 1, position.z);
-      case 3:
-        return new Position(position.x - 1, position.y, position.z);
-      default:
-        return null;
-    }
+  private getForwardPosition(position: Position, facing: number): Position {
+    const dir = facing & 3;
+    return (dir === 0) ? position.north
+      : (dir === 1) ? position.east
+      : (dir === 2) ? position.south
+      : position.west;
   }
 
   private normalizeObjectInHand(value: ObjectID | null | undefined): ObjectID | null {
@@ -955,93 +888,6 @@ export class ActuatorSystem {
     return encodeObjectID(pos & 0x3, decoded.category, decoded.index);
   }
 
-  private constructPredefinedMissile(missileType: number): ObjectID | null {
-    let normalized = missileType | 0;
-    if (normalized >= MISSILE_TYPE_TORCH_MIN && normalized <= MISSILE_TYPE_TORCH_MAX) {
-      normalized = TORCH_NAME_INDEX;
-    }
-
-    let dbType: DBType | null = null;
-    let weaponType: number | null = null;
-    let miscType: number | null = null;
-
-    switch (normalized) {
-      case MISSILE_TYPE_ROCK:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_ROCK;
-        break;
-      case MISSILE_TYPE_BOULDER:
-        dbType = DBType.MISC;
-        miscType = MISC_BOULDER;
-        break;
-      case MISSILE_TYPE_ARROW:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_ARROW;
-        break;
-      case MISSILE_TYPE_SLAYER:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_SLAYER;
-        break;
-      case MISSILE_TYPE_POISON_DART:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_POISON_DART;
-        break;
-      case MISSILE_TYPE_THROWING_STAR:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_THROWING_STAR;
-        break;
-      case MISSILE_TYPE_DAGGER:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_DAGGER;
-        break;
-      case TORCH_NAME_INDEX:
-        dbType = DBType.WEAPON;
-        weaponType = WEAPON_TORCH;
-        break;
-      default:
-        return null;
-    }
-
-    const data = this.dungeon.getData();
-    const maxIndex = 1023;
-    const bumpCount = (): void => {
-      data.header.objectCounts[dbType] = ((data.header.objectCounts[dbType] ?? 0) + 1) & 0xffff;
-    };
-
-    if (dbType === DBType.WEAPON && weaponType !== null) {
-      if (data.databases.weapons.records.length >= maxIndex + 1) return null;
-      data.databases.weapons.records.push({
-        nextObject: OBJECT_ID_EOF,
-        broken: false,
-        charges: 0,
-        litTorch: false,
-        poisoned: false,
-        cursed: false,
-        important: false,
-        weaponType,
-      });
-      data.databases.weapons.count++;
-      bumpCount();
-      const newIndex = data.databases.weapons.records.length - 1;
-      return encodeObjectID(0, DBType.WEAPON, newIndex);
-    }
-
-    if (dbType === DBType.MISC && miscType !== null) {
-      if (data.databases.misc.records.length >= maxIndex + 1) return null;
-      data.databases.misc.records.push({
-        nextObject: OBJECT_ID_EOF,
-        specialState: 0,
-        important: false,
-        miscType,
-      });
-      data.databases.misc.count++;
-      bumpCount();
-      const newIndex = data.databases.misc.records.length - 1;
-      return encodeObjectID(0, DBType.MISC, newIndex);
-    }
-
-    return null;
-  }
 }
 
 interface PressurePadContext {

@@ -85,6 +85,10 @@ export interface InterpreterContext {
 
   // Per-frame wall decoration hit rects (viewport coordinates)
   wallDecorationRects?: RectPos[];
+  doorSwitchRects?: RectPos[];
+
+  // Monster attack animation state hook (used for sound triggers)
+  onMonsterAttackState?: (monster: CreatureRecord, index: number, soundOrdinal: number, isAttacking: boolean) => void;
 
 }
 
@@ -270,6 +274,7 @@ export class BytecodeInterpreter {
   private flipCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
   private graphicRandomState = 12345;
   private removeMortarJoint = true;
+  private hasAlcove = 0;
 
   constructor(context: InterpreterContext) {
     this.context = context;
@@ -284,6 +289,7 @@ export class BytecodeInterpreter {
     this.pc = 0;
     this.stack = [];
     this.removeMortarJoint = true;
+    this.hasAlcove = 0;
 
     void cellNum;
     // Executing program for cell ${cellNum}
@@ -404,6 +410,9 @@ export class BytecodeInterpreter {
       case Opcode.Alcove:
         return this.opCondition(opcode);
 
+      case Opcode.DoorSwitch:
+        return this.opDoorSwitch();
+
       case Opcode.wallDecorationRight:
       case Opcode.wallDecorationFront:
       case Opcode.wallDecorationLeft:
@@ -428,9 +437,11 @@ export class BytecodeInterpreter {
 
       // Drawing opcodes
       case Opcode.StdDrawCeilingPit:
-      case Opcode.StdDrawDoorSwitch:
       case Opcode.StdDrawSeeThruDoorEdge:
         return this.opDrawAction(opcode);
+
+      case Opcode.StdDrawDoorSwitch:
+        return this.opStdDrawDoorSwitch();
 
       case Opcode.StdDrawFloorDecoration:
         return this.opStdDrawFloorDecoration();
@@ -902,9 +913,11 @@ export class BytecodeInterpreter {
   }
 
   private opCondition(opcode: number): boolean {
-    void opcode;
-    // For prototype, all conditions are false (0)
-    // Real implementation would check actual game state
+    if (opcode === Opcode.Alcove) {
+      // CSBWin uses the last StdDrawWallDecoration result (Viewport.cpp:2946).
+      this.stack.push(this.hasAlcove ? 1 : 0);
+      return true;
+    }
     // Condition(${Opcode[opcode]}) -> 0
     this.stack.push(0);
     return true;
@@ -931,6 +944,24 @@ export class BytecodeInterpreter {
     const has = cell ? (cell.decorations[wallDecorationPos as 0 | 1 | 2] !== 0 ? 1 : 0) : 0;
     // HasDecoration(cell=${relativeCell}, pos=${wallDecorationPos}) -> ${has}
     this.stack.push(has);
+    return true;
+  }
+
+  private opDoorSwitch(): boolean {
+    const relativeCell = this.stack.pop();
+    if (relativeCell === undefined) {
+      this.stack.push(0);
+      return true;
+    }
+    const doorIndex = this.context.roomData[relativeCell | 0]?.decorations[1] ?? 0;
+    const dungeon = this.context.dungeonState;
+    if (!dungeon) {
+      this.stack.push(0);
+      return true;
+    }
+    const rec = dungeon.getDoorRecordByIndex(doorIndex | 0);
+    const hasSwitch = rec?.hasButton ? 1 : 0;
+    this.stack.push(hasSwitch);
     return true;
   }
 
@@ -965,6 +996,60 @@ export class BytecodeInterpreter {
 
     // Clear stack for this drawing operation
     this.stack = [];
+
+    return true;
+  }
+
+  private opStdDrawDoorSwitch(): boolean {
+    // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2886-2889, CSBCode.cpp:4065+)
+    const distance = this.stack.pop();
+    const switchId = this.stack.pop();
+
+    if (distance === undefined || switchId === undefined) {
+      // ERROR: StdDrawDoorSwitch - missing arguments
+      return true;
+    }
+
+    const doorSwitchId = switchId | 0;
+    if (doorSwitchId === 0) return true;
+
+    const tables = this.context.objectTables;
+    const viewport = this.context.viewportIndexBuffer;
+    const getGraphic = this.context.getGraphicBitmap;
+    if (!tables || !viewport || !getGraphic) return true;
+
+    const setIndex = tables.doorSwitchRectIndex[doorSwitchId - 1] ?? 0;
+    const rectSet = tables.doorSwitchRectSets?.[setIndex];
+    const srcSet = tables.doorSwitchSourceDescSets?.[setIndex];
+    const distanceIndex = distance | 0;
+    if (distanceIndex < 0 || distanceIndex > 3) return true;
+    const desc = rectSet?.[distanceIndex];
+    if (!desc) return true;
+
+    const graphicNum = 315 + (doorSwitchId - 1);
+    const base = getGraphic(graphicNum);
+    if (!base) return true;
+
+    const srcDesc = srcSet?.[0] ?? desc;
+    const srcWidthBytes = srcDesc.widthBytes | 0;
+    const srcWidth = srcWidthBytes > 0 ? srcWidthBytes * 2 : base.width;
+    const srcHeight = (srcDesc.height | 0) > 0 ? (srcDesc.height | 0) : base.height;
+    const destWidth = (desc.x2 | 0) - (desc.x1 | 0) + 1;
+    const rawDestHeight = desc.height | 0;
+    const destHeight = rawDestHeight > 0 ? rawDestHeight : (desc.y2 | 0) - (desc.y1 | 0) + 1;
+    if (destWidth <= 0 || destHeight <= 0) return true;
+
+    let bitmap = this.cropBitmap(base, srcWidth, srcHeight);
+    if (distanceIndex !== 3) {
+      const colorMap = distanceIndex === 2 ? tables.colorMapMedium : tables.colorMapFar;
+      bitmap = this.scaleIndexedBitmap(bitmap, destWidth, destHeight, colorMap);
+    }
+
+    bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
+
+    if (distanceIndex === 3 && this.context.doorSwitchRects) {
+      this.context.doorSwitchRects.push({ x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
+    }
 
     return true;
   }
@@ -1126,7 +1211,7 @@ export class BytecodeInterpreter {
 
     const rd = this.context.roomData[relativeCell | 0];
     const graphicOrdinal = rd?.decorations[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? 0;
-    this.drawWallDecoration(graphicOrdinal | 0, wallDecorationDrawLocation | 0);
+    this.hasAlcove = this.drawWallDecoration(graphicOrdinal | 0, wallDecorationDrawLocation | 0) ? 1 : 0;
     return true;
   }
 
@@ -1148,38 +1233,39 @@ export class BytecodeInterpreter {
     return true;
   }
 
-  private drawWallDecoration(graphicOrdinal: number, relativePosition: number): void {
-    if (graphicOrdinal === 0) return;
+  private drawWallDecoration(graphicOrdinal: number, relativePosition: number): boolean {
+    if (graphicOrdinal === 0) return false;
 
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
     const getGraphic = this.context.getGraphicBitmap;
     const csbGraphics = this.context.csbGraphics;
-    if (!tables || !dungeon || !viewport || !getGraphic) return;
+    if (!tables || !dungeon || !viewport || !getGraphic) return false;
 
     if ((graphicOrdinal & 0x10000) !== 0) {
-      if (!csbGraphics) return;
+      if (!csbGraphics) return false;
       this.drawExtendedWallDecoration(csbGraphics, graphicOrdinal, relativePosition);
-      return;
+      return false;
     }
 
     const map = dungeon.getMap(this.context.frameMapIndex ?? 0);
-    if (!map?.wallDecorationTOC) return;
+    if (!map?.wallDecorationTOC) return false;
 
     // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3179-3183)
     const graphicIndex = (graphicOrdinal - 1) | 0;
     const numWallDecoration = this.context.numWallDecoration ?? 0;
-    if (graphicIndex < 0 || graphicIndex > numWallDecoration) return;
+    if (graphicIndex < 0 || graphicIndex > numWallDecoration) return false;
 
     const decorationIndex = graphicIndex === numWallDecoration ? 0 : (map.wallDecorationTOC[graphicIndex] ?? 0);
+    const isAlcove = this.isAlcoveDecorationIndex(decorationIndex, tables);
     const rectSetId = tables.wallDecorationRectSetIndex[decorationIndex] ?? 0;
     const rectSetIndex = rectSetId & 0xff;
-    if (rectSetIndex >= tables.wallDecorationRectSets.length) return;
+    if (rectSetIndex >= tables.wallDecorationRectSets.length) return isAlcove;
 
     const rectSet = tables.wallDecorationRectSets[rectSetIndex];
     const desc = rectSet?.[relativePosition];
-    if (!desc) return;
+    if (!desc) return isAlcove;
 
     const x1 = desc.x1 | 0;
     const y1 = desc.y1 | 0;
@@ -1187,14 +1273,14 @@ export class BytecodeInterpreter {
     const y2 = desc.y2 | 0;
     const dstW = x2 - x1 + 1;
     const dstH = y2 - y1 + 1;
-    if (dstW <= 0 || dstH <= 0) return;
+    if (dstW <= 0 || dstH <= 0) return isAlcove;
 
     // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3171-3176).
     const frontView = (relativePosition % 5) > 1;
     const graphicNum = 121 + 2 * decorationIndex + (frontView ? 1 : 0);
 
     const src = getGraphic(graphicNum);
-    if (!src) return;
+    if (!src) return isAlcove;
 
     const distanceBand = Math.floor(relativePosition / 5); // 0=F3, 1=F2, 2=F1
     const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
@@ -1205,7 +1291,7 @@ export class BytecodeInterpreter {
       if (this.context.wallDecorationRects && distanceBand === 2) {
         this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
       }
-      return;
+      return isAlcove;
     }
 
     const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
@@ -1237,6 +1323,15 @@ export class BytecodeInterpreter {
     if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
       this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
     }
+    return isAlcove;
+  }
+
+  private isAlcoveDecorationIndex(decorationIndex: number, tables: ObjectTables): boolean {
+    const alcoves = tables.alcoveDecorationIndices;
+    for (let i = 0; i < alcoves.length; i++) {
+      if ((alcoves[i] ?? 0xff) === decorationIndex) return true;
+    }
+    return false;
   }
 
   private drawExtendedWallDecoration(
@@ -1947,6 +2042,7 @@ export class BytecodeInterpreter {
     const showSide = hasSide && (relFacing & 1) !== 0;
     const showBack = hasBack && relFacing === 0;
     const showAttack = hasAttack && !showBack && sms.attacking;
+    this.context.onMonsterAttackState?.(monster, indexWithinGroup, desc.attackSound ?? 0, showAttack);
 
     let graphicNum = 446 + (graphic.word0 | 0);
     let widthBytes = graphic.frontRearByteWidth;

@@ -25,6 +25,7 @@ export interface DecorationDesc {
 
 export interface MonsterDesc {
   type: number;
+  attackSound: number;
   word2: number;
   word4: number;
 }
@@ -56,6 +57,7 @@ export interface ObjectTables {
   monsterPositions: MonsterPositionTable; // d.s6982[3].s[11]
   monsterDesc: MonsterDesc[]; // d.MonsterDescriptor[27]
   monsterGraphics: MonsterGraphicDesc[]; // d.Item6414[27]
+  monsterAttackSounds: Uint8Array; // d.uByte9672[8]
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
   smallOffsetIndices: Uint8Array; // d.smallOffsetIndicies[16][2] packed row-major
   smallOffsets: Int8Array; // d.smallOffsets[24]
@@ -89,6 +91,11 @@ export interface ObjectTables {
 
   // Wall decoration alcove markers (CSBCode.cpp:205-219, Data.h:1174-1177)
   alcoveDecorationIndices: Uint8Array; // d.Byte4038[4]
+
+  // Door switch helpers (DrawDoorSwitch, CSBCode.cpp:4065+)
+  doorSwitchRectIndex: Uint8Array; // d.Byte4124[2]
+  doorSwitchRectSets: DecorationDesc[][]; // d.Byte5094[?][4]
+  doorSwitchSourceDescSets: DecorationDesc[][]; // d.Byte5076[?][4]
 
   // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3780+)
   floorDecorationDescSets: DecorationDesc[][]; // d.floorDecorDesc[3][9]
@@ -133,6 +140,9 @@ const ABS_WALL_DECORATION_RECT_SET_INDEX = 4100; // Byte4100[60]
 const ABS_WALL_TEXT_RECT = 4192; // Byte4192 (RectPos x1,x2,y1,y2)
 const ABS_WALL_TEXT_LINE_Y2 = 4196; // Byte4196[4]
 const ABS_BYTE4038 = 4038; // Byte4038[4]
+const ABS_BYTE4124 = 4124; // Byte4124[2] (door switch rect set indices)
+const ABS_BYTE5094 = 5094; // Byte5094[?] (door switch rectangles)
+const ABS_BYTE5076 = 5076; // Byte5076[?] (door switch source desc)
 const ABS_FLOOR_DECOR_DESC = 4998; // floorDecorDesc[3][9]
 const ABS_FLOOR_DECOR_RECT_SET_INDEX = 4110; // Byte4110[10]
 const ABS_REL_CELL_GRAPHIC_INCREMENT = 4034; // RelativeCellGraphicIncrement[10]
@@ -145,6 +155,7 @@ const ABS_OBJDESC = 8382; // ObjDesc[180]
 const ABS_WEAPONS = 8658; // weapons[46]
 const ABS_CLOTHING = 8890; // ClothingDesc[58]
 const ABS_BYTE8946 = 8946; // Byte8946[54]
+const ABS_MONSTER_ATTACK_SOUND = 9672; // uByte9672[8]
 const ABS_MONSTER_DESC = 9664; // MonsterDescriptor[27]
 const ABS_BYTE10336 = 10336; // Byte10336[256]
 const ABS_BYTE10080 = 10080; // Byte10080[64]
@@ -396,11 +407,20 @@ function readMonsterDesc22f(raw: Uint8Array): MonsterDesc[] {
     const base = start + i * stride;
     out.push({
       type: raw[base + 0] ?? 0,
+      attackSound: raw[base + 1] ?? 0,
       word2: readU16BE(raw, base + 2),
       word4: readU16BE(raw, base + 4),
     });
   }
   return out;
+}
+
+function readMonsterAttackSounds22f(raw: Uint8Array): Uint8Array {
+  const start = ABS_22F_START - ABS_MONSTER_ATTACK_SOUND;
+  const count = 8;
+  const end = start + count;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for uByte9672[8]');
+  return raw.slice(start, end);
 }
 
 function readI16Array(raw: Uint8Array, off: number, count: number): Int16Array {
@@ -421,6 +441,29 @@ function readDecorationDescTable22e(raw: Uint8Array, off: number): DecorationDes
   const stride = 6;
   const end = off + sets * entries * stride;
   if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for wallDecorationPosition[8][13]');
+
+  const out: DecorationDesc[][] = new Array(sets);
+  for (let s = 0; s < sets; s++) {
+    out[s] = new Array(entries);
+    for (let i = 0; i < entries; i++) {
+      const base = off + (s * entries + i) * stride;
+      out[s][i] = {
+        x1: raw[base + 0] ?? 0,
+        x2: raw[base + 1] ?? 0,
+        y1: raw[base + 2] ?? 0,
+        y2: raw[base + 3] ?? 0,
+        widthBytes: raw[base + 4] ?? 0,
+        height: raw[base + 5] ?? 0,
+      };
+    }
+  }
+  return out;
+}
+
+function readDecorationDescSets(raw: Uint8Array, off: number, sets: number, entries: number): DecorationDesc[][] {
+  const stride = 6;
+  const end = off + sets * entries * stride;
+  if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for decoration desc sets');
 
   const out: DecorationDesc[][] = new Array(sets);
   for (let s = 0; s < sets; s++) {
@@ -493,6 +536,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallTextRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_RECT);
   const wallTextLineY2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_LINE_Y2);
   const alcoveDecorationIndicesOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4038);
+  const doorSwitchRectIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4124);
+  const doorSwitchRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5094);
+  const doorSwitchSourceDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5076);
   const floorDecorationDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_FLOOR_DECOR_DESC);
   const floorDecorationRectSetIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_FLOOR_DECOR_RECT_SET_INDEX);
   const relativeCellGraphicIncrementOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_REL_CELL_GRAPHIC_INCREMENT);
@@ -524,6 +570,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallTextRectOffset < 0 ||
     wallTextLineY2Offset < 0 ||
     alcoveDecorationIndicesOffset < 0 ||
+    doorSwitchRectIndexOffset < 0 ||
+    doorSwitchRectOffset < 0 ||
+    doorSwitchSourceDescOffset < 0 ||
     floorDecorationDescOffset < 0 ||
     floorDecorationRectSetIndexOffset < 0 ||
     relativeCellGraphicIncrementOffset < 0 ||
@@ -539,6 +588,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const monsterGraphics = readMonsterGraphics22e(raw22e, monsterGraphicsOffset);
   const missileGraphics = readMissileGraphics22e(raw22e, struct5688Offset);
   const monsterDesc = readMonsterDesc22f(raw22f);
+  const monsterAttackSounds = readMonsterAttackSounds22f(raw22f);
   const smallOffsetIndices = raw22e.slice(smallOffsetIndicesOffset, smallOffsetIndicesOffset + 16 * 2);
   const smallOffsets = Int8Array.from(
     raw22e.slice(smallOffsetsOffset, smallOffsetsOffset + 24).map((b) => (b >= 0x80 ? b - 0x100 : b))
@@ -568,6 +618,14 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
   const alcoveDecorationIndices = raw22e.slice(alcoveDecorationIndicesOffset, alcoveDecorationIndicesOffset + 4);
+  const doorSwitchRectIndex = raw22e.slice(doorSwitchRectIndexOffset, doorSwitchRectIndexOffset + 2);
+  let doorSwitchSetCount = 1;
+  for (let i = 0; i < doorSwitchRectIndex.length; i++) {
+    const v = doorSwitchRectIndex[i] ?? 0;
+    if (v + 1 > doorSwitchSetCount) doorSwitchSetCount = v + 1;
+  }
+  const doorSwitchRectSets = readDecorationDescSets(raw22e, doorSwitchRectOffset, doorSwitchSetCount, 4);
+  const doorSwitchSourceDescSets = readDecorationDescSets(raw22e, doorSwitchSourceDescOffset, doorSwitchSetCount, 4);
   const floorDecorationDescSets = readFloorDecorationDescTable22e(raw22e, floorDecorationDescOffset);
   const floorDecorationRectSetIndex = raw22e.slice(
     floorDecorationRectSetIndexOffset,
@@ -613,6 +671,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     monsterPositions,
     monsterDesc,
     monsterGraphics,
+    monsterAttackSounds,
     missileGraphics,
     smallOffsetIndices,
     smallOffsets,
@@ -640,6 +699,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallTextRect,
     wallTextLineY2,
     alcoveDecorationIndices,
+    doorSwitchRectIndex,
+    doorSwitchRectSets,
+    doorSwitchSourceDescSets,
     floorDecorationDescSets,
     floorDecorationRectSetIndex,
     relativeCellGraphicIncrement,

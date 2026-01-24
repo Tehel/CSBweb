@@ -13,6 +13,10 @@ export interface UIContext {
     onToggleAttackPanel: () => void;
     setCrtEnabled: (enabled: boolean) => boolean;
     isCrtEnabled: () => boolean;
+    setSoundEnabled: (enabled: boolean) => void;
+    isSoundEnabled: () => boolean;
+    setSoundVolume: (volume: number) => void;
+    getSoundVolume: () => number;
 }
 
 let context: UIContext | null = null;

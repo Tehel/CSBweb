@@ -3,6 +3,7 @@
  */
 
 import { Direction } from './core';
+import { SoundManager } from './audio';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader, type PresetHero } from './data';
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
 import { Game, type ActuatorTables, type TimerTables, type Champion, type PartyState, type RuntimeSaveState, assignPresetHeroPossessions, createChampionFromPreset, createSkillsFromSubskillLevels, type AddCharacterTables } from './engine';
@@ -22,6 +23,7 @@ let graphicsLoader: GraphicsLoader | null = null;
 let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 let dungeonData: DungeonData | null = null;
+let soundManager: SoundManager | null = null;
 let addCharacterTables: AddCharacterTables | null = null;
 let actuatorTables: ActuatorTables | null = null;
 let timerTables: TimerTables | null = null;
@@ -441,6 +443,18 @@ async function init() {
             await graphicsLoader.load(`${GAME_DATA_DIR}/graphics.dat`);
             console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
+            soundManager = new SoundManager(graphicsLoader);
+            if (soundManager.isAvailable()) {
+                soundManager.preloadAll();
+                const unlockAudio = (): void => {
+                    soundManager?.unlock();
+                };
+                if (gameCanvasEl) {
+                    gameCanvasEl.addEventListener('pointerdown', unlockAudio, { once: true });
+                }
+                window.addEventListener('keydown', unlockAudio, { once: true });
+            }
+
             // Optional CSBgraphics.dat overlay (extended decorations, portraits, etc.)
             csbGraphicsLoader = new CSBGraphicsLoader();
             const csbLoaded = await csbGraphicsLoader.tryLoad(`${GAME_DATA_DIR}/CSBgraphics.dat`);
@@ -462,6 +476,7 @@ async function init() {
                 cursorFilter: handleCursorFilter,
                 onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
                 onTextMessage: (text) => updateDebug(text),
+                playSound: (soundId, rateIdx) => soundManager?.playSound(soundId, rateIdx),
             };
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
@@ -469,13 +484,20 @@ async function init() {
 
             // Initialize game engine
             console.log('Initializing game engine...');
-            game = new Game(dungeon, actuatorTables, timerTables ?? undefined);
+            const timerHooks = soundManager
+                ? { playSound: (soundId: number, rateIdx?: number) => soundManager?.playSound(soundId, rateIdx) }
+                : undefined;
+            const playSound = soundManager
+                ? (soundId: number, rateIdx?: number) => soundManager?.playSound(soundId, rateIdx)
+                : undefined;
+            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
 
             // Initialize viewport renderer
             console.log('Initializing viewport renderer (CSBWin bytecode system)...');
             const dungeonState = game.dungeonState;
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
+            renderer.setPlaySound(playSound);
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });
@@ -492,15 +514,26 @@ async function init() {
                 onToggleAttackPanel: toggleAttackPanel,
                 setCrtEnabled,
                 isCrtEnabled,
+                setSoundEnabled: (enabled) => {
+                    soundManager?.unlock();
+                    soundManager?.setEnabled(enabled);
+                },
+                isSoundEnabled: () => soundManager?.isEnabled() ?? false,
+                setSoundVolume: (volume) => soundManager?.setVolume(volume),
+                getSoundVolume: () => soundManager?.getVolume() ?? 0,
             });
 
             // Register movement callback
-            game.onMove((success, message) => {
+            game.onMove((success, message, result) => {
                 const posInfo = game?.getPositionInfo();
                 console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo, message ?? ' ');
 
                 if (message) updateDebug(message);
                 else if (success) updateDebug(posInfo || 'Moved');
+
+                if (result?.soundId !== undefined) {
+                    soundManager?.playSound(result.soundId, result.soundRateIdx);
+                }
 
                 // Render 3D view after movement
                 if (success && renderer && game) {

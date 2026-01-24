@@ -9,6 +9,8 @@ export interface UISettings {
     smooth: boolean;
     debug: boolean;
     crt: boolean;
+    soundEnabled: boolean;
+    soundVolume: number;
 }
 
 export function loadUISettings(): UISettings {
@@ -23,6 +25,8 @@ export function loadUISettings(): UISettings {
             smooth: parsed.smooth ?? false,
             debug: parsed.debug ?? false,
             crt: parsed.crt ?? false,
+            soundEnabled: parsed.soundEnabled ?? true,
+            soundVolume: parsed.soundVolume ?? 0.8,
         };
     } catch {
         return defaultUISettings();
@@ -45,6 +49,8 @@ export function readUISettings(): UISettings {
         smooth,
         debug: isDebugFeaturesEnabled(),
         crt: getUIContext()?.isCrtEnabled() ?? false,
+        soundEnabled: getUIContext()?.isSoundEnabled() ?? true,
+        soundVolume: getUIContext()?.getSoundVolume() ?? 0.8,
     };
 }
 
@@ -59,6 +65,8 @@ export function applyUISettings(settings: UISettings): void {
     const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
     const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
     const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
+    const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
+    const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
 
     mapEl && (mapEl.style.display = settings.mapVisible ? 'block' : 'none');
     logEl && (logEl.style.display = settings.logVisible ? 'block' : 'none');
@@ -77,8 +85,22 @@ export function applyUISettings(settings: UISettings): void {
     smoothButton?.classList.toggle('is-pressed', settings.smooth);
     const crtEnabled = ctx?.setCrtEnabled(settings.crt) ?? false;
     crtButton?.classList.toggle('is-pressed', crtEnabled);
+
+    if (ctx) ctx.setSoundEnabled(settings.soundEnabled);
+    soundButton?.classList.toggle('is-pressed', settings.soundEnabled);
+    if (ctx) ctx.setSoundVolume(settings.soundVolume);
+    if (soundVolume) soundVolume.value = String(Math.round(settings.soundVolume * 100));
 }
 
 function defaultUISettings(): UISettings {
-    return { mapVisible: true, logVisible: true, hoverVisible: true, smooth: false, debug: false, crt: false };
+    return {
+        mapVisible: true,
+        logVisible: true,
+        hoverVisible: true,
+        smooth: false,
+        debug: false,
+        crt: false,
+        soundEnabled: true,
+        soundVolume: 0.8,
+    };
 }

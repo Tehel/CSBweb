@@ -222,6 +222,13 @@ Goal: match CSBWin’s actuator pipeline (trigger evaluation -> queued timers ->
     - Lists actuators at a cell with decoded fields
     - Steps timers and logs resulting cell/object changes for compare with CSBWin.
 
+Follow-ups from recent Phase 8 work (not done yet):
+- Implement CSBWin `ProcessTT_OPENROOM` text printing when a hidden text becomes visible and the party is standing on the cell.
+- Implement `WiggleEverything()` effects for pit/teleporter timers to force falls when a cell toggles.
+- Implement missile encounter resolution parity: party/monster hit routing + damage logic, and correct projectile recovery/drop behavior.
+- Implement missile decay rates (`deltaEnergy`) for non-launch sources (spell/throw) and store into `timerWord8` as CSBWin does.
+- Implement door close crush behavior (party/monster damage) during `TT_DOOR_STEP`.
+
 Status:
 - ✅ Timer queue core implemented with CSBWin ordering rules and `CreateTimer()` semantics (`src/engine/TimerQueue.ts`).
 - ✅ `PressurePadOrAlcove()` trigger evaluation ported for party stepping, using CSBWin actuator checks and action selection (`src/engine/ActuatorSystem.ts`, `src/engine/MovementSystem.ts`).

@@ -15,6 +15,8 @@ const logButton = document.getElementById('btn-log') as HTMLButtonElement | null
 const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
 const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
+const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
+const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
 
 function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): void {
     if (!canvas) return;
@@ -34,7 +36,11 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
         if (buttonMask !== 0) {
             ctx.renderer.enqueueMouseClick(x, y, buttonMask);
             if (buttonMask === 2 && isViewportPoint(x, y)) {
-                if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) ctx.renderView();
+                if (ctx.renderer.isDoorSwitchHit(x, y)) {
+                    if (ctx.game.handleDoorSwitchClick()) ctx.renderView();
+                } else if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) {
+                    ctx.renderView();
+                }
             }
             ctx.renderView();
         }
@@ -83,6 +89,20 @@ export function bindUIEvents(): void {
             crtButton.classList.toggle('is-pressed', enabled);
             if (next && !enabled) updateDebug('CRT effect unavailable');
             else updateDebug(enabled ? 'CRT effect enabled' : 'CRT effect disabled');
+            saveUISettings(readUISettings());
+        });
+
+        soundButton?.addEventListener('click', () => {
+            const next = !ctx.isSoundEnabled();
+            ctx.setSoundEnabled(next);
+            soundButton.classList.toggle('is-pressed', next);
+            updateDebug(next ? 'Sound enabled' : 'Sound disabled');
+            saveUISettings(readUISettings());
+        });
+
+        soundVolume?.addEventListener('input', () => {
+            const value = Math.max(0, Math.min(100, Number(soundVolume.value)));
+            ctx.setSoundVolume(value / 100);
             saveUISettings(readUISettings());
         });
 

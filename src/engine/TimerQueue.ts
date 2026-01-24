@@ -1,4 +1,7 @@
 export enum TimerFunction {
+  TT_DOOR_STEP = 1,
+  TT_MISSILE0 = 48,
+  TT_MISSILE = 49,
   TT_OPENROOM = 5,
   TT_STONEROOM = 6,
   TT_FALSEWALL = 7,

@@ -10,6 +10,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { Champion, PartyState } from '../engine/gameTypes';
+import type { CreatureRecord } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { DrawViewport } from './DrawViewport';
@@ -160,6 +161,8 @@ export class ViewportRenderer {
   private mouseQEnd: number = 0;
   private uiMode: UIMode = UIMode.Adventure;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
+  private playSound?: (soundId: number, rateIdx?: number) => void;
+  private monsterAttackState: WeakMap<CreatureRecord, boolean[]> = new WeakMap();
 
   constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
     this.graphicsLoader = graphicsLoader;
@@ -233,6 +236,8 @@ export class ViewportRenderer {
       viewportIndexBuffer,
       seeThroughWalls: false,
       roomData: [],
+      onMonsterAttackState: (monster, index, soundOrdinal, isAttacking) =>
+        this.handleMonsterAttackState(monster, index, soundOrdinal, isAttacking),
     };
 
     this.initialized = true;
@@ -241,6 +246,10 @@ export class ViewportRenderer {
 
   getUITables(): UITables | null {
     return this.uiTables;
+  }
+
+  setPlaySound(playSound?: (soundId: number, rateIdx?: number) => void): void {
+    this.playSound = playSound;
   }
 
   setMessageLines(lines: string[]): void {
@@ -352,6 +361,7 @@ export class ViewportRenderer {
     this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
     this.context.doorBitmaps = wb.doors;
     this.context.wallDecorationRects = [];
+    this.context.doorSwitchRects = [];
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
@@ -371,6 +381,48 @@ export class ViewportRenderer {
       if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
     }
     return false;
+  }
+
+  isDoorSwitchHit(x: number, y: number): boolean {
+    const rects = this.context?.doorSwitchRects;
+    if (!rects || rects.length === 0) return false;
+    const vx = x - VIEWPORT_X;
+    const vy = y - VIEWPORT_Y;
+    for (const rect of rects) {
+      if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
+    }
+    return false;
+  }
+
+  private handleMonsterAttackState(
+    monster: CreatureRecord,
+    index: number,
+    soundOrdinal: number,
+    isAttacking: boolean
+  ): void {
+    let entry = this.monsterAttackState.get(monster);
+    if (!entry) {
+      entry = [];
+      this.monsterAttackState.set(monster, entry);
+    }
+    const prev = entry[index] ?? false;
+    entry[index] = isAttacking;
+    if (!isAttacking || prev) return;
+    if (soundOrdinal <= 0) return;
+    this.playMonsterAttackSound(soundOrdinal);
+  }
+
+  private playMonsterAttackSound(soundOrdinal: number): void {
+    if (!this.playSound) return;
+    if (!this.objectTables || !this.uiTables) return;
+    // CSBWin: ordinal -> uByte9672 -> sound1772[word0]
+    const soundNum = this.objectTables.monsterAttackSounds[soundOrdinal - 1] ?? 0;
+    if (!soundNum) return;
+    const entry = this.uiTables.graphic232.soundTable[soundNum];
+    if (!entry) return;
+    const soundId = entry.word0 | 0;
+    if (!soundId) return;
+    this.playSound(soundId);
   }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
