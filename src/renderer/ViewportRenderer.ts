@@ -154,6 +154,8 @@ export class ViewportRenderer {
   private pressingEye: boolean = false;
   private hoverPoint: { x: number; y: number } | null = null;
   private showAttackPanel: boolean = false;
+  private cursorArrowBitmap: IndexedBitmap | null = null;
+  private cursorHandBitmap: IndexedBitmap | null = null;
   private primaryButtons: UIButton[] | null = null; // graphic231 -> buttons17196
   private secondaryButtons: UIButton[] | null = null; // graphic231 -> buttons17304
   private mouseQueue: Array<{ num: number; x: number; y: number }> = [];
@@ -258,6 +260,7 @@ export class ViewportRenderer {
 
   setPartyState(state: PartyState | null): void {
     this.partyState = state;
+    this.syncInventoryButtons();
   }
 
   setHoverPoint(point: { x: number; y: number } | null): void {
@@ -275,6 +278,7 @@ export class ViewportRenderer {
   setUIMode(mode: UIMode): void {
     this.uiMode = mode;
     this.updateButtonLists();
+    this.syncInventoryButtons();
   }
 
   enqueueMouseClick(x: number, y: number, buttons: number): void {
@@ -362,6 +366,8 @@ export class ViewportRenderer {
     this.context.doorBitmaps = wb.doors;
     this.context.wallDecorationRects = [];
     this.context.doorSwitchRects = [];
+    this.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
+    this.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
@@ -392,6 +398,99 @@ export class ViewportRenderer {
       if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
     }
     return false;
+  }
+
+  tryPickViewportObject(x: number, y: number): boolean {
+    if (!this.partyState || !this.context?.viewportObjectButtons || !this.context.viewportObjectRNs) return false;
+    if (this.normalizeObjectValue(this.partyState.objectInHand) !== null) return false;
+    if ((this.partyState.cursorOwner ?? -1) < 0) return false;
+
+    const hit = this.findViewportObjectHit(x, y);
+    if (!hit) return false;
+
+    const target = this.getPickupCellForRelativePos(hit.relativeLocation);
+    if (!target) return false;
+    if (this.isMonsterBlockingPickup(hit.relativeLocation, target)) return false;
+    if (!this.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
+
+    this.partyState.objectInHand = hit.rn;
+    return true;
+  }
+
+  private findViewportObjectHit(x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
+    const buttons = this.context?.viewportObjectButtons;
+    const rns = this.context?.viewportObjectRNs;
+    if (!buttons || !rns) return null;
+
+    const vx = x - VIEWPORT_X;
+    const vy = y - VIEWPORT_Y;
+    if (vx < 0 || vy < 0 || vx >= VIEWPORT_WIDTH || vy >= VIEWPORT_HEIGHT) return null;
+
+    const max = Math.min(5, buttons.length, rns.length);
+    for (let i = 0; i < max; i++) {
+      const rect = buttons[i];
+      if (!rect || rect.x1 === 255) continue;
+      if (vx < rect.x1 || vx > rect.x2 || vy < rect.y1 || vy > rect.y2) continue;
+      const rn = rns[i];
+      if (this.normalizeObjectValue(rn) === null) continue;
+      return { relativeLocation: i, rn };
+    }
+    return null;
+  }
+
+  private getPickupCellForRelativePos(relativeLocation: number): Position | null {
+    if (!this.partyState) return null;
+    const facing = this.partyState.facing & 0x3;
+    let target = this.partyState.position;
+    if (relativeLocation >= 2) {
+      target =
+        facing === 0 ? target.north :
+        facing === 1 ? target.east :
+        facing === 2 ? target.south :
+        target.west;
+    }
+    return target;
+  }
+
+  private isMonsterBlockingPickup(relativeLocation: number, position: Position): boolean {
+    if (!this.partyState || relativeLocation < 2) return false;
+    const rn = this.findFirstMonsterAt(position);
+    if (rn === OBJECT_ID_EOF) return false;
+    const creature = this.dungeonState.getCreatureRecord(rn);
+    if (!creature || this.isMonsterLevitating(creature)) return false;
+    const monsterCount = Math.max(1, creature.count ?? 1);
+    const absPos = (this.partyState.facing + relativeLocation) & 0x3;
+    return this.monsterOccupiesPosition(creature.positions, absPos, monsterCount);
+  }
+
+  private findFirstMonsterAt(position: Position): ObjectID {
+    for (let rn = this.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeonState.getDBRecordLink(rn)) {
+      const { category } = decodeObjectID(rn);
+      if (category === DBType.CREATURE) return rn;
+    }
+    return OBJECT_ID_EOF;
+  }
+
+  private isMonsterLevitating(creature: CreatureRecord): boolean {
+    const desc = this.objectTables?.monsterDesc?.[creature.creatureType];
+    if (!desc) return false;
+    return (desc.word2 & 0x20) !== 0;
+  }
+
+  private isCenteredPositions(positions: number): boolean {
+    return (positions & 0xff) === 0xff;
+  }
+
+  private monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
+    if (this.isCenteredPositions(positions)) return 0;
+    for (let i = 0; i < count; i++) {
+      if (((positions >> (2 * i)) & 0x3) === curAbsPos) return i;
+    }
+    return -1;
+  }
+
+  private monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
+    return this.monsterIndexAtPosition(positions, curAbsPos, count) >= 0;
   }
 
   private handleMonsterAttackState(
@@ -620,6 +719,7 @@ export class ViewportRenderer {
     this.drawSpellControls();
     this.drawMessageLines();
     this.drawHoverHighlights();
+    this.drawCursorItem();
 
     updateImageDataFromIndex(this.screenImageData, this.screenIndexBuffer, this.palette);
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
@@ -2058,6 +2158,12 @@ export class ViewportRenderer {
       this.handlePartyBlockClick(id - 12, x, y);
       return;
     }
+    if (id >= 28 && id <= 65) {
+      if ((this.partyState?.cursorOwner ?? -1) >= 0) {
+        this.handleClothingClick(id - 20);
+      }
+      return;
+    }
     if (id === 71) {
       this.handleEyePress();
       return;
@@ -2097,6 +2203,12 @@ export class ViewportRenderer {
     const sub = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18216, x, y, 2);
     if (sub >= 16 && sub <= 19) {
       this.partyState.cursorOwner = sub - 16;
+      return;
+    }
+    if (sub >= 20 && sub <= 27) {
+      if ((this.partyState.cursorOwner ?? -1) >= 0) {
+        this.handleClothingClick(sub - 20);
+      }
     }
   }
 
@@ -2105,6 +2217,7 @@ export class ViewportRenderer {
     if (button === 4) {
       this.partyState.selectedCharacterIndex = -1;
       this.pressingEye = false;
+      this.syncInventoryButtons();
       return;
     }
     if (button < 0 || button > 3) return;
@@ -2118,6 +2231,14 @@ export class ViewportRenderer {
     if (this.partyState.selectedCharacterIndex < 0) {
       this.pressingEye = false;
     }
+    this.syncInventoryButtons();
+  }
+
+  private syncInventoryButtons(): void {
+    if (!this.uiTables || this.uiMode !== UIMode.Adventure) return;
+    const buttons = this.uiTables.graphic231.buttons;
+    const inventoryOpen = (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    this.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
   }
 
   private handleMagicClick(clickX: number, clickY: number): void {
@@ -2136,6 +2257,260 @@ export class ViewportRenderer {
     const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
       this.applyMagicSelection(magicButton);
+    }
+  }
+
+  private handleClothingClick(button: number): void {
+    if (!this.partyState || !this.uiTables) return;
+    const cursorOwner = this.partyState.cursorOwner ?? -1;
+    if (cursorOwner < 0) return;
+
+    let chIdx = -1;
+    let slot = -1;
+    if (button < 8) {
+      chIdx = Math.floor(button / 2);
+      if (chIdx >= this.partyState.champions.length) return;
+      if (this.partyState.selectedCharacterIndex === chIdx) return;
+      const champ =
+        this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+        this.partyState.champions[chIdx] ??
+        null;
+      if (!champ || champ.alive === false) return;
+      slot = button & 1;
+    } else {
+      chIdx = this.partyState.selectedCharacterIndex ?? -1;
+      if (chIdx < 0) return;
+      slot = button - 8;
+    }
+
+    if (slot < 0 || slot >= 30) return;
+    const champ =
+      this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+      this.partyState.champions[chIdx] ??
+      null;
+    if (!champ || champ.alive === false) return;
+
+    const objectInHand = this.normalizeObjectValue(this.partyState.objectInHand);
+    const slotObject = this.normalizeObjectValue(this.getChampionPossession(champ, slot));
+    if (!objectInHand && !slotObject) return;
+
+    if (objectInHand && !this.canPlaceInSlot(objectInHand, slot)) return;
+
+    if (objectInHand) {
+      this.partyState.objectInHand = null;
+    }
+    if (slotObject) {
+      this.setChampionPossession(champ, slot, null);
+      this.partyState.objectInHand = slotObject;
+    }
+    if (objectInHand) {
+      this.setChampionPossession(champ, slot, objectInHand);
+    }
+  }
+
+  private getChampionPossession(champion: Champion, slot: number): number | null {
+    if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
+      const value = champion.possessions[slot];
+      if (typeof value === 'number') return value;
+    }
+    if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand;
+    if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand;
+    if (slot === 8 && typeof champion.quiver === 'number') return champion.quiver;
+    return null;
+  }
+
+  private setChampionPossession(champion: Champion, slot: number, value: number | null): void {
+    const next = this.normalizeObjectValue(value);
+    if (!champion.possessions || champion.possessions.length < 30) {
+      const slots = new Array(30).fill(null) as Array<number | null>;
+      if (champion.possessions) {
+        for (let i = 0; i < champion.possessions.length && i < slots.length; i++) {
+          slots[i] = this.normalizeObjectValue(champion.possessions[i]);
+        }
+      }
+      champion.possessions = slots;
+    }
+    champion.possessions[slot] = next;
+    if (slot === 0) champion.shieldHand = next;
+    if (slot === 1) champion.weaponHand = next;
+    if (slot === 8) champion.quiver = next;
+  }
+
+  private normalizeObjectValue(value: number | null | undefined): number | null {
+    if (value === undefined || value === null) return null;
+    if (value === OBJECT_ID_NULL || value === OBJECT_ID_EOF) return null;
+    return value;
+  }
+
+  private canPlaceInSlot(objectId: number, slot: number): boolean {
+    if (!this.objectTables || !this.uiTables) return true;
+    const descIndex = this.isLikelyObjectRecord(objectId)
+      ? this.descIndexForObject(objectId as ObjectID)
+      : this.getDescIndexForObjectType(objectId | 0);
+    if (descIndex === null) return true;
+    const carryMask = this.objectTables.objDescCarryMask[descIndex] ?? 0;
+    const slotMask = this.uiTables.graphic232.carryLocation[slot] ?? 0;
+    return (carryMask & slotMask) !== 0;
+  }
+
+  private drawCursorItem(): void {
+    if (!this.screenIndexBuffer || !this.uiTables || !this.partyState || !this.hoverPoint) return;
+    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (objectId === null) {
+      this.drawEmptyCursor();
+      return;
+    }
+
+    const word612 = this.uiTables.graphic232.word612;
+    const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
+    if (objectNameIndex < 0) return;
+
+    const baseX = Math.floor(this.hoverPoint.x) - 8;
+    const baseY = Math.floor(this.hoverPoint.y) - 8;
+    this.drawObjectIconAt(baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
+    this.drawObjectIconAt(baseX, baseY, objectNameIndex, word612, 12);
+  }
+
+  private drawObjectIconAt(
+    x: number,
+    y: number,
+    objectNameIndex: number,
+    word612: number[],
+    transparentColor: number,
+    overrideColor?: number
+  ): void {
+    if (!this.screenIndexBuffer) return;
+    if (objectNameIndex < 0) return;
+    if (word612.length === 0) return;
+
+    let group = 0;
+    while (group < word612.length && objectNameIndex >= word612[group]) {
+      group++;
+    }
+    group -= 1;
+    if (group < 0) return;
+
+    const graphicIndex = 42 + group;
+    const graphic = this.getGraphicBitmap(graphicIndex);
+    if (!graphic) return;
+
+    const offset = objectNameIndex - word612[group];
+    const srcX = (offset & 15) << 4;
+    const srcY = offset & 0xff0;
+
+    const dst = this.screenIndexBuffer;
+    const dstStride = dst.width;
+    const srcStride = graphic.width;
+    const maxW = Math.min(16, dst.width - x, srcStride - srcX);
+    const maxH = Math.min(16, dst.height - y, graphic.height - srcY);
+    if (maxW <= 0 || maxH <= 0) return;
+
+    const tc = transparentColor & 0x0f;
+    for (let row = 0; row < maxH; row++) {
+      const sy = srcY + row;
+      const dy = y + row;
+      if (dy < 0) continue;
+      const dstRow = dy * dstStride;
+      const srcRow = sy * srcStride;
+      for (let col = 0; col < maxW; col++) {
+        const dx = x + col;
+        if (dx < 0) continue;
+        const pixel = graphic.pixels[srcRow + (srcX + col)] & 0x0f;
+        if (pixel === tc) continue;
+        dst.pixels[dstRow + dx] = overrideColor !== undefined ? (overrideColor & 0x0f) : pixel;
+      }
+    }
+  }
+
+  private drawEmptyCursor(): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.hoverPoint) return;
+    const x = Math.floor(this.hoverPoint.x);
+    const y = Math.floor(this.hoverPoint.y);
+    const useHand = this.shouldUseHandCursor(x, y);
+    const bitmap = useHand ? this.getCursorHandBitmap() : this.getCursorArrowBitmap();
+    if (!bitmap) return;
+
+    this.drawCursorBitmap(bitmap, x, y, 12);
+  }
+
+  private shouldUseHandCursor(x: number, y: number): boolean {
+    const cursorOwner = this.partyState?.cursorOwner ?? -1;
+    if (cursorOwner < 0) return false;
+
+    if (y >= 169) return false;
+    if (x >= 274) return false;
+
+    if (y <= 28) {
+      const numChar = this.partyState?.champions.length ?? 0;
+      const selectedOrdinal = (this.partyState?.selectedCharacterIndex ?? -1) + 1;
+      const charIndex = Math.floor(x / 69);
+      const pixelWithin = x - charIndex * 69;
+      if (charIndex < numChar && pixelWithin <= 42) {
+        if (charIndex + 1 === selectedOrdinal) return false;
+        if (y <= 6) return false;
+      }
+    } else if (x >= 224) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private getCursorArrowBitmap(): IndexedBitmap | null {
+    if (!this.uiTables) return null;
+    if (this.cursorArrowBitmap) return this.cursorArrowBitmap;
+    this.cursorArrowBitmap = this.decodeCursorBitmap(this.uiTables.graphic232.cursorArrow);
+    return this.cursorArrowBitmap;
+  }
+
+  private getCursorHandBitmap(): IndexedBitmap | null {
+    if (!this.uiTables) return null;
+    if (this.cursorHandBitmap) return this.cursorHandBitmap;
+    this.cursorHandBitmap = this.decodeCursorBitmap(this.uiTables.graphic232.cursorHand);
+    return this.cursorHandBitmap;
+  }
+
+  private decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
+    if (!raw || raw.length < 128) return null;
+    const pixels = new Uint8Array(16 * 16);
+    for (let row = 0; row < 16; row++) {
+      const base = row * 8;
+      const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
+      const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
+      const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
+      const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
+      for (let col = 0; col < 16; col++) {
+        const bit = 15 - col;
+        const v =
+          ((p0 >> bit) & 1) |
+          (((p1 >> bit) & 1) << 1) |
+          (((p2 >> bit) & 1) << 2) |
+          (((p3 >> bit) & 1) << 3);
+        pixels[row * 16 + col] = v & 0x0f;
+      }
+    }
+    return { width: 16, height: 16, pixels };
+  }
+
+  private drawCursorBitmap(bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
+    if (!this.screenIndexBuffer) return;
+    const dst = this.screenIndexBuffer;
+    const maxW = bitmap.width;
+    const maxH = bitmap.height;
+    const tc = transparentColor & 0x0f;
+
+    for (let row = 0; row < maxH; row++) {
+      const dy = y + row;
+      if (dy < 0 || dy >= dst.height) continue;
+      const dstRow = dy * dst.width;
+      const srcRow = row * bitmap.width;
+      for (let col = 0; col < maxW; col++) {
+        const dx = x + col;
+        if (dx < 0 || dx >= dst.width) continue;
+        const pixel = bitmap.pixels[srcRow + col] & 0x0f;
+        if (pixel === tc) continue;
+        dst.pixels[dstRow + dx] = pixel;
+      }
     }
   }
 

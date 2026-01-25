@@ -40,6 +40,8 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
                     if (ctx.game.handleDoorSwitchClick()) ctx.renderView();
                 } else if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) {
                     ctx.renderView();
+                } else {
+                    ctx.renderer.tryPickViewportObject(x, y);
                 }
             }
             ctx.renderView();

@@ -86,6 +86,8 @@ export interface InterpreterContext {
   // Per-frame wall decoration hit rects (viewport coordinates)
   wallDecorationRects?: RectPos[];
   doorSwitchRects?: RectPos[];
+  viewportObjectButtons?: RectPos[];
+  viewportObjectRNs?: ObjectID[];
 
   // Monster attack animation state hook (used for sound triggers)
   onMonsterAttackState?: (monster: CreatureRecord, index: number, soundOrdinal: number, isAttacking: boolean) => void;
@@ -1865,7 +1867,21 @@ export class BytecodeInterpreter {
       const rightSideOfCell = ((relativeLocationWithinCell + 1) & 2) !== 0;
       const local36 = (gc.byte4 & 1) !== 0 && !local34 && (middleLeftRight === 2 || (middleLeftRight === 0 && rightSideOfCell));
 
-      const r = this.drawSingleObject(tables, graphicNum, gc, relativeCellNumber, relativeLocationWithinCell, currentSmallOffset, local36, drawingAlcoveObjects, vp.x, vp.y);
+      const r = this.drawSingleObject(
+        tables,
+        graphicNum,
+        gc,
+        relativeCellNumber,
+        relativeLocationWithinCell,
+        currentSmallOffset,
+        local36,
+        drawingAlcoveObjects,
+        vp.x,
+        vp.y,
+        middleLeftRight,
+        false,
+        rn
+      );
       currentSmallOffset = r.nextSmallOffset;
     }
   }
@@ -1910,7 +1926,10 @@ export class BytecodeInterpreter {
     mirror: boolean,
     drawingAlcoveObjects: boolean,
     baseX: number,
-    baseY2: number
+    baseY2: number,
+    middleLeftRight: number,
+    drawingMissiles: boolean,
+    objRn: ObjectID
   ): { nextSmallOffset: number } {
     const viewport = this.context.viewportIndexBuffer;
     const getGraphic = this.context.getGraphicBitmap;
@@ -1922,6 +1941,7 @@ export class BytecodeInterpreter {
     if (relativeCellNumber === 9 || (relativeCellNumber >= 6 && nearSideOfCell)) distanceFromUs = 0;
     else if (relativeCellNumber >= 6 || (relativeCellNumber >= 3 && nearSideOfCell)) distanceFromUs = 1;
     else distanceFromUs = 2;
+    const touchable = distanceFromUs === 0 && middleLeftRight === 0 && !drawingMissiles;
 
     const src = getGraphic(graphicNum);
     if (!src) return { nextSmallOffset: currentSmallOffset };
@@ -1978,6 +1998,35 @@ export class BytecodeInterpreter {
     }
     if (x2 > 223) x2 = 223;
     if (y2 > 135) y2 = 135;
+
+    if (touchable && this.context.viewportObjectButtons && this.context.viewportObjectRNs) {
+      const button = this.context.viewportObjectButtons[relativeLocationWithinCell];
+      if (button) {
+        if (button.x1 === 255) {
+          button.x1 = x1;
+          button.x2 = x2;
+          button.y1 = y1;
+          button.y2 = y2;
+
+          let height32 = button.y2 - button.y1;
+          if (height32 < 14) {
+            height32 >>= 1;
+            button.y1 += height - 7;
+            if (height32 < 4) {
+              button.y2 -= height32 - 3;
+            }
+          }
+        } else {
+          button.x1 = Math.min(button.x1, x1);
+          button.x2 = Math.max(button.x2, x2);
+          button.y1 = Math.min(button.y1, y1);
+          button.y2 = Math.max(button.y2, y2);
+        }
+        if (relativeLocationWithinCell < this.context.viewportObjectRNs.length) {
+          this.context.viewportObjectRNs[relativeLocationWithinCell] = objRn;
+        }
+      }
+    }
 
     bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2, srcX, srcY });
     return { nextSmallOffset: currentSmallOffset };
@@ -2159,7 +2208,21 @@ export class BytecodeInterpreter {
         const gc = tables.graphicClasses[graphicClass];
         if (!gc) continue;
         const graphicNum = 360 + (gc.objectGraphicIndex & 0xff);
-        this.drawSingleObject(tables, graphicNum, gc, relativeCellNumber, relativeLocation, 0, false, false, centerX, 47);
+        this.drawSingleObject(
+          tables,
+          graphicNum,
+          gc,
+          relativeCellNumber,
+          relativeLocation,
+          0,
+          false,
+          false,
+          centerX,
+          47,
+          middleLeftRight,
+          true,
+          rn
+        );
         continue;
       }
 

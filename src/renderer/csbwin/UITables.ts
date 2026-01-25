@@ -90,6 +90,10 @@ export interface UITables {
     word1398: WordRect;
     byte1390: number[];
     byte1386: number[];
+    cursorColorMapLight: number[];
+    cursorColorMapDark: number[];
+    cursorHand: Uint8Array;
+    cursorArrow: Uint8Array;
     byte640: number[];
     carryLocation: number[];
     byte1094: WordRect;
@@ -392,11 +396,10 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const byte1390 = Array.from(raw.slice(off, off + 4)); off += 4;
   const byte1386 = Array.from(raw.slice(off, off + 4)); off += 4;
 
-  // Byte1382[16], Byte1366[16], Byte1350[128], Byte1222[128]
-  off += 16;
-  off += 16;
-  off += 128;
-  off += 128;
+  const cursorColorMapLight = Array.from(raw.slice(off, off + 16)); off += 16;
+  const cursorColorMapDark = Array.from(raw.slice(off, off + 16)); off += 16;
+  const cursorHand = raw.slice(off, off + 128); off += 128;
+  const cursorArrow = raw.slice(off, off + 128); off += 128;
 
   const byte1094 = readWordRect(view, off); off += 8;
 
@@ -460,6 +463,10 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     word1398,
     byte1390,
     byte1386,
+    cursorColorMapLight,
+    cursorColorMapDark,
+    cursorHand,
+    cursorArrow,
     byte640,
     carryLocation,
     byte1094,
