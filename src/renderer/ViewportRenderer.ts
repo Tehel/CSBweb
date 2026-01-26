@@ -44,6 +44,8 @@ import { getOrSet, Position } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateDebug, updateHover } from '@/ui';
 import { GraphicRoomType } from './bytecode/Types';
+import type { TextDecodeTables } from '../engine/DungeonState';
+import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -56,6 +58,7 @@ type ViewportCursorAction =
   | { kind: 'throw'; side: 0 | 1 }
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
+type ItemDescriptionLine = { text: string; color: number };
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -73,7 +76,9 @@ export interface FloorCeiling {
 
 const charColors = [7, 11, 8, 14];
 const OBJNI_COMPASS_N = 0;
+const OBJNI_COMPASS_W = 3;
 const OBJNI_TORCH_A = 4;
+const OBJNI_TORCH_D = OBJNI_TORCH_A + 3;
 const OBJNI_WATERSKIN = 8;
 const OBJNI_WATER = 9;
 const OBJNI_JEWEL_SYMAL_A = 10;
@@ -92,6 +97,7 @@ const OBJNI_LAST_MODIFIABLE = 31;
 const OBJNI_ELVEN_BOOTS = 119;
 const OBJNI_FIRST_FULL_FLASK = 148;
 const OBJNI_LAST_FULL_FLASK = 163;
+const OBJNI_WATER_FLASK = 163;
 const OBJNI_EMPTY_FLASK = 195;
 const OBJNI_SPECIAL_F = 204;
 const OBJNI_SPECIAL_C = 201;
@@ -109,6 +115,9 @@ const OBJNI_PENDANT_FERAL = 126;
 const POTION_WATER_FLASK = 15;
 const POTION_EMPTY_FLASK = 20;
 const DEFAULT_CHEST_WEIGHT = 50;
+const MISC_BONES_OF_HERO = 5;
+const MAX_SCROLL_LINE_LENGTH = 16;
+const MAX_LINES_IN_SCROLL = 9;
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const MASTERY_LABELS = [
   '',
@@ -172,6 +181,7 @@ export class ViewportRenderer {
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
   private playSound?: (soundId: number, rateIdx?: number) => void;
   private monsterAttackState: WeakMap<CreatureRecord, boolean[]> = new WeakMap();
+  private viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
   constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
     this.graphicsLoader = graphicsLoader;
@@ -259,6 +269,10 @@ export class ViewportRenderer {
 
   setPlaySound(playSound?: (soundId: number, rateIdx?: number) => void): void {
     this.playSound = playSound;
+  }
+
+  setViewingFilter(handler?: (options: ViewingFilterOptions) => ViewingFilterResult | null): void {
+    this.viewingFilter = handler;
   }
 
   setMessageLines(lines: string[]): void {
@@ -1007,6 +1021,10 @@ export class ViewportRenderer {
 
   private drawObjectInfoPanel(objectId: ObjectID): void {
     if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.objectTables) return;
+    if (decodeObjectID(objectId).category === DBType.SCROLL) {
+      this.drawScrollPanel(objectId);
+      return;
+    }
     const ui = this.uiTables.graphic232;
     this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
     this.blitBasicGraphicToViewport(29, ui.wRectPos942, 32, 12);
@@ -1014,13 +1032,13 @@ export class ViewportRenderer {
     const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
     if (objectNameIndex >= 0) {
       const iconRect = {
-        x1: VIEWPORT_X + 110,
+        x1: VIEWPORT_X + 111,
         y1: VIEWPORT_Y + 59,
-        x2: VIEWPORT_X + 125,
+        x2: VIEWPORT_X + 126,
         y2: VIEWPORT_Y + 74,
       };
       this.drawObjectIcon(iconRect, objectNameIndex, ui.word612);
-      const name = this.getObjectName(objectNameIndex);
+      const name = this.getObjectDisplayName(objectId, objectNameIndex);
       if (name) {
         drawTextLineIndex(
           this.screenIndexBuffer,
@@ -1034,17 +1052,305 @@ export class ViewportRenderer {
       }
     }
 
+    const lines = this.getObjectDescriptionLines(objectId, objectNameIndex);
+    const textState = { x: VIEWPORT_X + 108, y: VIEWPORT_Y + 87 };
+    for (const line of lines) {
+      this.drawItemDescriptionLine(line.text, line.color, textState);
+    }
+  }
+
+  private drawScrollPanel(objectId: ObjectID): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.objectTables) return;
+    let scrollId = objectId;
+    const filter = this.applyViewingFilter(objectId, 0);
+    if (filter) {
+      const candidate = filter.objectId | 0;
+      if (candidate >= 0 && this.isLikelyObjectRecord(candidate)) {
+        const decoded = decodeObjectID(candidate as ObjectID);
+        if (decoded.category === DBType.SCROLL) scrollId = candidate as ObjectID;
+      }
+    }
+
+    const scroll = this.dungeonState.getScrollRecord(scrollId);
+    if (!scroll) return;
+    const textTables: TextDecodeTables = {
+      escape1: this.objectTables.textEscape1,
+      escape2Wall: this.objectTables.textEscape2Wall,
+      escape2Other: this.objectTables.textEscape2Other,
+    };
+    const text = this.dungeonState.decodeScrollText(scroll, textTables) ?? '';
+
+    const ui = this.uiTables.graphic232;
+    this.blitBasicGraphicToViewport(23, ui.wRectPos926, 144, 8);
+
+    const { lines, startY } = this.splitScrollLines(text);
+    let y = startY;
+    for (const line of lines) {
+      this.drawScrollLine(y, line);
+      y += 7;
+    }
+  }
+
+  private splitScrollLines(text: string): { lines: string[]; startY: number } {
+    const bytes: number[] = [];
+    for (let i = 0; i < text.length; i++) bytes.push(text.charCodeAt(i) & 0xff);
+    bytes.push(0, 0);
+
+    let cursor = 0;
+    while (bytes[cursor] !== 0 && bytes[cursor] !== 10) cursor++;
+    const firstLine = this.bytesToString(bytes, 0, cursor);
+    bytes[cursor] = 0;
+    cursor++;
+
+    let numLines = 1;
+    let scan = cursor;
+    while (bytes[scan] !== 0) {
+      if (bytes[scan] === 10) numLines++;
+      scan++;
+    }
+
+    const lastIndex = scan - 1;
+    if (lastIndex >= 0) {
+      if (bytes[lastIndex] !== 10) {
+        numLines++;
+      } else if (lastIndex - 1 >= 0 && bytes[lastIndex - 1] === 10) {
+        numLines--;
+      }
+    }
+
+    if (numLines > MAX_LINES_IN_SCROLL) numLines = MAX_LINES_IN_SCROLL;
+    const startY = 92 - Math.floor((7 * numLines) / 2);
+
+    const lines: string[] = [];
+    lines.push(firstLine);
+    numLines -= 1;
+    if (numLines <= 0) return { lines, startY };
+
+    let lineStart = cursor;
+    for (let remaining = numLines; remaining > 0; remaining--) {
+      while (bytes[cursor] !== 0 && bytes[cursor] !== 10) cursor++;
+      if (bytes[cursor] === 0) {
+        bytes[cursor + 1] = 0;
+      }
+      bytes[cursor] = 0;
+      lines.push(this.bytesToString(bytes, lineStart, cursor));
+      cursor++;
+      lineStart = cursor;
+    }
+
+    return { lines, startY };
+  }
+
+  private bytesToString(bytes: number[], start: number, end: number): string {
+    let out = '';
+    for (let i = start; i < end; i++) {
+      out += String.fromCharCode(bytes[i] ?? 0);
+    }
+    return out;
+  }
+
+  private drawScrollLine(y: number, text: string): void {
+    if (!this.fontData || !this.screenIndexBuffer) return;
+    const line = text.length > MAX_SCROLL_LINE_LENGTH ? text.slice(0, MAX_SCROLL_LINE_LENGTH) : text;
+    const encoded = this.encodeScrollFontText(line);
+    const x = VIEWPORT_X + 162 - Math.floor((line.length * 6) / 2);
+    drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, VIEWPORT_Y + y, 0, 15, encoded);
+  }
+
+  private encodeScrollFontText(text: string): string {
+    const out: number[] = [];
+    for (let i = 0; i < text.length; i++) {
+      let code = text.charCodeAt(i) & 0xff;
+      if (code >= 65 && code <= 90) {
+        code -= 64;
+      } else if (code >= 0x7b) {
+        code -= 0x60;
+      }
+      out.push(code);
+    }
+    return String.fromCharCode(...out);
+  }
+
+  private getObjectDescriptionLines(objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
+    if (!this.objectTables) return [];
+    const lines: ItemDescriptionLine[] = [];
+    const { category } = decodeObjectID(objectId);
+    const phrases = ['CONSUMABLE', 'POISONED', 'BROKEN', 'CURSED', '', '', '', ''];
+    const phraseColors = Array.from({ length: 8 }, () => 13);
+    let descriptionMask = 0;
+    let flags = 0;
+
+    switch (category) {
+      case DBType.WEAPON: {
+        const rec = this.dungeonState.getWeaponRecord(objectId);
+        if (objectNameIndex >= OBJNI_TORCH_A && objectNameIndex <= OBJNI_TORCH_D) {
+          if ((rec?.charges ?? 0) === 0) {
+            lines.push({ text: '(BURNT OUT)', color: 13 });
+          }
+        }
+        descriptionMask = 0x0e;
+        if (rec?.cursed) flags |= 0x8;
+        if (rec?.poisoned) flags |= 0x2;
+        if (rec?.broken) flags |= 0x4;
+        break;
+      }
+      case DBType.CLOTHING: {
+        const rec = this.dungeonState.getClothingRecord(objectId);
+        descriptionMask = 0x0c;
+        if (rec?.cursed) flags |= 0x8;
+        if (rec?.broken) flags |= 0x4;
+        break;
+      }
+      case DBType.POTION: {
+        const descIndex = this.descIndexForObject(objectId);
+        descriptionMask = 0x01;
+        if (descIndex !== null) flags = this.objectTables.objDescCarryMask[descIndex] ?? 0;
+        break;
+      }
+      case DBType.MISC: {
+        const rec = this.dungeonState.getMiscRecord(objectId);
+        if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
+          descriptionMask = 0;
+          const state = rec?.specialState ?? 0;
+          const text =
+            state === 3 ? '(FULL)'
+              : state === 2 ? '(ALMOST FULL)'
+                : state === 1 ? '(ALMOST EMPTY)'
+                  : '(EMPTY)';
+          lines.push({ text, color: 13 });
+          break;
+        }
+        if (objectNameIndex >= OBJNI_COMPASS_N && objectNameIndex <= OBJNI_COMPASS_W) {
+          descriptionMask = 0;
+          const facing = this.partyState?.facing ?? 0;
+          const directions = ['NORTH', 'EAST', 'SOUTH', 'WEST'];
+          lines.push({ text: `PARTY FACING ${directions[facing & 3] ?? ''}`.trim(), color: 13 });
+          break;
+        }
+        const descIndex = this.descIndexForObject(objectId);
+        descriptionMask = 0x09;
+        if (descIndex !== null) flags = this.objectTables.objDescCarryMask[descIndex] ?? 0;
+        break;
+      }
+      default:
+        break;
+    }
+
+    let phraseMask = descriptionMask & flags & 0x0f;
+    phraseMask |= 0x40;
+
     const weight = this.getObjectWeight(objectId | 0, new Set<number>());
-    const weightText = this.formatWeightText(weight);
-    drawTextLineIndex(
-      this.screenIndexBuffer,
-      this.fontData,
-      VIEWPORT_X + 107,
-      VIEWPORT_Y + 87,
-      13,
-      null,
-      weightText
-    );
+    phrases[6] = this.formatWeightText(weight);
+
+    const filter = this.applyViewingFilter(objectId, phraseMask);
+    if (filter) {
+      phraseMask = filter.phraseMask;
+      for (let i = 0; i < filter.phraseTextOverrides.length; i++) {
+        const text = filter.phraseTextOverrides[i];
+        if (text !== null && text !== undefined) phrases[i] = text;
+      }
+      for (let i = 0; i < filter.phraseColorOverrides.length; i++) {
+        const color = filter.phraseColorOverrides[i];
+        if (color !== null && color !== undefined) phraseColors[i] = color;
+      }
+    }
+
+    const phraseLine = this.buildPhraseSummary(phraseMask & 0x3f, phrases, phraseColors);
+    if (phraseLine) lines.push(phraseLine);
+    if ((phraseMask & 0x40) !== 0 && phrases[6]) {
+      lines.push({ text: phrases[6], color: phraseColors[6] ?? 13 });
+    }
+    if ((phraseMask & 0x80) !== 0 && phrases[7]) {
+      lines.push({ text: phrases[7], color: phraseColors[7] ?? 13 });
+    }
+    return lines;
+  }
+
+  private buildPhraseSummary(mask: number, phrases: string[], colors: number[]): ItemDescriptionLine | null {
+    if (mask === 0) return null;
+    const chosen: string[] = [];
+    let color = 13;
+    for (let i = 0; i < phrases.length; i++) {
+      if ((mask & (1 << i)) === 0) continue;
+      if (!phrases[i]) continue;
+      chosen.push(phrases[i]);
+      color = colors[i] ?? 13;
+    }
+    if (chosen.length === 0) return null;
+    if (chosen.length === 1) return { text: `(${chosen[0]})`, color };
+    if (chosen.length === 2) return { text: `(${chosen[0]} AND ${chosen[1]})`, color };
+    return { text: `(${chosen.slice(0, -1).join(', ')} AND ${chosen[chosen.length - 1]})`, color };
+  }
+
+  private drawItemDescriptionLine(text: string, color: number, state: { x: number; y: number }): void {
+    if (!this.fontData || !this.screenIndexBuffer) return;
+    let remaining = text;
+    while (remaining.length > 0) {
+      let line = remaining;
+      let next = '';
+      if (line.length > 18) {
+        let cut = 17;
+        while (cut > 2 && line[cut] !== ' ') cut--;
+        if (cut === 2) cut = 17;
+        next = remaining.slice(cut + 1);
+        line = remaining.slice(0, cut);
+      }
+      drawTextLineIndex(this.screenIndexBuffer, this.fontData, state.x, state.y, color, null, line);
+      state.y += 7;
+      remaining = next;
+    }
+  }
+
+  private getObjectDisplayName(objectId: ObjectID, objectNameIndex: number): string {
+    let name = this.getObjectName(objectNameIndex);
+    if (!name) return name;
+    const { category } = decodeObjectID(objectId);
+
+    if (category === DBType.MISC) {
+      const misc = this.dungeonState.getMiscRecord(objectId);
+      if (misc?.miscType === MISC_BONES_OF_HERO) {
+        const fingerprint = this.dungeonState.copyChampionBonesRecord(objectId);
+        if (fingerprint !== null && this.partyState) {
+          const champ = this.partyState.champions.find(
+            (c) => (c?.fingerprint ?? 0) === (fingerprint & 0xffff)
+          );
+          if (champ?.name) name = `${champ.name}${name}`;
+        }
+      }
+    }
+
+    if (category === DBType.POTION) {
+      if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
+        const selected = this.partyState?.selectedCharacterIndex ?? -1;
+        if (selected >= 0 && this.partyState) {
+          const champ = this.partyState.champions[selected];
+          if (champ && this.determineMastery(champ, 2) > 1) {
+            const potion = this.dungeonState.getPotionRecord(objectId);
+            const prefix = 95 + Math.floor((potion?.power ?? 0) / 40);
+            name = `${String.fromCharCode(prefix)} ${name}`;
+          }
+        }
+      }
+    }
+
+    return name;
+  }
+
+  private applyViewingFilter(objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
+    if (!this.viewingFilter || !this.objectTables) return null;
+    const selected = this.partyState?.selectedCharacterIndex ?? -1;
+    if (selected < 0) return null;
+    const textTables: TextDecodeTables = {
+      escape1: this.objectTables.textEscape1,
+      escape2Wall: this.objectTables.textEscape2Wall,
+      escape2Other: this.objectTables.textEscape2Other,
+    };
+    return this.viewingFilter({
+      phraseMask,
+      objectId: objectId | 0,
+      selectedCharacter: selected,
+      textTables,
+    });
   }
 
   private getObjectName(objectNameIndex: number): string {
@@ -2749,7 +3055,7 @@ export class ViewportRenderer {
     }
 
     // baseMana: [ 1, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 7, 9, 2, 2, 3, 4, 6, 7 ]
-    // scaleMana: [ 8, 12, 16, 20, 24, 28 ]
+    // scaleMana: [ 8, 12, 16, 20, 24, 28 ] ( = [ x1, x1.5, x2, x2.5, x3, x3.5 ])
 
     // Add rune
     const step = champion.incantation.length;
@@ -2794,11 +3100,11 @@ export class ViewportRenderer {
     const { x, y } = this.hoverPoint;
 
     const hovered: string[] = [];
-    // for (const btn of this.uiTables.graphic231.moveButtons) {
-    //   if (this.pointInRect(x, y, btn.x1, btn.y1, btn.x2, btn.y2)) {
-    //     drawRectOutlineIndex(this.screenIndexBuffer, btn, 15);
-    //   }
-    // }
+    for (const btn of this.uiTables.graphic231.moveButtons) {
+      if (this.pointInRect(x, y, btn)) {
+        // drawRectOutlineIndex(this.screenIndexBuffer, btn, 15);
+      }
+    }
 
     const buttonGroups = Object.values(this.uiTables.graphic231.buttons);
     for (const group of buttonGroups) {

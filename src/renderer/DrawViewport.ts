@@ -130,7 +130,6 @@ export function DrawViewport(
   }
 
   // TODO: Draw champion portraits
-  // TODO: Draw status bar
   // TODO: Handle custom backgrounds
   // TODO: Handle see-through walls
 }

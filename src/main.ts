@@ -798,6 +798,7 @@ async function init() {
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
             renderer.setPlaySound(playSound);
+            renderer.setViewingFilter((options) => game?.processViewingFilter(options) ?? null);
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });

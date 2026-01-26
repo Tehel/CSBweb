@@ -9,7 +9,7 @@ import {
   Position,
   RoomType,
 } from '../core/types';
-import type { ActuatorRecord, DsaDefinition, DsaState } from '../data/dungeonTypes';
+import type { ActuatorRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
 import {
   getActuatorDsaSelector,
   getActuatorDsaState,
@@ -24,7 +24,7 @@ import {
   setActuatorParameterA,
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
-import type { DungeonState } from './DungeonState';
+import type { DungeonState, TextDecodeTables } from './DungeonState';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
@@ -34,6 +34,20 @@ export interface DsaTables {
   roomTimerFunctions?: ArrayLike<number>;
   objDescCarryMask?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
+}
+
+export interface ViewingFilterOptions {
+  phraseMask: number;
+  objectId: number;
+  selectedCharacter: number;
+  textTables?: TextDecodeTables;
+}
+
+export interface ViewingFilterResult {
+  phraseMask: number;
+  objectId: number;
+  phraseTextOverrides: Array<string | null>;
+  phraseColorOverrides: Array<number | null>;
 }
 
 interface DsaLocation {
@@ -133,6 +147,7 @@ enum StkOp {
   ULESS = 50,
   RANDOM = 67,
   XOR = 70,
+  DESCRIBE = 72,
   COPY = 76,
   TIME_FETCH = 97,
   GENERATOR_DELAY_FETCH = 100,
@@ -144,7 +159,9 @@ enum StkOp {
 
 const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
+const ESL_VIEWING_FILTER = 3;
 const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
+const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 
@@ -197,6 +214,14 @@ class DsaVars {
     this.definedFlags.fill(DsaVarType.Undefined);
     this.values.fill(0);
   }
+}
+
+interface ViewingFilterContext {
+  phraseMask: number;
+  phraseTextOverrides: Array<string | null>;
+  phraseColorOverrides: Array<number | null>;
+  textTables?: TextDecodeTables;
+  modified: boolean;
 }
 
 class DsaStack {
@@ -344,6 +369,7 @@ export class DsaSystem {
   private warnedOps = new Set<number>();
   private overridePos = 0;
   private overrideP = false;
+  private viewingFilterContext: ViewingFilterContext | null = null;
 
   constructor(
     private dungeon: DungeonState,
@@ -427,6 +453,55 @@ export class DsaSystem {
 
     this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
     return this.getParameter(0);
+  }
+
+  processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
+    const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
+    if (special === null) return null;
+    const locrFilter = intToLocation(special);
+    if (!this.isValidLocation(locrFilter)) return null;
+    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+    const dsaActuator = this.findFirstDsaActuator(filterPos);
+    if (dsaActuator === OBJECT_ID_EOF) return null;
+
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: locrFilter.l & 0xff,
+      function: 0,
+      uByte5: 0,
+      uByte6: locrFilter.x & 0xff,
+      uByte7: locrFilter.y & 0xff,
+      uByte8: 0,
+      uByte9: 0,
+      sequence: 0,
+      timerWord8: 0,
+    };
+
+    this.setParameters(3, [options.phraseMask | 0, options.objectId | 0, options.selectedCharacter | 0]);
+    this.viewingFilterContext = {
+      phraseMask: options.phraseMask | 0,
+      phraseTextOverrides: Array.from({ length: 8 }, () => null),
+      phraseColorOverrides: Array.from({ length: 8 }, () => null),
+      textTables: options.textTables,
+      modified: false,
+    };
+
+    this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
+
+    const ctx = this.viewingFilterContext;
+    this.viewingFilterContext = null;
+    if (!ctx) return null;
+    const paramMask = this.getParameter(0);
+    const phraseMask = ctx.modified ? ctx.phraseMask : (paramMask | 0);
+    const objectId = this.getParameter(1);
+
+    return {
+      phraseMask,
+      objectId,
+      phraseTextOverrides: ctx.phraseTextOverrides,
+      phraseColorOverrides: ctx.phraseColorOverrides,
+    };
   }
 
   processTimer5(rn: number, timer: TimerEntry, location: Position): boolean {
@@ -1108,6 +1183,21 @@ export class DsaSystem {
         }
         break;
       }
+      case StkOp.DESCRIBE: {
+        const color = bank.stack.pop();
+        const index = bank.stack.pop();
+        let locrInt = bank.stack.pop();
+        if (this.overrideP) {
+          this.overrideP = false;
+          if (locrInt >= 0) {
+            const locr = intToLocation(locrInt);
+            locr.p = this.overridePos & 0x3;
+            locrInt = locationToInt(locr);
+          }
+        }
+        this.modifyDescription(locrInt, index, color);
+        break;
+      }
       case StkOp.PLUS:
         bank.stack.push(bank.stack.pop() + bank.stack.pop());
         break;
@@ -1766,6 +1856,44 @@ export class DsaSystem {
     tile.attributes = next & 0xf;
     tile.roomType = (next >> 5) & 0x7;
     tile.hasObjects = (next & 0x10) !== 0;
+  }
+
+  private modifyDescription(locrInt: number, index: number, color: number): void {
+    const ctx = this.viewingFilterContext;
+    if (!ctx) return;
+    if (index < 0 || index > 7) return;
+    ctx.phraseColorOverrides[index] = color | 0;
+    if (locrInt === -1) {
+      ctx.phraseMask |= 1 << index;
+      ctx.modified = true;
+      return;
+    }
+    if (locrInt === -2) {
+      ctx.phraseMask &= ~(1 << index);
+      ctx.modified = true;
+      return;
+    }
+    if (locrInt < 0) return;
+    const locr = intToLocation(locrInt);
+    if (!this.isValidLocation(locr)) return;
+    const record = this.findTextRecordAtLocation(locr);
+    if (!record) return;
+    const text = this.dungeon.decodeTextString(record, 0x8001, ctx.textTables);
+    if (!text) return;
+    ctx.phraseTextOverrides[index] = text;
+    ctx.phraseMask |= 1 << index;
+    ctx.modified = true;
+  }
+
+  private findTextRecordAtLocation(locr: DsaLocation): TextRecord | null {
+    const pos = new Position(locr.x, locr.y, locr.l);
+    for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      const decoded = decodeObjectID(rn);
+      if (decoded.category !== DBType.TEXT) continue;
+      if ((decoded.position & 0x3) !== (locr.p & 0x3)) continue;
+      return this.dungeon.getTextRecord(rn);
+    }
+    return null;
   }
 
   private isValidObjectId(objectId: number): boolean {

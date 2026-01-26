@@ -15,7 +15,7 @@ import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
 import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
-import { DsaSystem, type DsaTables } from './DsaSystem';
+import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
@@ -138,6 +138,10 @@ export class Game {
         this.movementSystem = new MovementSystem(this.party, this.dungeonState, this.actuators);
 
         console.log('Game initialized at position:', startPos, 'facing:', startFacing);
+    }
+
+    processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
+        return this.dsaSystem.processViewingFilter(options);
     }
 
     /**
