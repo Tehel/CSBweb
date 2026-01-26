@@ -59,6 +59,13 @@ type ViewportCursorAction =
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
 type ItemDescriptionLine = { text: string; color: number };
+type ObjectMoveHandler = (
+  position: Position,
+  object: ObjectID,
+  place: boolean,
+  unchangedRoom: boolean,
+  facing: number,
+) => void;
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -158,6 +165,7 @@ export class ViewportRenderer {
 
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
   private graphicCache: Map<string, IndexedBitmap> = new Map();
+  private onObjectMove?: ObjectMoveHandler;
   private portraitSheet: IndexedBitmap | null | undefined = undefined;
   private portraitCache: Map<number, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
@@ -273,6 +281,10 @@ export class ViewportRenderer {
 
   setViewingFilter(handler?: (options: ViewingFilterOptions) => ViewingFilterResult | null): void {
     this.viewingFilter = handler;
+  }
+
+  setObjectMoveHandler(handler?: ObjectMoveHandler): void {
+    this.onObjectMove = handler;
   }
 
   setMessageLines(lines: string[]): void {
@@ -440,6 +452,7 @@ export class ViewportRenderer {
     if (!target) return false;
     if (this.isMonsterBlockingPickup(hit.relativeLocation, target)) return false;
     if (!this.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
+    this.onObjectMove?.(target, hit.rn, false, false, this.partyState.facing & 0x3);
 
     this.partyState.objectInHand = hit.rn;
     return true;

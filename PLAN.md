@@ -6,6 +6,10 @@ Project priority: **maximum compliance with the CSBWin C++ implementation** in `
 
 - Renderer choice: ✅ **Bytecode-based renderer only** (authoritative path)
 - Phase 1: ✅ all `graphics.dat` `0x22e` rectangle tables wired
+- Input handling: ✅ movement keys are queued (length 3) and processed in order to mirror CSBWin’s key queue
+- Timing parity: ✅ immediate timer processing after movement to avoid 1-tick delay on pressure pad actions
+- Actuator parity: ✅ object drop/pick now triggers pressure-pad logic, and pad context ignores the moved object (matching CSBWin PlaceOrRemoveObjectInRoom ordering)
+- Timer parity: ✅ `TimerQueue` now mirrors CSBWin duplicate-timer suppression for map timers and door-step interactions; latest conflicting timer replaces older entry
 
 ## Next Steps (Phased)
 

@@ -36,12 +36,7 @@ export class MovementSystem {
     move(action: MovementAction): MovementResult {
         // Check timing - can we move yet?
         const currentTime = Date.now();
-        if (!this.party.canMove(action, currentTime)) {
-            return {
-                success: false,
-                message: 'Too soon to move again',
-            };
-        }
+        if (!this.party.canMove(action, currentTime)) return { success: false };
 
         // Handle turns (no collision detection needed)
         if (action === MovementAction.TURN_LEFT || action === MovementAction.TURN_RIGHT) {

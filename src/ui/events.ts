@@ -160,35 +160,35 @@ export function bindUIEvents(): void {
                 case 'ArrowUp':
                 case 'w':
                 case 'W':
-                    ctx.game.move(MovementAction.MOVE_FORWARD);
+                    ctx.game.enqueueMovement(MovementAction.MOVE_FORWARD);
                     handled = true;
                     break;
                 case 'ArrowDown':
                 case 's':
                 case 'S':
-                    ctx.game.move(MovementAction.MOVE_BACKWARD);
+                    ctx.game.enqueueMovement(MovementAction.MOVE_BACKWARD);
                     handled = true;
                     break;
                 case 'ArrowLeft':
                 case 'q':
                 case 'Q':
-                    ctx.game.move(MovementAction.TURN_LEFT);
+                    ctx.game.enqueueMovement(MovementAction.TURN_LEFT);
                     handled = true;
                     break;
                 case 'ArrowRight':
                 case 'e':
                 case 'E':
-                    ctx.game.move(MovementAction.TURN_RIGHT);
+                    ctx.game.enqueueMovement(MovementAction.TURN_RIGHT);
                     handled = true;
                     break;
                 case 'a':
                 case 'A':
-                    ctx.game.move(MovementAction.STRAFE_LEFT);
+                    ctx.game.enqueueMovement(MovementAction.STRAFE_LEFT);
                     handled = true;
                     break;
                 case 'd':
                 case 'D':
-                    ctx.game.move(MovementAction.STRAFE_RIGHT);
+                    ctx.game.enqueueMovement(MovementAction.STRAFE_RIGHT);
                     handled = true;
                     break;
                 case 'Escape':

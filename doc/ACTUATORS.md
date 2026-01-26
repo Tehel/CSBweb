@@ -28,6 +28,7 @@ Key fields and helpers (all from `DB3` in `doc/CSBwin-src/CSB.h:927-1075`):
     - `energyRemaining()` (missile launcher).
     - `andOrEdge()` / `drawAsSize4()` (type-specific flags).
     - `SetResponses()` / `ClearResponses()` / `ToggleResponses()` / `DisableMessage()` / `State()` / `Position()` for portrait/DSA state handling.
+- `ParameterA()` uses `word4` plus bits 0-1 of `word8`; for DSAs (`actuatorType() == 47`), `word8` is synthesized from the high bits of `word4` and `word6`, and then `word4`/`word6` are masked to 14 bits (`doc/CSBwin-src/data.cpp`).
 
 ## 2) Actuator type meanings (from CSB.h comments)
 
@@ -76,6 +77,7 @@ High-level behavior:
 - `CONSTPRESSURE` converts to `SET` when closed, `CLEAR` when open.
 - Audible pads queue sound `soundPRESSUREPAD` (see `PressurePadOrAlcove()`).
 - Final action queues via `QueueSwitchAction()` with `tmrAct` derived from actuator action.
+- `PlaceOrRemoveObjectInRoom` removes objects before computing pressure-pad context, scans existing objects to set `objectDB5To13Present`/`sameTypeObjectPresent`/`differentTypeObjectPresent`, then adds the moved object if `place == true` and finally calls `PressurePadOrAlcove` for each actuator (`doc/CSBwin-src/Code11f52.cpp`).
 
 ## 4) QueueSwitchAction: "anything can act on anything"
 
@@ -83,7 +85,7 @@ High-level behavior:
 
 Key behavior:
 - If `onceOnly()` is set, actuator type is cleared (`actuatorType(0)`).
-- `actionTime = d.Time + delay()`.
+- `actionTime = d.Time + delay()` and the resulting time is passed to `CreateTimer` (`doc/CSBwin-src/Code11f52.cpp`).
 - If `localActionOnly()` is set, call `PerformLocalAction()` and return.
 - Otherwise:
   - Read target room type from `d.LevelCellFlags[targetX][targetY]`.

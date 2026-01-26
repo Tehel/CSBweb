@@ -12,6 +12,12 @@ Complete reference for how CSBWin (the C++ Dungeon Master port) implements graph
 7. [Bytecode System](#bytecode-system)
 8. [Blitting Operations](#blitting-operations)
 9. [Screen Output](#screen-output)
+10. [Scaled Sprite Rendering](#scaled-sprite-rendering)
+11. [CSBgraphics Decorations](#csbgraphics-decorations)
+12. [CSBgraphics Container Format](#csbgraphics-container-format)
+13. [Backgrounds and Skins](#backgrounds-and-skins)
+14. [Bytecode Interpreter Details](#bytecode-interpreter-details)
+15. [Affine Transforms and Masks](#affine-transforms-and-masks)
 
 ---
 
@@ -630,6 +636,120 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 - **Screen space**: 320×200 pixels (full display)
 - **Dungeon space**: Grid coordinates (x, y)
 - **Relative space**: Distance/direction from party
+
+---
+
+## Scaled Sprite Rendering
+
+### ShrinkBLT
+
+**Location**: `Graphics.cpp`
+
+- `ShrinkBLT` downsizes bitplane graphics using fixed-point accumulators derived from `(srcWidth<<10)/dstWidth` and `(srcHeight<<10)/dstHeight`, seeds them with `+0x7fff`, and applies a 16-entry color map by dividing `pColorMap[color] / 10` to obtain the 4-bit output value (switch over `D5W/10`).
+- It advances source rows using the width rounded to 16-pixel hunks.
+
+### Scaled monsters
+
+**Location**: `Code51a4.cpp`
+
+- Monsters at distance 1/2 use `ShrinkBLT` with scale factors `20/32` or `16/32` and color maps `d.Byte6628` (medium) / `d.Byte6612` (far).
+- The transparent color is selected by mapping the base transparent index through the same color map and dividing by 10.
+
+### Scaled floor items
+
+**Location**: `Code51a4.cpp`
+
+- Floor items at distance 1/2 use `ShrinkBLT` with scale factors `20/32` or `16/32` and color maps `d.Byte5744` (medium) / `d.Byte5728` (far).
+- `dstWidth = (scaledWidthBytes << 1)` and `dstHeight = scaledHeight`.
+
+### Missile sprite parity
+
+**Location**: `Code51a4.cpp`
+
+- Missile drawing switches on `(w124 & 1) != (facing & 1)` (parity test) to choose mirror/flip and graphic offset; it does not compare full facing.
+
+---
+
+## CSBgraphics Decorations
+
+### ReadWallDecoration
+
+**Location**: `CSBCode.cpp`
+
+- `ReadWallDecoration` calls `ReadCSBgraphic(CGT_WallDecoration, id, 92, ...)`.
+- Extended wall decorations (flag `graphicOrdinal & 0x10000`) use the CSBgraphics.dat data layout: 13 `DECORATION_DESC` placements, then a 2-byte pad, then side bitmap bytes (size `desc[11].width * desc[11].height`), then front bitmap bytes (size `desc[12].width * desc[12].height`), with `desc[11]` and `desc[12]` serving as source size descriptors.
+
+### ReadFloorDecoration
+
+**Location**: `CSBCode.cpp`
+
+- `ReadFloorDecoration` reads `CGT_FloorDecoration` (minimum size 92).
+- Extended floor decorations (flag `graphicOrdinal & 0x4000`) use 9 `DECORATION_DESC` entries followed by a 16-bit `mirrorFlags` and the bitmap data at `&desc[9] + 2`.
+- `DrawFloorDecorations` mirrors when `(((mirrorFlags >> (d.partyFacing + 9)) ^ (mirrorFlags >> relativeCell)) & 1) != 0`.
+
+---
+
+## CSBgraphics Container Format
+
+### ReadCSBgraphic
+
+**Location**: `Graphics.cpp`
+
+- `ReadCSBgraphic` validates the `CSBg` sentinel, reads `version` and `numSection`, scans `SECTIONHEADER` entries to find matching `{type,id}`, then decompresses with `OVLDECODE` using 32-bit codewords and a table that grows when the code equals `maxTableLen-1`.
+
+---
+
+## Backgrounds and Skins
+
+### Background data structures
+
+**Location**: `CSB.h`
+
+- `BACKGROUND_MASK` is defined with `srcX`, `srcY`, `dstX`, `dstY`, `width`, `height` in pixel units (with `srcX` multiple of 16) and a trailing `mask[]` array.
+- `CGT_Backgrounds = 3` in `CSB_GRAPHICTYPE` for background assets.
+
+### Background library
+
+**Location**: `Viewport.cpp`
+
+- `BACKGROUND_LIB::FindGraphicInCache` loads background assets via `ReadCSBgraphic(CGT_Backgrounds, graphicID, ...)` and caches them by `BACKGROUND_GRAPHIC.id`.
+- `BACKGROUND_LIB::GetSkinDef` reads background graphic ID `1` as the skin index: `pSkinIndex[0]` is the number of skins and `pSkinIndex[skinNum+1]` is the byte offset to that skin definition; it rejects entries where `skinDefOffset + minimumSize >= actualSize`.
+- `GetSkinID` returns `pSkinDef[IDnum]`; `GetFloorGraphicID`/`GetMiddleGraphicID`/`GetCeilingGraphicID`/`GetWallGraphicID` map to indices `0..3`, `GetFloorMaskID`/`GetMiddleMaskID`/`GetCeilingMaskID`/`GetWallMaskID` map to `4..7`, and `GetCode` uses index `8` with a minimum code size of `2 * (1 + 8*21)` bytes.
+- `GetWallDecorationID` expects `pSkinDef[9]` to be the floor-decoration count, skips `numFloorDec + 1` entries, then reads a wall-decoration count and IDs from the same array.
+- `BACKGROUND_LIB::GetMask` treats background graphics as `ui32` arrays: `pGraphic[0]` is the number of masks and `pGraphic[masknum+1]` is the byte offset for the mask; it returns null if the offset is `0` or out of bounds.
+- `BACKGROUND_LIB::GetDecorationBitmap` expects a layout of `ui16 numDecoration`, `ui16 offsets[numDecoration]`, `ui16 numLocation`, then `numLocation` entries; it returns `pBitmap` at the chosen offset and `pLocation` pointing at the selected location entry (cast to `ui8 *`).
+
+### Skin cache
+
+**Location**: `data.cpp`
+
+- `SKIN_CACHE::GetSkin` loads expool records with `recId = (EDT_Skins << 24) + (level << 4) + (x / 2)`; the per-cell index is `(2 * y) + (x & 1)` and returns `0` for out-of-range or missing data.
+- `SKIN_CACHE::GetDefaultSkin` reads expool record `recId = (EDT_Skins << 24) + 0x800000` into a 64-byte `defaultSkins` array and returns `defaultSkins[level]`.
+
+### DrawViewport skin selection
+
+**Location**: `Viewport.cpp`
+
+- `DrawViewport` sets `roomData[userCellNum].skinNumber` from `skinCache.GetSkin` (fallback to `GetDefaultSkin`), and for non-zero skins selects custom code with `mainOffset = pCode[0]` and `startOffset = pCode[mainOffset + 8*userCellNum + roomData[userCellNum].graphicRoomType]` before calling `Interpret`.
+- `CustomBackgrounds` (guarded by `#ifndef newgraphics`) uses `skinCache` and `backgroundLib.GetSkinDef` to apply background masks/bitmaps: `pSkinDef[0]/[4]` (mask size 64, bitmap size 7840), `pSkinDef[2]/[6]` (size 3248), and for `roomNum < 5` `pSkinDef[1]/[5]` (size 4144).
+
+---
+
+## Bytecode Interpreter Details
+
+**Location**: `Viewport.cpp`
+
+- `Interpret` pushes a return-stack sentinel `0xffff`, treats opcodes `< 60000` as subroutine calls (push return address, jump to absolute offset), and `Return` pops back to that address until the sentinel.
+
+---
+
+## Affine Transforms and Masks
+
+**Location**: `Viewport.cpp`
+
+- `AffineTransform4` maps destination pixels using `srcX = Cxx*col + Cxy*row + Cxc + 16` and `srcY = Cyx*col + Cyy*row + Cyc + 16`, then wraps via modulo `32 * srcWidth/srcHeight` before reading `GetPixel4` and writing `PutPixel4`.
+- `AffineTransform1` uses the same coefficient math as `AffineTransform4`, but reads/writes 1-bit mask pixels via `GetPixel1`/`PutPixel1`.
+- `CreateVirtualMask` sets `Xform.srcX = Xform.srcY = 0`, `Xform.srcWidth/Height` from the old mask, and `Xform.dstWidth/Height` from the new mask before calling `AffineTransform1`.
 
 ---
 

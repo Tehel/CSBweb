@@ -62,3 +62,21 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `DrawItem` uses `IconDisplay.pixelX/pixelY` to create a 16x16 destination rect for each slot (`doc/CSBwin-src/Character.cpp:35`, `doc/CSBwin-src/Character.cpp:41`).
 - Slots < 8 draw into `d.LogicalScreenBase`, slots >= 8 draw into `d.pViewportBMP` (inventory view) (`doc/CSBwin-src/Character.cpp:61`, `doc/CSBwin-src/Character.cpp:71`).
 - `Word612[7]` selects the graphic group for object icons (`doc/CSBwin-src/Data.h:1454`, `doc/CSBwin-src/Character.cpp:48`).
+
+## Eye click and inspection flow
+
+- `ClickOnEye` sets `PressingEyeOrMouth`/`PressingEye`, draws the eye icon (`objNI_Special_e`), and if the hand is empty calls `TAG019036` (attributes); otherwise it calls `DescribeObject(d.objectInHand, 1)` (`doc/CSBwin-src/Viewport.cpp`).
+
+## Item description panel
+
+- `DescribeObject` draws the item-info panel using basic graphics `20` (food/water box) and `29`, draws the object name at `(134, 68)` and icon at `(111, 59)`, and formats the weight as `WEIGHS {weight/10}.{weight%10} KG.` using `GetObjectWeight` (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` sets phrase labels `{CONSUMABLE, POISONED, BROKEN, CURSED}`, computes `phraseMask` from item flags (`weapon/clothing` flags or `ObjDesc.word4` for potion/misc), prints the combined phrase list via `EncodeDescriptivePhrases`, and prints weight when `phraseMask & 0x40` is set (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` prints waterskin fullness strings based on `DB10->value()` (`(EMPTY)`, `(ALMOST EMPTY)`, `(ALMOST FULL)`, `(FULL)`), and prints `PARTY FACING {dir}` for compass items (`objNI_Compass_N..objNI_Compass_W`) (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` prefixes potion names (except water/empty flasks) with `char(95 + strength/40)` when `DetermineMastery(selectedChampion, 2) > 1` (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` builds hero bones names by concatenating the champion name with `ObjectNames[objNI_Bones_a]` when `DB10->value()` is non-zero and `CopyChampionBonesRecord` resolves a valid champion (`doc/CSBwin-src/Character.cpp`).
+- `DescribeObject` invokes the `ESL_VIEWINGFILTER` DSA (special location) with `pDSAparameters[1]=phraseMask`, `pDSAparameters[2]=objectId`, `pDSAparameters[3]=selectedChampion`, and `pDSAparameters[0]=3`, allowing `STKOP_Describe` (`ModifyDescription`) to override phrase text/colors (`doc/CSBwin-src/Character.cpp`).
+
+## Scroll display
+
+- `DisplayScroll` decodes scroll text with `DecodeText(..., 0x8002)`, blits basic graphic `23` into `wRectPos926`, caps to `MAX_LINES_IN_SCROLL` (9), centers lines starting at `y = 92 - (7 * numLines / 2)`, and uses `DisplayScrollText_OneLine` to draw each line with `MAX_SCROLL_LINE_LENGTH` (16) and text color `0` over background `15` (`doc/CSBwin-src/Character.cpp`).
+- `DisplayScrollText_OneLine` remaps characters by subtracting `64` for `'A'..'Z'` and subtracting `0x60` for bytes `>= 0x7b` before calling `TextOut_OneLine` (`doc/CSBwin-src/Character.cpp`).

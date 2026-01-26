@@ -34,6 +34,7 @@ export class TimerQueue {
   private nextSequence = 0;
   private nextIndex = 0;
   private indexMap = new Map<number, TimerEntry>();
+  private deleteDuplicateTimers = true; // CSBWin deleteDuplicateTimers default
 
   getTimers(): readonly TimerEntry[] {
     return this.queue;
@@ -79,11 +80,12 @@ export class TimerQueue {
       timerWord8: timerWord8 & 0xffff,
       object,
     };
-    this.addTimer(entry);
-    return entry;
+    return this.addTimer(entry);
   }
 
-  addTimer(entry: TimerEntry): void {
+  addTimer(entry: TimerEntry): TimerEntry {
+    const deduped = this.applyDuplicateTimerRules(entry);
+    if (deduped) return deduped;
     if (!this.indexMap.has(entry.index)) this.indexMap.set(entry.index, entry);
     const idx = this.queue.findIndex((existing) => compareTimers(entry, existing) < 0);
     if (idx === -1) {
@@ -91,6 +93,7 @@ export class TimerQueue {
     } else {
       this.queue.splice(idx, 0, entry);
     }
+    return entry;
   }
 
   getTimer(index: number): TimerEntry | null {
@@ -114,6 +117,63 @@ export class TimerQueue {
     this.indexMap.delete(index);
     const idx = this.queue.indexOf(entry);
     if (idx >= 0) this.queue.splice(idx, 1);
+  }
+
+  private applyDuplicateTimerRules(entry: TimerEntry): TimerEntry | null {
+    if (this.isMapTimer(entry.function)) {
+      if (this.deleteDuplicateTimers) {
+        let toDelete: TimerEntry | null = null;
+        for (const existing of this.queue) {
+          if (this.isMapTimer(existing.function)) {
+            if (!this.matchTimeLevelWord6(entry, existing)) continue;
+            if (existing.function === TimerFunction.TT_STONEROOM && existing.uByte8 !== entry.uByte8) continue;
+            toDelete = existing;
+            break;
+          }
+          if (existing.function !== TimerFunction.TT_DOOR_STEP) continue;
+          if (!this.matchTimeLevelWord6(entry, existing)) continue;
+          if ((entry.uByte9 & 0xff) === 2) {
+            entry.uByte9 = 1 - (existing.uByte9 & 0xff);
+          }
+          toDelete = existing;
+          break;
+        }
+        if (toDelete) this.deleteTimer(toDelete.index);
+      }
+      return null;
+    }
+
+    if (entry.function === TimerFunction.TT_DOOR_STEP) {
+      let toDelete: TimerEntry | null = null;
+      for (const existing of this.queue) {
+        if (!this.matchTimeLevelWord6(entry, existing)) continue;
+        if (existing.function === TimerFunction.TT_DOOR) {
+          if ((existing.uByte9 & 0xff) === 2) {
+            entry.uByte9 = 1 - (entry.uByte9 & 0xff);
+          }
+          toDelete = existing;
+          break;
+        }
+        if (existing.function === TimerFunction.TT_DOOR_STEP) {
+          toDelete = existing;
+          break;
+        }
+      }
+      if (toDelete) this.deleteTimer(toDelete.index);
+    }
+
+    return null;
+  }
+
+  private matchTimeLevelWord6(a: TimerEntry, b: TimerEntry): boolean {
+    return a.time === b.time
+      && a.level === b.level
+      && a.uByte6 === b.uByte6
+      && a.uByte7 === b.uByte7;
+  }
+
+  private isMapTimer(functionType: number): boolean {
+    return functionType >= TimerFunction.TT_OPENROOM && functionType <= TimerFunction.TT_DOOR;
   }
 }
 

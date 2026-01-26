@@ -149,6 +149,7 @@ export class ActuatorSystem {
       movedObjectDBType,
       movedObjectNameIndex,
       positionOfObject,
+      place && object !== OBJECT_ID_NULL ? object : null,
     );
 
     let triggered = false;
@@ -582,6 +583,7 @@ export class ActuatorSystem {
     movedObjectDBType: number,
     movedObjectNameIndex: number,
     positionOfObject: number,
+    ignoreObject: ObjectID | null,
   ): PressurePadContext {
     let objectDB5To13Present = false;
     let monstersPresent = false;
@@ -589,6 +591,7 @@ export class ActuatorSystem {
     let differentTypeObjectPresent = false;
 
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (ignoreObject !== null && rn === ignoreObject) continue;
       const decoded = decodeObjectID(rn);
       const dbType = decoded.category;
 

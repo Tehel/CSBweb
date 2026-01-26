@@ -799,6 +799,9 @@ async function init() {
             await renderer.initialize(gameCanvasEl);
             renderer.setPlaySound(playSound);
             renderer.setViewingFilter((options) => game?.processViewingFilter(options) ?? null);
+            renderer.setObjectMoveHandler((position, object, place, unchangedRoom, facing) => {
+                game?.triggerObjectMove(position, object, place, unchangedRoom, facing);
+            });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });

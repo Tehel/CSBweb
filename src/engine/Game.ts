@@ -56,6 +56,8 @@ export class Game {
     party: Party;
     dungeonState: DungeonState;
     private movementSystem: MovementSystem;
+    private movementQueue: MovementAction[] = [];
+    private readonly movementQueueLen = 3; // CSBUI.cpp keyQueueLen
     private timerQueue: TimerQueue;
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
@@ -195,6 +197,7 @@ export class Game {
 
         const currentTime = Date.now();
         this.state.currentTime = currentTime;
+        this.processMovementQueue(currentTime);
 
         // Calculate time since last tick
         const timeSinceLastTick = currentTime - this.lastTickTime;
@@ -232,6 +235,14 @@ export class Game {
         this.state.party = this.party.state;
     }
 
+    enqueueMovement(action: MovementAction): boolean {
+        if (this.movementQueue.length >= this.movementQueueLen) {
+            return false;
+        }
+        this.movementQueue.push(action);
+        return true;
+    }
+
     /**
      * Attempt to move the party
      */
@@ -244,6 +255,7 @@ export class Game {
                 this.timerSystem.checkMoveFromMissile(oldPos, result.newPosition, null);
             }
             this.party.applyMovement(result);
+            this.timerSystem.processTimers(this.state.tickCount);
 
             // Update party state in game state
             this.state.party = this.party.state;
@@ -262,6 +274,19 @@ export class Game {
 
             return false;
         }
+    }
+
+    triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
+        this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
+        this.timerSystem.processTimers(this.state.tickCount);
+    }
+
+    private processMovementQueue(currentTime: number): void {
+        if (this.movementQueue.length === 0) return;
+        const next = this.movementQueue[0];
+        if (!this.party.canMove(next, currentTime)) return;
+        this.movementQueue.shift();
+        this.move(next);
     }
 
     /**
@@ -498,6 +523,10 @@ export class Game {
         party.objectInHand = null;
         const added = this.dungeonState.addObjectToCell(target, newObj);
         if (!added) party.objectInHand = obj;
+        if (added) {
+            this.actuators.triggerObjectMove(target, newObj, true, false, facing);
+            this.timerSystem.processTimers(this.state.tickCount);
+        }
         if (added && options?.viAltar) {
             this.maybeScheduleViAltar(newObj, target, newPos);
         }
