@@ -11,6 +11,8 @@ export interface UIContext {
     onQuickLoad: () => void;
     onInjectRandomParty: () => void;
     onToggleAttackPanel: () => void;
+    onToggleMissileTrace: () => void;
+    onRunMissileScenario: () => void;
     setCrtEnabled: (enabled: boolean) => boolean;
     isCrtEnabled: () => boolean;
     setSoundEnabled: (enabled: boolean) => void;

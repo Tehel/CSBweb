@@ -5,12 +5,14 @@
  * and expects the standard (non-extended-features) save-game layout.
  */
 
-import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition } from './dungeonTypes';
+import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
+import { DBType } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
 
 export interface SaveGameState {
   item16: Item16Record[];
-  timers: TimerRecord[];
+  timers?: TimerRecord[];
+  missiles?: MissileRecord[];
   maxItem16: number;
   maxTimers: number;
   sequencedTimers: boolean;
@@ -19,6 +21,7 @@ export interface SaveGameState {
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
   extendedWallDecorations?: boolean;
+  specialLocations?: Record<number, number>;
 }
 
 interface Block1 {
@@ -58,6 +61,25 @@ function readU32LE(buf: Uint8Array, off: number): number {
   const b3 = buf[off + 3] ?? 0;
   return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
 }
+
+function readU16BE(buf: Uint8Array, off: number): number {
+  const hi = buf[off] ?? 0;
+  const lo = buf[off + 1] ?? 0;
+  return ((hi << 8) | lo) & 0xffff;
+}
+
+function readU32BE(buf: Uint8Array, off: number): number {
+  const b0 = buf[off] ?? 0;
+  const b1 = buf[off + 1] ?? 0;
+  const b2 = buf[off + 2] ?? 0;
+  const b3 = buf[off + 3] ?? 0;
+  return ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0;
+}
+
+const EXPOOL_RECORD_SIZE = 256;
+const EXPOOL_WORDS_PER_BLOCK = 64;
+const EDT_SPECIAL_LOCATIONS = 3;
+const ESL_SPECIAL_LOCATION_MAX = 15;
 
 function applyBigActuators(dungeon: DungeonData): void {
   if (dungeon.bigActuators) return;
@@ -264,11 +286,12 @@ function readExtendedFeatures(data: Uint8Array): {
   extendedTimers: boolean;
   extendedWallDecorations: boolean;
   bigActuators: boolean;
+  indirectText: boolean;
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
 } {
   if (data.length < EXTENDED_FEATURES_SIZE) {
-    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false };
+    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false };
   }
 
   let block = data.subarray(0, EXTENDED_FEATURES_SIZE);
@@ -279,7 +302,7 @@ function readExtendedFeatures(data: Uint8Array): {
     if (hasExtendedSentinel(decoded)) {
       parsed = decoded;
     } else {
-      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false };
+      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false };
     }
   }
 
@@ -293,6 +316,7 @@ function readExtendedFeatures(data: Uint8Array): {
   const extendedTimers = (extendedFlags & 0x80) !== 0;
   const extendedWallDecorations = (extendedFlags & 0x10) !== 0;
   const bigActuators = (flags & 0x80) !== 0;
+  const indirectText = (flags & 0x08) !== 0;
 
   let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
 
@@ -334,7 +358,182 @@ function readExtendedFeatures(data: Uint8Array): {
     }
   }
 
-  return { offset, sequencedTimers, extendedTimers, extendedWallDecorations, bigActuators, dsaLevelIndex, dsaIndex };
+  return { offset, sequencedTimers, extendedTimers, extendedWallDecorations, bigActuators, indirectText, dsaLevelIndex, dsaIndex };
+}
+
+function parseSpecialLocationsFromSaveData(
+  data: Uint8Array,
+  startOffset: number,
+  indirectText: boolean,
+): Record<number, number> | null {
+  const HEADER_SIZE = 44;
+  const MAP_DESCRIPTOR_SIZE = 16;
+  const dbRecordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
+
+  if (startOffset + HEADER_SIZE > data.length) return null;
+
+  const numMaps = data[startOffset + 4] ?? 0;
+  const textDataSize = readU16BE(data, startOffset + 6);
+  const objectListSize = readU16BE(data, startOffset + 10);
+
+  const objectCounts: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
+  }
+
+  let totalColumns = 0;
+  const mapBase = startOffset + HEADER_SIZE;
+  for (let i = 0; i < numMaps; i++) {
+    const offset = mapBase + i * MAP_DESCRIPTOR_SIZE;
+    if (offset + MAP_DESCRIPTOR_SIZE > data.length) return null;
+    const sizeWord = readU16BE(data, offset + 8);
+    const width = ((sizeWord >> 6) & 0x1f) + 1;
+    totalColumns += width;
+  }
+
+  const columnIndexOffset = HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
+  const objectListOffset = columnIndexOffset + totalColumns * 2;
+  const textDataOffset = objectListOffset + objectListSize * 2;
+
+  let databaseOffset = textDataOffset;
+  if (indirectText) {
+    const indexBytes = textDataSize * 4;
+    const sizeOffset = startOffset + textDataOffset + indexBytes;
+    if (sizeOffset + 4 > data.length) return null;
+    const compressedSize = readU32BE(data, sizeOffset);
+    databaseOffset = textDataOffset + indexBytes + 4 + compressedSize * 2;
+  } else {
+    databaseOffset = textDataOffset + textDataSize * 2;
+  }
+
+  let expoolOffset = -1;
+  let cursor = databaseOffset;
+  for (let db = 0; db < 16; db++) {
+    if (db === 11) expoolOffset = cursor;
+    cursor += objectCounts[db] * (dbRecordSizes[db] ?? 0);
+  }
+
+  const expoolCount = objectCounts[11] ?? 0;
+  if (expoolOffset < 0 || expoolCount <= 0) return null;
+
+  const expoolBytes = expoolCount * EXPOOL_RECORD_SIZE;
+  const expoolStart = startOffset + expoolOffset;
+  if (expoolStart + expoolBytes > data.length) return null;
+
+  const expool = new Uint32Array(expoolCount * EXPOOL_WORDS_PER_BLOCK);
+  for (let i = 0; i < expool.length; i++) {
+    expool[i] = readU32BE(data, expoolStart + i * 4);
+  }
+
+  const locations: Record<number, number> = {};
+  for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) {
+    const key = ((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0;
+    const record = locateExpoolRecord(expool, key);
+    if (record !== null) locations[key] = record;
+  }
+
+  return Object.keys(locations).length === 0 ? null : locations;
+}
+
+function parseMissileRecordsFromSaveData(
+  data: Uint8Array,
+  startOffset: number,
+  indirectText: boolean,
+): MissileRecord[] | null {
+  const HEADER_SIZE = 44;
+  const MAP_DESCRIPTOR_SIZE = 16;
+  const dbRecordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
+
+  if (startOffset + HEADER_SIZE > data.length) return null;
+
+  const numMaps = data[startOffset + 4] ?? 0;
+  const textDataSize = readU16BE(data, startOffset + 6);
+  const objectListSize = readU16BE(data, startOffset + 10);
+
+  const objectCounts: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
+  }
+
+  let totalColumns = 0;
+  const mapBase = startOffset + HEADER_SIZE;
+  for (let i = 0; i < numMaps; i++) {
+    const offset = mapBase + i * MAP_DESCRIPTOR_SIZE;
+    if (offset + MAP_DESCRIPTOR_SIZE > data.length) return null;
+    const sizeWord = readU16BE(data, offset + 8);
+    const width = ((sizeWord >> 6) & 0x1f) + 1;
+    totalColumns += width;
+  }
+
+  const columnIndexOffset = HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
+  const objectListOffset = columnIndexOffset + totalColumns * 2;
+  const textDataOffset = objectListOffset + objectListSize * 2;
+
+  let databaseOffset = textDataOffset;
+  if (indirectText) {
+    const indexBytes = textDataSize * 4;
+    const sizeOffset = startOffset + textDataOffset + indexBytes;
+    if (sizeOffset + 4 > data.length) return null;
+    const compressedSize = readU32BE(data, sizeOffset);
+    databaseOffset = textDataOffset + indexBytes + 4 + compressedSize * 2;
+  } else {
+    databaseOffset = textDataOffset + textDataSize * 2;
+  }
+
+  let missileOffset = -1;
+  let cursor = databaseOffset;
+  for (let db = 0; db < 16; db++) {
+    if (db === DBType.MISSILE) missileOffset = cursor;
+    cursor += objectCounts[db] * (dbRecordSizes[db] ?? 0);
+  }
+
+  const missileCount = objectCounts[DBType.MISSILE] ?? 0;
+  if (missileOffset < 0 || missileCount <= 0) return null;
+
+  const start = startOffset + missileOffset;
+  const total = missileCount * (dbRecordSizes[DBType.MISSILE] ?? 0);
+  if (start + total > data.length) return null;
+
+  const records: MissileRecord[] = [];
+  for (let i = 0; i < missileCount; i++) {
+    const base = start + i * 8;
+    records.push({
+      nextObject: readU16BE(data, base),
+      projectileObject: readU16BE(data, base + 2),
+      rangeRemaining: data[base + 4] ?? 0,
+      damageRemaining: data[base + 5] ?? 0,
+      timerIndex: readU16BE(data, base + 6),
+    });
+  }
+
+  return records;
+}
+
+function locateExpoolRecord(expool: Uint32Array, key: number): number | null {
+  const hash = Math.imul(key, 0xbb40e62d) >>> 0;
+  let hashi = 32 + (hash >>> 27);
+  if ((expool[hashi] & 0x80000000) !== 0) {
+    hashi = ((expool[hashi] & 0x7fffffff) + ((hash >>> 21) & 0x3f)) >>> 0;
+  }
+
+  let guard = 0;
+  while (expool[hashi] !== 0) {
+    if (guard++ > expool.length) break;
+    const p = expool[hashi] >>> 0;
+    if (p + 1 >= expool.length) return null;
+    if ((expool[p + 1] >>> 0) === (key >>> 0)) {
+      const blockStart = p & 0xffffffc0;
+      if (blockStart >= expool.length) return null;
+      const size = expool[blockStart] & 0xffff;
+      if (size < 3) return null;
+      if (p + 2 >= expool.length) return null;
+      return expool[p + 2] >>> 0;
+    }
+    hashi = expool[hashi] >>> 0;
+    if (hashi >= expool.length) return null;
+  }
+
+  return null;
 }
 function unscramble(buf: Uint8Array, initialHash: number, numWords: number): number {
   let d7 = initialHash & 0xffff;
@@ -518,7 +717,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
 
   const timers = parseTimers(timersBuf, block2.maxTimers, timerSize);
 
-  unscrambleStream(
+  const { next: afterTimerQueue } = unscrambleStream(
     saveData,
     offset,
     block2.maxTimers * 2,
@@ -526,9 +725,13 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     block1.timerQueueChecksum
   );
 
+  const specialLocations = parseSpecialLocationsFromSaveData(saveData, afterTimerQueue, extended.indirectText);
+  const missiles = parseMissileRecordsFromSaveData(saveData, afterTimerQueue, extended.indirectText);
+
   return {
     item16,
     timers,
+    missiles: missiles ?? undefined,
     maxItem16: block2.maxItem16,
     maxTimers: block2.maxTimers,
     sequencedTimers,
@@ -537,12 +740,29 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     dsaLevelIndex: extended.dsaLevelIndex,
     dsaIndex: extended.dsaIndex,
     extendedWallDecorations: extended.extendedWallDecorations,
+    specialLocations: specialLocations ?? undefined,
   };
 }
 
 export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): void {
   dungeon.item16 = save.item16;
-  dungeon.timers = save.timers;
+  if (save.timers) {
+    dungeon.timerWord8Table = save.timers.map((rec) => rec.timerWord8 & 0xffff);
+  }
+  if (save.missiles) {
+    dungeon.databases.missiles.records = save.missiles.map((rec) => ({
+      nextObject: rec.nextObject,
+      projectileObject: rec.projectileObject,
+      rangeRemaining: rec.rangeRemaining,
+      damageRemaining: rec.damageRemaining,
+      timerIndex: rec.timerIndex,
+    }));
+    dungeon.databases.missiles.count = save.missiles.length & 0xffff;
+    dungeon.header.objectCounts[DBType.MISSILE] = save.missiles.length & 0xffff;
+  }
+  if (save.specialLocations) {
+    dungeon.specialLocations = save.specialLocations;
+  }
   if (save.dsaLevelIndex) {
     dungeon.dsaLevelIndex = save.dsaLevelIndex;
   }
@@ -584,9 +804,10 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const character = new Uint8Array(CHARACTER_SIZE);
 
   const timers = new Uint8Array(maxTimers * timerSize);
+  const timerRecords = save.timers ?? [];
   for (let i = 0; i < maxTimers; i++) {
     const base = i * timerSize;
-    const rec = save.timers[i];
+    const rec = timerRecords[i];
     if (!rec) continue;
     writeU16LE(timers, base + 8, rec.timerWord8 ?? 0);
   }

@@ -88,6 +88,7 @@ export interface Champion {
     alive: boolean;
     portraitGraphic?: ui16;     // Optional portrait index in graphic 26
     facing?: Direction;         // Optional facing for UI indicator
+    fingerprint?: ui16;         // CSBWin CHARDESC.fingerPrint (used for bones mapping)
     incantation: number[];     // Magic incantation bytes (ASCII)
     food: i16;                 // Signed food level (CSBWin uses negative for starving)
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)

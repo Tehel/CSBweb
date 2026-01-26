@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
@@ -30,8 +30,46 @@ import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
 import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
 
+const RN_FIREBALL = 0xff80;
+const RN_POISON = 0xff81;
+const RN_LIGHTNING = 0xff82;
+const RN_DISPELL_MISSILE = 0xff83;
+const RN_ZO_SPELL = 0xff84;
+const RN_POISON_BOLT = 0xff86;
+const RN_POISON_CLOUD = 0xff87;
+const RN_MONSTER_DEATH = 0xffa8;
+
+const POTION_VEN_POTION = 3;
+const POTION_FUL_BOMB = 19;
+
+const WEAPON_DAGGER = 8;
+const WEAPON_ARROW = 27;
+const WEAPON_SLAYER = 28;
+const WEAPON_POISON_DART = 31;
+const WEAPON_THROWING_STAR = 32;
+
 export interface TimerTables {
   monsterDesc?: ArrayLike<{ word2: number }>;
+}
+
+export interface LocationRel {
+  position: Position;
+  posInCell: number;
+}
+
+type MissileDropTarget = { monster: number } | null;
+
+export interface MissileTraceEvent {
+  stage: 'tick' | 'move' | 'drop' | 'expire' | 'encounter';
+  missile: number;
+  projectile: number;
+  position: Position;
+  posInCell: number;
+  direction: number;
+  range: number;
+  damage: number;
+  detail?: string;
+  hit?: boolean;
 }
 
 export interface TimerHooks {
@@ -57,6 +95,15 @@ export interface TimerHooks {
     damage: number;
     range: number;
   }) => boolean;
+  onMissileEncounterFilter?: (options: {
+    type: number;
+    position: Position;
+    posInCell: number;
+    missile: number;
+    projectile: number;
+    direction: number;
+    index: number;
+  }) => number;
   onSpawnMonster?: (options: {
     type: number;
     hitPointMultiplier: number;
@@ -74,10 +121,13 @@ export interface TimerHooks {
     mapX: number;
     mapY: number;
   }) => void;
+  onMissileTrace?: (event: MissileTraceEvent) => void;
   playSound?: (soundId: number, rateIdx?: number) => void;
 }
 
 export class TimerSystem {
+  private missileFilterObject = OBJECT_ID_EOF;
+  private missileFilterTimer: TimerEntry | null = null;
   constructor(
     private dungeon: DungeonState,
     private getPartyState: () => PartyState,
@@ -85,7 +135,9 @@ export class TimerSystem {
     private actuators: ActuatorSystem,
     private tables?: TimerTables,
     private hooks?: TimerHooks,
-  ) {}
+  ) {
+    this.dungeon.setTimerWord8Lookup((index) => this.timers.getTimerWord8(index));
+  }
 
   processTimers(currentTime: number): void {
     let processed = 0;
@@ -128,6 +180,9 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_DOOR:
         this.processDoor(timer);
+        break;
+      case TimerFunction.TT_VI_ALTAR:
+        this.processViAltar(timer);
         break;
       case TimerFunction.TT_DESSAGE:
         this.processOpenRoom(timer);
@@ -252,15 +307,16 @@ export class TimerSystem {
       nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
+    const cellFlag = map.cellFlags[target.x][target.y];
     if (nextAction === ActuatorAction.CLEAR) {
       if (this.isPartyAt(target) || this.isNonMaterialMonsterAt(target)) {
         timer.time = (timer.time + 1) >>> 0;
         this.timers.addTimer(timer);
         return;
       }
-      map.cellFlags[target.x][target.y] &= 0xfb;
+      this.setCellFlag(map, target.x, target.y, cellFlag & 0xfb);
     } else {
-      map.cellFlags[target.x][target.y] |= 0x04;
+      this.setCellFlag(map, target.x, target.y, cellFlag | 0x04);
     }
   }
 
@@ -278,11 +334,12 @@ export class TimerSystem {
       nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
+    const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
     if (nextAction === ActuatorAction.SET) {
-      map.cellFlags[timer.uByte6][timer.uByte7] |= 0x08;
+      this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
       this.wiggleEverything(timer.uByte6, timer.uByte7, timer.level);
     } else {
-      map.cellFlags[timer.uByte6][timer.uByte7] &= 0xf7;
+      this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag & 0xf7);
     }
   }
 
@@ -300,14 +357,15 @@ export class TimerSystem {
       nextAction = isSet ? ActuatorAction.CLEAR : ActuatorAction.SET;
     }
 
+    const cellFlag = map.cellFlags[timer.uByte6][timer.uByte7];
     if (nextAction === ActuatorAction.SET) {
-      const wasClosed = (map.cellFlags[timer.uByte6][timer.uByte7] & 0x08) === 0;
-      map.cellFlags[timer.uByte6][timer.uByte7] |= 0x08;
+      const wasClosed = (cellFlag & 0x08) === 0;
+      this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag | 0x08);
       if (wasClosed) {
         this.wiggleEverything(timer.uByte6, timer.uByte7, timer.level);
       }
     } else {
-      map.cellFlags[timer.uByte6][timer.uByte7] &= 0xf7;
+      this.setCellFlag(map, timer.uByte6, timer.uByte7, cellFlag & 0xf7);
     }
   }
 
@@ -522,25 +580,288 @@ export class TimerSystem {
     level: number,
     position: number,
     direction: number,
-    rangeEnergy: number,
-    damageEnergy: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    decayRate: number,
     startTime: number,
     missileDelay: boolean,
   ): boolean {
-    const eventIndex = this.allocateMissileTimerWord8(launchX, launchY, direction, 0);
-    const rn = this.createMissileRecord(projectileObject, rangeEnergy, damageEnergy, eventIndex, position);
+    const rn = this.createMissileRecord(projectileObject, rangeRemaining, damageRemaining, 0xffff, position);
     if (rn === null) return false;
     if (!this.dungeon.addObjectToCell(new Position(launchX, launchY, level), rn)) return false;
     const functionType = missileDelay ? TimerFunction.TT_MISSILE : TimerFunction.TT_MISSILE0;
-    this.timers.createTimer(functionType, launchX, launchY, 0, 0, (startTime + 1) >>> 0, level, rn);
+    const timerWord8 = this.encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
+    const entry = this.timers.createTimer(functionType, launchX, launchY, 0, 0, (startTime + 1) >>> 0, level, rn, timerWord8);
+    const missile = this.dungeon.getMissileRecord(rn);
+    if (missile) missile.timerIndex = entry.index & 0xffff;
     return true;
+  }
+
+  launchThrownMissile(
+    projectileObject: number,
+    position: Position,
+    posInCell: number,
+    direction: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    decayRate: number,
+    startTime: number,
+  ): boolean {
+    return this.launchMissile(
+      projectileObject,
+      position.x,
+      position.y,
+      position.z,
+      posInCell,
+      direction,
+      rangeRemaining,
+      damageRemaining,
+      decayRate,
+      startTime,
+      false,
+    );
+  }
+
+  launchDelayedMissile(
+    projectileObject: number,
+    position: Position,
+    posInCell: number,
+    direction: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    decayRate: number,
+    startTime: number,
+    delayTicks: number,
+  ): boolean {
+    const delay = Math.max(1, delayTicks | 0);
+    const scheduledTime = (startTime + delay - 1) >>> 0;
+    return this.launchMissile(
+      projectileObject,
+      position.x,
+      position.y,
+      position.z,
+      posInCell,
+      direction,
+      rangeRemaining,
+      damageRemaining,
+      decayRate,
+      scheduledTime,
+      true,
+    );
+  }
+
+  throwMissile(
+    missileType: number,
+    launchLocation: LocationRel,
+    direction: number,
+    objectLocation: LocationRel | null,
+    range: number,
+    damage: number,
+    decayRate: number,
+    startTime: number,
+  ): boolean {
+    if (!this.isValidLocation(launchLocation.position)) return false;
+
+    const missileTypeWord = missileType & 0xffff;
+    let projectileObject = OBJECT_ID_EOF;
+
+    if (missileTypeWord === 0) {
+      if (!objectLocation) return false;
+      if (!this.isValidLocation(objectLocation.position)) return false;
+      for (
+        let rn = this.dungeon.findFirstObject(objectLocation.position);
+        rn !== OBJECT_ID_EOF;
+        rn = this.dungeon.getDBRecordLink(rn)
+      ) {
+        const decoded = decodeObjectID(rn);
+        if (decoded.category <= DBType.CREATURE || decoded.category > DBType.MISC) continue;
+        if ((decoded.position & 0x3) !== (objectLocation.posInCell & 0x3)) continue;
+        this.dungeon.removeObjectFromCell(objectLocation.position, rn);
+        projectileObject = rn;
+        break;
+      }
+    } else {
+      projectileObject = missileTypeWord >= 0xff80 ? missileTypeWord : spellObjectId(missileTypeWord);
+    }
+
+    if (projectileObject === OBJECT_ID_EOF) return false;
+
+    return this.launchMissile(
+      projectileObject,
+      launchLocation.position.x,
+      launchLocation.position.y,
+      launchLocation.position.z,
+      launchLocation.posInCell & 0x3,
+      direction & 0x3,
+      range,
+      damage,
+      decayRate,
+      startTime,
+      false,
+    );
+  }
+
+  throwObjectFromHand(
+    projectileObject: number,
+    partyPosition: Position,
+    leftOrRight: number,
+    facing: number,
+    range: number,
+    damage: number,
+    decayRate: number,
+    startTime: number,
+  ): boolean {
+    const posInCell = (facing + (leftOrRight & 0x1)) & 0x3;
+    return this.launchMissile(
+      projectileObject,
+      partyPosition.x,
+      partyPosition.y,
+      partyPosition.z,
+      posInCell,
+      facing & 0x3,
+      range,
+      damage,
+      decayRate,
+      startTime,
+      false,
+    );
+  }
+
+  scheduleViAltar(bones: number, location: Position, posInCell: number, startTime: number): void {
+    this.queueViAltarTimer(bones, location, posInCell, 2, startTime);
+  }
+
+  private processViAltar(timer: TimerEntry): void {
+    const state = this.unpackViAltarState(timer.uByte5);
+    const pos = this.unpackViAltarPos(timer.uByte5);
+    const location = new Position(timer.uByte6, timer.uByte7, timer.level);
+    const bones = (timer.object ?? OBJECT_ID_EOF) as number;
+    if (bones === OBJECT_ID_EOF) return;
+
+    if (state === 2) {
+      this.queueViAltarTimer(bones, location, pos, 1, (timer.time + 5) >>> 0);
+      return;
+    }
+
+    if (state === 1) {
+      const target = this.findViAltarBones(bones, location, pos);
+      if (target === null) return;
+      let chIdx: number | null = null;
+      let consumeBonesRecord = false;
+      const fingerprint = this.dungeon.copyChampionBonesRecord(target);
+      if (fingerprint !== null) {
+        chIdx = this.findChampionIndexByFingerprint(fingerprint);
+        if (chIdx === null) return;
+        if (!this.isChampionDead(this.getPartyState().champions[chIdx])) return;
+        consumeBonesRecord = true;
+      } else {
+        chIdx = this.findViAltarChampionIndex();
+        if (chIdx === null) return;
+      }
+      if (!this.dungeon.removeObjectFromCell(location, target)) return;
+      this.dungeon.deleteDBEntry(target);
+      if (consumeBonesRecord) this.dungeon.getChampionBonesRecord(target);
+      this.queueViAltarTimer(bones, location, chIdx, 0, (timer.time + 1) >>> 0);
+      return;
+    }
+
+    if (state === 0) {
+      const chIdx = pos & 0x3;
+      this.reviveChampion(chIdx);
+    }
+  }
+
+  private queueViAltarTimer(
+    bones: number,
+    location: Position,
+    posInCell: number,
+    state: number,
+    time: number,
+  ): void {
+    const entry = this.timers.createTimer(
+      TimerFunction.TT_VI_ALTAR,
+      location.x,
+      location.y,
+      0,
+      0,
+      time >>> 0,
+      location.z,
+      bones,
+    );
+    entry.uByte5 = this.packViAltarByte(posInCell, state);
+    entry.uByte8 = 0;
+    entry.uByte9 = 0;
+  }
+
+  private packViAltarByte(pos: number, state: number): number {
+    return ((pos & 0x3) << 2) | (state & 0x3);
+  }
+
+  private unpackViAltarState(value: number): number {
+    return value & 0x3;
+  }
+
+  private unpackViAltarPos(value: number): number {
+    return (value >> 2) & 0x3;
+  }
+
+  private findViAltarBones(bones: number, location: Position, posInCell: number): number | null {
+    const target = bones as number;
+    for (let rn = this.dungeon.findFirstObject(location); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (rn !== target) continue;
+      const decoded = decodeObjectID(rn);
+      if ((decoded.position & 0x3) !== (posInCell & 0x3)) continue;
+      return rn;
+    }
+    return null;
+  }
+
+  private findViAltarChampionIndex(): number | null {
+    const party = this.getPartyState();
+    let candidate: number | null = null;
+    for (let i = 0; i < party.champions.length; i++) {
+      const champ = party.champions[i];
+      if (!champ) continue;
+      if (!this.isChampionDead(champ)) continue;
+      // CSBwin resolves bones to a specific champion; only revive when unambiguous here.
+      if (candidate !== null) return null;
+      candidate = i;
+    }
+    return candidate;
+  }
+
+  private findChampionIndexByFingerprint(fingerprint: number): number | null {
+    const party = this.getPartyState();
+    for (let i = 0; i < party.champions.length; i++) {
+      const champ = party.champions[i];
+      if (!champ) continue;
+      if ((champ.fingerprint ?? 0) === (fingerprint & 0xffff)) return i;
+    }
+    return null;
+  }
+
+  private isChampionDead(champ: PartyState['champions'][number]): boolean {
+    const health = champ.attributes?.health ?? 0;
+    if (health <= 0) return true;
+    return champ.alive === false;
+  }
+
+  private reviveChampion(chIdx: number): void {
+    const party = this.getPartyState();
+    const champ = party.champions[chIdx];
+    if (!champ) return;
+    const maxHealth = champ.attributes?.maxHealth ?? 0;
+    const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
+    champ.attributes.maxHealth = reducedMax;
+    champ.attributes.health = Math.floor(reducedMax / 2);
+    champ.alive = true;
   }
 
   private createMissileRecord(
     projectileObject: number,
-    rangeEnergy: number,
-    damageEnergy: number,
-    eventIndex: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    timerIndex: number,
     position: number,
   ): number | null {
     const data = this.dungeon.getData();
@@ -549,9 +870,9 @@ export class TimerSystem {
     data.databases.missiles.records.push({
       nextObject: OBJECT_ID_EOF,
       projectileObject: projectileObject & 0xffff,
-      rangeEnergy: rangeEnergy & 0xff,
-      damageEnergy: damageEnergy & 0xff,
-      eventIndex: eventIndex & 0xffff,
+      rangeRemaining: rangeRemaining & 0xff,
+      damageRemaining: damageRemaining & 0xff,
+      timerIndex: timerIndex & 0xffff,
     });
     data.databases.missiles.count++;
     data.header.objectCounts[DBType.MISSILE] = ((data.header.objectCounts[DBType.MISSILE] ?? 0) + 1) & 0xffff;
@@ -559,19 +880,6 @@ export class TimerSystem {
     return encodeObjectID(position & 0x3, DBType.MISSILE, index);
   }
 
-  private allocateMissileTimerWord8(
-    x: number,
-    y: number,
-    direction: number,
-    deltaEnergy: number,
-  ): number {
-    const data = this.dungeon.getData();
-    if (!data.timers) data.timers = [];
-    if (data.timers.length >= 0xffff) return 0xffff;
-    const word8 = ((x & 0x1f) | ((y & 0x1f) << 5) | ((direction & 0x3) << 10) | ((deltaEnergy & 0xf) << 12)) & 0xffff;
-    data.timers.push({ timerWord8: word8 });
-    return data.timers.length - 1;
-  }
 
   private setDoorState(map: MapData, x: number, y: number, doorState: number): void {
     const cellFlag = map.cellFlags[x][y];
@@ -582,10 +890,31 @@ export class TimerSystem {
     tile.attributes = newCellFlag & 0x0f;
   }
 
+  private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {
+    map.cellFlags[x][y] = cellFlag;
+    const tile = map.tiles[x]?.[y];
+    if (!tile) return;
+    tile.cellFlag = cellFlag;
+    tile.attributes = cellFlag & 0x0f;
+    tile.roomType = (cellFlag >> 5) & 0x7;
+    tile.hasObjects = (cellFlag & 0x10) !== 0;
+  }
+
   private isPartyAt(position: Position): boolean {
     const party = this.getPartyState();
     const pos = party.position;
     return pos.x === position.x && pos.y === position.y && pos.z === position.z;
+  }
+
+  private getPartyIndexAtPosition(posInCell: number): number {
+    const target = posInCell & 0x3;
+    const party = this.getPartyState();
+    for (let i = 0; i < party.champions.length; i++) {
+      const champ = party.champions[i];
+      if (!champ.alive) continue;
+      if ((champ.partyPosition & 0x3) === target) return i;
+    }
+    return -1;
   }
 
   private isNonMaterialMonsterAt(position: Position): boolean {
@@ -781,6 +1110,7 @@ export class TimerSystem {
       dir,
       energyRemaining,
       100,
+      0,
       timer.time,
       true,
     );
@@ -796,6 +1126,7 @@ export class TimerSystem {
         dir,
         energyRemaining,
         100,
+        0,
         timer.time,
         true,
       );
@@ -816,144 +1147,765 @@ export class TimerSystem {
     if (missileRn === OBJECT_ID_EOF) return;
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
-    const word8 = this.getMissileTimerWord8(missile);
-    if (word8 === null) return;
 
-    const map = this.dungeon.getMap(timer.level);
-    if (!map) return;
+    if (this.missileFilterObject !== OBJECT_ID_EOF) {
+      throw new Error('MissileFilter already active');
+    }
 
-    const { x: origMapX, y: origMapY, dir: missileDir, deltaEnergy } = this.decodeMissileTimerWord8(word8);
+    this.missileFilterObject = missileRn;
+    this.missileFilterTimer = timer;
+
     const decoded = decodeObjectID(missileRn);
-    let curPos = decoded.position & 0x3;
+    const word8 = timer.timerWord8 & 0xffff;
+    const { x: origMapX, y: origMapY, dir: initialDir, deltaEnergy } = this.decodeMissileTimerWord8(word8);
     let curMapX = origMapX;
     let curMapY = origMapY;
+    const initialPosInCell = decoded.position & 0x3;
+    this.emitMissileTrace({
+      stage: 'tick',
+      missile: missileRn,
+      projectile: missile.projectileObject & 0xffff,
+      position: new Position(curMapX, curMapY, timer.level),
+      posInCell: initialPosInCell,
+      direction: initialDir & 0x3,
+      range: missile.rangeRemaining & 0xff,
+      damage: missile.damageRemaining & 0xff,
+      detail: timer.function === TimerFunction.TT_MISSILE0 ? 'missile0' : undefined,
+    });
 
     if (timer.function === TimerFunction.TT_MISSILE0) {
       timer.function = TimerFunction.TT_MISSILE;
     } else {
+      const curPos = decoded.position & 0x3;
       const current = new Position(curMapX, curMapY, timer.level);
-      if (this.isPartyAt(current) && this.hooks?.onMissileHitParty) {
-        const consumed = this.hooks.onMissileHitParty({
-          missile: missileRn,
-          projectile: missile.projectileObject,
-          position: current,
-          posInCell: curPos,
-          direction: missileDir,
-          damage: missile.damageEnergy & 0xff,
-          range: missile.rangeEnergy & 0xff,
-        });
-        if (consumed) {
-          this.finishMissile(missileRn, missile, current, curPos);
+      if (this.isPartyAt(current)) {
+        if (this.processMissileEncounter(-2, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+          this.clearMissileFilterState();
           return;
         }
       }
 
       const monster = this.findFirstMonsterAt(current);
-      if (monster !== null && this.hooks?.onMissileHitMonster) {
-        const consumed = this.hooks.onMissileHitMonster({
+      if (monster !== null) {
+        if (this.processMissileEncounter(-1, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+          this.clearMissileFilterState();
+          return;
+        }
+      }
+
+      if ((missile.rangeRemaining & 0xff) <= deltaEnergy) {
+        const filterProjectile = missile.projectileObject & 0xffff;
+        this.missileEncounterFilter(5, current, curPos, missileRn, filterProjectile, -1);
+        this.emitMissileTrace({
+          stage: 'expire',
           missile: missileRn,
-          projectile: missile.projectileObject,
-          monster,
+          projectile: missile.projectileObject & 0xffff,
           position: current,
           posInCell: curPos,
-          direction: missileDir,
-          damage: missile.damageEnergy & 0xff,
-          range: missile.rangeEnergy & 0xff,
+          direction: initialDir & 0x3,
+          range: missile.rangeRemaining & 0xff,
+          damage: missile.damageRemaining & 0xff,
+          detail: 'range',
+          hit: true,
         });
-        if (consumed) {
-          this.finishMissile(missileRn, missile, current, curPos);
-          return;
-        }
+        this.processObjectFromMissile(missileRn, null, current, curPos);
+        this.clearMissileFilterState();
+        return;
       }
-      if (deltaEnergy > 0) {
-        if ((missile.rangeEnergy & 0xff) <= deltaEnergy) {
-          this.finishMissile(missileRn, missile, new Position(curMapX, curMapY, timer.level), curPos);
-          return;
-        }
-        missile.rangeEnergy = (missile.rangeEnergy - deltaEnergy) & 0xff;
-        if ((missile.damageEnergy & 0xff) <= deltaEnergy) {
-          missile.damageEnergy = 0;
-        } else {
-          missile.damageEnergy = (missile.damageEnergy - deltaEnergy) & 0xff;
-        }
-      }
-    }
 
-    const leavingThisCell = (missileDir === curPos) || (((missileDir + 1) & 0x3) === curPos);
-    let blocked = false;
-
-    if (leavingThisCell) {
-      const nextX = curMapX + (missileDir === 1 ? 1 : missileDir === 3 ? -1 : 0);
-      const nextY = curMapY + (missileDir === 2 ? 1 : missileDir === 0 ? -1 : 0);
-      if (nextX < 0 || nextY < 0 || nextX >= map.descriptor.width || nextY >= map.descriptor.height) {
-        blocked = true;
+      missile.rangeRemaining = (missile.rangeRemaining - deltaEnergy) & 0xff;
+      if ((missile.damageRemaining & 0xff) <= deltaEnergy) {
+        missile.damageRemaining = 0;
       } else {
-        const nextCellFlag = map.cellFlags[nextX][nextY];
-        const nextRoomType = (nextCellFlag >> 5) & 0x7;
-        const origCellFlag = map.cellFlags[curMapX][curMapY];
-        const origRoomType = (origCellFlag >> 5) & 0x7;
-        const nextIsStone = nextRoomType === RoomType.STONE;
-        const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
-        const falseWallIsSolid = (nextCellFlag & 0x5) === 0;
-        const nextIsStairs = nextRoomType === RoomType.STAIRS;
-        const origIsStairs = origRoomType === RoomType.STAIRS;
-        if (nextIsStone || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
-          blocked = true;
-        } else {
-          curMapX = nextX;
-          curMapY = nextY;
-        }
+        missile.damageRemaining = (missile.damageRemaining - deltaEnergy) & 0xff;
       }
     }
 
-    if (blocked) {
-      this.finishMissile(missileRn, missile, new Position(origMapX, origMapY, timer.level), curPos);
-      return;
+    let missileDir = initialDir & 0x3;
+    let curPos = decoded.position & 0x3;
+    let leavingThisCell = false;
+    let nextRoomType: number = RoomType.OPEN;
+    let outOfBounds = false;
+
+    do {
+      missileDir = (timer.timerWord8 >> 10) & 0x3;
+      curPos = decodeObjectID(this.missileFilterObject).position & 0x3;
+      leavingThisCell = (missileDir === curPos) || (((missileDir + 1) & 3) === curPos);
+      curMapX = origMapX;
+      curMapY = origMapY;
+      outOfBounds = false;
+
+      if (leavingThisCell) {
+        curMapX += missileDir === 1 ? 1 : missileDir === 3 ? -1 : 0;
+        curMapY += missileDir === 2 ? 1 : missileDir === 0 ? -1 : 0;
+
+        const map = this.dungeon.getMap(timer.level);
+        if (!map || curMapX < 0 || curMapY < 0 || curMapX >= map.descriptor.width || curMapY >= map.descriptor.height) {
+          nextRoomType = 8;
+          outOfBounds = true;
+        } else {
+          const nextCellFlags = map.cellFlags[curMapX][curMapY];
+          nextRoomType = (nextCellFlags >> 5) & 0x7;
+          const origCellFlags = map.cellFlags[origMapX][origMapY];
+          const nextIsStoneWall = nextRoomType === RoomType.STONE;
+          const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
+          const falseWallIsSolid = (nextCellFlags & 0x5) === 0;
+          const nextIsStairs = nextRoomType === RoomType.STAIRS;
+          const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
+          if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
+            if (this.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, curPos, missileRn)) {
+              this.clearMissileFilterState();
+              return;
+            }
+          }
+        }
+      }
+    } while (((timer.timerWord8 >> 10) & 0x3) !== missileDir);
+
+    if ((missileDir & 1) === (curPos & 1)) {
+      curPos = (curPos + 3) & 0x3;
+    } else {
+      curPos = (curPos + 1) & 0x3;
     }
-
-    const parityMatch = (missileDir & 0x1) === (curPos & 0x1);
-    curPos = parityMatch ? (curPos + 3) & 0x3 : (curPos + 1) & 0x3;
-
-    const oldPos = new Position(origMapX, origMapY, timer.level);
-    const newPos = new Position(curMapX, curMapY, timer.level);
-    const newRn = encodeObjectID(curPos & 0x3, DBType.MISSILE, decoded.index);
 
     if (leavingThisCell) {
+      if (outOfBounds) {
+        const dropPos = new Position(origMapX, origMapY, timer.level);
+        this.emitMissileTrace({
+          stage: 'drop',
+          missile: missileRn,
+          projectile: missile.projectileObject & 0xffff,
+          position: dropPos,
+          posInCell: curPos,
+          direction: missileDir & 0x3,
+          range: missile.rangeRemaining & 0xff,
+          damage: missile.damageRemaining & 0xff,
+          detail: 'out-of-bounds',
+        });
+        this.processObjectFromMissile(missileRn, null, dropPos, curPos);
+        this.clearMissileFilterState();
+        return;
+      }
+
+      const oldPos = new Position(origMapX, origMapY, timer.level);
+      const moveResult = this.moveMissileToCell(new Position(curMapX, curMapY, timer.level), curPos, missileDir);
+      const newPosInCell = moveResult.posInCell & 0x3;
+      const newDir = moveResult.dir & 0x3;
+      const newPos = moveResult.position;
+      const newRn = encodeObjectID(newPosInCell, DBType.MISSILE, decoded.index);
+
       this.dungeon.removeObjectFromCell(oldPos, missileRn);
-      if (!this.dungeon.addObjectToCell(newPos, newRn)) return;
+      if (!this.dungeon.addObjectToCell(newPos, newRn)) {
+        this.clearMissileFilterState();
+        return;
+      }
+
       timer.object = newRn;
-      timer.uByte6 = curMapX & 0xff;
-      timer.uByte7 = curMapY & 0xff;
-      const updatedWord8 = this.encodeMissileTimerWord8(curMapX, curMapY, missileDir, deltaEnergy);
-      this.setMissileTimerWord8(missile, updatedWord8);
+      this.missileFilterObject = newRn;
+      timer.uByte6 = newPos.x & 0xff;
+      timer.uByte7 = newPos.y & 0xff;
+      timer.level = newPos.z & 0xff;
+      timer.timerWord8 = this.encodeMissileTimerWord8(newPos.x, newPos.y, newDir, deltaEnergy);
+      this.emitMissileTrace({
+        stage: 'move',
+        missile: newRn,
+        projectile: missile.projectileObject & 0xffff,
+        position: newPos,
+        posInCell: newPosInCell,
+        direction: newDir & 0x3,
+        range: missile.rangeRemaining & 0xff,
+        damage: missile.damageRemaining & 0xff,
+      });
     } else {
-      const cellFlag = map.cellFlags[curMapX][curMapY];
-      const roomType = (cellFlag >> 5) & 0x7;
-      if (roomType === RoomType.DOOR) {
-        const doorState = cellFlag & 0x7;
-        if (doorState !== 0 && doorState !== 5) {
-          this.finishMissile(missileRn, missile, oldPos, curPos);
-          return;
+      const map = this.dungeon.getMap(timer.level);
+      if (map) {
+        const cellFlag = map.cellFlags[curMapX][curMapY];
+        if (((cellFlag >> 5) & 0x7) === RoomType.DOOR) {
+          if (this.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+            this.clearMissileFilterState();
+            return;
+          }
         }
       }
+
+      const oldPos = new Position(curMapX, curMapY, timer.level);
+      const newRn = encodeObjectID(curPos & 0x3, DBType.MISSILE, decoded.index);
       this.dungeon.removeObjectFromCell(oldPos, missileRn);
-      if (!this.dungeon.addObjectToCell(oldPos, newRn)) return;
+      if (!this.dungeon.addObjectToCell(oldPos, newRn)) {
+        this.clearMissileFilterState();
+        return;
+      }
       timer.object = newRn;
+      this.missileFilterObject = newRn;
     }
 
     timer.time = (timer.time + 1) >>> 0;
     this.timers.addTimer(timer);
+    missile.timerIndex = timer.index & 0xffff;
+    this.clearMissileFilterState();
   }
 
-  private finishMissile(
+  checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: number | null): void {
+    if (this.missileFilterObject !== OBJECT_ID_EOF) return;
+
+    const party = this.getPartyState();
+    const movedObjectType = movedObject === null ? -2 : -1;
+    const whoLeavesCell = [0, 0, 0, 0];
+    const whoLeavesNewCell = [0, 0, 0, 0];
+
+    if (movedObject === null) {
+      for (const champion of party.champions) {
+        if (!champion.alive) continue;
+        const pos = champion.partyPosition & 0x3;
+        whoLeavesCell[pos] = (pos + 1) & 0xff;
+      }
+    } else {
+      const decoded = decodeObjectID(movedObject);
+      if (decoded.category !== DBType.CREATURE) return;
+      if (oldPos.z !== party.position.z) return;
+      const monster = this.dungeon.getCreatureRecord(movedObject);
+      if (!monster) return;
+      const hasHp = (monster.hp ?? []).some((hp) => (hp ?? 0) > 0);
+      if (!hasHp) return;
+      for (let pos = 0; pos < 4; pos++) {
+        if (this.ordinalOfMonsterAtPosition(monster, pos) !== 0) {
+          whoLeavesCell[pos] = (pos + 1) & 0xff;
+        }
+      }
+    }
+
+    let numCellsToTry = 1;
+    const sameLevelNewPos = newPos && newPos.z === oldPos.z ? newPos : null;
+    if (sameLevelNewPos) {
+      const distanceTraveled = Math.abs(oldPos.x - sameLevelNewPos.x) + Math.abs(oldPos.y - sameLevelNewPos.y);
+      if (distanceTraveled === 1) {
+        const headPosLeft = this.primaryDirectionFromMove(oldPos, sameLevelNewPos);
+        const headPosRight = (headPosLeft + 1) & 0x3;
+        const tailPosLeft = (headPosLeft + 3) & 0x3;
+        const tailPosRight = (headPosLeft + 2) & 0x3;
+
+        if (whoLeavesCell[headPosLeft]) {
+          whoLeavesNewCell[tailPosLeft] = whoLeavesCell[headPosLeft];
+          numCellsToTry = 2;
+        } else {
+          whoLeavesCell[headPosLeft] = whoLeavesCell[tailPosLeft];
+        }
+
+        if (whoLeavesCell[headPosRight]) {
+          whoLeavesNewCell[tailPosRight] = whoLeavesCell[headPosRight];
+          numCellsToTry = 2;
+        } else {
+          whoLeavesCell[headPosRight] = whoLeavesCell[tailPosRight];
+        }
+      }
+    }
+
+    let missileX = oldPos.x;
+    let missileY = oldPos.y;
+    const level = oldPos.z;
+
+    for (let cellIdx = 0; cellIdx < numCellsToTry; cellIdx++) {
+      let timerDeleted = true;
+      while (timerDeleted) {
+        timerDeleted = false;
+        const missiles = this.findMissilesAt(new Position(missileX, missileY, level));
+        for (const missileRn of missiles) {
+          const missile = this.dungeon.getMissileRecord(missileRn);
+          if (!missile) continue;
+          const timer = this.timers.getTimer(missile.timerIndex);
+          if (!timer) continue;
+          if (timer.function === TimerFunction.TT_MISSILE0) continue;
+          const missilePos = decodeObjectID(missileRn).position & 0x3;
+          const leaving = whoLeavesCell[missilePos];
+          if (leaving === 0) continue;
+
+          this.missileFilterObject = missileRn;
+          this.missileFilterTimer = timer;
+          const hit = this.processMissileEncounter(
+            movedObjectType,
+            oldPos.x,
+            oldPos.y,
+            missileX,
+            missileY,
+            (leaving - 1) & 0xff,
+            missileRn,
+          );
+          this.clearMissileFilterState();
+
+          if (hit) {
+            this.timers.deleteTimer(missile.timerIndex);
+            timerDeleted = true;
+            break;
+          }
+        }
+      }
+
+      if (numCellsToTry > 1 && cellIdx === 0 && sameLevelNewPos) {
+        missileX = sameLevelNewPos.x;
+        missileY = sameLevelNewPos.y;
+        for (let i = 0; i < 4; i++) whoLeavesCell[i] = whoLeavesNewCell[i];
+      }
+    }
+  }
+
+  private moveMissileToCell(
+    position: Position,
+    posInCell: number,
+    direction: number,
+  ): { position: Position; posInCell: number; dir: number } {
+    const result = this.resolveCellEffects(position, DBType.MISSILE, posInCell, 0, direction, false);
+    return {
+      position: result.position,
+      posInCell: result.objectPos & 0x3,
+      dir: result.missileDir ?? direction,
+    };
+  }
+
+  private processMissileEncounter(
+    cellType: number,
+    objX: number,
+    objY: number,
+    missileX: number,
+    missileY: number,
+    objectPos: number,
     missileRn: number,
-    missile: { projectileObject: number },
+  ): boolean {
+    const missile = this.dungeon.getMissileRecord(missileRn);
+    if (!missile) return false;
+    const position = new Position(missileX, missileY, this.missileFilterTimer?.level ?? 0);
+    const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
+    const filterProjectile = missile.projectileObject & 0xffff;
+    let projectile = missile.projectileObject & 0xffff;
+    let projectileDbType = this.isMagicSpell(projectile)
+      ? DBType.CLOUD
+      : decodeObjectID(projectile).category;
+
+    let convertedPotion = false;
+    let convertedPower = 0;
+    let convertedProjectile = projectile;
+
+    if (projectileDbType === DBType.POTION) {
+      const potion = this.dungeon.getPotionRecord(projectile as number);
+      if (potion) {
+        if ((potion.potionType | 0) === POTION_VEN_POTION) {
+          convertedProjectile = RN_POISON_CLOUD;
+          convertedPower = potion.power & 0xff;
+          convertedPotion = true;
+        } else if ((potion.potionType | 0) === POTION_FUL_BOMB) {
+          convertedProjectile = RN_FIREBALL;
+          convertedPower = potion.power & 0xff;
+          convertedPotion = true;
+        }
+      }
+    }
+
+    if (convertedPotion) {
+      projectile = convertedProjectile & 0xffff;
+      projectileDbType = DBType.CLOUD;
+    }
+
+    const nonPoisonSpell =
+      projectileDbType === DBType.CLOUD &&
+      projectile !== RN_POISON &&
+      projectile !== RN_POISON_BOLT;
+
+    let absorbedMonster: number | null = null;
+    const traceEncounter = (hit: boolean, detail: string): boolean => {
+      this.emitMissileTrace({
+        stage: 'encounter',
+        missile: missileRn,
+        projectile,
+        position,
+        posInCell: objectPos,
+        direction,
+        range: missile.rangeRemaining & 0xff,
+        damage: missile.damageRemaining & 0xff,
+        detail,
+        hit,
+      });
+      return hit;
+    };
+
+    switch (cellType) {
+      case RoomType.FALSEWALL:
+        if (this.missileEncounterFilter(3, position, objectPos, missileRn, filterProjectile, -1) === 1) {
+          return traceEncounter(false, 'falsewall-filter');
+        }
+        break;
+      case RoomType.STONE:
+        if (this.missileEncounterFilter(4, position, objectPos, missileRn, filterProjectile, -1) === 1) {
+          return traceEncounter(false, 'stone-filter');
+        }
+        break;
+      case 8:
+        this.missileEncounterFilter(6, position, objectPos, missileRn, filterProjectile, -1);
+        break;
+      case RoomType.DOOR: {
+        const map = this.dungeon.getMap(position.z);
+        if (!map) return false;
+        const cellFlag = map.cellFlags[objX]?.[objY] ?? 0;
+        const doorState = cellFlag & 0x7;
+        const doorRn = this.dungeon.findFirstDoor(new Position(objX, objY, position.z));
+        const door = doorRn !== OBJECT_ID_EOF ? this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index) : null;
+
+        if (doorState !== 5 && projectile === RN_ZO_SPELL && door?.hasButton) {
+          const time = (this.missileFilterTimer?.time ?? 0) + 1;
+          this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, time >>> 0, position.z);
+        }
+
+        if (doorState === 5 || doorState <= 1) {
+          return traceEncounter(false, `door-pass state=${doorState}`);
+        }
+        if (this.missileEncounterFilter(2, position, objectPos, missileRn, filterProjectile, -1) === 1) {
+          return traceEncounter(false, 'door-filter');
+        }
+        this.emitMissileTrace({
+          stage: 'encounter',
+          missile: missileRn,
+          projectile,
+          position,
+          posInCell: objectPos,
+          direction,
+          range: missile.rangeRemaining & 0xff,
+          damage: missile.damageRemaining & 0xff,
+          detail: 'door-hit',
+          hit: true,
+        });
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+      }
+      case -2: {
+        const partyIndex = this.getPartyIndexAtPosition(objectPos);
+        if (this.missileEncounterFilter(7, position, objectPos, missileRn, filterProjectile, partyIndex) === 1) {
+          return traceEncounter(false, 'party-filter');
+        }
+        if (this.hooks?.onMissileHitParty) {
+          const consumed = this.hooks.onMissileHitParty({
+            missile: missileRn,
+            projectile,
+            position,
+            posInCell: objectPos,
+            direction,
+            damage: missile.damageRemaining & 0xff,
+            range: missile.rangeRemaining & 0xff,
+          });
+          if (!consumed) return traceEncounter(false, 'party-ignored');
+        }
+        this.emitMissileTrace({
+          stage: 'encounter',
+          missile: missileRn,
+          projectile,
+          position,
+          posInCell: objectPos,
+          direction,
+          range: missile.rangeRemaining & 0xff,
+          damage: missile.damageRemaining & 0xff,
+          detail: 'party-hit',
+          hit: true,
+        });
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+      }
+      case -1: {
+        const monsterRn = this.findFirstMonsterAt(position);
+        if (monsterRn === null) return traceEncounter(false, 'monster-missing');
+        const monster = this.dungeon.getCreatureRecord(monsterRn);
+        if (monster) {
+          const monsterOrdinal = this.ordinalOfMonsterAtPosition(monster, objectPos);
+          const filterIndex = monsterOrdinal > 0 ? monsterOrdinal - 1 : -1;
+          if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, filterIndex) === 1) {
+            return traceEncounter(false, 'monster-filter');
+          }
+          const desc = this.tables?.monsterDesc?.[monster.creatureType];
+          const nonMaterial = desc ? (desc.word2 & 0x40) !== 0 : false;
+          const absorbs = desc ? (desc.word2 & 0x400) !== 0 : false;
+          if (nonMaterial && projectile !== RN_DISPELL_MISSILE) return traceEncounter(false, 'monster-immune');
+
+          if (projectileDbType === DBType.WEAPON && absorbs) {
+            const weapon = this.dungeon.getWeaponRecord(projectile as number);
+            if (weapon) {
+              const wt = weapon.weaponType | 0;
+              if (
+                wt === WEAPON_DAGGER ||
+                wt === WEAPON_ARROW ||
+                wt === WEAPON_SLAYER ||
+                wt === WEAPON_POISON_DART ||
+                wt === WEAPON_THROWING_STAR
+              ) {
+                absorbedMonster = monsterRn;
+              }
+            }
+          }
+        }
+
+        if (this.hooks?.onMissileHitMonster) {
+          const consumed = this.hooks.onMissileHitMonster({
+            missile: missileRn,
+            projectile,
+            monster: monsterRn,
+            position,
+            posInCell: objectPos,
+            direction,
+            damage: missile.damageRemaining & 0xff,
+            range: missile.rangeRemaining & 0xff,
+          });
+          if (!consumed) return traceEncounter(false, 'monster-ignored');
+        }
+        this.emitMissileTrace({
+          stage: 'encounter',
+          missile: missileRn,
+          projectile,
+          position,
+          posInCell: objectPos,
+          direction,
+          range: missile.rangeRemaining & 0xff,
+          damage: missile.damageRemaining & 0xff,
+          detail: absorbedMonster ? 'monster-hit absorb' : 'monster-hit',
+          hit: true,
+        });
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+      }
+      default:
+        break;
+    }
+
+    this.emitMissileTrace({
+      stage: 'encounter',
+      missile: missileRn,
+      projectile,
+      position,
+      posInCell: objectPos,
+      direction,
+      range: missile.rangeRemaining & 0xff,
+      damage: missile.damageRemaining & 0xff,
+      detail: `room-${cellType}`,
+      hit: true,
+    });
+    return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+  }
+
+  private processObjectFromMissile(
+    missileRn: number,
+    dest: MissileDropTarget,
     position: Position,
     posInCell: number,
   ): void {
+    const missile = this.dungeon.getMissileRecord(missileRn);
+    if (!missile) return;
+    const projectile = missile.projectileObject & 0xffff;
+    const projectileIsMagic = this.isMagicSpell(projectile);
+    const projectileDbType = projectileIsMagic ? DBType.CLOUD : decodeObjectID(projectile).category;
+
     this.dungeon.removeObjectFromCell(position, missileRn as number);
-    this.dropMissileObject(missile.projectileObject, position, posInCell);
+
+    if (!projectileIsMagic && projectileDbType !== DBType.CLOUD) {
+      if (dest && dest.monster !== OBJECT_ID_EOF) {
+        this.addObjectToMonsterPossession(dest.monster, projectile);
+      } else {
+        this.dropMissileObject(projectile, position, posInCell);
+      }
+    }
+
     this.dungeon.deleteDBEntry(missileRn as number);
+  }
+
+  private missileEncounterFilter(
+    type: number,
+    position: Position,
+    posInCell: number,
+    missile: number,
+    projectile: number,
+    index: number,
+  ): number {
+    const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
+    if (!this.hooks?.onMissileEncounterFilter) return 0;
+    return this.hooks.onMissileEncounterFilter({
+      type,
+      position,
+      posInCell: posInCell & 0x3,
+      missile,
+      projectile,
+      direction,
+      index,
+    }) | 0;
+  }
+
+  private emitMissileTrace(event: MissileTraceEvent): void {
+    if (!this.hooks?.onMissileTrace) return;
+    this.hooks.onMissileTrace({
+      ...event,
+      posInCell: event.posInCell & 0x3,
+      direction: event.direction & 0x3,
+      range: event.range & 0xff,
+      damage: event.damage & 0xff,
+    });
+  }
+
+  private clearMissileFilterState(): void {
+    this.missileFilterObject = OBJECT_ID_EOF;
+    this.missileFilterTimer = null;
+  }
+
+  private findMissilesAt(position: Position): number[] {
+    const missiles: number[] = [];
+    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      const decoded = decodeObjectID(rn);
+      if (decoded.category === DBType.MISSILE) missiles.push(rn);
+    }
+    return missiles;
+  }
+
+  private primaryDirectionFromMove(oldPos: Position, newPos: Position): number {
+    if (newPos.x > oldPos.x) return Direction.EAST;
+    if (newPos.x < oldPos.x) return Direction.WEST;
+    if (newPos.y > oldPos.y) return Direction.SOUTH;
+    return Direction.NORTH;
+  }
+
+  private ordinalOfMonsterAtPosition(monster: CreatureRecord, pos: number): number {
+    const render = this.dungeon.getMonsterRenderState(monster);
+    const positions = render.positions & 0xff;
+    if (positions === 0xff) return 1;
+    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const horizontalSize = desc ? (desc.word2 & 0x3) : 0;
+    const numMonM1 = monster.count & 0x3;
+    let checkPos = pos & 0x3;
+
+    if (horizontalSize === 1) {
+      const facing = render.facings & 0xff;
+      if (((facing & 1) !== 0) === ((checkPos & 1) !== 0)) {
+        checkPos = (checkPos + 3) & 0x3;
+      }
+      for (let idx = numMonM1; idx >= 0; idx--) {
+        const monsterPos = (positions >> (idx * 2)) & 0x3;
+        if (monsterPos === checkPos || monsterPos === ((checkPos + 1) & 0x3)) return idx + 1;
+      }
+      return 0;
+    }
+
+    for (let idx = numMonM1; idx >= 0; idx--) {
+      const monsterPos = (positions >> (idx * 2)) & 0x3;
+      if (monsterPos === checkPos) return idx + 1;
+    }
+    return 0;
+  }
+
+  private finishMissileEncounter(
+    missileRn: number,
+    destMonster: number | null,
+    position: Position,
+    objectPos: number,
+    projectile: number,
+    convertedPotion: boolean,
+    convertedPower: number,
+    nonPoisonSpell: boolean,
+    objX: number,
+    objY: number,
+  ): boolean {
+    const missile = this.dungeon.getMissileRecord(missileRn);
+    if (!missile) return false;
+    const dest: MissileDropTarget = destMonster !== null ? { monster: destMonster } : null;
+
+    if (nonPoisonSpell || convertedPotion) {
+      let size = convertedPotion ? convertedPower : (missile.rangeRemaining & 0xff);
+      if (projectile === RN_LIGHTNING) {
+        size = Math.floor(size / 2);
+        if (size <= 0) {
+          this.processObjectFromMissile(missileRn, dest, position, objectPos);
+          return true;
+        }
+      }
+      const cloudPos = projectile === RN_POISON_CLOUD ? 255 : objectPos & 0xff;
+      this.createCloud(projectile, size, objX, objY, position, cloudPos);
+    } else {
+      this.playMissileImpactSound(projectile);
+    }
+
+    if (convertedPotion) {
+      this.dungeon.deleteDBEntry(missile.projectileObject);
+      missile.projectileObject = projectile & 0xffff;
+    }
+
+    this.processObjectFromMissile(missileRn, dest, position, objectPos);
+    return true;
+  }
+
+  private createCloud(
+    projectile: number,
+    size: number,
+    objX: number,
+    objY: number,
+    position: Position,
+    posInCell: number,
+  ): void {
+    if (objX < 0 || objY < 0) return;
+    const rn = this.createCloudRecord(projectile, size, posInCell);
+    if (rn === null) return;
+    this.dungeon.addObjectToCell(position, rn);
+    this.playCloudSound(projectile, size);
+  }
+
+  private createCloudRecord(projectile: number, size: number, posInCell: number): number | null {
+    const data = this.dungeon.getData();
+    const maxIndex = 1023;
+    if (data.databases.clouds.records.length >= maxIndex + 1) return null;
+    const cloudType = projectile & 0x7f;
+    const bit7 = (posInCell & 0xff) === 255;
+    data.databases.clouds.records.push({
+      nextObject: OBJECT_ID_EOF,
+      value: size & 0xff,
+      cloudType: cloudType & 0x7f,
+      bit7,
+    });
+    data.databases.clouds.count++;
+    data.header.objectCounts[DBType.CLOUD] = ((data.header.objectCounts[DBType.CLOUD] ?? 0) + 1) & 0xffff;
+    const index = data.databases.clouds.records.length - 1;
+    return encodeObjectID(bit7 ? 0 : (posInCell & 0x3), DBType.CLOUD, index);
+  }
+
+  private playMissileImpactSound(projectile: number): void {
+    if (!this.hooks?.playSound) return;
+    if (!this.isMagicSpell(projectile) && decodeObjectID(projectile).category === DBType.WEAPON) {
+      this.hooks.playSound(SoundIndex.FALLING_ITEM);
+      return;
+    }
+    if (projectile === RN_POISON_BOLT) {
+      this.hooks.playSound(SoundIndex.SPELL_EXPLODE);
+      return;
+    }
+    this.hooks.playSound(SoundIndex.FIREBALL_EXPLODE);
+  }
+
+  private playCloudSound(projectile: number, size: number): void {
+    if (!this.hooks?.playSound) return;
+    if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
+      this.hooks.playSound(size > 80 ? SoundIndex.FIREBALL_EXPLODE : SoundIndex.SPELL_EXPLODE);
+      return;
+    }
+    if (projectile !== RN_MONSTER_DEATH) {
+      this.hooks.playSound(SoundIndex.SPELL_EXPLODE);
+    }
+  }
+
+  private isMagicSpell(objectId: number): boolean {
+    return (objectId & 0xffff) >= RN_FIREBALL;
+  }
+
+  private addObjectToMonsterPossession(monsterRn: number, objectRn: number): void {
+    const monster = this.dungeon.getCreatureRecord(monsterRn as number);
+    if (!monster) return;
+    const head = monster.possession ?? OBJECT_ID_EOF;
+    if (head === OBJECT_ID_EOF || head === OBJECT_ID_NULL) {
+      monster.possession = objectRn as number;
+      this.dungeon.setDBRecordLink(objectRn as number, OBJECT_ID_EOF);
+      return;
+    }
+    let current = head;
+    for (;;) {
+      const next = this.dungeon.getDBRecordLink(current as number);
+      if (next === OBJECT_ID_EOF) break;
+      current = next;
+    }
+    this.dungeon.setDBRecordLink(current as number, objectRn as number);
+    this.dungeon.setDBRecordLink(objectRn as number, OBJECT_ID_EOF);
   }
 
   private dropMissileObject(projectileObject: number, position: Position, posInCell: number): void {
@@ -972,19 +1924,12 @@ export class TimerSystem {
     return null;
   }
 
-  private getMissileTimerWord8(missile: { eventIndex: number }): number | null {
-    const timers = this.dungeon.getData().timers;
-    if (!timers) return null;
-    const rec = timers[missile.eventIndex];
-    return rec ? rec.timerWord8 : null;
+  private getMissileTimerWord8(missile: { timerIndex: number }): number | null {
+    return this.timers.getTimerWord8(missile.timerIndex);
   }
 
-  private setMissileTimerWord8(missile: { eventIndex: number }, word8: number): void {
-    const timers = this.dungeon.getData().timers;
-    if (!timers) return;
-    const rec = timers[missile.eventIndex];
-    if (!rec) return;
-    rec.timerWord8 = word8 & 0xffff;
+  private setMissileTimerWord8(missile: { timerIndex: number }, word8: number): void {
+    this.timers.setTimerWord8(missile.timerIndex, word8);
   }
 
   private decodeMissileTimerWord8(word8: number): { x: number; y: number; dir: number; deltaEnergy: number } {
@@ -1030,6 +1975,7 @@ export class TimerSystem {
     if (!result.moved) return;
 
     const oldPos = new Position(position.x, position.y, position.z);
+    this.checkMoveFromMissile(oldPos, result.position, null);
     party.position = result.position;
     party.facing = result.facing & 0x3;
 
@@ -1047,6 +1993,7 @@ export class TimerSystem {
     if (!result.moved) return;
 
     const oldPos = new Position(position.x, position.y, position.z);
+    this.checkMoveFromMissile(oldPos, result.position, monsterRn);
     const newRn = encodeObjectID(result.objectPos & 0x3, DBType.CREATURE, decoded.index);
     this.dungeon.removeObjectFromCell(oldPos, monsterRn);
     this.dungeon.addObjectToCell(result.position, newRn);
@@ -1224,14 +2171,21 @@ export class TimerSystem {
   }
 
   private updateMissileTimerEntry(oldRn: number, newRn: number, position: Position): void {
-    for (const entry of this.timers.getTimers()) {
-      if (entry.object !== oldRn) continue;
-      entry.object = newRn;
-      entry.uByte6 = position.x & 0xff;
-      entry.uByte7 = position.y & 0xff;
-      entry.level = position.z & 0xff;
-      break;
-    }
+    const missile = this.dungeon.getMissileRecord(newRn);
+    const entry = missile ? this.timers.getTimer(missile.timerIndex) : null;
+    if (!entry) return;
+    if (entry.object !== oldRn) entry.object = newRn;
+    entry.uByte6 = position.x & 0xff;
+    entry.uByte7 = position.y & 0xff;
+    entry.level = position.z & 0xff;
+  }
+
+  private isValidLocation(position: Position): boolean {
+    const map = this.dungeon.getMap(position.z);
+    if (!map) return false;
+    if (position.x < 0 || position.y < 0) return false;
+    if (position.x >= map.descriptor.width || position.y >= map.descriptor.height) return false;
+    return true;
   }
 
   private isSamePosition(a: Position, b: Position): boolean {

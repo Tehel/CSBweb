@@ -218,9 +218,9 @@ export interface MiscRecord {
 export interface MissileRecord {
     nextObject: ObjectID;       // +0x00
     projectileObject: ObjectID; // +0x02
-    rangeEnergy: ui8;           // +0x04
-    damageEnergy: ui8;          // +0x05
-    eventIndex: ui16;           // +0x06
+    rangeRemaining: ui8;        // +0x04
+    damageRemaining: ui8;       // +0x05
+    timerIndex: ui16;           // +0x06
 }
 
 /**
@@ -338,10 +338,11 @@ export interface DungeonData {
     objectList: ObjectID[];     // Object list by tile
     columnIndex: ui16[];        // Column index for object lookup
     levelIndex: ui16[];         // Level index for object lookup
+    timerWord8Table?: ui16[];   // Save-game timerWord8 table (by timer index)
     item16?: Item16Record[];    // Save-game runtime monster state
-    timers?: TimerRecord[];     // Save-game timer table
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
     dsaIndex?: DsaIndex;        // Extended-feature DSA programs (DSAIndex)
+    specialLocations?: Record<number, number>; // EXPOOL special locations (EDT_SpecialLocations)
     extendedWallDecorations?: boolean; // Extended-feature flag
     bigActuators?: boolean;     // Extended-feature flag
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data

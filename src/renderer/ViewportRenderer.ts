@@ -41,8 +41,9 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateDebug, updateHover } from '@/ui';
+import { GraphicRoomType } from './bytecode/Types';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -51,6 +52,10 @@ export enum UIMode {
 }
 
 type IndexedBitmapSet = IndexedBitmap[]
+type ViewportCursorAction =
+  | { kind: 'throw'; side: 0 | 1 }
+  | { kind: 'drop'; pos: number; viAltar?: boolean }
+  | { kind: 'wall' };
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -81,6 +86,7 @@ const OBJNI_STORM_A = 23;
 const OBJNI_RA_BLADE_A = 25;
 const OBJNI_OPEN_SCROLL = 30;
 const OBJNI_SCROLL = 31;
+const OBJNI_BONES_A = 93;
 const OBJNI_FIRST_MODIFIABLE = 0;
 const OBJNI_LAST_MODIFIABLE = 31;
 const OBJNI_ELVEN_BOOTS = 119;
@@ -100,6 +106,7 @@ const OBJNI_GEM_OF_AGES = 122;
 const OBJNI_EKKHARD_CROSS = 123;
 const OBJNI_MOONSTONE = 124;
 const OBJNI_PENDANT_FERAL = 126;
+const POTION_WATER_FLASK = 15;
 const POTION_EMPTY_FLASK = 20;
 const DEFAULT_CHEST_WEIGHT = 50;
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
@@ -281,6 +288,10 @@ export class ViewportRenderer {
     this.syncInventoryButtons();
   }
 
+  isInventoryOpen(): boolean {
+    return (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+  }
+
   enqueueMouseClick(x: number, y: number, buttons: number): void {
     const mouseQueueLength = this.mouseQueue.length;
     const numEnt = (this.mouseQEnd - this.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
@@ -368,6 +379,9 @@ export class ViewportRenderer {
     this.context.doorSwitchRects = [];
     this.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
     this.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
+    this.context.facingAlcove = false;
+    this.context.facingViAltar = false;
+    this.context.facingWaterFountain = false;
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
     this.context.frameFacing = facing;
@@ -415,6 +429,136 @@ export class ViewportRenderer {
 
     this.partyState.objectInHand = hit.rn;
     return true;
+  }
+
+  hasCursorObject(): boolean {
+    if (!this.partyState) return false;
+    return this.normalizeObjectValue(this.partyState.objectInHand) !== null;
+  }
+
+  resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
+    if (!this.partyState || !this.uiTables) return null;
+    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (objectId === null) return null;
+    if ((this.partyState.cursorOwner ?? -1) < 0) return null;
+
+    const stoneAhead = this.isFrontCellStoneOrVisibleFalseWall();
+    const doorFacingAhead = this.isFrontCellDoorFacing();
+
+    if (stoneAhead) {
+      const dropPos = this.findDropAreaHit(x, y, 2);
+      if (dropPos !== null) return { kind: 'drop', pos: dropPos };
+
+      if (this.isViewportButtonHit(5, x, y)) {
+        if (this.context?.facingAlcove) {
+          let viAltar = false;
+          if (this.context?.facingViAltar) {
+            const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
+            viAltar = objectNameIndex === OBJNI_BONES_A;
+          }
+          return { kind: 'drop', pos: 4, viAltar };
+        }
+        return { kind: 'wall' };
+      }
+      return null;
+    }
+
+    const throwSide = this.testThrow(x, y, doorFacingAhead);
+    if (throwSide !== null) return { kind: 'throw', side: throwSide };
+
+    const dropPos = this.findDropAreaHit(x, y, 4);
+    if (dropPos !== null) return { kind: 'drop', pos: dropPos };
+    return null;
+  }
+
+  tryUseFrontWallItem(x: number, y: number): boolean {
+    if (!this.partyState || !this.context) return false;
+    if ((this.partyState.cursorOwner ?? -1) < 0) return false;
+    if (!this.isViewportButtonHit(5, x, y)) return false;
+    if (this.context.facingAlcove) return false;
+    if (!this.context.facingWaterFountain) return false;
+
+    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (objectId === null) return false;
+    if (!this.isLikelyObjectRecord(objectId)) return false;
+
+    const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
+    if (objectNameIndex < 0) return false;
+
+    if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
+      const misc = this.dungeonState.getMiscRecord(objectId as ObjectID);
+      if (!misc) return false;
+      misc.specialState = 3;
+      return true;
+    }
+
+    if (objectNameIndex === OBJNI_EMPTY_FLASK) {
+      const potion = this.dungeonState.getPotionRecord(objectId as ObjectID);
+      if (!potion) return false;
+      potion.potionType = POTION_WATER_FLASK;
+      return true;
+    }
+
+    return false;
+  }
+
+  private findDropAreaHit(x: number, y: number, count: number): number | null {
+    const areas = this.uiTables?.graphic231.dropAreas;
+    if (!areas || areas.length === 0) return null;
+    const max = Math.min(count, areas.length);
+    for (let i = 0; i < max; i++) {
+      const rect = areas[i];
+      if (!rect) continue;
+      if (x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2) return i;
+    }
+    return null;
+  }
+
+  private isViewportButtonHit(index: number, x: number, y: number): boolean {
+    const buttons = this.context?.viewportObjectButtons;
+    if (!buttons || index < 0 || index >= buttons.length) return false;
+    const rect = buttons[index];
+    if (!rect || rect.x1 === 255) return false;
+    const vx = x - VIEWPORT_X;
+    const vy = y - VIEWPORT_Y;
+    return vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2;
+  }
+
+  private testThrow(clickX: number, clickY: number, doorFacing: boolean): 0 | 1 | null {
+    if (clickY < 47 || clickY > 102) return null;
+    if (clickX <= 111) {
+      if (clickX < 32) return null;
+      if (clickX < 64 && doorFacing) return null;
+      return 0;
+    }
+    if (clickX > 191) return null;
+    if (clickX > 163 && doorFacing) return null;
+    return 1;
+  }
+
+  private isFrontCellStoneOrVisibleFalseWall(): boolean {
+    if (!this.partyState) return false;
+    const facing = this.partyState.facing & 0x3;
+    const pos = this.partyState.position;
+    const target =
+      facing === 0 ? pos.north :
+      facing === 1 ? pos.east :
+      facing === 2 ? pos.south :
+      pos.west;
+    const map = this.dungeonState.getMap(target.z);
+    if (!map) return true;
+    if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
+    const cellFlag = map.cellFlags[target.x]?.[target.y];
+    if (cellFlag === undefined) return true;
+    const roomType = (cellFlag >> 5) & 0x7;
+    if (roomType === RoomType.STONE) return true;
+    if (roomType === RoomType.FALSEWALL && (cellFlag & 0x5) === 0) return true;
+    return false;
+  }
+
+  private isFrontCellDoorFacing(): boolean {
+    const rd = this.context?.roomData?.[17];
+    return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
   }
 
   private findViewportObjectHit(x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
@@ -859,6 +1003,63 @@ export class ViewportRenderer {
       );
       lineY += 7;
     }
+  }
+
+  private drawObjectInfoPanel(objectId: ObjectID): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.objectTables) return;
+    const ui = this.uiTables.graphic232;
+    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
+    this.blitBasicGraphicToViewport(29, ui.wRectPos942, 32, 12);
+
+    const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
+    if (objectNameIndex >= 0) {
+      const iconRect = {
+        x1: VIEWPORT_X + 110,
+        y1: VIEWPORT_Y + 59,
+        x2: VIEWPORT_X + 125,
+        y2: VIEWPORT_Y + 74,
+      };
+      this.drawObjectIcon(iconRect, objectNameIndex, ui.word612);
+      const name = this.getObjectName(objectNameIndex);
+      if (name) {
+        drawTextLineIndex(
+          this.screenIndexBuffer,
+          this.fontData,
+          VIEWPORT_X + 133,
+          VIEWPORT_Y + 68,
+          13,
+          null,
+          name
+        );
+      }
+    }
+
+    const weight = this.getObjectWeight(objectId | 0, new Set<number>());
+    const weightText = this.formatWeightText(weight);
+    drawTextLineIndex(
+      this.screenIndexBuffer,
+      this.fontData,
+      VIEWPORT_X + 107,
+      VIEWPORT_Y + 87,
+      13,
+      null,
+      weightText
+    );
+  }
+
+  private getObjectName(objectNameIndex: number): string {
+    const names = this.objectTables?.objectNames ?? [];
+    if (objectNameIndex >= 0 && objectNameIndex < names.length) {
+      return names[objectNameIndex] ?? '';
+    }
+    return `OBJECT ${objectNameIndex}`;
+  }
+
+  private formatWeightText(weight: number): string {
+    const total = Math.max(0, weight | 0);
+    const kg = Math.floor(total / 10);
+    const tenths = Math.abs(total % 10);
+    return `WEIGHS ${kg}.${tenths} KG.`;
   }
 
   private drawEyeIcon(): void {
@@ -1451,7 +1652,12 @@ export class ViewportRenderer {
     }
 
     if (this.pressingEye) {
-      this.drawAttributePanel(champion);
+      const cursorObject = this.normalizeObjectValue(this.partyState?.objectInHand);
+      if (cursorObject !== null) {
+        this.drawObjectInfoPanel(cursorObject);
+      } else {
+        this.drawAttributePanel(champion);
+      }
     } else {
       this.drawFoodWaterPanel(champion);
     }

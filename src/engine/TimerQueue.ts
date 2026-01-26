@@ -8,12 +8,14 @@ export enum TimerFunction {
   TT_TELEPORTER = 8,
   TT_PIT = 9,
   TT_DOOR = 10,
+  TT_VI_ALTAR = 13,
   TT_REACTIVATE_GENERATOR = 65,
   TT_PARAMETER_MESSAGE = 101,
   TT_DESSAGE = 102,
 }
 
 export interface TimerEntry {
+  index: number;
   time: number;
   level: number;
   function: number;
@@ -23,12 +25,15 @@ export interface TimerEntry {
   uByte8: number;
   uByte9: number;
   sequence: number;
+  timerWord8: number;
   object?: number;
 }
 
 export class TimerQueue {
   private queue: TimerEntry[] = [];
   private nextSequence = 0;
+  private nextIndex = 0;
+  private indexMap = new Map<number, TimerEntry>();
 
   getTimers(): readonly TimerEntry[] {
     return this.queue;
@@ -45,6 +50,8 @@ export class TimerQueue {
   clear(): void {
     this.queue = [];
     this.nextSequence = 0;
+    this.nextIndex = 0;
+    this.indexMap.clear();
   }
 
   createTimer(
@@ -56,8 +63,10 @@ export class TimerQueue {
     time: number,
     level: number,
     object?: number,
+    timerWord8 = 0,
   ): TimerEntry {
     const entry: TimerEntry = {
+      index: this.nextIndex++,
       time: time >>> 0,
       level: level & 0xff,
       function: functionType & 0xff,
@@ -67,6 +76,7 @@ export class TimerQueue {
       uByte8: pos & 0xff,
       uByte9: action & 0xff,
       sequence: this.nextSequence++,
+      timerWord8: timerWord8 & 0xffff,
       object,
     };
     this.addTimer(entry);
@@ -74,12 +84,36 @@ export class TimerQueue {
   }
 
   addTimer(entry: TimerEntry): void {
+    if (!this.indexMap.has(entry.index)) this.indexMap.set(entry.index, entry);
     const idx = this.queue.findIndex((existing) => compareTimers(entry, existing) < 0);
     if (idx === -1) {
       this.queue.push(entry);
     } else {
       this.queue.splice(idx, 0, entry);
     }
+  }
+
+  getTimer(index: number): TimerEntry | null {
+    return this.indexMap.get(index) ?? null;
+  }
+
+  getTimerWord8(index: number): number | null {
+    const entry = this.indexMap.get(index);
+    return entry ? entry.timerWord8 & 0xffff : null;
+  }
+
+  setTimerWord8(index: number, value: number): void {
+    const entry = this.indexMap.get(index);
+    if (!entry) return;
+    entry.timerWord8 = value & 0xffff;
+  }
+
+  deleteTimer(index: number): void {
+    const entry = this.indexMap.get(index);
+    if (!entry) return;
+    this.indexMap.delete(index);
+    const idx = this.queue.indexOf(entry);
+    if (idx >= 0) this.queue.splice(idx, 1);
   }
 }
 

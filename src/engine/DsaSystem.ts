@@ -142,6 +142,10 @@ enum StkOp {
   NUM_PARAM = 139,
 }
 
+const EDT_SPECIAL_LOCATIONS = 3;
+const ESL_MISSILE_ENCOUNTER_FILTER = 13;
+const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
+
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 
 const enum DsaMoveError {
@@ -358,6 +362,71 @@ export class DsaSystem {
     if (tables.roomTimerFunctions) this.roomTimerFunctions = tables.roomTimerFunctions;
     if (tables.objDescCarryMask) this.objDescCarryMask = tables.objDescCarryMask;
     if (tables.carryLocation) this.carryLocation = tables.carryLocation;
+  }
+
+  setParameters(count: number, values: ArrayLike<number>): void {
+    const n = Math.min(Math.max(count, 0), 100);
+    this.parameters[0] = n;
+    for (let i = 0; i < n; i++) {
+      this.parameters[1 + i] = values[i] ?? 0;
+    }
+  }
+
+  getParameter(index: number): number {
+    if (index < 0 || index >= 100) return 0;
+    return this.parameters[1 + index] ?? 0;
+  }
+
+  processMissileEncounterFilter(options: {
+    type: number;
+    position: Position;
+    posInCell: number;
+    missile: number;
+    projectile: number;
+    direction: number;
+    index: number;
+  }): number {
+    const special = this.dungeon.getSpecialLocation(MISSILE_ENCOUNTER_FILTER_KEY);
+    if (special === null) return 0;
+    const locrFilter = intToLocation(special);
+    if (!this.isValidLocation(locrFilter)) return 0;
+    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+    const dsaActuator = this.findFirstDsaActuator(filterPos);
+    if (dsaActuator === OBJECT_ID_EOF) return 0;
+
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: locrFilter.l & 0xff,
+      function: 0,
+      uByte5: 0,
+      uByte6: locrFilter.x & 0xff,
+      uByte7: locrFilter.y & 0xff,
+      uByte8: 0,
+      uByte9: 0,
+      sequence: 0,
+      timerWord8: 0,
+    };
+
+    const encounterLoc = locationToInt({
+      l: options.position.z & 0x3f,
+      x: options.position.x & 0x1f,
+      y: options.position.y & 0x1f,
+      p: options.posInCell & 0x3,
+    });
+
+    this.setParameters(7, [
+      0,
+      options.type | 0,
+      encounterLoc,
+      options.missile | 0,
+      options.projectile | 0,
+      options.direction | 0,
+      options.index | 0,
+    ]);
+
+    this.processTimer6Internal(dsaActuator, timer, filterPos, true, new DsaVars());
+    return this.getParameter(0);
   }
 
   processTimer5(rn: number, timer: TimerEntry, location: Position): boolean {
@@ -1642,6 +1711,16 @@ export class DsaSystem {
   private findFirstTeleporter(position: Position): number {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category === DBType.TELEPORTER) return rn;
+    }
+    return OBJECT_ID_EOF;
+  }
+
+  private findFirstDsaActuator(position: Position): number {
+    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      const rec = this.dungeon.getActuatorRecord(rn);
+      if (!rec) continue;
+      if (getActuatorType(rec) === 47) return rn;
     }
     return OBJECT_ID_EOF;
   }

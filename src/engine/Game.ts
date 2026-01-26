@@ -5,7 +5,7 @@
  * Based on CSBWin's VBL-driven game loop
  */
 
-import type { DungeonData, Item16Record, TimerRecord } from '../data/dungeonTypes';
+import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Party } from './Party';
@@ -16,7 +16,7 @@ import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
 import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { DsaSystem, type DsaTables } from './DsaSystem';
-import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
 
@@ -25,6 +25,12 @@ import { ActuatorAction } from '../data/actuatorHelpers';
  */
 export type GameEventCallback = (game: Game) => void;
 export type MovementCallback = (success: boolean, message?: string, result?: MovementResult) => void;
+
+interface DropCursorOptions {
+    viAltar?: boolean;
+}
+
+const MISC_BONES_OF_HERO = 5; // CSBwin Objects.h misc_BonesOfHero
 
 export interface RuntimeSaveState {
     version: 1;
@@ -38,6 +44,7 @@ export interface RuntimeSaveState {
     dungeon: {
         item16?: Item16Record[];
         timers?: TimerRecord[];
+        missiles?: MissileRecord[];
     };
 }
 
@@ -54,6 +61,7 @@ export class Game {
     private timerSystem: TimerSystem;
     private playSound?: (soundId: number, rateIdx?: number) => void;
     private dsaSystem: DsaSystem;
+    private nextChampionFingerprint = 1;
 
     // Game loop
     private running: boolean = false;
@@ -120,6 +128,7 @@ export class Game {
                 onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
+                onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 ...timerHooks,
             },
         );
@@ -226,6 +235,10 @@ export class Game {
         const result = this.movementSystem.move(action);
 
         if (result.success) {
+            const oldPos = this.party.state.position;
+            if (result.newPosition) {
+                this.timerSystem.checkMoveFromMissile(oldPos, result.newPosition, null);
+            }
             this.party.applyMovement(result);
 
             // Update party state in game state
@@ -251,7 +264,58 @@ export class Game {
      * Add a champion to the party
      */
     addChampion(champion: Champion): boolean {
+        this.assignChampionFingerprint(champion);
         return this.party.addChampion(champion);
+    }
+
+    registerChampionBones(bones: ObjectID, champIndex: number): void {
+        const champ = this.party.state.champions[champIndex];
+        if (!champ) return;
+        this.assignChampionFingerprint(champ);
+        const fingerprint = champ.fingerprint ?? 0;
+        if (!fingerprint) return;
+        this.dungeonState.addChampionBonesRecord(bones, fingerprint);
+    }
+
+    private assignChampionFingerprint(champion: Champion): void {
+        if (champion.fingerprint !== undefined && champion.fingerprint !== null) {
+            this.refreshNextChampionFingerprint();
+            return;
+        }
+        champion.fingerprint = this.allocateChampionFingerprint();
+    }
+
+    private allocateChampionFingerprint(): number {
+        const used = this.collectChampionFingerprints();
+        let next = this.nextChampionFingerprint & 0xffff;
+        if (next === 0) next = 1;
+        while (used.has(next)) {
+            next = (next + 1) & 0xffff;
+            if (next === 0) next = 1;
+        }
+        this.nextChampionFingerprint = (next + 1) & 0xffff;
+        if (this.nextChampionFingerprint === 0) this.nextChampionFingerprint = 1;
+        return next;
+    }
+
+    private refreshNextChampionFingerprint(): void {
+        const used = this.collectChampionFingerprints();
+        let next = this.nextChampionFingerprint & 0xffff;
+        if (next === 0) next = 1;
+        while (used.has(next)) {
+            next = (next + 1) & 0xffff;
+            if (next === 0) next = 1;
+        }
+        this.nextChampionFingerprint = next;
+    }
+
+    private collectChampionFingerprints(): Set<number> {
+        const used = new Set<number>();
+        for (const champ of this.party.state.champions) {
+            const fp = champ.fingerprint ?? 0;
+            if (fp) used.add(fp & 0xffff);
+        }
+        return used;
     }
 
     private applyMissileDamageToParty(options: {
@@ -326,6 +390,9 @@ export class Game {
     setPartyState(state: PartyState): void {
         this.party.setState(state);
         this.state.party = this.party.state;
+        for (const champ of this.party.state.champions) {
+            this.assignChampionFingerprint(champ);
+        }
     }
 
     /**
@@ -392,6 +459,159 @@ export class Game {
     }
 
     /**
+     * Drop the cursor object into the current/front cell, following CSBWin's DropObject positioning rules.
+     */
+    dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
+        const party = this.party.state;
+        const owner = party.cursorOwner ?? -1;
+        if (owner < 0) return false;
+
+        const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
+        if (obj === null) return false;
+        if (!this.isLikelyObjectRecord(obj)) return false;
+
+        let dropPos = relativePos | 0;
+        if (dropPos < 0 || dropPos > 4) return false;
+        if (dropPos === 4) dropPos = 2;
+
+        const facing = party.facing & 0x3;
+        const target =
+            dropPos > 1
+                ? facing === 0 ? party.position.north
+                    : facing === 1 ? party.position.east
+                        : facing === 2 ? party.position.south
+                            : party.position.west
+                : party.position;
+
+        const map = this.dungeonState.getMap(target.z);
+        if (!map) return false;
+        if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return false;
+
+        const decoded = decodeObjectID(obj);
+        const newPos = (facing + dropPos) & 0x3;
+        const newObj = encodeObjectID(newPos, decoded.category, decoded.index);
+
+        party.objectInHand = null;
+        const added = this.dungeonState.addObjectToCell(target, newObj);
+        if (!added) party.objectInHand = obj;
+        if (added && options?.viAltar) {
+            this.maybeScheduleViAltar(newObj, target, newPos);
+        }
+        return added;
+    }
+
+    private maybeScheduleViAltar(obj: ObjectID, location: Position, posInCell: number): void {
+        const misc = this.dungeonState.getMiscRecord(obj);
+        if (!misc) return;
+        if ((misc.miscType | 0) !== MISC_BONES_OF_HERO) return;
+        if ((misc.specialState | 0) !== 2) return;
+        this.timerSystem.scheduleViAltar(obj, location, posInCell, this.state.tickCount);
+    }
+
+    /**
+     * Throw the cursor object as a missile using CSBwin's LaunchMissile path.
+     */
+    throwObjectFromCursor(leftOrRight: number): boolean {
+        const party = this.party.state;
+        const owner = party.cursorOwner ?? -1;
+        if (owner < 0) return false;
+
+        const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
+        if (obj === null) return false;
+        if (!this.isLikelyObjectRecord(obj)) return false;
+
+        const champion = party.champions[owner] ?? null;
+        const range = this.estimateThrowRange(champion);
+        const damage = this.estimateThrowDamage(champion);
+        const decayRate = this.estimateThrowDecay(champion);
+
+        party.objectInHand = null;
+        const launched = this.timerSystem.throwObjectFromHand(
+            obj,
+            party.position,
+            leftOrRight,
+            party.facing,
+            range,
+            damage,
+            decayRate,
+            this.state.tickCount,
+        );
+        if (!launched) party.objectInHand = obj;
+        return launched;
+    }
+
+    debugLaunchMissileDelayed(
+        projectileObject: ObjectID,
+        position: Position,
+        posInCell: number,
+        direction: number,
+        range: number,
+        damage: number,
+        decayRate: number,
+        delayTicks: number,
+    ): boolean {
+        return this.timerSystem.launchDelayedMissile(
+            projectileObject,
+            position,
+            posInCell,
+            direction,
+            range,
+            damage,
+            decayRate,
+            this.state.tickCount,
+            delayTicks,
+        );
+    }
+
+    private normalizeObjectInHand(value: ObjectID | null): ObjectID | null {
+        if (value === null || value === undefined) return null;
+        if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return null;
+        return value;
+    }
+
+    private isLikelyObjectRecord(value: ObjectID): boolean {
+        const { category, index } = decodeObjectID(value);
+        switch (category) {
+            case DBType.WEAPON:
+                return index < this.dungeonState.getData().databases.weapons.records.length;
+            case DBType.CLOTHING:
+                return index < this.dungeonState.getData().databases.clothing.records.length;
+            case DBType.SCROLL:
+                return index < this.dungeonState.getData().databases.scrolls.records.length;
+            case DBType.POTION:
+                return index < this.dungeonState.getData().databases.potions.records.length;
+            case DBType.CHEST:
+                return index < this.dungeonState.getData().databases.containers.records.length;
+            case DBType.MISC:
+                return index < this.dungeonState.getData().databases.misc.records.length;
+            default:
+                return false;
+        }
+    }
+
+    private estimateThrowRange(champion: Champion | null): number {
+        const strength = champion?.attributes?.strength ?? 0;
+        const dexterity = champion?.attributes?.dexterity ?? 0;
+        let range = 8 + ((strength + dexterity) >> 2);
+        range = Math.max(1, Math.min(100, range));
+        return range;
+    }
+
+    private estimateThrowDamage(champion: Champion | null): number {
+        const strength = champion?.attributes?.strength ?? 0;
+        let damage = 20 + strength;
+        damage = Math.max(1, Math.min(200, damage));
+        return damage;
+    }
+
+    private estimateThrowDecay(champion: Champion | null): number {
+        const dexterity = champion?.attributes?.dexterity ?? 0;
+        let decay = Math.max(1, 10 - Math.floor(dexterity / 20));
+        decay = Math.max(1, Math.min(15, decay));
+        return decay;
+    }
+
+    /**
      * Get position info for debugging
      */
     getPositionInfo(): string {
@@ -423,10 +643,14 @@ export class Game {
                   singleMonsterStatus: [...r.singleMonsterStatus],
               }))
             : undefined;
-        const timers = this.state.dungeon.timers
-            ? this.state.dungeon.timers.map((t) => ({ timerWord8: t.timerWord8 }))
-            : undefined;
-
+        const timers = this.buildTimerRecords();
+        const missiles = this.state.dungeon.databases.missiles.records.map((rec) => ({
+            nextObject: rec.nextObject,
+            projectileObject: rec.projectileObject,
+            rangeRemaining: rec.rangeRemaining,
+            damageRemaining: rec.damageRemaining,
+            timerIndex: rec.timerIndex,
+        }));
         return {
             version: 1,
             savedAt: Date.now(),
@@ -439,6 +663,7 @@ export class Game {
             dungeon: {
                 item16,
                 timers,
+                missiles,
             },
         };
     }
@@ -449,6 +674,9 @@ export class Game {
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         this.party.setState(save.party);
         this.state.party = this.party.state;
+        for (const champ of this.party.state.champions) {
+            this.assignChampionFingerprint(champ);
+        }
 
         this.state.paused = save.game.paused;
         this.state.tickCount = save.game.tickCount;
@@ -458,14 +686,30 @@ export class Game {
 
         const item16 = save.dungeon.item16 ?? [];
         const timers = save.dungeon.timers ?? [];
+        const missiles = save.dungeon.missiles ?? [];
         const saveGameState: SaveGameState = {
             item16,
             timers,
+            missiles,
             maxItem16: item16.length,
             maxTimers: timers.length,
             sequencedTimers: false,
             extendedTimers: false,
         };
         applySaveGameState(this.state.dungeon, saveGameState);
+    }
+
+    private buildTimerRecords(): TimerRecord[] {
+        const entries = this.timerQueue.getTimers();
+        let maxIndex = -1;
+        for (const entry of entries) {
+            if (entry.index > maxIndex) maxIndex = entry.index;
+        }
+        if (maxIndex < 0) return [];
+        const records: TimerRecord[] = Array.from({ length: maxIndex + 1 }, () => ({ timerWord8: 0 }));
+        for (const entry of entries) {
+            records[entry.index] = { timerWord8: entry.timerWord8 & 0xffff };
+        }
+        return records;
     }
 }

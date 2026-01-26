@@ -77,6 +77,7 @@ export interface ObjectTables {
   objDescAttackClass: Int8Array; // d.ObjDesc[180].attackClass
   objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
+  objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
   clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
   miscWeights: Uint8Array; // d.Byte8946[54]
@@ -91,6 +92,7 @@ export interface ObjectTables {
 
   // Wall decoration alcove markers (CSBCode.cpp:205-219, Data.h:1174-1177)
   alcoveDecorationIndices: Uint8Array; // d.Byte4038[4]
+  fountainDecorationIndex: number; // d.Word4040[0]
 
   // Door switch helpers (DrawDoorSwitch, CSBCode.cpp:4065+)
   doorSwitchRectIndex: Uint8Array; // d.Byte4124[2]
@@ -110,6 +112,7 @@ export interface ObjectTables {
   textEscape2Wall: Uint8Array; // d.Byte10336[256]
 }
 
+const GRAPHIC_OBJECT_NAMES = 0x22c; // 556
 const GRAPHIC_22E_INDEX = 0x22e; // 558
 const GRAPHIC_22F_INDEX = 0x22f; // 559
 
@@ -140,6 +143,7 @@ const ABS_WALL_DECORATION_RECT_SET_INDEX = 4100; // Byte4100[60]
 const ABS_WALL_TEXT_RECT = 4192; // Byte4192 (RectPos x1,x2,y1,y2)
 const ABS_WALL_TEXT_LINE_Y2 = 4196; // Byte4196[4]
 const ABS_BYTE4038 = 4038; // Byte4038[4]
+const ABS_WORD4040 = 4040; // Word4040[1]
 const ABS_BYTE4124 = 4124; // Byte4124[2] (door switch rect set indices)
 const ABS_BYTE5094 = 5094; // Byte5094[?] (door switch rectangles)
 const ABS_BYTE5076 = 5076; // Byte5076[?] (door switch source desc)
@@ -359,6 +363,21 @@ function readObjDescCarryMask22f(raw: Uint8Array): Uint16Array {
   return out;
 }
 
+function readObjectNames22c(raw: Uint8Array): string[] {
+  const names: string[] = [];
+  let cursor = 0;
+  let current = '';
+  while (cursor < raw.length && names.length < 199) {
+    const value = raw[cursor++] ?? 0;
+    current += String.fromCharCode(value & 0x7f);
+    if ((value & 0x80) !== 0) {
+      names.push(current);
+      current = '';
+    }
+  }
+  return names;
+}
+
 function readWeaponWeights22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_WEAPONS;
   const count = 46;
@@ -509,6 +528,7 @@ function readFloorDecorationDescTable22e(raw: Uint8Array, off: number): Decorati
 }
 
 export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffset: number): ObjectTables {
+  const raw22c = graphics.getRawGraphic(GRAPHIC_OBJECT_NAMES);
   const raw22e = graphics.getRawGraphic(GRAPHIC_22E_INDEX);
   const raw22f = graphics.getRawGraphic(GRAPHIC_22F_INDEX);
 
@@ -536,6 +556,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallTextRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_RECT);
   const wallTextLineY2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_TEXT_LINE_Y2);
   const alcoveDecorationIndicesOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4038);
+  const fountainDecorationIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_WORD4040);
   const doorSwitchRectIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4124);
   const doorSwitchRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5094);
   const doorSwitchSourceDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5076);
@@ -570,6 +591,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallTextRectOffset < 0 ||
     wallTextLineY2Offset < 0 ||
     alcoveDecorationIndicesOffset < 0 ||
+    fountainDecorationIndexOffset < 0 ||
     doorSwitchRectIndexOffset < 0 ||
     doorSwitchRectOffset < 0 ||
     doorSwitchSourceDescOffset < 0 ||
@@ -610,6 +632,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objDescAttackClass = readObjDescAttackClass22f(raw22f);
   const objDescObjectType = readObjDescObjectType22f(raw22f);
   const objDescCarryMask = readObjDescCarryMask22f(raw22f);
+  const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
   const clothingWeights = readClothingWeights22f(raw22f);
   const miscWeights = readMiscWeights22f(raw22f);
@@ -618,6 +641,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
   const alcoveDecorationIndices = raw22e.slice(alcoveDecorationIndicesOffset, alcoveDecorationIndicesOffset + 4);
+  const fountainDecorationIndex = readI16BE(raw22e, fountainDecorationIndexOffset);
   const doorSwitchRectIndex = raw22e.slice(doorSwitchRectIndexOffset, doorSwitchRectIndexOffset + 2);
   let doorSwitchSetCount = 1;
   for (let i = 0; i < doorSwitchRectIndex.length; i++) {
@@ -691,6 +715,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     objDescAttackClass,
     objDescCarryMask,
     objDescObjectType,
+    objectNames,
     weaponWeights,
     clothingWeights,
     miscWeights,
@@ -699,6 +724,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     wallTextRect,
     wallTextLineY2,
     alcoveDecorationIndices,
+    fountainDecorationIndex,
     doorSwitchRectIndex,
     doorSwitchRectSets,
     doorSwitchSourceDescSets,

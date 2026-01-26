@@ -258,7 +258,64 @@ Remaining implementation steps (detail):
 8. **DSA opcode coverage**. Audit `DSA.cpp` opcode tables vs `src/engine/DsaSystem.ts` and implement remaining `&` subcodes plus any missing stack ops; document coverage after each batch (`doc/CSBwin-src/DSA.cpp`).
 9. **DSA filter wiring**. Add calls to `ProcessDSAFilter` for party move, missile encounters, action-name resolution, and character filters, with correct timer/location parameters (`doc/CSBwin-src/Code11f52.cpp:928-1040`, `doc/CSBwin-src/Character.cpp:4559-4573`, `doc/CSBwin-src/CSBCode.cpp:7792-7840`, `doc/CSBwin-src/CSBCode.cpp:8631-8705`).
 
-### Phase 9 — CSBWin-Compatible Save/Load (pre‑work checklist)
+### Phase 9 — CSBWin-Compatible missiles behavior
+Goal: match CSBwin’s missile lifecycle (launch → flight → encounter → resolution) as implemented in `doc/CSBwin-src/Timer.cpp` and `doc/CSBwin-src/Code11f52.cpp`.
+
+1. ✅**Replace the missile data model**. Align DB14 records with CSBwin:
+   - `flyingObject` (projectile RN), `rangeRemaining`, `damageRemaining`, `timerIndex`.
+   - Store `timerWord8` directly on the missile timer entry (bits: x/y/dir/deltaEnergy); remove any parallel `eventIndex`/aux timer word table.
+2. ✅**Rebuild missile launch paths**. Port:
+   - `ThrowMissile()` (Timer.cpp) for hand throws.
+   - `TriggerMissileLauncher()` (Timer.cpp) for actuator launchers.
+   - Spell missile creation paths (Magic.cpp + Mouse.cpp `ConstructPredefinedMissile`).
+   Remove the current simplified throw logic in `src/engine/Game.ts` and rewire throw input to the CSBwin path.
+3. ✅**Port MissileTimer() exactly**. Implement CSBwin’s tick flow:
+   - `TT_Missile0 → TT_Missile` on first tick.
+   - Party/monster hit checks via `ProcessMissileEncounter(-2/-1, ...)`.
+   - `deltaEnergy` decay for `rangeRemaining`/`damageRemaining`.
+   - Leaving‑cell detection based on `(dir == pos) || ((dir+1)&3 == pos)`.
+   - Wall/falsewall/stairs/exterior checks and door‑in‑cell collision via `ProcessMissileEncounter(roomType, ...)`.
+   - Movement via `MoveObject()` so teleporter/stairs/pit/rotation logic is shared.
+4. ✅**Port ProcessMissileEncounter()**. Bring over the collision pipeline from `Code11f52.cpp`:
+   - Door interactions (Zo spell, pass‑through rules, door damage).
+   - Potions → fireball/poison cloud conversion with strength.
+   - Non‑material monster immunity, Black Flame fireball heal.
+   - Monster absorption of thrown weapons into possession lists.
+   - Cloud creation and sound effects.
+5. ✅**Port ProcessObjectFromMissile()**. Match projectile recovery rules:
+   - Link to monster possessions when requested (`pDest`).
+   - Otherwise move to room with missile position preserved.
+   - Always delete the missile record after processing.
+6. ✅**Implement CheckMoveFromMissile() and MoveObject integration**.
+   - When party/monster moves, scan missiles in the vacated cell and call `ProcessMissileEncounter()` using the leaving position.
+   - Skip missiles still in `TT_Missile0`.
+   - Ensure missile timers are deleted when a hit consumes the missile.
+7. ✅**Missile encounter filters (DSA)**.
+   - Port `MissileEncounterFilter()` and `missileFilterTimer`/`missileFilterObject` globals.
+   - Wire `ProcessDSAFilter` for types 1–7 with correct `LOCATIONREL` + timer parameters.
+8. ✅**Rendering correctness hooks**.
+   - Use `timerWord8` direction for missile orientation/mirroring.
+   - Ensure missiles whose timers are deleted do not render.
+9. ✅**Save/load parity**.
+   - Load `DB14.timerIndex` from saves, use the timer entry’s `timerWord8`.
+   - Adjust runtime serialization to store updated DB14 fields and missile timers.
+10. ✅**Validation tooling**.
+    - Add a “missile trace” debug mode that logs each tick’s missile position, dir, range/damage, and encounter outcome.
+    - Scripted scenario tests: throw into door, throw into wall, step‑away collision, potion splash, monster absorption.
+11. **ThrowByCharacter stats parity**.
+    - Port CSBWin throw range/damage/decay calculations from skills, stamina, and item weight.
+    - Replace the current estimate-based throw values with CSBWin logic.
+    - Refs: `doc/CSBwin-src/Mouse.cpp:673+` (`ThrowByCharacter`), `doc/CSBwin-src/Attack.cpp:652+` (`DetermineThrowingDistance`), `doc/CSBwin-src/CSB.h:3729+`.
+12. **Door pass-through + magic damage parity**.
+    - Implement DoorTOC pass-through rules and ObjDesc checks for missiles.
+    - Port magic damage/poison formulas and Black Flame fireball healing.
+    - Refs: `doc/CSBwin-src/Code11f52.cpp:1870+` (door pass-through in `ProcessMissileEncounter`), `doc/CSBwin-src/CSBCode.cpp:4156+` (`DoorTOC` lookup), `doc/CSBwin-src/Code11f52.cpp:1488+` (magic damage formulas), `doc/CSBwin-src/Code11f52.cpp:1976+` (Black Flame fireball heal).
+13. **Cloud timers/damage parity**.
+    - Implement cloud timers, per-tick damage, and any size/decay rules from CSBWin.
+    - Refs: `doc/CSBwin-src/Timer.cpp:479+` (cloud timer handling), `doc/CSBwin-src/Code11f52.cpp:1376+` (`CreateCloud` setup + timer linkage).
+14. **remove dev debug and validation tooling**
+
+### Phase 10 — CSBWin-Compatible Save/Load (pre‑work checklist)
 Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
 
 1. **Inventory all save file blocks (CSBWin `SaveGame.cpp`)**:

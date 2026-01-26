@@ -112,8 +112,7 @@ export class DungeonLoader {
             objectList,
             columnIndex,
             levelIndex,
-            item16: [],
-            timers: []
+            item16: []
         };
 
         data.presetHeroes = extractPresetHeroes(data);
@@ -626,16 +625,16 @@ export class DungeonLoader {
         for (let i = 0; i < count; i++) {
             const nextObject = this.file.readU16();
             const projectileObject = this.file.readU16();
-            const rangeEnergy = this.file.readU8();
-            const damageEnergy = this.file.readU8();
-            const eventIndex = this.file.readU16();
+            const rangeRemaining = this.file.readU8();
+            const damageRemaining = this.file.readU8();
+            const timerIndex = this.file.readU16();
 
             records.push({
                 nextObject,
                 projectileObject,
-                rangeEnergy,
-                damageEnergy,
-                eventIndex
+                rangeRemaining,
+                damageRemaining,
+                timerIndex
             });
         }
 

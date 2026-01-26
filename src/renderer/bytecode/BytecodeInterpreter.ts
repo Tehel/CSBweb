@@ -79,6 +79,9 @@ export interface InterpreterContext {
   viewportContext: CanvasRenderingContext2D;
   viewportIndexBuffer?: PaletteIndexViewportBuffer;
   seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2639)
+  facingAlcove?: boolean;
+  facingViAltar?: boolean;
+  facingWaterFountain?: boolean;
 
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
@@ -1286,6 +1289,21 @@ export class BytecodeInterpreter {
 
     const distanceBand = Math.floor(relativePosition / 5); // 0=F3, 1=F2, 2=F1
     const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
+    if (relativePosition === 12) {
+      if (this.context.viewportObjectButtons?.[5]) {
+        const button = this.context.viewportObjectButtons[5];
+        button.x1 = x1;
+        button.x2 = x2;
+        button.y1 = y1;
+        button.y2 = y2;
+      }
+      if (this.context.facingAlcove !== undefined) this.context.facingAlcove = isAlcove;
+      if (this.context.facingViAltar !== undefined) this.context.facingViAltar = decorationIndex === 2;
+      if (this.context.facingWaterFountain !== undefined) {
+        const fountainIdx = tables.fountainDecorationIndex ?? -1;
+        this.context.facingWaterFountain = decorationIndex === (fountainIdx | 0);
+      }
+    }
 
     if (relativePosition >= 10) {
       const bitmap = mirror ? this.getMirroredBitmap(src) : src;
@@ -2236,8 +2254,9 @@ export class BytecodeInterpreter {
       const w140 = w126 === 0;
       const w138 = w140 ? ((mapX + mapY) & 1) : 0;
 
-      const timerWord8 = dungeon.getTimerWord8(missile.eventIndex);
-      const w124 = timerWord8 !== null ? (timerWord8 >> 10) & 0x3 : (facing & 0x3);
+      const timerWord8 = dungeon.getTimerWord8(missile.timerIndex);
+      if (timerWord8 === null) continue;
+      const w124 = (timerWord8 >> 10) & 0x3;
 
       let w128 = 0;
       let mirror = false;
@@ -2273,7 +2292,7 @@ export class BytecodeInterpreter {
       const distanceFromUs = 2 * Math.floor(relativeCellNumber / 3) + Math.floor(relativeLocation / 2);
       let scale = tables.missileScale[distanceFromUs] ?? 0;
       if (!w130) {
-        const range = missile.rangeEnergy & 0xff;
+        const range = missile.rangeRemaining & 0xff;
         const w192 = Math.max(96, range + 1);
         scale = Math.floor((scale * w192) >> 8);
       }

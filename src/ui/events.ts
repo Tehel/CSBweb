@@ -35,13 +35,24 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
         const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
         if (buttonMask !== 0) {
             ctx.renderer.enqueueMouseClick(x, y, buttonMask);
-            if (buttonMask === 2 && isViewportPoint(x, y)) {
-                if (ctx.renderer.isDoorSwitchHit(x, y)) {
-                    if (ctx.game.handleDoorSwitchClick()) ctx.renderView();
-                } else if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) {
-                    ctx.renderView();
-                } else {
-                    ctx.renderer.tryPickViewportObject(x, y);
+            if (buttonMask === 2 && isViewportPoint(x, y) && !ctx.renderer.isInventoryOpen()) {
+                const cursorAction = ctx.renderer.resolveViewportCursorAction(x, y);
+                if (cursorAction) {
+                    if (cursorAction.kind === 'drop') ctx.game.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
+                    else if (cursorAction.kind === 'throw') ctx.game.throwObjectFromCursor(cursorAction.side);
+                    else if (cursorAction.kind === 'wall') {
+                        if (!ctx.renderer.tryUseFrontWallItem(x, y)) {
+                            ctx.game.handleWallClick();
+                        }
+                    }
+                } else if (!ctx.renderer.hasCursorObject()) {
+                    if (ctx.renderer.isDoorSwitchHit(x, y)) {
+                        if (ctx.game.handleDoorSwitchClick()) ctx.renderView();
+                    } else if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) {
+                        ctx.renderView();
+                    } else {
+                        ctx.renderer.tryPickViewportObject(x, y);
+                    }
                 }
             }
             ctx.renderView();
@@ -199,6 +210,16 @@ export function bindUIEvents(): void {
                     break;
                 case 'F7':
                     ctx.onToggleAttackPanel();
+                    handled = true;
+                    break;
+                case 'F6':
+                    if (isDebugFeaturesEnabled()) ctx.onToggleMissileTrace();
+                    else updateDebug('Enable Debug to toggle missile trace');
+                    handled = true;
+                    break;
+                case 'F10':
+                    if (isDebugFeaturesEnabled()) ctx.onRunMissileScenario();
+                    else updateDebug('Enable Debug to run missile scenarios');
                     handled = true;
                     break;
             }

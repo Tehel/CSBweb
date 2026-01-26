@@ -21,7 +21,6 @@ import type {
     ScrollRecord,
     TeleporterRecord,
     TileData,
-    TimerRecord,
     WeaponRecord,
     ActuatorRecord,
 } from '../data/dungeonTypes';
@@ -39,6 +38,8 @@ export interface TextDecodeTables {
  */
 export class DungeonState {
     private data: DungeonData;
+    private championBonesRecords = new Map<number, number>();
+    private timerWord8Lookup?: (index: number) => ui16 | null;
 
     constructor(data: DungeonData) {
         this.data = data;
@@ -49,6 +50,60 @@ export class DungeonState {
      */
     getData(): Readonly<DungeonData> {
         return this.data;
+    }
+
+    getSpecialLocation(key: number): number | null {
+        const locations = this.data.specialLocations;
+        if (!locations) return null;
+        const value = locations[key];
+        return value === undefined ? null : value;
+    }
+
+    setTimerWord8Lookup(getWord8: (index: number) => ui16 | null): void {
+        this.timerWord8Lookup = getWord8;
+    }
+
+    setTimerWord8Table(table: ui16[] | null): void {
+        this.data.timerWord8Table = table ?? undefined;
+    }
+
+    addChampionBonesRecord(bones: ObjectID, fingerprint: number): void {
+        const key = this.getBonesRecordKey(bones);
+        if (key === null) return;
+        this.championBonesRecords.set(key, fingerprint & 0xffff);
+    }
+
+    checkChampionBonesRecord(bones: ObjectID): boolean {
+        const key = this.getBonesRecordKey(bones);
+        if (key === null) return false;
+        return this.championBonesRecords.has(key);
+    }
+
+    copyChampionBonesRecord(bones: ObjectID): number | null {
+        const key = this.getBonesRecordKey(bones);
+        if (key === null) return null;
+        const value = this.championBonesRecords.get(key);
+        return value === undefined ? null : value;
+    }
+
+    getChampionBonesRecord(bones: ObjectID): number | null {
+        const key = this.getBonesRecordKey(bones);
+        if (key === null) return null;
+        const value = this.championBonesRecords.get(key);
+        if (value === undefined) return null;
+        this.championBonesRecords.delete(key);
+        return value;
+    }
+
+    clearChampionBonesRecord(bones: ObjectID): void {
+        const key = this.getBonesRecordKey(bones);
+        if (key === null) return;
+        this.championBonesRecords.delete(key);
+    }
+
+    private getBonesRecordKey(bones: ObjectID): number | null {
+        if (bones === OBJECT_ID_EOF || bones === OBJECT_ID_NULL) return null;
+        return bones & 0x3fff;
     }
 
     /**
@@ -635,15 +690,15 @@ export class DungeonState {
         return items[index] ?? null;
     }
 
-    getTimerRecord(index: number): TimerRecord | null {
-        const timers = this.data.timers;
-        if (!timers || index < 0 || index >= timers.length) return null;
-        return timers[index] ?? null;
-    }
-
     getTimerWord8(index: number): ui16 | null {
-        const rec = this.getTimerRecord(index);
-        return rec ? rec.timerWord8 : null;
+        if (this.timerWord8Lookup) {
+            const fromQueue = this.timerWord8Lookup(index);
+            if (fromQueue !== null) return fromQueue;
+        }
+        const table = this.data.timerWord8Table;
+        if (!table) return null;
+        if (index < 0 || index >= table.length) return null;
+        return table[index] ?? null;
     }
 
     getMonsterRenderState(creature: CreatureRecord): { positions: ui8; facings: ui8; statuses: Uint8Array } {
@@ -698,7 +753,8 @@ export class DungeonState {
             case RoomType.TELEPORTER:
                 return true;  // Teleporters are walkable
             case RoomType.FALSEWALL:
-                return false; // False walls appear as walls initially
+                // CSBWin treats false walls as solid when (cellFlag & 0x05) == 0.
+                return (tile.cellFlag & 0x05) !== 0;
             case RoomType.EMPTY:
                 return false; // Empty space (void)
             default:
@@ -741,7 +797,9 @@ export class DungeonState {
     isWall(position: Position): boolean {
         const tile = this.getTile(position);
         if (!tile) return true; // Out of bounds = wall
-        return tile.roomType === RoomType.STONE || tile.roomType === RoomType.FALSEWALL;
+        if (tile.roomType === RoomType.STONE) return true;
+        if (tile.roomType === RoomType.FALSEWALL) return (tile.cellFlag & 0x05) === 0;
+        return false;
     }
 
     /**

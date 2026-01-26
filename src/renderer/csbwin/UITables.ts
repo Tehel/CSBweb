@@ -51,6 +51,7 @@ export interface UITables {
     rect18584: WordRect;
     rect18576: WordRect;
     moveButtons: WordRect[];
+    dropAreas: Rect[];
     buttons: {
       buttons18936: UIButton[];
       buttons18876: UIButton[];
@@ -271,6 +272,17 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   const moveButtons = readMoveButtons(view, off, 4); off += 4 * 8;
 
   // DropAreas[16], Byte18448[8], Byte18440[12], Byte18428[7], Byte18400[28]
+  requireSize(raw, off, 16, '0x231 DropAreas');
+  const dropAreas: Rect[] = [];
+  for (let i = 0; i < 4; i++) {
+    const base = off + i * 4;
+    dropAreas.push({
+      x1: raw[base] ?? 0,
+      x2: raw[base + 1] ?? 0,
+      y1: raw[base + 2] ?? 0,
+      y2: raw[base + 3] ?? 0,
+    });
+  }
   off += 16;
   off += 8;
   off += 12;
@@ -312,6 +324,7 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     rect18584,
     rect18576,
     moveButtons,
+    dropAreas,
     buttons: {
       buttons18936,
       buttons18876,
