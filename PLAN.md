@@ -262,6 +262,26 @@ Remaining implementation steps (detail):
 8. **DSA opcode coverage**. Audit `DSA.cpp` opcode tables vs `src/engine/DsaSystem.ts` and implement remaining `&` subcodes plus any missing stack ops; document coverage after each batch (`doc/CSBwin-src/DSA.cpp`).
 9. **DSA filter wiring**. Add calls to `ProcessDSAFilter` for party move, missile encounters, action-name resolution, and character filters, with correct timer/location parameters (`doc/CSBwin-src/Code11f52.cpp:928-1040`, `doc/CSBwin-src/Character.cpp:4559-4573`, `doc/CSBwin-src/CSBCode.cpp:7792-7840`, `doc/CSBwin-src/CSBCode.cpp:8631-8705`).
 
+### Phase 8.5 — Teleporter cell actions parity (Complete)
+Goal: match CSBWin teleporter behavior for movement, visibility, sounds, and timer toggles.
+
+1. **Teleporter record parity**. Honor DB1 bitfields exactly: destination X/Y/level, rotation, facingMode (absolute vs relative), scope (objects/monsters/party/anything), and audible buzz (`doc/CSBwin-src/CSB.h:855-879`).
+2. **MoveObject teleporter loop**. Mirror CSBWin’s 1000-iteration teleporter chain with active-bit gating and scope checks, including the “pretend teleporter” one-shot path used by DSA TeleportParty (`doc/CSBwin-src/Code11f52.cpp:2899-3012`, `doc/CSBwin-src/DSA.cpp:4583-4609`).
+3. **Party/monster/missile rotation parity**. Use `facingMode` to apply absolute or relative rotation for party, monsters, and missiles; apply the CSBWin `TeleportMonster` group-position logic and `TeleportMissile` direction/pos adjustment (`doc/CSBwin-src/Code11f52.cpp:2308-2410`).
+4. **Sound + visibility gates**. Play `soundTELEPORT` only when `audible` is set (party channel 0, monster channel 1), and draw teleporters only when both visible and active bits are set in the cell flag (`doc/CSBwin-src/Code11f52.cpp:2962-2986`, `doc/CSBwin-src/Codea59a.cpp:354-357`, `doc/CSBwin-src/CSBTypes.h:203-205`).
+5. **TT_TELEPORTER timers**. Toggle the cell active bit, run DSA activation, and call `WiggleEverything()` so occupants get reprocessed after activation (`doc/CSBwin-src/Timer.cpp:2390-2449`).
+6. **Monster movement constraint**. Block monster movement onto an active teleporter when the destination level disallows the monster, matching CSBWin’s pre-move check (`doc/CSBwin-src/Monster.cpp:724-740`).
+
+Status:
+- ✅ Teleporter DB1 bitfields are parsed and consumed (destX/destY local coords, dest level, rotation/facingMode, scope, audible).
+- ✅ MoveObject teleporter loop parity now applied in `TimerSystem.resolveCellEffects` (chain traversal + scope gating + per-type rotation).
+- ✅ Party/Monster/Missile rotation parity implemented with Item16-aware facing/position updates.
+- ✅ Party movement now routes through the teleporter loop and triggers actuators at the resolved destination.
+- ✅ Pretend-teleporter one-shot path wired for DSA TeleportParty handling.
+- ✅ Teleporter sounds now respect the DB1 audible flag; movement no longer plays unconditional teleporter sounds.
+- ✅ TT_TELEPORTER timers toggle active bit, run DSA activation, and wiggle occupants on activation.
+- ✅ Monster movement onto teleporters now blocks when the destination level disallows the monster (CSBWin pre-move constraint).
+
 ### Phase 9 — CSBWin-Compatible missiles behavior
 Goal: match CSBwin’s missile lifecycle (launch → flight → encounter → resolution) as implemented in `doc/CSBwin-src/Timer.cpp` and `doc/CSBwin-src/Code11f52.cpp`.
 

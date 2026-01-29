@@ -2,7 +2,15 @@ import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJEC
 import { SoundIndex } from '../core/constants';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
-import type { ActuatorRecord, CreatureRecord, MapData, MissileRecord, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
+import type {
+  ActuatorRecord,
+  CreatureRecord,
+  Item16Record,
+  MapData,
+  MissileRecord,
+  TeleporterRecord,
+  TextRecord,
+} from '../data/dungeonTypes';
 import {
   ActuatorAction,
   getActuatorAction,
@@ -929,7 +937,7 @@ export class TimerSystem {
       if (!desc) continue;
       if ((desc.word2 & 0x40) !== 0) return true;
     }
-    return false;
+    return allowed.length === 0;
   }
 
   private processPortraitTimer(timer: TimerEntry, actuator: ActuatorRecord): void {
@@ -1984,12 +1992,26 @@ export class TimerSystem {
     this.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }
 
+  resolvePartyMove(position: Position, facing: number): { position: Position; facing: number; moved: boolean } {
+    const result = this.resolveCellEffects(position, -1, 0, facing, undefined, true);
+    return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
+  }
+
+  resolvePartyMoveWithTeleporter(
+    position: Position,
+    facing: number,
+    teleporter: TeleporterRecord,
+  ): { position: Position; facing: number; moved: boolean } {
+    const result = this.resolveCellEffects(position, -1, 0, facing, undefined, true, undefined, teleporter);
+    return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
+  }
+
   private wiggleMonster(monsterRn: number, position: Position): void {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = decodeObjectID(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
     const facing = rec?.facing ?? 0;
-    const result = this.resolveCellEffects(position, DBType.CREATURE, decoded.position & 0x3, facing, undefined, canFall);
+    const result = this.resolveCellEffects(position, DBType.CREATURE, decoded.position & 0x3, facing, undefined, canFall, rec ?? undefined);
     if (!result.moved) return;
 
     const oldPos = new Position(position.x, position.y, position.z);
@@ -1997,7 +2019,7 @@ export class TimerSystem {
     const newRn = encodeObjectID(result.objectPos & 0x3, DBType.CREATURE, decoded.index);
     this.dungeon.removeObjectFromCell(oldPos, monsterRn);
     this.dungeon.addObjectToCell(result.position, newRn);
-    if (rec) rec.facing = result.facing & 0x3;
+    if (rec && !result.usedItem16) rec.facing = result.facing & 0x3;
 
     const unchanged = this.isSamePosition(oldPos, result.position);
     this.actuators.triggerObjectMove(oldPos, monsterRn, false, unchanged, result.facing);
@@ -2051,16 +2073,22 @@ export class TimerSystem {
     facing: number,
     missileDir: number | undefined,
     allowFall: boolean,
-  ): { position: Position; objectPos: number; facing: number; missileDir?: number; moved: boolean } {
+    monster?: CreatureRecord,
+    pretendTeleporter?: TeleporterRecord,
+  ): { position: Position; objectPos: number; facing: number; missileDir?: number; moved: boolean; usedItem16?: boolean } {
     let position = new Position(start.x, start.y, start.z);
     let curFacing = facing & 0x3;
     let curPos = objectPos & 0x3;
     let curDir = missileDir;
     let moved = false;
+    let usedItem16 = false;
+    let forcedTeleporter = pretendTeleporter ?? null;
 
     for (let step = 0; step < 1000; step++) {
-      const teleporter = this.getActiveTeleporterAt(position);
-      if (teleporter && this.teleporterAllowsObject(teleporter, objectType)) {
+      const teleporter = forcedTeleporter ?? this.getActiveTeleporterAt(position);
+      if (forcedTeleporter) forcedTeleporter = null;
+      const canTeleport = objectType < 0 || objectType >= DBType.CREATURE;
+      if (teleporter && canTeleport && this.teleporterAllowsObject(teleporter, objectType)) {
         const destination = this.getTeleporterDestination(teleporter);
         if (!destination) break;
 
@@ -2077,12 +2105,20 @@ export class TimerSystem {
             curDir = ((curDir ?? 0) + rotation) & 0x3;
             curPos = (curPos + rotation) & 0x3;
           }
+        } else if (objectType === DBType.CREATURE) {
+          const result = monster ? this.applyTeleporterToMonster(monster, teleporter, position.z) : null;
+          if (result) {
+            if (result.blocked) break;
+            curFacing = result.facing & 0x3;
+            usedItem16 = result.usedItem16;
+            if (teleporter.sound) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1);
+          } else {
+            curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
+            if (teleporter.sound) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1);
+          }
         } else {
           if (!teleporter.absoluteRotation) {
             curPos = (curPos + rotation) & 0x3;
-          }
-          if (objectType === DBType.CREATURE) {
-            curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
           }
         }
 
@@ -2103,7 +2139,7 @@ export class TimerSystem {
       break;
     }
 
-    return { position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved };
+    return { position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved, usedItem16 };
   }
 
   private getActiveTeleporterAt(position: Position): TeleporterRecord | null {
@@ -2126,20 +2162,17 @@ export class TimerSystem {
 
   private getTeleporterDestination(teleporter: TeleporterRecord): Position | null {
     const destLevel = teleporter.destMap & 0xff;
-    const destAbsX = teleporter.destX & 0x1f;
-    const destAbsY = teleporter.destY & 0x1f;
+    const destX = teleporter.destX & 0x1f;
+    const destY = teleporter.destY & 0x1f;
 
     for (let idx = 0; idx < this.dungeon.getMapCount(); idx++) {
       const map = this.dungeon.getMap(idx as number);
       if (!map) continue;
       const desc = map.descriptor;
       if (desc.level !== destLevel) continue;
-      const minX = desc.offsetX;
-      const minY = desc.offsetY;
-      const maxX = desc.offsetX + desc.width - 1;
-      const maxY = desc.offsetY + desc.height - 1;
-      if (destAbsX < minX || destAbsX > maxX || destAbsY < minY || destAbsY > maxY) continue;
-      return new Position(destAbsX - desc.offsetX, destAbsY - desc.offsetY, idx as number);
+      if (destX < 0 || destY < 0) continue;
+      if (destX >= desc.width || destY >= desc.height) continue;
+      return new Position(destX, destY, idx as number);
     }
 
     return null;
@@ -2190,6 +2223,92 @@ export class TimerSystem {
 
   private isSamePosition(a: Position, b: Position): boolean {
     return a.x === b.x && a.y === b.y && a.z === b.z;
+  }
+
+  private applyTeleporterToMonster(
+    monster: CreatureRecord,
+    teleporter: TeleporterRecord,
+    level: number,
+  ): { facing: number; usedItem16: boolean; blocked: boolean } {
+    const item16 = this.getMonsterItem16(monster, level);
+    const useItem16 = item16 !== null;
+    const rotation = teleporter.rotation & 0x3;
+    const absolute = teleporter.absoluteRotation;
+
+    let facings = useItem16 ? (item16!.facings & 0xff) : this.encodeFacingByte(monster.facing);
+    let positions = useItem16 ? (item16!.positions & 0xff) : (monster.positions & 0xff);
+
+    let newFacings = absolute ? rotation : (facings + rotation) & 0x3;
+    let newPositions = positions;
+
+    if (positions !== 0xff) {
+      const desc = this.tables?.monsterDesc?.[monster.creatureType];
+      const horizontalSize = desc ? (desc.word2 & 0x3) : 0;
+      const numMonM1 = Math.max(0, (monster.count ?? 1) - 1);
+      let facingShift = facings & 0xff;
+      let posShift = positions & 0xff;
+      let posDelta = (newFacings + 4 - facingShift) & 0x3;
+
+      for (let idx = 0; idx <= numMonM1; idx++) {
+        const facingValue = absolute ? rotation : (facingShift + rotation) & 0x3;
+        newFacings = this.setPackedBits(newFacings, idx, facingValue);
+
+        if (horizontalSize === 0) {
+          posDelta = absolute ? 0 : 1;
+          if (posDelta !== 0) posDelta = rotation;
+        }
+
+        if (posDelta !== 0) {
+          const newPos = (posShift + posDelta) & 0x3;
+          newPositions = this.setPackedBits(newPositions, idx, newPos);
+        }
+
+        facingShift >>= 2;
+        posShift >>= 2;
+      }
+    }
+
+    if (useItem16) {
+      item16!.facings = newFacings & 0xff;
+      if (positions !== 0xff) item16!.positions = newPositions & 0xff;
+    } else {
+      monster.facing = newFacings & 0x3;
+      if (positions !== 0xff) monster.positions = newPositions & 0xff;
+    }
+
+    const destLevel = teleporter.destMap & 0xff;
+    const blocked = !this.isMonsterAllowedOnLevel(monster, destLevel);
+    return { facing: newFacings & 0x3, usedItem16: useItem16, blocked };
+  }
+
+  private isMonsterAllowedOnLevel(monster: CreatureRecord, level: number): boolean {
+    const map = this.dungeon.getMap(level);
+    if (!map) return false;
+    const allowed = map.monsterTypes ?? [];
+    const mt = monster.creatureType & 0xff;
+    for (const entry of allowed) {
+      if ((entry & 0xff) === mt) return true;
+    }
+    return false;
+  }
+
+  private getMonsterItem16(monster: CreatureRecord, level: number): Item16Record | null {
+    const partyLevel = this.getPartyState().position.z;
+    if (level !== partyLevel) return null;
+    const groupIndex = monster.groupIndex;
+    if (groupIndex === undefined) return null;
+    return this.dungeon.getItem16Record(groupIndex);
+  }
+
+  private encodeFacingByte(facing: number): number {
+    const face = facing & 0x3;
+    return (face | (face << 2) | (face << 4) | (face << 6)) & 0xff;
+  }
+
+  private setPackedBits(value: number, index: number, bits: number): number {
+    const shift = (index & 0x3) * 2;
+    const mask = 0x3 << shift;
+    return (value & ~mask) | ((bits & 0x3) << shift);
   }
 
   private activateDsa(timer: TimerEntry): void {

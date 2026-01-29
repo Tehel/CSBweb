@@ -5,7 +5,7 @@
  * Based on CSBWin's VBL-driven game loop
  */
 
-import type { DungeonData, Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
+import type { DungeonData, Item16Record, MissileRecord, TeleporterRecord, TimerRecord } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Party } from './Party';
@@ -103,6 +103,7 @@ export class Game {
         };
 
         this.timerQueue = new TimerQueue();
+        this.playSound = playSound;
         this.actuators = new ActuatorSystem(
             this.dungeonState,
             () => this.party.state,
@@ -131,13 +132,14 @@ export class Game {
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
+                playSound: (soundId, rateIdx) => this.playSound?.(soundId, rateIdx),
                 ...timerHooks,
             },
         );
-        this.playSound = playSound;
+        this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
 
         // Initialize movement system
-        this.movementSystem = new MovementSystem(this.party, this.dungeonState, this.actuators);
+        this.movementSystem = new MovementSystem(this.party, this.dungeonState);
 
         console.log('Game initialized at position:', startPos, 'facing:', startFacing);
     }
@@ -251,10 +253,28 @@ export class Game {
 
         if (result.success) {
             const oldPos = this.party.state.position;
-            if (result.newPosition) {
-                this.timerSystem.checkMoveFromMissile(oldPos, result.newPosition, null);
+            const oldFacing = this.party.state.facing;
+            let resolvedPosition = result.newPosition;
+            let resolvedFacing = result.newFacing ?? oldFacing;
+
+            if (resolvedPosition) {
+                this.timerSystem.checkMoveFromMissile(oldPos, resolvedPosition, null);
+                const teleported = this.timerSystem.resolvePartyMove(resolvedPosition, resolvedFacing);
+                resolvedPosition = teleported.position;
+                resolvedFacing = teleported.facing;
+                result.newPosition = resolvedPosition;
+                if (resolvedFacing !== (result.newFacing ?? oldFacing)) {
+                    result.newFacing = resolvedFacing;
+                }
             }
             this.party.applyMovement(result);
+            if (resolvedPosition) {
+                const unchanged = oldPos.x === resolvedPosition.x
+                    && oldPos.y === resolvedPosition.y
+                    && oldPos.z === resolvedPosition.z;
+                this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
+                this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
+            }
             this.timerSystem.processTimers(this.state.tickCount);
 
             // Update party state in game state
@@ -274,6 +294,34 @@ export class Game {
 
             return false;
         }
+    }
+
+    private handleDsaTeleportParty(locr: { l: number; x: number; y: number; p: number }): void {
+        const party = this.party.state;
+        const oldPos = new Position(party.position.x, party.position.y, party.position.z);
+        const oldFacing = party.facing & 0x3;
+        const pretendTeleporter: TeleporterRecord = {
+            nextObject: OBJECT_ID_EOF,
+            sound: false,
+            scope: 2,
+            absoluteRotation: false,
+            rotation: locr.p & 0x3,
+            destX: locr.x & 0x1f,
+            destY: locr.y & 0x1f,
+            destMap: locr.l & 0xff,
+        };
+
+        this.timerSystem.checkMoveFromMissile(oldPos, oldPos, null);
+        const resolved = this.timerSystem.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
+        party.position = resolved.position;
+        party.facing = resolved.facing & 0x3;
+
+        const unchanged = oldPos.x === resolved.position.x
+            && oldPos.y === resolved.position.y
+            && oldPos.z === resolved.position.z;
+        this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
+        this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+        this.state.party = this.party.state;
     }
 
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {

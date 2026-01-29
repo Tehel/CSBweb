@@ -9,8 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import type { ActuatorSystem } from './ActuatorSystem';
-import { OBJECT_ID_NULL, Position, RoomType } from '../core/types';
+import { Position, RoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
 
 /**
@@ -19,12 +18,10 @@ import { SoundIndex } from '../core/constants';
 export class MovementSystem {
     private party: Party;
     private dungeon: DungeonState;
-    private actuators?: ActuatorSystem;
 
-    constructor(party: Party, dungeon: DungeonState, actuators?: ActuatorSystem) {
+    constructor(party: Party, dungeon: DungeonState) {
         this.party = party;
         this.dungeon = dungeon;
-        this.actuators = actuators;
     }
 
     /**
@@ -134,12 +131,6 @@ export class MovementSystem {
             return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0);
         }
 
-        const facing = this.party.state.facing;
-        if (this.actuators) {
-            this.actuators.triggerObjectMove(position, OBJECT_ID_NULL, false, false, facing);
-            this.actuators.triggerObjectMove(newPosition, OBJECT_ID_NULL, true, false, facing);
-        }
-
         // Movement is valid
         return {
             success: true,
@@ -157,7 +148,7 @@ export class MovementSystem {
     private checkSpecialTiles(position: Position): { message?: string; soundId?: number } | undefined {
         if (this.dungeon.isPit(position)) return { message: 'You step into a pit!' };
         if (this.dungeon.isTeleporter(position)) {
-            return { message: 'You feel a strange sensation...', soundId: SoundIndex.TELEPORT };
+            return { message: 'You feel a strange sensation...' };
         }
 
         if (this.dungeon.isStairs(position)) return { message: 'You find stairs' };

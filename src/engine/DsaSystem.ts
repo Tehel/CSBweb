@@ -57,6 +57,8 @@ interface DsaLocation {
   p: number;
 }
 
+type TeleportPartyLocation = { l: number; x: number; y: number; p: number };
+
 enum DsaCommand {
   MESSAGE = 1,
   OVERRIDE = 2,
@@ -145,6 +147,7 @@ enum StkOp {
   CELL_STORE = 58,
   GLOBAL_FETCH = 59,
   ULESS = 50,
+  TELEPORT_PARTY = 62,
   RANDOM = 67,
   XOR = 70,
   DESCRIBE = 72,
@@ -155,6 +158,7 @@ enum StkOp {
   OBJECT_ID = 123,
   MODIFY_MESSAGE = 138,
   NUM_PARAM = 139,
+  I_TELEPORT_PARTY = 83,
 }
 
 const EDT_SPECIAL_LOCATIONS = 3;
@@ -370,6 +374,7 @@ export class DsaSystem {
   private overridePos = 0;
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
+  private teleportPartyHandler?: (location: TeleportPartyLocation) => void;
 
   constructor(
     private dungeon: DungeonState,
@@ -401,6 +406,10 @@ export class DsaSystem {
   getParameter(index: number): number {
     if (index < 0 || index >= 100) return 0;
     return this.parameters[1 + index] ?? 0;
+  }
+
+  setTeleportPartyHandler(handler: (location: TeleportPartyLocation) => void): void {
+    this.teleportPartyHandler = handler;
   }
 
   processMissileEncounterFilter(options: {
@@ -1180,6 +1189,19 @@ export class DsaSystem {
         if (firstDisabled !== null) {
           const rec = this.dungeon.getActuatorRecord(firstDisabled);
           if (rec) setActuatorDisableTime(rec, delay);
+        }
+        break;
+      }
+      case StkOp.TELEPORT_PARTY:
+      case StkOp.I_TELEPORT_PARTY: {
+        const location = bank.stack.pop();
+        const locr = intToLocation(location);
+        if (!this.isValidLocation(locr)) break;
+        if (this.teleportPartyHandler) {
+          this.teleportPartyHandler(locr);
+        } else if (!this.warnedOps.has(subcode)) {
+          this.warnedOps.add(subcode);
+          console.warn('DSA TeleportParty handler not set');
         }
         break;
       }
