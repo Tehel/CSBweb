@@ -66,6 +66,9 @@ type ObjectMoveHandler = (
   unchangedRoom: boolean,
   facing: number,
 ) => void;
+type ChestViewSource =
+  | { id: ObjectID; source: 'cursor' }
+  | { id: ObjectID; source: 'hand'; slot: number };
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -98,6 +101,7 @@ const OBJNI_STORM_A = 23;
 const OBJNI_RA_BLADE_A = 25;
 const OBJNI_OPEN_SCROLL = 30;
 const OBJNI_SCROLL = 31;
+const OBJNI_OPEN_CHEST = 91;
 const OBJNI_BONES_A = 93;
 const OBJNI_FIRST_MODIFIABLE = 0;
 const OBJNI_LAST_MODIFIABLE = 31;
@@ -176,6 +180,9 @@ export class ViewportRenderer {
   private partyState: PartyState | null = null;
   private objectTables: ObjectTables | null = null;
   private pressingEye: boolean = false;
+  private openChestId: ObjectID | null = null;
+  private openChestContents: Array<ObjectID | null> = Array(8).fill(null);
+  private openChestIconIndex: number | null = null;
   private hoverPoint: { x: number; y: number } | null = null;
   private showAttackPanel: boolean = false;
   private cursorArrowBitmap: IndexedBitmap | null = null;
@@ -874,6 +881,9 @@ export class ViewportRenderer {
     clearIndex(this.screenIndexBuffer, 0);
     this.drawStaticUIFrame();
     const inventoryOpen = (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    if (!inventoryOpen) {
+      this.syncOpenChest(null);
+    }
     if (inventoryOpen) {
       this.drawInventoryBackground();
     } else {
@@ -1070,6 +1080,7 @@ export class ViewportRenderer {
     for (const line of lines) {
       this.drawItemDescriptionLine(line.text, line.color, textState);
     }
+    this.drawInspectArrow(this.pressingEye);
   }
 
   private drawScrollPanel(objectId: ObjectID): void {
@@ -1102,6 +1113,7 @@ export class ViewportRenderer {
       this.drawScrollLine(y, line);
       y += 7;
     }
+    this.drawInspectArrow(this.pressingEye);
   }
 
   private splitScrollLines(text: string): { lines: string[]; startY: number } {
@@ -1924,6 +1936,8 @@ export class ViewportRenderer {
 
     const iconSlots = this.uiTables.graphic232.iconDisplay;
     const word612 = this.uiTables.graphic232.word612;
+    const chestView = this.getActiveChestView(champion);
+    this.syncOpenChest(chestView);
 
     if (this.fontData) {
       const nameColor = this.partyState.cursorOwner === selected ? 9 : 13;
@@ -1957,7 +1971,10 @@ export class ViewportRenderer {
     }
 
     for (let slot = 0; slot < 30; slot++) {
-      const objectIndex = this.getInventoryItemIndex(champion, slot);
+      let objectIndex = this.getInventoryItemIndex(champion, slot);
+      if (chestView?.source === 'hand' && chestView.slot === slot) {
+        objectIndex = this.getOpenChestIconIndex();
+      }
       const rect = this.getInventorySlotRect(iconSlots, slot);
       if (!rect) continue;
       if (objectIndex >= 0) {
@@ -1970,7 +1987,9 @@ export class ViewportRenderer {
       }
     }
 
-    if (this.pressingEye) {
+    if (chestView) {
+      this.drawChestPanel(chestView);
+    } else if (this.pressingEye) {
       const cursorObject = this.normalizeObjectValue(this.partyState?.objectInHand);
       if (cursorObject !== null) {
         this.drawObjectInfoPanel(cursorObject);
@@ -1995,6 +2014,17 @@ export class ViewportRenderer {
     };
   }
 
+  private getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
+    const icon = iconSlots[38 + slot];
+    if (!icon) return null;
+    return {
+      x1: icon.pixelX + VIEWPORT_X,
+      y1: icon.pixelY + VIEWPORT_Y,
+      x2: icon.pixelX + VIEWPORT_X + 15,
+      y2: icon.pixelY + VIEWPORT_Y + 15,
+    };
+  }
+
   private getInventoryItemIndex(champion: Champion, slot: number): number {
     const possessions = champion.possessions;
     if (possessions && slot >= 0 && slot < possessions.length) {
@@ -2008,6 +2038,134 @@ export class ViewportRenderer {
       return this.resolveObjectNameIndex(champion.weaponHand | 0);
     }
     return -1;
+  }
+
+  private getOpenChestIconIndex(): number {
+    if (this.openChestIconIndex !== null) return this.openChestIconIndex;
+    const names = this.objectTables?.objectNames ?? [];
+    for (let i = 0; i < names.length; i++) {
+      const name = (names[i] ?? '').trim().toUpperCase();
+      if (name === 'OPEN CHEST') {
+        this.openChestIconIndex = i;
+        return i;
+      }
+    }
+    this.openChestIconIndex = OBJNI_OPEN_CHEST;
+    return this.openChestIconIndex;
+  }
+
+  private getActiveChestView(champion: Champion): ChestViewSource | null {
+    if (!this.partyState) return null;
+
+    const cursorObject = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (this.pressingEye && this.isChestRecord(cursorObject)) {
+      return { id: cursorObject as ObjectID, source: 'cursor' };
+    }
+
+    if (this.pressingEye) return null;
+    const handSlot = 1; // CSBWin uses weapon hand for chest display.
+    const handObject = this.normalizeObjectValue(this.getChampionPossession(champion, handSlot));
+    if (this.isChestRecord(handObject)) {
+      return { id: handObject as ObjectID, source: 'hand', slot: handSlot };
+    }
+    return null;
+  }
+
+  private syncOpenChest(chestView: ChestViewSource | null): void {
+    if (!chestView) {
+      if (this.openChestId !== null) {
+        this.repackOpenChest();
+      }
+      return;
+    }
+
+    if (this.openChestId !== null && this.openChestId === chestView.id) return;
+    if (this.openChestId !== null) this.repackOpenChest();
+    this.openChest(chestView.id);
+  }
+
+  private openChest(chestId: ObjectID): void {
+    const chest = this.dungeonState.getContainerRecord(chestId);
+    if (!chest) {
+      this.openChestId = null;
+      this.openChestContents = Array(8).fill(null);
+      return;
+    }
+
+    this.openChestId = chestId;
+    const contents: Array<ObjectID | null> = Array(8).fill(null);
+    let cursor = chest.containedObject;
+    let index = 0;
+    while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
+      contents[index++] = cursor;
+      cursor = this.dungeonState.getDBRecordLink(cursor);
+    }
+    this.openChestContents = contents;
+
+    for (const item of contents) {
+      if (item !== null) {
+        this.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+      }
+    }
+    chest.containedObject = OBJECT_ID_EOF;
+  }
+
+  private repackOpenChest(): void {
+    if (this.openChestId === null) return;
+    const chest = this.dungeonState.getContainerRecord(this.openChestId);
+    if (!chest) {
+      this.openChestId = null;
+      this.openChestContents = Array(8).fill(null);
+      return;
+    }
+
+    chest.containedObject = OBJECT_ID_EOF;
+    let previous: ObjectID | null = null;
+    for (const item of this.openChestContents) {
+      if (item === null) continue;
+      this.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+      if (previous === null) {
+        chest.containedObject = item;
+      } else {
+        this.dungeonState.setDBRecordLink(previous, item);
+      }
+      previous = item;
+    }
+
+    this.openChestId = null;
+    this.openChestContents = Array(8).fill(null);
+  }
+
+  private drawChestPanel(chestView: ChestViewSource): void {
+    if (!this.uiTables || !this.screenIndexBuffer) return;
+    const ui = this.uiTables.graphic232;
+    this.blitBasicGraphicToViewport(25, ui.wRectPos926, 144, 8);
+    this.drawInspectArrow(chestView.source === 'cursor');
+
+    const word612 = ui.word612;
+    const iconSlots = ui.iconDisplay;
+    for (let slot = 0; slot < 8; slot++) {
+      const rect = this.getChestSlotRect(iconSlots, slot);
+      if (!rect) continue;
+      const item = this.normalizeObjectValue(this.openChestContents[slot] ?? null);
+      if (item === null) continue;
+      const objectIndex = this.resolveObjectNameIndex(item | 0);
+      if (objectIndex >= 0) this.drawObjectIcon(rect, objectIndex, word612);
+    }
+  }
+
+  private drawInspectArrow(fromEye: boolean): void {
+    if (!this.uiTables || !this.screenIndexBuffer) return;
+    const ui = this.uiTables.graphic232;
+    const graphicIndex = fromEye ? 19 : 18;
+    this.blitBasicGraphicToViewport(graphicIndex, ui.wRectPos934, 16, 8);
+  }
+
+  private isChestRecord(value: number | null): value is ObjectID {
+    if (value === null || value === undefined) return false;
+    if (!this.isLikelyObjectRecord(value)) return false;
+    const { category } = decodeObjectID(value as ObjectID);
+    return category === DBType.CHEST;
   }
 
   private resolveObjectNameIndex(value: number): number {
@@ -2669,6 +2827,10 @@ export class ViewportRenderer {
       this.handleMagicClick(x, y);
       return;
     }
+    if (id === 81) {
+      this.handleChestAreaClick(x, y);
+      return;
+    }
     if (id === 83) {
       if (!this.partyState) return;
       const owner = this.partyState.cursorOwner;
@@ -2737,9 +2899,31 @@ export class ViewportRenderer {
     }
   }
 
+  private handleChestAreaClick(clickX: number, clickY: number): void {
+    if (!this.uiTables || !this.partyState) return;
+    if ((this.partyState.cursorOwner ?? -1) < 0) return;
+
+    const selected = this.partyState.selectedCharacterIndex ?? -1;
+    if (selected < 0) return;
+    const champ =
+      this.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.partyState.champions[selected] ??
+      null;
+    if (!champ || champ.alive === false) return;
+
+    const chestView = this.getActiveChestView(champ);
+    if (!chestView || chestView.source !== 'hand') return;
+
+    const button = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
+    if (button !== 0) {
+      this.handleClothingClick(button - 20);
+    }
+  }
+
   private handleInventoryToggle(button: number): void {
     if (!this.partyState) return;
     if (button === 4) {
+      this.syncOpenChest(null);
       this.partyState.selectedCharacterIndex = -1;
       this.pressingEye = false;
       this.syncInventoryButtons();
@@ -2751,8 +2935,12 @@ export class ViewportRenderer {
       this.partyState.champions[button] ??
       null;
     if (!champ || champ.alive === false) return;
+    const previous = this.partyState.selectedCharacterIndex;
     this.partyState.selectedCharacterIndex =
       this.partyState.selectedCharacterIndex === button ? -1 : button;
+    if (this.partyState.selectedCharacterIndex !== previous) {
+      this.syncOpenChest(null);
+    }
     if (this.partyState.selectedCharacterIndex < 0) {
       this.pressingEye = false;
     }
@@ -2808,15 +2996,24 @@ export class ViewportRenderer {
       slot = button - 8;
     }
 
-    if (slot < 0 || slot >= 30) return;
+    if (slot < 0 || slot >= 38) return;
     const champ =
       this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
       this.partyState.champions[chIdx] ??
       null;
     if (!champ || champ.alive === false) return;
 
+    const chestView = this.getActiveChestView(champ);
+    const isChestSlot = slot >= 30;
+    if (isChestSlot) {
+      if (!chestView) return;
+      this.syncOpenChest(chestView);
+    }
+
     const objectInHand = this.normalizeObjectValue(this.partyState.objectInHand);
-    const slotObject = this.normalizeObjectValue(this.getChampionPossession(champ, slot));
+    const slotObject = isChestSlot
+      ? this.normalizeObjectValue(this.openChestContents[slot - 30] ?? null)
+      : this.normalizeObjectValue(this.getChampionPossession(champ, slot));
     if (!objectInHand && !slotObject) return;
 
     if (objectInHand && !this.canPlaceInSlot(objectInHand, slot)) return;
@@ -2825,11 +3022,19 @@ export class ViewportRenderer {
       this.partyState.objectInHand = null;
     }
     if (slotObject) {
-      this.setChampionPossession(champ, slot, null);
+      if (isChestSlot) {
+        this.openChestContents[slot - 30] = null;
+      } else {
+        this.setChampionPossession(champ, slot, null);
+      }
       this.partyState.objectInHand = slotObject;
     }
     if (objectInHand) {
-      this.setChampionPossession(champ, slot, objectInHand);
+      if (isChestSlot) {
+        this.openChestContents[slot - 30] = objectInHand;
+      } else {
+        this.setChampionPossession(champ, slot, objectInHand);
+      }
     }
   }
 

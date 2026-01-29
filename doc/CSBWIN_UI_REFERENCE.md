@@ -63,6 +63,16 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - Slots < 8 draw into `d.LogicalScreenBase`, slots >= 8 draw into `d.pViewportBMP` (inventory view) (`doc/CSBwin-src/Character.cpp:61`, `doc/CSBwin-src/Character.cpp:71`).
 - `Word612[7]` selects the graphic group for object icons (`doc/CSBwin-src/Data.h:1454`, `doc/CSBwin-src/Character.cpp:48`).
 
+## Chest view and slots
+
+- `ShowChestContents` draws the chest panel graphic `25` into `wRectPos926` with a 72-byte stride (144 pixels at 4bpp) and transparency color 8, placing it in the same panel area as food/water or scrolls (`doc/CSBwin-src/Character.cpp:3051-3054`).
+- When the chest display comes from the weapon hand (`P3 == 0`), `ShowChestContents` draws the open chest icon into slot `9` via `DrawItem(9, objNI_OpenChest)` (`doc/CSBwin-src/Character.cpp:3047-3050`).
+- Chest contents are copied into `d.rnChestContents[0..7]` and rendered using `DrawItem(D7W+38, ...)`, with empty slots filled by `objNI_NotAnObject` (`doc/CSBwin-src/Character.cpp:3055-3069`).
+- While the chest is displayed, CSBWin clears each item's link and sets the chest's `contents` link to `RNeof` to avoid stale/looped lists (`doc/CSBwin-src/Character.cpp:3088-3101`).
+- `RepackChest` rebuilds the chest linked list from `d.rnChestContents`, setting the first item as `contents` and chaining the rest via `AddObjectToRoom` (`doc/CSBwin-src/Character.cpp:3128-3149`).
+- Chest display is triggered through `DescribeObject` when the DB type is `dbCHEST` (`doc/CSBwin-src/Character.cpp:3534-3536`), which is called both from eye-click (`doc/CSBwin-src/Viewport.cpp:7284-7286`) and when the selected character's weapon hand holds a chest (`doc/CSBwin-src/Character.cpp:3864-3894`, `doc/CSBwin-src/Data.h:742-746`).
+- `HandleClothingClick` reserves chest slot indices 30..37 (after subtracting 20), mapping them to `d.rnChestContents[D6W-30]` for click handling (`doc/CSBwin-src/CSBCode.cpp:6918-6953`).
+
 ## Eye click and inspection flow
 
 - `ClickOnEye` sets `PressingEyeOrMouth`/`PressingEye`, draws the eye icon (`objNI_Special_e`), and if the hand is empty calls `TAG019036` (attributes); otherwise it calls `DescribeObject(d.objectInHand, 1)` (`doc/CSBwin-src/Viewport.cpp`).
@@ -75,6 +85,11 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `DescribeObject` prefixes potion names (except water/empty flasks) with `char(95 + strength/40)` when `DetermineMastery(selectedChampion, 2) > 1` (`doc/CSBwin-src/Character.cpp`).
 - `DescribeObject` builds hero bones names by concatenating the champion name with `ObjectNames[objNI_Bones_a]` when `DB10->value()` is non-zero and `CopyChampionBonesRecord` resolves a valid champion (`doc/CSBwin-src/Character.cpp`).
 - `DescribeObject` invokes the `ESL_VIEWINGFILTER` DSA (special location) with `pDSAparameters[1]=phraseMask`, `pDSAparameters[2]=objectId`, `pDSAparameters[3]=selectedChampion`, and `pDSAparameters[0]=3`, allowing `STKOP_Describe` (`ModifyDescription`) to override phrase text/colors (`doc/CSBwin-src/Character.cpp`).
+
+## Inspection arrow indicator
+
+- `TAG018238` blits basic graphic `18` (weapon-hand view) or `19` (eye view) into `wRectPos934` with an 8-byte stride and transparency color 8 (`doc/CSBwin-src/Character.cpp:3270-3274`).
+- `DescribeObject` always calls `TAG018238(P2)` after drawing the object panel; `P2` is `0` when called from weapon-hand view (`TAG0189d4`) and `1` when called from eye view (`_ClickOnEye`) (`doc/CSBwin-src/Character.cpp:3794`, `doc/CSBwin-src/Character.cpp:3864-3894`, `doc/CSBwin-src/Viewport.cpp:7284-7286`).
 
 ## Scroll display
 
