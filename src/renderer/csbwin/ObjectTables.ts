@@ -81,6 +81,7 @@ export interface ObjectTables {
   weaponWeights: Uint8Array; // d.weapons[46].weight
   clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
   miscWeights: Uint8Array; // d.Byte8946[54]
+  foodValue: Int16Array; // d.FoodValue[8]
 
   // Wall decorations
   wallDecorationRectSets: DecorationDesc[][]; // d.wallDecorationPosition[8][13]
@@ -158,6 +159,7 @@ const ABS_22F_START = 10340; // Byte10340[4] - start of graphic 0x22f
 const ABS_OBJDESC = 8382; // ObjDesc[180]
 const ABS_WEAPONS = 8658; // weapons[46]
 const ABS_CLOTHING = 8890; // ClothingDesc[58]
+const ABS_FOOD_VALUE = 8962; // FoodValue[8]
 const ABS_BYTE8946 = 8946; // Byte8946[54]
 const ABS_MONSTER_ATTACK_SOUND = 9672; // uByte9672[8]
 const ABS_MONSTER_DESC = 9664; // MonsterDescriptor[27]
@@ -406,6 +408,19 @@ function readClothingWeights22f(raw: Uint8Array): Uint8Array {
   return out;
 }
 
+function readFoodValue22f(raw: Uint8Array): Int16Array {
+  const start = ABS_22F_START - ABS_FOOD_VALUE;
+  const count = 8;
+  const end = start + count * 2;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for FoodValue[8]');
+
+  const out = new Int16Array(count);
+  for (let i = 0; i < count; i++) {
+    out[i] = readI16BE(raw, start + i * 2);
+  }
+  return out;
+}
+
 function readMiscWeights22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_BYTE8946;
   const count = 54;
@@ -635,6 +650,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
   const clothingWeights = readClothingWeights22f(raw22f);
+  const foodValue = readFoodValue22f(raw22f);
   const miscWeights = readMiscWeights22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
   const wallDecorationRectSetIndex = raw22e.slice(wallDecorationRectSetIndexOffset, wallDecorationRectSetIndexOffset + 60);
@@ -718,6 +734,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     objectNames,
     weaponWeights,
     clothingWeights,
+    foodValue,
     miscWeights,
     wallDecorationRectSets,
     wallDecorationRectSetIndex,

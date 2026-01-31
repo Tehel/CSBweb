@@ -1,6 +1,6 @@
 import { SNDexpand } from '../core/compression';
 import type { GraphicsLoader } from '../data/GraphicsLoader';
-import { ratesDefault, soundsIndex, type SoundInfo } from './soundsIndex';
+import { buildSoundCatalog, ratesDefault, type SoundInfo, type SoundTableEntry } from './soundsIndex';
 
 interface SoundVariant {
   name: string;
@@ -15,6 +15,7 @@ export class SoundManager {
   private cache = new Map<number, SoundVariant[]>();
   private enabled = true;
   private volume = 0.8;
+  private soundCatalog: Record<number, SoundInfo> = buildSoundCatalog();
 
   constructor(private graphics: GraphicsLoader) {
     const hasAudio = typeof globalThis !== 'undefined' && 'AudioContext' in globalThis;
@@ -60,9 +61,9 @@ export class SoundManager {
   }
 
   preloadAll(): void {
-    for (const key of Object.keys(soundsIndex)) {
+    for (const key of Object.keys(this.soundCatalog)) {
       const id = Number(key);
-      const info = soundsIndex[id];
+      const info = this.soundCatalog[id];
       if (!info) continue;
       this.preloadSound(id, info);
     }
@@ -74,12 +75,11 @@ export class SoundManager {
 
     const raw = this.graphics.getRawGraphic(id);
     const data = SNDexpand(raw);
-    const rates = info.rates ?? ratesDefault;
     const rateTarget = this.audioContext.sampleRate;
-    const duration = data.length / ratesDefault[0];
 
     const variants: SoundVariant[] = [];
-    for (const rate of rates) {
+    for (const rate of info.rates ?? ratesDefault) {
+      const duration = data.length / rate;
       const sampleCount = Math.max(1, Math.floor(duration * rateTarget));
       const buffer = this.audioContext.createBuffer(1, sampleCount, rateTarget);
       const channel = buffer.getChannelData(0);
@@ -89,7 +89,7 @@ export class SoundManager {
         channel[i] = (src - 127.5) / 127.5;
       }
 
-      const name = info.rates ? `${info.name} (${rate} Hz)` : info.name;
+      const name = `${info.name} (${rate} Hz)`;
       variants.push({
         name,
         rate,
@@ -106,7 +106,7 @@ export class SoundManager {
     if (!this.enabled) return;
 
     if (!this.cache.has(id)) {
-      const info = soundsIndex[id] ?? { name: `Sound ${id}` };
+      const info = this.soundCatalog[id] ?? { name: `Sound ${id}` };
       this.preloadSound(id, info);
     }
 
@@ -119,5 +119,13 @@ export class SoundManager {
     if (!this.gainNode) return;
     source.connect(this.gainNode);
     source.start();
+  }
+
+  setSoundTable(soundTable?: SoundTableEntry[]): void {
+    this.soundCatalog = buildSoundCatalog(soundTable);
+  }
+
+  getSoundCatalog(): Record<number, SoundInfo> {
+    return this.soundCatalog;
   }
 }

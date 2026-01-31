@@ -40,7 +40,7 @@ import {
   VIEWPORT_X,
   VIEWPORT_Y,
 } from './ViewportGraphics';
-import { getOrSet, Position } from '@/core';
+import { getOrSet, Position, SoundIndex } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateDebug, updateHover } from '@/ui';
 import { GraphicRoomType } from './bytecode/Types';
@@ -59,6 +59,14 @@ type ViewportCursorAction =
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
 type ItemDescriptionLine = { text: string; color: number };
+type FeedingOutcome = {
+  foodDelta: number;
+  waterDelta: number;
+  removeFromHand: boolean;
+  deleteRecord: boolean;
+  chew: boolean;
+  playGulp: boolean;
+};
 type ObjectMoveHandler = (
   position: Position,
   object: ObjectID,
@@ -84,11 +92,17 @@ export interface FloorCeiling {
   mirrored: Uint8Array;
 }
 
-const charColors = [7, 11, 8, 14];
+const OBJNI_FIRST_MODIFIABLE = 0;
+const OBJNI_LAST_MODIFIABLE = 31;
+const OBJNI_FIRST_FULL_FLASK = 148;
+const OBJNI_LAST_FULL_FLASK = 163;
+
 const OBJNI_COMPASS_N = 0;
 const OBJNI_COMPASS_W = 3;
 const OBJNI_TORCH_A = 4;
-const OBJNI_TORCH_D = OBJNI_TORCH_A + 3;
+const OBJNI_TORCH_B = 5;
+const OBJNI_TORCH_C = 6;
+const OBJNI_TORCH_D = 7;
 const OBJNI_WATERSKIN = 8;
 const OBJNI_WATER = 9;
 const OBJNI_JEWEL_SYMAL_A = 10;
@@ -99,37 +113,39 @@ const OBJNI_STORM_RING_A = 18;
 const OBJNI_STAFF_OF_CLAWS_A = 20;
 const OBJNI_STORM_A = 23;
 const OBJNI_RA_BLADE_A = 25;
-const OBJNI_OPEN_SCROLL = 30;
-const OBJNI_SCROLL = 31;
-const OBJNI_OPEN_CHEST = 91;
-const OBJNI_BONES_A = 93;
-const OBJNI_FIRST_MODIFIABLE = 0;
-const OBJNI_LAST_MODIFIABLE = 31;
-const OBJNI_ELVEN_BOOTS = 119;
-const OBJNI_FIRST_FULL_FLASK = 148;
-const OBJNI_LAST_FULL_FLASK = 163;
-const OBJNI_WATER_FLASK = 163;
-const OBJNI_EMPTY_FLASK = 195;
-const OBJNI_SPECIAL_F = 204;
-const OBJNI_SPECIAL_C = 201;
-const OBJNI_SPECIAL_D = 202;
-const OBJNI_SPECIAL_E = 203;
-const OBJNI_SPECIAL_J = 208;
-const OBJNI_SPECIAL_N = 212;
 const OBJNI_THE_FIRESTAFF_A = 28;
 const OBJNI_THE_FIRESTAFF_B = 29;
+const OBJNI_OPEN_SCROLL = 30;
+const OBJNI_SCROLL = 31;
 const OBJNI_SCEPTRE_OF_LYF = 68;
+const OBJNI_OPEN_CHEST = 91;
+const OBJNI_BONES_A = 93;
+const OBJNI_ELVEN_BOOTS = 119;
 const OBJNI_GEM_OF_AGES = 122;
 const OBJNI_EKKHARD_CROSS = 123;
 const OBJNI_MOONSTONE = 124;
 const OBJNI_PENDANT_FERAL = 126;
-const POTION_WATER_FLASK = 15;
-const POTION_EMPTY_FLASK = 20;
-const DEFAULT_CHEST_WEIGHT = 50;
+const OBJNI_WATER_FLASK = 163;
+const OBJNI_APPLE = 168;
+const OBJNI_DRAGON_STEAK = 175;
+const OBJNI_EMPTY_FLASK = 195;
+const OBJNI_SPECIAL_C = 201;
+const OBJNI_SPECIAL_D = 202;
+const OBJNI_SPECIAL_E = 203;
+const OBJNI_SPECIAL_F = 204;
+const OBJNI_SPECIAL_G = 205;
+const OBJNI_SPECIAL_H = 206;
+const OBJNI_SPECIAL_J = 208;
+const OBJNI_SPECIAL_N = 212;
+
 const MISC_BONES_OF_HERO = 5;
-const MAX_SCROLL_LINE_LENGTH = 16;
 const MAX_LINES_IN_SCROLL = 9;
+const DEFAULT_CHEST_WEIGHT = 50;
+const POTION_EMPTY_FLASK = 20;
+const POTION_WATER_FLASK = 15;
+const MAX_SCROLL_LINE_LENGTH = 16;
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+const CHAR_COLORS = [7, 11, 8, 14];
 const MASTERY_LABELS = [
   '',
   '',
@@ -183,6 +199,11 @@ export class ViewportRenderer {
   private openChestId: ObjectID | null = null;
   private openChestContents: Array<ObjectID | null> = Array(8).fill(null);
   private openChestIconIndex: number | null = null;
+  private mouthChewStartMs: number | null = null;
+  private mouthChewEndMs: number = 0;
+  private mouthChewFrameHandle: number | null = null;
+  private lastRenderPosition: Position | null = null;
+  private lastRenderFacing: number = 0;
   private hoverPoint: { x: number; y: number } | null = null;
   private showAttackPanel: boolean = false;
   private cursorArrowBitmap: IndexedBitmap | null = null;
@@ -374,6 +395,8 @@ export class ViewportRenderer {
     }
 
     if (!this.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
+    this.lastRenderPosition = { x, y, z };
+    this.lastRenderFacing = facing;
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
     const map = this.dungeonState.getMap(z);
@@ -1999,6 +2022,7 @@ export class ViewportRenderer {
     } else {
       this.drawFoodWaterPanel(champion);
     }
+    this.drawMouthChewAnimation();
     this.drawEyeIcon();
     this.drawVitalsAndLoad(champion);
   }
@@ -2775,7 +2799,7 @@ export class ViewportRenderer {
 
       for (let row = 0; row <= 24; row++) {
         const filled = height > (24 - row);
-        const color = filled ? charColors[chIdx] : 12;
+        const color = filled ? CHAR_COLORS[chIdx] : 12;
         const y = 2 + row;
         this.drawMaskedBarRow(startX, y, mask1, color);
         this.drawMaskedBarRow(startX + 16, y, mask2, color);
@@ -2821,6 +2845,10 @@ export class ViewportRenderer {
     updateDebug(`handling click on ${id}`)
     if (id === 80 && this.isEyeClick(x, y)) {
       this.handleEyePress();
+      return;
+    }
+    if (id === 70) {
+      this.handleMouthPress();
       return;
     }
     if (id === 100) {
@@ -2874,6 +2902,191 @@ export class ViewportRenderer {
     if (!this.partyState) return;
     if (this.partyState.selectedCharacterIndex < 0) return;
     this.pressingEye = true;
+  }
+
+  private handleMouthPress(): void {
+    if (!this.partyState || !this.objectTables) return;
+    if ((this.partyState.cursorOwner ?? -1) < 0) return;
+    const selected = this.partyState.selectedCharacterIndex ?? -1;
+    if (selected < 0) return;
+    const champ =
+      this.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.partyState.champions[selected] ??
+      null;
+    if (!champ || champ.alive === false) return;
+
+    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (objectId === null) return;
+
+    const outcome = this.computeFeedingOutcome(objectId);
+    if (!outcome) return;
+
+    if (outcome.removeFromHand) {
+      this.partyState.objectInHand = null;
+      if (outcome.deleteRecord && this.isLikelyObjectRecord(objectId)) {
+        this.dungeonState.deleteDBEntry(objectId as ObjectID);
+      }
+    }
+
+    champ.food = this.clampFoodWater((champ.food ?? 0) + outcome.foodDelta);
+    champ.water = this.clampFoodWater((champ.water ?? 0) + outcome.waterDelta);
+
+    if (outcome.chew) this.startMouthChewAnimation();
+    if (outcome.playGulp && this.playSound) this.playSound(SoundIndex.SWALLOW);
+  }
+
+
+  private computeFeedingOutcome(objectId: number): FeedingOutcome | null {
+    if (!this.objectTables) return null;
+    const isRecord = this.isLikelyObjectRecord(objectId);
+    const nameIndex = isRecord ? this.resolveObjectNameIndex(objectId) : this.getBaseObjectNameIndex(objectId);
+    if (nameIndex < 0) return null;
+
+    const descIndex = isRecord
+      ? this.descIndexForObject(objectId as ObjectID)
+      : this.getDescIndexForObjectType(objectId | 0);
+    const carryMask = descIndex !== null ? this.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
+    const mouthAllowed = (carryMask & 1) !== 0;
+
+    const isFood = this.isFoodNameIndex(nameIndex);
+    const isWater = this.isWaterNameIndex(nameIndex);
+    const isWaterFlask = isRecord && this.isWaterFlaskRecord(objectId as ObjectID);
+
+    if (!mouthAllowed && !isFood && !isWater && !isWaterFlask) return null;
+
+    const outcome: FeedingOutcome = {
+      foodDelta: 0,
+      waterDelta: 0,
+      removeFromHand: false,
+      deleteRecord: false,
+      chew: false,
+      playGulp: false,
+    };
+
+    if (isWaterFlask) {
+      const rec = this.dungeonState.getPotionRecord(objectId as ObjectID);
+      if (!rec) return null;
+      outcome.waterDelta = 1600;
+      outcome.playGulp = true;
+      rec.potionType = POTION_EMPTY_FLASK;
+      return outcome;
+    }
+
+    if (isWater) {
+      if (isRecord && decodeObjectID(objectId as ObjectID).category === DBType.MISC) {
+        const rec = this.dungeonState.getMiscRecord(objectId as ObjectID);
+        const value = rec?.specialState ?? 0;
+        if (value > 0) {
+          outcome.waterDelta = 800;
+          outcome.playGulp = true;
+          if (rec) rec.specialState = Math.max(0, value - 1);
+        }
+      } else {
+        outcome.waterDelta = 800;
+        outcome.playGulp = true;
+        outcome.removeFromHand = true;
+        outcome.deleteRecord = isRecord;
+      }
+      return outcome;
+    }
+
+    if (isFood) {
+      outcome.foodDelta = this.getFoodValue(nameIndex);
+      outcome.removeFromHand = true;
+      outcome.deleteRecord = isRecord;
+      outcome.chew = true;
+      outcome.playGulp = true;
+      return outcome;
+    }
+
+    return null;
+  }
+
+  private isWaterFlaskRecord(objectId: ObjectID): boolean {
+    const rec = this.dungeonState.getPotionRecord(objectId);
+    return rec?.potionType === POTION_WATER_FLASK;
+  }
+
+  private isFoodNameIndex(nameIndex: number): boolean {
+    return nameIndex >= OBJNI_APPLE && nameIndex <= OBJNI_DRAGON_STEAK;
+  }
+
+  private isWaterNameIndex(nameIndex: number): boolean {
+    return nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER;
+  }
+
+  private getFoodValue(nameIndex: number): number {
+    const values = this.objectTables?.foodValue;
+    if (!values) return 0;
+    const offset = nameIndex - OBJNI_APPLE;
+    if (offset < 0 || offset >= values.length) return 0;
+    return values[offset] ?? 0;
+  }
+
+  private clampFoodWater(value: number): number {
+    return Math.max(-1023, Math.min(2048, Math.floor(value)));
+  }
+
+  private startMouthChewAnimation(): void {
+    const now = this.nowMs();
+    const frameMs = (1000 * 8) / 60;
+    this.mouthChewStartMs = now;
+    this.mouthChewEndMs = now + frameMs * 4;
+    this.ensureMouthChewLoop();
+  }
+
+  private drawMouthChewAnimation(): void {
+    if (!this.uiTables || !this.screenIndexBuffer || !this.objectTables) return;
+    if (this.mouthChewStartMs === null) return;
+    const now = this.nowMs();
+    if (now >= this.mouthChewEndMs) return;
+
+    const frameMs = (1000 * 8) / 60;
+    const frame = Math.floor((now - this.mouthChewStartMs) / frameMs);
+    const icon = (frame % 2 === 0) ? OBJNI_SPECIAL_H : OBJNI_SPECIAL_G;
+    const mouthRect = this.uiTables.graphic232.word1398;
+    const x = VIEWPORT_X + mouthRect.x1 + 1;
+    const y = VIEWPORT_Y + mouthRect.y1 + 1;
+    this.drawObjectIconAt(x, y, icon, this.uiTables.graphic232.word612, -1);
+  }
+
+  private ensureMouthChewLoop(): void {
+    if (this.mouthChewFrameHandle !== null) return;
+    const schedule = (cb: (time: number) => void): number => {
+      if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);
+      return setTimeout(() => cb(this.nowMs()), 16) as unknown as number;
+    };
+    const tick = () => {
+      if (this.mouthChewStartMs === null) {
+        this.mouthChewFrameHandle = null;
+        return;
+      }
+      const now = this.nowMs();
+      if (now >= this.mouthChewEndMs) {
+        this.mouthChewStartMs = null;
+        this.mouthChewFrameHandle = null;
+        this.renderLastFrame();
+        return;
+      }
+      this.renderLastFrame();
+      this.mouthChewFrameHandle = schedule(tick);
+    };
+    this.mouthChewFrameHandle = schedule(tick);
+  }
+
+  private renderLastFrame(): void {
+    if (!this.lastRenderPosition) return;
+    this.render(
+      { x: this.lastRenderPosition.x, y: this.lastRenderPosition.y, z: this.lastRenderPosition.z },
+      this.lastRenderFacing
+    );
+  }
+
+  private nowMs(): number {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+    return Date.now();
   }
 
   private handlePartyBlockClick(button: number, x: number, y: number): void {

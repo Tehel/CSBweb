@@ -739,7 +739,6 @@ async function init() {
 
             soundManager = new SoundManager(graphicsLoader);
             if (soundManager.isAvailable()) {
-                soundManager.preloadAll();
                 const unlockAudio = (): void => {
                     soundManager?.unlock();
                 };
@@ -762,6 +761,10 @@ async function init() {
             const uiTables = extractUITables(graphicsLoader);
             const viewportTables = extractViewportTables(graphicsLoader);
             const objectTables = extractObjectTables(graphicsLoader, viewportTables.wallRectanglesOffset);
+            soundManager?.setSoundTable(uiTables.graphic232.soundTable);
+            if (soundManager?.isAvailable()) {
+                soundManager.preloadAll();
+            }
             actuatorTables = {
                 roomTimerFunctions: uiTables.graphic232.byte1596,
                 objDescObjectType: objectTables.objDescObjectType,

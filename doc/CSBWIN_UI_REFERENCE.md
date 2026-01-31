@@ -77,6 +77,18 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 
 - `ClickOnEye` sets `PressingEyeOrMouth`/`PressingEye`, draws the eye icon (`objNI_Special_e`), and if the hand is empty calls `TAG019036` (attributes); otherwise it calls `DescribeObject(d.objectInHand, 1)` (`doc/CSBwin-src/Viewport.cpp`).
 
+## Mouth click and feeding
+
+- The mouth button dispatch uses `D6W == 70` to call `FeedCharacter` (`doc/CSBwin-src/Mouse.cpp:1653-1656`), while eye uses `D6W == 71` (`doc/CSBwin-src/Mouse.cpp:1659-1662`).
+- When the hand is empty, `FeedCharacter` sets `PressingMouth`/`PressingEyeOrMouth`, shows food/water (`DisplayFoodWater`), and defers until mouse release (`doc/CSBwin-src/Character.cpp:4041-4058`).
+- `FeedCharacter` only allows items with `ObjDesc.word4 & 1` (can put in mouth), otherwise it rejects chests and scrolls (`doc/CSBwin-src/Character.cpp:4071-4079`).
+- Waterskins (`objNI_Waterskin..objNI_Water`) give `waterValue = 800` when non-empty, set `gulp = 8`, and later decrement the waterskin value by one (`doc/CSBwin-src/Character.cpp:4099-4113`, `doc/CSBwin-src/Character.cpp:4451-4460`).
+- Water flasks (`potion_WaterFlask`) give `waterValue = 1600` and convert to `potion_EmptyFlask` (`doc/CSBwin-src/Character.cpp:4262-4269`, `doc/CSBwin-src/Character.cpp:4451-4456`).
+- Food (`objNI_Apple..objNI_DragonSteak`) adds `FoodValue[objNI-objNI_Apple]`, sets `chew = true`, `gulp = 8`, and clears the hand (`doc/CSBwin-src/Character.cpp:4273-4282`, `doc/CSBwin-src/Character.cpp:4471-4482`).
+- Food/water values are clamped with `LIMIT(-1023, value + delta, 2048)` (`doc/CSBwin-src/Character.cpp:4425-4427`), and `QueueSound(gulp)` plays when `gulp >= 0` (`doc/CSBwin-src/Character.cpp:4483-4485`).
+- Chew animation blits `objNI_Special_h`/`objNI_Special_g` at `(56,46)` with 8‑VBL delays, twice (`doc/CSBwin-src/Character.cpp:4437-4445`, `doc/CSBwin-src/Graphics.cpp:181-189`).
+- When `fp.emptyHand` is set, CSBWin calls `CURSORFILTER_Eat`, removes the object from the hand, and deletes the DB record (`doc/CSBwin-src/Character.cpp:4471-4482`, `doc/CSBwin-src/Character.cpp:4492-4494`).
+
 ## Item description panel
 
 - `DescribeObject` draws the item-info panel using basic graphics `20` (food/water box) and `29`, draws the object name at `(134, 68)` and icon at `(111, 59)`, and formats the weight as `WEIGHS {weight/10}.{weight%10} KG.` using `GetObjectWeight` (`doc/CSBwin-src/Character.cpp`).
