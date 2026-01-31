@@ -215,7 +215,7 @@ export class ViewportRenderer {
   private mouseQEnd: number = 0;
   private uiMode: UIMode = UIMode.Adventure;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
-  private playSound?: (soundId: number, rateIdx?: number) => void;
+  private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private monsterAttackState: WeakMap<CreatureRecord, boolean[]> = new WeakMap();
   private viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
@@ -303,7 +303,7 @@ export class ViewportRenderer {
     return this.uiTables;
   }
 
-  setPlaySound(playSound?: (soundId: number, rateIdx?: number) => void): void {
+  setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {
     this.playSound = playSound;
   }
 

@@ -74,7 +74,7 @@ export interface ActuatorTables {
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   onTextMessage?: (text: string) => void;
-  playSound?: (soundId: number, rateIdx?: number) => void;
+  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
 }
 
 export class ActuatorSystem {
@@ -83,7 +83,7 @@ export class ActuatorSystem {
   private cursorFilter?: CursorFilterHook;
   private onAddCharacter?: AddCharacterHook;
   private onTextMessage?: (text: string) => void;
-  private playSound?: (soundId: number, rateIdx?: number) => void;
+  private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
   private delayedActionY = 0;

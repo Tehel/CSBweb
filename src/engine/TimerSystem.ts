@@ -130,7 +130,7 @@ export interface TimerHooks {
     mapY: number;
   }) => void;
   onMissileTrace?: (event: MissileTraceEvent) => void;
-  playSound?: (soundId: number, rateIdx?: number) => void;
+  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
 }
 
 export class TimerSystem {
@@ -435,7 +435,8 @@ export class TimerSystem {
     doorState = Math.max(0, Math.min(4, doorState + delta));
     this.setDoorState(map, x, y, doorState);
     if (prevState !== doorState) {
-      this.hooks?.playSound?.(SoundIndex.DOOR);
+      const distance = this.getPartyDistance(x, y, timer.level);
+      if (distance !== null) this.hooks?.playSound?.(SoundIndex.DOOR, 0, distance);
     }
 
     if ((action === ActuatorAction.SET && doorState !== 0) || (action === ActuatorAction.CLEAR && doorState !== 4)) {
@@ -456,6 +457,14 @@ export class TimerSystem {
     } else {
       this.processStoneRoom(timer);
     }
+  }
+
+  private getPartyDistance(x: number, y: number, level: number): number | null {
+    const party = this.getPartyState();
+    if (party.position.z !== level) return null;
+    const dx = Math.abs((party.position.x ?? 0) - x);
+    const dy = Math.abs((party.position.y ?? 0) - y);
+    return dx + dy;
   }
 
   private operateCounterActuator(timer: TimerEntry, actuator: ActuatorRecord, target: Position): void {
@@ -2097,7 +2106,10 @@ export class TimerSystem {
 
         if (objectType === -1) {
           curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
-          if (teleporter.sound) this.hooks?.playSound?.(SoundIndex.TELEPORT);
+          if (teleporter.sound) {
+            const distance = this.getPartyDistance(position.x, position.y, position.z);
+            if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 0, distance);
+          }
         } else if (objectType === DBType.MISSILE) {
           if (teleporter.absoluteRotation) {
             curDir = rotation;
@@ -2111,10 +2123,16 @@ export class TimerSystem {
             if (result.blocked) break;
             curFacing = result.facing & 0x3;
             usedItem16 = result.usedItem16;
-            if (teleporter.sound) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1);
+            if (teleporter.sound) {
+              const distance = this.getPartyDistance(position.x, position.y, position.z);
+              if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
+            }
           } else {
             curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
-            if (teleporter.sound) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1);
+            if (teleporter.sound) {
+              const distance = this.getPartyDistance(position.x, position.y, position.z);
+              if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
+            }
           }
         } else {
           if (!teleporter.absoluteRotation) {

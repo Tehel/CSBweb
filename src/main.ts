@@ -773,7 +773,7 @@ async function init() {
                 cursorFilter: handleCursorFilter,
                 onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
                 onTextMessage: (text) => updateDebug(text),
-                playSound: (soundId, rateIdx) => soundManager?.playSound(soundId, rateIdx),
+                playSound: (soundId, rateIdx, distance) => soundManager?.playSound(soundId, rateIdx, distance),
             };
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
@@ -788,10 +788,11 @@ async function init() {
                 },
             };
             if (soundManager) {
-                timerHooks.playSound = (soundId: number, rateIdx?: number) => soundManager?.playSound(soundId, rateIdx);
+                timerHooks.playSound = (soundId: number, rateIdx?: number, distance?: number) =>
+                    soundManager?.playSound(soundId, rateIdx, distance);
             }
             const playSound = soundManager
-                ? (soundId: number, rateIdx?: number) => soundManager?.playSound(soundId, rateIdx)
+                ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
             game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
 

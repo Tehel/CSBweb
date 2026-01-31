@@ -61,7 +61,7 @@ export class Game {
     private timerQueue: TimerQueue;
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
-    private playSound?: (soundId: number, rateIdx?: number) => void;
+    private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
     private nextChampionFingerprint = 1;
 
@@ -80,7 +80,7 @@ export class Game {
         timerTables?: TimerTables,
         dsaTables?: DsaTables,
         timerHooks?: TimerHooks,
-        playSound?: (soundId: number, rateIdx?: number) => void,
+        playSound?: (soundId: number, rateIdx?: number, distance?: number) => void,
     ) {
         // Initialize dungeon state
         this.dungeonState = new DungeonState(dungeonData);
@@ -132,7 +132,7 @@ export class Game {
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
-                playSound: (soundId, rateIdx) => this.playSound?.(soundId, rateIdx),
+                playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
                 ...timerHooks,
             },
         );

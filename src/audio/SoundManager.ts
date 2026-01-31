@@ -101,7 +101,7 @@ export class SoundManager {
     this.cache.set(id, variants);
   }
 
-  playSound(id: number, rateIdx = 0): void {
+  playSound(id: number, rateIdx = 0, distance?: number): void {
     if (!this.audioContext) return;
     if (!this.enabled) return;
 
@@ -117,7 +117,11 @@ export class SoundManager {
     const source = this.audioContext.createBufferSource();
     source.buffer = entry.buffer;
     if (!this.gainNode) return;
-    source.connect(this.gainNode);
+    const gain = this.audioContext.createGain();
+    gain.gain.value = this.getDistanceVolume(id, distance);
+    if (gain.gain.value <= 0) return;
+    source.connect(gain);
+    gain.connect(this.gainNode);
     source.start();
   }
 
@@ -127,5 +131,19 @@ export class SoundManager {
 
   getSoundCatalog(): Record<number, SoundInfo> {
     return this.soundCatalog;
+  }
+
+  private getDistanceVolume(id: number, distance?: number): number {
+    if (distance === undefined || distance === null) return 1;
+    if (distance < 0) return 1;
+    const info = this.soundCatalog[id];
+    const meta = info?.meta;
+    if (!meta) return 1;
+    const far = meta.distanceFar ?? -1;
+    const near = meta.distanceNear ?? 0;
+    if (far <= 0) return 1;
+    if (distance >= far) return 0;
+    if (distance <= near) return 1;
+    return 1 / 18;
   }
 }
