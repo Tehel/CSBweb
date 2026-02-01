@@ -43,6 +43,12 @@ export interface MonsterGraphicDesc {
   uByte11: number;
 }
 
+export interface SpecialColorScheme {
+  paletteEntries: number[]; // 6 entries (one per viewport palette)
+  monsterColorMapMedium: number; // Byte6628
+  monsterColorMapFar: number; // Byte6612
+}
+
 export interface MissileGraphicDesc {
   uByte0: number;
   uByte1: number;
@@ -61,6 +67,7 @@ export interface ObjectTables {
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
   smallOffsetIndices: Uint8Array; // d.smallOffsetIndicies[16][2] packed row-major
   smallOffsets: Int8Array; // d.smallOffsets[24]
+  specialColors: SpecialColorScheme[]; // d.specialColors[13][7]
   colorMapMedium: Uint8Array; // d.Byte5744[16]
   colorMapFar: Uint8Array; // d.Byte5728[16]
   monsterColorMapMedium: Uint8Array; // d.Byte6628[16]
@@ -126,6 +133,7 @@ const ABS_WORD7162 = 7162;
 const ABS_WORD7042 = 7042;
 const ABS_S6982 = 6982; // ITEM110[3]
 const ABS_SMALL_OFFSETS = 6652; // smallOffsets[24]
+const ABS_SPECIAL_COLORS = 6596; // specialColors[13][7]
 const ABS_MONSTER_COLOR_MAP_MEDIUM = 6628; // Byte6628[16]
 const ABS_MONSTER_COLOR_MAP_FAR = 6612; // Byte6612[16]
 const ABS_ITEM6414 = 6414; // Item6414[27]
@@ -212,6 +220,27 @@ function readRectPosByte4(raw: Uint8Array, off: number): RectPos {
     y1: raw[off + 2] ?? 0,
     y2: raw[off + 3] ?? 0,
   };
+}
+
+function readSpecialColors22e(raw: Uint8Array, off: number): SpecialColorScheme[] {
+  const rows = 13;
+  const cols = 7;
+  const stride = cols * 2;
+  const end = off + rows * stride;
+  if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for specialColors[13][7]');
+
+  const out: SpecialColorScheme[] = [];
+  for (let r = 0; r < rows; r++) {
+    const base = off + r * stride;
+    const paletteEntries: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      paletteEntries.push(readU16BE(raw, base + i * 2));
+    }
+    const monsterColorMapMedium = raw[base + 12] ?? 0;
+    const monsterColorMapFar = raw[base + 13] ?? 0;
+    out.push({ paletteEntries, monsterColorMapMedium, monsterColorMapFar });
+  }
+  return out;
 }
 
 function readViewportPosition22e(raw: Uint8Array, off: number): ViewportPositionTable {
@@ -552,6 +581,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const word7162Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WORD7162);
   const word7042Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_WORD7042);
   const monsterPositionsOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_S6982);
+  const specialColorsOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_SPECIAL_COLORS);
   const monsterColorMapMediumOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_MONSTER_COLOR_MAP_MEDIUM);
   const monsterColorMapFarOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_MONSTER_COLOR_MAP_FAR);
   const monsterGraphicsOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_ITEM6414);
@@ -587,6 +617,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     word7162Offset < 0 ||
     word7042Offset < 0 ||
     monsterPositionsOffset < 0 ||
+    specialColorsOffset < 0 ||
     monsterColorMapMediumOffset < 0 ||
     monsterColorMapFarOffset < 0 ||
     monsterGraphicsOffset < 0 ||
@@ -623,6 +654,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const viewportPosition = readViewportPosition22e(raw22e, viewportPositionOffset);
   const monsterPositions = readMonsterPositions22e(raw22e, monsterPositionsOffset);
   const monsterGraphics = readMonsterGraphics22e(raw22e, monsterGraphicsOffset);
+  const specialColors = readSpecialColors22e(raw22e, specialColorsOffset);
   const missileGraphics = readMissileGraphics22e(raw22e, struct5688Offset);
   const monsterDesc = readMonsterDesc22f(raw22f);
   const monsterAttackSounds = readMonsterAttackSounds22f(raw22f);
@@ -715,6 +747,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     missileGraphics,
     smallOffsetIndices,
     smallOffsets,
+    specialColors,
     colorMapMedium,
     colorMapFar,
     monsterColorMapMedium,

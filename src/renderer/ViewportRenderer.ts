@@ -10,7 +10,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { Champion, PartyState } from '../engine/gameTypes';
-import type { CreatureRecord } from '../data/dungeonTypes';
+import type { CreatureRecord, MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { DrawViewport } from './DrawViewport';
@@ -185,6 +185,9 @@ export class ViewportRenderer {
   private screenIndexBuffer: ReturnType<typeof createPaletteIndexViewportBuffer> | null = null;
   private palette: number[] | null = null;
   private uiPalette: number[] | null = null;
+  private baseViewportPalettes: number[][] | null = null;
+  private viewportPalettes: number[][] | null = null;
+  private lastPaletteLevel: number | null = null;
   private initialized: boolean = false;
 
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
@@ -258,7 +261,14 @@ export class ViewportRenderer {
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
     this.uiTables = extractUITables(this.graphicsLoader);
-    this.uiPalette = this.uiTables.graphic232.palette552?.[0] ?? this.palette;
+    const palette552 = this.uiTables.graphic232.palette552;
+    if (palette552 && palette552.length > 0) {
+      this.baseViewportPalettes = palette552.map((pal) => pal.slice());
+      this.viewportPalettes = palette552.map((pal) => pal.slice());
+      this.uiPalette = this.baseViewportPalettes[0] ?? this.palette;
+    } else {
+      this.uiPalette = this.palette;
+    }
     this.fontData = loadFontData(this.graphicsLoader);
 
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
@@ -395,6 +405,60 @@ export class ViewportRenderer {
     this.handleMouseButton(entry.num, entry.x, entry.y);
   }
 
+  private resetViewportPalettes(): void {
+    if (!this.baseViewportPalettes || !this.viewportPalettes) return;
+    const count = Math.min(this.baseViewportPalettes.length, this.viewportPalettes.length);
+    for (let i = 0; i < count; i++) {
+      const base = this.baseViewportPalettes[i];
+      if (!base) continue;
+      const target = this.viewportPalettes[i];
+      if (!target) {
+        this.viewportPalettes[i] = base.slice();
+        continue;
+      }
+      for (let j = 0; j < base.length; j++) target[j] = base[j];
+    }
+  }
+
+  private applySpecialColorScheme(whichColor: number, schemeIndex: number): void {
+    const tables = this.objectTables;
+    if (!tables || !this.viewportPalettes) return;
+    const scheme = tables.specialColors[schemeIndex];
+    if (!scheme) return;
+    for (let i = 0; i < this.viewportPalettes.length; i++) {
+      const palette = this.viewportPalettes[i];
+      if (!palette) continue;
+      const entry = scheme.paletteEntries[i];
+      if (entry !== undefined) palette[whichColor] = entry;
+    }
+    if (whichColor >= 0 && whichColor < tables.monsterColorMapMedium.length) {
+      tables.monsterColorMapMedium[whichColor] = scheme.monsterColorMapMedium;
+    }
+    if (whichColor >= 0 && whichColor < tables.monsterColorMapFar.length) {
+      tables.monsterColorMapFar[whichColor] = scheme.monsterColorMapFar;
+    }
+  }
+
+  private applyMonsterPaletteOverrides(map?: MapData | null): void {
+    if (!this.objectTables || !this.viewportPalettes) return;
+    if (!this.objectTables.specialColors || this.objectTables.specialColors.length === 0) return;
+
+    this.resetViewportPalettes();
+    this.applySpecialColorScheme(9, 8);
+    this.applySpecialColorScheme(10, 12);
+
+    const monsterTypes = map?.monsterTypes ?? [];
+    for (const monsterType of monsterTypes) {
+      if (monsterType < 0 || monsterType >= this.objectTables.monsterGraphics.length) continue;
+      const graphic = this.objectTables.monsterGraphics[monsterType];
+      if (!graphic) continue;
+      const lowNibble = graphic.uByte11 & 0x0f;
+      if (lowNibble !== 0) this.applySpecialColorScheme(9, lowNibble - 1);
+      const highNibble = (graphic.uByte11 >> 4) & 0x0f;
+      if (highNibble !== 0) this.applySpecialColorScheme(10, highNibble - 1);
+    }
+  }
+
   /**
    * Render the viewport for a given party position and facing
    */
@@ -416,6 +480,10 @@ export class ViewportRenderer {
     this.context.backgroundGraphicSet = backgroundGraphicSet;
     this.context.frameMapIndex = z;
     this.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
+    if (this.lastPaletteLevel !== z) {
+      this.applyMonsterPaletteOverrides(map);
+      this.lastPaletteLevel = z;
+    }
 
     // CSBWin `ReadGraphicsForLevel()` (Code390e.cpp:180-199): DoorGraphic[3][2] is derived from Door1Type/Door2Type.
     const doorType0 = map?.descriptor.doorType0Index ?? 0;
@@ -959,11 +1027,9 @@ export class ViewportRenderer {
   }
 
   private getViewportPalette(): number[] | null {
-    if (!this.uiTables) return null;
-    const palette552 = this.uiTables.graphic232.palette552;
-    if (!palette552 || palette552.length === 0) return null;
-    const index = Math.min(this.selectPaletteIndexForLightLevel(), palette552.length - 1);
-    return palette552[index] ?? palette552[0] ?? null;
+    if (!this.viewportPalettes || this.viewportPalettes.length === 0) return null;
+    const index = Math.min(this.selectPaletteIndexForLightLevel(), this.viewportPalettes.length - 1);
+    return this.viewportPalettes[index] ?? this.viewportPalettes[0] ?? null;
   }
 
   private selectPaletteIndexForLightLevel(): number {

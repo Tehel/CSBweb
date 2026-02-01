@@ -655,6 +655,17 @@ rectpos.w.x2 = 270;  // Right edge of viewport on screen
 - Monsters at distance 1/2 use `ShrinkBLT` with scale factors `20/32` or `16/32` and color maps `d.Byte6628` (medium) / `d.Byte6612` (far).
 - The transparent color is selected by mapping the base transparent index through the same color map and dividing by 10.
 
+### Monster palette selection (special colors)
+
+**Location**: `Code390e.cpp`, `CSBCode.cpp`, `AsciiDump.cpp`
+
+- `ReadGraphicsForLevel()` updates the viewport palettes before rendering a level: it calls `ModifyPalettes(9, 8)` and `ModifyPalettes(10, 12)` for defaults, then iterates over the level’s monster-type list (`pCurLevelDesc->numMonsterType()` entries read via `EndOfCELLFLAGS`) and applies per-monster overrides from `ITEM12.uByte11` (graphics `0x22e`) (`Code390e.cpp:323-343`).
+  - `uByte11` low nibble selects a **special color scheme** for palette index `9`; high nibble selects a scheme for palette index `10`. A nibble value of `0` means “no override”.
+- `ModifyPalettes(whichColor, newColor)` applies the selected scheme to **all six viewport palettes** (`Palette552[0..5]`) and also updates the **distance color maps** `Byte6628` (medium) and `Byte6612` (far) for that color index (`CSBCode.cpp:2839-2854`).
+  - The special-color table is `specialColors[13][7]` (from graphics `0x22e`): 6 palette entries (one per light level) plus a final word containing the two distance-map bytes (low byte → `Byte6628`, high byte → `Byte6612`).
+  - `AsciiDump.cpp` labels these as “Special Colors (for monsters on different levels)”.
+- `SelectPaletteForLightLevel()` chooses `CurrentPalette` based on torch brightness and `PaletteBrightness`, so the monster colors come from `Palette552[CurrentPalette]` (`CSBCode.cpp:7242+`).
+
 ### Scaled floor items
 
 **Location**: `Code51a4.cpp`
