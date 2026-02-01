@@ -154,6 +154,7 @@ enum StkOp {
   XOR = 70,
   DESCRIBE = 72,
   COPY = 76,
+  SET_ADJUST_SKILLS_PARAMETERS = 92,
   TIME_FETCH = 97,
   GENERATOR_DELAY_FETCH = 100,
   MOVE = 73,
@@ -165,8 +166,10 @@ enum StkOp {
 
 const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
+const ESL_ADJUST_SKILLS_FILTER = 6;
 const ESL_VIEWING_FILTER = 3;
 const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
+const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
@@ -375,6 +378,7 @@ export class DsaSystem {
   private word1074: ArrayLike<number> | null;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
+  private adjustSkillsParameters = new Int32Array(5);
   private globalVariables = new Int32Array(100);
   private warnedOps = new Set<number>();
   private overridePos = 0;
@@ -416,6 +420,10 @@ export class DsaSystem {
   getParameter(index: number): number {
     if (index < 0 || index >= 100) return 0;
     return this.parameters[1 + index] ?? 0;
+  }
+
+  getAdjustSkillsParameters(): Int32Array {
+    return this.adjustSkillsParameters;
   }
 
   setTeleportPartyHandler(handler: (location: TeleportPartyLocation) => void): void {
@@ -523,6 +531,66 @@ export class DsaSystem {
       phraseTextOverrides: ctx.phraseTextOverrides,
       phraseColorOverrides: ctx.phraseColorOverrides,
     };
+  }
+
+  processAdjustSkillsFilter(options: {
+    chIdx: number;
+    skillNumber: number;
+    experience: number;
+    why: number;
+  }): { chIdx: number; skillNumber: number; experience: number } | null {
+    const special = this.dungeon.getSpecialLocation(ADJUST_SKILLS_FILTER_KEY);
+    if (special === null) return null;
+    const locrFilter = intToLocation(special);
+    if (!this.isValidLocation(locrFilter)) return null;
+    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: locrFilter.l & 0xff,
+      function: 0,
+      uByte5: 0,
+      uByte6: locrFilter.x & 0xff,
+      uByte7: locrFilter.y & 0xff,
+      uByte8: 0,
+      uByte9: 0,
+      sequence: 0,
+      timerWord8: 0,
+      timerWord6: 0,
+    };
+
+    let chIdx = options.chIdx | 0;
+    let skillNumber = options.skillNumber | 0;
+    let experience = options.experience | 0;
+    let why = options.why | 0;
+    let found = false;
+
+    for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      const rec = this.dungeon.getActuatorRecord(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      found = true;
+      this.setParameters(9, [
+        chIdx,
+        skillNumber,
+        experience,
+        why,
+        this.adjustSkillsParameters[0] ?? 0,
+        this.adjustSkillsParameters[1] ?? 0,
+        this.adjustSkillsParameters[2] ?? 0,
+        this.adjustSkillsParameters[3] ?? 0,
+        this.adjustSkillsParameters[4] ?? 0,
+      ]);
+      this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
+      chIdx = this.getParameter(0);
+      skillNumber = this.getParameter(1);
+      experience = this.getParameter(2);
+      why = this.getParameter(3);
+    }
+
+    if (!found) return null;
+    return { chIdx, skillNumber, experience };
   }
 
   processTimer5(rn: number, timer: TimerEntry, location: Position): boolean {
@@ -1438,6 +1506,14 @@ export class DsaSystem {
             this.parameters[1 + j] = bank.getVar(index + j);
           }
         }
+        break;
+      }
+      case StkOp.SET_ADJUST_SKILLS_PARAMETERS: {
+        this.adjustSkillsParameters[4] = bank.stack.pop();
+        this.adjustSkillsParameters[3] = bank.stack.pop();
+        this.adjustSkillsParameters[2] = bank.stack.pop();
+        this.adjustSkillsParameters[1] = bank.stack.pop();
+        this.adjustSkillsParameters[0] = bank.stack.pop();
         break;
       }
       case StkOp.CELL_FETCH: {

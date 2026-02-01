@@ -10,7 +10,7 @@ import {
 } from '../core/types';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
-import { limitSkillExperience, populateBaseSkillExperience } from './skills';
+import { adjustSkills, AdjustSkillsWhy } from './skills';
 import type {
   ActuatorRecord,
   ContainerRecord,
@@ -65,6 +65,12 @@ export interface CursorFilterPacket {
 export type CursorFilterHook = (packet: CursorFilterPacket) => boolean;
 
 export type AddCharacterHook = (portraitIndex: number, position: Position, pos: number) => boolean;
+export type AdjustSkillsFilterHook = (params: {
+  chIdx: number;
+  skillNumber: number;
+  experience: number;
+  why: number;
+}) => { chIdx: number; skillNumber: number; experience: number } | null;
 
 export interface ActuatorTables {
   roomTimerFunctions?: ArrayLike<number>;
@@ -75,6 +81,7 @@ export interface ActuatorTables {
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   onTextMessage?: (text: string) => void;
+  adjustSkillsFilter?: AdjustSkillsFilterHook;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
 }
 
@@ -84,6 +91,7 @@ export class ActuatorSystem {
   private cursorFilter?: CursorFilterHook;
   private onAddCharacter?: AddCharacterHook;
   private onTextMessage?: (text: string) => void;
+  private adjustSkillsFilter?: AdjustSkillsFilterHook;
   private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
@@ -103,6 +111,7 @@ export class ActuatorSystem {
     this.cursorFilter = tables?.cursorFilter;
     this.onAddCharacter = tables?.onAddCharacter;
     this.onTextMessage = tables?.onTextMessage;
+    this.adjustSkillsFilter = tables?.adjustSkillsFilter;
     this.playSound = tables?.playSound;
   }
 
@@ -112,6 +121,7 @@ export class ActuatorSystem {
     if (tables.cursorFilter) this.cursorFilter = tables.cursorFilter;
     if (tables.onAddCharacter) this.onAddCharacter = tables.onAddCharacter;
     if (tables.onTextMessage) this.onTextMessage = tables.onTextMessage;
+    if (tables.adjustSkillsFilter) this.adjustSkillsFilter = tables.adjustSkillsFilter;
     if (tables.playSound) this.playSound = tables.playSound;
   }
 
@@ -662,18 +672,21 @@ export class ActuatorSystem {
     if (localActionType === 10) {
       const adjustment = 300;
       const party = this.getPartyState();
-      const alive = party.champions.filter((c) => c.alive);
       const divisor = party.champions.length > 0 ? party.champions.length : 1;
       const perChampion = Math.floor(adjustment / divisor);
+      const experienceMultiplier = this.dungeon.getMap(mapZ)?.descriptor.difficulty ?? 0;
 
       if (mapPos === -1) {
-        for (const champ of alive) {
-          this.applySkillIncrease(champ.skills, 8, perChampion);
+        for (let i = 0; i < party.champions.length; i++) {
+          const champ = party.champions[i];
+          if (!champ.alive) continue;
+          this.applySkillIncrease(champ, i, 8, perChampion, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
         }
       } else {
-        const target = alive.find((c) => c.partyPosition === (mapPos & 3));
-        if (target) {
-          this.applySkillIncrease(target.skills, 8, adjustment);
+        const targetIndex = party.champions.findIndex((c) => c.alive && c.partyPosition === (mapPos & 3));
+        if (targetIndex >= 0) {
+          const target = party.champions[targetIndex];
+          this.applySkillIncrease(target, targetIndex, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
         }
       }
       return;
@@ -686,11 +699,37 @@ export class ActuatorSystem {
     this.delayedActionPos = mapPos | 0;
   }
 
-  private applySkillIncrease(skills: PartyState['champions'][number]['skills'], index: number, delta: number): void {
-    if (!skills || index < 0 || index >= skills.length) return;
-    const current = skills[index]?.experience ?? 0;
-    skills[index].experience = limitSkillExperience(current + delta);
-    populateBaseSkillExperience(skills);
+  private applySkillIncrease(
+    champion: PartyState['champions'][number],
+    chIdx: number,
+    index: number,
+    delta: number,
+    experienceMultiplier: number,
+    why: AdjustSkillsWhy,
+  ): void {
+    if (!champion || index < 0) return;
+    const party = this.getPartyState();
+    adjustSkills(party.champions, chIdx, index, delta, why, {
+      time: this.timeSource(),
+      lastMonsterAttackTime: party.lastMonsterAttackTime,
+      experienceMultiplier,
+      applyAdjustSkillsFilter: this.adjustSkillsFilter,
+      onLevelUp: (levelIdx, basicSkill) => this.queueLevelUpMessage(levelIdx, basicSkill),
+    });
+  }
+
+  private queueLevelUpMessage(chIdx: number, basicSkill: number): void {
+    if (!this.onTextMessage) return;
+    const party = this.getPartyState();
+    const champ = party.champions[chIdx];
+    if (!champ) return;
+    const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+    const label = labels[basicSkill] ?? 'SKILL';
+    this.onTextMessage(`${champ.name}\nJUST GAINED A\n${label}\nLEVEL`);
+  }
+
+  notifyLevelUp(chIdx: number, basicSkill: number): void {
+    this.queueLevelUpMessage(chIdx, basicSkill);
   }
 
   private isDebugTimersEnabled(): boolean {

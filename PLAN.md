@@ -358,6 +358,26 @@ Goal: match CSBwin’s missile lifecycle (launch → flight → encounter → re
     - Refs: `doc/CSBwin-src/Timer.cpp:479+` (cloud timer handling), `doc/CSBwin-src/Code11f52.cpp:1376+` (`CreateCloud` setup + timer linkage).
 14. **remove dev debug and validation tooling**
 
+### Phase 9.5 — Skills & Experience parity
+Goal: match CSBWin’s champion skill/experience pipeline (mastery, AdjustSkills, level-up, action hooks).
+
+1. **Data model parity**. Ensure runtime champions store `skills92[20]` with `tempAdjust` + `experience`, and keep `LimitSkillExperience` identical to CSBWin (`doc/CSBwin-src/CSB.h`).
+2. **Mastery calculation**. Implement engine-level `DetermineMastery` with `0x4000/0x8000` flags, base-skill inclusion for subskills, and possession bonuses (`doc/CSBwin-src/Code17818.cpp`).
+3. **Skill adjustment pipeline**. Port `AdjustSkills` scaling (LastMonsterAttackTime gates + level experience multiplier), DSA AdjustSkills filter, tempAdjust increments, base-skill accumulation, and `LevelUp` (`doc/CSBwin-src/Magic.cpp`).
+4. **Level-up effects**. Port `LevelUp` stat increments, caps, and UI messaging hooks (`doc/CSBwin-src/Magic.cpp`).
+5. **Action hooks**. Wire skill gains and mastery effects for attacks, throws, monster hits, and spellcasting (`doc/CSBwin-src/Attack.cpp`, `doc/CSBwin-src/Mouse.cpp`, `doc/CSBwin-src/Monster.cpp`, `doc/CSBwin-src/Magic.cpp`).
+6. **Timed updates**. Add `TenSecondUpdate` logic to drive mana regen and tempAdjust decay (`doc/CSBwin-src/Code17818.cpp`).
+7. **DSA integration**. Implement `STKOP_ExperiencePlus` → `AddToSkill` and `STKOP_SetAdjustSkillsParameters` for AdjustSkills filters (`doc/CSBwin-src/DSA.cpp`).
+8. **Save/load parity**. Persist skills with tempAdjust/experience in save files (`doc/CSBwin-src/SaveGame.cpp`).
+9. **Validation tooling**. Add debug hooks to log mastery/experience changes and compare against CSBWin traces for a few scripted actions.
+
+Status:
+- ✅ Steps 1–4 implemented: engine `DetermineMastery`, `AdjustSkills`/`AddToSkill`/`LevelUp`, DSA AdjustSkills filter + `STKOP_SetAdjustSkillsParameters`, skill increaser now calls `AdjustSkills`, and level‑up messages route via `onTextMessage` (`src/engine/skills.ts`, `src/engine/DsaSystem.ts`, `src/engine/ActuatorSystem.ts`, `src/renderer/ViewportRenderer.ts`).
+- ✅ LastMonsterAttackTime tracking added (set on monster-hit path, stored in `PartyState`, passed into `AdjustSkills` gating).
+- ✅ Wired throw + spell-cast UI to `AdjustSkills` (throw skill 10, wizard base skill placeholder, mana-cost-based exp) (`src/engine/Game.ts`, `src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ TenSecondUpdate mana regen + tempAdjust decay implemented (regen uses mastery + wisdom and stamina drain) (`src/engine/Game.ts`).
+- ⚠️ Pending: refine spell skill selection once spell definitions are implemented, replace throw skill gain with CSBWin tables, and refine LastMonsterAttackTime source once monster AI is in place.
+
 ### Phase 10 — CSBWin-Compatible Save/Load (pre‑work checklist)
 Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
 

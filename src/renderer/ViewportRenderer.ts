@@ -47,6 +47,7 @@ import { updateDebug, updateHover } from '@/ui';
 import { GraphicRoomType } from './bytecode/Types';
 import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
+import { determineMastery as determineMasteryEngine } from '../engine/skills';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -189,6 +190,7 @@ export class ViewportRenderer {
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
   private graphicCache: Map<string, IndexedBitmap> = new Map();
   private onObjectMove?: ObjectMoveHandler;
+  private onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => void;
   private portraitSheet: IndexedBitmap | null | undefined = undefined;
   private portraitCache: Map<number, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
@@ -317,6 +319,10 @@ export class ViewportRenderer {
 
   setObjectMoveHandler(handler?: ObjectMoveHandler): void {
     this.onObjectMove = handler;
+  }
+
+  setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => void): void {
+    this.onSpellCast = handler;
   }
 
   setMessageLines(lines: string[]): void {
@@ -1649,80 +1655,10 @@ export class ViewportRenderer {
   }
 
   private determineMastery(champion: Champion, skill: number): number {
-    if (this.uiMode === UIMode.Sleeping) return 1;
-
-    const ignoreTempAdjust = (skill & 0x8000) !== 0;
-    const ignorePossessions = (skill & 0x4000) !== 0;
-    const skillIndex = skill & 0x3fff;
-
-    let experience = 0;
-    const skills = champion.skills ?? [];
-    if (skillIndex >= 0 && skillIndex < skills.length) {
-      const entry = skills[skillIndex];
-      experience = entry?.experience ?? 0;
-      if (!ignoreTempAdjust) {
-        experience += entry?.tempAdjust ?? 0;
-      }
-    }
-
-    if (skillIndex > 3) {
-      const baseIndex = Math.floor((skillIndex - 4) / 4);
-      const base = skills[baseIndex];
-      experience += base?.experience ?? 0;
-      if (!ignoreTempAdjust) {
-        experience += base?.tempAdjust ?? 0;
-      }
-      experience = Math.floor(experience / 2);
-    }
-
-    let mastery = 1;
-    let expValue = experience;
-    while (expValue >= 500) {
-      expValue = Math.floor(expValue / 2);
-      mastery++;
-    }
-
-    if (!ignorePossessions) {
-      const weaponNameIndex = this.getPossessionNameIndex(champion, 1);
-      if (weaponNameIndex === OBJNI_THE_FIRESTAFF_A) {
-        mastery++;
-      } else if (weaponNameIndex === OBJNI_THE_FIRESTAFF_B) {
-        mastery += 2;
-      }
-
-      const neckNameIndex = this.getPossessionNameIndex(champion, 10);
-      switch (skillIndex) {
-        case 3:
-          if (neckNameIndex === OBJNI_PENDANT_FERAL) mastery++;
-          break;
-        case 15:
-          if (neckNameIndex === OBJNI_EKKHARD_CROSS) mastery++;
-          break;
-        case 13:
-          if (neckNameIndex === OBJNI_GEM_OF_AGES || weaponNameIndex === OBJNI_SCEPTRE_OF_LYF) {
-            mastery++;
-          }
-          break;
-        case 14:
-          if (neckNameIndex === OBJNI_MOONSTONE) mastery++;
-          break;
-      }
-    }
-
-    return mastery;
-  }
-
-  private getPossessionNameIndex(champion: Champion, slot: number): number | null {
-    let possession: number | null | undefined;
-    if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
-      possession = champion.possessions[slot];
-    }
-    if (possession == null && slot === 1 && typeof champion.weaponHand === 'number') {
-      possession = champion.weaponHand;
-    }
-    if (possession == null || typeof possession !== 'number') return null;
-    if (possession === OBJECT_ID_EOF || possession === OBJECT_ID_NULL) return null;
-    return this.resolveObjectNameIndex(possession | 0);
+    return determineMasteryEngine(champion, skill, {
+      partySleeping: this.uiMode === UIMode.Sleeping,
+      getObjectNameIndex: (objectId) => this.resolveObjectNameIndex(objectId),
+    });
   }
 
   private formatLifeValue(value: number): string {
@@ -3703,8 +3639,16 @@ export class ViewportRenderer {
     // Cast
     if (buttonId === 108) {
       if (champion.incantation.length === 0) return;
+      const totalManaCost = this.computeIncantationManaCost(
+        champion.incantation,
+        this.uiTables.graphic230.spellBaseMana,
+        this.uiTables.graphic230.spellFirstRuneScale,
+      );
+      const chIdx = this.partyState.champions.indexOf(champion);
+      if (chIdx >= 0) {
+        this.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
+      }
       // TODO: actually run the spell effect
-      console.log(`casting: `, champion.incantation);
       champion.incantation = [];
       return;
     }
@@ -3728,6 +3672,23 @@ export class ViewportRenderer {
     // apply cost en enqueue rune
     champion.attributes.mana -= manaCost;
     champion.incantation.push(96 + step * 6 + runeId);
+  }
+
+  private computeIncantationManaCost(incantation: number[], baseMana: number[], scaleMana: number[]): number {
+    if (incantation.length === 0) return 0;
+    const powerIndex = Math.max(0, Math.min(5, (incantation[0] ?? 96) - 96));
+    let total = 0;
+    for (let step = 0; step < incantation.length; step++) {
+      const value = incantation[step] ?? 96;
+      const runeId = value - 96 - step * 6;
+      if (runeId < 0 || runeId > 5) continue;
+      let cost = baseMana[step * 6 + runeId] ?? 0;
+      if (step > 0) {
+        cost = Math.floor((cost * (scaleMana[powerIndex] ?? 0)) / 8);
+      }
+      total += cost;
+    }
+    return total;
   }
 
   private updateButtonLists(): void {

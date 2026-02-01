@@ -808,6 +808,9 @@ async function init() {
             renderer.setObjectMoveHandler((position, object, place, unchangedRoom, facing) => {
                 game?.triggerObjectMove(position, object, place, unchangedRoom, facing);
             });
+            renderer.setSpellCastHandler((chIdx, incantation, totalManaCost) => {
+                game?.recordSpellCast(chIdx, incantation, totalManaCost);
+            });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });

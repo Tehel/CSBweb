@@ -122,6 +122,7 @@ export interface PartyState {
     fireShield?: ui16;          // Optional fire shield strength
     spellShield?: ui16;         // Optional spell shield strength
     brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
+    lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
 
     // Movement state
     moving: boolean;            // Is party currently moving?

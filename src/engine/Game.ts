@@ -16,6 +16,7 @@ import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
 import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
+import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
@@ -122,6 +123,9 @@ export class Game {
             dsaTables ?? actuatorTables,
             this.actuators,
         );
+        this.actuators.setTables({
+            adjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
+        });
         this.timerSystem = new TimerSystem(
             this.dungeonState,
             () => this.party.state,
@@ -237,6 +241,7 @@ export class Game {
 
         this.timerSystem.processTimers(this.state.tickCount);
         this.processNinetySecondUpdate();
+        this.processTenSecondUpdate();
 
         // Update party state in game state
         this.state.party = this.party.state;
@@ -408,6 +413,7 @@ export class Game {
         if (damage <= 0) return false;
         const candidates = this.party.state.champions.filter((c) => c.alive);
         if (candidates.length === 0) return false;
+        this.noteMonsterAttack();
 
         const frontRow = candidates.filter((c) => c.partyPosition === 0 || c.partyPosition === 1);
         const target = (frontRow[0] ?? candidates[0]) ?? null;
@@ -466,6 +472,11 @@ export class Game {
         return true;
     }
 
+    private noteMonsterAttack(): void {
+        this.party.state.lastMonsterAttackTime = this.state.tickCount | 0;
+        this.state.party = this.party.state;
+    }
+
     /**
      * Replace the current party state (debug/testing).
      */
@@ -522,6 +533,71 @@ export class Game {
         if (changed) {
             this.state.party = this.party.state;
         }
+    }
+
+    private processTenSecondUpdate(): void {
+        const updateTicks = GAME_TIMING.TICKS_PER_SECOND * 10;
+        if (updateTicks <= 0) return;
+        if ((this.state.tickCount % updateTicks) !== 0) return;
+
+        const party = this.party.state;
+        const random112 = (this.state.tickCount & 0x40)
+            | ((this.state.tickCount & 0x80) >> 2)
+            | ((this.state.tickCount & 0x100) >> 4);
+        const getObjectNameIndex = (objectId: number): number | null => {
+            const value = this.getBaseObjectNameIndex(objectId as ObjectID);
+            return value >= 0 ? value : null;
+        };
+
+        for (const champ of party.champions) {
+            if (!champ || !champ.alive) continue;
+            const attrs = champ.attributes;
+            const maxMana = attrs.maxMana | 0;
+            const mana = attrs.mana | 0;
+            if (mana < maxMana) {
+                const magicMastery =
+                    determineMastery(champ, 3, { getObjectNameIndex })
+                    + determineMastery(champ, 2, { getObjectNameIndex });
+                const wisdom = attrs.wisdom | 0;
+                if (random112 >= magicMastery + wisdom) {
+                    if (mana > maxMana) {
+                        attrs.mana = Math.max(maxMana, mana - 1);
+                    }
+                } else {
+                    let manaAdjust = Math.trunc(maxMana / 40);
+                    manaAdjust += 1;
+                    const staminaAdjust = manaAdjust * Math.max(7, 16 - magicMastery);
+                    this.adjustStamina(champ, staminaAdjust);
+                    const deltaMana = Math.min(manaAdjust, maxMana - mana);
+                    attrs.mana = mana + deltaMana;
+                }
+            } else if (mana > maxMana) {
+                attrs.mana = Math.max(maxMana, mana - 1);
+            }
+
+            const skills = ensureSkills(champ.skills ?? []);
+            for (const entry of skills) {
+                if (entry.tempAdjust > 0) entry.tempAdjust -= 1;
+            }
+            champ.skills = skills;
+        }
+    }
+
+    private adjustStamina(champion: Champion, decrement: number): void {
+        const attrs = champion.attributes;
+        let newStamina = (attrs.stamina | 0) - (decrement | 0);
+        if (newStamina <= 0) {
+            const abs = -newStamina;
+            attrs.stamina = 0;
+            const health = attrs.health | 0;
+            const reduced = Math.max(0, health - Math.floor(abs / 2));
+            attrs.health = reduced;
+            if (reduced === 0) champion.alive = false;
+            return;
+        }
+        const maxStamina = attrs.maxStamina | 0;
+        if (newStamina > maxStamina) newStamina = maxStamina;
+        attrs.stamina = newStamina;
     }
 
     private getChampionPossession(champion: Champion, slot: number): ObjectID | null {
@@ -742,8 +818,29 @@ export class Game {
             decayRate,
             this.state.tickCount,
         );
-        if (!launched) party.objectInHand = obj;
+        if (!launched) {
+            party.objectInHand = obj;
+        } else {
+            this.awardThrowSkill(owner, obj);
+        }
         return launched;
+    }
+
+    recordSpellCast(chIdx: number, incantation: number[], totalManaCost: number): void {
+        if (chIdx < 0 || chIdx >= this.party.state.champions.length) return;
+        if (!incantation || incantation.length === 0) return;
+        const experience = Math.max(0, totalManaCost | 0);
+        if (experience === 0) return;
+        const map = this.dungeonState.getMap(this.party.state.position.z);
+        const experienceMultiplier = map?.descriptor.difficulty ?? 0;
+        const skillNumber = 3; // TODO: use spell definitions to select priest/wizard subskill.
+        adjustSkills(this.party.state.champions, chIdx, skillNumber, experience, AdjustSkillsWhy.CastSpell2, {
+            time: this.state.tickCount,
+            lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
+            experienceMultiplier,
+            applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
+            onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
+        });
     }
 
     debugLaunchMissileDelayed(
@@ -815,6 +912,25 @@ export class Game {
         let decay = Math.max(1, 10 - Math.floor(dexterity / 20));
         decay = Math.max(1, Math.min(15, decay));
         return decay;
+    }
+
+    private awardThrowSkill(chIdx: number, obj: ObjectID): void {
+        const experience = this.computeThrowSkillGain(obj);
+        if (experience <= 0) return;
+        const map = this.dungeonState.getMap(this.party.state.position.z);
+        const experienceMultiplier = map?.descriptor.difficulty ?? 0;
+        adjustSkills(this.party.state.champions, chIdx, 10, experience, AdjustSkillsWhy.ThrowByCharacter, {
+            time: this.state.tickCount,
+            lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
+            experienceMultiplier,
+            applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
+            onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
+        });
+    }
+
+    private computeThrowSkillGain(obj: ObjectID): number {
+        const { category } = decodeObjectID(obj);
+        return category === DBType.WEAPON ? 12 : 8;
     }
 
     /**
