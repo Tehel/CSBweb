@@ -200,6 +200,25 @@ Validation
 - Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).
 - Verify pixel‑perfect alignment of the viewport frame, portraits, and message line.
 
+### Phase 7.5 — Light level / palette switching (viewport)
+Goal: match CSBWin global light level logic and palette selection.
+
+1. Load `Palette552[6]`, `PaletteBrightness[6]`, and `Word1074[16]` into runtime state (from graphics block `0x232`).
+2. Port `SelectPaletteForLightLevel` to compute `totalLight` from torches-in-hand and `d.Brightness` with the CSBWin weighting.
+3. Port `SetBrightnessTimer` + `ProcessLightLevelTimer` and wire `TT_LIGHT` handling into the timer system.
+4. Apply `CurrentPalette` to viewport rendering only (mirror CSBWin `Palette11946` semantics) without dimming portraits/text.
+5. Hook equip/unequip (Illumulet), spell effects, torch charge decay, and attack light effects to call `SelectPaletteForLightLevel`.
+6. Add logging/trace tooling to compare palette index changes against CSBWin for known light events.
+
+Status:
+- ✅ Light tables (`PaletteBrightness`, `Word1074`, `Palette552`) parsed from graphic `0x232` and wired into runtime (`src/renderer/csbwin/UITables.ts`, `src/main.ts`).
+- ✅ `SelectPaletteForLightLevel` logic ported in renderer (torch weighting + `d.Brightness` + `experienceMultiplier` gate).
+- ✅ `TT_LIGHT` handling + `ProcessLightLevelTimer` ported with `timerWord6` support; `Game.setBrightnessTimer` added for scheduling.
+- ✅ Viewport-only palette applied during present; UI uses palette 0 (`src/renderer/csbwin/CanvasBlitter.ts`, `src/renderer/ViewportRenderer.ts`).
+- ✅ Illumulet equip/unequip adjusts `d.Brightness` for inventory UI + DSA moves; torch-in-hand sets `litTorch` bit for visuals.
+- ✅ 90-second torch charge decay tick added (hands only), mirroring `NinetySecondUpdate` behavior.
+- ⏳ Pending: spell/attack light effects (no spell system yet); add a light-level trace hook.
+
 ### Phase 8 — CSBWin-Compatible actuators
 Goal: match CSBWin’s actuator pipeline (trigger evaluation -> queued timers -> room-type effects -> DSA/monster/missile behavior).
 

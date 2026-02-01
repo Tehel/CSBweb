@@ -341,6 +341,51 @@ export function updateImageDataFromIndex(
   }
 }
 
+export function updateImageDataFromIndexWithViewportPalette(
+  imageData: ImageData,
+  src: PaletteIndexViewportBuffer,
+  viewportRect: Rect,
+  viewportPalette: number[],
+  uiPalette: number[]
+): void {
+  const out = imageData.data;
+  const inPx = src.pixels;
+  const pixelCount = src.width * src.height;
+  if (inPx.length !== pixelCount) {
+    throw new Error(`Index buffer size mismatch: expected ${pixelCount}, got ${inPx.length}`);
+  }
+  if (imageData.width !== src.width || imageData.height !== src.height) {
+    throw new Error('ImageData dimensions do not match index buffer');
+  }
+
+  const x1 = clampInt(viewportRect.x1, 0, src.width - 1);
+  const y1 = clampInt(viewportRect.y1, 0, src.height - 1);
+  const x2 = clampInt(viewportRect.x2, 0, src.width - 1);
+  const y2 = clampInt(viewportRect.y2, 0, src.height - 1);
+
+  for (let y = 0; y < src.height; y++) {
+    const row = y * src.width;
+    const inViewportY = y >= y1 && y <= y2;
+    for (let x = 0; x < src.width; x++) {
+      const idx = row + x;
+      const colorIndex = inPx[idx] & 0x0f;
+      const useViewportPalette = inViewportY && x >= x1 && x <= x2;
+      const palette = useViewportPalette ? viewportPalette : uiPalette;
+      const color = palette[colorIndex] ?? 0;
+
+      const r = ((color >> 8) & 0x7) * 36;
+      const g = ((color >> 4) & 0x7) * 36;
+      const b = (color & 0x7) * 36;
+
+      const o = idx * 4;
+      out[o + 0] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = 255;
+    }
+  }
+}
+
 /**
  * `TAG0088b2` port for RGBA `ImageData` sources.
  *

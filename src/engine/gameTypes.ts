@@ -121,6 +121,7 @@ export interface PartyState {
     partyShield?: ui16;         // Optional party shield strength
     fireShield?: ui16;          // Optional fire shield strength
     spellShield?: ui16;         // Optional spell shield strength
+    brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
 
     // Movement state
     moving: boolean;            // Is party currently moving?

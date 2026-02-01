@@ -96,8 +96,15 @@ export interface UITables {
     cursorHand: Uint8Array;
     cursorArrow: Uint8Array;
     byte640: number[];
+    paletteBrightness: number[];
+    word1074: number[];
     carryLocation: number[];
     byte1094: WordRect;
+    palette552: number[][];
+    palette360: number[];
+    palette328: number[];
+    defaultGraphicList: number[];
+    identityColorMap: number[];
     wRectPos966: WordRect;
     wRectPos958: WordRect;
     wRectPos950: WordRect;
@@ -148,6 +155,14 @@ function readI16Array(view: DataView, off: number, count: number): number[] {
   const out: number[] = [];
   for (let i = 0; i < count; i++) {
     out.push(view.getInt16(off + i * 2, false));
+  }
+  return out;
+}
+
+function readU16Array(view: DataView, off: number, count: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push(view.getUint16(off + i * 2, false));
   }
   return out;
 }
@@ -417,8 +432,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const byte1094 = readWordRect(view, off); off += 8;
 
   // PaletteBrightness[6], Word1074[16], CarryLocation[38]
-  off += 6 * 2;
-  off += 16 * 2;
+  const paletteBrightness = readI16Array(view, off, 6); off += 6 * 2;
+  const word1074 = readI16Array(view, off, 16); off += 16 * 2;
   const carryLocation = readI16Array(view, off, 38);
   off += 38 * 2;
 
@@ -450,11 +465,15 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 2;
 
   // Palette552[6], Palette360, Palette328, DefaultGraphicList[70], IdentityColorMap[16]
+  const palette552: number[][] = [];
+  for (let i = 0; i < 6; i++) {
+    palette552.push(readU16Array(view, off + i * 32, 16));
+  }
   off += 6 * 32;
-  off += 32;
-  off += 32;
-  off += 70 * 2;
-  off += 16;
+  const palette360 = readU16Array(view, off, 16); off += 32;
+  const palette328 = readU16Array(view, off, 16); off += 32;
+  const defaultGraphicList = readU16Array(view, off, 70); off += 70 * 2;
+  const identityColorMap = Array.from(raw.slice(off, off + 16)); off += 16;
 
   const wordRects = readWordRectArray(view, off, 17);
   const word28 = wordRects[14];
@@ -481,8 +500,15 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     cursorHand,
     cursorArrow,
     byte640,
+    paletteBrightness,
+    word1074,
     carryLocation,
     byte1094,
+    palette552,
+    palette360,
+    palette328,
+    defaultGraphicList,
+    identityColorMap,
     wRectPos966,
     wRectPos958,
     wRectPos950,

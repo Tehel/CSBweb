@@ -71,6 +71,7 @@ export interface ActuatorTables {
   objDescObjectType?: ArrayLike<number>;
   objDescCarryMask?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
+  word1074?: ArrayLike<number>;
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   onTextMessage?: (text: string) => void;

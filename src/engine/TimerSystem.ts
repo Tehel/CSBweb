@@ -58,6 +58,7 @@ const WEAPON_THROWING_STAR = 32;
 
 export interface TimerTables {
   monsterDesc?: ArrayLike<{ word2: number }>;
+  word1074?: number[];
 }
 
 export interface LocationRel {
@@ -167,6 +168,9 @@ export class TimerSystem {
       case TimerFunction.TT_DOOR_STEP:
         this.processDoorStep(timer);
         break;
+      case TimerFunction.TT_LIGHT:
+        this.processLightLevelTimer(timer);
+        break;
       case TimerFunction.TT_MISSILE0:
       case TimerFunction.TT_MISSILE:
         this.processMissileTimer(timer);
@@ -203,6 +207,60 @@ export class TimerSystem {
         break;
       default:
         break;
+    }
+  }
+
+  queueBrightnessTimer(deltaSteps: number, time: number): void {
+    const party = this.getPartyState();
+    this.timers.createTimer(
+      TimerFunction.TT_LIGHT,
+      0,
+      0,
+      0,
+      0,
+      time >>> 0,
+      party.position.z,
+      undefined,
+      0,
+      deltaSteps,
+    );
+  }
+
+  private processLightLevelTimer(timer: TimerEntry): void {
+    const word1074 = this.tables?.word1074;
+    if (!word1074 || word1074.length < 2) return;
+
+    let steps = normalizeWord6(timer.timerWord6);
+    if (steps === 0) return;
+
+    const negative = steps < 0;
+    if (negative) steps = -steps;
+    if (steps >= word1074.length) steps = word1074.length - 1;
+
+    const newSteps = steps - 1;
+    let change = (word1074[steps] ?? 0) - (word1074[newSteps] ?? 0);
+    if (negative) {
+      change = -change;
+    }
+
+    const party = this.getPartyState();
+    const current = party.brightness ?? 0;
+    party.brightness = normalizeWord6(current + change);
+
+    if (newSteps !== 0) {
+      const nextSteps = negative ? -newSteps : newSteps;
+      this.timers.createTimer(
+        TimerFunction.TT_LIGHT,
+        0,
+        0,
+        0,
+        0,
+        (timer.time + 4) >>> 0,
+        party.position.z,
+        undefined,
+        0,
+        nextSteps,
+      );
     }
   }
 
@@ -2345,4 +2403,8 @@ export class TimerSystem {
     if (max <= min) return min;
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
+}
+
+function normalizeWord6(value: number): number {
+  return (value << 16) >> 16;
 }

@@ -31,6 +31,8 @@ interface DropCursorOptions {
 }
 
 const MISC_BONES_OF_HERO = 5; // CSBwin Objects.h misc_BonesOfHero
+const OBJNI_TORCH_A = 4;
+const OBJNI_TORCH_D = 7;
 
 export interface RuntimeSaveState {
     version: 1;
@@ -64,6 +66,7 @@ export class Game {
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
     private nextChampionFingerprint = 1;
+    private objDescObjectType: ArrayLike<number> | null = null;
 
     // Game loop
     private running: boolean = false;
@@ -137,6 +140,7 @@ export class Game {
             },
         );
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
+        this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
 
         // Initialize movement system
         this.movementSystem = new MovementSystem(this.party, this.dungeonState);
@@ -232,6 +236,7 @@ export class Game {
         }
 
         this.timerSystem.processTimers(this.state.tickCount);
+        this.processNinetySecondUpdate();
 
         // Update party state in game state
         this.state.party = this.party.state;
@@ -469,6 +474,126 @@ export class Game {
         this.state.party = this.party.state;
         for (const champ of this.party.state.champions) {
             this.assignChampionFingerprint(champ);
+        }
+    }
+
+    setBrightness(value: number): void {
+        this.party.state.brightness = normalizeWord6(value);
+        this.state.party = this.party.state;
+    }
+
+    adjustBrightness(delta: number): void {
+        const current = this.party.state.brightness ?? 0;
+        this.party.state.brightness = normalizeWord6(current + delta);
+        this.state.party = this.party.state;
+    }
+
+    setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
+        const time = (this.state.tickCount + delayTicks) >>> 0;
+        this.timerSystem.queueBrightnessTimer(deltaSteps, time);
+    }
+
+    private processNinetySecondUpdate(): void {
+        const decayTicks = GAME_TIMING.TICKS_PER_SECOND * 90;
+        if (decayTicks <= 0) return;
+        if ((this.state.tickCount % decayTicks) !== 0) return;
+
+        let changed = false;
+        for (const champion of this.party.state.champions) {
+            if (!champion) continue;
+            for (let hand = 0; hand < 2; hand++) {
+                const obj = this.getChampionPossession(champion, hand);
+                if (obj === null) continue;
+                if (!this.isLikelyObjectRecord(obj)) continue;
+                if (!this.isTorchObject(obj)) continue;
+                const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
+                if (!weapon) continue;
+                const charges = weapon.charges & 0x0f;
+                if (charges === 0) continue;
+                const next = (charges - 1) & 0x0f;
+                weapon.charges = next;
+                if (next === 0) {
+                    weapon.important = false;
+                }
+                changed = true;
+            }
+        }
+
+        if (changed) {
+            this.state.party = this.party.state;
+        }
+    }
+
+    private getChampionPossession(champion: Champion, slot: number): ObjectID | null {
+        if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
+            const value = champion.possessions[slot];
+            if (typeof value === 'number') return value as ObjectID;
+        }
+        if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand as ObjectID;
+        if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand as ObjectID;
+        return null;
+    }
+
+    private isLikelyObjectRecord(value: number): boolean {
+        const { category, index } = decodeObjectID(value as ObjectID);
+        switch (category) {
+            case DBType.WEAPON:
+                return index >= 0 && index < this.dungeonState.getData().databases.weapons.records.length;
+            case DBType.CLOTHING:
+                return index >= 0 && index < this.dungeonState.getData().databases.clothing.records.length;
+            case DBType.SCROLL:
+                return index >= 0 && index < this.dungeonState.getData().databases.scrolls.records.length;
+            case DBType.POTION:
+                return index >= 0 && index < this.dungeonState.getData().databases.potions.records.length;
+            case DBType.CHEST:
+                return index >= 0 && index < this.dungeonState.getData().databases.containers.records.length;
+            case DBType.MISC:
+                return index >= 0 && index < this.dungeonState.getData().databases.misc.records.length;
+            default:
+                return false;
+        }
+    }
+
+    private isTorchObject(rn: ObjectID): boolean {
+        const base = this.getBaseObjectNameIndex(rn);
+        return base >= OBJNI_TORCH_A && base <= OBJNI_TORCH_D;
+    }
+
+    private getBaseObjectNameIndex(rn: ObjectID): number {
+        if (!this.objDescObjectType) return -1;
+        const descIndex = this.getObjectDescIndex(rn);
+        if (descIndex === null || descIndex < 0 || descIndex >= this.objDescObjectType.length) return -1;
+        const value = this.objDescObjectType[descIndex];
+        return typeof value === 'number' ? value | 0 : -1;
+    }
+
+    private getObjectDescIndex(rn: ObjectID): number | null {
+        const { category, index } = decodeObjectID(rn);
+        switch (category) {
+            case DBType.SCROLL:
+                return 0;
+            case DBType.CHEST: {
+                const rec = this.dungeonState.getContainerRecord(rn);
+                return rec ? 1 + (rec.containerType & 0x7f) : null;
+            }
+            case DBType.POTION: {
+                const rec = this.dungeonState.getPotionRecord(rn);
+                return rec ? 2 + (rec.potionType & 0x7f) : null;
+            }
+            case DBType.WEAPON: {
+                const rec = this.dungeonState.getWeaponRecord(rn);
+                return rec ? 23 + (rec.weaponType & 0x7f) : null;
+            }
+            case DBType.CLOTHING: {
+                const rec = this.dungeonState.getClothingRecord(rn);
+                return rec ? 69 + (rec.clothingType & 0x7f) : null;
+            }
+            case DBType.MISC: {
+                const rec = this.dungeonState.getMiscRecord(rn);
+                return rec ? 127 + (rec.miscType & 0x7f) : null;
+            }
+            default:
+                return null;
         }
     }
 
@@ -793,4 +918,8 @@ export class Game {
         }
         return records;
     }
+}
+
+function normalizeWord6(value: number): number {
+    return (value << 16) >> 16;
 }

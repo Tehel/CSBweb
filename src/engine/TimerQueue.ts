@@ -10,6 +10,7 @@ export enum TimerFunction {
   TT_DOOR = 10,
   TT_VI_ALTAR = 13,
   TT_REACTIVATE_GENERATOR = 65,
+  TT_LIGHT = 70,
   TT_PARAMETER_MESSAGE = 101,
   TT_DESSAGE = 102,
 }
@@ -26,6 +27,7 @@ export interface TimerEntry {
   uByte9: number;
   sequence: number;
   timerWord8: number;
+  timerWord6: number;
   object?: number;
 }
 
@@ -65,6 +67,7 @@ export class TimerQueue {
     level: number,
     object?: number,
     timerWord8 = 0,
+    timerWord6 = 0,
   ): TimerEntry {
     const entry: TimerEntry = {
       index: this.nextIndex++,
@@ -78,6 +81,7 @@ export class TimerQueue {
       uByte9: action & 0xff,
       sequence: this.nextSequence++,
       timerWord8: timerWord8 & 0xffff,
+      timerWord6: normalizeWord6(timerWord6),
       object,
     };
     return this.addTimer(entry);
@@ -175,6 +179,10 @@ export class TimerQueue {
   private isMapTimer(functionType: number): boolean {
     return functionType >= TimerFunction.TT_OPENROOM && functionType <= TimerFunction.TT_DOOR;
   }
+}
+
+function normalizeWord6(value: number): number {
+  return (value << 16) >> 16;
 }
 
 function compareTimers(a: TimerEntry, b: TimerEntry): number {

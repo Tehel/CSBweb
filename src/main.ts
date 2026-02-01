@@ -770,6 +770,7 @@ async function init() {
                 objDescObjectType: objectTables.objDescObjectType,
                 objDescCarryMask: objectTables.objDescCarryMask,
                 carryLocation: uiTables.graphic232.carryLocation,
+                word1074: uiTables.graphic232.word1074,
                 cursorFilter: handleCursorFilter,
                 onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
                 onTextMessage: (text) => updateDebug(text),
@@ -777,6 +778,7 @@ async function init() {
             };
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
+                word1074: uiTables.graphic232.word1074,
             };
 
             // Initialize game engine

@@ -33,7 +33,9 @@ import type { ActuatorSystem } from './ActuatorSystem';
 export interface DsaTables {
   roomTimerFunctions?: ArrayLike<number>;
   objDescCarryMask?: ArrayLike<number>;
+  objDescObjectType?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
+  word1074?: ArrayLike<number>;
 }
 
 export interface ViewingFilterOptions {
@@ -168,6 +170,8 @@ const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
+const OBJNI_ILLUMULET_A = 12;
+const OBJNI_ILLUMULET_B = 13;
 
 const enum DsaMoveError {
   SER_OK = 0,
@@ -366,7 +370,9 @@ function intToLocation(value: number): DsaLocation {
 export class DsaSystem {
   private roomTimerFunctions: ArrayLike<number> | null;
   private objDescCarryMask: ArrayLike<number> | null;
+  private objDescObjectType: ArrayLike<number> | null;
   private carryLocation: ArrayLike<number> | null;
+  private word1074: ArrayLike<number> | null;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
   private globalVariables = new Int32Array(100);
@@ -386,13 +392,17 @@ export class DsaSystem {
   ) {
     this.roomTimerFunctions = tables?.roomTimerFunctions ?? null;
     this.objDescCarryMask = tables?.objDescCarryMask ?? null;
+    this.objDescObjectType = tables?.objDescObjectType ?? null;
     this.carryLocation = tables?.carryLocation ?? null;
+    this.word1074 = tables?.word1074 ?? null;
   }
 
   setTables(tables: DsaTables): void {
     if (tables.roomTimerFunctions) this.roomTimerFunctions = tables.roomTimerFunctions;
     if (tables.objDescCarryMask) this.objDescCarryMask = tables.objDescCarryMask;
+    if (tables.objDescObjectType) this.objDescObjectType = tables.objDescObjectType;
     if (tables.carryLocation) this.carryLocation = tables.carryLocation;
+    if (tables.word1074) this.word1074 = tables.word1074;
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -441,6 +451,7 @@ export class DsaSystem {
       uByte9: 0,
       sequence: 0,
       timerWord8: 0,
+      timerWord6: 0,
     };
 
     const encounterLoc = locationToInt({
@@ -485,6 +496,7 @@ export class DsaSystem {
       uByte9: 0,
       sequence: 0,
       timerWord8: 0,
+      timerWord6: 0,
     };
 
     this.setParameters(3, [options.phraseMask | 0, options.objectId | 0, options.selectedCharacter | 0]);
@@ -2055,6 +2067,7 @@ export class DsaSystem {
   private setChampionPossession(champion: Champion, slot: number, objectId: number | null): void {
     if (slot < 0 || slot >= 30) return;
     const next = this.normalizePossessionValue(objectId);
+    const previous = this.normalizePossessionValue(champion.possessions?.[slot] ?? null);
     if (!champion.possessions || champion.possessions.length < 30) {
       const slots = new Array(30).fill(null) as Array<number | null>;
       if (champion.possessions) {
@@ -2068,12 +2081,48 @@ export class DsaSystem {
     if (slot === 0) champion.shieldHand = next;
     if (slot === 1) champion.weaponHand = next;
     if (slot === 8) champion.quiver = next;
+    this.updateLightForPossessionChange(slot, previous, next);
   }
 
   private normalizePossessionValue(value: number | null | undefined): number | null {
     if (value === undefined || value === null) return null;
     if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return null;
     return value;
+  }
+
+  private updateLightForPossessionChange(slot: number, previous: number | null, next: number | null): void {
+    if (slot !== 10) return;
+    const word1074 = this.word1074;
+    const party = this.getPartyState?.();
+    if (!word1074 || !party) return;
+    const stepValue = word1074[2] ?? 0;
+    if (stepValue === 0) return;
+
+    const prevIsIllumulet = previous !== null
+      && this.isBaseObjectNameIndex(previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
+    const nextIsIllumulet = next !== null
+      && this.isBaseObjectNameIndex(next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
+    const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
+    if (delta === 0) return;
+
+    const current = party.brightness ?? 0;
+    party.brightness = this.normalizeWord6(current + delta);
+  }
+
+  private isBaseObjectNameIndex(objectId: number, min: number, max: number): boolean {
+    const base = this.getBaseObjectNameIndex(objectId);
+    return base >= min && base <= max;
+  }
+
+  private getBaseObjectNameIndex(objectId: number): number {
+    const descIndex = this.getObjectDescIndex(objectId);
+    if (descIndex === null) return objectId | 0;
+    const value = this.objDescObjectType?.[descIndex];
+    return typeof value === 'number' ? value | 0 : objectId | 0;
+  }
+
+  private normalizeWord6(value: number): number {
+    return (value << 16) >> 16;
   }
 
   private isEmptyObject(value: number | null | undefined): boolean {

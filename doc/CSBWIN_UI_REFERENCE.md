@@ -44,6 +44,10 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - Spell control highlight rectangles use explicit coordinates with `vblFlashButn`: `(0xe9..0x115, 0x2a..0x31)` and related segments based on active characters (`doc/CSBwin-src/Character.cpp:5006`, `doc/CSBwin-src/Character.cpp:5013`).
 - The active caster name is drawn at `(0xeb, 0x30)`, with other cases using `(0xf9, 0x30)` and `(0x107, 0x30)` (`doc/CSBwin-src/Character.cpp:5007`, `doc/CSBwin-src/Character.cpp:5045`, `doc/CSBwin-src/Character.cpp:5062`).
 
+## Held object label
+
+- `DrawNameOfHeldObject` draws the cursor item name at `(x=0xe9, y=0x25)` using text color `4`, background `0`, and a fixed length of `14` characters (`doc/CSBwin-src/Code11f52.cpp:32-72`, `doc/CSBwin-src/Character.cpp:82-112`).
+
 ## Movement buttons
 
 - Movement buttons are drawn by blitting basic graphic 13 into `Word28` (`doc/CSBwin-src/Character.cpp:5101`).
@@ -62,6 +66,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `DrawItem` uses `IconDisplay.pixelX/pixelY` to create a 16x16 destination rect for each slot (`doc/CSBwin-src/Character.cpp:35`, `doc/CSBwin-src/Character.cpp:41`).
 - Slots < 8 draw into `d.LogicalScreenBase`, slots >= 8 draw into `d.pViewportBMP` (inventory view) (`doc/CSBwin-src/Character.cpp:61`, `doc/CSBwin-src/Character.cpp:71`).
 - `Word612[7]` selects the graphic group for object icons (`doc/CSBwin-src/Data.h:1454`, `doc/CSBwin-src/Character.cpp:48`).
+- Body part slots (0..5) draw an 18×18 frame before the icon using basic graphic `33` (healthy) or `34` (wounded), with rect expanded to `x-1..x+17` and transparency color `12` (`doc/CSBwin-src/Character.cpp:1147-1214`).
 
 ## Chest view and slots
 

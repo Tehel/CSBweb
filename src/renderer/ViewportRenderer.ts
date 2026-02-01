@@ -23,6 +23,7 @@ import {
   fillRectIndex,
   tag0088b2Index,
   updateImageDataFromIndex,
+  updateImageDataFromIndexWithViewportPalette,
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
@@ -107,6 +108,7 @@ const OBJNI_WATERSKIN = 8;
 const OBJNI_WATER = 9;
 const OBJNI_JEWEL_SYMAL_A = 10;
 const OBJNI_ILLUMULET_A = 12;
+const OBJNI_ILLUMULET_B = 13;
 const OBJNI_FLAMITT_A = 14;
 const OBJNI_EYE_OF_TIME_A = 16;
 const OBJNI_STORM_RING_A = 18;
@@ -181,6 +183,7 @@ export class ViewportRenderer {
   private screenImageData: ImageData | null = null; // RGBA staging for present
   private screenIndexBuffer: ReturnType<typeof createPaletteIndexViewportBuffer> | null = null;
   private palette: number[] | null = null;
+  private uiPalette: number[] | null = null;
   private initialized: boolean = false;
 
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
@@ -253,6 +256,7 @@ export class ViewportRenderer {
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
     this.uiTables = extractUITables(this.graphicsLoader);
+    this.uiPalette = this.uiTables.graphic232.palette552?.[0] ?? this.palette;
     this.fontData = loadFontData(this.graphicsLoader);
 
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
@@ -921,12 +925,134 @@ export class ViewportRenderer {
     this.drawAttackPanel();
     this.drawSpellPanel();
     this.drawSpellControls();
+    this.drawHeldObjectName();
     this.drawMessageLines();
     this.drawHoverHighlights();
     this.drawCursorItem();
 
-    updateImageDataFromIndex(this.screenImageData, this.screenIndexBuffer, this.palette);
+    const uiPalette = this.uiPalette ?? this.palette;
+    if (!uiPalette) return;
+    const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);
+    if (!inventoryOpen && viewportPalette !== uiPalette) {
+      updateImageDataFromIndexWithViewportPalette(
+        this.screenImageData,
+        this.screenIndexBuffer,
+        {
+          x1: VIEWPORT_X,
+          y1: VIEWPORT_Y,
+          x2: VIEWPORT_X + VIEWPORT_WIDTH - 1,
+          y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1,
+        },
+        viewportPalette,
+        uiPalette,
+      );
+    } else {
+      updateImageDataFromIndex(this.screenImageData, this.screenIndexBuffer, uiPalette);
+    }
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
+  }
+
+  private getViewportPalette(): number[] | null {
+    if (!this.uiTables) return null;
+    const palette552 = this.uiTables.graphic232.palette552;
+    if (!palette552 || palette552.length === 0) return null;
+    const index = Math.min(this.selectPaletteIndexForLightLevel(), palette552.length - 1);
+    return palette552[index] ?? palette552[0] ?? null;
+  }
+
+  private selectPaletteIndexForLightLevel(): number {
+    if (!this.uiTables || !this.partyState) return 0;
+    const { paletteBrightness, word1074 } = this.uiTables.graphic232;
+    if (!paletteBrightness || paletteBrightness.length === 0 || !word1074 || word1074.length === 0) return 0;
+
+    const map = this.dungeonState.getMap(this.partyState.position.z);
+    const experienceMultiplier = map?.descriptor.difficulty ?? 0;
+    if (experienceMultiplier === 0) return 0;
+
+    const torchLight = this.computeTorchLight(word1074);
+    const totalLight = (this.partyState.brightness ?? 0) + torchLight;
+
+    if (totalLight <= 0) return paletteBrightness.length - 1;
+
+    let paletteIndex = 0;
+    for (let i = 0; i < paletteBrightness.length; i++) {
+      if ((paletteBrightness[i] ?? 0) > totalLight) {
+        paletteIndex++;
+      } else {
+        break;
+      }
+    }
+
+    if (paletteIndex < 0) paletteIndex = 0;
+    if (paletteIndex >= paletteBrightness.length) paletteIndex = paletteBrightness.length - 1;
+    return paletteIndex;
+  }
+
+  private computeTorchLight(word1074: number[]): number {
+    if (!this.partyState) return 0;
+    const charges = this.collectTorchCharges();
+
+    // CSBWin selection-sort: bring four brightest charges to the front.
+    for (let i = 0; i < 4; i++) {
+      for (let j = i + 1; j < charges.length; j++) {
+        if (charges[j] > charges[i]) {
+          const temp = charges[j];
+          charges[j] = charges[i];
+          charges[i] = temp;
+        }
+      }
+    }
+
+    let total = 0;
+    let shift = 6;
+    for (let i = 0; i < 5 && i < charges.length; i++) {
+      const charge = charges[i] ?? 0;
+      if (charge === 0) continue;
+      const idx = Math.max(0, Math.min(charge, word1074.length - 1));
+      let value = word1074[idx] ?? 0;
+      value &= 0xffff;
+      value = (value << shift) >>> 0;
+      value = (value >>> 6) & 0x3ff;
+      total += value;
+      shift = Math.max(0, shift - 1);
+    }
+
+    return total;
+  }
+
+  private collectTorchCharges(): number[] {
+    const charges = new Array(8).fill(0);
+    if (!this.partyState) return charges;
+
+    let outIndex = 0;
+    for (let chIdx = 0; chIdx < 4; chIdx++) {
+      const champ = this.partyState.champions[chIdx];
+      for (let hand = 0; hand < 2; hand++) {
+        if (!champ) {
+          charges[outIndex++] = 0;
+          continue;
+        }
+        const objectId = this.normalizeObjectValue(this.getChampionPossession(champ, hand));
+        if (objectId === null) {
+          charges[outIndex++] = 0;
+          continue;
+        }
+        const baseNameIndex = this.getBaseObjectNameIndex(objectId);
+        if (baseNameIndex >= OBJNI_TORCH_A && baseNameIndex <= OBJNI_TORCH_D) {
+          charges[outIndex++] = this.getTorchCharge(objectId);
+        } else {
+          charges[outIndex++] = 0;
+        }
+      }
+    }
+    return charges;
+  }
+
+  private getTorchCharge(objectId: number): number {
+    if (!this.isLikelyObjectRecord(objectId)) return 0;
+    const weapon = this.dungeonState.getWeaponRecord(objectId as ObjectID);
+    if (!weapon) return 0;
+    return weapon.charges & 0xf;
   }
 
   private drawStaticUIFrame(): void {
@@ -1804,6 +1930,23 @@ export class ViewportRenderer {
     this.drawTopBarHandIcons();
   }
 
+  private drawHeldObjectName(): void {
+    if (!this.uiTables || !this.fontData || !this.screenIndexBuffer) return;
+
+    const objectNames = this.objectTables?.objectNames;
+    if (!objectNames || objectNames.length === 0) return;
+
+    const objectId = this.normalizeObjectValue(this.partyState?.objectInHand);
+    let label = '';
+    if (objectId !== null) {
+      const nameIndex = this.getBaseObjectNameIndex(objectId);
+      label = objectNames[nameIndex] ?? '';
+    }
+
+    const padded = (label || '').padEnd(14, ' ').slice(0, 14);
+    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0xe9, 0x25, 4, 0, padded);
+  }
+
   private drawShieldDots(baseX: number, champion: Champion): void {
     if (!this.screenIndexBuffer || !this.partyState) return;
     const shields: number[] = [];
@@ -2000,6 +2143,10 @@ export class ViewportRenderer {
       }
       const rect = this.getInventorySlotRect(iconSlots, slot);
       if (!rect) continue;
+      const wounds = champion.wounds ?? 0;
+      if (slot <= 5 && (wounds & (1 << slot)) !== 0) {
+        this.drawWoundedOutline(rect);
+      }
       if (objectIndex >= 0) {
         this.drawObjectIcon(rect, objectIndex, word612);
         continue;
@@ -2025,6 +2172,37 @@ export class ViewportRenderer {
     this.drawMouthChewAnimation();
     this.drawEyeIcon();
     this.drawVitalsAndLoad(champion);
+  }
+
+  private drawWoundedOutline(rect: Rect): void {
+    if (!this.screenIndexBuffer) return;
+    const graphic = this.getGraphicBitmap(34);
+    if (!graphic) {
+      drawRectOutlineIndex(this.screenIndexBuffer, {
+        x1: rect.x1 - 1,
+        y1: rect.y1 - 1,
+        x2: rect.x2 + 1,
+        y2: rect.y2 + 1,
+      }, 8);
+      return;
+    }
+
+    tag0088b2Index(
+      graphic,
+      this.screenIndexBuffer,
+      {
+        x1: rect.x1 - 1,
+        y1: rect.y1 - 1,
+        x2: rect.x2 + 1,
+        y2: rect.y2 + 1,
+        srcX: 0,
+        srcY: 0,
+        srcStride: graphic.width,
+        srcWidth: graphic.width,
+        srcHeight: graphic.height,
+      },
+      12
+    );
   }
 
   private getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
@@ -3263,6 +3441,7 @@ export class ViewportRenderer {
   }
 
   private setChampionPossession(champion: Champion, slot: number, value: number | null): void {
+    const previous = this.normalizeObjectValue(this.getChampionPossession(champion, slot));
     const next = this.normalizeObjectValue(value);
     if (!champion.possessions || champion.possessions.length < 30) {
       const slots = new Array(30).fill(null) as Array<number | null>;
@@ -3277,12 +3456,57 @@ export class ViewportRenderer {
     if (slot === 0) champion.shieldHand = next;
     if (slot === 1) champion.weaponHand = next;
     if (slot === 8) champion.quiver = next;
+    this.updateLightForPossessionChange(slot, previous, next);
   }
 
   private normalizeObjectValue(value: number | null | undefined): number | null {
     if (value === undefined || value === null) return null;
     if (value === OBJECT_ID_NULL || value === OBJECT_ID_EOF) return null;
     return value;
+  }
+
+  private updateLightForPossessionChange(slot: number, previous: number | null, next: number | null): void {
+    if (!this.partyState || !this.uiTables) return;
+    if (slot !== 0 && slot !== 1 && slot !== 10) return;
+
+    if (slot === 10) {
+      const word1074 = this.uiTables.graphic232.word1074;
+      const stepValue = word1074[2] ?? 0;
+      if (stepValue !== 0) {
+        const prevIsIllumulet = previous !== null
+          && this.isBaseObjectNameIndex(previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
+        const nextIsIllumulet = next !== null
+          && this.isBaseObjectNameIndex(next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
+        const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
+        if (delta !== 0) {
+          const current = this.partyState.brightness ?? 0;
+          this.partyState.brightness = this.normalizeWord6(current + delta);
+        }
+      }
+    }
+
+    if (slot === 0 || slot === 1) {
+      this.setTorchLitState(previous, false);
+      this.setTorchLitState(next, true);
+    }
+  }
+
+  private isBaseObjectNameIndex(objectId: number, min: number, max: number): boolean {
+    const base = this.getBaseObjectNameIndex(objectId);
+    return base >= min && base <= max;
+  }
+
+  private setTorchLitState(objectId: number | null, lit: boolean): void {
+    if (objectId === null) return;
+    if (!this.isLikelyObjectRecord(objectId)) return;
+    if (!this.isBaseObjectNameIndex(objectId, OBJNI_TORCH_A, OBJNI_TORCH_A)) return;
+    const weapon = this.dungeonState.getWeaponRecord(objectId as ObjectID);
+    if (!weapon) return;
+    weapon.litTorch = lit;
+  }
+
+  private normalizeWord6(value: number): number {
+    return (value << 16) >> 16;
   }
 
   private canPlaceInSlot(objectId: number, slot: number): boolean {
