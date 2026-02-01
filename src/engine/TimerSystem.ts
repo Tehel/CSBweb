@@ -171,9 +171,30 @@ export class TimerSystem {
       case TimerFunction.TT_LIGHT:
         this.processLightLevelTimer(timer);
         break;
+      case TimerFunction.TT_71:
+        this.processInvisibleTimer();
+        break;
+      case TimerFunction.TT_73:
+        this.processSeeThruWallsTimer();
+        break;
+      case TimerFunction.TT_74:
+        this.processPartyShieldTimer(timer);
+        break;
+      case TimerFunction.TT_77:
+        this.processSpellShieldTimer(timer);
+        break;
+      case TimerFunction.TT_78:
+        this.processFireShieldTimer(timer);
+        break;
+      case TimerFunction.TT_79:
+        this.processMagicFootprintsTimer();
+        break;
       case TimerFunction.TT_MISSILE0:
       case TimerFunction.TT_MISSILE:
         this.processMissileTimer(timer);
+        break;
+      case TimerFunction.TT_11:
+        this.processActionDisableTimer(timer);
         break;
       case TimerFunction.TT_OPENROOM:
         this.processOpenRoom(timer);
@@ -210,6 +231,17 @@ export class TimerSystem {
     }
   }
 
+  private processActionDisableTimer(timer: TimerEntry): void {
+    const party = this.getPartyState();
+    const chIdx = timer.uByte5 & 0xff;
+    const champ = party.champions[chIdx];
+    if (!champ) return;
+    if ((champ.busyTimerIndex ?? -1) === timer.index) {
+      champ.busyTimerIndex = -1;
+      champ.actionDisabledUntil = 0;
+    }
+  }
+
   queueBrightnessTimer(deltaSteps: number, time: number): void {
     const party = this.getPartyState();
     this.timers.createTimer(
@@ -224,6 +256,17 @@ export class TimerSystem {
       0,
       deltaSteps,
     );
+  }
+
+  applyBrightnessSteps(steps: number, sign: number): void {
+    const word1074 = this.tables?.word1074;
+    if (!word1074 || word1074.length === 0) return;
+    let idx = steps | 0;
+    if (idx < 0) idx = -idx;
+    if (idx >= word1074.length) idx = word1074.length - 1;
+    const delta = (word1074[idx] ?? 0) * (sign >= 0 ? 1 : -1);
+    const party = this.getPartyState();
+    party.brightness = normalizeWord6((party.brightness ?? 0) + delta);
   }
 
   private processLightLevelTimer(timer: TimerEntry): void {
@@ -262,6 +305,45 @@ export class TimerSystem {
         nextSteps,
       );
     }
+  }
+
+  private processInvisibleTimer(): void {
+    const party = this.getPartyState();
+    const value = (party.invisible ?? 0) - 1;
+    party.invisible = value < 0 ? 0 : value;
+  }
+
+  private processSeeThruWallsTimer(): void {
+    const party = this.getPartyState();
+    const value = (party.seeThruWalls ?? 0) - 1;
+    party.seeThruWalls = value < 0 ? 0 : value;
+  }
+
+  private processPartyShieldTimer(timer: TimerEntry): void {
+    const party = this.getPartyState();
+    const current = party.partyShield ?? 0;
+    const next = current - normalizeWord6(timer.timerWord6);
+    party.partyShield = next < 0 ? 0 : next;
+  }
+
+  private processSpellShieldTimer(timer: TimerEntry): void {
+    const party = this.getPartyState();
+    const current = party.spellShield ?? 0;
+    const next = current - normalizeWord6(timer.timerWord6);
+    party.spellShield = next < 0 ? 0 : next;
+  }
+
+  private processFireShieldTimer(timer: TimerEntry): void {
+    const party = this.getPartyState();
+    const current = party.fireShield ?? 0;
+    const next = current - normalizeWord6(timer.timerWord6);
+    party.fireShield = next < 0 ? 0 : next;
+  }
+
+  private processMagicFootprintsTimer(): void {
+    const party = this.getPartyState();
+    const value = (party.magicFootprintsActive ?? 0) - 1;
+    party.magicFootprintsActive = value < 0 ? 0 : value;
   }
 
   private processOpenRoom(timer: TimerEntry): void {

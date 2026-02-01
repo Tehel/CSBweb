@@ -59,6 +59,10 @@ export class DungeonState {
         return value === undefined ? null : value;
     }
 
+    getSpellFilterLocation(): number {
+        return this.data.spellFilterLocation ?? 0;
+    }
+
     setTimerWord8Lookup(getWord8: (index: number) => ui16 | null): void {
         this.timerWord8Lookup = getWord8;
     }

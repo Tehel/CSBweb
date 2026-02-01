@@ -95,6 +95,8 @@ export interface Champion {
     wounds?: ui16;             // Bitmask of wounded body parts (CSBWin "ouches")
     poisonCount?: ui8;         // Poison counter for UI and effects
     skills: Skill[];           // CSBWin skills92[20]
+    actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
+    busyTimerIndex?: i32;      // Timer index for action disable
 
     // Inventory slots (simplified for MVP)
     weaponHand: any | null;     // Right hand weapon
@@ -122,6 +124,12 @@ export interface PartyState {
     fireShield?: ui16;          // Optional fire shield strength
     spellShield?: ui16;         // Optional spell shield strength
     brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
+    invisible?: i16;            // Active invisibility counter
+    seeThruWalls?: i16;         // Active see-thru-walls counter
+    magicFootprintsActive?: i16; // Active magic footprint counter
+    indexOfFirstMagicFootprint?: i16;
+    indexOfLastMagicFootprint?: i16;
+    numFootprintEnt?: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
 
     // Movement state

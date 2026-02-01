@@ -22,6 +22,7 @@ export interface SaveGameState {
   dsaIndex?: DsaIndex;
   extendedWallDecorations?: boolean;
   specialLocations?: Record<number, number>;
+  spellFilterLocation?: number;
 }
 
 interface Block1 {
@@ -287,6 +288,7 @@ function readExtendedFeatures(data: Uint8Array): {
   extendedWallDecorations: boolean;
   bigActuators: boolean;
   indirectText: boolean;
+  spellFilterLocation?: number;
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
 } {
@@ -310,7 +312,8 @@ function readExtendedFeatures(data: Uint8Array): {
   const flags = parsed[37] ?? 0;
   const numDSA = readU16LE(parsed, 38);
   const gameInfoSize = readU32LE(parsed, 44);
-  const extendedFlags = readU32LE(parsed, 64);
+  const spellFilterLocation = readU32LE(parsed, 64);
+  const extendedFlags = readU32LE(parsed, 68);
 
   const sequencedTimers = (extendedFlags & 0x20) !== 0;
   const extendedTimers = (extendedFlags & 0x80) !== 0;
@@ -358,7 +361,17 @@ function readExtendedFeatures(data: Uint8Array): {
     }
   }
 
-  return { offset, sequencedTimers, extendedTimers, extendedWallDecorations, bigActuators, indirectText, dsaLevelIndex, dsaIndex };
+  return {
+    offset,
+    sequencedTimers,
+    extendedTimers,
+    extendedWallDecorations,
+    bigActuators,
+    indirectText,
+    spellFilterLocation,
+    dsaLevelIndex,
+    dsaIndex,
+  };
 }
 
 function parseSpecialLocationsFromSaveData(
@@ -741,6 +754,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     dsaIndex: extended.dsaIndex,
     extendedWallDecorations: extended.extendedWallDecorations,
     specialLocations: specialLocations ?? undefined,
+    spellFilterLocation: extended.spellFilterLocation,
   };
 }
 
@@ -774,6 +788,9 @@ export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): v
   }
   if (save.bigActuators) {
     applyBigActuators(dungeon);
+  }
+  if (save.spellFilterLocation !== undefined) {
+    dungeon.spellFilterLocation = save.spellFilterLocation;
   }
 }
 

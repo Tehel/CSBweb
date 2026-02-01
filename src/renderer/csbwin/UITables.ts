@@ -1,4 +1,5 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
+import type { SpellDefinition } from '../../data/spellTypes';
 
 export interface Rect {
   x1: number;
@@ -42,6 +43,7 @@ export interface UITables {
     wRectPos20210: WordRect;
     wRectPos20202: WordRect;
     shrinkColorMap: number[];
+    spells: SpellDefinition[];
     spellFirstRuneScale: number[];
     spellBaseMana: number[];
   };
@@ -240,6 +242,25 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   const shrinkColorMap = Array.from(raw.slice(off, off + 16));
   off += 16;
 
+  // Spell table lives near the end of graphic 0x230 (Data.h: SPELL Spells[25]).
+  const spellTableOffset = off + (44 * 7) + 300 + (44 * 8) + 2;
+  requireSize(raw, spellTableOffset, 25 * 8, '0x230 Spells');
+  const spells: SpellDefinition[] = [];
+  let spellOff = spellTableOffset;
+  for (let i = 0; i < 25; i++) {
+    const spellId = view.getUint32(spellOff, false);
+    const skillRequired = raw[spellOff + 4] ?? 0;
+    const byte5 = raw[spellOff + 5] ?? 0;
+    const word6 = view.getUint16(spellOff + 6, false);
+    spells.push({
+      spellId: spellId >>> 0,
+      skillRequired,
+      byte5,
+      word6,
+    });
+    spellOff += 8;
+  }
+
   // Byte19016[6] and Byte19010[24] live at the tail of graphic 0x230 (Data.h:680-681).
   const tailOffset = raw.length - 30;
   requireSize(raw, tailOffset, 30, '0x230 Byte19016/Byte19010');
@@ -254,6 +275,7 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
     wRectPos20210,
     wRectPos20202,
     shrinkColorMap,
+    spells,
     spellFirstRuneScale,
     spellBaseMana,
   };

@@ -125,6 +125,12 @@ export class ActuatorSystem {
     if (tables.playSound) this.playSound = tables.playSound;
   }
 
+  emitTextMessage(text: string): void {
+    if (!this.onTextMessage) return;
+    if (!text) return;
+    this.onTextMessage(text);
+  }
+
   queueSwitchActionForActuator(actuator: ActuatorRecord, action: ActuatorAction, level: number, mapPos?: number): void {
     const source = new Position(getActuatorTargetX(actuator), getActuatorTargetY(actuator), level);
     const pos = mapPos ?? getActuatorTargetPos(actuator);

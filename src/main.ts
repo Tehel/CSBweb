@@ -797,6 +797,7 @@ async function init() {
                 ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
             game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
+            game.setSpellDefinitions(uiTables.graphic230.spells);
 
             // Initialize viewport renderer
             console.log('Initializing viewport renderer (CSBWin bytecode system)...');
@@ -809,7 +810,7 @@ async function init() {
                 game?.triggerObjectMove(position, object, place, unchangedRoom, facing);
             });
             renderer.setSpellCastHandler((chIdx, incantation, totalManaCost) => {
-                game?.recordSpellCast(chIdx, incantation, totalManaCost);
+                return game?.castSpellFromUi(chIdx, incantation, totalManaCost) ?? 0;
             });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);

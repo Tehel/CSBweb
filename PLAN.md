@@ -378,6 +378,32 @@ Status:
 - ✅ TenSecondUpdate mana regen + tempAdjust decay implemented (regen uses mastery + wisdom and stamina drain) (`src/engine/Game.ts`).
 - ⚠️ Pending: refine spell skill selection once spell definitions are implemented, replace throw skill gain with CSBWin tables, and refine LastMonsterAttackTime source once monster AI is in place.
 
+### Phase 9.75 — Magic casting parity (spell effects)
+Goal: mirror CSBWin’s `CastMagic`/`CastSpell` pipeline and spell effects.
+
+1. **Spell data model parity**. Load `SPELL` records from graphics `0x230` (spellID, skillRequired, byte5, word6) and expose `SPELL_PARAMETERS` in the engine (`doc/CSBwin-src/CSB.h`, `doc/CSBwin-src/CSBCode.cpp`).
+2. **Casting entrypoint**. Implement `FillSpellParameters`/`CastMagic`/`CastSpell` flow, including incantation override decoding and error handling (keep incantation on “needs flask”) (`doc/CSBwin-src/Magic.cpp`).
+3. **DSA spell filter**. Add `CallSpellFilter` behavior using `spellFilterLocation` and actuator type 47 to mutate spell parameters (`doc/CSBwin-src/Magic.cpp`, `doc/CSBwin-src/data.cpp`).
+4. **Skill gating + XP**. Match mastery checks, wisdom-based failure loop, and `AdjustSkills` gains (`doc/CSBwin-src/Magic.cpp`).
+5. **Class 1: potions**. Implement `GetFlaskInHand` and potion creation with strength calculation and UI updates (`doc/CSBwin-src/Magic.cpp`).
+6. **Class 2: missiles**. Implement `CharacterThrowsSpell` → `LaunchObject` → `LaunchMissile` with timerWord8 packing, range/decay rules, and missile creation (`doc/CSBwin-src/Magic.cpp`).
+7. **Class 3: light/utility**. Implement light/darkness, see‑thru walls, invisibility, party shield, footprints, Zokathra, and fire shield timers (`doc/CSBwin-src/Magic.cpp`, `doc/CSBwin-src/Attack.cpp`).
+8. **Action disable time**. Use `word6` bits 10–15 to schedule `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp`).
+9. **UI integration**. Replace the current TODO in the magic panel with the casting pipeline and reflect UI changes for failed/successful casts.
+10. **Validation tooling**. Add a debug “spell trace” mode to log parameters, effects, and timers for comparison against CSBWin.
+
+Status:
+- ✅ CSBWin casting flow documented in `doc/CSBWIN_MAGIC_CASTING_REFERENCE.md`.
+- ✅ Step 1: spell table parsed from graphics `0x230` and exposed to the engine (`src/renderer/csbwin/UITables.ts`, `src/engine/Game.ts`).
+- ✅ Step 2: `FillSpellParameters`/`CastMagic`/`CastSpell` pipeline stubbed with incantation override decoding and “needs flask” return code (`src/engine/Game.ts`, `src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Step 3: DSA spell filter wired to extended features `spellFilterLocation` (`src/engine/DsaSystem.ts`, `src/engine/DungeonState.ts`, `src/data/SaveGameLoader.ts`).
+- ✅ Step 4: mastery gating + experience award logic implemented for casts/fizzles (`src/engine/Game.ts`).
+- ✅ Step 5: potion creation now mutates the empty flask record with type/strength (`src/engine/Game.ts`).
+- ✅ Step 6: class‑2 missile spell launch wired to CSBWin range/decay rules (`src/engine/Game.ts`).
+- ✅ Step 7: class‑3 light/utility spell timers and counters implemented (`src/engine/Game.ts`, `src/engine/TimerQueue.ts`, `src/engine/TimerSystem.ts`, `src/engine/Party.ts`).
+- ✅ Step 8: action disable timers now use TT_11 with CSBWin busy‑timer scheduling (`src/engine/Game.ts`, `src/engine/TimerQueue.ts`, `src/engine/TimerSystem.ts`).
+- ✅ Spell abort/fizzle/meaningless/flask messages now emit via message area (`src/engine/Game.ts`, `src/engine/ActuatorSystem.ts`).
+
 ### Phase 10 — CSBWin-Compatible Save/Load (pre‑work checklist)
 Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
 

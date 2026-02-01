@@ -345,6 +345,7 @@ export interface DungeonData {
     specialLocations?: Record<number, number>; // EXPOOL special locations (EDT_SpecialLocations)
     extendedWallDecorations?: boolean; // Extended-feature flag
     bigActuators?: boolean;     // Extended-feature flag
+    spellFilterLocation?: number; // Extended-feature spell filter location
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }
 

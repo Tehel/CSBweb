@@ -10,6 +10,7 @@ import {
   RoomType,
 } from '../core/types';
 import type { ActuatorRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
+import type { SpellParameters } from './magicTypes';
 import {
   getActuatorDsaSelector,
   getActuatorDsaState,
@@ -591,6 +592,75 @@ export class DsaSystem {
 
     if (!found) return null;
     return { chIdx, skillNumber, experience };
+  }
+
+  processSpellFilter(params: SpellParameters): SpellParameters | null {
+    const location = this.dungeon.getSpellFilterLocation();
+    if ((location & 0x80000000) === 0) return null;
+    const locrFilter = intToLocation(location & 0x7fffffff);
+    if (!this.isValidLocation(locrFilter)) return null;
+    const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: locrFilter.l & 0xff,
+      function: 0,
+      uByte5: 0,
+      uByte6: locrFilter.x & 0xff,
+      uByte7: locrFilter.y & 0xff,
+      uByte8: 0,
+      uByte9: 0,
+      sequence: 0,
+      timerWord8: 0,
+      timerWord6: 0,
+    };
+
+    let updated: SpellParameters = { ...params };
+    let found = false;
+
+    for (let rn = this.dungeon.findFirstObject(filterPos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      const rec = this.dungeon.getActuatorRecord(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      found = true;
+      this.setParameters(14, [
+        updated.action,
+        updated.incantation,
+        updated.chIdx,
+        updated.disableTime,
+        updated.missileType,
+        updated.locationAbs,
+        updated.facing,
+        updated.skillRequired,
+        updated.spellByte5,
+        updated.spellClass,
+        updated.unused1,
+        updated.unused2,
+        updated.unused3,
+        updated.unused4,
+      ]);
+      this.processTimer6Internal(rn, timer, filterPos, true, new DsaVars());
+      updated = {
+        action: this.getParameter(0),
+        incantation: this.getParameter(1),
+        chIdx: this.getParameter(2),
+        disableTime: this.getParameter(3),
+        missileType: this.getParameter(4),
+        locationAbs: this.getParameter(5),
+        facing: this.getParameter(6),
+        skillRequired: this.getParameter(7),
+        spellByte5: this.getParameter(8),
+        spellClass: this.getParameter(9),
+        unused1: this.getParameter(10),
+        unused2: this.getParameter(11),
+        unused3: this.getParameter(12),
+        unused4: this.getParameter(13),
+      };
+    }
+
+    if (!found) return null;
+    return updated;
   }
 
   processTimer5(rn: number, timer: TimerEntry, location: Position): boolean {

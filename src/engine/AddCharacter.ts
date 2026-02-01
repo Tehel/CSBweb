@@ -129,6 +129,8 @@ export function createChampionFromPreset(
     food: 1500,
     water: 1500,
     skills,
+    actionDisabledUntil: 0,
+    busyTimerIndex: -1,
     weaponHand: slots[1] ?? null,
     shieldHand: slots[0] ?? null,
     quiver: slots[8] ?? null,

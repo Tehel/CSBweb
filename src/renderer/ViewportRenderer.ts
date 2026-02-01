@@ -190,7 +190,7 @@ export class ViewportRenderer {
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
   private graphicCache: Map<string, IndexedBitmap> = new Map();
   private onObjectMove?: ObjectMoveHandler;
-  private onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => void;
+  private onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void;
   private portraitSheet: IndexedBitmap | null | undefined = undefined;
   private portraitCache: Map<number, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
@@ -321,7 +321,7 @@ export class ViewportRenderer {
     this.onObjectMove = handler;
   }
 
-  setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => void): void {
+  setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void): void {
     this.onSpellCast = handler;
   }
 
@@ -2956,7 +2956,7 @@ export class ViewportRenderer {
   }
 
   private handleMouseButton(id: number, x: number, y: number): void {
-    updateDebug(`handling click on ${id}`)
+    // updateDebug(`handling click on ${id}`)
     if (id === 80 && this.isEyeClick(x, y)) {
       this.handleEyePress();
       return;
@@ -3645,11 +3645,13 @@ export class ViewportRenderer {
         this.uiTables.graphic230.spellFirstRuneScale,
       );
       const chIdx = this.partyState.champions.indexOf(champion);
+      let result: number | void = undefined;
       if (chIdx >= 0) {
-        this.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
+        result = this.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
       }
-      // TODO: actually run the spell effect
-      champion.incantation = [];
+      if (result !== 3) {
+        champion.incantation = [];
+      }
       return;
     }
 
