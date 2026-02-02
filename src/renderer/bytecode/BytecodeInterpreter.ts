@@ -18,7 +18,7 @@ import type { DungeonState } from '../../engine/DungeonState';
 import type { CreatureRecord } from '../../data/dungeonTypes';
 import type { ObjectTables } from '../csbwin/ObjectTables';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
-import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID } from '../../core/types';
+import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 
 const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
@@ -442,6 +442,7 @@ export class BytecodeInterpreter {
 
       // Drawing opcodes
       case Opcode.StdDrawCeilingPit:
+        return this.opStdDrawCeilingPit();
       case Opcode.StdDrawSeeThruDoorEdge:
         return this.opDrawAction(opcode);
 
@@ -990,6 +991,51 @@ export class BytecodeInterpreter {
 
     const floorCell = BytecodeInterpreter.floorDrawingLocations[relativeCell | 0] ?? 0;
     this.drawFloorDecorations(floorGraphicOrdinal | 0, floorCell | 0);
+    return true;
+  }
+
+  private opStdDrawCeilingPit(): boolean {
+    const mapY = this.stack.pop();
+    const mapX = this.stack.pop();
+    const relCellRF = this.stack.pop();
+
+    if (mapY === undefined || mapX === undefined || relCellRF === undefined) {
+      // ERROR: StdDrawCeilingPit - missing arguments
+      return true;
+    }
+
+    const dungeon = this.context.dungeonState;
+    const getGraphic = this.context.getGraphicBitmap;
+    const ceilingRects = this.context.ceilingPitRectangles;
+    const level = this.context.frameMapIndex;
+    if (!dungeon || !getGraphic || !ceilingRects || level === undefined) return true;
+
+    const relIndex = relCellRF | 0;
+    const relativeCell = BytecodeInterpreter.objectDrawingLocations[relIndex] ?? 0;
+
+    const posAbove = dungeon.incrementLevel(new Position(mapX | 0, mapY | 0, level | 0), -1);
+    if (!posAbove) return true;
+    const aboveMap = dungeon.getMap(posAbove.z);
+    if (!aboveMap) return true;
+
+    const cellFlag = aboveMap.cellFlags?.[posAbove.x]?.[posAbove.y] ?? 0;
+    const roomType = (cellFlag >> 5) & 0x7;
+    if (roomType !== RoomType.PIT) return true;
+    if ((cellFlag & 0x08) === 0) return true;
+
+    const cell2graphic = [0, 0, 0, 64, 63, 63, 66, 65, 65, 68, 67, 67];
+    const cell2rect = [0, 0, 0, 7, 8, 6, 4, 5, 3, 1, 2, 0];
+    const cell2mirror = [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1];
+    if (relativeCell < 0 || relativeCell >= cell2graphic.length) return true;
+
+    const rect = ceilingRects[cell2rect[relativeCell] ?? 0];
+    if (!rect) return true;
+
+    const bitmap = getGraphic(cell2graphic[relativeCell] ?? 0);
+    if (!bitmap) return true;
+
+    const mirror = (cell2mirror[relativeCell] ?? 0) !== 0;
+    this.blitShapeBitmapToViewport(bitmap, rect, mirror);
     return true;
   }
 
