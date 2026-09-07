@@ -38,6 +38,8 @@ import {
 } from '../data/actuatorHelpers';
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import { StateOfFear } from './monsterTypes';
+import { MonsterDamageResult } from './MonsterDamage';
 import {
   monsterAbsorbsDaggersEtc,
   monsterHorizontalSize,
@@ -132,6 +134,11 @@ export interface TimerHooks {
   }) => number;
   /** The party was relocated by a timer (a pit, a teleporter, a wiggle). */
   onPartyMoved?: () => void;
+  /**
+   * `ProcessTimer60and61` (doc/CSBwin-src/Timer.cpp:2566) — a monster waiting for its
+   * destination square to clear.
+   */
+  onMonsterAbeyance?: (timer: TimerEntry) => void;
   /**
    * `ProcessTimers29to41` (doc/CSBwin-src/Monster.cpp:3239). Every timer type from
    * 29 to 41 lands here rather than in the ordinary dispatch.
@@ -245,6 +252,10 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_11:
         this.processActionDisableTimer(timer);
+        break;
+      case TimerFunction.TT_60:
+      case TimerFunction.TT_61:
+        this.hooks?.onMonsterAbeyance?.(timer);
         break;
       case TimerFunction.TT_OPENROOM:
         this.processOpenRoom(timer);
@@ -1559,6 +1570,20 @@ export class TimerSystem {
     this.clearMissileFilterState();
   }
 
+  /**
+   * `d.MonsterDamageResult` — the result of the most recent `DamageMonster` call.
+   *
+   * CSBWin keeps this in globals because `CheckMoveFromMissile` needs to know whether
+   * the encounter it just resolved wiped out the whole group, and the call chain
+   * between them does not carry a return value
+   * (`doc/CSBwin-src/Code11f52.cpp:2742`).
+   */
+  private monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+
+  reportMonsterDamageResult(result: MonsterDamageResult): void {
+    this.monsterDamageResult = result;
+  }
+
   checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: number | null): void {
     if (this.missileFilterObject !== OBJECT_ID_EOF) return;
 
@@ -1648,6 +1673,12 @@ export class TimerSystem {
 
           if (hit) {
             this.timers.deleteTimer(missile.timerIndex);
+            if (this.monsterDamageResult === MonsterDamageResult.ALL_MONSTERS_DIED) {
+              // The whole group died to the missile, so the thing being moved no
+              // longer exists (doc/CSBwin-src/Code11f52.cpp:2740-2746).
+              this.movedObjectWasDestroyed = true;
+              return;
+            }
             timerDeleted = true;
             break;
           }
@@ -2222,6 +2253,60 @@ export class TimerSystem {
     return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
   }
 
+  /**
+   * Take a monster's intended destination through the destination cell's effects,
+   * for `MonsterSystem.moveMonster`.
+   *
+   * This is the same `resolveCellEffects` the party and every other object goes
+   * through, so a monster follows teleporter chains and falls down pits by the same
+   * rules. The returned `code` mirrors `TeleportMonster`'s value: `groupIndex + 2`
+   * for a fear-state-6 group so the caller can find its slot again, otherwise 1 when
+   * a teleport happened, or 0 when none did
+   * (`doc/CSBwin-src/Code11f52.cpp:2377-2384`).
+   */
+  resolveMonsterDestination(
+    destination: Position,
+    monsterRn: number,
+  ): { position: Position; code: number; audible: boolean } {
+    const rec = this.dungeon.getCreatureRecord(monsterRn);
+    const decoded = decodeObjectID(monsterRn);
+    const canFall = !this.isMonsterLevitating(rec);
+    const facing = rec?.facing ?? 0;
+    const result = this.resolveCellEffects(
+      destination,
+      DBType.CREATURE,
+      decoded.position & 0x3,
+      facing,
+      undefined,
+      canFall,
+      rec ?? undefined,
+    );
+    if (!result.moved) {
+      return { position: destination, code: 0, audible: false };
+    }
+    if (rec && !result.usedItem16) rec.facing = result.facing & 0x3;
+
+    let code = 1;
+    if (rec && result.usedItem16 && rec.fear === StateOfFear.StateOfFear6) {
+      code = rec.groupIndex + 2;
+    }
+    return { position: result.position, code, audible: result.teleportAudible };
+  }
+
+  /**
+   * Set by `checkMoveFromMissile` when the encounter destroyed the group that was
+   * being moved — CSBWin's `return 1` from `CheckMoveFromMissile`.
+   */
+  private movedObjectWasDestroyed = false;
+
+  /** `CheckMoveFromMissile` for a monster leaving a square. */
+  checkMonsterMoveFromMissile(from: Position, to: Position, monsterRn: number): boolean {
+    this.movedObjectWasDestroyed = false;
+    this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+    this.checkMoveFromMissile(from, to, monsterRn);
+    return this.movedObjectWasDestroyed;
+  }
+
   private wiggleMonster(monsterRn: number, position: Position): void {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = decodeObjectID(monsterRn);
@@ -2291,13 +2376,24 @@ export class TimerSystem {
     allowFall: boolean,
     monster?: CreatureRecord,
     pretendTeleporter?: TeleporterRecord,
-  ): { position: Position; objectPos: number; facing: number; missileDir?: number; moved: boolean; usedItem16?: boolean } {
+  ): {
+    position: Position;
+    objectPos: number;
+    facing: number;
+    missileDir?: number;
+    moved: boolean;
+    usedItem16?: boolean;
+    teleportAudible: boolean;
+  } {
     let position = new Position(start.x, start.y, start.z);
     let curFacing = facing & 0x3;
     let curPos = objectPos & 0x3;
     let curDir = missileDir;
     let moved = false;
     let usedItem16 = false;
+    // `LOCAL_26 = DB1A2->audible()` — remembered because it decides TT_60 vs TT_61
+    // if the monster then has to wait for its destination (Code11f52.cpp:2965).
+    let teleportAudible = false;
     let forcedTeleporter = pretendTeleporter ?? null;
 
     for (let step = 0; step < 1000; step++) {
@@ -2313,6 +2409,7 @@ export class TimerSystem {
 
         if (objectType === -1) {
           curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
+          teleportAudible = teleporter.sound;
           if (teleporter.sound) {
             const distance = this.getPartyDistance(position.x, position.y, position.z);
             if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 0, distance);
@@ -2330,12 +2427,14 @@ export class TimerSystem {
             if (result.blocked) break;
             curFacing = result.facing & 0x3;
             usedItem16 = result.usedItem16;
+            teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
               if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
             }
           } else {
             curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
+            teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
               if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
@@ -2364,7 +2463,7 @@ export class TimerSystem {
       break;
     }
 
-    return { position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved, usedItem16 };
+    return { position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved, usedItem16, teleportAudible };
   }
 
   private getActiveTeleporterAt(position: Position): TeleporterRecord | null {

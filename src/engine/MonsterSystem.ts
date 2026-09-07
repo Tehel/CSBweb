@@ -14,13 +14,13 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
-import { TimerFunction, type TimerQueue } from './TimerQueue';
+import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import {
@@ -63,6 +63,22 @@ export interface MonsterSystemTables {
 }
 
 export interface MonsterSystemHooks {
+  /**
+   * `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp`) — a monster leaving a
+   * square may be struck by a missile sitting in it. Returns true if that removed
+   * the monster from the dungeon.
+   */
+  checkMoveFromMissile?: (from: Position, to: Position, monsterRn: ObjectID) => boolean;
+  /**
+   * Take a monster's intended destination through the cell's effects — teleporter
+   * chains and pit falls — the way the party's move is resolved. `code` carries
+   * `TeleportMonster`'s return value (`groupIndex + 2` for a fear-6 group, else 1,
+   * or 0 for no teleport), and `audible` whether the teleporter buzzed.
+   */
+  resolveMonsterDestination?: (
+    destination: Position,
+    monsterRn: ObjectID,
+  ) => { position: Position; code: number; audible: boolean };
   /** `QueueSound(ordinal, mapX, mapY, deltaTime)` (`doc/CSBwin-src/CSBCode.cpp:1819`). */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** Dev-only AI trace sink; mirrors CSBWin's `AITraceActive` output. */
@@ -450,6 +466,245 @@ export class MonsterSystem {
       ? monsterDelayFromAttackToMove(desc)
       : monsterDelayFromMoveToAttack(desc);
     return (this.getTime() + minDelay + this.random.bool()) >>> 0;
+  }
+
+  /* ------------------------------------------------------------ moving ------- */
+
+  /**
+   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3325-3424`).
+   *
+   * Moves a group from one square to another, taking the destination cell's effects
+   * — teleporters, pits — through the same resolution the party uses, and keeping the
+   * `ITEM16` and the AI timers in step with the result.
+   *
+   * Returns CSBWin's `LOCAL_14`, whose encoding is worth spelling out because two of
+   * its values overlap in meaning:
+   *
+   * - `removed: true` is CSBWin's `return 1` — the group is no longer in the dungeon,
+   *   because the destination was occupied and it has gone into abeyance.
+   * - `code === 0` means nothing about the `ITEM16` changed.
+   * - `code === 1` means the slot was attached or detached by this move.
+   * - `code > 1` comes only from `TeleportMonster`, which returns `groupIndex + 2`
+   *   for a fear-state-6 group so the caller can find its slot again
+   *   (`doc/CSBwin-src/Code11f52.cpp:2377-2384`).
+   */
+  moveMonster(
+    monsterRn: ObjectID,
+    oldX: number,
+    oldY: number,
+    newX: number,
+    newY: number,
+    level: number,
+  ): { removed: boolean; code: number } {
+    const monster = this.dungeon.getCreatureRecord(monsterRn);
+    if (!monster) return { removed: false, code: 0 };
+
+    const partyLevel = this.getPartyState().position.z | 0;
+    const fromDungeon = oldX >= 0;
+    // "Proper level && oldX >= 0 means an ITEM16 exists"
+    // (doc/CSBwin-src/Code11f52.cpp:3122).
+    const item16Attached = level === partyLevel && fromDungeon;
+
+    // A monster leaving a square may run into a missile sitting in it.
+    if (fromDungeon && level === partyLevel) {
+      const hit = this.hooks?.checkMoveFromMissile?.(
+        new Position(oldX, oldY, level),
+        new Position(newX, newY, level),
+        monsterRn,
+      );
+      if (hit) return { removed: true, code: 0 };
+    }
+
+    // Follow teleporters and fall down pits, exactly as the party does.
+    const resolved = this.hooks?.resolveMonsterDestination?.(
+      new Position(newX, newY, level),
+      monsterRn,
+    ) ?? { position: new Position(newX, newY, level), code: 0, audible: false };
+
+    const destination = resolved.position;
+    const destLevel = destination.z | 0;
+    let code = resolved.code;
+
+    // The destination is unusable if the party is standing there or another monster
+    // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
+    const blockedByParty =
+      destLevel === partyLevel &&
+      destination.x === (this.getPartyState().position.x | 0) &&
+      destination.y === (this.getPartyState().position.y | 0);
+    const occupant = this.findFirstMonsterAt(destination);
+    if (blockedByParty || occupant !== OBJECT_ID_EOF) {
+      if (fromDungeon) this.deleteMonsterMovementTimers(oldX, oldY, level);
+      if (item16Attached) this.detachItem16(monster.groupIndex);
+      if (fromDungeon) this.dungeon.removeObjectFromCell(new Position(oldX, oldY, level), monsterRn);
+      this.createMovementTimer(monsterRn, destination, resolved.audible);
+      return { removed: true, code: 0 };
+    }
+
+    // Crossing on or off the party's level attaches or detaches the slot.
+    if (item16Attached && destLevel !== partyLevel) {
+      this.detachItem16(monster.groupIndex);
+      code = 1;
+    } else if (destLevel === partyLevel && !item16Attached) {
+      this.attachItem16ToMonster(monsterRn, destination.x, destination.y);
+      code = 1;
+    }
+
+    if (fromDungeon) this.dungeon.removeObjectFromCell(new Position(oldX, oldY, level), monsterRn);
+    this.dungeon.addObjectToCell(destination, monsterRn);
+
+    // A freshly attached group, or one placed from nowhere, needs its first timer.
+    if (code !== 0 || !fromDungeon) {
+      this.startMonsterMovementTimers(destination.x, destination.y, destLevel);
+    }
+
+    if (fromDungeon) {
+      if (code > 1) {
+        // A teleported fear-6 group: stop it attacking and drop its old timers.
+        this.clearAttackingAndDeleteMovementTimers(code - 2, oldX, oldY, level);
+      } else if (code !== 0) {
+        this.deleteMonsterMovementTimers(oldX, oldY, level);
+      } else {
+        // Same level, still attached: the timers stay but must follow the group to
+        // its new square (doc/CSBwin-src/MoveObject.cpp:551-565).
+        this.retargetMonsterMovementTimers(oldX, oldY, destination.x, destination.y, level);
+      }
+    }
+
+    // Keep the slot's idea of where it is in step.
+    const slot = this.dungeon.getAttachedItem16(monster);
+    if (slot) {
+      slot.ubPrevX = slot.uByte10;
+      slot.ubPrevY = slot.uByte11;
+      slot.uByte10 = destination.x & 0xff;
+      slot.uByte11 = destination.y & 0xff;
+    }
+
+    return { removed: false, code };
+  }
+
+  /**
+   * `ClearAttacking_DeleteMovementTimers` (`doc/CSBwin-src/Code11f52.cpp:667`) — a
+   * group that has just been teleported is no longer mid-attack.
+   */
+  clearAttackingAndDeleteMovementTimers(slotIndex: number, mapX: number, mapY: number, level: number): void {
+    const slot = this.dungeon.getItem16Record(slotIndex);
+    if (slot) {
+      for (let i = 0; i < 4; i++) {
+        slot.singleMonsterStatus[i] = (slot.singleMonsterStatus[i] ?? 0) & ~SMS_ATTACKING;
+      }
+    }
+    this.deleteMonsterMovementTimers(mapX, mapY, level);
+  }
+
+  /**
+   * Point a group's existing AI timers at its new square.
+   *
+   * CSBWin does this in the DSA move path (`doc/CSBwin-src/MoveObject.cpp:551-565`)
+   * by rewriting `uByte6`/`uByte7` in place — the timers are addressed by map square,
+   * so a group that moved without changing its `ITEM16` would otherwise keep waking
+   * up at the square it left.
+   */
+  private retargetMonsterMovementTimers(
+    oldX: number,
+    oldY: number,
+    newX: number,
+    newY: number,
+    level: number,
+  ): void {
+    for (const timer of this.timers.getTimers()) {
+      if (timer.level !== (level & 0xff)) continue;
+      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
+      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
+      if (timer.uByte6 !== (oldX & 0xff)) continue;
+      if (timer.uByte7 !== (oldY & 0xff)) continue;
+      timer.uByte6 = newX & 0xff;
+      timer.uByte7 = newY & 0xff;
+    }
+  }
+
+  /**
+   * `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) — park a monster that
+   * could not be placed, to retry later.
+   *
+   * ⚠️ CSBWin also counts how many are already waiting at that square and, past 31,
+   * deletes the monster outright unless it is `Unique()` or carries something
+   * (`doc/CSBwin-src/Code11f52.cpp:2474-2510`). That overflow guard is **not** ported
+   * — see PLAN.md Phase 12.
+   */
+  createMovementTimer(monsterRn: ObjectID, destination: Position, audible: boolean): void {
+    this.timers.createTimer(
+      audible ? TimerFunction.TT_61 : TimerFunction.TT_60,
+      destination.x,
+      destination.y,
+      0,
+      0,
+      (this.getTime() + 5) >>> 0,
+      destination.z,
+      monsterRn,
+    );
+  }
+
+  /**
+   * `ProcessTimer60and61` (`doc/CSBwin-src/Timer.cpp:2566`) — retry a parked move.
+   *
+   * If the square is now free the monster is placed and the timer ends. Otherwise it
+   * is rescheduled 5 ticks later — except for Lord Chaos, who gets a 25% chance to
+   * wander one square and try there instead, which is how he escapes a corner.
+   */
+  processAbeyanceTimer(timer: TimerEntry): void {
+    const monsterRn = timer.object;
+    if (monsterRn === undefined) return;
+    const level = timer.level & 0xff;
+    let mapX = timer.uByte6;
+    let mapY = timer.uByte7;
+    const partyLevel = this.getPartyState().position.z | 0;
+    const party = this.getPartyState().position;
+
+    let triedWander = false;
+    for (;;) {
+      const free =
+        !(level === partyLevel && (party.x | 0) === mapX && (party.y | 0) === mapY) &&
+        this.findFirstMonsterAt(new Position(mapX, mapY, level)) === OBJECT_ID_EOF;
+      if (free) {
+        if (timer.function === TimerFunction.TT_61) {
+          this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
+        }
+        this.moveMonster(monsterRn as ObjectID, -1, 0, mapX, mapY, level);
+        return;
+      }
+
+      if (triedWander) break;
+      triedWander = true;
+
+      const monster = this.dungeon.getCreatureRecord(monsterRn as ObjectID);
+      if (!monster || monster.creatureType !== MonsterType.mon_LordChaos) break;
+      if (this.random.zeroTo3() !== 0) break; // 25 percent chance of movement
+
+      switch (this.random.zeroTo3()) {
+        case 0: mapX--; break;
+        case 1: mapX++; break;
+        case 2: mapY--; break;
+        default: mapY++; break;
+      }
+      if (!this.openTeleporterPitOrDoor(level, mapX, mapY)) break;
+    }
+
+    timer.time = (timer.time + 5) >>> 0;
+    this.timers.addTimer(timer);
+  }
+
+  /** `OpenTeleporterPitOrDoor` (`doc/CSBwin-src/Timer.cpp:625`). */
+  private openTeleporterPitOrDoor(level: number, mapX: number, mapY: number): boolean {
+    const map = this.dungeon.getMap(level);
+    if (!map) return false;
+    if (mapX < 0 || mapY < 0 || mapX >= map.descriptor.width || mapY >= map.descriptor.height) return false;
+    const roomType = (this.dungeon.getCellFlag(new Position(mapX, mapY, level)) >> 5) & 0x7;
+    return (
+      roomType === RoomType.OPEN ||
+      roomType === RoomType.TELEPORTER ||
+      roomType === RoomType.PIT ||
+      roomType === RoomType.DOOR
+    );
   }
 
   /* -------------------------------------------------------------------- AI ---- */

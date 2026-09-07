@@ -642,9 +642,30 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      defer the sound as a `TT_20` timer (`CSBCode.cpp:1832`) but plays it at once,
      and `SoundFilter`'s DSA hand-off (`Sound.cpp:670`) is not ported.
    - ✅ **Dev AI trace** on F4, formatted after CSBWin's `AITraceActive` output.
+   - ✅ **`MoveObject` for monsters** (`MonsterSystem.moveMonster`): monsters now use
+     the same teleporter and pit resolution the party does, via
+     `TimerSystem.resolveMonsterDestination` over the shared `resolveCellEffects`.
+     Includes `CheckMoveFromMissile` on the way out, the `ITEM16` attach/detach when
+     crossing levels, AI-timer retargeting, `ClearAttacking_DeleteMovementTimers`,
+     and the `d.MonsterDamageResult` global that decides whether a missile encounter
+     aborts the move.
+   - ✅ **Abeyance** (`TT_60`/`TT_61` + `ProcessTimer60and61`): a group whose
+     destination holds the party or another monster is parked and retries every 5
+     ticks, with Lord Chaos's 25%-chance random step so he can escape a walled-in
+     corner.
    - ⏳ Still to do: `ProcessTimers29to41` itself (a marked placeholder that logs and
-     returns), and the `MoveObject` integration so monsters use the same
-     teleporter/stairs/pit paths as the party.
+     returns).
+
+   ⚠️ **One deferral:** `CreateMovementTimer`'s overflow guard is not ported — CSBWin
+   counts the groups already waiting at a square and, past 31, deletes the monster
+   unless it is `Unique()` or carries something (`Code11f52.cpp:2474-2510`).
+
+   Verified with `tools/dump-monster-move.ts` (new): an Ant Man moved from (1,16) to
+   (2,16) leaves the old cell, appears in the new one, and its AI timer follows it
+   rather than staying behind, while its `ITEM16` records (2,16) and remembers
+   (1,16); a move onto an occupied square yields exactly one abeyance timer carrying
+   that monster; and the abeyance timer correctly reschedules while blocked, then
+   places the group once the destination clears.
 
    Verified with `tools/dump-monster-activation.ts` (new): on level 3 the real
    dungeon activates 13 groups — worms in the corridor at (2,1)-(6,1), munchers,
@@ -681,15 +702,12 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    the monster form of `MoveObject` for the off-party-level random walk (`:2908`). So
    the remaining work is *not* "step 3 then step 4" — it is:
 
-   1. `MoveObject` for monsters (step 2's remaining item: teleporter/stairs/pit).
+   1. ✅ `MoveObject` for monsters — **done**, see step 2 above.
    2. ✅ `DamageMonster` — **done**, see step 4 below.
-   3. `InitialChecks`, which both of the above gate.
+   3. `InitialChecks`, which both of the above gate. **Now unblocked.**
    4. `ProcessTimers29to41`'s main body (~1220 lines) plus the `Try_*` /
       `Standard_Finish` / `Process_Invincible` helper chain (~800 lines).
    5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
-
-   Nothing in 3-5 is worth starting before 1, since each would have to be written
-   against a stub and revisited.
 
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do

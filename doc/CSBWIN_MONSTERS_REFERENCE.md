@@ -225,6 +225,29 @@ The footprint trail that feeds smelling is `src/engine/PartyFootprints.ts` — s
 two `PROVEN_FACTS.md` entries on `AddFootprintEntry`, which CSBWin's own author
 describes as broken but which is the only writer of the age bytes smelling reads.
 
+## Moving a group
+
+`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3325-3424`), ported as
+`MonsterSystem.moveMonster`. In order:
+
+1. If the group is leaving a real square on the party's level, `CheckMoveFromMissile`
+   runs first — a missile sitting in that square gets its encounter as the group
+   walks out of it. Only a total wipe-out aborts the move.
+2. The destination goes through the same cell-effect resolution the party uses, so
+   teleporter chains and pit falls apply identically. A monster teleport also rotates
+   the group's facings and positions (`TeleportMonster`, `:2308`).
+3. If the resolved destination holds the party or another monster, the group is
+   parked in abeyance rather than placed.
+4. Otherwise, crossing on or off the party's level attaches or detaches the `ITEM16`,
+   the record is moved between cells, and the AI timers are started, dropped, or
+   retargeted depending on what happened to the slot.
+5. The slot's `uByte10`/`uByte11` learn the new square and `ubPrevX`/`ubPrevY`
+   remember the old one.
+
+See `doc/PROVEN_FACTS.md` for the three-way meaning of the return value, the abeyance
+mechanism and Lord Chaos's escape from a walled-in corner, why the AI timers have to
+be retargeted, and what `item16Attached` actually tests.
+
 ## Damage and death
 
 Ported in `src/engine/MonsterDamage.ts`. `DamageMonster`

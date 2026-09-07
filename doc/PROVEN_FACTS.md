@@ -637,3 +637,77 @@ dead member's position is pushed onto `d.Byte13050[d.Word13046++]`
 (`doc/CSBwin-src/Code11f52.cpp:762`) and `TAG00b522` (`:802`) drops them once the monster has
 finished moving. This is how a monster killed mid-move leaves its remains at the destination
 rather than the origin.
+
+## `MoveObject`'s monster return value encodes the `ITEM16` slot
+
+`doc/CSBwin-src/Code11f52.cpp` returns `LOCAL_14` from the monster branch (`:3424`), and the
+value carries three different meanings:
+
+- `1` from `return (1)` at `:3358` means the group is **no longer in the dungeon** — the
+  destination held the party or another monster, so it went into abeyance.
+- `0` means nothing about the `ITEM16` changed.
+- `1` (as `LOCAL_14`) means the slot was attached or detached by this move.
+- `> 1` comes only from `TeleportMonster`, which returns `groupIndex + 2` when the group is on
+  the party's level and in `StateOfFear6` (`doc/CSBwin-src/Code11f52.cpp:2377-2384`) — so the
+  caller can recover the slot index as `LOCAL_14 - 2` and call
+  `ClearAttacking_DeleteMovementTimers` on it (`:3411`).
+
+The overlap between "returned 1 because removed" and "LOCAL_14 == 1" is only safe because the
+two are reached by different `return` statements.
+
+## A monster whose destination is occupied is parked, not dropped
+
+`doc/CSBwin-src/Code11f52.cpp:3336-3359`. When the destination square holds the party or
+another monster, CSBWin deletes the group's movement timers, detaches its `ITEM16`, and calls
+`CreateMovementTimer` — putting it on a `TT_60` (silent) or `TT_61` (audible) timer that
+retries every 5 ticks (`ProcessTimer60and61`, `doc/CSBwin-src/Timer.cpp:2566`). The comment
+at `MoveObject`'s head calls this "abeyance".
+
+`ProcessTimer60and61` has one special case: `mon_LordChaos` gets a 25% chance per retry to
+step one square at random and try there instead, provided the new square is open, a
+teleporter, a pit or a door (`OpenTeleporterPitOrDoor`, `doc/CSBwin-src/Timer.cpp:625`). That
+is how he escapes a corner he has been walled into.
+
+## Monster AI timers are addressed by map square, so a move must retarget them
+
+Timer types 29-41 are found by `uByte6`/`uByte7` (`doc/CSBwin-src/Monster.cpp:1320-1327`).
+A group that moves without its `ITEM16` changing keeps its timers, so CSBWin rewrites their
+coordinates in place rather than recreating them (`doc/CSBwin-src/MoveObject.cpp:551-565`):
+
+```cpp
+if (pTimerA->timerUByte6() != srcLocr.x) continue;
+if (pTimerA->timerUByte7() != srcLocr.y) continue;
+pTimerA->timerUByte6(ub(locr.x));
+pTimerA->timerUByte7(ub(locr.y));
+```
+
+Miss this and the group goes on waking up at the square it left.
+
+## `CheckMoveFromMissile` reports only a total wipe-out
+
+`doc/CSBwin-src/Code11f52.cpp:2740-2746` — it returns 1, making `MoveObject` abandon the move,
+only when `d.MonsterDamageResult == 2` (`ALL_MONSTERS_DIED`):
+
+```cpp
+gameTimers.DeleteTimer(saveTimerIndex);
+if (d.MonsterDamageResult == 2)
+{
+  return (1);
+};
+```
+
+A missile that kills *some* of the group does not stop the move. `d.MonsterDamageResult` is a
+global precisely because the call chain between `DamageMonster` and here carries no return
+value.
+
+## `item16Attached` is a conjunction, not a lookup
+
+`doc/CSBwin-src/Code11f52.cpp:3122`:
+
+```cpp
+item16Attached = (AttachedLevel_4 == d.partyLevel) && (oldX>=0);
+        // proper level && oldX>=0 means ITEM16 exists
+```
+
+`oldX < 0` is CSBWin's way of saying "this object is not currently in the dungeon" — it is
+being placed rather than moved — so it cannot have a slot yet whatever level it is going to.

@@ -39,6 +39,12 @@ export enum TimerFunction {
   TT_MONSTER_B2 = 40,
   TT_MONSTER_B3 = 41,
   TT_LAST_MONSTER_AI = 41,
+  // A monster that could not be placed — the destination held the party or another
+  // monster — waits in "abeyance" on one of these and retries every 5 ticks
+  // (`ProcessTimer60and61`, doc/CSBwin-src/Timer.cpp:2566). TT_61 is the audible
+  // variant, which buzzes on arrival.
+  TT_60 = 60,
+  TT_61 = 61,
   TT_REACTIVATE_GENERATOR = 65,
   TT_LIGHT = 70,
   TT_71 = 71,

@@ -83,7 +83,8 @@ export class Game {
     private movementSystem: MovementSystem;
     private movementQueue: MovementAction[] = [];
     private readonly movementQueueLen = 3; // CSBUI.cpp keyQueueLen
-    private timerQueue: TimerQueue;
+    /** The timer queue. Public like the other subsystems; `tools/` drives it. */
+    readonly timerQueue: TimerQueue;
     /**
      * The game's random stream, CSBWin's `d.RandomNumber`. Everything with a
      * game-visible outcome draws from this one instance, in CSBWin's order, so a
@@ -95,7 +96,8 @@ export class Game {
     private random = new CsbRandom();
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
-    private monsterSystem: MonsterSystem;
+    /** Monster group lifecycle and movement. Public for the same reason. */
+    readonly monsterSystem: MonsterSystem;
     /**
      * The party's footprint trail — `d.PartyFootprints` (doc/CSBwin-src/Data.h:781).
      * Monsters smell it when they cannot see the party, and the Magic Footprints
@@ -195,6 +197,7 @@ export class Game {
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMonsterAI: (options) => this.monsterSystem.processTimers29to41(options),
+                onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
                 onPartyMoved: () => this.notePartyMoved(),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
@@ -219,6 +222,10 @@ export class Game {
             {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                checkMoveFromMissile: (from, to, monsterRn) =>
+                    this.timerSystem.checkMonsterMoveFromMissile(from, to, monsterRn),
+                resolveMonsterDestination: (destination, monsterRn) =>
+                    this.timerSystem.resolveMonsterDestination(destination, monsterRn),
                 ...monsterHooks,
             },
         );
@@ -587,6 +594,7 @@ export class Game {
             true,
             this.dungeonState.getAttachedItem16(record) === null,
         );
+        this.timerSystem.reportMonsterDamageResult(result);
         return result !== MonsterDamageResult.NO_MONSTER_DIED || damage > 0;
     }
 
