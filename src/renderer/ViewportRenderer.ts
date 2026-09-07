@@ -12,7 +12,6 @@ import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { Champion, PartyState } from '../engine/gameTypes';
 import type { CreatureRecord, MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
-import { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import { DrawViewport } from './DrawViewport';
 import { DungeonState } from '../engine/DungeonState';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
@@ -26,9 +25,9 @@ import {
   updateImageDataFromIndexWithViewportPalette,
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
-import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
+import { extractObjectTables } from './csbwin/ObjectTables';
 import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
-import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData, type FontData } from './csbwin/TextRenderer';
+import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from './csbwin/TextRenderer';
 import { scrollingText } from './csbwin/ScrollingText';
 import { ImageFormat } from '../core/imageDecoder';
 import {
@@ -45,6 +44,7 @@ import {
 import { getOrSet, MISC_BONES_OF_HERO, Position, SoundIndex } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
+import { createUIState, nowMs, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
 import { GraphicRoomType } from './bytecode/Types';
 import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
@@ -88,12 +88,6 @@ import {
     OBJNI_WATER_FLASK,
 } from '../core/objectNameIndex';
 
-export enum UIMode {
-  Adventure = 'adventure',
-  Sleeping = 'sleeping',
-  Frozen = 'frozen',
-}
-
 type IndexedBitmapSet = IndexedBitmap[]
 type ViewportCursorAction =
   | { kind: 'throw'; side: 0 | 1 }
@@ -108,16 +102,11 @@ type FeedingOutcome = {
   chew: boolean;
   playGulp: boolean;
 };
-type ObjectMoveHandler = (
-  position: Position,
-  object: ObjectID,
-  place: boolean,
-  unchangedRoom: boolean,
-  facing: number,
-) => void;
 type ChestViewSource =
   | { id: ObjectID; source: 'cursor' }
   | { id: ObjectID; source: 'hand'; slot: number };
+
+export { UIMode } from './ui/UIState';
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -166,14 +155,10 @@ const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-M
  * Manages viewport rendering state and provides API for rendering
  */
 export class ViewportRenderer {
-  private graphicsLoader: GraphicsLoader;
-  private dungeonState: DungeonState;
   private csbGraphicsLoader?: CSBGraphicsLoader;
-  private context: InterpreterContext | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private screenCtx: CanvasRenderingContext2D | null = null;
   private screenImageData: ImageData | null = null; // RGBA staging for present
-  private screenIndexBuffer: ReturnType<typeof createPaletteIndexViewportBuffer> | null = null;
   private palette: number[] | null = null;
   private uiPalette: number[] | null = null;
   private baseViewportPalettes: number[][] | null = null;
@@ -182,45 +167,22 @@ export class ViewportRenderer {
   private initialized: boolean = false;
 
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
-  private graphicCache: Map<string, IndexedBitmap> = new Map();
-  private onObjectMove?: ObjectMoveHandler;
-  private onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void;
-  private portraitSheet: IndexedBitmap | null | undefined = undefined;
-  private portraitCache: Map<number, IndexedBitmap> = new Map();
   private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
   private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
-  private uiTables: UITables | null = null;
-  private fontData: FontData | null = null;
-  private partyState: PartyState | null = null;
-  private objectTables: ObjectTables | null = null;
-  private pressingEye: boolean = false;
-  private openChestId: ObjectID | null = null;
-  private openChestContents: Array<ObjectID | null> = Array(8).fill(null);
-  private openChestIconIndex: number | null = null;
-  private mouthChewStartMs: number | null = null;
-  private mouthChewEndMs: number = 0;
-  private mouthChewFrameHandle: number | null = null;
   private lastRenderPosition: Position | null = null;
   private lastRenderFacing: number = 0;
-  private hoverPoint: { x: number; y: number } | null = null;
-  private showAttackPanel: boolean = false;
-  private cursorArrowBitmap: IndexedBitmap | null = null;
-  private cursorHandBitmap: IndexedBitmap | null = null;
-  private primaryButtons: UIButton[] | null = null; // graphic231 -> buttons17196
-  private secondaryButtons: UIButton[] | null = null; // graphic231 -> buttons17304
-  private mouseQueue: Array<{ num: number; x: number; y: number }> = [];
-  private mouseQStart: number = 0;
-  private mouseQEnd: number = 0;
-  private uiMode: UIMode = UIMode.Adventure;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
-  private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private monsterAttackState: WeakMap<CreatureRecord, boolean[]> = new WeakMap();
-  private viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
+
+  /** Everything the UI modules share. See `ui/UIState.ts`. */
+  private readonly ui: UIState;
 
   constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
-    this.graphicsLoader = graphicsLoader;
-    this.dungeonState = dungeonState;
     this.csbGraphicsLoader = csbGraphicsLoader;
+    this.ui = createUIState(graphicsLoader, dungeonState, {
+      getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
+      renderLastFrame: () => this.renderLastFrame(),
+    });
   }
 
   /**
@@ -239,19 +201,19 @@ export class ViewportRenderer {
     this.screenImageData = this.screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     // Get palette
-    const palette = this.graphicsLoader.getPalette(0);
+    const palette = this.ui.graphicsLoader.getPalette(0);
     this.palette = palette;
     console.log('Got palette from graphics loader');
 
     // Extract CSBWin viewport tables from graphics.dat item 0x22e
-    const viewportTables = extractViewportTables(this.graphicsLoader);
+    const viewportTables = extractViewportTables(this.ui.graphicsLoader);
     console.log(`Extracted wallRectangles[14] from 0x22e at offset 0x${viewportTables.wallRectanglesOffset.toString(16)}`);
-    const objectTables = extractObjectTables(this.graphicsLoader, viewportTables.wallRectanglesOffset);
-    this.objectTables = objectTables;
+    const objectTables = extractObjectTables(this.ui.graphicsLoader, viewportTables.wallRectanglesOffset);
+    this.ui.objectTables = objectTables;
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
-    this.uiTables = extractUITables(this.graphicsLoader);
-    const palette552 = this.uiTables.graphic232.palette552;
+    this.ui.uiTables = extractUITables(this.ui.graphicsLoader);
+    const palette552 = this.ui.uiTables.graphic232.palette552;
     if (palette552 && palette552.length > 0) {
       this.baseViewportPalettes = palette552.map((pal) => pal.slice());
       this.viewportPalettes = palette552.map((pal) => pal.slice());
@@ -259,18 +221,18 @@ export class ViewportRenderer {
     } else {
       this.uiPalette = this.palette;
     }
-    this.fontData = loadFontData(this.graphicsLoader);
+    this.ui.fontData = loadFontData(this.ui.graphicsLoader);
 
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
-    this.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+    this.ui.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
     const mouseQueueLength = 8;
-    this.mouseQueue = Array.from({ length: mouseQueueLength }, () => ({ num: 0, x: 0, y: 0 }));
-    this.mouseQStart = 0;
-    this.mouseQEnd = mouseQueueLength - 1;
+    this.ui.mouseQueue = Array.from({ length: mouseQueueLength }, () => ({ num: 0, x: 0, y: 0 }));
+    this.ui.mouseQStart = 0;
+    this.ui.mouseQEnd = mouseQueueLength - 1;
     this.updateButtonLists();
 
     // Create interpreter context
-    this.context = {
+    this.ui.context = {
       wallBitmaps: [],
       doorBitmaps: [],
       wallRectangles: viewportTables.wallRectangles,
@@ -289,10 +251,10 @@ export class ViewportRenderer {
       wallGraphicSet: 0,
       backgroundGraphicSet: 0,
       getGraphicBitmap: (n: number) => this.getGraphicBitmap(n),
-      graphicCache: this.graphicCache,
+      graphicCache: this.ui.graphicCache,
       objectTables,
       csbGraphics: this.csbGraphicsLoader,
-      dungeonState: this.dungeonState,
+      dungeonState: this.ui.dungeonState,
       viewportContext: this.screenCtx,
       viewportIndexBuffer,
       seeThroughWalls: false,
@@ -306,83 +268,83 @@ export class ViewportRenderer {
   }
 
   getUITables(): UITables | null {
-    return this.uiTables;
+    return this.ui.uiTables;
   }
 
   setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {
-    this.playSound = playSound;
+    this.ui.playSound = playSound;
   }
 
   setViewingFilter(handler?: (options: ViewingFilterOptions) => ViewingFilterResult | null): void {
-    this.viewingFilter = handler;
+    this.ui.viewingFilter = handler;
   }
 
   setObjectMoveHandler(handler?: ObjectMoveHandler): void {
-    this.onObjectMove = handler;
+    this.ui.onObjectMove = handler;
   }
 
   setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void): void {
-    this.onSpellCast = handler;
+    this.ui.onSpellCast = handler;
   }
 
   setPartyState(state: PartyState | null): void {
-    this.partyState = state;
+    this.ui.partyState = state;
     this.syncInventoryButtons();
   }
 
   setHoverPoint(point: { x: number; y: number } | null): void {
-    this.hoverPoint = point;
+    this.ui.hoverPoint = point;
   }
 
   setShowAttackPanel(show: boolean): void {
-    this.showAttackPanel = show;
+    this.ui.showAttackPanel = show;
   }
 
   isAttackPanelVisible(): boolean {
-    return this.showAttackPanel;
+    return this.ui.showAttackPanel;
   }
 
   setUIMode(mode: UIMode): void {
-    this.uiMode = mode;
+    this.ui.uiMode = mode;
     this.updateButtonLists();
     this.syncInventoryButtons();
   }
 
   isInventoryOpen(): boolean {
-    return (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
   }
 
   enqueueMouseClick(x: number, y: number, buttons: number): void {
-    const mouseQueueLength = this.mouseQueue.length;
-    const numEnt = (this.mouseQEnd - this.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
+    const mouseQueueLength = this.ui.mouseQueue.length;
+    const numEnt = (this.ui.mouseQEnd - this.ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
     if (numEnt >= mouseQueueLength - 2) return;
 
-    let id = this.searchButtonList(this.primaryButtons, x, y, buttons);
+    let id = this.searchButtonList(this.ui.primaryButtons, x, y, buttons);
     if (id === 0) {
-      id = this.searchButtonList(this.secondaryButtons, x, y, buttons);
+      id = this.searchButtonList(this.ui.secondaryButtons, x, y, buttons);
     }
     if (id === 0) return;
 
-    this.mouseQEnd = (this.mouseQEnd + 1) % mouseQueueLength;
-    this.mouseQueue[this.mouseQEnd] = { num: id, x, y };
+    this.ui.mouseQEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
+    this.ui.mouseQueue[this.ui.mouseQEnd] = { num: id, x, y };
   }
 
   enqueueMouseUnclick(): void {
-    const mouseQueueLength = this.mouseQueue.length;
-    const numEnt = (this.mouseQEnd - this.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
+    const mouseQueueLength = this.ui.mouseQueue.length;
+    const numEnt = (this.ui.mouseQEnd - this.ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
     if (numEnt >= mouseQueueLength - 1) return;
 
-    this.mouseQEnd = (this.mouseQEnd + 1) % mouseQueueLength;
-    this.mouseQueue[this.mouseQEnd] = { num: 0xadd, x: 0, y: 0 };
+    this.ui.mouseQEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
+    this.ui.mouseQueue[this.ui.mouseQEnd] = { num: 0xadd, x: 0, y: 0 };
   }
 
   processMouseQueue(): void {
-    const mouseQueueLength = this.mouseQueue.length;
-    const nextEnd = (this.mouseQEnd + 1) % mouseQueueLength;
-    if (nextEnd === this.mouseQStart) return;
+    const mouseQueueLength = this.ui.mouseQueue.length;
+    const nextEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
+    if (nextEnd === this.ui.mouseQStart) return;
 
-    const entry = this.mouseQueue[this.mouseQStart];
-    this.mouseQStart = (this.mouseQStart + 1) % mouseQueueLength;
+    const entry = this.ui.mouseQueue[this.ui.mouseQStart];
+    this.ui.mouseQStart = (this.ui.mouseQStart + 1) % mouseQueueLength;
     if (entry.num === 0xadd) {
       this.handleMouseUnclick();
       return;
@@ -407,7 +369,7 @@ export class ViewportRenderer {
   }
 
   private applySpecialColorScheme(whichColor: number, schemeIndex: number): void {
-    const tables = this.objectTables;
+    const tables = this.ui.objectTables;
     if (!tables || !this.viewportPalettes) return;
     const scheme = tables.specialColors[schemeIndex];
     if (!scheme) return;
@@ -426,8 +388,8 @@ export class ViewportRenderer {
   }
 
   private applyMonsterPaletteOverrides(map?: MapData | null): void {
-    if (!this.objectTables || !this.viewportPalettes) return;
-    if (!this.objectTables.specialColors || this.objectTables.specialColors.length === 0) return;
+    if (!this.ui.objectTables || !this.viewportPalettes) return;
+    if (!this.ui.objectTables.specialColors || this.ui.objectTables.specialColors.length === 0) return;
 
     this.resetViewportPalettes();
     this.applySpecialColorScheme(9, 8);
@@ -435,8 +397,8 @@ export class ViewportRenderer {
 
     const monsterTypes = map?.monsterTypes ?? [];
     for (const monsterType of monsterTypes) {
-      if (monsterType < 0 || monsterType >= this.objectTables.monsterGraphics.length) continue;
-      const graphic = this.objectTables.monsterGraphics[monsterType];
+      if (monsterType < 0 || monsterType >= this.ui.objectTables.monsterGraphics.length) continue;
+      const graphic = this.ui.objectTables.monsterGraphics[monsterType];
       if (!graphic) continue;
       const lowNibble = graphic.uByte11 & 0x0f;
       if (lowNibble !== 0) this.applySpecialColorScheme(9, lowNibble - 1);
@@ -450,22 +412,22 @@ export class ViewportRenderer {
    */
   render(position: Position, facing: number): void {
     const { x, y, z } = position;
-    if (!this.initialized || !this.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
+    if (!this.initialized || !this.ui.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
       throw new Error('Renderer not initialized. Call initialize() first.');
     }
 
-    if (!this.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
+    if (!this.ui.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
     this.lastRenderPosition = new Position(x, y, z);
     this.lastRenderFacing = facing;
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
-    const map = this.dungeonState.getMap(z);
+    const map = this.ui.dungeonState.getMap(z);
     const wallGraphicSet = map?.descriptor.mapGraphicsStyle ?? 0;
     const backgroundGraphicSet = map?.descriptor.floorCeilingStyle ?? 0;
-    this.context.wallGraphicSet = wallGraphicSet;
-    this.context.backgroundGraphicSet = backgroundGraphicSet;
-    this.context.frameMapIndex = z;
-    this.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
+    this.ui.context.wallGraphicSet = wallGraphicSet;
+    this.ui.context.backgroundGraphicSet = backgroundGraphicSet;
+    this.ui.context.frameMapIndex = z;
+    this.ui.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
     if (this.lastPaletteLevel !== z) {
       this.applyMonsterPaletteOverrides(map);
       this.lastPaletteLevel = z;
@@ -477,7 +439,7 @@ export class ViewportRenderer {
     const base0 = 108 + 3 * doorType0;
     const base1 = 108 + 3 * doorType1;
     // DoorGraphic[0]=F1 (nearness=2) = base+2; DoorGraphic[1]=F2 = base+1; DoorGraphic[2]=F3 = base+0
-    this.context.doorGraphics = [
+    this.ui.context.doorGraphics = [
       [base0 + 2, base1 + 2],
       [base0 + 1, base1 + 1],
       [base0 + 0, base1 + 0],
@@ -485,35 +447,35 @@ export class ViewportRenderer {
 
     // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6740)
     const useMirrorImages = ((x + y + facing) & 1) !== 0;
-    this.context.useMirrorImages = useMirrorImages;
+    this.ui.context.useMirrorImages = useMirrorImages;
 
     // Compose floor/ceiling background (CSBWin: FloorAndCeilingOnly + conditional Mirror).
     const fc = this.getFloorCeiling(backgroundGraphicSet);
-    this.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.mirrored : fc.normal);
+    this.ui.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.mirrored : fc.normal);
 
     // Select bitmaps set for this frame (CSBWin: mirrors swap some pointers when `UseMirrorImages != 0`).
     const wb = this.getBitmapsSet(wallGraphicSet);
-    this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
-    this.context.doorBitmaps = wb.doors;
-    this.context.wallDecorationRects = [];
-    this.context.doorSwitchRects = [];
-    this.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
-    this.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
-    this.context.facingAlcove = false;
-    this.context.facingViAltar = false;
-    this.context.facingWaterFountain = false;
+    this.ui.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
+    this.ui.context.doorBitmaps = wb.doors;
+    this.ui.context.wallDecorationRects = [];
+    this.ui.context.doorSwitchRects = [];
+    this.ui.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
+    this.ui.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
+    this.ui.context.facingAlcove = false;
+    this.ui.context.facingViAltar = false;
+    this.ui.context.facingWaterFountain = false;
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
-    this.context.frameFacing = facing;
+    this.ui.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
-    DrawViewport(this.context, this.dungeonState, position, facing);
+    DrawViewport(this.ui.context, this.ui.dungeonState, position, facing);
 
     this.presentViewport();
   }
 
   isWallDecorationHit(x: number, y: number): boolean {
-    const rects = this.context?.wallDecorationRects;
+    const rects = this.ui.context?.wallDecorationRects;
     if (!rects || rects.length === 0) return false;
     const vx = x - VIEWPORT_X;
     const vy = y - VIEWPORT_Y;
@@ -524,7 +486,7 @@ export class ViewportRenderer {
   }
 
   isDoorSwitchHit(x: number, y: number): boolean {
-    const rects = this.context?.doorSwitchRects;
+    const rects = this.ui.context?.doorSwitchRects;
     if (!rects || rects.length === 0) return false;
     const vx = x - VIEWPORT_X;
     const vy = y - VIEWPORT_Y;
@@ -535,9 +497,9 @@ export class ViewportRenderer {
   }
 
   tryPickViewportObject(x: number, y: number): boolean {
-    if (!this.partyState || !this.context?.viewportObjectButtons || !this.context.viewportObjectRNs) return false;
-    if (this.normalizeObjectValue(this.partyState.objectInHand) !== null) return false;
-    if ((this.partyState.cursorOwner ?? -1) < 0) return false;
+    if (!this.ui.partyState || !this.ui.context?.viewportObjectButtons || !this.ui.context.viewportObjectRNs) return false;
+    if (this.normalizeObjectValue(this.ui.partyState.objectInHand) !== null) return false;
+    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return false;
 
     const hit = this.findViewportObjectHit(x, y);
     if (!hit) return false;
@@ -545,23 +507,23 @@ export class ViewportRenderer {
     const target = this.getPickupCellForRelativePos(hit.relativeLocation);
     if (!target) return false;
     if (this.isMonsterBlockingPickup(hit.relativeLocation, target)) return false;
-    if (!this.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
-    this.onObjectMove?.(target, hit.rn, false, false, this.partyState.facing & 0x3);
+    if (!this.ui.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
+    this.ui.onObjectMove?.(target, hit.rn, false, false, this.ui.partyState.facing & 0x3);
 
-    this.partyState.objectInHand = hit.rn;
+    this.ui.partyState.objectInHand = hit.rn;
     return true;
   }
 
   hasCursorObject(): boolean {
-    if (!this.partyState) return false;
-    return this.normalizeObjectValue(this.partyState.objectInHand) !== null;
+    if (!this.ui.partyState) return false;
+    return this.normalizeObjectValue(this.ui.partyState.objectInHand) !== null;
   }
 
   resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
-    if (!this.partyState || !this.uiTables) return null;
-    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (!this.ui.partyState || !this.ui.uiTables) return null;
+    const objectId = this.normalizeObjectValue(this.ui.partyState.objectInHand);
     if (objectId === null) return null;
-    if ((this.partyState.cursorOwner ?? -1) < 0) return null;
+    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return null;
 
     const stoneAhead = this.isFrontCellStoneOrVisibleFalseWall();
     const doorFacingAhead = this.isFrontCellDoorFacing();
@@ -571,9 +533,9 @@ export class ViewportRenderer {
       if (dropPos !== null) return { kind: 'drop', pos: dropPos };
 
       if (this.isViewportButtonHit(5, x, y)) {
-        if (this.context?.facingAlcove) {
+        if (this.ui.context?.facingAlcove) {
           let viAltar = false;
-          if (this.context?.facingViAltar) {
+          if (this.ui.context?.facingViAltar) {
             const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
             viAltar = objectNameIndex === OBJNI_BONES_A;
           }
@@ -593,13 +555,13 @@ export class ViewportRenderer {
   }
 
   tryUseFrontWallItem(x: number, y: number): boolean {
-    if (!this.partyState || !this.context) return false;
-    if ((this.partyState.cursorOwner ?? -1) < 0) return false;
+    if (!this.ui.partyState || !this.ui.context) return false;
+    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return false;
     if (!this.isViewportButtonHit(5, x, y)) return false;
-    if (this.context.facingAlcove) return false;
-    if (!this.context.facingWaterFountain) return false;
+    if (this.ui.context.facingAlcove) return false;
+    if (!this.ui.context.facingWaterFountain) return false;
 
-    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    const objectId = this.normalizeObjectValue(this.ui.partyState.objectInHand);
     if (objectId === null) return false;
     if (!this.isLikelyObjectRecord(objectId)) return false;
 
@@ -607,14 +569,14 @@ export class ViewportRenderer {
     if (objectNameIndex < 0) return false;
 
     if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
-      const misc = this.dungeonState.getMiscRecord(objectId as ObjectID);
+      const misc = this.ui.dungeonState.getMiscRecord(objectId as ObjectID);
       if (!misc) return false;
       misc.specialState = 3;
       return true;
     }
 
     if (objectNameIndex === OBJNI_EMPTY_FLASK) {
-      const potion = this.dungeonState.getPotionRecord(objectId as ObjectID);
+      const potion = this.ui.dungeonState.getPotionRecord(objectId as ObjectID);
       if (!potion) return false;
       potion.potionType = POTION_WATER_FLASK;
       return true;
@@ -624,7 +586,7 @@ export class ViewportRenderer {
   }
 
   private findDropAreaHit(x: number, y: number, count: number): number | null {
-    const areas = this.uiTables?.graphic231.dropAreas;
+    const areas = this.ui.uiTables?.graphic231.dropAreas;
     if (!areas || areas.length === 0) return null;
     const max = Math.min(count, areas.length);
     for (let i = 0; i < max; i++) {
@@ -636,7 +598,7 @@ export class ViewportRenderer {
   }
 
   private isViewportButtonHit(index: number, x: number, y: number): boolean {
-    const buttons = this.context?.viewportObjectButtons;
+    const buttons = this.ui.context?.viewportObjectButtons;
     if (!buttons || index < 0 || index >= buttons.length) return false;
     const rect = buttons[index];
     if (!rect || rect.x1 === 255) return false;
@@ -658,15 +620,15 @@ export class ViewportRenderer {
   }
 
   private isFrontCellStoneOrVisibleFalseWall(): boolean {
-    if (!this.partyState) return false;
-    const facing = this.partyState.facing & 0x3;
-    const pos = this.partyState.position;
+    if (!this.ui.partyState) return false;
+    const facing = this.ui.partyState.facing & 0x3;
+    const pos = this.ui.partyState.position;
     const target =
       facing === 0 ? pos.north :
       facing === 1 ? pos.east :
       facing === 2 ? pos.south :
       pos.west;
-    const map = this.dungeonState.getMap(target.z);
+    const map = this.ui.dungeonState.getMap(target.z);
     if (!map) return true;
     if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
     const cellFlag = map.cellFlags[target.x]?.[target.y];
@@ -678,13 +640,13 @@ export class ViewportRenderer {
   }
 
   private isFrontCellDoorFacing(): boolean {
-    const rd = this.context?.roomData?.[17];
+    const rd = this.ui.context?.roomData?.[17];
     return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
   }
 
   private findViewportObjectHit(x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
-    const buttons = this.context?.viewportObjectButtons;
-    const rns = this.context?.viewportObjectRNs;
+    const buttons = this.ui.context?.viewportObjectButtons;
+    const rns = this.ui.context?.viewportObjectRNs;
     if (!buttons || !rns) return null;
 
     const vx = x - VIEWPORT_X;
@@ -704,9 +666,9 @@ export class ViewportRenderer {
   }
 
   private getPickupCellForRelativePos(relativeLocation: number): Position | null {
-    if (!this.partyState) return null;
-    const facing = this.partyState.facing & 0x3;
-    let target = this.partyState.position;
+    if (!this.ui.partyState) return null;
+    const facing = this.ui.partyState.facing & 0x3;
+    let target = this.ui.partyState.position;
     if (relativeLocation >= 2) {
       target =
         facing === 0 ? target.north :
@@ -718,18 +680,18 @@ export class ViewportRenderer {
   }
 
   private isMonsterBlockingPickup(relativeLocation: number, position: Position): boolean {
-    if (!this.partyState || relativeLocation < 2) return false;
+    if (!this.ui.partyState || relativeLocation < 2) return false;
     const rn = this.findFirstMonsterAt(position);
     if (rn === OBJECT_ID_EOF) return false;
-    const creature = this.dungeonState.getCreatureRecord(rn);
+    const creature = this.ui.dungeonState.getCreatureRecord(rn);
     if (!creature || this.isMonsterLevitating(creature)) return false;
     const monsterCount = Math.max(1, creature.count ?? 1);
-    const absPos = (this.partyState.facing + relativeLocation) & 0x3;
+    const absPos = (this.ui.partyState.facing + relativeLocation) & 0x3;
     return this.monsterOccupiesPosition(creature.positions, absPos, monsterCount);
   }
 
   private findFirstMonsterAt(position: Position): ObjectID {
-    for (let rn = this.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeonState.getDBRecordLink(rn)) {
+    for (let rn = this.ui.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.ui.dungeonState.getDBRecordLink(rn)) {
       const { category } = decodeObjectID(rn);
       if (category === DBType.CREATURE) return rn;
     }
@@ -737,7 +699,7 @@ export class ViewportRenderer {
   }
 
   private isMonsterLevitating(creature: CreatureRecord): boolean {
-    const desc = this.objectTables?.monsterDesc?.[creature.creatureType];
+    const desc = this.ui.objectTables?.monsterDesc?.[creature.creatureType];
     if (!desc) return false;
     return (desc.word2 & 0x20) !== 0;
   }
@@ -777,30 +739,30 @@ export class ViewportRenderer {
   }
 
   private playMonsterAttackSound(soundOrdinal: number): void {
-    if (!this.playSound) return;
-    if (!this.objectTables || !this.uiTables) return;
+    if (!this.ui.playSound) return;
+    if (!this.ui.objectTables || !this.ui.uiTables) return;
     // CSBWin: ordinal -> uByte9672 -> sound1772[word0]
-    const soundNum = this.objectTables.monsterAttackSounds[soundOrdinal - 1] ?? 0;
+    const soundNum = this.ui.objectTables.monsterAttackSounds[soundOrdinal - 1] ?? 0;
     if (!soundNum) return;
-    const entry = this.uiTables.graphic232.soundTable[soundNum];
+    const entry = this.ui.uiTables.graphic232.soundTable[soundNum];
     if (!entry) return;
     const soundId = entry.word0 | 0;
     if (!soundId) return;
-    this.playSound(soundId);
+    this.ui.playSound(soundId);
   }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
     return getOrSet(this.wallBitmapSets, wallGraphicSet, () => {
-      const wall = initializeWallBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+      const wall = initializeWallBitmapsIndexed(this.ui.graphicsLoader, wallGraphicSet);
       const wallMirrored = this.createMirrorModeWallBitmaps(wall);
-      const doors = initializeDoorBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
+      const doors = initializeDoorBitmapsIndexed(this.ui.graphicsLoader, wallGraphicSet);
       return { wall, wallMirrored, doors }
     });
   }
 
   private getFloorCeiling(backgroundGraphicSet: number): FloorCeiling {
     return getOrSet(this.floorCeilingCache, backgroundGraphicSet, () => {
-      const { floor, ceiling } = initializeFloorCeilingIndexed(this.graphicsLoader, backgroundGraphicSet);
+      const { floor, ceiling } = initializeFloorCeilingIndexed(this.ui.graphicsLoader, backgroundGraphicSet);
       const normal = this.buildFloorCeilingTemplate(ceiling, floor, true, false);
       const mirrored = this.buildFloorCeilingTemplate(ceiling, floor, false, true);
       return { normal, mirrored }
@@ -810,13 +772,13 @@ export class ViewportRenderer {
   private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
     if (graphicNum < 0) return null;
     const key = `${graphicNum}-${format}`;
-    const cached = this.graphicCache.get(key);
+    const cached = this.ui.graphicCache.get(key);
     if (cached) return cached;
     try {
-      const decoded = this.graphicsLoader.getImage(graphicNum, format);
+      const decoded = this.ui.graphicsLoader.getImage(graphicNum, format);
       const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
       const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
-      this.graphicCache.set(key, bmp);
+      this.ui.graphicCache.set(key, bmp);
       return bmp;
     } catch {
       return null;
@@ -839,7 +801,7 @@ export class ViewportRenderer {
     out[1] = mirror(normal[0]); // F0L1 becomes mirror of original F0R1
     out[2] = mirror(normal[2]); // F1
 
-    const wallRects = this.context?.wallRectangles;
+    const wallRects = this.ui.context?.wallRectangles;
     if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
       const derivedF3 = this.buildMirrorWallBitmap(normal[4], wallRects[0], this.mirrorWallRectF3, 11);
       const derivedF2 = this.buildMirrorWallBitmap(normal[3], wallRects[3], this.mirrorWallRectF2, 8);
@@ -963,11 +925,11 @@ export class ViewportRenderer {
   }
 
   private presentViewport(): void {
-    if (!this.context?.viewportIndexBuffer || !this.screenCtx || !this.screenImageData || !this.palette || !this.screenIndexBuffer) return;
+    if (!this.ui.context?.viewportIndexBuffer || !this.screenCtx || !this.screenImageData || !this.palette || !this.ui.screenIndexBuffer) return;
 
-    clearIndex(this.screenIndexBuffer, 0);
+    clearIndex(this.ui.screenIndexBuffer, 0);
     this.drawStaticUIFrame();
-    const inventoryOpen = (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
     if (!inventoryOpen) {
       this.syncOpenChest(null);
     }
@@ -979,7 +941,7 @@ export class ViewportRenderer {
     this.drawPartyStatus();
     if (inventoryOpen) {
       this.drawInventoryScreen();
-      if (this.uiTables) this.shadeRectIndex(this.uiTables.graphic232.word28, 0);
+      if (this.ui.uiTables) this.shadeRectIndex(this.ui.uiTables.graphic232.word28, 0);
     }
     this.drawAttackButtons();
     this.drawAttackPanel();
@@ -996,7 +958,7 @@ export class ViewportRenderer {
     if (!inventoryOpen && viewportPalette !== uiPalette) {
       updateImageDataFromIndexWithViewportPalette(
         this.screenImageData,
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         {
           x1: VIEWPORT_X,
           y1: VIEWPORT_Y,
@@ -1007,7 +969,7 @@ export class ViewportRenderer {
         uiPalette,
       );
     } else {
-      updateImageDataFromIndex(this.screenImageData, this.screenIndexBuffer, uiPalette);
+      updateImageDataFromIndex(this.screenImageData, this.ui.screenIndexBuffer, uiPalette);
     }
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
   }
@@ -1019,16 +981,16 @@ export class ViewportRenderer {
   }
 
   private selectPaletteIndexForLightLevel(): number {
-    if (!this.uiTables || !this.partyState) return 0;
-    const { paletteBrightness, word1074 } = this.uiTables.graphic232;
+    if (!this.ui.uiTables || !this.ui.partyState) return 0;
+    const { paletteBrightness, word1074 } = this.ui.uiTables.graphic232;
     if (!paletteBrightness || paletteBrightness.length === 0 || !word1074 || word1074.length === 0) return 0;
 
-    const map = this.dungeonState.getMap(this.partyState.position.z);
+    const map = this.ui.dungeonState.getMap(this.ui.partyState.position.z);
     const experienceMultiplier = map?.descriptor.difficulty ?? 0;
     if (experienceMultiplier === 0) return 0;
 
     const torchLight = this.computeTorchLight(word1074);
-    const totalLight = (this.partyState.brightness ?? 0) + torchLight;
+    const totalLight = (this.ui.partyState.brightness ?? 0) + torchLight;
 
     if (totalLight <= 0) return paletteBrightness.length - 1;
 
@@ -1047,7 +1009,7 @@ export class ViewportRenderer {
   }
 
   private computeTorchLight(word1074: number[]): number {
-    if (!this.partyState) return 0;
+    if (!this.ui.partyState) return 0;
     const charges = this.collectTorchCharges();
 
     // CSBWin selection-sort: bring four brightest charges to the front.
@@ -1080,11 +1042,11 @@ export class ViewportRenderer {
 
   private collectTorchCharges(): number[] {
     const charges = new Array(8).fill(0);
-    if (!this.partyState) return charges;
+    if (!this.ui.partyState) return charges;
 
     let outIndex = 0;
     for (let chIdx = 0; chIdx < 4; chIdx++) {
-      const champ = this.partyState.champions[chIdx];
+      const champ = this.ui.partyState.champions[chIdx];
       for (let hand = 0; hand < 2; hand++) {
         if (!champ) {
           charges[outIndex++] = 0;
@@ -1108,25 +1070,25 @@ export class ViewportRenderer {
 
   private getTorchCharge(objectId: number): number {
     if (!this.isLikelyObjectRecord(objectId)) return 0;
-    const weapon = this.dungeonState.getWeaponRecord(objectId as ObjectID);
+    const weapon = this.ui.dungeonState.getWeaponRecord(objectId as ObjectID);
     if (!weapon) return 0;
     return weapon.charges & 0xf;
   }
 
   private drawStaticUIFrame(): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
 
-    const ui = this.uiTables.graphic232;
-    fillRectIndex(this.screenIndexBuffer, ui.wRectPos1780, 0);
-    fillRectIndex(this.screenIndexBuffer, ui.wRectPos1788, 0);
-    fillRectIndex(this.screenIndexBuffer, ui.wRectPos1796, 0);
+    const ui = this.ui.uiTables.graphic232;
+    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1780, 0);
+    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1788, 0);
+    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1796, 0);
 
     const movementGraphic = this.getGraphicBitmap(13);
     if (!movementGraphic) return;
     const rect = ui.word28;
     tag0088b2Index(
       movementGraphic,
-      this.screenIndexBuffer,
+      this.ui.screenIndexBuffer,
       {
         x1: rect.x1,
         y1: rect.y1,
@@ -1143,12 +1105,12 @@ export class ViewportRenderer {
   }
 
   private drawInventoryBackground(): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     const bg = this.getGraphicBitmap(17);
     if (!bg) return;
     tag0088b2Index(
       bg,
-      this.screenIndexBuffer,
+      this.ui.screenIndexBuffer,
       {
         x1: VIEWPORT_X,
         y1: VIEWPORT_Y,
@@ -1165,8 +1127,8 @@ export class ViewportRenderer {
   }
 
   private drawFoodWaterPanel(champion: Champion): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
-    const ui = this.uiTables.graphic232;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
+    const ui = this.ui.uiTables.graphic232;
     this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
     this.blitBasicGraphicToViewport(30, ui.wRectPos950, 48, 12);
     this.blitBasicGraphicToViewport(31, ui.wRectPos958, 48, 12);
@@ -1179,8 +1141,8 @@ export class ViewportRenderer {
   }
 
   private drawAttributePanel(champion: Champion): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData) return;
-    const ui = this.uiTables.graphic232;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData) return;
+    const ui = this.ui.uiTables.graphic232;
     this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
 
     let lineY = 58;
@@ -1190,8 +1152,8 @@ export class ViewportRenderer {
       const masteryLabel = MASTERY_LABELS[mastery] ?? '';
       if (!masteryLabel) continue;
       drawTextLineIndex(
-        this.screenIndexBuffer,
-        this.fontData,
+        this.ui.screenIndexBuffer,
+        this.ui.fontData,
         VIEWPORT_X + 107,
         VIEWPORT_Y + lineY,
         13,
@@ -1219,8 +1181,8 @@ export class ViewportRenderer {
       else if (current > max) valueColor = 7;
 
       drawTextLineIndex(
-        this.screenIndexBuffer,
-        this.fontData,
+        this.ui.screenIndexBuffer,
+        this.ui.fontData,
         VIEWPORT_X + 107,
         VIEWPORT_Y + lineY,
         13,
@@ -1228,8 +1190,8 @@ export class ViewportRenderer {
         ATTRIBUTE_LABELS[i] ?? ''
       );
       drawTextLineIndex(
-        this.screenIndexBuffer,
-        this.fontData,
+        this.ui.screenIndexBuffer,
+        this.ui.fontData,
         VIEWPORT_X + 173,
         VIEWPORT_Y + lineY,
         valueColor,
@@ -1237,8 +1199,8 @@ export class ViewportRenderer {
         this.formatLifeValue(current)
       );
       drawTextLineIndex(
-        this.screenIndexBuffer,
-        this.fontData,
+        this.ui.screenIndexBuffer,
+        this.ui.fontData,
         VIEWPORT_X + 191,
         VIEWPORT_Y + lineY,
         13,
@@ -1250,12 +1212,12 @@ export class ViewportRenderer {
   }
 
   private drawObjectInfoPanel(objectId: ObjectID): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.objectTables) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.objectTables) return;
     if (decodeObjectID(objectId).category === DBType.SCROLL) {
       this.drawScrollPanel(objectId);
       return;
     }
-    const ui = this.uiTables.graphic232;
+    const ui = this.ui.uiTables.graphic232;
     this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
     this.blitBasicGraphicToViewport(29, ui.wRectPos942, 32, 12);
 
@@ -1271,8 +1233,8 @@ export class ViewportRenderer {
       const name = this.getObjectDisplayName(objectId, objectNameIndex);
       if (name) {
         drawTextLineIndex(
-          this.screenIndexBuffer,
-          this.fontData,
+          this.ui.screenIndexBuffer,
+          this.ui.fontData,
           VIEWPORT_X + 133,
           VIEWPORT_Y + 68,
           13,
@@ -1287,11 +1249,11 @@ export class ViewportRenderer {
     for (const line of lines) {
       this.drawItemDescriptionLine(line.text, line.color, textState);
     }
-    this.drawInspectArrow(this.pressingEye);
+    this.drawInspectArrow(this.ui.pressingEye);
   }
 
   private drawScrollPanel(objectId: ObjectID): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.objectTables) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.objectTables) return;
     let scrollId = objectId;
     const filter = this.applyViewingFilter(objectId, 0);
     if (filter) {
@@ -1302,16 +1264,16 @@ export class ViewportRenderer {
       }
     }
 
-    const scroll = this.dungeonState.getScrollRecord(scrollId);
+    const scroll = this.ui.dungeonState.getScrollRecord(scrollId);
     if (!scroll) return;
     const textTables: TextDecodeTables = {
-      escape1: this.objectTables.textEscape1,
-      escape2Wall: this.objectTables.textEscape2Wall,
-      escape2Other: this.objectTables.textEscape2Other,
+      escape1: this.ui.objectTables.textEscape1,
+      escape2Wall: this.ui.objectTables.textEscape2Wall,
+      escape2Other: this.ui.objectTables.textEscape2Other,
     };
-    const text = this.dungeonState.decodeScrollText(scroll, textTables) ?? '';
+    const text = this.ui.dungeonState.decodeScrollText(scroll, textTables) ?? '';
 
-    const ui = this.uiTables.graphic232;
+    const ui = this.ui.uiTables.graphic232;
     this.blitBasicGraphicToViewport(23, ui.wRectPos926, 144, 8);
 
     const { lines, startY } = this.splitScrollLines(text);
@@ -1320,7 +1282,7 @@ export class ViewportRenderer {
       this.drawScrollLine(y, line);
       y += 7;
     }
-    this.drawInspectArrow(this.pressingEye);
+    this.drawInspectArrow(this.ui.pressingEye);
   }
 
   private splitScrollLines(text: string): { lines: string[]; startY: number } {
@@ -1382,11 +1344,11 @@ export class ViewportRenderer {
   }
 
   private drawScrollLine(y: number, text: string): void {
-    if (!this.fontData || !this.screenIndexBuffer) return;
+    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
     const line = text.length > MAX_SCROLL_LINE_LENGTH ? text.slice(0, MAX_SCROLL_LINE_LENGTH) : text;
     const encoded = this.encodeScrollFontText(line);
     const x = VIEWPORT_X + 162 - Math.floor((line.length * 6) / 2);
-    drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, VIEWPORT_Y + y, 0, 15, encoded);
+    drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, VIEWPORT_Y + y, 0, 15, encoded);
   }
 
   private encodeScrollFontText(text: string): string {
@@ -1404,7 +1366,7 @@ export class ViewportRenderer {
   }
 
   private getObjectDescriptionLines(objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
-    if (!this.objectTables) return [];
+    if (!this.ui.objectTables) return [];
     const lines: ItemDescriptionLine[] = [];
     const { category } = decodeObjectID(objectId);
     const phrases = ['CONSUMABLE', 'POISONED', 'BROKEN', 'CURSED', '', '', '', ''];
@@ -1414,7 +1376,7 @@ export class ViewportRenderer {
 
     switch (category) {
       case DBType.WEAPON: {
-        const rec = this.dungeonState.getWeaponRecord(objectId);
+        const rec = this.ui.dungeonState.getWeaponRecord(objectId);
         if (objectNameIndex >= OBJNI_TORCH_A && objectNameIndex <= OBJNI_TORCH_D) {
           if ((rec?.charges ?? 0) === 0) {
             lines.push({ text: '(BURNT OUT)', color: 13 });
@@ -1427,7 +1389,7 @@ export class ViewportRenderer {
         break;
       }
       case DBType.CLOTHING: {
-        const rec = this.dungeonState.getClothingRecord(objectId);
+        const rec = this.ui.dungeonState.getClothingRecord(objectId);
         descriptionMask = 0x0c;
         if (rec?.cursed) flags |= 0x8;
         if (rec?.broken) flags |= 0x4;
@@ -1436,11 +1398,11 @@ export class ViewportRenderer {
       case DBType.POTION: {
         const descIndex = this.descIndexForObject(objectId);
         descriptionMask = 0x01;
-        if (descIndex !== null) flags = this.objectTables.objDescCarryMask[descIndex] ?? 0;
+        if (descIndex !== null) flags = this.ui.objectTables.objDescCarryMask[descIndex] ?? 0;
         break;
       }
       case DBType.MISC: {
-        const rec = this.dungeonState.getMiscRecord(objectId);
+        const rec = this.ui.dungeonState.getMiscRecord(objectId);
         if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
           descriptionMask = 0;
           const state = rec?.specialState ?? 0;
@@ -1454,14 +1416,14 @@ export class ViewportRenderer {
         }
         if (objectNameIndex >= OBJNI_COMPASS_N && objectNameIndex <= OBJNI_COMPASS_W) {
           descriptionMask = 0;
-          const facing = this.partyState?.facing ?? 0;
+          const facing = this.ui.partyState?.facing ?? 0;
           const directions = ['NORTH', 'EAST', 'SOUTH', 'WEST'];
           lines.push({ text: `PARTY FACING ${directions[facing & 3] ?? ''}`.trim(), color: 13 });
           break;
         }
         const descIndex = this.descIndexForObject(objectId);
         descriptionMask = 0x09;
-        if (descIndex !== null) flags = this.objectTables.objDescCarryMask[descIndex] ?? 0;
+        if (descIndex !== null) flags = this.ui.objectTables.objDescCarryMask[descIndex] ?? 0;
         break;
       }
       default:
@@ -1515,7 +1477,7 @@ export class ViewportRenderer {
   }
 
   private drawItemDescriptionLine(text: string, color: number, state: { x: number; y: number }): void {
-    if (!this.fontData || !this.screenIndexBuffer) return;
+    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
     let remaining = text;
     while (remaining.length > 0) {
       let line = remaining;
@@ -1527,7 +1489,7 @@ export class ViewportRenderer {
         next = remaining.slice(cut + 1);
         line = remaining.slice(0, cut);
       }
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, state.x, state.y, color, null, line);
+      drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, state.x, state.y, color, null, line);
       state.y += 7;
       remaining = next;
     }
@@ -1539,11 +1501,11 @@ export class ViewportRenderer {
     const { category } = decodeObjectID(objectId);
 
     if (category === DBType.MISC) {
-      const misc = this.dungeonState.getMiscRecord(objectId);
+      const misc = this.ui.dungeonState.getMiscRecord(objectId);
       if (misc?.miscType === MISC_BONES_OF_HERO) {
-        const fingerprint = this.dungeonState.copyChampionBonesRecord(objectId);
-        if (fingerprint !== null && this.partyState) {
-          const champ = this.partyState.champions.find(
+        const fingerprint = this.ui.dungeonState.copyChampionBonesRecord(objectId);
+        if (fingerprint !== null && this.ui.partyState) {
+          const champ = this.ui.partyState.champions.find(
             (c) => (c?.fingerprint ?? 0) === (fingerprint & 0xffff)
           );
           if (champ?.name) name = `${champ.name}${name}`;
@@ -1553,11 +1515,11 @@ export class ViewportRenderer {
 
     if (category === DBType.POTION) {
       if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
-        const selected = this.partyState?.selectedCharacterIndex ?? -1;
-        if (selected >= 0 && this.partyState) {
-          const champ = this.partyState.champions[selected];
+        const selected = this.ui.partyState?.selectedCharacterIndex ?? -1;
+        if (selected >= 0 && this.ui.partyState) {
+          const champ = this.ui.partyState.champions[selected];
           if (champ && this.determineMastery(champ, 2) > 1) {
-            const potion = this.dungeonState.getPotionRecord(objectId);
+            const potion = this.ui.dungeonState.getPotionRecord(objectId);
             const prefix = 95 + Math.floor((potion?.power ?? 0) / 40);
             name = `${String.fromCharCode(prefix)} ${name}`;
           }
@@ -1569,15 +1531,15 @@ export class ViewportRenderer {
   }
 
   private applyViewingFilter(objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
-    if (!this.viewingFilter || !this.objectTables) return null;
-    const selected = this.partyState?.selectedCharacterIndex ?? -1;
+    if (!this.ui.viewingFilter || !this.ui.objectTables) return null;
+    const selected = this.ui.partyState?.selectedCharacterIndex ?? -1;
     if (selected < 0) return null;
     const textTables: TextDecodeTables = {
-      escape1: this.objectTables.textEscape1,
-      escape2Wall: this.objectTables.textEscape2Wall,
-      escape2Other: this.objectTables.textEscape2Other,
+      escape1: this.ui.objectTables.textEscape1,
+      escape2Wall: this.ui.objectTables.textEscape2Wall,
+      escape2Other: this.ui.objectTables.textEscape2Other,
     };
-    return this.viewingFilter({
+    return this.ui.viewingFilter({
       phraseMask,
       objectId: objectId | 0,
       selectedCharacter: selected,
@@ -1586,7 +1548,7 @@ export class ViewportRenderer {
   }
 
   private getObjectName(objectNameIndex: number): string {
-    const names = this.objectTables?.objectNames ?? [];
+    const names = this.ui.objectTables?.objectNames ?? [];
     if (objectNameIndex >= 0 && objectNameIndex < names.length) {
       return names[objectNameIndex] ?? '';
     }
@@ -1601,17 +1563,17 @@ export class ViewportRenderer {
   }
 
   private drawEyeIcon(): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
-    const word612 = this.uiTables.graphic232.word612;
-    const icon = this.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
+    const word612 = this.ui.uiTables.graphic232.word612;
+    const icon = this.ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
     const rect = this.getEyeRect();
     if (!rect) return;
     this.drawObjectIcon(rect, icon, word612);
   }
 
   private getEyeRect(): Rect | null {
-    if (!this.uiTables) return null;
-    const rect = this.uiTables.graphic232.word1406;
+    if (!this.ui.uiTables) return null;
+    const rect = this.ui.uiTables.graphic232.word1406;
     return {
       x1: rect.x1 + VIEWPORT_X + 1,
       y1: rect.y1 + VIEWPORT_Y + 1,
@@ -1621,7 +1583,7 @@ export class ViewportRenderer {
   }
 
   private drawVitalsAndLoad(champion: Champion): void {
-    if (!this.fontData || !this.screenIndexBuffer) return;
+    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
 
     const attrs = champion.attributes;
     const health = attrs?.health ?? 0;
@@ -1640,9 +1602,9 @@ export class ViewportRenderer {
     const lineMana = VIEWPORT_Y + 132;
     const vitalsColor = 13;
 
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineHealth, vitalsColor, null, 'HEALTH');
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineStamina, vitalsColor, null, 'STAMINA');
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, labelX, lineMana, vitalsColor, null, 'MANA');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, labelX, lineHealth, vitalsColor, null, 'HEALTH');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, labelX, lineStamina, vitalsColor, null, 'STAMINA');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, labelX, lineMana, vitalsColor, null, 'MANA');
 
     this.drawLifeForceLine(baseX, slashX, maxX, lineHealth, health, maxHealth, vitalsColor);
     this.drawLifeForceLine(baseX, slashX, maxX, lineStamina, stamina, maxStamina, vitalsColor);
@@ -1652,8 +1614,8 @@ export class ViewportRenderer {
     if (!loadInfo) return;
     const { load, maxLoad, color } = loadInfo;
     drawTextLineIndex(
-      this.screenIndexBuffer,
-      this.fontData,
+      this.ui.screenIndexBuffer,
+      this.ui.fontData,
       VIEWPORT_X + 103,
       lineMana,
       color,
@@ -1661,8 +1623,8 @@ export class ViewportRenderer {
       'LOAD'
     );
     drawTextLineIndex(
-      this.screenIndexBuffer,
-      this.fontData,
+      this.ui.screenIndexBuffer,
+      this.ui.fontData,
       VIEWPORT_X + 147,
       lineMana,
       color,
@@ -1680,20 +1642,20 @@ export class ViewportRenderer {
     max: number,
     color: number
   ): void {
-    if (!this.fontData || !this.screenIndexBuffer) return;
+    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
     drawTextLineIndex(
-      this.screenIndexBuffer,
-      this.fontData,
+      this.ui.screenIndexBuffer,
+      this.ui.fontData,
       xCurrent,
       y,
       color,
       null,
       this.formatLifeValue(current)
     );
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, xSlash, y, color, null, '/');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, xSlash, y, color, null, '/');
     drawTextLineIndex(
-      this.screenIndexBuffer,
-      this.fontData,
+      this.ui.screenIndexBuffer,
+      this.ui.fontData,
       xMax,
       y,
       color,
@@ -1708,7 +1670,7 @@ export class ViewportRenderer {
 
   private determineMastery(champion: Champion, skill: number): number {
     return determineMasteryEngine(champion, skill, {
-      partySleeping: this.uiMode === UIMode.Sleeping,
+      partySleeping: this.ui.uiMode === UIMode.Sleeping,
       getObjectNameIndex: (objectId) => this.resolveObjectNameIndex(objectId),
     });
   }
@@ -1730,21 +1692,21 @@ export class ViewportRenderer {
   }
 
   private drawHorzBar(x0: number, y0: number, width: number, color: number): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     const x1 = VIEWPORT_X + x0;
     const y1 = VIEWPORT_Y + y0;
     const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
-    fillRectIndex(this.screenIndexBuffer, rect, color);
+    fillRectIndex(this.ui.screenIndexBuffer, rect, color);
   }
 
   private blitBasicGraphicToViewport(index: number, rect: Rect, srcStride: number, transparentColor: number): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     const graphic = this.getGraphicBitmap(index);
     if (!graphic) return;
     const dst = this.offsetViewportRect(rect);
     tag0088b2Index(
       graphic,
-      this.screenIndexBuffer,
+      this.ui.screenIndexBuffer,
       {
         x1: dst.x1,
         y1: dst.y1,
@@ -1769,9 +1731,9 @@ export class ViewportRenderer {
   }
 
   private shadeRectIndex(rect: Rect, color: number): void {
-    if (!this.screenIndexBuffer) return;
-    const width = this.screenIndexBuffer.width;
-    const height = this.screenIndexBuffer.height;
+    if (!this.ui.screenIndexBuffer) return;
+    const width = this.ui.screenIndexBuffer.width;
+    const height = this.ui.screenIndexBuffer.height;
     const x1 = Math.max(0, rect.x1 | 0);
     const y1 = Math.max(0, rect.y1 | 0);
     const x2 = Math.min(width - 1, rect.x2 | 0);
@@ -1782,7 +1744,7 @@ export class ViewportRenderer {
       const row = y * width;
       for (let x = x1; x <= x2; x++) {
         if ((x + y) & 1)
-          this.screenIndexBuffer.pixels[row + x] = fill;
+          this.ui.screenIndexBuffer.pixels[row + x] = fill;
       }
     }
   }
@@ -1792,22 +1754,22 @@ export class ViewportRenderer {
    * `ScrollingText`; the renderer only paints its current rows.
    */
   private drawMessageLines(): void {
-    if (!this.fontData || !this.screenIndexBuffer) return;
-    scrollingText.draw(this.screenIndexBuffer, this.fontData);
+    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
+    scrollingText.draw(this.ui.screenIndexBuffer, this.ui.fontData);
   }
 
   private drawPartyStatus(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.partyState || !this.fontData) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.partyState || !this.ui.fontData) return;
 
-    const ui = this.uiTables.graphic232;
-    const party = this.partyState;
+    const ui = this.ui.uiTables.graphic232;
+    const party = this.ui.partyState;
     const facing = party.facing | 0;
     const selected = party.selectedCharacterIndex | 0;
 
     for (let chIdx = 0; chIdx < 4; chIdx++) {
       const baseX = 69 * chIdx;
       fillRectIndex(
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         { x1: baseX, y1: 0, x2: baseX + 66, y2: 28 },
         12
       );
@@ -1819,10 +1781,10 @@ export class ViewportRenderer {
 
       if (selected !== chIdx) {
         const nameRect = { x1: baseX, y1: 0, x2: baseX + 42, y2: 6 };
-        fillRectIndex(this.screenIndexBuffer, nameRect, 1);
+        fillRectIndex(this.ui.screenIndexBuffer, nameRect, 1);
         if (champion) {
-          const nameColor = this.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
-          drawTextLineIndex(this.screenIndexBuffer, this.fontData, baseX + 1, 5, nameColor, 1, champion.name);
+          const nameColor = this.ui.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
+          drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, baseX + 1, 5, nameColor, 1, champion.name);
         }
       }
 
@@ -1831,7 +1793,7 @@ export class ViewportRenderer {
         if (deadGraphic) {
           tag0088b2Index(
             deadGraphic,
-            this.screenIndexBuffer,
+            this.ui.screenIndexBuffer,
             {
               x1: baseX,
               y1: 0,
@@ -1856,10 +1818,10 @@ export class ViewportRenderer {
         const portraitGraphic = this.getPortraitBitmap(champion.portraitGraphic);
         if (portraitGraphic) {
           const portraitRect = { x1: baseX + 7, y1: 0, x2: baseX + 38, y2: 28 };
-          fillRectIndex(this.screenIndexBuffer, portraitRect, 1);
+          fillRectIndex(this.ui.screenIndexBuffer, portraitRect, 1);
           tag0088b2Index(
             portraitGraphic,
-            this.screenIndexBuffer,
+            this.ui.screenIndexBuffer,
             {
               x1: portraitRect.x1,
               y1: portraitRect.y1,
@@ -1884,7 +1846,7 @@ export class ViewportRenderer {
       const dir = (charPos + 4 - facing) & 3;
       const posRect = ui.wRectPos1454[dir];
       const color = ui.byte1386[chIdx] ?? 13;
-      fillRectIndex(this.screenIndexBuffer, posRect, color);
+      fillRectIndex(this.ui.screenIndexBuffer, posRect, color);
 
       const indicator = this.getGraphicBitmap(28);
       if (indicator) {
@@ -1892,7 +1854,7 @@ export class ViewportRenderer {
         const srcX = ((champFacing + 4 - facing) & 3) * 19;
         tag0088b2Index(
           indicator,
-          this.screenIndexBuffer,
+          this.ui.screenIndexBuffer,
           {
             x1: posRect.x1,
             y1: posRect.y1,
@@ -1913,12 +1875,12 @@ export class ViewportRenderer {
   }
 
   private drawHeldObjectName(): void {
-    if (!this.uiTables || !this.fontData || !this.screenIndexBuffer) return;
+    if (!this.ui.uiTables || !this.ui.fontData || !this.ui.screenIndexBuffer) return;
 
-    const objectNames = this.objectTables?.objectNames;
+    const objectNames = this.ui.objectTables?.objectNames;
     if (!objectNames || objectNames.length === 0) return;
 
-    const objectId = this.normalizeObjectValue(this.partyState?.objectInHand);
+    const objectId = this.normalizeObjectValue(this.ui.partyState?.objectInHand);
     let label = '';
     if (objectId !== null) {
       const nameIndex = this.getBaseObjectNameIndex(objectId);
@@ -1926,15 +1888,15 @@ export class ViewportRenderer {
     }
 
     const padded = (label || '').padEnd(14, ' ').slice(0, 14);
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0xe9, 0x25, 4, 0, padded);
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 0xe9, 0x25, 4, 0, padded);
   }
 
   private drawShieldDots(baseX: number, champion: Champion): void {
-    if (!this.screenIndexBuffer || !this.partyState) return;
+    if (!this.ui.screenIndexBuffer || !this.ui.partyState) return;
     const shields: number[] = [];
-    const fireShield = this.partyState.fireShield ?? 0;
-    const spellShield = this.partyState.spellShield ?? 0;
-    const partyShield = this.partyState.partyShield ?? 0;
+    const fireShield = this.ui.partyState.fireShield ?? 0;
+    const spellShield = this.ui.partyState.spellShield ?? 0;
+    const partyShield = this.ui.partyState.partyShield ?? 0;
     const personalShield = champion.shieldStrength ?? 0;
 
     if (fireShield > 0) shields.push(38);
@@ -1948,7 +1910,7 @@ export class ViewportRenderer {
       if (!graphic) continue;
       tag0088b2Index(
         graphic,
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         {
           x1: rect.x1,
           y1: rect.y1,
@@ -1967,7 +1929,7 @@ export class ViewportRenderer {
 
   private getPortraitBitmap(portraitIndex: number): IndexedBitmap | null {
     if (portraitIndex < 0) return null;
-    const cached = this.portraitCache.get(portraitIndex);
+    const cached = this.ui.portraitCache.get(portraitIndex);
     if (cached) return cached;
 
     const sheet = this.getPortraitSheet();
@@ -1992,36 +1954,36 @@ export class ViewportRenderer {
     }
 
     const bmp: IndexedBitmap = { width: w, height: h, pixels: outPixels };
-    this.portraitCache.set(portraitIndex, bmp);
+    this.ui.portraitCache.set(portraitIndex, bmp);
     return bmp;
   }
 
   private getPortraitSheet(): IndexedBitmap | null {
-    if (this.portraitSheet !== undefined) return this.portraitSheet;
+    if (this.ui.portraitSheet !== undefined) return this.ui.portraitSheet;
     const img1 = this.getGraphicBitmap(26, ImageFormat.IMG1);
     if (img1 && img1.width >= 32 && img1.height >= 29) {
-      this.portraitSheet = img1;
+      this.ui.portraitSheet = img1;
       return img1;
     }
     const img2 = this.getGraphicBitmap(26, ImageFormat.IMG2);
     if (img2 && img2.width >= 32 && img2.height >= 29) {
-      this.portraitSheet = img2;
+      this.ui.portraitSheet = img2;
       return img2;
     }
-    this.portraitSheet = null;
+    this.ui.portraitSheet = null;
     return null;
   }
 
   private drawTopBarHandIcons(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.partyState) return;
-    const iconSlots = this.uiTables.graphic232.iconDisplay;
-    const word612 = this.uiTables.graphic232.word612;
-    const selected = this.partyState.selectedCharacterIndex | 0;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.partyState) return;
+    const iconSlots = this.ui.uiTables.graphic232.iconDisplay;
+    const word612 = this.ui.uiTables.graphic232.word612;
+    const selected = this.ui.partyState.selectedCharacterIndex | 0;
 
     for (let chIdx = 0; chIdx < 4; chIdx++) {
       const champion =
-        this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-        this.partyState.champions[chIdx] ??
+        this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+        this.ui.partyState.champions[chIdx] ??
         null;
       const alive = champion ? champion.alive !== false : false;
       if (!alive) continue;
@@ -2037,7 +1999,7 @@ export class ViewportRenderer {
         if (frame) {
           tag0088b2Index(
             frame,
-            this.screenIndexBuffer,
+            this.ui.screenIndexBuffer,
             {
               x1: rect.x1 - 1,
               y1: rect.y1 - 1,
@@ -2072,27 +2034,27 @@ export class ViewportRenderer {
   }
 
   private drawInventoryScreen(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.partyState) return;
-    const selected = this.partyState.selectedCharacterIndex | 0;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.partyState) return;
+    const selected = this.ui.partyState.selectedCharacterIndex | 0;
     if (selected < 0) return;
 
     const champion =
-      this.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.partyState.champions[selected] ??
+      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.ui.partyState.champions[selected] ??
       null;
     if (!champion || champion.alive === false) return;
 
-    const iconSlots = this.uiTables.graphic232.iconDisplay;
-    const word612 = this.uiTables.graphic232.word612;
+    const iconSlots = this.ui.uiTables.graphic232.iconDisplay;
+    const word612 = this.ui.uiTables.graphic232.word612;
     const chestView = this.getActiveChestView(champion);
     this.syncOpenChest(chestView);
 
-    if (this.fontData) {
-      const nameColor = this.partyState.cursorOwner === selected ? 9 : 13;
+    if (this.ui.fontData) {
+      const nameColor = this.ui.partyState.cursorOwner === selected ? 9 : 13;
       const nameBaseX = VIEWPORT_X + 2;
       drawTextLineIndex(
-        this.screenIndexBuffer,
-        this.fontData,
+        this.ui.screenIndexBuffer,
+        this.ui.fontData,
         nameBaseX,
         VIEWPORT_Y + 7,
         nameColor,
@@ -2107,8 +2069,8 @@ export class ViewportRenderer {
           titleX += 6;
         }
         drawTextLineIndex(
-          this.screenIndexBuffer,
-          this.fontData,
+          this.ui.screenIndexBuffer,
+          this.ui.fontData,
           titleX,
           VIEWPORT_Y + 7,
           nameColor,
@@ -2141,8 +2103,8 @@ export class ViewportRenderer {
 
     if (chestView) {
       this.drawChestPanel(chestView);
-    } else if (this.pressingEye) {
-      const cursorObject = this.normalizeObjectValue(this.partyState?.objectInHand);
+    } else if (this.ui.pressingEye) {
+      const cursorObject = this.normalizeObjectValue(this.ui.partyState?.objectInHand);
       if (cursorObject !== null) {
         this.drawObjectInfoPanel(cursorObject);
       } else {
@@ -2157,10 +2119,10 @@ export class ViewportRenderer {
   }
 
   private drawWoundedOutline(rect: Rect): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     const graphic = this.getGraphicBitmap(34);
     if (!graphic) {
-      drawRectOutlineIndex(this.screenIndexBuffer, {
+      drawRectOutlineIndex(this.ui.screenIndexBuffer, {
         x1: rect.x1 - 1,
         y1: rect.y1 - 1,
         x2: rect.x2 + 1,
@@ -2171,7 +2133,7 @@ export class ViewportRenderer {
 
     tag0088b2Index(
       graphic,
-      this.screenIndexBuffer,
+      this.ui.screenIndexBuffer,
       {
         x1: rect.x1 - 1,
         y1: rect.y1 - 1,
@@ -2225,28 +2187,28 @@ export class ViewportRenderer {
   }
 
   private getOpenChestIconIndex(): number {
-    if (this.openChestIconIndex !== null) return this.openChestIconIndex;
-    const names = this.objectTables?.objectNames ?? [];
+    if (this.ui.openChestIconIndex !== null) return this.ui.openChestIconIndex;
+    const names = this.ui.objectTables?.objectNames ?? [];
     for (let i = 0; i < names.length; i++) {
       const name = (names[i] ?? '').trim().toUpperCase();
       if (name === 'OPEN CHEST') {
-        this.openChestIconIndex = i;
+        this.ui.openChestIconIndex = i;
         return i;
       }
     }
-    this.openChestIconIndex = OBJNI_OPEN_CHEST;
-    return this.openChestIconIndex;
+    this.ui.openChestIconIndex = OBJNI_OPEN_CHEST;
+    return this.ui.openChestIconIndex;
   }
 
   private getActiveChestView(champion: Champion): ChestViewSource | null {
-    if (!this.partyState) return null;
+    if (!this.ui.partyState) return null;
 
-    const cursorObject = this.normalizeObjectValue(this.partyState.objectInHand);
-    if (this.pressingEye && this.isChestRecord(cursorObject)) {
+    const cursorObject = this.normalizeObjectValue(this.ui.partyState.objectInHand);
+    if (this.ui.pressingEye && this.isChestRecord(cursorObject)) {
       return { id: cursorObject as ObjectID, source: 'cursor' };
     }
 
-    if (this.pressingEye) return null;
+    if (this.ui.pressingEye) return null;
     const handSlot = 1; // CSBWin uses weapon hand for chest display.
     const handObject = this.normalizeObjectValue(this.getChampionPossession(champion, handSlot));
     if (this.isChestRecord(handObject)) {
@@ -2257,72 +2219,72 @@ export class ViewportRenderer {
 
   private syncOpenChest(chestView: ChestViewSource | null): void {
     if (!chestView) {
-      if (this.openChestId !== null) {
+      if (this.ui.openChestId !== null) {
         this.repackOpenChest();
       }
       return;
     }
 
-    if (this.openChestId !== null && this.openChestId === chestView.id) return;
-    if (this.openChestId !== null) this.repackOpenChest();
+    if (this.ui.openChestId !== null && this.ui.openChestId === chestView.id) return;
+    if (this.ui.openChestId !== null) this.repackOpenChest();
     this.openChest(chestView.id);
   }
 
   private openChest(chestId: ObjectID): void {
-    const chest = this.dungeonState.getContainerRecord(chestId);
+    const chest = this.ui.dungeonState.getContainerRecord(chestId);
     if (!chest) {
-      this.openChestId = null;
-      this.openChestContents = Array(8).fill(null);
+      this.ui.openChestId = null;
+      this.ui.openChestContents = Array(8).fill(null);
       return;
     }
 
-    this.openChestId = chestId;
+    this.ui.openChestId = chestId;
     const contents: Array<ObjectID | null> = Array(8).fill(null);
     let cursor = chest.containedObject;
     let index = 0;
     while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
       contents[index++] = cursor;
-      cursor = this.dungeonState.getDBRecordLink(cursor);
+      cursor = this.ui.dungeonState.getDBRecordLink(cursor);
     }
-    this.openChestContents = contents;
+    this.ui.openChestContents = contents;
 
     for (const item of contents) {
       if (item !== null) {
-        this.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+        this.ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
       }
     }
     chest.containedObject = OBJECT_ID_EOF;
   }
 
   private repackOpenChest(): void {
-    if (this.openChestId === null) return;
-    const chest = this.dungeonState.getContainerRecord(this.openChestId);
+    if (this.ui.openChestId === null) return;
+    const chest = this.ui.dungeonState.getContainerRecord(this.ui.openChestId);
     if (!chest) {
-      this.openChestId = null;
-      this.openChestContents = Array(8).fill(null);
+      this.ui.openChestId = null;
+      this.ui.openChestContents = Array(8).fill(null);
       return;
     }
 
     chest.containedObject = OBJECT_ID_EOF;
     let previous: ObjectID | null = null;
-    for (const item of this.openChestContents) {
+    for (const item of this.ui.openChestContents) {
       if (item === null) continue;
-      this.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+      this.ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
       if (previous === null) {
         chest.containedObject = item;
       } else {
-        this.dungeonState.setDBRecordLink(previous, item);
+        this.ui.dungeonState.setDBRecordLink(previous, item);
       }
       previous = item;
     }
 
-    this.openChestId = null;
-    this.openChestContents = Array(8).fill(null);
+    this.ui.openChestId = null;
+    this.ui.openChestContents = Array(8).fill(null);
   }
 
   private drawChestPanel(chestView: ChestViewSource): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
-    const ui = this.uiTables.graphic232;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
+    const ui = this.ui.uiTables.graphic232;
     this.blitBasicGraphicToViewport(25, ui.wRectPos926, 144, 8);
     this.drawInspectArrow(chestView.source === 'cursor');
 
@@ -2331,7 +2293,7 @@ export class ViewportRenderer {
     for (let slot = 0; slot < 8; slot++) {
       const rect = this.getChestSlotRect(iconSlots, slot);
       if (!rect) continue;
-      const item = this.normalizeObjectValue(this.openChestContents[slot] ?? null);
+      const item = this.normalizeObjectValue(this.ui.openChestContents[slot] ?? null);
       if (item === null) continue;
       const objectIndex = this.resolveObjectNameIndex(item | 0);
       if (objectIndex >= 0) this.drawObjectIcon(rect, objectIndex, word612);
@@ -2339,8 +2301,8 @@ export class ViewportRenderer {
   }
 
   private drawInspectArrow(fromEye: boolean): void {
-    if (!this.uiTables || !this.screenIndexBuffer) return;
-    const ui = this.uiTables.graphic232;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
+    const ui = this.ui.uiTables.graphic232;
     const graphicIndex = fromEye ? 19 : 18;
     this.blitBasicGraphicToViewport(graphicIndex, ui.wRectPos934, 16, 8);
   }
@@ -2354,10 +2316,10 @@ export class ViewportRenderer {
 
   private resolveObjectNameIndex(value: number): number {
     if (value < 0) return -1;
-    if (!this.objectTables) return value | 0;
+    if (!this.ui.objectTables) return value | 0;
     const descIndex = this.descIndexForObject(value as ObjectID);
     if (descIndex === null) return value | 0;
-    let objectType = this.objectTables.objDescObjectType[descIndex];
+    let objectType = this.ui.objectTables.objDescObjectType[descIndex];
     if (typeof objectType !== 'number') return value | 0;
 
     objectType |= 0;
@@ -2371,15 +2333,15 @@ export class ViewportRenderer {
     }
 
     if (objectType === OBJNI_COMPASS_N) {
-      const facing = this.partyState?.facing ?? 0;
+      const facing = this.ui.partyState?.facing ?? 0;
       return (objectType + (facing & 0x3)) | 0;
     }
 
     if (objectType === OBJNI_TORCH_A) {
-      const weapon = this.dungeonState.getWeaponRecord(value as ObjectID);
+      const weapon = this.ui.dungeonState.getWeaponRecord(value as ObjectID);
       if (weapon?.litTorch) {
         const charge = weapon.charges ?? 0;
-        const byte640 = this.uiTables?.graphic232.byte640 ?? [];
+        const byte640 = this.ui.uiTables?.graphic232.byte640 ?? [];
         const offset = byte640[charge] ?? 0;
         return (objectType + (offset & 0xff)) | 0;
       }
@@ -2387,7 +2349,7 @@ export class ViewportRenderer {
     }
 
     if (objectType === OBJNI_OPEN_SCROLL) {
-      const scroll = this.dungeonState.getScrollRecord(value as ObjectID);
+      const scroll = this.ui.dungeonState.getScrollRecord(value as ObjectID);
       if (scroll && !scroll.open) return OBJNI_SCROLL;
       return objectType;
     }
@@ -2397,7 +2359,7 @@ export class ViewportRenderer {
       objectType === OBJNI_ILLUMULET_A ||
       objectType === OBJNI_JEWEL_SYMAL_A
     ) {
-      const misc = this.dungeonState.getMiscRecord(value as ObjectID);
+      const misc = this.ui.dungeonState.getMiscRecord(value as ObjectID);
       if (misc && misc.specialState !== 0) return objectType + 1;
       return objectType;
     }
@@ -2410,7 +2372,7 @@ export class ViewportRenderer {
       objectType === OBJNI_EYE_OF_TIME_A ||
       objectType === OBJNI_STAFF_OF_CLAWS_A
     ) {
-      const weapon = this.dungeonState.getWeaponRecord(value as ObjectID);
+      const weapon = this.ui.dungeonState.getWeaponRecord(value as ObjectID);
       if (weapon && weapon.charges > 0) return objectType + 1;
       return objectType;
     }
@@ -2420,19 +2382,19 @@ export class ViewportRenderer {
 
   private getBaseObjectNameIndex(value: number): number {
     if (value < 0) return -1;
-    if (!this.objectTables) return value | 0;
+    if (!this.ui.objectTables) return value | 0;
 
     const descIndex = this.isLikelyObjectRecord(value)
       ? this.descIndexForObject(value as ObjectID)
       : this.getDescIndexForObjectType(value | 0);
     if (descIndex === null) return value | 0;
 
-    const objectType = this.objectTables.objDescObjectType[descIndex];
+    const objectType = this.ui.objectTables.objDescObjectType[descIndex];
     return typeof objectType === 'number' ? objectType | 0 : value | 0;
   }
 
   private getAttackClass(value: number): number {
-    if (!this.objectTables) return 0;
+    if (!this.ui.objectTables) return 0;
     if (value < 0) return 0;
 
     const descIndex = this.isLikelyObjectRecord(value)
@@ -2440,7 +2402,7 @@ export class ViewportRenderer {
       : this.getDescIndexForObjectType(value | 0);
     if (descIndex === null) return 0;
 
-    return this.objectTables.objDescAttackClass[descIndex] ?? 0;
+    return this.ui.objectTables.objDescAttackClass[descIndex] ?? 0;
   }
 
   private descIndexForObject(rn: ObjectID): number | null {
@@ -2449,23 +2411,23 @@ export class ViewportRenderer {
       case DBType.SCROLL:
         return 0;
       case DBType.CHEST: {
-        const rec = this.dungeonState.getContainerRecord(rn);
+        const rec = this.ui.dungeonState.getContainerRecord(rn);
         return rec ? 1 + (rec.containerType & 0xff) : null;
       }
       case DBType.POTION: {
-        const rec = this.dungeonState.getPotionRecord(rn);
+        const rec = this.ui.dungeonState.getPotionRecord(rn);
         return rec ? 2 + (rec.potionType & 0xff) : null;
       }
       case DBType.WEAPON: {
-        const rec = this.dungeonState.getWeaponRecord(rn);
+        const rec = this.ui.dungeonState.getWeaponRecord(rn);
         return rec ? 23 + (rec.weaponType & 0xff) : null;
       }
       case DBType.CLOTHING: {
-        const rec = this.dungeonState.getClothingRecord(rn);
+        const rec = this.ui.dungeonState.getClothingRecord(rn);
         return rec ? 69 + (rec.clothingType & 0xff) : null;
       }
       case DBType.MISC: {
-        const rec = this.dungeonState.getMiscRecord(rn);
+        const rec = this.ui.dungeonState.getMiscRecord(rn);
         return rec ? 127 + (rec.miscType & 0xff) : null;
       }
       default:
@@ -2474,7 +2436,7 @@ export class ViewportRenderer {
   }
 
   private computeChampionLoad(champion: Champion): { load: number; maxLoad: number; color: number } | null {
-    if (!this.objectTables) return null;
+    if (!this.ui.objectTables) return null;
     const load = this.computeLoadWeight(champion);
     const maxLoad = this.computeMaxLoad(champion);
     const color = this.getLoadColor(load, maxLoad);
@@ -2482,7 +2444,7 @@ export class ViewportRenderer {
   }
 
   private computeLoadWeight(champion: Champion): number {
-    if (!this.objectTables) return 0;
+    if (!this.ui.objectTables) return 0;
     const visited = new Set<number>();
     const items: Array<number | null | undefined> = champion.possessions?.length
       ? champion.possessions
@@ -2496,7 +2458,7 @@ export class ViewportRenderer {
   }
 
   private getObjectWeight(value: number, visited: Set<number>): number {
-    if (!this.objectTables) return 0;
+    if (!this.ui.objectTables) return 0;
     if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return 0;
     if (this.isLikelyObjectRecord(value)) {
       return this.getObjectWeightForRecord(value as ObjectID, visited);
@@ -2508,62 +2470,62 @@ export class ViewportRenderer {
     const { category, index } = decodeObjectID(value as ObjectID);
     switch (category) {
       case DBType.WEAPON:
-        return index < this.dungeonState.getData().databases.weapons.records.length;
+        return index < this.ui.dungeonState.getData().databases.weapons.records.length;
       case DBType.CLOTHING:
-        return index < this.dungeonState.getData().databases.clothing.records.length;
+        return index < this.ui.dungeonState.getData().databases.clothing.records.length;
       case DBType.SCROLL:
-        return index < this.dungeonState.getData().databases.scrolls.records.length;
+        return index < this.ui.dungeonState.getData().databases.scrolls.records.length;
       case DBType.POTION:
-        return index < this.dungeonState.getData().databases.potions.records.length;
+        return index < this.ui.dungeonState.getData().databases.potions.records.length;
       case DBType.CHEST:
-        return index < this.dungeonState.getData().databases.containers.records.length;
+        return index < this.ui.dungeonState.getData().databases.containers.records.length;
       case DBType.MISC:
-        return index < this.dungeonState.getData().databases.misc.records.length;
+        return index < this.ui.dungeonState.getData().databases.misc.records.length;
       default:
         return false;
     }
   }
 
   private getObjectWeightForRecord(rn: ObjectID, visited: Set<number>): number {
-    if (!this.objectTables) return 0;
+    if (!this.ui.objectTables) return 0;
     if (visited.has(rn)) return 0;
     visited.add(rn);
 
     const { category } = decodeObjectID(rn);
     switch (category) {
       case DBType.WEAPON: {
-        const rec = this.dungeonState.getWeaponRecord(rn);
+        const rec = this.ui.dungeonState.getWeaponRecord(rn);
         if (!rec) return 0;
-        return this.objectTables.weaponWeights[rec.weaponType] ?? 0;
+        return this.ui.objectTables.weaponWeights[rec.weaponType] ?? 0;
       }
       case DBType.CLOTHING: {
-        const rec = this.dungeonState.getClothingRecord(rn);
+        const rec = this.ui.dungeonState.getClothingRecord(rn);
         if (!rec) return 0;
-        return this.objectTables.clothingWeights[rec.clothingType] ?? 0;
+        return this.ui.objectTables.clothingWeights[rec.clothingType] ?? 0;
       }
       case DBType.SCROLL:
         return 1;
       case DBType.POTION: {
-        const rec = this.dungeonState.getPotionRecord(rn);
+        const rec = this.ui.dungeonState.getPotionRecord(rn);
         if (!rec) return 0;
         return rec.potionType === POTION_EMPTY_FLASK ? 1 : 3;
       }
       case DBType.MISC: {
-        const rec = this.dungeonState.getMiscRecord(rn);
+        const rec = this.ui.dungeonState.getMiscRecord(rn);
         if (!rec) return 0;
-        let weight = this.objectTables.miscWeights[rec.miscType] ?? 0;
+        let weight = this.ui.objectTables.miscWeights[rec.miscType] ?? 0;
         if (rec.miscType === 1) {
           weight += 2 * (rec.specialState ?? 0);
         }
         return weight;
       }
       case DBType.CHEST: {
-        const rec = this.dungeonState.getContainerRecord(rn);
+        const rec = this.ui.dungeonState.getContainerRecord(rn);
         let total = DEFAULT_CHEST_WEIGHT;
         let obj = rec?.containedObject ?? OBJECT_ID_EOF;
         while (obj !== OBJECT_ID_EOF && obj !== OBJECT_ID_NULL) {
           total += this.getObjectWeight(obj, visited);
-          obj = this.dungeonState.getDBRecordLink(obj);
+          obj = this.ui.dungeonState.getDBRecordLink(obj);
         }
         return total;
       }
@@ -2573,7 +2535,7 @@ export class ViewportRenderer {
   }
 
   private getObjectWeightForObjectType(objectType: number): number {
-    if (!this.objectTables) return 0;
+    if (!this.ui.objectTables) return 0;
     let descIndex = this.getDescIndexForObjectType(objectType);
     if (descIndex === null) {
       if (objectType === OBJNI_SCROLL || objectType === OBJNI_OPEN_SCROLL) return 1;
@@ -2594,13 +2556,13 @@ export class ViewportRenderer {
       return 3;
     }
     if (descIndex >= 23 && descIndex <= 68) {
-      return this.objectTables.weaponWeights[descIndex - 23] ?? 0;
+      return this.ui.objectTables.weaponWeights[descIndex - 23] ?? 0;
     }
     if (descIndex >= 69 && descIndex <= 126) {
-      return this.objectTables.clothingWeights[descIndex - 69] ?? 0;
+      return this.ui.objectTables.clothingWeights[descIndex - 69] ?? 0;
     }
     if (descIndex >= 127 && descIndex <= 179) {
-      let weight = this.objectTables.miscWeights[descIndex - 127] ?? 0;
+      let weight = this.ui.objectTables.miscWeights[descIndex - 127] ?? 0;
       if (objectType === OBJNI_WATER) weight += 6;
       return weight;
     }
@@ -2608,8 +2570,8 @@ export class ViewportRenderer {
   }
 
   private getDescIndexForObjectType(objectType: number): number | null {
-    if (!this.objectTables) return null;
-    const table = this.objectTables.objDescObjectType;
+    if (!this.ui.objectTables) return null;
+    const table = this.ui.objectTables.objDescObjectType;
     for (let i = 0; i < table.length; i++) {
       if (table[i] === objectType) return i;
     }
@@ -2677,16 +2639,16 @@ export class ViewportRenderer {
   }
 
   private drawAttackButtons(): void {
-    if (!this.screenIndexBuffer || !this.partyState || !this.uiTables) return;
+    if (!this.ui.screenIndexBuffer || !this.ui.partyState || !this.ui.uiTables) return;
 
     const buttonHeightTop = 86;
     const buttonHeightBottom = 120;
-    const word612 = this.uiTables.graphic232.word612;
+    const word612 = this.ui.uiTables.graphic232.word612;
 
     for (let chIdx = 0; chIdx < 4; chIdx++) {
       const champion =
-        this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-        this.partyState.champions[chIdx] ??
+        this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+        this.ui.partyState.champions[chIdx] ??
         null;
 
       const x1 = 22 * chIdx + 233;
@@ -2694,7 +2656,7 @@ export class ViewportRenderer {
       const alive = champion ? champion.alive !== false : false;
       const fillColor = alive ? 4 : 0;
 
-      fillRectIndex(this.screenIndexBuffer, { x1, y1: buttonHeightTop, x2, y2: buttonHeightBottom }, fillColor);
+      fillRectIndex(this.ui.screenIndexBuffer, { x1, y1: buttonHeightTop, x2, y2: buttonHeightBottom }, fillColor);
 
       if (alive) {
         const iconRect = { x1: x1 + 2, y1: 95, x2: x2 - 2, y2: 110 };
@@ -2708,14 +2670,14 @@ export class ViewportRenderer {
           iconIndex = this.getBaseObjectNameIndex(weaponId);
         }
         if (iconIndex >= 0) {
-          this.drawObjectIconMask(iconRect, iconIndex, word612, this.uiTables.graphic230.shrinkColorMap);
+          this.drawObjectIconMask(iconRect, iconIndex, word612, this.ui.uiTables.graphic230.shrinkColorMap);
         }
       }
     }
   }
 
   private drawObjectIcon(rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     if (objectNameIndex < 0) return;
     if (word612.length === 0) return;
 
@@ -2736,7 +2698,7 @@ export class ViewportRenderer {
 
     tag0088b2Index(
       graphic,
-      this.screenIndexBuffer,
+      this.ui.screenIndexBuffer,
       {
         x1: rect.x1,
         y1: rect.y1,
@@ -2758,7 +2720,7 @@ export class ViewportRenderer {
     word612: number[],
     colorMap: number[]
   ): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     if (objectNameIndex < 0) return;
     if (word612.length === 0 || colorMap.length === 0) return;
 
@@ -2777,7 +2739,7 @@ export class ViewportRenderer {
     const srcX = (offset & 15) << 4;
     const srcY = offset & 0xff0;
 
-    const dst = this.screenIndexBuffer;
+    const dst = this.ui.screenIndexBuffer;
     const dstStride = dst.width;
     const srcStride = graphic.width;
     const maxW = Math.min(16, rect.x2 - rect.x1 + 1);
@@ -2799,20 +2761,20 @@ export class ViewportRenderer {
   }
 
   private drawAttackPanel(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
-    if (!this.showAttackPanel) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
+    if (!this.ui.showAttackPanel) return;
 
-    fillRectIndex(this.screenIndexBuffer, this.uiTables.graphic232.word20, 0);
+    fillRectIndex(this.ui.screenIndexBuffer, this.ui.uiTables.graphic232.word20, 0);
 
-    const active = this.partyState.champions.find((c) => c.alive !== false);
+    const active = this.ui.partyState.champions.find((c) => c.alive !== false);
     if (!active) return;
 
     const panelGraphic = this.getGraphicBitmap(10);
     if (panelGraphic) {
-      const rect = this.uiTables.graphic230.wRectPos20202;
+      const rect = this.ui.uiTables.graphic230.wRectPos20202;
       tag0088b2Index(
         panelGraphic,
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         {
           x1: rect.x1,
           y1: rect.y1,
@@ -2828,10 +2790,10 @@ export class ViewportRenderer {
       );
     }
 
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 235, 83, 0, 4, active.name);
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 241, 93, 4, 0, 'ATTACK 1');
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 241, 105, 4, 0, 'ATTACK 2');
-    drawTextLineIndex(this.screenIndexBuffer, this.fontData, 241, 117, 4, 0, 'ATTACK 3');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 235, 83, 0, 4, active.name);
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 93, 4, 0, 'ATTACK 1');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 105, 4, 0, 'ATTACK 2');
+    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 117, 4, 0, 'ATTACK 3');
   }
 
   private spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
@@ -2847,33 +2809,33 @@ export class ViewportRenderer {
   }
 
   private drawSpellControls(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
 
-    const rect = this.uiTables.graphic230.word20242;
-    fillRectIndex(this.screenIndexBuffer, rect, 0);
+    const rect = this.ui.uiTables.graphic230.word20242;
+    fillRectIndex(this.ui.screenIndexBuffer, rect, 0);
 
-    for (const champion of this.partyState.champions) {
+    for (const champion of this.ui.partyState.champions) {
       if (!champion || !champion.alive || champion.attributes.maxMana === 0) continue;
-      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.partyState.magicCasterIndex);
-      const isCaster = champion.partyPosition === this.partyState.magicCasterIndex;
-      fillRectIndex(this.screenIndexBuffer, rct, 4);
-      if (isCaster) drawTextLineIndex(this.screenIndexBuffer, this.fontData, rct.x1 + 2, rect.y2-1, 0, 4, champion.name);
+      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.ui.partyState.magicCasterIndex);
+      const isCaster = champion.partyPosition === this.ui.partyState.magicCasterIndex;
+      fillRectIndex(this.ui.screenIndexBuffer, rct, 4);
+      if (isCaster) drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, rct.x1 + 2, rect.y2-1, 0, 4, champion.name);
     };
   }
 
   private drawSpellPanel(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.fontData || !this.partyState) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
 
-    const rect = this.uiTables.graphic232.word12;
+    const rect = this.ui.uiTables.graphic232.word12;
 
-    fillRectIndex(this.screenIndexBuffer, rect, 0);
-    if (this.partyState.magicCasterIndex < 0) return;
+    fillRectIndex(this.ui.screenIndexBuffer, rect, 0);
+    if (this.ui.partyState.magicCasterIndex < 0) return;
 
     let panelGraphic = this.getGraphicBitmap(9);
     if (panelGraphic) {
       tag0088b2Index(
         panelGraphic,
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         {
           x1: rect.x1,
           y1: rect.y1,
@@ -2893,7 +2855,7 @@ export class ViewportRenderer {
     if (panelOverlay) {
       tag0088b2Index(
         panelOverlay,
-        this.screenIndexBuffer,
+        this.ui.screenIndexBuffer,
         {
           x1: rect.x1,
           y1: rect.y1,
@@ -2910,8 +2872,8 @@ export class ViewportRenderer {
     }
 
     const caster =
-      this.partyState.champions.find((c) => c.partyPosition === this.partyState!.magicCasterIndex) ??
-      this.partyState.champions[this.partyState.magicCasterIndex];
+      this.ui.partyState.champions.find((c) => c.partyPosition === this.ui.partyState!.magicCasterIndex) ??
+      this.ui.partyState.champions[this.ui.partyState.magicCasterIndex];
     if (!caster || caster.alive === false) return;
 
     this.drawSpellMenuCharacters(caster.incantation.length);
@@ -2919,29 +2881,29 @@ export class ViewportRenderer {
   }
 
   private drawSpellMenuCharacters(step: number): void {
-    if (!this.screenIndexBuffer || !this.fontData) return;
+    if (!this.ui.screenIndexBuffer || !this.ui.fontData) return;
     const y = 58;
     for (let i=0; i<6; i++) {
       const x = 224 + 14 * (i + 1);
       const ch = String.fromCharCode(96 + 6 * Math.min(step, 3) + i);
-      drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, y, 4, 0, ch);
+      drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, y, 4, 0, ch);
     }
   }
 
   private drawMagicIncantation(incantation: number[]): void {
-    if (!this.screenIndexBuffer || !this.fontData) return;
+    if (!this.ui.screenIndexBuffer || !this.ui.fontData) return;
     const y = 70;
     for (let i=0; i<4; i++) {
       const x = 231 + 9 * (i + 1);
       const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]);
-      drawTextLineIndexRaw(this.screenIndexBuffer, this.fontData, x, y, 4, 0, ch);
+      drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, y, 4, 0, ch);
     }
   }
 
   private drawLifeBars(chIdx: number, champion: Champion): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !champion.alive) return;
-    const offsets = this.uiTables.graphic232.word1526[chIdx];
-    const masks = this.uiTables.graphic232.word1502[chIdx];
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !champion.alive) return;
+    const offsets = this.ui.uiTables.graphic232.word1526[chIdx];
+    const masks = this.ui.uiTables.graphic232.word1502[chIdx];
     if (!offsets || !masks) return;
 
     const heights = [
@@ -2968,10 +2930,10 @@ export class ViewportRenderer {
   }
 
   private drawMaskedBarRow(xBase: number, y: number, mask: number, color: number): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     if (mask === 0) return;
-    const width = this.screenIndexBuffer.width;
-    const height = this.screenIndexBuffer.height;
+    const width = this.ui.screenIndexBuffer.width;
+    const height = this.ui.screenIndexBuffer.height;
     if (y < 0 || y >= height) return;
 
     const row = y * width;
@@ -2980,7 +2942,7 @@ export class ViewportRenderer {
       if ((bits & (1 << (15 - bit))) === 0) continue;
       const x = xBase + bit;
       if (x < 0 || x >= width) continue;
-      this.screenIndexBuffer.pixels[row + x] = color & 0x0f;
+      this.ui.screenIndexBuffer.pixels[row + x] = color & 0x0f;
     }
   }
 
@@ -3020,8 +2982,8 @@ export class ViewportRenderer {
       return;
     }
     if (id === 83) {
-      if (!this.partyState) return;
-      const owner = this.partyState.cursorOwner;
+      if (!this.ui.partyState) return;
+      const owner = this.ui.partyState.cursorOwner;
       if (owner >= 0) this.handleInventoryToggle(owner);
       return;
     }
@@ -3034,7 +2996,7 @@ export class ViewportRenderer {
       return;
     }
     if (id >= 28 && id <= 65) {
-      if ((this.partyState?.cursorOwner ?? -1) >= 0) {
+      if ((this.ui.partyState?.cursorOwner ?? -1) >= 0) {
         this.handleClothingClick(id - 20);
       }
       return;
@@ -3046,45 +3008,45 @@ export class ViewportRenderer {
   }
 
   private isEyeClick(x: number, y: number): boolean {
-    if (!this.partyState || this.partyState.selectedCharacterIndex < 0) return false;
+    if (!this.ui.partyState || this.ui.partyState.selectedCharacterIndex < 0) return false;
     const rect = this.getEyeRect();
     if (!rect) return false;
     return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
   }
 
   private handleMouseUnclick(): void {
-    if (this.pressingEye) {
-      this.pressingEye = false;
+    if (this.ui.pressingEye) {
+      this.ui.pressingEye = false;
     }
   }
 
   private handleEyePress(): void {
-    if (!this.partyState) return;
-    if (this.partyState.selectedCharacterIndex < 0) return;
-    this.pressingEye = true;
+    if (!this.ui.partyState) return;
+    if (this.ui.partyState.selectedCharacterIndex < 0) return;
+    this.ui.pressingEye = true;
   }
 
   private handleMouthPress(): void {
-    if (!this.partyState || !this.objectTables) return;
-    if ((this.partyState.cursorOwner ?? -1) < 0) return;
-    const selected = this.partyState.selectedCharacterIndex ?? -1;
+    if (!this.ui.partyState || !this.ui.objectTables) return;
+    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return;
+    const selected = this.ui.partyState.selectedCharacterIndex ?? -1;
     if (selected < 0) return;
     const champ =
-      this.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.partyState.champions[selected] ??
+      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.ui.partyState.champions[selected] ??
       null;
     if (!champ || champ.alive === false) return;
 
-    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    const objectId = this.normalizeObjectValue(this.ui.partyState.objectInHand);
     if (objectId === null) return;
 
     const outcome = this.computeFeedingOutcome(objectId);
     if (!outcome) return;
 
     if (outcome.removeFromHand) {
-      this.partyState.objectInHand = null;
+      this.ui.partyState.objectInHand = null;
       if (outcome.deleteRecord && this.isLikelyObjectRecord(objectId)) {
-        this.dungeonState.deleteDBEntry(objectId as ObjectID);
+        this.ui.dungeonState.deleteDBEntry(objectId as ObjectID);
       }
     }
 
@@ -3092,11 +3054,11 @@ export class ViewportRenderer {
     champ.water = this.clampFoodWater((champ.water ?? 0) + outcome.waterDelta);
 
     if (outcome.chew) this.startMouthChewAnimation();
-    if (outcome.playGulp && this.playSound) this.playSound(SoundIndex.SWALLOW);
+    if (outcome.playGulp && this.ui.playSound) this.ui.playSound(SoundIndex.SWALLOW);
   }
 
   private computeFeedingOutcome(objectId: number): FeedingOutcome | null {
-    if (!this.objectTables) return null;
+    if (!this.ui.objectTables) return null;
     const isRecord = this.isLikelyObjectRecord(objectId);
     const nameIndex = isRecord ? this.resolveObjectNameIndex(objectId) : this.getBaseObjectNameIndex(objectId);
     if (nameIndex < 0) return null;
@@ -3104,7 +3066,7 @@ export class ViewportRenderer {
     const descIndex = isRecord
       ? this.descIndexForObject(objectId as ObjectID)
       : this.getDescIndexForObjectType(objectId | 0);
-    const carryMask = descIndex !== null ? this.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
+    const carryMask = descIndex !== null ? this.ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
     const mouthAllowed = (carryMask & 1) !== 0;
 
     const isFood = this.isFoodNameIndex(nameIndex);
@@ -3123,7 +3085,7 @@ export class ViewportRenderer {
     };
 
     if (isWaterFlask) {
-      const rec = this.dungeonState.getPotionRecord(objectId as ObjectID);
+      const rec = this.ui.dungeonState.getPotionRecord(objectId as ObjectID);
       if (!rec) return null;
       outcome.waterDelta = 1600;
       outcome.playGulp = true;
@@ -3133,7 +3095,7 @@ export class ViewportRenderer {
 
     if (isWater) {
       if (isRecord && decodeObjectID(objectId as ObjectID).category === DBType.MISC) {
-        const rec = this.dungeonState.getMiscRecord(objectId as ObjectID);
+        const rec = this.ui.dungeonState.getMiscRecord(objectId as ObjectID);
         const value = rec?.specialState ?? 0;
         if (value > 0) {
           outcome.waterDelta = 800;
@@ -3162,7 +3124,7 @@ export class ViewportRenderer {
   }
 
   private isWaterFlaskRecord(objectId: ObjectID): boolean {
-    const rec = this.dungeonState.getPotionRecord(objectId);
+    const rec = this.ui.dungeonState.getPotionRecord(objectId);
     return rec?.potionType === POTION_WATER_FLASK;
   }
 
@@ -3175,7 +3137,7 @@ export class ViewportRenderer {
   }
 
   private getFoodValue(nameIndex: number): number {
-    const values = this.objectTables?.foodValue;
+    const values = this.ui.objectTables?.foodValue;
     if (!values) return 0;
     const offset = nameIndex - OBJNI_APPLE;
     if (offset < 0 || offset >= values.length) return 0;
@@ -3187,50 +3149,50 @@ export class ViewportRenderer {
   }
 
   private startMouthChewAnimation(): void {
-    const now = this.nowMs();
+    const now = nowMs();
     const frameMs = (1000 * 8) / 60;
-    this.mouthChewStartMs = now;
-    this.mouthChewEndMs = now + frameMs * 4;
+    this.ui.mouthChewStartMs = now;
+    this.ui.mouthChewEndMs = now + frameMs * 4;
     this.ensureMouthChewLoop();
   }
 
   private drawMouthChewAnimation(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.objectTables) return;
-    if (this.mouthChewStartMs === null) return;
-    const now = this.nowMs();
-    if (now >= this.mouthChewEndMs) return;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.objectTables) return;
+    if (this.ui.mouthChewStartMs === null) return;
+    const now = nowMs();
+    if (now >= this.ui.mouthChewEndMs) return;
 
     const frameMs = (1000 * 8) / 60;
-    const frame = Math.floor((now - this.mouthChewStartMs) / frameMs);
+    const frame = Math.floor((now - this.ui.mouthChewStartMs) / frameMs);
     const icon = (frame % 2 === 0) ? OBJNI_SPECIAL_H : OBJNI_SPECIAL_G;
-    const mouthRect = this.uiTables.graphic232.word1398;
+    const mouthRect = this.ui.uiTables.graphic232.word1398;
     const x = VIEWPORT_X + mouthRect.x1 + 1;
     const y = VIEWPORT_Y + mouthRect.y1 + 1;
-    this.drawObjectIconAt(x, y, icon, this.uiTables.graphic232.word612, -1);
+    this.drawObjectIconAt(x, y, icon, this.ui.uiTables.graphic232.word612, -1);
   }
 
   private ensureMouthChewLoop(): void {
-    if (this.mouthChewFrameHandle !== null) return;
+    if (this.ui.mouthChewFrameHandle !== null) return;
     const schedule = (cb: (time: number) => void): number => {
       if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);
-      return setTimeout(() => cb(this.nowMs()), 16) as unknown as number;
+      return setTimeout(() => cb(nowMs()), 16) as unknown as number;
     };
     const tick = () => {
-      if (this.mouthChewStartMs === null) {
-        this.mouthChewFrameHandle = null;
+      if (this.ui.mouthChewStartMs === null) {
+        this.ui.mouthChewFrameHandle = null;
         return;
       }
-      const now = this.nowMs();
-      if (now >= this.mouthChewEndMs) {
-        this.mouthChewStartMs = null;
-        this.mouthChewFrameHandle = null;
+      const now = nowMs();
+      if (now >= this.ui.mouthChewEndMs) {
+        this.ui.mouthChewStartMs = null;
+        this.ui.mouthChewFrameHandle = null;
         this.renderLastFrame();
         return;
       }
       this.renderLastFrame();
-      this.mouthChewFrameHandle = schedule(tick);
+      this.ui.mouthChewFrameHandle = schedule(tick);
     };
-    this.mouthChewFrameHandle = schedule(tick);
+    this.ui.mouthChewFrameHandle = schedule(tick);
   }
 
   private renderLastFrame(): void {
@@ -3238,137 +3200,130 @@ export class ViewportRenderer {
     this.render(this.lastRenderPosition, this.lastRenderFacing);
   }
 
-  private nowMs(): number {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-      return performance.now();
-    }
-    return Date.now();
-  }
-
   private handlePartyBlockClick(button: number, x: number, y: number): void {
-    if (!this.uiTables || !this.partyState) return;
-    if (this.partyState.selectedCharacterIndex === button) {
+    if (!this.ui.uiTables || !this.ui.partyState) return;
+    if (this.ui.partyState.selectedCharacterIndex === button) {
       const champ =
-        this.partyState.champions.find((c) => c.partyPosition === button) ??
-        this.partyState.champions[button] ??
+        this.ui.partyState.champions.find((c) => c.partyPosition === button) ??
+        this.ui.partyState.champions[button] ??
         null;
       if (champ && champ.alive === false) return;
-      this.partyState.cursorOwner = button;
+      this.ui.partyState.cursorOwner = button;
       return;
     }
-    const sub = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18216, x, y, 2);
+    const sub = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
     if (sub >= 16 && sub <= 19) {
-      this.partyState.cursorOwner = sub - 16;
+      this.ui.partyState.cursorOwner = sub - 16;
       return;
     }
     if (sub >= 20 && sub <= 27) {
-      if ((this.partyState.cursorOwner ?? -1) >= 0) {
+      if ((this.ui.partyState.cursorOwner ?? -1) >= 0) {
         this.handleClothingClick(sub - 20);
       }
     }
   }
 
   private handleChestAreaClick(clickX: number, clickY: number): void {
-    if (!this.uiTables || !this.partyState) return;
-    if ((this.partyState.cursorOwner ?? -1) < 0) return;
+    if (!this.ui.uiTables || !this.ui.partyState) return;
+    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return;
 
-    const selected = this.partyState.selectedCharacterIndex ?? -1;
+    const selected = this.ui.partyState.selectedCharacterIndex ?? -1;
     if (selected < 0) return;
     const champ =
-      this.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.partyState.champions[selected] ??
+      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
+      this.ui.partyState.champions[selected] ??
       null;
     if (!champ || champ.alive === false) return;
 
     const chestView = this.getActiveChestView(champ);
     if (!chestView || chestView.source !== 'hand') return;
 
-    const button = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
+    const button = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
     if (button !== 0) {
       this.handleClothingClick(button - 20);
     }
   }
 
   private handleInventoryToggle(button: number): void {
-    if (!this.partyState) return;
+    if (!this.ui.partyState) return;
     if (button === 4) {
       this.syncOpenChest(null);
-      this.partyState.selectedCharacterIndex = -1;
-      this.pressingEye = false;
+      this.ui.partyState.selectedCharacterIndex = -1;
+      this.ui.pressingEye = false;
       this.syncInventoryButtons();
       return;
     }
     if (button < 0 || button > 3) return;
     const champ =
-      this.partyState.champions.find((c) => c.partyPosition === button) ??
-      this.partyState.champions[button] ??
+      this.ui.partyState.champions.find((c) => c.partyPosition === button) ??
+      this.ui.partyState.champions[button] ??
       null;
     if (!champ || champ.alive === false) return;
-    const previous = this.partyState.selectedCharacterIndex;
-    this.partyState.selectedCharacterIndex =
-      this.partyState.selectedCharacterIndex === button ? -1 : button;
-    if (this.partyState.selectedCharacterIndex !== previous) {
+    const previous = this.ui.partyState.selectedCharacterIndex;
+    this.ui.partyState.selectedCharacterIndex =
+      this.ui.partyState.selectedCharacterIndex === button ? -1 : button;
+    if (this.ui.partyState.selectedCharacterIndex !== previous) {
       this.syncOpenChest(null);
     }
-    if (this.partyState.selectedCharacterIndex < 0) {
-      this.pressingEye = false;
+    if (this.ui.partyState.selectedCharacterIndex < 0) {
+      this.ui.pressingEye = false;
     }
     this.syncInventoryButtons();
   }
 
   private syncInventoryButtons(): void {
-    if (!this.uiTables || this.uiMode !== UIMode.Adventure) return;
-    const buttons = this.uiTables.graphic231.buttons;
-    const inventoryOpen = (this.partyState?.selectedCharacterIndex ?? -1) >= 0;
-    this.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
+    if (!this.ui.uiTables || this.ui.uiMode !== UIMode.Adventure) return;
+    const buttons = this.ui.uiTables.graphic231.buttons;
+    const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    this.ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
   }
 
   private handleMagicClick(clickX: number, clickY: number): void {
-    if (!this.uiTables || !this.partyState) return;
+    if (!this.ui.uiTables || !this.ui.partyState) return;
 
-    const rect = this.uiTables.graphic230.word20242;
-    for (const champion of this.partyState.champions) {
+    const rect = this.ui.uiTables.graphic230.word20242;
+    for (const champion of this.ui.partyState.champions) {
       if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
-      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.partyState.magicCasterIndex);
+      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.ui.partyState.magicCasterIndex);
       if (this.pointInRect(clickX, clickY, rct)) {
-        this.partyState.magicCasterIndex = champion.partyPosition;
+        this.ui.partyState.magicCasterIndex = champion.partyPosition;
         break;
       }
     }
 
-    const magicButton = this.searchButtonList(this.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
+    const magicButton = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
       this.applyMagicSelection(magicButton);
     }
   }
 
   private handleClothingClick(button: number): void {
-    if (!this.partyState || !this.uiTables) return;
-    const cursorOwner = this.partyState.cursorOwner ?? -1;
+    if (!this.ui.partyState || !this.ui.uiTables) return;
+    const cursorOwner = this.ui.partyState.cursorOwner ?? -1;
     if (cursorOwner < 0) return;
 
     let chIdx = -1;
     let slot = -1;
     if (button < 8) {
       chIdx = Math.floor(button / 2);
-      if (chIdx >= this.partyState.champions.length) return;
-      if (this.partyState.selectedCharacterIndex === chIdx) return;
+      if (chIdx >= this.ui.partyState.champions.length) return;
+      if (this.ui.partyState.selectedCharacterIndex === chIdx) return;
       const champ =
-        this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-        this.partyState.champions[chIdx] ??
+        this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+        this.ui.partyState.champions[chIdx] ??
         null;
       if (!champ || champ.alive === false) return;
       slot = button & 1;
     } else {
-      chIdx = this.partyState.selectedCharacterIndex ?? -1;
+      chIdx = this.ui.partyState.selectedCharacterIndex ?? -1;
       if (chIdx < 0) return;
       slot = button - 8;
     }
 
     if (slot < 0 || slot >= 38) return;
     const champ =
-      this.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-      this.partyState.champions[chIdx] ??
+      this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+      this.ui.partyState.champions[chIdx] ??
       null;
     if (!champ || champ.alive === false) return;
 
@@ -3379,28 +3334,28 @@ export class ViewportRenderer {
       this.syncOpenChest(chestView);
     }
 
-    const objectInHand = this.normalizeObjectValue(this.partyState.objectInHand);
+    const objectInHand = this.normalizeObjectValue(this.ui.partyState.objectInHand);
     const slotObject = isChestSlot
-      ? this.normalizeObjectValue(this.openChestContents[slot - 30] ?? null)
+      ? this.normalizeObjectValue(this.ui.openChestContents[slot - 30] ?? null)
       : this.normalizeObjectValue(this.getChampionPossession(champ, slot));
     if (!objectInHand && !slotObject) return;
 
     if (objectInHand && !this.canPlaceInSlot(objectInHand, slot)) return;
 
     if (objectInHand) {
-      this.partyState.objectInHand = null;
+      this.ui.partyState.objectInHand = null;
     }
     if (slotObject) {
       if (isChestSlot) {
-        this.openChestContents[slot - 30] = null;
+        this.ui.openChestContents[slot - 30] = null;
       } else {
         this.setChampionPossession(champ, slot, null);
       }
-      this.partyState.objectInHand = slotObject;
+      this.ui.partyState.objectInHand = slotObject;
     }
     if (objectInHand) {
       if (isChestSlot) {
-        this.openChestContents[slot - 30] = objectInHand;
+        this.ui.openChestContents[slot - 30] = objectInHand;
       } else {
         this.setChampionPossession(champ, slot, objectInHand);
       }
@@ -3444,11 +3399,11 @@ export class ViewportRenderer {
   }
 
   private updateLightForPossessionChange(slot: number, previous: number | null, next: number | null): void {
-    if (!this.partyState || !this.uiTables) return;
+    if (!this.ui.partyState || !this.ui.uiTables) return;
     if (slot !== 0 && slot !== 1 && slot !== 10) return;
 
     if (slot === 10) {
-      const word1074 = this.uiTables.graphic232.word1074;
+      const word1074 = this.ui.uiTables.graphic232.word1074;
       const stepValue = word1074[2] ?? 0;
       if (stepValue !== 0) {
         const prevIsIllumulet = previous !== null
@@ -3457,8 +3412,8 @@ export class ViewportRenderer {
           && this.isBaseObjectNameIndex(next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
         const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
         if (delta !== 0) {
-          const current = this.partyState.brightness ?? 0;
-          this.partyState.brightness = this.normalizeWord6(current + delta);
+          const current = this.ui.partyState.brightness ?? 0;
+          this.ui.partyState.brightness = this.normalizeWord6(current + delta);
         }
       }
     }
@@ -3478,7 +3433,7 @@ export class ViewportRenderer {
     if (objectId === null) return;
     if (!this.isLikelyObjectRecord(objectId)) return;
     if (!this.isBaseObjectNameIndex(objectId, OBJNI_TORCH_A, OBJNI_TORCH_A)) return;
-    const weapon = this.dungeonState.getWeaponRecord(objectId as ObjectID);
+    const weapon = this.ui.dungeonState.getWeaponRecord(objectId as ObjectID);
     if (!weapon) return;
     weapon.litTorch = lit;
   }
@@ -3488,30 +3443,30 @@ export class ViewportRenderer {
   }
 
   private canPlaceInSlot(objectId: number, slot: number): boolean {
-    if (!this.objectTables || !this.uiTables) return true;
+    if (!this.ui.objectTables || !this.ui.uiTables) return true;
     const descIndex = this.isLikelyObjectRecord(objectId)
       ? this.descIndexForObject(objectId as ObjectID)
       : this.getDescIndexForObjectType(objectId | 0);
     if (descIndex === null) return true;
-    const carryMask = this.objectTables.objDescCarryMask[descIndex] ?? 0;
-    const slotMask = this.uiTables.graphic232.carryLocation[slot] ?? 0;
+    const carryMask = this.ui.objectTables.objDescCarryMask[descIndex] ?? 0;
+    const slotMask = this.ui.uiTables.graphic232.carryLocation[slot] ?? 0;
     return (carryMask & slotMask) !== 0;
   }
 
   private drawCursorItem(): void {
-    if (!this.screenIndexBuffer || !this.uiTables || !this.partyState || !this.hoverPoint) return;
-    const objectId = this.normalizeObjectValue(this.partyState.objectInHand);
+    if (!this.ui.screenIndexBuffer || !this.ui.uiTables || !this.ui.partyState || !this.ui.hoverPoint) return;
+    const objectId = this.normalizeObjectValue(this.ui.partyState.objectInHand);
     if (objectId === null) {
       this.drawEmptyCursor();
       return;
     }
 
-    const word612 = this.uiTables.graphic232.word612;
+    const word612 = this.ui.uiTables.graphic232.word612;
     const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
     if (objectNameIndex < 0) return;
 
-    const baseX = Math.floor(this.hoverPoint.x) - 8;
-    const baseY = Math.floor(this.hoverPoint.y) - 8;
+    const baseX = Math.floor(this.ui.hoverPoint.x) - 8;
+    const baseY = Math.floor(this.ui.hoverPoint.y) - 8;
     this.drawObjectIconAt(baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
     this.drawObjectIconAt(baseX, baseY, objectNameIndex, word612, 12);
   }
@@ -3524,7 +3479,7 @@ export class ViewportRenderer {
     transparentColor: number,
     overrideColor?: number
   ): void {
-    if (!this.screenIndexBuffer) return;
+    if (!this.ui.screenIndexBuffer) return;
     if (objectNameIndex < 0) return;
     if (word612.length === 0) return;
 
@@ -3543,7 +3498,7 @@ export class ViewportRenderer {
     const srcX = (offset & 15) << 4;
     const srcY = offset & 0xff0;
 
-    const dst = this.screenIndexBuffer;
+    const dst = this.ui.screenIndexBuffer;
     const dstStride = dst.width;
     const srcStride = graphic.width;
     const maxW = Math.min(16, dst.width - x, srcStride - srcX);
@@ -3568,9 +3523,9 @@ export class ViewportRenderer {
   }
 
   private drawEmptyCursor(): void {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.hoverPoint) return;
-    const x = Math.floor(this.hoverPoint.x);
-    const y = Math.floor(this.hoverPoint.y);
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.hoverPoint) return;
+    const x = Math.floor(this.ui.hoverPoint.x);
+    const y = Math.floor(this.ui.hoverPoint.y);
     const useHand = this.shouldUseHandCursor(x, y);
     const bitmap = useHand ? this.getCursorHandBitmap() : this.getCursorArrowBitmap();
     if (!bitmap) return;
@@ -3579,15 +3534,15 @@ export class ViewportRenderer {
   }
 
   private shouldUseHandCursor(x: number, y: number): boolean {
-    const cursorOwner = this.partyState?.cursorOwner ?? -1;
+    const cursorOwner = this.ui.partyState?.cursorOwner ?? -1;
     if (cursorOwner < 0) return false;
 
     if (y >= 169) return false;
     if (x >= 274) return false;
 
     if (y <= 28) {
-      const numChar = this.partyState?.champions.length ?? 0;
-      const selectedOrdinal = (this.partyState?.selectedCharacterIndex ?? -1) + 1;
+      const numChar = this.ui.partyState?.champions.length ?? 0;
+      const selectedOrdinal = (this.ui.partyState?.selectedCharacterIndex ?? -1) + 1;
       const charIndex = Math.floor(x / 69);
       const pixelWithin = x - charIndex * 69;
       if (charIndex < numChar && pixelWithin <= 42) {
@@ -3602,17 +3557,17 @@ export class ViewportRenderer {
   }
 
   private getCursorArrowBitmap(): IndexedBitmap | null {
-    if (!this.uiTables) return null;
-    if (this.cursorArrowBitmap) return this.cursorArrowBitmap;
-    this.cursorArrowBitmap = this.decodeCursorBitmap(this.uiTables.graphic232.cursorArrow);
-    return this.cursorArrowBitmap;
+    if (!this.ui.uiTables) return null;
+    if (this.ui.cursorArrowBitmap) return this.ui.cursorArrowBitmap;
+    this.ui.cursorArrowBitmap = this.decodeCursorBitmap(this.ui.uiTables.graphic232.cursorArrow);
+    return this.ui.cursorArrowBitmap;
   }
 
   private getCursorHandBitmap(): IndexedBitmap | null {
-    if (!this.uiTables) return null;
-    if (this.cursorHandBitmap) return this.cursorHandBitmap;
-    this.cursorHandBitmap = this.decodeCursorBitmap(this.uiTables.graphic232.cursorHand);
-    return this.cursorHandBitmap;
+    if (!this.ui.uiTables) return null;
+    if (this.ui.cursorHandBitmap) return this.ui.cursorHandBitmap;
+    this.ui.cursorHandBitmap = this.decodeCursorBitmap(this.ui.uiTables.graphic232.cursorHand);
+    return this.ui.cursorHandBitmap;
   }
 
   private decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
@@ -3638,8 +3593,8 @@ export class ViewportRenderer {
   }
 
   private drawCursorBitmap(bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
-    if (!this.screenIndexBuffer) return;
-    const dst = this.screenIndexBuffer;
+    if (!this.ui.screenIndexBuffer) return;
+    const dst = this.ui.screenIndexBuffer;
     const maxW = bitmap.width;
     const maxH = bitmap.height;
     const tc = transparentColor & 0x0f;
@@ -3660,13 +3615,13 @@ export class ViewportRenderer {
   }
 
   private applyMagicSelection(buttonId: number): void {
-    if (!this.partyState || !this.uiTables) return;
+    if (!this.ui.partyState || !this.ui.uiTables) return;
     if (buttonId < 101 || buttonId > 108) return;
 
-    const casterIdx = this.partyState.magicCasterIndex;
+    const casterIdx = this.ui.partyState.magicCasterIndex;
     if (casterIdx < 0) return;
 
-    const champion = this.partyState.champions.find((c) => c.partyPosition === casterIdx);
+    const champion = this.ui.partyState.champions.find((c) => c.partyPosition === casterIdx);
     if (!champion || champion.alive === false) return;
 
     // buttons: magic runes (101-106), back (107), cast (108)
@@ -3683,13 +3638,13 @@ export class ViewportRenderer {
       if (champion.incantation.length === 0) return;
       const totalManaCost = this.computeIncantationManaCost(
         champion.incantation,
-        this.uiTables.graphic230.spellBaseMana,
-        this.uiTables.graphic230.spellFirstRuneScale,
+        this.ui.uiTables.graphic230.spellBaseMana,
+        this.ui.uiTables.graphic230.spellFirstRuneScale,
       );
-      const chIdx = this.partyState.champions.indexOf(champion);
+      const chIdx = this.ui.partyState.champions.indexOf(champion);
       let result: number | void = undefined;
       if (chIdx >= 0) {
-        result = this.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
+        result = this.ui.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
       }
       if (result !== 3) {
         champion.incantation = [];
@@ -3705,8 +3660,8 @@ export class ViewportRenderer {
     if (step > 3) return;
 
     const runeId = buttonId - 101;
-    const baseMana = this.uiTables.graphic230.spellBaseMana; // number[24]
-    const scaleMana = this.uiTables.graphic230.spellFirstRuneScale; // number[6]
+    const baseMana = this.ui.uiTables.graphic230.spellBaseMana; // number[24]
+    const scaleMana = this.ui.uiTables.graphic230.spellFirstRuneScale; // number[6]
 
     // compute mana cost: rune base cost * [1, 1.5, 2, 2.5, 3, 3.5][firstRune]
     let manaCost = baseMana[step * 6 + runeId];
@@ -3736,42 +3691,42 @@ export class ViewportRenderer {
   }
 
   private updateButtonLists(): void {
-    if (!this.uiTables) return;
-    const buttons = this.uiTables.graphic231.buttons;
-    switch (this.uiMode) {
+    if (!this.ui.uiTables) return;
+    const buttons = this.ui.uiTables.graphic231.buttons;
+    switch (this.ui.uiMode) {
       case UIMode.Sleeping:
-        this.primaryButtons = buttons.buttons17796;
-        this.secondaryButtons = null;
+        this.ui.primaryButtons = buttons.buttons17796;
+        this.ui.secondaryButtons = null;
         break;
       case UIMode.Frozen:
-        this.primaryButtons = buttons.buttons17832;
-        this.secondaryButtons = null;
+        this.ui.primaryButtons = buttons.buttons17832;
+        this.ui.secondaryButtons = null;
         break;
       case UIMode.Adventure:
       default:
-        this.primaryButtons = buttons.buttons17196;
-        this.secondaryButtons = buttons.buttons17304;
+        this.ui.primaryButtons = buttons.buttons17196;
+        this.ui.secondaryButtons = buttons.buttons17304;
         break;
     }
   }
 
   private drawHoverHighlights() {
-    if (!this.uiTables || !this.screenIndexBuffer || !this.hoverPoint) return;
-    const { x, y } = this.hoverPoint;
+    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.hoverPoint) return;
+    const { x, y } = this.ui.hoverPoint;
 
     const hovered: string[] = [];
-    for (const btn of this.uiTables.graphic231.moveButtons) {
+    for (const btn of this.ui.uiTables.graphic231.moveButtons) {
       if (this.pointInRect(x, y, btn)) {
-        // drawRectOutlineIndex(this.screenIndexBuffer, btn, 15);
+        // drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 15);
       }
     }
 
-    const buttonGroups = Object.values(this.uiTables.graphic231.buttons);
+    const buttonGroups = Object.values(this.ui.uiTables.graphic231.buttons);
     for (const group of buttonGroups) {
       for (const btn of group) {
         if (this.pointInRect(x, y, btn)) {
           hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
-          drawRectOutlineIndex(this.screenIndexBuffer, btn, 9);
+          drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 9);
         }
       }
     }
@@ -3783,10 +3738,10 @@ export class ViewportRenderer {
   }
 
   private blitViewportToScreen(): void {
-    if (!this.context?.viewportIndexBuffer || !this.screenIndexBuffer) return;
+    if (!this.ui.context?.viewportIndexBuffer || !this.ui.screenIndexBuffer) return;
 
-    const src = this.context.viewportIndexBuffer;
-    const dst = this.screenIndexBuffer;
+    const src = this.ui.context.viewportIndexBuffer;
+    const dst = this.ui.screenIndexBuffer;
     const dstX = VIEWPORT_X;
     const dstY = VIEWPORT_Y;
 
