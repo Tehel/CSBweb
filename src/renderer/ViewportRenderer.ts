@@ -40,8 +40,17 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../core/types';
+import { OBJECT_ID_EOF, type ObjectID } from '../core/types';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  ViewportCursorAction,
+  hasCursorObject,
+  isDoorSwitchHit,
+  isWallDecorationHit,
+  resolveViewportCursorAction,
+  tryPickViewportObject,
+  tryUseFrontWallItem,
+} from './ui/ViewportPicking';
 import {
   drawCursorItem,
   drawHoverHighlights,
@@ -73,28 +82,18 @@ import {
   getBaseObjectNameIndex,
   isLikelyObjectRecord,
   normalizeObjectValue,
-  resolveObjectNameIndex,
 } from './ui/Objects';
 import {
   drawMessageLines,
   shadeRectIndex,
 } from './ui/Draw';
-import { GraphicRoomType } from './bytecode/Types';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 import {
-    OBJNI_BONES_A,
-    OBJNI_EMPTY_FLASK,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
-    OBJNI_WATER,
-    OBJNI_WATERSKIN,
 } from '../core/objectNameIndex';
 
 type IndexedBitmapSet = IndexedBitmap[]
-type ViewportCursorAction =
-  | { kind: 'throw'; side: 0 | 1 }
-  | { kind: 'drop'; pos: number; viAltar?: boolean }
-  | { kind: 'wall' };
 
 export { UIMode } from './ui/UIState';
 
@@ -112,7 +111,6 @@ export interface FloorCeiling {
   mirrored: Uint8Array;
 }
 
-const POTION_WATER_FLASK = 15;
 
 /**
  * Main ViewportRenderer class
@@ -247,6 +245,32 @@ export class ViewportRenderer {
 
   processMouseQueue(): void {
     processMouseQueue(this.ui);
+  }
+
+  /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
+
+  isWallDecorationHit(x: number, y: number): boolean {
+    return isWallDecorationHit(this.ui, x, y);
+  }
+
+  isDoorSwitchHit(x: number, y: number): boolean {
+    return isDoorSwitchHit(this.ui, x, y);
+  }
+
+  tryPickViewportObject(x: number, y: number): boolean {
+    return tryPickViewportObject(this.ui, x, y);
+  }
+
+  hasCursorObject(): boolean {
+    return hasCursorObject(this.ui);
+  }
+
+  resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
+    return resolveViewportCursorAction(this.ui, x, y);
+  }
+
+  tryUseFrontWallItem(x: number, y: number): boolean {
+    return tryUseFrontWallItem(this.ui, x, y);
   }
 
   setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {
@@ -411,252 +435,6 @@ export class ViewportRenderer {
     DrawViewport(this.ui.context, this.ui.dungeonState, position, facing);
 
     this.presentViewport();
-  }
-
-  isWallDecorationHit(x: number, y: number): boolean {
-    const rects = this.ui.context?.wallDecorationRects;
-    if (!rects || rects.length === 0) return false;
-    const vx = x - VIEWPORT_X;
-    const vy = y - VIEWPORT_Y;
-    for (const rect of rects) {
-      if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
-    }
-    return false;
-  }
-
-  isDoorSwitchHit(x: number, y: number): boolean {
-    const rects = this.ui.context?.doorSwitchRects;
-    if (!rects || rects.length === 0) return false;
-    const vx = x - VIEWPORT_X;
-    const vy = y - VIEWPORT_Y;
-    for (const rect of rects) {
-      if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
-    }
-    return false;
-  }
-
-  tryPickViewportObject(x: number, y: number): boolean {
-    if (!this.ui.partyState || !this.ui.context?.viewportObjectButtons || !this.ui.context.viewportObjectRNs) return false;
-    if (normalizeObjectValue(this.ui.partyState.objectInHand) !== null) return false;
-    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return false;
-
-    const hit = this.findViewportObjectHit(x, y);
-    if (!hit) return false;
-
-    const target = this.getPickupCellForRelativePos(hit.relativeLocation);
-    if (!target) return false;
-    if (this.isMonsterBlockingPickup(hit.relativeLocation, target)) return false;
-    if (!this.ui.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
-    this.ui.onObjectMove?.(target, hit.rn, false, false, this.ui.partyState.facing & 0x3);
-
-    this.ui.partyState.objectInHand = hit.rn;
-    return true;
-  }
-
-  hasCursorObject(): boolean {
-    if (!this.ui.partyState) return false;
-    return normalizeObjectValue(this.ui.partyState.objectInHand) !== null;
-  }
-
-  resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
-    if (!this.ui.partyState || !this.ui.uiTables) return null;
-    const objectId = normalizeObjectValue(this.ui.partyState.objectInHand);
-    if (objectId === null) return null;
-    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return null;
-
-    const stoneAhead = this.isFrontCellStoneOrVisibleFalseWall();
-    const doorFacingAhead = this.isFrontCellDoorFacing();
-
-    if (stoneAhead) {
-      const dropPos = this.findDropAreaHit(x, y, 2);
-      if (dropPos !== null) return { kind: 'drop', pos: dropPos };
-
-      if (this.isViewportButtonHit(5, x, y)) {
-        if (this.ui.context?.facingAlcove) {
-          let viAltar = false;
-          if (this.ui.context?.facingViAltar) {
-            const objectNameIndex = resolveObjectNameIndex(this.ui, objectId | 0);
-            viAltar = objectNameIndex === OBJNI_BONES_A;
-          }
-          return { kind: 'drop', pos: 4, viAltar };
-        }
-        return { kind: 'wall' };
-      }
-      return null;
-    }
-
-    const throwSide = this.testThrow(x, y, doorFacingAhead);
-    if (throwSide !== null) return { kind: 'throw', side: throwSide };
-
-    const dropPos = this.findDropAreaHit(x, y, 4);
-    if (dropPos !== null) return { kind: 'drop', pos: dropPos };
-    return null;
-  }
-
-  tryUseFrontWallItem(x: number, y: number): boolean {
-    if (!this.ui.partyState || !this.ui.context) return false;
-    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return false;
-    if (!this.isViewportButtonHit(5, x, y)) return false;
-    if (this.ui.context.facingAlcove) return false;
-    if (!this.ui.context.facingWaterFountain) return false;
-
-    const objectId = normalizeObjectValue(this.ui.partyState.objectInHand);
-    if (objectId === null) return false;
-    if (!isLikelyObjectRecord(this.ui, objectId)) return false;
-
-    const objectNameIndex = resolveObjectNameIndex(this.ui, objectId | 0);
-    if (objectNameIndex < 0) return false;
-
-    if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
-      const misc = this.ui.dungeonState.getMiscRecord(objectId as ObjectID);
-      if (!misc) return false;
-      misc.specialState = 3;
-      return true;
-    }
-
-    if (objectNameIndex === OBJNI_EMPTY_FLASK) {
-      const potion = this.ui.dungeonState.getPotionRecord(objectId as ObjectID);
-      if (!potion) return false;
-      potion.potionType = POTION_WATER_FLASK;
-      return true;
-    }
-
-    return false;
-  }
-
-  private findDropAreaHit(x: number, y: number, count: number): number | null {
-    const areas = this.ui.uiTables?.graphic231.dropAreas;
-    if (!areas || areas.length === 0) return null;
-    const max = Math.min(count, areas.length);
-    for (let i = 0; i < max; i++) {
-      const rect = areas[i];
-      if (!rect) continue;
-      if (x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2) return i;
-    }
-    return null;
-  }
-
-  private isViewportButtonHit(index: number, x: number, y: number): boolean {
-    const buttons = this.ui.context?.viewportObjectButtons;
-    if (!buttons || index < 0 || index >= buttons.length) return false;
-    const rect = buttons[index];
-    if (!rect || rect.x1 === 255) return false;
-    const vx = x - VIEWPORT_X;
-    const vy = y - VIEWPORT_Y;
-    return vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2;
-  }
-
-  private testThrow(clickX: number, clickY: number, doorFacing: boolean): 0 | 1 | null {
-    if (clickY < 47 || clickY > 102) return null;
-    if (clickX <= 111) {
-      if (clickX < 32) return null;
-      if (clickX < 64 && doorFacing) return null;
-      return 0;
-    }
-    if (clickX > 191) return null;
-    if (clickX > 163 && doorFacing) return null;
-    return 1;
-  }
-
-  private isFrontCellStoneOrVisibleFalseWall(): boolean {
-    if (!this.ui.partyState) return false;
-    const facing = this.ui.partyState.facing & 0x3;
-    const pos = this.ui.partyState.position;
-    const target =
-      facing === 0 ? pos.north :
-      facing === 1 ? pos.east :
-      facing === 2 ? pos.south :
-      pos.west;
-    const map = this.ui.dungeonState.getMap(target.z);
-    if (!map) return true;
-    if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
-    const cellFlag = map.cellFlags[target.x]?.[target.y];
-    if (cellFlag === undefined) return true;
-    const roomType = (cellFlag >> 5) & 0x7;
-    if (roomType === RoomType.STONE) return true;
-    if (roomType === RoomType.FALSEWALL && (cellFlag & 0x5) === 0) return true;
-    return false;
-  }
-
-  private isFrontCellDoorFacing(): boolean {
-    const rd = this.ui.context?.roomData?.[17];
-    return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
-  }
-
-  private findViewportObjectHit(x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
-    const buttons = this.ui.context?.viewportObjectButtons;
-    const rns = this.ui.context?.viewportObjectRNs;
-    if (!buttons || !rns) return null;
-
-    const vx = x - VIEWPORT_X;
-    const vy = y - VIEWPORT_Y;
-    if (vx < 0 || vy < 0 || vx >= VIEWPORT_WIDTH || vy >= VIEWPORT_HEIGHT) return null;
-
-    const max = Math.min(5, buttons.length, rns.length);
-    for (let i = 0; i < max; i++) {
-      const rect = buttons[i];
-      if (!rect || rect.x1 === 255) continue;
-      if (vx < rect.x1 || vx > rect.x2 || vy < rect.y1 || vy > rect.y2) continue;
-      const rn = rns[i];
-      if (normalizeObjectValue(rn) === null) continue;
-      return { relativeLocation: i, rn };
-    }
-    return null;
-  }
-
-  private getPickupCellForRelativePos(relativeLocation: number): Position | null {
-    if (!this.ui.partyState) return null;
-    const facing = this.ui.partyState.facing & 0x3;
-    let target = this.ui.partyState.position;
-    if (relativeLocation >= 2) {
-      target =
-        facing === 0 ? target.north :
-        facing === 1 ? target.east :
-        facing === 2 ? target.south :
-        target.west;
-    }
-    return target;
-  }
-
-  private isMonsterBlockingPickup(relativeLocation: number, position: Position): boolean {
-    if (!this.ui.partyState || relativeLocation < 2) return false;
-    const rn = this.findFirstMonsterAt(position);
-    if (rn === OBJECT_ID_EOF) return false;
-    const creature = this.ui.dungeonState.getCreatureRecord(rn);
-    if (!creature || this.isMonsterLevitating(creature)) return false;
-    const monsterCount = Math.max(1, creature.count ?? 1);
-    const absPos = (this.ui.partyState.facing + relativeLocation) & 0x3;
-    return this.monsterOccupiesPosition(creature.positions, absPos, monsterCount);
-  }
-
-  private findFirstMonsterAt(position: Position): ObjectID {
-    for (let rn = this.ui.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.ui.dungeonState.getDBRecordLink(rn)) {
-      const { category } = decodeObjectID(rn);
-      if (category === DBType.CREATURE) return rn;
-    }
-    return OBJECT_ID_EOF;
-  }
-
-  private isMonsterLevitating(creature: CreatureRecord): boolean {
-    const desc = this.ui.objectTables?.monsterDesc?.[creature.creatureType];
-    if (!desc) return false;
-    return (desc.word2 & 0x20) !== 0;
-  }
-
-  private isCenteredPositions(positions: number): boolean {
-    return (positions & 0xff) === 0xff;
-  }
-
-  private monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
-    if (this.isCenteredPositions(positions)) return 0;
-    for (let i = 0; i < count; i++) {
-      if (((positions >> (2 * i)) & 0x3) === curAbsPos) return i;
-    }
-    return -1;
-  }
-
-  private monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
-    return this.monsterIndexAtPosition(positions, curAbsPos, count) >= 0;
   }
 
   private handleMonsterAttackState(

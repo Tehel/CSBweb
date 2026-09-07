@@ -1,0 +1,270 @@
+/**
+ * Clicking inside the 3D viewport: what the point under the cursor refers to.
+ *
+ * The bytecode renderer records, for every object and wall feature it blits, the screen
+ * rectangle it occupied plus the object's RN (`context.viewportObjectButtons` /
+ * `viewportObjectRNs`). Picking is therefore a reverse lookup over that frame's output —
+ * CSBWin does the same thing (`doc/CSBwin-src/Mouse.cpp`, `doc/CSBwin-src/Viewport.cpp`)
+ * rather than projecting the click back into the dungeon.
+ */
+import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
+import { DBType, OBJECT_ID_EOF, ObjectID, RoomType, decodeObjectID } from '../../core/types';
+import { CreatureRecord } from '../../data/dungeonTypes';
+import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
+import { GraphicRoomType } from '../bytecode/Types';
+import { isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { UIState } from './UIState';
+import { Position } from '@/core';
+
+const POTION_WATER_FLASK = 15;
+
+export type ViewportCursorAction =
+  | { kind: 'throw'; side: 0 | 1 }
+  | { kind: 'drop'; pos: number; viAltar?: boolean }
+  | { kind: 'wall' };
+
+export function isWallDecorationHit(ui: UIState, x: number, y: number): boolean {
+  const rects = ui.context?.wallDecorationRects;
+  if (!rects || rects.length === 0) return false;
+  const vx = x - VIEWPORT_X;
+  const vy = y - VIEWPORT_Y;
+  for (const rect of rects) {
+    if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
+  }
+  return false;
+}
+
+export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
+  const rects = ui.context?.doorSwitchRects;
+  if (!rects || rects.length === 0) return false;
+  const vx = x - VIEWPORT_X;
+  const vy = y - VIEWPORT_Y;
+  for (const rect of rects) {
+    if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
+  }
+  return false;
+}
+
+export function tryPickViewportObject(ui: UIState, x: number, y: number): boolean {
+  if (!ui.partyState || !ui.context?.viewportObjectButtons || !ui.context.viewportObjectRNs) return false;
+  if (normalizeObjectValue(ui.partyState.objectInHand) !== null) return false;
+  if ((ui.partyState.cursorOwner ?? -1) < 0) return false;
+
+  const hit = findViewportObjectHit(ui, x, y);
+  if (!hit) return false;
+
+  const target = getPickupCellForRelativePos(ui, hit.relativeLocation);
+  if (!target) return false;
+  if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
+  if (!ui.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
+  ui.onObjectMove?.(target, hit.rn, false, false, ui.partyState.facing & 0x3);
+
+  ui.partyState.objectInHand = hit.rn;
+  return true;
+}
+
+export function hasCursorObject(ui: UIState): boolean {
+  if (!ui.partyState) return false;
+  return normalizeObjectValue(ui.partyState.objectInHand) !== null;
+}
+
+export function resolveViewportCursorAction(ui: UIState, x: number, y: number): ViewportCursorAction | null {
+  if (!ui.partyState || !ui.uiTables) return null;
+  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
+  if (objectId === null) return null;
+  if ((ui.partyState.cursorOwner ?? -1) < 0) return null;
+
+  const stoneAhead = isFrontCellStoneOrVisibleFalseWall(ui);
+  const doorFacingAhead = isFrontCellDoorFacing(ui);
+
+  if (stoneAhead) {
+    const dropPos = findDropAreaHit(ui, x, y, 2);
+    if (dropPos !== null) return { kind: 'drop', pos: dropPos };
+
+    if (isViewportButtonHit(ui, 5, x, y)) {
+      if (ui.context?.facingAlcove) {
+        let viAltar = false;
+        if (ui.context?.facingViAltar) {
+          const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+          viAltar = objectNameIndex === OBJNI_BONES_A;
+        }
+        return { kind: 'drop', pos: 4, viAltar };
+      }
+      return { kind: 'wall' };
+    }
+    return null;
+  }
+
+  const throwSide = testThrow(x, y, doorFacingAhead);
+  if (throwSide !== null) return { kind: 'throw', side: throwSide };
+
+  const dropPos = findDropAreaHit(ui, x, y, 4);
+  if (dropPos !== null) return { kind: 'drop', pos: dropPos };
+  return null;
+}
+
+export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean {
+  if (!ui.partyState || !ui.context) return false;
+  if ((ui.partyState.cursorOwner ?? -1) < 0) return false;
+  if (!isViewportButtonHit(ui, 5, x, y)) return false;
+  if (ui.context.facingAlcove) return false;
+  if (!ui.context.facingWaterFountain) return false;
+
+  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
+  if (objectId === null) return false;
+  if (!isLikelyObjectRecord(ui, objectId)) return false;
+
+  const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+  if (objectNameIndex < 0) return false;
+
+  if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
+    const misc = ui.dungeonState.getMiscRecord(objectId as ObjectID);
+    if (!misc) return false;
+    misc.specialState = 3;
+    return true;
+  }
+
+  if (objectNameIndex === OBJNI_EMPTY_FLASK) {
+    const potion = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+    if (!potion) return false;
+    potion.potionType = POTION_WATER_FLASK;
+    return true;
+  }
+
+  return false;
+}
+
+export function findDropAreaHit(ui: UIState, x: number, y: number, count: number): number | null {
+  const areas = ui.uiTables?.graphic231.dropAreas;
+  if (!areas || areas.length === 0) return null;
+  const max = Math.min(count, areas.length);
+  for (let i = 0; i < max; i++) {
+    const rect = areas[i];
+    if (!rect) continue;
+    if (x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2) return i;
+  }
+  return null;
+}
+
+export function isViewportButtonHit(ui: UIState, index: number, x: number, y: number): boolean {
+  const buttons = ui.context?.viewportObjectButtons;
+  if (!buttons || index < 0 || index >= buttons.length) return false;
+  const rect = buttons[index];
+  if (!rect || rect.x1 === 255) return false;
+  const vx = x - VIEWPORT_X;
+  const vy = y - VIEWPORT_Y;
+  return vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2;
+}
+
+export function testThrow(clickX: number, clickY: number, doorFacing: boolean): 0 | 1 | null {
+  if (clickY < 47 || clickY > 102) return null;
+  if (clickX <= 111) {
+    if (clickX < 32) return null;
+    if (clickX < 64 && doorFacing) return null;
+    return 0;
+  }
+  if (clickX > 191) return null;
+  if (clickX > 163 && doorFacing) return null;
+  return 1;
+}
+
+export function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
+  if (!ui.partyState) return false;
+  const facing = ui.partyState.facing & 0x3;
+  const pos = ui.partyState.position;
+  const target =
+    facing === 0 ? pos.north :
+    facing === 1 ? pos.east :
+    facing === 2 ? pos.south :
+    pos.west;
+  const map = ui.dungeonState.getMap(target.z);
+  if (!map) return true;
+  if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
+  const cellFlag = map.cellFlags[target.x]?.[target.y];
+  if (cellFlag === undefined) return true;
+  const roomType = (cellFlag >> 5) & 0x7;
+  if (roomType === RoomType.STONE) return true;
+  if (roomType === RoomType.FALSEWALL && (cellFlag & 0x5) === 0) return true;
+  return false;
+}
+
+export function isFrontCellDoorFacing(ui: UIState): boolean {
+  const rd = ui.context?.roomData?.[17];
+  return rd?.graphicRoomType === GraphicRoomType.DOOR_FACING;
+}
+
+export function findViewportObjectHit(ui: UIState, x: number, y: number): { relativeLocation: number; rn: ObjectID } | null {
+  const buttons = ui.context?.viewportObjectButtons;
+  const rns = ui.context?.viewportObjectRNs;
+  if (!buttons || !rns) return null;
+
+  const vx = x - VIEWPORT_X;
+  const vy = y - VIEWPORT_Y;
+  if (vx < 0 || vy < 0 || vx >= VIEWPORT_WIDTH || vy >= VIEWPORT_HEIGHT) return null;
+
+  const max = Math.min(5, buttons.length, rns.length);
+  for (let i = 0; i < max; i++) {
+    const rect = buttons[i];
+    if (!rect || rect.x1 === 255) continue;
+    if (vx < rect.x1 || vx > rect.x2 || vy < rect.y1 || vy > rect.y2) continue;
+    const rn = rns[i];
+    if (normalizeObjectValue(rn) === null) continue;
+    return { relativeLocation: i, rn };
+  }
+  return null;
+}
+
+export function getPickupCellForRelativePos(ui: UIState, relativeLocation: number): Position | null {
+  if (!ui.partyState) return null;
+  const facing = ui.partyState.facing & 0x3;
+  let target = ui.partyState.position;
+  if (relativeLocation >= 2) {
+    target =
+      facing === 0 ? target.north :
+      facing === 1 ? target.east :
+      facing === 2 ? target.south :
+      target.west;
+  }
+  return target;
+}
+
+export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, position: Position): boolean {
+  if (!ui.partyState || relativeLocation < 2) return false;
+  const rn = findFirstMonsterAt(ui, position);
+  if (rn === OBJECT_ID_EOF) return false;
+  const creature = ui.dungeonState.getCreatureRecord(rn);
+  if (!creature || isMonsterLevitating(ui, creature)) return false;
+  const monsterCount = Math.max(1, creature.count ?? 1);
+  const absPos = (ui.partyState.facing + relativeLocation) & 0x3;
+  return monsterOccupiesPosition(creature.positions, absPos, monsterCount);
+}
+
+export function findFirstMonsterAt(ui: UIState, position: Position): ObjectID {
+  for (let rn = ui.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = ui.dungeonState.getDBRecordLink(rn)) {
+    const { category } = decodeObjectID(rn);
+    if (category === DBType.CREATURE) return rn;
+  }
+  return OBJECT_ID_EOF;
+}
+
+export function isMonsterLevitating(ui: UIState, creature: CreatureRecord): boolean {
+  const desc = ui.objectTables?.monsterDesc?.[creature.creatureType];
+  if (!desc) return false;
+  return (desc.word2 & 0x20) !== 0;
+}
+
+export function monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
+  return monsterIndexAtPosition(positions, curAbsPos, count) >= 0;
+}
+
+export function monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
+  if (isCenteredPositions(positions)) return 0;
+  for (let i = 0; i < count; i++) {
+    if (((positions >> (2 * i)) & 0x3) === curAbsPos) return i;
+  }
+  return -1;
+}
+
+export function isCenteredPositions(positions: number): boolean {
+  return (positions & 0xff) === 0xff;
+}
