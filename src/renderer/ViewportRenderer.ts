@@ -18,7 +18,6 @@ import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
   createPaletteIndexViewportBuffer,
-  fillRectIndex,
   tag0088b2Index,
   updateImageDataFromIndex,
   updateImageDataFromIndexWithViewportPalette,
@@ -40,8 +39,14 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { OBJECT_ID_EOF, type ObjectID } from '../core/types';
+import { OBJECT_ID_EOF } from '../core/types';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  drawStaticUIFrame,
+} from './ui/Draw';
+import {
+  selectPaletteIndexForLightLevel,
+} from './ui/Light';
 import {
   ViewportCursorAction,
   hasCursorObject,
@@ -76,22 +81,12 @@ import {
 import {
   drawHeldObjectName,
   drawPartyStatus,
-  getChampionPossession,
 } from './ui/Character';
-import {
-  getBaseObjectNameIndex,
-  isLikelyObjectRecord,
-  normalizeObjectValue,
-} from './ui/Objects';
 import {
   drawMessageLines,
   shadeRectIndex,
 } from './ui/Draw';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
-import {
-    OBJNI_TORCH_A,
-    OBJNI_TORCH_D,
-} from '../core/objectNameIndex';
 
 type IndexedBitmapSet = IndexedBitmap[]
 
@@ -645,7 +640,7 @@ export class ViewportRenderer {
     if (!this.ui.context?.viewportIndexBuffer || !this.screenCtx || !this.screenImageData || !this.palette || !this.ui.screenIndexBuffer) return;
 
     clearIndex(this.ui.screenIndexBuffer, 0);
-    this.drawStaticUIFrame();
+    drawStaticUIFrame(this.ui);
     const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
     if (!inventoryOpen) {
       syncOpenChest(this.ui, null);
@@ -693,132 +688,8 @@ export class ViewportRenderer {
 
   private getViewportPalette(): number[] | null {
     if (!this.viewportPalettes || this.viewportPalettes.length === 0) return null;
-    const index = Math.min(this.selectPaletteIndexForLightLevel(), this.viewportPalettes.length - 1);
+    const index = Math.min(selectPaletteIndexForLightLevel(this.ui), this.viewportPalettes.length - 1);
     return this.viewportPalettes[index] ?? this.viewportPalettes[0] ?? null;
-  }
-
-  private selectPaletteIndexForLightLevel(): number {
-    if (!this.ui.uiTables || !this.ui.partyState) return 0;
-    const { paletteBrightness, word1074 } = this.ui.uiTables.graphic232;
-    if (!paletteBrightness || paletteBrightness.length === 0 || !word1074 || word1074.length === 0) return 0;
-
-    const map = this.ui.dungeonState.getMap(this.ui.partyState.position.z);
-    const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-    if (experienceMultiplier === 0) return 0;
-
-    const torchLight = this.computeTorchLight(word1074);
-    const totalLight = (this.ui.partyState.brightness ?? 0) + torchLight;
-
-    if (totalLight <= 0) return paletteBrightness.length - 1;
-
-    let paletteIndex = 0;
-    for (let i = 0; i < paletteBrightness.length; i++) {
-      if ((paletteBrightness[i] ?? 0) > totalLight) {
-        paletteIndex++;
-      } else {
-        break;
-      }
-    }
-
-    if (paletteIndex < 0) paletteIndex = 0;
-    if (paletteIndex >= paletteBrightness.length) paletteIndex = paletteBrightness.length - 1;
-    return paletteIndex;
-  }
-
-  private computeTorchLight(word1074: number[]): number {
-    if (!this.ui.partyState) return 0;
-    const charges = this.collectTorchCharges();
-
-    // CSBWin selection-sort: bring four brightest charges to the front.
-    for (let i = 0; i < 4; i++) {
-      for (let j = i + 1; j < charges.length; j++) {
-        if (charges[j] > charges[i]) {
-          const temp = charges[j];
-          charges[j] = charges[i];
-          charges[i] = temp;
-        }
-      }
-    }
-
-    let total = 0;
-    let shift = 6;
-    for (let i = 0; i < 5 && i < charges.length; i++) {
-      const charge = charges[i] ?? 0;
-      if (charge === 0) continue;
-      const idx = Math.max(0, Math.min(charge, word1074.length - 1));
-      let value = word1074[idx] ?? 0;
-      value &= 0xffff;
-      value = (value << shift) >>> 0;
-      value = (value >>> 6) & 0x3ff;
-      total += value;
-      shift = Math.max(0, shift - 1);
-    }
-
-    return total;
-  }
-
-  private collectTorchCharges(): number[] {
-    const charges = new Array(8).fill(0);
-    if (!this.ui.partyState) return charges;
-
-    let outIndex = 0;
-    for (let chIdx = 0; chIdx < 4; chIdx++) {
-      const champ = this.ui.partyState.champions[chIdx];
-      for (let hand = 0; hand < 2; hand++) {
-        if (!champ) {
-          charges[outIndex++] = 0;
-          continue;
-        }
-        const objectId = normalizeObjectValue(getChampionPossession(champ, hand));
-        if (objectId === null) {
-          charges[outIndex++] = 0;
-          continue;
-        }
-        const baseNameIndex = getBaseObjectNameIndex(this.ui, objectId);
-        if (baseNameIndex >= OBJNI_TORCH_A && baseNameIndex <= OBJNI_TORCH_D) {
-          charges[outIndex++] = this.getTorchCharge(objectId);
-        } else {
-          charges[outIndex++] = 0;
-        }
-      }
-    }
-    return charges;
-  }
-
-  private getTorchCharge(objectId: number): number {
-    if (!isLikelyObjectRecord(this.ui, objectId)) return 0;
-    const weapon = this.ui.dungeonState.getWeaponRecord(objectId as ObjectID);
-    if (!weapon) return 0;
-    return weapon.charges & 0xf;
-  }
-
-  private drawStaticUIFrame(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-
-    const g232 = this.ui.uiTables.graphic232;
-    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1780, 0);
-    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1788, 0);
-    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1796, 0);
-
-    const movementGraphic = this.getGraphicBitmap(13);
-    if (!movementGraphic) return;
-    const rect = g232.word28;
-    tag0088b2Index(
-      movementGraphic,
-      this.ui.screenIndexBuffer,
-      {
-        x1: rect.x1,
-        y1: rect.y1,
-        x2: rect.x2,
-        y2: rect.y2,
-        srcX: 0,
-        srcY: 0,
-        srcStride: movementGraphic.width,
-        srcWidth: movementGraphic.width,
-        srcHeight: movementGraphic.height,
-      },
-      -1
-    );
   }
 
   private renderLastFrame(): void {

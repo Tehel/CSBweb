@@ -278,3 +278,33 @@ export function drawWoundedOutline(ui: UIState, rect: Rect): void {
     12
   );
 }
+
+/** The unchanging screen chrome around the viewport (CSBWin `doc/CSBwin-src/CSBUI.cpp`). */
+export function drawStaticUIFrame(ui: UIState): void {
+  if (!ui.uiTables || !ui.screenIndexBuffer) return;
+
+  const g232 = ui.uiTables.graphic232;
+  fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1780, 0);
+  fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1788, 0);
+  fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1796, 0);
+
+  const movementGraphic = ui.getGraphicBitmap(13);
+  if (!movementGraphic) return;
+  const rect = g232.word28;
+  tag0088b2Index(
+    movementGraphic,
+    ui.screenIndexBuffer,
+    {
+      x1: rect.x1,
+      y1: rect.y1,
+      x2: rect.x2,
+      y2: rect.y2,
+      srcX: 0,
+      srcY: 0,
+      srcStride: movementGraphic.width,
+      srcWidth: movementGraphic.width,
+      srcHeight: movementGraphic.height,
+    },
+    -1
+  );
+}
