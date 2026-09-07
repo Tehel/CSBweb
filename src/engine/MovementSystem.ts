@@ -85,7 +85,6 @@ export class MovementSystem {
             return {
                 success: false,
                 blocked: true,
-                message: 'Invalid map',
                 soundId: SoundIndex.WALL_BUMP,
             };
         }
@@ -95,35 +94,20 @@ export class MovementSystem {
             return {
                 success: false,
                 blocked: true,
-                message: 'The edge of the dungeon blocks your path',
                 soundId: SoundIndex.WALL_BUMP,
             };
         }
 
-        // Check if new position is walkable
+        // Check if new position is walkable.
+        // CSBWin answers a blocked move with a sound only — there is no message
+        // (`doc/CSBwin-src/Movement.cpp`, `doc/CSBwin-src/Mouse.cpp`).
         if (!this.dungeon.isWalkable(newPosition)) {
-            // Get wall type for better message
-            const tile = this.dungeon.getTile(newPosition);
-            let message = 'A wall blocks your path';
-
-            if (tile) {
-                if (this.dungeon.isWall(newPosition)) {
-                    message = 'A wall blocks your path';
-                } else if (this.dungeon.isDoor(newPosition)) {
-                    message = 'A closed door blocks your path';
-                }
-            }
-
             return {
                 success: false,
                 blocked: true,
-                message,
                 soundId: SoundIndex.WALL_BUMP,
             };
         }
-
-        // Check for special tiles
-        const special = this.checkSpecialTiles(newPosition);
 
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
@@ -135,30 +119,7 @@ export class MovementSystem {
         return {
             success: true,
             newPosition,
-            message: special?.message,
-            soundId: special?.soundId,
         };
-    }
-
-    /**
-     * Check for special tiles (pits, teleporters, etc.)
-     *
-     * Returns a message if there's something special about this tile
-     */
-    private checkSpecialTiles(position: Position): { message?: string; soundId?: number } | undefined {
-        if (this.dungeon.isPit(position)) return { message: 'You step into a pit!' };
-        if (this.dungeon.isTeleporter(position)) {
-            return { message: 'You feel a strange sensation...' };
-        }
-
-        if (this.dungeon.isStairs(position)) return { message: 'You find stairs' };
-
-        // Check for objects
-        if (this.dungeon.hasObjects(position)) {
-            // Could return info about objects here
-        }
-
-        return undefined;
     }
 
     private getRelativeDirection(action: MovementAction): number | null {
@@ -179,7 +140,6 @@ export class MovementSystem {
             return {
                 success: false,
                 blocked: true,
-                message: 'The stairway does not lead anywhere',
             };
         }
 
@@ -202,23 +162,10 @@ export class MovementSystem {
     executeMovement(action: MovementAction): boolean {
         const result = this.move(action);
 
-        if (result.success) {
-            this.party.applyMovement(result);
+        if (!result.success) return false;
 
-            // Log message if any
-            if (result.message) {
-                console.log(result.message);
-            }
-
-            return true;
-        } else {
-            // Log blocked message
-            if (result.message) {
-                console.log(result.message);
-            }
-
-            return false;
-        }
+        this.party.applyMovement(result);
+        return true;
     }
 
     /**

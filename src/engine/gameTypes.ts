@@ -170,7 +170,6 @@ export interface MovementResult {
     newPosition?: Position;  // New position (if moved)
     newFacing?: Direction;      // New facing (if turned)
     blocked?: boolean;          // Was movement blocked by wall?
-    message?: string;           // Optional message (e.g., "A wall blocks your path")
     soundId?: number;           // Optional sound effect to play
     soundRateIdx?: number;      // Optional rate index for sound playback
 }

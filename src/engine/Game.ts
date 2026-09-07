@@ -33,7 +33,7 @@ import {
  * Game event callback types
  */
 export type GameEventCallback = (game: Game) => void;
-export type MovementCallback = (success: boolean, message?: string, result?: MovementResult) => void;
+export type MovementCallback = (success: boolean, result?: MovementResult) => void;
 
 interface DropCursorOptions {
     viAltar?: boolean;
@@ -301,14 +301,14 @@ export class Game {
 
             // Notify callbacks
             for (const callback of this.onMoveCallbacks) {
-                callback(true, result.message, result);
+                callback(true, result);
             }
 
             return true;
         } else {
             // Notify callbacks of failure
             for (const callback of this.onMoveCallbacks) {
-                callback(false, result.message, result);
+                callback(false, result);
             }
 
             return false;

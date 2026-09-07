@@ -846,12 +846,11 @@ async function init() {
             });
 
             // Register movement callback
-            game.onMove((success, message, result) => {
+            game.onMove((success, result) => {
                 const posInfo = game?.getPositionInfo();
-                console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo, message ?? ' ');
+                console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo);
 
-                if (message) updateDebug(message);
-                else if (success) updateDebug(posInfo || 'Moved');
+                if (success) updateDebug(posInfo || 'Moved');
 
                 if (result?.soundId !== undefined) {
                     soundManager?.playSound(result.soundId, result.soundRateIdx);
