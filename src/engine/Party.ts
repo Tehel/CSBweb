@@ -236,3 +236,66 @@ export class Party {
         return this.state.champions.filter(c => c.alive).length;
     }
 }
+
+/**
+ * `SetHandOwner` (`doc/CSBwin-src/CSBCode.cpp:8390`) — hand champion `chIdx` the mouse
+ * cursor, or -1 to leave it unowned.
+ *
+ * This is not cosmetic: CSBWin gates every inventory click on `d.HandChar != -1`
+ * (`doc/CSBwin-src/Mouse.cpp:1600-1606`), and so does this port, so nobody can pick an
+ * object up until a champion owns the cursor. CSBWin therefore gives it away as soon as
+ * the party has a first champion (`doc/CSBwin-src/Character.cpp:706-710` and
+ * `doc/CSBwin-src/CSBCode.cpp:6787-6791`), moves it to a living champion when the owner
+ * dies (`doc/CSBwin-src/Character.cpp:2684-2688`), takes it back when the last champion
+ * is cancelled out of the mirror (`doc/CSBwin-src/CSBCode.cpp:6641-6644`), and saves and
+ * restores it with the game (`doc/CSBwin-src/SaveGame.cpp:1020` and `:1636`).
+ *
+ * The `load` arithmetic CSBWin does here has no counterpart: this port recomputes a
+ * champion's load from its possessions instead of tracking it incrementally
+ * (`computeLoadWeight`), and counts the object in hand against whoever owns the cursor.
+ */
+export function setHandOwner(party: PartyState, chIdx: number): void {
+    const current = party.cursorOwner ?? -1;
+    if (chIdx === current) return;
+    if (chIdx !== -1) {
+        const champion = getPartyChampion(party, chIdx);
+        // CSBWin tests `HP()==0`; this port also carries an explicit `alive` flag.
+        if (!champion) return;
+        if (champion.alive === false || (champion.attributes?.health ?? 0) === 0) return;
+    }
+    party.cursorOwner = -1;
+    if (chIdx === -1) return;
+    party.cursorOwner = chIdx;
+    // `pcA3->facing = (ui8)d.partyFacing` (doc/CSBwin-src/CSBCode.cpp:8417).
+    const champion = getPartyChampion(party, chIdx);
+    if (champion) champion.facing = party.facing;
+}
+
+/**
+ * Restore CSBWin's invariant that a party with champions always has a cursor owner.
+ *
+ * `d.HandChar` is set the moment the first champion joins and is only ever -1 while the
+ * party is empty, so a restored state that has champions but no owner cannot have come
+ * from CSBWin. Quick-saves written before `setHandOwner` existed are exactly that, and
+ * without this they load into a party whose inventory cannot be touched.
+ */
+export function ensureHandOwner(party: PartyState): void {
+    if ((party.cursorOwner ?? -1) >= 0) return;
+    if (party.champions.length === 0) return;
+    for (let chIdx = 0; chIdx < 4; chIdx++) {
+        const champion = getPartyChampion(party, chIdx);
+        if (!champion || champion.alive === false) continue;
+        setHandOwner(party, chIdx);
+        if ((party.cursorOwner ?? -1) >= 0) return;
+    }
+}
+
+/**
+ * `d.CH16482[chIdx]` — CSBWin indexes its champion array by party slot. This port keeps
+ * champions in a list that carries its own `partyPosition`, so look-ups go through it and
+ * fall back to the list order, as the UI modules do.
+ */
+function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
+    if (chIdx < 0) return null;
+    return party.champions.find((c) => c.partyPosition === chIdx) ?? party.champions[chIdx] ?? null;
+}

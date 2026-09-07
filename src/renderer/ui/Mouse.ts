@@ -15,6 +15,7 @@ import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
 import { UIMode, UIState } from './UIState';
+import { setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
 
 export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
@@ -122,23 +123,20 @@ export function handleEyePress(ui: UIState): void {
 export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
   if (!ui.uiTables || !ui.partyState) return;
   if (ui.partyState.selectedCharacterIndex === button) {
-    const champ =
-      ui.partyState.champions.find((c) => c.partyPosition === button) ??
-      ui.partyState.champions[button] ??
-      null;
-    if (champ && champ.alive === false) return;
-    ui.partyState.cursorOwner = button;
+    setHandOwner(ui.partyState, button);
     return;
   }
   const sub = searchButtonList(ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
   if (sub >= 16 && sub <= 19) {
-    ui.partyState.cursorOwner = sub - 16;
+    setHandOwner(ui.partyState, sub - 16);
     return;
   }
   if (sub >= 20 && sub <= 27) {
-    if ((ui.partyState.cursorOwner ?? -1) >= 0) {
-      handleClothingClick(ui, sub - 20);
-    }
+    // No cursor-owner test here: `TAG019c34` reaches `HandleClothingClick` directly
+    // (doc/CSBwin-src/CSBCode.cpp:8376-8381). Only the id 28-65 dispatcher path
+    // (doc/CSBwin-src/Mouse.cpp:1600-1606) and the chest area
+    // (doc/CSBwin-src/CSBCode.cpp:8509-8511) require one.
+    handleClothingClick(ui, sub - 20);
   }
 }
 
@@ -199,9 +197,8 @@ export function syncInventoryButtons(ui: UIState): void {
 
 export function handleClothingClick(ui: UIState, button: number): void {
   if (!ui.partyState || !ui.uiTables) return;
-  const cursorOwner = ui.partyState.cursorOwner ?? -1;
-  if (cursorOwner < 0) return;
-
+  // `HandleClothingClick` itself does not care who owns the cursor
+  // (doc/CSBwin-src/CSBCode.cpp:6928); its callers decide.
   let chIdx = -1;
   let slot = -1;
   if (button < 8) {
@@ -408,7 +405,7 @@ export function drawHoverHighlights(ui: UIState) {
     for (const btn of group) {
       if (pointInRect(x, y, btn)) {
         hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
-        drawRectOutlineIndex(ui.screenIndexBuffer, btn, 9);
+        // drawRectOutlineIndex(ui.screenIndexBuffer, btn, 9);
       }
     }
   }

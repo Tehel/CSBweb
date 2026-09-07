@@ -872,3 +872,49 @@ a `misc_BonesOfHero` with `important(true)` and `value(2)` — the 2 is what dis
 dead champion's bones from an ordinary bones item. The object's position within the cell is
 set from `pcA3->charPosition`, so the bones appear where that champion stood, and
 `expool.AddChampionBonesRecord` records the bones↔fingerprint pairing for resurrection.
+
+## Every inventory click is gated on `d.HandChar`, and the party always owns it
+
+`doc/CSBwin-src/Mouse.cpp:1600-1606` — the button ids 28 to 65, which are the inventory
+slots and the two hands of each champion, only reach `HandleClothingClick` when somebody
+owns the mouse cursor:
+
+```cpp
+if ((D6W>=28)&&(D6W<66))
+{
+  if (d.HandChar != -1) //owner of cursor
+  {
+    HandleClothingClick(D6W-20);
+  };
+```
+
+The chest area gates the same way (`doc/CSBwin-src/CSBCode.cpp:8509-8511`, via
+`D4W = (d.HandChar == -1) ? 1 : 0`). `HandleClothingClick` itself
+(`doc/CSBwin-src/CSBCode.cpp:6928`) does **not** test it, and neither does the
+party-block path that reaches it through `TAG019c34`
+(`doc/CSBwin-src/CSBCode.cpp:8376-8381`) — so the gate belongs to those two callers only.
+
+That makes `SetHandOwner` (`doc/CSBwin-src/CSBCode.cpp:8390`) load-bearing rather than
+cosmetic, and CSBWin never leaves a formed party without an owner. It is set:
+
+| where | when |
+| --- | --- |
+| `Character.cpp:706-710` | `if (d.NumCharacter == 1) SetHandOwner(0)` — the first champion to join |
+| `CSBCode.cpp:6787-6791` | same rule at the end of resurrect/reincarnate |
+| `Character.cpp:2684-2686` | `if (chIdx == d.HandChar) SetHandOwner(D5W)` — the owner died, D5W is the first living champion |
+| `CSBCode.cpp:8366`, `:8374` | the player clicks a party block, or one of its sub-buttons 16-19 |
+| `CSBCode.cpp:6641-6644` | `SetHandOwner(-1)` when the last champion is cancelled out of the mirror |
+| `SaveGame.cpp:1020`, `:1636` | saved as `gb2.handChar`, restored into `d.HandChar` |
+
+`SetHandOwner` refuses a champion whose `HP()` is 0 (`:8396`) and sets the new owner's
+`facing` to the party facing (`:8417`). Its `load` arithmetic — the object in hand is
+weighed against whoever holds the cursor — has no counterpart in this port, which
+recomputes a champion's load from its possessions instead of tracking it incrementally.
+
+## Not every preset hero starts with possessions
+
+DAROOU's `HeroInventoryItem[]` in `dungeon.dat` is empty; HALK's holds four records and
+WU TSE's six. A test that takes "the first preset hero" and expects something in a slot
+is testing the wrong hero, not a broken `assignPresetHeroPossessions`. HALK's weapon hand
+is rn 37976, `WEAPON#88` — the same record `tools/dump-level-items.ts` finds lying in
+HALK's mirror cell (7,8) on level 0.

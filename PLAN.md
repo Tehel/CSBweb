@@ -865,8 +865,18 @@ Status: 🔄 in progress — step 1 done; steps 2 and 3 partly done (the AI stat
 5. ⏳ **Drinking potions.**
 6. ⏳ **Pit fall damage** + stamina drain, for party and monsters.
 7. ⏳ **Red square around the eye on level gain.**
+8. ⏳ **The rest of `KillCharacter`'s tail** (`doc/CSBwin-src/Character.cpp:2670-2694`).
+   `SetHandOwner` is now moved off a dead cursor owner, because without it the whole
+   inventory stops responding. The other two outcomes of that block are still missing:
+   `d.GameIsLost = 1` when no champion is left alive, and moving `d.MagicCaster` off the
+   dead champion (`SelectMagicCaster`).
+9. ⏳ **`handChar` is not read from a real DM save game.** `SaveGameLoader.parseBlock2`
+   reads only `maxTimers` and `maxItem16`; CSBWin restores the cursor owner from
+   `gb2.handChar` (`doc/CSBwin-src/SaveGame.cpp:1636`). Our own quick-saves carry it in
+   the runtime party state, and `ensureHandOwner` repairs a state that lacks it, but the
+   GAMEBLOCK2 offset has not been established so the real field is not parsed.
 
-Status: ⏳ not started.
+Status: ⏳ not started, apart from item 8's cursor hand-off.
 
 ### Phase 14 — Structural cleanup
 

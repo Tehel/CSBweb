@@ -22,6 +22,7 @@ import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
 import { MonsterType } from './monsterTypes';
+import { setHandOwner } from './Party';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -521,6 +522,20 @@ export class MonsterAttack {
       );
       if (placed) this.hooks?.registerBones?.(bones, chIdx);
       else this.dungeon.deleteDBEntry(bones);
+    }
+
+    // `KillCharacter` ends by looking for a living party member and handing on what the
+    // dead champion held (doc/CSBwin-src/Character.cpp:2670-2694). Without this the
+    // cursor stays with a corpse and the whole inventory stops responding, because every
+    // inventory click is gated on `d.HandChar != -1`.
+    //
+    // ⚠️ Two of that block's three outcomes are still missing: `d.GameIsLost = 1` when
+    // no champion is left, and moving `d.MagicCaster` off the dead champion. Both belong
+    // to champion death proper — PLAN.md Phase 13.
+    if (chIdx === (party.cursorOwner ?? -1)) {
+      const living = party.champions.findIndex((c) => c.alive !== false);
+      if (living >= 0) setHandOwner(party, party.champions[living].partyPosition);
+      else setHandOwner(party, -1);
     }
 
     this.hooks?.onChampionDied?.(chIdx);

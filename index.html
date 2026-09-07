@@ -19,7 +19,12 @@
             color: #fff;
             display: flex;
             justify-content: center;
-            align-items: center;
+            /* Top-aligned on purpose: the debug panels beside the canvas change height as
+               the mouse moves, and a centred layout then slides the canvas up and down
+               under the pointer. That desynchronised the drawn cursor from the pixel a
+               click was mapped to, which made small targets — floor items are ~6px tall —
+               unpickable. */
+            align-items: flex-start;
             min-height: 100vh;
             padding: 20px;
         }
@@ -59,16 +64,18 @@
            in CSBWin's 4-row scrolling message area. */
         #log {
             background-color: #999;
-            max-height: 220px;
+            height: 220px;
             overflow-y: auto;
             white-space: pre-wrap;
             font-size: 11px;
             line-height: 1.25;
             padding: 2px 4px;
         }
+        /* Fixed height, not max-height: the hover report changes length on every mouse
+           move, and a panel that resizes reflows the canvas beside it. */
         #hover {
             background-color: #aaa;
-            max-height: 150px;
+            height: 150px;
             overflow-y: scroll;
         }
 

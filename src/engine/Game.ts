@@ -8,7 +8,7 @@
 import type { DungeonData, Item16Record, MissileRecord, TeleporterRecord, TimerRecord } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
-import { Party } from './Party';
+import { Party, ensureHandOwner, setHandOwner } from './Party';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
@@ -563,7 +563,14 @@ export class Game {
      */
     addChampion(champion: Champion): boolean {
         this.assignChampionFingerprint(champion);
-        return this.party.addChampion(champion);
+        if (!this.party.addChampion(champion)) return false;
+        // `if (d.NumCharacter == 1) SetHandOwner(0)` — the first champion to join the
+        // party gets the cursor (doc/CSBwin-src/Character.cpp:706-710). Every inventory
+        // click is gated on someone owning it.
+        if (this.party.state.champions.length === 1) {
+            setHandOwner(this.party.state, 0);
+        }
+        return true;
     }
 
     registerChampionBones(bones: ObjectID, champIndex: number): void {
@@ -751,6 +758,7 @@ export class Game {
      */
     setPartyState(state: PartyState): void {
         this.party.setState(state);
+        ensureHandOwner(this.party.state);
         this.state.party = this.party.state;
         for (const champ of this.party.state.champions) {
             this.assignChampionFingerprint(champ);
@@ -1767,6 +1775,10 @@ export class Game {
     // Restore runtime state from quick-save.
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         this.party.setState(save.party);
+        // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1636): the cursor
+        // owner is part of the saved state. `setState` carries it, and this repairs the
+        // states written before it was ever set.
+        ensureHandOwner(this.party.state);
         this.state.party = this.party.state;
         for (const champ of this.party.state.champions) {
             this.assignChampionFingerprint(champ);
