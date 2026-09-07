@@ -26,8 +26,8 @@ import {
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables } from './csbwin/ObjectTables';
-import { extractUITables, Rect, type UITables } from './csbwin/UITables';
-import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from './csbwin/TextRenderer';
+import { extractUITables, type UITables } from './csbwin/UITables';
+import { loadFontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   initializeFloorCeilingIndexed,
@@ -44,6 +44,13 @@ import { getOrSet, Position } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  drawAttackButtons,
+  drawAttackPanel,
+  drawSpellControls,
+  drawSpellPanel,
+  handleMagicClick,
+} from './ui/MagicPanel';
 import {
   searchButtonList,
   pointInRect,
@@ -66,7 +73,6 @@ import {
   setChampionPossession,
 } from './ui/Character';
 import {
-  getAttackClass,
   getBaseObjectNameIndex,
   isLikelyObjectRecord,
   normalizeObjectValue,
@@ -75,7 +81,6 @@ import {
 import {
   drawMessageLines,
   drawObjectIconAt,
-  drawObjectIconMask,
   shadeRectIndex,
 } from './ui/Draw';
 import { GraphicRoomType } from './bytecode/Types';
@@ -83,7 +88,6 @@ import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSys
 import {
     OBJNI_BONES_A,
     OBJNI_EMPTY_FLASK,
-    OBJNI_SPECIAL_C,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
     OBJNI_WATER,
@@ -907,10 +911,10 @@ export class ViewportRenderer {
       drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
     }
-    this.drawAttackButtons();
-    this.drawAttackPanel();
-    this.drawSpellPanel();
-    this.drawSpellControls();
+    drawAttackButtons(this.ui);
+    drawAttackPanel(this.ui);
+    drawSpellPanel(this.ui);
+    drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui);
     this.drawHoverHighlights();
@@ -1068,184 +1072,6 @@ export class ViewportRenderer {
     );
   }
 
-  private drawAttackButtons(): void {
-    if (!this.ui.screenIndexBuffer || !this.ui.partyState || !this.ui.uiTables) return;
-
-    const buttonHeightTop = 86;
-    const buttonHeightBottom = 120;
-    const word612 = this.ui.uiTables.graphic232.word612;
-
-    for (let chIdx = 0; chIdx < 4; chIdx++) {
-      const champion =
-        this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-        this.ui.partyState.champions[chIdx] ??
-        null;
-
-      const x1 = 22 * chIdx + 233;
-      const x2 = x1 + 19;
-      const alive = champion ? champion.alive !== false : false;
-      const fillColor = alive ? 4 : 0;
-
-      fillRectIndex(this.ui.screenIndexBuffer, { x1, y1: buttonHeightTop, x2, y2: buttonHeightBottom }, fillColor);
-
-      if (alive) {
-        const iconRect = { x1: x1 + 2, y1: 95, x2: x2 - 2, y2: 110 };
-        const weaponId = typeof champion?.weaponHand === 'number'
-          ? (champion.weaponHand | 0)
-          : -1;
-        let iconIndex = -1;
-        if (weaponId < 0) {
-          iconIndex = OBJNI_SPECIAL_C;
-        } else if (getAttackClass(this.ui, weaponId) !== 0) {
-          iconIndex = getBaseObjectNameIndex(this.ui, weaponId);
-        }
-        if (iconIndex >= 0) {
-          drawObjectIconMask(this.ui, iconRect, iconIndex, word612, this.ui.uiTables.graphic230.shrinkColorMap);
-        }
-      }
-    }
-  }
-
-  private drawAttackPanel(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
-    if (!this.ui.showAttackPanel) return;
-
-    fillRectIndex(this.ui.screenIndexBuffer, this.ui.uiTables.graphic232.word20, 0);
-
-    const active = this.ui.partyState.champions.find((c) => c.alive !== false);
-    if (!active) return;
-
-    const panelGraphic = this.getGraphicBitmap(10);
-    if (panelGraphic) {
-      const rect = this.ui.uiTables.graphic230.wRectPos20202;
-      tag0088b2Index(
-        panelGraphic,
-        this.ui.screenIndexBuffer,
-        {
-          x1: rect.x1,
-          y1: rect.y1,
-          x2: rect.x2,
-          y2: rect.y2,
-          srcX: 0,
-          srcY: 0,
-          srcStride: panelGraphic.width,
-          srcWidth: panelGraphic.width,
-          srcHeight: panelGraphic.height,
-        },
-        -1
-      );
-    }
-
-    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 235, 83, 0, 4, active.name);
-    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 93, 4, 0, 'ATTACK 1');
-    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 105, 4, 0, 'ATTACK 2');
-    drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, 241, 117, 4, 0, 'ATTACK 3');
-  }
-
-  private spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
-      const isCaster = chIdx === casterIdx;
-      const isAfterCaster = chIdx > casterIdx;
-      const x = base.x1 + chIdx * 14 + (isAfterCaster ? 33 : 0);
-      return {
-        x1: x,
-        x2: x + (isCaster ? 44 : 11),
-        y1: base.y1,
-        y2: base.y2 - (isCaster ? 0 : 1)
-      };
-  }
-
-  private drawSpellControls(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
-
-    const rect = this.ui.uiTables.graphic230.word20242;
-    fillRectIndex(this.ui.screenIndexBuffer, rect, 0);
-
-    for (const champion of this.ui.partyState.champions) {
-      if (!champion || !champion.alive || champion.attributes.maxMana === 0) continue;
-      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.ui.partyState.magicCasterIndex);
-      const isCaster = champion.partyPosition === this.ui.partyState.magicCasterIndex;
-      fillRectIndex(this.ui.screenIndexBuffer, rct, 4);
-      if (isCaster) drawTextLineIndex(this.ui.screenIndexBuffer, this.ui.fontData, rct.x1 + 2, rect.y2-1, 0, 4, champion.name);
-    };
-  }
-
-  private drawSpellPanel(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.partyState) return;
-
-    const rect = this.ui.uiTables.graphic232.word12;
-
-    fillRectIndex(this.ui.screenIndexBuffer, rect, 0);
-    if (this.ui.partyState.magicCasterIndex < 0) return;
-
-    let panelGraphic = this.getGraphicBitmap(9);
-    if (panelGraphic) {
-      tag0088b2Index(
-        panelGraphic,
-        this.ui.screenIndexBuffer,
-        {
-          x1: rect.x1,
-          y1: rect.y1,
-          x2: rect.x2,
-          y2: rect.y2,
-          srcX: 0,
-          srcY: 0,
-          srcStride: panelGraphic.width,
-          srcWidth: panelGraphic.width,
-          srcHeight: panelGraphic.height,
-        },
-        -1
-      );
-    }
-
-    const panelOverlay = this.getGraphicBitmap(11);
-    if (panelOverlay) {
-      tag0088b2Index(
-        panelOverlay,
-        this.ui.screenIndexBuffer,
-        {
-          x1: rect.x1,
-          y1: rect.y1,
-          x2: rect.x2,
-          y2: rect.y2,
-          srcX: 0,
-          srcY: 4,
-          srcStride: panelOverlay.width,
-          srcWidth: panelOverlay.width,
-          srcHeight: panelOverlay.height,
-        },
-        0
-      );
-    }
-
-    const caster =
-      this.ui.partyState.champions.find((c) => c.partyPosition === this.ui.partyState!.magicCasterIndex) ??
-      this.ui.partyState.champions[this.ui.partyState.magicCasterIndex];
-    if (!caster || caster.alive === false) return;
-
-    this.drawSpellMenuCharacters(caster.incantation.length);
-    this.drawMagicIncantation(caster.incantation);
-  }
-
-  private drawSpellMenuCharacters(step: number): void {
-    if (!this.ui.screenIndexBuffer || !this.ui.fontData) return;
-    const y = 58;
-    for (let i=0; i<6; i++) {
-      const x = 224 + 14 * (i + 1);
-      const ch = String.fromCharCode(96 + 6 * Math.min(step, 3) + i);
-      drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, y, 4, 0, ch);
-    }
-  }
-
-  private drawMagicIncantation(incantation: number[]): void {
-    if (!this.ui.screenIndexBuffer || !this.ui.fontData) return;
-    const y = 70;
-    for (let i=0; i<4; i++) {
-      const x = 231 + 9 * (i + 1);
-      const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]);
-      drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, y, 4, 0, ch);
-    }
-  }
-
   private handleMouseButton(id: number, x: number, y: number): void {
     // updateDebug(`handling click on ${id}`)
     if (id === 80 && this.isEyeClick(x, y)) {
@@ -1257,7 +1083,7 @@ export class ViewportRenderer {
       return;
     }
     if (id === 100) {
-      this.handleMagicClick(x, y);
+      handleMagicClick(this.ui, x, y);
       return;
     }
     if (id === 81) {
@@ -1390,25 +1216,6 @@ export class ViewportRenderer {
     const buttons = this.ui.uiTables.graphic231.buttons;
     const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
     this.ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
-  }
-
-  private handleMagicClick(clickX: number, clickY: number): void {
-    if (!this.ui.uiTables || !this.ui.partyState) return;
-
-    const rect = this.ui.uiTables.graphic230.word20242;
-    for (const champion of this.ui.partyState.champions) {
-      if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
-      const rct = this.spellControlGetRect(rect, champion.partyPosition, this.ui.partyState.magicCasterIndex);
-      if (pointInRect(clickX, clickY, rct)) {
-        this.ui.partyState.magicCasterIndex = champion.partyPosition;
-        break;
-      }
-    }
-
-    const magicButton = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
-    if (magicButton !== 0) {
-      this.applyMagicSelection(magicButton);
-    }
   }
 
   private handleClothingClick(button: number): void {
@@ -1584,82 +1391,6 @@ export class ViewportRenderer {
         dst.pixels[dstRow + dx] = pixel;
       }
     }
-  }
-
-  private applyMagicSelection(buttonId: number): void {
-    if (!this.ui.partyState || !this.ui.uiTables) return;
-    if (buttonId < 101 || buttonId > 108) return;
-
-    const casterIdx = this.ui.partyState.magicCasterIndex;
-    if (casterIdx < 0) return;
-
-    const champion = this.ui.partyState.champions.find((c) => c.partyPosition === casterIdx);
-    if (!champion || champion.alive === false) return;
-
-    // buttons: magic runes (101-106), back (107), cast (108)
-
-    // Back
-    if (buttonId === 107) {
-      if (champion.incantation.length === 0) return;
-      champion.incantation.pop();
-      return;
-    }
-
-    // Cast
-    if (buttonId === 108) {
-      if (champion.incantation.length === 0) return;
-      const totalManaCost = this.computeIncantationManaCost(
-        champion.incantation,
-        this.ui.uiTables.graphic230.spellBaseMana,
-        this.ui.uiTables.graphic230.spellFirstRuneScale,
-      );
-      const chIdx = this.ui.partyState.champions.indexOf(champion);
-      let result: number | void = undefined;
-      if (chIdx >= 0) {
-        result = this.ui.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
-      }
-      if (result !== 3) {
-        champion.incantation = [];
-      }
-      return;
-    }
-
-    // baseMana: [ 1, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 7, 9, 2, 2, 3, 4, 6, 7 ]
-    // scaleMana: [ 8, 12, 16, 20, 24, 28 ] ( = [ x1, x1.5, x2, x2.5, x3, x3.5 ])
-
-    // Add rune
-    const step = champion.incantation.length;
-    if (step > 3) return;
-
-    const runeId = buttonId - 101;
-    const baseMana = this.ui.uiTables.graphic230.spellBaseMana; // number[24]
-    const scaleMana = this.ui.uiTables.graphic230.spellFirstRuneScale; // number[6]
-
-    // compute mana cost: rune base cost * [1, 1.5, 2, 2.5, 3, 3.5][firstRune]
-    let manaCost = baseMana[step * 6 + runeId];
-    if (step > 0) manaCost = (manaCost * scaleMana[(champion.incantation[0] - 96)]) / 8;
-    if (champion.attributes.mana < manaCost) return;
-
-    // apply cost en enqueue rune
-    champion.attributes.mana -= manaCost;
-    champion.incantation.push(96 + step * 6 + runeId);
-  }
-
-  private computeIncantationManaCost(incantation: number[], baseMana: number[], scaleMana: number[]): number {
-    if (incantation.length === 0) return 0;
-    const powerIndex = Math.max(0, Math.min(5, (incantation[0] ?? 96) - 96));
-    let total = 0;
-    for (let step = 0; step < incantation.length; step++) {
-      const value = incantation[step] ?? 96;
-      const runeId = value - 96 - step * 6;
-      if (runeId < 0 || runeId > 5) continue;
-      let cost = baseMana[step * 6 + runeId] ?? 0;
-      if (step > 0) {
-        cost = Math.floor((cost * (scaleMana[powerIndex] ?? 0)) / 8);
-      }
-      total += cost;
-    }
-    return total;
   }
 
   private updateButtonLists(): void {
