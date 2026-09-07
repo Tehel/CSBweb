@@ -1,4 +1,5 @@
 import type { Champion, Skill } from './gameTypes';
+import { CsbRandom } from '../core/random';
 import {
     OBJNI_EKKHARD_CROSS,
     OBJNI_GEM_OF_AGES,
@@ -56,7 +57,8 @@ export interface AdjustSkillsContext {
   adjustSkillsParameters?: ArrayLike<number> | null;
   applyAdjustSkillsFilter?: (params: AdjustSkillsFilterParams) => AdjustSkillsFilterResult | null;
   onLevelUp?: (chIdx: number, basicSkill: number) => void;
-  rng?: () => number;
+  /** CSBWin's `d.RandomNumber` stream. See `src/core/random.ts`. */
+  random?: CsbRandom;
   getObjectNameIndex?: (objectId: number) => number | null;
 }
 
@@ -265,7 +267,7 @@ export function adjustSkills(
 
   let leveledUp = false;
   if (newMastery > oldMastery) {
-    levelUp(finalChamp, basicSkill, context.rng);
+    levelUp(finalChamp, basicSkill, context.random);
     context.onLevelUp?.(chIdx, basicSkill);
     leveledUp = true;
   }
@@ -308,7 +310,7 @@ export function addToSkill(
 
   let leveledUp = false;
   if (newMastery > oldMastery) {
-    levelUp(champ, basicSkill, context.rng);
+    levelUp(champ, basicSkill, context.random);
     context.onLevelUp?.(chIdx, basicSkill);
     leveledUp = true;
   }
@@ -316,14 +318,14 @@ export function addToSkill(
   return { chIdx, skillNumber, experienceApplied: experience, leveledUp };
 }
 
-export function levelUp(champion: Champion, basicSkill: number, rng?: () => number): void {
-  const random = rng ?? Math.random;
-  const randInt = (maxExclusive: number): number => {
-    if (maxExclusive <= 0) return 0;
-    return Math.floor(random() * maxExclusive);
-  };
-  const randBool = (): number => randInt(2);
-  const rand0_3 = (): number => randInt(4);
+export function levelUp(champion: Champion, basicSkill: number, random?: CsbRandom): void {
+  // CSBWin's `LevelUp` draws from three different generators, in a fixed order
+  // (doc/CSBwin-src/Magic.cpp:79-160). They are not interchangeable — each advances
+  // the seed once but keeps different bits — so the mapping is kept explicit here.
+  const rng = random ?? new CsbRandom();
+  const randInt = (maxExclusive: number): number => rng.below(maxExclusive); // STRandom(n)
+  const randBool = (): number => rng.bool(); // STRandomBool()
+  const rand0_3 = (): number => rng.zeroTo3(); // STRandom0_3()
 
   let newMastery = determineMastery(champion, basicSkill | 0xc000, {});
   let maxManaIncrement = newMastery;

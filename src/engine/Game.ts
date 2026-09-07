@@ -19,6 +19,19 @@ import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilte
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
+import { CsbRandom } from '../core/random';
+
+/**
+ * Champion wound sounds, in party-position order. CSBWin reaches these as sound
+ * ordinals `chIdx + 9` (doc/CSBwin-src/Monster.cpp:4584); ordinals 9-12 resolve
+ * through `graphic232.soundTable` to SND items 541-544.
+ */
+const CHAMP_WOUND_SOUNDS = [
+    SoundIndex.CHAMP_WOUND_1,
+    SoundIndex.CHAMP_WOUND_2,
+    SoundIndex.CHAMP_WOUND_3,
+    SoundIndex.CHAMP_WOUND_4,
+];
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import type { SpellDefinition } from '../data/spellTypes';
@@ -66,6 +79,15 @@ export class Game {
     private movementQueue: MovementAction[] = [];
     private readonly movementQueueLen = 3; // CSBUI.cpp keyQueueLen
     private timerQueue: TimerQueue;
+    /**
+     * The game's random stream, CSBWin's `d.RandomNumber`. Everything with a
+     * game-visible outcome draws from this one instance, in CSBWin's order, so a
+     * seeded run is reproducible and an AI trace is comparable with CSBWin's.
+     * Rendering must never draw from it — CSBWin keeps a separate `viewportRandom`
+     * precisely so drawing "doesn't upset the game"
+     * (doc/CSBwin-src/Viewport.cpp:6706).
+     */
+    private random = new CsbRandom();
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -118,12 +140,14 @@ export class Game {
             () => this.party.state,
             this.timerQueue,
             () => this.state.tickCount,
+            this.random,
             actuatorTables,
         );
         this.dsaSystem = new DsaSystem(
             this.dungeonState,
             () => this.state.tickCount,
             this.timerQueue,
+            this.random,
             () => this.party.state,
             dsaTables ?? actuatorTables,
             this.actuators,
@@ -136,6 +160,7 @@ export class Game {
             () => this.party.state,
             this.timerQueue,
             this.actuators,
+            this.random,
             timerTables,
             {
                 onDsaTimer5: (rn, timer, loc) => this.dsaSystem.processTimer5(rn, timer, loc),
@@ -432,14 +457,10 @@ export class Game {
         const next = Math.max(0, current - damage);
         target.attributes.health = next;
         if (next === 0) target.alive = false;
-        const woundSounds = [
-            SoundIndex.CHAMP_WOUND_1,
-            SoundIndex.CHAMP_WOUND_2,
-            SoundIndex.CHAMP_WOUND_3,
-            SoundIndex.CHAMP_WOUND_4,
-        ];
-        const sound = woundSounds[Math.floor(Math.random() * woundSounds.length)];
-        this.playSound?.(sound);
+        // Sound ordinal `chIdx + 9` (doc/CSBwin-src/Monster.cpp:4584), which is
+        // soundTable[9..12] = SND items 541-544. The wound sound identifies *which*
+        // champion was hurt; it was being picked at random here.
+        this.playSound?.(CHAMP_WOUND_SOUNDS[target.partyPosition & 0x3] ?? SoundIndex.CHAMP_WOUND_1);
         return true;
     }
 
@@ -914,6 +935,7 @@ export class Game {
         adjustSkills(this.party.state.champions, chIdx, skillNumber, experience, why, {
             time: this.state.tickCount,
             lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
+            random: this.random,
             experienceMultiplier,
             applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
             onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
@@ -1148,8 +1170,7 @@ export class Game {
     }
 
     private randomInt(maxExclusive: number): number {
-        if (maxExclusive <= 0) return 0;
-        return Math.floor(Math.random() * maxExclusive);
+        return this.random.below(maxExclusive);
     }
 
     private isLikelyObjectRecord(value: ObjectID): boolean {
@@ -1441,6 +1462,7 @@ export class Game {
         adjustSkills(this.party.state.champions, chIdx, 10, experience, AdjustSkillsWhy.ThrowByCharacter, {
             time: this.state.tickCount,
             lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
+            random: this.random,
             experienceMultiplier,
             applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
             onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),

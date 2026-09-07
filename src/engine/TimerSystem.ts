@@ -1,5 +1,6 @@
 import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
+import type { CsbRandom } from '../core/random';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
 import type {
@@ -149,6 +150,7 @@ export class TimerSystem {
     private getPartyState: () => PartyState,
     private timers: TimerQueue,
     private actuators: ActuatorSystem,
+    private random: CsbRandom,
     private tables?: TimerTables,
     private hooks?: TimerHooks,
   ) {
@@ -1133,13 +1135,15 @@ export class TimerSystem {
   private spawnMonsterGenerator(timer: TimerEntry, actuator: ActuatorRecord, rn: number, target: Position): void {
     let countMinus1 = getActuatorDelay(actuator);
     if ((countMinus1 & 0x8) !== 0) {
-      countMinus1 = this.randomInt(0, countMinus1 & 0x7);
+      // `STRandom(n)` yields 0..n-1 (doc/CSBwin-src/Timer.cpp:1776). This used to be
+      // an inclusive 0..n, one monster too many at the top of the range.
+      countMinus1 = this.random.below(countMinus1 & 0x7);
     } else {
       countMinus1 = (countMinus1 - 1) & 0xffff;
     }
 
     const hitPointMultiplier = getActuatorHitPointMultiplier(actuator) || 0;
-    const facing = this.randomInt(0, 3);
+    const facing = this.random.zeroTo3(); // doc/CSBwin-src/Timer.cpp:1791
     const drawAsSize4 = getActuatorDrawAsSize4(actuator);
     const normallyClosed = isActuatorNormallyClosed(actuator);
     const audible = isActuatorAudible(actuator);
@@ -1261,7 +1265,7 @@ export class TimerSystem {
     }
 
     if (singleMissile) {
-      initialPosition = (initialPosition + this.randomInt(0, 1)) & 0x3;
+      initialPosition = (initialPosition + this.random.bool()) & 0x3; // doc/CSBwin-src/Timer.cpp:1980
     }
 
     const dir = timerPos & 0x3;
@@ -2492,10 +2496,7 @@ export class TimerSystem {
     }
   }
 
-  private randomInt(min: number, max: number): number {
-    if (max <= min) return min;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
+
 }
 
 function normalizeWord6(value: number): number {

@@ -40,6 +40,7 @@ import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { CsbRandom } from '../core/random';
 import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import {
     OBJNI_NOT_AN_OBJECT,
@@ -130,6 +131,7 @@ export class ActuatorSystem {
     private getPartyState: () => PartyState,
     private timers: TimerQueue,
     private timeSource: () => number,
+    private random: CsbRandom,
     tables?: ActuatorTables,
   ) {
     this.roomTimerFunctions = tables?.roomTimerFunctions ?? null;
@@ -754,6 +756,7 @@ export class ActuatorSystem {
       time: this.timeSource(),
       lastMonsterAttackTime: party.lastMonsterAttackTime,
       experienceMultiplier,
+      random: this.random,
       applyAdjustSkillsFilter: this.adjustSkillsFilter,
       onLevelUp: (levelIdx, basicSkill) => this.queueLevelUpMessage(levelIdx, basicSkill),
     });

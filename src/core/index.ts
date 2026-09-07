@@ -7,3 +7,4 @@ export * from './constants';
 export * from './BinaryFile';
 export * from './compression';
 export * from './imageDecoder';
+export * from './random';

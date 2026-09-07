@@ -31,6 +31,7 @@ import { TimerFunction } from './TimerQueue';
 import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
+import type { CsbRandom } from '../core/random';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
 import {
@@ -396,6 +397,7 @@ export class DsaSystem {
     private dungeon: DungeonState,
     private getTime: () => number,
     private timers: TimerQueue,
+    private random: CsbRandom,
     private getPartyState?: () => PartyState,
     tables?: DsaTables,
     private actuators?: ActuatorSystem,
@@ -1467,7 +1469,9 @@ export class DsaSystem {
       case StkOp.RANDOM: {
         let v = bank.stack.pop();
         if (v === 0) v = 1;
-        const result = Math.floor(Math.random() * v);
+        // `(ui32)STRandom() % V` (doc/CSBwin-src/DSA.cpp:2729) — the full 24-bit
+        // draw modulo V, *not* `STRandom(V)`, which masks to 16 bits first.
+        const result = this.random.next() % v;
         bank.stack.push(result);
         break;
       }
@@ -2863,7 +2867,7 @@ export class DsaSystem {
       if ((m & (1 << p)) !== 0) positions.push(p as TilePosition);
     }
     if (positions.length === 0) return fallback;
-    const idx = Math.floor(Math.random() * positions.length);
+    const idx = this.random.below(positions.length); // STRandom(n), doc/CSBwin-src/DSA.cpp:2042
     return positions[idx] ?? fallback;
   }
 
