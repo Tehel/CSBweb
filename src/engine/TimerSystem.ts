@@ -72,6 +72,10 @@ export interface TimerTables {
   soundTable?: ArrayLike<SoundTableEntry>;
   /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC`. */
   doorCharacteristics?: ArrayLike<number>;
+  /** `d.MonsterDroppings[40]` — what a dying monster leaves behind. */
+  monsterDroppings?: ArrayLike<number>;
+  /** `d.Byte10340[4]` — group facing byte when no `ITEM16` is attached. */
+  facingReplication?: ArrayLike<number>;
 }
 
 export interface LocationRel {
@@ -2036,6 +2040,15 @@ export class TimerSystem {
 
     this.processObjectFromMissile(missileRn, dest, position, objectPos);
     return true;
+  }
+
+  /**
+   * Public entry to `CreateCloud` for the monster death cloud
+   * (`doc/CSBwin-src/Code11f52.cpp:1376`, called from `DamageMonster`). The cloud
+   * machinery lives here because that is where every other cloud is made.
+   */
+  createDeathCloud(projectile: number, size: number, position: Position, posInCell: number): void {
+    this.createCloud(projectile, size, position.x, position.y, position, posInCell);
   }
 
   private createCloud(

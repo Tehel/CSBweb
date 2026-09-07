@@ -207,6 +207,16 @@ export class MonsterSystem {
     slot.word0 = ITEM16_FREE;
   }
 
+  /**
+   * `d.ITEM16QueLen--` for a slot freed elsewhere.
+   *
+   * `DeleteMonster` (in `MonsterDamage`) releases a slot directly, and the count is
+   * owned here, so it tells us rather than reaching into this object's state.
+   */
+  noteItem16Freed(): void {
+    if (this.item16QueLen > 0) this.item16QueLen--;
+  }
+
   /** `TAG00bd40` (`doc/CSBwin-src/CSBCode.cpp:6141`) — detach every active group. */
   detachAllItem16(): void {
     const pool = this.pool;

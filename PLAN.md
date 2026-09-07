@@ -682,14 +682,14 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    the remaining work is *not* "step 3 then step 4" — it is:
 
    1. `MoveObject` for monsters (step 2's remaining item: teleporter/stairs/pit).
-   2. `DamageMonster` (part of step 4).
+   2. ✅ `DamageMonster` — **done**, see step 4 below.
    3. `InitialChecks`, which both of the above gate.
    4. `ProcessTimers29to41`'s main body (~1220 lines) plus the `Try_*` /
       `Standard_Finish` / `Process_Invincible` helper chain (~800 lines).
    5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
 
-   Nothing in 3-5 is worth starting before 1 and 2, since each would have to be
-   written against a stub and revisited.
+   Nothing in 3-5 is worth starting before 1, since each would have to be written
+   against a stub and revisited.
 
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
@@ -697,8 +697,39 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    north is correctly blind to a party to its south while smelling it in the right
    direction; and across all 22 groups no monster ever reports a legal move into
    stone. Eleven new entries in `doc/PROVEN_FACTS.md`.
-4. **Attack resolution.** Port `Attack.cpp`: hit determination, damage, wounds, armour,
-   `PossibleAttackTypes`, and champion↔monster hooks into `AdjustSkills`.
+4. 🔄 **Attack resolution.**
+   - ✅ **`DamageMonster`** (`src/engine/MonsterDamage.ts`) with `DeleteMonster`,
+     `DropMonsterRemains`, `CreateAndDropObject` and the four packed-byte accessors
+     `MonsterPositionByte` / `SetMonsterPositionByte` / `MonsterFacingByte` /
+     `SetMonsterFacingByte`. This was done ahead of the rest of the phase because it
+     is both a hard prerequisite for `InitialChecks` and the one piece that retires a
+     stub already live in the shipping path.
+   - ✅ **`Game.applyMissileDamageToMonster` retired.** The missile system now goes
+     through the real `DamageMonster`, so a hit produces the death cloud, the
+     droppings, the dropped possessions, the survivors' fear reaction and the
+     per-member timer renumbering — none of which the 35-line stand-in did.
+   - ✅ **`TimerQueue.reprioritizeTimer`** added, mirroring CSBWin's
+     `AdjustTimerPriority` (`Code11f52.cpp:1194`): the function code is part of the
+     queue's sort key, so renumbering a per-member timer has to re-sort it.
+   - ✅ **`Byte10340[4]` and `MonsterDroppings[40]`** extracted from graphic `0x22f`.
+   - ⏳ Still to do: `Attack.cpp` proper — hit determination, damage, wounds, armour,
+     `PossibleAttackTypes`, and the champion↔monster `AdjustSkills` hooks.
+
+   ⚠️ **One divergence, deliberate:** `CreateAndDropObject` appends new weapon /
+   clothing / misc records rather than reusing a freed slot as CSBWin's
+   `FindEmptyDB5Entry` does. This matches what `Game.createMiscObject` and
+   `DsaSystem`'s object copy already do; it is invisible in play but drifts object
+   indices from CSBWin's, which matters only for Phase 10's binary-compatible saves.
+
+   Verified with `tools/dump-monster-damage.ts` (new), four cases on the real
+   dungeon: killing member 1 of a 4-strong Screamer group compacts HP
+   `[100,110,120,130]` → `[100,120,130]` and status `[a0,a1,a2,a3]` → `[a0,a2,a3]`
+   while its per-member timers go `[0,1,2,3]` → `[0,1,2]` and the group timer is left
+   alone; the same group outside fear state 6 has its timers correctly untouched;
+   killing a lone Mummy frees the `ITEM16`, clears the AI timers, removes it from the
+   cell and makes exactly one death cloud; and a Screamer's remains come back as
+   `misc` type 33, `misc_ScreamerSlice`, which confirms the `MonsterDroppings`
+   range-split arithmetic. Seven new entries in `doc/PROVEN_FACTS.md`.
 5. **Creature generators.** Port actuator type 6 generator behaviour and
    `TT_REACTIVATE_GENERATOR` (the timer type is already defined).
 6. **Retire the proxies** listed above and delete the renderer-side attack trigger.

@@ -182,6 +182,26 @@ export class TimerQueue {
     entry.timerWord8 = value & 0xffff;
   }
 
+  /**
+   * `TIMER_SEARCH::AdjustTimerPriority` (`doc/CSBwin-src/Code11f52.cpp:1194`).
+   *
+   * Re-sort one timer in place after its sort key changed. The function code is part
+   * of the ordering (see `compareTimers`), so renumbering a monster's per-member AI
+   * timer moves it in the queue — CSBWin adjusts the position rather than removing
+   * and re-inserting, and this does the same so that the duplicate-timer rules and
+   * the entry's `sequence` are both left alone.
+   */
+  reprioritizeTimer(index: number): void {
+    const entry = this.indexMap.get(index);
+    if (!entry) return;
+    const at = this.queue.indexOf(entry);
+    if (at < 0) return;
+    this.queue.splice(at, 1);
+    const insertAt = this.queue.findIndex((existing) => compareTimers(entry, existing) < 0);
+    if (insertAt === -1) this.queue.push(entry);
+    else this.queue.splice(insertAt, 0, entry);
+  }
+
   deleteTimer(index: number): void {
     const entry = this.indexMap.get(index);
     if (!entry) return;

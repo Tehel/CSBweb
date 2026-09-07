@@ -558,3 +558,82 @@ if (D6W != 0)
 `D7W` is `smellingDistance()`, so the threshold `30 - 2 * smell` *falls* as the nose improves.
 Note the index skew, which is CSBWin's and not a transcription slip: the age is read at
 `D6W - 1` but the followed print at `D6W` (`doc/CSBwin-src/Monster.cpp:624-625`).
+
+## `DamageMonster` renumbers per-member timers only in fear state 6
+
+`doc/CSBwin-src/Code11f52.cpp:1147` gates the entire timer-renumbering block — and the
+survivors' bravery check with it — on the group's fear state:
+
+```cpp
+if (pMonster->fear() == StateOfFear6)
+{
+  TIMER_SEARCH timerSearch;
+  while (timerSearch.FindNextTimer())
+  { ... delete or renumber the per-member timer ... };
+  if (onPartyLevel)
+  { ... maybe drop to StateOfFear5 ... };
+};
+```
+
+This looks like an omission until you find where per-member timers come from:
+`MaybeDelTimers_Fear6_TurnIndividuals` (`doc/CSBwin-src/Monster.cpp:1436`) sets fear to 6 and
+*then* creates a `TT_MONSTER_B<n>` per member. Outside state 6 a group has only its group
+timer, so there is nothing per-member to renumber.
+
+## The group timer survives `DamageMonster`'s renumbering by arithmetic, not by a test
+
+The scan range is `TT_MONSTER_A0` (33) to `TT_MONSTER_B3` (41), which **includes**
+`TT_MONSTER_Bgroup` (37). CSBWin does not exclude it explicitly; instead
+
+```cpp
+d4Index = tt - TT_MONSTER_B0;// -= 38;
+```
+
+yields `-1` for the group timer, which matches neither `d4Index == indexInGroup` nor
+`d4Index > indexInGroup`, so it falls through untouched
+(`doc/CSBwin-src/Code11f52.cpp:1155-1163`). Note the asymmetry: `TT_MONSTER_Agroup` (32) is
+below the range and excluded outright.
+
+## A dying group member is compacted over, not blanked
+
+`doc/CSBwin-src/Code11f52.cpp:1217-1232` shifts every survivor above the dead member down one
+slot, moving **five parallel things** together: `hitPoints6[]`, the packed position byte, the
+packed facing byte, `singleMonsterStatus[]`, and (per the entry above) the queued per-member
+AI timers. Only then does `numMonM1` decrement. The position byte is masked to `0x3f` before
+being written back, discarding the now-vacated top field.
+
+The consequence for callers: live members are always packed into the low indices, so "the
+first member with hit points" is a valid way to pick a target.
+
+## `MonsterDroppings` words are split by range, not by a type field
+
+`doc/CSBwin-src/Code11f52.cpp:735-753`. Bit 15 of a word means "drop only on a coin toss";
+the low 15 bits are then classified by magnitude:
+
+- `>= 127` → misc, minus 127
+- `>= 69` → clothing, minus 69
+- `>= 23` → weapon, minus 23
+- below 23 → skipped entirely
+
+Verified against the shipped data: `mon_Screamer`'s list at `MonsterDroppings[15]` yields
+`misc` type 33, which is `misc_ScreamerSlice` (`doc/CSBwin-src/Objects.h:220`).
+
+Only `mon_DethKnight` sets the cursed flag on its droppings
+(`doc/CSBwin-src/Code11f52.cpp:712`), and a monster type absent from the switch drops nothing
+at all via its `default: return`.
+
+## `Byte10340[4]` is the group facing byte for an unattached monster
+
+The first four bytes of `graphics.dat` item `0x22f` are `0x00 0x55 0xaa 0xff` — each a
+direction replicated into all four 2-bit fields. `MonsterFacingByte` returns
+`d.Byte10340[pDB4->facing()]` when the group has no `ITEM16`
+(`doc/CSBwin-src/Code11f52.cpp:229`), because such a group faces one way as a whole rather
+than per member.
+
+## `DamageMonster`'s `P6` parameter defers the droppings rather than suppressing them
+
+With `P6 == 0` the group is not removed and `CreateAndDropObject` is not called; instead the
+dead member's position is pushed onto `d.Byte13050[d.Word13046++]`
+(`doc/CSBwin-src/Code11f52.cpp:762`) and `TAG00b522` (`:802`) drops them once the monster has
+finished moving. This is how a monster killed mid-move leaves its remains at the destination
+rather than the origin.

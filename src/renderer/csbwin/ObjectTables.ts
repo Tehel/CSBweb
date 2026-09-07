@@ -143,6 +143,13 @@ export interface ObjectTables {
   doorCharacteristics: Int16Array;
   /** `d.MonsterDroppings[40]` (doc/CSBwin-src/Data.h:1074). */
   monsterDroppings: Int16Array;
+  /**
+   * `d.Byte10340[4]` (doc/CSBwin-src/Data.h:1069) — the first four bytes of graphic
+   * `0x22f`, holding `0x00 0x55 0xaa 0xff`. Each entry is a facing replicated into
+   * all four 2-bit fields, used as the facing byte for a group that has no `ITEM16`
+   * and therefore faces one way as a whole (doc/CSBwin-src/Code11f52.cpp:229).
+   */
+  facingReplication: Uint8Array;
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
   smallOffsetIndices: Uint8Array; // d.smallOffsetIndicies[16][2] packed row-major
   smallOffsets: Int8Array; // d.smallOffsets[24]
@@ -779,6 +786,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const monsterDesc = readMonsterDesc22f(raw22f);
   const doorCharacteristics = readDoorCharacteristics22f(raw22f);
   const monsterDroppings = readMonsterDroppings22f(raw22f);
+  // Byte10340[4] is at the very start of the graphic (ABS_22F_START itself).
+  const facingReplication = raw22f.slice(0, 4);
   const monsterAttackSounds = readMonsterAttackSounds22f(raw22f);
   const smallOffsetIndices = raw22e.slice(smallOffsetIndicesOffset, smallOffsetIndicesOffset + 16 * 2);
   const smallOffsets = Int8Array.from(
@@ -866,6 +875,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     monsterDesc,
     doorCharacteristics,
     monsterDroppings,
+    facingReplication,
     monsterGraphics,
     monsterAttackSounds,
     missileGraphics,

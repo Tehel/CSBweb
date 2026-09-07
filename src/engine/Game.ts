@@ -19,6 +19,7 @@ import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import { SoundQueue } from './SoundQueue';
 import { PartyFootprints } from './PartyFootprints';
 import { MonsterPerception } from './MonsterPerception';
+import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -107,6 +108,11 @@ export class Game {
      * both drive it directly.
      */
     readonly monsterPerception: MonsterPerception;
+    /**
+     * `DamageMonster` and friends. Public because the missile system, the monster AI
+     * and (later) champion melee all reach it, and `tools/` drives it directly.
+     */
+    readonly monsterDamage: MonsterDamage;
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -216,6 +222,25 @@ export class Game {
                 ...monsterHooks,
             },
         );
+        this.monsterDamage = new MonsterDamage(
+            this.dungeonState,
+            () => this.party.state.position.z,
+            this.timerQueue,
+            this.random,
+            {
+                monsterDesc: timerTables?.monsterDesc,
+                monsterDroppings: timerTables?.monsterDroppings,
+                facingReplication: timerTables?.facingReplication,
+            },
+            {
+                queueSound: (ordinal, mapX, mapY, deltaTime) =>
+                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                createCloud: (projectile, size, position, posInCell) =>
+                    this.timerSystem.createDeathCloud(projectile, size, position, posInCell),
+                trace: monsterHooks?.trace,
+            },
+        );
+        this.monsterDamage.onItem16Freed = () => this.monsterSystem.noteItem16Freed();
         this.monsterPerception = new MonsterPerception(
             this.dungeonState,
             () => this.party.state.position.z,
@@ -520,6 +545,17 @@ export class Game {
         return true;
     }
 
+    /**
+     * A missile hit a monster. Now routed through the real `DamageMonster`
+     * (`doc/CSBwin-src/Code11f52.cpp:1054`) instead of the stand-in that used to live
+     * here — so a hit now produces the death cloud, the droppings, the dropped
+     * possessions, the survivors' fear reaction and the per-member timer
+     * renumbering, none of which the stand-in did.
+     *
+     * The damaged member is the first with hit points left, which is what the
+     * compaction in `DamageMonster` maintains: survivors are always packed down to
+     * the low indices.
+     */
     private applyMissileDamageToMonster(options: {
         damage: number;
         monster: number;
@@ -532,7 +568,7 @@ export class Game {
 
         const hp = record.hp ?? [];
         let targetIndex = -1;
-        for (let i = 0; i < hp.length; i++) {
+        for (let i = 0; i <= (record.numMonM1 & 0x3); i++) {
             if ((hp[i] ?? 0) > 0) {
                 targetIndex = i;
                 break;
@@ -540,22 +576,18 @@ export class Game {
         }
         if (targetIndex === -1) return false;
 
-        const current = hp[targetIndex] ?? 0;
-        const next = Math.max(0, current - damage);
-        hp[targetIndex] = next;
-
-        let aliveCount = 0;
-        for (const value of hp) {
-            if ((value ?? 0) > 0) aliveCount++;
-        }
-        record.numMonM1 = Math.max(0, aliveCount - 1);
-        if (aliveCount === 0) {
-            const monsterRn = options.monster as ObjectID;
-            this.dungeonState.removeObjectFromCell(options.position, monsterRn);
-            this.dungeonState.deleteDBEntry(monsterRn);
-        }
-
-        return true;
+        const position = options.position;
+        const result = this.monsterDamage.damageMonster(
+            record,
+            targetIndex,
+            position.z,
+            position.x,
+            position.y,
+            damage,
+            true,
+            this.dungeonState.getAttachedItem16(record) === null,
+        );
+        return result !== MonsterDamageResult.NO_MONSTER_DIED || damage > 0;
     }
 
     /**

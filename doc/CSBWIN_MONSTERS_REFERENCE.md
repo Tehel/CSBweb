@@ -225,6 +225,32 @@ The footprint trail that feeds smelling is `src/engine/PartyFootprints.ts` — s
 two `PROVEN_FACTS.md` entries on `AddFootprintEntry`, which CSBWin's own author
 describes as broken but which is the only writer of the age bytes smelling reads.
 
+## Damage and death
+
+Ported in `src/engine/MonsterDamage.ts`. `DamageMonster`
+(`doc/CSBwin-src/Code11f52.cpp:1054`) returns one of three results —
+`NO_MONSTER_DIED`, `SOME_NOT_ALL_MONSTERS_DIED`, `ALL_MONSTERS_DIED`
+(`doc/CSBwin-src/CSB.h:2928`) — and has four callers: the missile system, the AI gate
+`InitialChecks`, champion melee (`Attack.cpp:503`) and cloud damage
+(`Timer.cpp:524`).
+
+Two early exits take no damage at all: an `invincible()` monster type, and a member
+whose hit points are exactly `0xffff`. A member dies when `hp <= damage`; below that,
+the write-back only happens for strictly positive damage, so a zero-damage call is a
+pure liveness probe — which is precisely how `InitialChecks` uses it.
+
+The whole-group death path drops remains, deletes the monster and frees its `ITEM16`.
+The single-member path is the subtle one: survivors are compacted down over the dead
+member across five parallel structures at once. See `doc/PROVEN_FACTS.md` for that,
+for the fear-state-6 gate on timer renumbering, for how the group timer survives the
+renumbering by arithmetic rather than by an explicit test, and for the range-split
+encoding of `MonsterDroppings`.
+
+`DropMonsterRemains` (`:830`) takes an explicit `monsterAttachedToLevel` because of a
+bug CSBWin fixed: a monster teleported onto a level its type is not allowed on dies
+*there*, so `d.LoadedLevel` is the destination and reading the position byte with it
+would consult an `ITEM16` belonging to a different level.
+
 ## Attack tables
 
 Everything the champion attack pipeline needs is in `graphics.dat` item `0x230`,
