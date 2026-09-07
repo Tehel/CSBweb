@@ -9,7 +9,7 @@
  */
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
-import type { Champion, PartyState } from '../engine/gameTypes';
+import type { PartyState } from '../engine/gameTypes';
 import type { CreatureRecord, MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { DrawViewport } from './DrawViewport';
@@ -41,57 +41,46 @@ import {
   VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
 import {
-  drawMouthChewAnimation,
+  drawInventoryBackground,
+  drawInventoryScreen,
+  getActiveChestView,
+  getEyeRect,
+  syncOpenChest,
+} from './ui/Inventory';
+import {
   handleMouthPress,
 } from './ui/Feeding';
 import {
   canPlaceInSlot,
-  drawAttributePanel,
-  drawFoodWaterPanel,
   drawHeldObjectName,
   drawPartyStatus,
-  drawVitalsAndLoad,
   getChampionPossession,
-  getInventoryItemIndex,
   setChampionPossession,
 } from './ui/Character';
 import {
-  applyViewingFilter,
-  drawItemDescriptionLine,
   getAttackClass,
   getBaseObjectNameIndex,
-  getInventoryPlaceholderIndex,
-  getObjectDescriptionLines,
-  getObjectDisplayName,
-  isChestRecord,
   isLikelyObjectRecord,
   normalizeObjectValue,
   resolveObjectNameIndex,
 } from './ui/Objects';
 import {
-  blitBasicGraphicToViewport,
   drawMessageLines,
-  drawObjectIcon,
   drawObjectIconAt,
   drawObjectIconMask,
-  drawWoundedOutline,
   pointInRect,
   shadeRectIndex,
 } from './ui/Draw';
 import { GraphicRoomType } from './bytecode/Types';
-import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 import {
     OBJNI_BONES_A,
     OBJNI_EMPTY_FLASK,
-    OBJNI_OPEN_CHEST,
     OBJNI_SPECIAL_C,
-    OBJNI_SPECIAL_D,
-    OBJNI_SPECIAL_E,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
     OBJNI_WATER,
@@ -103,9 +92,6 @@ type ViewportCursorAction =
   | { kind: 'throw'; side: 0 | 1 }
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
-type ChestViewSource =
-  | { id: ObjectID; source: 'cursor' }
-  | { id: ObjectID; source: 'hand'; slot: number };
 
 export { UIMode } from './ui/UIState';
 
@@ -123,9 +109,7 @@ export interface FloorCeiling {
   mirrored: Uint8Array;
 }
 
-const MAX_LINES_IN_SCROLL = 9;
 const POTION_WATER_FLASK = 15;
-const MAX_SCROLL_LINE_LENGTH = 16;
 
 /**
  * Main ViewportRenderer class
@@ -908,16 +892,16 @@ export class ViewportRenderer {
     this.drawStaticUIFrame();
     const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
     if (!inventoryOpen) {
-      this.syncOpenChest(null);
+      syncOpenChest(this.ui, null);
     }
     if (inventoryOpen) {
-      this.drawInventoryBackground();
+      drawInventoryBackground(this.ui);
     } else {
       this.blitViewportToScreen();
     }
     drawPartyStatus(this.ui);
     if (inventoryOpen) {
-      this.drawInventoryScreen();
+      drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
     }
     this.drawAttackButtons();
@@ -1079,430 +1063,6 @@ export class ViewportRenderer {
       },
       -1
     );
-  }
-
-  private drawInventoryBackground(): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const bg = this.getGraphicBitmap(17);
-    if (!bg) return;
-    tag0088b2Index(
-      bg,
-      this.ui.screenIndexBuffer,
-      {
-        x1: VIEWPORT_X,
-        y1: VIEWPORT_Y,
-        x2: VIEWPORT_X + bg.width - 1,
-        y2: VIEWPORT_Y + bg.height - 1,
-        srcX: 0,
-        srcY: 0,
-        srcStride: bg.width,
-        srcWidth: bg.width,
-        srcHeight: bg.height,
-      },
-      -1
-    );
-  }
-
-  private drawObjectInfoPanel(objectId: ObjectID): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.objectTables) return;
-    if (decodeObjectID(objectId).category === DBType.SCROLL) {
-      this.drawScrollPanel(objectId);
-      return;
-    }
-    const g232 = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 20, g232.wRectPos926, 144, 8);
-    blitBasicGraphicToViewport(this.ui, 29, g232.wRectPos942, 32, 12);
-
-    const objectNameIndex = resolveObjectNameIndex(this.ui, objectId | 0);
-    if (objectNameIndex >= 0) {
-      const iconRect = {
-        x1: VIEWPORT_X + 111,
-        y1: VIEWPORT_Y + 59,
-        x2: VIEWPORT_X + 126,
-        y2: VIEWPORT_Y + 74,
-      };
-      drawObjectIcon(this.ui, iconRect, objectNameIndex, g232.word612);
-      const name = getObjectDisplayName(this.ui, objectId, objectNameIndex);
-      if (name) {
-        drawTextLineIndex(
-          this.ui.screenIndexBuffer,
-          this.ui.fontData,
-          VIEWPORT_X + 133,
-          VIEWPORT_Y + 68,
-          13,
-          null,
-          name
-        );
-      }
-    }
-
-    const lines = getObjectDescriptionLines(this.ui, objectId, objectNameIndex);
-    const textState = { x: VIEWPORT_X + 108, y: VIEWPORT_Y + 87 };
-    for (const line of lines) {
-      drawItemDescriptionLine(this.ui, line.text, line.color, textState);
-    }
-    this.drawInspectArrow(this.ui.pressingEye);
-  }
-
-  private drawScrollPanel(objectId: ObjectID): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData || !this.ui.objectTables) return;
-    let scrollId = objectId;
-    const filter = applyViewingFilter(this.ui, objectId, 0);
-    if (filter) {
-      const candidate = filter.objectId | 0;
-      if (candidate >= 0 && isLikelyObjectRecord(this.ui, candidate)) {
-        const decoded = decodeObjectID(candidate as ObjectID);
-        if (decoded.category === DBType.SCROLL) scrollId = candidate as ObjectID;
-      }
-    }
-
-    const scroll = this.ui.dungeonState.getScrollRecord(scrollId);
-    if (!scroll) return;
-    const textTables: TextDecodeTables = {
-      escape1: this.ui.objectTables.textEscape1,
-      escape2Wall: this.ui.objectTables.textEscape2Wall,
-      escape2Other: this.ui.objectTables.textEscape2Other,
-    };
-    const text = this.ui.dungeonState.decodeScrollText(scroll, textTables) ?? '';
-
-    const g232 = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 23, g232.wRectPos926, 144, 8);
-
-    const { lines, startY } = this.splitScrollLines(text);
-    let y = startY;
-    for (const line of lines) {
-      this.drawScrollLine(y, line);
-      y += 7;
-    }
-    this.drawInspectArrow(this.ui.pressingEye);
-  }
-
-  private splitScrollLines(text: string): { lines: string[]; startY: number } {
-    const bytes: number[] = [];
-    for (let i = 0; i < text.length; i++) bytes.push(text.charCodeAt(i) & 0xff);
-    bytes.push(0, 0);
-
-    let cursor = 0;
-    while (bytes[cursor] !== 0 && bytes[cursor] !== 10) cursor++;
-    const firstLine = this.bytesToString(bytes, 0, cursor);
-    bytes[cursor] = 0;
-    cursor++;
-
-    let numLines = 1;
-    let scan = cursor;
-    while (bytes[scan] !== 0) {
-      if (bytes[scan] === 10) numLines++;
-      scan++;
-    }
-
-    const lastIndex = scan - 1;
-    if (lastIndex >= 0) {
-      if (bytes[lastIndex] !== 10) {
-        numLines++;
-      } else if (lastIndex - 1 >= 0 && bytes[lastIndex - 1] === 10) {
-        numLines--;
-      }
-    }
-
-    if (numLines > MAX_LINES_IN_SCROLL) numLines = MAX_LINES_IN_SCROLL;
-    const startY = 92 - Math.floor((7 * numLines) / 2);
-
-    const lines: string[] = [];
-    lines.push(firstLine);
-    numLines -= 1;
-    if (numLines <= 0) return { lines, startY };
-
-    let lineStart = cursor;
-    for (let remaining = numLines; remaining > 0; remaining--) {
-      while (bytes[cursor] !== 0 && bytes[cursor] !== 10) cursor++;
-      if (bytes[cursor] === 0) {
-        bytes[cursor + 1] = 0;
-      }
-      bytes[cursor] = 0;
-      lines.push(this.bytesToString(bytes, lineStart, cursor));
-      cursor++;
-      lineStart = cursor;
-    }
-
-    return { lines, startY };
-  }
-
-  private bytesToString(bytes: number[], start: number, end: number): string {
-    let out = '';
-    for (let i = start; i < end; i++) {
-      out += String.fromCharCode(bytes[i] ?? 0);
-    }
-    return out;
-  }
-
-  private drawScrollLine(y: number, text: string): void {
-    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
-    const line = text.length > MAX_SCROLL_LINE_LENGTH ? text.slice(0, MAX_SCROLL_LINE_LENGTH) : text;
-    const encoded = this.encodeScrollFontText(line);
-    const x = VIEWPORT_X + 162 - Math.floor((line.length * 6) / 2);
-    drawTextLineIndexRaw(this.ui.screenIndexBuffer, this.ui.fontData, x, VIEWPORT_Y + y, 0, 15, encoded);
-  }
-
-  private encodeScrollFontText(text: string): string {
-    const out: number[] = [];
-    for (let i = 0; i < text.length; i++) {
-      let code = text.charCodeAt(i) & 0xff;
-      if (code >= 65 && code <= 90) {
-        code -= 64;
-      } else if (code >= 0x7b) {
-        code -= 0x60;
-      }
-      out.push(code);
-    }
-    return String.fromCharCode(...out);
-  }
-
-  private drawEyeIcon(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const word612 = this.ui.uiTables.graphic232.word612;
-    const icon = this.ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
-    const rect = this.getEyeRect();
-    if (!rect) return;
-    drawObjectIcon(this.ui, rect, icon, word612);
-  }
-
-  private getEyeRect(): Rect | null {
-    if (!this.ui.uiTables) return null;
-    const rect = this.ui.uiTables.graphic232.word1406;
-    return {
-      x1: rect.x1 + VIEWPORT_X + 1,
-      y1: rect.y1 + VIEWPORT_Y + 1,
-      x2: rect.x2 + VIEWPORT_X - 1,
-      y2: rect.y2 + VIEWPORT_Y - 1,
-    };
-  }
-
-  private drawInventoryScreen(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.partyState) return;
-    const selected = this.ui.partyState.selectedCharacterIndex | 0;
-    if (selected < 0) return;
-
-    const champion =
-      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.ui.partyState.champions[selected] ??
-      null;
-    if (!champion || champion.alive === false) return;
-
-    const iconSlots = this.ui.uiTables.graphic232.iconDisplay;
-    const word612 = this.ui.uiTables.graphic232.word612;
-    const chestView = this.getActiveChestView(champion);
-    this.syncOpenChest(chestView);
-
-    if (this.ui.fontData) {
-      const nameColor = this.ui.partyState.cursorOwner === selected ? 9 : 13;
-      const nameBaseX = VIEWPORT_X + 2;
-      drawTextLineIndex(
-        this.ui.screenIndexBuffer,
-        this.ui.fontData,
-        nameBaseX,
-        VIEWPORT_Y + 7,
-        nameColor,
-        12,
-        champion.name
-      );
-      const title = champion.title ?? '';
-      if (title.length > 0) {
-        let titleX = nameBaseX + champion.name.length * 6;
-        const firstChar = title.charCodeAt(0);
-        if (firstChar !== 44 && firstChar !== 59 && firstChar !== 45) {
-          titleX += 6;
-        }
-        drawTextLineIndex(
-          this.ui.screenIndexBuffer,
-          this.ui.fontData,
-          titleX,
-          VIEWPORT_Y + 7,
-          nameColor,
-          12,
-          title
-        );
-      }
-    }
-
-    for (let slot = 0; slot < 30; slot++) {
-      let objectIndex = getInventoryItemIndex(this.ui, champion, slot);
-      if (chestView?.source === 'hand' && chestView.slot === slot) {
-        objectIndex = this.getOpenChestIconIndex();
-      }
-      const rect = this.getInventorySlotRect(iconSlots, slot);
-      if (!rect) continue;
-      const wounds = champion.wounds ?? 0;
-      if (slot <= 5 && (wounds & (1 << slot)) !== 0) {
-        drawWoundedOutline(this.ui, rect);
-      }
-      if (objectIndex >= 0) {
-        drawObjectIcon(this.ui, rect, objectIndex, word612);
-        continue;
-      }
-      const placeholder = getInventoryPlaceholderIndex(champion, slot);
-      if (placeholder >= 0) {
-        drawObjectIcon(this.ui, rect, placeholder, word612);
-      }
-    }
-
-    if (chestView) {
-      this.drawChestPanel(chestView);
-    } else if (this.ui.pressingEye) {
-      const cursorObject = normalizeObjectValue(this.ui.partyState?.objectInHand);
-      if (cursorObject !== null) {
-        this.drawObjectInfoPanel(cursorObject);
-      } else {
-        drawAttributePanel(this.ui, champion);
-      }
-    } else {
-      drawFoodWaterPanel(this.ui, champion);
-    }
-    drawMouthChewAnimation(this.ui);
-    this.drawEyeIcon();
-    drawVitalsAndLoad(this.ui, champion);
-  }
-
-  private getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
-    const icon = iconSlots[8 + slot];
-    if (!icon) return null;
-    return {
-      x1: icon.pixelX + VIEWPORT_X,
-      y1: icon.pixelY + VIEWPORT_Y,
-      x2: icon.pixelX + VIEWPORT_X + 15,
-      y2: icon.pixelY + VIEWPORT_Y + 15,
-    };
-  }
-
-  private getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
-    const icon = iconSlots[38 + slot];
-    if (!icon) return null;
-    return {
-      x1: icon.pixelX + VIEWPORT_X,
-      y1: icon.pixelY + VIEWPORT_Y,
-      x2: icon.pixelX + VIEWPORT_X + 15,
-      y2: icon.pixelY + VIEWPORT_Y + 15,
-    };
-  }
-
-  private getOpenChestIconIndex(): number {
-    if (this.ui.openChestIconIndex !== null) return this.ui.openChestIconIndex;
-    const names = this.ui.objectTables?.objectNames ?? [];
-    for (let i = 0; i < names.length; i++) {
-      const name = (names[i] ?? '').trim().toUpperCase();
-      if (name === 'OPEN CHEST') {
-        this.ui.openChestIconIndex = i;
-        return i;
-      }
-    }
-    this.ui.openChestIconIndex = OBJNI_OPEN_CHEST;
-    return this.ui.openChestIconIndex;
-  }
-
-  private getActiveChestView(champion: Champion): ChestViewSource | null {
-    if (!this.ui.partyState) return null;
-
-    const cursorObject = normalizeObjectValue(this.ui.partyState.objectInHand);
-    if (this.ui.pressingEye && isChestRecord(this.ui, cursorObject)) {
-      return { id: cursorObject as ObjectID, source: 'cursor' };
-    }
-
-    if (this.ui.pressingEye) return null;
-    const handSlot = 1; // CSBWin uses weapon hand for chest display.
-    const handObject = normalizeObjectValue(getChampionPossession(champion, handSlot));
-    if (isChestRecord(this.ui, handObject)) {
-      return { id: handObject as ObjectID, source: 'hand', slot: handSlot };
-    }
-    return null;
-  }
-
-  private syncOpenChest(chestView: ChestViewSource | null): void {
-    if (!chestView) {
-      if (this.ui.openChestId !== null) {
-        this.repackOpenChest();
-      }
-      return;
-    }
-
-    if (this.ui.openChestId !== null && this.ui.openChestId === chestView.id) return;
-    if (this.ui.openChestId !== null) this.repackOpenChest();
-    this.openChest(chestView.id);
-  }
-
-  private openChest(chestId: ObjectID): void {
-    const chest = this.ui.dungeonState.getContainerRecord(chestId);
-    if (!chest) {
-      this.ui.openChestId = null;
-      this.ui.openChestContents = Array(8).fill(null);
-      return;
-    }
-
-    this.ui.openChestId = chestId;
-    const contents: Array<ObjectID | null> = Array(8).fill(null);
-    let cursor = chest.containedObject;
-    let index = 0;
-    while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
-      contents[index++] = cursor;
-      cursor = this.ui.dungeonState.getDBRecordLink(cursor);
-    }
-    this.ui.openChestContents = contents;
-
-    for (const item of contents) {
-      if (item !== null) {
-        this.ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
-      }
-    }
-    chest.containedObject = OBJECT_ID_EOF;
-  }
-
-  private repackOpenChest(): void {
-    if (this.ui.openChestId === null) return;
-    const chest = this.ui.dungeonState.getContainerRecord(this.ui.openChestId);
-    if (!chest) {
-      this.ui.openChestId = null;
-      this.ui.openChestContents = Array(8).fill(null);
-      return;
-    }
-
-    chest.containedObject = OBJECT_ID_EOF;
-    let previous: ObjectID | null = null;
-    for (const item of this.ui.openChestContents) {
-      if (item === null) continue;
-      this.ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
-      if (previous === null) {
-        chest.containedObject = item;
-      } else {
-        this.ui.dungeonState.setDBRecordLink(previous, item);
-      }
-      previous = item;
-    }
-
-    this.ui.openChestId = null;
-    this.ui.openChestContents = Array(8).fill(null);
-  }
-
-  private drawChestPanel(chestView: ChestViewSource): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const g232 = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 25, g232.wRectPos926, 144, 8);
-    this.drawInspectArrow(chestView.source === 'cursor');
-
-    const word612 = g232.word612;
-    const iconSlots = g232.iconDisplay;
-    for (let slot = 0; slot < 8; slot++) {
-      const rect = this.getChestSlotRect(iconSlots, slot);
-      if (!rect) continue;
-      const item = normalizeObjectValue(this.ui.openChestContents[slot] ?? null);
-      if (item === null) continue;
-      const objectIndex = resolveObjectNameIndex(this.ui, item | 0);
-      if (objectIndex >= 0) drawObjectIcon(this.ui, rect, objectIndex, word612);
-    }
-  }
-
-  private drawInspectArrow(fromEye: boolean): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const g232 = this.ui.uiTables.graphic232;
-    const graphicIndex = fromEye ? 19 : 18;
-    blitBasicGraphicToViewport(this.ui, graphicIndex, g232.wRectPos934, 16, 8);
   }
 
   private drawAttackButtons(): void {
@@ -1740,7 +1300,7 @@ export class ViewportRenderer {
 
   private isEyeClick(x: number, y: number): boolean {
     if (!this.ui.partyState || this.ui.partyState.selectedCharacterIndex < 0) return false;
-    const rect = this.getEyeRect();
+    const rect = getEyeRect(this.ui);
     if (!rect) return false;
     return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
   }
@@ -1797,7 +1357,7 @@ export class ViewportRenderer {
       null;
     if (!champ || champ.alive === false) return;
 
-    const chestView = this.getActiveChestView(champ);
+    const chestView = getActiveChestView(this.ui, champ);
     if (!chestView || chestView.source !== 'hand') return;
 
     const button = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
@@ -1809,7 +1369,7 @@ export class ViewportRenderer {
   private handleInventoryToggle(button: number): void {
     if (!this.ui.partyState) return;
     if (button === 4) {
-      this.syncOpenChest(null);
+      syncOpenChest(this.ui, null);
       this.ui.partyState.selectedCharacterIndex = -1;
       this.ui.pressingEye = false;
       this.syncInventoryButtons();
@@ -1825,7 +1385,7 @@ export class ViewportRenderer {
     this.ui.partyState.selectedCharacterIndex =
       this.ui.partyState.selectedCharacterIndex === button ? -1 : button;
     if (this.ui.partyState.selectedCharacterIndex !== previous) {
-      this.syncOpenChest(null);
+      syncOpenChest(this.ui, null);
     }
     if (this.ui.partyState.selectedCharacterIndex < 0) {
       this.ui.pressingEye = false;
@@ -1889,11 +1449,11 @@ export class ViewportRenderer {
       null;
     if (!champ || champ.alive === false) return;
 
-    const chestView = this.getActiveChestView(champ);
+    const chestView = getActiveChestView(this.ui, champ);
     const isChestSlot = slot >= 30;
     if (isChestSlot) {
       if (!chestView) return;
-      this.syncOpenChest(chestView);
+      syncOpenChest(this.ui, chestView);
     }
 
     const objectInHand = normalizeObjectValue(this.ui.partyState.objectInHand);
