@@ -1,0 +1,416 @@
+/**
+ * The mouse: CSBWin's click ring buffer, the button dispatcher, and the cursor.
+ *
+ * Mirrors `doc/CSBwin-src/Mouse.cpp`. Clicks are not handled where they arrive — they are
+ * pushed onto a small ring buffer (`ui.mouseQueue`) and drained once per frame by
+ * `processMouseQueue`, so a click always acts on the state the frame was drawn from.
+ * `handleMouseButton` is the dispatcher on the `word0` ids that `searchButtonList` returns.
+ */
+import { IndexedBitmap, drawRectOutlineIndex } from '../csbwin/CanvasBlitter';
+import { canPlaceInSlot, getChampionPossession, setChampionPossession } from './Character';
+import { drawObjectIconAt } from './Draw';
+import { handleMouthPress } from './Feeding';
+import { pointInRect, searchButtonList } from './HitTest';
+import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
+import { handleMagicClick } from './MagicPanel';
+import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { UIMode, UIState } from './UIState';
+import { updateHover } from '@/ui';
+
+export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
+  const mouseQueueLength = ui.mouseQueue.length;
+  const numEnt = (ui.mouseQEnd - ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
+  if (numEnt >= mouseQueueLength - 2) return;
+
+  let id = searchButtonList(ui.primaryButtons, x, y, buttons);
+  if (id === 0) {
+    id = searchButtonList(ui.secondaryButtons, x, y, buttons);
+  }
+  if (id === 0) return;
+
+  ui.mouseQEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
+  ui.mouseQueue[ui.mouseQEnd] = { num: id, x, y };
+}
+
+export function enqueueMouseUnclick(ui: UIState): void {
+  const mouseQueueLength = ui.mouseQueue.length;
+  const numEnt = (ui.mouseQEnd - ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
+  if (numEnt >= mouseQueueLength - 1) return;
+
+  ui.mouseQEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
+  ui.mouseQueue[ui.mouseQEnd] = { num: 0xadd, x: 0, y: 0 };
+}
+
+export function processMouseQueue(ui: UIState): void {
+  const mouseQueueLength = ui.mouseQueue.length;
+  const nextEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
+  if (nextEnd === ui.mouseQStart) return;
+
+  const entry = ui.mouseQueue[ui.mouseQStart];
+  ui.mouseQStart = (ui.mouseQStart + 1) % mouseQueueLength;
+  if (entry.num === 0xadd) {
+    handleMouseUnclick(ui);
+    return;
+  }
+
+  handleMouseButton(ui, entry.num, entry.x, entry.y);
+}
+
+export function handleMouseButton(ui: UIState, id: number, x: number, y: number): void {
+  // updateDebug(`handling click on ${id}`)
+  if (id === 80 && isEyeClick(ui, x, y)) {
+    handleEyePress(ui);
+    return;
+  }
+  if (id === 70) {
+    handleMouthPress(ui);
+    return;
+  }
+  if (id === 100) {
+    handleMagicClick(ui, x, y);
+    return;
+  }
+  if (id === 81) {
+    handleChestAreaClick(ui, x, y);
+    return;
+  }
+  if (id === 83) {
+    if (!ui.partyState) return;
+    const owner = ui.partyState.cursorOwner;
+    if (owner >= 0) handleInventoryToggle(ui, owner);
+    return;
+  }
+  if (id >= 7 && id <= 11) {
+    handleInventoryToggle(ui, id - 7);
+    return;
+  }
+  if (id >= 12 && id <= 15) {
+    handlePartyBlockClick(ui, id - 12, x, y);
+    return;
+  }
+  if (id >= 28 && id <= 65) {
+    if ((ui.partyState?.cursorOwner ?? -1) >= 0) {
+      handleClothingClick(ui, id - 20);
+    }
+    return;
+  }
+  if (id === 71) {
+    handleEyePress(ui);
+    return;
+  }
+}
+
+export function handleMouseUnclick(ui: UIState): void {
+  if (ui.pressingEye) {
+    ui.pressingEye = false;
+  }
+}
+
+export function isEyeClick(ui: UIState, x: number, y: number): boolean {
+  if (!ui.partyState || ui.partyState.selectedCharacterIndex < 0) return false;
+  const rect = getEyeRect(ui);
+  if (!rect) return false;
+  return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
+}
+
+export function handleEyePress(ui: UIState): void {
+  if (!ui.partyState) return;
+  if (ui.partyState.selectedCharacterIndex < 0) return;
+  ui.pressingEye = true;
+}
+
+export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
+  if (!ui.uiTables || !ui.partyState) return;
+  if (ui.partyState.selectedCharacterIndex === button) {
+    const champ =
+      ui.partyState.champions.find((c) => c.partyPosition === button) ??
+      ui.partyState.champions[button] ??
+      null;
+    if (champ && champ.alive === false) return;
+    ui.partyState.cursorOwner = button;
+    return;
+  }
+  const sub = searchButtonList(ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
+  if (sub >= 16 && sub <= 19) {
+    ui.partyState.cursorOwner = sub - 16;
+    return;
+  }
+  if (sub >= 20 && sub <= 27) {
+    if ((ui.partyState.cursorOwner ?? -1) >= 0) {
+      handleClothingClick(ui, sub - 20);
+    }
+  }
+}
+
+export function handleChestAreaClick(ui: UIState, clickX: number, clickY: number): void {
+  if (!ui.uiTables || !ui.partyState) return;
+  if ((ui.partyState.cursorOwner ?? -1) < 0) return;
+
+  const selected = ui.partyState.selectedCharacterIndex ?? -1;
+  if (selected < 0) return;
+  const champ =
+    ui.partyState.champions.find((c) => c.partyPosition === selected) ??
+    ui.partyState.champions[selected] ??
+    null;
+  if (!champ || champ.alive === false) return;
+
+  const chestView = getActiveChestView(ui, champ);
+  if (!chestView || chestView.source !== 'hand') return;
+
+  const button = searchButtonList(ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
+  if (button !== 0) {
+    handleClothingClick(ui, button - 20);
+  }
+}
+
+export function handleInventoryToggle(ui: UIState, button: number): void {
+  if (!ui.partyState) return;
+  if (button === 4) {
+    syncOpenChest(ui, null);
+    ui.partyState.selectedCharacterIndex = -1;
+    ui.pressingEye = false;
+    syncInventoryButtons(ui);
+    return;
+  }
+  if (button < 0 || button > 3) return;
+  const champ =
+    ui.partyState.champions.find((c) => c.partyPosition === button) ??
+    ui.partyState.champions[button] ??
+    null;
+  if (!champ || champ.alive === false) return;
+  const previous = ui.partyState.selectedCharacterIndex;
+  ui.partyState.selectedCharacterIndex =
+    ui.partyState.selectedCharacterIndex === button ? -1 : button;
+  if (ui.partyState.selectedCharacterIndex !== previous) {
+    syncOpenChest(ui, null);
+  }
+  if (ui.partyState.selectedCharacterIndex < 0) {
+    ui.pressingEye = false;
+  }
+  syncInventoryButtons(ui);
+}
+
+export function syncInventoryButtons(ui: UIState): void {
+  if (!ui.uiTables || ui.uiMode !== UIMode.Adventure) return;
+  const buttons = ui.uiTables.graphic231.buttons;
+  const inventoryOpen = (ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+  ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
+}
+
+export function handleClothingClick(ui: UIState, button: number): void {
+  if (!ui.partyState || !ui.uiTables) return;
+  const cursorOwner = ui.partyState.cursorOwner ?? -1;
+  if (cursorOwner < 0) return;
+
+  let chIdx = -1;
+  let slot = -1;
+  if (button < 8) {
+    chIdx = Math.floor(button / 2);
+    if (chIdx >= ui.partyState.champions.length) return;
+    if (ui.partyState.selectedCharacterIndex === chIdx) return;
+    const champ =
+      ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+      ui.partyState.champions[chIdx] ??
+      null;
+    if (!champ || champ.alive === false) return;
+    slot = button & 1;
+  } else {
+    chIdx = ui.partyState.selectedCharacterIndex ?? -1;
+    if (chIdx < 0) return;
+    slot = button - 8;
+  }
+
+  if (slot < 0 || slot >= 38) return;
+  const champ =
+    ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
+    ui.partyState.champions[chIdx] ??
+    null;
+  if (!champ || champ.alive === false) return;
+
+  const chestView = getActiveChestView(ui, champ);
+  const isChestSlot = slot >= 30;
+  if (isChestSlot) {
+    if (!chestView) return;
+    syncOpenChest(ui, chestView);
+  }
+
+  const objectInHand = normalizeObjectValue(ui.partyState.objectInHand);
+  const slotObject = isChestSlot
+    ? normalizeObjectValue(ui.openChestContents[slot - 30] ?? null)
+    : normalizeObjectValue(getChampionPossession(champ, slot));
+  if (!objectInHand && !slotObject) return;
+
+  if (objectInHand && !canPlaceInSlot(ui, objectInHand, slot)) return;
+
+  if (objectInHand) {
+    ui.partyState.objectInHand = null;
+  }
+  if (slotObject) {
+    if (isChestSlot) {
+      ui.openChestContents[slot - 30] = null;
+    } else {
+      setChampionPossession(ui, champ, slot, null);
+    }
+    ui.partyState.objectInHand = slotObject;
+  }
+  if (objectInHand) {
+    if (isChestSlot) {
+      ui.openChestContents[slot - 30] = objectInHand;
+    } else {
+      setChampionPossession(ui, champ, slot, objectInHand);
+    }
+  }
+}
+
+export function updateButtonLists(ui: UIState): void {
+  if (!ui.uiTables) return;
+  const buttons = ui.uiTables.graphic231.buttons;
+  switch (ui.uiMode) {
+    case UIMode.Sleeping:
+      ui.primaryButtons = buttons.buttons17796;
+      ui.secondaryButtons = null;
+      break;
+    case UIMode.Frozen:
+      ui.primaryButtons = buttons.buttons17832;
+      ui.secondaryButtons = null;
+      break;
+    case UIMode.Adventure:
+    default:
+      ui.primaryButtons = buttons.buttons17196;
+      ui.secondaryButtons = buttons.buttons17304;
+      break;
+  }
+}
+
+export function drawCursorItem(ui: UIState): void {
+  if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
+  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
+  if (objectId === null) {
+    drawEmptyCursor(ui);
+    return;
+  }
+
+  const word612 = ui.uiTables.graphic232.word612;
+  const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+  if (objectNameIndex < 0) return;
+
+  const baseX = Math.floor(ui.hoverPoint.x) - 8;
+  const baseY = Math.floor(ui.hoverPoint.y) - 8;
+  drawObjectIconAt(ui, baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
+  drawObjectIconAt(ui, baseX, baseY, objectNameIndex, word612, 12);
+}
+
+export function drawEmptyCursor(ui: UIState): void {
+  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.hoverPoint) return;
+  const x = Math.floor(ui.hoverPoint.x);
+  const y = Math.floor(ui.hoverPoint.y);
+  const useHand = shouldUseHandCursor(ui, x, y);
+  const bitmap = useHand ? getCursorHandBitmap(ui) : getCursorArrowBitmap(ui);
+  if (!bitmap) return;
+
+  drawCursorBitmap(ui, bitmap, x, y, 12);
+}
+
+export function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {
+  const cursorOwner = ui.partyState?.cursorOwner ?? -1;
+  if (cursorOwner < 0) return false;
+
+  if (y >= 169) return false;
+  if (x >= 274) return false;
+
+  if (y <= 28) {
+    const numChar = ui.partyState?.champions.length ?? 0;
+    const selectedOrdinal = (ui.partyState?.selectedCharacterIndex ?? -1) + 1;
+    const charIndex = Math.floor(x / 69);
+    const pixelWithin = x - charIndex * 69;
+    if (charIndex < numChar && pixelWithin <= 42) {
+      if (charIndex + 1 === selectedOrdinal) return false;
+      if (y <= 6) return false;
+    }
+  } else if (x >= 224) {
+    return false;
+  }
+
+  return true;
+}
+
+export function getCursorArrowBitmap(ui: UIState): IndexedBitmap | null {
+  if (!ui.uiTables) return null;
+  if (ui.cursorArrowBitmap) return ui.cursorArrowBitmap;
+  ui.cursorArrowBitmap = decodeCursorBitmap(ui.uiTables.graphic232.cursorArrow);
+  return ui.cursorArrowBitmap;
+}
+
+export function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
+  if (!ui.uiTables) return null;
+  if (ui.cursorHandBitmap) return ui.cursorHandBitmap;
+  ui.cursorHandBitmap = decodeCursorBitmap(ui.uiTables.graphic232.cursorHand);
+  return ui.cursorHandBitmap;
+}
+
+export function decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
+  if (!raw || raw.length < 128) return null;
+  const pixels = new Uint8Array(16 * 16);
+  for (let row = 0; row < 16; row++) {
+    const base = row * 8;
+    const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
+    const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
+    const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
+    const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
+    for (let col = 0; col < 16; col++) {
+      const bit = 15 - col;
+      const v =
+        ((p0 >> bit) & 1) |
+        (((p1 >> bit) & 1) << 1) |
+        (((p2 >> bit) & 1) << 2) |
+        (((p3 >> bit) & 1) << 3);
+      pixels[row * 16 + col] = v & 0x0f;
+    }
+  }
+  return { width: 16, height: 16, pixels };
+}
+
+export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
+  if (!ui.screenIndexBuffer) return;
+  const dst = ui.screenIndexBuffer;
+  const maxW = bitmap.width;
+  const maxH = bitmap.height;
+  const tc = transparentColor & 0x0f;
+
+  for (let row = 0; row < maxH; row++) {
+    const dy = y + row;
+    if (dy < 0 || dy >= dst.height) continue;
+    const dstRow = dy * dst.width;
+    const srcRow = row * bitmap.width;
+    for (let col = 0; col < maxW; col++) {
+      const dx = x + col;
+      if (dx < 0 || dx >= dst.width) continue;
+      const pixel = bitmap.pixels[srcRow + col] & 0x0f;
+      if (pixel === tc) continue;
+      dst.pixels[dstRow + dx] = pixel;
+    }
+  }
+}
+
+export function drawHoverHighlights(ui: UIState) {
+  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.hoverPoint) return;
+  const { x, y } = ui.hoverPoint;
+
+  const hovered: string[] = [];
+  for (const btn of ui.uiTables.graphic231.moveButtons) {
+    if (pointInRect(x, y, btn)) {
+      // drawRectOutlineIndex(ui.screenIndexBuffer, btn, 15);
+    }
+  }
+
+  const buttonGroups = Object.values(ui.uiTables.graphic231.buttons);
+  for (const group of buttonGroups) {
+    for (const btn of group) {
+      if (pointInRect(x, y, btn)) {
+        hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
+        drawRectOutlineIndex(ui.screenIndexBuffer, btn, 9);
+      }
+    }
+  }
+  updateHover(hovered.join("<br>"));
+}

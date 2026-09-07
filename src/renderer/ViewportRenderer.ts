@@ -18,7 +18,6 @@ import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
   createPaletteIndexViewportBuffer,
-  drawRectOutlineIndex,
   fillRectIndex,
   tag0088b2Index,
   updateImageDataFromIndex,
@@ -42,35 +41,33 @@ import {
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../core/types';
-import { updateHover } from '@/ui';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  drawCursorItem,
+  drawHoverHighlights,
+  enqueueMouseClick,
+  enqueueMouseUnclick,
+  processMouseQueue,
+  syncInventoryButtons,
+  updateButtonLists,
+} from './ui/Mouse';
 import {
   drawAttackButtons,
   drawAttackPanel,
   drawSpellControls,
   drawSpellPanel,
-  handleMagicClick,
 } from './ui/MagicPanel';
-import {
-  searchButtonList,
-  pointInRect,
-} from './ui/HitTest';
 import {
   drawInventoryBackground,
   drawInventoryScreen,
-  getActiveChestView,
-  getEyeRect,
   syncOpenChest,
 } from './ui/Inventory';
 import {
-  handleMouthPress,
 } from './ui/Feeding';
 import {
-  canPlaceInSlot,
   drawHeldObjectName,
   drawPartyStatus,
   getChampionPossession,
-  setChampionPossession,
 } from './ui/Character';
 import {
   getBaseObjectNameIndex,
@@ -80,7 +77,6 @@ import {
 } from './ui/Objects';
 import {
   drawMessageLines,
-  drawObjectIconAt,
   shadeRectIndex,
 } from './ui/Draw';
 import { GraphicRoomType } from './bytecode/Types';
@@ -197,7 +193,7 @@ export class ViewportRenderer {
     this.ui.mouseQueue = Array.from({ length: mouseQueueLength }, () => ({ num: 0, x: 0, y: 0 }));
     this.ui.mouseQStart = 0;
     this.ui.mouseQEnd = mouseQueueLength - 1;
-    this.updateButtonLists();
+    updateButtonLists(this.ui);
 
     // Create interpreter context
     this.ui.context = {
@@ -239,6 +235,20 @@ export class ViewportRenderer {
     return this.ui.uiTables;
   }
 
+  /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
+
+  enqueueMouseClick(x: number, y: number, buttons: number): void {
+    enqueueMouseClick(this.ui, x, y, buttons);
+  }
+
+  enqueueMouseUnclick(): void {
+    enqueueMouseUnclick(this.ui);
+  }
+
+  processMouseQueue(): void {
+    processMouseQueue(this.ui);
+  }
+
   setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {
     this.ui.playSound = playSound;
   }
@@ -257,7 +267,7 @@ export class ViewportRenderer {
 
   setPartyState(state: PartyState | null): void {
     this.ui.partyState = state;
-    this.syncInventoryButtons();
+    syncInventoryButtons(this.ui);
   }
 
   setHoverPoint(point: { x: number; y: number } | null): void {
@@ -274,51 +284,12 @@ export class ViewportRenderer {
 
   setUIMode(mode: UIMode): void {
     this.ui.uiMode = mode;
-    this.updateButtonLists();
-    this.syncInventoryButtons();
+    updateButtonLists(this.ui);
+    syncInventoryButtons(this.ui);
   }
 
   isInventoryOpen(): boolean {
     return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
-  }
-
-  enqueueMouseClick(x: number, y: number, buttons: number): void {
-    const mouseQueueLength = this.ui.mouseQueue.length;
-    const numEnt = (this.ui.mouseQEnd - this.ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
-    if (numEnt >= mouseQueueLength - 2) return;
-
-    let id = searchButtonList(this.ui.primaryButtons, x, y, buttons);
-    if (id === 0) {
-      id = searchButtonList(this.ui.secondaryButtons, x, y, buttons);
-    }
-    if (id === 0) return;
-
-    this.ui.mouseQEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
-    this.ui.mouseQueue[this.ui.mouseQEnd] = { num: id, x, y };
-  }
-
-  enqueueMouseUnclick(): void {
-    const mouseQueueLength = this.ui.mouseQueue.length;
-    const numEnt = (this.ui.mouseQEnd - this.ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
-    if (numEnt >= mouseQueueLength - 1) return;
-
-    this.ui.mouseQEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
-    this.ui.mouseQueue[this.ui.mouseQEnd] = { num: 0xadd, x: 0, y: 0 };
-  }
-
-  processMouseQueue(): void {
-    const mouseQueueLength = this.ui.mouseQueue.length;
-    const nextEnd = (this.ui.mouseQEnd + 1) % mouseQueueLength;
-    if (nextEnd === this.ui.mouseQStart) return;
-
-    const entry = this.ui.mouseQueue[this.ui.mouseQStart];
-    this.ui.mouseQStart = (this.ui.mouseQStart + 1) % mouseQueueLength;
-    if (entry.num === 0xadd) {
-      this.handleMouseUnclick();
-      return;
-    }
-
-    this.handleMouseButton(entry.num, entry.x, entry.y);
   }
 
   private resetViewportPalettes(): void {
@@ -917,8 +888,8 @@ export class ViewportRenderer {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui);
-    this.drawHoverHighlights();
-    this.drawCursorItem();
+    drawHoverHighlights(this.ui);
+    drawCursorItem(this.ui);
 
     const uiPalette = this.uiPalette ?? this.palette;
     if (!uiPalette) return;
@@ -1072,368 +1043,9 @@ export class ViewportRenderer {
     );
   }
 
-  private handleMouseButton(id: number, x: number, y: number): void {
-    // updateDebug(`handling click on ${id}`)
-    if (id === 80 && this.isEyeClick(x, y)) {
-      this.handleEyePress();
-      return;
-    }
-    if (id === 70) {
-      handleMouthPress(this.ui);
-      return;
-    }
-    if (id === 100) {
-      handleMagicClick(this.ui, x, y);
-      return;
-    }
-    if (id === 81) {
-      this.handleChestAreaClick(x, y);
-      return;
-    }
-    if (id === 83) {
-      if (!this.ui.partyState) return;
-      const owner = this.ui.partyState.cursorOwner;
-      if (owner >= 0) this.handleInventoryToggle(owner);
-      return;
-    }
-    if (id >= 7 && id <= 11) {
-      this.handleInventoryToggle(id - 7);
-      return;
-    }
-    if (id >= 12 && id <= 15) {
-      this.handlePartyBlockClick(id - 12, x, y);
-      return;
-    }
-    if (id >= 28 && id <= 65) {
-      if ((this.ui.partyState?.cursorOwner ?? -1) >= 0) {
-        this.handleClothingClick(id - 20);
-      }
-      return;
-    }
-    if (id === 71) {
-      this.handleEyePress();
-      return;
-    }
-  }
-
-  private isEyeClick(x: number, y: number): boolean {
-    if (!this.ui.partyState || this.ui.partyState.selectedCharacterIndex < 0) return false;
-    const rect = getEyeRect(this.ui);
-    if (!rect) return false;
-    return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
-  }
-
-  private handleMouseUnclick(): void {
-    if (this.ui.pressingEye) {
-      this.ui.pressingEye = false;
-    }
-  }
-
-  private handleEyePress(): void {
-    if (!this.ui.partyState) return;
-    if (this.ui.partyState.selectedCharacterIndex < 0) return;
-    this.ui.pressingEye = true;
-  }
-
   private renderLastFrame(): void {
     if (!this.lastRenderPosition) return;
     this.render(this.lastRenderPosition, this.lastRenderFacing);
-  }
-
-  private handlePartyBlockClick(button: number, x: number, y: number): void {
-    if (!this.ui.uiTables || !this.ui.partyState) return;
-    if (this.ui.partyState.selectedCharacterIndex === button) {
-      const champ =
-        this.ui.partyState.champions.find((c) => c.partyPosition === button) ??
-        this.ui.partyState.champions[button] ??
-        null;
-      if (champ && champ.alive === false) return;
-      this.ui.partyState.cursorOwner = button;
-      return;
-    }
-    const sub = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
-    if (sub >= 16 && sub <= 19) {
-      this.ui.partyState.cursorOwner = sub - 16;
-      return;
-    }
-    if (sub >= 20 && sub <= 27) {
-      if ((this.ui.partyState.cursorOwner ?? -1) >= 0) {
-        this.handleClothingClick(sub - 20);
-      }
-    }
-  }
-
-  private handleChestAreaClick(clickX: number, clickY: number): void {
-    if (!this.ui.uiTables || !this.ui.partyState) return;
-    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return;
-
-    const selected = this.ui.partyState.selectedCharacterIndex ?? -1;
-    if (selected < 0) return;
-    const champ =
-      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.ui.partyState.champions[selected] ??
-      null;
-    if (!champ || champ.alive === false) return;
-
-    const chestView = getActiveChestView(this.ui, champ);
-    if (!chestView || chestView.source !== 'hand') return;
-
-    const button = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
-    if (button !== 0) {
-      this.handleClothingClick(button - 20);
-    }
-  }
-
-  private handleInventoryToggle(button: number): void {
-    if (!this.ui.partyState) return;
-    if (button === 4) {
-      syncOpenChest(this.ui, null);
-      this.ui.partyState.selectedCharacterIndex = -1;
-      this.ui.pressingEye = false;
-      this.syncInventoryButtons();
-      return;
-    }
-    if (button < 0 || button > 3) return;
-    const champ =
-      this.ui.partyState.champions.find((c) => c.partyPosition === button) ??
-      this.ui.partyState.champions[button] ??
-      null;
-    if (!champ || champ.alive === false) return;
-    const previous = this.ui.partyState.selectedCharacterIndex;
-    this.ui.partyState.selectedCharacterIndex =
-      this.ui.partyState.selectedCharacterIndex === button ? -1 : button;
-    if (this.ui.partyState.selectedCharacterIndex !== previous) {
-      syncOpenChest(this.ui, null);
-    }
-    if (this.ui.partyState.selectedCharacterIndex < 0) {
-      this.ui.pressingEye = false;
-    }
-    this.syncInventoryButtons();
-  }
-
-  private syncInventoryButtons(): void {
-    if (!this.ui.uiTables || this.ui.uiMode !== UIMode.Adventure) return;
-    const buttons = this.ui.uiTables.graphic231.buttons;
-    const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
-    this.ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
-  }
-
-  private handleClothingClick(button: number): void {
-    if (!this.ui.partyState || !this.ui.uiTables) return;
-    const cursorOwner = this.ui.partyState.cursorOwner ?? -1;
-    if (cursorOwner < 0) return;
-
-    let chIdx = -1;
-    let slot = -1;
-    if (button < 8) {
-      chIdx = Math.floor(button / 2);
-      if (chIdx >= this.ui.partyState.champions.length) return;
-      if (this.ui.partyState.selectedCharacterIndex === chIdx) return;
-      const champ =
-        this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-        this.ui.partyState.champions[chIdx] ??
-        null;
-      if (!champ || champ.alive === false) return;
-      slot = button & 1;
-    } else {
-      chIdx = this.ui.partyState.selectedCharacterIndex ?? -1;
-      if (chIdx < 0) return;
-      slot = button - 8;
-    }
-
-    if (slot < 0 || slot >= 38) return;
-    const champ =
-      this.ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-      this.ui.partyState.champions[chIdx] ??
-      null;
-    if (!champ || champ.alive === false) return;
-
-    const chestView = getActiveChestView(this.ui, champ);
-    const isChestSlot = slot >= 30;
-    if (isChestSlot) {
-      if (!chestView) return;
-      syncOpenChest(this.ui, chestView);
-    }
-
-    const objectInHand = normalizeObjectValue(this.ui.partyState.objectInHand);
-    const slotObject = isChestSlot
-      ? normalizeObjectValue(this.ui.openChestContents[slot - 30] ?? null)
-      : normalizeObjectValue(getChampionPossession(champ, slot));
-    if (!objectInHand && !slotObject) return;
-
-    if (objectInHand && !canPlaceInSlot(this.ui, objectInHand, slot)) return;
-
-    if (objectInHand) {
-      this.ui.partyState.objectInHand = null;
-    }
-    if (slotObject) {
-      if (isChestSlot) {
-        this.ui.openChestContents[slot - 30] = null;
-      } else {
-        setChampionPossession(this.ui, champ, slot, null);
-      }
-      this.ui.partyState.objectInHand = slotObject;
-    }
-    if (objectInHand) {
-      if (isChestSlot) {
-        this.ui.openChestContents[slot - 30] = objectInHand;
-      } else {
-        setChampionPossession(this.ui, champ, slot, objectInHand);
-      }
-    }
-  }
-
-  private drawCursorItem(): void {
-    if (!this.ui.screenIndexBuffer || !this.ui.uiTables || !this.ui.partyState || !this.ui.hoverPoint) return;
-    const objectId = normalizeObjectValue(this.ui.partyState.objectInHand);
-    if (objectId === null) {
-      this.drawEmptyCursor();
-      return;
-    }
-
-    const word612 = this.ui.uiTables.graphic232.word612;
-    const objectNameIndex = resolveObjectNameIndex(this.ui, objectId | 0);
-    if (objectNameIndex < 0) return;
-
-    const baseX = Math.floor(this.ui.hoverPoint.x) - 8;
-    const baseY = Math.floor(this.ui.hoverPoint.y) - 8;
-    drawObjectIconAt(this.ui, baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
-    drawObjectIconAt(this.ui, baseX, baseY, objectNameIndex, word612, 12);
-  }
-
-  private drawEmptyCursor(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.hoverPoint) return;
-    const x = Math.floor(this.ui.hoverPoint.x);
-    const y = Math.floor(this.ui.hoverPoint.y);
-    const useHand = this.shouldUseHandCursor(x, y);
-    const bitmap = useHand ? this.getCursorHandBitmap() : this.getCursorArrowBitmap();
-    if (!bitmap) return;
-
-    this.drawCursorBitmap(bitmap, x, y, 12);
-  }
-
-  private shouldUseHandCursor(x: number, y: number): boolean {
-    const cursorOwner = this.ui.partyState?.cursorOwner ?? -1;
-    if (cursorOwner < 0) return false;
-
-    if (y >= 169) return false;
-    if (x >= 274) return false;
-
-    if (y <= 28) {
-      const numChar = this.ui.partyState?.champions.length ?? 0;
-      const selectedOrdinal = (this.ui.partyState?.selectedCharacterIndex ?? -1) + 1;
-      const charIndex = Math.floor(x / 69);
-      const pixelWithin = x - charIndex * 69;
-      if (charIndex < numChar && pixelWithin <= 42) {
-        if (charIndex + 1 === selectedOrdinal) return false;
-        if (y <= 6) return false;
-      }
-    } else if (x >= 224) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private getCursorArrowBitmap(): IndexedBitmap | null {
-    if (!this.ui.uiTables) return null;
-    if (this.ui.cursorArrowBitmap) return this.ui.cursorArrowBitmap;
-    this.ui.cursorArrowBitmap = this.decodeCursorBitmap(this.ui.uiTables.graphic232.cursorArrow);
-    return this.ui.cursorArrowBitmap;
-  }
-
-  private getCursorHandBitmap(): IndexedBitmap | null {
-    if (!this.ui.uiTables) return null;
-    if (this.ui.cursorHandBitmap) return this.ui.cursorHandBitmap;
-    this.ui.cursorHandBitmap = this.decodeCursorBitmap(this.ui.uiTables.graphic232.cursorHand);
-    return this.ui.cursorHandBitmap;
-  }
-
-  private decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
-    if (!raw || raw.length < 128) return null;
-    const pixels = new Uint8Array(16 * 16);
-    for (let row = 0; row < 16; row++) {
-      const base = row * 8;
-      const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
-      const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
-      const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
-      const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
-      for (let col = 0; col < 16; col++) {
-        const bit = 15 - col;
-        const v =
-          ((p0 >> bit) & 1) |
-          (((p1 >> bit) & 1) << 1) |
-          (((p2 >> bit) & 1) << 2) |
-          (((p3 >> bit) & 1) << 3);
-        pixels[row * 16 + col] = v & 0x0f;
-      }
-    }
-    return { width: 16, height: 16, pixels };
-  }
-
-  private drawCursorBitmap(bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const dst = this.ui.screenIndexBuffer;
-    const maxW = bitmap.width;
-    const maxH = bitmap.height;
-    const tc = transparentColor & 0x0f;
-
-    for (let row = 0; row < maxH; row++) {
-      const dy = y + row;
-      if (dy < 0 || dy >= dst.height) continue;
-      const dstRow = dy * dst.width;
-      const srcRow = row * bitmap.width;
-      for (let col = 0; col < maxW; col++) {
-        const dx = x + col;
-        if (dx < 0 || dx >= dst.width) continue;
-        const pixel = bitmap.pixels[srcRow + col] & 0x0f;
-        if (pixel === tc) continue;
-        dst.pixels[dstRow + dx] = pixel;
-      }
-    }
-  }
-
-  private updateButtonLists(): void {
-    if (!this.ui.uiTables) return;
-    const buttons = this.ui.uiTables.graphic231.buttons;
-    switch (this.ui.uiMode) {
-      case UIMode.Sleeping:
-        this.ui.primaryButtons = buttons.buttons17796;
-        this.ui.secondaryButtons = null;
-        break;
-      case UIMode.Frozen:
-        this.ui.primaryButtons = buttons.buttons17832;
-        this.ui.secondaryButtons = null;
-        break;
-      case UIMode.Adventure:
-      default:
-        this.ui.primaryButtons = buttons.buttons17196;
-        this.ui.secondaryButtons = buttons.buttons17304;
-        break;
-    }
-  }
-
-  private drawHoverHighlights() {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.hoverPoint) return;
-    const { x, y } = this.ui.hoverPoint;
-
-    const hovered: string[] = [];
-    for (const btn of this.ui.uiTables.graphic231.moveButtons) {
-      if (pointInRect(x, y, btn)) {
-        // drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 15);
-      }
-    }
-
-    const buttonGroups = Object.values(this.ui.uiTables.graphic231.buttons);
-    for (const group of buttonGroups) {
-      for (const btn of group) {
-        if (pointInRect(x, y, btn)) {
-          hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
-          drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 9);
-        }
-      }
-    }
-    updateHover(hovered.join("<br>"));
   }
 
   private blitViewportToScreen(): void {
