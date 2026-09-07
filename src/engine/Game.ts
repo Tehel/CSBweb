@@ -18,7 +18,7 @@ import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { SoundIndex } from '../core/constants';
+import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import type { SpellDefinition } from '../data/spellTypes';
@@ -38,8 +38,6 @@ export type MovementCallback = (success: boolean, message?: string, result?: Mov
 interface DropCursorOptions {
     viAltar?: boolean;
 }
-
-const MISC_BONES_OF_HERO = 5; // CSBwin Objects.h misc_BonesOfHero
 
 export interface RuntimeSaveState {
     version: 1;

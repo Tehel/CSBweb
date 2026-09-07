@@ -39,11 +39,11 @@ import {
 import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
+import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import {
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
 
-const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 const PORTRAIT_INACTIVE = 1;
 
 export enum CursorFilterType {

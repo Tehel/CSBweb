@@ -42,7 +42,7 @@ import {
   VIEWPORT_X,
   VIEWPORT_Y,
 } from './ViewportGraphics';
-import { getOrSet, Position, SoundIndex } from '@/core';
+import { getOrSet, MISC_BONES_OF_HERO, Position, SoundIndex } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
 import { GraphicRoomType } from './bytecode/Types';
@@ -133,7 +133,6 @@ export interface FloorCeiling {
   mirrored: Uint8Array;
 }
 
-const MISC_BONES_OF_HERO = 5;
 const MAX_LINES_IN_SCROLL = 9;
 const DEFAULT_CHEST_WEIGHT = 50;
 const POTION_EMPTY_FLASK = 20;

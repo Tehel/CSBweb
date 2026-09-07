@@ -198,3 +198,10 @@ export enum PotionType {
     ANTI_VENOM = 7,
     // ... (20+ types)
 }
+
+/**
+ * Misc object types (CSBWin `doc/CSBwin-src/Objects.h:192`).
+ * `MISC_BONES_OF_HERO`'s record value is the champion index
+ * (`doc/CSBwin-src/Character.cpp:2630`).
+ */
+export const MISC_BONES_OF_HERO = 5;

@@ -28,6 +28,7 @@ import {
 import type { DungeonState, TextDecodeTables } from './DungeonState';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
+import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
 import {
@@ -176,8 +177,6 @@ const ESL_VIEWING_FILTER = 3;
 const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
 const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
-
-const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 
 const enum DsaMoveError {
   SER_OK = 0,
