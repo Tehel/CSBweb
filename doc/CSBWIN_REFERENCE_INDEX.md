@@ -26,3 +26,4 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/VIEWPORT_RENDERING.md` - Narrative rendering overview tied to CSBWin behavior.
 - `doc/PROVEN_FACTS.md` - Specific verified facts with source references.
 - `doc/UI_MODULE_MAP.md` - Which `src/renderer/ui/` module ports which CSBWin UI file.
+- `doc/MONSTER_BEHAVIOUR.md` - Plain-language account of monster decision-making: senses, moods, the turn as a decision tree, per-type differences, and what remains unexplained.
