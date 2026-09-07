@@ -10,6 +10,7 @@ export enum TimerFunction {
   TT_M3 = -3, // Monster damaged by a cloud or a door
   TT_M2 = -2, // Monster damaged
   TT_M1 = -1, // Monster attacked, or the party bumped into it
+  TT_EMPTY = 0,
   TT_DOOR_STEP = 1,
   TT_MISSILE0 = 48,
   TT_MISSILE = 49,

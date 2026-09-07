@@ -653,8 +653,20 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      destination holds the party or another monster is parked and retries every 5
      ticks, with Lord Chaos's 25%-chance random step so he can escape a walled-in
      corner.
-   - ⏳ Still to do: `ProcessTimers29to41` itself (a marked placeholder that logs and
-     returns).
+   - ✅ **`InitialChecks`** and `ProcessTimers29to41`'s prologue
+     (`src/engine/MonsterAI.ts`), with the timer-helper chain CSBWin factored its
+     `goto`s into: `SetMonsterTimerB`, `Set_Monster_Timer`, `EnsureI60NonZero`,
+     `Increment_Time_By_W52_Plus_Random`, `Delete_Timers_Maybe_Set_Fear`,
+     `MaybeDelTimers_Fear6_TurnIndividuals`, `Turn_Monsters_As_Group` and
+     `StartBGroupTimer`. CSBWin's `d.` scratch globals are gathered into an explicit
+     `AiScratch`.
+   - ✅ **`d.freezeLifeTimer`** and **`d.Word11694`** (game won) added as real state,
+     with the per-tick countdown (`CSBCode.cpp:684`).
+   - ⏳ Still to do: `ProcessTimers29to41`'s **decision body** — the TT_31/30/29
+     dispatch and the `Try_To_Move` chain. A group that passes `InitialChecks`
+     currently just has its group timer rescheduled, marked as temporary in
+     `MonsterAI.rescheduleGroupTimer`, so the AI keeps ticking instead of stopping
+     dead after one turn.
 
    ⚠️ **One deferral:** `CreateMovementTimer`'s overflow guard is not ported — CSBWin
    counts the groups already waiting at a square and, past 31, deletes the monster
@@ -704,8 +716,8 @@ Several systems already carry proxies waiting on this phase; each must be revisi
 
    1. ✅ `MoveObject` for monsters — **done**, see step 2 above.
    2. ✅ `DamageMonster` — **done**, see step 4 below.
-   3. `InitialChecks`, which both of the above gate. **Now unblocked.**
-   4. `ProcessTimers29to41`'s main body (~1220 lines) plus the `Try_*` /
+   3. ✅ `InitialChecks` — **done**, with the timer-helper chain.
+   4. `ProcessTimers29to41`'s decision body (~1220 lines) plus the `Try_*` /
       `Standard_Finish` / `Process_Invincible` helper chain (~800 lines).
    5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
 

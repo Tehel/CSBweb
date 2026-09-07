@@ -707,33 +707,6 @@ export class MonsterSystem {
     );
   }
 
-  /* -------------------------------------------------------------------- AI ---- */
-
-  /**
-   * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3239`) — every monster AI
-   * timer arrives here.
-   *
-   * ⏳ **PLACEHOLDER.** The real port is ~2000 lines of `Monster.cpp`
-   * (`InitialChecks`, `Try_To_Move`, `Try_Preferred_Direction_Then_Others`,
-   * `Try_Directions_D5_To_D4`, `Standard_Finish`, `Process_Invincible`, …) and lands
-   * in the next step of Phase 12. Until then a group gets its slot and its first
-   * timer, that timer fires exactly once, and nothing moves. This is deliberately
-   * inert rather than approximated — a guessed AI would be worse than none.
-   */
-  processTimers29to41(options: {
-    mapX: number;
-    mapY: number;
-    level: number;
-    timerFunction: number;
-    timeUntilAlternateUpdate: number;
-  }): void {
-    this.trace(
-      `MonsterAI ${String(options.level).padStart(2, '0')}` +
-        `(${options.mapX},${options.mapY})@${this.getTime()} ` +
-        `timeFunc=${options.timerFunction} tuau=${options.timeUntilAlternateUpdate} [not ported]`,
-    );
-  }
-
   /* ----------------------------------------------------------------- misc ---- */
 
   /**

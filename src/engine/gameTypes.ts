@@ -131,6 +131,14 @@ export interface PartyState {
     indexOfLastMagicFootprint?: i16;
     numFootprintEnt?: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
+    /**
+     * `d.freezeLifeTimer` (`doc/CSBwin-src/Data.h:774`). While non-zero every monster
+     * that is not `invincible()` is held motionless
+     * (`doc/CSBwin-src/Monster.cpp:2996`). Raised by the FREEZE LIFE attack, capped
+     * at 200 there and 255 absolutely (`doc/CSBwin-src/Attack.cpp:2062-2067`), and
+     * counted down one per game tick (`doc/CSBwin-src/CSBCode.cpp:684`).
+     */
+    freezeLifeTimer: ui8;
 
     // Movement state
     moving: boolean;            // Is party currently moving?

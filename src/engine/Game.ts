@@ -20,6 +20,7 @@ import { SoundQueue } from './SoundQueue';
 import { PartyFootprints } from './PartyFootprints';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
+import { MonsterAI } from './MonsterAI';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -115,6 +116,16 @@ export class Game {
      * and (later) champion melee all reach it, and `tools/` drives it directly.
      */
     readonly monsterDamage: MonsterDamage;
+    /** The monster AI state machine (`doc/CSBwin-src/Monster.cpp`). */
+    readonly monsterAI: MonsterAI;
+    /**
+     * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While
+     * set, invincible monsters stop taking their turns entirely
+     * (`doc/CSBwin-src/Monster.cpp:2966-2971`), which is what freezes Lord Chaos
+     * after the fusion.
+     */
+    gameWon = false;
+
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -196,7 +207,7 @@ export class Game {
                 onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
-                onMonsterAI: (options) => this.monsterSystem.processTimers29to41(options),
+                onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
                 onPartyMoved: () => this.notePartyMoved(),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
@@ -256,6 +267,19 @@ export class Game {
             () => timerTables?.monsterDesc ?? null,
             () => timerTables?.doorCharacteristics ?? null,
         );
+        this.monsterAI = new MonsterAI({
+            dungeon: this.dungeonState,
+            getPartyState: () => this.party.state,
+            getTime: () => this.state.tickCount,
+            random: this.random,
+            timers: this.timerQueue,
+            monsters: this.monsterSystem,
+            damage: this.monsterDamage,
+            perception: this.monsterPerception,
+            monsterDesc: () => timerTables?.monsterDesc ?? null,
+            isGameWon: () => this.gameWon,
+            trace: monsterHooks?.trace,
+        });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
 
@@ -360,6 +384,9 @@ export class Game {
         this.timerSystem.processTimers(this.state.tickCount);
         this.processNinetySecondUpdate();
         this.processTenSecondUpdate();
+        // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
+        // (doc/CSBwin-src/CSBCode.cpp:684).
+        if (this.party.state.freezeLifeTimer !== 0) this.party.state.freezeLifeTimer--;
 
         // Update party state in game state
         this.state.party = this.party.state;
