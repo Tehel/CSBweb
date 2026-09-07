@@ -63,11 +63,23 @@ probes, pixel comparisons against CSBWin screenshots) that were **never carried 
 there is no test framework in the project at all. Verification has been visual and ad hoc.
 Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
 
-There is now one partial exception: `tools/probe-frames.mjs` + `tools/check-frames.sh`
-drive the real app over the DevTools Protocol and byte-compare five screen states against
-`tools/frames/`. It was built to make the Phase 14 split safe and it is *not* a test
-framework — five frames, no assertions beyond equality, and it needs a dev server and a
-headless Chrome running. Phase 15 should absorb it rather than start from nothing.
+There are now two partial exceptions, and Phase 15 should absorb both rather than start
+from nothing:
+
+1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
+   DevTools Protocol and byte-compare five screen states against `tools/frames/`. Built
+   to make the Phase 14 split safe. Five frames, no assertions beyond equality, needs a
+   dev server and a headless Chrome.
+2. **Seven assertion-carrying verification tools** built during Phase 12
+   (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
+   `watch-monster{s,-attacks}.ts`). These load the real game files, drive the real
+   engine with a fixed RNG seed, print a human-readable table and assert invariants,
+   exiting non-zero on failure. They are the de-facto regression suite for everything
+   the frames cannot see, and they caught two real bugs and two wrong tests.
+
+   The pattern is written up in `.claude/skills/verification-tools/`. What Phase 15
+   would add is a runner, shared fixtures, and assertions that do not each hand-roll a
+   `check()` helper — not the idea.
 
 ## Next Steps (Phased)
 

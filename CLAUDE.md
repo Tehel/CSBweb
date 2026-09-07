@@ -58,11 +58,19 @@ commit. `vite build` alone will happily succeed on broken code, because esbuild 
 without checking them — so it proves nothing. The project once sat with a broken `tsc` for
 months, and a genuine runtime bug was hiding among the type errors.
 
-There is **no test framework** yet (see `PLAN.md` Phase 15). `tools/*.ts|mjs` are one-off
-dump/inspection scripts run with `npx tsx`. Verification is mostly visual — but
-`tools/check-frames.sh` byte-compares five live screen states against `tools/frames/` and is
-the cheapest way to prove a change to the renderer or UI kept every pixel. Run it before
-committing anything structural.
+There is **no test framework** yet (see `PLAN.md` Phase 15), but there are now two
+standing forms of evidence, and both must pass before a commit:
+
+- `tools/check-frames.sh` byte-compares five live screen states against `tools/frames/`.
+  The cheapest way to prove a renderer or UI change kept every pixel.
+- `tools/dump-*.ts` and `tools/watch-*.ts` (run with `npx tsx`) stand the real engine up
+  against the real game files, print what happened, and assert invariants. **They are the
+  regression suite for everything the frames cannot see** — tables, AI, damage, timers,
+  movement. Re-run all of them, not just the one you are working on.
+
+When porting behaviour that is invisible on screen, write the tool in the same commit.
+The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and
+the "canary" technique for proving an extracted table sits at the right offset.
 
 ## Code layout (`src/`, ~30k LOC)
 

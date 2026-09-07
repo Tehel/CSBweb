@@ -1,0 +1,150 @@
+---
+name: verification-tools
+description: Write a tools/ verification script to prove a CSBWin port is faithful. Use when porting engine behaviour that cannot be seen on screen — data tables, AI, damage, timers, movement — or when asked to test/verify/check ported logic. This project has no test framework; these scripts are how correctness is demonstrated.
+---
+
+# Verification tools
+
+This project has **no test framework** (PLAN.md Phase 15). Correctness is demonstrated
+by scripts in `tools/` that stand up the real engine against the real game files, drive
+it, and both **print what happened** and **assert invariants**.
+
+That dual nature is the point. A pass/fail assertion tells you a number matched. A
+printed table lets you look at the output and notice that Mummies are on level 1 and
+Ant Men on level 2, which is how you find out the port is actually right rather than
+consistently wrong.
+
+## When to write one
+
+Whenever you port something whose behaviour is invisible: extracted tables, AI
+decisions, damage formulas, timer scheduling, object lifecycles. If the only evidence
+a change works is `tsc` passing, there is no evidence.
+
+`tools/check-frames.sh` covers the renderer. It does **not** cover anything else.
+
+## The three gates
+
+Before any commit:
+
+1. `npx tsc --noEmit` — the real gate. `vite build` proves nothing (esbuild strips
+   types without checking them).
+2. `bash tools/check-frames.sh` — five live screen states byte-compared. Needs
+   `npm run dev` on :9000 and headless Chrome on `--remote-debugging-port=9222`.
+3. **Every existing `tools/*.ts` that has assertions**, re-run. They are the
+   regression suite. Adding a table or changing a shared record breaks them silently
+   otherwise.
+
+## Shape
+
+Two naming conventions, both run with `npx tsx tools/<name>.ts [args]`:
+
+- `dump-*.ts` — inspect and assert on a specific mechanism.
+- `watch-*.ts` — run the clock and report what emerged over time.
+
+```ts
+/**
+ * One paragraph: what is invisible without this, and what the reader should look for.
+ *
+ * Run: `npx tsx tools/dump-thing.ts [level]`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+// …engine imports…
+
+let problems = 0;
+function check(ok: boolean, what: string): void {
+  if (!ok) { console.log(`  !! ${what}`); problems++; }
+}
+
+async function main(): Promise<void> {
+  // 1. Load the real files. Never synthesise a dungeon.
+  const loader = new DungeonLoader();
+  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = loader.getData();
+  if (!data) throw new Error('dungeon.dat did not load');
+
+  // 2. Stand up the real objects, with a FIXED seed so the run repeats.
+  const random = new CsbRandom(0x12345678);
+
+  // 3. Drive it.
+
+  // 4. Print a table a human can sanity-check.
+  console.log(['thing', 'at', 'value'].join('\t'));
+
+  // 5. Assert invariants.
+  check(somethingTrue, 'what should have held');
+
+  console.log(problems === 0 ? 'ALL CHECKS PASSED' : `${problems} CHECK(S) FAILED`);
+  process.exitCode = problems === 0 ? 0 : 1;
+}
+
+main();
+```
+
+**Top-level `await` breaks under `tsx`** — always wrap in `async function main()` and
+call it.
+
+## The canary technique
+
+The strongest evidence that an extracted table is at the right offset is a value that
+could only be right by luck. Look for one and print it.
+
+- Attack names read `BLOCK, CHOP, PUNCH, KICK…` in `ATTACKTYPE` order → graphic `0x230`
+  offsets are right.
+- A Screamer's remains come back as misc type 33, which is `misc_ScreamerSlice` → the
+  whole `MonsterDroppings` range-split arithmetic is right.
+- The clothing bit-7 flag is set on exactly the seven shields and nothing else.
+- Monster AI timers get `uByte5 = 255 - movementTicks06` per type, matching the
+  descriptor dump.
+
+A table of plausible-looking numbers proves nothing. A table where one entry spells a
+word proves the offsets.
+
+## Suspect the test before the port
+
+This happened **twice in one session**, and both times the port was right:
+
+- Timer renumbering "didn't happen" — the test had built a state the game cannot
+  reach (per-member timers outside fear state 6, which is the only state that creates
+  them).
+- Wounds "never occurred" at 4/200 — the test counted saturation, not frequency,
+  because wounds accumulate into one mask. Resetting between hits gave 163/200.
+
+When an assertion fails, re-read the C++ for a **gate you missed** before touching the
+port. A failing check that turns out to be a wrong test is still valuable: pin the real
+behaviour with an extra case explaining why it looks like an omission.
+
+## Gotchas
+
+**Tools build their own tables.** Each tool constructs its own `timerTables` /
+`actuatorTables`. Adding a field in `main.ts` does **not** reach them — the armour test
+silently measured nothing until the tool got the same tables. When you add a table,
+grep `tools/` and update every constructor.
+
+**Seed fixed, always.** `new CsbRandom(0x12345678)`. An unseeded run is not a test.
+
+**Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
+overrides `Math.random` to make the golden frames reproducible; anything that draws
+from it during setup shifts every frame. `CsbRandom` seeds lazily for exactly this
+reason — keep it that way.
+
+**Trace buffers fill up.** Counting events by filtering a capped log undercounts. Use a
+dedicated counter for totals and cap only the sample lines you print.
+
+**Give the clock enough ticks.** Monster move intervals run to 185 ticks; a 60-tick
+window legitimately observes nothing. Size the window from the slowest thing involved.
+
+**Make output diffable.** Tab-separated columns, stable ordering, no timestamps.
+
+## Existing tools worth copying from
+
+| Tool | Pattern it demonstrates |
+| --- | --- |
+| `dump-monster-tables.ts` | Extracted-table dump with a canary |
+| `dump-monster-activation.ts` | Lifecycle + cross-checking two structures agree |
+| `dump-monster-perception.ts` | Probing a predicate against map geometry |
+| `dump-monster-damage.ts` | Multi-case with named sub-cases and a pinned counter-case |
+| `dump-monster-move.ts` | Before/after state around one operation |
+| `dump-monster-ai.ts` | Driving the real timer queue; gate coverage |
+| `watch-monsters.ts` | Emergent behaviour over time, with a safety invariant |
+| `watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
