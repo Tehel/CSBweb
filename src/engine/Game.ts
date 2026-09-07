@@ -1369,22 +1369,6 @@ export class Game {
         return launched;
     }
 
-    recordSpellCast(chIdx: number, incantation: number[], totalManaCost: number): void {
-        if (chIdx < 0 || chIdx >= this.party.state.champions.length) return;
-        if (!incantation || incantation.length === 0) return;
-        const experience = Math.max(0, totalManaCost | 0);
-        if (experience === 0) return;
-        const map = this.dungeonState.getMap(this.party.state.position.z);
-        const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-        const skillNumber = 3; // TODO: use spell definitions to select priest/wizard subskill.
-        adjustSkills(this.party.state.champions, chIdx, skillNumber, experience, AdjustSkillsWhy.CastSpell2, {
-            time: this.state.tickCount,
-            lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
-            experienceMultiplier,
-            applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
-            onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
-        });
-    }
 
     castSpellFromUi(chIdx: number, incantation: number[], totalManaCost: number): number {
         if (chIdx < 0 || chIdx >= this.party.state.champions.length) return 0;
@@ -1463,6 +1447,14 @@ export class Game {
         });
     }
 
+    /**
+     * CSBWin `doc/CSBwin-src/Mouse.cpp:724-736`: `D6W = 8`, `+= 4` for a weapon, and then
+     * for a weapon whose `weaponDesc->uByte1 <= 12` a further `+ uByte3 / 4`.
+     *
+     * TODO: the last term is missing — `weaponDesc` (CSBWin `TAG0099d2`, our
+     * `ObjectTables.weaponDesc`) is not plumbed into the engine yet, only
+     * `objDescObjectType` is. Wire it through `ActuatorTables` and finish the port.
+     */
     private computeThrowSkillGain(obj: ObjectID): number {
         const { category } = decodeObjectID(obj);
         return category === DBType.WEAPON ? 12 : 8;

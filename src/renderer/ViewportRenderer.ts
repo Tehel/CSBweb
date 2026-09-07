@@ -403,6 +403,12 @@ export class ViewportRenderer {
       [base0 + 0, base1 + 0],
     ];
 
+    // CSBWin reads the See-Thru-Walls counter as a boolean each frame:
+    // `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).
+    // The engine already maintains the counter (`Magic.cpp:1314` increments it, TT_73
+    // decrements it — see `TimerSystem.processSeeThruWallsTimer`).
+    this.ui.context.seeThroughWalls = (this.ui.partyState?.seeThruWalls ?? 0) !== 0;
+
     // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6740)
     const useMirrorImages = ((x + y + facing) & 1) !== 0;
     this.ui.context.useMirrorImages = useMirrorImages;

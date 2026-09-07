@@ -266,6 +266,10 @@ function modPositive(value: number, modulo: number): number {
  *
  * This fills `rect` from `src` using jitter offsets and an optional mask.
  * Pixels outside the mask are set to `transparentColor` (then skipped on write).
+ *
+ * TODO: this is a behavioural approximation, not a transcription — the jitter and mask
+ * handling were reconstructed from observed output rather than read off `TAG008c98`.
+ * Verify it line-by-line against the C++ before relying on it for new callers.
  */
 export function tag008c98Index(
   src: IndexedBitmap,

@@ -386,7 +386,10 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
     !hasExactRecord(raw, wallRectanglesOffset + 10 * 8, F0L1) ||
     !hasExactRecord(raw, wallRectanglesOffset + 11 * 8, F0R1)
   ) {
-    // Fallback: locate via pattern search, then trust relative positions.
+    // The packed-tail offset did not carry the expected F0L1/F0R1 records, so locate
+    // wallRectangles[14] by pattern search instead and trust the relative positions
+    // declared in CSBWin `doc/CSBwin-src/Data.h:1238`. This is a validation path, not a
+    // guess: it throws rather than inventing an offset.
     const found = findWallRectanglesOffset(raw);
     if (found < 0) {
       throw new Error('Failed to locate wallRectangles[14] in graphics.dat item 0x22e');
