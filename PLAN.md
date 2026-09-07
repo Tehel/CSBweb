@@ -41,9 +41,10 @@ Verified against the code, not inherited from earlier revisions of this file.
 - Light levels / palette switching, sound, most of the DM UI.
 
 **Known-incomplete, in rough priority order:**
-1. **Message area is wrong** — gameplay text goes through the debug helper `updateDebug()`.
-   See Phase 11. *This is the current priority.*
-2. **No monsters.** `Monster.cpp` is entirely unported: no AI, no movement, no attacks, no
+1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
+   emission, 53-column word wrap, 4 rows with 70-tick expiry, and `updateDebug()` demoted to
+   the external debug log. Scroll *animation* and save-game serialization remain deferred.
+2. **No monsters.** *This is the current priority.* `Monster.cpp` is entirely unported: no AI, no movement, no attacks, no
    creature generators. Several systems carry proxies waiting on it (see Phase 12).
 3. **No champion death / bones / resurrection**, no character creation, no potion drinking.
 4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
@@ -540,7 +541,38 @@ via `setMessageLines()`. Consequences, all confirmed:
    (`d.PushTextUp` / `d.TextScanlineScrollCount`). Land instant row scrolling first and
    record here when the animation is added.
 
-Status: ⏳ not started. Spec complete in `doc/CSBWIN_MESSAGES_REFERENCE.md`.
+Status:
+- ✅ Step 1: `ScrollingText` ported (`src/renderer/csbwin/ScrollingText.ts`) — future-lines
+  queue, `clockTick`, per-row 70/700-tick timeouts with the monotonic clamp,
+  `removeTimedOutText`, `createNewTextRow`/`scrollUp`, `discardText`, `resetTime`.
+- ✅ Step 2: `PrintLines` tokenizer ported — 53-column word wrap, 2-column continuation
+  indent, single-space handling, LF-guard.
+- ✅ Step 3: two-stage queue (`quePrintLines` → `pump()` → `printLines`), pumped once per
+  game tick from `main.ts`. Deviation: CSBWin's main loop drains one fragment per iteration
+  at well above the clock rate; our pump runs at the 4 Hz tick, so it drains the whole queue
+  at once. Equivalent, because `printLines()` ends with a `clockTick()` regardless.
+- ✅ Step 4: callers converted to fragments. `SpellErrorMsg` and `StandardSpellMessage`
+  (colour 4) in `src/engine/Game.ts`; `LevelUp` (per-champion colour `d.Byte1386`) and room
+  text (colour 15, no explicit linefeed — the decoder prepends it) in
+  `src/engine/ActuatorSystem.ts`. Engine emits through an injected `MessageSink`
+  (`printLinefeed()` / `quePrintLines()`) rather than CSBWin's globals, so the engine stays
+  independent of the renderer.
+- ✅ Step 5: drawn from the index buffer at CSBWin geometry; `setMessageLines()` and the
+  `messageLines` field are gone from `ViewportRenderer`.
+- ✅ Step 6: `updateDebug()` now writes only to the external `#log` div, which was made a
+  bounded auto-scrolling region. The in-game area is reserved for gameplay text.
+- ✅ Verified against CSBWin semantics with a throwaway harness: fragment messages produce
+  one wrapped line (previously four hard-broken ones), 4-row fill-then-scroll, exact 70-tick
+  expiry, monotonic clamp, leading-LF room text, and 53-column wrap with 2-column indent.
+  Deliberately not kept as a test — there is no test framework yet (Phase 15 should adopt
+  these cases as its first tests).
+- ⏳ Step 7 deferred as planned: the pixel-level scroll animation (`d.PushTextUp` /
+  `d.TextScanlineScrollCount`) is not implemented; rows scroll instantly, and the guards
+  CSBWin uses to wait for that animation are absent.
+- ⏳ Also deferred: `SCROLLING_TEXT::Serialize` (message state in save games,
+  `doc/CSBwin-src/Data.h:1666`). Quick-load currently calls `discardText()` instead, so
+  tick-based timeouts can't be left stale by a clock jump.
+- ⏳ `d.PartySleeping` is plumbed (`setPartySleeping`) but never set — no sleep system yet.
 
 ### Phase 12 — Monsters: AI, movement, combat
 
@@ -603,6 +635,12 @@ Goal: undo the drift that makes each new port harder than the last.
    Keep them behind an explicit dev flag or delete them.
 3. ⏳ **Remove remaining fallbacks/placeholders**, or mark each with a TODO naming the CSBWin
    function it stands in for.
+   - Specific case: `src/engine/MovementSystem.ts` invents English gameplay strings
+     ("A wall blocks your path", "You step into a pit!", "You feel a strange sensation...",
+     "You find stairs", "The edge of the dungeon blocks your path"). **None of these exist
+     in CSBWin** — verified by grep over `doc/CSBwin-src/`; the real game answers a blocked
+     move with a sound, not text. They now go to the debug log rather than the in-game
+     message area; they should be deleted along with the `message` field on the move result.
 4. ⏳ **Retire `static/js/`.** It was a hand-made proof-of-concept for browsing the `.dat`
    files and the main project no longer depends on it (all source comments pointing at it
    have been removed). One fact from it must survive: the **sound sample rates**, which are

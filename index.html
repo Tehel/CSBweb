@@ -55,12 +55,16 @@
         #map {
             background-color: #888;
         }
+        /* Developer/debug output only. Gameplay messages render inside the canvas,
+           in CSBWin's 4-row scrolling message area. */
         #log {
             background-color: #999;
-            /* margin-top: 20px;
-            text-align: left;
-            max-width: 640px;
-            font-size: 12px; */
+            max-height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 11px;
+            line-height: 1.25;
+            padding: 2px 4px;
         }
         #hover {
             background-color: #aaa;
@@ -132,7 +136,7 @@
             <div id="map">
                 <canvas id="map-canvas" width="360" height="360"></canvas>
             </div>
-            <div id="log">...log...</div>
+            <div id="log"></div>
             <div id="hover">...hover...</div>
         </div>
     </div>

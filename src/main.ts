@@ -13,6 +13,7 @@ import { extractObjectTables } from './renderer/csbwin/ObjectTables';
 import { extractUITables } from './renderer/csbwin/UITables';
 import { extractViewportTables } from './renderer/csbwin/ViewportTables';
 import { bindUIContext, drawMapPreview, handleCursorFilter, updateDebug, appendLog, clearLog } from './ui';
+import { scrollingText } from './renderer/csbwin/ScrollingText';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -685,6 +686,10 @@ function quickLoad(): void {
         const saveState = loadSaveGameState(saveBytes);
         applySaveGameState(game.state.dungeon, saveState);
         game.applyRuntimeSaveState(parsed.runtime);
+        // Message timeouts are game-tick based, so a load that moves the clock would leave
+        // rows that expire at the wrong time (or never). CSBWin serializes the text area
+        // (doc/CSBwin-src/Data.h:1666); until we do, discard it. See PLAN.md Phase 11.
+        scrollingText.discardText();
         renderView();
         updateDebug('Quick-loaded');
     } catch (error) {
@@ -773,7 +778,8 @@ async function init() {
                 word1074: uiTables.graphic232.word1074,
                 cursorFilter: handleCursorFilter,
                 onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
-                onTextMessage: (text) => updateDebug(text),
+                messages: scrollingText,
+                championMessageColors: uiTables.graphic232.byte1386,
                 playSound: (soundId, rateIdx, distance) => soundManager?.playSound(soundId, rateIdx, distance),
             };
             timerTables = {
@@ -858,9 +864,13 @@ async function init() {
                 }
             });
 
-            // Register tick callback to update view
+            // Register tick callback to update view.
+            // The message queue is pumped here, mirroring CSBWin's main loop
+            // (doc/CSBwin-src/CSBCode.cpp:716) — see doc/CSBWIN_MESSAGES_REFERENCE.md.
             game.onTick(() => {
-                 if (renderer && game) renderView();
+                 if (!renderer || !game) return;
+                 scrollingText.pump(game.getTickCount());
+                 renderView();
             });
 
             // Start game loop

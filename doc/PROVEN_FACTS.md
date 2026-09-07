@@ -274,6 +274,6 @@ This is therefore one of the very few places where we intentionally do *not* fol
 CSBWin. Do not "fix" `ratesDefault` / the door rates in `src/audio/soundsIndex.ts` to
 match the C++ source.
 
-Related open question (see `NOTES.md`): doors still do not sound like the real game.
-The rate *values* are correct, so the suspect is which variant index gets selected when
-a door sound is played, not the table itself.
+The door sound specifically was verified correct in DMweb: the divergence toward the JS
+pitch has already been applied and matches the real game. (`NOTES.md` still carries an
+older entry saying doors sound wrong — that entry is stale.)

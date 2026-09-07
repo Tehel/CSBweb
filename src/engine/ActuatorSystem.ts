@@ -74,6 +74,25 @@ export type AdjustSkillsFilterHook = (params: {
   why: number;
 }) => { chIdx: number; skillNumber: number; experience: number } | null;
 
+/**
+ * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
+ * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1654`, `:1744`).
+ *
+ * Messages are composed from FRAGMENTS that flow onto one logical line and get word-wrapped
+ * by the message area — never from pre-split strings containing newlines.
+ * See `doc/CSBWIN_MESSAGES_REFERENCE.md`.
+ *
+ * Injected rather than imported as a global so the engine stays independent of the renderer.
+ */
+export interface MessageSink {
+  printLinefeed(): void;
+  quePrintLines(color: number, text: string): void;
+}
+
+/** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */
+export const MSG_COLOR_SPELL = 4;
+export const MSG_COLOR_ROOM_TEXT = 15;
+
 export interface ActuatorTables {
   roomTimerFunctions?: ArrayLike<number>;
   objDescObjectType?: ArrayLike<number>;
@@ -82,7 +101,9 @@ export interface ActuatorTables {
   word1074?: ArrayLike<number>;
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
-  onTextMessage?: (text: string) => void;
+  messages?: MessageSink;
+  /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
+  championMessageColors?: ArrayLike<number>;
   adjustSkillsFilter?: AdjustSkillsFilterHook;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
 }
@@ -92,7 +113,8 @@ export class ActuatorSystem {
   private objDescObjectType: ArrayLike<number> | null;
   private cursorFilter?: CursorFilterHook;
   private onAddCharacter?: AddCharacterHook;
-  private onTextMessage?: (text: string) => void;
+  private messages?: MessageSink;
+  private championMessageColors?: ArrayLike<number>;
   private adjustSkillsFilter?: AdjustSkillsFilterHook;
   private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
@@ -112,7 +134,8 @@ export class ActuatorSystem {
     this.objDescObjectType = tables?.objDescObjectType ?? null;
     this.cursorFilter = tables?.cursorFilter;
     this.onAddCharacter = tables?.onAddCharacter;
-    this.onTextMessage = tables?.onTextMessage;
+    this.messages = tables?.messages;
+    this.championMessageColors = tables?.championMessageColors;
     this.adjustSkillsFilter = tables?.adjustSkillsFilter;
     this.playSound = tables?.playSound;
   }
@@ -122,15 +145,20 @@ export class ActuatorSystem {
     if (tables.objDescObjectType) this.objDescObjectType = tables.objDescObjectType;
     if (tables.cursorFilter) this.cursorFilter = tables.cursorFilter;
     if (tables.onAddCharacter) this.onAddCharacter = tables.onAddCharacter;
-    if (tables.onTextMessage) this.onTextMessage = tables.onTextMessage;
+    if (tables.messages) this.messages = tables.messages;
+    if (tables.championMessageColors) this.championMessageColors = tables.championMessageColors;
     if (tables.adjustSkillsFilter) this.adjustSkillsFilter = tables.adjustSkillsFilter;
     if (tables.playSound) this.playSound = tables.playSound;
   }
 
-  emitTextMessage(text: string): void {
-    if (!this.onTextMessage) return;
-    if (!text) return;
-    this.onTextMessage(text);
+  /** Expose the message sink so sibling systems (Game) can compose fragments. */
+  getMessages(): MessageSink | undefined {
+    return this.messages;
+  }
+
+  /** CSBWin per-champion message colour `d.Byte1386[chIdx]`; 13 is the historical default. */
+  getChampionMessageColor(chIdx: number): number {
+    return this.championMessageColors?.[chIdx] ?? 13;
   }
 
   queueSwitchActionForActuator(actuator: ActuatorRecord, action: ActuatorAction, level: number, mapPos?: number): void {
@@ -622,8 +650,11 @@ export class ActuatorSystem {
         if (dbType === DBType.TEXT && movedObjectDBType === -1 && place && !unchangedRoom) {
           const rec = this.dungeon.getTextRecord(rn);
           const text = rec ? this.dungeon.decodeMessageText(rec) : null;
-          if (text && this.onTextMessage) {
-            this.onTextMessage(text);
+          // CSBWin: `QuePrintLines(15, text)` with no preceding PrintLinefeed() — the
+          // decoder prepends the linefeed itself for typeOfText 1
+          // (doc/CSBwin-src/Code11f52.cpp:3962, doc/CSBwin-src/CSBCode.cpp:5510).
+          if (text && this.messages) {
+            this.messages.quePrintLines(MSG_COLOR_ROOM_TEXT, text);
           }
           continue;
         }
@@ -727,13 +758,20 @@ export class ActuatorSystem {
   }
 
   private queueLevelUpMessage(chIdx: number, basicSkill: number): void {
-    if (!this.onTextMessage) return;
+    if (!this.messages) return;
     const party = this.getPartyState();
     const champ = party.champions[chIdx];
     if (!champ) return;
     const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
     const label = labels[basicSkill] ?? 'SKILL';
-    this.onTextMessage(`${champ.name}\nJUST GAINED A\n${label}\nLEVEL`);
+    // CSBWin LevelUp (doc/CSBwin-src/Magic.cpp:173-177): linefeed, then four fragments in
+    // the champion's own colour, flowing onto one wrapped line.
+    const color = this.getChampionMessageColor(chIdx);
+    this.messages.printLinefeed();
+    this.messages.quePrintLines(color, champ.name);
+    this.messages.quePrintLines(color, ' JUST GAINED A ');
+    this.messages.quePrintLines(color, label);
+    this.messages.quePrintLines(color, ' LEVEL');
   }
 
   notifyLevelUp(chIdx: number, basicSkill: number): void {

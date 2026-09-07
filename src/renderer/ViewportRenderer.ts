@@ -29,6 +29,7 @@ import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
 import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData, type FontData } from './csbwin/TextRenderer';
+import { scrollingText } from './csbwin/ScrollingText';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   initializeFloorCeilingIndexed,
@@ -191,7 +192,6 @@ export class ViewportRenderer {
   private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
   private uiTables: UITables | null = null;
   private fontData: FontData | null = null;
-  private messageLines: string[] = [];
   private partyState: PartyState | null = null;
   private objectTables: ObjectTables | null = null;
   private pressingEye: boolean = false;
@@ -324,10 +324,6 @@ export class ViewportRenderer {
 
   setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void): void {
     this.onSpellCast = handler;
-  }
-
-  setMessageLines(lines: string[]): void {
-    this.messageLines = lines.slice(0, 4);
   }
 
   setPartyState(state: PartyState | null): void {
@@ -1792,19 +1788,13 @@ export class ViewportRenderer {
     }
   }
 
+  /**
+   * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
+   * `ScrollingText`; the renderer only paints its current rows.
+   */
   private drawMessageLines(): void {
-    if (!this.uiTables || !this.fontData || !this.screenIndexBuffer) return;
-    if (this.messageLines.length === 0) return;
-
-    const baseY = 177;
-    const lineHeight = 7;
-    const color = 15;
-
-    for (let i = 0; i < this.messageLines.length; i++) {
-      const text = this.messageLines[i];
-      const y = baseY + i * lineHeight;
-      drawTextLineIndex(this.screenIndexBuffer, this.fontData, 0, y, color, null, text);
-    }
+    if (!this.fontData || !this.screenIndexBuffer) return;
+    scrollingText.draw(this.screenIndexBuffer, this.fontData);
   }
 
   private drawPartyStatus(): void {

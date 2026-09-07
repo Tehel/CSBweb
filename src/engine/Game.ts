@@ -20,6 +20,7 @@ import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from '.
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
+import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -1098,27 +1099,52 @@ export class Game {
         return `${text.slice(0, idx)}${champion.name}${text.slice(idx + 1)}`;
     }
 
+    /**
+     * CSBWin `StandardSpellMessage()` (`doc/CSBwin-src/Magic.cpp:1058`): a linefeed, then the
+     * text in colour 4, with '%' replaced by the caster's name. One logical line — the
+     * message area word-wraps it.
+     */
     private emitSpellMessage(text: string): void {
-        this.actuators.emitTextMessage(text);
+        const messages = this.actuators.getMessages();
+        if (!messages || !text) return;
+        messages.printLinefeed();
+        messages.quePrintLines(MSG_COLOR_SPELL, text);
     }
 
+    /**
+     * CSBWin `SpellErrorMsg()` (`doc/CSBwin-src/Magic.cpp:1004`).
+     *
+     * Emitted as a linefeed followed by separate fragments, all colour 4. The fragments carry
+     * their own leading/trailing spaces and flow onto a single wrapped line — CSBWin never
+     * puts a hard newline between the champion name and the message body.
+     */
     private spellErrorMsg(champion: Champion, code: number, skillNumber: number): void {
+        const messages = this.actuators.getMessages();
+        if (!messages) return;
+
+        let base = skillNumber | 0;
+        if (base > 3) base = Math.floor((base - 4) / 4);
+
+        messages.printLinefeed();
+        messages.quePrintLines(MSG_COLOR_SPELL, champion.name);
+
         switch (code | 0) {
             case 0: {
-                let base = skillNumber | 0;
-                if (base > 3) base = Math.floor((base - 4) / 4);
                 const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
                 const label = labels[base] ?? 'SKILL';
-                this.emitSpellMessage(`${champion.name}\nNEEDS MORE PRACTICE WITH THIS\n${label} SPELL.`);
+                messages.quePrintLines(MSG_COLOR_SPELL, ' NEEDS MORE PRACTICE WITH THIS ');
+                messages.quePrintLines(MSG_COLOR_SPELL, label);
+                messages.quePrintLines(MSG_COLOR_SPELL, ' SPELL.');
                 break;
             }
             case 1:
-                this.emitSpellMessage(`${champion.name}\nMUMBLES A MEANINGLESS SPELL.`);
+                messages.quePrintLines(MSG_COLOR_SPELL, ' MUMBLES A MEANINGLESS SPELL.');
                 break;
             case 10:
-                this.emitSpellMessage(`${champion.name}\nNEEDS AN EMPTY FLASK IN HAND FOR POTION.`);
+                messages.quePrintLines(MSG_COLOR_SPELL, ' NEEDS AN EMPTY FLASK IN HAND FOR POTION.');
                 break;
             default:
+                messages.quePrintLines(MSG_COLOR_SPELL, ' UNKNOWN SPELL ERROR');
                 break;
         }
     }
