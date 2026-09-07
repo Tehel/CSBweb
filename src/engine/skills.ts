@@ -1,4 +1,13 @@
 import type { Champion, Skill } from './gameTypes';
+import {
+    OBJNI_EKKHARD_CROSS,
+    OBJNI_GEM_OF_AGES,
+    OBJNI_MOONSTONE,
+    OBJNI_PENDANT_FERAL,
+    OBJNI_SCEPTRE_OF_LYF,
+    OBJNI_THE_FIRESTAFF_A,
+    OBJNI_THE_FIRESTAFF_B,
+} from '../core/objectNameIndex';
 
 const SKILL_EXPERIENCE_LIMIT = 0x10000000;
 const SUBSKILL_START = 4;
@@ -7,14 +16,6 @@ const TOTAL_SKILLS = 20;
 const MAX_HP = 999;
 const MAX_STAMINA = 9999;
 const MAX_MANA = 900;
-
-const OBJNI_THE_FIRESTAFF_A = 28;
-const OBJNI_THE_FIRESTAFF_B = 29;
-const OBJNI_SCEPTRE_OF_LYF = 68;
-const OBJNI_GEM_OF_AGES = 122;
-const OBJNI_EKKHARD_CROSS = 123;
-const OBJNI_MOONSTONE = 124;
-const OBJNI_PENDANT_FERAL = 126;
 
 export enum AdjustSkillsWhy {
   Unknown = 0,

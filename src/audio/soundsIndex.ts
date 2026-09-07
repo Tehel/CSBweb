@@ -26,6 +26,15 @@ export interface SoundTableEntry {
   byte7: number;
 }
 
+/**
+ * Playback rates for the 4-bit PCM sounds, in Hz.
+ *
+ * DELIBERATE DIVERGENCE FROM CSBWIN: these rates come from the original JS
+ * proof-of-concept and were validated against the real Atari ST software
+ * (emulator + vintage-hardware video). CSBWin's own rates are wrong here.
+ * Do not "fix" these to match the C++ source.
+ * See doc/PROVEN_FACTS.md - "Audio sample rates".
+ */
 export const ratesDefault = [5486];
 
 const baseSounds: Record<number, SoundInfo> = {

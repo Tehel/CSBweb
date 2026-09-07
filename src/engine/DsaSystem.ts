@@ -30,6 +30,10 @@ import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
+import {
+    OBJNI_ILLUMULET_A,
+    OBJNI_ILLUMULET_B,
+} from '../core/objectNameIndex';
 
 export interface DsaTables {
   roomTimerFunctions?: ArrayLike<number>;
@@ -174,8 +178,6 @@ const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKIL
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
 
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
-const OBJNI_ILLUMULET_A = 12;
-const OBJNI_ILLUMULET_B = 13;
 
 const enum DsaMoveError {
   SER_OK = 0,

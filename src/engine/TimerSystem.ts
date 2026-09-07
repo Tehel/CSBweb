@@ -1074,19 +1074,24 @@ export class TimerSystem {
     return -1;
   }
 
+  /**
+   * Mirrors CSBWin `FindFirstMonster()` + `RN::NonMaterial()`
+   * (doc/CSBwin-src/Code11f52.cpp:533, doc/CSBwin-src/data.cpp:553).
+   * Only the FIRST monster in the cell chain is consulted, exactly as the
+   * false-wall timer does (doc/CSBwin-src/Timer.cpp:1466-1472).
+   */
   private isNonMaterialMonsterAt(position: Position): boolean {
     const table = this.tables?.monsterDesc;
     if (!table) return false;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
-      if (decoded.category !== DBType.CREATURE) continue;
+      if (decodeObjectID(rn).category !== DBType.CREATURE) continue;
       const rec = this.dungeon.getCreatureRecord(rn);
-      if (!rec) continue;
+      if (!rec) return false;
       const desc = table[rec.creatureType];
-      if (!desc) continue;
-      if ((desc.word2 & 0x40) !== 0) return true;
+      if (!desc) return false;
+      return (desc.word2 & 0x40) !== 0;
     }
-    return allowed.length === 0;
+    return false;
   }
 
   private processPortraitTimer(timer: TimerEntry, actuator: ActuatorRecord): void {

@@ -1,7 +1,7 @@
 /**
  * Game constants
  *
- * Based on CSBWin and static/js/mediaindex.js
+ * Reference: CSBWin (doc/CSBwin-src/)
  */
 
 import type { Palette } from './types';
@@ -79,7 +79,7 @@ export const GraphicIndex = {
 
 /**
  * Sound indices (graphics.dat SND1 items)
- * Based on static/js/mediaindex.js sound table.
+ * Reference: CSBWin sound table.
  */
 export const SoundIndex = {
     FALLING_ITEM: 533,

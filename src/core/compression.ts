@@ -1,8 +1,7 @@
 /**
  * Compression algorithms for Dungeon Master data files
  *
- * Based on static/js/pack.js
- * Algorithms verified against CSBWin implementation
+ * Algorithms verified against the CSBWin implementation.
  */
 
 import type { ui8, ui16 } from './types';

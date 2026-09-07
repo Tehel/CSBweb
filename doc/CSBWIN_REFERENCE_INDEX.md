@@ -12,6 +12,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_MOVEMENT_REFERENCE.md` - Movement blocking rules and collision constraints.
 - `doc/CSBWIN_INPUT_REFERENCE.md` - Mouse routing, viewport interaction, and throw gating.
 - `doc/CSBWIN_MAGIC_REFERENCE.md` - Magic UI selection, rune entry, and caster tabs.
+- `doc/CSBWIN_MESSAGES_REFERENCE.md` - Scrolling message area: queue, word wrap, 4 rows, timeouts, colours.
 - `doc/CSBWIN_MISSILES_REFERENCE.md` - Missile timers, movement, and encounter resolution.
 - `doc/CSBWIN_DSA_REFERENCE.md` - DSA loading, timers, and STKOP behaviors.
 - `doc/CSBWIN_DECORATIONS_REFERENCE.md` - Wall/floor decoration eligibility and rendering rules.

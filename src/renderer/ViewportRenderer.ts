@@ -43,11 +43,49 @@ import {
 } from './ViewportGraphics';
 import { getOrSet, Position, SoundIndex } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
-import { updateDebug, updateHover } from '@/ui';
+import { updateHover } from '@/ui';
 import { GraphicRoomType } from './bytecode/Types';
 import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 import { determineMastery as determineMasteryEngine } from '../engine/skills';
+import {
+    OBJNI_APPLE,
+    OBJNI_BONES_A,
+    OBJNI_COMPASS_N,
+    OBJNI_COMPASS_W,
+    OBJNI_DRAGON_STEAK,
+    OBJNI_ELVEN_BOOTS,
+    OBJNI_EMPTY_FLASK,
+    OBJNI_EYE_OF_TIME_A,
+    OBJNI_FIRST_FULL_FLASK,
+    OBJNI_FIRST_MODIFIABLE,
+    OBJNI_FLAMITT_A,
+    OBJNI_ILLUMULET_A,
+    OBJNI_ILLUMULET_B,
+    OBJNI_JEWEL_SYMAL_A,
+    OBJNI_LAST_FULL_FLASK,
+    OBJNI_LAST_MODIFIABLE,
+    OBJNI_OPEN_CHEST,
+    OBJNI_OPEN_SCROLL,
+    OBJNI_RA_BLADE_A,
+    OBJNI_SCROLL,
+    OBJNI_SPECIAL_C,
+    OBJNI_SPECIAL_D,
+    OBJNI_SPECIAL_E,
+    OBJNI_SPECIAL_F,
+    OBJNI_SPECIAL_G,
+    OBJNI_SPECIAL_H,
+    OBJNI_SPECIAL_J,
+    OBJNI_SPECIAL_N,
+    OBJNI_STAFF_OF_CLAWS_A,
+    OBJNI_STORM_A,
+    OBJNI_STORM_RING_A,
+    OBJNI_TORCH_A,
+    OBJNI_TORCH_D,
+    OBJNI_WATER,
+    OBJNI_WATERSKIN,
+    OBJNI_WATER_FLASK,
+} from '../core/objectNameIndex';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -93,53 +131,6 @@ export interface FloorCeiling {
   normal: Uint8Array;
   mirrored: Uint8Array;
 }
-
-const OBJNI_FIRST_MODIFIABLE = 0;
-const OBJNI_LAST_MODIFIABLE = 31;
-const OBJNI_FIRST_FULL_FLASK = 148;
-const OBJNI_LAST_FULL_FLASK = 163;
-
-const OBJNI_COMPASS_N = 0;
-const OBJNI_COMPASS_W = 3;
-const OBJNI_TORCH_A = 4;
-const OBJNI_TORCH_B = 5;
-const OBJNI_TORCH_C = 6;
-const OBJNI_TORCH_D = 7;
-const OBJNI_WATERSKIN = 8;
-const OBJNI_WATER = 9;
-const OBJNI_JEWEL_SYMAL_A = 10;
-const OBJNI_ILLUMULET_A = 12;
-const OBJNI_ILLUMULET_B = 13;
-const OBJNI_FLAMITT_A = 14;
-const OBJNI_EYE_OF_TIME_A = 16;
-const OBJNI_STORM_RING_A = 18;
-const OBJNI_STAFF_OF_CLAWS_A = 20;
-const OBJNI_STORM_A = 23;
-const OBJNI_RA_BLADE_A = 25;
-const OBJNI_THE_FIRESTAFF_A = 28;
-const OBJNI_THE_FIRESTAFF_B = 29;
-const OBJNI_OPEN_SCROLL = 30;
-const OBJNI_SCROLL = 31;
-const OBJNI_SCEPTRE_OF_LYF = 68;
-const OBJNI_OPEN_CHEST = 91;
-const OBJNI_BONES_A = 93;
-const OBJNI_ELVEN_BOOTS = 119;
-const OBJNI_GEM_OF_AGES = 122;
-const OBJNI_EKKHARD_CROSS = 123;
-const OBJNI_MOONSTONE = 124;
-const OBJNI_PENDANT_FERAL = 126;
-const OBJNI_WATER_FLASK = 163;
-const OBJNI_APPLE = 168;
-const OBJNI_DRAGON_STEAK = 175;
-const OBJNI_EMPTY_FLASK = 195;
-const OBJNI_SPECIAL_C = 201;
-const OBJNI_SPECIAL_D = 202;
-const OBJNI_SPECIAL_E = 203;
-const OBJNI_SPECIAL_F = 204;
-const OBJNI_SPECIAL_G = 205;
-const OBJNI_SPECIAL_H = 206;
-const OBJNI_SPECIAL_J = 208;
-const OBJNI_SPECIAL_N = 212;
 
 const MISC_BONES_OF_HERO = 5;
 const MAX_LINES_IN_SCROLL = 9;
@@ -469,7 +460,7 @@ export class ViewportRenderer {
     }
 
     if (!this.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
-    this.lastRenderPosition = { x, y, z };
+    this.lastRenderPosition = new Position(x, y, z);
     this.lastRenderFacing = facing;
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
@@ -3115,7 +3106,6 @@ export class ViewportRenderer {
     if (outcome.playGulp && this.playSound) this.playSound(SoundIndex.SWALLOW);
   }
 
-
   private computeFeedingOutcome(objectId: number): FeedingOutcome | null {
     if (!this.objectTables) return null;
     const isRecord = this.isLikelyObjectRecord(objectId);
@@ -3256,10 +3246,7 @@ export class ViewportRenderer {
 
   private renderLastFrame(): void {
     if (!this.lastRenderPosition) return;
-    this.render(
-      { x: this.lastRenderPosition.x, y: this.lastRenderPosition.y, z: this.lastRenderPosition.z },
-      this.lastRenderFacing
-    );
+    this.render(this.lastRenderPosition, this.lastRenderFacing);
   }
 
   private nowMs(): number {

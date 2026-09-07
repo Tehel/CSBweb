@@ -1,10 +1,7 @@
 /**
  * Binary file reader with support for big-endian data
  *
- * Based on static/js/file.js but with:
- * - TypeScript types
- * - Modern fetch API
- * - Explicit endianness handling
+ * All game data is big-endian (Atari ST heritage).
  * - Error checking
  */
 

@@ -2,8 +2,7 @@
  * Graphics.dat loader
  *
  * Complete parser for Dungeon Master graphics files
- * Based on static/js/graphics.js and CSBWin Graphics.cpp
- * Reference: doc/notes.txt (IMG1/IMG2 format)
+ * Reference: CSBWin Graphics.cpp; doc/GRAPHICS_MAPPINGS.md
  */
 
 import { BinaryFile, Endianness } from '../core/BinaryFile';

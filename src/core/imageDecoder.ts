@@ -1,8 +1,7 @@
 /**
  * IMG1/IMG2 image format decoder
  *
- * Based on static/js/graphics.js and documentation in doc/notes.txt
- * IMG1/IMG2 are RLE-compressed 16-color images
+ * IMG1/IMG2 are RLE-compressed 16-color images.
  *
  * Reference: CSBWin Bitmaps.cpp, dmweb.free.fr documentation
  */
@@ -35,7 +34,7 @@ export interface DecodedImage extends ImageDimensions {
  * - 2 bytes: height
  * - N bytes: RLE-compressed nibble data
  *
- * RLE Algorithm (see doc/notes.txt lines 20-50):
+ * RLE Algorithm (reference: CSBWin Bitmaps.cpp):
  * Each block starts with 2 nibbles: [nib1][nib2]
  *
  * nib1 determines action:

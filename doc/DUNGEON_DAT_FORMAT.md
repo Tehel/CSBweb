@@ -2,7 +2,7 @@
 
 Complete technical specification for Dungeon Master / Chaos Strikes Back dungeon.dat files.
 
-**Source**: dmweb.free.fr documentation (archived in `doc/dungeon format.html`)
+**Source**: dmweb.free.fr documentation (archived in `doc/external/dungeon format.html`)
 **Applies to**: Dungeon Master, Chaos Strikes Back, Dungeon Master II
 **Platforms**: All (Atari ST, Amiga, PC, Mac, etc.)
 **Date**: 2026-01-04

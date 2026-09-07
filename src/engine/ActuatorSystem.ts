@@ -39,8 +39,10 @@ import {
 import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
+import {
+    OBJNI_NOT_AN_OBJECT,
+} from '../core/objectNameIndex';
 
-const OBJNI_NOT_AN_OBJECT = 255;
 const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
 const PORTRAIT_INACTIVE = 1;
 

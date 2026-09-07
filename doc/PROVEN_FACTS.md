@@ -256,3 +256,24 @@ CSBWin does not hard-code the `RectPos` coordinate tables in C++ source; they ar
 - `CSBCode.cpp:10125`: `ReadAndExpandGraphic(0x8000|0x22e, (ui8 *)d.Byte7248+2, 0,0);`
 - `Data.h:1109+`: marks the loaded region as “Start of graphic 0x22e”
 - `Data.h:1238`: `RectPos wallRectangles[14];` (and many related viewport rectangles) are within that region
+
+## Audio sample rates (deliberate divergence from CSBWin)
+
+Sounds in `graphics.dat` are **4-bit unsigned mono PCM** (SND items, `SNDexpand`).
+
+Playback rates:
+- **5486 Hz** for every sound, **except**
+- **4237 Hz** for the second (front) variant of the door sound.
+
+Provenance: these rates come from the original hand-made JavaScript proof-of-concept
+(`static/js/mediaindex.js`) and were validated by the project author against the real
+Atari ST software running under emulation and against video of the game on vintage
+hardware. **CSBWin's own playback rates are wrong here.**
+
+This is therefore one of the very few places where we intentionally do *not* follow
+CSBWin. Do not "fix" `ratesDefault` / the door rates in `src/audio/soundsIndex.ts` to
+match the C++ source.
+
+Related open question (see `NOTES.md`): doors still do not sound like the real game.
+The rate *values* are correct, so the suspect is which variant index gets selected when
+a door sound is played, not the table itself.

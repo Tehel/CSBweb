@@ -1,15 +1,61 @@
-# dmweb – Implementation Plan (Renderer Compliance First)
+# dmweb – Implementation Plan
 
 Project priority: **maximum compliance with the CSBWin C++ implementation** in `doc/CSBwin-src/`.
 
-## Status (Current)
+This document is the **authority on detailed project status**. Every phase carries progress
+markers; keep them honest. Marker meanings:
 
-- Renderer choice: ✅ **Bytecode-based renderer only** (authoritative path)
-- Phase 1: ✅ all `graphics.dat` `0x22e` rectangle tables wired
-- Input handling: ✅ movement keys are queued (length 3) and processed in order to mirror CSBWin’s key queue
-- Timing parity: ✅ immediate timer processing after movement to avoid 1-tick delay on pressure pad actions
-- Actuator parity: ✅ object drop/pick now triggers pressure-pad logic, and pad context ignores the moved object (matching CSBWin PlaceOrRemoveObjectInRoom ordering)
-- Timer parity: ✅ `TimerQueue` now mirrors CSBWin duplicate-timer suppression for map timers and door-step interactions; latest conflicting timer replaces older entry
+- ✅ done and believed faithful to CSBWin
+- ⚠️ implemented but knowingly diverges or is incomplete — the note says how
+- ⏳ not started, or a placeholder stands in for the real logic
+- 🚫 deliberately skipped (the note says why)
+
+**When you defer part of a job, record the deferral here.** A phase marked ✅ with silent
+gaps is worse than one marked ⚠️.
+
+## Ground rules
+
+1. **The build must stay clean.** `npm run build` runs `tsc && vite build`; `tsc --noEmit`
+   must pass with zero errors before any commit. Note that `vite build` alone will happily
+   succeed on broken code — esbuild strips types without checking them — so `tsc` is the
+   only real gate. (The project sat with a broken `tsc` and a genuine runtime bug hidden
+   among the type errors; don't let that recur.)
+2. **No guessed tables in the shipping path.** If a rectangle/offset/formula is not extracted
+   from the game data or transcribed from CSBWin, mark it as temporary.
+3. **One renderer is authoritative**: the bytecode-based path.
+4. Prefer small tooling over manual reasoning: table dumps, render probes, trace hooks.
+
+## Status (September 2026)
+
+Verified against the code, not inherited from earlier revisions of this file.
+
+**Solid:**
+- Data loading: `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, save games (base + extended).
+- Bytecode viewport renderer — the authoritative path. All `0x22e` rectangle tables are
+  extracted at runtime; no guessed geometry remains in the renderer.
+- Movement + collision, CSBWin-style 3-deep key queue, immediate post-move timer processing.
+- Timer queue with CSBWin duplicate-timer suppression.
+- Actuators, DSA scripting, teleporters, pits, doors, false walls.
+- Missiles and throwing (lifecycle, encounters, DSA filters).
+- Skills/experience (mastery, AdjustSkills, LevelUp), magic casting (all three spell classes).
+- Light levels / palette switching, sound, most of the DM UI.
+
+**Known-incomplete, in rough priority order:**
+1. **Message area is wrong** — gameplay text goes through the debug helper `updateDebug()`.
+   See Phase 11. *This is the current priority.*
+2. **No monsters.** `Monster.cpp` is entirely unported: no AI, no movement, no attacks, no
+   creature generators. Several systems carry proxies waiting on it (see Phase 12).
+3. **No champion death / bones / resurrection**, no character creation, no potion drinking.
+4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
+5. **Throw stats are estimates**, not CSBWin's skill/weight/stamina formulas (Phase 9 step 11).
+6. **Debug scaffolding is wired into shipping paths** (Phase 14).
+7. **`ViewportRenderer.ts` is a 3800-line god object** holding the whole UI (Phase 14).
+8. **CSBWin-binary-compatible save files** not attempted (Phase 10).
+
+**Validation debt:** several phases below list "Validation" steps (render tests, render
+probes, pixel comparisons against CSBWin screenshots) that were **never carried out** —
+there is no test framework in the project at all. Verification has been visual and ad hoc.
+Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
 
 ## Next Steps (Phased)
 
@@ -59,7 +105,7 @@ Goal: make “draw primitives” match CSBWin semantics before completing high-l
 4. Implement viewport presentation equivalent of `BLT2Screen()` (copy viewport to screen canvas at `x=47,y=33`).
 
 Validation
-- Add a minimal render test that blits a known wall bitmap into `F0L1` / `F0R1` using extracted rectangles and verifies pixels change where expected.
+- 🚫 Never carried out (no test framework exists). Tracked in Phase 15.
 
 Status:
 - ✅ Palette-index viewport buffer + present-to-RGBA staging (`src/renderer/csbwin/CanvasBlitter.ts`).
@@ -93,7 +139,7 @@ Goal: drive program selection and opcode behavior from real dungeon state.
    - Object list / contents for a cell (even if object drawing is deferred).
 
 Validation
-- Render known positions in `static/gamefiles/dungeon.dat` and compare against expected “qualitative” outcomes (wall vs open vs door etc.) before pixel-perfect checks.
+- ⚠️ Done informally by playing, never scripted. Tracked in Phase 15.
 
 Status:
 - ✅ CSBWin `SummarizeRoomInfo` logic ported from `doc/CSBwin-src/Codea59a.cpp:225` (`src/renderer/csbwin/SummarizeRoomInfo.ts`), including door/stair edge-vs-facing classification and out-of-bounds `GetCellFlags` behavior (`doc/CSBwin-src/CSBCode.cpp:4609`).
@@ -113,7 +159,7 @@ Implement in small, testable batches:
 6. Objects: draw order, occlusion, per-distance sprite selection.
 
 Validation
-- Add a small “render probe” tool that renders a single cell program with controlled inputs and dumps the viewport as PNG.
+- 🚫 Never built. `tools/` contains data-dump scripts only, no render probe. Tracked in Phase 15.
 
 Status:
 - ✅ CSBWin-style `StdBitmapPointers()` and `StdRectanglePointers()` plumbing for `StdBltShape`/`StdBltShapeToViewport`/`StdMirrorShapeToViewport` (`src/renderer/bytecode/BytecodeInterpreter.ts`).
@@ -149,7 +195,8 @@ Goal: support CSBWin’s per-cell “skin” overrides even when the base DM dun
 1. Identify whether the shipped DM dungeon uses custom backgrounds.
 2. Port the minimal `BACKGROUND_LIB`/`skinCache` behaviors needed to select and execute custom code per cell.
 
-Status: skipped
+Status: 🚫 skipped — the shipped DM dungeon does not use custom backgrounds, so this is
+only needed to support third-party CSBWin dungeons. Revisit if we ever load one.
 
 ### Phase 7 — UI Rendering (faithful DM layout)
 Goal: render the original Dungeon Master UI (portraits, status bars, hands, controls, and message area) with CSBWin-accurate layout and graphics.
@@ -164,15 +211,17 @@ Goal: render the original Dungeon Master UI (portraits, status bars, hands, cont
 8. ✅ **Portraits**. Wire `portraitGraphic` to champion data, load internal/external portrait graphics, render real portraits in the top bar and inventory, and add shield dots with the correct per-champion offsets and colors.
    - Note: shield dot rendering is wired but shield values are not yet populated by gameplay state (`partyShield`, `fireShield`, `spellShield`, `champion.shieldStrength`).
 9. ✅ **Status bars**. Implement health/stamina/mana bars in the top bar using CSBWin masks and height rounding with per‑champion colors.
-10. ⏳ **Inventory screen**. Build the full inventory layout (paper-doll slots, backpack grid, eye/mouth overlays) and hook item icons to equipment/backpack state with the correct slot geometry.
-   - Remaining inventory UI work:
-     - Eye/mouth overlays + stat-dependent highlight boxes
-     - Chest/scroll subviews
-     - Object-in-hand/selection interactions
+10. ✅ **Inventory screen**. Paper-doll slots, backpack grid, eye/mouth overlays (inspect
+   arrow, feeding via mouth, chew animation), wound outlines, and object-in-hand/selection
+   interactions are implemented (`src/renderer/ViewportRenderer.ts`).
 11. ✅ **Character stats**. Render stat panels (attributes and skill titles/levels) using CSBWin text layout, including base values, modifiers, and any highlight states.
-12. ⏳ **Chests + scrolls**. Implement chest grid view and scroll view layouts, render item slots/scroll pages, and connect them to container/scroll data for selection and paging.
+12. ✅ **Chests + scrolls**. Chest grid view (open/repack/sync) and scroll view
+   (`drawScrollPanel`, max 9 lines) are implemented and connected to container/scroll data.
 13. ⏳ **Magic panel**. Render the spell panel contents (rune slots, selected runes, and labels), implement highlight/flash rectangles, and gate visibility by caster state (remaining: rune click flash effect).
-14. ⏳ **Attack panel**. Replace placeholder action labels with real `PossibleAttackTypes`/weapon actions, gate options by attack state, and display the correct action names and availability per champion/hand.
+14. ⏳ **Attack panel**. Still a placeholder: `drawAttackPanel()` picks the first alive
+   champion rather than the acting one, `PossibleAttackTypes` is not ported at all, and
+   visibility is driven by a debug toggle (F7) instead of real attack state. Depends on
+   Phase 12 for meaningful attack actions.
 15. ⏳ **Interaction highlights**. Add button press/selection effects (flash, shading, or invert) across UI regions, and ensure highlight behavior is consistent with hit-test rectangles and current UI mode.
 
 Status:
@@ -196,11 +245,14 @@ Status:
 - ✅ Character stats panel (skills + attributes) and load readout are now rendered in the inventory view (`src/renderer/ViewportRenderer.ts`).
 - ✅ Champion state extended for inventory and condition flags: `possessions[30]`, `wounds`, `food`, `water`, `poisonCount` (`src/engine/gameTypes.ts`, `src/main.ts`).
 - ✅ Magic panel runes/incantation rendering wired; ⏳ rune click flash effect still missing (`src/renderer/ViewportRenderer.ts`).
-- ⏳ Inventory view still missing: eye/mouth overlays + stats-dependent highlight boxes, chest/scroll subviews, and object-in-hand/selection interactions.
+- ✅ Inventory view completed since: eye/mouth overlays, chest and scroll subviews, and
+  object-in-hand/selection interactions are all implemented.
+- ⏳ Remaining Phase 7 gaps: rune click flash effect, real attack panel (item 14),
+  and interaction press/flash highlights (item 15).
 
 Validation
-- Compare against CSBWin screenshots for at least 3 known scenes (start, mid‑dungeon, combat UI).
-- Verify pixel‑perfect alignment of the viewport frame, portraits, and message line.
+- 🚫 Never carried out. No comparison against CSBWin screenshots was made, and no
+  pixel-alignment verification exists. Tracked in Phase 15.
 
 ### Phase 7.5 — Light level / palette switching (viewport)
 Goal: match CSBWin global light level logic and palette selection.
@@ -219,7 +271,9 @@ Status:
 - ✅ Viewport-only palette applied during present; UI uses palette 0 (`src/renderer/csbwin/CanvasBlitter.ts`, `src/renderer/ViewportRenderer.ts`).
 - ✅ Illumulet equip/unequip adjusts `d.Brightness` for inventory UI + DSA moves; torch-in-hand sets `litTorch` bit for visuals.
 - ✅ 90-second torch charge decay tick added (hands only), mirroring `NinetySecondUpdate` behavior.
-- ⏳ Pending: spell/attack light effects (no spell system yet); add a light-level trace hook.
+- ✅ Spell light effects implemented as part of Phase 9.75 class-3 spells (light/darkness
+  adjust `d.Brightness` via `applyBrightnessSteps` + `setBrightnessTimer`).
+- ⏳ Pending: attack-driven light effects (depends on Phase 12); light-level trace hook.
 
 ### Phase 8 — CSBWin-Compatible actuators
 Goal: match CSBWin’s actuator pipeline (trigger evaluation -> queued timers -> room-type effects -> DSA/monster/missile behavior).
@@ -347,18 +401,23 @@ Goal: match CSBwin’s missile lifecycle (launch → flight → encounter → re
 10. ✅**Validation tooling**.
     - Add a “missile trace” debug mode that logs each tick’s missile position, dir, range/damage, and encounter outcome.
     - Scripted scenario tests: throw into door, throw into wall, step‑away collision, potion splash, monster absorption.
-11. **ThrowByCharacter stats parity**.
+11. ⏳ **ThrowByCharacter stats parity**.
+    - Current placeholders: `Game.estimateThrowRange/estimateThrowDamage/estimateThrowDecay`.
     - Port CSBWin throw range/damage/decay calculations from skills, stamina, and item weight.
     - Replace the current estimate-based throw values with CSBWin logic.
     - Refs: `doc/CSBwin-src/Mouse.cpp:673+` (`ThrowByCharacter`), `doc/CSBwin-src/Attack.cpp:652+` (`DetermineThrowingDistance`), `doc/CSBwin-src/CSB.h:3729+`.
-12. **Door pass-through + magic damage parity**.
+12. ⏳ **Door pass-through + magic damage parity**.
     - Implement DoorTOC pass-through rules and ObjDesc checks for missiles.
     - Port magic damage/poison formulas and Black Flame fireball healing.
     - Refs: `doc/CSBwin-src/Code11f52.cpp:1870+` (door pass-through in `ProcessMissileEncounter`), `doc/CSBwin-src/CSBCode.cpp:4156+` (`DoorTOC` lookup), `doc/CSBwin-src/Code11f52.cpp:1488+` (magic damage formulas), `doc/CSBwin-src/Code11f52.cpp:1976+` (Black Flame fireball heal).
-13. **Cloud timers/damage parity**.
-    - Implement cloud timers, per-tick damage, and any size/decay rules from CSBWin.
+13. ⏳ **Cloud timers/damage parity**.
+    - Current state: `createCloud()`/`createCloudRecord()` create the DB13 record and add it
+      to the cell, but **no timer is ever scheduled**. Clouds therefore render forever and
+      deal no damage. This is a visible bug, not just a missing feature.
+    - Implement cloud timers, per-tick damage, and size/decay rules from CSBWin.
     - Refs: `doc/CSBwin-src/Timer.cpp:479+` (cloud timer handling), `doc/CSBwin-src/Code11f52.cpp:1376+` (`CreateCloud` setup + timer linkage).
-14. **remove dev debug and validation tooling**
+14. ⏳ **Remove dev debug and validation tooling** — see Phase 14, which covers this
+    project-wide rather than only for missiles.
 
 ### Phase 9.5 — Skills & Experience parity
 Goal: match CSBWin’s champion skill/experience pipeline (mastery, AdjustSkills, level-up, action hooks).
@@ -397,7 +456,10 @@ Goal: mirror CSBWin’s `CastMagic`/`CastSpell` pipeline and spell effects.
 Status:
 - ✅ CSBWin casting flow documented in `doc/CSBWIN_MAGIC_CASTING_REFERENCE.md`.
 - ✅ Step 1: spell table parsed from graphics `0x230` and exposed to the engine (`src/renderer/csbwin/UITables.ts`, `src/engine/Game.ts`).
-- ✅ Step 2: `FillSpellParameters`/`CastMagic`/`CastSpell` pipeline stubbed with incantation override decoding and “needs flask” return code (`src/engine/Game.ts`, `src/renderer/ViewportRenderer.ts`, `src/main.ts`).
+- ✅ Step 2: `FillSpellParameters`/`CastMagic`/`CastSpell` pipeline implemented (not merely
+  stubbed): parameter overrides, incantation override decoding, spell-power validation,
+  mastery gating with the wisdom failure loop, and the three spell-class branches
+  (`src/engine/Game.ts`, `src/renderer/ViewportRenderer.ts`, `src/main.ts`).
 - ✅ Step 3: DSA spell filter wired to extended features `spellFilterLocation` (`src/engine/DsaSystem.ts`, `src/engine/DungeonState.ts`, `src/data/SaveGameLoader.ts`).
 - ✅ Step 4: mastery gating + experience award logic implemented for casts/fizzles (`src/engine/Game.ts`).
 - ✅ Step 5: potion creation now mutates the empty flask record with type/strength (`src/engine/Game.ts`).
@@ -436,13 +498,135 @@ Goal: ensure internal state and data structures are complete enough to write a b
    - Add a tool to load CSBWin save → re‑serialize → binary‑compare.
    - Add targeted checks for door/pit state, object chains, and timers after load.
 
-Status: pending.
+Status: ⏳ pending — not started. Note this is a large piece of work and is *not* a
+prerequisite for playability; quick-save/load via a runtime JSON snapshot already works.
 
-## Practical Guidance for Work Organization
+### Phase 11 — Unify the messaging system (CURRENT PRIORITY)
 
-- **One renderer is authoritative**: keep bytecode-based as the shipping path.
-- **No guessed tables in the final path**: if a rectangle/offset is not extracted from the CSBWin-loaded tables, treat it as temporary/debug-only.
-- Prefer small tooling over manual reasoning:
-  - “Dump tables” from `graphics.dat`
-  - “Render probe” for one opcode/program
-  - Regression snapshot images for a handful of known party positions
+Goal: replace the debug-helper message path with a faithful port of CSBWin's
+`SCROLLING_TEXT`. Full spec extracted in **`doc/CSBWIN_MESSAGES_REFERENCE.md`**.
+
+The problem: actuator texts, spell messages and level-up notices all call `updateDebug()`
+(`src/ui/messages.ts`), a debug helper that pushes pre-split whole lines into the renderer
+via `setMessageLines()`. Consequences, all confirmed:
+- Messages carry embedded `\n`, forcing hard breaks where CSBWin word-wraps one logical line.
+- They render in the wrong colour (CSBWin uses colour 4 for spell messages).
+- They **never expire** — CSBWin drops each row 70 ticks after it is drawn.
+- No row management: CSBWin fills 4 rows top-to-bottom then scrolls up.
+
+1. **Build the scrolling-text core** (new module, e.g. `src/ui/ScrollingText.ts` or
+   `src/renderer/csbwin/ScrollingText.ts`). Port from `doc/CSBwin-src/CSBCode.cpp:1422-1600`:
+   - `m_futureLines` queue of text pieces (`row`, `col`, `color`, `printLinesCount`).
+   - `clockTick()`: place pieces, set `textTimeout[row] = time + 70` (or `+700` when the
+     party sleeps), apply the monotonic clamp against the row above.
+   - `removeTimedOutText()`: clear the row rect, reset timeout to -1, defer while scrolling.
+   - `createNewTextRow()` / `scrollUp()` row management.
+   - `resetTime()` for save/load rebasing.
+2. **Port the tokenizer** `PrintLines` (`doc/CSBwin-src/CSBCode.cpp:1674`): word wrap at 53
+   columns, 2-column indent on continuation, single-space handling, LF → new row (guarded by
+   `column != 0 || row != 0`).
+3. **Two-stage queue**. `quePrintLines(color, text)` enqueues; the game loop drains one entry
+   per iteration into `printLines()` (mirrors `doc/CSBwin-src/CSBCode.cpp:716`).
+4. **Convert every caller to fragments.** Emit `printLinefeed()` then append fragments —
+   do *not* pre-join with `\n`. Start with `SpellErrorMsg`
+   (`doc/CSBwin-src/Magic.cpp:1004`) and the level-up message in `ActuatorSystem`.
+   Colour 4 for spell messages; `Byte1386[champion]` for name fragments.
+5. **Draw from the index buffer** at the CSBWin geometry (rows at `y = 172 + i*7`, text at
+   `x = col*6`, `y = row*7 + 177`), replacing `setMessageLines()`.
+6. **Separate the debug log.** `updateDebug()` should write only to the DOM `#log` panel
+   (i.e. become `appendLog`), never to the in-game message area. Reserve the message area
+   for real gameplay text.
+7. ⏳ Deferred deliberately: the pixel-level scroll animation
+   (`d.PushTextUp` / `d.TextScanlineScrollCount`). Land instant row scrolling first and
+   record here when the animation is added.
+
+Status: ⏳ not started. Spec complete in `doc/CSBWIN_MESSAGES_REFERENCE.md`.
+
+### Phase 12 — Monsters: AI, movement, combat
+
+Goal: port `doc/CSBwin-src/Monster.cpp` and the attack pipeline in
+`doc/CSBwin-src/Attack.cpp`. This is the single largest remaining gap — there are currently
+**no active monsters at all**, only their rendering.
+
+Several systems already carry proxies waiting on this phase; each must be revisited here:
+- `LastMonsterAttackTime` is fed from the missile-hit path instead of real monster attacks
+  (gates `AdjustSkills` scaling).
+- Monster attack rendering is triggered from the renderer rather than from combat logic.
+- Monster teleport rotation/position logic and monster teleporter sounds are stubs.
+- `Game.registerChampionBones()` exists but is never called automatically.
+- Attack panel (Phase 7 item 14) cannot show real actions without `PossibleAttackTypes`.
+
+1. **Monster data model.** DB4 creature records + `MonsterDescriptor` fields already parse;
+   audit against `doc/CSBwin-src/CSB.h:2276+` for fields the AI needs.
+2. **Monster timers and movement.** Port the monster timer functions and `MoveObject`
+   integration so monsters use the same teleporter/stairs/pit paths as the party.
+3. **AI / targeting.** Port monster activation, pursuit, fleeing, and attack selection.
+4. **Attack resolution.** Port `Attack.cpp`: hit determination, damage, wounds, armour,
+   `PossibleAttackTypes`, and champion↔monster hooks into `AdjustSkills`.
+5. **Creature generators.** Port actuator type 6 generator behaviour and
+   `TT_REACTIVATE_GENERATOR` (the timer type is already defined).
+6. **Retire the proxies** listed above and delete the renderer-side attack trigger.
+
+Status: ⏳ not started.
+
+### Phase 13 — Champion lifecycle
+
+1. ⏳ **Death.** Champion death → bones creation → possessions dropped to the floor. Wire
+   `Game.registerChampionBones()` into this path so the bones↔champion mapping is automatic.
+2. ⏳ **Item naming.** Add the bones-name special case once the champion-bones value from
+   DB10 is exposed.
+3. ⏳ **Resurrection / reincarnation** at the altars, including the reduced-HP rule.
+4. ⏳ **Character creation.** Portrait selection and the hall-of-champions flow.
+   `HeroExtractor` + `AddCharacter` already provide preset heroes; this replaces the debug
+   random-party injection.
+5. ⏳ **Drinking potions.**
+6. ⏳ **Pit fall damage** + stamina drain, for party and monsters.
+7. ⏳ **Red square around the eye on level gain.**
+
+Status: ⏳ not started.
+
+### Phase 14 — Structural cleanup
+
+Goal: undo the drift that makes each new port harder than the last.
+
+1. ⏳ **Split `ViewportRenderer.ts`** (~3800 lines). It currently owns viewport rendering,
+   the mouse queue, inventory, chests, feeding, spell/attack panels, cursor drawing,
+   portraits and clothing slots. CSBWin separates these (`Mouse.cpp`, `CSBUI.cpp`,
+   `Magic.cpp`, `Character.cpp`) — mirroring that split restores greppability against the
+   reference, which is the whole point of the project. Suggested seams:
+   - mouse queue + hit-testing + cursor → a `Mouse`/input module
+   - inventory / chest / scroll / stats panels → a UI module per CSBWin file
+   - spell + attack panels → alongside the magic engine code
+   - leave only viewport composition in the renderer
+2. ⏳ **Remove debug scaffolding from shipping paths**: missile scenarios and missile trace,
+   random-party injection (F8), attack-panel toggle (F7), quick-save/quick-load hotkeys.
+   Keep them behind an explicit dev flag or delete them.
+3. ⏳ **Remove remaining fallbacks/placeholders**, or mark each with a TODO naming the CSBWin
+   function it stands in for.
+4. ⏳ **Retire `static/js/`.** It was a hand-made proof-of-concept for browsing the `.dat`
+   files and the main project no longer depends on it (all source comments pointing at it
+   have been removed). One fact from it must survive: the **sound sample rates**, which are
+   correct there and wrong in CSBWin — now recorded in `doc/PROVEN_FACTS.md`.
+5. ⏳ **De-duplicate shared constants.** `OBJNI_*` are now centralised in
+   `src/core/objectNameIndex.ts`; `MISC_BONES_OF_HERO` and `DEFAULT_ROOM_TIMER_FUNCTIONS`
+   are still declared in more than one file.
+
+Status: ⏳ not started.
+
+### Phase 15 — Verification
+
+Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation steps that were
+never carried out, because the project has **no test framework**.
+
+1. ⏳ Add a minimal test runner (the repo has no `test` script at all).
+2. ⏳ **Golden-frame rendering tests.** Render a fixed set of party positions to the index
+   buffer and compare against committed reference frames. This is the highest-value test
+   for a project whose correctness is mostly pixels.
+3. ⏳ **Render probe tool** (Phase 5's skipped validation): render a single cell program with
+   controlled inputs and dump the viewport as PNG.
+4. ⏳ **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
+   table regressions surface immediately.
+5. ⏳ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
+   validation).
+
+Status: ⏳ not started.

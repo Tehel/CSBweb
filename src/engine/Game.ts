@@ -22,6 +22,11 @@ import { SoundIndex } from '../core/constants';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
+import {
+    OBJNI_EMPTY_FLASK,
+    OBJNI_TORCH_A,
+    OBJNI_TORCH_D,
+} from '../core/objectNameIndex';
 
 /**
  * Game event callback types
@@ -34,9 +39,6 @@ interface DropCursorOptions {
 }
 
 const MISC_BONES_OF_HERO = 5; // CSBwin Objects.h misc_BonesOfHero
-const OBJNI_TORCH_A = 4;
-const OBJNI_TORCH_D = 7;
-const OBJNI_EMPTY_FLASK = 0xc3;
 
 export interface RuntimeSaveState {
     version: 1;
@@ -1161,7 +1163,7 @@ export class Game {
     }
 
     private getObjectDescIndex(rn: ObjectID): number | null {
-        const { category, index } = decodeObjectID(rn);
+        const { category } = decodeObjectID(rn);
         switch (category) {
             case DBType.SCROLL:
                 return 0;
