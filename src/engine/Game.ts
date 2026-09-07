@@ -15,6 +15,8 @@ import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
 import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
+import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
+import { SoundQueue } from './SoundQueue';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -90,6 +92,9 @@ export class Game {
     private random = new CsbRandom();
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
+    private monsterSystem: MonsterSystem;
+    /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
+    readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
     private nextChampionFingerprint = 1;
@@ -112,6 +117,7 @@ export class Game {
         dsaTables?: DsaTables,
         timerHooks?: TimerHooks,
         playSound?: (soundId: number, rateIdx?: number, distance?: number) => void,
+        monsterHooks?: MonsterSystemHooks,
     ) {
         // Initialize dungeon state
         this.dungeonState = new DungeonState(dungeonData);
@@ -168,9 +174,31 @@ export class Game {
                 onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
+                onMonsterAI: (options) => this.monsterSystem.processTimers29to41(options),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
                 ...timerHooks,
+            },
+        );
+        this.sounds = new SoundQueue({
+            soundTable: timerTables?.soundTable,
+            getPartyPosition: () => this.party.state.position,
+            // Only the party's level is ever loaded in this port; CSBWin's
+            // `d.LoadedLevel` can differ transiently while it walks another level.
+            getLoadedLevel: () => this.party.state.position.z,
+            play: playSound,
+        });
+        this.monsterSystem = new MonsterSystem(
+            this.dungeonState,
+            () => this.party.state,
+            this.timerQueue,
+            () => this.state.tickCount,
+            this.random,
+            { monsterDesc: timerTables?.monsterDesc },
+            {
+                queueSound: (ordinal, mapX, mapY, deltaTime) =>
+                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                ...monsterHooks,
             },
         );
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
@@ -273,6 +301,7 @@ export class Game {
             callback(this);
         }
 
+        this.monsterSystem.loadPartyLevelIfChanged();
         this.timerSystem.processTimers(this.state.tickCount);
         this.processNinetySecondUpdate();
         this.processTenSecondUpdate();
@@ -319,6 +348,7 @@ export class Game {
                 this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
                 this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
+            this.monsterSystem.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
 
             // Update party state in game state
@@ -370,6 +400,7 @@ export class Game {
 
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
+        this.monsterSystem.loadPartyLevelIfChanged();
         this.timerSystem.processTimers(this.state.tickCount);
     }
 
@@ -1338,6 +1369,7 @@ export class Game {
         if (!added) party.objectInHand = obj;
         if (added) {
             this.actuators.triggerObjectMove(target, newObj, true, false, facing);
+            this.monsterSystem.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
         }
         if (added && options?.viAltar) {
@@ -1551,6 +1583,10 @@ export class Game {
             extendedTimers: false,
         };
         applySaveGameState(this.state.dungeon, saveGameState);
+        // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
+        // active, as CSBWin does after its own restore
+        // (doc/CSBwin-src/SaveGame.cpp:1240-1244).
+        this.monsterSystem.reloadAfterSaveGame();
     }
 
     private buildTimerRecords(): TimerRecord[] {

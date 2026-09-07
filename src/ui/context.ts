@@ -12,6 +12,7 @@ export interface UIContext {
     onInjectRandomParty: () => void;
     onToggleAttackPanel: () => void;
     onToggleMissileTrace: () => void;
+    onToggleMonsterAITrace: () => void;
     onRunMissileScenario: () => void;
     setCrtEnabled: (enabled: boolean) => boolean;
     isCrtEnabled: () => boolean;

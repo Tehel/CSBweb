@@ -53,6 +53,9 @@ const DIR_STEPS = [
 export interface DevTools {
     /** `TimerHooks.onMissileTrace` sink; a no-op unless the trace is on. */
     onMissileTrace(event: MissileTraceEvent): void;
+    /** `MonsterSystemHooks.trace` sink; a no-op unless the AI trace is on. */
+    onMonsterAITrace(line: string): void;
+    toggleMonsterAITrace(): void;
     quickSave(): void;
     quickLoad(): void;
     injectRandomParty(): void;
@@ -63,6 +66,7 @@ export interface DevTools {
 
 export function createDevTools(host: DevHost): DevTools {
     let missileTraceEnabled = false;
+    let aiTraceEnabled = false;
     let missileScenarioIndex = 0;
 
     function decodeBase64ToBytes(data: string): Uint8Array {
@@ -165,6 +169,22 @@ export function createDevTools(host: DevHost): DevTools {
         const rn = event.missile.toString(16).padStart(4, '0');
         const projectile = event.projectile.toString(16).padStart(4, '0');
         return `[MissileTrace] ${event.stage} t=${tick} rn=0x${rn} proj=0x${projectile} L${event.position.z}(${event.position.x},${event.position.y}) pos=${event.posInCell} dir=${dirLabel} range=${event.range} dmg=${event.damage}${hit}${detail}`;
+    }
+
+    /**
+     * `AITraceActive` sink (doc/CSBwin-src/Monster.cpp:3290 and throughout). The line
+     * format deliberately mirrors CSBWin's own `fprintf`s so a run of each can be
+     * diffed against the other — see PLAN.md Phase 12.
+     */
+    function onMonsterAITrace(line: string): void {
+        if (!aiTraceEnabled) return;
+        appendLog(line);
+    }
+
+    function toggleMonsterAITrace(): void {
+        aiTraceEnabled = !aiTraceEnabled;
+        if (aiTraceEnabled) clearLog();
+        updateDebug(aiTraceEnabled ? 'Monster AI trace ON' : 'Monster AI trace OFF');
     }
 
     function toggleMissileTrace(): void {
@@ -565,6 +585,8 @@ export function createDevTools(host: DevHost): DevTools {
 
     return {
         onMissileTrace,
+        onMonsterAITrace,
+        toggleMonsterAITrace,
         quickSave,
         quickLoad,
         injectRandomParty,

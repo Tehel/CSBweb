@@ -226,6 +226,11 @@ export function bindUIEvents(): void {
                     else updateDebug('Enable Debug to run missile scenarios');
                     handled = true;
                     break;
+                case 'F4':
+                    if (isDebugFeaturesEnabled()) ctx.onToggleMonsterAITrace();
+                    else updateDebug('Enable Debug to toggle monster AI trace');
+                    handled = true;
+                    break;
             }
             if (handled) e.preventDefault();
         });

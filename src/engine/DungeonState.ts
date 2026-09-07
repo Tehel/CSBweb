@@ -694,6 +694,28 @@ export class DungeonState {
         return items[index] ?? null;
     }
 
+    /**
+     * The mutable `ITEM16` pool, created empty if the dungeon had none.
+     *
+     * `MonsterSystem` owns the pool's contents — CSBWin allocates and reallocates
+     * `d.Item16` as monsters come and go — so it needs the array itself, not a
+     * read-only view of the surrounding `DungeonData`.
+     */
+    getItem16Pool(): Item16Record[] {
+        if (!this.data.item16) this.data.item16 = [];
+        return this.data.item16;
+    }
+
+    /**
+     * A creature record by bare DB4 index, as CSBWin's
+     * `GetRecordAddressDB4(pi16A3->word0)` does — `ITEM16.word0` stores the index
+     * alone, with no position or category bits.
+     */
+    getCreatureRecordByIndex(index: number): CreatureRecord | null {
+        if (index < 0) return null;
+        return this.data.databases.creatures.records[index] ?? null;
+    }
+
     getTimerWord8(index: number): ui16 | null {
         if (this.timerWord8Lookup) {
             const fromQueue = this.timerWord8Lookup(index);

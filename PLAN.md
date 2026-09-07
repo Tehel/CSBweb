@@ -625,8 +625,32 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    Verified with `tools/dump-monster-tables.ts` (new) — the attack names read `BLOCK`,
    `CHOP`, `PUNCH`, … in `ATTACKTYPE` order, which pins the graphic `0x230` offsets — and
    all five `tools/check-frames.sh` frames stayed byte-identical.
-2. **Monster timers and movement.** Port the monster timer functions and `MoveObject`
-   integration so monsters use the same teleporter/stairs/pit paths as the party.
+2. 🔄 **Monster timers and movement.**
+   - ✅ **Group lifecycle** (`src/engine/MonsterSystem.ts`): the `ITEM16` pool with
+     CSBWin's two different growth caps, `AttachItem16ToMonster`, `DetachItem16`,
+     `TAG00bd40`, `ProcessMonstersOnLevel`, `InitializeItem16`,
+     `NextMonsterUpdateTime`, `StartMonsterMovementTimers`,
+     `DeleteMonsterMovementTimers` and `EnsureItem16Available`.
+   - ✅ **`LoadPartyLevel`** wired: monsters are detached and re-attached whenever the
+     party changes level, and the check runs immediately before `processTimers` at
+     each of the four call sites, as CSBWin orders it (`CSBCode.cpp:618-635`).
+     Restoring a save re-derives the pool (`SaveGame.cpp:1240-1244`).
+   - ✅ **Timer types 29-41 routed** out of the dispatcher ahead of the switch, as
+     CSBWin does (`CSBCode.cpp:6422`).
+   - ✅ **`QueueSound` ported** (`src/engine/SoundQueue.ts`) — the engine can now name
+     a sound by ordinal instead of raw SND id. ⚠️ Two gaps: `deltaTime > 1` should
+     defer the sound as a `TT_20` timer (`CSBCode.cpp:1832`) but plays it at once,
+     and `SoundFilter`'s DSA hand-off (`Sound.cpp:670`) is not ported.
+   - ✅ **Dev AI trace** on F4, formatted after CSBWin's `AITraceActive` output.
+   - ⏳ Still to do: `ProcessTimers29to41` itself (a marked placeholder that logs and
+     returns), and the `MoveObject` integration so monsters use the same
+     teleporter/stairs/pit paths as the party.
+
+   Verified with `tools/dump-monster-activation.ts` (new): on level 3 the real
+   dungeon activates 13 groups — worms in the corridor at (2,1)-(6,1), munchers,
+   rock piles, a Rive — each with exactly one AI timer whose `uByte5` is
+   `255 - movementTicks06` for its type, and every DB4 pointing back at its own slot.
+   All five `tools/check-frames.sh` frames unchanged.
 3. **AI / targeting.** Port monster activation, pursuit, fleeing, and attack selection.
 4. **Attack resolution.** Port `Attack.cpp`: hit determination, damage, wounds, armour,
    `PossibleAttackTypes`, and champion↔monster hooks into `AdjustSkills`.
@@ -644,7 +668,7 @@ untested. Validation is `tools/check-frames.sh` plus a dev-only AI trace mirrori
 CSBWin's own `AITraceActive` output (`Monster.cpp:3290`), so the two codebases stay
 diffable; a real test framework stays Phase 15.
 
-Status: 🔄 in progress — step 1 done.
+Status: 🔄 in progress — step 1 done, step 2 partly done.
 
 ### Phase 13 — Champion lifecycle
 

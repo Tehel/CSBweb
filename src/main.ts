@@ -290,6 +290,7 @@ async function init() {
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
                 word1074: uiTables.graphic232.word1074,
+                soundTable: uiTables.graphic232.soundTable,
             };
 
             // Initialize game engine
@@ -304,7 +305,9 @@ async function init() {
             const playSound = soundManager
                 ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
-            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
+            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound, {
+                trace: dev.onMonsterAITrace,
+            });
             game.setSpellDefinitions(uiTables.graphic230.spells);
 
             // Initialize viewport renderer
@@ -334,6 +337,7 @@ async function init() {
                 onQuickLoad: dev.quickLoad,
                 onInjectRandomParty: dev.injectRandomParty,
                 onToggleAttackPanel: dev.toggleAttackPanel,
+                onToggleMonsterAITrace: dev.toggleMonsterAITrace,
                 onToggleMissileTrace: dev.toggleMissileTrace,
                 onRunMissileScenario: dev.runNextMissileScenario,
                 setCrtEnabled,

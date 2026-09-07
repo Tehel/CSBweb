@@ -1,6 +1,7 @@
 import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import type { CsbRandom } from '../core/random';
+import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
 import type {
@@ -67,6 +68,8 @@ const WEAPON_THROWING_STAR = 32;
 export interface TimerTables {
   monsterDesc?: ArrayLike<MonsterDesc>;
   word1074?: number[];
+  /** `d.sound1772` — graphic `0x232`'s sound table, for `QueueSound`. */
+  soundTable?: ArrayLike<SoundTableEntry>;
 }
 
 export interface LocationRel {
@@ -121,6 +124,18 @@ export interface TimerHooks {
     direction: number;
     index: number;
   }) => number;
+  /**
+   * `ProcessTimers29to41` (doc/CSBwin-src/Monster.cpp:3239). Every timer type from
+   * 29 to 41 lands here rather than in the ordinary dispatch.
+   */
+  onMonsterAI?: (options: {
+    mapX: number;
+    mapY: number;
+    level: number;
+    timerFunction: number;
+    timeUntilAlternateUpdate: number;
+    timer: TimerEntry;
+  }) => void;
   onSpawnMonster?: (options: {
     type: number;
     hitPointMultiplier: number;
@@ -173,6 +188,24 @@ export class TimerSystem {
   }
 
   private dispatch(timer: TimerEntry): void {
+    // The monster AI is routed off before the switch, exactly as CSBWin does
+    // (doc/CSBwin-src/CSBCode.cpp:6422-6429) — timer types 29-41 never reach the
+    // ordinary timer dispatch.
+    if (
+      timer.function >= TimerFunction.TT_FIRST_MONSTER_AI &&
+      timer.function <= TimerFunction.TT_LAST_MONSTER_AI
+    ) {
+      this.hooks?.onMonsterAI?.({
+        mapX: timer.uByte6,
+        mapY: timer.uByte7,
+        level: timer.level,
+        timerFunction: timer.function,
+        timeUntilAlternateUpdate: timer.uByte8,
+        timer,
+      });
+      return;
+    }
+
     switch (timer.function) {
       case TimerFunction.TT_DOOR_STEP:
         this.processDoorStep(timer);
