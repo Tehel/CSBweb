@@ -705,25 +705,41 @@ export class DungeonState {
         return table[index] ?? null;
     }
 
+    /**
+     * The `ITEM16` attached to a monster group, or null when it has none.
+     *
+     * Mirrors CSBWin's test, which is the bare bound check `groupIndex() <
+     * d.MaxITEM16` (doc/CSBwin-src/Monster.cpp:531). That works in CSBWin because a
+     * monster not on the party's level has its index parked at 0xd8 or 0xff by
+     * `MoveObject` (doc/CSBwin-src/MoveObject.cpp:517-518), and because the array is
+     * only ever as long as the slots that exist. On a freshly loaded dungeon the
+     * array is empty and every monster correctly reads as unattached, which is the
+     * state `ProcessMonstersOnLevel` then fixes.
+     */
+    getAttachedItem16(creature: CreatureRecord): Item16Record | null {
+        const items = this.data.item16;
+        if (!items || creature.groupIndex >= items.length) return null;
+        return items[creature.groupIndex] ?? null;
+    }
+
     getMonsterRenderState(creature: CreatureRecord): { positions: ui8; facings: ui8; statuses: Uint8Array } {
-        const groupIndex = creature.groupIndex;
-        if (groupIndex !== undefined) {
-            const item16 = this.getItem16Record(groupIndex);
-            if (item16) {
-                const statuses = new Uint8Array(4);
-                for (let i = 0; i < 4; i++) statuses[i] = item16.singleMonsterStatus[i] ?? 0;
-                return {
-                    positions: item16.positions,
-                    facings: item16.facings,
-                    statuses
-                };
-            }
+        const item16 = this.getAttachedItem16(creature);
+        if (item16) {
+            const statuses = new Uint8Array(4);
+            for (let i = 0; i < 4; i++) statuses[i] = item16.singleMonsterStatus[i] ?? 0;
+            return {
+                positions: item16.positions,
+                facings: item16.facings,
+                statuses
+            };
         }
 
+        // No ITEM16: `groupIndex` is itself the packed positions byte, and the whole
+        // group faces whichever way DB4.word14 says.
         const face = creature.facing & 0x3;
         const facings = (face | (face << 2) | (face << 4) | (face << 6)) & 0xff;
         return {
-            positions: creature.positions,
+            positions: creature.groupIndex,
             facings,
             statuses: new Uint8Array(4)
         };

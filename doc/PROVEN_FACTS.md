@@ -335,3 +335,73 @@ CSBWin answers a blocked move with a **sound only**. Verified by grep over the w
 `doc/CSBwin-src/`: none of "A wall blocks your path", "You step into a pit", "You feel a
 strange sensation", "You find stairs" or "The edge of the dungeon blocks your path" exists
 anywhere in the C++ source. They were invented by this port and were removed in Phase 14.
+
+## `DB4.uByte4` packs the monster type with the alternate-graphic selector
+
+`doc/CSBwin-src/CSB.h:1113-1116`:
+
+```cpp
+MONSTERTYPE monsterType(void) {return (MONSTERTYPE)(uByte4&0x1f);};
+i32 alternateGraphics(void){return (uByte4>>5)&0x7;};
+```
+
+The type must be masked to five bits before indexing `MonsterDescriptor[27]`. This port
+read the whole byte as the type until Phase 12; the shipped Dungeon Master data happens to
+set no alternate-graphic bits, which is why nothing had gone visibly wrong.
+
+## `DB4.numMonM1` is a count minus one, everywhere
+
+`doc/CSBwin-src/CSB.h:1123`: `ui16 numMonM1(void){return BITS5_6(word14);};` — and every
+CSBWin caller treats it that way, including `CreateMonster`'s `do { … } while
+((numMonM1--) != 0)` loop (`doc/CSBwin-src/Monster.cpp:206-217`).
+
+Before Phase 12 this port stored it as a 1-based count, and two of its three readers
+(`TimerSystem.ordinalOfMonsterAtPosition`, `Game.applyMissileDamageToMonster`) used it as
+`numMonM1` anyway. The field is now named and stored as CSBWin has it.
+
+## `DB4.uByte5` is either the `ITEM16` index or the packed positions
+
+`doc/CSBwin-src/CSB.h:1084-1087`:
+
+```cpp
+ui8  uByte5; //ITEM16 index when the monster group is on
+             // the same level as the party.  Else it is
+             // four 2-bit fields with positions of each
+             // group member.
+```
+
+`AttachItem16ToMonster` swaps one reading for the other — `pi16A2->positions() =
+pDB4A3->groupIndex(); pDB4A3->groupIndex(item16Index);`
+(`doc/CSBwin-src/CSBCode.cpp:6087-6088`) — and `DetachItem16` swaps it back
+(`doc/CSBwin-src/CSBCode.cpp:6127-6128`).
+
+CSBWin distinguishes the two with a bare bound check, `if (pDB4->groupIndex() <
+d.MaxITEM16)` (`doc/CSBwin-src/Monster.cpp:531`). That is sound only because a monster
+off the party's level has its index deliberately parked out of range at `0xd8`, or `0xff`
+when it fills the whole cell (`doc/CSBwin-src/MoveObject.cpp:517-518`).
+
+## `AttackNames` is NUL-separated, unlike `ObjectNames`
+
+`GetAttackTypeName` walks forward over `n` NUL terminators rather than indexing
+(`doc/CSBwin-src/CSBCode.cpp:8609-8626`):
+
+```cpp
+for (A3 = d.AttackNames; D7W-- != 0; )
+{
+  while ( *(A3++) != 0) {}; // Skip one string
+};
+```
+
+`ObjectNames` in graphic `0x22c` uses the opposite convention — the high bit of the last
+byte of each entry terminates it. The two tables are not interchangeable.
+
+## `LEGALATTACKS` byte 6 is dead data
+
+`doc/CSBwin-src/Character.cpp:4932` is the only reader, and it is commented out:
+
+```cpp
+//Not used anywhere!!  // d.Word20262 = *(pLegalAttacks+6);//This seems wrong but who cares?
+```
+
+Bit 7 of bytes 4 and 5, by contrast, is live: it means the wielded item must have charges
+left before that attack option is offered (`doc/CSBwin-src/Character.cpp:4789-4792`).

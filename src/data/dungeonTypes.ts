@@ -6,7 +6,7 @@
  */
 
 import type {
-    ui8, ui16, ui32,
+    ui8, ui16, ui32, i16,
     ObjectID,
     CellFlag,
     Position,
@@ -137,16 +137,40 @@ export interface ActuatorRecord {
 /**
  * Database record: Creature (16 bytes)
  */
+/**
+ * CSBWin `DB4` (doc/CSBwin-src/CSB.h:1075-1139). Sixteen bytes.
+ *
+ * Two fields are dual-purpose and were previously split or misread here:
+ *
+ * - `uByte4` packs `monsterType()` in bits 0-4 and `alternateGraphics()` in bits
+ *   5-7, so the type must be masked before it indexes `MonsterDescriptor[27]`.
+ * - `groupIndex` (`uByte5`) is the `ITEM16` slot index while the group is on the
+ *   party's level, and *is* the four packed 2-bit positions otherwise. The two
+ *   readings are swapped by `AttachItem16ToMonster` / `DetachItem16`
+ *   (doc/CSBwin-src/CSBCode.cpp:6087 and :6127); `Blocked()` picks between them
+ *   with a bare `groupIndex() < d.MaxITEM16` test (doc/CSBwin-src/Monster.cpp:531),
+ *   which works because `MoveObject` parks an off-level monster's index at 0xd8 or
+ *   0xff (doc/CSBwin-src/MoveObject.cpp:517-518).
+ *
+ * `numMonM1` is CSBWin's own spelling and, like CSBWin, holds the group size *minus
+ * one*. It used to be stored here as a 1-based count while two of the three readers
+ * treated it as `numMonM1`.
+ */
 export interface CreatureRecord {
     nextObject: ObjectID;       // +0x00
-    possession: ObjectID;       // +0x02: Object carried
-    creatureType: ui8;          // +0x04: 0-26
-    positions: ui8;             // +0x05: 2 bits per creature, 0xFF=centered
-    hp: ui16[];                 // +0x06-0x0D: HP for up to 4 creatures
-    important: boolean;         // +0x0E bit 10
-    facing: ui8;                // bits 9-8: direction
-    count: ui8;                 // bits 6-5: count-1 (0-3)
-    groupIndex?: ui8;           // Item16 index (runtime, save games only)
+    possession: ObjectID;       // +0x02: head of the carried-object chain
+    creatureType: ui8;          // +0x04 bits 0-4: MONSTERTYPE, 0-26
+    alternateGraphics: ui8;     // +0x04 bits 5-7
+    groupIndex: ui8;            // +0x05: ITEM16 index, or the packed positions byte
+    hp: ui16[];                 // +0x06-0x0D: hit points for up to 4 creatures
+    fear: ui8;                  // +0x0E bits 0-3: STATE_OF_FEAR
+    numMonM1: ui8;              // bits 5-6: group size minus one (0-3)
+    facing: ui8;                // bits 8-9: direction
+    important: boolean;         // bit 10
+    invisible: boolean;         // bit 11 (gated on the InvisibleMonsters option)
+    drawAsSize4: boolean;       // bit 12 (gated on the DrawAsSize4Monsters option)
+    unique: boolean;            // bit 13: the designer tracks this monster by its ID
+    poisoned: boolean;          // bit 14: DSAs only
 }
 
 /**
@@ -235,12 +259,41 @@ export interface CloudRecord {
 
 /**
  * Save-game Item16 record (runtime monster state)
+ *
+ * CSBWin `ITEM16` (doc/CSBwin-src/CSB.h:2190-2227). Sixteen bytes, one slot per
+ * monster group that lives on the loaded level; `AttachItem16ToMonster` hands a
+ * group its slot and `DetachItem16` gives it back (doc/CSBwin-src/CSBCode.cpp:6024
+ * and :6117). A free slot is marked by `word0 < 0`.
+ *
+ * Everything past `singleMonsterStatus` is the movement state the AI needs, which
+ * is why the port carries the whole record rather than the three render fields.
  */
 export interface Item16Record {
-    facings: ui8;               // 2 bits per creature (facing)
-    positions: ui8;             // 2 bits per creature, 0xFF=centered
-    singleMonsterStatus: ui8[]; // 4 bytes (attacking/mirror/offset nibbles)
+    word0: i16;                 // +0x00: DB4 index of the group, or -1 when the slot is free
+    facings: ui8;               // +0x02: 2 bits per creature (facing)
+    positions: ui8;             // +0x03: 2 bits per creature, 0xFF=centered
+    uByte4: ui8;                // +0x04: low byte of the next-update time (d.Time - 127 at attach)
+    uByte5: ui8;                // +0x05: pause/countdown (a giggler gets STRandom(64)+20)
+    uByte6: ui8;                // +0x06: mapX of the square being approached
+    uByte7: ui8;                // +0x07: mapY of the square being approached
+    ubPrevX: ui8;               // +0x08: previous mapX
+    ubPrevY: ui8;               // +0x09: previous mapY
+    uByte10: ui8;               // +0x0A: current mapX
+    uByte11: ui8;               // +0x0B: current mapY
+    singleMonsterStatus: ui8[]; // +0x0C: 4 bytes (attacking/mirror/offset nibbles)
 }
+
+/** A free `ITEM16` slot is flagged by a negative `word0` (CSBWin `CSBCode.cpp:6210`). */
+export const ITEM16_FREE = -1;
+
+/**
+ * `SINGLE_MONSTER_STATUS` bit accessors (doc/CSBwin-src/CSB.h:2171-2188).
+ *
+ * Bit 7 = attacking, bit 6 = mirror the sprite, bits 0-2 and 3-5 are the two
+ * signed 2-bit screen offsets the viewport applies while the monster walks.
+ */
+export const SMS_ATTACKING = 0x80;
+export const SMS_MIRROR = 0x40;
 
 /**
  * Save-game timer record (runtime)

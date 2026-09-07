@@ -39,6 +39,7 @@ import {
 import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
+import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import {
     OBJNI_NOT_AN_OBJECT,
@@ -99,6 +100,7 @@ export interface ActuatorTables {
   objDescCarryMask?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
   word1074?: ArrayLike<number>;
+  monsterDesc?: ArrayLike<MonsterDesc>;
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   messages?: MessageSink;

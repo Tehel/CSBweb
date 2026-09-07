@@ -474,25 +474,33 @@ export class DungeonLoader {
         for (let i = 0; i < count; i++) {
             const nextObject = this.file.readU16();
             const possession = this.file.readU16();
-            const creatureType = this.file.readU8();
-            const positions = this.file.readU8();
+            const uByte4 = this.file.readU8();
+            const groupIndex = this.file.readU8();
             const hp = [
                 this.file.readU16(),
                 this.file.readU16(),
                 this.file.readU16(),
                 this.file.readU16()
             ];
-            const attributes = this.file.readU16();
+            const word14 = this.file.readU16();
 
             records.push({
                 nextObject,
                 possession,
-                creatureType,
-                positions,
+                // DB4::monsterType() masks to 5 bits; the top three are the alternate
+                // graphic selector (doc/CSBwin-src/CSB.h:1113-1116).
+                creatureType: uByte4 & 0x1f,
+                alternateGraphics: (uByte4 >> 5) & 0x7,
+                groupIndex,
                 hp,
-                important: (attributes & 0x400) !== 0,
-                facing: (attributes >> 8) & 0x3,
-                count: ((attributes >> 5) & 0x3) + 1
+                fear: word14 & 0xf,
+                numMonM1: (word14 >> 5) & 0x3,
+                facing: (word14 >> 8) & 0x3,
+                important: (word14 & 0x400) !== 0,
+                invisible: (word14 & 0x800) !== 0,
+                drawAsSize4: (word14 & 0x1000) !== 0,
+                unique: (word14 & 0x2000) !== 0,
+                poisoned: (word14 & 0x4000) !== 0
             });
         }
 

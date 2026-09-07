@@ -280,6 +280,7 @@ async function init() {
                 objDescCarryMask: objectTables.objDescCarryMask,
                 carryLocation: uiTables.graphic232.carryLocation,
                 word1074: uiTables.graphic232.word1074,
+                monsterDesc: objectTables.monsterDesc,
                 cursorFilter: handleCursorFilter,
                 onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
                 messages: scrollingText,

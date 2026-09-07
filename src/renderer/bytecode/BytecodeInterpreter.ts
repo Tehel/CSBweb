@@ -17,6 +17,12 @@ import {
 import type { DungeonState } from '../../engine/DungeonState';
 import type { CreatureRecord } from '../../data/dungeonTypes';
 import type { ObjectTables } from '../csbwin/ObjectTables';
+import {
+  monsterHasAttackGraphic,
+  monsterHasBackGraphic,
+  monsterHasSideGraphic,
+  monsterNonAttackingMirrorOK,
+} from '../csbwin/ObjectTables';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 
@@ -1844,7 +1850,7 @@ export class BytecodeInterpreter {
       this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, false);
 
       if (monsterRecord && monsterState) {
-        const monsterCount = Math.max(1, monsterRecord.count ?? 1);
+        const monsterCount = (monsterRecord.numMonM1 & 0x3) + 1;
         if (this.isCenteredPositions(monsterState.positions)) {
           if (!centeredMonsterDrawn && positionList === 0 && sideOfDoor !== SideOfDoor.FarSide) {
             this.drawMonster(monsterRecord, monsterState, facing, relativeCellNumber, 4, middleLeftRight, curAbsPos);
@@ -2140,10 +2146,10 @@ export class BytecodeInterpreter {
     const graphic = tables.monsterGraphics[mt];
     if (!desc || !graphic) return;
 
-    const hasSide = (desc.word4 & 0x0008) !== 0;
-    const hasBack = (desc.word4 & 0x0010) !== 0;
-    const hasAttack = (desc.word4 & 0x0020) !== 0;
-    const monsterCount = Math.max(1, monster.count ?? 1);
+    const hasSide = monsterHasSideGraphic(desc);
+    const hasBack = monsterHasBackGraphic(desc);
+    const hasAttack = monsterHasAttackGraphic(desc);
+    const monsterCount = (monster.numMonM1 & 0x3) + 1;
     const indexWithinGroup = this.monsterIndexAtPosition(monsterState.positions, curAbsPos, monsterCount);
     if (indexWithinGroup < 0) return;
 
@@ -2177,7 +2183,7 @@ export class BytecodeInterpreter {
       widthBytes = graphic.attackByteWidth;
       height = graphic.attackHeight;
       mirror = sms.mirror;
-    } else if ((desc.word4 & 0x0004) !== 0 && sms.mirror) {
+    } else if (monsterNonAttackingMirrorOK(desc) && sms.mirror) {
       mirror = true;
     }
 

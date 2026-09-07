@@ -31,6 +31,8 @@ import { TimerFunction } from './TimerQueue';
 import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
+import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
 import {
     OBJNI_ILLUMULET_A,
     OBJNI_ILLUMULET_B,
@@ -42,6 +44,7 @@ export interface DsaTables {
   objDescObjectType?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
   word1074?: ArrayLike<number>;
+  monsterDesc?: ArrayLike<MonsterDesc>;
 }
 
 export interface ViewingFilterOptions {
@@ -386,6 +389,7 @@ export class DsaSystem {
   private overridePos = 0;
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
+  private monsterDesc: ArrayLike<MonsterDesc> | null = null;
   private teleportPartyHandler?: (location: TeleportPartyLocation) => void;
 
   constructor(
@@ -401,6 +405,7 @@ export class DsaSystem {
     this.objDescObjectType = tables?.objDescObjectType ?? null;
     this.carryLocation = tables?.carryLocation ?? null;
     this.word1074 = tables?.word1074 ?? null;
+    this.monsterDesc = tables?.monsterDesc ?? null;
   }
 
   setTables(tables: DsaTables): void {
@@ -409,6 +414,7 @@ export class DsaSystem {
     if (tables.objDescObjectType) this.objDescObjectType = tables.objDescObjectType;
     if (tables.carryLocation) this.carryLocation = tables.carryLocation;
     if (tables.word1074) this.word1074 = tables.word1074;
+    if (tables.monsterDesc) this.monsterDesc = tables.monsterDesc;
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -2927,11 +2933,17 @@ export class DsaSystem {
         if (!rec) return null;
         if (data.databases.creatures.records.length >= maxIndex + 1) return null;
         const copiedPossessions = this.copyItemList(rec.possession);
+        // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
+        // 0xd8, or 0xff for a monster that fills the whole cell, so that every
+        // `groupIndex() < d.MaxITEM16` test reads it as unattached
+        // (doc/CSBwin-src/DSA.cpp:1884-1887).
+        const desc = this.monsterDesc?.[rec.creatureType];
+        const fillsCell = desc ? monsterHorizontalSize(desc) === 2 : false;
         data.databases.creatures.records.push({
           ...rec,
           nextObject: OBJECT_ID_EOF,
           possession: copiedPossessions,
-          groupIndex: undefined,
+          groupIndex: fillsCell ? 0xff : 0xd8,
         });
         data.databases.creatures.count++;
         bumpCount();

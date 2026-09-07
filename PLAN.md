@@ -596,8 +596,35 @@ Several systems already carry proxies waiting on this phase; each must be revisi
 - `Game.registerChampionBones()` exists but is never called automatically.
 - Attack panel (Phase 7 item 14) cannot show real actions without `PossibleAttackTypes`.
 
-1. **Monster data model.** DB4 creature records + `MonsterDescriptor` fields already parse;
-   audit against `doc/CSBwin-src/CSB.h:2276+` for fields the AI needs.
+1. ✅ **Monster data model.** The audit found all three records truncated or misread, and
+   they are now field-for-field transcriptions of CSBWin (see
+   `doc/CSBWIN_MONSTERS_REFERENCE.md`):
+   - `MonsterDesc` went from 4 fields to the whole 26-byte `MONSTERDESC`
+     (`CSB.h:2256`) with named `word2`/`word4`/`word14`/`word16`/`word18`/`word20` bit
+     accessors, plus CSBWin's zero-`movementTicks06` clamp (`CSBCode.cpp:10163`).
+   - `Item16Record` went from 3 fields to the whole 16-byte `ITEM16` (`CSB.h:2190`) —
+     `word0` and all the movement state the AI needs.
+   - `CreatureRecord` now mirrors `DB4`: `creatureType` masked to 5 bits with
+     `alternateGraphics` split off, `count` renamed to CSBWin's `numMonM1` and stored as
+     count-minus-one, `positions`/`groupIndex?` collapsed into the single dual-purpose
+     `groupIndex`, and `fear`/`invisible`/`drawAsSize4`/`unique`/`poisoned` added.
+   - The attack tables `parseGraphic230` used to skip over are extracted:
+     `experienceForAttacking`, `skillNumber`, `byte20090`, `byte20046`, `byte20002`,
+     `byte19958`, `byte19914`, `attackNames[300]` and `legalAttacks[44]`.
+   - `MonsterType`, `StateOfFear` and `ATTACKTYPE` transcribed into
+     `src/engine/monsterTypes.ts`; timer types 29-41 and `TT_M1`/`TT_M2`/`TT_M3` added
+     to `TimerFunction`.
+
+   **Three real bugs fell out of the audit**, all recorded in `doc/PROVEN_FACTS.md`:
+   `numMonM1` was read as a count by the renderer and as count-minus-one by
+   `TimerSystem`/`Game`; `getMonsterRenderState` could never reach an `ITEM16` because
+   the `groupIndex?` field was never assigned by any loader, so monster attack and mirror
+   flags were dead even when loading a save; and `ViewportPicking` read positions
+   straight off `DB4` instead of the render state.
+
+   Verified with `tools/dump-monster-tables.ts` (new) — the attack names read `BLOCK`,
+   `CHOP`, `PUNCH`, … in `ATTACKTYPE` order, which pins the graphic `0x230` offsets — and
+   all five `tools/check-frames.sh` frames stayed byte-identical.
 2. **Monster timers and movement.** Port the monster timer functions and `MoveObject`
    integration so monsters use the same teleporter/stairs/pit paths as the party.
 3. **AI / targeting.** Port monster activation, pursuit, fleeing, and attack selection.
@@ -607,7 +634,17 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    `TT_REACTIVATE_GENERATOR` (the timer type is already defined).
 6. **Retire the proxies** listed above and delete the renderer-side attack trigger.
 
-Status: ⏳ not started.
+**Scope decided at the start of the phase.** Items 1-4 (with champion death/bones, since
+item 6 requires retiring the `registerChampionBones` proxy) are being done first; items 5
+and 6, and the champion melee pipeline from `Attack.cpp` with the real attack panel
+(Phase 7 item 14), follow. `Attack.cpp`'s Lord Chaos endgame — `_Fusion`,
+`_FusionSequence`, `FluxCage`, `IsLordChaosHere` — is **deliberately deferred**: it cannot
+be exercised until both monsters and Lord Chaos work, so porting it now would land
+untested. Validation is `tools/check-frames.sh` plus a dev-only AI trace mirroring
+CSBWin's own `AITraceActive` output (`Monster.cpp:3290`), so the two codebases stay
+diffable; a real test framework stays Phase 15.
+
+Status: 🔄 in progress — step 1 done.
 
 ### Phase 13 — Champion lifecycle
 

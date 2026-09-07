@@ -43,6 +43,16 @@ export interface UITables {
     wRectPos20210: WordRect;
     wRectPos20202: WordRect;
     shrinkColorMap: number[];
+    /* Attack tables — all indexed by ATTACKTYPE (doc/CSBwin-src/Data.h:638-651). */
+    experienceForAttacking: Int8Array; // Byte20178[44] — ATTACKPARAMETERS.experienceGained
+    skillNumber: Int8Array; // SkillNumber[44] — which skill the attack trains/requires
+    byte20090: Int8Array; // Byte20090[44] — becomes CHARDESC.word64 for the attack
+    byte20046: Int8Array; // Byte20046[44] — base stamina cost (+ STRandomBool())
+    byte20002: Int8Array; // Byte20002[44] — the "D6W" damage factor
+    byte19958: Int8Array; // Byte19958[44] — the "D7W" factor
+    byte19914: Int8Array; // Byte19914[44] — ATTACKPARAMETERS.disableTime
+    attackNames: string[]; // AttackNames[300] — "KICK", "PUNCH", "BASH", …
+    legalAttacks: Uint8Array[]; // legalAttacks[44], 8 bytes each
     spells: SpellDefinition[];
     spellFirstRuneScale: number[];
     spellBaseMana: number[];
@@ -242,8 +252,42 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
   const shrinkColorMap = Array.from(raw.slice(off, off + 16));
   off += 16;
 
+  // Seven parallel 44-entry tables indexed by ATTACKTYPE, then the attack names,
+  // then the per-attack-class legal-attack lists (doc/CSBwin-src/Data.h:638-651).
+  // These are signed bytes in CSBWin; `PossibleAttackTypes` relies on -1 meaning
+  // "no such option", so keep the sign.
+  const attackTableOffset = off;
+  requireSize(raw, attackTableOffset, 44 * 7, '0x230 attack tables');
+  const readI8Table = (index: number): Int8Array =>
+    new Int8Array(raw.slice(attackTableOffset + index * 44, attackTableOffset + (index + 1) * 44));
+  const experienceForAttacking = readI8Table(0);
+  const skillNumber = readI8Table(1);
+  const byte20090 = readI8Table(2);
+  const byte20046 = readI8Table(3);
+  const byte20002 = readI8Table(4);
+  const byte19958 = readI8Table(5);
+  const byte19914 = readI8Table(6);
+  off = attackTableOffset + 44 * 7;
+
+  // NUL-separated, indexed by attack type — CSBWin walks the list counting
+  // terminators (`GetAttackTypeName`, doc/CSBwin-src/CSBCode.cpp:8609).
+  requireSize(raw, off, 300, '0x230 AttackNames');
+  const attackNames = readNulSeparatedNames(raw.subarray(off, off + 300));
+  off += 300;
+
+  // LEGALATTACKS.byte0[8] (doc/CSBwin-src/Data.h:225). Byte 0 is the always-legal
+  // attack; bytes 1-2 are the two optional attacks (255 = absent) and bytes 4-5 the
+  // mastery each needs, with bit 7 meaning "the item must have charges left"
+  // (`GetLegalAttackTypes`, doc/CSBwin-src/Character.cpp:4769-4808).
+  requireSize(raw, off, 44 * 8, '0x230 legalAttacks');
+  const legalAttacks: Uint8Array[] = [];
+  for (let i = 0; i < 44; i++) {
+    legalAttacks.push(raw.slice(off + i * 8, off + (i + 1) * 8));
+  }
+  off += 44 * 8;
+
   // Spell table lives near the end of graphic 0x230 (Data.h: SPELL Spells[25]).
-  const spellTableOffset = off + (44 * 7) + 300 + (44 * 8) + 2;
+  const spellTableOffset = off + 2;
   requireSize(raw, spellTableOffset, 25 * 8, '0x230 Spells');
   const spells: SpellDefinition[] = [];
   let spellOff = spellTableOffset;
@@ -275,10 +319,42 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
     wRectPos20210,
     wRectPos20202,
     shrinkColorMap,
+    experienceForAttacking,
+    skillNumber,
+    byte20090,
+    byte20046,
+    byte20002,
+    byte19958,
+    byte19914,
+    attackNames,
+    legalAttacks,
     spells,
     spellFirstRuneScale,
     spellBaseMana,
   };
+}
+
+/**
+ * Split a fixed-size blob into NUL-terminated strings.
+ *
+ * CSBWin never counts these — it walks forward over `n` terminators to reach the
+ * nth name (doc/CSBwin-src/CSBCode.cpp:8609) — so a trailing run of padding zeroes
+ * simply yields no further entries.
+ */
+function readNulSeparatedNames(raw: Uint8Array): string[] {
+  const names: string[] = [];
+  let current = '';
+  for (let i = 0; i < raw.length; i++) {
+    const value = raw[i] ?? 0;
+    if (value === 0) {
+      names.push(current);
+      current = '';
+      continue;
+    }
+    current += String.fromCharCode(value & 0x7f);
+  }
+  if (current.length > 0) names.push(current);
+  return names;
 }
 
 function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {

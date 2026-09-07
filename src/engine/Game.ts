@@ -471,7 +471,7 @@ export class Game {
         for (const value of hp) {
             if ((value ?? 0) > 0) aliveCount++;
         }
-        record.count = Math.max(0, aliveCount - 1);
+        record.numMonM1 = Math.max(0, aliveCount - 1);
         if (aliveCount === 0) {
             const monsterRn = options.monster as ObjectID;
             this.dungeonState.removeObjectFromCell(options.position, monsterRn);
@@ -1473,8 +1473,7 @@ export class Game {
     getRuntimeSaveState(): RuntimeSaveState {
         const item16 = this.state.dungeon.item16
             ? this.state.dungeon.item16.map((r) => ({
-                  facings: r.facings,
-                  positions: r.positions,
+                  ...r,
                   singleMonsterStatus: [...r.singleMonsterStatus],
               }))
             : undefined;

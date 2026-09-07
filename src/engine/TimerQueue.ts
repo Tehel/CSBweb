@@ -1,4 +1,15 @@
+/**
+ * CSBWin `TIMERTYPE` (doc/CSBwin-src/CSB.h:1741-1797).
+ *
+ * The negative entries are not real queue entries — `ProcessTimers29to41` rewrites
+ * its incoming function code into one of them to say *why* it was woken
+ * (doc/CSBwin-src/Monster.cpp:3405+), and `InitialChecks` maps `TT_M3` back to
+ * `TT_29` (doc/CSBwin-src/Monster.cpp:3022).
+ */
 export enum TimerFunction {
+  TT_M3 = -3, // Monster damaged by a cloud or a door
+  TT_M2 = -2, // Monster damaged
+  TT_M1 = -1, // Monster attacked, or the party bumped into it
   TT_DOOR_STEP = 1,
   TT_MISSILE0 = 48,
   TT_MISSILE = 49,
@@ -10,6 +21,24 @@ export enum TimerFunction {
   TT_DOOR = 10,
   TT_11 = 11,
   TT_VI_ALTAR = 13,
+  // Monster AI. 29-31 are movement wake-ups, 32-36 the "A" attack group and its four
+  // individuals, 37-41 the "B" group and its four. `ProcessTimers29to41` handles the
+  // whole span; `TT_31` specifically means the party ran into the monster.
+  TT_FIRST_MONSTER_AI = 29,
+  TT_29 = 29,
+  TT_30 = 30,
+  TT_31 = 31,
+  TT_MONSTER_AGROUP = 32,
+  TT_MONSTER_A0 = 33,
+  TT_MONSTER_A1 = 34,
+  TT_MONSTER_A2 = 35,
+  TT_MONSTER_A3 = 36,
+  TT_MONSTER_BGROUP = 37,
+  TT_MONSTER_B0 = 38,
+  TT_MONSTER_B1 = 39,
+  TT_MONSTER_B2 = 40,
+  TT_MONSTER_B3 = 41,
+  TT_LAST_MONSTER_AI = 41,
   TT_REACTIVATE_GENERATOR = 65,
   TT_LIGHT = 70,
   TT_71 = 71,

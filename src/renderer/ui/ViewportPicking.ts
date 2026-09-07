@@ -234,9 +234,12 @@ export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, p
   if (rn === OBJECT_ID_EOF) return false;
   const creature = ui.dungeonState.getCreatureRecord(rn);
   if (!creature || isMonsterLevitating(ui, creature)) return false;
-  const monsterCount = Math.max(1, creature.count ?? 1);
+  const monsterCount = (creature.numMonM1 & 0x3) + 1;
   const absPos = (ui.partyState.facing + relativeLocation) & 0x3;
-  return monsterOccupiesPosition(creature.positions, absPos, monsterCount);
+  // Take the positions from the render state, not from DB4 directly: once an ITEM16
+  // is attached the live positions live there and `groupIndex` is the slot number.
+  const positions = ui.dungeonState.getMonsterRenderState(creature).positions;
+  return monsterOccupiesPosition(positions, absPos, monsterCount);
 }
 
 export function findFirstMonsterAt(ui: UIState, position: Position): ObjectID {

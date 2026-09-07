@@ -35,6 +35,13 @@ import {
   setActuatorValue,
 } from '../data/actuatorHelpers';
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
+import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import {
+  monsterAbsorbsDaggersEtc,
+  monsterHorizontalSize,
+  monsterLevitating,
+  monsterNonMaterial,
+} from '../renderer/csbwin/ObjectTables';
 import type { ActuatorSystem } from './ActuatorSystem';
 import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
 
@@ -57,7 +64,7 @@ const WEAPON_POISON_DART = 31;
 const WEAPON_THROWING_STAR = 32;
 
 export interface TimerTables {
-  monsterDesc?: ArrayLike<{ word2: number }>;
+  monsterDesc?: ArrayLike<MonsterDesc>;
   word1074?: number[];
 }
 
@@ -1089,7 +1096,7 @@ export class TimerSystem {
       if (!rec) return false;
       const desc = table[rec.creatureType];
       if (!desc) return false;
-      return (desc.word2 & 0x40) !== 0;
+      return monsterNonMaterial(desc);
     }
     return false;
   }
@@ -1777,8 +1784,8 @@ export class TimerSystem {
             return traceEncounter(false, 'monster-filter');
           }
           const desc = this.tables?.monsterDesc?.[monster.creatureType];
-          const nonMaterial = desc ? (desc.word2 & 0x40) !== 0 : false;
-          const absorbs = desc ? (desc.word2 & 0x400) !== 0 : false;
+          const nonMaterial = desc ? monsterNonMaterial(desc) : false;
+          const absorbs = desc ? monsterAbsorbsDaggersEtc(desc) : false;
           if (nonMaterial && projectile !== RN_DISPELL_MISSILE) return traceEncounter(false, 'monster-immune');
 
           if (projectileDbType === DBType.WEAPON && absorbs) {
@@ -1927,8 +1934,8 @@ export class TimerSystem {
     const positions = render.positions & 0xff;
     if (positions === 0xff) return 1;
     const desc = this.tables?.monsterDesc?.[monster.creatureType];
-    const horizontalSize = desc ? (desc.word2 & 0x3) : 0;
-    const numMonM1 = monster.count & 0x3;
+    const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
+    const numMonM1 = monster.numMonM1 & 0x3;
     let checkPos = pos & 0x3;
 
     if (horizontalSize === 1) {
@@ -2363,7 +2370,7 @@ export class TimerSystem {
     if (!rec) return false;
     const desc = this.tables?.monsterDesc?.[rec.creatureType];
     if (!desc) return false;
-    return (desc.word2 & 0x20) !== 0;
+    return monsterLevitating(desc);
   }
 
   private updateMissileTimerEntry(oldRn: number, newRn: number, position: Position): void {
@@ -2399,15 +2406,15 @@ export class TimerSystem {
     const absolute = teleporter.absoluteRotation;
 
     let facings = useItem16 ? (item16!.facings & 0xff) : this.encodeFacingByte(monster.facing);
-    let positions = useItem16 ? (item16!.positions & 0xff) : (monster.positions & 0xff);
+    let positions = useItem16 ? (item16!.positions & 0xff) : (monster.groupIndex & 0xff);
 
     let newFacings = absolute ? rotation : (facings + rotation) & 0x3;
     let newPositions = positions;
 
     if (positions !== 0xff) {
       const desc = this.tables?.monsterDesc?.[monster.creatureType];
-      const horizontalSize = desc ? (desc.word2 & 0x3) : 0;
-      const numMonM1 = Math.max(0, (monster.count ?? 1) - 1);
+      const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
+      const numMonM1 = monster.numMonM1 & 0x3;
       let facingShift = facings & 0xff;
       let posShift = positions & 0xff;
       let posDelta = (newFacings + 4 - facingShift) & 0x3;
@@ -2436,7 +2443,8 @@ export class TimerSystem {
       if (positions !== 0xff) item16!.positions = newPositions & 0xff;
     } else {
       monster.facing = newFacings & 0x3;
-      if (positions !== 0xff) monster.positions = newPositions & 0xff;
+      // With no ITEM16 attached, `groupIndex` is the packed positions byte.
+      if (positions !== 0xff) monster.groupIndex = newPositions & 0xff;
     }
 
     const destLevel = teleporter.destMap & 0xff;
@@ -2458,9 +2466,7 @@ export class TimerSystem {
   private getMonsterItem16(monster: CreatureRecord, level: number): Item16Record | null {
     const partyLevel = this.getPartyState().position.z;
     if (level !== partyLevel) return null;
-    const groupIndex = monster.groupIndex;
-    if (groupIndex === undefined) return null;
-    return this.dungeon.getItem16Record(groupIndex);
+    return this.dungeon.getAttachedItem16(monster);
   }
 
   private encodeFacingByte(facing: number): number {
