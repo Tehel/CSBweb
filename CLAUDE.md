@@ -98,6 +98,8 @@ main.ts     Bootstrap, wiring, and a lot of debug commands
   This overrides the global `JIRA-XXX` convention.
 - Deleting code that won't survive to the end state is expected — no need to preserve
   intermediate functionality for its own sake.
+- **Never `git push`.** Commit freely, but the remote is frequently out of range; pushing is
+  the author's call. Ask rather than assume a push is wanted.
 
 ## Current state
 

@@ -21,3 +21,10 @@ This document captures verified timer behavior from the CSBWin C++ source under 
 ## False wall timers
 
 - `ProcessTT_FALSEWALL` toggles false wall visibility by setting/clearing bit `0x04` in the cell flag; when clearing, it defers if the party or a non-material monster occupies the cell (`doc/CSBwin-src/Timer.cpp`).
+- The non-material check consults **only the first monster** in the cell's object chain, not
+  every monster present: `FindFirstMonster()` walks the chain and returns the first `dbMONSTER`
+  record (`doc/CSBwin-src/Code11f52.cpp:533`), and `RN::NonMaterial()` then reads
+  `MonsterDescriptor[monsterType].nonMaterial()`, i.e. `word2 & 0x40`
+  (`doc/CSBwin-src/data.cpp:553`, `doc/CSBwin-src/CSB.h:2286`). A cell may hold up to four
+  monsters, so "any monster is non-material" is **not** equivalent and would defer the false
+  wall in cases CSBWin does not. See `doc/CSBwin-src/Timer.cpp:1466-1472`.
