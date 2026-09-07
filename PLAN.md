@@ -49,14 +49,22 @@ Verified against the code, not inherited from earlier revisions of this file.
 3. **No champion death / bones / resurrection**, no character creation, no potion drinking.
 4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
 5. **Throw stats are estimates**, not CSBWin's skill/weight/stamina formulas (Phase 9 step 11).
-6. **Debug scaffolding is wired into shipping paths** (Phase 14).
-7. **`ViewportRenderer.ts` is a 3800-line god object** holding the whole UI (Phase 14).
+6. ✅ **Debug scaffolding** — done (Phase 14). Now confined to `src/dev.ts` and reached only
+   through `isDebugFeaturesEnabled()`.
+7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
+   the UI now lives in `src/renderer/ui/`.
 8. **CSBWin-binary-compatible save files** not attempted (Phase 10).
 
 **Validation debt:** several phases below list "Validation" steps (render tests, render
 probes, pixel comparisons against CSBWin screenshots) that were **never carried out** —
 there is no test framework in the project at all. Verification has been visual and ad hoc.
 Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
+
+There is now one partial exception: `tools/probe-frames.mjs` + `tools/check-frames.sh`
+drive the real app over the DevTools Protocol and byte-compare five screen states against
+`tools/frames/`. It was built to make the Phase 14 split safe and it is *not* a test
+framework — five frames, no assertions beyond equality, and it needs a dev server and a
+headless Chrome running. Phase 15 should absorb it rather than start from nothing.
 
 ## Next Steps (Phased)
 
@@ -621,35 +629,82 @@ Status: ⏳ not started.
 
 Goal: undo the drift that makes each new port harder than the last.
 
-1. ⏳ **Split `ViewportRenderer.ts`** (~3800 lines). It currently owns viewport rendering,
-   the mouse queue, inventory, chests, feeding, spell/attack panels, cursor drawing,
-   portraits and clothing slots. CSBWin separates these (`Mouse.cpp`, `CSBUI.cpp`,
-   `Magic.cpp`, `Character.cpp`) — mirroring that split restores greppability against the
-   reference, which is the whole point of the project. Suggested seams:
-   - mouse queue + hit-testing + cursor → a `Mouse`/input module
-   - inventory / chest / scroll / stats panels → a UI module per CSBWin file
-   - spell + attack panels → alongside the magic engine code
-   - leave only viewport composition in the renderer
-2. ⏳ **Remove debug scaffolding from shipping paths**: missile scenarios and missile trace,
-   random-party injection (F8), attack-panel toggle (F7), quick-save/quick-load hotkeys.
-   Keep them behind an explicit dev flag or delete them.
-3. ⏳ **Remove remaining fallbacks/placeholders**, or mark each with a TODO naming the CSBWin
-   function it stands in for.
-   - Specific case: `src/engine/MovementSystem.ts` invents English gameplay strings
-     ("A wall blocks your path", "You step into a pit!", "You feel a strange sensation...",
-     "You find stairs", "The edge of the dungeon blocks your path"). **None of these exist
-     in CSBWin** — verified by grep over `doc/CSBwin-src/`; the real game answers a blocked
-     move with a sound, not text. They now go to the debug log rather than the in-game
-     message area; they should be deleted along with the `message` field on the move result.
-4. ⏳ **Retire `static/js/`.** It was a hand-made proof-of-concept for browsing the `.dat`
-   files and the main project no longer depends on it (all source comments pointing at it
-   have been removed). One fact from it must survive: the **sound sample rates**, which are
-   correct there and wrong in CSBWin — now recorded in `doc/PROVEN_FACTS.md`.
-5. ⏳ **De-duplicate shared constants.** `OBJNI_*` are now centralised in
-   `src/core/objectNameIndex.ts`; `MISC_BONES_OF_HERO` and `DEFAULT_ROOM_TIMER_FUNCTIONS`
-   are still declared in more than one file.
+1. ✅ **Split `ViewportRenderer.ts`** — 3809 lines down to 723. The shared state it used to
+   own is now an explicit `UIState` context (`src/renderer/ui/UIState.ts`) that the new
+   modules take as their first argument, mirroring how CSBWin's UI files reach into
+   globals. Each module is named after its C++ counterpart so the two stay greppable:
+   - `ui/Mouse.ts` — the click ring buffer, the `word0` button dispatcher, the cursor
+     (`Mouse.cpp`)
+   - `ui/HitTest.ts` — `searchButtonList` / `pointInRect`, the leaf both Mouse and the
+     panels depend on
+   - `ui/Inventory.ts` — inventory screen, open chest, the eye's object-info panel, scrolls
+     (`CSBUI.cpp`)
+   - `ui/Character.ts` — portraits, hand icons, life bars, attributes, food/water, load,
+     possession slots (`Character.cpp`)
+   - `ui/Feeding.ts` — the mouth button and its chew animation (`Character.cpp`)
+   - `ui/MagicPanel.ts` — rune keypad, incantation, mana cost, attack buttons (`Magic.cpp`)
+   - `ui/Objects.ts` — name index resolution, description phrases, weight,
+     `DetermineMastery` (`Objects.cpp`, `Code17818.cpp`)
+   - `ui/Light.ts` — torch/magic light totals → viewport palette index
+   - `ui/Draw.ts` — screen-buffer primitives and the static chrome
+   - `ui/ViewportPicking.ts` — reverse lookup of a click against the frame's blit records
+   `ViewportRenderer` keeps what the plan asked it to keep: initialisation, palettes, the
+   wall / floor-ceiling bitmap caches, `render()`, present and blit-to-screen — plus thin
+   public wrappers over the mouse and picking entry points the host page calls.
+2. ✅ **Debug scaffolding removed from shipping paths.** ~450 lines moved out of `main.ts`
+   into `src/dev.ts` behind a `DevHost` of live getters; `main.ts` went 899 → 401 lines.
+   F5/F9 (quick-save/load), F8 (random party) and F7 (attack panel) are now gated on
+   `isDebugFeaturesEnabled()` like F6/F10 already were, and the boot-time quick-load is too
+   — with Debug off the game boots into a fresh dungeon.
 
-Status: ⏳ not started.
+   ⚠️ **Deferred, deliberately:** these were *not* deleted, as the plan's wording suggested.
+   F8 is currently the only way to get a playable party (Phase 13's hall-of-champions flow
+   does not exist yet; only `addCharacterFromPortrait` does) and F5/F9 are the only way to
+   persist anything (Phase 10). Delete each one as its real feature lands.
+3. ✅ **Fallbacks and placeholders resolved or marked.**
+   - The invented English movement strings are gone, along with the `message` field on
+     `MovementResult` and the `message` parameter of `MovementCallback`. A blocked move now
+     answers with `SoundIndex.WALL_BUMP` only, as CSBWin does. `checkSpecialTiles()` existed
+     only to produce those strings and was deleted.
+   - `DEFAULT_ROOM_TIMER_FUNCTIONS` moved to `src/engine/roomTimers.ts` with a note that the
+     authoritative table is `graphic232.byte1596` (CSBWin `Data.h:1403`) and that the literal
+     is only a pre-wiring fallback.
+   - `Game.recordSpellCast()` was dead code carrying a `skillNumber = 3` placeholder; the
+     live `castMagic` path already uses the spell record's `byte5`, as CSBWin does
+     (`Magic.cpp:1396`). Deleted.
+   - Stale TODOs in `DrawViewport.ts` ("implement complete viewport buffer system", "draw
+     champion portraits", "handle see-through walls") described work that has since landed;
+     replaced with what actually happens and where.
+   - Still marked, not fixed: `computeThrowSkillGain` is missing CSBWin's
+     `+ weaponDesc->uByte3 / 4` term (`Mouse.cpp:724-736`) because `weaponDesc` is not
+     plumbed into the engine; `tag008c98Index` is an unverified behavioural approximation of
+     `TAG008c98`.
+   - **`PLAN.md` was wrong** about the throw skill: `AdjustSkills(chIdx, 10, …)` is literally
+     what CSBWin does (`Mouse.cpp:737`), so there is no table to replace. Only the
+     experience term above is short.
+4. ✅ **Retired the JavaScript proof-of-concept.** `static/js/`, `static/index.html` and
+   `static/style/` deleted together — they were one self-contained unit and nothing else
+   referenced them. The sound sample rates survive in `doc/PROVEN_FACTS.md`, and the two doc
+   references to the old files now say they were retired here and are recoverable from git
+   history.
+5. ✅ **De-duplicated shared constants.** `MISC_BONES_OF_HERO` → `src/core/constants.ts`
+   (with its CSBWin citation), `DEFAULT_ROOM_TIMER_FUNCTIONS` → `src/engine/roomTimers.ts`.
+
+**Bug found and fixed along the way:** `context.seeThroughWalls` was hardcoded `false`, so
+the See-Thru-Walls spell had no visible effect even though the engine maintained the counter
+(`Magic.cpp:1314` increments it, `TT_73` decrements it). `render()` now feeds it per frame,
+as CSBWin's `SeeThroughWalls` opcode expects (`Viewport.cpp:2638`). Still unported: CSBWin
+also recolours a near door while the effect is active (`CSBCode.cpp:4171-4174`).
+
+**How this was verified.** `tsc --noEmit` clean at every step, and each of the twelve commits
+byte-compared five live screen states against a golden baseline
+(`tools/check-frames.sh`) — boot, party injected, inventory open, a selection inside it, and
+the attack panel. Every frame stayed identical through the whole split. Interaction is
+covered only to the extent the probe clicks: the inventory open/select path runs through the
+new `ui/Mouse.ts` dispatcher, but throwing, dropping, chests, feeding and casting are not
+exercised.
+
+Status: ✅ completed.
 
 ### Phase 15 — Verification
 
@@ -657,9 +712,13 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ⏳ Add a minimal test runner (the repo has no `test` script at all).
-2. ⏳ **Golden-frame rendering tests.** Render a fixed set of party positions to the index
-   buffer and compare against committed reference frames. This is the highest-value test
-   for a project whose correctness is mostly pixels.
+2. ⚠️ **Golden-frame rendering tests.** Partly there: `tools/probe-frames.mjs` drives the
+   real app over the DevTools Protocol and `tools/check-frames.sh` byte-compares five states
+   against `tools/frames/`. Determinism comes from clearing localStorage and seeding
+   `Math.random` on every load. What it still needs to become a real test: a fixed set of
+   *party positions* rather than whatever the boot dungeon gives, rendering straight from the
+   index buffer instead of a browser screenshot (no dev server, no Chrome), and a `test`
+   script that runs it. Absorb it rather than starting over.
 3. ⏳ **Render probe tool** (Phase 5's skipped validation): render a single cell program with
    controlled inputs and dump the viewport as PNG.
 4. ⏳ **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so

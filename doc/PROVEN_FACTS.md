@@ -278,3 +278,60 @@ match the C++ source.
 The door sound specifically was verified correct in DMweb: the divergence toward the JS
 pitch has already been applied and matches the real game. (`NOTES.md` still carries an
 older entry saying doors sound wrong — that entry is stale.)
+
+## See-Thru-Walls is a counter read as a boolean
+
+`d.SeeThruWalls` (`doc/CSBwin-src/Data.h:768`, an `i8`) is a **counter**, not a flag:
+
+- `doc/CSBwin-src/Magic.cpp:1314` — the spell increments it.
+- `doc/CSBwin-src/Attack.cpp:2016` — an attack path also increments it.
+- `doc/CSBwin-src/CSBCode.cpp:6549` — timer type `TT_73` decrements it.
+
+The viewport reads it as a boolean, every frame, through one bytecode opcode:
+
+```cpp
+case SeeThroughWalls: push(d.SeeThruWalls?1:0);   // Viewport.cpp:2638
+```
+
+So overlapping casts stack their durations rather than their effect, and the renderer must
+consult the counter per frame rather than latch a flag.
+
+One related effect is **not** ported: while the counter is non-zero, CSBWin recolours a
+door in the nearest rank via `TAG004b26(17, 2)` (`doc/CSBwin-src/CSBCode.cpp:4171-4174`).
+
+## Throwing awards skill 10 with a literal experience base
+
+`doc/CSBwin-src/Mouse.cpp:724-737`:
+
+```cpp
+D6W = 8;
+D5W = 1;
+if (objD4.dbType() == dbWEAPON)
+{
+  D6W += 4;
+  weaponDescA2 = TAG0099d2(objD4);
+  if (weaponDescA2->uByte1 <= 12)
+  {
+    D5W = weaponDescA2->uByte3;
+    D6W = sw(D6W + D5W/4);
+  };
+};
+AdjustSkills(chIdx, 10, D6W, ASW_ThrowByCharacter);
+```
+
+The skill number is the literal `10` — there is no lookup table for it. The experience is
+`8`, `+4` for a weapon, and `+ uByte3/4` for a weapon whose `uByte1 <= 12`.
+
+## Spell experience uses the spell record's `byte5`
+
+CSBWin passes `spellByte5` as the skill number for both spell `AdjustSkills` calls —
+`ASW_CastSpell1` on a wisdom-check failure (`doc/CSBwin-src/Magic.cpp:1226`) and
+`ASW_CastSpell2` on success (`doc/CSBwin-src/Magic.cpp:1396`). `byte5` comes from the
+`SPELL` record in graphics `0x230`; it is not derived from the champion's class.
+
+## Blocked movement has no message
+
+CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of
+`doc/CSBwin-src/`: none of "A wall blocks your path", "You step into a pit", "You feel a
+strange sensation", "You find stairs" or "The edge of the dungeon blocks your path" exists
+anywhere in the C++ source. They were invented by this port and were removed in Phase 14.

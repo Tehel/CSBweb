@@ -24,3 +24,4 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/GRAPHICS_MAPPINGS.md` - Wall/door bitmap indices and rectangle mappings.
 - `doc/VIEWPORT_RENDERING.md` - Narrative rendering overview tied to CSBWin behavior.
 - `doc/PROVEN_FACTS.md` - Specific verified facts with source references.
+- `doc/UI_MODULE_MAP.md` - Which `src/renderer/ui/` module ports which CSBWin UI file.

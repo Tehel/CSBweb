@@ -59,7 +59,10 @@ without checking them — so it proves nothing. The project once sat with a brok
 months, and a genuine runtime bug was hiding among the type errors.
 
 There is **no test framework** yet (see `PLAN.md` Phase 15). `tools/*.ts|mjs` are one-off
-dump/inspection scripts run with `npx tsx`. Verification is currently visual.
+dump/inspection scripts run with `npx tsx`. Verification is mostly visual — but
+`tools/check-frames.sh` byte-compares five live screen states against `tools/frames/` and is
+the cheapest way to prove a change to the renderer or UI kept every pixel. Run it before
+committing anything structural.
 
 ## Code layout (`src/`, ~30k LOC)
 
@@ -69,12 +72,17 @@ core/       BinaryFile (big-endian), compression (LZW/RLE/SND), imageDecoder (IM
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
 engine/     Game, DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
             ActuatorSystem, DsaSystem, skills, AddCharacter
-renderer/   ViewportRenderer, DrawViewport, ViewportGraphics
+renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
             SummarizeRoomInfo, CanvasBlitter, TextRenderer
+  ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
+            MagicPanel, Feeding, Objects, Light, Draw, HitTest, ViewportPicking, all over
+            a shared UIState. See doc/UI_MODULE_MAP.md.
 ui/         DOM-side debug chrome (settings, map preview, log)
-main.ts     Bootstrap, wiring, and a lot of debug commands
+dev.ts      Dev-only scaffolding (random party, quick-save, missile scenarios/trace),
+            reached only via isDebugFeaturesEnabled()
+main.ts     Bootstrap and wiring
 ```
 
 ## Key technical concepts
@@ -105,8 +113,8 @@ main.ts     Bootstrap, wiring, and a lot of debug commands
 
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
 renderer, movement, timers, actuators, DSA scripting, missiles, skills/experience, magic
-casting, light levels, sound and most of the DM UI all work. The largest gaps are **no
-monsters at all** (`Monster.cpp` unported — Phase 12), no champion death/creation
-(Phase 13), and a **message area still routed through a debug helper** (Phase 11, the
-current priority). `ViewportRenderer.ts` has grown into a 3800-line god object holding the
-entire UI and wants splitting (Phase 14).
+casting, light levels, sound and most of the DM UI all work. The message area (Phase 11) and
+the structural cleanup (Phase 14) are done — the UI now lives in `src/renderer/ui/`, one
+module per CSBWin file. The largest gaps are **no monsters at all** (`Monster.cpp` unported
+— Phase 12, the current priority), no champion death/creation (Phase 13), and the validation
+debt (Phase 15).
