@@ -1087,14 +1087,14 @@ export class ViewportRenderer {
   private drawStaticUIFrame(): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
 
-    const ui = this.ui.uiTables.graphic232;
-    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1780, 0);
-    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1788, 0);
-    fillRectIndex(this.ui.screenIndexBuffer, ui.wRectPos1796, 0);
+    const g232 = this.ui.uiTables.graphic232;
+    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1780, 0);
+    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1788, 0);
+    fillRectIndex(this.ui.screenIndexBuffer, g232.wRectPos1796, 0);
 
     const movementGraphic = this.getGraphicBitmap(13);
     if (!movementGraphic) return;
-    const rect = ui.word28;
+    const rect = g232.word28;
     tag0088b2Index(
       movementGraphic,
       this.ui.screenIndexBuffer,
@@ -1137,12 +1137,12 @@ export class ViewportRenderer {
 
   private drawFoodWaterPanel(champion: Champion): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const ui = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
-    blitBasicGraphicToViewport(this.ui, 30, ui.wRectPos950, 48, 12);
-    blitBasicGraphicToViewport(this.ui, 31, ui.wRectPos958, 48, 12);
+    const g232 = this.ui.uiTables.graphic232;
+    blitBasicGraphicToViewport(this.ui, 20, g232.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 30, g232.wRectPos950, 48, 12);
+    blitBasicGraphicToViewport(this.ui, 31, g232.wRectPos958, 48, 12);
     if ((champion.poisonCount ?? 0) !== 0) {
-      blitBasicGraphicToViewport(this.ui, 32, ui.wRectPos966, 96, 12);
+      blitBasicGraphicToViewport(this.ui, 32, g232.wRectPos966, 96, 12);
     }
 
     drawFoodWaterBar(this.ui, champion.food ?? 0, 69, 5);
@@ -1151,8 +1151,8 @@ export class ViewportRenderer {
 
   private drawAttributePanel(champion: Champion): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData) return;
-    const ui = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
+    const g232 = this.ui.uiTables.graphic232;
+    blitBasicGraphicToViewport(this.ui, 20, g232.wRectPos926, 144, 8);
 
     let lineY = 58;
     for (let role = 0; role < ROLE_LABELS.length; role++) {
@@ -1226,9 +1226,9 @@ export class ViewportRenderer {
       this.drawScrollPanel(objectId);
       return;
     }
-    const ui = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
-    blitBasicGraphicToViewport(this.ui, 29, ui.wRectPos942, 32, 12);
+    const g232 = this.ui.uiTables.graphic232;
+    blitBasicGraphicToViewport(this.ui, 20, g232.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 29, g232.wRectPos942, 32, 12);
 
     const objectNameIndex = resolveObjectNameIndex(this.ui, objectId | 0);
     if (objectNameIndex >= 0) {
@@ -1238,7 +1238,7 @@ export class ViewportRenderer {
         x2: VIEWPORT_X + 126,
         y2: VIEWPORT_Y + 74,
       };
-      drawObjectIcon(this.ui, iconRect, objectNameIndex, ui.word612);
+      drawObjectIcon(this.ui, iconRect, objectNameIndex, g232.word612);
       const name = getObjectDisplayName(this.ui, objectId, objectNameIndex);
       if (name) {
         drawTextLineIndex(
@@ -1282,8 +1282,8 @@ export class ViewportRenderer {
     };
     const text = this.ui.dungeonState.decodeScrollText(scroll, textTables) ?? '';
 
-    const ui = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 23, ui.wRectPos926, 144, 8);
+    const g232 = this.ui.uiTables.graphic232;
+    blitBasicGraphicToViewport(this.ui, 23, g232.wRectPos926, 144, 8);
 
     const { lines, startY } = this.splitScrollLines(text);
     let y = startY;
@@ -1484,7 +1484,7 @@ export class ViewportRenderer {
   private drawPartyStatus(): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.partyState || !this.ui.fontData) return;
 
-    const ui = this.ui.uiTables.graphic232;
+    const g232 = this.ui.uiTables.graphic232;
     const party = this.ui.partyState;
     const facing = party.facing | 0;
     const selected = party.selectedCharacterIndex | 0;
@@ -1567,8 +1567,8 @@ export class ViewportRenderer {
 
       const charPos = champion?.partyPosition ?? chIdx;
       const dir = (charPos + 4 - facing) & 3;
-      const posRect = ui.wRectPos1454[dir];
-      const color = ui.byte1386[chIdx] ?? 13;
+      const posRect = g232.wRectPos1454[dir];
+      const color = g232.byte1386[chIdx] ?? 13;
       fillRectIndex(this.ui.screenIndexBuffer, posRect, color);
 
       const indicator = this.getGraphicBitmap(28);
@@ -1976,12 +1976,12 @@ export class ViewportRenderer {
 
   private drawChestPanel(chestView: ChestViewSource): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const ui = this.ui.uiTables.graphic232;
-    blitBasicGraphicToViewport(this.ui, 25, ui.wRectPos926, 144, 8);
+    const g232 = this.ui.uiTables.graphic232;
+    blitBasicGraphicToViewport(this.ui, 25, g232.wRectPos926, 144, 8);
     this.drawInspectArrow(chestView.source === 'cursor');
 
-    const word612 = ui.word612;
-    const iconSlots = ui.iconDisplay;
+    const word612 = g232.word612;
+    const iconSlots = g232.iconDisplay;
     for (let slot = 0; slot < 8; slot++) {
       const rect = this.getChestSlotRect(iconSlots, slot);
       if (!rect) continue;
@@ -1994,9 +1994,9 @@ export class ViewportRenderer {
 
   private drawInspectArrow(fromEye: boolean): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
-    const ui = this.ui.uiTables.graphic232;
+    const g232 = this.ui.uiTables.graphic232;
     const graphicIndex = fromEye ? 19 : 18;
-    blitBasicGraphicToViewport(this.ui, graphicIndex, ui.wRectPos934, 16, 8);
+    blitBasicGraphicToViewport(this.ui, graphicIndex, g232.wRectPos934, 16, 8);
   }
 
   private computeChampionLoad(champion: Champion): { load: number; maxLoad: number; color: number } | null {
