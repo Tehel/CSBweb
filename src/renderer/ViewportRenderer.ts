@@ -40,10 +40,14 @@ import {
   VIEWPORT_X,
   VIEWPORT_Y,
 } from './ViewportGraphics';
-import { getOrSet, Position, SoundIndex } from '@/core';
+import { getOrSet, Position } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
-import { createUIState, nowMs, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  drawMouthChewAnimation,
+  handleMouthPress,
+} from './ui/Feeding';
 import {
   canPlaceInSlot,
   drawAttributePanel,
@@ -57,11 +61,9 @@ import {
 } from './ui/Character';
 import {
   applyViewingFilter,
-  descIndexForObject,
   drawItemDescriptionLine,
   getAttackClass,
   getBaseObjectNameIndex,
-  getDescIndexForObjectType,
   getInventoryPlaceholderIndex,
   getObjectDescriptionLines,
   getObjectDisplayName,
@@ -84,16 +86,12 @@ import { GraphicRoomType } from './bytecode/Types';
 import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 import {
-    OBJNI_APPLE,
     OBJNI_BONES_A,
-    OBJNI_DRAGON_STEAK,
     OBJNI_EMPTY_FLASK,
     OBJNI_OPEN_CHEST,
     OBJNI_SPECIAL_C,
     OBJNI_SPECIAL_D,
     OBJNI_SPECIAL_E,
-    OBJNI_SPECIAL_G,
-    OBJNI_SPECIAL_H,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
     OBJNI_WATER,
@@ -105,14 +103,6 @@ type ViewportCursorAction =
   | { kind: 'throw'; side: 0 | 1 }
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
-type FeedingOutcome = {
-  foodDelta: number;
-  waterDelta: number;
-  removeFromHand: boolean;
-  deleteRecord: boolean;
-  chew: boolean;
-  playGulp: boolean;
-};
 type ChestViewSource =
   | { id: ObjectID; source: 'cursor' }
   | { id: ObjectID; source: 'hand'; slot: number };
@@ -134,7 +124,6 @@ export interface FloorCeiling {
 }
 
 const MAX_LINES_IN_SCROLL = 9;
-const POTION_EMPTY_FLASK = 20;
 const POTION_WATER_FLASK = 15;
 const MAX_SCROLL_LINE_LENGTH = 16;
 
@@ -1368,7 +1357,7 @@ export class ViewportRenderer {
     } else {
       drawFoodWaterPanel(this.ui, champion);
     }
-    this.drawMouthChewAnimation();
+    drawMouthChewAnimation(this.ui);
     this.drawEyeIcon();
     drawVitalsAndLoad(this.ui, champion);
   }
@@ -1712,7 +1701,7 @@ export class ViewportRenderer {
       return;
     }
     if (id === 70) {
-      this.handleMouthPress();
+      handleMouthPress(this.ui);
       return;
     }
     if (id === 100) {
@@ -1766,175 +1755,6 @@ export class ViewportRenderer {
     if (!this.ui.partyState) return;
     if (this.ui.partyState.selectedCharacterIndex < 0) return;
     this.ui.pressingEye = true;
-  }
-
-  private handleMouthPress(): void {
-    if (!this.ui.partyState || !this.ui.objectTables) return;
-    if ((this.ui.partyState.cursorOwner ?? -1) < 0) return;
-    const selected = this.ui.partyState.selectedCharacterIndex ?? -1;
-    if (selected < 0) return;
-    const champ =
-      this.ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-      this.ui.partyState.champions[selected] ??
-      null;
-    if (!champ || champ.alive === false) return;
-
-    const objectId = normalizeObjectValue(this.ui.partyState.objectInHand);
-    if (objectId === null) return;
-
-    const outcome = this.computeFeedingOutcome(objectId);
-    if (!outcome) return;
-
-    if (outcome.removeFromHand) {
-      this.ui.partyState.objectInHand = null;
-      if (outcome.deleteRecord && isLikelyObjectRecord(this.ui, objectId)) {
-        this.ui.dungeonState.deleteDBEntry(objectId as ObjectID);
-      }
-    }
-
-    champ.food = this.clampFoodWater((champ.food ?? 0) + outcome.foodDelta);
-    champ.water = this.clampFoodWater((champ.water ?? 0) + outcome.waterDelta);
-
-    if (outcome.chew) this.startMouthChewAnimation();
-    if (outcome.playGulp && this.ui.playSound) this.ui.playSound(SoundIndex.SWALLOW);
-  }
-
-  private computeFeedingOutcome(objectId: number): FeedingOutcome | null {
-    if (!this.ui.objectTables) return null;
-    const isRecord = isLikelyObjectRecord(this.ui, objectId);
-    const nameIndex = isRecord ? resolveObjectNameIndex(this.ui, objectId) : getBaseObjectNameIndex(this.ui, objectId);
-    if (nameIndex < 0) return null;
-
-    const descIndex = isRecord
-      ? descIndexForObject(this.ui, objectId as ObjectID)
-      : getDescIndexForObjectType(this.ui, objectId | 0);
-    const carryMask = descIndex !== null ? this.ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
-    const mouthAllowed = (carryMask & 1) !== 0;
-
-    const isFood = this.isFoodNameIndex(nameIndex);
-    const isWater = this.isWaterNameIndex(nameIndex);
-    const isWaterFlask = isRecord && this.isWaterFlaskRecord(objectId as ObjectID);
-
-    if (!mouthAllowed && !isFood && !isWater && !isWaterFlask) return null;
-
-    const outcome: FeedingOutcome = {
-      foodDelta: 0,
-      waterDelta: 0,
-      removeFromHand: false,
-      deleteRecord: false,
-      chew: false,
-      playGulp: false,
-    };
-
-    if (isWaterFlask) {
-      const rec = this.ui.dungeonState.getPotionRecord(objectId as ObjectID);
-      if (!rec) return null;
-      outcome.waterDelta = 1600;
-      outcome.playGulp = true;
-      rec.potionType = POTION_EMPTY_FLASK;
-      return outcome;
-    }
-
-    if (isWater) {
-      if (isRecord && decodeObjectID(objectId as ObjectID).category === DBType.MISC) {
-        const rec = this.ui.dungeonState.getMiscRecord(objectId as ObjectID);
-        const value = rec?.specialState ?? 0;
-        if (value > 0) {
-          outcome.waterDelta = 800;
-          outcome.playGulp = true;
-          if (rec) rec.specialState = Math.max(0, value - 1);
-        }
-      } else {
-        outcome.waterDelta = 800;
-        outcome.playGulp = true;
-        outcome.removeFromHand = true;
-        outcome.deleteRecord = isRecord;
-      }
-      return outcome;
-    }
-
-    if (isFood) {
-      outcome.foodDelta = this.getFoodValue(nameIndex);
-      outcome.removeFromHand = true;
-      outcome.deleteRecord = isRecord;
-      outcome.chew = true;
-      outcome.playGulp = true;
-      return outcome;
-    }
-
-    return null;
-  }
-
-  private isWaterFlaskRecord(objectId: ObjectID): boolean {
-    const rec = this.ui.dungeonState.getPotionRecord(objectId);
-    return rec?.potionType === POTION_WATER_FLASK;
-  }
-
-  private isFoodNameIndex(nameIndex: number): boolean {
-    return nameIndex >= OBJNI_APPLE && nameIndex <= OBJNI_DRAGON_STEAK;
-  }
-
-  private isWaterNameIndex(nameIndex: number): boolean {
-    return nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER;
-  }
-
-  private getFoodValue(nameIndex: number): number {
-    const values = this.ui.objectTables?.foodValue;
-    if (!values) return 0;
-    const offset = nameIndex - OBJNI_APPLE;
-    if (offset < 0 || offset >= values.length) return 0;
-    return values[offset] ?? 0;
-  }
-
-  private clampFoodWater(value: number): number {
-    return Math.max(-1023, Math.min(2048, Math.floor(value)));
-  }
-
-  private startMouthChewAnimation(): void {
-    const now = nowMs();
-    const frameMs = (1000 * 8) / 60;
-    this.ui.mouthChewStartMs = now;
-    this.ui.mouthChewEndMs = now + frameMs * 4;
-    this.ensureMouthChewLoop();
-  }
-
-  private drawMouthChewAnimation(): void {
-    if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.objectTables) return;
-    if (this.ui.mouthChewStartMs === null) return;
-    const now = nowMs();
-    if (now >= this.ui.mouthChewEndMs) return;
-
-    const frameMs = (1000 * 8) / 60;
-    const frame = Math.floor((now - this.ui.mouthChewStartMs) / frameMs);
-    const icon = (frame % 2 === 0) ? OBJNI_SPECIAL_H : OBJNI_SPECIAL_G;
-    const mouthRect = this.ui.uiTables.graphic232.word1398;
-    const x = VIEWPORT_X + mouthRect.x1 + 1;
-    const y = VIEWPORT_Y + mouthRect.y1 + 1;
-    drawObjectIconAt(this.ui, x, y, icon, this.ui.uiTables.graphic232.word612, -1);
-  }
-
-  private ensureMouthChewLoop(): void {
-    if (this.ui.mouthChewFrameHandle !== null) return;
-    const schedule = (cb: (time: number) => void): number => {
-      if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);
-      return setTimeout(() => cb(nowMs()), 16) as unknown as number;
-    };
-    const tick = () => {
-      if (this.ui.mouthChewStartMs === null) {
-        this.ui.mouthChewFrameHandle = null;
-        return;
-      }
-      const now = nowMs();
-      if (now >= this.ui.mouthChewEndMs) {
-        this.ui.mouthChewStartMs = null;
-        this.ui.mouthChewFrameHandle = null;
-        this.renderLastFrame();
-        return;
-      }
-      this.renderLastFrame();
-      this.ui.mouthChewFrameHandle = schedule(tick);
-    };
-    this.ui.mouthChewFrameHandle = schedule(tick);
   }
 
   private renderLastFrame(): void {
