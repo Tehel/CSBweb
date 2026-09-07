@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Dungeon Master's monsters think</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f5;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f1ede7;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --rule: #e0d9cf;
+    --accent: #8c3a1e;
+    --accent-bg: #f6ece7;
+    --mystery: #6b4423;
+    --mystery-bg: #f7f0e6;
+    --mystery-rule: #d9c4a3;
+    --measure: 40rem;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17161a;
+      --bg-raised: #1e1d22;
+      --bg-sunken: #131216;
+      --ink: #e6e2dc;
+      --ink-soft: #a9a49c;
+      --ink-faint: #7d786f;
+      --rule: #302e35;
+      --accent: #e8916a;
+      --accent-bg: #2a201c;
+      --mystery: #d8b78a;
+      --mystery-bg: #221d17;
+      --mystery-rule: #4a3d2c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17161a;
+    --bg-raised: #1e1d22;
+    --bg-sunken: #131216;
+    --ink: #e6e2dc;
+    --ink-soft: #a9a49c;
+    --ink-faint: #7d786f;
+    --rule: #302e35;
+    --accent: #e8916a;
+    --accent-bg: #2a201c;
+    --mystery: #d8b78a;
+    --mystery-bg: #221d17;
+    --mystery-rule: #4a3d2c;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+  }
+
+  .page { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+
+  header.masthead { margin-bottom: 3rem; }
+  header.masthead h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 .9rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1.4rem; }
+  .provenance {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 3.4rem 0 1rem;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  h2::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: 1.1rem;
+    opacity: .8;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 2.2rem 0 .6rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--bg-sunken);
+    padding: .12em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+  li > ul, li > ol { margin-top: .5rem; }
+
+  /* --- The decision trees --------------------------------------------- */
+  .tree {
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.55;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1.1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink);
+    tab-size: 2;
+  }
+  .tree .q { color: var(--accent); }
+  .tree .act { font-weight: 600; }
+
+  /* --- Tables ---------------------------------------------------------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  /* The creature table has seven columns and does not belong inside the prose
+     measure. Let it break out, centred, bounded by the viewport. */
+  .table-wrap.wide {
+    --wide: min(58rem, calc(100vw - 3rem));
+    width: var(--wide);
+    margin-left: calc((var(--wide) - 100%) / -2);
+  }
+  .table-wrap.wide td.notes { min-width: 13rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+    font-family: var(--serif);
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-top: .7rem;
+    font-style: italic;
+  }
+  th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-size: .84em; text-align: right; white-space: nowrap; padding-left: .45rem; padding-right: .45rem; }
+  td.name { white-space: nowrap; font-weight: 600; }
+  .peak { color: var(--accent); font-weight: 700; }
+  .dash { color: var(--ink-faint); }
+  tbody tr.lord td { background: var(--accent-bg); }
+
+  /* --- Callouts -------------------------------------------------------- */
+  .note {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+
+  .mystery {
+    background: var(--mystery-bg);
+    border: 1px solid var(--mystery-rule);
+    border-left: 3px solid var(--mystery);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1rem;
+    font-size: .95rem;
+  }
+  .mystery h4 {
+    margin: 0 0 .45rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mystery);
+    font-family: var(--serif);
+  }
+  .mystery p { margin-bottom: .6rem; }
+  .mystery p:last-child { margin-bottom: 0; }
+  .quote {
+    font-style: italic;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--mystery-rule);
+    padding-left: .8rem;
+    margin: .7rem 0;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 3rem 0;
+  }
+
+  .lede {
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    margin: 0 0 1.6rem;
+  }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: .84rem;
+    color: var(--ink-faint);
+  }
+  footer.colophon p { margin-bottom: .5rem; }
+
+  @media (max-width: 34rem) {
+    body { font-size: 17px; }
+    .page { padding: 2.5rem 1.1rem 4rem; }
+    .tree { font-size: .68rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <h1>How Dungeon Master's monsters think</h1>
+  <p class="standfirst">A plain-language account of the decision-making behind the
+  creatures in FTL's 1987 dungeon crawler — the senses they have, the moods they
+  move between, and the handful of things that still make no sense.</p>
+  <p class="provenance">Traced from Paul R. Stevens' CSBWin C++ source · Written
+  while porting it to TypeScript · Behaviour observed running in the port</p>
+</header>
+
+<p class="lede">Everything here is behaviour I read in the source and then watched
+happen. Where I could not work out <em>why</em> something is the way it is, it goes in
+<a href="#unsolved">Unsolved</a> at the end rather than being smoothed over.</p>
+
+<p><strong>One machine, many parameters.</strong> I had expected each monster type to
+have its own logic and found the opposite: there is a single decision procedure, and
+the twenty-odd creature types differ almost entirely by the numbers fed into it. The
+exceptions — the giggler, Lord Chaos, and the handful of creatures that throw things —
+are called out below.</p>
+
+<hr>
+
+<h2>The unit of behaviour is the group, not the monster</h2>
+
+<p>A "monster" in the dungeon file is up to four creatures of one kind sharing a cell.
+They move as one, they are hurt as one, they have one shared mood. Only in a fight do
+they act individually, and even then only sometimes.</p>
+
+<p>Each group occupies one cell and, within it, each member stands in one of four
+corners — or the whole group is "centred", which is what a solitary monster does. A
+worm is wide enough to occupy two corners; a dragon fills the cell entirely and can
+never be more than one.</p>
+
+<div class="note">
+  <span class="label">The dungeon is not simulated behind you</span>
+  <p>A group only thinks while the party is on its level. Off-level, the group leader
+  gets an occasional turn in which it takes one random step and then sleeps for a
+  while — longer the further away the party is. Everything else is frozen. The dungeon
+  does not live without you; it only twitches.</p>
+</div>
+
+<h2>What a monster can perceive</h2>
+
+<p>Two senses, and they fail in different ways. That difference is doing more work
+than either sense on its own.</p>
+
+<h3>Sight</h3>
+
+<p>To see you, all of these must hold:</p>
+
+<ol>
+  <li><strong>You are not magically invisible</strong> — unless this creature sees
+  through that.</li>
+  <li><strong>You are in front of it.</strong> Roughly a 45° cone, but one cell wider
+  than that suggests: a monster facing north also sees a target directly to its side.
+  A few creatures see in all directions and skip this test entirely.</li>
+  <li><strong>You are close enough.</strong> Each type has a sight range.
+  <strong>Darkness halves it</strong>, in proportion to how dark the screen actually
+  is — the same value that dims your viewport shortens their vision. Some creatures
+  see in the dark and are exempt. Even in pitch black, a monster still sees one
+  cell.</li>
+  <li><strong>There is a clear line.</strong> Walls block. Closed doors block, unless
+  the door is one of the two "special" types the level designer marked as
+  passable.</li>
+</ol>
+
+<p>For a group, only <em>distinct</em> facings are tested. Four monsters all looking
+north perform one test, not four.</p>
+
+<p>The line-of-sight test is worth describing because it is not a ray cast. It walks
+from <strong>you</strong> towards the monster, one cell at a time, choosing at each
+step whether to move along x or y by whichever keeps the slope of the line closest to
+the original. If it walks into a wall the path is blocked — except on an exact tie
+between the two choices, where it gets one retry along the other diagonal. Perfect
+diagonals are special-cased: both orthogonal neighbours <em>and</em> the corner cell
+must be blocked before the line is refused, so monsters can see you round the inside
+of a corner.</p>
+
+<h3>Smell</h3>
+
+<p>If sight fails, a monster can still find you two ways.</p>
+
+<p><strong>Close range.</strong> Within roughly half its smelling range, and with a
+clear line that <strong>ignores doors</strong>, it simply knows where you are. This is
+the mechanic that makes hiding behind a closed door unreliable: the door stops them
+seeing you, not smelling you.</p>
+
+<p><strong>Your trail.</strong> The game remembers the last two dozen squares the
+party stood on, each with a staleness value. A monster standing on one of those
+squares may follow it. The test is a random roll plus the print's staleness against a
+threshold — and the threshold <strong>falls as the creature's nose improves</strong>,
+so a keen-nosed monster will follow older, colder trails. A worm has by far the best
+nose in the game and can scarcely see at all.</p>
+
+<h2 id="moods">Six moods</h2>
+
+<p>Behaviour is dominated by a single small state I will call the group's
+<strong>mood</strong>. There are six in use.</p>
+
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th>Mood</th><th>What it means</th><th>What it does</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="name">Calm</td><td>Nothing is happening</td><td>Wanders; hunts by smell if it catches your trail</td></tr>
+    <tr><td class="name">Wary</td><td>Aware, unbothered</td><td>Seeing you only makes it pause</td></tr>
+    <tr><td class="name">Alert</td><td>Suspicious</td><td>Seeing you at range flips it to Charging</td></tr>
+    <tr><td class="name">Fleeing</td><td>Panicking</td><td>Runs away, faster than it hunts</td></tr>
+    <tr><td class="name">Engaged</td><td>In your face</td><td>Formation breaks — each member acts alone</td></tr>
+    <tr><td class="name">Charging</td><td>Coming for you</td><td>Heads for where it last knew you to be</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The transitions are the interesting part:</p>
+
+<ul>
+  <li><strong>You attack it, or walk into it</strong> → <em>Engaged</em>, unless it is
+  already Engaged or Fleeing. This is the fastest way to get a monster's full
+  attention.</li>
+  <li><strong>It takes damage</strong> → if already Fleeing or Engaged, nothing
+  changes. Otherwise it checks whether it can see you; if it cannot, it just turns on
+  the spot, and if it can, it tries to move.</li>
+  <li><strong>Calm or Alert, and it sees you at range</strong> → <em>Charging</em>.
+  Note <em>Wary</em> is the exception: a wary monster that sees you merely waits.</li>
+  <li><strong>It reaches the square where it last saw you and you are not there</strong>
+  → <em>Calm</em>. The trail has gone cold.</li>
+  <li><strong>A group member dies while Engaged</strong> → the survivors may drop to
+  <em>Fleeing</em>, and are likelier to the more of them have already died. Bravery is
+  a per-type number; at the maximum a creature never breaks, whatever happens.</li>
+  <li><strong>Fleeing runs out</strong> — the panic is a countdown — or a fleeing
+  monster is cornered next to you with nowhere to go → <em>Calm</em>. It stops
+  panicking and turns to face you.</li>
+</ul>
+
+<div class="note">
+  <span class="label">Why this one detail matters</span>
+  <p><strong>Engaged is the only mood in which individual members get their own
+  turns.</strong> Several other parts of the code only bother renumbering or clearing
+  per-member state when the group is Engaged — because that is the only time
+  per-member state exists at all.</p>
+</div>
+
+<h2 id="turn">One turn, as a decision tree</h2>
+
+<p>A group's turn arrives as a scheduled event. Roughly:</p>
+
+<pre class="tree"><span class="q">Is this group's level the party's level?</span>
+├─ No ──▶ only the leader acts: one random step, then sleep
+│         (longer the further the party's level is)
+└─ Yes
+   │
+   ├─ <span class="q">Is any member at zero health?</span>
+   │  └─ Yes ──▶ remove it, re-queue this turn for right now, stop
+   │             (the group reconsiders once it has shrunk)
+   │
+   ├─ <span class="q">Is life magically frozen, and this creature not invincible?</span>
+   │  └─ Yes ──▶ do nothing, try again in a moment
+   │
+   └─ <span class="q">Act, according to why this turn happened:</span>
+      │
+      ├─ "I was attacked"  ──▶ <span class="act">break formation</span>, everyone turn to face you
+      │
+      ├─ "I was damaged"   ──▶ can I see them?
+      │                        ├─ no  ──▶ turn on the spot, reschedule
+      │                        └─ yes ──▶ <span class="act">try to move</span>
+      │
+      ├─ "A cloud or door hurt me"
+      │                     ──▶ try every direction from a random start
+      │
+      ├─ An individual member's turn (only when Engaged)
+      │                     ──▶ see "Deciding to attack"
+      │
+      └─ The group's ordinary turn ──▶ dispatch on mood</pre>
+
+<p>The ordinary group turn, expanded:</p>
+
+<pre class="tree"><span class="q">Mood?</span>
+├─ Fleeing  ──▶ <span class="act">run away</span>
+│
+├─ Charging ──▶ can I see them?
+│               ├─ yes, close enough, lined up ──▶ <span class="act">break formation</span>
+│               ├─ yes, otherwise ──▶ <span class="act">close in at double speed</span>
+│               └─ no  ──▶ <span class="act">head for where I last saw them</span>
+│
+├─ Wary / Alert / Calm ──▶ can I see them?
+│    ├─ yes, close enough and lined up ──▶ <span class="act">break formation</span>
+│    ├─ yes, and I am Wary             ──▶ wait one move interval
+│    ├─ yes, otherwise                 ──▶ become <span class="act">Charging</span>, act next tick
+│    └─ no:
+│         ├─ Wary or Alert ──▶ wait one move interval
+│         └─ Calm ──▶ can I smell them, or their trail?
+│                      ├─ yes ──▶ <span class="act">move that way</span>
+│                      └─ no  ──▶ coin flip:
+│                                  ├─ wander in a random direction
+│                                  └─ try all four from a random start
+│
+└─ Engaged ──▶ (the group does little; members act on their own turns)</pre>
+
+<p>"Break formation" means: mood becomes <em>Engaged</em>, note where the party is,
+and give every member its own turn — member 0 always turns to face you, the rest on a
+coin flip.</p>
+
+<h2>Choosing a direction</h2>
+
+<p>When a monster has somewhere it wants to go, it tries four directions in a fixed
+order, taking the first that works:</p>
+
+<ol>
+  <li>The direction it wants.</li>
+  <li>The <strong>secondary</strong> direction — when the target is off at an angle,
+  the other of the two directions bracketing it, chosen at random when the angle is an
+  exact diagonal.</li>
+  <li>That secondary reversed.</li>
+  <li>The wanted direction reversed — but only one time in four.</li>
+</ol>
+
+<p>If none work, it turns to face where it wanted to go and waits out a move interval.
+Monsters therefore look like they are "thinking" when boxed in: they face the right
+way and shuffle.</p>
+
+<p>Two touches make movement feel less mechanical. <strong>It will not immediately
+double back</strong> to the square it just left — or rather, it will one time in four,
+which is what stops monsters oscillating between two cells. And <strong>a step only
+happens if enough time has passed</strong>; if not, the monster keeps the turn but
+shortens its own next interval, so its motion stays smooth rather than stuttering.</p>
+
+<p>A step is refused by walls, stairs, open pits (unless the creature floats), closed
+false walls, doors too far shut for a creature of that height, another monster, and by
+the party. Some creatures recognise <em>illusory</em> pits and false walls and will
+walk onto them; most are fooled. Only a few types are willing to use teleporters at
+all.</p>
+
+<div class="note">
+  <span class="label">Speed is emotional</span>
+  <p>Fleeing is a quarter faster than normal, and charging is twice as fast. A
+  cornered monster that turns to fight is genuinely slower than the same monster
+  running away from you.</p>
+</div>
+
+<h2 id="attack">Deciding to attack</h2>
+
+<p>An individual member, on its own turn, and not already mid-swing:</p>
+
+<pre class="tree"><span class="q">Can it see the party?</span>
+│
+├─ no ──▶ can the <em>group</em> see them?
+│         ├─ yes ──▶ turn towards them, wait
+│         └─ no  ──▶ become <span class="act">Charging</span>, head for last known position
+│
+└─ yes
+   │
+   ├─ <span class="q">Is it facing them?</span> (or does it see in all directions?)
+   │   └─ no ──▶ as above
+   │
+   ├─ <span class="q">Is the party within this creature's reach?</span>
+   ├─ <span class="q">Are they orthogonally lined up?</span> (same row or column)
+   ├─ <span class="q">Does it win a roll against its own reach?</span>
+   │   └─ any "no" ──▶ become <span class="act">Charging</span>, close in at double speed
+   │
+   └─ all yes ──▶ <span class="act">ATTACK</span></pre>
+
+<p>Before a melee attack — reach 1 only — a monster standing in an awkward corner of
+its cell will often <strong>sidestep</strong> to a better one first, and that shuffle
+can walk it onto a missile you left lying there.</p>
+
+<div class="note">
+  <span class="label">The attack is a form, not a decision</span>
+  <p>The attack itself is a filled-in block of parameters: who to hit, whether to
+  throw something instead, what to throw, how far, how hard, which sound. The block is
+  handed to a dungeon script that may rewrite <em>any</em> field, and only then acted
+  on. That indirection is why custom dungeons can make monsters behave in ways the
+  original never did.</p>
+</div>
+
+<p><strong>Who gets hit</strong> is either the nearest reachable champion —
+determined by which side of the cell the blow comes from, then a fixed order per side
+— or, for a handful of creature types, a <em>randomly chosen</em> living champion
+regardless of position.</p>
+
+<p><strong>Whether it lands</strong> has two independent escapes before damage is even
+rolled: being quicker than the attacker (and still needing to win a 3-in-4 roll), and
+being lucky. Luck is a spendable resource — succeeding at a luck check
+<em>lowers</em> your luck.</p>
+
+<p><strong>How much it hurts</strong> goes through a deliberately convoluted chain: a
+base from the creature's attack rating, reduced by twice your fighting skill, then
+halved, then grown by three separate random terms, then quartered, then possibly
+reduced again. Armour then scales it, averaged over the body parts the blow could land
+on. A large enough hit also <strong>wounds</strong> a body part, and because the wound
+threshold doubles each time, one big blow can mark several places while a hundred
+small ones mark none.</p>
+
+<h2 id="types">Where types actually differ</h2>
+
+<p>Almost all variation is numeric. From the shipped game data:</p>
+
+<div class="table-wrap wide">
+<table>
+  <caption>"Moves every" is ticks between steps — smaller is faster. A muncher takes a
+  step 185 times as often as a rock pile.</caption>
+  <thead>
+    <tr>
+      <th>Creature</th><th>Moves every</th><th>Sight</th><th>Smell</th>
+      <th>Reach</th><th>Bravery</th><th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="name">Muncher</td><td class="num">1</td><td class="num">2</td><td class="num">4</td><td class="num">1</td><td class="num">max</td><td class="notes">Fastest thing in the game</td></tr>
+    <tr><td class="name">Giggler</td><td class="num">3</td><td class="num">6</td><td class="num">3</td><td class="num">1</td><td class="num peak">0</td><td class="notes">Steals instead of hurting; the biggest coward</td></tr>
+    <tr><td class="name">Couatl</td><td class="num">5</td><td class="num">3</td><td class="num">3</td><td class="num">1</td><td class="num">3</td><td class="notes">Fills a cell</td></tr>
+    <tr><td class="name">Zytaz</td><td class="num">5</td><td class="num">8</td><td class="num">2</td><td class="num">3</td><td class="num">7</td><td class="notes">Throws poison clouds or fireballs</td></tr>
+    <tr><td class="name">Skeleton</td><td class="num">7</td><td class="num">3</td><td class="num dash">—</td><td class="num">1</td><td class="num">9</td><td class="notes">No sense of smell at all</td></tr>
+    <tr><td class="name">Oitu</td><td class="num">7</td><td class="num">2</td><td class="num">5</td><td class="num">1</td><td class="num">6</td><td class="notes"></td></tr>
+    <tr><td class="name">Scorpion</td><td class="num">8</td><td class="num">3</td><td class="num">1</td><td class="num">1</td><td class="num">9</td><td class="notes">Fills a cell</td></tr>
+    <tr><td class="name">Hellhound</td><td class="num">9</td><td class="num">4</td><td class="num">5</td><td class="num">1</td><td class="num">max</td><td class="notes">Two-corner creature</td></tr>
+    <tr><td class="name">Flying Eye</td><td class="num">10</td><td class="num peak">10</td><td class="num">2</td><td class="num">3</td><td class="num">10</td><td class="notes">Sees everything, everywhere; throws lightning</td></tr>
+    <tr><td class="name">Vexirk</td><td class="num">10</td><td class="num">5</td><td class="num">3</td><td class="num">4</td><td class="num">5</td><td class="notes">Throws one of five different spells</td></tr>
+    <tr><td class="name">Demon</td><td class="num">10</td><td class="num">4</td><td class="num">3</td><td class="num">4</td><td class="num">max</td><td class="notes">Breathes fire</td></tr>
+    <tr><td class="name">Rive</td><td class="num">11</td><td class="num">3</td><td class="num">4</td><td class="num">1</td><td class="num">6</td><td class="notes">Passes through walls and doors; sees invisible</td></tr>
+    <tr class="lord"><td class="name">Lord Chaos</td><td class="num">12</td><td class="num">9</td><td class="num">3</td><td class="num">6</td><td class="num">3</td><td class="notes">Invincible — see below</td></tr>
+    <tr class="lord"><td class="name">Lord Order</td><td class="num">12</td><td class="num">9</td><td class="num">3</td><td class="num">6</td><td class="num">3</td><td class="notes">Unnamed in CSBWin; appears only mid-fusion</td></tr>
+    <tr class="lord"><td class="name">Grey Lord</td><td class="num">12</td><td class="num">9</td><td class="num">3</td><td class="num">6</td><td class="num">3</td><td class="notes">The endgame. Never acts</td></tr>
+    <tr><td class="name">Ant Man</td><td class="num">13</td><td class="num">3</td><td class="num">3</td><td class="num">1</td><td class="num">4</td><td class="notes"></td></tr>
+    <tr><td class="name">Dragon</td><td class="num">13</td><td class="num">5</td><td class="num">6</td><td class="num">2</td><td class="num">7</td><td class="notes">Fills a cell; breathes fire</td></tr>
+    <tr><td class="name">Deth Knight</td><td class="num">14</td><td class="num">5</td><td class="num dash">—</td><td class="num">1</td><td class="num">max</td><td class="notes">Flips its sprite mid-swing, audibly</td></tr>
+    <tr><td class="name">Slime Devil</td><td class="num">15</td><td class="num">2</td><td class="num">1</td><td class="num">3</td><td class="num">10</td><td class="notes">Spits poison</td></tr>
+    <tr><td class="name">Mummy</td><td class="num">17</td><td class="num">4</td><td class="num">2</td><td class="num">1</td><td class="num">9</td><td class="notes"></td></tr>
+    <tr><td class="name">Worm</td><td class="num">18</td><td class="num peak">1</td><td class="num peak">10</td><td class="num">1</td><td class="num">10</td><td class="notes">Nearly blind, best nose in the game</td></tr>
+    <tr><td class="name">(unnamed, type 5)</td><td class="num">20</td><td class="num">2</td><td class="num">2</td><td class="num">1</td><td class="num">3</td><td class="notes">Two-corner creature</td></tr>
+    <tr><td class="name">Stone Golem</td><td class="num">21</td><td class="num">3</td><td class="num dash">—</td><td class="num">1</td><td class="num">max</td><td class="notes">No sense of smell</td></tr>
+    <tr><td class="name">Water Elemental</td><td class="num">25</td><td class="num">1</td><td class="num">3</td><td class="num">1</td><td class="num">7</td><td class="notes">Passes through walls</td></tr>
+    <tr><td class="name">Screamer</td><td class="num peak">120</td><td class="num peak">1</td><td class="num">1</td><td class="num">1</td><td class="num">max</td><td class="notes">Almost blind, almost immobile, fearless</td></tr>
+    <tr><td class="name">Rock Pile</td><td class="num peak">185</td><td class="num">3</td><td class="num">4</td><td class="num">1</td><td class="num">12</td><td class="notes">Slowest thing in the game</td></tr>
+    <tr><td class="name">Black Flame</td><td class="num dash">—</td><td class="num">4</td><td class="num">3</td><td class="num">1</td><td class="num">10</td><td class="notes"><strong>Never moves at all</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Four genuine behavioural differences, rather than numeric ones:</p>
+
+<p><strong>The giggler</strong> does not damage you. It steals an item and, having
+stolen, is put into a special agitated state and runs. It is also the only creature in
+the game with zero bravery, so it flees at the slightest provocation.</p>
+
+<p><strong>The throwers</strong> — slime devil, flying eye, vexirk, zytaz, demon,
+dragon, Lord Chaos — each have a fixed repertoire. A vexirk or Lord Chaos rolls between
+a fireball and one of four spells; a flying eye throws lightning seven times in eight
+and something else otherwise. A thrower standing <em>next to</em> you will sometimes
+punch instead, on a coin flip. Everything else in the game has no ranged attack at
+all.</p>
+
+<p><strong>The Deth Knight</strong> is the only creature that visibly flips its sprite
+mid-attack, on a coin toss, with a sound cue.</p>
+
+<h3>The three aspects of the Lord</h3>
+
+<p><strong>Lord Chaos, Lord Order and the Grey Lord are one being in three
+aspects</strong>, which is why all three share a single identical set of statistics.
+The endgame is a transformation between them, and it explains a great deal about how
+they are written.</p>
+
+<p>Lord Chaos alone is a creature you can meet and fight. Fusing him with Lord Order —
+the being CSBWin leaves unnamed, and the aspect representing pure order — produces the
+Grey Lord, and the Grey Lord is not an opponent at all. It appears, the game is won,
+and it ends.</p>
+
+<p>The fusion sequence bears that out step for step: the game-won flag is set at the
+very start, all three party shields are raised to 100, fireball clouds swell, and the
+creature ahead of you flickers <strong>between Chaos and Order twelve times</strong>,
+slowing as it goes, before settling as the Grey Lord. Every other monster on the level
+is then deleted, the dungeon's text is read out, and the game prints "THE END." and
+rolls the credits.</p>
+
+<div class="note">
+  <span class="label">Two apparent defects, explained</span>
+  <p>The Grey Lord has a long reach, which would normally qualify it to throw
+  something, yet it appears in no table of what any creature throws — because it is
+  never meant to act. And the check that stops an invincible creature taking turns
+  once the game is won exists precisely so that, in the seconds between the Grey Lord
+  appearing and the credits, it stands there and does nothing.</p>
+</div>
+
+<p>Lord Chaos himself is a different animal to everything else you actually fight:</p>
+
+<ul>
+  <li>He cannot be damaged at all. Nothing you do reduces his health.</li>
+  <li>He moves <strong>two squares at a time</strong>, and buzzes as he arrives.</li>
+  <li>The only thing that blocks him is a <strong>Fluxcage</strong>. That is not a
+  general mechanic — the fluxcage check sits inside an "am I invincible?" branch, so a
+  fluxcage is inert against every other creature in the game. It exists for this one
+  purpose: herding him into position for the fusion.</li>
+  <li>If he ends up somewhere he cannot be placed, he gets a 25% chance per retry to
+  wander one square and try again — so he can escape a corner you have walled him
+  into, given time.</li>
+</ul>
+
+<p><strong>Two-corner and cell-filling creatures</strong> (worms, hellhounds; dragons,
+scorpions, couatls, golems, elementals, the Lords) constrain group size — you cannot
+have four dragons in a cell — and two-corner creatures must turn both halves
+together.</p>
+
+<h2 id="unsolved">Unsolved</h2>
+
+<p>Things I could not explain, in rough order of how much they bother me. Paul Stevens'
+comments show he hit several of the same walls, and I have quoted him where he did.</p>
+
+<div class="mystery">
+  <h4>The condition that cannot fail</h4>
+  <p>One branch tests whether the mood is Calm or Alert <em>and</em> not Charging — but
+  the first test already excludes Charging. Stevens wrote:</p>
+  <p class="quote">"The following line makes no sense. But I have studied the original
+  machine language over and over again. This is what it did."</p>
+  <p>He suggests it may have been written backwards. My compiler independently flagged
+  it as unreachable, which is a strange kind of corroboration across thirty years.</p>
+</div>
+
+<div class="mystery">
+  <h4>The footprint trail is acknowledged broken and still load-bearing</h4>
+  <p>The routine that writes trail staleness gets Stevens' bluntest comment:</p>
+  <p class="quote">"I think this is much hogwash. Does nothing useful. Is full of
+  errors. Perhaps an old, abandoned debug trace."</p>
+  <p>He is right that it is wrong — it overwrites every entry it walks past with a
+  single value, and the routine that <em>deletes</em> an entry shifts the tail the
+  wrong way. But it is the only thing that writes the staleness values that smelling
+  reads. Whatever it does, the game's tracking behaviour depends on it, and it cannot
+  simply be repaired without changing how monsters hunt.</p>
+</div>
+
+<div class="mystery">
+  <h4>A branch that does nothing but consume randomness</h4>
+  <p>In the pre-melee sidestep there is a 50% branch whose only statement is commented
+  out in CSBWin. It still draws a random number, so it still shifts everything
+  downstream. I ported it as written. It looks like a behaviour that was removed and
+  whose removal was never finished.</p>
+</div>
+
+<div class="mystery">
+  <h4>Two moods are never used</h4>
+  <p>Of eight possible values only six appear. One of the unused ones shows up solely
+  in a "reset anything at or above this" cleanup, which suggests there were once more
+  states than survive in the shipped game.</p>
+</div>
+
+<div class="mystery">
+  <h4>Undocumented flags that turned out to matter</h4>
+  <p>Two per-type flags are marked only "????" in CSBWin. I worked out that one of them
+  selects random targeting over nearest targeting — that is why some creatures hit the
+  back rank seemingly at random. The other appears only in the sidestep condition and I
+  still do not know what it means; the types that have it (screamer, vexirk, water
+  elemental, dragon, and all three aspects of the Lord) do not obviously have anything
+  in common.</p>
+</div>
+
+<div class="mystery">
+  <h4>A value read before it is written</h4>
+  <p>On rare paths a variable reaches the movement code uninitialised. Stevens patched
+  the Atari binary to force it to a fixed number, noting that the uninitialised value
+  was usually "part of an address" and that leaving it made the two builds impossible
+  to compare. So the original game had a real bug here, and its effect was "slightly
+  erratic behaviour" that nobody ever noticed.</p>
+</div>
+
+<div class="mystery">
+  <h4>A number reused as two different things</h4>
+  <p>In the corner-shuffling code one value is used as both a position and a bitfield
+  within a few lines. Stevens: <em>"I think there is something wrong with D5 here."</em>
+  I ported it as written because I could not determine what the correct version would
+  even be.</p>
+</div>
+
+<div class="mystery">
+  <h4>Why the willingness-to-teleport threshold is what it is</h4>
+  <p>Whether a creature will step into a teleporter is decided by a per-type number
+  being at least 10. The types that pass are vexirk, zytaz, demon, dragon and the three
+  aspects of the Lord. Why that field, and why 10, I have no idea — the same field is
+  not obviously used for anything else.</p>
+</div>
+
+<h2>What this adds up to</h2>
+
+<p>The impression from outside is that Dungeon Master's monsters are cunning. Having
+read the code, I would say the effect comes from four cheap tricks layered well:</p>
+
+<ol>
+  <li><strong>Senses that fail differently.</strong> Sight is blocked by doors and
+  darkness, smell is not. So a monster that has lost you often still knows roughly
+  where you went, and the two failure modes together read as searching.</li>
+  <li><strong>Commitment.</strong> A monster that has seen you keeps heading for where
+  you <em>were</em>, and only calms down on arriving and finding nothing. That single
+  behaviour produces most of the game's best moments.</li>
+  <li><strong>Reluctance to backtrack.</strong> One rule — do not immediately re-enter
+  the square you just left — removes nearly all of the twitching that would otherwise
+  expose the machinery.</li>
+  <li><strong>Speed tied to intent.</strong> Fleeing is faster than hunting; charging
+  is faster still. The pace of a fight changes as the monster's mood changes, and that
+  reads as emotion.</li>
+</ol>
+
+<p>None of it is planning. There is no pathfinding — a monster that cannot see a way
+towards you simply tries four directions and gives up. Put a pillar between you and a
+rock pile and it will lose you completely. But the failure modes are quiet, and the
+successes are legible, which is the whole trick.</p>
+
+<footer class="colophon">
+  <p>Companion to <code>doc/MONSTER_BEHAVIOUR.md</code>, which carries the same text in
+  Markdown. For the mapping back to CSBWin's own names see
+  <code>doc/CSBWIN_MONSTERS_REFERENCE.md</code>; for line-level citations,
+  <code>doc/PROVEN_FACTS.md</code>.</p>
+  <p>Self-contained: no external fonts, scripts or stylesheets. Open it straight from
+  disk.</p>
+</footer>
+
+</div>
+</body>
+</html>

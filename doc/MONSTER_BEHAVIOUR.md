@@ -283,13 +283,15 @@ Almost all variation is numeric. From the shipped data:
 | Vexirk | 10 | 5 | 3 | 4 | 5 | Throws one of five different spells |
 | Demon | 10 | 4 | 3 | 4 | max | Breathes fire |
 | Rive | 11 | 3 | 4 | 1 | 6 | Passes through walls and doors; sees invisible |
-| Lord Chaos | 12 | 9 | 3 | 6 | 3 | See below |
-| Grey Lord | 12 | 9 | 3 | 6 | 3 | See below |
-| Skeleton/Ant Man | 13 | 3 | 3 | 1 | 4 | |
+| Lord Chaos | 12 | 9 | 3 | 6 | 3 | Invincible; see below |
+| Lord Order | 12 | 9 | 3 | 6 | 3 | Unnamed in CSBWin; appears only mid-fusion |
+| Grey Lord | 12 | 9 | 3 | 6 | 3 | The endgame. Never acts |
+| Ant Man | 13 | 3 | 3 | 1 | 4 | |
 | Dragon | 13 | 5 | 6 | 2 | 7 | Fills a cell; breathes fire |
 | Deth Knight | 14 | 5 | — | 1 | max | Flips its sprite mid-swing, audibly |
 | Slime Devil | 15 | 2 | 1 | 3 | 10 | Spits poison |
 | Mummy | 17 | 4 | 2 | 1 | 9 | |
+| (unnamed, type 5) | 20 | 2 | 2 | 1 | 3 | Two-corner creature |
 | Worm | 18 | **1** | **10** | 1 | 10 | Nearly blind, best nose in the game |
 | Stone Golem | 21 | 3 | — | 1 | max | No sense of smell |
 | Water Elemental | 25 | 1 | 3 | 1 | 7 | Passes through walls |
@@ -315,17 +317,40 @@ flip. Everything else in the game has no ranged attack at all.
 **The Deth Knight** is the only creature that visibly flips its sprite mid-attack, on a
 coin toss, with a sound cue.
 
-**Lord Chaos and the Grey Lords** are a different animal:
+**Lord Chaos, Lord Order and the Grey Lord** are one being in three aspects, which is
+why all three share a single identical set of statistics. The endgame is a
+transformation between them, and it explains a great deal about how they are written.
 
-- They cannot be damaged at all. Nothing you do reduces their health.
-- They move **two squares at a time**, and buzz as they arrive.
-- The only thing that blocks them is a **Fluxcage**. That is not a general mechanic —
-  the fluxcage check is inside an "am I invincible?" branch, so a fluxcage is inert
-  against every other creature in the game. It exists for this one purpose.
-- If they end up somewhere they cannot be placed, they get a 25% chance per retry to
-  wander one square and try again — so they can escape a corner you have walled them
+Lord Chaos alone is a creature you can meet and fight. Fusing him with Lord Order — the
+being CSBWin leaves unnamed, and the aspect representing pure order — produces the
+Grey Lord, and the Grey Lord is not an opponent at all. It appears, the game is won,
+and it ends.
+
+The fusion sequence bears that out step for step: the game-won flag is set at the very
+start, all three party shields are raised to 100, fireball clouds swell, and the
+creature ahead of you flickers **between Chaos and Order twelve times**, slowing as it
+goes, before settling as the Grey Lord. Every other monster on the level is then
+deleted, the dungeon's text is read out, and the game prints "THE END." and rolls the
+credits.
+
+This makes sense of two things that look like defects in isolation. The Grey Lord has a
+long reach, which would normally qualify it to throw something, yet it appears in no
+table of what any creature throws — because it is never meant to act. And the check
+that stops an invincible creature taking turns once the game is won exists precisely
+so that, in the seconds between the Grey Lord appearing and the credits, it stands
+there and does nothing.
+
+Lord Chaos himself is a different animal to everything else you actually fight:
+
+- He cannot be damaged at all. Nothing you do reduces his health.
+- He moves **two squares at a time**, and buzzes as he arrives.
+- The only thing that blocks him is a **Fluxcage**. That is not a general mechanic —
+  the fluxcage check sits inside an "am I invincible?" branch, so a fluxcage is inert
+  against every other creature in the game. It exists for this one purpose: herding
+  him into position for the fusion.
+- If he ends up somewhere he cannot be placed, he gets a 25% chance per retry to
+  wander one square and try again — so he can escape a corner you have walled him
   into, given time.
-- Once the game is won, they stop taking turns entirely.
 
 **Two-corner and cell-filling creatures** (worms, hellhounds; dragons, scorpions,
 couatls, golems, elementals, Lord Chaos) constrain group size — you cannot have four
@@ -359,13 +384,6 @@ is a 50% branch whose only statement is commented out in CSBWin. It still draws 
 random number, so it still shifts everything downstream. I ported it as written. It
 looks like a behaviour that was removed and whose removal was never finished.
 
-**Grey Lords appear to attack with nothing.** They have a reach of 6, which qualifies
-them to throw — but they are absent from the table of what each creature throws, so at
-range they enter their attack pose and no missile is created. As far as I can tell they
-can only actually hurt you at melee range, and only on a coin flip. I do not know
-whether this is intended, a consequence of the Grey Lord being a late addition, or
-something I have misread.
-
 **Two moods are never used.** Of eight possible values only six appear. One of the
 unused ones shows up solely in a "reset anything at or above this" cleanup, which
 suggests there were once more states than survive in the shipped game.
@@ -374,8 +392,8 @@ suggests there were once more states than survive in the shipped game.
 "????" in CSBWin. I worked out that one of them selects random targeting over nearest
 targeting — that is why some creatures hit the back rank seemingly at random. The other
 appears only in the sidestep condition and I still do not know what it means; the types
-that have it (screamer, vexirk, water elemental, Lord Chaos, dragon, Grey Lord) do not
-obviously have anything in common.
+that have it (screamer, vexirk, water elemental, dragon, and all three aspects of the
+Lord) do not obviously have anything in common.
 
 **A value read before it is written.** On rare paths a variable reaches the movement
 code uninitialised. Stevens patched the Atari binary to force it to a fixed number,
@@ -390,7 +408,7 @@ what the correct version would even be.
 
 **Why the willingness-to-teleport threshold is what it is.** Whether a creature will
 step into a teleporter is decided by a per-type number being at least 10. The types
-that pass are vexirk, zytaz, demon, dragon and the Lords. Why that field, and why 10, I
+that pass are vexirk, zytaz, demon, dragon and the three aspects of the Lord. Why that field, and why 10, I
 have no idea — the same field is not obviously used for anything else.
 
 ---
