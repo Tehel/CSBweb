@@ -197,19 +197,23 @@ export function bindUIEvents(): void {
                     handled = true;
                     break;
                 case 'F5':
-                    ctx.onQuickSave();
+                    if (isDebugFeaturesEnabled()) ctx.onQuickSave();
+                    else updateDebug('Enable Debug to quick-save');
                     handled = true;
                     break;
                 case 'F9':
-                    ctx.onQuickLoad();
+                    if (isDebugFeaturesEnabled()) ctx.onQuickLoad();
+                    else updateDebug('Enable Debug to quick-load');
                     handled = true;
                     break;
                 case 'F8':
-                    ctx.onInjectRandomParty();
+                    if (isDebugFeaturesEnabled()) ctx.onInjectRandomParty();
+                    else updateDebug('Enable Debug to inject a random party');
                     handled = true;
                     break;
                 case 'F7':
-                    ctx.onToggleAttackPanel();
+                    if (isDebugFeaturesEnabled()) ctx.onToggleAttackPanel();
+                    else updateDebug('Enable Debug to toggle the attack panel');
                     handled = true;
                     break;
                 case 'F6':

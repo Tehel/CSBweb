@@ -12,7 +12,7 @@ import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { extractObjectTables } from './renderer/csbwin/ObjectTables';
 import { extractUITables } from './renderer/csbwin/UITables';
 import { extractViewportTables } from './renderer/csbwin/ViewportTables';
-import { bindUIContext, drawMapPreview, handleCursorFilter, updateDebug, appendLog, clearLog } from './ui';
+import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug, appendLog, clearLog } from './ui';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -877,7 +877,9 @@ async function init() {
             console.log('✓ Game engine started');
             console.log('✓ Starting position:', game.getPositionInfo());
 
-            quickLoad();
+            // Dev convenience only: restore the previous session's quick-save so a reload
+            // lands back where you were. With Debug off, boot into a fresh dungeon.
+            if (isDebugFeaturesEnabled()) quickLoad();
 
             // Initial render
             renderView();
