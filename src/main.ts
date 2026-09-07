@@ -291,6 +291,7 @@ async function init() {
                 monsterDesc: objectTables.monsterDesc,
                 word1074: uiTables.graphic232.word1074,
                 soundTable: uiTables.graphic232.soundTable,
+                doorCharacteristics: objectTables.doorCharacteristics,
             };
 
             // Initialize game engine

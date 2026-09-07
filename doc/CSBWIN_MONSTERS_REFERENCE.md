@@ -194,6 +194,37 @@ bumped into, `TT_M2` = monster damaged, `TT_M3` = monster damaged by a cloud or 
 door. `InitialChecks` maps `TT_M3` back to `TT_29`
 (`doc/CSBwin-src/Monster.cpp:3022`).
 
+## Perception and movement
+
+Ported in `src/engine/MonsterPerception.ts`. The two wall predicates differ in exactly
+one way: `BlockedTypeA` (`doc/CSBwin-src/Monster.cpp:294`) treats an almost-closed or
+closed door as a wall unless its `DoorTOC` entry has bit 8 set, while
+`StoneOrClosedFalseWall` (`:354`) ignores doors entirely. Sight uses the first, smell
+the second — so a monster can smell you through a closed door but not see you.
+
+`TestDirectPathOpen` (`:375`) walks *from the party towards the monster*, keeping the
+slope of the line as constant as it can. At each step it computes what the slope would
+become after a step in x and after a step in y, and takes whichever deviates less;
+slopes are scaled by 64 with integer division, and the truncation is part of the
+result. If the chosen cell is blocked it gives up, except on an exact tie of the two
+deviations, which earns one retry along the other diagonal. A perfect diagonal is a
+separate branch: both orthogonal neighbours must be blocked *and* the diagonal cell
+itself before the path is refused.
+
+`Blocked` (`:518`) is misnamed — it returns the distance to the party when the party
+**can** be seen, and 0 otherwise. See `doc/PROVEN_FACTS.md` for the facing
+de-duplication, the darkness penalty, and the cone geometry.
+
+`PossibleMove` (`:635`) runs its tests in a fixed order that matters: bounds, the DSA
+move-inhibit flags, room type (stone/stairs/pit/false-wall), then the Fluxcage scan
+for invincible monsters, then teleporter willingness, then the party's square, then
+doors, and only then whether another monster is already there. It answers through six
+`d.` globals rather than a return value, gathered into `MoveProbe` in the port.
+
+The footprint trail that feeds smelling is `src/engine/PartyFootprints.ts` — see the
+two `PROVEN_FACTS.md` entries on `AddFootprintEntry`, which CSBWin's own author
+describes as broken but which is the only writer of the age bytes smelling reads.
+
 ## Attack tables
 
 Everything the champion attack pipeline needs is in `graphics.dat` item `0x230`,

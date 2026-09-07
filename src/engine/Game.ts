@@ -17,6 +17,8 @@ import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import { SoundQueue } from './SoundQueue';
+import { PartyFootprints } from './PartyFootprints';
+import { MonsterPerception } from './MonsterPerception';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -93,6 +95,18 @@ export class Game {
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
     private monsterSystem: MonsterSystem;
+    /**
+     * The party's footprint trail — `d.PartyFootprints` (doc/CSBwin-src/Data.h:781).
+     * Monsters smell it when they cannot see the party, and the Magic Footprints
+     * spell draws from it.
+     */
+    readonly footprints = new PartyFootprints();
+    /**
+     * Monster sight, smell and step probing (`doc/CSBwin-src/Monster.cpp`).
+     * Public because the AI state machine and `tools/dump-monster-perception.ts`
+     * both drive it directly.
+     */
+    readonly monsterPerception: MonsterPerception;
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -175,6 +189,7 @@ export class Game {
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMonsterAI: (options) => this.monsterSystem.processTimers29to41(options),
+                onPartyMoved: () => this.notePartyMoved(),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
                 ...timerHooks,
@@ -200,6 +215,14 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 ...monsterHooks,
             },
+        );
+        this.monsterPerception = new MonsterPerception(
+            this.dungeonState,
+            () => this.party.state.position.z,
+            this.random,
+            this.footprints,
+            () => timerTables?.monsterDesc ?? null,
+            () => timerTables?.doorCharacteristics ?? null,
         );
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
@@ -348,6 +371,7 @@ export class Game {
                 this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
                 this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
+            this.notePartyMoved();
             this.monsterSystem.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
 
@@ -393,6 +417,7 @@ export class Game {
         const unchanged = oldPos.x === resolved.position.x
             && oldPos.y === resolved.position.y
             && oldPos.z === resolved.position.z;
+        if (!unchanged) this.notePartyMoved();
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
         this.state.party = this.party.state;
@@ -531,6 +556,25 @@ export class Game {
         }
 
         return true;
+    }
+
+    /**
+     * Append the party's new square to the footprint trail.
+     *
+     * CSBWin does this inside `MoveObject` whenever the party is the thing being
+     * moved and the party is non-empty (doc/CSBwin-src/Code11f52.cpp:3222-3247), so
+     * it fires for every kind of relocation — walking, teleporters, pits, DSAs.
+     */
+    notePartyMoved(): void {
+        if (this.party.state.champions.length === 0) return;
+        const position = this.party.state.position;
+        this.footprints.recordPartyMove(
+            this.state.tickCount,
+            position.z,
+            position.x,
+            position.y,
+            (this.party.state.magicFootprintsActive ?? 0) !== 0,
+        );
     }
 
     private noteMonsterAttack(): void {
@@ -1586,6 +1630,7 @@ export class Game {
         // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
         // active, as CSBWin does after its own restore
         // (doc/CSBwin-src/SaveGame.cpp:1240-1244).
+        this.footprints.reset();
         this.monsterSystem.reloadAfterSaveGame();
     }
 

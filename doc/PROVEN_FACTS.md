@@ -405,3 +405,156 @@ byte of each entry terminates it. The two tables are not interchangeable.
 
 Bit 7 of bytes 4 and 5, by contrast, is live: it means the wielded item must have charges
 left before that attack option is offered (`doc/CSBwin-src/Character.cpp:4789-4792`).
+
+## Monster sight is halved by darkness, and never falls below 1
+
+`doc/CSBwin-src/Monster.cpp:577-584`:
+
+```cpp
+D5W = pmtDesc->sightDistance();
+if (!pmtDesc->canSeeInDark())
+{
+  D5W = sw(D5W - d.CurrentPalette/2);
+};
+w_18 = sw(Larger(1, D5W));
+if (d.OrthogonalDistance2Party > w_18) return 0; //Cannot see the party then zero.
+```
+
+`sightDistance()` is `word14` bits 0-3, and the subtrahend is the *viewport palette index* — so
+the effect of darkness on monster perception is derived from the same value that dims the
+screen. Even in total darkness a monster still sees one cell.
+
+## `Blocked()` de-duplicates the group's facings before testing
+
+`doc/CSBwin-src/Monster.cpp:542-563` builds a list of the group's *distinct* facings and tests
+`IsItInThisDirection` once per distinct value. A group of four monsters all facing north
+therefore performs one cone test, not four. A `See360()` monster skips the facing test
+entirely via `goto tag00c2fe`.
+
+The function is named `Blocked` but answers the opposite question: it returns the distance to
+the party when the party **can** be seen, and 0 when it cannot.
+
+## `IsItInThisDirection` accepts a cone one cell wider than a diagonal
+
+`doc/CSBwin-src/Code11f52.cpp:2171-2174`:
+
+```cpp
+if (ahead < 0) return false;
+// It is in front of us or even with us.
+if (abs(sideways)>ahead+1) return false;
+return true;
+```
+
+`ahead == 0` (level with the monster) counts as in front, and the sideways tolerance is
+`ahead + 1` rather than `ahead`. So a monster at (0,0) facing north accepts a target at
+(1,0) — directly beside it.
+
+## `GetPrimaryAndSecondaryDirection` treats north specially
+
+`doc/CSBwin-src/Code11f52.cpp:2233-2240`: having found a primary direction whose `dir + 1`
+neighbour is not also in cone, CSBWin only tries the `dir + 3` neighbour when `dir != 0`:
+
+```cpp
+if (   (dirD4 != 0)
+    || (IsItInThisDirection(
+                 d.SecondaryDirection = (DIRECTION)((dirD4+3)&3),
+                 ...)==0)  )
+```
+
+The `||` short-circuits, so for `dirD4 == 0` the second test runs but its result is discarded
+and the random-secondary branch is taken regardless. Preserved in the port.
+
+## Monsters step onto fake pits and false walls only if they recognise them
+
+`doc/CSBwin-src/Monster.cpp:681-703`. Bit 0 of the cell flag marks a *fake* pit or false wall,
+and `PossibleMove`'s `RFPAW` parameter (RecognizesFalsePitsAndWalls) decides whether the
+monster is fooled:
+
+```cpp
+if (!((D5W&1)?RFPAW:(D5W&1))) //Can monster walk on fake pit?
+```
+
+The expression reads oddly but is just "if bit 0 is set, use RFPAW; otherwise false". A
+levitating monster ignores an open pit outright, fake or not. `PossibleDoubleMove` hard-codes
+`RFPAW` to 0 for the second step (`doc/CSBwin-src/Monster.cpp:814`).
+
+## A Fluxcage stops only invincible monsters
+
+`doc/CSBwin-src/Monster.cpp:705-721`: the Fluxcage scan in `PossibleMove` is inside
+`if (pmtDesc->invincible())`. Since Lord Chaos and the Grey Lords are the only `invincible`
+types in the shipped data, a Fluxcage is inert against everything else — which is what makes
+it the tool for herding Lord Chaos in the fusion endgame.
+
+## `movementTicks06 == 255` means the monster never moves
+
+`doc/CSBwin-src/Monster.cpp:669`: `if (pmtDesc->timePerMove() == 255) return 0;` — the first
+thing `PossibleMove` tests. Monster type 11 (Black Flame) has exactly this value in the
+shipped data.
+
+## Turning away takes two steps, and worms turn in pairs
+
+`doc/CSBwin-src/Monster.cpp:838-846`: a monster whose facing is 180° from the preferred
+direction turns only 90°, to a randomly chosen side:
+
+```cpp
+D0W = (I16)((D0W - preferredDirection) & 3); // relative to preference
+if (D0W == 2) // if facing away from party
+{
+  newDir = ((STRandom() & 2) + preferredDirection + 1) & 3;
+```
+
+`TurnMonster`'s `P4` parameter means "treat the monsters as pairs" — a `horizontalSize == 1`
+monster occupies two corners and both halves must face the same way, so the partner at
+`monsterIndex ^ 1` is set too. `d.Time13130`/`d.pI1613134` then suppress a second pair-turn in
+the same tick. In `TurnMonsterGroup` every member turns on a coin toss *except* member 0,
+which always turns (`doc/CSBwin-src/Monster.cpp:893`).
+
+## `DoorTOC` is two of four `DoorCharacteristics` entries, chosen per level
+
+`doc/CSBwin-src/CSBCode.cpp:5780-5783`:
+
+```cpp
+D0W = d.pCurLevelDesc->Door1Type();
+d.DoorTOC[0] = d.DoorCharacteristics[D0W];
+D0W = d.pCurLevelDesc->Door2Type();
+d.DoorTOC[1] = d.DoorCharacteristics[D0W];
+```
+
+`DoorCharacteristics[4]` lives in `graphics.dat` item `0x22f` at absolute 9760
+(`doc/CSBwin-src/Data.h:1073`); `DB0.doorType` is a single bit selecting which of the level's
+two. The low byte is the force needed to bash the door (`doc/CSBwin-src/Code11f52.cpp:2277`)
+and bit 8 marks a door monsters may walk through (`doc/CSBwin-src/Monster.cpp:320`).
+
+## `AddFootprintEntry` is acknowledged broken, and still load-bearing
+
+`doc/CSBwin-src/Code11f52.cpp:4343-4346` carries Paul Stevens' own verdict:
+
+```cpp
+void AddFootprintEntry(i32 /*newX*/,i32 /*newY*/, ui16 deltaTime)
+{ //I think this is much hogwash.  Does nothing useful.
+  //Is full of errors.  Perhaps an old, abandoned
+  //debug trace or something.
+```
+
+It is nonetheless the only writer of `d.Byte13220`, the age bytes that
+`GetBestMonsterFacingP1` reads to decide whether a footprint is fresh enough to follow
+(`doc/CSBwin-src/Monster.cpp:617-620`). Its loop overwrites every entry it walks past with one
+value, and `DeleteFootprintEntry`'s `MemMove` shifts the tail *up* rather than down
+(`doc/CSBwin-src/Code11f52.cpp:4328-4329`). Both are ported as written.
+
+## A monster follows staler footprints the keener its nose
+
+`doc/CSBwin-src/Monster.cpp:615-620`:
+
+```cpp
+D6W = SearchFootprints(mapX, mapY);
+if (D6W != 0)
+{
+  w_10 = STRandom0_3();
+  D0W = sw(w_10 + (UI8)(d.Byte13220[D6W-1]));
+  if (D0W > 30 - 2*D7W)
+```
+
+`D7W` is `smellingDistance()`, so the threshold `30 - 2 * smell` *falls* as the nose improves.
+Note the index skew, which is CSBWin's and not a transcription slip: the age is read at
+`D6W - 1` but the followed print at `D6W` (`doc/CSBwin-src/Monster.cpp:624-625`).

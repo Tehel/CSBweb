@@ -133,6 +133,16 @@ export interface ObjectTables {
   monsterDesc: MonsterDesc[]; // d.MonsterDescriptor[27]
   monsterGraphics: MonsterGraphicDesc[]; // d.Item6414[27]
   monsterAttackSounds: Uint8Array; // d.uByte9672[8]
+  /**
+   * `d.DoorCharacteristics[4]` (doc/CSBwin-src/Data.h:1073). A level picks two of
+   * these by its `doorType0Index`/`doorType1Index` to form `d.DoorTOC[2]`
+   * (doc/CSBwin-src/CSBCode.cpp:5780-5783). The low byte is the force needed to bash
+   * the door; bit 8 marks a door monsters may walk through
+   * (doc/CSBwin-src/Monster.cpp:320).
+   */
+  doorCharacteristics: Int16Array;
+  /** `d.MonsterDroppings[40]` (doc/CSBwin-src/Data.h:1074). */
+  monsterDroppings: Int16Array;
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
   smallOffsetIndices: Uint8Array; // d.smallOffsetIndicies[16][2] packed row-major
   smallOffsets: Int8Array; // d.smallOffsets[24]
@@ -239,6 +249,8 @@ const ABS_CLOTHING = 8890; // ClothingDesc[58]
 const ABS_FOOD_VALUE = 8962; // FoodValue[8]
 const ABS_BYTE8946 = 8946; // Byte8946[54]
 const ABS_MONSTER_ATTACK_SOUND = 9672; // uByte9672[8]
+const ABS_DOOR_CHARACTERISTICS = 9760; // DoorCharacteristics[4]
+const ABS_MONSTER_DROPPINGS = 9752; // MonsterDroppings[40]
 const ABS_MONSTER_DESC = 9664; // MonsterDescriptor[27]
 const ABS_BYTE10336 = 10336; // Byte10336[256]
 const ABS_BYTE10080 = 10080; // Byte10080[64]
@@ -568,6 +580,24 @@ function readMonsterDesc22f(raw: Uint8Array): MonsterDesc[] {
   return out;
 }
 
+function readDoorCharacteristics22f(raw: Uint8Array): Int16Array {
+  const start = ABS_22F_START - ABS_DOOR_CHARACTERISTICS;
+  const count = 4;
+  if (start < 0 || start + count * 2 > raw.length) throw new Error('graphics.dat item 0x22f too small for DoorCharacteristics[4]');
+  const out = new Int16Array(count);
+  for (let i = 0; i < count; i++) out[i] = readI16BE(raw, start + i * 2);
+  return out;
+}
+
+function readMonsterDroppings22f(raw: Uint8Array): Int16Array {
+  const start = ABS_22F_START - ABS_MONSTER_DROPPINGS;
+  const count = 40;
+  if (start < 0 || start + count * 2 > raw.length) throw new Error('graphics.dat item 0x22f too small for MonsterDroppings[40]');
+  const out = new Int16Array(count);
+  for (let i = 0; i < count; i++) out[i] = readI16BE(raw, start + i * 2);
+  return out;
+}
+
 function readMonsterAttackSounds22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_MONSTER_ATTACK_SOUND;
   const count = 8;
@@ -747,6 +777,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const specialColors = readSpecialColors22e(raw22e, specialColorsOffset);
   const missileGraphics = readMissileGraphics22e(raw22e, struct5688Offset);
   const monsterDesc = readMonsterDesc22f(raw22f);
+  const doorCharacteristics = readDoorCharacteristics22f(raw22f);
+  const monsterDroppings = readMonsterDroppings22f(raw22f);
   const monsterAttackSounds = readMonsterAttackSounds22f(raw22f);
   const smallOffsetIndices = raw22e.slice(smallOffsetIndicesOffset, smallOffsetIndicesOffset + 16 * 2);
   const smallOffsets = Int8Array.from(
@@ -832,6 +864,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     viewportPosition,
     monsterPositions,
     monsterDesc,
+    doorCharacteristics,
+    monsterDroppings,
     monsterGraphics,
     monsterAttackSounds,
     missileGraphics,

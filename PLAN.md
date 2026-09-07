@@ -651,7 +651,34 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    rock piles, a Rive — each with exactly one AI timer whose `uByte5` is
    `255 - movementTicks06` for its type, and every DB4 pointing back at its own slot.
    All five `tools/check-frames.sh` frames unchanged.
-3. **AI / targeting.** Port monster activation, pursuit, fleeing, and attack selection.
+3. 🔄 **AI / targeting.**
+   - ✅ **Perception and movement probing** (`src/engine/MonsterPerception.ts`):
+     `BlockedTypeA`, `StoneOrClosedFalseWall`, `TestDirectPathOpen`, `Blocked`,
+     `GetBestMonsterFacingP1`, `PossibleMove`, `FindPossibleMove`,
+     `PossibleDoubleMove`, `TurnMonster`, `TurnMonsterGroup`, plus
+     `IsItInThisDirection`, `GetPrimaryAndSecondaryDirection`, `RelativeXY` and
+     `DistanceBetweenPoints`. `PossibleMove`'s six `d.` output globals are gathered
+     into an explicit `MoveProbe`.
+   - ✅ **The footprint trail** (`src/engine/PartyFootprints.ts`): `d.PartyFootprints`
+     + `d.Byte13220` with `AddFootprintEntry`, `DeleteFootprintEntry` and
+     `SearchFootprints`, recorded at every party relocation. This is the smelling
+     mechanism, and it did not exist before — only a `numFootprintEnt` counter did.
+     CSBWin's author calls `AddFootprintEntry` broken; it is ported as written,
+     because it is the sole writer of the age bytes smelling reads.
+   - ✅ **`DoorCharacteristics[4]`** extracted from graphic `0x22f` (absolute 9760),
+     so `DoorTOC` is real data rather than a guess; `MonsterDroppings[40]` came with
+     it.
+   - ⏳ Still to do: the state machine — `InitialChecks`, `ProcessTimers29to41` and
+     the `Try_To_Move` / `Try_Preferred_Direction_Then_Others` /
+     `Try_Directions_D5_To_D4` / `Standard_Finish` / `Process_Invincible` chain — and
+     the Monster Move Filter DSA that wraps it.
+
+   Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
+   beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
+   not (Ant Man `sightDistance` is 3); the one standing one cell away but facing
+   north is correctly blind to a party to its south while smelling it in the right
+   direction; and across all 22 groups no monster ever reports a legal move into
+   stone. Eleven new entries in `doc/PROVEN_FACTS.md`.
 4. **Attack resolution.** Port `Attack.cpp`: hit determination, damage, wounds, armour,
    `PossibleAttackTypes`, and champion↔monster hooks into `AdjustSkills`.
 5. **Creature generators.** Port actuator type 6 generator behaviour and
@@ -668,7 +695,7 @@ untested. Validation is `tools/check-frames.sh` plus a dev-only AI trace mirrori
 CSBWin's own `AITraceActive` output (`Monster.cpp:3290`), so the two codebases stay
 diffable; a real test framework stays Phase 15.
 
-Status: 🔄 in progress — step 1 done, step 2 partly done.
+Status: 🔄 in progress — step 1 done; steps 2 and 3 partly done (the AI state machine is the remaining core).
 
 ### Phase 13 — Champion lifecycle
 

@@ -70,6 +70,8 @@ export interface TimerTables {
   word1074?: number[];
   /** `d.sound1772` — graphic `0x232`'s sound table, for `QueueSound`. */
   soundTable?: ArrayLike<SoundTableEntry>;
+  /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC`. */
+  doorCharacteristics?: ArrayLike<number>;
 }
 
 export interface LocationRel {
@@ -124,6 +126,8 @@ export interface TimerHooks {
     direction: number;
     index: number;
   }) => number;
+  /** The party was relocated by a timer (a pit, a teleporter, a wiggle). */
+  onPartyMoved?: () => void;
   /**
    * `ProcessTimers29to41` (doc/CSBwin-src/Monster.cpp:3239). Every timer type from
    * 29 to 41 lands here rather than in the ordinary dispatch.
@@ -2186,6 +2190,7 @@ export class TimerSystem {
     party.facing = result.facing & 0x3;
 
     const unchanged = this.isSamePosition(oldPos, result.position);
+    if (!unchanged) this.hooks?.onPartyMoved?.();
     this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
     this.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }

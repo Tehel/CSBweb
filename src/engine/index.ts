@@ -10,6 +10,8 @@ export * from './ActuatorSystem';
 export * from './TimerQueue';
 export * from './TimerSystem';
 export * from './MonsterSystem';
+export * from './MonsterPerception';
+export * from './PartyFootprints';
 export * from './SoundQueue';
 export * from './monsterTypes';
 export * from './DsaSystem';
