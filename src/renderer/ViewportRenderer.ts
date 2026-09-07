@@ -28,7 +28,6 @@ import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables } from './csbwin/ObjectTables';
 import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from './csbwin/TextRenderer';
-import { scrollingText } from './csbwin/ScrollingText';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   initializeFloorCeilingIndexed,
@@ -45,6 +44,19 @@ import { getOrSet, MISC_BONES_OF_HERO, Position, SoundIndex } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
 import { createUIState, nowMs, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  blitBasicGraphicToViewport,
+  computeBarHeight,
+  drawFoodWaterBar,
+  drawMaskedBarRow,
+  drawMessageLines,
+  drawObjectIcon,
+  drawObjectIconAt,
+  drawObjectIconMask,
+  drawWoundedOutline,
+  pointInRect,
+  shadeRectIndex,
+} from './ui/Draw';
 import { GraphicRoomType } from './bytecode/Types';
 import type { TextDecodeTables } from '../engine/DungeonState';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
@@ -941,14 +953,14 @@ export class ViewportRenderer {
     this.drawPartyStatus();
     if (inventoryOpen) {
       this.drawInventoryScreen();
-      if (this.ui.uiTables) this.shadeRectIndex(this.ui.uiTables.graphic232.word28, 0);
+      if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
     }
     this.drawAttackButtons();
     this.drawAttackPanel();
     this.drawSpellPanel();
     this.drawSpellControls();
     this.drawHeldObjectName();
-    this.drawMessageLines();
+    drawMessageLines(this.ui);
     this.drawHoverHighlights();
     this.drawCursorItem();
 
@@ -1129,21 +1141,21 @@ export class ViewportRenderer {
   private drawFoodWaterPanel(champion: Champion): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
     const ui = this.ui.uiTables.graphic232;
-    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
-    this.blitBasicGraphicToViewport(30, ui.wRectPos950, 48, 12);
-    this.blitBasicGraphicToViewport(31, ui.wRectPos958, 48, 12);
+    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 30, ui.wRectPos950, 48, 12);
+    blitBasicGraphicToViewport(this.ui, 31, ui.wRectPos958, 48, 12);
     if ((champion.poisonCount ?? 0) !== 0) {
-      this.blitBasicGraphicToViewport(32, ui.wRectPos966, 96, 12);
+      blitBasicGraphicToViewport(this.ui, 32, ui.wRectPos966, 96, 12);
     }
 
-    this.drawFoodWaterBar(champion.food ?? 0, 69, 5);
-    this.drawFoodWaterBar(champion.water ?? 0, 92, 14);
+    drawFoodWaterBar(this.ui, champion.food ?? 0, 69, 5);
+    drawFoodWaterBar(this.ui, champion.water ?? 0, 92, 14);
   }
 
   private drawAttributePanel(champion: Champion): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer || !this.ui.fontData) return;
     const ui = this.ui.uiTables.graphic232;
-    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
 
     let lineY = 58;
     for (let role = 0; role < ROLE_LABELS.length; role++) {
@@ -1218,8 +1230,8 @@ export class ViewportRenderer {
       return;
     }
     const ui = this.ui.uiTables.graphic232;
-    this.blitBasicGraphicToViewport(20, ui.wRectPos926, 144, 8);
-    this.blitBasicGraphicToViewport(29, ui.wRectPos942, 32, 12);
+    blitBasicGraphicToViewport(this.ui, 20, ui.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 29, ui.wRectPos942, 32, 12);
 
     const objectNameIndex = this.resolveObjectNameIndex(objectId | 0);
     if (objectNameIndex >= 0) {
@@ -1229,7 +1241,7 @@ export class ViewportRenderer {
         x2: VIEWPORT_X + 126,
         y2: VIEWPORT_Y + 74,
       };
-      this.drawObjectIcon(iconRect, objectNameIndex, ui.word612);
+      drawObjectIcon(this.ui, iconRect, objectNameIndex, ui.word612);
       const name = this.getObjectDisplayName(objectId, objectNameIndex);
       if (name) {
         drawTextLineIndex(
@@ -1274,7 +1286,7 @@ export class ViewportRenderer {
     const text = this.ui.dungeonState.decodeScrollText(scroll, textTables) ?? '';
 
     const ui = this.ui.uiTables.graphic232;
-    this.blitBasicGraphicToViewport(23, ui.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 23, ui.wRectPos926, 144, 8);
 
     const { lines, startY } = this.splitScrollLines(text);
     let y = startY;
@@ -1568,7 +1580,7 @@ export class ViewportRenderer {
     const icon = this.ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
     const rect = this.getEyeRect();
     if (!rect) return;
-    this.drawObjectIcon(rect, icon, word612);
+    drawObjectIcon(this.ui, rect, icon, word612);
   }
 
   private getEyeRect(): Rect | null {
@@ -1678,84 +1690,6 @@ export class ViewportRenderer {
   private formatLifeValue(value: number): string {
     const clamped = Math.max(0, Math.min(9999, Math.floor(value)));
     return String(clamped).padStart(3, ' ');
-  }
-
-  private drawFoodWaterBar(value: number, y: number, color: number): void {
-    let barColor = color;
-    if (value < 0) barColor = 11;
-    if (value < -512) barColor = 8;
-    let width = value + 1024;
-    if (width >= 3072) width = 3071;
-    width = Math.floor(width / 32);
-    this.drawHorzBar(115, y + 2, width, 0);
-    this.drawHorzBar(113, y, width, barColor);
-  }
-
-  private drawHorzBar(x0: number, y0: number, width: number, color: number): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const x1 = VIEWPORT_X + x0;
-    const y1 = VIEWPORT_Y + y0;
-    const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
-    fillRectIndex(this.ui.screenIndexBuffer, rect, color);
-  }
-
-  private blitBasicGraphicToViewport(index: number, rect: Rect, srcStride: number, transparentColor: number): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const graphic = this.getGraphicBitmap(index);
-    if (!graphic) return;
-    const dst = this.offsetViewportRect(rect);
-    tag0088b2Index(
-      graphic,
-      this.ui.screenIndexBuffer,
-      {
-        x1: dst.x1,
-        y1: dst.y1,
-        x2: dst.x2,
-        y2: dst.y2,
-        srcX: 0,
-        srcY: 0,
-        srcStride,
-        srcHeight: graphic.height,
-      },
-      transparentColor
-    );
-  }
-
-  private offsetViewportRect(rect: Rect): Rect {
-    return {
-      x1: rect.x1 + VIEWPORT_X,
-      x2: rect.x2 + VIEWPORT_X,
-      y1: rect.y1 + VIEWPORT_Y,
-      y2: rect.y2 + VIEWPORT_Y,
-    };
-  }
-
-  private shadeRectIndex(rect: Rect, color: number): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const width = this.ui.screenIndexBuffer.width;
-    const height = this.ui.screenIndexBuffer.height;
-    const x1 = Math.max(0, rect.x1 | 0);
-    const y1 = Math.max(0, rect.y1 | 0);
-    const x2 = Math.min(width - 1, rect.x2 | 0);
-    const y2 = Math.min(height - 1, rect.y2 | 0);
-    const fill = color & 0x0f;
-
-    for (let y = y1; y <= y2; y++) {
-      const row = y * width;
-      for (let x = x1; x <= x2; x++) {
-        if ((x + y) & 1)
-          this.ui.screenIndexBuffer.pixels[row + x] = fill;
-      }
-    }
-  }
-
-  /**
-   * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
-   * `ScrollingText`; the renderer only paints its current rows.
-   */
-  private drawMessageLines(): void {
-    if (!this.ui.fontData || !this.ui.screenIndexBuffer) return;
-    scrollingText.draw(this.ui.screenIndexBuffer, this.ui.fontData);
   }
 
   private drawPartyStatus(): void {
@@ -2024,10 +1958,10 @@ export class ViewportRenderer {
         const objectNameIndex = objectId >= 0 ? this.resolveObjectNameIndex(objectId) : -1;
 
         if (objectNameIndex >= 0) {
-          this.drawObjectIcon(rect, objectNameIndex, word612);
+          drawObjectIcon(this.ui, rect, objectNameIndex, word612);
         } else if (champion) {
           const placeholder = this.getInventoryPlaceholderIndex(champion, hand);
-          this.drawObjectIcon(rect, placeholder, word612);
+          drawObjectIcon(this.ui, rect, placeholder, word612);
         }
       }
     }
@@ -2089,15 +2023,15 @@ export class ViewportRenderer {
       if (!rect) continue;
       const wounds = champion.wounds ?? 0;
       if (slot <= 5 && (wounds & (1 << slot)) !== 0) {
-        this.drawWoundedOutline(rect);
+        drawWoundedOutline(this.ui, rect);
       }
       if (objectIndex >= 0) {
-        this.drawObjectIcon(rect, objectIndex, word612);
+        drawObjectIcon(this.ui, rect, objectIndex, word612);
         continue;
       }
       const placeholder = this.getInventoryPlaceholderIndex(champion, slot);
       if (placeholder >= 0) {
-        this.drawObjectIcon(rect, placeholder, word612);
+        drawObjectIcon(this.ui, rect, placeholder, word612);
       }
     }
 
@@ -2116,37 +2050,6 @@ export class ViewportRenderer {
     this.drawMouthChewAnimation();
     this.drawEyeIcon();
     this.drawVitalsAndLoad(champion);
-  }
-
-  private drawWoundedOutline(rect: Rect): void {
-    if (!this.ui.screenIndexBuffer) return;
-    const graphic = this.getGraphicBitmap(34);
-    if (!graphic) {
-      drawRectOutlineIndex(this.ui.screenIndexBuffer, {
-        x1: rect.x1 - 1,
-        y1: rect.y1 - 1,
-        x2: rect.x2 + 1,
-        y2: rect.y2 + 1,
-      }, 8);
-      return;
-    }
-
-    tag0088b2Index(
-      graphic,
-      this.ui.screenIndexBuffer,
-      {
-        x1: rect.x1 - 1,
-        y1: rect.y1 - 1,
-        x2: rect.x2 + 1,
-        y2: rect.y2 + 1,
-        srcX: 0,
-        srcY: 0,
-        srcStride: graphic.width,
-        srcWidth: graphic.width,
-        srcHeight: graphic.height,
-      },
-      12
-    );
   }
 
   private getInventorySlotRect(iconSlots: { pixelX: number; pixelY: number }[], slot: number): Rect | null {
@@ -2285,7 +2188,7 @@ export class ViewportRenderer {
   private drawChestPanel(chestView: ChestViewSource): void {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
     const ui = this.ui.uiTables.graphic232;
-    this.blitBasicGraphicToViewport(25, ui.wRectPos926, 144, 8);
+    blitBasicGraphicToViewport(this.ui, 25, ui.wRectPos926, 144, 8);
     this.drawInspectArrow(chestView.source === 'cursor');
 
     const word612 = ui.word612;
@@ -2296,7 +2199,7 @@ export class ViewportRenderer {
       const item = this.normalizeObjectValue(this.ui.openChestContents[slot] ?? null);
       if (item === null) continue;
       const objectIndex = this.resolveObjectNameIndex(item | 0);
-      if (objectIndex >= 0) this.drawObjectIcon(rect, objectIndex, word612);
+      if (objectIndex >= 0) drawObjectIcon(this.ui, rect, objectIndex, word612);
     }
   }
 
@@ -2304,7 +2207,7 @@ export class ViewportRenderer {
     if (!this.ui.uiTables || !this.ui.screenIndexBuffer) return;
     const ui = this.ui.uiTables.graphic232;
     const graphicIndex = fromEye ? 19 : 18;
-    this.blitBasicGraphicToViewport(graphicIndex, ui.wRectPos934, 16, 8);
+    blitBasicGraphicToViewport(this.ui, graphicIndex, ui.wRectPos934, 16, 8);
   }
 
   private isChestRecord(value: number | null): value is ObjectID {
@@ -2670,92 +2573,8 @@ export class ViewportRenderer {
           iconIndex = this.getBaseObjectNameIndex(weaponId);
         }
         if (iconIndex >= 0) {
-          this.drawObjectIconMask(iconRect, iconIndex, word612, this.ui.uiTables.graphic230.shrinkColorMap);
+          drawObjectIconMask(this.ui, iconRect, iconIndex, word612, this.ui.uiTables.graphic230.shrinkColorMap);
         }
-      }
-    }
-  }
-
-  private drawObjectIcon(rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
-    if (!this.ui.screenIndexBuffer) return;
-    if (objectNameIndex < 0) return;
-    if (word612.length === 0) return;
-
-    let group = 0;
-    while (group < word612.length && objectNameIndex >= word612[group]) {
-      group++;
-    }
-    group -= 1;
-    if (group < 0) return;
-
-    const graphicIndex = 42 + group;
-    const graphic = this.getGraphicBitmap(graphicIndex);
-    if (!graphic) return;
-
-    const offset = objectNameIndex - word612[group];
-    const srcX = (offset & 15) << 4;
-    const srcY = offset & 0xff0;
-
-    tag0088b2Index(
-      graphic,
-      this.ui.screenIndexBuffer,
-      {
-        x1: rect.x1,
-        y1: rect.y1,
-        x2: rect.x2,
-        y2: rect.y2,
-        srcX,
-        srcY,
-        srcStride: graphic.width,
-        srcWidth: graphic.width,
-        srcHeight: graphic.height,
-      },
-      -1
-    );
-  }
-
-  private drawObjectIconMask(
-    rect: { x1: number; y1: number; x2: number; y2: number },
-    objectNameIndex: number,
-    word612: number[],
-    colorMap: number[]
-  ): void {
-    if (!this.ui.screenIndexBuffer) return;
-    if (objectNameIndex < 0) return;
-    if (word612.length === 0 || colorMap.length === 0) return;
-
-    let group = 0;
-    while (group < word612.length && objectNameIndex >= word612[group]) {
-      group++;
-    }
-    group -= 1;
-    if (group < 0) return;
-
-    const graphicIndex = 42 + group;
-    const graphic = this.getGraphicBitmap(graphicIndex);
-    if (!graphic) return;
-
-    const offset = objectNameIndex - word612[group];
-    const srcX = (offset & 15) << 4;
-    const srcY = offset & 0xff0;
-
-    const dst = this.ui.screenIndexBuffer;
-    const dstStride = dst.width;
-    const srcStride = graphic.width;
-    const maxW = Math.min(16, rect.x2 - rect.x1 + 1);
-    const maxH = Math.min(16, rect.y2 - rect.y1 + 1);
-
-    for (let y = 0; y < maxH; y++) {
-      const sy = srcY + y;
-      if (sy < 0 || sy >= graphic.height) continue;
-      const dstRow = (rect.y1 + y) * dstStride;
-      for (let x = 0; x < maxW; x++) {
-        const sx = srcX + x;
-        if (sx < 0 || sx >= srcStride) continue;
-        const pixel = graphic.pixels[sy * srcStride + sx] & 0x0f;
-        const mapped = colorMap[pixel] ?? 0;
-        if (mapped !== 0) continue; // leave cyan background for mapped pixels (ex: color 12 -> 40)
-        dst.pixels[dstRow + rect.x1 + x] = 0; // black mask for non-mapped pixels
       }
     }
   }
@@ -2907,9 +2726,9 @@ export class ViewportRenderer {
     if (!offsets || !masks) return;
 
     const heights = [
-      this.computeBarHeight(champion.attributes?.health ?? 0, champion.attributes?.maxHealth ?? 0, false),
-      this.computeBarHeight(champion.attributes?.stamina ?? 0, champion.attributes?.maxStamina ?? 0, false),
-      this.computeBarHeight(champion.attributes?.mana ?? 0, champion.attributes?.maxMana ?? 0, true),
+      computeBarHeight(champion.attributes?.health ?? 0, champion.attributes?.maxHealth ?? 0, false),
+      computeBarHeight(champion.attributes?.stamina ?? 0, champion.attributes?.maxStamina ?? 0, false),
+      computeBarHeight(champion.attributes?.mana ?? 0, champion.attributes?.maxMana ?? 0, true),
     ];
 
     for (let bar = 0; bar < 3; bar++) {
@@ -2923,33 +2742,10 @@ export class ViewportRenderer {
         const filled = height > (24 - row);
         const color = filled ? CHAR_COLORS[chIdx] : 12;
         const y = 2 + row;
-        this.drawMaskedBarRow(startX, y, mask1, color);
-        this.drawMaskedBarRow(startX + 16, y, mask2, color);
+        drawMaskedBarRow(this.ui, startX, y, mask1, color);
+        drawMaskedBarRow(this.ui, startX + 16, y, mask2, color);
       }
     }
-  }
-
-  private drawMaskedBarRow(xBase: number, y: number, mask: number, color: number): void {
-    if (!this.ui.screenIndexBuffer) return;
-    if (mask === 0) return;
-    const width = this.ui.screenIndexBuffer.width;
-    const height = this.ui.screenIndexBuffer.height;
-    if (y < 0 || y >= height) return;
-
-    const row = y * width;
-    const bits = mask & 0xffff;
-    for (let bit = 0; bit < 16; bit++) {
-      if ((bits & (1 << (15 - bit))) === 0) continue;
-      const x = xBase + bit;
-      if (x < 0 || x >= width) continue;
-      this.ui.screenIndexBuffer.pixels[row + x] = color & 0x0f;
-    }
-  }
-
-  private computeBarHeight(current: number, max: number, allowOverMax: boolean): number {
-    if (current <= 0 || max <= 0) return 0;
-    if (allowOverMax && current > max) return 25;
-    return Math.min(25, Math.ceil((25 * current) / max));
   }
 
   private searchButtonList(list: UIButton[] | null, x: number, y: number, buttons: number): number {
@@ -3168,7 +2964,7 @@ export class ViewportRenderer {
     const mouthRect = this.ui.uiTables.graphic232.word1398;
     const x = VIEWPORT_X + mouthRect.x1 + 1;
     const y = VIEWPORT_Y + mouthRect.y1 + 1;
-    this.drawObjectIconAt(x, y, icon, this.ui.uiTables.graphic232.word612, -1);
+    drawObjectIconAt(this.ui, x, y, icon, this.ui.uiTables.graphic232.word612, -1);
   }
 
   private ensureMouthChewLoop(): void {
@@ -3285,7 +3081,7 @@ export class ViewportRenderer {
     for (const champion of this.ui.partyState.champions) {
       if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
       const rct = this.spellControlGetRect(rect, champion.partyPosition, this.ui.partyState.magicCasterIndex);
-      if (this.pointInRect(clickX, clickY, rct)) {
+      if (pointInRect(clickX, clickY, rct)) {
         this.ui.partyState.magicCasterIndex = champion.partyPosition;
         break;
       }
@@ -3467,59 +3263,8 @@ export class ViewportRenderer {
 
     const baseX = Math.floor(this.ui.hoverPoint.x) - 8;
     const baseY = Math.floor(this.ui.hoverPoint.y) - 8;
-    this.drawObjectIconAt(baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
-    this.drawObjectIconAt(baseX, baseY, objectNameIndex, word612, 12);
-  }
-
-  private drawObjectIconAt(
-    x: number,
-    y: number,
-    objectNameIndex: number,
-    word612: number[],
-    transparentColor: number,
-    overrideColor?: number
-  ): void {
-    if (!this.ui.screenIndexBuffer) return;
-    if (objectNameIndex < 0) return;
-    if (word612.length === 0) return;
-
-    let group = 0;
-    while (group < word612.length && objectNameIndex >= word612[group]) {
-      group++;
-    }
-    group -= 1;
-    if (group < 0) return;
-
-    const graphicIndex = 42 + group;
-    const graphic = this.getGraphicBitmap(graphicIndex);
-    if (!graphic) return;
-
-    const offset = objectNameIndex - word612[group];
-    const srcX = (offset & 15) << 4;
-    const srcY = offset & 0xff0;
-
-    const dst = this.ui.screenIndexBuffer;
-    const dstStride = dst.width;
-    const srcStride = graphic.width;
-    const maxW = Math.min(16, dst.width - x, srcStride - srcX);
-    const maxH = Math.min(16, dst.height - y, graphic.height - srcY);
-    if (maxW <= 0 || maxH <= 0) return;
-
-    const tc = transparentColor & 0x0f;
-    for (let row = 0; row < maxH; row++) {
-      const sy = srcY + row;
-      const dy = y + row;
-      if (dy < 0) continue;
-      const dstRow = dy * dstStride;
-      const srcRow = sy * srcStride;
-      for (let col = 0; col < maxW; col++) {
-        const dx = x + col;
-        if (dx < 0) continue;
-        const pixel = graphic.pixels[srcRow + (srcX + col)] & 0x0f;
-        if (pixel === tc) continue;
-        dst.pixels[dstRow + dx] = overrideColor !== undefined ? (overrideColor & 0x0f) : pixel;
-      }
-    }
+    drawObjectIconAt(this.ui, baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
+    drawObjectIconAt(this.ui, baseX, baseY, objectNameIndex, word612, 12);
   }
 
   private drawEmptyCursor(): void {
@@ -3716,7 +3461,7 @@ export class ViewportRenderer {
 
     const hovered: string[] = [];
     for (const btn of this.ui.uiTables.graphic231.moveButtons) {
-      if (this.pointInRect(x, y, btn)) {
+      if (pointInRect(x, y, btn)) {
         // drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 15);
       }
     }
@@ -3724,17 +3469,13 @@ export class ViewportRenderer {
     const buttonGroups = Object.values(this.ui.uiTables.graphic231.buttons);
     for (const group of buttonGroups) {
       for (const btn of group) {
-        if (this.pointInRect(x, y, btn)) {
+        if (pointInRect(x, y, btn)) {
           hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
           drawRectOutlineIndex(this.ui.screenIndexBuffer, btn, 9);
         }
       }
     }
     updateHover(hovered.join("<br>"));
-  }
-
-  private pointInRect(x: number, y: number, rect: Rect): boolean {
-    return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
   }
 
   private blitViewportToScreen(): void {

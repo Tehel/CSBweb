@@ -1,0 +1,283 @@
+/**
+ * Low-level drawing primitives for the DM screen buffer.
+ *
+ * Everything here writes palette indices into `ui.screenIndexBuffer`; the conversion to
+ * RGBA happens once at present time, as in CSBWin.
+ */
+import { Rect } from '../csbwin/UITables';
+import { drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { scrollingText } from '../csbwin/ScrollingText';
+import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
+import type { UIState } from './UIState';
+
+export function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, color: number): void {
+  if (!ui.screenIndexBuffer) return;
+  const x1 = VIEWPORT_X + x0;
+  const y1 = VIEWPORT_Y + y0;
+  const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
+  fillRectIndex(ui.screenIndexBuffer, rect, color);
+}
+
+export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rect, srcStride: number, transparentColor: number): void {
+  if (!ui.screenIndexBuffer) return;
+  const graphic = ui.getGraphicBitmap(index);
+  if (!graphic) return;
+  const dst = offsetViewportRect(rect);
+  tag0088b2Index(
+    graphic,
+    ui.screenIndexBuffer,
+    {
+      x1: dst.x1,
+      y1: dst.y1,
+      x2: dst.x2,
+      y2: dst.y2,
+      srcX: 0,
+      srcY: 0,
+      srcStride,
+      srcHeight: graphic.height,
+    },
+    transparentColor
+  );
+}
+
+export function offsetViewportRect(rect: Rect): Rect {
+  return {
+    x1: rect.x1 + VIEWPORT_X,
+    x2: rect.x2 + VIEWPORT_X,
+    y1: rect.y1 + VIEWPORT_Y,
+    y2: rect.y2 + VIEWPORT_Y,
+  };
+}
+
+export function shadeRectIndex(ui: UIState, rect: Rect, color: number): void {
+  if (!ui.screenIndexBuffer) return;
+  const width = ui.screenIndexBuffer.width;
+  const height = ui.screenIndexBuffer.height;
+  const x1 = Math.max(0, rect.x1 | 0);
+  const y1 = Math.max(0, rect.y1 | 0);
+  const x2 = Math.min(width - 1, rect.x2 | 0);
+  const y2 = Math.min(height - 1, rect.y2 | 0);
+  const fill = color & 0x0f;
+
+  for (let y = y1; y <= y2; y++) {
+    const row = y * width;
+    for (let x = x1; x <= x2; x++) {
+      if ((x + y) & 1)
+        ui.screenIndexBuffer.pixels[row + x] = fill;
+    }
+  }
+}
+
+/**
+ * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
+ * `ScrollingText`; the renderer only paints its current rows.
+ */
+
+export function pointInRect(x: number, y: number, rect: Rect): boolean {
+  return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
+}
+
+export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
+  if (!ui.screenIndexBuffer) return;
+  if (objectNameIndex < 0) return;
+  if (word612.length === 0) return;
+
+  let group = 0;
+  while (group < word612.length && objectNameIndex >= word612[group]) {
+    group++;
+  }
+  group -= 1;
+  if (group < 0) return;
+
+  const graphicIndex = 42 + group;
+  const graphic = ui.getGraphicBitmap(graphicIndex);
+  if (!graphic) return;
+
+  const offset = objectNameIndex - word612[group];
+  const srcX = (offset & 15) << 4;
+  const srcY = offset & 0xff0;
+
+  tag0088b2Index(
+    graphic,
+    ui.screenIndexBuffer,
+    {
+      x1: rect.x1,
+      y1: rect.y1,
+      x2: rect.x2,
+      y2: rect.y2,
+      srcX,
+      srcY,
+      srcStride: graphic.width,
+      srcWidth: graphic.width,
+      srcHeight: graphic.height,
+    },
+    -1
+  );
+}
+
+export function drawObjectIconMask(ui: UIState, 
+  rect: { x1: number; y1: number; x2: number; y2: number },
+  objectNameIndex: number,
+  word612: number[],
+  colorMap: number[]
+): void {
+  if (!ui.screenIndexBuffer) return;
+  if (objectNameIndex < 0) return;
+  if (word612.length === 0 || colorMap.length === 0) return;
+
+  let group = 0;
+  while (group < word612.length && objectNameIndex >= word612[group]) {
+    group++;
+  }
+  group -= 1;
+  if (group < 0) return;
+
+  const graphicIndex = 42 + group;
+  const graphic = ui.getGraphicBitmap(graphicIndex);
+  if (!graphic) return;
+
+  const offset = objectNameIndex - word612[group];
+  const srcX = (offset & 15) << 4;
+  const srcY = offset & 0xff0;
+
+  const dst = ui.screenIndexBuffer;
+  const dstStride = dst.width;
+  const srcStride = graphic.width;
+  const maxW = Math.min(16, rect.x2 - rect.x1 + 1);
+  const maxH = Math.min(16, rect.y2 - rect.y1 + 1);
+
+  for (let y = 0; y < maxH; y++) {
+    const sy = srcY + y;
+    if (sy < 0 || sy >= graphic.height) continue;
+    const dstRow = (rect.y1 + y) * dstStride;
+    for (let x = 0; x < maxW; x++) {
+      const sx = srcX + x;
+      if (sx < 0 || sx >= srcStride) continue;
+      const pixel = graphic.pixels[sy * srcStride + sx] & 0x0f;
+      const mapped = colorMap[pixel] ?? 0;
+      if (mapped !== 0) continue; // leave cyan background for mapped pixels (ex: color 12 -> 40)
+      dst.pixels[dstRow + rect.x1 + x] = 0; // black mask for non-mapped pixels
+    }
+  }
+}
+
+export function drawObjectIconAt(ui: UIState, 
+  x: number,
+  y: number,
+  objectNameIndex: number,
+  word612: number[],
+  transparentColor: number,
+  overrideColor?: number
+): void {
+  if (!ui.screenIndexBuffer) return;
+  if (objectNameIndex < 0) return;
+  if (word612.length === 0) return;
+
+  let group = 0;
+  while (group < word612.length && objectNameIndex >= word612[group]) {
+    group++;
+  }
+  group -= 1;
+  if (group < 0) return;
+
+  const graphicIndex = 42 + group;
+  const graphic = ui.getGraphicBitmap(graphicIndex);
+  if (!graphic) return;
+
+  const offset = objectNameIndex - word612[group];
+  const srcX = (offset & 15) << 4;
+  const srcY = offset & 0xff0;
+
+  const dst = ui.screenIndexBuffer;
+  const dstStride = dst.width;
+  const srcStride = graphic.width;
+  const maxW = Math.min(16, dst.width - x, srcStride - srcX);
+  const maxH = Math.min(16, dst.height - y, graphic.height - srcY);
+  if (maxW <= 0 || maxH <= 0) return;
+
+  const tc = transparentColor & 0x0f;
+  for (let row = 0; row < maxH; row++) {
+    const sy = srcY + row;
+    const dy = y + row;
+    if (dy < 0) continue;
+    const dstRow = dy * dstStride;
+    const srcRow = sy * srcStride;
+    for (let col = 0; col < maxW; col++) {
+      const dx = x + col;
+      if (dx < 0) continue;
+      const pixel = graphic.pixels[srcRow + (srcX + col)] & 0x0f;
+      if (pixel === tc) continue;
+      dst.pixels[dstRow + dx] = overrideColor !== undefined ? (overrideColor & 0x0f) : pixel;
+    }
+  }
+}
+
+export function drawMessageLines(ui: UIState): void {
+  if (!ui.fontData || !ui.screenIndexBuffer) return;
+  scrollingText.draw(ui.screenIndexBuffer, ui.fontData);
+}
+
+export function drawFoodWaterBar(ui: UIState, value: number, y: number, color: number): void {
+  let barColor = color;
+  if (value < 0) barColor = 11;
+  if (value < -512) barColor = 8;
+  let width = value + 1024;
+  if (width >= 3072) width = 3071;
+  width = Math.floor(width / 32);
+  drawHorzBar(ui, 115, y + 2, width, 0);
+  drawHorzBar(ui, 113, y, width, barColor);
+}
+
+export function drawMaskedBarRow(ui: UIState, xBase: number, y: number, mask: number, color: number): void {
+  if (!ui.screenIndexBuffer) return;
+  if (mask === 0) return;
+  const width = ui.screenIndexBuffer.width;
+  const height = ui.screenIndexBuffer.height;
+  if (y < 0 || y >= height) return;
+
+  const row = y * width;
+  const bits = mask & 0xffff;
+  for (let bit = 0; bit < 16; bit++) {
+    if ((bits & (1 << (15 - bit))) === 0) continue;
+    const x = xBase + bit;
+    if (x < 0 || x >= width) continue;
+    ui.screenIndexBuffer.pixels[row + x] = color & 0x0f;
+  }
+}
+
+export function computeBarHeight(current: number, max: number, allowOverMax: boolean): number {
+  if (current <= 0 || max <= 0) return 0;
+  if (allowOverMax && current > max) return 25;
+  return Math.min(25, Math.ceil((25 * current) / max));
+}
+
+export function drawWoundedOutline(ui: UIState, rect: Rect): void {
+  if (!ui.screenIndexBuffer) return;
+  const graphic = ui.getGraphicBitmap(34);
+  if (!graphic) {
+    drawRectOutlineIndex(ui.screenIndexBuffer, {
+      x1: rect.x1 - 1,
+      y1: rect.y1 - 1,
+      x2: rect.x2 + 1,
+      y2: rect.y2 + 1,
+    }, 8);
+    return;
+  }
+
+  tag0088b2Index(
+    graphic,
+    ui.screenIndexBuffer,
+    {
+      x1: rect.x1 - 1,
+      y1: rect.y1 - 1,
+      x2: rect.x2 + 1,
+      y2: rect.y2 + 1,
+      srcX: 0,
+      srcY: 0,
+      srcStride: graphic.width,
+      srcWidth: graphic.width,
+      srcHeight: graphic.height,
+    },
+    12
+  );
+}
