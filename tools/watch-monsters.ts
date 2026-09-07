@@ -1,0 +1,125 @@
+/**
+ * Watch monsters move.
+ *
+ * Runs the real dungeon's AI for a while and prints where each group started and
+ * ended up, how far it travelled, and how its fear state changed — plus a small ASCII
+ * map of one group's path.
+ *
+ * This is the payoff check for the whole AI port. The things worth looking for: a
+ * monster near the party should end up *closer* to it, one far away should wander,
+ * and none should end up inside a wall.
+ *
+ * Run: `npx tsx tools/watch-monsters.ts [level] [partyX] [partyY] [ticks]`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { Position, RoomType } from '../src/core/types';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { Game } from '../src/engine/Game';
+import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
+import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractUITables } from '../src/renderer/csbwin/UITables';
+
+async function main(): Promise<void> {
+  const loader = new DungeonLoader();
+  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = loader.getData();
+  if (!data) throw new Error('dungeon.dat did not load');
+
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const viewportTables = extractViewportTables(graphics);
+  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const uiTables = extractUITables(graphics);
+
+  const level = Number(process.argv[2] ?? 2);
+  const px = Number(process.argv[3] ?? 6);
+  const py = Number(process.argv[4] ?? 14);
+  const ticks = Number(process.argv[5] ?? 600);
+
+  const game = new Game(
+    data,
+    { roomTimerFunctions: uiTables.graphic232.byte1596, monsterDesc: objectTables.monsterDesc },
+    {
+      monsterDesc: objectTables.monsterDesc,
+      word1074: uiTables.graphic232.word1074,
+      soundTable: uiTables.graphic232.soundTable,
+      doorCharacteristics: objectTables.doorCharacteristics,
+      monsterDroppings: objectTables.monsterDroppings,
+      facingReplication: objectTables.facingReplication,
+    },
+  );
+  game.party.state.position = new Position(px, py, level);
+  game.monsterSystem.loadPartyLevel(level);
+
+  const dungeon = game.dungeonState;
+  const pool = dungeon.getItem16Pool();
+  const start = pool.map((s) => (s.word0 >= 0 ? { db4: s.word0, x: s.uByte10, y: s.uByte11 } : null));
+  const startFear = pool.map((s) => {
+    if (s.word0 < 0) return -1;
+    return dungeon.getCreatureRecordByIndex(s.word0)?.fear ?? -1;
+  });
+
+  // Follow one group's path: the closest to the party.
+  let followed = -1;
+  let bestDist = 1e9;
+  pool.forEach((s, i) => {
+    if (s.word0 < 0) return;
+    const d = Math.abs(s.uByte10 - px) + Math.abs(s.uByte11 - py);
+    if (d < bestDist) { bestDist = d; followed = i; }
+  });
+  const path: string[] = [];
+
+  for (let t = 0; t < ticks; t++) {
+    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.timerSystem.processTimers(t);
+    if (followed >= 0) {
+      const s = pool[followed]!;
+      const here = `${s.uByte10},${s.uByte11}`;
+      if (path[path.length - 1] !== here) path.push(here);
+    }
+  }
+
+  console.log(`level ${level}, party at (${px},${py}), ${ticks} ticks\n`);
+  console.log(['monster', 'from', 'to', 'moved', 'dist0', 'dist1', 'fear'].join('\t'));
+  let moversTotal = 0;
+  let closedIn = 0;
+  let inWall = 0;
+  pool.forEach((s, i) => {
+    const s0 = start[i];
+    if (!s0 || s.word0 < 0) return;
+    const rec = dungeon.getCreatureRecordByIndex(s.word0);
+    if (!rec) return;
+    const moved = Math.abs(s.uByte10 - s0.x) + Math.abs(s.uByte11 - s0.y);
+    const d0 = Math.abs(s0.x - px) + Math.abs(s0.y - py);
+    const d1 = Math.abs(s.uByte10 - px) + Math.abs(s.uByte11 - py);
+    if (moved > 0) moversTotal++;
+    if (d1 < d0) closedIn++;
+    const rt = (dungeon.getCellFlag(new Position(s.uByte10, s.uByte11, level)) >> 5) & 7;
+    if (rt === RoomType.STONE) { inWall++; }
+    console.log([
+      MonsterType[rec.creatureType] ?? rec.creatureType,
+      `(${s0.x},${s0.y})`,
+      `(${s.uByte10},${s.uByte11})`,
+      moved,
+      d0,
+      d1,
+      `${StateOfFear[startFear[i]!] ?? startFear[i]}->${StateOfFear[rec.fear] ?? rec.fear}`,
+    ].join('\t'));
+  });
+
+  console.log('');
+  console.log(`groups that moved: ${moversTotal}, closed in on the party: ${closedIn}, standing in stone: ${inWall}`);
+  if (followed >= 0) {
+    console.log(`\nnearest group's path (${path.length} squares):`);
+    console.log('  ' + path.join(' -> '));
+  }
+  console.log('');
+  console.log(inWall === 0 ? 'OK: no monster is standing inside a wall' : 'PROBLEM: a monster is inside a wall');
+  process.exitCode = inWall === 0 ? 0 : 1;
+}
+
+main();

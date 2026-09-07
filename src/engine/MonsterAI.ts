@@ -40,7 +40,67 @@ import {
   type TurnState,
 } from './MonsterPerception';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
-import { monsterHorizontalSize, monsterInvincible } from '../renderer/csbwin/ObjectTables';
+import {
+  monsterDelayFromAttackToMove,
+  monsterDelayFromMoveToAttack,
+  monsterHorizontalSize,
+  monsterInvincible,
+  monsterSee360,
+  monsterSmellingDistance,
+  monsterWord14_12_15,
+  monsterWord20_0_3,
+  monsterWord2Bit3,
+  monsterWord2Bit4,
+} from '../renderer/csbwin/ObjectTables';
+import { setPackedBits } from './MonsterSystem';
+
+/**
+ * The values CSBWin passes by reference through the `Try_*` chain.
+ *
+ * Each helper takes some of these `&` and some by value; where CSBWin copies, the
+ * caller here copies too, so a `Set_Monster_Timer` deep in the chain cannot reach
+ * back and change a caller's `timePerMove`.
+ */
+export interface AiFrame {
+  /** `timer_70` — always by reference. */
+  timer: TimerEntry;
+  /** `i_60` — the time of the group's alternate event. */
+  i60: number;
+  /** `w_54` — ticks since the last update, or -1 once a move has been deferred. */
+  sinceLastUpdate: number;
+  /** `timePerMove`, which several paths shorten as the monster hurries. */
+  timePerMove: number;
+  /** `bool_36` — "a move actually happened this turn". */
+  bool36: boolean;
+  /** `D5` — the direction the group ended up moving. */
+  d5: number;
+  /** `d.SecondaryDirection`. */
+  secondaryDirection: number;
+}
+
+/** The values CSBWin passes as `const` for the whole turn. */
+export interface AiConst {
+  monsterRn: ObjectID;
+  monster: CreatureRecord;
+  slot: Item16Record;
+  slotIndex: number;
+  desc: MonsterDesc;
+  mapX: number;
+  mapY: number;
+  level: number;
+  timeUntilAlternateUpdate: number;
+  indexOfLastMonster: number;
+  horizSize: number;
+  invincible: boolean;
+  xDistance: number;
+  yDistance: number;
+  /** `attackDistance` — not const in practice; a few paths overwrite it. */
+  attackDistance: number;
+  /** `timeFunc`, rewritten into its negative form by the 29/30/31 branches. */
+  timerFunction: number;
+  fearFactorIs6: boolean;
+  processingATimer: boolean;
+}
 
 /**
  * The `d.` globals the AI threads through its call chain.
@@ -106,6 +166,22 @@ export interface MonsterAiDeps {
   perception: MonsterPerception;
   monsterDesc: () => ArrayLike<MonsterDesc> | null;
   isGameWon: () => boolean;
+  /** `d.CurrentPalette` — the viewport light level, which shortens monster sight. */
+  getCurrentPalette?: () => number;
+  /**
+   * `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:944`) — resolve one member's attack
+   * on the party, returning whether it is now in its attacking pose.
+   *
+   * ⏳ Not supplied yet; without it a monster reaches the point of attacking and then
+   * simply doesn't. Tracked in PLAN.md Phase 12 step 5.
+   */
+  monsterAttacks?: (
+    monsterRn: ObjectID,
+    monster: CreatureRecord,
+    mapX: number,
+    mapY: number,
+    member: number,
+  ) => boolean;
   trace?: (line: string) => void;
 }
 
@@ -115,10 +191,8 @@ export class MonsterAI {
   constructor(private deps: MonsterAiDeps) {}
 
   /**
-   * `ProcessTimers29to41`'s prologue plus `InitialChecks`.
-   *
-   * Only the gate is ported so far; the decision body that follows it is still to
-   * come. See PLAN.md Phase 12 step 3.
+   * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3239`) — one monster group's
+   * turn, from the top.
    */
   processTimers29to41(options: {
     mapX: number;
@@ -174,13 +248,943 @@ export class MonsterAI {
         `w_54=${checks.sinceLastUpdate} indexOfLastMonster=${indexOfLastMonster} horizSize=${horizSize}`,
     );
 
-    // ⏳ The decision body — the TT_31/TT_30/TT_29 dispatch and the
-    // `Try_To_Move` / `Try_Preferred_Direction_Then_Others` /
-    // `Try_Directions_D5_To_D4` / `Standard_Finish` / `Process_Invincible` chain
-    // (doc/CSBwin-src/Monster.cpp:3405-4462) — is not ported yet. Until it is, a
-    // group that gets this far simply keeps its turn coming round: reschedule the
-    // group timer so the AI stays alive rather than stopping dead.
-    this.rescheduleGroupTimer(checks, timeUntilAlternateUpdate);
+    const slot = this.deps.dungeon.getAttachedItem16(monster);
+    if (!slot) return;
+
+    const xDistance = Math.abs(mapX - s.partyX);
+    const yDistance = Math.abs(mapY - s.partyY);
+
+    const frame: AiFrame = {
+      timer: checks.timer,
+      i60: 0,
+      sinceLastUpdate: checks.sinceLastUpdate,
+      timePerMove: checks.timePerMove,
+      bool36: false,
+      d5: 0,
+      secondaryDirection: s.secondaryDirectionToParty,
+    };
+
+    const c: AiConst = {
+      monsterRn,
+      monster,
+      slot,
+      slotIndex: monster.groupIndex,
+      desc,
+      mapX,
+      mapY,
+      level,
+      timeUntilAlternateUpdate,
+      indexOfLastMonster,
+      horizSize,
+      invincible,
+      xDistance,
+      yDistance,
+      attackDistance: checks.attackDistance,
+      timerFunction: timerFunction,
+      fearFactorIs6: false,
+      processingATimer: true,
+    };
+
+    this.dispatch(frame, c, fearFactor);
+  }
+
+  /**
+   * The `timeFunc` dispatch at the heart of `ProcessTimers29to41`
+   * (`doc/CSBwin-src/Monster.cpp:3409-4462`).
+   *
+   * Three shapes of turn, in the order CSBWin tests them:
+   *
+   * - **29, 30, 31** — a *reaction*. The group was attacked (31), damaged (30) or
+   *   hurt by a cloud or door (29). Each rewrites `timeFunc` into its negative twin
+   *   so that everything downstream can tell a reaction from a scheduled turn.
+   * - **32-36** — the "A" family: the group or one member is part-way through
+   *   something and this is the earlier of its two scheduled times.
+   * - **37-41** — the "B" family, the ordinary turn. 37 is the group as a whole;
+   *   38-41 are individual members, which only exist in fear state 6.
+   */
+  private dispatch(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    const fn = c.timerFunction;
+
+    if (fn === TimerFunction.TT_31) {
+      // The party ran into us, or attacked us.
+      c.timerFunction = TimerFunction.TT_M1;
+      if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
+        this.trace('      MAI timeFunc 31.  FearFactor not 5 or 6. So Delete all timers and set fear to 6.');
+        this.deps.monsters.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level);
+        this.maybeDelTimersFear6TurnIndividuals(
+          c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
+          c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
+          c.indexOfLastMonster, c.horizSize, true,
+        );
+        return;
+      }
+      this.trace('      MAI timeFunc 31.  FearFactor is 5 or 6.');
+      this.rememberPartyPosition(c.slot);
+      return;
+    }
+
+    if (fn === TimerFunction.TT_30) {
+      c.timerFunction = TimerFunction.TT_M2;
+      if (fearFactor === StateOfFear.StateOfFear6 || fearFactor === StateOfFear.StateOfFear5) {
+        this.trace('      MAI timeFunc 30.  FearFactor is 5 or 6.');
+        return;
+      }
+      const fearIs2or3 = fearFactor === StateOfFear.StateOfFear2 || fearFactor === StateOfFear.StateOfFear3;
+      if (fearIs2or3 || this.deps.random.zeroTo3() !== 0) {
+        const seen = this.blocked(c, -1);
+        this.trace(`      MAI timeFunc 31. FearFactor 2 or 3 or random. Block=${seen}`);
+        if (seen === 0) {
+          frame.bool36 = false;
+          c.fearFactorIs6 = false;
+          this.turnMonstersAsGroup(
+            c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize,
+            frame.bool36, frame.sinceLastUpdate,
+          );
+          if (c.timerFunction < TimerFunction.TT_M1) {
+            if (!frame.bool36) return;
+            this.deleteTimersMaybeSetFear(c.monster, c.slotIndex, c.mapX, c.mapY, c.level, c.fearFactorIs6);
+          }
+          this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+          this.startBGroupTimer(
+            frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, true, c.mapX, c.mapY,
+          );
+          return;
+        }
+        if (fearIs2or3) return;
+        if (this.deps.random.zeroTo3() !== 0) return;
+      }
+      c.fearFactorIs6 = fearFactor === StateOfFear.StateOfFear6;
+      frame.bool36 = false;
+      this.tryDirectionsD5ToD4(frame, c);
+      return;
+    }
+
+    if (fn === TimerFunction.TT_29) {
+      this.trace('      MAI timeFunc 29.');
+      c.timerFunction = TimerFunction.TT_M3;
+      c.fearFactorIs6 = fearFactor === StateOfFear.StateOfFear6;
+      frame.bool36 = false;
+      this.tryDirectionsD5ToD4(frame, c);
+      return;
+    }
+
+    if (fn <= TimerFunction.TT_MONSTER_A3) {
+      this.processATimer(frame, c, fearFactor);
+      return;
+    }
+
+    // The B family.
+    c.processingATimer = false;
+    this.trace('      MAI timeFunc>=37.');
+    if (c.timeUntilAlternateUpdate !== 0) frame.i60 = this.deps.getTime();
+
+    if (fn !== TimerFunction.TT_MONSTER_BGROUP) {
+      this.processIndividualBTimer(frame, c, fearFactor);
+      return;
+    }
+    this.processGroupBTimer(frame, c, fearFactor);
+  }
+
+  /**
+   * Timer types 32-36 — the "A" family (`doc/CSBwin-src/Monster.cpp:3607-3752`).
+   *
+   * The timer flips to its B twin and then, mostly, just reschedules. The interesting
+   * cases are being seen by a party that is *adjacent* (break formation) and being in
+   * fear state 0 or 3 while seen at range (go to state 7 and charge).
+   */
+  private processATimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    const flipped = A_TO_B[c.timerFunction];
+    if (flipped === undefined) {
+      console.warn(`MonsterAI: illegal monster AI timer ${c.timerFunction}`);
+      return;
+    }
+    frame.timer.function = flipped;
+    this.trace(`      MAI timeFunc<37. Set New timerFunction to ${TimerFunction[flipped] ?? flipped}`);
+
+    const seen = this.blocked(c, -1);
+    this.trace(`      MAI timeFunc<37.  Blocked=${seen}`);
+    if (seen !== 0) {
+      if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
+        if (c.xDistance + c.yDistance <= 1) {
+          this.maybeDelTimersFear6TurnIndividuals(
+            c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
+            c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
+            c.indexOfLastMonster, c.horizSize, true,
+          );
+          return;
+        }
+        // CSBWin's comment on the next line: "The following line makes no sense. But
+        // I have studied the original machine language over and over again. This is
+        // what it did." The `fearFactor != 7` term cannot fail once the first two
+        // have passed, and `tsc` narrows the type enough to say so — hence the
+        // widened local, which keeps the test as written rather than dropping it
+        // (doc/CSBwin-src/Monster.cpp:3665-3672).
+        const fear: number = fearFactor;
+        const notSeven = (v: number): boolean => v !== (StateOfFear.StateOfFear7 as number);
+        if (
+          (fear === StateOfFear.StateOfFear0 || fear === StateOfFear.StateOfFear3) &&
+          notSeven(fear)
+        ) {
+          c.monster.fear = StateOfFear.StateOfFear7;
+          this.rememberPartyPosition(c.slot);
+          frame.timer.time = (frame.timer.time + 1) >>> 0;
+          this.startBGroupTimer(
+            frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, true, c.mapX, c.mapY,
+          );
+          return;
+        }
+      }
+      this.rememberPartyPosition(c.slot);
+    }
+
+    if (fearFactor === StateOfFear.StateOfFear6) {
+      this.trace('      MAI fearFactor==6');
+      const member = c.timerFunction - TimerFunction.TT_MONSTER_A0;
+      frame.i60 = this.deps.monsters.nextMonsterUpdateTime(
+        c.slot,
+        member,
+        ((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0,
+        c.mapX,
+        c.mapY,
+      );
+      this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
+      return;
+    }
+
+    if (c.xDistance > 3 || c.yDistance > 3) {
+      frame.i60 = this.deps.getTime() + monsterDelayFromMoveToAttack(c.desc);
+      this.trace(
+        `      MAI fearFactor != 6.  Distance to party > 3. AdditionalDelayAfter(move/attack) = ` +
+          `${monsterDelayFromMoveToAttack(c.desc)}, ${monsterDelayFromAttackToMove(c.desc)}`,
+      );
+      this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
+      return;
+    }
+
+    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY);
+    this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
+  }
+
+  /**
+   * Timer types 38-41 — one member's own turn
+   * (`doc/CSBwin-src/Monster.cpp:3770-4106`).
+   *
+   * A member already attacking simply schedules its next swing. One that is not
+   * decides whether it can attack: it must be able to see the party, be facing it (or
+   * see in all directions), be within `word14_12_15` cells, be orthogonally aligned,
+   * and win a die roll against that same value. Failing any of it, it shuffles
+   * position inside the cell, or turns, or gives up and moves.
+   */
+  private processIndividualBTimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    if (fearFactor === StateOfFear.StateOfFear5) {
+      if (c.indexOfLastMonster !== 0) {
+        this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+      }
+      this.tryToMove(frame, c);
+      return;
+    }
+
+    const member = c.timerFunction - TimerFunction.TT_MONSTER_B0;
+    if (((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0) {
+      // Mid-attack: schedule the follow-through.
+      frame.i60 = this.deps.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY);
+      const roll = this.deps.random.zeroTo3();
+      const attackTicks = c.desc.attackTicks07 & 0xff;
+      frame.timer.time = (frame.timer.time + ((attackTicks + roll - 1) & 0xffff)) >>> 0;
+      if (attackTicks > 15) {
+        // A slow attack gets a signed jitter, which can pull the time *earlier*.
+        frame.timer.time = (frame.timer.time + ((this.deps.random.next() & 7) - 2)) >>> 0;
+      }
+      frame.timer.function = c.timerFunction;
+      this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, false);
+      return;
+    }
+
+    if (member > c.indexOfLastMonster) return;
+
+    const preferredDirection = this.scratch.primaryDirectionToParty;
+    let attackDistance = this.blocked(c, member);
+    if (attackDistance !== 0) this.rememberPartyPosition(c.slot);
+
+    // A lone monster in an open cell sometimes shuffles to another corner, or spreads
+    // to fill the cell (positions = 0xff) (doc/CSBwin-src/Monster.cpp:3846-3893).
+    let shuffle = 0;
+    if (c.indexOfLastMonster === 0 && c.horizSize !== 2) {
+      shuffle = this.deps.random.next() & 0xffff;
+      if ((shuffle & 0xc0) === 0) {
+        if (c.slot.positions !== 255) {
+          if (shuffle & 0x38) {
+            c.slot.positions = 0xff;
+          } else {
+            const turn = shuffle & 1 ? 1 : -1;
+            shuffle = (c.slot.positions + turn) & 0x3;
+            // CSBWin: "I think there is something wrong with D5 here." The value is
+            // reused below as both a position and a bitfield.
+          }
+        }
+        if ((shuffle & 0x38) === 0 && attackDistance !== 1 && c.horizSize === 0) {
+          if (this.checkMonsterVersusMissiles(c)) return;
+          c.slot.positions = shuffle & 0x3;
+        }
+      }
+    }
+
+    const facingParty =
+      monsterSee360(c.desc) || ((c.slot.facings >> (2 * member)) & 0x3) === preferredDirection;
+
+    if (attackDistance !== 0 && facingParty) {
+      const reach = monsterWord14_12_15(c.desc);
+      if (
+        attackDistance <= reach &&
+        (c.xDistance === 0 || c.yDistance === 0) &&
+        reach <= this.deps.random.below(16) + 1
+      ) {
+        if (reach === 1 && this.sidestepBeforeMeleeing(frame, c, member, preferredDirection)) return;
+
+        // Attack.
+        frame.i60 = this.deps.monsters.nextMonsterUpdateTime(
+          c.slot,
+          member,
+          this.deps.monsterAttacks?.(c.monsterRn, c.monster, c.mapX, c.mapY, member) ?? false,
+          c.mapX,
+          c.mapY,
+        );
+        frame.timer.time =
+          (frame.timer.time + ((monsterWord20_0_3(c.desc) + this.deps.random.bool()) & 0xffff)) >>> 0;
+      } else {
+        c.monster.fear = StateOfFear.StateOfFear7;
+        if (c.indexOfLastMonster !== 0) {
+          this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+        }
+        this.d4d0Finish(frame, c);
+        return;
+      }
+    } else {
+      const seen = this.blocked(c, -1);
+      if (seen !== 0) {
+        this.rememberPartyPosition(c.slot);
+        const ref = { facings: c.slot.facings };
+        this.deps.perception.turnMonster(
+          this.scratch, c.slotIndex, ref, preferredDirection, member,
+          c.indexOfLastMonster !== 0 && c.horizSize === 1, this.deps.getTime(),
+        );
+        c.slot.facings = ref.facings;
+        frame.timer.time = (frame.timer.time + 2) >>> 0;
+        frame.i60 = frame.timer.time;
+      } else {
+        c.monster.fear = StateOfFear.StateOfFear7;
+        if (c.indexOfLastMonster !== 0) {
+          this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+        }
+        this.tryUByte67(frame, c, preferredDirection);
+        return;
+      }
+    }
+
+    frame.timer.function = c.timerFunction;
+    this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, false);
+    void attackDistance;
+  }
+
+  /**
+   * A monster about to melee that is standing in the wrong corner shifts sideways
+   * first (`doc/CSBwin-src/Monster.cpp:3925-3999`). Returns true when it did, in
+   * which case the turn is over.
+   */
+  private sidestepBeforeMeleeing(
+    frame: AiFrame,
+    c: AiConst,
+    member: number,
+    preferredDirection: number,
+  ): boolean {
+    if (
+      !(
+        (!monsterWord2Bit3(c.desc) || this.deps.random.zeroTo3() === 0 || !monsterWord2Bit4(c.desc)) &&
+        c.horizSize === 0 &&
+        c.slot.positions !== 255
+      )
+    ) {
+      return false;
+    }
+
+    let pos = (c.slot.positions >> (2 * member)) & 0x3;
+    if (preferredDirection === pos) return false;
+    if (pos === ((preferredDirection + 1) & 0x3)) return false;
+
+    if (c.indexOfLastMonster === 0 && this.deps.random.bool() !== 0) {
+      // CSBWin has the assignment `pI16A2->uByte3 = 0xff` commented out here, so this
+      // branch deliberately does nothing but consume the die roll.
+    } else {
+      pos = ((preferredDirection & 1) === (pos & 1) ? pos - 1 : pos + 1) & 0x3;
+      let ordinal = this.ordinalOfMonsterAtPosition(c.monster, pos);
+      if (ordinal !== 0 && this.deps.random.bool() !== 0) {
+        pos = (pos + 2) & 0x3;
+        ordinal = this.ordinalOfMonsterAtPosition(c.monster, pos);
+      }
+      if (ordinal === 0) {
+        if (this.checkMonsterVersusMissiles(c)) return true;
+        if (this.lastDamageResult !== MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
+          c.slot.positions = setPackedBits(c.slot.positions, member, pos);
+        }
+      }
+    }
+
+    const delay = Math.max(1, Math.trunc(c.desc.movementTicks06 / 2) + this.deps.random.bool());
+    frame.timer.time = (frame.timer.time + delay) >>> 0;
+    frame.timer.function = c.timerFunction;
+    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY);
+    this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, false);
+    return true;
+  }
+
+  /**
+   * Timer type 37 — the group's ordinary turn
+   * (`doc/CSBwin-src/Monster.cpp:4106-4452`).
+   *
+   * Fear state decides almost everything. States 0, 2 and 3 are the calm ones and can
+   * end in a hunt; 5 flees; 7 charges; anything else just waits.
+   */
+  private processGroupBTimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
+    this.trace('      MAI timeFunc=37.');
+
+    if (
+      fearFactor !== StateOfFear.StateOfFear0 &&
+      fearFactor !== StateOfFear.StateOfFear2 &&
+      fearFactor !== StateOfFear.StateOfFear3
+    ) {
+      this.trace('      MAI fearFactor not 0, 2, or 3');
+      if (fearFactor !== StateOfFear.StateOfFear7) {
+        if (fearFactor !== StateOfFear.StateOfFear5) {
+          this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+          this.startBGroupTimer(
+            frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, false, c.mapX, c.mapY,
+          );
+          return;
+        }
+        this.tryToMove(frame, c);
+        return;
+      }
+      // State 7: charging.
+      const seen = this.blocked(c, -1);
+      if (seen !== 0) {
+        if (seen <= monsterWord14_12_15(c.desc) && (c.xDistance === 0 || c.yDistance === 0)) {
+          this.maybeDelTimersFear6TurnIndividuals(
+            c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
+            c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
+            c.indexOfLastMonster, c.horizSize, false,
+          );
+          return;
+        }
+        c.attackDistance = seen;
+        this.d4d0Finish(frame, c);
+        return;
+      }
+      this.tryUByte67(frame, c, this.scratch.primaryDirectionToParty);
+      return;
+    }
+
+    const seen = this.blocked(c, -1);
+    this.trace(`      MAI fearFactor is 0, 2, or 3.  attackDistance=${seen}`);
+    if (seen !== 0) {
+      if (seen <= monsterWord14_12_15(c.desc) && (c.xDistance === 0 || c.yDistance === 0)) {
+        this.maybeDelTimersFear6TurnIndividuals(
+          c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
+          c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
+          c.indexOfLastMonster, c.horizSize, false,
+        );
+        return;
+      }
+      if (fearFactor !== StateOfFear.StateOfFear2) {
+        c.monster.fear = StateOfFear.StateOfFear7;
+        this.rememberPartyPosition(c.slot);
+        frame.timer.time = (frame.timer.time + 1) >>> 0;
+        this.startBGroupTimer(
+          frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, false, c.mapX, c.mapY,
+        );
+        return;
+      }
+      this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+      this.startBGroupTimer(
+        frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, false, c.mapX, c.mapY,
+      );
+      return;
+    }
+
+    if (fearFactor !== StateOfFear.StateOfFear0) {
+      this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+      this.startBGroupTimer(
+        frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, false, c.mapX, c.mapY,
+      );
+      return;
+    }
+
+    // Fear state 0 and the party is out of sight: hunt by smell.
+    const smelled = this.deps.perception.getBestMonsterFacing(c.desc, c.level, c.mapX, c.mapY, {
+      partyX: this.scratch.partyX,
+      partyY: this.scratch.partyY,
+      orthogonalDistanceToParty: this.scratch.orthogonalDistanceToParty,
+      primaryDirectionToParty: this.scratch.primaryDirectionToParty,
+      secondaryDirectionToParty: this.scratch.secondaryDirectionToParty,
+    });
+    this.trace(`      MAI fearFactor is 0. Preferred Direction=${smelled.direction}`);
+    if (smelled.direction !== 0) {
+      frame.secondaryDirection = smelled.secondary;
+      this.tryPreferredDirectionThenOthers(frame, c, smelled.direction - 1, false);
+      return;
+    }
+
+    frame.bool36 = false;
+    if (this.deps.random.bool() === 0) {
+      this.trace('      MAI No Preferrred Direction.  RandomBool()=0.');
+      this.processInvincibleAndFinish(frame, c, 0);
+      return;
+    }
+    this.trace('      MAI No Preferrred Direction.  RandomBool()=1.');
+    this.tryDirectionsD5ToD4(frame, c);
+  }
+
+  /* ------------------------------------------------------- the Try_* chain ---- */
+
+  /**
+   * `Try_Directions_D5_To_D4` (`doc/CSBwin-src/Monster.cpp:2380`).
+   *
+   * Try all four directions starting from a random one, wrapping round. A direction
+   * that would double back to the square just left is skipped three times out of
+   * four. If the step would land on the party, that counts as finding it.
+   */
+  private tryDirectionsD5ToD4(frame: AiFrame, c: AiConst): void {
+    const start = this.deps.random.zeroTo3();
+    frame.d5 = start;
+    let direction = start;
+
+    do {
+      const newX = c.mapX + (DELTA_X[direction] ?? 0);
+      const newY = c.mapY + (DELTA_Y[direction] ?? 0);
+
+      let skip = false;
+      if (c.slot.ubPrevX === newX && c.slot.ubPrevY === newY) {
+        // Doubling straight back: only one time in four.
+        skip = this.deps.random.zeroTo3() !== 0;
+      }
+
+      if (!skip) {
+        const probe = this.deps.perception.possibleMove(
+          c.monsterRn, c.desc, c.level, c.mapX, c.mapY, direction, false, this.scratch,
+        );
+        if (probe.possible) {
+          frame.d5 = direction;
+          if (!this.stepOrDefer(frame, c, newX, newY)) return;
+          this.processInvincibleAndFinish(frame, c, direction);
+          return;
+        }
+        if (probe.moveOntoPartyPosition && c.timerFunction !== TimerFunction.TT_M3) {
+          // Reaching the party is as good as arriving. The `& 15 != 5` test throttles
+          // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2497-2513).
+          if (
+            (c.timeUntilAlternateUpdate & 15) !== 5 ||
+            this.deps.perception.findPossibleMove(
+              c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
+            ) === 0 ||
+            this.deps.random.bool() !== 0
+          ) {
+            this.maybeDelTimersFear6TurnIndividuals(
+              c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
+              c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
+              c.indexOfLastMonster, c.horizSize, c.processingATimer,
+            );
+            return;
+          }
+        }
+        if (probe.moveOntoPartyPosition) this.rememberPartyPosition(c.slot);
+      }
+
+      direction = (direction + 1) & 0x3;
+    } while (start !== direction);
+
+    frame.d5 = direction;
+    this.processInvincibleAndFinish(frame, c, direction);
+  }
+
+  /**
+   * `Try_Preferred_Direction_Then_Others` (`doc/CSBwin-src/Monster.cpp:2001`).
+   *
+   * Four candidate directions in a fixed order: the preferred one, the secondary, the
+   * secondary reversed, and the preferred reversed — the last two each behind a die
+   * roll. The whole thing is one short-circuiting `&&` chain in CSBWin, and the
+   * side effects of each `PossibleMove` matter, so it is kept in that shape.
+   */
+  private tryPreferredDirectionThenOthers(
+    frame: AiFrame,
+    c: AiConst,
+    preferredDirection: number,
+    recognizesFalsePitsAndWalls: boolean,
+  ): void {
+    const rfpaw = recognizesFalsePitsAndWalls;
+    const probe = (dir: number, rec: boolean): boolean =>
+      this.deps.perception.possibleMove(
+        c.monsterRn, c.desc, c.level, c.mapX, c.mapY, dir, rec, this.scratch,
+      ).possible;
+
+    let dir = preferredDirection;
+    let found = probe(dir, rfpaw);
+    if (!found) {
+      dir = frame.secondaryDirection;
+      found = probe(dir, rfpaw && this.deps.random.bool() !== 0);
+    }
+    if (!found) {
+      dir = (dir + 2) & 0x3;
+      found = probe(dir, false);
+    }
+    if (!found && this.deps.random.zeroTo3() === 0) {
+      dir = (preferredDirection + 2) & 0x3;
+      found = probe(dir, false);
+    }
+
+    if (!found) {
+      if (!c.invincible) {
+        this.turnMonstersAsGroup(
+          c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize, true, frame.sinceLastUpdate,
+        );
+        this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+        this.startBGroupTimer(
+          frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+        );
+        return;
+      }
+      if (this.processInvincible(frame, c, preferredDirection)) return;
+    } else {
+      frame.d5 = dir;
+      const newX = c.mapX + (DELTA_X[dir] ?? 0);
+      const newY = c.mapY + (DELTA_Y[dir] ?? 0);
+      if (!this.stepOrDefer(frame, c, newX, newY)) return;
+    }
+
+    this.processInvincibleAndFinish(frame, c, preferredDirection);
+  }
+
+  /**
+   * `Try_To_Move` (`doc/CSBwin-src/Monster.cpp:2156`) — the fleeing path.
+   *
+   * A monster that can see the party runs *away* from it: the preferred direction is
+   * the direction to the party turned 180°, and `timePerMove` is cut by a quarter so
+   * it flees faster than it hunts. `uByte5` counts down the panic; when it reaches
+   * zero the group calms to fear state 0.
+   */
+  private tryToMove(frame: AiFrame, c: AiConst): void {
+    const seen = this.blocked(c, -1);
+    if (seen !== 0) {
+      this.rememberPartyPosition(c.slot);
+      const dirs = getPrimaryAndSecondaryDirection(
+        this.deps.random, c.mapX, c.mapY, this.scratch.partyX, this.scratch.partyY,
+      );
+      const away = (dirs.primary + 2) & 0x3;
+      frame.secondaryDirection = (dirs.secondary + 2) & 0x3;
+      frame.timePerMove = frame.timePerMove - Math.trunc(frame.timePerMove / 4);
+      this.tryPreferredDirectionThenOthers(frame, c, away, true);
+      return;
+    }
+
+    c.slot.uByte5 = (c.slot.uByte5 - 1) & 0xff;
+    if (c.slot.uByte5 !== 0) {
+      if (this.deps.random.bool() !== 0) {
+        const anyMove = this.deps.perception.findPossibleMove(
+          c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
+        );
+        if (anyMove === 0 && c.xDistance + c.yDistance <= 1) {
+          // Cornered next to the party: stop panicking.
+          c.monster.fear = StateOfFear.StateOfFear0;
+          this.turnMonstersAsGroup(
+            c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+          );
+          if (c.timerFunction < TimerFunction.TT_M1) return;
+          this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+          this.startBGroupTimer(
+            frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+          );
+          return;
+        }
+        // Head back towards where the group came from.
+        const dirs = getPrimaryAndSecondaryDirection(
+          this.deps.random, c.mapX, c.mapY, c.slot.uByte10, c.slot.uByte11,
+        );
+        frame.secondaryDirection = dirs.secondary;
+        this.tryPreferredDirectionThenOthers(frame, c, dirs.primary, true);
+        return;
+      }
+      const dirs = getPrimaryAndSecondaryDirection(
+        this.deps.random, c.mapX, c.mapY, c.slot.uByte6, c.slot.uByte7,
+      );
+      frame.secondaryDirection = (dirs.secondary + 2) & 0x3;
+      frame.timePerMove = frame.timePerMove - Math.trunc(frame.timePerMove / 4);
+      this.tryPreferredDirectionThenOthers(frame, c, (dirs.primary + 2) & 0x3, true);
+      return;
+    }
+
+    // The panic ran out.
+    c.monster.fear = StateOfFear.StateOfFear0;
+    this.turnMonstersAsGroup(
+      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+    );
+    if (c.timerFunction < TimerFunction.TT_M1) return;
+    this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+    this.startBGroupTimer(
+      frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+    );
+  }
+
+  /**
+   * `D4D0Finish` (`doc/CSBwin-src/Monster.cpp:2557`) — close in on the party at
+   * double speed.
+   */
+  private d4d0Finish(frame: AiFrame, c: AiConst): void {
+    frame.timePerMove = Math.trunc((frame.timePerMove + 1) / 2);
+    this.rememberPartyPosition(c.slot);
+    const dirs = getPrimaryAndSecondaryDirection(
+      this.deps.random, c.mapX, c.mapY, this.scratch.partyX, this.scratch.partyY,
+    );
+    frame.secondaryDirection = dirs.secondary;
+    this.tryPreferredDirectionThenOthers(frame, c, dirs.primary, true);
+  }
+
+  /**
+   * `TryUByte67` (`doc/CSBwin-src/Monster.cpp:2625`) — head for the square the group
+   * last knew the party to be at. Standing on it already means the trail is cold, so
+   * the group calms down.
+   */
+  private tryUByte67(frame: AiFrame, c: AiConst, preferredDirection: number): void {
+    void preferredDirection;
+    if (c.mapX === c.slot.uByte6 && c.mapY === c.slot.uByte7) {
+      c.monster.fear = StateOfFear.StateOfFear0;
+      this.turnMonstersAsGroup(
+        c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, false, frame.sinceLastUpdate,
+      );
+      if (c.timerFunction < TimerFunction.TT_M1) return;
+      this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+      this.startBGroupTimer(
+        frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+      );
+      return;
+    }
+    const dirs = getPrimaryAndSecondaryDirection(
+      this.deps.random, c.mapX, c.mapY, c.slot.uByte6, c.slot.uByte7,
+    );
+    frame.secondaryDirection = dirs.secondary;
+    this.tryPreferredDirectionThenOthers(frame, c, dirs.primary, true);
+  }
+
+  /**
+   * `Process_Invincible` (`doc/CSBwin-src/Monster.cpp:1612`) — Lord Chaos moves *two*
+   * squares at a time, and a Fluxcage is what stops him.
+   *
+   * Returns true when the turn is finished. The `FindPossibleMove` call at the top
+   * looks pointless — its result is discarded — but it is what populates
+   * `d.FluxCages[]` and `d.FluxCageCount` for the tests below.
+   */
+  private processInvincible(frame: AiFrame, c: AiConst, preferredDirection: number): boolean {
+    this.trace('      MAI Entering Process_Invincible');
+    this.deps.perception.findPossibleMove(
+      c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
+    );
+
+    const doubleMove = (dir: number): boolean =>
+      this.deps.perception.possibleDoubleMove(
+        c.monsterRn, c.desc, c.level, c.mapX, c.mapY, dir, this.scratch,
+      );
+
+    let dir = preferredDirection;
+    let ok = doubleMove(dir);
+    if (!ok) {
+      dir = frame.secondaryDirection;
+      ok = doubleMove(dir);
+      if (!ok) {
+        if (this.scratch.fluxCageCount !== 0) {
+          dir = (dir + 2) & 0x3;
+          ok = doubleMove(dir);
+        }
+        if (!ok) {
+          if (this.scratch.fluxCageCount < 2) {
+            this.turnAndWait(frame, c, preferredDirection);
+            return true;
+          }
+          dir = (preferredDirection + 2) & 0x3;
+          ok = doubleMove(dir);
+          if (!ok) {
+            this.turnAndWait(frame, c, preferredDirection);
+            return true;
+          }
+        }
+      }
+    }
+
+    frame.d5 = dir;
+    const newX = c.mapX + 2 * (DELTA_X[dir] ?? 0);
+    const newY = c.mapY + 2 * (DELTA_Y[dir] ?? 0);
+    this.deps.monsters.playTeleportSound(newX, newY);
+
+    const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
+    frame.bool36 = remaining <= 0;
+    if (frame.bool36) {
+      const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+      if (moved.removed) return true;
+      frame.timer.uByte6 = newX & 0xff;
+      frame.timer.uByte7 = newY & 0xff;
+      c.slot.ubPrevX = c.mapX & 0xff;
+      c.slot.ubPrevY = c.mapY & 0xff;
+      c.slot.uByte4 = this.deps.getTime() & 0xff;
+    } else {
+      frame.timePerMove = remaining;
+      frame.sinceLastUpdate = -1;
+    }
+    return false;
+  }
+
+  /**
+   * `Process_Invincible_And_Finish` (`doc/CSBwin-src/Monster.cpp:1894`) — an
+   * invincible monster keeps trying random double-moves until one works or the loop
+   * conditions fail; everything else falls straight through to `Standard_Finish`.
+   */
+  private processInvincibleAndFinish(frame: AiFrame, c: AiConst, preferredDirection: number): void {
+    this.trace('      MAI Entering Process_Invincible_And_Finish');
+    let preferred = preferredDirection;
+    while (
+      !frame.bool36 &&
+      frame.sinceLastUpdate !== -1 &&
+      c.invincible &&
+      (c.timerFunction === TimerFunction.TT_M3 || this.deps.random.zeroTo3() === 0)
+    ) {
+      preferred = this.deps.random.zeroTo3();
+      frame.secondaryDirection = (preferred + 1) & 0x3;
+      if (this.processInvincible(frame, c, preferred)) return;
+    }
+    this.standardFinish(frame, c);
+  }
+
+  /**
+   * `Standard_Finish` (`doc/CSBwin-src/Monster.cpp:1740`) — how nearly every turn
+   * ends: maybe turn the group, then schedule the next one.
+   */
+  private standardFinish(frame: AiFrame, c: AiConst): void {
+    this.trace('      MAI Entering Standard_Finish');
+    if (!frame.bool36) {
+      if (this.deps.random.zeroTo3() !== 0) {
+        if (c.attackDistance > monsterSmellingDistance(c.desc)) {
+          if (c.timerFunction < TimerFunction.TT_M1 && !frame.bool36) return;
+          this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+          this.startBGroupTimer(
+            frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+          );
+          return;
+        }
+      }
+      if (c.timerFunction === TimerFunction.TT_M3) {
+        if (c.timerFunction < TimerFunction.TT_M1 && !frame.bool36) return;
+        this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+        this.startBGroupTimer(
+          frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+        );
+        return;
+      }
+    }
+
+    this.turnMonstersAsGroup(
+      c.slot, c.slotIndex, frame.d5, c.indexOfLastMonster, c.horizSize, frame.bool36, frame.sinceLastUpdate,
+    );
+    if (c.timerFunction < TimerFunction.TT_M1) {
+      if (!frame.bool36) return;
+      this.deleteTimersMaybeSetFear(c.monster, c.slotIndex, c.mapX, c.mapY, c.level, c.fearFactorIs6);
+    }
+    this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+    this.startBGroupTimer(
+      frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+    );
+  }
+
+  /* -------------------------------------------------------------- helpers ---- */
+
+  /**
+   * The shared tail of every "found a direction" branch: either take the step now, or
+   * note that not enough time has passed and let the caller reschedule.
+   *
+   * Returns false when the group left the dungeon and the turn must end immediately.
+   */
+  private stepOrDefer(frame: AiFrame, c: AiConst, newX: number, newY: number): boolean {
+    const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
+    frame.bool36 = remaining <= 0;
+    if (!frame.bool36) {
+      frame.timePerMove = remaining;
+      frame.sinceLastUpdate = -1;
+      return true;
+    }
+    const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+    if (moved.removed) return false;
+    frame.timer.uByte6 = newX & 0xff;
+    frame.timer.uByte7 = newY & 0xff;
+    c.slot.ubPrevX = c.mapX & 0xff;
+    c.slot.ubPrevY = c.mapY & 0xff;
+    c.slot.uByte4 = this.deps.getTime() & 0xff;
+    return true;
+  }
+
+  /** Turn the group to face where it wanted to go, then wait out a move interval. */
+  private turnAndWait(frame: AiFrame, c: AiConst, preferredDirection: number): void {
+    this.turnMonstersAsGroup(
+      c.slot, c.slotIndex, preferredDirection, c.indexOfLastMonster, c.horizSize, true, frame.sinceLastUpdate,
+    );
+    this.incrementTimeByTimePerMovePlusRandom(frame.timer, frame.timePerMove);
+    this.startBGroupTimer(
+      frame.timer, c.slot, frame.i60, c.timeUntilAlternateUpdate, c.processingATimer, c.mapX, c.mapY,
+    );
+  }
+
+  /** `pI16A2->uByte6/7 = d.partyX/Y` — the group's last sighting of the party. */
+  private rememberPartyPosition(slot: Item16Record): void {
+    slot.uByte6 = this.scratch.partyX & 0xff;
+    slot.uByte7 = this.scratch.partyY & 0xff;
+  }
+
+  private blocked(c: AiConst, member: number): number {
+    return this.deps.perception.blocked(c.monster, member, c.level, c.mapX, c.mapY, {
+      partyX: this.scratch.partyX,
+      partyY: this.scratch.partyY,
+      partyInvisible: (this.deps.getPartyState().invisible ?? 0) !== 0,
+      currentPalette: this.deps.getCurrentPalette?.() ?? 0,
+      orthogonalDistanceToParty: this.scratch.orthogonalDistanceToParty,
+    });
+  }
+
+  /**
+   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — shifting
+   * position inside a cell can walk the monster into a missile already there.
+   *
+   * ⏳ **Not ported.** Returns false, i.e. "no missile hit", which is the common case.
+   * Tracked in PLAN.md Phase 12.
+   */
+  private checkMonsterVersusMissiles(c: AiConst): boolean {
+    void c;
+    this.lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+    return false;
+  }
+
+  /** `d.MonsterDamageResult`, as the AI sees it. */
+  private lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+
+  /**
+   * `OrdinalOfMonsterAtPosition` — which group member, 1-based, occupies a corner.
+   */
+  private ordinalOfMonsterAtPosition(monster: CreatureRecord, position: number): number {
+    const render = this.deps.dungeon.getMonsterRenderState(monster);
+    const positions = render.positions & 0xff;
+    if (positions === 0xff) return 1;
+    const desc = this.deps.monsterDesc()?.[monster.creatureType];
+    const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
+    const numMonM1 = monster.numMonM1 & 0x3;
+    const check = position & 0x3;
+    for (let idx = 0; idx <= numMonM1; idx++) {
+      const at = (positions >> (idx * 2)) & 0x3;
+      if (at === check) return idx + 1;
+      if (horizontalSize === 1 && at === ((check + 1) & 0x3)) return idx + 1;
+    }
+    return 0;
   }
 
   /**
@@ -572,21 +1576,6 @@ export class MonsterAI {
 
   /* -------------------------------------------------------------- internals ---- */
 
-  /**
-   * Keep a group's turn coming round while the decision body is unported.
-   *
-   * ⏳ Temporary. `ProcessTimers29to41` always ends by scheduling the group's next
-   * event through one of the `Set_Monster_Timer` paths; until those are in, this
-   * stands in for them so the AI does not silently stop after one tick.
-   */
-  private rescheduleGroupTimer(checks: InitialChecksResult, timeUntilAlternateUpdate: number): void {
-    const timer = checks.timer;
-    timer.function = TimerFunction.TT_MONSTER_BGROUP;
-    timer.uByte8 = timeUntilAlternateUpdate & 0xff;
-    this.incrementTimeByTimePerMovePlusRandom(timer, checks.timePerMove);
-    this.deps.timers.addTimer(timer);
-  }
-
   private makeTimer(
     mapX: number,
     mapY: number,
@@ -614,6 +1603,15 @@ export class MonsterAI {
     this.deps.trace?.(line);
   }
 }
+
+/** The A→B flip when an "A" timer is processed (`doc/CSBwin-src/Monster.cpp:3611-3620`). */
+const A_TO_B: Record<number, number> = {
+  [TimerFunction.TT_MONSTER_AGROUP]: TimerFunction.TT_MONSTER_BGROUP,
+  [TimerFunction.TT_MONSTER_A0]: TimerFunction.TT_MONSTER_B0,
+  [TimerFunction.TT_MONSTER_A1]: TimerFunction.TT_MONSTER_B1,
+  [TimerFunction.TT_MONSTER_A2]: TimerFunction.TT_MONSTER_B2,
+  [TimerFunction.TT_MONSTER_A3]: TimerFunction.TT_MONSTER_B3,
+};
 
 /** `SetMonsterTimerB`'s B→A mapping (`doc/CSBwin-src/Monster.cpp:1267-1273`). */
 const B_TO_A: Record<number, number> = {

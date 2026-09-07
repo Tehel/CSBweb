@@ -711,3 +711,67 @@ item16Attached = (AttachedLevel_4 == d.partyLevel) && (oldX>=0);
 
 `oldX < 0` is CSBWin's way of saying "this object is not currently in the dungeon" — it is
 being placed rather than moved — so it cannot have a slot yet whatever level it is going to.
+
+## Fear state is the monster AI's whole personality
+
+`ProcessTimers29to41`'s type-37 branch (`doc/CSBwin-src/Monster.cpp:4106-4452`) dispatches
+almost entirely on `DB4.fear()`:
+
+| State | Behaviour |
+| --- | --- |
+| 0 | Calm. If the party is unseen, hunt it by smell; otherwise close in |
+| 2 | Calm, but seeing the party only makes it wait a move interval |
+| 3 | Calm; seeing the party at range flips it to 7 |
+| 5 | Fleeing — `Try_To_Move` runs *away* from the party |
+| 6 | Broken formation: each member has its own timer and acts alone |
+| 7 | Charging: head straight for the party's last known square |
+
+Only `MaybeDelTimers_Fear6_TurnIndividuals` (`doc/CSBwin-src/Monster.cpp:1436`) creates the
+per-member `TT_MONSTER_B<n>` timers, and it sets fear to 6 as it does — which is why
+`DamageMonster` only renumbers those timers in state 6.
+
+## A fleeing monster moves faster than a hunting one
+
+`Try_To_Move` (`doc/CSBwin-src/Monster.cpp:2196`) and `D4D0Finish`
+(`doc/CSBwin-src/Monster.cpp:2561`) both shorten the move interval before running:
+
+```cpp
+timePerMove = sw(timePerMove - timePerMove/4);   // Try_To_Move: flee at 3/4 the interval
+timePerMove = sw((timePerMove + 1)/2);           // D4D0Finish: charge at half
+```
+
+`Try_To_Move` also turns the direction to the party 180° — both the primary *and* the
+secondary — so a frightened monster runs directly away.
+
+## `w_54 == -1` means "a move was deferred, not skipped"
+
+Every movement path computes `D4W = timePerMove/2 - w_54; bool_36 = D4W <= 0`
+(`doc/CSBwin-src/Monster.cpp:2404-2423` and elsewhere). When enough time has passed the
+monster steps and `bool_36` is true; otherwise `timePerMove` is *replaced* by the remaining
+time and `w_54` is set to -1, which then suppresses the random re-facing in
+`Turn_Monsters_As_Group` and stops `Process_Invincible_And_Finish` retrying.
+
+## `Process_Invincible` calls `FindPossibleMove` for its side effects
+
+`doc/CSBwin-src/Monster.cpp:1638`: the return value is discarded. The call is there because
+`PossibleMove` populates `d.FluxCages[]` and `d.FluxCageCount`
+(`doc/CSBwin-src/Monster.cpp:705-721`), which the three tests immediately below it read.
+Delete the call as dead and Lord Chaos stops noticing Fluxcages.
+
+An invincible monster also moves **two squares at a time** — `PossibleDoubleMove`, and
+`mapX + 2*DeltaX` — and buzzes on arrival with sound ordinal 17.
+
+## The pre-melee sidestep has a deliberately dead branch
+
+`doc/CSBwin-src/Monster.cpp:3956-3960`: a lone monster about to melee has a 50% chance to
+take a branch whose only statement is commented out in CSBWin:
+
+```cpp
+if ( (indexOfLastMonster == 0) && (STRandomBool() != 0) )
+{
+  //                  pI16A2->uByte3 = 0xff;
+}
+```
+
+The branch still consumes its `STRandomBool()`, so removing it would desynchronise the random
+stream from CSBWin's even though no state changes. Ported as written.

@@ -695,8 +695,18 @@ export class ViewportRenderer {
   private getViewportPalette(): number[] | null {
     if (!this.viewportPalettes || this.viewportPalettes.length === 0) return null;
     const index = Math.min(selectPaletteIndexForLightLevel(this.ui), this.viewportPalettes.length - 1);
+    // Publish it as CSBWin's `d.CurrentPalette`: the monster AI reads the light level
+    // to shorten how far a monster can see (`doc/CSBwin-src/Monster.cpp:577-581`).
+    this.onPaletteSelected?.(index);
     return this.viewportPalettes[index] ?? this.viewportPalettes[0] ?? null;
   }
+
+  /** Set by the host so the engine learns the current light level. */
+  setPaletteSelectedHandler(handler: (index: number) => void): void {
+    this.onPaletteSelected = handler;
+  }
+
+  private onPaletteSelected?: (index: number) => void;
 
   private renderLastFrame(): void {
     if (!this.lastRenderPosition) return;

@@ -43,7 +43,11 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 2);
   const ticks = Number(process.argv[3] ?? 200);
 
+  // Two separate things: a capped buffer for showing sample lines, and uncapped
+  // counters, because the buffer fills up long before the run ends.
   const traceLines: string[] = [];
+  let turnsStarted = 0;
+  let turnsPassedGate = 0;
   const game = new Game(
     data,
     { roomTimerFunctions: uiTables.graphic232.byte1596, monsterDesc: objectTables.monsterDesc },
@@ -56,7 +60,13 @@ async function main(): Promise<void> {
       facingReplication: objectTables.facingReplication,
     },
     undefined, undefined, undefined,
-    { trace: (l) => { if (traceLines.length < 4000) traceLines.push(l); } },
+    {
+      trace: (l) => {
+        if (l.startsWith('MonsterAI ')) turnsStarted++;
+        if (l.includes('MAI Passed.')) turnsPassedGate++;
+        if (traceLines.length < 200) traceLines.push(l);
+      },
+    },
   );
   game.party.state.position = new Position(10, 10, level);
   game.monsterSystem.loadPartyLevel(level);
@@ -70,14 +80,13 @@ async function main(): Promise<void> {
 
   // ---- Run the clock -----------------------------------------------------
   const startTimers = aiTimers();
-  let fired = 0;
-  const before = traceLines.length;
+  turnsStarted = 0; turnsPassedGate = 0;
   for (let t = 0; t < ticks; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerQueue.getTimers(); // no-op, keeps the intent clear
     game.timerSystem.processTimers(t);
   }
-  fired = traceLines.slice(before).filter(l => l.startsWith('MonsterAI ')).length;
+  const fired = turnsStarted;
+  const passed = turnsPassedGate;
 
   console.log(`After ${ticks} ticks:`);
   console.log(`  AI timer events processed: ${fired}`);
@@ -86,20 +95,21 @@ async function main(): Promise<void> {
   check(fired > 0, 'monster AI timers should have fired');
   check(aiTimers() >= startTimers - 1, 'groups should keep their turns coming round, not run dry');
 
-  const passed = traceLines.filter(l => l.includes('MAI Passed.')).length;
   console.log(`  reached the AI proper:     ${passed}`);
   check(passed > 0, 'some timers should have passed InitialChecks');
   console.log('');
 
   // ---- Gate: FREEZE LIFE holds everything ---------------------------------
-  game.party.state.freezeLifeTimer = 100;
-  const beforeFreeze = traceLines.length;
-  for (let t = ticks; t < ticks + 60; t++) {
+  // The window has to be long enough for something to actually be due: the slowest
+  // monsters here have a `timePerMove` of 185 ticks, so 60 would see nothing at all.
+  game.party.state.freezeLifeTimer = 2000;
+  turnsStarted = 0; turnsPassedGate = 0;
+  for (let t = ticks; t < ticks + 400; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
     game.timerSystem.processTimers(t);
   }
-  const passedFrozen = traceLines.slice(beforeFreeze).filter(l => l.includes('MAI Passed.')).length;
-  const firedFrozen = traceLines.slice(beforeFreeze).filter(l => l.startsWith('MonsterAI ')).length;
+  const firedFrozen = turnsStarted;
+  const passedFrozen = turnsPassedGate;
   console.log(`FREEZE LIFE active: ${firedFrozen} timer(s) fired, ${passedFrozen} reached the AI`);
   check(firedFrozen > 0, 'timers should still fire while frozen');
   check(passedFrozen === 0, 'no monster should pass InitialChecks while life is frozen');
@@ -117,7 +127,7 @@ async function main(): Promise<void> {
     const n0 = rec.numMonM1;
     rec.hp[0] = 0; // kill member 0 without going through DamageMonster
     console.log(`Zero-HP gate — ${MonsterType[rec.creatureType]} at (${groupSlot.uByte10},${groupSlot.uByte11}), numMonM1 ${n0}`);
-    for (let t = ticks + 60; t < ticks + 200; t++) {
+    for (let t = ticks + 400; t < ticks + 900; t++) {
       (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
       game.timerSystem.processTimers(t);
     }

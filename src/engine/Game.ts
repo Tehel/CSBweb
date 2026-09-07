@@ -126,6 +126,16 @@ export class Game {
      */
     gameWon = false;
 
+    /**
+     * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
+     *
+     * The renderer computes it and writes it here each frame; the monster AI reads it
+     * to shorten sight distance in the dark (`doc/CSBwin-src/Monster.cpp:577-581`).
+     * That is the same direction of flow as CSBWin, where the renderer sets the
+     * global and `Blocked` reads it.
+     */
+    currentPalette = 0;
+
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -278,6 +288,7 @@ export class Game {
             perception: this.monsterPerception,
             monsterDesc: () => timerTables?.monsterDesc ?? null,
             isGameWon: () => this.gameWon,
+            getCurrentPalette: () => this.currentPalette,
             trace: monsterHooks?.trace,
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));

@@ -44,8 +44,11 @@ Verified against the code, not inherited from earlier revisions of this file.
 1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
    emission, 53-column word wrap, 4 rows with 70-tick expiry, and `updateDebug()` demoted to
    the external debug log. Scroll *animation* and save-game serialization remain deferred.
-2. **No monsters.** *This is the current priority.* `Monster.cpp` is entirely unported: no AI, no movement, no attacks, no
-   creature generators. Several systems carry proxies waiting on it (see Phase 12).
+2. 🔄 **Monsters move.** *Still the current priority.* `Monster.cpp`'s AI, movement and
+   damage are ported (Phase 12 steps 1-4): groups get timers, hunt, flee, and take
+   damage properly. **They cannot attack yet** — `MonsterAttacks` and
+   `MonsterDamagesCharacter` are step 5, along with creature generators and champion
+   death/bones.
 3. **No champion death / bones / resurrection**, no character creation, no potion drinking.
 4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
 5. **Throw stats are estimates**, not CSBWin's skill/weight/stamina formulas (Phase 9 step 11).
@@ -662,11 +665,25 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `AiScratch`.
    - ✅ **`d.freezeLifeTimer`** and **`d.Word11694`** (game won) added as real state,
      with the per-tick countdown (`CSBCode.cpp:684`).
-   - ⏳ Still to do: `ProcessTimers29to41`'s **decision body** — the TT_31/30/29
-     dispatch and the `Try_To_Move` chain. A group that passes `InitialChecks`
-     currently just has its group timer rescheduled, marked as temporary in
-     `MonsterAI.rescheduleGroupTimer`, so the AI keeps ticking instead of stopping
-     dead after one turn.
+   - ✅ **`ProcessTimers29to41`'s decision body** — the TT_29/30/31 reaction
+     branches, the A-family and B-family timer paths, and the whole movement chain:
+     `Try_Directions_D5_To_D4`, `Try_Preferred_Direction_Then_Others`, `Try_To_Move`,
+     `D4D0Finish`, `TryUByte67`, `Process_Invincible`,
+     `Process_Invincible_And_Finish` and `Standard_Finish`.
+
+   **Monsters now move, hunt and flee.** Verified with `tools/watch-monsters.ts`
+   (new): on level 2 with the party at (6,14), 18 of 22 groups move over 600 ticks
+   and none ends up inside a wall; the two groups adjacent to the party both enter
+   fear state 6 — the break-formation-and-attack state — and close to distance 1,
+   while distant groups stay in state 0 and wander; and the nearest group's path
+   `(6,13) → (7,13) → (7,14)` shows the pre-melee position shuffle. Six new entries
+   in `doc/PROVEN_FACTS.md`, including the fear-state table.
+
+   ⚠️ **Two gaps inside the AI, both marked in the code:**
+   - `MonsterAttacks` is not supplied, so a monster reaches the point of attacking
+     and then does nothing. That is step 5.
+   - `CheckMonsterVersusMissiles` (`Monster.cpp:4462`) returns "no hit", so shuffling
+     position inside a cell cannot walk a monster into a missile.
 
    ⚠️ **One deferral:** `CreateMovementTimer`'s overflow guard is not ported — CSBWin
    counts the groups already waiting at a square and, past 31, deletes the monster
@@ -717,8 +734,7 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    1. ✅ `MoveObject` for monsters — **done**, see step 2 above.
    2. ✅ `DamageMonster` — **done**, see step 4 below.
    3. ✅ `InitialChecks` — **done**, with the timer-helper chain.
-   4. `ProcessTimers29to41`'s decision body (~1220 lines) plus the `Try_*` /
-      `Standard_Finish` / `Process_Invincible` helper chain (~800 lines).
+   4. ✅ `ProcessTimers29to41`'s decision body and the `Try_*` chain — **done**.
    5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
 
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party

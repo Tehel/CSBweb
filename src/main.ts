@@ -319,6 +319,9 @@ async function init() {
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
             renderer.setPlaySound(playSound);
+            renderer.setPaletteSelectedHandler((index) => {
+                if (game) game.currentPalette = index;
+            });
             renderer.setViewingFilter((options) => game?.processViewingFilter(options) ?? null);
             renderer.setObjectMoveHandler((position, object, place, unchangedRoom, facing) => {
                 game?.triggerObjectMove(position, object, place, unchangedRoom, facing);
