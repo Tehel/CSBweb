@@ -21,6 +21,7 @@ import { PartyFootprints } from './PartyFootprints';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
+import { MonsterAttack } from './MonsterAttack';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -118,6 +119,8 @@ export class Game {
     readonly monsterDamage: MonsterDamage;
     /** The monster AI state machine (`doc/CSBwin-src/Monster.cpp`). */
     readonly monsterAI: MonsterAI;
+    /** Monsters hitting the party (`doc/CSBwin-src/Monster.cpp:944`). */
+    readonly monsterAttack: MonsterAttack;
     /**
      * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While
      * set, invincible monsters stop taking their turns entirely
@@ -277,6 +280,28 @@ export class Game {
             () => timerTables?.monsterDesc ?? null,
             () => timerTables?.doorCharacteristics ?? null,
         );
+        this.monsterAttack = new MonsterAttack(
+            this.dungeonState,
+            () => this.party.state,
+            () => this.state.tickCount,
+            this.random,
+            () => this.dungeonState.getMap(this.party.state.position.z)?.descriptor.difficulty ?? 0,
+            {
+                monsterDesc: timerTables?.monsterDesc,
+                monsterAttackSounds: timerTables?.monsterAttackSounds,
+                uByte590: timerTables?.uByte590,
+                byte586: timerTables?.byte586,
+            },
+            {
+                queueSound: (ordinal, mapX, mapY, deltaTime) =>
+                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                launchMissile: (o) => this.timerSystem.launchMonsterMissile(o),
+                registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
+                dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
+                onChampionDied: (chIdx) => this.onChampionDied(chIdx),
+                trace: monsterHooks?.trace,
+            },
+        );
         this.monsterAI = new MonsterAI({
             dungeon: this.dungeonState,
             getPartyState: () => this.party.state,
@@ -289,6 +314,12 @@ export class Game {
             monsterDesc: () => timerTables?.monsterDesc ?? null,
             isGameWon: () => this.gameWon,
             getCurrentPalette: () => this.currentPalette,
+            monsterAttacks: (monsterRn, monster, mapX, mapY, member) =>
+                this.monsterAttack.monsterAttacks(monsterRn, monster, mapX, mapY, member, {
+                    level: this.party.state.position.z,
+                    primaryDirectionToParty: this.monsterAI.primaryDirectionToParty,
+                    orthogonalDistanceToParty: this.monsterAI.orthogonalDistanceToParty,
+                }),
             trace: monsterHooks?.trace,
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
@@ -653,6 +684,41 @@ export class Game {
             position.y,
             (this.party.state.magicFootprintsActive ?? 0) !== 0,
         );
+    }
+
+    /**
+     * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497`) — everything a dying
+     * champion carried falls into the party's cell.
+     */
+    private dropAllPossessions(chIdx: number): void {
+        const champ = this.party.state.champions[chIdx];
+        if (!champ) return;
+        const slots = champ.possessions;
+        if (!slots) return;
+        const here = this.party.state.position;
+        for (let i = 0; i < slots.length; i++) {
+            const value = slots[i];
+            if (value === null || value === undefined) continue;
+            slots[i] = null;
+            const rn = value as ObjectID;
+            if (!this.isLikelyObjectRecord(rn)) continue;
+            this.dungeonState.addObjectToCell(here, this.setObjectPosition(rn, champ.partyPosition & 0x3));
+        }
+        champ.weaponHand = null;
+        champ.shieldHand = null;
+    }
+
+    /** A champion died. Keeps the derived party state honest. */
+    private onChampionDied(chIdx: number): void {
+        const champ = this.party.state.champions[chIdx];
+        if (!champ) return;
+        if (this.party.state.selectedCharacterIndex === chIdx) {
+            this.party.state.selectedCharacterIndex = -1;
+        }
+        if (this.party.state.magicCasterIndex === chIdx) {
+            this.party.state.magicCasterIndex = -1;
+        }
+        this.state.party = this.party.state;
     }
 
     private noteMonsterAttack(): void {

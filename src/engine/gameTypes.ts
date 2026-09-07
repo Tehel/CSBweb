@@ -94,6 +94,14 @@ export interface Champion {
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)
     wounds?: ui16;             // Bitmask of wounded body parts (CSBWin "ouches")
     poisonCount?: ui8;         // Poison counter for UI and effects
+    /**
+     * `CHARDESC.maxRecentDamage` — the largest hit taken since the portrait last
+     * showed it. Drives which way the damage flash points
+     * (`doc/CSBwin-src/Monster.cpp:1237-1242`).
+     */
+    maxRecentDamage?: ui8;
+    /** `CHARDESC.facing3` — the direction the biggest recent hit came from. */
+    damageFromDirection?: ui8;
     skills: Skill[];           // CSBWin skills92[20]
     actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
     busyTimerIndex?: i32;      // Timer index for action disable
@@ -131,6 +139,13 @@ export interface PartyState {
     indexOfLastMagicFootprint?: i16;
     numFootprintEnt?: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
+    /**
+     * `d.PartySleeping`. A sleeping party neither dodges nor gets lucky, and is woken
+     * by any blow that lands (`doc/CSBwin-src/Monster.cpp:4529`).
+     *
+     * ⏳ Nothing sets this yet — the sleep UI is unported — so it is always false.
+     */
+    sleeping?: boolean;
     /**
      * `d.freezeLifeTimer` (`doc/CSBwin-src/Data.h:774`). While non-zero every monster
      * that is not `invincible()` is held motionless

@@ -190,6 +190,16 @@ export class MonsterAI {
 
   constructor(private deps: MonsterAiDeps) {}
 
+  /** `d.PrimaryDirectionToParty`, for `MonsterAttacks`. */
+  get primaryDirectionToParty(): number {
+    return this.scratch.primaryDirectionToParty;
+  }
+
+  /** `d.OrthogonalDistance2Party`, for `MonsterAttacks`. */
+  get orthogonalDistanceToParty(): number {
+    return this.scratch.orthogonalDistanceToParty;
+  }
+
   /**
    * `ProcessTimers29to41` (`doc/CSBwin-src/Monster.cpp:3239`) — one monster group's
    * turn, from the top.

@@ -44,12 +44,12 @@ Verified against the code, not inherited from earlier revisions of this file.
 1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
    emission, 53-column word wrap, 4 rows with 70-tick expiry, and `updateDebug()` demoted to
    the external debug log. Scroll *animation* and save-game serialization remain deferred.
-2. 🔄 **Monsters move.** *Still the current priority.* `Monster.cpp`'s AI, movement and
-   damage are ported (Phase 12 steps 1-4): groups get timers, hunt, flee, and take
-   damage properly. **They cannot attack yet** — `MonsterAttacks` and
-   `MonsterDamagesCharacter` are step 5, along with creature generators and champion
-   death/bones.
-3. **No champion death / bones / resurrection**, no character creation, no potion drinking.
+2. 🔄 **Monsters work.** `Monster.cpp` is ported (Phase 12 steps 1-5): groups hunt,
+   flee, throw missiles, hit the party, take damage and die, and a killed champion
+   leaves bones. Remaining in the phase: creature generators, and the *champion's*
+   own attacks from `Attack.cpp`. Armour does not yet reduce damage — see Phase 12.
+3. 🔄 **Champion death and bones now work** (Phase 12); resurrection, character
+   creation and potion drinking remain (Phase 13).
 4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
 5. **Throw stats are estimates**, not CSBWin's skill/weight/stamina formulas (Phase 9 step 11).
 6. ✅ **Debug scaffolding** — done (Phase 14). Now confined to `src/dev.ts` and reached only
@@ -679,11 +679,9 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    `(6,13) → (7,13) → (7,14)` shows the pre-melee position shuffle. Six new entries
    in `doc/PROVEN_FACTS.md`, including the fear-state table.
 
-   ⚠️ **Two gaps inside the AI, both marked in the code:**
-   - `MonsterAttacks` is not supplied, so a monster reaches the point of attacking
-     and then does nothing. That is step 5.
-   - `CheckMonsterVersusMissiles` (`Monster.cpp:4462`) returns "no hit", so shuffling
-     position inside a cell cannot walk a monster into a missile.
+   ⚠️ **One gap left inside the AI:** `CheckMonsterVersusMissiles`
+   (`Monster.cpp:4462`) returns "no hit", so shuffling position inside a cell cannot
+   walk a monster into a missile.
 
    ⚠️ **One deferral:** `CreateMovementTimer`'s overflow guard is not ported — CSBWin
    counts the groups already waiting at a square and, past 31, deletes the monster
@@ -735,7 +733,10 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    2. ✅ `DamageMonster` — **done**, see step 4 below.
    3. ✅ `InitialChecks` — **done**, with the timer-helper chain.
    4. ✅ `ProcessTimers29to41`'s decision body and the `Try_*` chain — **done**.
-   5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
+   5. ✅ `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones — **done**.
+   6. Remaining: creature generators (step 5 of the phase), the champion melee
+      pipeline from `Attack.cpp` with the real attack panel, and the armour/load gaps
+      listed below.
 
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
@@ -758,8 +759,36 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `AdjustTimerPriority` (`Code11f52.cpp:1194`): the function code is part of the
      queue's sort key, so renumbering a per-member timer has to re-sort it.
    - ✅ **`Byte10340[4]` and `MonsterDroppings[40]`** extracted from graphic `0x22f`.
-   - ⏳ Still to do: `Attack.cpp` proper — hit determination, damage, wounds, armour,
-     `PossibleAttackTypes`, and the champion↔monster `AdjustSkills` hooks.
+   - ✅ **`MonsterAttacks` and the champion damage chain** (`src/engine/MonsterAttack.ts`):
+     the attack parameter block and its DSA filter hook, per-type missile selection,
+     `LaunchMissile` for monsters, `MonsterDamagesCharacter`, `DamageCharacter` with
+     wounds, `Quickness`, `IsCharacterLucky`, `TAG016426`, `GetCharacterToDamage`,
+     `DetermineAttackOrder`, `PoisonCharacter` and `KillCharacter`.
+   - ✅ **Champion death → bones → possessions dropped**, with
+     `Game.registerChampionBones` now called automatically — retiring the proxy Phase
+     12 item 6 named. `d.uByte590[4]` and `d.Byte586[8][4]` extracted from graphic
+     `0x232`.
+   - ✅ **`LastMonsterAttackTime` proxy retired** — it is now fed by `MonsterAttacks`
+     itself rather than from the missile-hit path.
+   - ⏳ Still to do: `Attack.cpp` proper — the *champion's* attacks: hit
+     determination, `PossibleAttackTypes`, the real attack panel.
+
+   ⚠️ **Two divergences, both marked in the code and in
+   `doc/CSBWIN_MONSTERS_REFERENCE.md`:**
+   - **Armour does not reduce damage.** `DamageCharacter` averages `TAG01680a` over
+     the wounded body parts; that chain needs `ClothingDesc`, `Byte1412` and
+     `DetermineThrowingDistance`, so the average is 0 here and monsters hit much
+     harder than they should.
+   - **`Quickness` ignores load**, so a laden champion dodges as well as an empty
+     one.
+
+   Verified with `tools/watch-monster-attacks.ts` (new): a four-champion party stood
+   next to the monsters on level 2 takes its first hit at tick ~146, loses its first
+   champion around tick ~160-240, and ends as four sets of `misc_BonesOfHero` with
+   `value = 2` lying in the party's cell. A direct wound probe confirms the
+   threshold-doubling mechanism: 163 of 200 hits of 300 damage wound (reaching all
+   six body parts), 0 of 200 hits of 6 damage do. Eight new entries in
+   `doc/PROVEN_FACTS.md`.
 
    ⚠️ **One divergence, deliberate:** `CreateAndDropObject` appends new weapon /
    clothing / misc records rather than reusing a freed slot as CSBWin's

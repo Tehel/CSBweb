@@ -775,3 +775,100 @@ if ( (indexOfLastMonster == 0) && (STRandomBool() != 0) )
 
 The branch still consumes its `STRandomBool()`, so removing it would desynchronise the random
 stream from CSBWin's even though no state changes. Ported as written.
+
+## `MonsterAttacks` decides *how* to attack before it attacks
+
+`doc/CSBwin-src/Monster.cpp:944` does not deal damage directly. It fills in an
+`attackParameters` block — target, missile or melee, which missile, range, damage, sound —
+hands the whole block to the Monster Attack Filter DSA, which may rewrite any field
+(`:1160-1166`), and only then acts on it. That is why the parameters are a struct rather
+than locals, and why the port keeps them as one object.
+
+Two ways a target is chosen. A `word2Bit4` monster picks a *random* live champion, walking
+forward from `STRandom0_3()` until it finds one; everything else uses
+`GetCharacterToDamage`, which only reaches the party when adjacent
+(`doc/CSBwin-src/CSBCode.cpp:6899`) and takes the first live champion in the order
+`Byte586` gives for that side. CSBWin's comment on the random path is worth keeping: "For
+four years we didn't increment heroToDamage!"
+
+## Only some monsters throw, and each type throws its own thing
+
+`monsterShouldLaunchMissile` requires `word14_12_15 > 1` *and* either distance above 1 or a
+coin toss (`doc/CSBwin-src/Monster.cpp:1025-1027`) — so a thrower next to you sometimes
+punches instead. The missile is fixed per type (`:1029-1058`): Vexirk and Lord Chaos roll
+between a fireball and one of four spells, Slime Devils spit poison, Flying Eyes throw
+lightning seven times in eight, Zytaz alternate poison cloud and fireball, Demons and
+Dragons breathe fire. Everything else has no missile at all and the launch is skipped.
+
+## Two independent chances to avoid a blow entirely
+
+`MonsterDamagesCharacter` (`doc/CSBwin-src/Monster.cpp:4536-4545`) checks, before rolling any
+damage:
+
+```cpp
+D0W = sw(Quickness(chA2));
+D1W = sw(STRandom(32));
+D3W = mtDesc.dexterity12;
+D1W = sw(D1W + D3W + w_2 - 16);
+if ( (D0W >= D1W) && (STRandom0_3() != 0) ) return 0;
+if (IsCharacterLucky(chA2, 60)) return 0;
+```
+
+Being quicker than the monster is not enough on its own — it still needs a 3-in-4 roll. A
+**sleeping** party gets neither check; it is woken by the blow instead.
+
+`IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2165`) then moves Luck by 2 in the
+*opposite* direction to the outcome: down when it saved you. Luck is spent by using it.
+
+## The damage formula is deliberately many-stage
+
+`doc/CSBwin-src/Monster.cpp:4561-4580`: a base of
+`2*experienceMultiplier + Random(16) + attack10`, less twice the champion's Fighter mastery;
+if that lands at 1 or below there is a 50% chance of no damage at all and otherwise a floor
+of `Random(0..3) + 2`. Then halve, add two random terms, add another random term, quarter,
+add `Random(0..3) + 1`, and on a coin toss subtract `Random(damage/2 + 1) - 1`.
+
+No shorter form reproduces the distribution, so it is ported step for step.
+
+## Wounds come from the blow exceeding a vitality-scaled threshold, then doubling
+
+`doc/CSBwin-src/Character.cpp:2789-2803`. The threshold starts at
+`TAG016426(char, Vitality, Random(128) + 10)` and **doubles** each time a body part is
+marked, so one large hit can wound several places and a small one wounds none:
+
+```cpp
+D6W = TAG016426(pcA3, 4, D0W);
+if (D7W > LOCAL_10)
+{
+  do
+  {
+    LOCAL_20 = sw(STRandom(8));
+    D1W = sw((1 << LOCAL_20) & mask);
+    d.PendingOuches[chIdx] |= D1W;
+    D6W <<= 1;
+    ...
+```
+
+Note the candidate bit is `1 << Random(8)` masked by the monster's wound mask, so a roll
+outside the mask marks nothing that round. Measured against the shipped data: 163 of 200
+hits of 300 damage wound, 0 of 200 hits of 6.
+
+## `TAG016426` has a second branch for very high attributes
+
+`doc/CSBwin-src/Character.cpp:2060-2062`: when `170 - attribute` falls below 16 — an
+attribute above 154 — the function divides by 8 flat instead of scaling:
+
+```cpp
+if (D7W < 16) { D0W = sw(P3 >> 3); }
+else { D0W = ScaledMultiply(P3, 7, D7W); }
+```
+
+Easy to miss, and it only shows up on a champion with an exceptional stat.
+
+## Champion bones carry `value = 2` and the champion's own party position
+
+`KillCharacter` (`doc/CSBwin-src/Character.cpp:2626-2645`) drops all possessions, then makes
+a `misc_BonesOfHero` with `important(true)` and `value(2)` — the 2 is what distinguishes a
+dead champion's bones from an ordinary bones item. The object's position within the cell is
+set from `pcA3->charPosition`, so the bones appear where that champion stood, and
+`expool.AddChampionBonesRecord` records the bones↔fingerprint pairing for resurrection.

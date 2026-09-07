@@ -96,6 +96,10 @@ export interface UITables {
     wRectPos1780: WordRect;
     soundTable: SoundTableEntry[];
     byte1596: number[];
+    /** `d.uByte590[4]` — wound-location bitmasks for monster attacks. */
+    uByte590: number[];
+    /** `d.Byte586[8][4]` — the order an attack from a given side reaches the party. */
+    byte586: number[][];
     word1526: number[][];
     word1502: number[][];
     wRectPos1454: WordRect[];
@@ -556,11 +560,23 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   const word612 = readI16Array(view, off, 7); off += 7 * 2;
 
-  // FILL(598,590) length 8, uByte590[4], Byte586[8][4], unused554
+  // FILL(598,590) length 8, then two tables the monster attack code needs.
   off += 8;
-  off += 4;
+  /**
+   * `d.uByte590[4]` (doc/CSBwin-src/Data.h:1461) — the wound-location bitmasks a
+   * monster's attack picks from, indexed by how far down `MONSTERDESC.word22`'s
+   * nibbles the roll fell (doc/CSBwin-src/Monster.cpp:4548-4556).
+   */
+  const uByte590 = Array.from(raw.slice(off, off + 4)); off += 4;
+  /**
+   * `d.Byte586[8][4]` (doc/CSBwin-src/Data.h:1462) — for each of eight
+   * direction/side combinations, the party positions in the order an attack from
+   * there reaches them (`DetermineAttackOrder`, doc/CSBwin-src/Character.cpp:384).
+   */
+  const byte586: number[][] = [];
+  for (let i = 0; i < 8; i++) byte586.push(Array.from(raw.slice(off + i * 4, off + i * 4 + 4)));
   off += 8 * 4;
-  off += 2;
+  off += 2; // unused554
 
   // Palette552[6], Palette360, Palette328, DefaultGraphicList[70], IdentityColorMap[16]
   const palette552: number[][] = [];
@@ -579,6 +595,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const word12 = wordRects[16];
 
   return {
+    uByte590,
+    byte586,
     long1828,
     long1812,
     wRectPos1796,

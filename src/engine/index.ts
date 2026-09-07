@@ -11,6 +11,7 @@ export * from './TimerQueue';
 export * from './TimerSystem';
 export * from './MonsterSystem';
 export * from './MonsterAI';
+export * from './MonsterAttack';
 export * from './MonsterDamage';
 export * from './MonsterPerception';
 export * from './PartyFootprints';

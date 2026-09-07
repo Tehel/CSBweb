@@ -78,6 +78,12 @@ export interface TimerTables {
   monsterDroppings?: ArrayLike<number>;
   /** `d.Byte10340[4]` — group facing byte when no `ITEM16` is attached. */
   facingReplication?: ArrayLike<number>;
+  /** `d.uByte9672[8]` — monster attack sound ordinals. */
+  monsterAttackSounds?: ArrayLike<number>;
+  /** `d.uByte590[4]` — wound-location bitmasks. */
+  uByte590?: ArrayLike<number>;
+  /** `d.Byte586[8][4]` — attack order by side. */
+  byte586?: ArrayLike<ArrayLike<number>>;
 }
 
 export interface LocationRel {
@@ -813,6 +819,42 @@ export class TimerSystem {
     const missile = this.dungeon.getMissileRecord(rn);
     if (missile) missile.timerIndex = entry.index & 0xffff;
     return true;
+  }
+
+  /**
+   * `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1195-1214`).
+   *
+   * The projectile is a predefined spell RN (`RNFireball` and friends) rather than a
+   * real object, so it goes through `constructPredefinedMissile` first — the same
+   * path a cast spell takes.
+   */
+  launchMonsterMissile(options: {
+    projectile: number;
+    mapX: number;
+    mapY: number;
+    posInCell: number;
+    direction: number;
+    range: number;
+    damage: number;
+    decayRate: number;
+    level: number;
+    startTime: number;
+  }): void {
+    const projectileObject = constructPredefinedMissile(this.dungeon.getData(), options.projectile);
+    if (projectileObject === null) return;
+    this.launchMissile(
+      projectileObject,
+      options.mapX,
+      options.mapY,
+      options.level,
+      options.posInCell,
+      options.direction,
+      options.range,
+      options.damage,
+      options.decayRate,
+      options.startTime,
+      false,
+    );
   }
 
   launchThrownMissile(

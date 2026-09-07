@@ -274,6 +274,33 @@ bug CSBWin fixed: a monster teleported onto a level its type is not allowed on d
 *there*, so `d.LoadedLevel` is the destination and reading the position byte with it
 would consult an `ITEM16` belonging to a different level.
 
+## Attacking the party
+
+Ported in `src/engine/MonsterAttack.ts`. `MonsterAttacks`
+(`doc/CSBwin-src/Monster.cpp:944`) is a *decision* about how to attack, expressed as
+a parameter block the Monster Attack Filter DSA may rewrite before anything happens —
+see `doc/PROVEN_FACTS.md` for that, for which monsters throw what, for the two
+independent chances to avoid a blow, for the many-stage damage formula, and for how
+wounds accumulate.
+
+The champion side is `MonsterDamagesCharacter` (`:4518`) → `DamageCharacter`
+(`doc/CSBwin-src/Character.cpp:2703`) → `KillCharacter` (`:2526`). `DamageCharacter`'s
+`P4` selects the mitigation: 1 fire, 5 spell, 6 wisdom-scaled, 2 half armour, anything
+else full armour, 0 no mitigation and no wounds at all. Its value comes from
+`MONSTERDESC.uByte22[2]`, which is non-zero for every shipped monster except the
+Giggler.
+
+Two things this port does **not** yet do, both marked in the code:
+
+- **Armour strength.** CSBWin averages `TAG01680a`
+  (`doc/CSBwin-src/Character.cpp:2391`) over the masked body parts; that needs
+  `ClothingDesc`, `Byte1412` and `DetermineThrowingDistance`. Here the average is 0,
+  so armour offers no protection and monsters hit considerably harder than they
+  should.
+- **Load in `Quickness`.** The `load / maxLoad` term is 0, so a laden champion dodges
+  as well as an empty-handed one. `computeChampionLoad` exists but lives in the
+  renderer's UI layer.
+
 ## Attack tables
 
 Everything the champion attack pipeline needs is in `graphics.dat` item `0x230`,
