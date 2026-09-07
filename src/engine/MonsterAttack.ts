@@ -86,6 +86,12 @@ export interface MonsterAttackTables {
   uByte590?: ArrayLike<number>;
   /** `d.Byte586[8][4]` — attack order by side. */
   byte586?: ArrayLike<ArrayLike<number>>;
+  /** `d.ClothingDesc[58].uByte1` — armour strength per garment. */
+  clothingArmour?: ArrayLike<number>;
+  /** `d.ClothingDesc[58].uByte2` — flags; bit 7 marks a shield. */
+  clothingFlags?: ArrayLike<number>;
+  /** `d.Byte1412[6]` — per-body-part shield weighting. */
+  byte1412?: ArrayLike<number>;
 }
 
 export interface MonsterAttackHooks {
@@ -420,11 +426,8 @@ export class MonsterAttack {
    * 5 spell, 6 wisdom-scaled, 2 half armour, anything else full armour. Zero skips
    * mitigation and wounds entirely.
    *
-   * ⚠️ **Armour strength is not ported.** CSBWin averages `TAG01680a`
-   * (`doc/CSBwin-src/Character.cpp:2391`) over the masked body parts, which needs
-   * `ClothingDesc`, `Byte1412` and `DetermineThrowingDistance`. Here that average is
-   * 0, so the `130 - armour` scaling reduces damage by the same factor for everyone
-   * and armour offers no protection. Recorded in PLAN.md Phase 12.
+   * Armour is the average of `armourStrength` over every body part the blow could
+   * land on, which then scales the damage by `130 - armour`.
    */
   damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number {
     const party = this.getPartyState();
@@ -436,8 +439,18 @@ export class MonsterAttack {
     if (dealt <= 0) return 0;
 
     if (kind !== 0) {
-      // ⚠️ The armour average, always 0 here. See the note above.
-      const armour = 0;
+      // Average the armour over every body part the blow could land on.
+      let parts = 0;
+      let armourTotal = 0;
+      for (let part = 0; part <= 5; part++) {
+        if ((woundMask & (1 << part)) === 0) continue;
+        parts++;
+        // `P4 == 4` sets bit 15 of the index, which halves the shield term and makes
+        // `TAG009470` scale rather than take the raw strength
+        // (doc/CSBwin-src/Character.cpp:2729-2741).
+        armourTotal += this.armourStrength(champ, part, kind === 4);
+      }
+      const armour = parts !== 0 ? Math.trunc(armourTotal / parts) : 0;
 
       if (kind === 6) {
         const margin = 115 - champ.attributes.wisdom;
@@ -526,6 +539,81 @@ export class MonsterAttack {
     });
     db.count++;
     return withPosition(encodeMisc(db.records.length - 1), 0);
+  }
+
+  /**
+   * `TAG01680a` (`doc/CSBwin-src/Character.cpp:2391`) — how well one body part is
+   * protected, 0 to 100.
+   *
+   * Three contributions, and they are not the obvious ones:
+   *
+   * 1. **Shields held in either hand.** Each is weighted by `Byte1412[bodyPart]`,
+   *    so a shield protects some parts far better than others, and by whether it is
+   *    in the hand the blow came at.
+   * 2. **A vitality-scaled random term**, plus the champion's current shield spell,
+   *    the party shield, and the temporary modifier the champion's own attack type
+   *    imposes. Being mid-swing genuinely leaves you more open.
+   * 3. **The garment actually worn on that part**, but only for parts above 1 —
+   *    i.e. not the two hands, which are covered by (1).
+   *
+   * The result is halved and clamped to 0-100 before it reaches the damage scaling.
+   *
+   * ⚠️ One term is missing: CSBWin adds `DetermineThrowingDistance(chIdx, hand)` to
+   * each shield's contribution (`:2416`), which needs the object-weight and max-load
+   * chain. It is 0 here, so a shield in hand protects slightly less than it should.
+   * Worn armour — the larger term — is complete. Recorded in PLAN.md Phase 12.
+   */
+  armourStrength(champ: Champion, bodyPart: number, scale: boolean): number {
+    let handTotal = 0;
+    for (let hand = 0; hand < 2; hand++) {
+      const worn = this.clothingTypeIn(champ, hand);
+      if (worn === null) continue;
+      if (((this.tables?.clothingFlags?.[worn] ?? 0) & 0x80) === 0) continue; // not a shield
+      // ⚠️ `+ DetermineThrowingDistance(chIdx, hand)` belongs here.
+      const strength = this.clothingArmourValue(worn, scale);
+      const weight = this.tables?.byte1412?.[bodyPart] ?? 0;
+      const product = (strength * weight) & 0xffff;
+      handTotal += product >> (hand === bodyPart ? 4 : 5);
+    }
+
+    // Zero to roughly 8 × vitality.
+    const spread = Math.trunc(champ.attributes.vitality / 8) + 1;
+    let total = (this.random.next() & 0xffff) % spread;
+    if (scale) total = Math.trunc(total / 2);
+
+    const party = this.getPartyState();
+    total +=
+      (champ.attackStatModifier ?? 0) +
+      (champ.shieldStrength ?? 0) +
+      (party.partyShield ?? 0) +
+      handTotal;
+
+    // The garment worn on this part — hands (0 and 1) are the shields handled above.
+    if (bodyPart > 1) {
+      const worn = this.clothingTypeIn(champ, bodyPart);
+      if (worn !== null) total += this.clothingArmourValue(worn, scale);
+    }
+
+    return Math.min(100, Math.max(0, total >> 1));
+  }
+
+  /**
+   * `TAG009470` (`doc/CSBwin-src/Character.cpp:167`) — a garment's armour value,
+   * optionally scaled by its own flags rather than taken raw.
+   */
+  private clothingArmourValue(clothingType: number, scale: boolean): number {
+    const strength = this.tables?.clothingArmour?.[clothingType] ?? 0;
+    if (!scale) return strength;
+    const flags = this.tables?.clothingFlags?.[clothingType] ?? 0;
+    return scaledMultiply(strength, 3, (flags & 7) + 4);
+  }
+
+  /** The clothing type in a possession slot, or null if it holds something else. */
+  private clothingTypeIn(champ: Champion, slot: number): number | null {
+    const value = champ.possessions?.[slot];
+    if (value === null || value === undefined) return null;
+    const rec = this.dungeon.getClothingRecord(value as ObjectID);
+    return rec ? rec.clothingType : null;
   }
 
   /* ------------------------------------------------------------ champion ---- */

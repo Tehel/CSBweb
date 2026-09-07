@@ -297,6 +297,9 @@ async function init() {
                 monsterAttackSounds: objectTables.monsterAttackSounds,
                 uByte590: uiTables.graphic232.uByte590,
                 byte586: uiTables.graphic232.byte586,
+                clothingArmour: objectTables.clothingArmour,
+                clothingFlags: objectTables.clothingFlags,
+                byte1412: uiTables.graphic232.byte1412,
             };
 
             // Initialize game engine

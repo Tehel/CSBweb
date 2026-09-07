@@ -99,7 +99,6 @@ export interface InterpreterContext {
   viewportObjectRNs?: ObjectID[];
 
   // Monster attack animation state hook (used for sound triggers)
-  onMonsterAttackState?: (monster: CreatureRecord, index: number, soundOrdinal: number, isAttacking: boolean) => void;
 
 }
 
@@ -2160,8 +2159,11 @@ export class BytecodeInterpreter {
 
     const showSide = hasSide && (relFacing & 1) !== 0;
     const showBack = hasBack && relFacing === 0;
+    // The attacking flag is set by the AI, in `NextMonsterUpdateTime`; the renderer
+    // only reads it. It used to be the *renderer* that noticed an attack starting and
+    // played the sound, which meant a monster off screen attacked silently — the
+    // sound now comes from `MonsterAttacks` where the attack actually happens.
     const showAttack = hasAttack && !showBack && sms.attacking;
-    this.context.onMonsterAttackState?.(monster, indexWithinGroup, desc.attackSound ?? 0, showAttack);
 
     let graphicNum = 446 + (graphic.word0 | 0);
     let widthBytes = graphic.frontRearByteWidth;

@@ -66,6 +66,9 @@ async function main(): Promise<void> {
       monsterAttackSounds: objectTables.monsterAttackSounds,
       uByte590: uiTables.graphic232.uByte590,
       byte586: uiTables.graphic232.byte586,
+      clothingArmour: objectTables.clothingArmour,
+      clothingFlags: objectTables.clothingFlags,
+      byte1412: uiTables.graphic232.byte1412,
     },
   );
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
@@ -150,8 +153,67 @@ async function main(): Promise<void> {
   console.log(`             200 hits of 6 wounded ${smallWounds} times`);
   const woundsOk = bigWounds > 0 && bigWounds > smallWounds;
 
+  // ---- Armour should actually protect ------------------------------------
+  // Same blow, same champion, with and without a plate mail body garment. Averaged,
+  // because the armour term carries a vitality-scaled random component.
+  const armoured = champion(0, 'ARMOURED');
+  armoured.attributes.health = 1000000;
+  armoured.attributes.maxHealth = 1000000;
+  game.party.state.champions.push(armoured);
+  const armIdx = game.party.state.champions.length - 1;
+
+  const measure = (): number => {
+    armoured.attributes.health = 1000000;
+    let total = 0;
+    for (let i = 0; i < 400; i++) total += game.monsterAttack.damageCharacter(armIdx, 100, 0x3f, 3);
+    return total;
+  };
+  const bare = measure();
+  // clothing_PlateMail is type 34; put one on the body slot and a shield in hand.
+  const plate = data.databases.clothing.records.length;
+  data.databases.clothing.records.push({
+    nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: 34,
+  });
+  data.databases.clothing.count++;
+  const shield = data.databases.clothing.records.length;
+  data.databases.clothing.records.push({
+    nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: 30,
+  });
+  data.databases.clothing.count++;
+  const encode = (i: number) => ((6 << 10) | i);
+  armoured.possessions![3] = encode(plate);  // body
+  armoured.possessions![0] = encode(shield); // shield hand
+  const partial = measure();
+
+  // Now a full suit. Only the body part actually struck is consulted, so covering
+  // one slot out of six can only help a sixth of the time.
+  const addClothing = (type: number): number => {
+    const i = data.databases.clothing.records.length;
+    data.databases.clothing.records.push({
+      nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: type,
+    });
+    data.databases.clothing.count++;
+    return encode(i);
+  };
+  armoured.possessions![2] = addClothing(43); // HelmOfRa
+  armoured.possessions![4] = addClothing(45); // PoleynOfRa
+  armoured.possessions![5] = addClothing(46); // GreaveOfRa
+  const clad = measure();
+
+  console.log('');
+  console.log(`armour probe: 400 hits of 100 dealt ${bare} bare,`);
+  console.log(`              ${partial} in plate + shield, ${clad} in a full suit`);
+  const armourOk = clad < partial && partial < bare;
+
   console.log('');
   console.log(totalLost > 0 ? 'OK: monsters are hurting the party' : 'PROBLEM: nobody took any damage');
+  console.log(
+    armourOk
+      ? `OK: armour reduced damage by ${Math.round((1 - partial / bare) * 100)}% (one piece) ` +
+        `and ${Math.round((1 - clad / bare) * 100)}% (full suit)`
+      : 'PROBLEM: armour did not help',
+  );
+  if (!armourOk) process.exitCode = 1;
   console.log(woundsOk ? 'OK: big hits wound, small hits mostly do not' : 'PROBLEM: the wound mechanism looks wrong');
   if (!woundsOk) process.exitCode = 1;
   process.exitCode = totalLost > 0 ? 0 : 1;

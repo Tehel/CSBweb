@@ -173,6 +173,18 @@ export interface ObjectTables {
   objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
   clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
+  /**
+   * `d.ClothingDesc[58].uByte1` — the armour strength a garment contributes
+   * (doc/CSBwin-src/CSB.h:1700, read by `TAG009470`,
+   * doc/CSBwin-src/Character.cpp:167).
+   */
+  clothingArmour: Uint8Array;
+  /**
+   * `d.ClothingDesc[58].uByte2` — flags. Bit 7 marks a shield, i.e. a garment that
+   * counts when held in a hand rather than worn
+   * (doc/CSBwin-src/Character.cpp:2415).
+   */
+  clothingFlags: Uint8Array;
   miscWeights: Uint8Array; // d.Byte8946[54]
   foodValue: Int16Array; // d.FoodValue[8]
 
@@ -525,6 +537,16 @@ function readClothingWeights22f(raw: Uint8Array): Uint8Array {
   return out;
 }
 
+/** `ClothingDesc[58].uByte1` / `.uByte2`, from the same 4-byte records as the weight. */
+function readClothingBytes22f(raw: Uint8Array, byteIndex: number): Uint8Array {
+  const start = ABS_22F_START - ABS_CLOTHING;
+  const count = 58;
+  const stride = 4;
+  const out = new Uint8Array(count);
+  for (let i = 0; i < count; i++) out[i] = raw[start + i * stride + byteIndex] ?? 0;
+  return out;
+}
+
 function readFoodValue22f(raw: Uint8Array): Int16Array {
   const start = ABS_22F_START - ABS_FOOD_VALUE;
   const count = 8;
@@ -813,6 +835,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
   const clothingWeights = readClothingWeights22f(raw22f);
+  const clothingArmour = readClothingBytes22f(raw22f, 1);
+  const clothingFlags = readClothingBytes22f(raw22f, 2);
   const foodValue = readFoodValue22f(raw22f);
   const miscWeights = readMiscWeights22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
@@ -901,6 +925,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     objectNames,
     weaponWeights,
     clothingWeights,
+    clothingArmour,
+    clothingFlags,
     foodValue,
     miscWeights,
     wallDecorationRectSets,

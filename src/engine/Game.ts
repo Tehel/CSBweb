@@ -222,6 +222,21 @@ export class Game {
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
+                onSpawnMonster: (o) => {
+                    this.monsterSystem.createMonster({
+                        value: o.type,
+                        hitPointMultiplier: o.hitPointMultiplier,
+                        numMonM1: o.countMinus1,
+                        facing: o.facing,
+                        mapX: o.x,
+                        mapY: o.y,
+                        level: this.party.state.position.z,
+                        // CSBWin passes `normallyClosed()` as `invisible` and
+                        // `drawAsSize4()` as itself (doc/CSBwin-src/Timer.cpp:1785-1793).
+                        invisible: o.normallyClosed,
+                        drawAsSize4: o.drawAsSize4,
+                    });
+                },
                 onPartyMoved: () => this.notePartyMoved(),
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
@@ -291,6 +306,9 @@ export class Game {
                 monsterAttackSounds: timerTables?.monsterAttackSounds,
                 uByte590: timerTables?.uByte590,
                 byte586: timerTables?.byte586,
+                clothingArmour: timerTables?.clothingArmour,
+                clothingFlags: timerTables?.clothingFlags,
+                byte1412: timerTables?.byte1412,
             },
             {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
@@ -314,6 +332,8 @@ export class Game {
             monsterDesc: () => timerTables?.monsterDesc ?? null,
             isGameWon: () => this.gameWon,
             getCurrentPalette: () => this.currentPalette,
+            checkMonsterVersusMissiles: (mapX, mapY, position, level) =>
+                this.timerSystem.checkMonsterVersusMissiles(mapX, mapY, position, level),
             monsterAttacks: (monsterRn, monster, mapX, mapY, member) =>
                 this.monsterAttack.monsterAttacks(monsterRn, monster, mapX, mapY, member, {
                     level: this.party.state.position.z,

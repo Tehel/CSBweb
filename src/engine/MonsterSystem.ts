@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -705,6 +705,139 @@ export class MonsterSystem {
       roomType === RoomType.PIT ||
       roomType === RoomType.DOOR
     );
+  }
+
+  /* --------------------------------------------------------------- create ---- */
+
+  /**
+   * `CreateMonster` (`doc/CSBwin-src/Monster.cpp:111`) — bring a new group into
+   * being, as a creature generator or a DSA does.
+   *
+   * `value` packs the monster type in bits 0-4 and an alternate-graphic selector in
+   * bits 5-6. The group size is clamped by the type's footprint: a two-corner monster
+   * can have at most two, a whole-cell monster at most one — CSBWin shows a message
+   * box and carries on rather than refusing.
+   *
+   * Placement is left to `moveMonster`, which is what attaches the `ITEM16`; if the
+   * destination turns out to be occupied the group goes straight into abeyance and
+   * this returns null.
+   */
+  createMonster(options: {
+    value: number;
+    hitPointMultiplier: number;
+    numMonM1: number;
+    facing: number;
+    mapX: number;
+    mapY: number;
+    level: number;
+    invisible: boolean;
+    drawAsSize4: boolean;
+  }): ObjectID | null {
+    const monsterType = options.value & 0x1f;
+    const alternateGraphics = (options.value >> 5) & 0x3;
+
+    if (!this.isMonsterAllowedOnLevel(monsterType, options.level)) return null;
+
+    this.ensureItem16Available();
+    if (this.isItem16PoolFull()) return null;
+
+    const desc = this.tables?.monsterDesc?.[monsterType];
+    if (!desc) return null;
+
+    const rn = this.findEmptyCreatureEntry();
+    if (rn === null) return null;
+    const monster = this.dungeon.getCreatureRecord(rn);
+    if (!monster) return null;
+
+    // Clamp the group to what its footprint allows.
+    let numMonM1 = options.numMonM1 & 0x3;
+    const horizontalSize = monsterHorizontalSize(desc);
+    if (horizontalSize === 1 && numMonM1 > 1) numMonM1 = 1;
+    if (horizontalSize === 2 && numMonM1 > 0) numMonM1 = 0;
+
+    monster.creatureType = monsterType;
+    monster.alternateGraphics = alternateGraphics;
+    monster.possession = OBJECT_ID_EOF;
+    monster.important = false;
+    monster.facing = options.facing & 0x3;
+    monster.numMonM1 = numMonM1;
+    monster.invisible = options.invisible;
+    monster.drawAsSize4 = options.drawAsSize4;
+    monster.fear = StateOfFear.StateOfFear0;
+    monster.unique = false;
+    monster.poisoned = false;
+    monster.hp = [0, 0, 0, 0];
+
+    // A lone monster is centred (0xff); a group gets packed corner positions from a
+    // random start, advancing by two for a two-corner monster.
+    const isGroup = numMonM1 !== 0;
+    let positions = isGroup ? 0 : 255;
+    let nextPosition = isGroup ? this.random.zeroTo3() : 0;
+
+    // CSBWin fills from the top index downwards.
+    let index = numMonM1;
+    for (;;) {
+      // `STRandom() % n` here, not `STRandom(n)` — the full 24-bit draw, unmasked
+      // (doc/CSBwin-src/Monster.cpp:207).
+      const spread = this.random.next() % (Math.trunc(desc.baseHealth09 / 4) + 1);
+      monster.hp[index] = (desc.baseHealth09 * options.hitPointMultiplier + spread) & 0xffff;
+      if (isGroup) {
+        positions = setPackedBits(positions, index, nextPosition);
+        nextPosition++;
+        if (horizontalSize === 1) nextPosition++;
+        nextPosition &= 0x3;
+      }
+      if (index === 0) break;
+      index--;
+    }
+    monster.groupIndex = positions & 0xff;
+
+    const placed = this.moveMonster(rn, -1, 0, options.mapX, options.mapY, options.level);
+    if (placed.removed) return null;
+    this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
+    return rn;
+  }
+
+  /**
+   * `MonsterAllowedOnLevel` — a level lists which creature types may exist on it.
+   */
+  private isMonsterAllowedOnLevel(monsterType: number, level: number): boolean {
+    const map = this.dungeon.getMap(level);
+    if (!map) return false;
+    for (const entry of map.monsterTypes ?? []) {
+      if ((entry & 0xff) === (monsterType & 0xff)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * `FindEmptyDB4Entry` — a free creature record.
+   *
+   * ⚠️ CSBWin reuses freed slots; this appends, as the rest of this port does. See
+   * the note on `MonsterDamage.createDroppedRecord`.
+   */
+  private findEmptyCreatureEntry(): ObjectID | null {
+    const data = this.dungeon.getData();
+    const db = data.databases.creatures;
+    if (db.records.length >= 1024) return null;
+    db.records.push({
+      nextObject: OBJECT_ID_EOF,
+      possession: OBJECT_ID_EOF,
+      creatureType: 0,
+      alternateGraphics: 0,
+      groupIndex: GROUP_INDEX_DETACHED,
+      hp: [0, 0, 0, 0],
+      fear: StateOfFear.StateOfFear0,
+      numMonM1: 0,
+      facing: 0,
+      important: false,
+      invisible: false,
+      drawAsSize4: false,
+      unique: false,
+      poisoned: false,
+    });
+    db.count++;
+    return encodeObjectID(0, DBType.CREATURE, db.records.length - 1) as ObjectID;
   }
 
   /* ----------------------------------------------------------------- misc ---- */

@@ -102,6 +102,13 @@ export interface Champion {
     maxRecentDamage?: ui8;
     /** `CHARDESC.facing3` — the direction the biggest recent hit came from. */
     damageFromDirection?: ui8;
+    /**
+     * `CHARDESC.word64` — the temporary defence modifier the champion's *own* attack
+     * type imposes while it is in progress, from `Byte20090[attackType]`
+     * (`doc/CSBwin-src/Character.cpp:4970`). Mostly negative: swinging leaves you
+     * open. Cleared by `EnableCharacterAction`.
+     */
+    attackStatModifier?: i16;
     skills: Skill[];           // CSBWin skills92[20]
     actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
     busyTimerIndex?: i32;      // Timer index for action disable

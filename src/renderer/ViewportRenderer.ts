@@ -10,7 +10,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { PartyState } from '../engine/gameTypes';
-import type { CreatureRecord, MapData } from '../data/dungeonTypes';
+import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { DrawViewport } from './DrawViewport';
 import { DungeonState } from '../engine/DungeonState';
@@ -129,7 +129,6 @@ export class ViewportRenderer {
   private lastRenderPosition: Position | null = null;
   private lastRenderFacing: number = 0;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
-  private monsterAttackState: WeakMap<CreatureRecord, boolean[]> = new WeakMap();
 
   /** Everything the UI modules share. See `ui/UIState.ts`. */
   private readonly ui: UIState;
@@ -216,8 +215,6 @@ export class ViewportRenderer {
       viewportIndexBuffer,
       seeThroughWalls: false,
       roomData: [],
-      onMonsterAttackState: (monster, index, soundOrdinal, isAttacking) =>
-        this.handleMonsterAttackState(monster, index, soundOrdinal, isAttacking),
     };
 
     this.initialized = true;
@@ -438,36 +435,6 @@ export class ViewportRenderer {
     this.presentViewport();
   }
 
-  private handleMonsterAttackState(
-    monster: CreatureRecord,
-    index: number,
-    soundOrdinal: number,
-    isAttacking: boolean
-  ): void {
-    let entry = this.monsterAttackState.get(monster);
-    if (!entry) {
-      entry = [];
-      this.monsterAttackState.set(monster, entry);
-    }
-    const prev = entry[index] ?? false;
-    entry[index] = isAttacking;
-    if (!isAttacking || prev) return;
-    if (soundOrdinal <= 0) return;
-    this.playMonsterAttackSound(soundOrdinal);
-  }
-
-  private playMonsterAttackSound(soundOrdinal: number): void {
-    if (!this.ui.playSound) return;
-    if (!this.ui.objectTables || !this.ui.uiTables) return;
-    // CSBWin: ordinal -> uByte9672 -> sound1772[word0]
-    const soundNum = this.ui.objectTables.monsterAttackSounds[soundOrdinal - 1] ?? 0;
-    if (!soundNum) return;
-    const entry = this.ui.uiTables.graphic232.soundTable[soundNum];
-    if (!entry) return;
-    const soundId = entry.word0 | 0;
-    if (!soundId) return;
-    this.ui.playSound(soundId);
-  }
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
     return getOrSet(this.wallBitmapSets, wallGraphicSet, () => {

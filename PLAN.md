@@ -679,9 +679,8 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    `(6,13) → (7,13) → (7,14)` shows the pre-melee position shuffle. Six new entries
    in `doc/PROVEN_FACTS.md`, including the fear-state table.
 
-   ⚠️ **One gap left inside the AI:** `CheckMonsterVersusMissiles`
-   (`Monster.cpp:4462`) returns "no hit", so shuffling position inside a cell cannot
-   walk a monster into a missile.
+   - ✅ **`CheckMonsterVersusMissiles`** (`Monster.cpp:4462`) — a monster shuffling to
+     another corner of its cell now walks onto any missile already sitting there.
 
    ⚠️ **One deferral:** `CreateMovementTimer`'s overflow guard is not ported — CSBWin
    counts the groups already waiting at a square and, past 31, deletes the monster
@@ -773,12 +772,19 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    - ⏳ Still to do: `Attack.cpp` proper — the *champion's* attacks: hit
      determination, `PossibleAttackTypes`, the real attack panel.
 
-   ⚠️ **Two divergences, both marked in the code and in
-   `doc/CSBWIN_MONSTERS_REFERENCE.md`:**
-   - **Armour does not reduce damage.** `DamageCharacter` averages `TAG01680a` over
-     the wounded body parts; that chain needs `ClothingDesc`, `Byte1412` and
-     `DetermineThrowingDistance`, so the average is 0 here and monsters hit much
-     harder than they should.
+   - ✅ **Armour now protects.** `TAG01680a` ported: shields held in either hand
+     weighted per body part by `Byte1412`, the vitality-scaled random term, the
+     champion's shield spell, the party shield, the champion's own attack-type
+     modifier, and the garment worn on the struck part. `ClothingDesc.uByte1/uByte2`
+     extracted from graphic `0x22f` and `Byte1412[6]` from `0x232`; bit 7 of
+     `uByte2` marks a shield, verified as exactly the seven shields in the shipped
+     data. Measured: one body piece cuts damage ~6%, a full suit ~18%.
+
+   ⚠️ **Two divergences left, both marked in the code:**
+   - `TAG01680a` omits its `DetermineThrowingDistance(chIdx, hand)` term
+     (`Character.cpp:2416`), which needs the object-weight and max-load chain, so a
+     shield *held in hand* protects slightly less than it should. Worn armour — the
+     larger term — is complete.
    - **`Quickness` ignores load**, so a laden champion dodges as well as an empty
      one.
 
@@ -805,9 +811,22 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    cell and makes exactly one death cloud; and a Screamer's remains come back as
    `misc` type 33, `misc_ScreamerSlice`, which confirms the `MonsterDroppings`
    range-split arithmetic. Seven new entries in `doc/PROVEN_FACTS.md`.
-5. **Creature generators.** Port actuator type 6 generator behaviour and
-   `TT_REACTIVATE_GENERATOR` (the timer type is already defined).
-6. **Retire the proxies** listed above and delete the renderer-side attack trigger.
+5. ✅ **Creature generators.** `CreateMonster` ported
+   (`MonsterSystem.createMonster`): group size clamped by the type's footprint, per
+   member hit points of `baseHealth * multiplier + Random(baseHealth/4 + 1)`, corner
+   positions from a random start advancing by two for a two-corner monster, and
+   placement through `moveMonster` so an occupied square sends the new group into
+   abeyance. Actuator type 6 now spawns; `TT_REACTIVATE_GENERATOR` was already wired.
+6. 🔄 **Retire the proxies.**
+   - ✅ `LastMonsterAttackTime` is fed by `MonsterAttacks`, not the missile path.
+   - ✅ The renderer-side attack trigger is **deleted** — `onMonsterAttackState`,
+     `handleMonsterAttackState` and `playMonsterAttackSound` are gone. The attacking
+     flag is set by the AI and the renderer only reads it, so a monster attacking off
+     screen is no longer silent.
+   - ✅ `Game.registerChampionBones()` is called automatically from `KillCharacter`.
+   - ✅ Monster teleport rotation and teleporter sounds are real (`moveMonster`).
+   - ⏳ The attack panel still shows placeholder text; it needs the champion melee
+     pipeline below.
 
 **Scope decided at the start of the phase.** Items 1-4 (with champion death/bones, since
 item 6 requires retiring the `registerChampionBones` proxy) are being done first; items 5

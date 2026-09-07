@@ -105,6 +105,8 @@ export interface UITables {
     wRectPos1454: WordRect[];
     word1406: WordRect;
     word1398: WordRect;
+    /** `d.Byte1412[6]` — per-body-part shield weighting. */
+    byte1412: number[];
     byte1390: number[];
     byte1386: number[];
     cursorColorMapLight: number[];
@@ -515,11 +517,15 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   const wRectPos1454 = readWordRectArray(view, off, 4); off += 4 * 8;
 
-  // SpecialChars[6], Byte1416[2], Byte1414[2], Byte1412[6]
+  // SpecialChars[6], Byte1416[2], Byte1414[2], then Byte1412[6].
   off += 6;
   off += 2;
   off += 2;
-  off += 6;
+  /**
+   * `d.Byte1412[6]` (doc/CSBwin-src/Data.h:1412) — per-body-part weighting for how
+   * much a shield held in hand protects that part (doc/CSBwin-src/Character.cpp:2419).
+   */
+  const byte1412 = Array.from(raw.slice(off, off + 6)); off += 6;
 
   const word1406 = readWordRect(view, off); off += 8;
   const word1398 = readWordRect(view, off); off += 8;
@@ -609,6 +615,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos1454,
     word1406,
     word1398,
+    byte1412,
     byte1390,
     byte1386,
     cursorColorMapLight,

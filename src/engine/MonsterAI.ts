@@ -169,6 +169,11 @@ export interface MonsterAiDeps {
   /** `d.CurrentPalette` — the viewport light level, which shortens monster sight. */
   getCurrentPalette?: () => number;
   /**
+   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — returns true
+   * when resolving the missiles at that cell position destroyed the whole group.
+   */
+  checkMonsterVersusMissiles?: (mapX: number, mapY: number, position: number, level: number) => boolean;
+  /**
    * `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:944`) — resolve one member's attack
    * on the party, returning whether it is now in its attacking pose.
    *
@@ -1166,13 +1171,15 @@ export class MonsterAI {
    * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — shifting
    * position inside a cell can walk the monster into a missile already there.
    *
-   * ⏳ **Not ported.** Returns false, i.e. "no missile hit", which is the common case.
-   * Tracked in PLAN.md Phase 12.
+   * Returns true when that wiped out the group, in which case the turn ends.
    */
   private checkMonsterVersusMissiles(c: AiConst): boolean {
-    void c;
-    this.lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
-    return false;
+    const wiped =
+      this.deps.checkMonsterVersusMissiles?.(c.mapX, c.mapY, c.slot.positions, c.level) ?? false;
+    this.lastDamageResult = wiped
+      ? MonsterDamageResult.ALL_MONSTERS_DIED
+      : MonsterDamageResult.NO_MONSTER_DIED;
+    return wiped;
   }
 
   /** `d.MonsterDamageResult`, as the AI sees it. */

@@ -84,6 +84,11 @@ export interface TimerTables {
   uByte590?: ArrayLike<number>;
   /** `d.Byte586[8][4]` — attack order by side. */
   byte586?: ArrayLike<ArrayLike<number>>;
+  /** `d.ClothingDesc[58].uByte1` / `.uByte2` — armour strength and flags. */
+  clothingArmour?: ArrayLike<number>;
+  clothingFlags?: ArrayLike<number>;
+  /** `d.Byte1412[6]` — per-body-part shield weighting. */
+  byte1412?: ArrayLike<number>;
 }
 
 export interface LocationRel {
@@ -1620,10 +1625,22 @@ export class TimerSystem {
    * between them does not carry a return value
    * (`doc/CSBwin-src/Code11f52.cpp:2742`).
    */
-  private monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+  private monsterDamageResult: MonsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
 
   reportMonsterDamageResult(result: MonsterDamageResult): void {
     this.monsterDamageResult = result;
+  }
+
+  /**
+   * Whether the last `DamageMonster` wiped out the whole group.
+   *
+   * A method rather than an inline comparison because the field is only ever written
+   * from a hook — `Game.applyMissileDamageToMonster` calls
+   * `reportMonsterDamageResult` — which `tsc` cannot see, so it narrows the field to
+   * its initialiser and rejects the comparison.
+   */
+  private groupWasWipedOut(): boolean {
+    return (this.monsterDamageResult as number) === MonsterDamageResult.ALL_MONSTERS_DIED;
   }
 
   checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: number | null): void {
@@ -1715,7 +1732,7 @@ export class TimerSystem {
 
           if (hit) {
             this.timers.deleteTimer(missile.timerIndex);
-            if (this.monsterDamageResult === MonsterDamageResult.ALL_MONSTERS_DIED) {
+            if (this.groupWasWipedOut()) {
               // The whole group died to the missile, so the thing being moved no
               // longer exists (doc/CSBwin-src/Code11f52.cpp:2740-2746).
               this.movedObjectWasDestroyed = true;
@@ -2340,6 +2357,45 @@ export class TimerSystem {
    * being moved — CSBWin's `return 1` from `CheckMoveFromMissile`.
    */
   private movedObjectWasDestroyed = false;
+
+  /**
+   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`).
+   *
+   * A monster shuffling to a different corner of its cell may walk onto a missile
+   * that is sitting in the corner it is moving to. Resolves every missile at that
+   * position, stopping early if the group is wiped out.
+   *
+   * Returns true when the whole group died, which is what the caller needs in order
+   * to abandon the rest of the turn.
+   */
+  checkMonsterVersusMissiles(mapX: number, mapY: number, position: number, level: number): boolean {
+    this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+    const cell = new Position(mapX, mapY, level);
+
+    // Restart the scan after each hit: resolving one missile mutates the cell chain.
+    for (let guard = 0; guard < 64; guard++) {
+      let hitSomething = false;
+      for (
+        let rn = this.dungeon.findFirstObject(cell);
+        rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
+        rn = this.dungeon.getDBRecordLink(rn)
+      ) {
+        const decoded = decodeObjectID(rn);
+        if (decoded.category !== DBType.MISSILE) continue;
+        if ((decoded.position & 0x3) !== (position & 0x3)) continue;
+        const missile = this.dungeon.getMissileRecord(rn);
+        const timerIndex = missile?.timerIndex;
+        if (this.processMissileEncounter(-1, mapX, mapY, mapX, mapY, position & 0x3, rn)) {
+          if (timerIndex !== undefined) this.timers.deleteTimer(timerIndex);
+          hitSomething = true;
+          break;
+        }
+      }
+      if (!hitSomething) break;
+      if (this.groupWasWipedOut()) break;
+    }
+    return this.groupWasWipedOut();
+  }
 
   /** `CheckMoveFromMissile` for a monster leaving a square. */
   checkMonsterMoveFromMissile(from: Position, to: Position, monsterRn: number): boolean {

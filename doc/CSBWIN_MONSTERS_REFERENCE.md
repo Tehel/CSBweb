@@ -290,13 +290,18 @@ else full armour, 0 no mitigation and no wounds at all. Its value comes from
 `MONSTERDESC.uByte22[2]`, which is non-zero for every shipped monster except the
 Giggler.
 
-Two things this port does **not** yet do, both marked in the code:
+Armour is `TAG01680a` (`doc/CSBwin-src/Character.cpp:2391`) averaged over every body
+part the blow could land on. It combines shields held in either hand — weighted per
+body part by `Byte1412`, so a shield covers some parts far better than others — a
+vitality-scaled random term, the champion's shield spell, the party shield, the
+temporary modifier the champion's *own* attack type imposes, and the garment worn on
+the struck part.
 
-- **Armour strength.** CSBWin averages `TAG01680a`
-  (`doc/CSBwin-src/Character.cpp:2391`) over the masked body parts; that needs
-  `ClothingDesc`, `Byte1412` and `DetermineThrowingDistance`. Here the average is 0,
-  so armour offers no protection and monsters hit considerably harder than they
-  should.
+Two smaller terms are still missing, both marked in the code:
+
+- `TAG01680a` omits `DetermineThrowingDistance(chIdx, hand)` from each shield's
+  contribution (`:2416`), so a shield held in hand protects slightly less than it
+  should. Worn armour is complete.
 - **Load in `Quickness`.** The `load / maxLoad` term is 0, so a laden champion dodges
   as well as an empty-handed one. `computeChampionLoad` exists but lives in the
   renderer's UI layer.
