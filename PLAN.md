@@ -673,6 +673,24 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `Try_Directions_D5_To_D4` / `Standard_Finish` / `Process_Invincible` chain — and
      the Monster Move Filter DSA that wraps it.
 
+   **Dependency found while reading `InitialChecks`** — it changes the order the rest
+   of this phase has to be done in. `InitialChecks` cannot be finished before
+   `DamageMonster` exists: its first real act is to sweep the group for a member at
+   zero HP and call `DamageMonster` to remove it, re-queueing its own timer and
+   bailing out if anyone died (`doc/CSBwin-src/Monster.cpp:2802-2832`). It also needs
+   the monster form of `MoveObject` for the off-party-level random walk (`:2908`). So
+   the remaining work is *not* "step 3 then step 4" — it is:
+
+   1. `MoveObject` for monsters (step 2's remaining item: teleporter/stairs/pit).
+   2. `DamageMonster` (part of step 4).
+   3. `InitialChecks`, which both of the above gate.
+   4. `ProcessTimers29to41`'s main body (~1220 lines) plus the `Try_*` /
+      `Standard_Finish` / `Process_Invincible` helper chain (~800 lines).
+   5. `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones.
+
+   Nothing in 3-5 is worth starting before 1 and 2, since each would have to be
+   written against a stub and revisited.
+
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
    not (Ant Man `sightDistance` is 3); the one standing one cell away but facing
