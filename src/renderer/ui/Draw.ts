@@ -73,9 +73,6 @@ export function shadeRectIndex(ui: UIState, rect: Rect, color: number): void {
  * `ScrollingText`; the renderer only paints its current rows.
  */
 
-export function pointInRect(x: number, y: number, rect: Rect): boolean {
-  return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
-}
 
 export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
   if (!ui.screenIndexBuffer) return;

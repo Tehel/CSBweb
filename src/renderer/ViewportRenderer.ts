@@ -26,7 +26,7 @@ import {
 } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables } from './csbwin/ObjectTables';
-import { extractUITables, Rect, UIButton, type UITables } from './csbwin/UITables';
+import { extractUITables, Rect, type UITables } from './csbwin/UITables';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
@@ -44,6 +44,10 @@ import { getOrSet, Position } from '@/core';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../core/types';
 import { updateHover } from '@/ui';
 import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import {
+  searchButtonList,
+  pointInRect,
+} from './ui/HitTest';
 import {
   drawInventoryBackground,
   drawInventoryScreen,
@@ -72,7 +76,6 @@ import {
   drawMessageLines,
   drawObjectIconAt,
   drawObjectIconMask,
-  pointInRect,
   shadeRectIndex,
 } from './ui/Draw';
 import { GraphicRoomType } from './bytecode/Types';
@@ -280,9 +283,9 @@ export class ViewportRenderer {
     const numEnt = (this.ui.mouseQEnd - this.ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
     if (numEnt >= mouseQueueLength - 2) return;
 
-    let id = this.searchButtonList(this.ui.primaryButtons, x, y, buttons);
+    let id = searchButtonList(this.ui.primaryButtons, x, y, buttons);
     if (id === 0) {
-      id = this.searchButtonList(this.ui.secondaryButtons, x, y, buttons);
+      id = searchButtonList(this.ui.secondaryButtons, x, y, buttons);
     }
     if (id === 0) return;
 
@@ -1243,17 +1246,6 @@ export class ViewportRenderer {
     }
   }
 
-  private searchButtonList(list: UIButton[] | null, x: number, y: number, buttons: number): number {
-    if (!list || list.length === 0) return 0;
-    for (const entry of list) {
-      if (entry.word0 === 0) break;
-      if (x >= entry.x1 && x < entry.x2 && y >= entry.y1 && y < entry.y2) {
-        if ((buttons & entry.button) !== 0) return entry.word0;
-      }
-    }
-    return 0;
-  }
-
   private handleMouseButton(id: number, x: number, y: number): void {
     // updateDebug(`handling click on ${id}`)
     if (id === 80 && this.isEyeClick(x, y)) {
@@ -1333,7 +1325,7 @@ export class ViewportRenderer {
       this.ui.partyState.cursorOwner = button;
       return;
     }
-    const sub = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
+    const sub = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
     if (sub >= 16 && sub <= 19) {
       this.ui.partyState.cursorOwner = sub - 16;
       return;
@@ -1360,7 +1352,7 @@ export class ViewportRenderer {
     const chestView = getActiveChestView(this.ui, champ);
     if (!chestView || chestView.source !== 'hand') return;
 
-    const button = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
+    const button = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
     if (button !== 0) {
       this.handleClothingClick(button - 20);
     }
@@ -1413,7 +1405,7 @@ export class ViewportRenderer {
       }
     }
 
-    const magicButton = this.searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
+    const magicButton = searchButtonList(this.ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
     if (magicButton !== 0) {
       this.applyMagicSelection(magicButton);
     }
