@@ -266,9 +266,10 @@ Playback rates:
 - **4237 Hz** for the second (front) variant of the door sound.
 
 Provenance: these rates come from the original hand-made JavaScript proof-of-concept
-(`static/js/mediaindex.js`) and were validated by the project author against the real
-Atari ST software running under emulation and against video of the game on vintage
-hardware. **CSBWin's own playback rates are wrong here.**
+(`static/js/mediaindex.js`, retired in Phase 14 — recoverable from git history) and were
+validated by the project author against the real Atari ST software running under emulation
+and against video of the game on vintage hardware. **CSBWin's own playback rates are wrong
+here.** This paragraph is now the only surviving record of those rates' origin.
 
 This is therefore one of the very few places where we intentionally do *not* follow
 CSBWin. Do not "fix" `ratesDefault` / the door rates in `src/audio/soundsIndex.ts` to

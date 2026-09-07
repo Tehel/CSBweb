@@ -913,4 +913,5 @@ Verify:
 
 - Original documentation: dmweb.free.fr
 - CSBWin source code: `doc/CSBwin-src/SaveGame.cpp` (ReadDatabases function)
-- Existing JavaScript parser: `static/js/dungeon.js`
+- Original JavaScript parser: `static/js/dungeon.js` (the pre-TypeScript
+  proof-of-concept, retired in Phase 14 — recoverable from git history)
