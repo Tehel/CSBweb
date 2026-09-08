@@ -17,7 +17,8 @@ import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import { SoundQueue } from './SoundQueue';
-import { PartyFootprints } from './PartyFootprints';
+import { PartyFootprints, type FootprintsSnapshot } from './PartyFootprints';
+import type { DungeonSnapshot } from './DungeonSnapshot';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
@@ -63,19 +64,41 @@ interface DropCursorOptions {
     viAltar?: boolean;
 }
 
+/**
+ * The quick-save payload.
+ *
+ * Version 2 added `dungeon.snapshot` and the `game` fields below it. Version 1
+ * carried only the party, the tick count, the `ITEM16` pool, the timers and the
+ * missile records, so restoring one reset the whole world — doors, moved objects,
+ * fired actuators — while leaving the party's inventory alone. There is no upgrade
+ * path, because the world state a v1 save would need was never written; `quickLoad`
+ * refuses them rather than restoring a half-state.
+ */
+export const RUNTIME_SAVE_VERSION = 2;
+
 export interface RuntimeSaveState {
-    version: 1;
+    version: typeof RUNTIME_SAVE_VERSION;
     savedAt: number;
     party: PartyState;
     game: {
         tickCount: number;
         paused: boolean;
         elapsedTimeMs: number;
+        /** `d.RandomNumber`, so a reload continues the same stream. */
+        randomSeed: number;
+        /** `d.Word11694`. */
+        gameWon: boolean;
+        /** `d.PartyFootprints` + `d.Byte13220` — the scent trail monsters follow. */
+        footprints: FootprintsSnapshot;
+        /** The DSA global variables, where a dungeon keeps its puzzle progress. */
+        dsaGlobals: number[];
     };
     dungeon: {
         item16?: Item16Record[];
         timers?: TimerRecord[];
         missiles?: MissileRecord[];
+        /** Everything play can change: cell flags, object chains, all DB records. */
+        snapshot: DungeonSnapshot;
     };
 }
 
@@ -2158,18 +2181,23 @@ export class Game {
             timerIndex: rec.timerIndex,
         }));
         return {
-            version: 1,
+            version: RUNTIME_SAVE_VERSION,
             savedAt: Date.now(),
             party: this.party.state,
             game: {
                 tickCount: this.state.tickCount,
                 paused: this.state.paused,
                 elapsedTimeMs: this.state.currentTime - this.state.startTime,
+                randomSeed: this.random.getSeed(),
+                gameWon: this.gameWon,
+                footprints: this.footprints.capture(),
+                dsaGlobals: this.dsaSystem.getGlobalVariables(),
             },
             dungeon: {
                 item16,
                 timers,
                 missiles,
+                snapshot: this.dungeonState.captureSnapshot(),
             },
         };
     }
@@ -2191,6 +2219,14 @@ export class Game {
         const now = Date.now();
         this.state.currentTime = now;
         this.state.startTime = now - save.game.elapsedTimeMs;
+        this.random.setSeed(save.game.randomSeed);
+        this.gameWon = save.game.gameWon;
+        this.dsaSystem.setGlobalVariables(save.game.dsaGlobals);
+
+        // The world first: cell flags, object chains and every database record. This
+        // has to land before the ITEM16/timer restore below, because the monster pool
+        // is re-derived from the creature records it puts back.
+        this.dungeonState.applySnapshot(save.dungeon.snapshot);
 
         const item16 = save.dungeon.item16 ?? [];
         const timers = save.dungeon.timers ?? [];
@@ -2208,7 +2244,7 @@ export class Game {
         // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
         // active, as CSBWin does after its own restore
         // (doc/CSBwin-src/SaveGame.cpp:1240-1244).
-        this.footprints.reset();
+        this.footprints.restore(save.game.footprints);
         this.monsterSystem.reloadAfterSaveGame();
     }
 

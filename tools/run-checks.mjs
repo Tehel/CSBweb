@@ -37,6 +37,9 @@ const CHECKS = [
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },
   { tool: 'dump-player-attacks.ts' },
+  // Level 1 is the argument the assertions were written for: it has a closed door,
+  // a movable object with an open neighbour, and creatures.
+  { tool: 'dump-savegame.ts', args: ['1'] },
   { tool: 'watch-monsters.ts' },
   { tool: 'watch-monster-attacks.ts' },
 ];

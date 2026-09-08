@@ -25,6 +25,7 @@ import {
     type RuntimeSaveState,
     type TimerTables,
 } from './engine';
+import { RUNTIME_SAVE_VERSION } from './engine';
 import type { ViewportRenderer } from './renderer/ViewportRenderer';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { appendLog, clearLog, updateDebug } from './ui';
@@ -553,6 +554,18 @@ export function createDevTools(host: DevHost): DevTools {
         }
         try {
             const parsed = JSON.parse(raw) as { runtime: RuntimeSaveState; raw: string };
+            // A version-1 save has no world state in it at all — no cell flags, no
+            // object chains, no database records — so there is nothing to upgrade
+            // from. Restoring one would put the party back into a dungeon reset to
+            // `dungeon.dat`, which is the bug this version exists to fix.
+            if (parsed.runtime?.version !== RUNTIME_SAVE_VERSION) {
+                updateDebug(
+                    `Quick-save is format v${parsed.runtime?.version ?? '?'}, this build reads ` +
+                        `v${RUNTIME_SAVE_VERSION} — discarded (it carried no dungeon state)`,
+                );
+                localStorage.removeItem(QUICK_SAVEGAME_RAW_KEY);
+                return;
+            }
             const saveBytes = decodeBase64ToBytes(parsed.raw);
             const saveState = loadSaveGameState(saveBytes);
             applySaveGameState(host.game.state.dungeon, saveState);

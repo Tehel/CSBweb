@@ -26,6 +26,8 @@ import type {
 } from '../data/dungeonTypes';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
+import type { DungeonSnapshot } from './DungeonSnapshot';
+import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
 
 export interface TextDecodeTables {
     escape1: Uint8Array; // Byte10080[64]
@@ -108,6 +110,24 @@ export class DungeonState {
     private getBonesRecordKey(bones: ObjectID): number | null {
         if (bones === OBJECT_ID_EOF || bones === OBJECT_ID_NULL) return null;
         return bones & 0x3fff;
+    }
+
+    /**
+     * Snapshot everything play can change, for the quick-save.
+     * See `src/engine/DungeonSnapshot.ts` for what counts as mutable and why.
+     */
+    captureSnapshot(): DungeonSnapshot {
+        const snapshot = captureDungeonSnapshot(this.data);
+        snapshot.championBones = [...this.championBonesRecords.entries()];
+        return snapshot;
+    }
+
+    applySnapshot(snapshot: DungeonSnapshot): void {
+        applyDungeonSnapshot(this.data, snapshot);
+        this.championBonesRecords.clear();
+        for (const [key, fingerprint] of snapshot.championBones ?? []) {
+            this.championBonesRecords.set(key, fingerprint & 0xffff);
+        }
     }
 
     /**

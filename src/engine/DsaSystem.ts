@@ -401,6 +401,10 @@ export class DsaSystem {
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
+  /**
+   * `d.GlobalVariables` — where a dungeon's DSAs keep their puzzle progress, so the
+   * quick-save has to carry them (`getGlobalVariables` / `setGlobalVariables`).
+   */
   private globalVariables = new Int32Array(100);
   private warnedOps = new Set<number>();
   private overridePos = 0;
@@ -764,6 +768,17 @@ export class DsaSystem {
   processTimer7(rn: number, timer: TimerEntry, location: Position): boolean {
     const vars = new DsaVars();
     return this.processTimer6Internal(rn, timer, location, false, vars);
+  }
+
+  /** The DSA global variables, for the quick-save. */
+  getGlobalVariables(): number[] {
+    return Array.from(this.globalVariables);
+  }
+
+  setGlobalVariables(values: readonly number[]): void {
+    this.globalVariables.fill(0);
+    const count = Math.min(values.length, this.globalVariables.length);
+    for (let i = 0; i < count; i++) this.globalVariables[i] = values[i] | 0;
   }
 
   private processTimer6Internal(

@@ -189,4 +189,39 @@ export class PartyFootprints {
     this.indexOfFirstMagic = 0;
     this.indexOfLastMagic = 0;
   }
+
+  /**
+   * The whole trail, for the quick-save. Monsters that cannot see the party smell
+   * this, so a restore that dropped it would make every hunting monster lose the
+   * scent at exactly the moment the game was reloaded.
+   */
+  capture(): FootprintsSnapshot {
+    return {
+      prints: [...this.prints],
+      ages: [...this.ages],
+      count: this.count,
+      lastPartyMoveTime: this.lastPartyMoveTime,
+      indexOfFirstMagic: this.indexOfFirstMagic,
+      indexOfLastMagic: this.indexOfLastMagic,
+    };
+  }
+
+  restore(snapshot: FootprintsSnapshot): void {
+    this.prints = [...snapshot.prints];
+    this.ages = [...snapshot.ages];
+    this.count = snapshot.count;
+    this.lastPartyMoveTime = snapshot.lastPartyMoveTime;
+    this.indexOfFirstMagic = snapshot.indexOfFirstMagic;
+    this.indexOfLastMagic = snapshot.indexOfLastMagic;
+  }
+}
+
+/** `PartyFootprints.capture()`'s payload. */
+export interface FootprintsSnapshot {
+  prints: number[];
+  ages: number[];
+  count: number;
+  lastPartyMoveTime: number;
+  indexOfFirstMagic: number;
+  indexOfLastMagic: number;
 }

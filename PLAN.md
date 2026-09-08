@@ -85,7 +85,8 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
 2. **Twelve assertion-carrying verification tools** — the Phase 12 eight
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
-   `dump-hand-owner.ts`, `dump-throwing.ts` and `dump-clouds.ts`. These load the real game
+   `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts` and `dump-savegame.ts`.
+   These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
    suite for everything the frames cannot see, and they caught two real bugs and two
@@ -110,6 +111,16 @@ archive section.
 
 **Bugs found but not fixed**
 
+- ✅ **The level-3 monster timer stall — no longer reproduces.** Re-checked after
+  Phase 12 closed: `npx tsx tools/watch-monsters.ts 3 10 25 200` runs the documented
+  repro and the `50000 cap` warning never fires; 5 of 13 groups move and the Muncher
+  at (11,29) walks its whole path to (9,25). The next-time computation the entry
+  suspected (`Increment_Time_By_W52_Plus_Random` / `EnsureI60NonZero`) was ⏳ when the
+  cloud work hit this, and was ported in Phase 12 step 2. Kept here as a record of the
+  diagnosis; `tools/dump-clouds.ts` still uses level 2 and need not change.
+
+  <details><summary>original entry</summary>
+
 - 🐞 **The level-3 monster timer stall.** A `TT_MONSTER_AGROUP` timer for the group at
   (10,29) on level 3 re-queues itself at the tick it just ran on, so `processTimers`
   spins until its 50000-iteration cap and **every timer behind it never runs** — on that
@@ -121,6 +132,8 @@ archive section.
   is producing a zero delay where CSBWin guarantees a positive one. Found while porting
   clouds: it was masking the cloud timer on that level.
   `tools/dump-clouds.ts` deliberately kills its test monster on level **2** to avoid it.
+
+  </details>
 
 **Rendering / UI**
 
@@ -266,6 +279,19 @@ Goal: ensure internal state and data structures are complete enough to write a b
 
 Status: ⏳ pending — not started. Note this is a large piece of work and is *not* a
 prerequisite for playability; quick-save/load via a runtime JSON snapshot already works.
+
+**The runtime snapshot now carries the world** (`src/engine/DungeonSnapshot.ts`,
+save format v2). It used to carry the party, the tick count, the `ITEM16` pool, the
+timers and the missile records and nothing else, so a quick-load reset every dungeon
+mutation — doors closed again, moved objects snapped back to their `dungeon.dat`
+cells, fired actuators re-armed — while the party kept its inventory. A door opened
+with a consumed key was then unopenable and the save was dead. v2 adds cell flags
+(with `tiles` re-derived), the object list, every database's records, the DSA state
+machine positions and global variables, the champion-bones map, `d.RandomNumber`,
+`d.Word11694` and the footprint trail. v1 saves are refused by `quickLoad` rather
+than half-restored, since the world state they would need was never written.
+Verified by `tools/dump-savegame.ts`. This does not shorten Phase 10 — the binary
+format is a separate job — but it removes the reason to rush it.
 
 ### Phase 12 — Monsters: AI, movement, combat
 
