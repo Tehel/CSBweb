@@ -14,6 +14,22 @@ export type ViewportPositionTable = { x: number; y: number }[][][]; // [3][10][5
 
 export type MonsterPositionTable = { x: number; y: number }[][][]; // [3][11][5]
 
+/**
+ * `WEAPONDESC` (doc/CSBwin-src/CSB.h:1349) — one 6-byte record per weapon type.
+ *
+ * `uByte1` is a class number that decides which skill a throw draws on
+ * (`DetermineThrowingDistance`, doc/CSBwin-src/Character.cpp:2331-2353): 0 or 2 adds
+ * mastery of skill 4, below 16 adds skill 10, 16-111 adds skill 11. `uByte2` is added
+ * straight to the throwing distance, and `uByte3` is the throw's damage contribution.
+ */
+export interface WeaponDesc {
+  weight: number; // ui8
+  uByte1: number; // ui8 — weapon class, selects the skill a throw uses
+  uByte2: number; // ui8 — added to throwing distance
+  uByte3: number; // ui8 — throw damage contribution
+  word4: number; // i16
+}
+
 export interface DecorationDesc {
   x1: number;
   x2: number;
@@ -172,6 +188,13 @@ export interface ObjectTables {
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
   objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
+  /**
+   * `d.weapons[46]` — the whole `WEAPONDESC` (doc/CSBwin-src/CSB.h:1349), which
+   * `TAG0099d2` (doc/CSBwin-src/Code51a4.cpp:2875) looks up by weapon type. Only
+   * `weight` was read before, so everything downstream of `uByte1`/`uByte2`/`uByte3`
+   * — throwing distance, throw damage, the throw skill gain — had to be estimated.
+   */
+  weaponDesc: WeaponDesc[];
   clothingWeights: Uint8Array; // d.ClothingDesc[58].weight
   /**
    * `d.ClothingDesc[58].uByte1` — the armour strength a garment contributes
@@ -523,6 +546,31 @@ function readWeaponWeights22f(raw: Uint8Array): Uint8Array {
   return out;
 }
 
+/**
+ * The whole `weapons[46]` array — the same 6-byte records `readWeaponWeights22f` takes
+ * byte 0 of. `word4` is big-endian, like everything else from the Atari data.
+ */
+function readWeaponDesc22f(raw: Uint8Array): WeaponDesc[] {
+  const start = ABS_22F_START - ABS_WEAPONS;
+  const count = 46;
+  const stride = 6;
+  const end = start + count * stride;
+  if (start < 0 || end > raw.length) throw new Error('graphics.dat item 0x22f too small for weapons[46]');
+
+  const out: WeaponDesc[] = [];
+  for (let i = 0; i < count; i++) {
+    const base = start + i * stride;
+    out.push({
+      weight: raw[base] ?? 0,
+      uByte1: raw[base + 1] ?? 0,
+      uByte2: raw[base + 2] ?? 0,
+      uByte3: raw[base + 3] ?? 0,
+      word4: (((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0)) << 16 >> 16,
+    });
+  }
+  return out;
+}
+
 function readClothingWeights22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_CLOTHING;
   const count = 58;
@@ -839,6 +887,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const clothingFlags = readClothingBytes22f(raw22f, 2);
   const foodValue = readFoodValue22f(raw22f);
   const miscWeights = readMiscWeights22f(raw22f);
+  const weaponDesc = readWeaponDesc22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
   const wallDecorationRectSetIndex = raw22e.slice(wallDecorationRectSetIndexOffset, wallDecorationRectSetIndexOffset + 60);
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
@@ -929,6 +978,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     clothingFlags,
     foodValue,
     miscWeights,
+    weaponDesc,
     wallDecorationRectSets,
     wallDecorationRectSetIndex,
     wallTextRect,

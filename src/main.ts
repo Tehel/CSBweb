@@ -286,6 +286,10 @@ async function init() {
                 messages: scrollingText,
                 championMessageColors: uiTables.graphic232.byte1386,
                 playSound: (soundId, rateIdx, distance) => soundManager?.playSound(soundId, rateIdx, distance),
+                weaponDesc: objectTables.weaponDesc,
+                weaponWeights: objectTables.weaponWeights,
+                clothingWeights: objectTables.clothingWeights,
+                miscWeights: objectTables.miscWeights,
             };
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
@@ -325,6 +329,7 @@ async function init() {
             renderer = new ViewportRenderer(graphicsLoader, dungeonState, csbGraphicsLoader ?? undefined);
             await renderer.initialize(gameCanvasEl);
             renderer.setPlaySound(playSound);
+            renderer.setCharacterStats(game.characterStats);
             renderer.setPaletteSelectedHandler((index) => {
                 if (game) game.currentPalette = index;
             });

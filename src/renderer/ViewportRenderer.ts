@@ -10,6 +10,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { PartyState } from '../engine/gameTypes';
+import type { CharacterStats } from '../engine/CharacterStats';
 import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { DrawViewport } from './DrawViewport';
@@ -263,6 +264,14 @@ export class ViewportRenderer {
 
   tryUseFrontWallItem(x: number, y: number): boolean {
     return tryUseFrontWallItem(this.ui, x, y);
+  }
+
+  /**
+   * Hand the UI the engine's `CharacterStats`, so the load and weight figures the eye
+   * panel prints come out of the same code the engine acts on.
+   */
+  setCharacterStats(stats: CharacterStats): void {
+    this.ui.characterStats = stats;
   }
 
   setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {

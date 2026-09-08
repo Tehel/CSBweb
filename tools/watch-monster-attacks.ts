@@ -56,7 +56,15 @@ async function main(): Promise<void> {
 
   const game = new Game(
     data,
-    { roomTimerFunctions: uiTables.graphic232.byte1596, monsterDesc: objectTables.monsterDesc },
+    {
+      roomTimerFunctions: uiTables.graphic232.byte1596,
+      monsterDesc: objectTables.monsterDesc,
+      objDescObjectType: objectTables.objDescObjectType,
+      weaponDesc: objectTables.weaponDesc,
+      weaponWeights: objectTables.weaponWeights,
+      clothingWeights: objectTables.clothingWeights,
+      miscWeights: objectTables.miscWeights,
+    },
     {
       monsterDesc: objectTables.monsterDesc,
       word1074: uiTables.graphic232.word1074,

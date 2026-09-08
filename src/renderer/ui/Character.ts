@@ -6,14 +6,14 @@
  * possession slots those panels read and write.
  */
 import { ImageFormat } from '../../core/imageDecoder';
-import { OBJNI_ELVEN_BOOTS, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
+import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
 import { Champion } from '../../engine/gameTypes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, getInventoryPlaceholderIndex, getObjectWeight, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -201,49 +201,17 @@ export function computeChampionLoad(ui: UIState, champion: Champion): { load: nu
   return { load, maxLoad, color };
 }
 
+/**
+ * `CHARDESC.load`. Delegated to the engine so the figure the eye panel prints is the
+ * one `Quickness` and `DetermineThrowingDistance` act on.
+ */
 export function computeLoadWeight(ui: UIState, champion: Champion): number {
-  if (!ui.objectTables) return 0;
-  const visited = new Set<number>();
-  const items: Array<number | null | undefined> = champion.possessions?.length
-    ? champion.possessions
-    : [champion.shieldHand, champion.weaponHand, champion.quiver];
-  let total = 0;
-  for (const item of items) {
-    if (typeof item !== 'number') continue;
-    total += getObjectWeight(ui, item, visited);
-  }
-  return total;
+  return ui.characterStats?.characterLoad(champion) ?? 0;
 }
 
+/** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`), in the engine. */
 export function computeMaxLoad(ui: UIState, champion: Champion): number {
-  const strength = champion.attributes?.strength ?? 0;
-  let maxLoad = 8 * strength + 100;
-  maxLoad = staminaAdjustedAttribute(champion, maxLoad);
-
-  const wounds = champion.wounds ?? 0;
-  if (wounds !== 0) {
-    const shift = (wounds & 0x10) !== 0 ? 2 : 3;
-    maxLoad -= maxLoad >> shift;
-  }
-
-  const feetItem = getInventoryItemIndex(ui, champion, 5);
-  if (feetItem === OBJNI_ELVEN_BOOTS) {
-    maxLoad += maxLoad >> 4;
-  }
-
-  maxLoad += 9;
-  maxLoad -= maxLoad % 10;
-  return maxLoad;
-}
-
-export function staminaAdjustedAttribute(champion: Champion, base: number): number {
-  const stamina = champion.attributes?.stamina ?? 0;
-  const maxStamina = champion.attributes?.maxStamina ?? 0;
-  const half = Math.floor(maxStamina / 2);
-  if (half <= 0 || stamina >= half) return base;
-
-  const halfBase = Math.floor(base / 2);
-  return halfBase + Math.floor((halfBase * stamina) / half);
+  return ui.characterStats?.maxLoad(champion) ?? 0;
 }
 
 export function getLoadColor(load: number, maxLoad: number): number {

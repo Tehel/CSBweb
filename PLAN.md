@@ -56,7 +56,8 @@ Verified against the code, not inherited from earlier revisions of this file.
 3. 🔄 **Champion death and bones now work** (Phase 12); resurrection, character
    creation and potion drinking remain (Phase 13).
 4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
-5. **Throw stats are estimates**, not CSBWin's skill/weight/stamina formulas (Phase 9 step 11).
+5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
+   ported over the real `DetermineThrowingDistance` chain (Phase 9 step 11).
 6. ✅ **Debug scaffolding** — done (Phase 14). Now confined to `src/dev.ts` and reached only
    through `isDebugFeaturesEnabled()`.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
@@ -126,10 +127,12 @@ archive section.
   engine hooks — see the TODOs in `src/engine/TimerSystem.ts`.
 - ⚠️ *(Phase 8)* DSA object manipulation skips cloud/missile timer updates and does not free
   DB records on delete (CSBWin uses a deferred `DeleteDBEntry`).
-- ⏳ *(Phase 9 step 11)* **`ThrowByCharacter` stats are estimates.**
-  `Game.estimateThrowRange/estimateThrowDamage/estimateThrowDecay` stand in for CSBWin's
-  range/damage/decay from skills, stamina and item weight.
-  Ref: `doc/CSBwin-src/Mouse.cpp:673+`, `doc/CSBwin-src/Attack.cpp:652+`.
+- ✅ *(Phase 9 step 11)* **`ThrowByCharacter` is ported.**
+  `estimateThrowRange/Damage/Decay` are gone; range, damage and decay come from
+  `DetermineThrowingDistance` and skill-10 mastery, in CSBWin's order — the throw raises
+  the skill *before* the mastery that sets its range is read. The sound, the stamina cost
+  (`TAG016382`) and the action disable came with it; they were missing entirely.
+  Ref: `doc/CSBwin-src/Mouse.cpp:672-757`, `doc/CSBwin-src/Character.cpp:2267`.
 - ⏳ *(Phase 9 step 12)* Door pass-through rules (DoorTOC + ObjDesc checks for missiles) and
   the magic damage/poison formulas incl. Black Flame fireball healing.
   Ref: `doc/CSBwin-src/Code11f52.cpp:1870+`, `doc/CSBwin-src/Code11f52.cpp:1488+`.
@@ -140,6 +143,17 @@ archive section.
 - ⚠️ *(Phase 9.5)* Refine spell skill selection once spell definitions exist, replace the
   throw skill gain with CSBWin's tables, and refine the `LastMonsterAttackTime` source now
   that monster AI is in.
+- ⚠️ *(new, `src/engine/CharacterStats.ts`)* Two knowingly-different things in the
+  weight/load chain, both recorded in the module comment:
+  - `CHARDESC.load` is **recomputed** from the possessions rather than cached and
+    adjusted at each of CSBWin's eight possession writers. Same value, and it cannot
+    drift; `Party.ts` already made the same choice for `SetHandOwner`.
+  - The `nameIndex` hook is `Game.getBaseObjectNameIndex`, which returns the *base*
+    object name index rather than `RN::NameIndex()`'s modified one. This only matters
+    where a modifiable object (0-31) is looked up — `determineMastery`'s Firestaff A/B
+    bonus — and it is pre-existing: `Game.ts:844` already fed it the same way. The
+    Elven Boots check in `MaxLoad` is unaffected (index 119, outside the range).
+
 - ⚠️ *(Phase 5)* Save-game fidelity gaps: extended-feature save games (sequenced/extended
   timers + DSA blocks), full monster attack/alternate-graphics state, and exact missile
   mirror/flip edge cases.
@@ -420,13 +434,12 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `uByte2` marks a shield, verified as exactly the seven shields in the shipped
      data. Measured: one body piece cuts damage ~6%, a full suit ~18%.
 
-   ⚠️ **Two divergences left, both marked in the code:**
-   - `TAG01680a` omits its `DetermineThrowingDistance(chIdx, hand)` term
-     (`Character.cpp:2416`), which needs the object-weight and max-load chain, so a
-     shield *held in hand* protects slightly less than it should. Worn armour — the
-     larger term — is complete.
-   - **`Quickness` ignores load**, so a laden champion dodges as well as an empty
-     one.
+   ✅ **Both divergences closed** by `src/engine/CharacterStats.ts`:
+   - `TAG01680a`'s `DetermineThrowingDistance(chIdx, hand)` term
+     (`Character.cpp:2416`) is in, so a shield too heavy for its bearer protects less.
+     The full suit in `tools/watch-monster-attacks.ts` moved from 18% to 20%.
+   - **`Quickness` uses load**: a champion carrying 504 against a 500 max load averages
+     13.2, an empty-handed one 26.5 (`tools/dump-throwing.ts`).
 
    Verified with `tools/watch-monster-attacks.ts` (new): a four-champion party stood
    next to the monsters on level 2 takes its first hit at tick ~146, loses its first

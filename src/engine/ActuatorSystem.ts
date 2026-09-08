@@ -39,7 +39,7 @@ import {
 import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc, WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import type { CsbRandom } from '../core/random';
 import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import {
@@ -109,6 +109,15 @@ export interface ActuatorTables {
   championMessageColors?: ArrayLike<number>;
   adjustSkillsFilter?: AdjustSkillsFilterHook;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+  /**
+   * The object-weight and weapon tables `CharacterStats` needs. They ride here rather
+   * than on their own channel because this is already how `objDescObjectType` reaches
+   * the engine, and `Game` passes the whole bag straight through.
+   */
+  weaponDesc?: ArrayLike<WeaponDesc>;
+  weaponWeights?: ArrayLike<number>;
+  clothingWeights?: ArrayLike<number>;
+  miscWeights?: ArrayLike<number>;
 }
 
 export class ActuatorSystem {

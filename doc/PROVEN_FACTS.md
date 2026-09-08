@@ -918,3 +918,74 @@ WU TSE's six. A test that takes "the first preset hero" and expects something in
 is testing the wrong hero, not a broken `assignPresetHeroPossessions`. HALK's weapon hand
 is rn 37976, `WEAPON#88` — the same record `tools/dump-level-items.ts` finds lying in
 HALK's mirror cell (7,8) on level 0.
+
+## `WEAPONDESC` is six bytes, and only the first was being read
+
+`weapons[46]` in graphic `0x22f` (absolute 8658) holds a `WEAPONDESC`
+(`doc/CSBwin-src/CSB.h:1349`): `weight`, `uByte1`, `uByte2`, `uByte3`, `word4`. The port
+read byte 0 and skipped the rest, which is why every consumer of the other three had to
+be estimated.
+
+The weight column is the canary that the base and stride are right — it reproduces the
+weights Dungeon Master's own manual prints: arrow 0.2 kg, throwing star 0.1, rock 1.0,
+sling 1.9, crossbow 2.8, club 3.6, axe 4.3.
+
+`uByte1` is a class number that selects which skill a throw draws mastery from
+(`doc/CSBwin-src/Character.cpp:2331-2353`), and it partitions the shipped weapons
+exactly along Dungeon Master's fighter skills:
+
+| `uByte1` | skill | weapons |
+| --- | --- | --- |
+| 0 or 2 | 4, Swing | swords, axes, maces, clubs |
+| 1-15 (not 0) | 10, Throw | arrow, slayer, rock, poison dart, throwing star |
+| 16-111 | 11, Shoot | bow, crossbow, sling |
+| 112+ | none | staves, wands, the Firestaff |
+
+`uByte2` is added straight to the throwing distance and is what makes a weapon a good
+throwing weapon (throwing star 3, rock 6, club 19, axe 49). `uByte3` is the throw's
+damage contribution and also the `+ uByte3 / 4` term in the throw's skill gain
+(`doc/CSBwin-src/Mouse.cpp:731-735`).
+
+## Throwing distance *rises* with weight before it collapses
+
+`DetermineThrowingDistance` (`doc/CSBwin-src/Character.cpp:2295-2314`) is not
+"heavier throws shorter". With `S = MaxLoad/16`:
+
+| object weight | effect on the distance |
+| --- | --- |
+| `w <= S` | `+ w - 12` — heft **helps**, linearly |
+| `S < w <= (S-12)/2 + S` | `+ (w - S)/2` — still helps, at half rate |
+| beyond that | `- 2 * (w - midpoint)` — collapses, at double rate |
+
+Measured with `tools/dump-throwing.ts` on a strength-10 champion (`MaxLoad` 180, so
+`S = 11`): compass (0.1 kg) 2.9, waterskin (0.3) 3.9, cheese (0.8) 6.4, worm round (1.1)
+8.0 — then bones (1.5) drops to 4.5 and a boulder (8.1) to 0.
+
+Two more terms after that: `StaminaAdjustedAttribute` scales the lot when the champion
+is below half stamina, and a wound on **that hand** — bit 1 for hand 0, bit 2 for hand 1
+(`:2367-2372`) — halves it. Measured: a rock throws 31.4 from a healthy fighting hand,
+15.5 with that hand wounded, and 31.3 from the *other* hand at the same moment.
+
+## Throwing raises the skill before it reads the mastery that sets the range
+
+`ThrowByCharacter` (`doc/CSBwin-src/Mouse.cpp:736-742`) calls
+`AdjustSkills(chIdx, 10, …)` and only then `DetermineMastery(chIdx, 10)`, so a throw
+that levels the skill flies that little bit further. All three missile statistics come
+out of that one mastery value:
+
+```
+range     = D7 + STRandom(16) + D7/2 + mastery      (D7 = throwingDistance + weaponBonus)
+damage    = ApplyLimits(40, 8*mastery + (STRandom()&31), 200)
+decayRate = Larger(5, 11 - mastery)
+```
+
+`weaponBonus` is 1 for anything that is not a weapon, and `weaponDesc->uByte3` for a
+weapon of class 12 or below — the throwables. Staves and wands, class 128 and up, gain
+nothing from being thrown.
+
+## `MaxLoad` is rounded down to a multiple of 10
+
+`MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`) is `8 * Strength + 100`, stamina-adjusted,
+less an eighth for any wound (a quarter if the torso is hurt, bit 4), plus a sixteenth for
+Elven Boots in slot 5, then `+9` and rounded down to a multiple of 10. A strength-50
+champion at full stamina gets exactly 500; at 10/100 stamina, 300; with a wounded torso, 380.

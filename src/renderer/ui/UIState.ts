@@ -14,6 +14,7 @@ import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { UIButton, UITables } from '../csbwin/UITables';
 import type { ObjectTables } from '../csbwin/ObjectTables';
+import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import type { ObjectID, Position } from '../../core/types';
@@ -42,6 +43,13 @@ export interface UIState {
   screenIndexBuffer: ScreenIndexBuffer | null;
   uiTables: UITables | null;
   objectTables: ObjectTables | null;
+  /**
+   * `GetObjectWeight` / `MaxLoad` and friends (`src/engine/CharacterStats.ts`). The UI
+   * shows the load figure the engine's `Quickness` and `DetermineThrowingDistance` act
+   * on, so both must come out of the same code — there used to be two implementations.
+   * Set once the object tables are extracted.
+   */
+  characterStats: CharacterStats | null;
   fontData: FontData | null;
   partyState: PartyState | null;
   uiMode: UIMode;
@@ -95,6 +103,7 @@ export function createUIState(
     screenIndexBuffer: null,
     uiTables: null,
     objectTables: null,
+    characterStats: null,
     fontData: null,
     partyState: null,
     uiMode: UIMode.Adventure,

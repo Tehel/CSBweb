@@ -16,7 +16,6 @@ import { UIMode, UIState } from './UIState';
 import { MISC_BONES_OF_HERO } from '@/core';
 export type ItemDescriptionLine = { text: string; color: number };
 const DEFAULT_CHEST_WEIGHT = 50;
-const POTION_EMPTY_FLASK = 20;
 
 export function resolveObjectNameIndex(ui: UIState, value: number): number {
   if (value < 0) return -1;
@@ -249,52 +248,13 @@ export function getObjectWeight(ui: UIState, value: number, visited: Set<number>
   return getObjectWeightForObjectType(ui, value | 0);
 }
 
+/**
+ * `GetObjectWeight` / `TAG0091e6` for an object *record*, in the engine
+ * (`src/engine/CharacterStats.ts`). The name-index form below stays here: it exists for
+ * the icons and the eye panel, which deal in object types rather than records.
+ */
 export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
-  if (!ui.objectTables) return 0;
-  if (visited.has(rn)) return 0;
-  visited.add(rn);
-
-  const { category } = decodeObjectID(rn);
-  switch (category) {
-    case DBType.WEAPON: {
-      const rec = ui.dungeonState.getWeaponRecord(rn);
-      if (!rec) return 0;
-      return ui.objectTables.weaponWeights[rec.weaponType] ?? 0;
-    }
-    case DBType.CLOTHING: {
-      const rec = ui.dungeonState.getClothingRecord(rn);
-      if (!rec) return 0;
-      return ui.objectTables.clothingWeights[rec.clothingType] ?? 0;
-    }
-    case DBType.SCROLL:
-      return 1;
-    case DBType.POTION: {
-      const rec = ui.dungeonState.getPotionRecord(rn);
-      if (!rec) return 0;
-      return rec.potionType === POTION_EMPTY_FLASK ? 1 : 3;
-    }
-    case DBType.MISC: {
-      const rec = ui.dungeonState.getMiscRecord(rn);
-      if (!rec) return 0;
-      let weight = ui.objectTables.miscWeights[rec.miscType] ?? 0;
-      if (rec.miscType === 1) {
-        weight += 2 * (rec.specialState ?? 0);
-      }
-      return weight;
-    }
-    case DBType.CHEST: {
-      const rec = ui.dungeonState.getContainerRecord(rn);
-      let total = DEFAULT_CHEST_WEIGHT;
-      let obj = rec?.containedObject ?? OBJECT_ID_EOF;
-      while (obj !== OBJECT_ID_EOF && obj !== OBJECT_ID_NULL) {
-        total += getObjectWeight(ui, obj, visited);
-        obj = ui.dungeonState.getDBRecordLink(obj);
-      }
-      return total;
-    }
-    default:
-      return 0;
-  }
+  return ui.characterStats?.getObjectWeight(rn, visited) ?? 0;
 }
 
 export function getObjectWeightForObjectType(ui: UIState, objectType: number): number {

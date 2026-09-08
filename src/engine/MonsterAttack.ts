@@ -26,6 +26,7 @@ import { setHandOwner } from './Party';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { CharacterStats } from './CharacterStats';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 
 /**
@@ -557,6 +558,17 @@ export class MonsterAttack {
   }
 
   /**
+   * `CharacterStats`, for the `DetermineThrowingDistance` term in `TAG01680a` and the
+   * load term in `Quickness`. Injected after construction because `Game` builds it
+   * from tables that arrive with the graphics.
+   */
+  private characterStats: CharacterStats | null = null;
+
+  setCharacterStats(stats: CharacterStats): void {
+    this.characterStats = stats;
+  }
+
+  /**
    * `TAG01680a` (`doc/CSBwin-src/Character.cpp:2391`) — how well one body part is
    * protected, 0 to 100.
    *
@@ -573,10 +585,10 @@ export class MonsterAttack {
    *
    * The result is halved and clamped to 0-100 before it reaches the damage scaling.
    *
-   * ⚠️ One term is missing: CSBWin adds `DetermineThrowingDistance(chIdx, hand)` to
-   * each shield's contribution (`:2416`), which needs the object-weight and max-load
-   * chain. It is 0 here, so a shield in hand protects slightly less than it should.
-   * Worn armour — the larger term — is complete. Recorded in PLAN.md Phase 12.
+   * The throwing-distance term in (1) is `DetermineThrowingDistance(chIdx, hand)`
+   * (`:2416`) — how well the champion is handling what is in that hand. A shield too
+   * heavy for its bearer therefore protects less, which is the same weight-versus-load
+   * curve that governs a throw.
    */
   armourStrength(champ: Champion, bodyPart: number, scale: boolean): number {
     let handTotal = 0;
@@ -584,8 +596,10 @@ export class MonsterAttack {
       const worn = this.clothingTypeIn(champ, hand);
       if (worn === null) continue;
       if (((this.tables?.clothingFlags?.[worn] ?? 0) & 0x80) === 0) continue; // not a shield
-      // ⚠️ `+ DetermineThrowingDistance(chIdx, hand)` belongs here.
-      const strength = this.clothingArmourValue(worn, scale);
+      const throwingDistance = this.characterStats?.determineThrowingDistance(
+        champ, hand, this.getPartyState().sleeping ?? false,
+      ) ?? 0;
+      const strength = this.clothingArmourValue(worn, scale) + throwingDistance;
       const weight = this.tables?.byte1412?.[bodyPart] ?? 0;
       const product = (strength * weight) & 0xffff;
       handTotal += product >> (hand === bodyPart ? 4 : 5);
@@ -637,13 +651,17 @@ export class MonsterAttack {
    * `Quickness` (`doc/CSBwin-src/Character.cpp:2209`) — roughly
    * `0.5 * Dexterity * (1 - load/maxLoad/2)`, with random limits near 5 and 95.
    *
-   * ⚠️ Load is not plumbed into the engine, so the `load / maxLoad` term is 0 and a
-   * fully-laden champion dodges as well as an empty-handed one. `computeChampionLoad`
-   * exists but lives in the renderer's UI layer. Recorded in PLAN.md Phase 12.
+   * Delegated to `CharacterStats`, which owns the `MaxLoad` chain. Until that existed
+   * the load term was simply missing and a fully-laden champion dodged as well as an
+   * empty-handed one.
    */
   quickness(champ: Champion): number {
-    let quickness = champ.attributes.dexterity + this.random.below(8);
     const party = this.getPartyState();
+    if (this.characterStats) {
+      return this.characterStats.quickness(champ, party.sleeping ?? false);
+    }
+    // No tables yet (a partially constructed engine): the pre-load behaviour.
+    let quickness = champ.attributes.dexterity + this.random.below(8);
     if (party.sleeping) quickness = Math.trunc(quickness / 2);
     quickness = Math.trunc(quickness / 2);
     const loLimit = this.random.below(8) + 1;

@@ -31,6 +31,9 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { getChampionPossession } from '../src/renderer/ui/Character';
+import { getBaseObjectNameIndex } from '../src/renderer/ui/Objects';
+import { CharacterStats } from '../src/engine/CharacterStats';
+import { CsbRandom } from '../src/core/random';
 import { check, finish } from './lib/check';
 
 /**
@@ -153,6 +156,19 @@ async function main(): Promise<void> {
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
+  // Without this the UI's load and weight readouts silently return 0 — they delegate
+  // to the engine now (`src/engine/CharacterStats.ts`).
+  ui.characterStats = new CharacterStats({
+    dungeon,
+    random: new CsbRandom(0x12345678),
+    tables: {
+      weaponDesc: objectTables.weaponDesc,
+      weaponWeights: objectTables.weaponWeights,
+      clothingWeights: objectTables.clothingWeights,
+      miscWeights: objectTables.miscWeights,
+    },
+    nameIndex: (rn) => getBaseObjectNameIndex(ui, rn),
+  });
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
 

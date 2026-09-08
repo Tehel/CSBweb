@@ -41,6 +41,7 @@ const CHAMP_WOUND_SOUNDS = [
 ];
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
+import { CharacterStats } from './CharacterStats';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -145,6 +146,12 @@ export class Game {
     private dsaSystem: DsaSystem;
     private nextChampionFingerprint = 1;
     private objDescObjectType: ArrayLike<number> | null = null;
+    /**
+     * `GetObjectWeight` / `MaxLoad` / `DetermineThrowingDistance` / `Quickness`
+     * (`src/engine/CharacterStats.ts`). Public because the throw path, the armour
+     * calculation and `tools/` all reach it.
+     */
+    readonly characterStats: CharacterStats;
     private spellDefinitions: SpellDefinition[] = [];
 
     // Game loop
@@ -344,6 +351,19 @@ export class Game {
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
+
+        this.characterStats = new CharacterStats({
+            dungeon: this.dungeonState,
+            random: this.random,
+            tables: {
+                weaponDesc: actuatorTables?.weaponDesc,
+                weaponWeights: actuatorTables?.weaponWeights,
+                clothingWeights: actuatorTables?.clothingWeights,
+                miscWeights: actuatorTables?.miscWeights,
+            },
+            nameIndex: (rn) => this.getBaseObjectNameIndex(rn),
+        });
+        this.monsterAttack.setCharacterStats(this.characterStats);
 
         // Initialize movement system
         this.movementSystem = new MovementSystem(this.party, this.dungeonState);
@@ -1603,7 +1623,8 @@ export class Game {
     }
 
     /**
-     * Throw the cursor object as a missile using CSBwin's LaunchMissile path.
+     * `ThrowObjectInHand` / `TAG01772e` (`doc/CSBwin-src/Mouse.cpp:764`) — throw what
+     * the cursor is holding, on behalf of the champion who owns the cursor.
      */
     throwObjectFromCursor(leftOrRight: number): boolean {
         const party = this.party.state;
@@ -1615,12 +1636,76 @@ export class Game {
         if (!this.isLikelyObjectRecord(obj)) return false;
 
         const champion = party.champions[owner] ?? null;
-        const range = this.estimateThrowRange(champion);
-        const damage = this.estimateThrowDamage(champion);
-        const decayRate = this.estimateThrowDecay(champion);
+        if (!champion) return false;
+
+        // CSBWin's `hand < 0` path: the object goes into the fighting hand for exactly
+        // as long as it takes to measure the throw, because `DetermineThrowingDistance`
+        // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:698-705`).
+        const saved = this.getChampionPossession(champion, 1);
+        this.setPossessionDirect(champion, 1, obj);
+        const throwingDistance = this.characterStats.determineThrowingDistance(
+            champion, 1, party.sleeping ?? false,
+        );
+        this.setPossessionDirect(champion, 1, saved);
 
         party.objectInHand = null;
-        const launched = this.timerSystem.throwObjectFromHand(
+        const launched = this.throwByCharacter(owner, champion, obj, leftOrRight, throwingDistance);
+        if (!launched) party.objectInHand = obj;
+        return launched;
+    }
+
+    /**
+     * The tail of `ThrowByCharacter` / `TAG017570` (`doc/CSBwin-src/Mouse.cpp:722-756`),
+     * from the sound to `LaunchMissile`.
+     *
+     * The order matters and is not the obvious one: the throw **raises skill 10 before**
+     * the mastery that sets its range is read, so a throw that levels the skill flies
+     * that little bit further. All three missile statistics come out of one mastery
+     * value — range from it plus the throwing distance, damage as `8 * mastery` plus
+     * noise, and the decay rate as `11 - mastery` — so a master thrower throws further,
+     * harder, and with a projectile that keeps its damage longer.
+     *
+     * This replaces `estimateThrowRange/Damage/Decay`, three invented formulas built on
+     * strength and dexterity that touched neither the object's weight nor the skill.
+     */
+    private throwByCharacter(
+        chIdx: number,
+        champion: Champion,
+        obj: ObjectID,
+        leftOrRight: number,
+        throwingDistance: number,
+    ): boolean {
+        const party = this.party.state;
+
+        this.sounds.queueSound(16, party.position.x, party.position.y, 1);
+        this.adjustStamina(champion, this.throwStaminaCost(obj));
+        this.disableCharacterAction(chIdx, 4);
+
+        // The experience the throw earns, and `weaponBonus` — the weapon's own
+        // contribution to the distance, which doubles as the damage scale below.
+        let experience = 8;
+        let weaponBonus = 1;
+        if (decodeObjectID(obj).category === DBType.WEAPON) {
+            experience += 4;
+            const desc = this.characterStats.weaponDescFor(obj);
+            // Above class 12 are the staves and wands, which gain nothing from a throw.
+            if (desc && desc.uByte1 <= 12) {
+                weaponBonus = desc.uByte3;
+                experience += Math.trunc(weaponBonus / 4);
+            }
+        }
+        this.awardThrowSkill(chIdx, experience);
+
+        const base = throwingDistance + weaponBonus;
+        const mastery = determineMastery(champion, 10, {
+            partySleeping: party.sleeping ?? false,
+            getObjectNameIndex: (objectId: number) => this.getBaseObjectNameIndex(objectId as ObjectID),
+        });
+        const range = base + this.random.below(16) + Math.trunc(base / 2) + mastery;
+        const damage = this.applyLimits(40, 8 * mastery + (this.random.next() & 31), 200);
+        const decayRate = Math.max(5, 11 - mastery);
+
+        return this.timerSystem.throwObjectFromHand(
             obj,
             party.position,
             leftOrRight,
@@ -1630,12 +1715,31 @@ export class Game {
             decayRate,
             this.state.tickCount,
         );
-        if (!launched) {
-            party.objectInHand = obj;
-        } else {
-            this.awardThrowSkill(owner, obj);
+    }
+
+    /**
+     * `TAG016382` (`doc/CSBwin-src/Mouse.cpp:653`) — the stamina a throw costs, which
+     * grows faster than linearly with weight: half the weight, clamped to 1-10, and then
+     * half of every remaining 10 units piled on top.
+     */
+    private throwStaminaCost(obj: ObjectID): number {
+        let remaining = Math.trunc(this.characterStats.getObjectWeight(obj) / 2);
+        let cost = this.applyLimits(1, remaining, 10);
+        while ((remaining -= 10) > 0) {
+            cost = cost + Math.trunc(remaining / 2);
         }
-        return launched;
+        return cost;
+    }
+
+    /** Write a possession slot without the UI's placement rules — used for CSBWin's
+     * temporary hand swap, where the object is put back immediately. */
+    private setPossessionDirect(champion: Champion, slot: number, value: ObjectID | null): void {
+        if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
+            champion.possessions[slot] = value;
+            return;
+        }
+        if (slot === 1) champion.weaponHand = value;
+        else if (slot === 0) champion.shieldHand = value;
     }
 
 
@@ -1680,30 +1784,8 @@ export class Game {
         return value;
     }
 
-    private estimateThrowRange(champion: Champion | null): number {
-        const strength = champion?.attributes?.strength ?? 0;
-        const dexterity = champion?.attributes?.dexterity ?? 0;
-        let range = 8 + ((strength + dexterity) >> 2);
-        range = Math.max(1, Math.min(100, range));
-        return range;
-    }
-
-    private estimateThrowDamage(champion: Champion | null): number {
-        const strength = champion?.attributes?.strength ?? 0;
-        let damage = 20 + strength;
-        damage = Math.max(1, Math.min(200, damage));
-        return damage;
-    }
-
-    private estimateThrowDecay(champion: Champion | null): number {
-        const dexterity = champion?.attributes?.dexterity ?? 0;
-        let decay = Math.max(1, 10 - Math.floor(dexterity / 20));
-        decay = Math.max(1, Math.min(15, decay));
-        return decay;
-    }
-
-    private awardThrowSkill(chIdx: number, obj: ObjectID): void {
-        const experience = this.computeThrowSkillGain(obj);
+    /** `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. */
+    private awardThrowSkill(chIdx: number, experience: number): void {
         if (experience <= 0) return;
         const map = this.dungeonState.getMap(this.party.state.position.z);
         const experienceMultiplier = map?.descriptor.difficulty ?? 0;
@@ -1715,19 +1797,6 @@ export class Game {
             applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
             onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
         });
-    }
-
-    /**
-     * CSBWin `doc/CSBwin-src/Mouse.cpp:724-736`: `D6W = 8`, `+= 4` for a weapon, and then
-     * for a weapon whose `weaponDesc->uByte1 <= 12` a further `+ uByte3 / 4`.
-     *
-     * TODO: the last term is missing — `weaponDesc` (CSBWin `TAG0099d2`, our
-     * `ObjectTables.weaponDesc`) is not plumbed into the engine yet, only
-     * `objDescObjectType` is. Wire it through `ActuatorTables` and finish the port.
-     */
-    private computeThrowSkillGain(obj: ObjectID): number {
-        const { category } = decodeObjectID(obj);
-        return category === DBType.WEAPON ? 12 : 8;
     }
 
     // Get position info for debugging
