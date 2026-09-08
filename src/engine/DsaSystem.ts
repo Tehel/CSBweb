@@ -55,6 +55,12 @@ export interface ViewingFilterOptions {
   textTables?: TextDecodeTables;
 }
 
+/** The one type-47 actuator `SetupDSAParam` picked out (`doc/CSBwin-src/Attack.cpp:434`). */
+export interface PartyAttackFilter {
+  position: Position;
+  actuator: ObjectID;
+}
+
 export interface ViewingFilterResult {
   phraseMask: number;
   objectId: number;
@@ -178,9 +184,19 @@ const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_MISSILE_ENCOUNTER_FILTER = 13;
 const ESL_ADJUST_SKILLS_FILTER = 6;
 const ESL_VIEWING_FILTER = 3;
+const ESL_PARTY_ATTACK_FILTER = 4;
 const MISSILE_ENCOUNTER_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_MISSILE_ENCOUNTER_FILTER;
 const ADJUST_SKILLS_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_ADJUST_SKILLS_FILTER;
 const VIEWING_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_VIEWING_FILTER;
+const PARTY_ATTACK_FILTER_KEY = (EDT_SPECIAL_LOCATIONS << 24) | ESL_PARTY_ATTACK_FILTER;
+
+/**
+ * `sizeof(ATTACKPARAMETERS)` — what `SetupDSAParam` writes into `pDSAparameters[0]`
+ * (`doc/CSBwin-src/Attack.cpp:1361`). It is a byte count where every other filter
+ * stores a word count, which is CSBWin's own inconsistency; since `PARAM_FETCH`
+ * clamps its request to 100 first, an over-large count behaves as "all of them".
+ */
+const PARTY_ATTACK_PARAM_SIZEOF = 124;
 
 const enum DsaMoveError {
   SER_OK = 0,
@@ -601,6 +617,69 @@ export class DsaSystem {
 
     if (!found) return null;
     return { chIdx, skillNumber, experience };
+  }
+
+  /**
+   * `SetupDSAParam` (`doc/CSBwin-src/Attack.cpp:1346`) — locate the Party Attack
+   * Filter once, at the top of `_Attack`, so every later `CallAttackFilter` runs the
+   * *same* actuator rather than re-searching the cell.
+   *
+   * Returns null when the dungeon has no such filter, which is the common case and
+   * the reason `CallAttackFilter` is free.
+   */
+  findPartyAttackFilter(): PartyAttackFilter | null {
+    const special = this.dungeon.getSpecialLocation(PARTY_ATTACK_FILTER_KEY);
+    if (special === null) return null;
+    const locrFilter = intToLocation(special);
+    if (!this.isValidLocation(locrFilter)) return null;
+    const position = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
+    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      const rec = this.dungeon.getActuatorRecord(rn);
+      if (!rec || getActuatorType(rec) !== 47) continue;
+      return { position, actuator: rn };
+    }
+    return null;
+  }
+
+  /**
+   * `CallAttackFilter` (`doc/CSBwin-src/Attack.cpp:457`).
+   *
+   * `_Attack` calls this three times for one blow — `msg` 0 before it decides
+   * anything, 1 once the attack type's own code has filled in its half of the block,
+   * and 2 after everything has been applied — and the DSA sees the *same* parameter
+   * block each time, mutated in place. So the caller keeps the words and passes them
+   * back in; this only marshals them across.
+   *
+   * `msg` rides in the timer's `uByte9` (`timerFunction`), which is how the DSA tells
+   * the three calls apart.
+   */
+  callPartyAttackFilter(filter: PartyAttackFilter, words: ArrayLike<number>, msg: number): number[] {
+    const timer: TimerEntry = {
+      index: -1,
+      time: 0,
+      level: filter.position.z & 0xff,
+      function: msg & 0xff,
+      uByte5: 0,
+      uByte6: filter.position.x & 0xff,
+      uByte7: filter.position.y & 0xff,
+      uByte8: 0,
+      uByte9: msg & 0xff,
+      sequence: 0,
+      timerWord8: 0,
+      timerWord6: 0,
+    };
+
+    const count = Math.min(words.length, 100);
+    this.parameters.fill(0);
+    this.parameters[0] = PARTY_ATTACK_PARAM_SIZEOF;
+    for (let i = 0; i < count; i++) this.parameters[1 + i] = words[i] ?? 0;
+
+    this.processTimer6Internal(filter.actuator, timer, filter.position, true, new DsaVars());
+
+    const out = new Array<number>(words.length);
+    for (let i = 0; i < words.length; i++) out[i] = this.getParameter(i);
+    return out;
   }
 
   processSpellFilter(params: SpellParameters): SpellParameters | null {

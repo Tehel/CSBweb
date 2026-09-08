@@ -40,13 +40,12 @@ import {
   monsterWord16_12_15,
 } from '../renderer/csbwin/ObjectTables';
 import { setPackedBits } from './MonsterSystem';
+import { CloudType } from './cloudTypes';
 
 /** `d.DeltaX` / `d.DeltaY`, indexed by direction (N, E, S, W). */
 export const DELTA_X = [0, 1, 0, -1];
 export const DELTA_Y = [-1, 0, 1, 0];
 
-/** Cloud type for a Fluxcage (`CT_FLUXCAGE`). */
-const CLOUD_TYPE_FLUXCAGE = 7;
 
 /** `PossibleMove`'s minimum `word16_12_15` before a monster will use a teleporter. */
 const TELEPORTER_WILLINGNESS = 10;
@@ -469,7 +468,7 @@ export class MonsterPerception {
       ) {
         if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
         const cloud = this.dungeon.getCloudRecord(rn);
-        if (!cloud || cloud.cloudType !== CLOUD_TYPE_FLUXCAGE) continue;
+        if (!cloud || cloud.cloudType !== CloudType.CT_FLUXCAGE) continue;
         state.fluxCages[dir] = 1;
         state.fluxCageCount++;
         probe.fluxcage = true;

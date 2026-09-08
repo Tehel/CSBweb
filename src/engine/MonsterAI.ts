@@ -53,6 +53,7 @@ import {
   monsterWord2Bit4,
 } from '../renderer/csbwin/ObjectTables';
 import { setPackedBits } from './MonsterSystem';
+import { ordinalOfMonsterAtPosition } from './monsterPosition';
 
 /**
  * The values CSBWin passes by reference through the `Try_*` chain.
@@ -1185,23 +1186,17 @@ export class MonsterAI {
   /** `d.MonsterDamageResult`, as the AI sees it. */
   private lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
 
-  /**
-   * `OrdinalOfMonsterAtPosition` — which group member, 1-based, occupies a corner.
-   */
+  /** `OrdinalOfMonsterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:619`). */
   private ordinalOfMonsterAtPosition(monster: CreatureRecord, position: number): number {
     const render = this.deps.dungeon.getMonsterRenderState(monster);
-    const positions = render.positions & 0xff;
-    if (positions === 0xff) return 1;
     const desc = this.deps.monsterDesc()?.[monster.creatureType];
-    const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
-    const numMonM1 = monster.numMonM1 & 0x3;
-    const check = position & 0x3;
-    for (let idx = 0; idx <= numMonM1; idx++) {
-      const at = (positions >> (idx * 2)) & 0x3;
-      if (at === check) return idx + 1;
-      if (horizontalSize === 1 && at === ((check + 1) & 0x3)) return idx + 1;
-    }
-    return 0;
+    return ordinalOfMonsterAtPosition({
+      positions: render.positions,
+      facings: render.facings,
+      numMonM1: monster.numMonM1,
+      horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
+      position,
+    });
   }
 
   /**

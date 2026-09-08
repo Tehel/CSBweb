@@ -13,6 +13,7 @@ import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
+import { handleAttackAreaClick } from './Attack';
 import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
 import { UIMode, UIState } from './UIState';
 import { setHandOwner } from '../../engine/Party';
@@ -73,6 +74,10 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   }
   if (id === 81) {
     handleChestAreaClick(ui, x, y);
+    return;
+  }
+  if (id === 111) {
+    handleAttackAreaClick(ui, x, y);
     return;
   }
   if (id === 83) {

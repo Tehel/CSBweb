@@ -289,6 +289,7 @@ export class MonsterDamage {
         db.records.push({
           nextObject: OBJECT_ID_EOF,
           broken: false,
+          charges: 0,
           cursed,
           important: false,
           clothingType: type & 0x7f,

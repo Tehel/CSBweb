@@ -59,7 +59,6 @@ export interface DevTools {
     quickSave(): void;
     quickLoad(): void;
     injectRandomParty(): void;
-    toggleAttackPanel(): void;
     toggleMissileTrace(): void;
     runNextMissileScenario(): void;
 }
@@ -521,14 +520,6 @@ export function createDevTools(host: DevHost): DevTools {
         updateDebug('Random party injected');
     }
 
-    function toggleAttackPanel(): void {
-        if (!host.renderer) return;
-        const next = !host.renderer.isAttackPanelVisible();
-        host.renderer.setShowAttackPanel(next);
-        updateDebug(next ? 'Attack panel ON' : 'Attack panel OFF');
-        host.renderView();
-    }
-
     function quickSave(): void {
         if (!host.game) return;
         const runtime = host.game.getRuntimeSaveState();
@@ -590,7 +581,6 @@ export function createDevTools(host: DevHost): DevTools {
         quickSave,
         quickLoad,
         injectRandomParty,
-        toggleAttackPanel,
         toggleMissileTrace,
         runNextMissileScenario,
     };

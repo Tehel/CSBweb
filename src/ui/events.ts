@@ -211,11 +211,6 @@ export function bindUIEvents(): void {
                     else updateDebug('Enable Debug to inject a random party');
                     handled = true;
                     break;
-                case 'F7':
-                    if (isDebugFeaturesEnabled()) ctx.onToggleAttackPanel();
-                    else updateDebug('Enable Debug to toggle the attack panel');
-                    handled = true;
-                    break;
                 case 'F6':
                     if (isDebugFeaturesEnabled()) ctx.onToggleMissileTrace();
                     else updateDebug('Enable Debug to toggle missile trace');

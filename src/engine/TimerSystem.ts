@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import type { CsbRandom } from '../core/random';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
@@ -49,6 +49,9 @@ import {
 } from '../renderer/csbwin/ObjectTables';
 import type { ActuatorSystem } from './ActuatorSystem';
 import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
+import { ordinalOfMonsterAtPosition } from './monsterPosition';
+import { CloudType } from './cloudTypes';
+import { setPartyFacing } from './Party';
 
 const RN_FIREBALL = 0xff80;
 const RN_POISON = 0xff81;
@@ -92,6 +95,15 @@ export interface TimerTables {
   clothingFlags?: ArrayLike<number>;
   /** `d.Byte1412[6]` — per-body-part shield weighting. */
   byte1412?: ArrayLike<number>;
+  /** Graphic `0x230`'s 44-entry `ATTACKTYPE` tables, for `AttackSystem`. */
+  experienceForAttacking?: ArrayLike<number>;
+  skillNumber?: ArrayLike<number>;
+  byte20046?: ArrayLike<number>;
+  byte20002?: ArrayLike<number>;
+  byte19958?: ArrayLike<number>;
+  byte19914?: ArrayLike<number>;
+  byte20090?: ArrayLike<number>;
+  attackNames?: ArrayLike<string>;
 }
 
 export interface LocationRel {
@@ -115,6 +127,18 @@ export interface MissileTraceEvent {
 }
 
 export interface TimerHooks {
+  /**
+   * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion's action
+   * timer has expired. `refillSlot` is the timer's `uByte6`: zero for an ordinary
+   * attack, otherwise one more than the possession slot to refill from the backpack,
+   * which is how a thrown weapon comes back to the hand.
+   *
+   * A hook rather than code here because refilling a hand needs the possession rules
+   * and the weapon descriptors, both of which live in `Game`.
+   */
+  onEnableCharacterAction?: (chIdx: number, refillSlot: number) => void;
+  /** `d.Word11694` — non-zero once the game is won, which freezes `TT_24`. */
+  isGameWon?: () => boolean;
   onDsaTimer5?: (rn: number, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer6?: (rn: number, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer7?: (rn: number, timer: TimerEntry, location: Position) => boolean;
@@ -299,6 +323,9 @@ export class TimerSystem {
       case TimerFunction.TT_11:
         this.processActionDisableTimer(timer);
         break;
+      case TimerFunction.TT_24:
+        this.processExpireObject(timer);
+        break;
       case TimerFunction.TT_25:
         this.processTT_25(timer);
         break;
@@ -350,6 +377,7 @@ export class TimerSystem {
       champ.busyTimerIndex = -1;
       champ.actionDisabledUntil = 0;
     }
+    this.hooks?.onEnableCharacterAction?.(chIdx, timer.uByte6 & 0xff);
   }
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {
@@ -2107,30 +2135,14 @@ export class TimerSystem {
 
   private ordinalOfMonsterAtPosition(monster: CreatureRecord, pos: number): number {
     const render = this.dungeon.getMonsterRenderState(monster);
-    const positions = render.positions & 0xff;
-    if (positions === 0xff) return 1;
     const desc = this.tables?.monsterDesc?.[monster.creatureType];
-    const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
-    const numMonM1 = monster.numMonM1 & 0x3;
-    let checkPos = pos & 0x3;
-
-    if (horizontalSize === 1) {
-      const facing = render.facings & 0xff;
-      if (((facing & 1) !== 0) === ((checkPos & 1) !== 0)) {
-        checkPos = (checkPos + 3) & 0x3;
-      }
-      for (let idx = numMonM1; idx >= 0; idx--) {
-        const monsterPos = (positions >> (idx * 2)) & 0x3;
-        if (monsterPos === checkPos || monsterPos === ((checkPos + 1) & 0x3)) return idx + 1;
-      }
-      return 0;
-    }
-
-    for (let idx = numMonM1; idx >= 0; idx--) {
-      const monsterPos = (positions >> (idx * 2)) & 0x3;
-      if (monsterPos === checkPos) return idx + 1;
-    }
-    return 0;
+    return ordinalOfMonsterAtPosition({
+      positions: render.positions,
+      facings: render.facings,
+      numMonM1: monster.numMonM1,
+      horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
+      position: pos,
+    });
   }
 
   private finishMissileEncounter(
@@ -2180,6 +2192,47 @@ export class TimerSystem {
    */
   createDeathCloud(projectile: number, size: number, position: Position, posInCell: number): void {
     this.createCloud(projectile, size, position.x, position.y, position, posInCell);
+  }
+
+  /**
+   * `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515`).
+   *
+   * Not `CreateCloud`: a Fluxcage gets no `TT_25` life of its own — it never shrinks
+   * and does no damage — only a single `TT_24` that removes it after 100 ticks. It
+   * also goes into the cell centred (`RNempty` position) rather than in a corner.
+   */
+  createFluxcage(position: Position, startTime: number): ObjectID | null {
+    const rn = this.createCloudRecord(CloudType.CT_FLUXCAGE, 0, 255);
+    if (rn === null) return null;
+    if (!this.dungeon.addObjectToCell(position, rn)) {
+      this.dungeon.deleteDBEntry(rn as ObjectID);
+      return null;
+    }
+    this.timers.createTimer(
+      TimerFunction.TT_24,
+      position.x,
+      position.y,
+      0,
+      0,
+      (startTime + 100) >>> 0,
+      position.z,
+      rn,
+    );
+    return rn as ObjectID;
+  }
+
+  /**
+   * `TT_24` (`doc/CSBwin-src/CSBCode.cpp:6494`) — the object's time is up: out of the
+   * cell and its record freed. Nothing happens once the game is won, which leaves the
+   * Fluxcages around Lord Chaos standing through the endgame.
+   */
+  private processExpireObject(timer: TimerEntry): void {
+    if (this.hooks?.isGameWon?.()) return;
+    const rn = timer.timerWord8 & 0xffff;
+    if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
+    const position = new Position(timer.uByte6 & 0xff, timer.uByte7 & 0xff, timer.level & 0xff);
+    this.dungeon.removeObjectFromCell(position, rn);
+    this.dungeon.deleteDBEntry(rn as ObjectID);
   }
 
   /**
@@ -2390,7 +2443,7 @@ export class TimerSystem {
    * the delayed form belongs to `Attack.cpp`'s melee (`TT_BASH_DOOR`), which does not
    * exist yet. Recorded in PLAN.md.
    */
-  private hitDoor(position: Position, force: number, explosion: boolean): boolean {
+  hitDoor(position: Position, force: number, explosion: boolean): boolean {
     const doorRn = this.dungeon.findFirstObject(position);
     if (doorRn === OBJECT_ID_EOF) return false;
     const door = this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
@@ -2544,7 +2597,7 @@ export class TimerSystem {
     const oldPos = new Position(position.x, position.y, position.z);
     this.checkMoveFromMissile(oldPos, result.position, null);
     party.position = result.position;
-    party.facing = result.facing & 0x3;
+    setPartyFacing(party, result.facing);
 
     const unchanged = this.isSamePosition(oldPos, result.position);
     if (!unchanged) this.hooks?.onPartyMoved?.();

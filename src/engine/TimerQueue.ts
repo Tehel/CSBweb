@@ -28,6 +28,12 @@ export enum TimerFunction {
    * switch and delete the cloud. Without it a cloud renders at full size forever.
    */
   TT_25 = 25,
+  /**
+   * Remove an object from its cell and free its record
+   * (`doc/CSBwin-src/CSBCode.cpp:6494`). A general expiry timer; the Fluxcage is what
+   * uses it, with a 100-tick life. Suppressed once the game is won.
+   */
+  TT_24 = 24,
   // Monster AI. 29-31 are movement wake-ups, 32-36 the "A" attack group and its four
   // individuals, 37-41 the "B" group and its four. `ProcessTimers29to41` handles the
   // whole span; `TT_31` specifically means the party ran into the monster.

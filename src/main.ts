@@ -304,6 +304,14 @@ async function init() {
                 clothingArmour: objectTables.clothingArmour,
                 clothingFlags: objectTables.clothingFlags,
                 byte1412: uiTables.graphic232.byte1412,
+                experienceForAttacking: uiTables.graphic230.experienceForAttacking,
+                skillNumber: uiTables.graphic230.skillNumber,
+                byte20046: uiTables.graphic230.byte20046,
+                byte20002: uiTables.graphic230.byte20002,
+                byte19958: uiTables.graphic230.byte19958,
+                byte19914: uiTables.graphic230.byte19914,
+                byte20090: uiTables.graphic230.byte20090,
+                attackNames: uiTables.graphic230.attackNames,
             };
 
             // Initialize game engine
@@ -353,7 +361,6 @@ async function init() {
                 onQuickSave: dev.quickSave,
                 onQuickLoad: dev.quickLoad,
                 onInjectRandomParty: dev.injectRandomParty,
-                onToggleAttackPanel: dev.toggleAttackPanel,
                 onToggleMonsterAITrace: dev.toggleMonsterAITrace,
                 onToggleMissileTrace: dev.toggleMissileTrace,
                 onRunMissileScenario: dev.runNextMissileScenario,
@@ -389,9 +396,17 @@ async function init() {
             // Register tick callback to update view.
             // The message queue is pumped here, mirroring CSBWin's main loop
             // (doc/CSBwin-src/CSBCode.cpp:716) — see doc/CSBWIN_MESSAGES_REFERENCE.md.
+            renderer.setChampionAttackHandler(
+                (chIdx, attackType) => game?.championAttack(chIdx, attackType) ?? 0,
+                () => game?.consumeAttackDamageToDisplay() ?? 0,
+            );
+
             game.onTick(() => {
                  if (!renderer || !game) return;
                  scrollingText.pump(game.getTickCount());
+                 // `TAG01b29a` — the champion flinch and the attack panel's redraw
+                 // state, before the frame is drawn (doc/CSBwin-src/CSBCode.cpp:685).
+                 renderer.attackPanelTick();
                  renderView();
             });
 

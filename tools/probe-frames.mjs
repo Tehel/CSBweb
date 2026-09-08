@@ -1,7 +1,7 @@
 // Golden-frame probe.
 //
 // Drives the running dev server over the Chrome DevTools Protocol — boot, enable Debug,
-// inject a party (F8), open a champion's inventory, select in it, show the attack panel —
+// inject a party (F8), open a champion's inventory, select in it, open the attack menu —
 // and writes a PNG per state. `Math.random` is seeded and localStorage cleared on every
 // load, so the frames are byte-identical run to run and can be compared directly.
 //
@@ -92,7 +92,10 @@ console.log('state: inventory');         await shot('03-inventory');
 await canvasClick(15, 15, 0);  await wait(400);
 console.log('state: inventory+select');  await shot('04-inventory-sel');
 await canvasClick(15, 15, 2);  await wait(500);   // back out
-await key('F7');               await wait(500);
+// Champion 0's attack button (233-252 x 86-120) opens the real attack menu, listing
+// that champion's legal attacks. This used to be a dev-only F7 preview of a
+// placeholder panel; the panel is now `ui/Attack.ts` driven by `word20252`.
+await canvasClick(240, 100, 0); await wait(600);
 console.log('state: attack panel');      await shot('05-attack');
 
 console.log('--- console errors ---');

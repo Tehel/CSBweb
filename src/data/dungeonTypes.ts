@@ -193,6 +193,7 @@ export interface WeaponRecord {
 export interface ClothingRecord {
     nextObject: ObjectID;       // +0x00
     broken: boolean;            // +0x02 bit 13
+    charges: ui8;               // bits 12-9 (doc/CSBwin-src/CSB.h:1186)
     cursed: boolean;            // bit 8
     important: boolean;         // bit 7
     clothingType: ui8;          // bits 6-0

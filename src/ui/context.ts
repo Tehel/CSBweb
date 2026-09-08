@@ -10,7 +10,6 @@ export interface UIContext {
     onQuickSave: () => void;
     onQuickLoad: () => void;
     onInjectRandomParty: () => void;
-    onToggleAttackPanel: () => void;
     onToggleMissileTrace: () => void;
     onToggleMonsterAITrace: () => void;
     onRunMissileScenario: () => void;

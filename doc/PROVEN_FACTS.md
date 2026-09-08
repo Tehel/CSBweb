@@ -1028,3 +1028,121 @@ queued. The queue then stops being sorted, and because `processTimers` stops at 
 entry that is not yet due, every timer behind the misplaced one stalls. `addTimer` now
 copies and mints the index, and callers must read the queued `index` from its **return**,
 which is what CSBWin does at `doc/CSBwin-src/Timer.cpp:429`.
+
+## Skill makes a champion's blows harder, not more frequent
+
+`DeterminePhysicalAttackDamage` (`doc/CSBwin-src/Attack.cpp:532`) decides whether the blow
+connects at all with `Quickness` — dexterity, stamina and load — against the monster's
+`dexterity12` plus `random(32)` plus the level's experience multiplier, less 16
+(`:601-607`). **Mastery is not in that comparison.** It enters only afterwards, twice: via
+`DetermineThrowingDistance`'s `2 * mastery` term (`doc/CSBwin-src/Character.cpp:2416`) and
+a flat `+10` when `random(64) < mastery` (`:876-882`).
+
+Measured with `tools/dump-player-attacks.ts`, 300 SWINGs each at the same Worm group on
+level 3: a champion at skill-4 mastery 4 landed 213 blows for 798 damage; one at mastery 8
+landed 212 for 915. Same frequency, a fifth more damage.
+
+## A blow has two damage rolls, and the second is the reason weak champions can fight
+
+If the first roll — throwing distance, scaled by `Byte19958[attackType]/32`, less the
+monster's `defense08` and two `random(32)` draws — comes out at 1 or below, or the champion
+could not throw at all, CSBWin does **not** return a miss (`doc/CSBwin-src/Attack.cpp:702`).
+It takes a second, much noisier roll: `random(4)`, and a zero there *is* a miss, but
+otherwise the running total is rebuilt from `random(16)`, `random(4)` and a 1-in-4 chance
+of `max(0, random(16) + D6W)`. Both roads then meet at the same tail — halve, add noise,
+halve twice more, `+random(4)+1`.
+
+Without that branch a champion whose throwing distance cannot out-roll a well-armoured
+monster's defence could never do anything at all. It is also why damage is so noisy:
+`STRandom` is drawn up to nine times for one blow.
+
+## Three named blades are special-cased in the damage formula
+
+By `objNI_*`, not weapon type (`doc/CSBwin-src/Attack.cpp:673-698`, `:884-905`):
+
+| blade | `objNI_` | effect |
+| --- | --- | --- |
+| Diamond Edge | 39 | the monster's defence term loses a quarter |
+| Executioner | 43 | the monster's defence term loses an eighth |
+| Vorpal Blade | 40 | the *only* weapon that can hurt a non-material monster; against anything solid its damage is halved, and a halved blow that rounds to 0 misses outright |
+
+A non-material monster (`MONSTERDESC.word2` bit 6) is otherwise untouchable by physical
+force: the whole formula is skipped and the champion spends `2 + random(1)` stamina
+(`:923-945`). Only the Vorpal Blade or `atk_DISRUPT` gets past it. Measured: 60 SWINGs at
+a Rive dealt 0, 60 DISRUPTs dealt 429.
+
+## The back rank cannot swing past the front rank
+
+`AttackWithPhysicalForce` (`doc/CSBwin-src/Attack.cpp:1093-1108`) takes
+`(charPosition + 4 - facing) & 3` and acts only on values 2 and 3 — the two corners behind
+the direction being attacked. It then looks one corner along for 3, two for 2, and if a
+living champion is standing there the attack is abandoned with
+`d.attackDamageToDisplay = -1`, which the panel flashes as "CAN'T REACH". The switch's
+fallthrough is what pairs "relative 2" with "step 3": `case 2` sets `D6W = 2` and falls
+into `case 3`, which increments it.
+
+## The party's turn rotates every champion's corner *and* facing
+
+`MoveObject` for the party (`doc/CSBwin-src/Code11f52.cpp:4085-4098`) adds the turn delta
+to both `charPosition` and `facing` for every champion. Two consequences that are easy to
+miss:
+
+- A champion's own attacks aim by `pChar->facing`, not `d.partyFacing` — only the spell,
+  throw and shoot attacks call `SetCharToPartyFacing` first
+  (`doc/CSBwin-src/Attack.cpp:1288`). A champion whose facing never rotated keeps swinging
+  in the direction the party faced when they joined.
+- `(charPosition - partyFacing)` is therefore **invariant** under turning, so the corner
+  marker in a champion's box does not move when the party turns.
+
+`charPosition` is consequently *not* the champion's slot in the four portrait boxes:
+`DrawAttackButton` and `DrawCharacterState` are indexed by champion number
+(`doc/CSBwin-src/Character.cpp:4820`), which never moves.
+
+## The attack menu's options are gated on mastery, the first one never
+
+`GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4772`) always offers
+`legalAttacks[attackClass].byte0[0]`, which is what makes every weapon usable by anybody.
+Options 1 and 2 carry a required mastery in bytes 4 and 5 of the same row, and bit 7 of
+that byte means "only while the object has charges left". A sword (attack class 13) offers
+SWING at no cost, PARRY at mastery 2 and CHOP at mastery 3; an empty hand (class 2) offers
+PUNCH, KICK and WAR CRY, all free.
+
+`d.Byte20256` records the requirement that was met, and nothing ever reads it —
+`DrawLegalAttackTypes` does not draw it.
+
+## `atk_SHOOT` throws away the damage it computes
+
+`doc/CSBwin-src/Attack.cpp:1905-1906`:
+
+```c
+pParam->attdep.shoot.damage = 2 * (pWeapon_18->word4 + w_42);
+pParam->attdep.shoot.damage = D4W;
+```
+
+`D4W` is the launcher's weapon class with 16 or 32 subtracted — a number from 0 to 15 — so
+a shot's damage is its weapon class, and the mastery-scaled figure on the line above is
+dead. Preserved, because it is what the real game does.
+
+## FREEZE LIFE is capped twice
+
+`atk_FREEZELIFE` (`doc/CSBwin-src/Attack.cpp:2043-2068`) is worth 70 from a charged item,
+30 from `misc_MagicalBoxA` and 125 from `misc_MagicalBoxB` — and a box is consumed outright
+rather than losing a charge. The increment is then clipped so the total cannot pass **200**,
+and the final store clips again at 255. Measured from zero: 70 → 140 → 200 → 200.
+
+## `CT_FLUXCAGE` is 50, not 7
+
+`CLOUDTYPE` (`doc/CSBwin-src/CSB.h:1320`) is `CT_FIREBALL 0, CT_DISPELL 3, CT_OPENDOOR 4,
+CT_POISON 7, CT_DEATH 40, CT_FLUXCAGE 50`. `MonsterPerception`'s fluxcage test was
+comparing against 7, so an invincible monster was stopped by a **poison cloud** and walked
+straight through a Fluxcage — which is the mechanism the Lord Chaos fusion depends on. The
+renderer had it right (`cloudType === 50`). The constants now live in
+`src/engine/cloudTypes.ts`.
+
+## A Fluxcage is not a cloud with a life
+
+`CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515`) is not `CreateCloud`: it gets no
+`TT_25`, so it never shrinks and damages nothing. It gets a single `TT_24` at
+`d.Time + 100`, which removes the record and frees it — and `TT_24` does nothing at all
+once `d.Word11694` (game won) is set, so the cage around Lord Chaos stays up through the
+endgame.

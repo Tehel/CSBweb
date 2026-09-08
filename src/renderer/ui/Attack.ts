@@ -1,0 +1,446 @@
+/**
+ * The attack menu.
+ *
+ * The UI half of the champion's attack, from `doc/CSBwin-src/Character.cpp`:
+ * `ItemHasChargesLeft` (`:4745`), `GetLegalAttackTypes` (`:4772`), `DrawAttackButton`
+ * (`:4815`), `TAG01b1c0` (`:4886`), `PrepareAttack` (`:4904`), `_ExecuteAttack`
+ * (`:4944`), plus `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`),
+ * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`), `_TAG01b29a`
+ * (`doc/CSBwin-src/CSBCode.cpp:8799`) and `_FlashAttackDamage`
+ * (`doc/CSBwin-src/Attack.cpp:949`).
+ *
+ * The area under the viewport is a two-state panel and `word20252` is the state:
+ *
+ *  - **1** — the four attack buttons, one per champion, each showing the weapon in its
+ *    fighting hand. Clicking one calls `prepareAttack`.
+ *  - **0** — that champion's legal attack options, up to three of them, named. Clicking
+ *    one calls `executeAttack`, which is where the engine's `Attack` is entered.
+ *
+ * `word20250` is "the panel owes a redraw", and `tag01b29a` — called once per game tick
+ * — is what acts on it. It is also where the damage figure is flashed over the panel
+ * before the buttons come back.
+ *
+ * ⚠️ One deliberate divergence: CSBWin's `_FlashAttackDamage` ends in `VBLDelay(15)`, a
+ * quarter-second in which the whole game is stopped. A browser cannot block the frame
+ * loop, so the flash is a timed overlay instead — `attackFlashUntilMs` — and the panel
+ * returns to the buttons when it expires. Same duration, same appearance; the game
+ * simply keeps running underneath, as it already does for the feeding animation.
+ */
+import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
+import { DBType, decodeObjectID, type ObjectID } from '../../core/types';
+import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
+import { determineMastery } from '../../engine/skills';
+import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { drawTextLineIndex } from '../csbwin/TextRenderer';
+import { Rect } from '../csbwin/UITables';
+import { drawObjectIconMask, shadeRectIndex } from './Draw';
+import { searchButtonList } from './HitTest';
+import { getAttackClass, getBaseObjectNameIndex } from './Objects';
+import { getChampionPossession } from './Character';
+import { nowMs, UIState } from './UIState';
+
+/** `VBLDelay(15)` at 60 Hz — a quarter of a second. */
+const FLASH_MS = 250;
+
+/** `DrawAttackButton`'s rectangle for champion `chIdx` (`Character.cpp:4820`). */
+export function attackButtonRect(chIdx: number): Rect {
+  const x1 = 22 * chIdx + 233;
+  return { x1, y1: 86, x2: x1 + 19, y2: 120 };
+}
+
+function championAt(ui: UIState, chIdx: number) {
+  const party = ui.partyState;
+  if (!party) return null;
+  return party.champions[chIdx] ?? null;
+}
+
+/**
+ * `ItemHasChargesLeft` (`doc/CSBwin-src/Character.cpp:4745`).
+ *
+ * Whether the thing in the fighting hand still has a charge to spend. Anything that is
+ * not a weapon, a garment or a misc object counts as ready — CSBWin's `default: return
+ * 1` — so an attack option gated on charges is never hidden by an object that has no
+ * charge field at all.
+ */
+export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
+  const champ = championAt(ui, chIdx);
+  if (!champ) return true;
+  const obj = getChampionPossession(champ, 1);
+  if (obj === null) return true;
+  const rn = obj as ObjectID;
+  switch (decodeObjectID(rn).category) {
+    case DBType.WEAPON:
+      return (ui.dungeonState.getWeaponRecord(rn)?.charges ?? 0) !== 0;
+    case DBType.CLOTHING:
+      return (ui.dungeonState.getClothingRecord(rn)?.charges ?? 0) !== 0;
+    case DBType.MISC:
+      return (ui.dungeonState.getMiscRecord(rn)?.specialState ?? 0) !== 0;
+    default:
+      return true;
+  }
+}
+
+/**
+ * `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4772`).
+ *
+ * An object's `legalAttacks` row holds three attack types and, for the second and
+ * third, the mastery they demand. The first is *always* offered — that is what makes
+ * every weapon usable by anybody — and the other two appear only if the champion is
+ * good enough with the relevant skill, and if bit 7 of the requirement is set, only
+ * while the object still has charges.
+ */
+export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<number>): void {
+  const champ = championAt(ui, chIdx);
+  ui.possibleAttackTypes[0] = row[0] ?? 0;
+  ui.byte20256[0] = 1;
+
+  let count = 1;
+  for (let i = 1; i < 3; i++) {
+    const attackType = row[i] ?? 255;
+    if (attackType === 255) continue;
+    let required = row[i + 3] ?? 0;
+    if ((required & 128) !== 0) {
+      if (!itemHasChargesLeft(ui, chIdx)) continue;
+    }
+    required &= 0x7f;
+    const skill = (ui.uiTables?.graphic230.skillNumber[attackType] ?? 0) & 0xff;
+    const mastery = champ ? masteryOf(ui, champ, skill) : 0;
+    if (mastery < required) continue;
+    ui.possibleAttackTypes[count] = attackType;
+    ui.byte20256[count] = required;
+    count++;
+  }
+  ui.word20248 = count;
+  for (let i = count; i < 3; i++) ui.possibleAttackTypes[i] = -1;
+}
+
+function masteryOf(ui: UIState, champ: NonNullable<ReturnType<typeof championAt>>, skill: number): number {
+  return determineMastery(champ, skill, {
+    partySleeping: ui.partyState?.sleeping ?? false,
+    getObjectNameIndex: (objectId: number) => {
+      const value = getBaseObjectNameIndex(ui, objectId);
+      return value >= 0 ? value : null;
+    },
+  });
+}
+
+/**
+ * `PrepareAttack` (`doc/CSBwin-src/Character.cpp:4904`) — open the attack menu for one
+ * champion.
+ *
+ * An empty fighting hand still has attacks: attack class 2, which is the bare-handed
+ * row. A held object whose attack class is 0 has none at all and the click is ignored.
+ */
+export function prepareAttack(ui: UIState, chIdx: number): void {
+  const champ = championAt(ui, chIdx);
+  if (!champ) return;
+  if (champ.alive === false || (champ.attributes.health | 0) === 0) return;
+
+  const weapon = getChampionPossession(champ, 1);
+  let attackClass: number;
+  if (weapon === null) {
+    attackClass = ATTACK_CLASS_EMPTY_HAND;
+  } else {
+    attackClass = getAttackClass(ui, weapon) & 0xff;
+    if (attackClass === 0) return;
+  }
+
+  const row = ui.uiTables?.graphic230.legalAttacks[attackClass];
+  if (!row) return;
+
+  ui.attackingCharacterOrdinal = chIdx + 1;
+  getLegalAttackTypes(ui, chIdx, row);
+  ui.word20252 = 0;
+  ui.word20250 = 0;
+}
+
+/**
+ * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4886`) — close the menu again, and ask for
+ * the panel to be redrawn on the next tick.
+ */
+export function closeAttackMenu(ui: UIState): void {
+  if (ui.attackingCharacterOrdinal === 0) return;
+  ui.attackingCharacterOrdinal = 0;
+  ui.word20250 = 1;
+}
+
+/**
+ * `_ExecuteAttack` (`doc/CSBwin-src/Character.cpp:4944`).
+ *
+ * `option` is 0-2 for one of the listed attacks, or -1 for the PASS button, which
+ * closes the menu without attacking and returns CSBWin's -1.
+ */
+export function executeAttack(ui: UIState, option: number): number {
+  if (ui.attackingCharacterOrdinal === 0) return 0;
+  const chIdx = ui.attackingCharacterOrdinal - 1;
+  let result: number;
+  if (option === -1) {
+    result = -1;
+  } else {
+    const attackType = ui.possibleAttackTypes[option] & 0xff;
+    if (attackType === ATTACK_TYPE_NONE) return 0;
+    result = ui.onChampionAttack?.(chIdx, attackType) ?? 0;
+  }
+  closeAttackMenu(ui);
+  return result;
+}
+
+/**
+ * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`) — button 111, the panel area.
+ *
+ * Which button list is consulted depends on the panel's state, so the same screen
+ * region means "pick a champion" or "pick an attack" at different moments.
+ */
+export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
+  if (!ui.partyState) return;
+  const numCharacter = ui.partyState.champions.length;
+
+  if (ui.attackingCharacterOrdinal !== 0) {
+    const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17892 ?? null, x, y, 2);
+    if (id === 0) return;
+    if (id === 112) {
+      executeAttack(ui, -1); // PASS
+      return;
+    }
+    // Only the options actually offered are live; the rows below `word20248` are dead
+    // even though the button list covers them.
+    if (id - 112 <= ui.word20248) executeAttack(ui, id - 113);
+    return;
+  }
+
+  if (ui.word20252 !== 0) {
+    const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17952 ?? null, x, y, 2);
+    if (id === 0) return;
+    const chIdx = id - 116;
+    if (chIdx >= 0 && chIdx < numCharacter) prepareAttack(ui, chIdx);
+  }
+}
+
+/**
+ * `_TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`) — once per game tick.
+ *
+ * Two jobs. It turns each champion to face whatever hit them hardest since the last
+ * tick, which is the flinch you see in play; and it services `word20250` by flashing
+ * the damage figure and then bringing the attack buttons back.
+ */
+export function attackPanelTick(ui: UIState): void {
+  const party = ui.partyState;
+  if (!party || party.champions.length === 0) return;
+
+  if (party.sleeping) {
+    if (ui.attackingCharacterOrdinal !== 0) closeAttackMenu(ui);
+    return;
+  }
+
+  const cursorOwner = party.cursorOwner ?? -1;
+  party.champions.forEach((champ, idx) => {
+    if (!champ) return;
+    // Not the champion holding the cursor, and not the one with the menu open: those
+    // two keep facing the way the player left them.
+    if (idx !== cursorOwner && idx + 1 !== ui.attackingCharacterOrdinal && champ.maxRecentDamage) {
+      const from = champ.damageFromDirection ?? champ.facing ?? 0;
+      if (champ.facing !== from) champ.facing = from;
+    }
+    champ.maxRecentDamage = 0;
+  });
+
+  if (ui.word20250 === 0) return;
+
+  if (ui.attackingCharacterOrdinal === 0) {
+    // The flash is a timed overlay rather than CSBWin's blocking delay; the panel stays
+    // owed a redraw until it has run its course.
+    if (ui.attackFlashUntilMs > nowMs()) return;
+    const damage = ui.onConsumeAttackDamage?.() ?? 0;
+    if (damage !== 0) {
+      ui.attackFlashValue = damage;
+      ui.attackFlashUntilMs = nowMs() + FLASH_MS;
+      return;
+    }
+    ui.attackFlashValue = 0;
+    ui.word20252 = 1;
+    ui.word20250 = 0;
+    return;
+  }
+
+  ui.word20252 = 0;
+  ui.word20250 = 0;
+}
+
+/**
+ * `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4815`).
+ *
+ * A dead champion's button is a black hole rather than a blue box; a living one shows
+ * the icon of whatever it is fighting with, or the bare-fist icon for an empty hand. An
+ * object that *is* held but has no attacks leaves the box empty. The box is shaded when
+ * the champion is mid-action, or while the party sleeps.
+ */
+export function drawAttackButton(ui: UIState, chIdx: number): void {
+  if (!ui.screenIndexBuffer || !ui.uiTables) return;
+  const rect = attackButtonRect(chIdx);
+  const champ = championAt(ui, chIdx);
+  const alive = !!champ && champ.alive !== false && (champ.attributes.health | 0) !== 0;
+
+  if (!alive) {
+    fillRectIndex(ui.screenIndexBuffer, rect, 0);
+    return;
+  }
+
+  fillRectIndex(ui.screenIndexBuffer, rect, 4);
+  const weapon = getChampionPossession(champ, 1);
+  let iconIndex = -1;
+  if (weapon === null) {
+    iconIndex = OBJNI_SPECIAL_C; // the empty fist
+  } else if (getAttackClass(ui, weapon) !== 0) {
+    iconIndex = getBaseObjectNameIndex(ui, weapon);
+  }
+  if (iconIndex >= 0) {
+    drawObjectIconMask(
+      ui,
+      { x1: rect.x1 + 2, y1: 95, x2: rect.x2 - 2, y2: 110 },
+      iconIndex,
+      ui.uiTables.graphic232.word612,
+      ui.uiTables.graphic230.shrinkColorMap,
+    );
+  }
+
+  const busy = (champ.actionDisabledUntil ?? 0) !== 0 || (champ.busyTimerIndex ?? -1) >= 0;
+  if (busy || (ui.partyState?.sleeping ?? false)) {
+    shadeRectIndex(ui, rect, 0);
+  }
+}
+
+/**
+ * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`) — the whole panel, either
+ * state.
+ *
+ * The backdrop rectangle for the option list depends on how many options there are, so
+ * a weapon with one attack gets a short box and one with three a tall one.
+ */
+export function drawAttackPanel(ui: UIState): void {
+  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
+
+  fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.word20, 0);
+
+  // The damage flash owns the panel while it lasts.
+  if (ui.attackFlashUntilMs > nowMs()) {
+    drawAttackDamageFlash(ui);
+    return;
+  }
+
+  if (ui.word20252 !== 0) {
+    for (let chIdx = 0; chIdx < ui.partyState.champions.length; chIdx++) {
+      drawAttackButton(ui, chIdx);
+    }
+    return;
+  }
+
+  if (ui.attackingCharacterOrdinal === 0) return;
+  const champ = championAt(ui, ui.attackingCharacterOrdinal - 1);
+  if (!champ) return;
+
+  let numAttackOption = 3;
+  let backdrop = ui.uiTables.graphic230.wRectPos20202;
+  if (ui.possibleAttackTypes[2] === -1) {
+    backdrop = ui.uiTables.graphic230.wRectPos20210;
+    numAttackOption = 2;
+  }
+  if (ui.possibleAttackTypes[1] === -1) {
+    backdrop = ui.uiTables.graphic230.wRectPos20218;
+    numAttackOption = 1;
+  }
+
+  const panelGraphic = ui.getGraphicBitmap(10);
+  if (panelGraphic) {
+    tag0088b2Index(
+      panelGraphic,
+      ui.screenIndexBuffer,
+      {
+        x1: backdrop.x1,
+        y1: backdrop.y1,
+        x2: backdrop.x2,
+        y2: backdrop.y2,
+        srcX: 0,
+        srcY: 0,
+        srcStride: panelGraphic.width,
+        srcWidth: panelGraphic.width,
+        srcHeight: panelGraphic.height,
+      },
+      -1,
+    );
+  }
+
+  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 235, 83, 0, 4, champ.name);
+  for (let i = 0; i < 3; i++) {
+    const name = attackTypeName(ui, ui.possibleAttackTypes[i]);
+    // CSBWin draws all three rows regardless; the ones past `numAttackOption` come out
+    // blank because `GetAttackTypeName(-1)` is the empty string.
+    void numAttackOption;
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 12 * i + 93, 4, 0, name);
+  }
+}
+
+/** `GetAttackTypeName` — index -1/255 has no name. */
+function attackTypeName(ui: UIState, attackType: number): string {
+  if (attackType < 0 || attackType === ATTACK_TYPE_NONE) return '';
+  return ui.uiTables?.graphic230.attackNames[attackType] ?? '';
+}
+
+/**
+ * `_FlashAttackDamage` (`doc/CSBwin-src/Attack.cpp:949`).
+ *
+ * Three sizes of starburst by how hard the blow landed — over 40, over 15, and the
+ * rest — with the number written across it. Two negative values are messages instead:
+ * -1 could not reach, -2 had no ammunition.
+ */
+function drawAttackDamageFlash(ui: UIState): void {
+  if (!ui.screenIndexBuffer || !ui.fontData || !ui.uiTables) return;
+  const damage = ui.attackFlashValue;
+
+  if (damage < 0) {
+    const [x, text] = damage === -1 ? [242, "CAN'T REACH"] : [248, 'NEED AMMO'];
+    drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, 100, 4, 0, text);
+    return;
+  }
+
+  const graphic = ui.getGraphicBitmap(14);
+  const rect = damage > 40
+    ? ui.uiTables.graphic230.wRectPos20202
+    : damage > 15
+      ? ui.uiTables.graphic230.wRectPos20226
+      : ui.uiTables.graphic230.wRectPos20234;
+  if (graphic) {
+    tag0088b2Index(
+      graphic,
+      ui.screenIndexBuffer,
+      {
+        x1: rect.x1,
+        y1: rect.y1,
+        x2: rect.x2,
+        y2: rect.y2,
+        srcX: 0,
+        srcY: 0,
+        srcStride: graphic.width,
+        srcWidth: graphic.width,
+        srcHeight: graphic.height,
+      },
+      -1,
+    );
+  }
+
+  // CSBWin writes the digits right to left from x=274, stepping 3 pixels a digit, so
+  // the number ends up centred on the burst whatever its width.
+  const digits = String(damage);
+  const x = 274 - 3 * digits.length;
+  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, 100, 4, 0, digits);
+}
+
+/** Which attack types the champion is currently offered — for tools and the trace. */
+export function possibleAttackTypeNames(ui: UIState): string[] {
+  const names: string[] = [];
+  for (let i = 0; i < ui.word20248; i++) {
+    const type = ui.possibleAttackTypes[i];
+    if (type < 0) continue;
+    names.push(attackTypeName(ui, type) || AttackType[type] || String(type));
+  }
+  return names;
+}

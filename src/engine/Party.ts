@@ -166,12 +166,30 @@ export class Party {
 
         // Update facing if turned
         if (result.newFacing !== undefined) {
-            this.state.facing = result.newFacing;
+            this.setFacing(result.newFacing);
             this.state.turning = true;
         }
 
         // Update last move time
         this.state.lastMoveTime = Date.now();
+    }
+
+    /**
+     * Turn the party, rotating every champion with it
+     * (`doc/CSBwin-src/Code11f52.cpp:4085`).
+     *
+     * Both champion fields move by the same delta: `charPosition`, so the champion who
+     * was on the party's left is still on its left afterwards, and `facing`, which is
+     * what the champion's *own* attacks and the corner marker in their box read.
+     * Nothing was rotating either before, so a champion kept attacking in the direction
+     * the party faced when they joined.
+     *
+     * **Every** change of party facing must come through here, not just a turn on the
+     * spot: a teleporter's rotation is the same operation, and in CSBWin both are one
+     * path because both are `MoveObject`.
+     */
+    setFacing(newFacing: number): void {
+        setPartyFacing(this.state, newFacing);
     }
 
     /**
@@ -298,4 +316,33 @@ export function ensureHandOwner(party: PartyState): void {
 function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
     if (chIdx < 0) return null;
     return party.champions.find((c) => c.partyPosition === chIdx) ?? party.champions[chIdx] ?? null;
+}
+
+/**
+ * Turn the party, rotating every champion with it
+ * (`doc/CSBwin-src/Code11f52.cpp:4085`).
+ *
+ * Both champion fields move by the same delta: `charPosition`, so the champion who was
+ * on the party's left is still on its left afterwards, and `facing`, which is what the
+ * champion's *own* attacks and the corner marker in their box read. Nothing was rotating
+ * either before, so a champion kept attacking in the direction the party faced when they
+ * joined.
+ *
+ * **Every** change of party facing must come through here, not just a turn on the spot:
+ * a teleporter's rotation and a pit shuffle are the same operation, and in CSBWin all
+ * three are one path because all three are `MoveObject`.
+ *
+ * A free function rather than only a method, because `TimerSystem` reaches the party
+ * through `PartyState` and has no `Party` to call.
+ */
+export function setPartyFacing(party: PartyState, newFacing: number): void {
+    const facing = (newFacing & 3) as Direction;
+    const delta = (facing - party.facing + 4) & 3;
+    party.facing = facing;
+    if (delta === 0) return;
+    for (const champion of party.champions) {
+        if (!champion) continue;
+        champion.partyPosition = (champion.partyPosition + delta) & 3;
+        champion.facing = (((champion.facing ?? facing) + delta) & 3) as Direction;
+    }
 }

@@ -30,10 +30,7 @@ export function handleMouthPress(ui: UIState): void {
   if ((ui.partyState.cursorOwner ?? -1) < 0) return;
   const selected = ui.partyState.selectedCharacterIndex ?? -1;
   if (selected < 0) return;
-  const champ =
-    ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-    ui.partyState.champions[selected] ??
-    null;
+  const champ = ui.partyState.champions[selected] ?? null;
   if (!champ || champ.alive === false) return;
 
   const objectId = normalizeObjectValue(ui.partyState.objectInHand);

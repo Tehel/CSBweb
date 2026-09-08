@@ -67,11 +67,10 @@ import {
   updateButtonLists,
 } from './ui/Mouse';
 import {
-  drawAttackButtons,
-  drawAttackPanel,
   drawSpellControls,
   drawSpellPanel,
 } from './ui/MagicPanel';
+import { attackPanelTick, drawAttackPanel } from './ui/Attack';
 import {
   drawInventoryBackground,
   drawInventoryScreen,
@@ -299,12 +298,21 @@ export class ViewportRenderer {
     this.ui.hoverPoint = point;
   }
 
-  setShowAttackPanel(show: boolean): void {
-    this.ui.showAttackPanel = show;
+  /** Attack menu → engine: `Attack()` and `d.attackDamageToDisplay`. */
+  setChampionAttackHandler(
+    attack: (chIdx: number, attackType: number) => number,
+    consumeDamage: () => number,
+  ): void {
+    this.ui.onChampionAttack = attack;
+    this.ui.onConsumeAttackDamage = consumeDamage;
   }
 
-  isAttackPanelVisible(): boolean {
-    return this.ui.showAttackPanel;
+  /**
+   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), which CSBWin's main loop calls
+   * once per game tick just before drawing (`:685`).
+   */
+  attackPanelTick(): void {
+    attackPanelTick(this.ui);
   }
 
   setUIMode(mode: UIMode): void {
@@ -637,7 +645,6 @@ export class ViewportRenderer {
       drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
     }
-    drawAttackButtons(this.ui);
     drawAttackPanel(this.ui);
     drawSpellPanel(this.ui);
     drawSpellControls(this.ui);

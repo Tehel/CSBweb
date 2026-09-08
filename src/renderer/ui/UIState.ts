@@ -57,7 +57,23 @@ export interface UIState {
   /* ---- interaction state ---- */
   pressingEye: boolean;
   hoverPoint: { x: number; y: number } | null;
-  showAttackPanel: boolean;
+
+  /* ---- the attack menu (doc/CSBwin-src/Character.cpp) ---- */
+  /** `d.AttackingCharacterOrdinal` — 1-based champion with the menu open, 0 for none. */
+  attackingCharacterOrdinal: number;
+  /** `d.PossibleAttackTypes[4]` — the offered `ATTACKTYPE`s; -1 marks an empty slot. */
+  possibleAttackTypes: Int8Array;
+  /** `d.Byte20256[4]` — the mastery each option demanded, for the panel's dots. */
+  byte20256: Uint8Array;
+  /** `d.Word20248` — how many of `possibleAttackTypes` are real. */
+  word20248: number;
+  /** `d.Word20250` — the panel owes a redraw. */
+  word20250: number;
+  /** `d.Word20252` — 1 shows the four attack buttons, 0 the option list. */
+  word20252: number;
+  /** The damage figure being flashed, and when the flash ends. See `ui/Attack.ts`. */
+  attackFlashValue: number;
+  attackFlashUntilMs: number;
   openChestId: ObjectID | null;
   openChestContents: Array<ObjectID | null>;
   openChestIconIndex: number | null;
@@ -83,6 +99,10 @@ export interface UIState {
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   onObjectMove?: ObjectMoveHandler;
   onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void;
+  /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
+  onChampionAttack?: (chIdx: number, attackType: number) => number;
+  /** `d.attackDamageToDisplay`, read and cleared. */
+  onConsumeAttackDamage?: () => number;
   viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
   /* ---- back into the renderer ---- */
@@ -110,7 +130,17 @@ export function createUIState(
 
     pressingEye: false,
     hoverPoint: null,
-    showAttackPanel: false,
+
+    attackingCharacterOrdinal: 0,
+    possibleAttackTypes: Int8Array.from([-1, -1, -1, -1]),
+    byte20256: new Uint8Array(4),
+    word20248: 0,
+    word20250: 0,
+    // The panel starts showing the four attack buttons, as CSBWin does after
+    // `TAG01b29a`'s first pass.
+    word20252: 1,
+    attackFlashValue: 0,
+    attackFlashUntilMs: 0,
     openChestId: null,
     openChestContents: Array(8).fill(null),
     openChestIconIndex: null,

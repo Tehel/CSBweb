@@ -247,16 +247,16 @@ export function drawPartyStatus(ui: UIState): void {
       12
     );
 
-    const champion =
-      party.champions.find((c) => c.partyPosition === chIdx) ??
-      party.champions[chIdx] ??
-      null;
+    // `&d.CH16482[chIdx]` — the champion *index*, which is what indexes the four
+    // portrait boxes. Not `charPosition`: that is the corner of the cell they stand in,
+    // and it rotates when the party turns while the boxes do not.
+    const champion = party.champions[chIdx] ?? null;
 
     if (selected !== chIdx) {
       const nameRect = { x1: baseX, y1: 0, x2: baseX + 42, y2: 6 };
       fillRectIndex(ui.screenIndexBuffer, nameRect, 1);
       if (champion) {
-        const nameColor = ui.partyState.cursorOwner === champion.partyPosition ? 9 : 13;
+        const nameColor = ui.partyState.cursorOwner === chIdx ? 9 : 13;
         drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, baseX + 1, 5, nameColor, 1, champion.name);
       }
     }
@@ -437,10 +437,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
   const selected = ui.partyState.selectedCharacterIndex | 0;
 
   for (let chIdx = 0; chIdx < 4; chIdx++) {
-    const champion =
-      ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-      ui.partyState.champions[chIdx] ??
-      null;
+    const champion = ui.partyState.champions[chIdx] ?? null;
     const alive = champion ? champion.alive !== false : false;
     if (!alive) continue;
     if (selected === chIdx) continue;

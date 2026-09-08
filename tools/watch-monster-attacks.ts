@@ -78,8 +78,18 @@ async function main(): Promise<void> {
       clothingArmour: objectTables.clothingArmour,
       clothingFlags: objectTables.clothingFlags,
       byte1412: uiTables.graphic232.byte1412,
+      experienceForAttacking: uiTables.graphic230.experienceForAttacking,
+      skillNumber: uiTables.graphic230.skillNumber,
+      byte20046: uiTables.graphic230.byte20046,
+      byte20002: uiTables.graphic230.byte20002,
+      byte19958: uiTables.graphic230.byte19958,
+      byte19914: uiTables.graphic230.byte19914,
+      byte20090: uiTables.graphic230.byte20090,
+      attackNames: uiTables.graphic230.attackNames,
     },
   );
+  // Fixed seed, so the numbers below repeat run to run.
+  game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
   game.party.state.position = new Position(px, py, level);
   game.monsterSystem.loadPartyLevel(level);

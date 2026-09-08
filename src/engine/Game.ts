@@ -22,6 +22,9 @@ import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
 import { MonsterAttack } from './MonsterAttack';
+import { AttackSystem } from './AttackSystem';
+import { AttackType } from './monsterTypes';
+import { constructPredefinedMissile } from './missileHelpers';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -96,6 +99,11 @@ export class Game {
      * precisely so drawing "doesn't upset the game"
      * (doc/CSBwin-src/Viewport.cpp:6706).
      */
+    /**
+     * `d.RandomNumber` (`doc/CSBwin-src/CSBCode.cpp:351`). Seeded from the host on first
+     * draw; `setRandomSeed` exists so a verification tool can pin the stream, which is
+     * what makes a run repeatable.
+     */
     private random = new CsbRandom();
     private actuators: ActuatorSystem;
     private timerSystem: TimerSystem;
@@ -122,6 +130,10 @@ export class Game {
     readonly monsterAI: MonsterAI;
     /** Monsters hitting the party (`doc/CSBwin-src/Monster.cpp:944`). */
     readonly monsterAttack: MonsterAttack;
+    /** The champions' own attacks (`doc/CSBwin-src/Attack.cpp`). */
+    readonly attackSystem: AttackSystem;
+    /** `d.Byte20090[44]` — the defence penalty each attack type carries while busy. */
+    private readonly byte20090: ArrayLike<number> | null;
     /**
      * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While
      * set, invincible monsters stop taking their turns entirely
@@ -255,6 +267,8 @@ export class Game {
                     });
                 },
                 onPartyMoved: () => this.notePartyMoved(),
+                onEnableCharacterAction: (chIdx, refillSlot) => this.enableCharacterAction(chIdx, refillSlot),
+                isGameWon: () => this.gameWon,
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
                 ...timerHooks,
@@ -361,6 +375,7 @@ export class Game {
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
+        this.byte20090 = timerTables?.byte20090 ?? null;
 
         this.characterStats = new CharacterStats({
             dungeon: this.dungeonState,
@@ -375,6 +390,75 @@ export class Game {
         });
         this.monsterAttack.setCharacterStats(this.characterStats);
 
+        this.attackSystem = new AttackSystem({
+            dungeon: this.dungeonState,
+            random: this.random,
+            getPartyState: () => this.party.state,
+            getTime: () => this.state.tickCount,
+            tables: {
+                monsterDesc: timerTables?.monsterDesc,
+                experienceForAttacking: timerTables?.experienceForAttacking,
+                skillNumber: timerTables?.skillNumber,
+                byte20046: timerTables?.byte20046,
+                byte20002: timerTables?.byte20002,
+                byte19958: timerTables?.byte19958,
+                byte19914: timerTables?.byte19914,
+                attackNames: timerTables?.attackNames,
+                word1074: timerTables?.word1074,
+            },
+            monsterDamage: this.monsterDamage,
+            monsterAttack: this.monsterAttack,
+            monsters: this.monsterSystem,
+            dsa: this.dsaSystem,
+            characterStats: this.characterStats,
+            hooks: {
+                queueSound: (ordinal, mapX, mapY, deltaTime) =>
+                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                adjustStamina: (chIdx, decrement) => {
+                    const champ = this.party.state.champions[chIdx];
+                    if (champ) this.adjustStamina(champ, decrement);
+                },
+                disableCharacterAction: (chIdx, timeDelay) => this.disableCharacterAction(chIdx, timeDelay),
+                hitDoor: (position, force, explosion) => this.timerSystem.hitDoor(position, force, explosion),
+                characterThrowsSpell: (chIdx, projectile, range, neededMana) =>
+                    this.characterThrowsSpell(chIdx, projectile, range, neededMana),
+                launchObject: (chIdx, object, range, damage, decayRate) =>
+                    this.launchObject(chIdx, object, range, damage, decayRate),
+                removeCharacterPossession: (chIdx, slot) => this.removeCharacterPossession(chIdx, slot),
+                magicShield: (chIdx, spellShield, strength, mustHaveMana) => {
+                    const champ = this.party.state.champions[chIdx];
+                    if (!champ) return 0;
+                    return this.applyMagicShield(champ, spellShield, strength, mustHaveMana);
+                },
+                applyLight: (deltaLight, decayRate, time) => {
+                    this.adjustBrightness(deltaLight);
+                    this.setBrightnessTimer(decayRate, time);
+                },
+                openWindow: (duration) => {
+                    this.party.state.seeThruWalls = (this.party.state.seeThruWalls ?? 0) + 1;
+                    this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
+                },
+                createFluxcage: (position) => this.timerSystem.createFluxcage(position, this.state.tickCount),
+                throwByCharacter: (options) => this.throwFromWeaponHand(options),
+                setBusyTimerRefill: (chIdx, value) => this.setBusyTimerRefill(chIdx, value),
+                climbDownIntoPit: (target) => this.climbDownIntoPit(target),
+                printMessage: (text) => this.emitSpellMessage(text),
+                deleteDBEntry: (rn) => { this.dungeonState.deleteDBEntry(rn); },
+                activateMonster: (mapX, mapY, level) => {
+                    this.monsterAI.processTimers29to41({
+                        mapX, mapY, level,
+                        timerFunction: TimerFunction.TT_M1,
+                        timeUntilAlternateUpdate: 0,
+                    });
+                },
+                adjustSkills: (chIdx, skillNumber, experience, why) =>
+                    this.applySpellSkillGain(chIdx, skillNumber, experience, why),
+                nameIndex: (rn) => this.getBaseObjectNameIndex(rn),
+                possession: (champ, slot) => this.getChampionPossession(champ, slot),
+                trace: monsterHooks?.trace,
+            },
+        });
+
         // Initialize movement system
         this.movementSystem = new MovementSystem(this.party, this.dungeonState);
 
@@ -383,6 +467,11 @@ export class Game {
 
     processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
         return this.dsaSystem.processViewingFilter(options);
+    }
+
+    /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
+    setRandomSeed(seed: number): void {
+        this.random.setSeed(seed);
     }
 
     setSpellDefinitions(spells: SpellDefinition[]): void {
@@ -563,7 +652,7 @@ export class Game {
         this.timerSystem.checkMoveFromMissile(oldPos, oldPos, null);
         const resolved = this.timerSystem.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
         party.position = resolved.position;
-        party.facing = resolved.facing & 0x3;
+        this.party.setFacing(resolved.facing);
 
         const unchanged = oldPos.x === resolved.position.x
             && oldPos.y === resolved.position.y
@@ -1267,15 +1356,20 @@ export class Game {
         );
     }
 
-    private applyMagicShield(champion: Champion, isSpellShield: boolean, strength: number, mustHaveMana: number): void {
+    private applyMagicShield(champion: Champion, isSpellShield: boolean, strength: number, mustHaveMana: number): number {
         const party = this.party.state;
         let fullStrength = strength | 0;
+        // CSBWin's `D6W`: 1 normally, 0 when the champion could not pay the full four
+        // mana and got half a shield for whatever was left. `_Attack` reads it to decide
+        // whether the cast counts.
+        let raised = 1;
         if (mustHaveMana !== 0) {
             const mana = champion.attributes.mana | 0;
-            if (mana === 0) return;
+            if (mana === 0) return 0;
             if (mana < 4) {
                 fullStrength = Math.trunc(fullStrength / 2);
                 champion.attributes.mana = 0;
+                raised = 0;
             } else {
                 champion.attributes.mana = mana - 4;
             }
@@ -1290,6 +1384,7 @@ export class Game {
             party.fireShield = (party.fireShield ?? 0) + add;
             this.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
         }
+        return raised;
     }
 
     private setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
@@ -1356,6 +1451,231 @@ export class Game {
         );
         champion.busyTimerIndex = entry.index;
         champion.actionDisabledUntil = entry.time;
+    }
+
+
+    // ------------------------------------------------------------ attacks
+
+    /**
+     * `_ExecuteAttack`'s engine half (`doc/CSBwin-src/Character.cpp:4944`): run the
+     * attack, and record the type on the champion so `EnableCharacterAction` can undo
+     * its defence penalty and refill a bow's quiver when the busy timer expires.
+     */
+    championAttack(chIdx: number, attackType: number): number {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return 0;
+        // `CHARDESC.word64` — the attack's own defence modifier, live until the
+        // champion is free again. Mostly negative: swinging leaves you open.
+        champion.attackStatModifier = this.attackStatModifier(attackType);
+        const result = this.attackSystem.attack(chIdx, attackType);
+        champion.attackType = attackType;
+        return result;
+    }
+
+    /** `d.Byte20090[attackType]`, as a signed byte. */
+    private attackStatModifier(attackType: number): number {
+        const raw = this.byte20090?.[attackType] ?? 0;
+        return (raw << 24) >> 24;
+    }
+
+    /** `d.attackDamageToDisplay` — read and cleared by the UI's damage flash. */
+    consumeAttackDamageToDisplay(): number {
+        const value = this.attackSystem.attackDamageToDisplay;
+        this.attackSystem.attackDamageToDisplay = 0;
+        return value;
+    }
+
+    /**
+     * `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:470`).
+     *
+     * The decay rate comes from the champion's *maximum* mana, not the current amount,
+     * so a naturally powerful caster's bolts keep their damage longer regardless of how
+     * drained they are. A spell whose range is short relative to its decay gets three
+     * extra cells and one less decay — a small bonus for close-range casting.
+     */
+    private characterThrowsSpell(chIdx: number, projectile: number, range: number, neededMana: number): number {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return 0;
+        if ((champion.attributes.mana | 0) < neededMana) return 0;
+        champion.attributes.mana = (champion.attributes.mana | 0) - neededMana;
+
+        let decayRate = 10 - Math.min(8, Math.trunc((champion.attributes.maxMana | 0) / 8));
+        let adjustedRange = range;
+        if (adjustedRange < 4 * decayRate) {
+            adjustedRange += 3;
+            decayRate -= 1;
+        }
+        return this.launchObject(chIdx, projectile as ObjectID, adjustedRange, 90, decayRate);
+    }
+
+    /**
+     * `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — throw from the champion's own
+     * side of the cell, so a bolt cast by the front-right champion leaves on the right.
+     */
+    private launchObject(
+        chIdx: number,
+        object: ObjectID,
+        range: number,
+        damage: number,
+        decayRate: number,
+    ): number {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return 0;
+        const facing = (champion.facing ?? this.party.state.facing) & 3;
+        const posInCell = ((((champion.partyPosition - facing + 1) & 2) >> 1) + facing) & 3;
+        const projectile = (object & 0xffff) >= 0xff80
+            ? constructPredefinedMissile(this.dungeonState.getData(), object & 0xffff)
+            : object;
+        if (projectile === null) return 0;
+        const launched = this.timerSystem.launchThrownMissile(
+            projectile,
+            this.party.state.position,
+            posInCell,
+            facing,
+            range,
+            damage,
+            decayRate,
+            this.state.tickCount,
+        );
+        return launched ? 1 : 0;
+    }
+
+    /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1093`). */
+    private removeCharacterPossession(chIdx: number, slot: number): ObjectID | null {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return null;
+        const obj = this.getChampionPossession(champion, slot);
+        if (obj === null) return null;
+        this.setPossessionDirect(champion, slot, null);
+        return obj;
+    }
+
+    /**
+     * `ThrowByCharacter` with an explicit hand (`doc/CSBwin-src/Mouse.cpp:672`) — the
+     * THROW attack, which throws what is in the fighting hand rather than what the
+     * cursor is holding. `range`/`damage`/`decayRate` of -1 mean "compute them", which
+     * is how the Party Attack Filter can override any of the three.
+     */
+    private throwFromWeaponHand(options: {
+        chIdx: number;
+        side: number;
+        disableTime: number;
+        range: number;
+        damage: number;
+        decayRate: number;
+    }): number {
+        const champion = this.party.state.champions[options.chIdx];
+        if (!champion) return 0;
+        const throwingDistance = this.characterStats.determineThrowingDistance(
+            champion, 1, this.party.state.sleeping ?? false,
+        );
+        const obj = this.removeCharacterPossession(options.chIdx, 1);
+        if (obj === null) return 0;
+        return this.throwByCharacter(
+            options.chIdx, champion, obj, options.side, throwingDistance, options,
+        ) ? 1 : 0;
+    }
+
+    /** The busy timer's `uByte6`, which decides which slot refills the hand. */
+    private setBusyTimerRefill(chIdx: number, value: number): void {
+        const champion = this.party.state.champions[chIdx];
+        const index = champion?.busyTimerIndex ?? -1;
+        if (index < 0) return;
+        const timer = this.timerQueue.getTimer(index);
+        if (timer) timer.uByte6 = value & 0xff;
+    }
+
+    /**
+     * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion is free
+     * again. Two pieces of tidying beyond clearing the flag: the attack's defence
+     * penalty goes, and a hand is refilled — the quiver after a shot, or the slot named
+     * by the timer's `uByte6` after a throw.
+     */
+    private enableCharacterAction(chIdx: number, refillSlot: number): void {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return;
+        if ((champion.attackType ?? -1) !== -1) champion.attackStatModifier = 0;
+        if ((champion.attributes.health | 0) !== 0) {
+            // A bow that has just been fired reloads itself from the quiver, then from
+            // the three pouch slots, taking the first object of the matching ammunition
+            // class (`TAG0153c2`).
+            if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === null) {
+                for (const slot of [12, 7, 8, 9]) {
+                    if (this.matchingAmmunition(champion, slot)) {
+                        const ammo = this.removeCharacterPossession(chIdx, slot);
+                        if (ammo !== null) this.setChampionHand(champion, 0, ammo);
+                        break;
+                    }
+                }
+            }
+        }
+        if (refillSlot !== 0) this.refillPossessionSlot(chIdx, refillSlot - 1);
+    }
+
+    /**
+     * `TAG0153c2` (`doc/CSBwin-src/CSBCode.cpp`) — is what is in `slot` the right
+     * ammunition for the launcher in the fighting hand? Weapon classes 16-31 fire
+     * class-10 objects (arrows), 32-47 fire class-11 (slingstones).
+     */
+    private matchingAmmunition(champion: Champion, slot: number): boolean {
+        const launcher = this.getChampionPossession(champion, 1);
+        if (launcher === null || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
+        const launcherDesc = this.characterStats.weaponDescFor(launcher);
+        if (!launcherDesc) return false;
+        let wanted: number;
+        if (launcherDesc.uByte1 >= 16 && launcherDesc.uByte1 <= 31) wanted = 10;
+        else if (launcherDesc.uByte1 >= 32 && launcherDesc.uByte1 <= 47) wanted = 11;
+        else return false;
+
+        const candidate = this.getChampionPossession(champion, slot);
+        if (candidate === null || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
+        const desc = this.characterStats.weaponDescFor(candidate);
+        return !!desc && desc.uByte1 === wanted;
+    }
+
+    /**
+     * `TAG0115ee` (`doc/CSBwin-src/CSBCode.cpp:6251`) — put a weapon back into the hand
+     * a throw emptied, from the quiver first and then the three pouch slots. Only a
+     * weapon: a thrown apple does not come back.
+     */
+    private refillPossessionSlot(chIdx: number, slot: number): void {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return;
+        if (this.getChampionPossession(champion, slot) !== null) return;
+        for (const source of [12, 7, 8, 9]) {
+            const obj = this.getChampionPossession(champion, source);
+            if (obj === null) continue;
+            if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
+            const moved = this.removeCharacterPossession(chIdx, source);
+            if (moved !== null) this.setChampionHand(champion, slot, moved);
+            return;
+        }
+    }
+
+    /**
+     * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2033`) — into the pit deliberately,
+     * which means falling all the way down whatever chain of pits is below.
+     *
+     * CSBWin sets `d.SupressPitDamage` around the move so a controlled descent hurts
+     * nobody. Nothing sets or reads that here yet, because the party's *own* pit-fall
+     * damage is not ported — so a climb down is currently free either way, and so is
+     * stepping into a pit. Noted in `PLAN.md` rather than faked.
+     */
+    private climbDownIntoPit(target: Position): void {
+        const party = this.party.state;
+        const oldPos = new Position(party.position.x, party.position.y, party.position.z);
+        const resolved = this.timerSystem.resolvePartyMove(target, party.facing & 0x3);
+        this.timerSystem.checkMoveFromMissile(oldPos, resolved.position, null);
+        party.position = resolved.position;
+        this.party.setFacing(resolved.facing);
+        const unchanged = oldPos.x === resolved.position.x
+            && oldPos.y === resolved.position.y
+            && oldPos.z === resolved.position.z;
+        if (!unchanged) this.notePartyMoved();
+        this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
+        this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+        this.monsterSystem.loadPartyLevelIfChanged();
+        this.state.party = this.party.state;
     }
 
     private getSpellAbortMessage(action: number, champion: Champion): string | null {
@@ -1684,12 +2004,15 @@ export class Game {
         obj: ObjectID,
         leftOrRight: number,
         throwingDistance: number,
+        overrides?: { disableTime: number; range: number; damage: number; decayRate: number },
     ): boolean {
         const party = this.party.state;
 
         this.sounds.queueSound(16, party.position.x, party.position.y, 1);
         this.adjustStamina(champion, this.throwStaminaCost(obj));
-        this.disableCharacterAction(chIdx, 4);
+        // A negative disable time means "use the default", which is 4 ticks.
+        const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
+        this.disableCharacterAction(chIdx, disableTime);
 
         // The experience the throw earns, and `weaponBonus` — the weapon's own
         // contribution to the distance, which doubles as the damage scale below.
@@ -1720,9 +2043,9 @@ export class Game {
             party.position,
             leftOrRight,
             party.facing,
-            range,
-            damage,
-            decayRate,
+            overrides && overrides.range >= 0 ? overrides.range : range,
+            overrides && overrides.damage >= 0 ? overrides.damage : damage,
+            overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,
             this.state.tickCount,
         );
     }

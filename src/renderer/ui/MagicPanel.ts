@@ -1,93 +1,17 @@
 /**
- * The spell and attack panels.
+ * The spell panel.
  *
  * The UI half of CSBWin `doc/CSBwin-src/Magic.cpp`: the rune keypad, the incantation being
- * assembled, its running mana cost, and the per-champion attack buttons. Casting itself
- * lives in the engine — `applyMagicSelection` only assembles the incantation and hands it
- * to `ui.onSpellCast`.
+ * assembled, and its running mana cost. Casting itself lives in the engine —
+ * `applyMagicSelection` only assembles the incantation and hands it to `ui.onSpellCast`.
+ * The attack buttons and the attack menu live in `ui/Attack.ts`, beside the rest of the
+ * `Character.cpp` port.
  */
-import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { Rect } from '../csbwin/UITables';
-import { drawObjectIconMask } from './Draw';
 import { pointInRect, searchButtonList } from './HitTest';
-import { getAttackClass, getBaseObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
-
-export function drawAttackButtons(ui: UIState): void {
-  if (!ui.screenIndexBuffer || !ui.partyState || !ui.uiTables) return;
-
-  const buttonHeightTop = 86;
-  const buttonHeightBottom = 120;
-  const word612 = ui.uiTables.graphic232.word612;
-
-  for (let chIdx = 0; chIdx < 4; chIdx++) {
-    const champion =
-      ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-      ui.partyState.champions[chIdx] ??
-      null;
-
-    const x1 = 22 * chIdx + 233;
-    const x2 = x1 + 19;
-    const alive = champion ? champion.alive !== false : false;
-    const fillColor = alive ? 4 : 0;
-
-    fillRectIndex(ui.screenIndexBuffer, { x1, y1: buttonHeightTop, x2, y2: buttonHeightBottom }, fillColor);
-
-    if (alive) {
-      const iconRect = { x1: x1 + 2, y1: 95, x2: x2 - 2, y2: 110 };
-      const weaponId = typeof champion?.weaponHand === 'number'
-        ? (champion.weaponHand | 0)
-        : -1;
-      let iconIndex = -1;
-      if (weaponId < 0) {
-        iconIndex = OBJNI_SPECIAL_C;
-      } else if (getAttackClass(ui, weaponId) !== 0) {
-        iconIndex = getBaseObjectNameIndex(ui, weaponId);
-      }
-      if (iconIndex >= 0) {
-        drawObjectIconMask(ui, iconRect, iconIndex, word612, ui.uiTables.graphic230.shrinkColorMap);
-      }
-    }
-  }
-}
-
-export function drawAttackPanel(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
-  if (!ui.showAttackPanel) return;
-
-  fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.word20, 0);
-
-  const active = ui.partyState.champions.find((c) => c.alive !== false);
-  if (!active) return;
-
-  const panelGraphic = ui.getGraphicBitmap(10);
-  if (panelGraphic) {
-    const rect = ui.uiTables.graphic230.wRectPos20202;
-    tag0088b2Index(
-      panelGraphic,
-      ui.screenIndexBuffer,
-      {
-        x1: rect.x1,
-        y1: rect.y1,
-        x2: rect.x2,
-        y2: rect.y2,
-        srcX: 0,
-        srcY: 0,
-        srcStride: panelGraphic.width,
-        srcWidth: panelGraphic.width,
-        srcHeight: panelGraphic.height,
-      },
-      -1
-    );
-  }
-
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 235, 83, 0, 4, active.name);
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 93, 4, 0, 'ATTACK 1');
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 105, 4, 0, 'ATTACK 2');
-  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 241, 117, 4, 0, 'ATTACK 3');
-}
 
 export function spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
     const isCaster = chIdx === casterIdx;
@@ -105,15 +29,19 @@ export function drawSpellControls(ui: UIState): void {
   if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
 
   const rect = ui.uiTables.graphic230.word20242;
-  fillRectIndex(ui.screenIndexBuffer, rect, 0);
+  const screen = ui.screenIndexBuffer;
+  const font = ui.fontData;
+  const casterIdx = ui.partyState.magicCasterIndex;
+  fillRectIndex(screen, rect, 0);
 
-  for (const champion of ui.partyState.champions) {
-    if (!champion || !champion.alive || champion.attributes.maxMana === 0) continue;
-    const rct = spellControlGetRect(rect, champion.partyPosition, ui.partyState.magicCasterIndex);
-    const isCaster = champion.partyPosition === ui.partyState.magicCasterIndex;
-    fillRectIndex(ui.screenIndexBuffer, rct, 4);
-    if (isCaster) drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, rct.x1 + 2, rect.y2-1, 0, 4, champion.name);
-  };
+  ui.partyState.champions.forEach((champion, chIdx) => {
+    if (!champion || !champion.alive || champion.attributes.maxMana === 0) return;
+    const rct = spellControlGetRect(rect, chIdx, casterIdx);
+    fillRectIndex(screen, rct, 4);
+    if (chIdx === casterIdx) {
+      drawTextLineIndex(screen, font, rct.x1 + 2, rect.y2 - 1, 0, 4, champion.name);
+    }
+  });
 }
 
 export function drawSpellPanel(ui: UIState): void {
@@ -164,9 +92,7 @@ export function drawSpellPanel(ui: UIState): void {
     );
   }
 
-  const caster =
-    ui.partyState.champions.find((c) => c.partyPosition === ui.partyState!.magicCasterIndex) ??
-    ui.partyState.champions[ui.partyState.magicCasterIndex];
+  const caster = ui.partyState.champions[ui.partyState.magicCasterIndex];
   if (!caster || caster.alive === false) return;
 
   drawSpellMenuCharacters(ui, caster.incantation.length);
@@ -200,7 +126,7 @@ export function applyMagicSelection(ui: UIState, buttonId: number): void {
   const casterIdx = ui.partyState.magicCasterIndex;
   if (casterIdx < 0) return;
 
-  const champion = ui.partyState.champions.find((c) => c.partyPosition === casterIdx);
+  const champion = ui.partyState.champions[casterIdx];
   if (!champion || champion.alive === false) return;
 
   // buttons: magic runes (101-106), back (107), cast (108)

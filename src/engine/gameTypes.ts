@@ -109,6 +109,12 @@ export interface Champion {
      * open. Cleared by `EnableCharacterAction`.
      */
     attackStatModifier?: i16;
+    /**
+     * `CHARDESC.attackType` — the attack currently in progress, or -1
+     * (`doc/CSBwin-src/Character.cpp:4973`). `EnableCharacterAction` reads it to know
+     * whether to clear the defence penalty and whether to reload a bow.
+     */
+    attackType?: i16;
     skills: Skill[];           // CSBWin skills92[20]
     actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
     busyTimerIndex?: i32;      // Timer index for action disable
@@ -120,7 +126,13 @@ export interface Champion {
     shieldStrength?: ui16;      // Optional shield strength for UI dots
     possessions?: Array<number | null>; // Optional 30-slot possessions (CSBWin CHARDESC possessions[30])
 
-    // Position in party (0-3: front-left, front-right, back-left, back-right)
+    /**
+     * `CHARDESC.charPosition` — which **corner of the cell** the champion stands in,
+     * 0-3. It rotates with the party (`doc/CSBwin-src/Code11f52.cpp:4085`), so it is
+     * *not* the champion's slot in the four portrait boxes: that is the index into
+     * `PartyState.champions`, which never moves. The two happen to agree until the
+     * party first turns.
+     */
     partyPosition: ui8;
 }
 

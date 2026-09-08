@@ -32,10 +32,7 @@ export function drawInventoryScreen(ui: UIState): void {
   const selected = ui.partyState.selectedCharacterIndex | 0;
   if (selected < 0) return;
 
-  const champion =
-    ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-    ui.partyState.champions[selected] ??
-    null;
+  const champion = ui.partyState.champions[selected] ?? null;
   if (!champion || champion.alive === false) return;
 
   const iconSlots = ui.uiTables.graphic232.iconDisplay;

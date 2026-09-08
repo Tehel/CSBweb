@@ -541,6 +541,7 @@ export class DungeonLoader {
             records.push({
                 nextObject,
                 broken: (attributes & 0x2000) !== 0,
+                charges: (attributes >> 9) & 0xF,
                 cursed: (attributes & 0x100) !== 0,
                 important: (attributes & 0x80) !== 0,
                 clothingType: attributes & 0x7F

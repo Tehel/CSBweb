@@ -14,6 +14,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_MAGIC_REFERENCE.md` - Magic UI selection, rune entry, and caster tabs.
 - `doc/CSBWIN_MESSAGES_REFERENCE.md` - Scrolling message area: queue, word wrap, 4 rows, timeouts, colours.
 - `doc/CSBWIN_MISSILES_REFERENCE.md` - Missile timers, movement, and encounter resolution.
+- `doc/CSBWIN_ATTACK_REFERENCE.md` - The champion's own attacks: the ATTACKPARAMETERS block and its filter, the physical damage chain, every attack type, and the attack menu.
 - `doc/CSBWIN_MONSTERS_REFERENCE.md` - Monster data model (MONSTERDESC/DB4/ITEM16), group lifecycle, AI timers, attack tables.
 - `doc/CSBWIN_DSA_REFERENCE.md` - DSA loading, timers, and STKOP behaviors.
 - `doc/CSBWIN_DECORATIONS_REFERENCE.md` - Wall/floor decoration eligibility and rendering rules.

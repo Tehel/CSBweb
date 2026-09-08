@@ -49,11 +49,12 @@ Verified against the code, not inherited from earlier revisions of this file.
 1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
    emission, 53-column word wrap, 4 rows with 70-tick expiry, and `updateDebug()` demoted to
    the external debug log. Scroll *animation* and save-game serialization remain deferred.
-2. 🔄 **Monsters work.** `Monster.cpp` is ported (Phase 12 steps 1-5): groups hunt,
-   flee, throw missiles, hit the party, take damage and die, and a killed champion
-   leaves bones. Remaining in the phase: creature generators, and the *champion's*
-   own attacks from `Attack.cpp`. Armour does not yet reduce damage — see Phase 12.
-3. 🔄 **Champion death and bones now work** (Phase 12); resurrection, character
+2. ✅ **Combat works both ways** — done (Phase 12). `Monster.cpp` is ported: groups
+   hunt, flee, throw missiles, hit the party, take damage and die, and a killed
+   champion leaves bones. `Attack.cpp` is ported too: the attack menu offers each
+   champion's legal options and every attack type resolves, through the Party Attack
+   Filter. Lord Chaos's fusion endgame is the one deliberate omission.
+3. 🔄 **Champion death and bones work** (Phase 12); resurrection, character
    creation and potion drinking remain (Phase 13).
 4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
    ported, so clouds shrink, damage and expire (Phase 9 step 13).
@@ -64,6 +65,8 @@ Verified against the code, not inherited from earlier revisions of this file.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
    the UI now lives in `src/renderer/ui/`.
 8. **CSBWin-binary-compatible save files** not attempted (Phase 10).
+9. **The party's own pit-fall damage** is unported, so `d.SupressPitDamage` has nothing
+   to suppress and CLIMBDOWN is free either way (Phase 12 step 4).
 
 **Validation debt:** several phases below list "Validation" steps (render tests, render
 probes, pixel comparisons against CSBWin screenshots) that were **never carried out** —
@@ -79,9 +82,10 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Nine assertion-carrying verification tools** — the Phase 12 seven
+2. **Twelve assertion-carrying verification tools** — the Phase 12 eight
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
-   `watch-monster{s,-attacks}.ts`) plus `dump-hand-owner.ts`. These load the real game
+   `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
+   `dump-hand-owner.ts`, `dump-throwing.ts` and `dump-clouds.ts`. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
    suite for everything the frames cannot see, and they caught two real bugs and two
@@ -124,13 +128,16 @@ archive section.
   ported. Wall and floor decoration selection currently follows `TAG00a4a2` + the actuator
   `wallGraphicOrdinal` for stone/open rooms.
 - ⏳ *(Phase 7)* **Rune click flash effect** missing in the magic panel.
-- ⏳ *(Phase 7)* **Attack panel is a placeholder**: `drawAttackPanel()` picks the first alive
-  champion rather than the acting one, `PossibleAttackTypes` is not ported at all, and
-  visibility is driven by the F7 debug toggle instead of real attack state. Blocked on
-  Phase 12's champion melee (see Phase 12's own open list).
+- ✅ *(Phase 7 item 14)* **Attack panel** — done (Phase 12 step 7). `src/renderer/ui/Attack.ts`
+  ports `GetLegalAttackTypes`, `PrepareAttack`, `DrawAttackButton`, `DrawLegalAttackTypes`,
+  `_ExecuteAttack`, `TAG019fac`, `TAG01b29a` and `_FlashAttackDamage`. The F7 debug toggle
+  and the placeholder text are deleted; the panel is driven by `word20250`/`word20252` as
+  CSBWin drives it. One deferral: `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`), the DSA that
+  can rename an option, is not ported — names come straight from `AttackNames`.
 - ⏳ *(Phase 7)* **Interaction highlights** — button press/selection effects (flash, shading,
   invert) across UI regions, consistent with the hit-test rectangles.
-- ⏳ *(Phase 7.5)* Attack-driven light effects (depends on Phase 12); light-level trace hook.
+- ⏳ *(Phase 7.5)* Attack-driven light effects; light-level trace hook. (`atk_LIGHT` itself
+  works — this is the *viewport* flash on a blow, not the LIGHT attack.)
 
 **Engine**
 
@@ -263,8 +270,9 @@ prerequisite for playability; quick-save/load via a runtime JSON snapshot alread
 ### Phase 12 — Monsters: AI, movement, combat
 
 Goal: port `doc/CSBwin-src/Monster.cpp` and the attack pipeline in
-`doc/CSBwin-src/Attack.cpp`. This is the single largest remaining gap — there are currently
-**no active monsters at all**, only their rendering.
+`doc/CSBwin-src/Attack.cpp`. When this phase opened it was the single largest remaining
+gap — there were **no active monsters at all**, only their rendering. Both halves of combat
+now work; see `doc/CSBWIN_MONSTERS_REFERENCE.md` and `doc/CSBWIN_ATTACK_REFERENCE.md`.
 
 Several systems already carry proxies waiting on this phase; each must be revisited here:
 - `LastMonsterAttackTime` is fed from the missile-hit path instead of real monster attacks
@@ -273,6 +281,8 @@ Several systems already carry proxies waiting on this phase; each must be revisi
 - Monster teleport rotation/position logic and monster teleporter sounds are stubs.
 - `Game.registerChampionBones()` exists but is never called automatically.
 - Attack panel (Phase 7 item 14) cannot show real actions without `PossibleAttackTypes`.
+
+All five are now retired — see step 6.
 
 1. ✅ **Monster data model.** The audit found all three records truncated or misread, and
    they are now field-for-field transcriptions of CSBWin (see
@@ -408,9 +418,9 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    3. ✅ `InitialChecks` — **done**, with the timer-helper chain.
    4. ✅ `ProcessTimers29to41`'s decision body and the `Try_*` chain — **done**.
    5. ✅ `MonsterAttacks` + `MonsterDamagesCharacter` + champion death/bones — **done**.
-   6. Remaining: creature generators (step 5 of the phase), the champion melee
-      pipeline from `Attack.cpp` with the real attack panel, and the armour/load gaps
-      listed below.
+   6. ✅ Creature generators — **done**, see step 5.
+   7. ✅ The champion melee pipeline from `Attack.cpp`, with the real attack panel —
+      **done**, see step 7.
 
    Verified with `tools/dump-monster-perception.ts` (new): on level 2 with the party
    beside a nest of Ant Men, the three at ranges 1-3 see it and the ones beyond do
@@ -444,8 +454,7 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `0x232`.
    - ✅ **`LastMonsterAttackTime` proxy retired** — it is now fed by `MonsterAttacks`
      itself rather than from the missile-hit path.
-   - ⏳ Still to do: `Attack.cpp` proper — the *champion's* attacks: hit
-     determination, `PossibleAttackTypes`, the real attack panel.
+   - ✅ **`Attack.cpp` proper** — the champion's own attacks. See step 7.
 
    - ✅ **Armour now protects.** `TAG01680a` ported: shields held in either hand
      weighted per body part by `Byte1412`, the vitality-scaled random term, the
@@ -491,7 +500,7 @@ Several systems already carry proxies waiting on this phase; each must be revisi
    positions from a random start advancing by two for a two-corner monster, and
    placement through `moveMonster` so an occupied square sends the new group into
    abeyance. Actuator type 6 now spawns; `TT_REACTIVATE_GENERATOR` was already wired.
-6. 🔄 **Retire the proxies.**
+6. ✅ **Retire the proxies.**
    - ✅ `LastMonsterAttackTime` is fed by `MonsterAttacks`, not the missile path.
    - ✅ The renderer-side attack trigger is **deleted** — `onMonsterAttackState`,
      `handleMonsterAttackState` and `playMonsterAttackSound` are gone. The attacking
@@ -499,20 +508,104 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      screen is no longer silent.
    - ✅ `Game.registerChampionBones()` is called automatically from `KillCharacter`.
    - ✅ Monster teleport rotation and teleporter sounds are real (`moveMonster`).
-   - ⏳ The attack panel still shows placeholder text; it needs the champion melee
-     pipeline below.
+   - ✅ The attack panel is real (step 7); the placeholder text and its F7 debug
+     toggle are deleted.
 
-**Scope decided at the start of the phase.** Items 1-4 (with champion death/bones, since
-item 6 requires retiring the `registerChampionBones` proxy) are being done first; items 5
-and 6, and the champion melee pipeline from `Attack.cpp` with the real attack panel
-(Phase 7 item 14), follow. `Attack.cpp`'s Lord Chaos endgame — `_Fusion`,
-`_FusionSequence`, `FluxCage`, `IsLordChaosHere` — is **deliberately deferred**: it cannot
-be exercised until both monsters and Lord Chaos work, so porting it now would land
-untested. Validation is `tools/check-frames.sh` plus a dev-only AI trace mirroring
-CSBWin's own `AITraceActive` output (`Monster.cpp:3290`), so the two codebases stay
+7. ✅ **The champion's own attacks** (`Attack.cpp`). See
+   `doc/CSBWIN_ATTACK_REFERENCE.md` for the whole shape.
+   - ✅ **`src/engine/AttackSystem.ts`**: `_Attack`'s dispatch over all 44
+     `ATTACKTYPE`s, `AttackWithPhysicalForce`, `DeterminePhysicalAttackDamage` with
+     both damage rolls and the three special-cased blades, `PhysicalAttackFilter`,
+     `DetermineAttackOrdinal`, `WarCryEtc`, `AttackWithSpell`,
+     `DecrementChargesRemaining`, `SetCharToPartyFacing`, `FluxCage`,
+     `IsCellFluxcage` and `IsLordChaosHere`. `ATTACKPARAMETERS` is kept as one block,
+     as CSBWin does, because the Party Attack Filter is handed the whole thing.
+   - ✅ **The Party Attack Filter** (`ESL_PARTYATTACKFILTER`): `SetupDSAParam` and
+     `CallAttackFilter` via `DsaSystem.findPartyAttackFilter` /
+     `callPartyAttackFilter`, called at `msg` 0, 1 and 2 with the same block mutated
+     in place.
+   - ✅ **`src/renderer/ui/Attack.ts`**: `ItemHasChargesLeft`,
+     `GetLegalAttackTypes`, `PrepareAttack`, `_ExecuteAttack`, `TAG01b1c0`,
+     `DrawAttackButton`, `DrawLegalAttackTypes`, `TAG019fac`, `TAG01b29a` and
+     `_FlashAttackDamage`, over new `UIState` fields mirroring
+     `AttackingCharacterOrdinal` / `PossibleAttackTypes` / `Byte20256` /
+     `Word20248` / `Word20250` / `Word20252`.
+   - ✅ **Supporting ports that were missing**: `CharacterThrowsSpell` and
+     `LaunchObject` (`Magic.cpp:449`), `EnableCharacterAction` (`Timer.cpp:2638`)
+     with the bow's auto-reload and the thrown weapon's hand refill (`TAG0115ee`,
+     `TAG011594`, `TAG0153c2`), `RemoveCharacterPossession`, `TT_24` and
+     `CreateFluxcage` (`Code11f52.cpp:1515`), `MagicShield`'s return value, and
+     `ThrowByCharacter` with the filter's range/damage/decay overrides.
+
+   **Four real bugs fell out**, all recorded in `doc/PROVEN_FACTS.md`:
+   - **`CT_FLUXCAGE` is 50, not 7.** `MonsterPerception` was comparing against
+     `CT_POISON`, so an invincible monster was stopped by a poison cloud and walked
+     straight through a Fluxcage — the mechanism the Lord Chaos fusion depends on.
+     The constants now live in `src/engine/cloudTypes.ts`.
+   - **The party's turn never rotated the champions.** CSBWin adds the turn delta to
+     every champion's `charPosition` *and* `facing` (`Code11f52.cpp:4085`); neither
+     moved here, so a champion kept attacking in the direction the party faced when
+     they joined, and the corner marker in their box rotated when it should not.
+     Ported as `setPartyFacing` in `src/engine/Party.ts`, which the plain turn, the
+     teleporter rotation and the pit shuffle now all go through — as in CSBWin, where
+     all three are `MoveObject`.
+   - **`charPosition` was doubling as the portrait slot.** `Character.ts`,
+     `Inventory.ts`, `Feeding.ts` and `MagicPanel.ts` looked champions up by
+     `partyPosition === chIdx`; CSBWin indexes `d.CH16482[chIdx]` directly, and once
+     the corner rotates the two part company. All four now index by champion number.
+   - **`ordinalOfMonsterAtPosition` existed twice and one copy was wrong.**
+     `MonsterAI`'s iterated the group ascending and skipped CSBWin's parity walk-back
+     for a two-corner monster. Extracted to `src/engine/monsterPosition.ts` and shared
+     with `TimerSystem` and `AttackSystem`.
+
+   Also added: `ClothingRecord.charges` (`DB6` bits 9-12), which no loader was
+   reading, and `Game.setRandomSeed` so a whole-`Game` tool can pin `d.RandomNumber` —
+   `watch-monster-attacks.ts` and `dump-clouds.ts` were unseeded and are now
+   reproducible.
+
+   ⚠️ **Deferrals, all deliberate:**
+   - **Lord Chaos's endgame** — `_Fusion` (`Attack.cpp:133`) and `_FusionSequence`
+     (`:2220`). `atk_FUSE` runs its filter and does nothing else. It cannot be
+     exercised until Lord Chaos works, so porting it now would land untested.
+   - **`ActionNameFilter`** (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`) — the DSA that
+     can rename an attack option. Option names come straight from `AttackNames`.
+   - **`d.SupressPitDamage`** is not modelled, because the party's own pit-fall damage
+     is not ported at all. `atk_CLIMBDOWN` moves the party down the pit through the
+     normal `resolveCellEffects` chain and nothing is hurt — which is currently also
+     true of falling in by accident.
+   - **`_FlashAttackDamage`'s `VBLDelay(15)`** stops the whole game for a quarter
+     second. The flash is a timed overlay of the same duration instead; the game keeps
+     running underneath, as it already does for the feeding animation.
+   - **`FluxCage`'s duplicated neighbour test** (`:1626-1630`) tests `(LCX, LCY-1)`
+     twice and never looks south. Kept as written — it is what the real game does.
+   - **`atk_SHOOT` overwrites the damage it computes** with the launcher's weapon class
+     (`:1905-1906`). Plainly a bug in the original; kept.
+
+   Verified with `tools/dump-player-attacks.ts` (new), seven cases on the real dungeon:
+   a sword's menu reads SWING / PARRY / CHOP with mastery requirements 2 and 3 and a
+   bare hand reads PUNCH / KICK / WAR CRY — the canary that pins the graphic `0x230`
+   offsets; each of the four corners reaches a different member of a two-worm group;
+   300 SWINGs by a mastery-4 champion land 213 blows for 798 damage against a mastery-8
+   champion's 212 for 915, which is how we learned the hit check ignores skill
+   entirely; a well-fed champion wipes a ~590-HP worm group in 115 swings; the two
+   back-rank corners report "CAN'T REACH" on all 20 attempts and the front two never
+   do; 60 SWINGs at a Rive deal 0 and 60 DISRUPTs deal 429; all five shouts frighten
+   the group exactly when `base + mastery` can reach its bravery; and FREEZE LIFE steps
+   70 → 140 → 200 → 200. Fourteen new entries in `doc/PROVEN_FACTS.md`. The
+   `tools/check-frames.sh` attack frame is *deliberately* rebaselined — it used to
+   capture the F7 placeholder and now captures the real menu.
+
+**Scope note.** `Attack.cpp`'s Lord Chaos endgame — `_Fusion`, `_FusionSequence` — is
+**deliberately deferred**: it cannot be exercised until both monsters and Lord Chaos work,
+so porting it now would land untested. `FluxCage`, `IsCellFluxcage` and `IsLordChaosHere`
+*are* ported, since they are reachable today. Validation is `tools/dump-player-attacks.ts`,
+`tools/watch-monster-attacks.ts` and `tools/check-frames.sh`, plus the dev-only AI trace
+mirroring CSBWin's own `AITraceActive`/`AttackTraceActive` output so the two codebases stay
 diffable; a real test framework stays Phase 15.
 
-Status: 🔄 in progress — step 1 done; steps 2 and 3 partly done (the AI state machine is the remaining core).
+Status: ✅ done — steps 1-7 complete, with the deferrals listed under each step. What
+remains of combat is not in this phase: the party's own pit-fall damage, the Lord Chaos
+endgame (Phase 13's neighbour), and `CreateMovementTimer`'s overflow guard (step 2).
 
 ### Phase 13 — Champion lifecycle
 
