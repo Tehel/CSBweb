@@ -27,7 +27,8 @@ Corollaries:
 | File | Role |
 | --- | --- |
 | `CLAUDE.md` | This file. High-level orientation only; keep it short. |
-| `PLAN.md` | **Authority on detailed project status.** Phased plan + progress ledger. |
+| `PLAN.md` | **Authority on detailed project status.** Live phases + carried-over debt. |
+| `doc/PLAN_ARCHIVE.md` | Working notes for completed phases. Reference only — read on demand. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
