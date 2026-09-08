@@ -6,7 +6,7 @@
  * `processMouseQueue`, so a click always acts on the state the frame was drawn from.
  * `handleMouseButton` is the dispatcher on the `word0` ids that `searchButtonList` returns.
  */
-import { IndexedBitmap, drawRectOutlineIndex } from '../csbwin/CanvasBlitter';
+import { IndexedBitmap } from '../csbwin/CanvasBlitter';
 import { canPlaceInSlot, getChampionPossession, setChampionPossession } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
