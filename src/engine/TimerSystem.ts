@@ -1,5 +1,13 @@
 import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
+
+/**
+ * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
+ * door springs back off them.
+ */
+const SOUND_DOOR_OPENING = 18;
+/** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
+const SOUND_DOOR_STRUGGLE = 4;
 import type { CsbRandom } from '../core/random';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
@@ -46,6 +54,7 @@ import {
   monsterHorizontalSize,
   monsterLevitating,
   monsterNonMaterial,
+  monsterVerticalSize,
 } from '../renderer/csbwin/ObjectTables';
 import type { ActuatorSystem } from './ActuatorSystem';
 import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
@@ -695,12 +704,81 @@ export class TimerSystem {
     const action = timer.uByte9 & 0xff;
     timer.time = (timer.time + 1) >>> 0;
 
-    if (action === ActuatorAction.CLEAR && doorState !== 0) {
+    // A door coming *down* onto something standing under it. `ProcessTT_1`
+    // (doc/CSBwin-src/Timer.cpp:1289-1357) has two different rules here, for the
+    // party and for a monster, and neither was ported — the door closed straight
+    // through both.
+    //
+    // The nesting matters and is easy to get wrong: CSBWin's outer test is on the
+    // action alone (`if (D5W == 1)`); the `D4W != 0` guard belongs to the *party*
+    // arm only. The monster arm's gate is `D4W >= D1W`, which a fully open door
+    // (`D4W == 0`) still passes against a monster of `VerticalSize() == 0` — and two
+    // of the 27 monster types in the shipped data have exactly that.
+    if (action === ActuatorAction.CLEAR) {
       const target = new Position(x, y, timer.level);
-      if (this.isPartyAt(target)) {
-        this.setDoorState(map, x, y, 0);
+
+      // `w_10 = pDB0_4->mode()` — read before either arm. Bit 5 of `DB0.word2`,
+      // up/down vs sideways (doc/CSBwin-src/CSB.h:837), which the loader reads as
+      // `vertical`.
+      const doorRn = this.dungeon.findFirstDoor(target);
+      const doorRecord =
+        doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+      const upDown = doorRecord?.vertical ?? false;
+
+      // The party arm. The door springs fully open again, hurts everyone, and only
+      // makes a noise if somebody was actually hurt:
+      //
+      //   *cfA2 &= 0xf8;        // fully open again
+      //   w_10 |= 8;            // dead store; nothing reads w_10 after this
+      //   D0W = DamageAllCharacters(5, 4, 2);
+      //   if (D0W != 0) QueueSound(soundDOOROPENING, x, y, 1);
+      //
+      // Gated on `d.NumCharacter > 0` — an empty party is not squashed.
+      if (this.isPartyAt(target) && doorState !== 0) {
+        if (this.getPartyState().champions.length > 0) {
+          this.setDoorState(map, x, y, 0);
+          const hurt = this.hooks?.damageAllCharacters?.(5, 4, 2) ?? 0;
+          if (hurt !== 0) this.hooks?.queueSound?.(SOUND_DOOR_OPENING, x, y, 1);
+        }
         this.timers.addTimer(timer);
         return;
+      }
+
+      // The monster arm. The door hurts the group and *rebounds* one step instead of
+      // closing through it:
+      //
+      //   obj_6 = FindFirstMonster(x, y);          // first monster in the chain only
+      //   if (!obj_6.NonMaterial())                // a ghost is not squashed
+      //     D1W = w_10 != 0 ? obj_6.VerticalSize() : 1;
+      //     if (D4W >= D1W) { ...crush... }        // the gap must reach the monster
+      //
+      // A sideways door catches anything (`D1W = 1`); an up-down one only catches a
+      // monster at least as tall as the gap that is left.
+      const monsterRn = this.findFirstMonsterAt(target);
+      if (monsterRn !== null) {
+        const creature = this.dungeon.getCreatureRecord(monsterRn);
+        const desc = creature ? this.tables?.monsterDesc?.[creature.creatureType] : undefined;
+        if (creature && desc && !monsterNonMaterial(desc)) {
+          const needed = upDown ? monsterVerticalSize(desc) : 1;
+          if (doorState >= needed) {
+            const result = this.hooks?.damageMonsterGroup?.(creature, timer.level, x, y, 5);
+            if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
+              this.hooks?.onMonsterAI?.({
+                mapX: x,
+                mapY: y,
+                level: timer.level,
+                timerFunction: TimerFunction.TT_M3,
+                timeUntilAlternateUpdate: 0,
+                timer,
+              });
+            }
+            // The rebound: one step back up, floored at 0, then re-queue.
+            this.setDoorState(map, x, y, doorState === 0 ? 0 : doorState - 1);
+            this.hooks?.queueSound?.(SOUND_DOOR_STRUGGLE, x, y, 1);
+            this.timers.addTimer(timer);
+            return;
+          }
+        }
       }
     }
 

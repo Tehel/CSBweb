@@ -154,6 +154,19 @@ archive section.
 
 **Engine**
 
+- ✅ *(playtest)* **A closing door no longer passes through the party or a monster.**
+  `ProcessTT_1`'s two blocker arms are ported (`doc/CSBwin-src/Timer.cpp:1289-1357`):
+  the party springs the door fully open, takes `DamageAllCharacters(5, 4, 2)` and only
+  then hears `soundDOOROPENING`; a monster takes `DamageMonsterGroup(…, 5)`, the
+  survivors are poked with `TT_M3`, and the door steps back **up** one with sound 4.
+  Neither existed — the door closed straight through both.
+
+  The nesting was the trap and is written up in `doc/CSBWIN_MOVEMENT_REFERENCE.md`:
+  `D4W != 0` guards the *party* arm alone, so a fully open up-down door still crushes a
+  `VerticalSize() == 0` monster, and two of the 27 monster types in the shipped data
+  are that size. Verified by `tools/dump-door-crush.ts`, which shows level 2's door
+  stepping `1 → 0 → 1` over an Ant Man and the party losing 71 HP under it.
+
 - ✅ *(playtest)* **Monsters block the party.** `MoveParty`'s monster arm is ported into
   `MovementSystem.handleMovement` — the `d.NumCharacter != 0` gate, the unfiltered
   `FindFirstMonster` (an immaterial monster blocks too), the silence, and

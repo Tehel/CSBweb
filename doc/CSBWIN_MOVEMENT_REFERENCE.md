@@ -59,3 +59,60 @@ Verified facts:
 Not yet ported (see `PLAN.md`): the terrain block's `DamageCharacter(…, 1, 24, 2)`
 wall-bump damage and its sound-18 gate, the `DiscardAllInput()` / `d.clockTick = 0`
 pair, and the vertical-move guard.
+
+## A closing door does not pass through what is under it
+
+`ProcessTT_1` (`doc/CSBwin-src/Timer.cpp:1271-1357`) — CSBWin's door-step timer, our
+`TimerFunction.TT_DOOR_STEP`. The whole blocker handling sits under `if (D5W == 1)`,
+i.e. only while the door is coming *down*:
+
+```c
+if (D5W == 1) {
+  pDB0_4 = FirstObjectRecordAddressDB0(x, y);
+  w_10 = pDB0_4->mode();                    // bit 5 of DB0.word2: up/down vs sideways
+  if (d.LoadedLevel==d.partyLevel && x==d.partyX && y==d.partyY && D4W != 0) {
+    if (d.NumCharacter > 0) {
+      *cfA2 &= 0xf8;                        // spring fully open again
+      w_10 |= 8;                            // dead store
+      D0W = DamageAllCharacters(5, 4, 2);
+      if (D0W != 0) QueueSound(soundDOOROPENING, x, y, 1);
+    }
+    pTimer->Time(pTimer->Time()+1); gameTimers.SetTimer(pTimer); return;
+  }
+  obj_6 = FindFirstMonster(x, y);
+  if (obj_6 != RNeof && !obj_6.NonMaterial()) {
+    D1W = (w_10 != 0) ? obj_6.VerticalSize() : 1;
+    if (D4W >= D1W) {
+      monsterDamageResult = DamageMonsterGroup(GetRecordAddressDB4(obj_6), x, y, 5, 1, false, NULL);
+      if (monsterDamageResult != ALL_MONSTERS_DIED) ProcessTimers29to41(x, y, TT_M3, 0);
+      D4W = (D4W == 0) ? 0 : D4W - 1;       // rebound one step back up
+      *cfA2 = (*cfA2 & 0xf8) | D4W;
+      QueueSound(4, x, y, 1);
+      pTimer->Time(pTimer->Time()+1); gameTimers.SetTimer(pTimer); return;
+    }
+  }
+}
+```
+
+Verified facts:
+
+- **The nesting is not what it looks like.** `D4W != 0` belongs to the *party* arm
+  only. The monster arm's only gate is `D4W >= D1W`, so a fully open (`D4W == 0`)
+  up-down door still crushes a monster whose `VerticalSize()` is 0 — and 2 of the 27
+  monster types in the shipped `graphics.dat` have `verticalSize == 0`
+  (histogram: 0→2, 1→18, 2→4, 3→3). Reading `D4W != 0` as guarding both arms is
+  wrong in play, not just on paper.
+- The party arm is additionally gated on `d.NumCharacter > 0`, and the sound only
+  plays when `DamageAllCharacters` reports somebody was actually hurt.
+- `soundDOOROPENING` is 18 (`doc/CSBwin-src/CSB.h:626`); the monster rebound queues
+  ordinal 4.
+- `FindFirstMonster` consults only the **first** monster in the cell chain, and an
+  immaterial one is skipped entirely — the door closes through a ghost.
+- `w_10 |= 8` in the party arm is a dead store: nothing reads `w_10` afterwards.
+- A sideways door catches anything (`D1W = 1`); an up-down door only catches a
+  monster at least as tall as the gap that is left.
+
+Observed on level 2's up-down door at (0,25) with an Ant Man
+(`verticalSize == 1`) under it: the door steps `1 → 0 → 1` — it closes to 1, crushes
+and rebounds to 0, and the `TT_M3` poke gives the group a turn, which it uses to walk
+out from under the door (`tools/dump-door-crush.ts`).
