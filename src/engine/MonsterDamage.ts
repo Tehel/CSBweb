@@ -31,6 +31,7 @@ import {
   monsterBravery,
   monsterHorizontalSize,
   monsterInvincible,
+  monsterPoisonResistance,
   monsterLeavesDroppings,
 } from '../renderer/csbwin/ObjectTables';
 
@@ -426,6 +427,60 @@ export class MonsterDamage {
    * `noItem16` says the group has no `ITEM16` attached, which changes where the
    * packed position and facing bytes live.
    */
+  /**
+   * `DamageMonsterGroup` (`doc/CSBwin-src/Code11f52.cpp:1317`) — one blow that lands on
+   * every member of a group, as a cloud or an explosion does.
+   *
+   * The damage is not shared out evenly: an eighth-plus-one is taken off the top and
+   * given back to each member as `STRandom(2 * that)`, so one Screamer can be gutted
+   * while the one beside it is scratched. Members are walked from the last down to the
+   * first, which is the order `DamageMonster`'s compaction needs.
+   */
+  damageMonsterGroup(
+    monster: CreatureRecord,
+    level: number,
+    mapX: number,
+    mapY: number,
+    damage: number,
+    apply: boolean,
+    noItem16: boolean,
+  ): MonsterDamageResult {
+    if (damage <= 0) return MonsterDamageResult.NO_MONSTER_DIED;
+
+    let allDied = true;
+    let anyDied = false;
+    const spread = ((damage >> 3) + 1) | 0;
+    const base = damage - spread;
+
+    for (let index = monster.numMonM1 & 3; index >= 0; index--) {
+      const dealt = base + this.random.below(2 * spread);
+      const result = this.damageMonster(monster, index, level, mapX, mapY, dealt, apply, noItem16);
+      const died = result !== MonsterDamageResult.NO_MONSTER_DIED;
+      allDied = allDied && died;
+      anyDied = anyDied || died;
+    }
+
+    if (allDied) return MonsterDamageResult.ALL_MONSTERS_DIED;
+    if (anyDied) return MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED;
+    return MonsterDamageResult.NO_MONSTER_DIED;
+  }
+
+  /**
+   * `DeterminePoisonDamage` (`doc/CSBwin-src/Code11f52.cpp:1358`).
+   *
+   * Poison resistance 15 means total immunity; otherwise the damage is *multiplied* by
+   * eight and divided by resistance-plus-one, so a poison cloud is devastating against
+   * something with no resistance and nearly harmless against something with a lot.
+   */
+  determinePoisonDamage(monsterType: number, damage: number): number {
+    if (damage === 0) return 0;
+    const desc = this.tables?.monsterDesc?.[monsterType];
+    if (!desc) return 0;
+    const resistance = monsterPoisonResistance(desc);
+    if (resistance === 15) return 0;
+    return Math.trunc((8 * (damage + this.random.zeroTo3())) / (resistance + 1));
+  }
+
   damageMonster(
     monster: CreatureRecord,
     indexInGroup: number,

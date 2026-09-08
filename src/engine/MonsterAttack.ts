@@ -422,6 +422,29 @@ export class MonsterAttack {
   }
 
   /**
+   * `DamageAllCharacters` (`doc/CSBwin-src/Code11f52.cpp:4378`) — one blow that lands
+   * on the whole party, as a fireball or a poison cloud does. Returns how many
+   * champions actually took damage.
+   *
+   * The same eighth-off-the-top spread `DamageMonsterGroup` uses, so the party is hurt
+   * unevenly by a single explosion.
+   */
+  damageAllCharacters(damage: number, woundMask: number, kind: number): number {
+    if (damage === 0) return 0;
+    const spread = Math.trunc(damage / 8) + 1;
+    const base = damage - spread;
+    const range = 2 * spread;
+
+    let hurt = 0;
+    const party = this.getPartyState();
+    for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
+      const roll = (this.random.next() & 0xffff) % range;
+      if (this.damageCharacter(chIdx, Math.max(1, base + roll), woundMask, kind) !== 0) hurt++;
+    }
+    return hurt;
+  }
+
+  /**
    * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`).
    *
    * `kind` is CSBWin's `P4`, and it selects how the blow is mitigated: 1 fire,

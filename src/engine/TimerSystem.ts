@@ -38,6 +38,7 @@ import {
 } from '../data/actuatorHelpers';
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import { monsterFireResistance } from '../renderer/csbwin/ObjectTables';
 import { StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import {
@@ -57,6 +58,8 @@ const RN_ZO_SPELL = 0xff84;
 const RN_POISON_BOLT = 0xff86;
 const RN_POISON_CLOUD = 0xff87;
 const RN_MONSTER_DEATH = 0xffa8;
+/** `RNffe4` — the Vi altar's resurrection cloud (`doc/CSBwin-src/Timer.cpp:2730`). */
+const RN_FFE4 = 0xffe4;
 
 const POTION_VEN_POTION = 3;
 const POTION_FUL_BOMB = 19;
@@ -181,10 +184,30 @@ export interface TimerHooks {
   }) => void;
   onMissileTrace?: (event: MissileTraceEvent) => void;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+  /** `QueueSound` — a sound named by ordinal, attenuated by distance from the party. */
+  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
+  /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
+  damageAllCharacters?: (damage: number, woundMask: number, kind: number) => number;
+  /** `DamageMonsterGroup` (doc/CSBwin-src/Code11f52.cpp:1317). Returns MONSTER_DAMAGE_RESULT. */
+  damageMonsterGroup?: (
+    monster: CreatureRecord,
+    level: number,
+    mapX: number,
+    mapY: number,
+    damage: number,
+  ) => number;
+  /** `DeterminePoisonDamage` (doc/CSBwin-src/Code11f52.cpp:1358). */
+  determinePoisonDamage?: (monsterType: number, damage: number) => number;
 }
 
 export class TimerSystem {
   private missileFilterObject = OBJECT_ID_EOF;
+  /**
+   * `d.Time` as the timer system last saw it. `CreateCloud` schedules relative to it,
+   * and it can be reached from outside a `processTimers` pass (a missile impact, a
+   * monster death), so it is also set by `setNow`.
+   */
+  private now = 0;
   private missileFilterTimer: TimerEntry | null = null;
   constructor(
     private dungeon: DungeonState,
@@ -199,6 +222,7 @@ export class TimerSystem {
   }
 
   processTimers(currentTime: number): void {
+    this.now = currentTime >>> 0;
     let processed = 0;
     let next = this.timers.peekNext();
 
@@ -208,7 +232,18 @@ export class TimerSystem {
       this.dispatch(timer);
 
       processed++;
-      if (processed > 50000) break;
+      if (processed > 50000) {
+        // A timer that re-queues itself at the tick it just ran on livelocks the pass,
+        // and everything behind it in the queue silently stops happening. This used to
+        // `break` without a word, which is how the level-3 monster stall below went
+        // unnoticed. Say which timer did it.
+        console.warn(
+          `TimerSystem: timer pass at t=${currentTime} hit the 50000 cap; last timer ` +
+          `fn=${timer.function} time=${timer.time} at (${timer.uByte6},${timer.uByte7}) ` +
+          `L${timer.level}. Timers behind it did not run.`,
+        );
+        break;
+      }
       next = this.timers.peekNext();
     }
   }
@@ -263,6 +298,9 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_11:
         this.processActionDisableTimer(timer);
+        break;
+      case TimerFunction.TT_25:
+        this.processTT_25(timer);
         break;
       case TimerFunction.TT_60:
       case TimerFunction.TT_61:
@@ -1612,8 +1650,11 @@ export class TimerSystem {
     }
 
     timer.time = (timer.time + 1) >>> 0;
-    this.timers.addTimer(timer);
-    missile.timerIndex = timer.index & 0xffff;
+    // CSBWin stores the *return* of SetTimer here
+    // (`pDBMissile->timerIndex(gameTimers.SetTimer(&missileFilterTimer))`,
+    // doc/CSBwin-src/Timer.cpp:429), and so must we: the queue keeps a copy.
+    const queued = this.timers.addTimer(timer);
+    missile.timerIndex = queued.index & 0xffff;
     this.clearMissileFilterState();
   }
 
@@ -2141,6 +2182,17 @@ export class TimerSystem {
     this.createCloud(projectile, size, position.x, position.y, position, posInCell);
   }
 
+  /**
+   * `CreateCloud` / `TAG00dea8` (`doc/CSBwin-src/Code11f52.cpp:1376`).
+   *
+   * The cloud is a DB15 record in the cell plus a `TT_25` timer that gives it its
+   * life. Without the timer — which is how this stood until now — the record sits in
+   * the cell at full size for the rest of the game, rendering a permanent puff and
+   * dealing no damage at all.
+   *
+   * A fireball or a lightning bolt also does its damage *here*, at the moment the
+   * cloud appears, not on the timer.
+   */
   private createCloud(
     projectile: number,
     size: number,
@@ -2152,8 +2204,210 @@ export class TimerSystem {
     if (objX < 0 || objY < 0) return;
     const rn = this.createCloudRecord(projectile, size, posInCell);
     if (rn === null) return;
-    this.dungeon.addObjectToCell(position, rn);
     this.playCloudSound(projectile, size);
+    this.dungeon.addObjectToCell(position, rn);
+
+    // The Vi altar's cloud gets 5 ticks before its first turn; everything else 1.
+    const delay = projectile === RN_FFE4 ? 5 : 1;
+    this.timers.createTimer(
+      TimerFunction.TT_25,
+      position.x,
+      position.y,
+      0,
+      0,
+      (this.now + delay) >>> 0,
+      position.z,
+      rn,
+    );
+
+    if (projectile !== RN_LIGHTNING && projectile !== RN_FIREBALL) return;
+
+    // A fireball's blast, dealt once. Lightning deals half.
+    let damage = Math.trunc(size / 2) + 1;
+    damage = damage + this.random.below(damage);
+    if (projectile !== RN_FIREBALL) {
+      damage = Math.trunc(damage / 2);
+      if (damage === 0) return;
+    }
+
+    const party = this.getPartyState();
+    if (position.z === party.position.z && objX === party.position.x && objY === party.position.y) {
+      this.hooks?.damageAllCharacters?.(damage, 63, 1);
+      return;
+    }
+
+    const monsterRn = this.findFirstMonsterAt(new Position(objX, objY, position.z));
+    if (monsterRn === null) return;
+    const monster = this.dungeon.getCreatureRecord(monsterRn);
+    if (!monster) return;
+    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    if (!desc) return;
+    const fireResistance = monsterFireResistance(desc);
+    if (fireResistance === 15) return;
+    if (monsterNonMaterial(desc)) damage >>= 2;
+    damage -= this.random.below(2 * fireResistance + 1);
+    if (damage <= 0) return;
+    this.monsterDamageResult =
+      this.hooks?.damageMonsterGroup?.(monster, position.z, objX, objY, damage) ?? 0;
+  }
+
+  /**
+   * `ProcessTT_25` (`doc/CSBwin-src/Timer.cpp:436`) — one tick of a cloud's life.
+   *
+   * Every branch either **reschedules** the timer one tick later, or falls out of the
+   * switch, and falling out is how a cloud dies: the record leaves the cell and the DB
+   * entry is freed. So each cloud type's own rule is also its lifespan.
+   *
+   *  - **Monster death** (`CT_DEATH`, 40) shrinks by 40 a tick while its value is over
+   *    55, then stops. A death cloud starts at 255, so it lives 5 ticks and visibly
+   *    shrinks the whole way — the renderer scales the puff by `value`.
+   *  - **Poison** (`CT_POISON`, 7) hurts whoever is standing in it, then shrinks by 3
+   *    until it is under 6. It is the long-lived one.
+   *  - **Fireball** (0) and **lightning** (2) do not persist at all: they get one tick
+   *    to burst a door open and are gone.
+   *  - **Dispell** (3) hurts non-material monsters only, and never lingers.
+   *  - The Vi altar's cloud (100) walks its own type upward each tick, which is what
+   *    animates it, and reschedules forever until its type leaves the range.
+   */
+  private processTT_25(timer: TimerEntry): void {
+    const x = timer.uByte6;
+    const y = timer.uByte7;
+    const cloudRn = timer.object;
+    if (cloudRn === undefined) return;
+    const cloud = this.dungeon.getCloudRecord(cloudRn);
+    const position = new Position(x, y, timer.level);
+    if (!cloud) return;
+
+    const roomType = (this.dungeon.getCellFlag(position) >> 5) & 7;
+    const party = this.getPartyState();
+    const partyHere =
+      timer.level === party.position.z && x === party.position.x && y === party.position.y;
+
+    const monsterRn = this.findFirstMonsterAt(position);
+    const monster = monsterRn !== null ? this.dungeon.getCreatureRecord(monsterRn) : null;
+    const monsterType = monster ? monster.creatureType : -1;
+    const desc = monster ? this.tables?.monsterDesc?.[monsterType] : null;
+
+    const kind = (0xff80 + (cloud.cloudType & 0x7f)) & 0xffff;
+
+    // How hard the cloud bites this tick, from what is left of it.
+    let damage: number;
+    if (kind === RN_POISON_CLOUD) {
+      damage = Math.max(1, Math.min(Math.trunc(cloud.value / 32), 4) + this.random.bool());
+    } else {
+      damage = Math.trunc(cloud.value / 2) + 1;
+      damage = damage + this.random.below(damage) + 1;
+    }
+
+    let reschedule = false;
+
+    switch (kind) {
+      case RN_LIGHTNING:
+      case RN_FIREBALL: {
+        // CSBWin marks its own "Note fall-through" here: lightning halves the damage
+        // and drops through into the fireball case, unless halving left nothing.
+        if (kind === RN_LIGHTNING) {
+          damage = Math.trunc(damage / 2);
+          if (damage === 0) break;
+        }
+        if (roomType === RoomType.DOOR) this.hitDoor(position, damage, true);
+        break;
+      }
+
+      case RN_DISPELL_MISSILE:
+        // Dispell only touches what is not really there.
+        if (monster && desc && monsterNonMaterial(desc)) {
+          this.hooks?.damageMonsterGroup?.(monster, timer.level, x, y, damage);
+        }
+        break;
+
+      case RN_FFE4:
+        cloud.cloudType = (cloud.cloudType + 1) & 0x7f;
+        this.hooks?.queueSound?.(5, x, y, 1);
+        reschedule = true;
+        break;
+
+      case RN_MONSTER_DEATH:
+        if (cloud.value > 55) {
+          cloud.value = (cloud.value - 40) & 0xff;
+          reschedule = true;
+        }
+        break;
+
+      case RN_POISON_CLOUD: {
+        if (partyHere) {
+          this.hooks?.damageAllCharacters?.(damage, 0, 0);
+        } else if (monster) {
+          const poison = this.hooks?.determinePoisonDamage?.(monsterType, damage) ?? 0;
+          if (poison !== 0) {
+            const result = this.hooks?.damageMonsterGroup?.(monster, timer.level, x, y, poison) ?? 0;
+            // Survivors notice: TT_M3 is CSBWin's "damaged by a cloud or a door".
+            if (result !== 2 && poison > 2) {
+              this.hooks?.onMonsterAI?.({
+                mapX: x,
+                mapY: y,
+                level: timer.level,
+                timerFunction: TimerFunction.TT_M3,
+                timeUntilAlternateUpdate: 0,
+                timer,
+              });
+            }
+          }
+        }
+        if (cloud.value < 6) break;
+        cloud.value = (cloud.value - 3) & 0xff;
+        reschedule = true;
+        break;
+      }
+    }
+
+    if (reschedule) {
+      this.timers.createTimer(
+        TimerFunction.TT_25,
+        x,
+        y,
+        timer.uByte8,
+        timer.uByte9,
+        (timer.time + 1) >>> 0,
+        timer.level,
+        cloudRn,
+      );
+      return;
+    }
+
+    this.dungeon.removeObjectFromCell(position, cloudRn);
+    this.dungeon.deleteDBEntry(cloudRn);
+  }
+
+  /**
+   * `HitDoor` (`doc/CSBwin-src/Code11f52.cpp:2263`) — a blow that may burst a door open.
+   *
+   * `explosion` picks which of the door's two "destructible by" flags is consulted:
+   * a fireball's blast tests `canOpenWithFireball`, an axe blow `canOpenWithAxe`. The
+   * force must also beat the door type's entry in `DoorTOC`.
+   *
+   * ⚠️ CSBWin's `delay` argument is not ported: only its zero case is reachable, since
+   * the delayed form belongs to `Attack.cpp`'s melee (`TT_BASH_DOOR`), which does not
+   * exist yet. Recorded in PLAN.md.
+   */
+  private hitDoor(position: Position, force: number, explosion: boolean): boolean {
+    const doorRn = this.dungeon.findFirstObject(position);
+    if (doorRn === OBJECT_ID_EOF) return false;
+    const door = this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
+    if (!door) return false;
+
+    if (explosion ? !door.destructibleByFireball : !door.destructibleByChop) return false;
+    const toc = (this.tables?.doorCharacteristics?.[door.doorType & 0x3] ?? 0) & 0xff;
+    if (force < toc) return false;
+
+    const map = this.dungeon.getMap(position.z);
+    if (!map) return false;
+    const cellFlag = map.cellFlags[position.x]?.[position.y];
+    if (cellFlag === undefined) return false;
+    // Bottom three bits 4 means a closed door; 5 is the shattered state.
+    if ((cellFlag & 7) !== 4) return false;
+    this.setDoorState(map, position.x, position.y, 5);
+    return true;
   }
 
   private createCloudRecord(projectile: number, size: number, posInCell: number): number | null {

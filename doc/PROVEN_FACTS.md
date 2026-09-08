@@ -989,3 +989,42 @@ nothing from being thrown.
 less an eighth for any wound (a quarter if the torso is hurt, bit 4), plus a sixteenth for
 Elven Boots in slot 5, then `+9` and rounded down to a multiple of 10. A strength-50
 champion at full stamina gets exactly 500; at 10/100 stamina, 300; with a wounded torso, 380.
+
+## A cloud's lifespan *is* its shrink rule
+
+Every branch of `ProcessTT_25` (`doc/CSBwin-src/Timer.cpp:436`) either reschedules the
+timer one tick later or falls out of the switch, and falling out is how a cloud dies —
+`RemoveObjectFromRoom` then `DeleteDBEntry`. So each cloud type's shrink rule and its
+lifespan are the same rule:
+
+| type | `0xff80 +` | per tick | lives |
+| --- | --- | --- | --- |
+| Fireball | 0 | bursts a door (`HitDoor`), nothing else | 1 tick |
+| Lightning | 2 | half damage, then the fireball branch | 1 tick |
+| Dispell | 3 | damages non-material monsters only | 1 tick |
+| Poison | 7 | hurts whoever stands in it, `value -= 3` while `value >= 6` | ~85 ticks |
+| Monster death | 40 (`CT_DEATH`) | `value -= 40` while `value > 55` | 3-6 ticks |
+| Vi altar | 100 | `cloudType++`, sound 5, always reschedules | until its type leaves range |
+
+The renderer scales the puff by `value` (`BytecodeInterpreter`, the
+`max(4, (cloudScale * max(48, value+1)) >> 8)` term), so the shrink *is* the animation:
+a death cloud made at 255 steps 255 → 215 → 175 → 135 → 95 → 55 and is gone, visibly
+dispersing. Measured with `tools/dump-clouds.ts`; a real monster killed on level 2 leaves
+a cloud of value 110, which clears in exactly 3 ticks.
+
+The poison cut-off is tested **before** the subtraction (`:597`), so the last value a
+poison cloud lives through is 3, not 6 — 255 less a multiple of 3 never lands on 6.
+
+## `GameTimers::SetTimer` copies the timer, and that matters
+
+CSBWin's `SetTimer(TIMER *)` copies the struct into its timer array, so a caller can
+reuse one local `TIMER` as a template across a loop. `MaybeDelTimers_Fear6_TurnIndividuals`
+(`doc/CSBwin-src/Monster.cpp:1476-1553`) does exactly that: it mutates one `timer_70` and
+calls `SetMonsterTimerB` once per group member.
+
+Storing the object by reference instead — as `TimerQueue.addTimer` did — puts the *same*
+entry in the queue up to four times, and every later mutation rewrites entries already
+queued. The queue then stops being sorted, and because `processTimers` stops at the first
+entry that is not yet due, every timer behind the misplaced one stalls. `addTimer` now
+copies and mints the index, and callers must read the queued `index` from its **return**,
+which is what CSBWin does at `doc/CSBwin-src/Timer.cpp:429`.

@@ -55,7 +55,8 @@ Verified against the code, not inherited from earlier revisions of this file.
    own attacks from `Attack.cpp`. Armour does not yet reduce damage — see Phase 12.
 3. 🔄 **Champion death and bones now work** (Phase 12); resurrection, character
    creation and potion drinking remain (Phase 13).
-4. **Clouds are created but inert** — no timer, no damage, never expire (Phase 9 step 13).
+4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
+   ported, so clouds shrink, damage and expire (Phase 9 step 13).
 5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
    ported over the real `DetermineThrowingDistance` chain (Phase 9 step 11).
 6. ✅ **Debug scaffolding** — done (Phase 14). Now confined to `src/dev.ts` and reached only
@@ -103,6 +104,20 @@ Every open item from them is listed here so that nothing is buried by the split 
 is the authority, the archive only holds the surrounding context. Each entry names its
 archive section.
 
+**Bugs found but not fixed**
+
+- 🐞 **The level-3 monster timer stall.** A `TT_MONSTER_AGROUP` timer for the group at
+  (10,29) on level 3 re-queues itself at the tick it just ran on, so `processTimers`
+  spins until its 50000-iteration cap and **every timer behind it never runs** — on that
+  level the game effectively stops. Reproduce: put the party on level 3, run
+  `processTimers` from tick 0, and watch the new `TimerSystem: timer pass … hit the 50000
+  cap` warning fire on 199 of the first 200 ticks. The trace shows `Standard_Finish`
+  reached with `timeUntilAlternateUpdate=0`, which suggests the next-time computation
+  (`Increment_Time_By_W52_Plus_Random` / `EnsureI60NonZero`, `doc/CSBwin-src/Monster.cpp`)
+  is producing a zero delay where CSBWin guarantees a positive one. Found while porting
+  clouds: it was masking the cloud timer on that level.
+  `tools/dump-clouds.ts` deliberately kills its test monster on level **2** to avoid it.
+
 **Rendering / UI**
 
 - ⚠️ *(Phase 4)* DSA-based decoration gating and footprints/extended cell flags are not
@@ -136,10 +151,16 @@ archive section.
 - ⏳ *(Phase 9 step 12)* Door pass-through rules (DoorTOC + ObjDesc checks for missiles) and
   the magic damage/poison formulas incl. Black Flame fireball healing.
   Ref: `doc/CSBwin-src/Code11f52.cpp:1870+`, `doc/CSBwin-src/Code11f52.cpp:1488+`.
-- ⏳ *(Phase 9 step 13)* **Clouds are inert — a visible bug, not just a gap.**
-  `createCloud()`/`createCloudRecord()` build the DB13 record and add it to the cell but
-  **never schedule a timer**, so clouds render forever and deal no damage.
-  Ref: `doc/CSBwin-src/Timer.cpp:479+`, `doc/CSBwin-src/Code11f52.cpp:1376+`.
+- ✅ *(Phase 9 step 13)* **Clouds are alive.** `CreateCloud` now schedules the `TT_25`
+  timer it always needed, and `ProcessTT_25` is ported in full: the death puff shrinks by
+  40 a tick and is gone in 3-6, poison lingers ~85 ticks and hurts whoever stands in it,
+  and a fireball bursts a door and vanishes. `CreateCloud`'s own blast damage came with
+  it, along with `DamageMonsterGroup`, `DeterminePoisonDamage`, `DamageAllCharacters` and
+  `HitDoor`, none of which existed. Verified by `tools/dump-clouds.ts`.
+  Ref: `doc/CSBwin-src/Timer.cpp:436`, `doc/CSBwin-src/Code11f52.cpp:1376`.
+
+  ⚠️ `HitDoor`'s `delay` argument is not ported — only the zero case is reachable, since
+  the delayed form is `Attack.cpp`'s melee (`TT_BASH_DOOR`), which does not exist yet.
 - ⚠️ *(Phase 9.5)* Refine spell skill selection once spell definitions exist, replace the
   throw skill gain with CSBWin's tables, and refine the `LastMonsterAttackTime` source now
   that monster AI is in.

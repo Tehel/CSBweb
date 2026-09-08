@@ -22,6 +22,12 @@ export enum TimerFunction {
   TT_DOOR = 10,
   TT_11 = 11,
   TT_VI_ALTAR = 13,
+  /**
+   * The cloud's life (`ProcessTT_25`, doc/CSBwin-src/Timer.cpp:436). One tick at a
+   * time: deal the cloud's damage, shrink it, and reschedule — or fall out of the
+   * switch and delete the cloud. Without it a cloud renders at full size forever.
+   */
+  TT_25 = 25,
   // Monster AI. 29-31 are movement wake-ups, 32-36 the "A" attack group and its four
   // individuals, 37-41 the "B" group and its four. `ProcessTimers29to41` handles the
   // whole span; `TT_31` specifically means the party ran into the monster.
@@ -113,7 +119,7 @@ export class TimerQueue {
     timerWord6 = 0,
   ): TimerEntry {
     const entry: TimerEntry = {
-      index: this.nextIndex++,
+      index: -1, // assigned by addTimer, which is the one place indices are minted
       time: time >>> 0,
       level: level & 0xff,
       function: functionType & 0xff,
@@ -144,7 +150,7 @@ export class TimerQueue {
     timerWord6 = 0,
   ): TimerEntry {
     const entry: TimerEntry = {
-      index: this.nextIndex++,
+      index: -1, // assigned by addTimer
       time: time >>> 0,
       level: level & 0xff,
       function: functionType & 0xff,
@@ -161,17 +167,31 @@ export class TimerQueue {
     return this.addTimer(entry);
   }
 
+  /**
+   * `GameTimers::SetTimer(TIMER *)` — queue a timer and return the queued entry.
+   *
+   * **The entry is copied**, exactly as CSBWin copies the struct into its timer array.
+   * Callers legitimately reuse one `TimerEntry` as a template across a loop — CSBWin's
+   * `MaybeDelTimers_Fear6_TurnIndividuals` does it for every member of a monster group
+   * (`doc/CSBwin-src/Monster.cpp:1476-1553`) — and storing the object by reference put
+   * the *same* entry in the queue several times, so each later mutation rewrote entries
+   * already queued. That left the queue unsorted, and since `processTimers` stops at the
+   * first entry that is not yet due, everything behind the misplaced one stalled
+   * forever. Read the returned entry, never the argument, for the queued `index`.
+   */
   addTimer(entry: TimerEntry): TimerEntry {
     const deduped = this.applyDuplicateTimerRules(entry);
     if (deduped) return deduped;
-    if (!this.indexMap.has(entry.index)) this.indexMap.set(entry.index, entry);
-    const idx = this.queue.findIndex((existing) => compareTimers(entry, existing) < 0);
+
+    const stored: TimerEntry = { ...entry, index: this.nextIndex++ };
+    this.indexMap.set(stored.index, stored);
+    const idx = this.queue.findIndex((existing) => compareTimers(stored, existing) < 0);
     if (idx === -1) {
-      this.queue.push(entry);
+      this.queue.push(stored);
     } else {
-      this.queue.splice(idx, 0, entry);
+      this.queue.splice(idx, 0, stored);
     }
-    return entry;
+    return stored;
   }
 
   getTimer(index: number): TimerEntry | null {

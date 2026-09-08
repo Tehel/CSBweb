@@ -1577,6 +1577,11 @@ export class MonsterAI {
         continue;
       }
       timer.function = perMember;
+      // Each member gets its **own** timer. CSBWin's `SetTimer(&timer)` copies the
+      // struct into the queue by value (`doc/CSBwin-src/Timer.cpp`), so the local
+      // `timer` it reuses each time round the loop is only a template. Queueing this
+      // object itself would put one entry in the queue up to four times and then keep
+      // mutating it, which left the queue unsorted and stalled every timer behind it.
       this.setMonsterTimerB(
         timer,
         this.deps.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY),

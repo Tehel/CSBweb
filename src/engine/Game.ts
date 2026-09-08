@@ -229,6 +229,16 @@ export class Game {
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
+                // The cloud machinery: `ProcessTT_25` needs to hurt whatever is standing
+                // in the cloud, and those live in MonsterAttack and MonsterDamage.
+                queueSound: (ordinal, mapX, mapY, deltaTime) =>
+                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+                damageAllCharacters: (damage, woundMask, kind) =>
+                    this.monsterAttack.damageAllCharacters(damage, woundMask, kind),
+                damageMonsterGroup: (monster, level, mapX, mapY, damage) =>
+                    this.monsterDamage.damageMonsterGroup(monster, level, mapX, mapY, damage, true, false),
+                determinePoisonDamage: (monsterType, damage) =>
+                    this.monsterDamage.determinePoisonDamage(monsterType, damage),
                 onSpawnMonster: (o) => {
                     this.monsterSystem.createMonster({
                         value: o.type,
