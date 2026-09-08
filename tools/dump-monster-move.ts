@@ -22,11 +22,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
-
-let problems = 0;
-function check(ok: boolean, what: string): void {
-  if (!ok) { console.log(`  !! ${what}`); problems++; }
-}
+import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -159,8 +155,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(problems === 0 ? 'ALL CHECKS PASSED' : `${problems} CHECK(S) FAILED`);
-  process.exitCode = problems === 0 ? 0 : 1;
+  finish();
 }
 
 main();

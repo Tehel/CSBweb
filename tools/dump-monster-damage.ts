@@ -28,11 +28,7 @@ import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
-
-let problems = 0;
-function check(ok: boolean, what: string): void {
-  if (!ok) { console.log(`  !! ${what}`); problems++; }
-}
+import { check, finish } from './lib/check';
 
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
   const out: string[] = [];
@@ -245,8 +241,7 @@ async function main(): Promise<void> {
     console.log('');
   }
 
-  console.log(problems === 0 ? 'ALL CHECKS PASSED' : `${problems} CHECK(S) FAILED`);
-  process.exitCode = problems === 0 ? 0 : 1;
+  finish();
 }
 
 main();

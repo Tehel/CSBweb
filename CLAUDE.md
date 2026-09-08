@@ -49,25 +49,29 @@ is blitted into one palette-index buffer and converted to RGBA at present time, 
 does. The HTML controls beside the canvas are dev/debug affordances only.
 
 ```bash
-npm run dev       # Vite dev server on :9000
-npm run build     # tsc && vite build
-npx tsc --noEmit  # the real gate — see below
+npm run dev            # Vite dev server on :9000
+npm run build          # tsc && vite build
+npm test               # the gate: tsc + every asserting tool  (~6s)
+npm test -- --frames   # …and the golden frames               (~12s)
 ```
 
-**Build hygiene (non-negotiable):** `tsc --noEmit` must pass with zero errors before any
-commit. `vite build` alone will happily succeed on broken code, because esbuild strips types
-without checking them — so it proves nothing. The project once sat with a broken `tsc` for
-months, and a genuine runtime bug was hiding among the type errors.
+**Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs
+`tsc --noEmit` first, which is the real build gate — `vite build` alone will happily
+succeed on broken code, because esbuild strips types without checking them, so it proves
+nothing. The project once sat with a broken `tsc` for months, and a genuine runtime bug
+was hiding among the type errors.
 
-There is **no test framework** yet (see `PLAN.md` Phase 15), but there are now two
-standing forms of evidence, and both must pass before a commit:
+There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
+(`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
 - `tools/check-frames.sh` byte-compares five live screen states against `tools/frames/`.
-  The cheapest way to prove a renderer or UI change kept every pixel.
-- `tools/dump-*.ts` and `tools/watch-*.ts` (run with `npx tsx`) stand the real engine up
-  against the real game files, print what happened, and assert invariants. **They are the
-  regression suite for everything the frames cannot see** — tables, AI, damage, timers,
-  movement. Re-run all of them, not just the one you are working on.
+  The cheapest way to prove a renderer or UI change kept every pixel. It starts its own
+  dev server and headless Chrome, so it needs no setup; it is out of the default run only
+  because it costs a browser and ~7s. Run it before any renderer or UI commit.
+- `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
+  files, print what happened, and assert invariants. **They are the regression suite for
+  everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
+  runs them all; run one on its own with `npx tsx tools/<name>.ts`.
 
 When porting behaviour that is invisible on screen, write the tool in the same commit.
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and

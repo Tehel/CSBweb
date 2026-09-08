@@ -44,7 +44,7 @@ function parseArgs(argv: string[]): ToolOptions {
   const options: ToolOptions = {
     file: 'static/gamefiles/dm-atari/dungeon.dat',
     graphics: 'static/gamefiles/dm-atari/graphics.dat',
-    out: 'level0-items.json',
+    out: 'tools/output/level0-items.json',  // tools/output is gitignored
     map: 0,
     all: false,
   };

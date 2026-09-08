@@ -1,12 +1,12 @@
 /**
  * Prove that the monster group lifecycle actually runs.
  *
- * Loads the real dungeon, stands a `MonsterSystem` up on the party's starting level
+ * Loads the real dungeon, stands a `MonsterSystem` up on a level that has creatures
  * and runs `ProcessMonstersOnLevel`, then reports which groups got an `ITEM16` slot
  * and what AI timer each was given. Without this there is nothing to look at: a
  * monster with a slot renders exactly like one without.
  *
- * Run: `npx tsx tools/dump-monster-activation.ts [level]`
+ * Run: `npx tsx tools/dump-monster-activation.ts [level]`  (default: level 3)
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -21,6 +21,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
+import { check, fail, finish } from './lib/check';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
@@ -38,7 +39,9 @@ async function main(): Promise<void> {
 
   const dungeon = new DungeonState(data);
   const start = dungeon.getStartPosition();
-  const level = process.argv[2] !== undefined ? Number(process.argv[2]) : start.z;
+  // Default to level 3, not the party's starting level: level 0 has no creatures at all,
+  // so the no-argument run used to activate nothing and check nothing.
+  const level = process.argv[2] !== undefined ? Number(process.argv[2]) : 3;
 
   const party = { position: { x: start.x, y: start.y, z: level } } as PartyState;
   const timers = new TimerQueue();
@@ -89,20 +92,33 @@ async function main(): Promise<void> {
     );
   }
 
-  // Every group must have exactly one timer, and no monster may keep a stale slot.
-  const bad: string[] = [];
-  if (aiTimers.length !== active.length) {
-    bad.push(`timer count ${aiTimers.length} != active group count ${active.length}`);
-  }
+  // Every group must have exactly one timer, no monster may keep a stale slot, and each
+  // timer's countdown must be the one its own type asks for.
+  console.log('');
+  check(active.length > 0, `the level activated at least one group (got ${active.length})`);
+  check(aiTimers.length === active.length,
+    `one AI timer per active group (${aiTimers.length} timers, ${active.length} groups)`);
+
   for (const slot of active) {
     const rec = dungeon.getCreatureRecordByIndex(slot.word0);
-    if (!rec) { bad.push(`slot for db4 ${slot.word0} has no record`); continue; }
-    if (dungeon.getAttachedItem16(rec) !== slot) {
-      bad.push(`db4 ${slot.word0} groupIndex ${rec.groupIndex} does not point back at its slot`);
+    if (!rec) { fail(`slot for db4 ${slot.word0} has no record`); continue; }
+    check(dungeon.getAttachedItem16(rec) === slot,
+      `db4 ${slot.word0} groupIndex ${rec.groupIndex} points back at its own slot`);
+
+    // `StartMonsterMovementTimers` stores `255 - movementTicks06` in the timer, so a
+    // slow monster's timer carries a small number. This is the canary that the timer
+    // belongs to *this* group rather than being a generic one.
+    const timer = aiTimers.find((t) => t.uByte6 === slot.uByte10 && t.uByte7 === slot.uByte11);
+    const want = 255 - (objectTables.monsterDesc[rec.creatureType]?.movementTicks06 ?? 0);
+    if (!timer) {
+      fail(`db4 ${slot.word0} at (${slot.uByte10},${slot.uByte11}) has no AI timer at its square`);
+    } else {
+      check(timer.uByte5 === want,
+        `${MonsterType[rec.creatureType] ?? rec.creatureType} at (${slot.uByte10},${slot.uByte11}) ` +
+        `has uByte5 ${timer.uByte5}, expected 255 - movementTicks06 = ${want}`);
     }
   }
-  console.log('');
-  console.log(bad.length === 0 ? 'CONSISTENT' : 'PROBLEMS:\n  ' + bad.join('\n  '));
+  finish();
 }
 
 main();

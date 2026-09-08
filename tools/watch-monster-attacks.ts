@@ -20,6 +20,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { check, finish } from './lib/check';
 
 function champion(i: number, name: string): Champion {
   return {
@@ -206,17 +207,17 @@ async function main(): Promise<void> {
   const armourOk = clad < partial && partial < bare;
 
   console.log('');
-  console.log(totalLost > 0 ? 'OK: monsters are hurting the party' : 'PROBLEM: nobody took any damage');
-  console.log(
-    armourOk
-      ? `OK: armour reduced damage by ${Math.round((1 - partial / bare) * 100)}% (one piece) ` +
-        `and ${Math.round((1 - clad / bare) * 100)}% (full suit)`
-      : 'PROBLEM: armour did not help',
-  );
-  if (!armourOk) process.exitCode = 1;
-  console.log(woundsOk ? 'OK: big hits wound, small hits mostly do not' : 'PROBLEM: the wound mechanism looks wrong');
-  if (!woundsOk) process.exitCode = 1;
-  process.exitCode = totalLost > 0 ? 0 : 1;
+  if (armourOk) {
+    console.log(
+      `armour reduced damage by ${Math.round((1 - partial / bare) * 100)}% (one piece) ` +
+      `and ${Math.round((1 - clad / bare) * 100)}% (full suit)`,
+    );
+  }
+
+  check(totalLost > 0, 'monsters are hurting the party');
+  check(armourOk, 'armour reduces damage, and more armour reduces it more');
+  check(woundsOk, 'big hits wound, small hits mostly do not');
+  finish();
 }
 
 main();

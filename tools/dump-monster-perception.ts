@@ -31,7 +31,8 @@ import {
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { TimerQueue } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractObjectTables, monsterSightDistance } from '../src/renderer/csbwin/ObjectTables';
+import { check, finish } from './lib/check';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
 
@@ -88,6 +89,9 @@ async function main(): Promise<void> {
   console.log(['type', 'at', 'dist', 'sees', 'smell->', 'moves', 'walls'].join('\t'));
 
   let inconsistent = 0;
+  let examined = 0;
+  let sawParty = 0;
+  let sightViolations = 0;
   for (const { slot, index } of active) {
     const rec = dungeon.getCreatureRecordByIndex(slot.word0);
     if (!rec) continue;
@@ -129,6 +133,18 @@ async function main(): Promise<void> {
       }
     }
 
+    // Sight is range-limited: a monster that reports seeing the party from beyond its
+    // own `sightDistance` means the range gate is not being applied.
+    examined++;
+    if (sees !== 0) {
+      sawParty++;
+      if (dist > monsterSightDistance(desc)) {
+        console.log(`  !! ${MonsterType[rec.creatureType] ?? rec.creatureType} at (${mx},${my}) ` +
+          `sees the party at ${dist}, beyond its sightDistance ${monsterSightDistance(desc)}`);
+        sightViolations++;
+      }
+    }
+
     console.log([
       `${MonsterType[rec.creatureType] ?? rec.creatureType}`,
       `(${mx},${my})`,
@@ -142,9 +158,11 @@ async function main(): Promise<void> {
   }
 
   console.log('');
-  console.log(inconsistent === 0
-    ? 'CONSISTENT: no monster claimed a move into stone'
-    : `PROBLEMS: ${inconsistent} illegal move(s) reported`);
+  check(examined > 0, `at least one group was probed (got ${examined})`);
+  check(inconsistent === 0, `no monster claimed a move into stone (${inconsistent} did)`);
+  check(sightViolations === 0, `no monster saw the party from beyond its sightDistance (${sightViolations} did)`);
+  check(sawParty > 0, `at least one monster saw the party (${sawParty} of ${examined})`);
+  finish();
 }
 
 main();

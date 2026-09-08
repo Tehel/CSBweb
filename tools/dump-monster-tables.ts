@@ -30,6 +30,8 @@ import {
   monsterSmellingDistance,
   monsterVerticalSize,
 } from '../src/renderer/csbwin/ObjectTables';
+import { AttackType, MonsterType } from '../src/engine/monsterTypes';
+import { check, finish } from './lib/check';
 
 const DEFAULT_GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
@@ -93,6 +95,38 @@ function main(): void {
     });
     console.log(`class ${String(i).padStart(2)}: [${Array.from(la).map((b) => String(b).padStart(3)).join(' ')}]  ${named.join(' / ')}`);
   });
+
+  console.log('');
+
+  // The canary. These names are the strongest evidence the graphic 0x230 offsets are
+  // right: a wrong offset gives plausible-looking numbers everywhere else, but it
+  // cannot spell BLOCK at ATTACKTYPE 1 and FUSE at 43. They are spread across the
+  // whole table on purpose — a shifted base would move all of them together.
+  const NAME_CANARY: [AttackType, string][] = [
+    [AttackType.atk_BLOCK, 'BLOCK'],
+    [AttackType.atk_CHOP, 'CHOP'],
+    [AttackType.atk_PUNCH, 'PUNCH'],
+    [AttackType.atk_KICK, 'KICK'],
+    [AttackType.atk_FIREBALL, 'FIREBALL'],
+    [AttackType.atk_MELEE, 'MELEE'],
+    [AttackType.atk_FLUXCAGE, 'FLUXCAGE'],
+    [AttackType.atk_FUSE, 'FUSE'],
+  ];
+  for (const [type, want] of NAME_CANARY) {
+    check(g230.attackNames[type] === want,
+      `attackNames[${AttackType[type] ?? type}] is '${want}' (got '${g230.attackNames[type] ?? '<none>'}')`);
+  }
+
+  check(g230.legalAttacks.length === 44, `legalAttacks has 44 classes (got ${g230.legalAttacks.length})`);
+  check(objectTables.monsterDesc.length === 27, `MONSTERDESC has 27 entries (got ${objectTables.monsterDesc.length})`);
+
+  // A second canary, in the other table: the Ant Man's sight distance is what
+  // tools/dump-monster-perception.ts measures the AI against.
+  const antMan = objectTables.monsterDesc[MonsterType.mon_AntMan];
+  check(antMan !== undefined && monsterSightDistance(antMan) === 3,
+    `Ant Man sightDistance is 3 (got ${antMan ? monsterSightDistance(antMan) : 'no record'})`);
+
+  finish();
 }
 
 main();

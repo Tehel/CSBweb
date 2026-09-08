@@ -68,23 +68,32 @@ probes, pixel comparisons against CSBWin screenshots) that were **never carried 
 there is no test framework in the project at all. Verification has been visual and ad hoc.
 Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
 
-There are now two partial exceptions, and Phase 15 should absorb both rather than start
-from nothing:
+`npm test` now exists (Phase 15 step 1) and runs both standing forms of evidence in ~6s,
+or ~12s with `--frames`. There is still no test *framework*; what there is:
 
 1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
    DevTools Protocol and byte-compare five screen states against `tools/frames/`. Built
-   to make the Phase 14 split safe. Five frames, no assertions beyond equality, needs a
-   dev server and a headless Chrome.
-2. **Seven assertion-carrying verification tools** built during Phase 12
+   to make the Phase 14 split safe. Five frames, no assertions beyond equality. The
+   script now starts its own dev server and headless Chrome, and the probe pins the
+   viewport, so the frames reproduce on any machine rather than only on the browser
+   the baseline happened to be captured in.
+2. **Nine assertion-carrying verification tools** — the Phase 12 seven
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
-   `watch-monster{s,-attacks}.ts`). These load the real game files, drive the real
-   engine with a fixed RNG seed, print a human-readable table and assert invariants,
-   exiting non-zero on failure. They are the de-facto regression suite for everything
-   the frames cannot see, and they caught two real bugs and two wrong tests.
+   `watch-monster{s,-attacks}.ts`) plus `dump-hand-owner.ts`. These load the real game
+   files, drive the real engine with a fixed RNG seed, print a human-readable table and
+   assert invariants, exiting non-zero on failure. They are the de-facto regression
+   suite for everything the frames cannot see, and they caught two real bugs and two
+   wrong tests.
 
-   The pattern is written up in `.claude/skills/verification-tools/`. What Phase 15
-   would add is a runner, shared fixtures, and assertions that do not each hand-roll a
-   `check()` helper — not the idea.
+   ⚠️ Three of the "assertion-carrying" seven were nothing of the kind when the runner
+   was built: `dump-monster-{tables,activation,perception}.ts` printed `PROBLEMS: …` and
+   exited 0, and `watch-monster-attacks.ts` had a verdict line that overwrote its own
+   armour and wound failures. All four now assert through `tools/lib/check.ts`, whose
+   `finish()` also fails a run that made **no** checks. `dump-monster-activation.ts` also
+   defaulted to a level with no creatures on it, so the no-argument run activated nothing.
+
+   The pattern is written up in `.claude/skills/verification-tools/`. What Phase 15 still
+   owes is shared fixtures and the render probe — not the idea.
 
 ## Carried-over debt (from completed phases)
 
@@ -303,8 +312,8 @@ Several systems already carry proxies waiting on this phase; each must be revisi
      `Process_Invincible_And_Finish` and `Standard_Finish`.
 
    **Monsters now move, hunt and flee.** Verified with `tools/watch-monsters.ts`
-   (new): on level 2 with the party at (6,14), 18 of 22 groups move over 600 ticks
-   and none ends up inside a wall; the two groups adjacent to the party both enter
+   (new): on level 2 with the party at (6,14), most of the 22 groups move over 600
+   ticks and none ends up inside a wall; the two groups adjacent to the party both enter
    fear state 6 — the break-formation-and-attack state — and close to distance 1,
    while distant groups stay in state 0 and wander; and the nearest group's path
    `(6,13) → (7,13) → (7,14)` shows the pre-melee position shuffle. Six new entries
@@ -502,14 +511,28 @@ Status: ⏳ not started, apart from item 8's cursor hand-off.
 Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation steps that were
 never carried out, because the project has **no test framework**.
 
-1. ⏳ Add a minimal test runner (the repo has no `test` script at all).
-2. ⚠️ **Golden-frame rendering tests.** Partly there: `tools/probe-frames.mjs` drives the
-   real app over the DevTools Protocol and `tools/check-frames.sh` byte-compares five states
-   against `tools/frames/`. Determinism comes from clearing localStorage and seeding
-   `Math.random` on every load. What it still needs to become a real test: a fixed set of
-   *party positions* rather than whatever the boot dungeon gives, rendering straight from the
-   index buffer instead of a browser screenshot (no dev server, no Chrome), and a `test`
-   script that runs it. Absorb it rather than starting over.
+1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the nine
+   asserting tools, then four non-asserting dumps as crash-only smoke, then the frames
+   with `--frames`. ~6s, ~12s with frames. Failures print the tool's whole output,
+   because the table above a failed assertion is what says which way the port went wrong.
+   Tools are listed in the runner with the arguments their assertions were written for.
+   `tsx` is now a devDependency — the suite used to depend on `npx` fetching it.
+
+   Came with `tools/lib/check.ts` (shared `check`/`fail`/`finish`, and `finish()` fails a
+   run that made no checks) and with real assertions for the four tools that could not
+   fail — see the ⚠️ under "Validation debt" above.
+2. ⚠️ **Golden-frame rendering tests.** `tools/check-frames.sh` now starts its own dev
+   server and headless Chrome (reusing ones already up), uses a throwaway Chrome profile,
+   and takes `--update` to refresh the baseline; `tools/probe-frames.mjs` pins the viewport
+   with `Emulation.setDeviceMetricsOverride`, which it did not before — the committed
+   baseline was 1600x861 only because of the window decoration of the one browser that
+   captured it, and every freshly started Chrome diffed on all five frames. The baseline
+   was re-captured at 1600x1000 and verified byte-identical from both a fresh browser and
+   the original one, so the *content* is unchanged.
+
+   Still owed to make it a real test: a fixed set of *party positions* rather than whatever
+   the boot dungeon gives, and rendering straight from the index buffer instead of a browser
+   screenshot (no dev server, no Chrome).
 3. ⏳ **Render probe tool** (Phase 5's skipped validation): render a single cell program with
    controlled inputs and dump the viewport as PNG.
 4. ⏳ **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
@@ -517,4 +540,4 @@ never carried out, because the project has **no test framework**.
 5. ⏳ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
    validation).
 
-Status: ⏳ not started.
+Status: 🔄 in progress — steps 1 and 2 done; 3, 4 and 5 remain.

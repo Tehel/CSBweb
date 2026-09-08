@@ -22,6 +22,7 @@ import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -88,6 +89,9 @@ async function main(): Promise<void> {
   let moversTotal = 0;
   let closedIn = 0;
   let inWall = 0;
+  let groupsTotal = 0;
+  let inFear6 = 0;
+  let nearestFinalDist = 1e9;
   pool.forEach((s, i) => {
     const s0 = start[i];
     if (!s0 || s.word0 < 0) return;
@@ -96,8 +100,11 @@ async function main(): Promise<void> {
     const moved = Math.abs(s.uByte10 - s0.x) + Math.abs(s.uByte11 - s0.y);
     const d0 = Math.abs(s0.x - px) + Math.abs(s0.y - py);
     const d1 = Math.abs(s.uByte10 - px) + Math.abs(s.uByte11 - py);
+    groupsTotal++;
     if (moved > 0) moversTotal++;
     if (d1 < d0) closedIn++;
+    if (rec.fear === StateOfFear.StateOfFear6) inFear6++;
+    if (d1 < nearestFinalDist) nearestFinalDist = d1;
     const rt = (dungeon.getCellFlag(new Position(s.uByte10, s.uByte11, level)) >> 5) & 7;
     if (rt === RoomType.STONE) { inWall++; }
     console.log([
@@ -118,8 +125,20 @@ async function main(): Promise<void> {
     console.log('  ' + path.join(' -> '));
   }
   console.log('');
-  console.log(inWall === 0 ? 'OK: no monster is standing inside a wall' : 'PROBLEM: a monster is inside a wall');
-  process.exitCode = inWall === 0 ? 0 : 1;
+  console.log(`groups in fear state 6 (break formation and attack): ${inFear6}, nearest group ended ${nearestFinalDist} away`);
+  console.log('');
+
+  // The scenario these thresholds describe is the default one in the header: level 2,
+  // party at (6,14), 600 ticks. They are floors, not the exact numbers, so a faithful
+  // change to the AI that shifts a few paths does not fail the run — but a port that
+  // stops moving monsters, stops them noticing the party, or walks them into stone does.
+  check(inWall === 0, 'no monster is standing inside a wall');
+  check(groupsTotal > 0, 'the level activated at least one monster group');
+  check(moversTotal >= groupsTotal / 2, `at least half the groups moved (${moversTotal}/${groupsTotal})`);
+  check(closedIn > 0, 'at least one group closed in on the party');
+  check(inFear6 > 0, 'at least one group reached fear state 6 — it saw the party');
+  check(nearestFinalDist <= 1, `a group reached melee range of the party (nearest ${nearestFinalDist})`);
+  finish();
 }
 
 main();

@@ -31,6 +31,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { getChampionPossession } from '../src/renderer/ui/Character';
+import { check, finish } from './lib/check';
 
 /**
  * `ui/Mouse` reaches the debug chrome through `@/ui`, which touches `document` while its
@@ -43,11 +44,6 @@ async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')>
   if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
   if (!g.window) g.window = g;
   return import('../src/renderer/ui/Mouse');
-}
-
-let problems = 0;
-function check(ok: boolean, what: string): void {
-  if (!ok) { console.log(`  !! ${what}`); problems++; }
 }
 
 function owner(party: PartyState): number {
@@ -192,8 +188,7 @@ async function main(): Promise<void> {
     check(getChampionPossession(first, slot) === object, 'the object should be back in its slot');
   }
 
-  console.log(problems === 0 ? '\nALL CHECKS PASSED' : `\n${problems} CHECK(S) FAILED`);
-  process.exitCode = problems === 0 ? 0 : 1;
+  finish();
 }
 
 main();

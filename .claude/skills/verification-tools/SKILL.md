@@ -24,15 +24,35 @@ a change works is `tsc` passing, there is no evidence.
 
 ## The three gates
 
-Before any commit:
+`npm test` runs them. Before any commit:
 
-1. `npx tsc --noEmit` — the real gate. `vite build` proves nothing (esbuild strips
-   types without checking them).
-2. `bash tools/check-frames.sh` — five live screen states byte-compared. Needs
-   `npm run dev` on :9000 and headless Chrome on `--remote-debugging-port=9222`.
-3. **Every existing `tools/*.ts` that has assertions**, re-run. They are the
-   regression suite. Adding a table or changing a shared record breaks them silently
-   otherwise.
+1. `tsc --noEmit` — the real gate. `vite build` proves nothing (esbuild strips types
+   without checking them).
+2. **Every `tools/*.ts` that has assertions**, re-run. They are the regression suite.
+   Adding a table or changing a shared record breaks them silently otherwise.
+3. `npm test -- --frames` adds `tools/check-frames.sh`: five live screen states
+   byte-compared. It starts its own dev server and headless Chrome (reusing yours if
+   they are already up), so there is nothing to set up. Always run it for a renderer
+   or UI change.
+
+A tool is in the suite because it is listed in `tools/run-checks.mjs`. **Add yours to
+that list**, with the arguments the assertions were written for — several tools take a
+level, and the wrong level activates no monsters and quietly checks nothing.
+
+## Assertions
+
+Import the shared helper — do not hand-roll `check()`:
+
+```ts
+import { check, fail, finish } from './lib/check';
+
+check(timer.uByte5 === 255 - desc.movementTicks06, 'Ant Man timer counts from 252');
+finish();  // prints the verdict, owns process.exitCode
+```
+
+`finish()` **fails a run that made no checks**. Three tools had drifted into printing
+`PROBLEMS: …` and exiting 0, so a runner would have called them green; one had a verdict
+line that overwrote two earlier failures. A tool that cannot fail is not evidence.
 
 ## Shape
 
@@ -51,10 +71,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 // …engine imports…
 
-let problems = 0;
-function check(ok: boolean, what: string): void {
-  if (!ok) { console.log(`  !! ${what}`); problems++; }
-}
+import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
   // 1. Load the real files. Never synthesise a dungeon.
@@ -74,8 +91,7 @@ async function main(): Promise<void> {
   // 5. Assert invariants.
   check(somethingTrue, 'what should have held');
 
-  console.log(problems === 0 ? 'ALL CHECKS PASSED' : `${problems} CHECK(S) FAILED`);
-  process.exitCode = problems === 0 ? 0 : 1;
+  finish();
 }
 
 main();
@@ -87,7 +103,8 @@ call it.
 ## The canary technique
 
 The strongest evidence that an extracted table is at the right offset is a value that
-could only be right by luck. Look for one and print it.
+could only be right by luck. Look for one, print it, **and assert it** — a canary that
+is only printed is a canary nobody checks on.
 
 - Attack names read `BLOCK, CHOP, PUNCH, KICK…` in `ATTACKTYPE` order → graphic `0x230`
   offsets are right.
@@ -148,3 +165,4 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 | `dump-monster-ai.ts` | Driving the real timer queue; gate coverage |
 | `watch-monsters.ts` | Emergent behaviour over time, with a safety invariant |
 | `watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
+| `dump-monster-tables.ts` | Asserting the canary rather than only printing it |

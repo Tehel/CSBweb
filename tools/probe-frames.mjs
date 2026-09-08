@@ -6,17 +6,23 @@
 // load, so the frames are byte-identical run to run and can be compared directly.
 //
 // Usage:
+//   bash tools/check-frames.sh                     # normally: it starts both daemons
+//
+// or, driving it directly against daemons you started yourself:
+//
 //   npm run dev &
 //   google-chrome --headless=new --remote-debugging-port=9222 \
 //     --window-size=1600,1000 http://localhost:9000/ &
 //   node tools/probe-frames.mjs tools/frames        # refresh the committed baseline
 //   node tools/probe-frames.mjs /tmp/now            # then diff /tmp/now against it
 //
+// CDP_PORT overrides the DevTools port (default 9222).
+//
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
 import { writeFileSync } from 'node:fs';
 
-const PORT = 9222;
+const PORT = Number(process.env.CDP_PORT ?? 9222);
 const res = await fetch(`http://127.0.0.1:${PORT}/json/list`);
 const page = (await res.json()).find(t => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -55,6 +61,13 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
 await send('Page.enable');
+// Pin the viewport instead of inheriting whatever --window-size the browser was started
+// with. Without this the frames are only comparable against captures from an identically
+// launched Chrome — the committed baseline was 1600x861 purely because of one instance's
+// window decoration, and any freshly started browser diffed on all five frames.
+await send('Emulation.setDeviceMetricsOverride', {
+  width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false,
+});
 // Deterministic run: no persisted UI settings / quick-save, and a seeded Math.random so
 // the injected party is always the same. Frames are then byte-comparable across runs.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
