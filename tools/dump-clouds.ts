@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
     const data = loader.getData();
     if (!data) throw new Error('dungeon.dat did not load');
-    return new Game(
+    const game = new Game(
       data,
       {
         roomTimerFunctions: uiTables.graphic232.byte1596,
@@ -82,8 +82,12 @@ async function main(): Promise<void> {
       attackNames: uiTables.graphic230.attackNames,
       },
     );
-  // Fixed seed, so the numbers below repeat run to run.
-  game.setRandomSeed(0x12345678);
+    // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
+    // `return new Game(...)` — dead code, so every run of this tool was unseeded
+    // despite the comment. `tsc` never saw it because `tools/` was outside the
+    // type gate; it is inside it now.
+    game.setRandomSeed(0x12345678);
+    return game;
   };
 
   /** The first cloud sitting in a cell, or null. */

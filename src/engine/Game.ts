@@ -129,7 +129,11 @@ export class Game {
      */
     private random = new CsbRandom();
     private actuators: ActuatorSystem;
-    private timerSystem: TimerSystem;
+    /**
+     * The timer system. Public like the other subsystems — `tools/` drives
+     * `processTimers` directly to turn the clock without a browser.
+     */
+    readonly timerSystem: TimerSystem;
     /** Monster group lifecycle and movement. Public for the same reason. */
     readonly monsterSystem: MonsterSystem;
     /**

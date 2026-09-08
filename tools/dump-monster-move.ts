@@ -12,7 +12,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { CsbRandom } from '../src/core/random';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';

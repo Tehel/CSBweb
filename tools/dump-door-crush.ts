@@ -67,7 +67,6 @@ async function main(): Promise<void> {
   const uiTables = extractUITables(graphics);
 
   const level = Number(process.argv[2] ?? 2);
-  const sounds: number[] = [];
   const game = new Game(
     data,
     {

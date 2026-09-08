@@ -465,9 +465,5 @@ function swingOnce(game: Game, chIdx: number, attackType: number): number {
   return flashed > 0 ? flashed : 0;
 }
 
-function skillExperience(game: Game, chIdx: number, skill: number): number {
-  return game.party.state.champions[chIdx]!.skills[skill]?.experience ?? 0;
-}
-
 void CsbRandom;
 main();

@@ -15,7 +15,6 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, Position } from '../src/core/typ
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
-import { MonsterType } from '../src/engine/monsterTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -191,12 +190,12 @@ async function main(): Promise<void> {
   // clothing_PlateMail is type 34; put one on the body slot and a shield in hand.
   const plate = data.databases.clothing.records.length;
   data.databases.clothing.records.push({
-    nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: 34,
+    nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: 34,
   });
   data.databases.clothing.count++;
   const shield = data.databases.clothing.records.length;
   data.databases.clothing.records.push({
-    nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: 30,
+    nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: 30,
   });
   data.databases.clothing.count++;
   const encode = (i: number) => ((6 << 10) | i);
@@ -209,7 +208,7 @@ async function main(): Promise<void> {
   const addClothing = (type: number): number => {
     const i = data.databases.clothing.records.length;
     data.databases.clothing.records.push({
-      nextObject: OBJECT_ID_EOF, broken: false, cursed: false, important: false, clothingType: type,
+      nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: type,
     });
     data.databases.clothing.count++;
     return encode(i);

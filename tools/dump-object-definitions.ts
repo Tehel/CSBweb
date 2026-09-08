@@ -59,7 +59,6 @@ interface DumpPayload {
 }
 
 const GRAPHIC_OBJECT_NAMES = 0x22c;
-const GRAPHIC_22E = 0x22e;
 const GRAPHIC_22F = 0x22f;
 
 const ABS_22F_START = 10340;

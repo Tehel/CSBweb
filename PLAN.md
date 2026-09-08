@@ -624,6 +624,12 @@ All five are now retired — see step 6.
    `watch-monster-attacks.ts` and `dump-clouds.ts` were unseeded and are now
    reproducible.
 
+   ⚠️ **`dump-clouds.ts`'s half of that never took effect** and was only found when
+   `tools/` was brought inside the type gate (Phase 15 step 1): its
+   `game.setRandomSeed(0x12345678)` sat *after* a `return new Game(...)`, so it was
+   dead code and every run drew a fresh `Math.random()` seed. Fixed; the tool now
+   produces byte-identical output across runs.
+
    ⚠️ **Deferrals, all deliberate:**
    - **Lord Chaos's endgame** — `_Fusion` (`Attack.cpp:133`) and `_FusionSequence`
      (`:2220`). `atk_FUSE` runs its filter and does nothing else. It cannot be
@@ -699,12 +705,30 @@ Status: ⏳ not started, apart from item 8's cursor hand-off.
 Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation steps that were
 never carried out, because the project has **no test framework**.
 
-1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the nine
-   asserting tools, then four non-asserting dumps as crash-only smoke, then the frames
-   with `--frames`. ~6s, ~12s with frames. Failures print the tool's whole output,
+1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
+   thirteen asserting tools, then four non-asserting dumps as crash-only smoke, then the
+   frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.
    `tsx` is now a devDependency — the suite used to depend on `npx` fetching it.
+
+   ✅ **`tools/` is inside the type gate.** `tsconfig.json` was `"include": ["src"]`, so
+   `tsc --noEmit` — the thing this plan calls "the real gate" — never looked at the
+   regression suite at all. Two errors slipped through in a single session before this
+   was noticed: a call to a `setPlaySound` that does not exist, and a
+   `TimerFunction.TT_1` that is spelled `TT_DOOR_STEP` here and therefore evaluated to
+   `undefined`, so the timer was never dispatched and the tool silently measured
+   nothing. Turning it on surfaced 34 errors; all are fixed. Of those, two were real:
+
+   - `dump-clouds.ts`'s dead `setRandomSeed` (see Phase 12 step 7 above);
+   - `watch-monster-attacks.ts`'s clothing fixtures never gained the
+     `ClothingRecord.charges` field Phase 12 added to the record.
+
+   The rest were unused locals plus twenty `Property 'timerSystem' is private`, which
+   is now `readonly` and public like `timerQueue` and `monsterSystem` — the tools
+   already drove it, TypeScript just could not see them doing it. `extract-graphics.ts`
+   keeps its parked portrait-slicer setup alive with `void` references rather than
+   deleting work that is only commented out.
 
    Came with `tools/lib/check.ts` (shared `check`/`fail`/`finish`, and `finish()` fails a
    run that made no checks) and with real assertions for the four tools that could not

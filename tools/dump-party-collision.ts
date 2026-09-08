@@ -133,11 +133,11 @@ async function main(): Promise<void> {
   // `MovementResult` and `main.ts` plays it (`src/main.ts:385`). So the sound has to
   // be read off the result, not off a sound hook; the first draft of this tool
   // counted hook calls and saw silence for the wall too.
-  let lastResult: MovementResult | null = null;
+  let lastResult: MovementResult | undefined;
   game.onMove((_success, result) => {
     lastResult = result;
   });
-  const soundOfLastMove = (): number | undefined => (lastResult as MovementResult | null)?.soundId;
+  const soundOfLastMove = (): number | undefined => lastResult?.soundId;
 
   const stand = (): void => {
     game.party.state.position = new Position(scene!.px, scene!.py, level);
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
   const rows: string[][] = [];
   const attempt = (label: string): { moved: boolean; soundId: number | undefined } => {
     stand();
-    lastResult = null;
+    lastResult = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const pos = game.party.state.position;
     const soundId = soundOfLastMove();
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
     game.party.state.position = new Position(wall.px, wall.py, level);
     game.party.setFacing(wall.facing);
     game.party.state.lastMoveTime = 0;
-    lastResult = null;
+    lastResult = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const pos = game.party.state.position;
     wallResult = { moved, soundId: soundOfLastMove() };

@@ -191,6 +191,11 @@ async function main(): Promise<void> {
   const portraitTransparency = normalizeTransparency(portraitInfo?.transparency);
   const portraitSheet = loader.getImage(PORTRAIT_GRAPHIC_INDEX, ImageFormat.IMG1);
 
+  // Parked: the portrait sheet slicer. Everything it needs is set up above, so the
+  // `void`s keep `noUnusedLocals` off its back without deleting the setup — the same
+  // idiom `dump-player-attacks.ts` uses. Un-comment the loop and drop this line.
+  void PORTRAIT_WIDTH; void PORTRAIT_HEIGHT; void PORTRAIT_COLUMNS; void PORTRAIT_ROWS;
+  void buildSubRGBA; void portraitPaletteRGBA; void portraitTransparency; void portraitSheet;
   // let portraitIndex = 1;
   // for (let row = 0; row < PORTRAIT_ROWS; row++) {
   //   for (let col = 0; col < PORTRAIT_COLUMNS; col++) {
