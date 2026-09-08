@@ -483,7 +483,18 @@ export class Game {
         });
 
         // Initialize movement system
-        this.movementSystem = new MovementSystem(this.party, this.dungeonState);
+        this.movementSystem = new MovementSystem(this.party, this.dungeonState, {
+            findFirstMonster: (position) => this.monsterSystem.findFirstMonsterAt(position),
+            activateMonster: (position) => {
+                this.monsterAI.processTimers29to41({
+                    mapX: position.x,
+                    mapY: position.y,
+                    level: position.z,
+                    timerFunction: TimerFunction.TT_M1,
+                    timeUntilAlternateUpdate: 0,
+                });
+            },
+        });
 
         console.log('Game initialized at position:', startPos, 'facing:', startFacing);
     }

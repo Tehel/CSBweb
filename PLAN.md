@@ -154,6 +154,28 @@ archive section.
 
 **Engine**
 
+- ✅ *(playtest)* **Monsters block the party.** `MoveParty`'s monster arm is ported into
+  `MovementSystem.handleMovement` — the `d.NumCharacter != 0` gate, the unfiltered
+  `FindFirstMonster` (an immaterial monster blocks too), the silence, and
+  `ProcessTimers29to41(x, y, TT_M1, 0)` so the group gets a turn out of being bumped
+  into. Before this the party walked straight through every monster, which made every
+  combat encounter escapable and every combat playtest measure the wrong game.
+  Ref: `doc/CSBwin-src/CSBCode.cpp:8286-8304`, written up in
+  `doc/CSBWIN_MOVEMENT_REFERENCE.md`. Verified by `tools/dump-party-collision.ts`.
+
+  ⏳ **Three deferrals from the same block**, all pre-existing gaps rather than new:
+  - The **wall-bump damage**: CSBWin answers a terrain-blocked move with
+    `DamageCharacter(…, 1, 24, 2)` on up to two champions and only then queues sound 18
+    (`:8288-8299`). We queue the sound unconditionally and nobody is hurt.
+  - **`DiscardAllInput()` / `d.clockTick = 0`** on any inhibited move (`:8311-8315`).
+    Not ported because `DiscardAllInput` drains CSBWin's raw keyboard and mouse queues
+    (`:7532`), which is not obviously our 3-deep `movementQueue` — that mirrors
+    `CSBUI.cpp`'s key queue. Establishing the mapping needs `CSBUI.cpp` read properly;
+    guessing it would change how queued moves behave after every bump.
+  - The **vertical-move guard** (`:8200-8204`), which refuses a Move Up / Move Down into
+    a monster's cell outright. `MovementAction` has no up/down member, so there is no
+    entry point to attach it to yet.
+
 - ⚠️ *(Phase 8)* `PerformLocalAction()` does not map `HandChar` precisely; it uses
   partyPosition matching when `mapPos` is specified.
 - ⚠️ *(Phase 8)* The DSA interpreter has many unimplemented ampersand subcodes — see the

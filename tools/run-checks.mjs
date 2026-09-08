@@ -40,6 +40,8 @@ const CHECKS = [
   // Level 1 is the argument the assertions were written for: it has a closed door,
   // a movable object with an open neighbour, and creatures.
   { tool: 'dump-savegame.ts', args: ['1'] },
+  // Level 2 has an Ant Man with a free open neighbour to be bumped into.
+  { tool: 'dump-party-collision.ts', args: ['2'] },
   { tool: 'watch-monsters.ts' },
   { tool: 'watch-monster-attacks.ts' },
 ];
