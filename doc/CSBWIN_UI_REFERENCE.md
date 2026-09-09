@@ -6,6 +6,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 
 - The viewport buffer is copied into the screen at `d.LogicalScreenBase + 5280`, then 112 bytes per row for 136 rows (`doc/CSBwin-src/CSBCode.cpp:1017`, `doc/CSBwin-src/CSBCode.cpp:1023`). This places the viewport at screen x=0 and y=33 (5280 / 160 bytes per row).
 - The viewport buffer is allocated as 15232 bytes with separate subregions for black and floor caches (`doc/CSBwin-src/CSBCode.cpp:10121`, `doc/CSBwin-src/CSBCode.cpp:10122`).
+- `BLT2Viewport(src, rect, P3, P4)` forwards to `TAG0088b2(src, d.pViewportBMP, rect, 0, 0, P3, 112, P4)` (`doc/CSBwin-src/Menu.cpp:15-28`). **`P3` is a source *byte* width and `P4` the transparent colour** — the hardcoded `112` is the destination byte width of the 224-pixel viewport, so at 4bpp one byte is two pixels. **Our `blitBasicGraphicToViewport` takes `srcStride` in pixels, i.e. exactly twice CSBWin's `P3`.** Every call in `src/renderer/ui/` follows that: graphic 29 is 16→32, graphics 30/31 are 24→48, graphic 32 is 48→96, and graphics 20/23/25/40 are 72→144. Transcribing `P3` unchanged draws the graphic at half width.
 
 ## Static UI background regions
 

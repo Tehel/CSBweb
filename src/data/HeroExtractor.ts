@@ -217,9 +217,12 @@ function parseHeroDefinition(text: string): Omit<PresetHero, 'textRecordIndex' |
   const attrs = parts[5] ?? '';
   const skills = parts[6] ?? '';
 
-  const health = statNumbers(stats.slice(0, 4));
-  const stamina = statNumbers(stats.slice(4, 8));
-  const mana = statNumbers(stats.slice(8, 12));
+  // `doc/CSBwin-src/Character.cpp:602-641` clamps each to MAXHP/MAXSTAMINA/MAXMANA and
+  // marks the hero illegal when it had to; we treat the overflow as a rejection, since
+  // an illegal hero is not one this extractor should offer at all.
+  const health = capped(statNumbers(stats.slice(0, 4)), 999);
+  const stamina = capped(statNumbers(stats.slice(4, 8)), 9999);
+  const mana = capped(statNumbers(stats.slice(8, 12)), 900);
 
   const luck = statNumbers(attrs.slice(0, 2));
   const strength = statNumbers(attrs.slice(2, 4));
@@ -262,19 +265,44 @@ function parseHeroDefinition(text: string): Omit<PresetHero, 'textRecordIndex' |
     ninja: skillNumbers(skills.slice(4, 8), ['Steal', 'Fight', 'Throw', 'Shoot']),
     priest: skillNumbers(skills.slice(8, 12), ['Identify', 'Heal', 'Influence', 'Defend']),
     wizard: skillNumbers(skills.slice(12, 16), ['Fire', 'Air', 'Earth', 'Water']),
+    // `doc/CSBwin-src/Character.cpp:682-687` — three `GetOneValue` reads follow the
+    // sixteen skill letters. The third, `randomPoints`, is parsed by CSBWin and then
+    // never used: `_ResurrectReincarnateCancel` hardcodes twelve points
+    // (`doc/CSBwin-src/CSBCode.cpp:6779`), so it is not carried here.
+    reincarnateAttributePenalty: oneValueOr(skills, 16, 16, 2),
+    reincarnateStatPenalty: oneValueOr(skills, 17, 16, 8),
   };
 }
 
+/**
+ * `GetOneValue` (`doc/CSBwin-src/Character.cpp:433-437`) plus the caller's range check:
+ * a letter outside 'A'..'Z' yields 0xff, and anything above `limit` falls back.
+ */
+function oneValueOr(text: string, offset: number, limit: number, fallback: number): number {
+  const ch = text.charCodeAt(offset);
+  const value = Number.isNaN(ch) || ch < 65 || ch > 90 ? 0xff : ch - 65;
+  return value > limit ? fallback : value;
+}
+
+/**
+ * `DecodeCharacterValue` (`doc/CSBwin-src/Character.cpp:414-431`) — one hex nibble per
+ * character, each of which must be 'A'..'P'. Anything else returns -1, which makes
+ * `AddCharacter` mark the hero illegal and fall back to its built-in `legalHero`.
+ */
 function statNumbers(value: string): number | null {
   if (value.length === 0) return null;
-  let hex = '';
+  let result = 0;
   for (const ch of value) {
-    const nibble = ch.charCodeAt(0) - 65;
-    if (nibble < 0 || nibble > 25) return null;
-    hex += nibble.toString(16);
+    const code = ch.charCodeAt(0);
+    if (code < 65 || code > 80) return null;
+    result = (result << 4) + (code - 65);
   }
-  const parsed = parseInt(hex, 16);
-  return Number.isNaN(parsed) ? null : parsed;
+  return result;
+}
+
+function capped(value: number | null, limit: number): number | null {
+  if (value === null || value > limit) return null;
+  return value;
 }
 
 function skillNumbers(value: string, names: string[]): Record<string, number> {

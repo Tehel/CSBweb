@@ -54,11 +54,14 @@ Verified against the code, not inherited from earlier revisions of this file.
    champion leaves bones. `Attack.cpp` is ported too: the attack menu offers each
    champion's legal options and every attack type resolves, through the Party Attack
    Filter. Lord Chaos's fusion endgame is the one deliberate omission.
-3. 🔄 **Champion death and bones work** (Phase 12), and the Vi altar resurrects
-   (with gaps). Character creation, reincarnation and potion drinking remain
-   (Phase 13). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
+3. 🔄 **Champion death and bones work** (Phase 12), the Vi altar resurrects (with
+   gaps), potions are drinkable, and the **Hall of Champions works**: a mirror click
+   offers Resurrect / Reincarnate / Cancel and the party is built the way DM builds it
+   (Phase 13 step 4). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
    (maximum, current, minimum) triple, `AdjustStamina`, `SelectMagicCaster` +
-   `gameIsLost`, and poison as a `TT_75` timer chain.
+   `gameIsLost`, and poison as a `TT_75` timer chain. What is left in Phase 13 is the
+   name-entry screen behind Reincarnate, the eye/mouth boxes (step 7) and `handChar`
+   from a real DM save (step 9).
 4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
    ported, so clouds shrink, damage and expire (Phase 9 step 13).
 5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
@@ -85,12 +88,13 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Nineteen assertion-carrying verification tools** — the Phase 12 nine
+2. **Twenty assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
-   `dump-champion-state.ts`, `dump-feeding.ts` and `dump-pit-fall.ts`.
+   `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts` and
+   `dump-hall-of-champions.ts`.
    `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
@@ -141,6 +145,30 @@ archive section.
   </details>
 
 **Rendering / UI**
+
+- ✅ *(playtest)* **A wall decoration one cell ahead and to the left is no longer cropped
+  on the wrong side.** Position 7 (the F2 front-left wall) scales to the width of the F2
+  *centre* rectangle and is then drawn into a narrower slot flush against the left border,
+  so it must show the bitmap's **right** end — `srcOffsetX = finalBitmapWidth -
+  (rect.x2 - rect.x1)` (`doc/CSBwin-src/CSBCode.cpp:3551`). The port computed no
+  `srcOffsetX` at all, so it drew the left end instead: cropped on the wrong side, with
+  the transparent margin that belonged off-screen showing as a gap from the border.
+  Its mirror-image case, position 9, was accidentally right because there the offset
+  really is 0. Found by playtest, standing one back and one right of a Hall of Champions
+  mirror. Written up in `doc/CSBWIN_DECORATIONS_REFERENCE.md`.
+
+  ⏳ **One deliberate non-port** in the same block: CSBWin's third arm,
+  `srcOffsetX = 15 - (finalBitmapWidth & 15)` for the mirrored far-right sidewalls
+  (positions 1 and 6, `:3536`), compensates for `MakeMirror` reversing a byte-aligned
+  buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would shift a
+  correctly aligned image. Left out on purpose, with the reasoning in the code.
+
+  ⏳ **No golden frame covers an edge decoration**, which is why this survived so long.
+  `tools/dump-hall-of-champions.ts` now pins the geometry that makes position 7 special
+  (both edge slots narrower than the bitmap; the front-left window ending flush with its
+  right edge, the front-right starting flush with its left) across all 8 rect sets, but
+  the pixels themselves are still verified only by screenshot. A sixth frame would want a
+  way to place the party, which the probe has no affordance for.
 
 - ⚠️ *(Phase 4)* DSA-based decoration gating and footprints/extended cell flags are not
   ported. Wall and floor decoration selection currently follows `TAG00a4a2` + the actuator
@@ -249,9 +277,10 @@ archive section.
 
 **Dev scaffolding (Phase 14)**
 
-- ⚠️ F8 (random party) was **not** deleted, contrary to the phase's original wording: it is
-  still the only way to get a playable party, because Phase 13's hall-of-champions does not
-  exist. Delete it when that lands.
+- ⚠️ F8 (random party) was **not** deleted, contrary to the phase's original wording. Its
+  justification — "the only way to get a playable party" — expired with Phase 13 step 4:
+  the Hall of Champions works. It is kept only because it is still convenient for
+  playtesting; deleting it is now a free choice, not a blocked one.
 - ✅ F5/F9 (quick-save/load) **stay**. They are not scaffolding to be removed: they are the
   functional equivalent of the original save menu, and are kept for their convenience
   whether or not that menu is ever ported (Phase 10).
@@ -776,23 +805,85 @@ one missing primitive.
      CSBWin reads the index straight out of the bones record's `value`.
 
    **Reincarnation is not here** — it belongs to the Hall of Champions, step 4.
-4. ⏳ **Character creation.** Clicking a mirror already calls
-   `addCharacterFromPortrait`, which drops a preset hero straight into the party. The
-   real flow (`doc/CSBwin-src/Character.cpp:456`, `CSBCode.cpp:6615`) is bigger:
-   - `d.PotentialCharacterOrdinal` — the "almost but not quite added" state, which
-     gates the mouth, the eye panel and the living-champion search;
-   - the Resurrect/Reincarnate/Cancel menu (graphic 40, `TAG0189a8`);
-   - **Reincarnate**: zero the skills, apply the hero's own
-     `reincarnateAttributePenalty`/`reincarnateStatPenalty`, then 12 random attribute
-     points;
-   - **Cancel**: undo the provisional add;
-   - collecting the mirror cell's objects as the champion's possessions;
-   - disabling the portrait actuator afterwards (`PortraitTranslateDisable`, and the
-     `BlockDisables` rule);
-   - the fingerprint from `(partyLevel<<10)|(partyX<<5)|partyY`, which the bones
-     mapping depends on.
+4. 🔄 **Character creation.** `main.ts`'s `addCharacterFromPortrait`, which dropped a
+   preset hero straight into the party, is gone. `Game.addCharacter` ports
+   `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) and
+   `Game.resurrectReincarnateCancel` ports `_ResurrectReincarnateCancel`
+   (`doc/CSBwin-src/CSBCode.cpp:6615`); the actuator hook is wired inside `Game` now, so
+   the tools reach it too. Done:
+   - `potentialChampionIndex` — the "almost but not quite added" state. It gates the
+     mouth (`Character.cpp:4061`) and, through the click dispatcher
+     (`Mouse.cpp:1578-1650`), the portrait boxes, the inventory buttons, the magic panel
+     and the attack panel. That is the only thing making the menu modal — CSBWin has no
+     mode flag for it.
+   - The Resurrect/Reincarnate/Cancel menu: `drawResurrectMenu` (`TAG0189a8`) blits
+     graphic 40 and sets `displayResurrectChestOrScroll = 5`, which is what
+     `Mouse.ts`'s `tag01a6ea` (`CSBCode.cpp:8500`) switches on to turn a click on button
+     id 81 into a `buttons18372` hit. The chest arm of the same function moved with it.
+   - **Reincarnate**: all 20 skills wiped, the hero's own
+     `reincarnateAttributePenalty`/`reincarnateStatPenalty` charged (`DM_rules` is false
+     by default, `data.cpp:251`, so they do apply), then 12 random attribute points —
+     hardcoded in CSBWin, *not* the `randomPoints` field it parses.
+   - **Cancel**: the champion is popped, `SetHandOwner(-1)` if they were the only one.
+   - The mirror cell's objects as possessions, through CSBWin's `switch`/`goto case9`
+     slot search — including the fall-through that makes slot 6 unreachable.
+     `AddCharacterPossession` deliberately leaves them linked in the room; Resurrect
+     `RemoveObjectFromRoom`s them, Cancel does not, which is what makes the undo clean.
+   - Disabling the portrait actuator afterwards, with the `BlockDisables` rule.
+   - The fingerprint from `(partyLevel<<10)|(partyX<<5)|partyY`. `Game`'s invented
+     `nextChampionFingerprint` counter is deleted; `assignChampionFingerprint` now
+     derives it the same way for every champion, including those loaded from a save.
 
-   This is what finally deletes the F8 debug hotkey.
+   Along the way `HeroExtractor` was made faithful where it had been approximate:
+   `statNumbers` is now `DecodeCharacterValue` (`'A'`..`'P'` only, `Character.cpp:414`)
+   where it used to accept `'A'`..`'Z'` and build nonsense hex, the MAXHP/MAXSTAMINA/
+   MAXMANA clamps are applied, and `reincarnateAttributePenalty`/`reincarnateStatPenalty`
+   are parsed off the end of the skill letters. All 24 shipped heroes still parse and
+   take the 2/8 fallbacks.
+
+   `tools/dump-hall-of-champions.ts` drives the whole flow through `handleWallClick` at
+   the real level-0 mirrors of HALK, BORIS, WU TSE and AZIZI (133 checks, including the
+   edge-decoration geometry below). Verified in
+   the browser too: menu, Cancel, Resurrect, and the spent mirror refusing a second
+   click.
+
+   ✅ **The mirrors show the champions' portraits** (playtest follow-up, strictly a
+   rendering job rather than part of the phase). `SummarizeRoomInfo` was already
+   computing `championPortraitOrdinal`; nothing consumed it. Now
+   `StdDrawWallDecoration` passes it to `drawWallDecoration`, which was restructured
+   into CSBWin's own two independent halves — frame under `graphicIndex >= 0`, portrait
+   under `relativePosition == 12`, early return only when *both* are absent — and
+   `drawChampionPortrait` blits the 32x29 cell out of graphic 26 with transparent colour
+   **1**, so the glass shows around the head. `d.Byte2546`, the destination rectangle, is
+   now extracted from graphics.dat item `0x22e` where the parser previously skipped it;
+   the canary is CSBWin's own recorded `0x60,0x7f,0x23,0x3f`. Written up in
+   `doc/CSBWIN_DECORATIONS_REFERENCE.md`, and verified in the browser at four mirrors
+   plus the distance and spent-mirror cases.
+
+   ⏳ **Gaps:**
+   - `ReIncarnate` itself (`doc/CSBwin-src/Code13ea4.cpp:20`), the viewport screen that
+     blanks name and title and has the player type new ones, is **not ported** — a
+     reincarnated champion keeps the hero text's name. It needs a keyboard-driven modal
+     screen the UI has no equivalent for; everything after it is done.
+   - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`) is
+     not ported. It only fires when the actuator carries a `DisableMessage`, a CSB
+     extension the shipped DM dungeon never uses; the `actuatorType(0)` half is done.
+   - `pcA3->talents` (`Character.cpp:688`) is parsed by CSBWin and dropped here —
+     `Champion` has no field for it.
+   - The `legalHero` fallback (`Character.cpp:475`) is not ported. CSBWin clamps a hero
+     text that overflows MAXHP/MAXSTAMINA/MAXMANA or carries an out-of-range letter,
+     marks it illegal and retries against its built-in "BOGUS / ILLEGAL HERO" string;
+     `HeroExtractor` rejects such a hero outright, so a third-party dungeon with a bad
+     hero text gets no champion where CSBWin would give a bogus one. No shipped DM hero
+     is affected.
+   - The portrait bitmap still comes from our own `portraitGraphic` path, not
+     `TAG0088b2`'s copy into `CHARDESC.portrait`; external portraits for `charID > 23`
+     are not supported (`GetExternalPortraitAddress`, a CSB extension no shipped DM hero
+     uses).
+   - **F8 (random party) is still there.** Its stated justification — "the only way to
+     get a playable party" — is now gone, so it can be deleted whenever the author
+     stops wanting it for playtesting. Left in deliberately rather than removed in the
+     same commit as the feature that replaces it.
 5. 🔄 **Drinking potions.** `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4020-4497`)
    is ported as its two halves: `src/renderer/ui/Feeding.ts` derives a
    `FEEDPARAMETERS` block from the object on the cursor, and
@@ -849,8 +940,8 @@ one missing primitive.
    the runtime party state, and `ensureHandOwner` repairs a state that lacks it, but the
    GAMEBLOCK2 offset has not been established so the real field is not parsed.
 
-Status: 🔄 in progress — prerequisites and steps 6 and 8 done; steps 1, 2, 3 and 5 done
-bar the gaps noted against each; steps 4, 7 and 9 open.
+Status: 🔄 in progress — prerequisites and steps 6 and 8 done; steps 1, 2, 3, 4 and 5
+done bar the gaps noted against each; steps 7 and 9 open.
 
 ### Phase 15 — Verification
 
@@ -858,7 +949,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   nineteen asserting tools, then four non-asserting dumps as crash-only smoke, then the
+   twenty asserting tools, then four non-asserting dumps as crash-only smoke, then the
    frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.

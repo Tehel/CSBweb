@@ -62,6 +62,8 @@ export interface InterpreterContext {
   seeThruWallsRect?: RectPos;
   seeThruWallsRect2?: RectPos;
   seeThruDoorEdgeRect?: RectPos;
+  /** `(RectPos *)d.Byte2546` — where a Hall of Champions portrait lands in the viewport. */
+  championPortraitRect?: RectPos;
 
   // Current per-frame style context (CSBWin LEVELDESC.word14 bits)
   wallGraphicSet?: number;
@@ -1267,7 +1269,14 @@ export class BytecodeInterpreter {
 
     const rd = this.context.roomData[relativeCell | 0];
     const graphicOrdinal = rd?.decorations[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? 0;
-    this.hasAlcove = this.drawWallDecoration(graphicOrdinal | 0, wallDecorationDrawLocation | 0) ? 1 : 0;
+    // CSBWin passes the cell's `championPortraitOrdinal` as the fourth argument
+    // (`doc/CSBwin-src/Viewport.cpp:2946-2950`); `SummarizeRoomInfo` set it from the
+    // type-127 actuator on the wall the party is facing.
+    this.hasAlcove = this.drawWallDecoration(
+      graphicOrdinal | 0,
+      wallDecorationDrawLocation | 0,
+      (rd?.championPortraitOrdinal ?? 0) | 0,
+    ) ? 1 : 0;
     return true;
   }
 
@@ -1289,9 +1298,39 @@ export class BytecodeInterpreter {
     return true;
   }
 
-  private drawWallDecoration(graphicOrdinal: number, relativePosition: number): boolean {
-    if (graphicOrdinal === 0) return false;
+  /**
+   * `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3133`) — the picture frame, and
+   * then the champion portrait inside it.
+   *
+   * The two halves are independent: `PORTRAIT_HideGraphic` leaves `graphicOrdinal` at 0
+   * with a portrait still to draw, and every other decoration has no portrait, so
+   * CSBWin bails only when *both* are absent (`:3191`) and draws the frame only when
+   * `graphicIndex >= 0` (`:3673`).
+   */
+  private drawWallDecoration(
+    graphicOrdinal: number,
+    relativePosition: number,
+    championPortraitOrdinal = 0,
+  ): boolean {
+    if (graphicOrdinal === 0 && championPortraitOrdinal === 0) return false;
 
+    const isAlcove = graphicOrdinal !== 0
+      ? this.drawWallDecorationGraphic(graphicOrdinal, relativePosition)
+      : false;
+
+    // `if (relativePosition == 12)` (`:3685`) — only the wall the party stands against
+    // is close enough to show a face.
+    if (relativePosition === 12) {
+      this.drawChampionPortrait(championPortraitOrdinal);
+    }
+    return isAlcove;
+  }
+
+  /**
+   * The frame half of `DrawWallDecoration`: everything under CSBWin's
+   * `if (graphicIndex >= 0)`.
+   */
+  private drawWallDecorationGraphic(graphicOrdinal: number, relativePosition: number): boolean {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
     const viewport = this.context.viewportIndexBuffer;
@@ -1389,12 +1428,81 @@ export class BytecodeInterpreter {
     const cropped = this.cropBitmap(src, widthPixels, heightPixels);
 
     const scaled = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
-    bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2 });
+
+    // `srcOffsetX` (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). Positions 7 and 9 scale the
+    // decoration to the width of the F2 *centre* rectangle (`rectSet[8]`, chosen above),
+    // which is wider than the slot they are drawn into, because a decoration at the edge
+    // of the screen is only partly visible. Which part depends on the side:
+    //
+    //   - position 9 (F2 front-right) runs off the *right* edge, so it shows its left
+    //     end and the offset is 0;
+    //   - position 7 (F2 front-left) runs off the *left* edge, so it must show its
+    //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3551`).
+    //
+    // Without this, position 7 drew its left end into a slot flush against the left
+    // border: cropped on the wrong side, and with the transparent margin that should
+    // have been off-screen left as a visible gap.
+    let srcOffsetX = 0;
+    if (relativePosition === 7) {
+      srcOffsetX = finalBitmapWidth - ((desc.x2 | 0) - (desc.x1 | 0));
+    }
+    // CSBWin also sets `srcOffsetX = 15 - (finalBitmapWidth & 15)` for the mirrored
+    // far-right sidewalls (positions 1 and 6, `:3536`). That is **not** ported, and
+    // deliberately: it compensates for `MakeMirror` reversing a byte-aligned buffer of
+    // `pWDP->width` bytes, which leaves the image `ceil16(w) - w` pixels from the left.
+    // `getMirroredBitmap` reverses the exact `finalBitmapWidth + 1` bitmap, so ours is
+    // already flush at 0 and the same offset would shift it wrongly.
+
+    bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2, srcX: srcOffsetX });
 
     if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
       this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
     }
     return isAlcove;
+  }
+
+  /**
+   * The portrait half of `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3686-3716`).
+   *
+   * `championPortraitOrdinal` is 1-based, so 0 means "no portrait" and the ordinal is
+   * decremented to CSBWin's `charID` before use. Graphic 26 is a 256x87 sheet of 32x29
+   * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`. The
+   * transparent colour is **1**, not the 10 that `BltShapeToViewport` uses, so the
+   * mirror's glass shows around the head.
+   */
+  private drawChampionPortrait(championPortraitOrdinal: number): void {
+    if (championPortraitOrdinal === 0) return;
+    const charID = (championPortraitOrdinal - 1) | 0;
+
+    const viewport = this.context.viewportIndexBuffer;
+    const rect = this.context.championPortraitRect;
+    const getGraphic = this.context.getGraphicBitmap;
+    if (!viewport || !rect || !getGraphic) return;
+
+    if (charID > 23) {
+      // `GetExternalPortraitAddress` (`:3706`) — a CSB dungeon may ship its own
+      // portraits outside graphic 26. ⏳ Not supported; the shipped DM dungeon uses
+      // charIDs 0..23 only.
+      return;
+    }
+
+    const sheet = getGraphic(26);
+    if (!sheet) return;
+
+    tag0088b2Index(
+      sheet,
+      viewport,
+      {
+        x1: rect.x1 | 0,
+        y1: rect.y1 | 0,
+        x2: rect.x2 | 0,
+        y2: rect.y2 | 0,
+        srcX: (charID & 7) << 5,
+        srcY: 29 * (charID >> 3),
+        srcStride: sheet.width,
+      },
+      1,
+    );
   }
 
   private isAlcoveDecorationIndex(decorationIndex: number, tables: ObjectTables): boolean {

@@ -68,16 +68,24 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     handleMouthPress(ui);
     return;
   }
+  // `d.PotentialCharacterOrdinal` makes the Hall of Champions menu modal: while a
+  // champion is only provisionally in the party, the portrait boxes, the inventory
+  // buttons, the magic panel and the attack panel are all inert
+  // (`doc/CSBwin-src/Mouse.cpp:1578-1650`).
+  const potential = (ui.partyState?.potentialChampionIndex ?? -1) >= 0;
+  const numChampions = ui.partyState?.champions.length ?? 0;
   if (id === 100) {
-    handleMagicClick(ui, x, y);
+    if (!potential && (ui.partyState?.magicCasterIndex ?? -1) !== -1) {
+      handleMagicClick(ui, x, y);
+    }
     return;
   }
   if (id === 81) {
-    handleChestAreaClick(ui, x, y);
+    tag01a6ea(ui, x, y);
     return;
   }
   if (id === 111) {
-    handleAttackAreaClick(ui, x, y);
+    if (!potential) handleAttackAreaClick(ui, x, y);
     return;
   }
   if (id === 83) {
@@ -87,11 +95,17 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     return;
   }
   if (id >= 7 && id <= 11) {
-    handleInventoryToggle(ui, id - 7);
+    const button = id - 7;
+    if ((button === 4 || button < numChampions) && !potential) {
+      handleInventoryToggle(ui, button);
+    }
     return;
   }
   if (id >= 12 && id <= 15) {
-    handlePartyBlockClick(ui, id - 12, x, y);
+    const button = id - 12;
+    if (button < numChampions && !potential) {
+      handlePartyBlockClick(ui, button, x, y);
+    }
     return;
   }
   if (id >= 28 && id <= 65) {
@@ -145,24 +159,38 @@ export function handlePartyBlockClick(ui: UIState, button: number, x: number, y:
   }
 }
 
-export function handleChestAreaClick(ui: UIState, clickX: number, clickY: number): void {
+/**
+ * `_TAG01a6ea` (`doc/CSBwin-src/CSBCode.cpp:8500`) — a click in the eye panel, routed
+ * by whatever `TAG0189d4` last drew there. Button id 81.
+ */
+export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
   if (!ui.uiTables || !ui.partyState) return;
-  if ((ui.partyState.cursorOwner ?? -1) < 0) return;
+  const buttons = ui.uiTables.graphic231.buttons;
 
-  const selected = ui.partyState.selectedCharacterIndex ?? -1;
-  if (selected < 0) return;
-  const champ =
-    ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-    ui.partyState.champions[selected] ??
-    null;
-  if (!champ || champ.alive === false) return;
+  if (ui.displayResurrectChestOrScroll === 4) {
+    // An open chest in the weapon hand: the grid takes clothing clicks, but only from
+    // someone holding the cursor (`d.HandChar != -1`).
+    if ((ui.partyState.cursorOwner ?? -1) < 0) return;
+    const selected = ui.partyState.selectedCharacterIndex ?? -1;
+    if (selected < 0) return;
+    const champ =
+      ui.partyState.champions.find((c) => c.partyPosition === selected) ??
+      ui.partyState.champions[selected] ??
+      null;
+    if (!champ || champ.alive === false) return;
+    const chestView = getActiveChestView(ui, champ);
+    if (!chestView || chestView.source !== 'hand') return;
+    const button = searchButtonList(buttons.buttons18324, clickX, clickY, 2);
+    if (button !== 0) handleClothingClick(ui, button - 20);
+    return;
+  }
 
-  const chestView = getActiveChestView(ui, champ);
-  if (!chestView || chestView.source !== 'hand') return;
-
-  const button = searchButtonList(ui.uiTables.graphic231.buttons.buttons18324, clickX, clickY, 2);
-  if (button !== 0) {
-    handleClothingClick(ui, button - 20);
+  if (ui.displayResurrectChestOrScroll === 5) {
+    // The Hall of Champions menu, and only with an empty cursor (`d.EmptyHanded`).
+    const inHand = ui.partyState.objectInHand;
+    if (inHand !== null && inHand !== undefined) return;
+    const button = searchButtonList(buttons.buttons18372, clickX, clickY, 2);
+    if (button !== 0) ui.onResurrectReincarnateCancel?.(button);
   }
 }
 

@@ -433,6 +433,16 @@ export interface PresetHero {
     ninja: Record<string, ui8>;
     priest: Record<string, ui8>;
     wizard: Record<string, ui8>;
+    /**
+     * `reincarnateAttributePenalty` / `reincarnateStatPenalty`
+     * (`doc/CSBwin-src/Character.cpp:682-685`) — the two sixteenths the Hall of
+     * Champions' Reincarnate button charges, read from the hero's own text after the
+     * sixteen sub-skill letters. A character outside 'A'..'Z' reads as 0xff, which is
+     * out of range, so CSBWin falls back to 2 and 8 — as the shipped DM heroes, whose
+     * text stops at the skills, all do.
+     */
+    reincarnateAttributePenalty: ui8;
+    reincarnateStatPenalty: ui8;
     location: { map: ui8; x: ui8; y: ui8; wall: ui8 };
     inventory: HeroInventoryItem[];
 }

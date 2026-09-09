@@ -5,10 +5,19 @@
  * Based on CSBWin's VBL-driven game loop
  */
 
-import type { DungeonData, Item16Record, MissileRecord, TeleporterRecord, TimerRecord } from '../data/dungeonTypes';
+import type {
+    ActuatorRecord,
+    DatabaseRecord,
+    DungeonData,
+    Item16Record,
+    MissileRecord,
+    PresetHero,
+    TeleporterRecord,
+    TimerRecord,
+} from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
-import { Party, ensureHandOwner, setHandOwner } from './Party';
+import { Party, ensureHandOwner, selectMagicCaster, setHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
@@ -44,7 +53,14 @@ const CHAMP_WOUND_SOUNDS = [
     SoundIndex.CHAMP_WOUND_3,
     SoundIndex.CHAMP_WOUND_4,
 ];
-import { ActuatorAction } from '../data/actuatorHelpers';
+import {
+    ActuatorAction,
+    PORTRAIT_INACTIVE,
+    blocksDisables,
+    getActuatorState,
+    getActuatorType,
+    setActuatorType,
+} from '../data/actuatorHelpers';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { CharacterStats } from './CharacterStats';
 import type { SpellDefinition } from '../data/spellTypes';
@@ -54,7 +70,24 @@ import {
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
-import { AttributeIndex, championAttribute } from './attributes';
+import {
+    AttributeIndex,
+    attributeCurrent,
+    attributeMaximum,
+    attributeMinimum,
+    championAttribute,
+    setAttributeCurrent,
+    setAttributeMaximum,
+} from './attributes';
+import {
+    assignAddCharacterPossessions,
+    computeChampionFingerprint,
+    createChampionFromPreset,
+    findFreeCharPosition,
+    type AddCharacterItem,
+    type AddCharacterTables,
+} from './AddCharacter';
+import { DELTA_X, DELTA_Y } from './MonsterPerception';
 
 /**
  * Game event callback types
@@ -189,8 +222,20 @@ export class Game {
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
-    private nextChampionFingerprint = 1;
     private objDescObjectType: ArrayLike<number> | null = null;
+    /**
+     * `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two tables `AddCharacter` needs
+     * to pick a possession slot. Taken from the actuator tables, which already carry
+     * both, so there is one copy in the engine.
+     */
+    private addCharacterTables: AddCharacterTables | null = null;
+    /**
+     * `reincarnateAttributePenalty` / `reincarnateStatPenalty`
+     * (`doc/CSBwin-src/Character.cpp:14`) — CSBWin holds them in file-scope globals that
+     * `AddCharacter` fills in while parsing the hero text and
+     * `_ResurrectReincarnateCancel` reads back. Same lifetime here.
+     */
+    private reincarnationSource: PresetHero | null = null;
     /**
      * `GetObjectWeight` / `MaxLoad` / `DetermineThrowingDistance` / `Quickness`
      * (`src/engine/CharacterStats.ts`). Public because the throw path, the armour
@@ -258,6 +303,9 @@ export class Game {
         );
         this.actuators.setTables({
             adjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
+            // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
+            // Wired here rather than by the host so the tools get it too.
+            onAddCharacter: (charID, mirrorCell, wall) => this.addCharacter(charID, mirrorCell, wall),
         });
         this.timerSystem = new TimerSystem(
             this.dungeonState,
@@ -417,6 +465,13 @@ export class Game {
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
+        this.addCharacterTables =
+            actuatorTables?.objDescCarryMask && actuatorTables.carryLocation
+                ? {
+                    objDescCarryMask: actuatorTables.objDescCarryMask,
+                    carryLocation: actuatorTables.carryLocation,
+                }
+                : null;
         this.byte20090 = timerTables?.byte20090 ?? null;
 
         this.characterStats = new CharacterStats({
@@ -745,6 +800,311 @@ export class Game {
         return true;
     }
 
+    /**
+     * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) — a click on a Hall of
+     * Champions mirror.
+     *
+     * `charID` picks the portrait bitmap and nothing else: the name, title, stats and
+     * skills come from the `dbTEXT` object lying in the **party's own** cell, and the
+     * possessions from the mirror's cell. The champion is only *provisionally* added
+     * here — `potentialChampionIndex` marks them, and
+     * `resurrectReincarnateCancel` either confirms or undoes it.
+     */
+    addCharacter(charID: number, mirrorCell: Position, wall: number): boolean {
+        const party = this.party.state;
+        // `if (d.EmptyHanded == 0) return; if (d.NumCharacter == 4) return;` (`:477-479`)
+        if (party.objectInHand !== null && party.objectInHand !== undefined) return false;
+        if (party.champions.length >= 4) return false;
+        // One mirror at a time: a second click while the menu is up would push a
+        // champion that `_ResurrectReincarnateCancel` can no longer reach.
+        if ((party.potentialChampionIndex ?? -1) >= 0) return false;
+
+        const hero = this.findHeroForMirror(charID, mirrorCell, wall);
+        if (!hero) return false;
+
+        const index = party.champions.length; // LOCAL_2
+        const possessions: Array<ObjectID | null> = new Array(30).fill(null);
+        const champion = createChampionFromPreset(
+            hero,
+            findFreeCharPosition(party.champions, party.facing),
+            possessions,
+        );
+        // `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:520`, `:531`) — the corner
+        // the champion stands in is chosen above, but they face the way the party does.
+        champion.facing = party.facing;
+        champion.portraitGraphic = charID;
+        champion.fingerprint = computeChampionFingerprint(
+            party.champions,
+            party.position.z,
+            party.position.x,
+            party.position.y,
+        );
+        // `(STRandom() & 0xff) + 1500` twice (`:533-534`).
+        champion.food = (this.random.next() & 0xff) + 1500;
+        champion.water = (this.random.next() & 0xff) + 1500;
+        // `if (pcA3->HP() == 0) return;` (`:703`) — a hero text that failed every
+        // validation pass, including the `legalHero` fallback.
+        if (champion.attributes.maxHealth === 0) return false;
+
+        if (!this.party.addChampion(champion)) return false;
+        // `d.PotentialCharacterOrdinal = LOCAL_2 + 1; d.NumCharacter++;` (`:704-705`).
+        party.potentialChampionIndex = index;
+        if (party.champions.length === 1) {
+            setHandOwner(party, 0);
+        }
+
+        this.collectMirrorPossessions(champion, possessions);
+
+        // `ShowHideInventory(LOCAL_2)` (`:792`) — the inventory opens on the new
+        // champion, and `potentialChampionIndex` turns its eye panel into the
+        // Resurrect/Reincarnate/Cancel menu.
+        party.selectedCharacterIndex = index;
+        this.state.party = party;
+        return true;
+    }
+
+    /**
+     * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6615`). `button` is
+     * CSBWin's own id from `Buttons18372`: 160 Resurrect, 161 Reincarnate, 162 Cancel.
+     */
+    resurrectReincarnateCancel(button: number): boolean {
+        const party = this.party.state;
+        const index = party.potentialChampionIndex ?? -1;
+        if (index < 0) return false;
+        // `pcA3 = &d.CH16482[d.NumCharacter-1]` — the potential champion is always last.
+        const champion = party.champions[party.champions.length - 1];
+        if (!champion) return false;
+
+        party.potentialChampionIndex = -1;
+
+        if (button === 162) {
+            // Cancel (`:6629-6658`): hide the inventory and take the champion back out.
+            // Their possessions were never removed from the mirror, so they stay there.
+            party.selectedCharacterIndex = -1;
+            if (party.champions.length === 1) {
+                setHandOwner(party, -1);
+            }
+            party.champions.pop();
+            this.state.party = party;
+            return true;
+        }
+
+        const mirror = this.getMirrorCell();
+        // `RemoveObjectFromRoom` for each possession (`:6668-6677`). `AddCharacter` left
+        // them linked in the mirror's cell *as well as* on the champion; this is where
+        // the room finally lets go of them.
+        for (const value of champion.possessions ?? []) {
+            if (value === null || value === undefined) continue;
+            this.dungeonState.removeObjectFromCell(mirror, value as ObjectID);
+        }
+
+        this.disableMirrorActuators(mirror);
+
+        if (button === 161) {
+            this.reincarnate(champion);
+        }
+
+        // `:6786-6793`
+        if (party.champions.length === 1) {
+            setHandOwner(party, 0);
+            selectMagicCaster(party, 0);
+        }
+
+        const messages = this.actuators.getMessages();
+        if (messages) {
+            const color = this.actuators.getChampionMessageColor(party.champions.length - 1);
+            messages.printLinefeed();
+            messages.quePrintLines(color, champion.name);
+            messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
+        }
+
+        party.selectedCharacterIndex = -1;
+        this.state.party = party;
+        return true;
+    }
+
+    /**
+     * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6736-6784`).
+     *
+     * ⏳ `ReIncarnate` itself (`doc/CSBwin-src/Code13ea4.cpp:20`) — the viewport screen
+     * that blanks the name and title and has the player type new ones — is not ported;
+     * the reincarnated champion keeps the hero's name. Everything after it is here.
+     */
+    private reincarnate(champion: Champion): void {
+        // `ClearMemory(pcA3->skills92, 120)` — all 20 skills, temporary adjust included.
+        for (const skill of champion.skills) {
+            skill.experience = 0;
+            skill.tempAdjust = 0;
+        }
+        // `attributes.experience` and the four role levels are this port's own derived
+        // mirrors of `skills92[0..3]`, set by `createChampionFromPreset` and currently
+        // read by nothing. Zeroed with the skills so they cannot go stale behind the
+        // first consumer that picks them up.
+        champion.attributes.experience = 0;
+        champion.attributes.fighter = 0;
+        champion.attributes.ninja = 0;
+        champion.attributes.priest = 0;
+        champion.attributes.wizard = 0;
+
+        const hero = this.reincarnationSource;
+        const attributePenalty = hero?.reincarnateAttributePenalty ?? 2;
+        const statPenalty = hero?.reincarnateStatPenalty ?? 8;
+
+        // `DM_rules` is false by default (`doc/CSBwin-src/data.cpp:251`), so both
+        // penalties apply. Attributes 1..6 only — Luck (0) is left alone.
+        for (let index = 1; index <= 6; index++) {
+            const attribute = champion.attributes.stats[index];
+            if (!attribute) continue;
+            let value = attributeCurrent(attribute);
+            value -= Math.trunc((value * attributePenalty) / 16);
+            value = Math.max(value, attributeMinimum(attribute));
+            setAttributeCurrent(attribute, value);
+            setAttributeMaximum(attribute, value);
+        }
+
+        const scale = (value: number): number => Math.trunc((value * (16 - statPenalty)) / 16);
+        const stats = champion.attributes;
+        stats.health = scale(stats.health);
+        stats.maxHealth = scale(stats.maxHealth);
+        stats.stamina = scale(stats.stamina);
+        stats.maxStamina = scale(stats.maxStamina);
+        stats.mana = scale(stats.mana);
+        stats.maxMana = scale(stats.maxMana);
+
+        // Twelve random attribute points, Current and Maximum together (`:6777-6783`).
+        // CSBWin parses a `randomPoints` field out of the hero text and then ignores it
+        // here; twelve is hardcoded.
+        for (let i = 0; i < 12; i++) {
+            const attribute = champion.attributes.stats[(this.random.next() & 0xffff) % 7];
+            if (!attribute) continue;
+            setAttributeCurrent(attribute, attributeCurrent(attribute) + 1);
+            setAttributeMaximum(attribute, attributeMaximum(attribute) + 1);
+        }
+    }
+
+    /** The cell the party is facing — CSBWin's `mapX/mapY` in both halves of the flow. */
+    private getMirrorCell(): Position {
+        const party = this.party.state;
+        const facing = party.facing & 3;
+        return new Position(
+            party.position.x + DELTA_X[facing],
+            party.position.y + DELTA_Y[facing],
+            party.position.z,
+        );
+    }
+
+    /**
+     * `doc/CSBwin-src/Character.cpp:715-790` — every object at the mirror's wall becomes
+     * a possession. CSBWin does *not* unlink them from the room here: they stay in the
+     * cell until Resurrect or Reincarnate is pressed, which is what makes Cancel a
+     * clean undo.
+     */
+    private collectMirrorPossessions(champion: Champion, possessions: Array<ObjectID | null>): void {
+        if (!this.addCharacterTables) return;
+        const party = this.party.state;
+        const mirror = this.getMirrorCell();
+        const wall = (party.facing + 2) & 3;
+
+        const items: AddCharacterItem[] = [];
+        for (
+            let rn = this.dungeonState.findFirstObject(mirror);
+            rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
+            rn = this.dungeonState.getDBRecordLink(rn)
+        ) {
+            const decoded = decodeObjectID(rn);
+            if (decoded.category <= DBType.ACTUATOR) continue;
+            if (decoded.position !== wall) continue;
+            items.push({
+                rn,
+                category: decoded.category,
+                record: this.getObjectRecord(rn),
+            });
+        }
+
+        assignAddCharacterPossessions(items, this.addCharacterTables, possessions);
+        champion.weaponHand = possessions[1] ?? null;
+        champion.shieldHand = possessions[0] ?? null;
+        champion.quiver = possessions[8] ?? null;
+    }
+
+    /**
+     * `doc/CSBwin-src/CSBCode.cpp:6679-6734` — disable the first *active* portrait
+     * actuator on the mirror's wall, then, unless it blocks disables, every actuator
+     * on that wall.
+     *
+     * ⏳ `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`:6540-6612`) is not
+     * ported: it fires only when the actuator carries a `DisableMessage`, which is a
+     * CSB extension the shipped DM dungeon never uses.
+     */
+    private disableMirrorActuators(mirror: Position): void {
+        const wall = (this.party.state.facing + 2) & 3;
+        const actuators: ActuatorRecord[] = [];
+        for (
+            let rn = this.dungeonState.findFirstObject(mirror);
+            rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
+            rn = this.dungeonState.getDBRecordLink(rn)
+        ) {
+            const decoded = decodeObjectID(rn);
+            if (decoded.category !== DBType.ACTUATOR) continue;
+            if (decoded.position !== wall) continue;
+            const record = this.dungeonState.getActuatorRecord(rn);
+            if (record) actuators.push(record);
+        }
+
+        let block = false;
+        for (const record of actuators) {
+            if (getActuatorType(record) !== 127) continue;
+            if ((getActuatorState(record) & PORTRAIT_INACTIVE) !== 0) continue;
+            setActuatorType(record, 0);
+            if (blocksDisables(record)) block = true;
+            break;
+        }
+
+        for (const record of actuators) {
+            if (block) break;
+            if (getActuatorType(record) === 127) {
+                block = blocksDisables(record);
+            }
+            setActuatorType(record, 0);
+        }
+    }
+
+    /**
+     * The hero whose text `AddCharacter` would read. CSBWin takes the first `dbTEXT` in
+     * the **party's own** cell; `HeroExtractor` has already decoded every one of them at
+     * load time, keyed by the mirror that faces it, so the mirror's cell and wall
+     * identify the same text.
+     */
+    private findHeroForMirror(charID: number, mirrorCell: Position, wall: number): PresetHero | null {
+        const heroes = this.state.dungeon.presetHeroes ?? [];
+        const exact = heroes.find((hero) =>
+            hero.location.map === mirrorCell.z
+            && hero.location.x === mirrorCell.x
+            && hero.location.y === mirrorCell.y
+            && hero.location.wall === wall
+        );
+        if (exact) {
+            this.reincarnationSource = exact;
+            return exact;
+        }
+        const byPortrait = heroes.find((hero) => hero.portraitIndex === charID) ?? null;
+        this.reincarnationSource = byPortrait;
+        return byPortrait;
+    }
+
+    /** The database record behind an object id, for the categories `AddCharacter` sorts on. */
+    private getObjectRecord(rn: ObjectID): DatabaseRecord | null {
+        switch (decodeObjectID(rn).category) {
+            case DBType.WEAPON: return this.dungeonState.getWeaponRecord(rn);
+            case DBType.CLOTHING: return this.dungeonState.getClothingRecord(rn);
+            case DBType.SCROLL: return this.dungeonState.getScrollRecord(rn);
+            case DBType.POTION: return this.dungeonState.getPotionRecord(rn);
+            case DBType.CHEST: return this.dungeonState.getContainerRecord(rn);
+            case DBType.MISC: return this.dungeonState.getMiscRecord(rn);
+            default: return null;
+        }
+    }
+
     registerChampionBones(bones: ObjectID, champIndex: number): void {
         const champ = this.party.state.champions[champIndex];
         if (!champ) return;
@@ -755,44 +1115,14 @@ export class Game {
     }
 
     private assignChampionFingerprint(champion: Champion): void {
-        if (champion.fingerprint !== undefined && champion.fingerprint !== null) {
-            this.refreshNextChampionFingerprint();
-            return;
-        }
-        champion.fingerprint = this.allocateChampionFingerprint();
-    }
-
-    private allocateChampionFingerprint(): number {
-        const used = this.collectChampionFingerprints();
-        let next = this.nextChampionFingerprint & 0xffff;
-        if (next === 0) next = 1;
-        while (used.has(next)) {
-            next = (next + 1) & 0xffff;
-            if (next === 0) next = 1;
-        }
-        this.nextChampionFingerprint = (next + 1) & 0xffff;
-        if (this.nextChampionFingerprint === 0) this.nextChampionFingerprint = 1;
-        return next;
-    }
-
-    private refreshNextChampionFingerprint(): void {
-        const used = this.collectChampionFingerprints();
-        let next = this.nextChampionFingerprint & 0xffff;
-        if (next === 0) next = 1;
-        while (used.has(next)) {
-            next = (next + 1) & 0xffff;
-            if (next === 0) next = 1;
-        }
-        this.nextChampionFingerprint = next;
-    }
-
-    private collectChampionFingerprints(): Set<number> {
-        const used = new Set<number>();
-        for (const champ of this.party.state.champions) {
-            const fp = champ.fingerprint ?? 0;
-            if (fp) used.add(fp & 0xffff);
-        }
-        return used;
+        if (champion.fingerprint !== undefined && champion.fingerprint !== null) return;
+        const pos = this.party.state.position;
+        champion.fingerprint = computeChampionFingerprint(
+            this.party.state.champions,
+            pos.z,
+            pos.x,
+            pos.y,
+        );
     }
 
     private applyMissileDamageToParty(options: {

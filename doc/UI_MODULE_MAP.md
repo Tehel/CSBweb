@@ -28,9 +28,9 @@ A function that turns out not to need the state does not take it — the pure he
 
 | Module | CSBWin counterpart | Holds |
 | --- | --- | --- |
-| `ui/Mouse.ts` | `Mouse.cpp` | Click ring buffer, the `word0` button dispatcher, clothing/party/chest/inventory click handlers, the cursor and hover highlights |
+| `ui/Mouse.ts` | `Mouse.cpp` | Click ring buffer, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, the cursor and hover highlights |
 | `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
-| `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading |
+| `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading, the Hall of Champions menu (`TAG0189a8`) |
 | `ui/Character.ts` | `Character.cpp` | Portraits, hand icons, shield dots, life/stamina/mana bars, attributes, food/water, carried load, possession slots |
 | `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it, through the `applyFeeding` hook |
 | `ui/MagicPanel.ts` | `Magic.cpp` (UI half) | Rune keypad, the incantation being assembled, its mana cost |

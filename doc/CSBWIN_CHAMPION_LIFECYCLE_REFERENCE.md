@@ -82,14 +82,38 @@ Reached from a wall click on actuator type **127** whose state lacks `PORTRAIT_I
    unused (`:514-518`). This is the key the bones record later resolves through.
 4. Takes the champion's corner of the cell as the first free one, starting from the
    party's facing (`:522-528`).
-5. Food and water are `random & 0xff + 1500` (`:533-534`).
+5. Food and water are `random & 0xff + 1500` (`:533-534`) — two separate `STRandom`
+   draws, so they differ.
 6. Decodes name, title, gender, HP/stamina/mana, the seven attributes and sixteen
-   sub-skills from the `dbTEXT` object in the party's own cell (`:536-700`). A hero
-   string that fails validation falls back to the built-in `legalHero` string.
+   sub-skills from the `dbTEXT` object in the party's own cell (`:536-700`) — the first
+   one in the chain, at any position. A hero string that fails validation falls back to
+   the built-in `legalHero` string. `charID` therefore selects **only the portrait
+   bitmap**: which champion you get is decided by where the party is standing.
+
+   Every number in that string is `DecodeCharacterValue` (`:414-431`): one hex nibble
+   per character, each of which must be `'A'`..`'P'`. Anything else returns -1 and makes
+   the hero illegal. HP, stamina and mana are then clamped to MAXHP 999 / MAXSTAMINA
+   9999 / MAXMANA 900 (`CSB.h:2452-2454`), and each clamp also sets `illegalHero`.
+   After the sixteen skill letters come three `GetOneValue` reads (`:433-437`, `'A'`..
+   `'Z'` or 0xff): `reincarnateAttributePenalty` (fallback 2 above 16),
+   `reincarnateStatPenalty` (fallback 8) and `randomPoints` (fallback 3). All 24
+   shipped DM heroes stop at the skills, so all three take their fallbacks.
 7. Sets `d.PotentialCharacterOrdinal = NumCharacter + 1` and increments `NumCharacter`
    (`:704-705`) — the champion is *provisionally* in the party.
 8. Collects every object in the **mirror's** cell (the cell in front, at the opposite
-   position) into the champion's possessions (`:715-790`).
+   position) into the champion's possessions (`:715-790`). The slot search is a
+   `switch` with two `goto case9`s: clothing takes the first of body slots 2..5 its
+   carry mask allows, a weapon takes slot 1, a scroll or potion takes slot 11, and
+   anything left over takes the neck (10) if it is legal and free, otherwise the next
+   backpack slot from 13 up. Two details are load-bearing: a scroll or potion whose
+   slot 11 is taken sets `LOCAL_6 = 6` and then falls through to `case9`, which
+   overwrites it — **slot 6 is never used**; and `AddCharacterPossession` (`:1936`)
+   does *not* remove the object from the room, see section 3.
+
+   `AddCharacter` only reaches this code with `dbType() > dbACTUATOR`, and then has no
+   `default:` arm, so a creature, missile or cloud lying in the mirror leaves `LOCAL_6`
+   at the previous iteration's value. That is undefined behaviour rather than
+   behaviour; our port skips those categories.
 9. Opens the inventory on the Resurrect/Reincarnate/Cancel screen (`:792`).
 
 `d.PotentialCharacterOrdinal` is the "almost but not quite added" flag (`Data.h:933`).
@@ -105,17 +129,43 @@ which also sets `d.DisplayResurrectChestOrScroll = 5`.
 - **Cancel (button 162)**: hide the inventory, clear `PotentialCharacterOrdinal`,
   `NumCharacter--`, `SetHandOwner(-1)` if that was the only champion, and clear the
   champion's boxes on screen.
-- **Resurrect (160) / Reincarnate (161)**, both first: drop every possession into the
-  mirror's cell, then disable the first active portrait actuator at that wall and — 
-  unless it `BlockDisables()` — every actuator there (`:6668-6734`).
-- **Reincarnate only** (`:6736-6784`): `ReIncarnate()`, zero all 20 skills, and (when
-  `DM_rules` is off) apply `reincarnateAttributePenalty`/`reincarnateStatPenalty`,
+- **Resurrect (160) / Reincarnate (161)**, both first: `RemoveObjectFromRoom` every
+  possession **out of** the mirror's cell, then disable the first active portrait
+  actuator at that wall and — unless it `BlockDisables()` — every actuator there
+  (`:6668-6734`).
+
+  This is the other half of the trick in section 2 step 8: `AddCharacterPossession`
+  (`Character.cpp:1936`) never unlinked those objects from the room, so between the add
+  and the answer each one is in two places at once. Confirming unlinks them; **Cancel
+  leaves them exactly where they were**, which is what makes the undo clean and is why
+  neither half can be written without the other.
+
+  Both mapX/mapY are recomputed from the party's *current* position, not from where the
+  mirror was clicked. CSBWin does not stop the party walking away with the menu up, so
+  answering it after a move takes the possessions out of — and disables the actuators
+  of — whatever the party is facing now. Quirk, faithfully preserved.
+- **Reincarnate only** (`:6736-6784`): `ReIncarnate()` — the viewport screen at
+  `Code13ea4.cpp:20` that blanks name and title and has the player type new ones — then
+  zero all 20 skills, and (when `DM_rules` is off) apply `reincarnateAttributePenalty`/`reincarnateStatPenalty`,
   both read from the hero's own text. Each of attributes 1..6 loses
   `v * penalty / 16`, floored at its Minimum, and Maximum is set to the result.
   HP/stamina/mana maxima are scaled by `(16 - statPenalty)/16`. Then **12 random
   attribute points**: `Attributes[random % 7]` gains 1 to both Current and Maximum.
+  Twelve is hardcoded at `:6779`; the `randomPoints` field `AddCharacter` parses out of
+  the hero text (`Character.cpp:686`) is **never read** by this path.
+  Luck (index 0) is outside the penalty loop, so it can only gain.
 - Both then: `SetHandOwner(0)` and `SelectMagicCaster(0)` if this is the only champion,
   and print "`<name> RESURRECTED`" or "` REINCARNATED`".
+
+The menu is modal by click gating, not by a mode flag: while `PotentialCharacterOrdinal`
+is non-zero the dispatcher drops clicks on the portrait boxes (ids 12-15), the inventory
+buttons (7-11), the magic panel (100) and the attack panel (111)
+(`Mouse.cpp:1578-1650`). Ids 83 (the cursor owner's inventory), 70 (mouth), 71 (eye) and
+81 (the eye panel itself) are *not* gated there — the mouth stops itself at
+`Character.cpp:4061` instead. `_TAG01a6ea` (`CSBCode.cpp:8500`) is what turns a click on
+id 81 into a menu button, switching on `d.DisplayResurrectChestOrScroll`: 4 sends it to
+`HandleClothingClick` for an open chest, 5 to `SearchButtonList(d.Buttons18372)` and
+`_ResurrectReincarnateCancel`, and only with an empty cursor.
 
 ## 4. Death — `KillCharacter` (`Character.cpp:2526`)
 

@@ -34,6 +34,13 @@ export interface ViewportTables {
   seeThruWallsRect: RectPos; // `d.SeeThruWallsRect`
   seeThruWallsRect2: RectPos; // `(RectPos *)&d.SeeThruWallsRect.b.uByte4`
   seeThruDoorEdgeRect: RectPos; // `(RectPos *)d.uByte2542`
+  /**
+   * `(RectPos *)d.Byte2546` — where the Hall of Champions portrait goes in the
+   * viewport, used only by the `relativePosition == 12` arm of `DrawWallDecoration`
+   * (`doc/CSBwin-src/CSBCode.cpp:3693-3700`). Byte-form: 32x29 pixels, the size of one
+   * cell of the graphic-26 portrait sheet.
+   */
+  championPortraitRect: RectPos;
 }
 
 const GRAPHIC_22E_INDEX = 0x22e; // 558
@@ -174,6 +181,7 @@ function parseGraphic22eTailOffsets(raw: Uint8Array): {
   stairEdgeRectOffset: number;
   stairFacingDownRectOffset: number;
   stairFacingUpRectOffset: number;
+  byte2546Offset: number;
   uByte2542Offset: number;
   seeThruWallsRectOffset: number;
 } {
@@ -196,8 +204,9 @@ function parseGraphic22eTailOffsets(raw: Uint8Array): {
   const uByte2542Offset = off - 4;
   off = uByte2542Offset;
 
-  // i8 Byte2546[4] (unused here)
-  off -= 4;
+  // i8 Byte2546[4] — the champion portrait rectangle
+  const byte2546Offset = off - 4;
+  off = byte2546Offset;
 
   // RectPos StairFacingUpRect[11]
   const stairFacingUpRectOffset = off - 11 * 8;
@@ -287,6 +296,7 @@ function parseGraphic22eTailOffsets(raw: Uint8Array): {
     stairEdgeRectOffset,
     stairFacingDownRectOffset,
     stairFacingUpRectOffset,
+    byte2546Offset,
     uByte2542Offset,
     seeThruWallsRectOffset,
   };
@@ -313,6 +323,7 @@ function computeGraphic22eOffsetsFromWall(rawLength: number, wallRectanglesOffse
   stairEdgeRectOffset: number;
   stairFacingDownRectOffset: number;
   stairFacingUpRectOffset: number;
+  byte2546Offset: number;
   uByte2542Offset: number;
   seeThruWallsRectOffset: number;
 } {
@@ -346,6 +357,7 @@ function computeGraphic22eOffsetsFromWall(rawLength: number, wallRectanglesOffse
   const stairFacingUpRectOffset = stairFacingDownRectOffset + 11 * 8;
 
   const uByte2542Offset = rawLength - (4 /*Word2530*/ + 8 /*SeeThruWallsRect*/ + 4 /*uByte2542*/);
+  const byte2546Offset = uByte2542Offset - 4;
   const seeThruWallsRectOffset = rawLength - (4 /*Word2530*/ + 8 /*SeeThruWallsRect*/);
 
   return {
@@ -369,6 +381,7 @@ function computeGraphic22eOffsetsFromWall(rawLength: number, wallRectanglesOffse
     stairEdgeRectOffset,
     stairFacingDownRectOffset,
     stairFacingUpRectOffset,
+    byte2546Offset,
     uByte2542Offset,
     seeThruWallsRectOffset,
   };
@@ -429,6 +442,7 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
   const seeThruWallsRect = toRectPos(raw, tail.seeThruWallsRectOffset);
   const seeThruWallsRect2 = toRectPos(raw, tail.seeThruWallsRectOffset + 4);
   const seeThruDoorEdgeRect = toRectPos(raw, tail.uByte2542Offset);
+  const championPortraitRect = readRectPosByte4(raw, tail.byte2546Offset);
 
   return {
     wallRectangles,
@@ -447,5 +461,6 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
     seeThruWallsRect,
     seeThruWallsRect2,
     seeThruDoorEdgeRect,
+    championPortraitRect,
   };
 }

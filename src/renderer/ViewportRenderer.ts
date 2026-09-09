@@ -205,6 +205,7 @@ export class ViewportRenderer {
       seeThruWallsRect: viewportTables.seeThruWallsRect,
       seeThruWallsRect2: viewportTables.seeThruWallsRect2,
       seeThruDoorEdgeRect: viewportTables.seeThruDoorEdgeRect,
+      championPortraitRect: viewportTables.championPortraitRect,
       wallGraphicSet: 0,
       backgroundGraphicSet: 0,
       getGraphicBitmap: (n: number) => this.getGraphicBitmap(n),
@@ -293,6 +294,11 @@ export class ViewportRenderer {
   /** Mouth → engine: the apply half of `_FeedCharacter`. */
   setFeedingHandler(handler?: (chIdx: number, fp: FeedParameters) => boolean): void {
     this.ui.applyFeeding = handler;
+  }
+
+  /** Hall of Champions menu → engine: `_ResurrectReincarnateCancel(button)`. */
+  setResurrectReincarnateCancelHandler(handler?: (button: number) => void): void {
+    this.ui.onResurrectReincarnateCancel = handler;
   }
 
   setPartyState(state: PartyState | null): void {
@@ -640,6 +646,7 @@ export class ViewportRenderer {
     const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
     if (!inventoryOpen) {
       syncOpenChest(this.ui, null);
+      this.ui.displayResurrectChestOrScroll = 0;
     }
     if (inventoryOpen) {
       drawInventoryBackground(this.ui);

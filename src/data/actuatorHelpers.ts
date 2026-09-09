@@ -129,6 +129,18 @@ export function getActuatorDisableMessage(rec: ActuatorRecord): number {
   return (rec.word4 >> 6) & 0x3;
 }
 
+/** `PORTRAIT_InActive` (`doc/CSBwin-src/CSB.h:913`) — a mirror that has been used up. */
+export const PORTRAIT_INACTIVE = 1;
+
+/**
+ * `DB3::BlockDisables` (`doc/CSBwin-src/CSB.h:1055`). Set on a portrait actuator, it
+ * stops the Hall of Champions from disabling the *other* actuators on the same wall
+ * (`doc/CSBwin-src/CSBCode.cpp:6700`).
+ */
+export function blocksDisables(rec: ActuatorRecord): boolean {
+  return (rec.word4 & 0x100) !== 0;
+}
+
 export function getActuatorState(rec: ActuatorRecord): number {
   return (rec.word4 >> 9) & 0x7;
 }

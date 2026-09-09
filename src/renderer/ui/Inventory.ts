@@ -92,9 +92,16 @@ export function drawInventoryScreen(ui: UIState): void {
     }
   }
 
-  if (chestView) {
+  // `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3847`). The branch also decides what a
+  // click in this area means, which is why it leaves `displayResurrectChestOrScroll`
+  // behind for `tag01a6ea` exactly as CSBWin does.
+  if ((ui.partyState.potentialChampionIndex ?? -1) >= 0) {
+    drawResurrectMenu(ui);
+  } else if (chestView) {
+    ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
     drawChestPanel(ui, chestView);
   } else if (ui.pressingEye) {
+    ui.displayResurrectChestOrScroll = 0;
     const cursorObject = normalizeObjectValue(ui.partyState?.objectInHand);
     if (cursorObject !== null) {
       drawObjectInfoPanel(ui, cursorObject);
@@ -102,11 +109,24 @@ export function drawInventoryScreen(ui: UIState): void {
       drawAttributePanel(ui, champion);
     }
   } else {
+    ui.displayResurrectChestOrScroll = 0;
     drawFoodWaterPanel(ui, champion);
   }
   drawMouthChewAnimation(ui);
   drawEyeIcon(ui);
   drawVitalsAndLoad(ui, champion);
+}
+
+/**
+ * `TAG0189a8` (`doc/CSBwin-src/Character.cpp:3837`) — graphic 40, the
+ * Resurrect / Reincarnate / Cancel menu a provisionally added champion is waiting on.
+ */
+export function drawResurrectMenu(ui: UIState): void {
+  if (!ui.uiTables) return;
+  ui.displayResurrectChestOrScroll = 5;
+  // CSBWin passes a *byte* width of 72 (`BLT2Viewport(…, 72, 6)`); this helper takes
+  // pixels, as every other call here does.
+  blitBasicGraphicToViewport(ui, 40, ui.uiTables.graphic232.wRectPos926, 144, 6);
 }
 
 export function drawInventoryBackground(ui: UIState): void {

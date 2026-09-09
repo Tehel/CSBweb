@@ -37,6 +37,7 @@ const CHECKS = [
   { tool: 'dump-hand-owner.ts' },
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-feeding.ts' },
+  { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },

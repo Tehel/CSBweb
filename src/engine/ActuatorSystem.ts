@@ -25,6 +25,7 @@ import {
   getActuatorDelay,
   getActuatorLocalActionType,
   getActuatorState,
+  PORTRAIT_INACTIVE,
   getActuatorTargetPos,
   getActuatorTargetX,
   getActuatorTargetY,
@@ -46,7 +47,6 @@ import {
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
 
-const PORTRAIT_INACTIVE = 1;
 
 export enum CursorFilterType {
   TakeKey = 'TakeKey',

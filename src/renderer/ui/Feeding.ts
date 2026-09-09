@@ -96,6 +96,9 @@ export function computeFeedParameters(
 export function handleMouthPress(ui: UIState): void {
   if (!ui.partyState || !ui.objectTables) return;
   if ((ui.partyState.cursorOwner ?? -1) < 0) return;
+  // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — the mouth is inert while the
+  // Hall of Champions menu is up (`doc/CSBwin-src/Character.cpp:4061`).
+  if ((ui.partyState.potentialChampionIndex ?? -1) >= 0) return;
   const selected = ui.partyState.selectedCharacterIndex ?? -1;
   if (selected < 0) return;
   const champ = ui.partyState.champions[selected] ?? null;

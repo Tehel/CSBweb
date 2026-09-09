@@ -75,6 +75,13 @@ export interface UIState {
   /** The damage figure being flashed, and when the flash ends. See `ui/Attack.ts`. */
   attackFlashValue: number;
   attackFlashUntilMs: number;
+  /**
+   * `d.DisplayResurrectChestOrScroll` (`doc/CSBwin-src/Character.cpp:3838`) — what the
+   * eye panel is currently showing, which is also what a click in it means: 5 the
+   * Resurrect/Reincarnate/Cancel menu, 4 an open chest, 0 anything else. Written by
+   * `TAG0189d4`'s port in `drawInventoryScreen`, read by `tag01a6ea`.
+   */
+  displayResurrectChestOrScroll: number;
   openChestId: ObjectID | null;
   openChestContents: Array<ObjectID | null>;
   openChestIconIndex: number | null;
@@ -111,6 +118,12 @@ export interface UIState {
    * `AdjustStamina` and the `TT_72` timer, none of which the UI owns.
    */
   applyFeeding?: (chIdx: number, fp: FeedParameters) => boolean;
+  /**
+   * `_ResurrectReincarnateCancel(button)` (`doc/CSBwin-src/CSBCode.cpp:6615`) — a
+   * button on the Hall of Champions menu. A hook because confirming reaches the
+   * dungeon's object chains and the mirror's actuators, none of which the UI owns.
+   */
+  onResurrectReincarnateCancel?: (button: number) => void;
   viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
   /* ---- back into the renderer ---- */
@@ -149,6 +162,7 @@ export function createUIState(
     word20252: 1,
     attackFlashValue: 0,
     attackFlashUntilMs: 0,
+    displayResurrectChestOrScroll: 0,
     openChestId: null,
     openChestContents: Array(8).fill(null),
     openChestIconIndex: null,

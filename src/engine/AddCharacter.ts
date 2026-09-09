@@ -1,7 +1,10 @@
 /**
- * AddCharacter helpers (CSBWin Character.cpp:716+)
+ * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) — the Hall of Champions.
  *
- * Maps preset hero inventory items to possession slots.
+ * The engine half: the fingerprint, the champion's corner of the cell, the possession
+ * slot chosen for each object lying in the mirror, and the champion record built out of
+ * a hero text. `Game.addCharacter` drives it; `Game.resurrectReincarnateCancel` is the
+ * other end (`doc/CSBwin-src/CSBCode.cpp:6615`).
  */
 
 import { DBType, type Direction, type ObjectID } from '../core/types';
@@ -20,69 +23,164 @@ export interface AddCharacterTables {
   objDescCarryMask: ArrayLike<number>;
 }
 
+/** One object lying in the mirror's cell, as the slot chooser needs to see it. */
+export interface AddCharacterItem {
+  rn: ObjectID;
+  category: DBType;
+  record: DatabaseRecord | null;
+}
+
+/**
+ * `FingerprintExists` (`doc/CSBwin-src/Character.cpp:437-450`).
+ *
+ * ⚠️ CSBWin also searches the wings (`character.GetFromWings`), the pool of champions
+ * who have left the party. We have no wings, so only the live party is scanned.
+ */
+export function fingerprintExists(champions: Champion[], fingerprint: number): boolean {
+  return champions.some((champ) => (champ.fingerprint ?? 0) === (fingerprint & 0xffff));
+}
+
+/**
+ * `AddCharacter`'s fingerprint (`doc/CSBwin-src/Character.cpp:514-518`) —
+ * `(partyLevel<<10)|(partyX<<5)|partyY`, bumped until unused. This is the key the
+ * champion's bones record resolves through, so it must be derived, not invented.
+ */
+export function computeChampionFingerprint(
+  champions: Champion[],
+  level: number,
+  x: number,
+  y: number,
+): number {
+  let fingerprint = ((level << 10) | (x << 5) | y) & 0xffff;
+  while (fingerprintExists(champions, fingerprint)) {
+    fingerprint = (fingerprint + 1) & 0xffff;
+  }
+  return fingerprint;
+}
+
+/**
+ * `doc/CSBwin-src/Character.cpp:522-528` — the new champion takes the first corner of
+ * the cell nobody stands in, counting round from the party's facing.
+ */
+export function findFreeCharPosition(champions: Champion[], partyFacing: number): number {
+  let step = 0;
+  while (step < 4 && characterAtPosition(champions, (step + partyFacing) & 3) !== -1) {
+    step++;
+  }
+  return (step + partyFacing) & 3;
+}
+
+/** `CharacterAtPosition` — the champion standing in a given corner, or -1. */
+export function characterAtPosition(champions: Champion[], position: number): number {
+  for (let i = 0; i < champions.length; i++) {
+    if ((champions[i]?.partyPosition ?? -1) === position) return i;
+  }
+  return -1;
+}
+
+/**
+ * `AddCharacter`'s possession loop (`doc/CSBwin-src/Character.cpp:730-790`), slot
+ * choice only — the caller does the `AddCharacterPossession` half.
+ *
+ * The control flow is CSBWin's `switch` with two `goto case9`s and a `switchbreak`
+ * label, kept shape-for-shape because the fall-throughs are the behaviour: a scroll or
+ * potion whose slot 11 is taken sets slot 6 and then *jumps past it*, so slot 6 is
+ * never actually used, and clothing that matches no body slot lands on the neck only if
+ * the neck is both legal and free.
+ */
+export function assignAddCharacterPossessions(
+  items: Iterable<AddCharacterItem>,
+  tables: AddCharacterTables,
+  possessions: Array<ObjectID | null>,
+): void {
+  let nextBackpackSlot = 13;
+
+  for (const item of items) {
+    // CSBWin filters on `dbType() > dbACTUATOR` and then falls off the end of the
+    // switch for dbCREATURE/dbMISSILE/dbCLOUD, leaving `LOCAL_6` at whatever the
+    // previous iteration left it. That is undefined behaviour, not behaviour: we skip
+    // those categories instead.
+    if (item.category < DBType.WEAPON || item.category > DBType.MISC) continue;
+
+    const carryMask = getCarryMask(item, tables.objDescCarryMask) ?? 0;
+    const neckLegal = (carryMask & getCarryLocation(tables.carryLocation, 10)) !== 0;
+    let slot = -1;
+    let toCase9 = false;
+
+    switch (item.category) {
+      case DBType.CLOTHING: {
+        let matched = false;
+        for (slot = 2; slot <= 5; slot++) {
+          if ((carryMask & getCarryLocation(tables.carryLocation, slot)) !== 0) {
+            matched = true;
+            break;
+          }
+        }
+        if (matched) break;
+        if (neckLegal && possessions[10] === null) {
+          slot = 10;
+          break;
+        }
+        toCase9 = true;
+        break;
+      }
+      case DBType.WEAPON:
+        if (possessions[1] !== null) {
+          toCase9 = true;
+          break;
+        }
+        slot = 1;
+        break;
+      case DBType.SCROLL:
+      case DBType.POTION:
+        if (possessions[11] === null) {
+          slot = 11;
+          break;
+        }
+        if (possessions[6] === null) slot = 6;
+        toCase9 = true;
+        break;
+      default:
+        // dbCHEST and dbMISC enter at `case9:` directly.
+        toCase9 = true;
+        break;
+    }
+
+    // `case9:` — neck if it will take the object, otherwise the next backpack slot.
+    // Reached again from `switchbreak:` when the chosen slot turns out to be full.
+    for (;;) {
+      if (toCase9) {
+        if (neckLegal && possessions[10] === null) {
+          slot = 10;
+        } else {
+          slot = nextBackpackSlot++;
+        }
+      }
+      // `switchbreak:`
+      if (slot >= 0 && slot < possessions.length && possessions[slot] !== null) {
+        toCase9 = true;
+        continue;
+      }
+      break;
+    }
+
+    if (slot >= 0 && slot < 30) {
+      possessions[slot] = item.rn;
+    }
+  }
+}
+
+/**
+ * The same slot choice over a `PresetHero`'s pre-scanned inventory, for the debug
+ * random party in `src/dev.ts` and for the tools. The real Hall of Champions flow goes
+ * through `assignAddCharacterPossessions` over the live cell.
+ */
 export function assignPresetHeroPossessions(
   items: HeroInventoryItem[],
   tables: AddCharacterTables,
 ): Array<ObjectID | null> {
   const possessions: Array<ObjectID | null> = new Array(30).fill(null);
-  let nextBackpackSlot = 13;
-
-  for (const item of items) {
-    const carryMask = getCarryMask(item, tables.objDescCarryMask);
-    const canNeck = carryMask !== null && (carryMask & getCarryLocation(tables.carryLocation, 10)) !== 0;
-
-    let slot = -1;
-    switch (item.category) {
-      case DBType.CLOTHING:
-        for (let loc = 2; loc <= 5; loc++) {
-          if (carryMask === null) continue;
-          if ((carryMask & getCarryLocation(tables.carryLocation, loc)) !== 0) {
-            slot = loc;
-            break;
-          }
-        }
-        if (slot === -1) {
-          if (canNeck && possessions[10] === null) {
-            slot = 10;
-          } else {
-            slot = -1;
-          }
-        }
-        break;
-      case DBType.WEAPON:
-        if (possessions[1] === null) slot = 1;
-        break;
-      case DBType.SCROLL:
-      case DBType.POTION:
-        if (possessions[11] === null) slot = 11;
-        else if (possessions[6] === null) slot = 6;
-        break;
-      case DBType.CHEST:
-      case DBType.MISC:
-        slot = -1;
-        break;
-      default:
-        slot = -1;
-        break;
-    }
-
-    if (slot >= 0 && possessions[slot] !== null) {
-      slot = -1;
-    }
-
-    if (slot < 0) {
-      if (canNeck && possessions[10] === null) {
-        slot = 10;
-      } else {
-        slot = nextBackpackSlot++;
-      }
-    }
-
-    if (slot >= 0 && slot < possessions.length) {
-      possessions[slot] = item.rn;
-    }
-  }
-
+  assignAddCharacterPossessions(items, tables, possessions);
   return possessions;
 }
 
@@ -175,7 +273,7 @@ function getCarryLocation(carryLocation: ArrayLike<number>, slot: number): numbe
   return typeof value === 'number' ? value : 0;
 }
 
-function getCarryMask(item: HeroInventoryItem, masks: ArrayLike<number>): number | null {
+function getCarryMask(item: AddCharacterItem, masks: ArrayLike<number>): number | null {
   const objDescIndex = getObjDescIndex(item.category, item.record);
   if (objDescIndex === null) return null;
   const mask = masks[objDescIndex];

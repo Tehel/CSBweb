@@ -4,8 +4,8 @@
 
 import { Direction } from './core';
 import { SoundManager } from './audio';
-import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader, type PresetHero } from './data';
-import { Game, type ActuatorTables, type TimerTables, type TimerHooks, assignPresetHeroPossessions, createChampionFromPreset, type AddCharacterTables } from './engine';
+import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
+import { Game, type ActuatorTables, type TimerTables, type TimerHooks, type AddCharacterTables } from './engine';
 import { loadGlfx } from './lib/glfx-loader';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { extractObjectTables } from './renderer/csbwin/ObjectTables';
@@ -153,46 +153,6 @@ function getAddCharacterTables(): AddCharacterTables | null {
     return addCharacterTables;
 }
 
-function findPresetHeroByPortrait(
-    presets: PresetHero[],
-    portraitIndex: number,
-    position: { x: number; y: number; z: number },
-    wall: number,
-): PresetHero | null {
-    const exact = presets.find((hero) =>
-        hero.portraitIndex === portraitIndex
-        && hero.location.map === position.z
-        && hero.location.x === position.x
-        && hero.location.y === position.y
-        && hero.location.wall === wall
-    );
-    if (exact) return exact;
-    return presets.find((hero) => hero.portraitIndex === portraitIndex) ?? null;
-}
-
-function addCharacterFromPortrait(portraitIndex: number, position: { x: number; y: number; z: number }, wall: number): boolean {
-    if (!game || !dungeonData) return false;
-    const party = game.party.state;
-    if (party.objectInHand !== null && party.objectInHand !== undefined) return false;
-    if (party.champions.length >= 4) return false;
-
-    const hero = findPresetHeroByPortrait(dungeonData.presetHeroes ?? [], portraitIndex, position, wall);
-    if (!hero) return false;
-
-    const tables = getAddCharacterTables();
-    const possessions = tables
-        ? assignPresetHeroPossessions(hero.inventory, tables)
-        : new Array(30).fill(null);
-
-    const occupied = new Set(party.champions.map((champ) => champ.partyPosition));
-    let partyPosition = 0;
-    while (occupied.has(partyPosition) && partyPosition < 4) partyPosition += 1;
-    if (partyPosition >= 4) return false;
-
-    const champion = createChampionFromPreset(hero, partyPosition, possessions);
-    return game.addChampion(champion);
-}
-
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
     return crtController.setEnabled(enabled);
@@ -282,7 +242,6 @@ async function init() {
                 word1074: uiTables.graphic232.word1074,
                 monsterDesc: objectTables.monsterDesc,
                 cursorFilter: handleCursorFilter,
-                onAddCharacter: (portraitIndex, position, pos) => addCharacterFromPortrait(portraitIndex, position, pos),
                 messages: scrollingText,
                 championMessageColors: uiTables.graphic232.byte1386,
                 playSound: (soundId, rateIdx, distance) => soundManager?.playSound(soundId, rateIdx, distance),
@@ -349,6 +308,9 @@ async function init() {
                 return game?.castSpellFromUi(chIdx, incantation, totalManaCost) ?? 0;
             });
             renderer.setFeedingHandler((chIdx, fp) => game?.applyFeeding(chIdx, fp) ?? false);
+            renderer.setResurrectReincarnateCancelHandler((button) => {
+                game?.resurrectReincarnateCancel(button);
+            });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });
