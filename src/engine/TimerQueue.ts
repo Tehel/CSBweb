@@ -61,6 +61,12 @@ export enum TimerFunction {
   TT_REACTIVATE_GENERATOR = 65,
   TT_LIGHT = 70,
   TT_71 = 71,
+  /**
+   * A champion's own shield wears off (`doc/CSBwin-src/CSBCode.cpp:6520`). `uByte5` is
+   * the champion, `timerWord6` the amount to take back off `shieldStrength`. Armed by
+   * a Ya potion.
+   */
+  TT_72 = 72,
   TT_73 = 73,
   TT_74 = 74,
   /**

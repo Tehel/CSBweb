@@ -10,6 +10,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import type { PartyState } from '../engine/gameTypes';
+import type { FeedParameters } from '../engine/Feeding';
 import type { CharacterStats } from '../engine/CharacterStats';
 import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
@@ -287,6 +288,11 @@ export class ViewportRenderer {
 
   setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void): void {
     this.ui.onSpellCast = handler;
+  }
+
+  /** Mouth → engine: the apply half of `_FeedCharacter`. */
+  setFeedingHandler(handler?: (chIdx: number, fp: FeedParameters) => boolean): void {
+    this.ui.applyFeeding = handler;
   }
 
   setPartyState(state: PartyState | null): void {

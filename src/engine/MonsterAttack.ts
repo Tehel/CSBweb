@@ -505,7 +505,7 @@ export class MonsterAttack {
         // (doc/CSBwin-src/Character.cpp:2729-2741).
         armourTotal += this.armourStrength(champ, part, kind === 4);
       }
-      const armour = parts !== 0 ? Math.trunc(armourTotal / parts) : 0;
+      let armour = parts !== 0 ? Math.trunc(armourTotal / parts) : 0;
 
       if (kind === 6) {
         const margin = 115 - attributeCurrent(champ.attributes.stats[AttributeIndex.Wisdom]);
@@ -515,8 +515,17 @@ export class MonsterAttack {
           dealt = this.attributeScaledReduction(champ, 5, dealt) - (party.spellShield ?? 0);
         } else if (kind === 1) {
           dealt = this.attributeScaledReduction(champ, 6, dealt) - (party.fireShield ?? 0);
+        } else if (kind === 2) {
+          // `P4 == 2` halves the *armour*, not the damage
+          // (`doc/CSBwin-src/Character.cpp:2780`) — a pit fall and a poison cloud both
+          // get partly through plate. This branch was missing: with the unarmoured
+          // fixtures the tools use, `0 >> 1` is still 0, so nothing showed.
+          armour >>= 1;
         }
         if (dealt <= 0) return 0;
+        // 130 is the neutral point at shift 6 — `dealt * (130 - armour) / 64` — so
+        // armour below 65 *amplifies* the blow. That is CSBWin's arithmetic, not a
+        // porting slip: an unarmoured champion takes roughly double.
         dealt = scaledMultiply(dealt, 6, 130 - armour);
       }
       if (dealt <= 0) return 0;

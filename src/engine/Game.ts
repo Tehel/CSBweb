@@ -9,6 +9,7 @@ import type { DungeonData, Item16Record, MissileRecord, TeleporterRecord, TimerR
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Party, ensureHandOwner, setHandOwner } from './Party';
+import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
@@ -279,8 +280,13 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 damageAllCharacters: (damage, woundMask, kind) =>
                     this.monsterAttack.damageAllCharacters(damage, woundMask, kind),
-                damageMonsterGroup: (monster, level, mapX, mapY, damage) =>
-                    this.monsterDamage.damageMonsterGroup(monster, level, mapX, mapY, damage, true, false),
+                damageMonsterGroup: (monster, level, mapX, mapY, damage, noItem16) =>
+                    this.monsterDamage.damageMonsterGroup(
+                        monster, level, mapX, mapY, damage, true, noItem16 ?? false,
+                    ),
+                adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
+                maxLoad: (champ) => this.characterStats.maxLoad(champ),
+                characterLoad: (champ) => this.characterStats.characterLoad(champ),
                 determinePoisonDamage: (monsterType, damage) =>
                     this.monsterDamage.determinePoisonDamage(monsterType, damage),
                 onSpawnMonster: (o) => {
@@ -899,6 +905,29 @@ export class Game {
         }
         champ.weaponHand = null;
         champ.shieldHand = null;
+    }
+
+    /**
+     * The apply half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4348`), with
+     * the engine pieces the UI cannot reach bound in. Returns CSBWin's
+     * `fp.performFeeding`, which is what tells the caller the object was consumed.
+     */
+    applyFeeding(chIdx: number, fp: FeedParameters): boolean {
+        const applied = applyFeedParameters(this.party.state, chIdx, fp, {
+            curePoison: (idx) => this.monsterAttack.curePoison(idx),
+            adjustStamina: (idx, decrement) => this.monsterAttack.adjustStamina(idx, decrement),
+            killCharacter: (idx) => this.monsterAttack.killCharacter(idx),
+            scheduleShieldExpiry: (idx, amount, duration) =>
+                this.timerSystem.scheduleChampionShieldExpiry(
+                    idx,
+                    amount,
+                    duration,
+                    this.party.state.position.z,
+                ),
+            random: () => this.random.next() & 0xffff,
+        });
+        if (applied) this.state.party = this.party.state;
+        return applied;
     }
 
     /**
@@ -1707,15 +1736,17 @@ export class Game {
      * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2033`) — into the pit deliberately,
      * which means falling all the way down whatever chain of pits is below.
      *
-     * CSBWin sets `d.SupressPitDamage` around the move so a controlled descent hurts
-     * nobody. Nothing sets or reads that here yet, because the party's *own* pit-fall
-     * damage is not ported — so a climb down is currently free either way, and so is
-     * stepping into a pit. Noted in `PLAN.md` rather than faked.
+     * CSBWin sets `d.SupressPitDamage` around the move (`Attack.cpp:2031`), so the
+     * *first* drop of a controlled descent costs stamina instead of blood. Only the
+     * first: the flag is cleared by the fall itself, so a rope onto a stack of pits
+     * still hurts for every pit after the one climbed into.
      */
     private climbDownIntoPit(target: Position): void {
         const party = this.party.state;
         const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-        const resolved = this.timerSystem.resolvePartyMove(target, party.facing & 0x3);
+        const resolved = this.timerSystem.withSupressedPitDamage(() =>
+            this.timerSystem.resolvePartyMove(target, party.facing & 0x3),
+        );
         this.timerSystem.checkMoveFromMissile(oldPos, resolved.position, null);
         party.position = resolved.position;
         this.party.setFacing(resolved.facing);

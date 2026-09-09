@@ -348,6 +348,7 @@ async function init() {
             renderer.setSpellCastHandler((chIdx, incantation, totalManaCost) => {
                 return game?.castSpellFromUi(chIdx, incantation, totalManaCost) ?? 0;
             });
+            renderer.setFeedingHandler((chIdx, fp) => game?.applyFeeding(chIdx, fp) ?? false);
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });

@@ -196,21 +196,61 @@ w_12 = strength / 25 + 8
 | Vi | HP += `MaxHP / w_14`, capped at MaxHP; heals `Larger(strength/42, 1)` wounds |
 | Water flask | water += 1600 |
 
-Every one of them ends with `emptyFlask = true`. The four attribute potions go through
-`AdjustCurrentAttribute`, so they raise **Current** only — which is why drinking a Ku
-potion turns the strength line red rather than raising the ceiling.
+Every one of them ends with `emptyFlask = true`, including the types with no case of
+their own — but nothing happens for those, because the apply step is gated on
+`performFeeding`. The four attribute potions go through `AdjustCurrentAttribute`, so they
+raise **Current** only, which is why drinking a Ku potion turns the strength line green
+rather than raising the ceiling.
 
 Food is `d.FoodValue[nameIndex - objNI_Apple]`, with the chew animation and a gulp.
 
-## 7. Pit falls (`Code11f52.cpp:3016-3086`)
+The apply block runs in this order (`:4348-4430`), and the order matters:
 
-When the party falls through an active pit:
+1. `AdjustCurrentAttribute` for attributes 1..6;
+2. `CurePoison` if `antiVenin`;
+3. `AdjustStamina(chIdx, -staminaAdjust)` — negated, because a gain is a negative cost;
+4. the shield, which also arms a `TT_72` for `shieldDuration` ticks to take it back off
+   (`CSBCode.cpp:6520`);
+5. mana, then hit points — and a champion killed here never reaches the wound heal;
+6. the wound heal, which is not "heal N wounds": the mask is AND-ed with `healCount`
+   fresh random words, retried up to ten times, stopping at the first pass that changed
+   anything;
+7. water and food, both `LIMIT(-1023, …, 2048)`;
+8. the stamina and hit-point ceilings.
+
+Steps 5 and 6 are skipped for the unconfirmed champion in a mirror, so a bad potion
+cannot kill them.
+
+**What the shipped dungeon contains.** Only these potion types exist as records in
+`dungeon.dat`: 2 (Des), 3 (Ven), 6 (Ros), 7 (Ku), 8 (Dane), 9 (Neta), 10 (Anti-venin),
+12 (Ya), 14 (Vi), 15 (Water flask), 19 (Ful bomb), 20 (Empty flask). There is no Mon or
+Ee potion anywhere in the dungeon — both only ever come from their spells.
+
+## 7. Pit falls (`Code11f52.cpp:3016-3106`)
+
+The branch fires only for an active pit that `PitGoesSomewhere` (`:2777`, which is just
+`IncrementLevel(level, 1, …) >= 0`) says leads somewhere, and only for something that is
+not levitating.
+
+When the **party** falls:
 
 - with `d.SupressPitDamage` set (they climbed down a rope, `Attack.cpp:2031`), each
-  living champion instead loses `AdjustStamina(chIdx, 25*load/MaxLoad + 1)`;
-- otherwise `DamageAllCharacters(20, 48, 2)`, and sound 6 if anyone was hurt.
+  *living* champion instead loses `AdjustStamina(chIdx, 25*load/MaxLoad + 1)`, so an
+  unladen champion pays the floor of 1 and a half-loaded one pays 13;
+- otherwise `DamageAllCharacters(20, 48, 2)` — mask 48 is legs and feet, kind 2 halves
+  the armour — and sound 6 if anyone was hurt.
 
-`d.SupressPitDamage` is cleared immediately afterwards.
+`d.SupressPitDamage` is cleared by the fall itself, not by the caller, so a rope onto a
+stack of pits is free for the first drop only.
+
+When a **monster group** falls: `DamageMonsterGroup(pDB4, oldX, oldY, 20, 0,
+!item16Attached, …)` (`:3097`). `oldX, oldY` is the cell it fell *from* — `MoveObject`
+has not relinked anything yet, so the group is still there.
+
+Note what `kind == 2` means in `DamageCharacter`: it halves the **armour**, not the
+damage (`Character.cpp:2780`). And the scaling that follows,
+`ScaledMultiply(damage, 6, 130 - armour)`, is neutral at armour 65 — below that it
+*amplifies*, so an unarmoured champion takes roughly double the nominal 20.
 
 `AdjustStamina` (`Code11f52.cpp:4413`) subtracts `decrement` — so a negative value
 restores — clamps the result to `[0, MaxStamina]`, and converts any overshoot below zero

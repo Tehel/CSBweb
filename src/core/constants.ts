@@ -185,18 +185,34 @@ export enum WeaponType {
 }
 
 /**
- * Potion types (from CSBWin)
+ * `POTIONTYPE` (`doc/CSBwin-src/Objects.h:14-37`), transcribed.
+ *
+ * The names are CSBWin's, spellings included. What was here before was a guess with
+ * eight invented members and the wrong values — nothing used it, and the two places
+ * that needed a potion type had each written their own local constant.
  */
 export enum PotionType {
-    MON_POTION = 0,
-    MANA_POTION = 1,
-    MAGIC_POTION = 2,       // Strength
-    DEXTERITY_POTION = 3,
-    SHIELD_POTION = 4,
-    WISDOM_POTION = 5,
-    VITALITY_POTION = 6,
-    ANTI_VENOM = 7,
-    // ... (20+ types)
+    MON_POTION_A = 0,
+    UM_POTION = 1,
+    DES_POTION = 2,
+    VEN_POTION = 3,
+    SAR_POTION = 4,
+    ZO_POTION = 5,
+    ROS_POTION = 6,
+    KU_POTION = 7,
+    DANE_POTION = 8,
+    NETA_POTION = 9,
+    ANTI_VENIN = 10,
+    MON_POTION_B = 11,
+    YA_POTION = 12,
+    EE_POTION = 13,
+    VI_POTION = 14,
+    WATER_FLASK = 15,
+    KATH_BOMB = 16,
+    PEW_BOMB = 17,
+    RA_BOMB = 18,
+    FUL_BOMB = 19,
+    EMPTY_FLASK = 20,
 }
 
 /**

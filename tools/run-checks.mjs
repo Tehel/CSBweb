@@ -36,6 +36,8 @@ const CHECKS = [
   { tool: 'dump-attributes.ts' },
   { tool: 'dump-hand-owner.ts' },
   { tool: 'dump-champion-state.ts' },
+  { tool: 'dump-feeding.ts' },
+  { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },
   { tool: 'dump-player-attacks.ts' },

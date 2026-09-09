@@ -6,6 +6,8 @@
  * and the short chew animation the portrait plays afterwards.
  */
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
+import { PotionType } from '../../core/constants';
+import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
 import { DBType, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
@@ -13,17 +15,83 @@ import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, 
 import { UIState, nowMs } from './UIState';
 import { SoundIndex } from '@/core';
 
-const POTION_EMPTY_FLASK = 20;
-const POTION_WATER_FLASK = 15;
+/**
+ * The derivation half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4062-4287`).
+ *
+ * Works out what the object on the cursor is worth and fills in a `FeedParameters`
+ * block. Nothing on the champion changes here: `applyFeedParameters` in
+ * `src/engine/Feeding.ts` does that, after the Feeding Filter DSA would have had its
+ * chance to rewrite the block.
+ */
+export function computeFeedParameters(
+  ui: UIState,
+  chIdx: number,
+  objectId: number,
+): FeedParameters | null {
+  if (!ui.objectTables || !ui.partyState) return null;
+  const champ = ui.partyState.champions[chIdx];
+  if (!champ) return null;
 
-type FeedingOutcome = {
-  foodDelta: number;
-  waterDelta: number;
-  removeFromHand: boolean;
-  deleteRecord: boolean;
-  chew: boolean;
-  playGulp: boolean;
-};
+  const isRecord = isLikelyObjectRecord(ui, objectId);
+  const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : getBaseObjectNameIndex(ui, objectId);
+  if (nameIndex < 0) return null;
+  const category = isRecord ? decodeObjectID(objectId as ObjectID).category : null;
+
+  const fp = clearFeedParameters();
+  fp.characterIndex = chIdx;
+  fp.objectID = objectId;
+  fp.objectType = nameIndex;
+  fp.objectDB = category ?? -1;
+
+  // `d.ObjDesc[objDI].word4 & 1` — the mouth bit of the carry-location mask. Anything
+  // without it is inedible, and a chest or a scroll is refused outright; other objects
+  // fall through so a waterskin or a bones can still reach the branches below.
+  const descIndex = isRecord
+    ? descIndexForObject(ui, objectId as ObjectID)
+    : getDescIndexForObjectType(ui, objectId | 0);
+  const carryMask = descIndex !== null ? ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
+  if ((carryMask & 1) === 0) {
+    if (category === DBType.CHEST || category === DBType.SCROLL) return null;
+  } else {
+    fp.performFeeding = true;
+  }
+
+  if (nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER) {
+    // A waterskin holds gulps in the misc record's `value`, and each drink spends one.
+    const rec = isRecord ? ui.dungeonState.getMiscRecord(objectId as ObjectID) : null;
+    if ((rec?.specialState ?? 0) === 0) {
+      fp.waterValue = 0;
+      fp.emptyFlask = false;
+    } else {
+      fp.waterValue = 800;
+      fp.gulp = SoundIndex.SWALLOW;
+      fp.emptyFlask = true;
+    }
+    fp.emptyHand = false;
+    fp.performFeeding = true;
+    return fp;
+  }
+
+  if (category === DBType.POTION) {
+    const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+    if (!rec) return null;
+    fp.emptyHand = false;
+    fp.gulp = SoundIndex.SWALLOW;
+    derivePotionFeeding(fp, champ, rec.potionType | 0, rec.power | 0);
+    return fp;
+  }
+
+  if (nameIndex >= OBJNI_APPLE && nameIndex <= OBJNI_DRAGON_STEAK) {
+    fp.foodValue = getFoodValue(ui, nameIndex);
+    fp.emptyHand = true;
+    fp.performFeeding = true;
+    fp.chew = true;
+    fp.gulp = SoundIndex.SWALLOW;
+    return fp;
+  }
+
+  return fp;
+}
 
 export function handleMouthPress(ui: UIState): void {
   if (!ui.partyState || !ui.objectTables) return;
@@ -36,100 +104,36 @@ export function handleMouthPress(ui: UIState): void {
   const objectId = normalizeObjectValue(ui.partyState.objectInHand);
   if (objectId === null) return;
 
-  const outcome = computeFeedingOutcome(ui, objectId);
-  if (!outcome) return;
+  const fp = computeFeedParameters(ui, selected, objectId);
+  if (!fp) return;
 
-  if (outcome.removeFromHand) {
-    ui.partyState.objectInHand = null;
-    if (outcome.deleteRecord && isLikelyObjectRecord(ui, objectId)) {
-      ui.dungeonState.deleteDBEntry(objectId as ObjectID);
-    }
-  }
+  // Where the Feeding Filter DSA would rewrite the block
+  // (`doc/CSBwin-src/Character.cpp:4288-4344`). ⏳ Not ported: no dungeon we load
+  // defines `ESL_FEEDINGFILTER`, and the DSA parameter marshalling is its own job.
+  const applied = ui.applyFeeding?.(selected, fp) ?? false;
+  if (!applied) return;
 
-  champ.food = clampFoodWater((champ.food ?? 0) + outcome.foodDelta);
-  champ.water = clampFoodWater((champ.water ?? 0) + outcome.waterDelta);
-
-  if (outcome.chew) startMouthChewAnimation(ui);
-  if (outcome.playGulp && ui.playSound) ui.playSound(SoundIndex.SWALLOW);
-}
-
-export function computeFeedingOutcome(ui: UIState, objectId: number): FeedingOutcome | null {
-  if (!ui.objectTables) return null;
   const isRecord = isLikelyObjectRecord(ui, objectId);
-  const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : getBaseObjectNameIndex(ui, objectId);
-  if (nameIndex < 0) return null;
-
-  const descIndex = isRecord
-    ? descIndexForObject(ui, objectId as ObjectID)
-    : getDescIndexForObjectType(ui, objectId | 0);
-  const carryMask = descIndex !== null ? ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
-  const mouthAllowed = (carryMask & 1) !== 0;
-
-  const isFood = isFoodNameIndex(nameIndex);
-  const isWater = isWaterNameIndex(nameIndex);
-  const isWaterFlask = isRecord && isWaterFlaskRecord(ui, objectId as ObjectID);
-
-  if (!mouthAllowed && !isFood && !isWater && !isWaterFlask) return null;
-
-  const outcome: FeedingOutcome = {
-    foodDelta: 0,
-    waterDelta: 0,
-    removeFromHand: false,
-    deleteRecord: false,
-    chew: false,
-    playGulp: false,
-  };
-
-  if (isWaterFlask) {
-    const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
-    if (!rec) return null;
-    outcome.waterDelta = 1600;
-    outcome.playGulp = true;
-    rec.potionType = POTION_EMPTY_FLASK;
-    return outcome;
-  }
-
-  if (isWater) {
-    if (isRecord && decodeObjectID(objectId as ObjectID).category === DBType.MISC) {
-      const rec = ui.dungeonState.getMiscRecord(objectId as ObjectID);
-      const value = rec?.specialState ?? 0;
-      if (value > 0) {
-        outcome.waterDelta = 800;
-        outcome.playGulp = true;
-        if (rec) rec.specialState = Math.max(0, value - 1);
-      }
-    } else {
-      outcome.waterDelta = 800;
-      outcome.playGulp = true;
-      outcome.removeFromHand = true;
-      outcome.deleteRecord = isRecord;
+  if (fp.chew) {
+    startMouthChewAnimation(ui);
+  } else if (fp.emptyFlask) {
+    // A drained potion becomes an empty flask; a waterskin just loses one gulp.
+    if (decodeObjectID(objectId as ObjectID).category === DBType.POTION) {
+      const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+      if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }
-    return outcome;
+    if (fp.objectType >= OBJNI_WATERSKIN && fp.objectType <= OBJNI_WATER) {
+      const rec = ui.dungeonState.getMiscRecord(objectId as ObjectID);
+      if (rec) rec.specialState = Math.max(0, (rec.specialState ?? 0) - 1);
+    }
   }
 
-  if (isFood) {
-    outcome.foodDelta = getFoodValue(ui, nameIndex);
-    outcome.removeFromHand = true;
-    outcome.deleteRecord = isRecord;
-    outcome.chew = true;
-    outcome.playGulp = true;
-    return outcome;
+  if (fp.emptyHand) {
+    ui.partyState.objectInHand = null;
+    if (isRecord) ui.dungeonState.deleteDBEntry(objectId as ObjectID);
   }
 
-  return null;
-}
-
-export function isWaterFlaskRecord(ui: UIState, objectId: ObjectID): boolean {
-  const rec = ui.dungeonState.getPotionRecord(objectId);
-  return rec?.potionType === POTION_WATER_FLASK;
-}
-
-export function isFoodNameIndex(nameIndex: number): boolean {
-  return nameIndex >= OBJNI_APPLE && nameIndex <= OBJNI_DRAGON_STEAK;
-}
-
-export function isWaterNameIndex(nameIndex: number): boolean {
-  return nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER;
+  if (fp.gulp >= 0) ui.playSound?.(fp.gulp);
 }
 
 export function getFoodValue(ui: UIState, nameIndex: number): number {

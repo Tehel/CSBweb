@@ -9,6 +9,7 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyState } from '../../engine/gameTypes';
+import type { FeedParameters } from '../../engine/Feeding';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
@@ -103,6 +104,13 @@ export interface UIState {
   onChampionAttack?: (chIdx: number, attackType: number) => number;
   /** `d.attackDamageToDisplay`, read and cleared. */
   onConsumeAttackDamage?: () => number;
+  /**
+   * Apply a `FEEDPARAMETERS` block to a champion — the engine half of
+   * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4348`). Returns whether anything
+   * was applied. A hook because it reaches `KillCharacter`, `CurePoison`,
+   * `AdjustStamina` and the `TT_72` timer, none of which the UI owns.
+   */
+  applyFeeding?: (chIdx: number, fp: FeedParameters) => boolean;
   viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
   /* ---- back into the renderer ---- */

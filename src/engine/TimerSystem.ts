@@ -1,5 +1,5 @@
 import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { SoundIndex } from '../core/constants';
+import { PotionType, SoundIndex } from '../core/constants';
 
 /**
  * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
@@ -11,7 +11,7 @@ const SOUND_DOOR_STRUGGLE = 4;
 import type { CsbRandom } from '../core/random';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
-import type { PartyState } from './gameTypes';
+import type { Champion, PartyState } from './gameTypes';
 import type {
   ActuatorRecord,
   CreatureRecord,
@@ -73,8 +73,6 @@ const RN_MONSTER_DEATH = 0xffa8;
 /** `RNffe4` — the Vi altar's resurrection cloud (`doc/CSBwin-src/Timer.cpp:2730`). */
 const RN_FFE4 = 0xffe4;
 
-const POTION_VEN_POTION = 3;
-const POTION_FUL_BOMB = 19;
 
 const WEAPON_DAGGER = 8;
 const WEAPON_ARROW = 27;
@@ -227,6 +225,12 @@ export interface TimerHooks {
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
   damageAllCharacters?: (damage: number, woundMask: number, kind: number) => number;
+  /** `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`). */
+  adjustStamina?: (chIdx: number, decrement: number) => void;
+  /** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`). */
+  maxLoad?: (champ: Champion) => number;
+  /** `CHARDESC.load` — what the champion is actually carrying. */
+  characterLoad?: (champ: Champion) => number;
   /** `DamageMonsterGroup` (doc/CSBwin-src/Code11f52.cpp:1317). Returns MONSTER_DAMAGE_RESULT. */
   damageMonsterGroup?: (
     monster: CreatureRecord,
@@ -234,6 +238,8 @@ export interface TimerHooks {
     mapX: number,
     mapY: number,
     damage: number,
+    /** CSBWin's `noItem16`; only the pit fall passes it, and only when true. */
+    noItem16?: boolean,
   ) => number;
   /** `DeterminePoisonDamage` (doc/CSBwin-src/Code11f52.cpp:1358). */
   determinePoisonDamage?: (monsterType: number, damage: number) => number;
@@ -315,6 +321,9 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_71:
         this.processInvisibleTimer();
+        break;
+      case TimerFunction.TT_72:
+        this.processChampionShieldTimer(timer);
         break;
       case TimerFunction.TT_73:
         this.processSeeThruWallsTimer();
@@ -480,6 +489,37 @@ export class TimerSystem {
     const current = party.partyShield ?? 0;
     const next = current - normalizeWord6(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
+  }
+
+  /**
+   * `TT_72` (`doc/CSBwin-src/CSBCode.cpp:6520`) — a champion's own shield expires and
+   * the Ya potion's contribution comes back off.
+   */
+  private processChampionShieldTimer(timer: TimerEntry): void {
+    const champ = this.getPartyState().champions[timer.uByte5 & 0xff];
+    if (!champ) return;
+    // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
+    champ.shieldStrength = ((champ.shieldStrength ?? 0) - normalizeWord6(timer.timerWord6)) & 0xffff;
+  }
+
+  /**
+   * The `TT_72` half of the Ya potion (`doc/CSBwin-src/Character.cpp:4386-4391`):
+   * `shieldDuration` ticks from now, carrying the amount to take back.
+   */
+  scheduleChampionShieldExpiry(chIdx: number, amount: number, duration: number, level: number): void {
+    this.timers.createTimerWithUByte5(
+      TimerFunction.TT_72,
+      0,
+      0,
+      0,
+      0,
+      (this.now + duration) >>> 0,
+      level,
+      chIdx & 0xff,
+      undefined,
+      0,
+      amount,
+    );
   }
 
   /**
@@ -1999,11 +2039,11 @@ export class TimerSystem {
     if (projectileDbType === DBType.POTION) {
       const potion = this.dungeon.getPotionRecord(projectile as number);
       if (potion) {
-        if ((potion.potionType | 0) === POTION_VEN_POTION) {
+        if ((potion.potionType | 0) === PotionType.VEN_POTION) {
           convertedProjectile = RN_POISON_CLOUD;
           convertedPower = potion.power & 0xff;
           convertedPotion = true;
-        } else if ((potion.potionType | 0) === POTION_FUL_BOMB) {
+        } else if ((potion.potionType | 0) === PotionType.FUL_BOMB) {
           convertedProjectile = RN_FIREBALL;
           convertedPower = potion.power & 0xff;
           convertedPotion = true;
@@ -2997,10 +3037,17 @@ export class TimerSystem {
       }
 
       if (allowFall && this.isActivePitAt(position)) {
+        // `PitGoesSomewhere` (`doc/CSBwin-src/Code11f52.cpp:2777`) is exactly this
+        // test: a pit with nothing under it is not a pit.
         const next = this.dungeon.incrementLevel(position, 1);
         if (!next) break;
         position = next;
         moved = true;
+        // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3053-3106`). `start` is
+        // CSBWin's `oldX, oldY`: nothing has been moved in the database yet, so a
+        // falling monster group is still linked at the cell it came from.
+        if (objectType === -1) this.partyFallsIntoPit();
+        else if (objectType === DBType.CREATURE && monster) this.monsterFallsIntoPit(monster, start);
         continue;
       }
 
@@ -3051,6 +3098,68 @@ export class TimerSystem {
     if (objectType === -1) return scope === 2 || scope === 3;
     if (objectType === DBType.CREATURE) return scope === 1 || scope === 3;
     return scope === 0 || scope === 2 || scope === 3;
+  }
+
+  /**
+   * `d.SupressPitDamage` (`doc/CSBwin-src/Data.h:790`) — set for the length of one
+   * deliberate climb down a rope, which costs stamina instead of blood.
+   */
+  private supressPitDamage = false;
+
+  /** Run `move` with `d.SupressPitDamage` set, as `atk_CLIMBDOWN` does. */
+  withSupressedPitDamage<T>(move: () => T): T {
+    this.supressPitDamage = true;
+    try {
+      return move();
+    } finally {
+      this.supressPitDamage = false;
+    }
+  }
+
+  /**
+   * The party falls (`doc/CSBwin-src/Code11f52.cpp:3057-3086`).
+   *
+   * A climb down costs each living champion stamina in proportion to how loaded they
+   * are — `25 * load / MaxLoad + 1` — which `AdjustStamina` turns into real damage
+   * only if it exhausts them. An uncontrolled fall is `DamageAllCharacters(20, 48, 2)`
+   * instead: mask 48 is the legs and feet, kind 2 halves the armour.
+   *
+   * CSBWin clears the flag here, not at the call site, because one climb can fall
+   * through a whole chain of pits and only the first drop is free.
+   */
+  private partyFallsIntoPit(): void {
+    const party = this.getPartyState();
+    if (party.champions.length === 0) return;
+
+    if (this.supressPitDamage) {
+      for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
+        const champ = party.champions[chIdx];
+        if (!champ) continue;
+        if ((champ.attributes?.health ?? 0) === 0) continue;
+        const maxLoad = this.hooks?.maxLoad?.(champ) ?? 0;
+        if (maxLoad <= 0) continue;
+        const load = this.hooks?.characterLoad?.(champ) ?? 0;
+        // `(25 * load) & 0xffff` first — CSBWin does the multiply in a word.
+        const cost = Math.trunc(((25 * load) & 0xffff) / maxLoad) + 1;
+        this.hooks?.adjustStamina?.(chIdx, cost);
+      }
+    } else {
+      const hurt = this.hooks?.damageAllCharacters?.(20, 48, 2) ?? 0;
+      if (hurt !== 0) {
+        this.hooks?.queueSound?.(6, party.position.x, party.position.y, 0);
+      }
+    }
+    this.supressPitDamage = false;
+  }
+
+  /**
+   * A monster group falls (`doc/CSBwin-src/Code11f52.cpp:3091-3100`). Damaged at the
+   * cell it fell *from*, on the level its `ITEM16` is attached to, and with
+   * `noItem16` set when it has none.
+   */
+  private monsterFallsIntoPit(monster: CreatureRecord, from: Position): void {
+    const noItem16 = this.getMonsterItem16(monster, from.z) === null;
+    this.hooks?.damageMonsterGroup?.(monster, from.z, from.x, from.y, 20, noItem16);
   }
 
   private isActivePitAt(position: Position): boolean {

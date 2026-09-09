@@ -26,9 +26,9 @@ import { determineMastery } from './skills';
 import { OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import { AttributeIndex, championAttribute } from './attributes';
+import { PotionType } from '../core/constants';
 
 /** `potion_EmptyFlask`. */
-const POTION_EMPTY_FLASK = 20;
 /** `misc_WaterSkin` — the one misc type whose weight depends on how full it is. */
 const MISC_WATERSKIN = 1;
 /**
@@ -124,7 +124,7 @@ export class CharacterStats {
       case DBType.POTION: {
         const rec = this.deps.dungeon.getPotionRecord(rn);
         if (!rec) return 0;
-        return rec.potionType === POTION_EMPTY_FLASK ? 1 : 3;
+        return rec.potionType === PotionType.EMPTY_FLASK ? 1 : 3;
       }
       case DBType.SCROLL:
         return 1;

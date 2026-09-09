@@ -68,8 +68,8 @@ Verified against the code, not inherited from earlier revisions of this file.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
    the UI now lives in `src/renderer/ui/`.
 8. **CSBWin-binary-compatible save files** not attempted (Phase 10).
-9. **The party's own pit-fall damage** is unported, so `d.SupressPitDamage` has nothing
-   to suppress and CLIMBDOWN is free either way (Phase 12 step 4).
+9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
+   `supressPitDamage` now has something to suppress.
 
 **Validation debt:** several phases below list "Validation" steps (render tests, render
 probes, pixel comparisons against CSBWin screenshots) that were **never carried out** —
@@ -85,12 +85,12 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Seventeen assertion-carrying verification tools** — the Phase 12 nine
+2. **Nineteen assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
-   `dump-champion-state.ts`.
+   `dump-champion-state.ts`, `dump-feeding.ts` and `dump-pit-fall.ts`.
    `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
@@ -793,17 +793,42 @@ one missing primitive.
      mapping depends on.
 
    This is what finally deletes the F8 debug hotkey.
-5. ⏳ **Drinking potions.** `src/renderer/ui/Feeding.ts` handles food and the water
-   flask only; every other potion does nothing. The real handler is a
-   `FEEDPARAMETERS` block passed through the Feeding Filter DSA
-   (`doc/CSBwin-src/Character.cpp:4020-4470`) — see the table in the reference doc.
-   Prerequisites 0 and 3 are in place, so this is unblocked.
-6. ⏳ **Pit fall damage + stamina drain**, for party and monsters
-   (`doc/CSBwin-src/Code11f52.cpp:3016-3086`): `DamageAllCharacters(20, 48, 2)` on a
-   free fall, or a per-champion `AdjustStamina(25*load/MaxLoad + 1)` when
-   `d.SupressPitDamage` is set by a rope climb. Both `damageAllCharacters` and
-   `adjustStamina` now exist; what is left is `d.SupressPitDamage` itself and the
-   wiring in the pit path.
+5. 🔄 **Drinking potions.** `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4020-4497`)
+   is ported as its two halves: `src/renderer/ui/Feeding.ts` derives a
+   `FEEDPARAMETERS` block from the object on the cursor, and
+   `src/engine/Feeding.ts` applies it, in CSBWin's order, through the `applyFeeding`
+   UI hook. All ten acting potion types work, the Ya potion arms its `TT_72`
+   expiry timer (newly ported), and a lethal `hitpointAdjust` goes through
+   `KillCharacter`. `tools/dump-feeding.ts` drives it over the **real potion records
+   in `dungeon.dat`** (47 checks).
+
+   `PotionType` in `src/core/constants.ts` was a guessed enum with eight invented
+   members and the wrong values; it is now transcribed from
+   `doc/CSBwin-src/Objects.h:14-37`, and the two files that had each written their own
+   local constant use it.
+
+   ⏳ **The Feeding Filter DSA is not ported** (`:4288-4344`). The insertion point is
+   marked in `handleMouthPress`; no dungeon we load defines `ESL_FEEDINGFILTER`, and
+   the parameter marshalling is its own job.
+   ⏳ Not modelled: the `charFlags` redraw bookkeeping, and CSBWin's incremental
+   `CHARDESC.load` update — `characterLoad` re-sums instead, as it already did.
+6. ✅ **Pit fall damage + stamina drain**, for party and monsters
+   (`doc/CSBwin-src/Code11f52.cpp:3016-3106`). The pit branch of
+   `TimerSystem.resolveCellEffects` now damages what falls through it:
+   `DamageAllCharacters(20, 48, 2)` plus sound 6 for a free fall, a per-champion
+   `AdjustStamina(25*load/MaxLoad + 1)` when `supressPitDamage` is set, and
+   `DamageMonsterGroup(rec, oldX, oldY, 20, …, noItem16)` for a monster group — at the
+   cell it fell *from*, because nothing is relinked until the resolver returns.
+   `climbDownIntoPit` sets the flag through `withSupressedPitDamage`, and the fall
+   clears it, so only the first drop of a chain is free.
+   `tools/dump-pit-fall.ts` drops a party down a real pit in the shipped dungeon
+   (12 checks).
+
+   This turned up **a second real bug in the Phase 12 damage chain**: `damageCharacter`
+   was missing CSBWin's `P4 == 2` branch, which halves the *armour* before the
+   `130 - armour` scaling (`doc/CSBwin-src/Character.cpp:2780`). Every fixture in the
+   tools is unarmoured, where `0 >> 1` is still 0, so nothing had shown it. It affects
+   pit falls and both cloud damage paths.
 7. 🔄 **Red square around the eye on level gain.** Diagnosed: it is not level-specific.
    The box around the eye is graphic **34** when any of attributes 1..6 has
    Current < Maximum and graphic **33** otherwise
@@ -824,8 +849,8 @@ one missing primitive.
    the runtime party state, and `ensureHandOwner` repairs a state that lacks it, but the
    GAMEBLOCK2 offset has not been established so the real field is not parsed.
 
-Status: 🔄 in progress — all four prerequisites done, and step 8 with them; steps 1, 2
-and 3 partly done from Phase 12; steps 4, 5, 6, 7 and 9 open.
+Status: 🔄 in progress — prerequisites and steps 6 and 8 done; steps 1, 2, 3 and 5 done
+bar the gaps noted against each; steps 4, 7 and 9 open.
 
 ### Phase 15 — Verification
 
@@ -833,7 +858,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   seventeen asserting tools, then four non-asserting dumps as crash-only smoke, then the
+   nineteen asserting tools, then four non-asserting dumps as crash-only smoke, then the
    frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.
