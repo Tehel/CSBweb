@@ -333,7 +333,21 @@ function main(): void {
   };
   check(before.skills.some((exp) => exp > 0), 'BORIS starts with skill experience to lose');
 
+  // Reincarnate now runs in two halves, because CSBWin's does: `ReIncarnate`
+  // (`doc/CSBwin-src/Code13ea4.cpp:20`) blocks for a typed name before any of the
+  // penalties are charged. With no UI attached the engine stops at exactly that point,
+  // so this stands in for the screen — which is what `main.ts` wires the real one as.
+  let screenOpenedFor = -1;
+  game.openReincarnateScreen = (chIdx) => { screenOpenedFor = chIdx; };
   game.resurrectReincarnateCancel(REINCARNATE);
+  check(screenOpenedFor === 1, 'Reincarnate raises the name-entry screen for the new champion');
+  check(
+    wizard.skills.every((skill, i) => skill.experience === before.skills[i]),
+    'and charges nothing at all until it is answered — CSBWin calls ReIncarnate first',
+  );
+  game.reincarnateNamed(screenOpenedFor, 'ZED', 'THE RENAMED');
+  check(wizard.name === 'ZED', 'the typed name replaces the hero text\'s');
+  check(wizard.title === 'THE RENAMED', 'and the typed title');
 
   const attributePenalty = boris.reincarnateAttributePenalty;
   const statPenalty = boris.reincarnateStatPenalty;

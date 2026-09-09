@@ -15,11 +15,22 @@ import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { handleAttackAreaClick } from './Attack';
 import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { isReincarnateScreenOpen, reincarnateClick } from './ReIncarnate';
 import { UIMode, UIState } from './UIState';
 import { setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
 
 export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
+  // The Reincarnate name-entry screen reads the mouse queue itself and does its own
+  // geometry (`doc/CSBwin-src/Code13ea4.cpp:114-212`) — it never consults a button
+  // list, and while it is up nothing else may act on a click. Handled here, before the
+  // lists, rather than in the dispatcher: `searchButtonList` would throw the click
+  // away as unmatched long before the dispatcher saw it.
+  if (isReincarnateScreenOpen(ui)) {
+    reincarnateClick(ui, x, y);
+    return;
+  }
+
   const mouseQueueLength = ui.mouseQueue.length;
   const numEnt = (ui.mouseQEnd - ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
   if (numEnt >= mouseQueueLength - 2) return;

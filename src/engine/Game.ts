@@ -907,6 +907,27 @@ export class Game {
         this.disableMirrorActuators(mirror);
 
         if (button === 161) {
+            // `ReIncarnate(_2_, pcA3)` (`:6738`) is the *first* thing this branch does,
+            // and in CSBWin it blocks until the player has typed a name. Here it opens
+            // a modal screen and returns, so everything after it — the skill wipe, the
+            // penalties, the tail below — is deferred to `finishReincarnate`, which the
+            // screen calls when it is answered. The champion stays potential-free but
+            // still last in the party throughout, which is all the deferred half needs.
+            this.openReincarnateScreen?.(party.champions.length - 1);
+            return true;
+        }
+
+        this.finishResurrectReincarnate(champion, button);
+        return true;
+    }
+
+    /**
+     * `_ResurrectReincarnateCancel` from `ReIncarnate`'s return to the end
+     * (`doc/CSBwin-src/CSBCode.cpp:6739-6800`).
+     */
+    private finishResurrectReincarnate(champion: Champion, button: number): void {
+        const party = this.party.state;
+        if (button === 161) {
             this.reincarnate(champion);
         }
 
@@ -926,15 +947,32 @@ export class Game {
 
         party.selectedCharacterIndex = -1;
         this.state.party = party;
-        return true;
     }
 
     /**
-     * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6736-6784`).
-     *
-     * ⏳ `ReIncarnate` itself (`doc/CSBwin-src/Code13ea4.cpp:20`) — the viewport screen
-     * that blanks the name and title and has the player type new ones — is not ported;
-     * the reincarnated champion keeps the hero's name. Everything after it is here.
+     * The name-entry screen has been answered (`doc/CSBwin-src/Code13ea4.cpp:155-160`).
+     * The champion takes the typed name and title, and the rest of the Reincarnate
+     * branch runs — including the message, which prints the **new** name.
+     */
+    reincarnateNamed(chIdx: number, name: string, title: string): void {
+        const champion = this.party.state.champions[chIdx];
+        if (!champion) return;
+        champion.name = name;
+        champion.title = title;
+        this.finishResurrectReincarnate(champion, 161);
+    }
+
+    /**
+     * Set by the host once the renderer exists: the Reincarnate branch has to raise a
+     * screen the engine does not own. Left optional so `tools/` can drive
+     * `resurrectReincarnateCancel` with no UI at all — there, Reincarnate stops at the
+     * point CSBWin would be waiting for a name, which is exactly where it stops here.
+     */
+    openReincarnateScreen?: (chIdx: number) => void;
+
+    /**
+     * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6739-6784`), everything
+     * after `ReIncarnate` has returned a name.
      */
     private reincarnate(champion: Champion): void {
         // `ClearMemory(pcA3->skills92, 120)` — all 20 skills, temporary adjust included.

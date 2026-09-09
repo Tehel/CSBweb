@@ -15,10 +15,12 @@ against each other.
   context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState`,
   `uiMode`
 - **interaction state**: `pressingEye`, `hoverPoint`, `showAttackPanel`, the open chest,
-  the chew-animation clock, the two button lists
+  the chew-animation clock, the two button lists, `reincarnate` (non-null while the
+  name-entry screen is modal)
 - **CSBWin's mouse ring buffer**: `mouseQueue`, `mouseQStart`, `mouseQEnd`
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out**: `playSound`, `onObjectMove`, `onSpellCast`, `viewingFilter`
+- **hooks out**: `playSound`, `onObjectMove`, `onSpellCast`, `viewingFilter`,
+  `onResurrectReincarnateCancel`, `onReincarnateNamed`
 - **hooks back into the renderer**: `getGraphicBitmap`, `renderLastFrame`
 
 A function that turns out not to need the state does not take it — the pure helpers
@@ -30,6 +32,7 @@ A function that turns out not to need the state does not take it — the pure he
 | --- | --- | --- |
 | `ui/Mouse.ts` | `Mouse.cpp` | Click ring buffer, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, the cursor and hover highlights |
 | `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
+| `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `Mouse.ts` and the host's key handler hand it every click and every key |
 | `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading, the Hall of Champions menu (`TAG0189a8`) |
 | `ui/Character.ts` | `Character.cpp` | Portraits, hand icons, shield dots, life/stamina/mana bars, attributes, food/water, carried load, possession slots |
 | `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it, through the `applyFeeding` hook |

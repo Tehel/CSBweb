@@ -73,6 +73,12 @@ import {
 } from './ui/MagicPanel';
 import { attackPanelTick, drawAttackPanel } from './ui/Attack';
 import {
+  drawReincarnateScreen,
+  isReincarnateScreenOpen,
+  openReincarnateScreen,
+  reincarnateKey,
+} from './ui/ReIncarnate';
+import {
   drawInventoryBackground,
   drawInventoryScreen,
   syncOpenChest,
@@ -235,6 +241,28 @@ export class ViewportRenderer {
 
   enqueueMouseUnclick(): void {
     enqueueMouseUnclick(this.ui);
+  }
+
+  /**
+   * Offer a key to the Reincarnate name-entry screen. Returns whether it took it —
+   * while that screen is up it takes everything, which is what makes it modal
+   * (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`).
+   */
+  handleReincarnateKey(key: string): boolean {
+    return reincarnateKey(this.ui, key);
+  }
+
+  isReincarnateScreenOpen(): boolean {
+    return isReincarnateScreenOpen(this.ui);
+  }
+
+  /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6738`) — open the screen. */
+  openReincarnateScreen(chIdx: number): void {
+    openReincarnateScreen(this.ui, chIdx);
+  }
+
+  setReincarnateNamedHandler(handler: (chIdx: number, name: string, title: string) => void): void {
+    this.ui.onReincarnateNamed = handler;
   }
 
   processMouseQueue(): void {
@@ -657,6 +685,10 @@ export class ViewportRenderer {
     if (inventoryOpen) {
       drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
+      // `_ReIncarnate` draws over the open inventory rather than replacing it: it
+      // blanks the name strip and puts its keyboard where the eye panel was
+      // (`doc/CSBwin-src/Code13ea4.cpp:39-50`). So it goes last, and only here.
+      drawReincarnateScreen(this.ui);
     }
     drawAttackPanel(this.ui);
     drawSpellPanel(this.ui);

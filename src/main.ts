@@ -311,6 +311,14 @@ async function init() {
             renderer.setResurrectReincarnateCancelHandler((button) => {
                 game?.resurrectReincarnateCancel(button);
             });
+            // The two halves of Reincarnate: the engine raises the name-entry screen,
+            // and the screen hands the typed name back so the engine can finish
+            // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`).
+            game.openReincarnateScreen = (chIdx) => renderer?.openReincarnateScreen(chIdx);
+            renderer.setReincarnateNamedHandler((chIdx, name, title) => {
+                game?.reincarnateNamed(chIdx, name, title);
+                renderView();
+            });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);
             });

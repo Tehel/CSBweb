@@ -107,6 +107,10 @@ export interface UITables {
     word1398: WordRect;
     /** `d.Byte1412[6]` — per-body-part shield weighting. */
     byte1412: number[];
+    /** `d.SpecialChars[6]` — comma, period, semi-colon, colon, space. */
+    specialChars: number[];
+    /** `d.Byte1414[2]` — the name-entry screen's one-character cursor string. */
+    byte1414: number[];
     byte1390: number[];
     byte1386: number[];
     cursorColorMapLight: number[];
@@ -517,10 +521,22 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
 
   const wRectPos1454 = readWordRectArray(view, off, 4); off += 4 * 8;
 
-  // SpecialChars[6], Byte1416[2], Byte1414[2], then Byte1412[6].
-  off += 6;
+  /**
+   * `d.SpecialChars[6]` (`doc/CSBwin-src/Data.h:1422`) — comma, period, semi-colon,
+   * colon, space. The name-entry keyboard's letter grid runs 'A'..'Z' and then indexes
+   * this table for the punctuation keys past 'Z'
+   * (`doc/CSBwin-src/Code13ea4.cpp:203-207`).
+   */
+  const specialChars = Array.from(raw.slice(off, off + 6)); off += 6;
+  // `d.Byte1416[2]` — a one-character C string the name-entry screen fills in to print
+  // the letter just typed (`Code13ea4.cpp:249`). The port passes the character instead.
   off += 2;
-  off += 2;
+  /**
+   * `d.Byte1414[2]` — the other one-character string, the name-entry screen's cursor.
+   * It is drawn in colour 9 to mark where the next letter will go and redrawn in 13 to
+   * take the mark away (`Code13ea4.cpp:70-79`, `:283-291`).
+   */
+  const byte1414 = Array.from(raw.slice(off, off + 2)); off += 2;
   /**
    * `d.Byte1412[6]` (doc/CSBwin-src/Data.h:1412) — per-body-part weighting for how
    * much a shield held in hand protects that part (doc/CSBwin-src/Character.cpp:2419).
@@ -616,6 +632,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     word1406,
     word1398,
     byte1412,
+    specialChars,
+    byte1414,
     byte1390,
     byte1386,
     cursorColorMapLight,

@@ -19,6 +19,7 @@ import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import type { ObjectID, Position } from '../../core/types';
+import type { ReincarnateState } from './ReIncarnate';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -56,6 +57,12 @@ export interface UIState {
   uiMode: UIMode;
 
   /* ---- interaction state ---- */
+  /**
+   * The Reincarnate name-entry screen while it is up, `null` otherwise
+   * (`src/renderer/ui/ReIncarnate.ts`). Non-null means modal: every click and every
+   * key goes to that module, which is how `keyboardMode = 2` behaves in CSBWin.
+   */
+  reincarnate: ReincarnateState | null;
   pressingEye: boolean;
   hoverPoint: { x: number; y: number } | null;
 
@@ -124,6 +131,13 @@ export interface UIState {
    * dungeon's object chains and the mirror's actuators, none of which the UI owns.
    */
   onResurrectReincarnateCancel?: (button: number) => void;
+  /**
+   * The name-entry screen has been answered (`doc/CSBwin-src/Code13ea4.cpp:155-160`).
+   * A hook because everything `_ResurrectReincarnateCancel` does *after* `ReIncarnate`
+   * returns — the skill wipe, the penalties, the twelve random points, the message —
+   * belongs to the engine.
+   */
+  onReincarnateNamed?: (chIdx: number, name: string, title: string) => void;
   viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
 
   /* ---- back into the renderer ---- */
@@ -149,6 +163,7 @@ export function createUIState(
     partyState: null,
     uiMode: UIMode.Adventure,
 
+    reincarnate: null,
     pressingEye: false,
     hoverPoint: null,
 

@@ -155,6 +155,18 @@ export function bindUIEvents(): void {
         });
 
         document.addEventListener('keydown', (e) => {
+            // The Reincarnate name-entry screen is modal on the keyboard as well as
+            // the mouse (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`): while
+            // it is up every key is a letter being typed, so none of the movement or
+            // debug keys below may see one. 'W' would otherwise walk the party into a
+            // wall while the player named their champion.
+            if (ctx.renderer?.isReincarnateScreenOpen()) {
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                ctx.renderer.handleReincarnateKey(e.key);
+                ctx.renderView();
+                e.preventDefault();
+                return;
+            }
             let handled = false;
             switch (e.key) {
                 case 'ArrowUp':

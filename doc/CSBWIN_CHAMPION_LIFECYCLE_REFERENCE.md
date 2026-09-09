@@ -166,8 +166,7 @@ which also sets `d.DisplayResurrectChestOrScroll = 5`.
   mirror was clicked. CSBWin does not stop the party walking away with the menu up, so
   answering it after a move takes the possessions out of — and disables the actuators
   of — whatever the party is facing now. Quirk, faithfully preserved.
-- **Reincarnate only** (`:6736-6784`): `ReIncarnate()` — the viewport screen at
-  `Code13ea4.cpp:20` that blanks name and title and has the player type new ones — then
+- **Reincarnate only** (`:6736-6784`): `ReIncarnate()` — see the section below — **then**
   zero all 20 skills, and (when `DM_rules` is off) apply `reincarnateAttributePenalty`/`reincarnateStatPenalty`,
   both read from the hero's own text. Each of attributes 1..6 loses
   `v * penalty / 16`, floored at its Minimum, and Maximum is set to the result.
@@ -188,6 +187,51 @@ buttons (7-11), the magic panel (100) and the attack panel (111)
 id 81 into a menu button, switching on `d.DisplayResurrectChestOrScroll`: 4 sends it to
 `HandleClothingClick` for an open chest, 5 to `SearchButtonList(d.Buttons18372)` and
 `_ResurrectReincarnateCancel`, and only with an empty cursor.
+
+## 3a. The name-entry screen — `_ReIncarnate` (`Code13ea4.cpp:20`)
+
+The first thing button 161 does, before a single penalty is charged. It sets
+`keyboardMode = 2`, blanks `pChar->name` and `pChar->title`, blanks the viewport's name
+strip (viewport `(3,3)-(170,8)`, colour 12), blits graphic **27** into `d.wRectPos926`
+(72-byte source line, transparent colour 4) and draws seven underscores at screen
+(177, 91) and nineteen at (105, 109). Then it loops until a name is accepted; there is
+**no cancel**.
+
+Two fields, `D6W` = 1 for the name and 2 for the title, `D7W` characters typed:
+
+- letters `A`-`Z`, `.`, `,`, `;`, `:` and space are taken; lower case is folded up.
+  A **space is refused as the first character** of either field;
+- the name is full at **7** and advances to the title by itself — no return needed;
+  the title stops dead at **19**;
+- **Return** ends the name (only if non-empty) and does nothing in the title;
+- **Backspace** rubs out a character; off the front of the title it steps back into the
+  name and lands *on* its last character, so that character is lost too (`:311-318`);
+- **OK** (screen `197..215 x 147..155`) is refused while the name is empty. It trims
+  trailing spaces from the name, then compares against every champion **but the last** —
+  the last is the one being named. A duplicate is refused silently: the screen simply
+  stays up.
+
+### The letter grid (`:174-210`)
+
+Screen `107..215 x 116..144`, three rows of eleven cells on a 10-pixel pitch. The
+arithmetic has three traps:
+
+1. the pixels *between* the keys are dead — a click needs `(x+4) % 10 != 0` and
+   `(y+5) % 10 != 0`;
+2. the exception is the **tall carriage-return key**, which spans the last cell of rows
+   1 and 2 and owns the grid line between them: `(x >= 207) && (y == 135)`;
+3. the letter is `'A' + 11 * ((y-116)/10) + (x-107)/10`, and **codes 86 and 97 are both
+   that CR key**; every code `>= 87` then shifts **down by one** to close the gap it
+   leaves, and anything past `'Z'` indexes `d.SpecialChars` — comma, period, semi-colon,
+   colon, space (`Data.h:1422`).
+
+Get (3) wrong and the keyboard still works, it just types the wrong letter from `W` on.
+The check that catches it is reading every key centre out in order and requiring the
+unbroken alphabet.
+
+`d.Byte1414` is a one-character string holding `'_'`, drawn in colour 9 to mark where
+the next character goes and in 13 to take the mark away; `d.Byte1416` is the same thing
+holding the character just typed.
 
 ## 4. Death — `KillCharacter` (`Character.cpp:2526`)
 
