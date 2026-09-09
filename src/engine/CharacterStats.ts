@@ -25,6 +25,7 @@ import type { Champion } from './gameTypes';
 import { determineMastery } from './skills';
 import { OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../renderer/csbwin/ObjectTables';
+import { AttributeIndex, championAttribute } from './attributes';
 
 /** `potion_EmptyFlask`. */
 const POTION_EMPTY_FLASK = 20;
@@ -154,7 +155,7 @@ export class CharacterStats {
    * before slowing down, rounded down to a multiple of 10.
    */
   maxLoad(champ: Champion): number {
-    let maxLoad = sw(8 * (champ.attributes?.strength ?? 0) + 100);
+    let maxLoad = sw(8 * championAttribute(champ, AttributeIndex.Strength) + 100);
     maxLoad = staminaAdjustedAttribute(champ, maxLoad);
 
     const wounds = champ.wounds ?? 0;
@@ -186,7 +187,7 @@ export class CharacterStats {
    * wound on that very hand halves it.
    */
   determineThrowingDistance(champ: Champion, hand: number, partySleeping = false): number {
-    let d7 = sw((this.deps.random.next() & 15) + (champ.attributes?.strength ?? 0));
+    let d7 = sw((this.deps.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
     const obj = this.possession(champ, hand);
     const weight = sw(typeof obj === 'number' ? this.getObjectWeight(obj as ObjectID) : 0);
@@ -230,7 +231,7 @@ export class CharacterStats {
    * `0.5 * Dexterity * (1 - load/maxLoad/2)`, with random limits near 5 and 95.
    */
   quickness(champ: Champion, partySleeping: boolean): number {
-    let quickness = (champ.attributes?.dexterity ?? 0) + this.deps.random.below(8);
+    let quickness = championAttribute(champ, AttributeIndex.Dexterity) + this.deps.random.below(8);
 
     const max = this.maxLoad(champ);
     if (max > 0) {

@@ -529,8 +529,9 @@ Goal: undo the drift that makes each new port harder than the last.
 
    ⚠️ **Deferred, deliberately:** these were *not* deleted, as the plan's wording suggested.
    F8 is currently the only way to get a playable party (Phase 13's hall-of-champions flow
-   does not exist yet; only `addCharacterFromPortrait` does) and F5/F9 are the only way to
-   persist anything (Phase 10). Delete each one as its real feature lands.
+   does not exist yet; only `addCharacterFromPortrait` does); delete it when that lands.
+   F5/F9 are **permanent**, not scaffolding — they are the functional equivalent of the
+   original save menu and stay whether or not it is ported (Phase 10).
 3. ✅ **Fallbacks and placeholders resolved or marked.**
    - The invented English movement strings are gone, along with the `message` field on
      `MovementResult` and the `message` parameter of `MovementCallback`. A blocked move now

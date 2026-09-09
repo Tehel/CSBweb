@@ -22,6 +22,8 @@ export class Party {
             position: initialPosition,
             facing: initialFacing,
             magicCasterIndex: -1,
+            potentialChampionIndex: -1,
+            gameIsLost: false,
             cursorOwner: -1,
             selectedCharacterIndex: -1,
             objectInHand: null,
@@ -215,6 +217,8 @@ export class Party {
             position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,
             magicCasterIndex: state.magicCasterIndex ?? -1,
+            potentialChampionIndex: state.potentialChampionIndex ?? -1,
+            gameIsLost: state.gameIsLost ?? false,
             cursorOwner: state.cursorOwner ?? -1,
             selectedCharacterIndex: state.selectedCharacterIndex ?? -1,
             objectInHand: state.objectInHand ?? null,
@@ -309,13 +313,38 @@ export function ensureHandOwner(party: PartyState): void {
 }
 
 /**
- * `d.CH16482[chIdx]` — CSBWin indexes its champion array by party slot. This port keeps
- * champions in a list that carries its own `partyPosition`, so look-ups go through it and
- * fall back to the list order, as the UI modules do.
+ * `d.CH16482[chIdx]` — CSBWin indexes its champion array by **party slot**, which is
+ * the champion's box in the top bar and never moves.
+ *
+ * This used to match on `partyPosition` first. That is `CHARDESC.charPosition`, the
+ * corner of the cell the champion stands in, and `setPartyFacing` rotates it — so
+ * after the party turned, `setHandOwner(party, 1)` validated whichever champion had
+ * drifted into corner 1 rather than the one in box 1. Every consumer of `cursorOwner`
+ * and `magicCasterIndex` reads them as list indices (`party.champions[chIdx]`), and so
+ * does CSBWin, so the list index is the one true meaning.
  */
 function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
     if (chIdx < 0) return null;
-    return party.champions.find((c) => c.partyPosition === chIdx) ?? party.champions[chIdx] ?? null;
+    return party.champions[chIdx] ?? null;
+}
+
+/**
+ * `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:716-740`) — move the magic tab to
+ * another champion.
+ *
+ * Only the state half is ported; the rest of CSBWin's function redraws the rune
+ * controls and caches the panel's pixels. The two guards are the whole logic: the
+ * call is a no-op if that champion already holds the tab, and a dead champion can
+ * never take it (`chIdx == -1`, which clears it, is always allowed).
+ */
+export function selectMagicCaster(party: PartyState, chIdx: number): void {
+    if (chIdx === (party.magicCasterIndex ?? -1)) return;
+    if (chIdx !== -1) {
+        const champion = getPartyChampion(party, chIdx);
+        if (!champion) return;
+        if (champion.alive === false || (champion.attributes?.health ?? 0) === 0) return;
+    }
+    party.magicCasterIndex = chIdx;
 }
 
 /**

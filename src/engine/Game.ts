@@ -53,6 +53,7 @@ import {
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
+import { AttributeIndex, championAttribute } from './attributes';
 
 /**
  * Game event callback types
@@ -70,11 +71,15 @@ interface DropCursorOptions {
  * Version 2 added `dungeon.snapshot` and the `game` fields below it. Version 1
  * carried only the party, the tick count, the `ITEM16` pool, the timers and the
  * missile records, so restoring one reset the whole world — doors, moved objects,
- * fired actuators — while leaving the party's inventory alone. There is no upgrade
- * path, because the world state a v1 save would need was never written; `quickLoad`
- * refuses them rather than restoring a half-state.
+ * fired actuators — while leaving the party's inventory alone.
+ *
+ * Version 3 replaced the champions' seven flat attribute numbers with CSBWin's
+ * `(maximum, current, minimum)` triples (`ChampionAttributes.stats`).
+ *
+ * Neither bump has an upgrade path: `quickLoad` refuses an older save rather than
+ * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 2;
+export const RUNTIME_SAVE_VERSION = 3;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -294,6 +299,7 @@ export class Game {
                     });
                 },
                 onPartyMoved: () => this.notePartyMoved(),
+                onPoisonTick: (chIdx, remaining) => this.monsterAttack.poisonCharacter(chIdx, remaining),
                 onEnableCharacterAction: (chIdx, refillSlot) => this.enableCharacterAction(chIdx, refillSlot),
                 isGameWon: () => this.gameWon,
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
@@ -375,6 +381,9 @@ export class Game {
                 registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
                 dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
                 onChampionDied: (chIdx) => this.onChampionDied(chIdx),
+                schedulePoison: (chIdx, remaining) =>
+                    this.timerSystem.schedulePoison(chIdx, remaining, this.party.state.position.z),
+                cancelPoisonTimers: (chIdx) => this.timerSystem.cancelPoisonTimers(chIdx),
                 trace: monsterHooks?.trace,
             },
         );
@@ -892,15 +901,19 @@ export class Game {
         champ.shieldHand = null;
     }
 
-    /** A champion died. Keeps the derived party state honest. */
+    /**
+     * A champion died. Keeps the derived party state honest.
+     *
+     * Closing the inventory on a dead champion is CSBWin's `ShowHideInventory(4)`
+     * (`doc/CSBwin-src/Character.cpp:2619`). The magic tab is *not* cleared here:
+     * `killCharacter` hands it to a living champion through `SelectMagicCaster`, and
+     * blanking it afterwards would undo that.
+     */
     private onChampionDied(chIdx: number): void {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
         if (this.party.state.selectedCharacterIndex === chIdx) {
             this.party.state.selectedCharacterIndex = -1;
-        }
-        if (this.party.state.magicCasterIndex === chIdx) {
-            this.party.state.magicCasterIndex = -1;
         }
         this.state.party = this.party.state;
     }
@@ -992,7 +1005,7 @@ export class Game {
                 const magicMastery =
                     determineMastery(champ, 3, { getObjectNameIndex })
                     + determineMastery(champ, 2, { getObjectNameIndex });
-                const wisdom = attrs.wisdom | 0;
+                const wisdom = championAttribute(champ, AttributeIndex.Wisdom);
                 if (random112 >= magicMastery + wisdom) {
                     if (mana > maxMana) {
                         attrs.mana = Math.max(maxMana, mana - 1);
@@ -1130,7 +1143,7 @@ export class Game {
         });
 
         if (mastery < required) {
-            const wisdom = champion.attributes.wisdom | 0;
+            const wisdom = championAttribute(champion, AttributeIndex.Wisdom);
             const threshold = Math.min(wisdom + 15, 115);
             const diff = required - mastery;
             for (let i = 0; i < diff; i += 1) {

@@ -1,5 +1,6 @@
 import type { Champion, Skill } from './gameTypes';
 import { CsbRandom } from '../core/random';
+import { AttributeIndex, incrAttributeMaximum } from './attributes';
 import {
     OBJNI_EKKHARD_CROSS,
     OBJNI_GEM_OF_AGES,
@@ -336,40 +337,42 @@ export function levelUp(champion: Champion, basicSkill: number, random?: CsbRand
     maxVitalityIncrement &= newMastery;
   }
 
-  champion.attributes.vitality = clampAttribute(champion.attributes.vitality + maxVitalityIncrement);
+  // `IncrMaximum`, not `IncrCurrent`: a level gain raises the ceiling and leaves the
+  // current value where it was, which is exactly what turns the stats line and the box
+  // around the eye red (`doc/CSBwin-src/Magic.cpp:98-148`).
+  incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Vitality], maxVitalityIncrement);
 
-  let antiFireIncrement = randBool() & (~newMastery);
-  antiFireIncrement &= 1;
-  champion.attributes.antiFire = clampAttribute(champion.attributes.antiFire + antiFireIncrement);
+  const antiFireIncrement = randBool() & (~newMastery);
+  incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiFire], antiFireIncrement);
 
   let maxStaminaIncrement = 0;
   switch (basicSkill) {
     case 0: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 16);
       newMastery = newMastery * 3;
-      champion.attributes.strength = clampAttribute(champion.attributes.strength + majorAttributeMaxIncrement);
-      champion.attributes.dexterity = clampAttribute(champion.attributes.dexterity + minorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Strength], majorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Dexterity], minorAttributeMaxIncrement);
       break;
     }
     case 1: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 21);
       newMastery = newMastery * 2;
-      champion.attributes.strength = clampAttribute(champion.attributes.strength + minorAttributeMaxIncrement);
-      champion.attributes.dexterity = clampAttribute(champion.attributes.dexterity + majorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Strength], minorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Dexterity], majorAttributeMaxIncrement);
       break;
     }
     case 2: {
       maxStaminaIncrement = Math.trunc(champion.attributes.maxStamina / 25);
       champion.attributes.maxMana = clampMax(champion.attributes.maxMana + newMastery, MAX_MANA);
       newMastery = newMastery + Math.trunc((newMastery + 1) / 2);
-      champion.attributes.wisdom = clampAttribute(champion.attributes.wisdom + minorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Wisdom], minorAttributeMaxIncrement);
       maxManaIncrement = Math.min(rand0_3(), maxManaIncrement - 1);
       if (champion.attributes.maxMana + maxManaIncrement > MAX_MANA) {
         champion.attributes.maxMana = MAX_MANA;
       } else {
         champion.attributes.maxMana += maxManaIncrement;
       }
-      champion.attributes.antiMagic = clampAttribute(champion.attributes.antiMagic + randInt(3));
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiMagic], randInt(3));
       break;
     }
     case 3: {
@@ -380,14 +383,14 @@ export function levelUp(champion: Champion, basicSkill: number, random?: CsbRand
       } else {
         champion.attributes.maxMana = MAX_MANA;
       }
-      champion.attributes.wisdom = clampAttribute(champion.attributes.wisdom + majorAttributeMaxIncrement);
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.Wisdom], majorAttributeMaxIncrement);
       maxManaIncrement = Math.min(rand0_3(), maxManaIncrement - 1);
       if (champion.attributes.maxMana + maxManaIncrement > MAX_MANA) {
         champion.attributes.maxMana = MAX_MANA;
       } else {
         champion.attributes.maxMana += maxManaIncrement;
       }
-      champion.attributes.antiMagic = clampAttribute(champion.attributes.antiMagic + randInt(3));
+      incrAttributeMaximum(champion.attributes.stats[AttributeIndex.AntiMagic], randInt(3));
       break;
     }
   }
@@ -401,12 +404,6 @@ export function levelUp(champion: Champion, basicSkill: number, random?: CsbRand
     maxStaminaIncrement += randInt(Math.trunc(maxStaminaIncrement / 2)) + 1;
   }
   champion.attributes.maxStamina = clampMax(champion.attributes.maxStamina + maxStaminaIncrement, MAX_STAMINA);
-}
-
-function clampAttribute(value: number): number {
-  if (value < 0) return 0;
-  if (value > 255) return 255;
-  return value | 0;
 }
 
 function clampMax(value: number, max: number): number {

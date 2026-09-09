@@ -27,6 +27,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomTy
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -189,7 +190,7 @@ async function main(): Promise<void> {
     name: 'VICTIM',
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      luck: 50, strength: 50, dexterity: 50, wisdom: 50, vitality: 50, antiMagic: 0, antiFire: 0,
+      stats: makeAddCharacterAttributes([50, 50, 50, 50, 50, 0, 0]),
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,

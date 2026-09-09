@@ -24,6 +24,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../sr
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion, MovementResult } from '../src/engine/gameTypes';
 import { SoundIndex } from '../src/core/constants';
@@ -40,7 +41,7 @@ function champion(i: number): Champion {
     name: `HERO${i}`,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
-      luck: 60, strength: 60, dexterity: 50, wisdom: 50, vitality: 50, antiMagic: 20, antiFire: 20,
+      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,

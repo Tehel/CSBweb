@@ -16,6 +16,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_MISSILES_REFERENCE.md` - Missile timers, movement, and encounter resolution.
 - `doc/CSBWIN_ATTACK_REFERENCE.md` - The champion's own attacks: the ATTACKPARAMETERS block and its filter, the physical damage chain, every attack type, and the attack menu.
 - `doc/CSBWIN_MONSTERS_REFERENCE.md` - Monster data model (MONSTERDESC/DB4/ITEM16), group lifecycle, AI timers, attack tables.
+- `doc/CSBWIN_CHAMPION_LIFECYCLE_REFERENCE.md` - The champion from creation to resurrection: the ATTRIBUTE (maximum, current, minimum) triple, AddCharacter and the Hall of Champions, KillCharacter and bones, the Vi altar, reincarnation, potions, pit falls.
 - `doc/CSBWIN_DSA_REFERENCE.md` - DSA loading, timers, and STKOP behaviors.
 - `doc/CSBWIN_DECORATIONS_REFERENCE.md` - Wall/floor decoration eligibility and rendering rules.
 - `doc/CSBWIN_SAVEGAME_REFERENCE.md` - Extended features and save/load structures.

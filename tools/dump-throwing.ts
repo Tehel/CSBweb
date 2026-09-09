@@ -32,6 +32,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { DungeonState } from '../src/engine/DungeonState';
 import type { Champion } from '../src/engine/gameTypes';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -41,14 +42,15 @@ import { check, finish } from './lib/check';
 /** Enough samples that the `random()&15` in the distance formula averages out. */
 const SAMPLES = 400;
 
-function champion(over: Partial<Champion['attributes']> = {}): Champion {
+function champion(over: Partial<Champion['attributes']> & { strength?: number } = {}): Champion {
+  const { strength = 50, ...attrOver } = over;
   return {
     name: 'TEST',
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
-      luck: 50, strength: 50, dexterity: 50, wisdom: 50, vitality: 50, antiMagic: 0, antiFire: 0,
+      stats: makeAddCharacterAttributes([50, strength, 50, 50, 50, 0, 0]),
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
-      ...over,
+      ...attrOver,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [], weaponHand: null, shieldHand: null, quiver: null,

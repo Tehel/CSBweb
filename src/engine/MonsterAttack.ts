@@ -22,7 +22,8 @@ import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
 import { MonsterType } from './monsterTypes';
-import { setHandOwner } from './Party';
+import { selectMagicCaster, setHandOwner } from './Party';
+import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -123,6 +124,10 @@ export interface MonsterAttackHooks {
   dropAllPossessions?: (chIdx: number) => void;
   /** `WakeUp` (`doc/CSBwin-src/CSBCode.cpp`). */
   wakeUp?: () => void;
+  /** Arm the `TT_75` poison timer (`doc/CSBwin-src/CSBCode.cpp:7228`). */
+  schedulePoison?: (chIdx: number, remaining: number) => void;
+  /** Delete this champion's `TT_75` timers (`doc/CSBwin-src/Character.cpp:3016`). */
+  cancelPoisonTimers?: (chIdx: number) => void;
   trace?: (line: string) => void;
 }
 
@@ -445,6 +450,31 @@ export class MonsterAttack {
   }
 
   /**
+   * `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) — spend or restore stamina.
+   *
+   * `decrement` is *subtracted*, so a negative value restores. The interesting half is
+   * the bottom: stamina never goes below zero, and whatever the decrement overshot by
+   * is converted into real damage at half rate — `DamageCharacter(chIdx, over/2, 0, 0)`,
+   * with mask and kind both zero, so it bypasses armour and cannot wound. That is how
+   * exhaustion kills. The top simply clamps to `MaxStamina`.
+   */
+  adjustStamina(chIdx: number, decrement: number): void {
+    if (chIdx === -1) return;
+    const champ = this.championAt(chIdx);
+    if (!champ) return;
+
+    const newStamina = (champ.attributes.stamina | 0) - (decrement | 0);
+    if (newStamina <= 0) {
+      champ.attributes.stamina = 0;
+      // `absStamina/2` — C truncation, and `absStamina` is `-newStamina`.
+      this.damageCharacter(chIdx, Math.trunc(-newStamina / 2), 0, 0);
+      return;
+    }
+    const maxStamina = champ.attributes.maxStamina | 0;
+    champ.attributes.stamina = newStamina > maxStamina ? maxStamina : newStamina;
+  }
+
+  /**
    * `DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`).
    *
    * `kind` is CSBWin's `P4`, and it selects how the blow is mitigated: 1 fire,
@@ -478,7 +508,7 @@ export class MonsterAttack {
       const armour = parts !== 0 ? Math.trunc(armourTotal / parts) : 0;
 
       if (kind === 6) {
-        const margin = 115 - champ.attributes.wisdom;
+        const margin = 115 - attributeCurrent(champ.attributes.stats[AttributeIndex.Wisdom]);
         dealt = margin <= 0 ? 0 : scaledMultiply(dealt, 6, margin);
       } else {
         if (kind === 5) {
@@ -548,18 +578,38 @@ export class MonsterAttack {
       else this.dungeon.deleteDBEntry(bones);
     }
 
-    // `KillCharacter` ends by looking for a living party member and handing on what the
-    // dead champion held (doc/CSBwin-src/Character.cpp:2670-2694). Without this the
-    // cursor stays with a corpse and the whole inventory stops responding, because every
-    // inventory click is gated on `d.HandChar != -1`.
+    // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the
+    // TT_75 timers must not outlive it (`doc/CSBwin-src/Character.cpp:2663-2666`).
+    champ.maxRecentDamage = 0;
+    if (champ.poisonCount) this.curePoison(chIdx);
+
+    // `KillCharacter`'s tail (`doc/CSBwin-src/Character.cpp:2670-2694`): find a living
+    // party member, and hand on everything the dead champion was holding on to.
     //
-    // ⚠️ Two of that block's three outcomes are still missing: `d.GameIsLost = 1` when
-    // no champion is left, and moving `d.MagicCaster` off the dead champion. Both belong
-    // to champion death proper — PLAN.md Phase 13.
-    if (chIdx === (party.cursorOwner ?? -1)) {
-      const living = party.champions.findIndex((c) => c.alive !== false);
-      if (living >= 0) setHandOwner(party, party.champions[living].partyPosition);
-      else setHandOwner(party, -1);
+    // The search skips the *potential* champion — the one standing in a Hall of
+    // Champions mirror who has not been confirmed yet — because they are counted in
+    // `d.NumCharacter` but are not really in the party. `potentialChampionIndex` is
+    // still always -1 here; Phase 13 step 4 is what sets it.
+    const potential = party.potentialChampionIndex ?? -1;
+    let living = -1;
+    for (let i = 0; i < party.champions.length; i++) {
+      const other = party.champions[i];
+      if (!other) continue;
+      if (potential === i) continue;
+      if ((other.attributes?.health ?? 0) === 0 || other.alive === false) continue;
+      living = i;
+      break;
+    }
+
+    if (living < 0) {
+      // Nobody left. CSBWin sets `d.GameIsLost` here and the VBL loop takes over.
+      party.gameIsLost = true;
+      setHandOwner(party, -1);
+    } else {
+      // Both indices are list slots, as `d.HandChar` and `d.MagicCaster` are in CSBWin,
+      // and both get the *same* champion.
+      if (chIdx === (party.cursorOwner ?? -1)) setHandOwner(party, living);
+      if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
 
     this.hooks?.onChampionDied?.(chIdx);
@@ -629,7 +679,7 @@ export class MonsterAttack {
     }
 
     // Zero to roughly 8 × vitality.
-    const spread = Math.trunc(champ.attributes.vitality / 8) + 1;
+    const spread = Math.trunc(attributeCurrent(champ.attributes.stats[AttributeIndex.Vitality]) / 8) + 1;
     let total = (this.random.next() & 0xffff) % spread;
     if (scale) total = Math.trunc(total / 2);
 
@@ -684,7 +734,7 @@ export class MonsterAttack {
       return this.characterStats.quickness(champ, party.sleeping ?? false);
     }
     // No tables yet (a partially constructed engine): the pre-load behaviour.
-    let quickness = champ.attributes.dexterity + this.random.below(8);
+    let quickness = attributeCurrent(champ.attributes.stats[AttributeIndex.Dexterity]) + this.random.below(8);
     if (party.sleeping) quickness = Math.trunc(quickness / 2);
     quickness = Math.trunc(quickness / 2);
     const loLimit = this.random.below(8) + 1;
@@ -699,15 +749,16 @@ export class MonsterAttack {
    * entirely, or a roll against current Luck. Either way Luck then moves by 2 —
    * *down* when it saved you, up when it did not, so luck is spent.
    *
-   * ⚠️ CSBWin clamps the new value between the attribute's own minimum and maximum;
-   * `Champion.luck` here is a plain number with no min/max, so this clamps to 0-255.
+   * The new value is held between the attribute's own minimum and maximum, so a
+   * champion with a high Luck floor cannot spend below it.
    */
   isCharacterLucky(champ: Champion, luckNeeded: number): boolean {
     if (this.random.bool() !== 0 && this.random.below(100) > luckNeeded) return true;
-    const currentLuck = champ.attributes.luck | 0;
+    const luck = champ.attributes.stats[AttributeIndex.Luck];
+    const currentLuck = attributeCurrent(luck);
     const roll = currentLuck === 0 ? 0 : this.random.below(currentLuck);
     const lucky = roll > luckNeeded;
-    champ.attributes.luck = Math.min(255, Math.max(0, currentLuck + (lucky ? -2 : 2)));
+    setAttributeCurrentWithinLimits(luck, currentLuck + (lucky ? -2 : 2));
     return lucky;
   }
 
@@ -720,27 +771,12 @@ export class MonsterAttack {
    * binary. Paul Stevens removed the `/256`, and this follows his corrected version.
    */
   attributeScaledReduction(champ: Champion, attrNum: number, value: number): number {
-    const attr = this.attributeByIndex(champ, attrNum);
+    const attr = championAttribute(champ, attrNum);
     const margin = 170 - attr;
     // A very high attribute (above 154) falls into a separate branch that divides by
     // 8 flat rather than scaling (doc/CSBwin-src/Character.cpp:2060-2062).
     if (margin < 16) return value >> 3;
     return scaledMultiply(value, 7, margin);
-  }
-
-  /** CSBWin's attribute order: Luck, Strength, Dexterity, Wisdom, Vitality, AntiMagic, AntiFire. */
-  private attributeByIndex(champ: Champion, index: number): number {
-    const a = champ.attributes;
-    switch (index) {
-      case 0: return a.luck;
-      case 1: return a.strength;
-      case 2: return a.dexterity;
-      case 3: return a.wisdom;
-      case 4: return a.vitality;
-      case 5: return a.antiMagic;
-      case 6: return a.antiFire;
-      default: return 0;
-    }
   }
 
   /**
@@ -793,12 +829,44 @@ export class MonsterAttack {
     return [row[0] ?? 0, row[1] ?? 0, row[2] ?? 0, row[3] ?? 0];
   }
 
-  /** `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7211`). */
+  /**
+   * `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7211`).
+   *
+   * `strength` is a *tick count*, not a dose. Each call deals `Larger(1, strength/64)`
+   * unmitigated damage — mask and kind both zero, so armour and wounds are skipped —
+   * then, if any ticks remain, raises `poisonCount` and arms a `TT_75` timer 36 ticks
+   * out carrying the decremented count. The timer handler drops `poisonCount` again
+   * and calls straight back in here, so the count hovers at 1 for the whole illness
+   * and the damage arrives in instalments.
+   *
+   * A champion still standing in a Hall of Champions mirror is immune, because they
+   * are not really in the party yet.
+   */
   poisonCharacter(chIdx: number, strength: number): void {
+    if (chIdx === -1) return;
+    const party = this.getPartyState();
+    if ((party.potentialChampionIndex ?? -1) === chIdx) return;
     const champ = this.championAt(chIdx);
     if (!champ) return;
-    if (strength <= 0) return;
-    champ.poisonCount = Math.min(255, (champ.poisonCount ?? 0) + strength);
+
+    this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
+
+    const remaining = strength - 1;
+    if (remaining !== 0) {
+      champ.poisonCount = Math.min(255, (champ.poisonCount ?? 0) + 1);
+      this.hooks?.schedulePoison?.(chIdx, remaining);
+    }
+  }
+
+  /**
+   * `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`) — cancel every outstanding
+   * `TT_75` for this champion and clear the count. Anti-venin, and `KillCharacter`.
+   */
+  curePoison(chIdx: number): void {
+    if (chIdx === -1) return;
+    this.hooks?.cancelPoisonTimers?.(chIdx);
+    const champ = this.championAt(chIdx);
+    if (champ) champ.poisonCount = 0;
   }
 
   /** `RanLiveChar` (`doc/CSBwin-src/Monster.cpp:905`). */

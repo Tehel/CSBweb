@@ -7,6 +7,7 @@
 import { DBType, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
 import type { Champion } from './gameTypes';
+import { makeAddCharacterAttributes } from './attributes';
 import { createSkillsFromSubskillLevels } from './skills';
 
 const FIGHTER_SUBSKILLS = ['Swing', 'Thrust', 'Club', 'Parry'];
@@ -110,13 +111,18 @@ export function createChampionFromPreset(
       maxStamina,
       mana: maxMana,
       maxMana,
-      luck: hero.luck,
-      strength: hero.strength,
-      dexterity: hero.dexterity,
-      wisdom: hero.wisdom,
-      vitality: hero.vitality,
-      antiMagic: hero.antiMagic,
-      antiFire: hero.antiFire,
+      // `AddCharacter` reads the seven attributes off the mirror's text in this
+      // order and gives each the same Maximum and Current
+      // (`doc/CSBwin-src/Character.cpp:640-659`).
+      stats: makeAddCharacterAttributes([
+        hero.luck,
+        hero.strength,
+        hero.dexterity,
+        hero.wisdom,
+        hero.vitality,
+        hero.antiMagic,
+        hero.antiFire,
+      ]),
       experience: 0,
       fighter,
       ninja,

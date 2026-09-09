@@ -63,6 +63,12 @@ export enum TimerFunction {
   TT_71 = 71,
   TT_73 = 73,
   TT_74 = 74,
+  /**
+   * One tick of poison (`doc/CSBwin-src/CSBCode.cpp:6554`). `uByte5` is the champion,
+   * `timerWord6` how many ticks are left; the handler decrements `poisonCount` and
+   * calls `PoisonCharacter` again, which re-arms the timer until the count runs out.
+   */
+  TT_75 = 75,
   TT_77 = 77,
   TT_78 = 78,
   TT_79 = 79,

@@ -9,6 +9,7 @@ import { ImageFormat } from '../../core/imageDecoder';
 import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
 import { Champion } from '../../engine/gameTypes';
+import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -58,15 +59,17 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
     lineY += 7;
   }
 
-  const attrValues = [
-    champion.attributes?.strength ?? 0,
-    champion.attributes?.dexterity ?? 0,
-    champion.attributes?.wisdom ?? 0,
-    champion.attributes?.vitality ?? 0,
-    champion.attributes?.antiMagic ?? 0,
-    champion.attributes?.antiFire ?? 0,
-  ];
-  const attrMax = attrValues.slice();
+  // `for (D7W=1; D7W<=6; D7W++)` — the panel lists attributes 1..6 and never Luck
+  // (`doc/CSBwin-src/Character.cpp:4609`). Red when Current has fallen below Maximum,
+  // green when a potion has pushed it above.
+  const stats = champion.attributes?.stats ?? [];
+  const attrValues: number[] = [];
+  const attrMax: number[] = [];
+  for (let i = AttributeIndex.Strength; i <= AttributeIndex.AntiFire; i++) {
+    const attr = stats[i];
+    attrValues.push(attr ? attributeCurrent(attr) : 0);
+    attrMax.push(attr ? attributeMaximum(attr) : 0);
+  }
   lineY = 86;
   for (let i = 0; i < ATTRIBUTE_LABELS.length; i++) {
     const current = attrValues[i] ?? 0;

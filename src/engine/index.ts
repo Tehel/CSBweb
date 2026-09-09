@@ -3,6 +3,7 @@
  */
 
 export * from './gameTypes';
+export * from './attributes';
 export * from './Party';
 export * from './DungeonState';
 export * from './MovementSystem';

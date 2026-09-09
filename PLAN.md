@@ -54,8 +54,11 @@ Verified against the code, not inherited from earlier revisions of this file.
    champion leaves bones. `Attack.cpp` is ported too: the attack menu offers each
    champion's legal options and every attack type resolves, through the Party Attack
    Filter. Lord Chaos's fusion endgame is the one deliberate omission.
-3. 🔄 **Champion death and bones work** (Phase 12); resurrection, character
-   creation and potion drinking remain (Phase 13).
+3. 🔄 **Champion death and bones work** (Phase 12), and the Vi altar resurrects
+   (with gaps). Character creation, reincarnation and potion drinking remain
+   (Phase 13). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
+   (maximum, current, minimum) triple, `AdjustStamina`, `SelectMagicCaster` +
+   `gameIsLost`, and poison as a `TT_75` timer chain.
 4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
    ported, so clouds shrink, damage and expire (Phase 9 step 13).
 5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
@@ -82,11 +85,13 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twelve assertion-carrying verification tools** — the Phase 12 eight
+2. **Seventeen assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
-   `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts` and `dump-savegame.ts`.
-   These load the real game
+   `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
+   `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
+   `dump-champion-state.ts`.
+   `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
    suite for everything the frames cannot see, and they caught two real bugs and two
@@ -244,9 +249,12 @@ archive section.
 
 **Dev scaffolding (Phase 14)**
 
-- ⚠️ F5/F8/F9 were **not** deleted, contrary to the phase's original wording. F8 is the only
-  way to get a playable party (Phase 13's hall-of-champions does not exist) and F5/F9 are
-  the only way to persist anything (Phase 10). Delete each as its real feature lands.
+- ⚠️ F8 (random party) was **not** deleted, contrary to the phase's original wording: it is
+  still the only way to get a playable party, because Phase 13's hall-of-champions does not
+  exist. Delete it when that lands.
+- ✅ F5/F9 (quick-save/load) **stay**. They are not scaffolding to be removed: they are the
+  functional equivalent of the original save menu, and are kept for their convenience
+  whether or not that menu is ever ported (Phase 10).
 
 **Deliberately closed, not debt**
 
@@ -676,29 +684,148 @@ endgame (Phase 13's neighbour), and `CreateMovementTimer`'s overflow guard (step
 
 ### Phase 13 — Champion lifecycle
 
-1. ⏳ **Death.** Champion death → bones creation → possessions dropped to the floor. Wire
-   `Game.registerChampionBones()` into this path so the bones↔champion mapping is automatic.
-2. ⏳ **Item naming.** Add the bones-name special case once the champion-bones value from
-   DB10 is exposed.
-3. ⏳ **Resurrection / reincarnation** at the altars, including the reduced-HP rule.
-4. ⏳ **Character creation.** Portrait selection and the hall-of-champions flow.
-   `HeroExtractor` + `AddCharacter` already provide preset heroes; this replaces the debug
-   random-party injection.
-5. ⏳ **Drinking potions.**
-6. ⏳ **Pit fall damage** + stamina drain, for party and monsters.
-7. ⏳ **Red square around the eye on level gain.**
-8. ⏳ **The rest of `KillCharacter`'s tail** (`doc/CSBwin-src/Character.cpp:2670-2694`).
-   `SetHandOwner` is now moved off a dead cursor owner, because without it the whole
-   inventory stops responding. The other two outcomes of that block are still missing:
-   `d.GameIsLost = 1` when no champion is left alive, and moving `d.MagicCaster` off the
-   dead champion (`SelectMagicCaster`).
+Reference: **`doc/CSBWIN_CHAMPION_LIFECYCLE_REFERENCE.md`** — the attribute model,
+`AddCharacter`, `KillCharacter`, the Vi altar, reincarnation, potions and pit falls,
+with citations. Read it before touching any step below.
+
+The phase was audited against CSBWin in September 2026 and re-ordered: three of the
+original steps turned out to be largely done already, and the rest turned out to share
+one missing primitive.
+
+#### Prerequisites
+
+0. ✅ **The `ATTRIBUTE` triple.** `CHARDESC.Attributes[7]` is seven
+   *(maximum, current, minimum)* byte-triples (`doc/CSBwin-src/CSB.h:2409-2435`,
+   `:2565`), not seven numbers. `src/engine/attributes.ts` ports it, including
+   CSBWin's byte-wrap and its "above 240 means negative" read
+   (`doc/CSBwin-src/data.cpp:1695-1741`), `AddCharacter`'s initial values
+   (minimum 30, 10 for Luck, cap 224 — `doc/CSBwin-src/Character.cpp:640-659`) and
+   `AdjustCurrentAttribute` (`doc/CSBwin-src/Character.cpp:3900-3934`).
+   `tools/dump-attributes.ts` asserts all of it against the real mirrors.
+
+   This was a prerequisite for nearly everything else in the phase — reincarnation
+   penalties, the four attribute potions, the red box around the eye, the stats-panel
+   colours — and it **fixed a live bug**: `levelUp` raised what was effectively
+   *current* where CSBWin raises *maximum* (`doc/CSBwin-src/Magic.cpp:98-148`), so a
+   level gain silently healed the attribute instead of opening a gap. It also closed
+   the ⚠️ in `isCharacterLucky`, which had no min/max to clamp against, and replaced
+   the `attrMax = attrValues.slice()` placeholder in the stats panel, where the
+   red/green colour logic had been comparing a value with itself.
+
+   The quick-save format went to v3; older quick-saves are refused, not upgraded.
+
+1. ✅ **`AdjustStamina`** (`doc/CSBwin-src/Code11f52.cpp:4413`) —
+   `MonsterAttack.adjustStamina`. Subtracts (so a negative value restores), clamps to
+   `[0, MaxStamina]`, and turns any overshoot below zero into
+   `DamageCharacter(chIdx, over/2, 0, 0)`. Wanted by step 6 and by anything that tires
+   a champion.
+2. ✅ **`SelectMagicCaster` and `d.GameIsLost`** — the two missing outcomes of
+   `KillCharacter`'s tail. `selectMagicCaster` is in `Party.ts` beside `setHandOwner`,
+   and `PartyState.gameIsLost` is set when the search finds nobody. The tail now runs
+   CSBWin's own loop, skipping `potentialChampionIndex` — a new field, always -1 until
+   Phase 13 step 4 sets it. `Game.onChampionDied` no longer blanks the magic tab, which
+   would have undone the hand-off.
+
+   This turned up a **real bug and fixed it**: `Party.getPartyChampion` resolved a
+   champion by matching `partyPosition`, which is `CHARDESC.charPosition` — the corner
+   of the cell, which `setPartyFacing` rotates. Every consumer of `cursorOwner` and
+   `magicCasterIndex` reads them as list indices, and so does CSBWin
+   (`d.CH16482[chIdx]`), so after the party turned, `setHandOwner(party, 1)` validated
+   whichever champion had drifted into corner 1. It is now a plain list index, and
+   `killCharacter` passes one.
+
+   ⏳ **The same conflation survives in `src/renderer/ui/MagicPanel.ts:204-206`**, which
+   both writes `magicCasterIndex = champion.partyPosition` and picks the rune-control
+   rectangle by `partyPosition`, though the four boxes do not rotate. Left alone here
+   because it is a UI change that wants the golden frames re-examined, not because it
+   is right.
+3. ✅ **Poison as a timer.** `TT_75` is ported: `poisonCharacter` deals
+   `Larger(1, strength/64)` unmitigated damage and arms the next tick 36 ticks out
+   carrying the remaining count; `TimerSystem.processPoisonTimer` drops `poisonCount`
+   and calls back in, so the count sits at 1 for the whole illness; `curePoison`
+   deletes the champion's pending `TT_75` timers, and `killCharacter` calls it. Before
+   this, `poisonCount` only ever went up.
+
+   `tools/dump-champion-state.ts` covers all three (36 checks) and caught a real defect
+   while doing it: `schedulePoison` called `addTimer` after
+   `createTimerWithUByte5`, which queues the entry itself, so two copies fired in the
+   same pass and poison ran at double rate.
+
+#### Steps
+
+1. ✅ **Death.** Ported in Phase 12: `killCharacter` drops the possessions, creates the
+   `value = 2` bones record at the champion's own cell position, and registers the
+   bones↔champion mapping through `Game.registerChampionBones()`.
+   ⏳ Still missing: the **character-death filter** DSA (`ESL_CHARDEATHFILTER`,
+   actuator type 47, `doc/CSBwin-src/Character.cpp:2535-2589`) that runs before
+   anything else.
+2. ✅ **Item naming.** `getObjectDisplayName` prefixes the champion's name to the bones
+   (`src/renderer/ui/Objects.ts:203`), matching
+   `doc/CSBwin-src/Character.cpp:3549-3580`.
+   ⚠️ It resolves the fingerprint against the *live party* only; CSBWin's
+   `CHARDESC::CopyCharacter` also searches the wings (`:5239`), which we do not have.
+3. 🔄 **Resurrection at the Vi altar.** The `TT_VI_ALTAR` three-state timer is ported
+   (`src/engine/TimerSystem.ts:1143`) and the reduced-HP rule is in `reviveChampion`.
+   ⏳ Gaps against `doc/CSBwin-src/Timer.cpp:2709` and `Character.cpp:804`:
+   - state 2 does not `CreateCloud(RNffe4)` over the bones, so the resurrection has no
+     visible effect;
+   - `reviveChampion` does not relocate the champion to a free `charPosition` when
+     theirs is taken, nor reset `facing`, nor redraw;
+   - the wings branch (a champion no longer in the party) is absent, and
+     `findViAltarChampionIndex` refuses when more than one champion is dead where
+     CSBWin reads the index straight out of the bones record's `value`.
+
+   **Reincarnation is not here** — it belongs to the Hall of Champions, step 4.
+4. ⏳ **Character creation.** Clicking a mirror already calls
+   `addCharacterFromPortrait`, which drops a preset hero straight into the party. The
+   real flow (`doc/CSBwin-src/Character.cpp:456`, `CSBCode.cpp:6615`) is bigger:
+   - `d.PotentialCharacterOrdinal` — the "almost but not quite added" state, which
+     gates the mouth, the eye panel and the living-champion search;
+   - the Resurrect/Reincarnate/Cancel menu (graphic 40, `TAG0189a8`);
+   - **Reincarnate**: zero the skills, apply the hero's own
+     `reincarnateAttributePenalty`/`reincarnateStatPenalty`, then 12 random attribute
+     points;
+   - **Cancel**: undo the provisional add;
+   - collecting the mirror cell's objects as the champion's possessions;
+   - disabling the portrait actuator afterwards (`PortraitTranslateDisable`, and the
+     `BlockDisables` rule);
+   - the fingerprint from `(partyLevel<<10)|(partyX<<5)|partyY`, which the bones
+     mapping depends on.
+
+   This is what finally deletes the F8 debug hotkey.
+5. ⏳ **Drinking potions.** `src/renderer/ui/Feeding.ts` handles food and the water
+   flask only; every other potion does nothing. The real handler is a
+   `FEEDPARAMETERS` block passed through the Feeding Filter DSA
+   (`doc/CSBwin-src/Character.cpp:4020-4470`) — see the table in the reference doc.
+   Prerequisites 0 and 3 are in place, so this is unblocked.
+6. ⏳ **Pit fall damage + stamina drain**, for party and monsters
+   (`doc/CSBwin-src/Code11f52.cpp:3016-3086`): `DamageAllCharacters(20, 48, 2)` on a
+   free fall, or a per-champion `AdjustStamina(25*load/MaxLoad + 1)` when
+   `d.SupressPitDamage` is set by a rope climb. Both `damageAllCharacters` and
+   `adjustStamina` now exist; what is left is `d.SupressPitDamage` itself and the
+   wiring in the pit path.
+7. 🔄 **Red square around the eye on level gain.** Diagnosed: it is not level-specific.
+   The box around the eye is graphic **34** when any of attributes 1..6 has
+   Current < Maximum and graphic **33** otherwise
+   (`doc/CSBwin-src/Character.cpp:1379-1392`); a level gain raises the maxima and
+   Current falls behind. Prerequisite 0 supplies the comparison — the stats panel now
+   colours correctly — but **neither box is drawn yet**: the open inventory omits both
+   the eye box and the matching mouth box (graphic 34 when `food < 0`, `water < 0` or
+   poisoned, `:1363-1377`).
+8. ✅ **The rest of `KillCharacter`'s tail** (`doc/CSBwin-src/Character.cpp:2670-2694`)
+   — done as prerequisite 2. The cursor and the magic tab both move to the first living
+   champion, `gameIsLost` is set when there is none, and `CurePoison` runs on the
+   corpse.
+   ⏳ Not modelled: the `charFlags` redraw bookkeeping (`CHARFLAG_*`), which this port
+   has no equivalent for — the renderer redraws from state every frame.
 9. ⏳ **`handChar` is not read from a real DM save game.** `SaveGameLoader.parseBlock2`
    reads only `maxTimers` and `maxItem16`; CSBWin restores the cursor owner from
    `gb2.handChar` (`doc/CSBwin-src/SaveGame.cpp:1636`). Our own quick-saves carry it in
    the runtime party state, and `ensureHandOwner` repairs a state that lacks it, but the
    GAMEBLOCK2 offset has not been established so the real field is not parsed.
 
-Status: ⏳ not started, apart from item 8's cursor hand-off.
+Status: 🔄 in progress — all four prerequisites done, and step 8 with them; steps 1, 2
+and 3 partly done from Phase 12; steps 4, 5, 6, 7 and 9 open.
 
 ### Phase 15 — Verification
 
@@ -706,7 +833,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   thirteen asserting tools, then four non-asserting dumps as crash-only smoke, then the
+   seventeen asserting tools, then four non-asserting dumps as crash-only smoke, then the
    frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.

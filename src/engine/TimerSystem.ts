@@ -179,6 +179,12 @@ export interface TimerHooks {
     direction: number;
     index: number;
   }) => number;
+  /**
+   * `TT_75` fired: apply another tick of poison to this champion, with `remaining`
+   * ticks left after it. `PoisonCharacter` lives with the rest of the champion damage
+   * chain, so the timer only wakes it.
+   */
+  onPoisonTick?: (chIdx: number, remaining: number) => void;
   /** The party was relocated by a timer (a pit, a teleporter, a wiggle). */
   onPartyMoved?: () => void;
   /**
@@ -315,6 +321,9 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_74:
         this.processPartyShieldTimer(timer);
+        break;
+      case TimerFunction.TT_75:
+        this.processPoisonTimer(timer);
         break;
       case TimerFunction.TT_77:
         this.processSpellShieldTimer(timer);
@@ -471,6 +480,58 @@ export class TimerSystem {
     const current = party.partyShield ?? 0;
     const next = current - normalizeWord6(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
+  }
+
+  /**
+   * `TT_75` (`doc/CSBwin-src/CSBCode.cpp:6554`) — one tick of poison.
+   *
+   * The count comes down here and `PoisonCharacter` puts it back up if there are ticks
+   * left, so `poisonCount` sits at 1 for as long as the champion is poisoned and
+   * reaches 0 on the last tick. That is what the portrait's poison indicator reads.
+   */
+  private processPoisonTimer(timer: TimerEntry): void {
+    const chIdx = timer.uByte5 & 0xff;
+    const champ = this.getPartyState().champions[chIdx];
+    if (!champ) return;
+    champ.poisonCount = Math.max(0, (champ.poisonCount ?? 0) - 1);
+    this.hooks?.onPoisonTick?.(chIdx, normalizeWord6(timer.timerWord6));
+  }
+
+  /**
+   * The `TT_75` half of `PoisonCharacter` (`doc/CSBwin-src/CSBCode.cpp:7228-7235`):
+   * 36 ticks from now, on the party's level, carrying the champion and the number of
+   * ticks still to come.
+   */
+  schedulePoison(chIdx: number, remaining: number, level: number): void {
+    // `createTimerWithUByte5` queues the entry itself — adding it again would put two
+    // copies in, and both would fire in the same pass.
+    this.timers.createTimerWithUByte5(
+      TimerFunction.TT_75,
+      0,
+      0,
+      0,
+      0,
+      (this.now + 36) >>> 0,
+      level,
+      chIdx & 0xff,
+      undefined,
+      0,
+      remaining,
+    );
+  }
+
+  /**
+   * The timer sweep of `CurePoison` (`doc/CSBwin-src/Character.cpp:3007-3031`) —
+   * delete every outstanding `TT_75` for this champion. Zeroing `poisonCount` is the
+   * caller's half.
+   */
+  cancelPoisonTimers(chIdx: number): void {
+    if (chIdx === -1) return;
+    for (const timer of [...this.timers.getTimers()]) {
+      if (timer.function !== TimerFunction.TT_75) continue;
+      if ((timer.uByte5 & 0xff) !== (chIdx & 0xff)) continue;
+      this.timers.deleteTimer(timer.index);
+    }
   }
 
   private processSpellShieldTimer(timer: TimerEntry): void {

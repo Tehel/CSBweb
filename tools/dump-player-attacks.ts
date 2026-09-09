@@ -27,6 +27,7 @@ import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType, MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables, monsterInvincible, monsterNonMaterial } from '../src/renderer/csbwin/ObjectTables';
@@ -47,7 +48,7 @@ function champion(i: number, name: string, fighterExp: number): Champion {
     name,
     attributes: {
       health: 200, maxHealth: 200, stamina: 200, maxStamina: 200, mana: 60, maxMana: 60,
-      luck: 60, strength: 90, dexterity: 90, wisdom: 50, vitality: 50, antiMagic: 20, antiFire: 20,
+      stats: makeAddCharacterAttributes([60, 90, 90, 50, 50, 20, 20]),
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,

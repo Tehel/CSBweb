@@ -16,6 +16,7 @@ import {
     MovementAction,
     assignPresetHeroPossessions,
     createChampionFromPreset,
+    makeAddCharacterAttributes,
     createSkillsFromSubskillLevels,
     type AddCharacterTables,
     type Champion,
@@ -122,13 +123,15 @@ export function createDevTools(host: DevHost): DevTools {
                 maxStamina,
                 mana: alive ? randomInt(0, maxMana) : 0,
                 maxMana,
-                luck: randomInt(20, 80),
-                strength: randomInt(20, 80),
-                dexterity: randomInt(20, 80),
-                wisdom: randomInt(20, 80),
-                vitality: randomInt(20, 80),
-                antiMagic: randomInt(20, 80),
-                antiFire: randomInt(20, 80),
+                stats: makeAddCharacterAttributes([
+                    randomInt(20, 80), // Luck
+                    randomInt(20, 80), // Strength
+                    randomInt(20, 80), // Dexterity
+                    randomInt(20, 80), // Wisdom
+                    randomInt(20, 80), // Vitality
+                    randomInt(20, 80), // AntiMagic
+                    randomInt(20, 80), // AntiFire
+                ]),
                 experience: randomInt(0, 65000),
                 fighter: randomInt(1, 8),
                 ninja: randomInt(1, 8),
@@ -554,14 +557,14 @@ export function createDevTools(host: DevHost): DevTools {
         }
         try {
             const parsed = JSON.parse(raw) as { runtime: RuntimeSaveState; raw: string };
-            // A version-1 save has no world state in it at all — no cell flags, no
-            // object chains, no database records — so there is nothing to upgrade
-            // from. Restoring one would put the party back into a dungeon reset to
-            // `dungeon.dat`, which is the bug this version exists to fix.
+            // Older formats are discarded, not upgraded. A v1 save has no world state
+            // in it at all, so restoring one would put the party back into a dungeon
+            // reset to `dungeon.dat`; a v2 save has champions whose attributes are
+            // flat numbers with no maximum or minimum to restore.
             if (parsed.runtime?.version !== RUNTIME_SAVE_VERSION) {
                 updateDebug(
                     `Quick-save is format v${parsed.runtime?.version ?? '?'}, this build reads ` +
-                        `v${RUNTIME_SAVE_VERSION} — discarded (it carried no dungeon state)`,
+                        `v${RUNTIME_SAVE_VERSION} — discarded`,
                 );
                 localStorage.removeItem(QUICK_SAVEGAME_RAW_KEY);
                 return;

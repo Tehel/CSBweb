@@ -6,6 +6,7 @@
  */
 
 import type { ui8, ui16, i16, i32, Direction, Position, ObjectID } from '../core/types';
+import type { Attribute } from './attributes';
 
 // Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
 // CSBWin maps these via inventory button ids 8..20 and 21..37 (HandleClothingClick).
@@ -54,14 +55,15 @@ export interface ChampionAttributes {
     mana: ui16;             // Current mana
     maxMana: ui16;          // Maximum mana
 
-    // Base attributes
-    luck: ui8;
-    strength: ui8;
-    dexterity: ui8;
-    wisdom: ui8;
-    vitality: ui8;
-    antiMagic: ui8;
-    antiFire: ui8;
+    /**
+     * `CHARDESC.Attributes[7]` (`doc/CSBwin-src/CSB.h:2565`), indexed by
+     * `AttributeIndex`. Each entry is a (maximum, current, minimum) triple, not a
+     * single number: a level gain raises the maximum, a potion the current, a cursed
+     * object the minimum, and the stats panel colours a line by comparing the first
+     * two. Read and write it through the helpers in `attributes.ts`, which carry
+     * CSBWin's byte-wrap and its "above 240 means negative" rule.
+     */
+    stats: Attribute[];
 
     // Experience
     experience: ui16;
@@ -146,6 +148,18 @@ export interface PartyState {
     magicCasterIndex: number;   // -1 = none
     cursorOwner: number;        // -1 = none
     selectedCharacterIndex: number; // -1 = none
+    /**
+     * `d.PotentialCharacterOrdinal - 1` (`doc/CSBwin-src/Data.h:933`) — the champion
+     * standing in a Hall of Champions mirror who has been provisionally added but not
+     * confirmed, or -1. They are counted in the party yet skipped by every "find a
+     * living champion" search. Nothing sets this yet; Phase 13 step 4 will.
+     */
+    potentialChampionIndex?: number;
+    /**
+     * `d.GameIsLost` (`doc/CSBwin-src/Character.cpp:2683`) — set when `KillCharacter`
+     * finds no living champion left.
+     */
+    gameIsLost?: boolean;
     objectInHand?: ObjectID | null; // Object on cursor (CSBWin d.objectInHand)
     partyShield?: ui16;         // Optional party shield strength
     fireShield?: ui16;          // Optional fire shield strength
