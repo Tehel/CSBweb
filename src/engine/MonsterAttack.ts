@@ -18,6 +18,7 @@
  */
 import { OBJECT_ID_EOF, Position, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
+import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
@@ -46,9 +47,6 @@ const THROWABLE: ReadonlySet<number> = new Set([
   RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,
   RN_ZO_SPELL, RN_POISON_CLOUD, RN_POISON_BOLT,
 ]);
-
-/** `misc_BonesOfHero` (`doc/CSBwin-src/Objects.h`). */
-const MISC_BONES_OF_HERO = 25;
 
 /**
  * `attackParameters` (`doc/CSBwin-src/Monster.cpp:919-941`).

@@ -41,6 +41,7 @@ import type { DsaSystem, PartyAttackFilter } from './DsaSystem';
 import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
+import { characterAtPosition } from './AddCharacter';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterSystem } from './MonsterSystem';
@@ -435,16 +436,13 @@ export class AttackSystem {
     return OBJECT_ID_EOF as ObjectID;
   }
 
-  /** `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4046`). */
+  /**
+   * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4046`), shared with
+   * `AddCharacter` and the Vi altar rather than kept as a second copy — the two
+   * transcriptions had already drifted apart on whether a dead champion holds a corner.
+   */
   private characterAtPosition(pos: number): number {
-    const champions = this.champions();
-    for (let i = 0; i < champions.length; i++) {
-      const champ = champions[i];
-      if (!champ) continue;
-      if ((champ.partyPosition | 0) !== pos) continue;
-      if ((champ.attributes.health | 0) !== 0) return i;
-    }
-    return -1;
+    return characterAtPosition(this.champions(), pos);
   }
 
   /**

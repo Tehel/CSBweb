@@ -17,7 +17,7 @@ import type {
 } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
-import { Party, ensureHandOwner, selectMagicCaster, setHandOwner } from './Party';
+import { Party, ensureHandOwner, findChampionByFingerprint, selectMagicCaster, setHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
@@ -2362,11 +2362,43 @@ export class Game {
         return added;
     }
 
+    /**
+     * Dropping bones into the Vi altar's alcove (`doc/CSBwin-src/Mouse.cpp:894-960`).
+     *
+     * The two arms are the same pair `ProcessTT_ViAltar` runs on, and the difference
+     * between them is the whole point. Bones made by a **death** carry an expool
+     * record holding the champion's fingerprint; there `value` is the kind of bones
+     * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1264`), and the
+     * champion is found by fingerprint. Bones placed by the **dungeon** carry no
+     * record; there `value` is itself the champion index and there is no `== 2` test
+     * at all — which is why this used to demand `value == 2` unconditionally and so
+     * ignored every dungeon-authored bones object except one aimed at champion 2.
+     *
+     * Both arms refuse a champion who is not dead, so the altar cannot be used to
+     * resurrect the living.
+     */
     private maybeScheduleViAltar(obj: ObjectID, location: Position, posInCell: number): void {
         const misc = this.dungeonState.getMiscRecord(obj);
         if (!misc) return;
+        // `objNI_2 == objNI_Bones_a`.
         if ((misc.miscType | 0) !== MISC_BONES_OF_HERO) return;
-        if ((misc.specialState | 0) !== 2) return;
+
+        const party = this.party.state;
+        const fingerprint = this.dungeonState.copyChampionBonesRecord(obj);
+        let chIdx: number;
+        if (fingerprint !== null) {
+            chIdx = findChampionByFingerprint(party, fingerprint);
+            if (chIdx === -1) return;
+            if ((misc.specialState | 0) !== 2) return;
+        } else {
+            chIdx = (misc.specialState | 0) & 0x3;
+            // `if (chIdx < d.NumCharacter)`.
+            if (chIdx >= party.champions.length) return;
+        }
+        const champion = party.champions[chIdx];
+        if (!champion) return;
+        if (champion.alive !== false && (champion.attributes?.health ?? 0) !== 0) return;
+
         this.timerSystem.scheduleViAltar(obj, location, posInCell, this.state.tickCount);
     }
 

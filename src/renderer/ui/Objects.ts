@@ -10,6 +10,7 @@ import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from 
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { TextDecodeTables } from '../../engine/DungeonState';
 import { Champion } from '../../engine/gameTypes';
+import { findChampionByFingerprint } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIMode, UIState } from './UIState';
@@ -207,9 +208,8 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
     if (misc?.miscType === MISC_BONES_OF_HERO) {
       const fingerprint = ui.dungeonState.copyChampionBonesRecord(objectId);
       if (fingerprint !== null && ui.partyState) {
-        const champ = ui.partyState.champions.find(
-          (c) => (c?.fingerprint ?? 0) === (fingerprint & 0xffff)
-        );
+        const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
+        const champ = chIdx === -1 ? null : ui.partyState.champions[chIdx];
         if (champ?.name) name = `${champ.name}${name}`;
       }
     }

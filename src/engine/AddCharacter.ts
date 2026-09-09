@@ -70,10 +70,24 @@ export function findFreeCharPosition(champions: Champion[], partyFacing: number)
   return (step + partyFacing) & 3;
 }
 
-/** `CharacterAtPosition` — the champion standing in a given corner, or -1. */
+/**
+ * `CharacterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:4046`) — the champion standing
+ * in a given corner, or -1.
+ *
+ * A corner held by a **dead** champion counts as free: CSBWin returns `i` only inside
+ * `if (d.CH16482[i].HP() != 0)` and otherwise keeps looking (`:4062-4066`). That is
+ * load-bearing in both callers. A new champion may take a corpse's corner; and
+ * `BringCharacterToLife` asks this about the champion it is *about to* revive, who is
+ * still dead — were they to match themselves, every resurrection would relocate, and
+ * a full party of four would send the free-corner search below off the end.
+ */
 export function characterAtPosition(champions: Champion[], position: number): number {
   for (let i = 0; i < champions.length; i++) {
-    if ((champions[i]?.partyPosition ?? -1) === position) return i;
+    const champ = champions[i];
+    if (!champ) continue;
+    if ((champ.partyPosition | 0) !== position) continue;
+    if (champ.alive === false) continue;
+    if ((champ.attributes?.health | 0) !== 0) return i;
   }
   return -1;
 }

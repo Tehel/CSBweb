@@ -12,6 +12,8 @@ import type { CsbRandom } from '../core/random';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
+import { characterAtPosition } from './AddCharacter';
+import { findChampionByFingerprint } from './Party';
 import type {
   ActuatorRecord,
   CreatureRecord,
@@ -1248,7 +1250,12 @@ export class TimerSystem {
     const bones = (timer.object ?? OBJECT_ID_EOF) as number;
     if (bones === OBJECT_ID_EOF) return;
 
+    // `CreateCloud(RN(RNffe4), 0, bonesX, bonesY, bonesX, bonesY, D5W, NULL)`
+    // (`doc/CSBwin-src/Timer.cpp:2730`) — the resurrection's only visible effect, and
+    // the reason the altar takes five ticks to answer: `createCloud` gives `RNffe4`
+    // a 5-tick first turn, and this state waits the same five before moving on.
     if (state === 2) {
+      this.createCloud(RN_FFE4, 0, location.x, location.y, location, pos);
       this.queueViAltarTimer(bones, location, pos, 1, (timer.time + 5) >>> 0);
       return;
     }
@@ -1260,13 +1267,32 @@ export class TimerSystem {
       let consumeBonesRecord = false;
       const fingerprint = this.dungeon.copyChampionBonesRecord(target);
       if (fingerprint !== null) {
-        chIdx = this.findChampionIndexByFingerprint(fingerprint);
+        const found = findChampionByFingerprint(this.getPartyState(), fingerprint);
+        chIdx = found === -1 ? null : found;
+        // ⏳ CSBWin's other arm here is the wings: a champion whose fingerprint
+        // matches nobody in the party is fetched with `CHARDESC::GetFromWings`,
+        // healed to `MaxHP/2`, saved back, and the bones deleted with the timer
+        // stopping there (`doc/CSBwin-src/Timer.cpp:2769-2782`). This port has no
+        // wings — no store of champions who have left the party — so there is
+        // nothing to look in, and the bones are left on the floor rather than
+        // silently destroyed.
         if (chIdx === null) return;
         if (!this.isChampionDead(this.getPartyState().champions[chIdx])) return;
         consumeBonesRecord = true;
       } else {
-        chIdx = this.findViAltarChampionIndex();
-        if (chIdx === null) return;
+        // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2789`). Bones with no
+        // expool record were placed by the dungeon rather than by a death, and their
+        // `value` — `DB10`'s bits 14-15, this port's `specialState`
+        // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index. This used to guess
+        // instead, resurrecting the one dead champion if there was exactly one and
+        // refusing outright if there were two.
+        const record = this.dungeon.getMiscRecord(target as ObjectID);
+        if (!record) return;
+        chIdx = (record.specialState ?? 0) & 0x3;
+        const champ = this.getPartyState().champions[chIdx];
+        // `if (chIndex < d.NumCharacter)`, then `if (HP() != 0) break`.
+        if (!champ) return;
+        if (!this.isChampionDead(champ)) return;
       }
       if (!this.dungeon.removeObjectFromCell(location, target)) return;
       this.dungeon.deleteDBEntry(target);
@@ -1277,7 +1303,7 @@ export class TimerSystem {
 
     if (state === 0) {
       const chIdx = pos & 0x3;
-      this.reviveChampion(chIdx);
+      this.bringCharacterToLife(chIdx);
     }
   }
 
@@ -1326,45 +1352,42 @@ export class TimerSystem {
     return null;
   }
 
-  private findViAltarChampionIndex(): number | null {
-    const party = this.getPartyState();
-    let candidate: number | null = null;
-    for (let i = 0; i < party.champions.length; i++) {
-      const champ = party.champions[i];
-      if (!champ) continue;
-      if (!this.isChampionDead(champ)) continue;
-      // CSBwin resolves bones to a specific champion; only revive when unambiguous here.
-      if (candidate !== null) return null;
-      candidate = i;
-    }
-    return candidate;
-  }
-
-  private findChampionIndexByFingerprint(fingerprint: number): number | null {
-    const party = this.getPartyState();
-    for (let i = 0; i < party.champions.length; i++) {
-      const champ = party.champions[i];
-      if (!champ) continue;
-      if ((champ.fingerprint ?? 0) === (fingerprint & 0xffff)) return i;
-    }
-    return null;
-  }
-
   private isChampionDead(champ: PartyState['champions'][number]): boolean {
     const health = champ.attributes?.health ?? 0;
     if (health <= 0) return true;
     return champ.alive === false;
   }
 
-  private reviveChampion(chIdx: number): void {
+  /**
+   * `BringCharacterToLife` (`doc/CSBwin-src/Character.cpp:804`).
+   *
+   * The order matters and is CSBWin's: the corner is settled **before** the champion
+   * is alive again, because `CharacterAtPosition` ignores the dead — so the champion
+   * never collides with themselves, and the free-corner search below always has one
+   * to find (at most three of four can be living while this runs).
+   *
+   * The `MaxHP` cut is permanent, not a temporary weakening: dying costs a champion
+   * a 64th of their maximum health for good, floored at 25.
+   */
+  private bringCharacterToLife(chIdx: number): void {
     const party = this.getPartyState();
     const champ = party.champions[chIdx];
     if (!champ) return;
+
+    if (characterAtPosition(party.champions, champ.partyPosition | 0) !== -1) {
+      let free = 0;
+      while (characterAtPosition(party.champions, free) !== -1) free++;
+      champ.partyPosition = free & 0xff;
+    }
+
     const maxHealth = champ.attributes?.maxHealth ?? 0;
     const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
     champ.attributes.maxHealth = reducedMax;
     champ.attributes.health = Math.floor(reducedMax / 2);
     champ.alive = true;
+    // `pcA3->facing = (ui8)d.partyFacing` (`:823`) — a champion who comes back looks
+    // the way the party is looking, not the way they died.
+    champ.facing = party.facing;
   }
 
   private createMissileRecord(

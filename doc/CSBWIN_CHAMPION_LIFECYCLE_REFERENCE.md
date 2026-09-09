@@ -201,15 +201,35 @@ set when the decoration in front is the ornate alcove (`CSBCode.cpp:3301`).
 `ProcessTT_ViAltar` (`Timer.cpp:2709`) runs three states downward:
 
 - **2** — `CreateCloud(RNffe4, …)` over the bones, `Time += 5`, reschedule at state 1.
-- **1** — find the bones again in the cell, resolve the champion (by fingerprint, or by
-  the record's `value` as a champion index when there is no bones record), refuse if
-  they are not dead, remove and delete the bones, `Time += 1`, reschedule at state 0
-  with `packedPos = chIndex`. A champion found only in the wings is healed to
-  `MaxHP/2` and saved back, and the timer stops there.
+- **1** — find the bones again in the cell, resolve the champion, refuse if they are
+  not dead, remove and delete the bones, `Time += 1`, reschedule at state 0 with
+  `packedPos = chIndex`. A champion found only in the wings is healed to `MaxHP/2` and
+  saved back, and the timer stops there.
+
+  **Resolving the champion has two arms, and they read `value` differently.** With an
+  expool bones record (bones left by a death), the fingerprint in that record names the
+  champion and `value` is the *kind* of bones — 0 inert, 1 named, **2 a dead
+  champion's** (`CSB.h:1258-1264`). With no expool record (bones the dungeon author
+  placed), `chIndex = DB10A2->value()` — `value` *is* the champion index
+  (`Timer.cpp:2789`, and `Objects.h:192` says so in the enum itself).
+
+  The drop-into-the-alcove handler that schedules the timer has the **same two arms**
+  (`Mouse.cpp:894-960`), and the asymmetry matters there too: the fingerprint arm
+  additionally requires `value() == 2`, and the `value`-as-index arm has no such test —
+  it requires only `chIdx < d.NumCharacter` and a dead champion.
 - **0** — `BringCharacterToLife(packedPos)`.
 
 `BringCharacterToLife` (`Character.cpp:804`) moves the champion to a free
 `charPosition` if theirs is taken, then:
+
+The order is the subtle part. The corner is settled **before** the champion is alive
+again, and `CharacterAtPosition` (`Code11f52.cpp:4046`) returns an index only for a
+champion whose `HP() != 0` — a corner held by a corpse counts as free. So the champion
+being revived never collides with themselves, and the unbounded search
+`for (D7W=0; CharacterAtPosition(D7W)!=-1; D7W++)` always terminates: at most three of
+four champions can be living while it runs. The same rule is why `AddCharacter` may
+seat a new champion in a dead one's corner (`:522-528`).
+
 
 ```
 MaxHP = Larger(25, MaxHP - MaxHP/64 - 1);

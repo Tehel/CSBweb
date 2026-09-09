@@ -329,6 +329,25 @@ function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
 }
 
 /**
+ * `CHARDESC::CopyCharacter` (`doc/CSBwin-src/Character.cpp:5239`), party half — the
+ * champion a bones fingerprint belongs to, or -1.
+ *
+ * ⚠️ CSBWin searches the party and then `GetFromWings`, the store of champions who
+ * have left it. This port has no wings, so a fingerprint that matches nobody in the
+ * party is simply unknown here where CSBWin might still resolve it. Every caller is
+ * written to fail closed on -1 rather than guess.
+ */
+export function findChampionByFingerprint(party: PartyState, fingerprint: number): number {
+    const wanted = fingerprint & 0xffff;
+    for (let i = 0; i < party.champions.length; i++) {
+        const champion = party.champions[i];
+        if (!champion) continue;
+        if (((champion.fingerprint ?? 0) & 0xffff) === wanted) return i;
+    }
+    return -1;
+}
+
+/**
  * `SelectMagicCaster` (`doc/CSBwin-src/Magic.cpp:716-740`) — move the magic tab to
  * another champion.
  *

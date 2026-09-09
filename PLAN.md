@@ -54,8 +54,9 @@ Verified against the code, not inherited from earlier revisions of this file.
    champion leaves bones. `Attack.cpp` is ported too: the attack menu offers each
    champion's legal options and every attack type resolves, through the Party Attack
    Filter. Lord Chaos's fusion endgame is the one deliberate omission.
-3. 🔄 **Champion death and bones work** (Phase 12), the Vi altar resurrects (with
-   gaps), potions are drinkable, and the **Hall of Champions works**: a mirror click
+3. 🔄 **Champion death and bones work** (Phase 12), the **Vi altar resurrects** (only
+   the wings branch is left), potions are drinkable, and the **Hall of Champions
+   works**: a mirror click
    offers Resurrect / Reincarnate / Cancel and the party is built the way DM builds it
    (Phase 13 step 4). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
    (maximum, current, minimum) triple, `AdjustStamina`, `SelectMagicCaster` +
@@ -87,14 +88,14 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twenty-one assertion-carrying verification tools** — the Phase 12 nine
+2. **Twenty-two assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
    `dump-savegame-blocks.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
-   `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts` and
-   `dump-hall-of-champions.ts`.
+   `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts`,
+   `dump-hall-of-champions.ts` and `dump-vi-altar.ts`.
    `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
@@ -790,19 +791,49 @@ one missing primitive.
    anything else.
 2. ✅ **Item naming.** `getObjectDisplayName` prefixes the champion's name to the bones
    (`src/renderer/ui/Objects.ts:203`), matching
-   `doc/CSBwin-src/Character.cpp:3549-3580`.
+   `doc/CSBwin-src/Character.cpp:3549-3580`. Only actually reachable since the
+   `misc_Boulder` mix-up under step 3 was fixed: the objects it tests for were never
+   being created.
    ⚠️ It resolves the fingerprint against the *live party* only; CSBWin's
    `CHARDESC::CopyCharacter` also searches the wings (`:5239`), which we do not have.
-3. 🔄 **Resurrection at the Vi altar.** The `TT_VI_ALTAR` three-state timer is ported
-   (`src/engine/TimerSystem.ts:1143`) and the reduced-HP rule is in `reviveChampion`.
-   ⏳ Gaps against `doc/CSBwin-src/Timer.cpp:2709` and `Character.cpp:804`:
-   - state 2 does not `CreateCloud(RNffe4)` over the bones, so the resurrection has no
-     visible effect;
-   - `reviveChampion` does not relocate the champion to a free `charPosition` when
-     theirs is taken, nor reset `facing`, nor redraw;
-   - the wings branch (a champion no longer in the party) is absent, and
-     `findViAltarChampionIndex` refuses when more than one champion is dead where
-     CSBWin reads the index straight out of the bones record's `value`.
+3. ✅ **Resurrection at the Vi altar.** The `TT_VI_ALTAR` three-state timer is ported
+   (`src/engine/TimerSystem.ts`), and the four gaps this step carried are closed:
+   - state 2 now calls `CreateCloud(RNffe4)` over the bones
+     (`doc/CSBwin-src/Timer.cpp:2730`), so the resurrection is visible;
+   - `reviveChampion` became `bringCharacterToLife` and does the whole of
+     `doc/CSBwin-src/Character.cpp:804` — the free-`charPosition` search when theirs is
+     taken, and `facing = partyFacing`;
+   - `findViAltarChampionIndex`, which guessed, is deleted. State 1's second arm reads
+     `chIndex = DB10A2->value()` (`Timer.cpp:2789`) — for bones with no expool record
+     the `value` field **is** the champion index, which `src/core/constants.ts` already
+     said and nothing acted on;
+   - the same two arms are now in the drop handler that *schedules* the timer
+     (`Mouse.cpp:894-960`). `maybeScheduleViAltar` had only ever tested
+     `value == 2`, which is the fingerprint arm's rule; a dungeon-authored bones object
+     aimed at any champion but index 2 could not be placed in the altar at all.
+
+   ⏳ **The wings are still absent** — CSBWin resolves a fingerprint that matches
+   nobody in the party through `CHARDESC::GetFromWings`, heals that champion to
+   `MaxHP/2` and saves them back (`Timer.cpp:2769-2782`). This port has no store of
+   champions who have left the party, so there is nothing to search; the bones are left
+   on the floor rather than silently destroyed. `Party.findChampionByFingerprint` is
+   the one place that would grow the second half, and it names the gap.
+
+   Along the way: three ad-hoc copies of `CHARDESC::CopyCharacter`'s party search
+   (`TimerSystem`, `Game`, `Objects.ts`) collapsed into that one function, and the two
+   copies of `CharacterAtPosition` into one — they had already drifted, `AddCharacter`'s
+   omitting CSBWin's `HP() != 0` test. That omission was load-bearing in the opposite
+   direction: without it a revived champion matches *themselves* and every
+   resurrection relocates, and a full party sends the free-corner search off the end.
+
+   `tools/dump-vi-altar.ts` drives both arms, the refusal of a living champion and the
+   corner search (20 checks). It found **a real bug before it could even run**:
+   `MonsterAttack.ts` declared its own `MISC_BONES_OF_HERO = 25` next to the correct
+   `5` in `src/core/constants.ts` (`doc/CSBwin-src/Objects.h:192`), so every champion
+   who died left a **boulder** (`misc_Boulder = 25`). Nothing downstream recognised it:
+   the bones never took the champion's name (step 2, believed done), and the altar
+   could never accept them — the entire death → altar → resurrection path was dead, in
+   a step marked as working.
 
    **Reincarnation is not here** — it belongs to the Hall of Champions, step 4.
 4. 🔄 **Character creation.** `main.ts`'s `addCharacterFromPortrait`, which dropped a
@@ -966,7 +997,7 @@ one missing primitive.
    groups. Masked until now because the runtime half also carries `dungeon.item16` and
    is applied after.
 
-Status: 🔄 in progress — prerequisites and steps 6, 8 and 9 done; steps 1, 2, 3, 4 and 5
+Status: 🔄 in progress — prerequisites and steps 3, 6, 8 and 9 done; steps 1, 2, 4 and 5
 done bar the gaps noted against each; step 7 open.
 
 ### Phase 15 — Verification
@@ -975,7 +1006,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   twenty-one asserting tools, then four non-asserting dumps as crash-only smoke, then
+   twenty-two asserting tools, then four non-asserting dumps as crash-only smoke, then
    the frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.
