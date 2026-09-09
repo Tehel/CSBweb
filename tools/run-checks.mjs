@@ -39,6 +39,7 @@ const CHECKS = [
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-vi-altar.ts' },
+  { tool: 'dump-status-boxes.ts' },
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },

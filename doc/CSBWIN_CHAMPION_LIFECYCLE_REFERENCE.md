@@ -57,6 +57,28 @@ The function every potion goes through. It is deliberately lopsided:
 - a **loss** is bounded only by the attribute's own Minimum;
 - neither direction touches Maximum.
 
+### The eye and mouth boxes (`Character.cpp:1363-1392`)
+
+Inside the `CHARFLAG_statsChanged` block, with the inventory open, two blits of the same
+shape choose between graphic **33** (plain) and **34** (marked):
+
+| Box | Rectangle | Marked when |
+| --- | --- | --- |
+| Mouth | `d.Word1398` | `food < 0`, `water < 0`, or `poisonCount != 0` |
+| Eye | `d.Word1406` | any of `Attributes[1..6]` has `Current() < Maximum()` |
+
+The eye loop is `for (D4W=1; D4W<=6; D4W++)`, so **Luck (index 0) can never mark it**.
+
+This is the "red square that appears on a level gain", and it has nothing to do with
+levels: `LevelUp` raises the *maxima* (`Magic.cpp:98-148`) and leaves Current where it
+was, so the gap opens. A champion drained by a monster shows exactly the same box.
+
+Both are `BLT2Viewport(…, 16, 12)`, which reads **16 bytes of source per line** — 32
+pixels, an 18-pixel row padded up to whole bitplane groups — with **12 as the
+transparent colour**, so the eye or mouth beneath shows through the frame. The
+destination rectangles are 18x18. The 16 and the 12 are a stride and a colour, not a
+width and a height.
+
 ### Where Current vs Maximum shows on screen
 
 - The **stats panel** colours each of attributes 1..6 (Luck is never listed):

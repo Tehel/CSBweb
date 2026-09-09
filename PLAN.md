@@ -61,7 +61,7 @@ Verified against the code, not inherited from earlier revisions of this file.
    (Phase 13 step 4). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
    (maximum, current, minimum) triple, `AdjustStamina`, `SelectMagicCaster` +
    `gameIsLost`, and poison as a `TT_75` timer chain. What is left in Phase 13 is the
-   name-entry screen behind Reincarnate and the eye/mouth boxes (step 7).
+   name-entry screen behind Reincarnate.
 4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
    ported, so clouds shrink, damage and expire (Phase 9 step 13).
 5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
@@ -88,14 +88,14 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twenty-two assertion-carrying verification tools** — the Phase 12 nine
+2. **Twenty-four assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
    `dump-savegame-blocks.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
    `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts`,
-   `dump-hall-of-champions.ts` and `dump-vi-altar.ts`.
+   `dump-hall-of-champions.ts`, `dump-vi-altar.ts` and `dump-status-boxes.ts`.
    `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
@@ -951,14 +951,30 @@ one missing primitive.
    `130 - armour` scaling (`doc/CSBwin-src/Character.cpp:2780`). Every fixture in the
    tools is unarmoured, where `0 >> 1` is still 0, so nothing had shown it. It affects
    pit falls and both cloud damage paths.
-7. 🔄 **Red square around the eye on level gain.** Diagnosed: it is not level-specific.
-   The box around the eye is graphic **34** when any of attributes 1..6 has
-   Current < Maximum and graphic **33** otherwise
-   (`doc/CSBwin-src/Character.cpp:1379-1392`); a level gain raises the maxima and
-   Current falls behind. Prerequisite 0 supplies the comparison — the stats panel now
-   colours correctly — but **neither box is drawn yet**: the open inventory omits both
-   the eye box and the matching mouth box (graphic 34 when `food < 0`, `water < 0` or
-   poisoned, `:1363-1377`).
+7. ✅ **The eye and mouth boxes are drawn.** `drawMouthAndEyeBoxes`
+   (`src/renderer/ui/Inventory.ts`) ports both blits of
+   `doc/CSBwin-src/Character.cpp:1363-1392`: graphic **34** in place of **33** for the
+   mouth when `food < 0`, `water < 0` or poisoned, and for the eye when any of
+   attributes **1..6** has Current < Maximum. Luck is index 0 and CSBWin's loop starts
+   at 1, so it can never mark the eye. Both go into `d.Word1398` / `d.Word1406`, which
+   were already extracted, with transparent colour 12 so the icon shows through.
+
+   The "red square on level gain" is answered and is **not level-specific**: a level
+   raises the maxima (`Magic.cpp:98-148`) and leaves Current behind, and a drained
+   champion shows the identical box.
+
+   ⚠️ **The golden frames cannot see this**, and said so: all five were byte-identical
+   after the change, because graphic 33 is the same pixels as the background beneath it
+   and the frames only ever capture a fed, undamaged party.
+   `tools/dump-status-boxes.ts` (28 checks) covers it instead — both rectangles out of
+   `graphics.dat`, both graphics measured and proved to *differ*, and every arm of both
+   predicates. Verified red in the browser too, at a champion made starving, poisoned
+   and Strength-drained at once.
+
+   One transcription trap worth keeping: `BLT2Viewport(…, 16, 12)` is a **16-byte
+   source stride** (32 pixels) and transparent colour 12 — not a 16x12 image. The boxes
+   are 18x18 on screen, and 18 pixels padded up to whole bitplane groups is what makes
+   the stride 32. Passing the visible width as the stride would skew every row.
 8. ✅ **The rest of `KillCharacter`'s tail** (`doc/CSBwin-src/Character.cpp:2670-2694`)
    — done as prerequisite 2. The cursor and the magic tab both move to the first living
    champion, `gameIsLost` is set when there is none, and `CurePoison` runs on the
@@ -997,8 +1013,10 @@ one missing primitive.
    groups. Masked until now because the runtime half also carries `dungeon.item16` and
    is applied after.
 
-Status: 🔄 in progress — prerequisites and steps 3, 6, 8 and 9 done; steps 1, 2, 4 and 5
-done bar the gaps noted against each; step 7 open.
+Status: 🔄 in progress — prerequisites and steps 3, 6, 7, 8 and 9 done; steps 1, 2 and 5
+done bar the gaps noted against each. **All that is left is the Reincarnate name-entry
+screen under step 4** (`doc/CSBwin-src/Code13ea4.cpp:20`); every other open item in the
+phase is a deferral recorded against its step.
 
 ### Phase 15 — Verification
 
@@ -1006,7 +1024,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   twenty-two asserting tools, then four non-asserting dumps as crash-only smoke, then
+   twenty-four asserting tools, then four non-asserting dumps as crash-only smoke, then
    the frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.

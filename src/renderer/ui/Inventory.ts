@@ -10,6 +10,7 @@ import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/o
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { TextDecodeTables } from '../../engine/DungeonState';
 import { Champion } from '../../engine/gameTypes';
+import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
@@ -115,6 +116,67 @@ export function drawInventoryScreen(ui: UIState): void {
   drawMouthChewAnimation(ui);
   drawEyeIcon(ui);
   drawVitalsAndLoad(ui, champion);
+  drawMouthAndEyeBoxes(ui, champion);
+}
+
+/**
+ * The boxes around the mouth and the eye (`doc/CSBwin-src/Character.cpp:1363-1392`).
+ *
+ * Two blits of the same shape from the `CHARFLAG_statsChanged` block, differing only
+ * in which graphic each picks. Graphic **33** is the plain box and **34** the marked
+ * one, and each says one thing about the champion:
+ *
+ * - the **mouth** is marked when `food < 0`, `water < 0` or the champion is poisoned —
+ *   starving, parched or ill;
+ * - the **eye** is marked when any of attributes **1..6** has Current below Maximum.
+ *   Luck (index 0) is deliberately outside the loop.
+ *
+ * The second one is what a player reads as "the red square after a level gain": a
+ * level raises the *maxima* (`doc/CSBwin-src/Magic.cpp:98-148`) and leaves Current
+ * where it was, so the gap opens and the box changes. Nothing about it is
+ * level-specific — a drained champion shows the same box.
+ *
+ * Both are drawn last and over the icons, as CSBWin draws them, with transparent
+ * colour 12 so the eye or mouth shows through the frame.
+ */
+export function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
+  if (!ui.uiTables || !ui.screenIndexBuffer) return;
+  const g232 = ui.uiTables.graphic232;
+  // `BLT2Viewport(…, 16, 12)`: 16 *bytes* per source line, which is 32 pixels, and 12
+  // is the transparent colour, not a height.
+  blitBasicGraphicToViewport(ui, mouthBoxGraphic(champion), g232.word1398, 32, 12);
+  blitBasicGraphicToViewport(ui, eyeBoxGraphic(champion), g232.word1406, 32, 12);
+}
+
+/** The plain box, and the one that marks something wrong. */
+export const BOX_GRAPHIC_PLAIN = 33;
+export const BOX_GRAPHIC_MARKED = 34;
+
+/**
+ * `if (food < 0 || water < 0 || poisonCount != 0)` (`doc/CSBwin-src/Character.cpp:1363`).
+ *
+ * Note `< 0`, not `<= 0`: a champion at exactly zero food is not yet starving.
+ */
+export function mouthBoxGraphic(champion: Champion): number {
+  const hungry = (champion.food ?? 0) < 0;
+  const thirsty = (champion.water ?? 0) < 0;
+  const poisoned = (champion.poisonCount ?? 0) !== 0;
+  return hungry || thirsty || poisoned ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
+}
+
+/**
+ * `for (D4W=1; D4W<=6; D4W++)` over Current vs Maximum
+ * (`doc/CSBwin-src/Character.cpp:1379-1392`).
+ *
+ * The loop starts at **1**, so Luck can never mark the eye however far it has fallen.
+ */
+export function eyeBoxGraphic(champion: Champion): number {
+  for (let i = AttributeIndex.Strength; i <= AttributeIndex.AntiFire; i++) {
+    const attr = champion.attributes?.stats?.[i];
+    if (!attr) continue;
+    if (attributeCurrent(attr) < attributeMaximum(attr)) return BOX_GRAPHIC_MARKED;
+  }
+  return BOX_GRAPHIC_PLAIN;
 }
 
 /**
