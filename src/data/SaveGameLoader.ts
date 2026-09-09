@@ -8,6 +8,7 @@
 import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
 import { DBType } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
+import type { PartyState } from '../engine/gameTypes';
 
 export interface SaveGameState {
   item16: Item16Record[];
@@ -23,6 +24,13 @@ export interface SaveGameState {
   extendedWallDecorations?: boolean;
   specialLocations?: Record<number, number>;
   spellFilterLocation?: number;
+  /**
+   * `gb2.handChar` — the champion index holding the cursor, -1 for nobody.
+   * `LoadGame` restores `d.HandChar` from it (`doc/CSBwin-src/SaveGame.cpp:1636`).
+   */
+  handChar?: number;
+  /** `gb2.MagicCaster`, restored on the next line of the same function (`:1637`). */
+  magicCaster?: number;
 }
 
 interface Block1 {
@@ -38,9 +46,19 @@ interface Block1 {
   timerQueueChecksum: number;
 }
 
+/**
+ * The fields of `GAMEBLOCK2` this port reads. The block is 128 bytes and every offset
+ * in it is spelled out in CSBWin's own struct comments
+ * (`doc/CSBwin-src/SaveGame.cpp:107-133`); what is missing here is missing because
+ * nothing consumes it yet, not because the layout is unknown.
+ */
 interface Block2 {
   maxTimers: number;
   maxItem16: number;
+  /** `gb2.handChar` (offset 20) — the champion *index* holding the cursor. */
+  handChar: number;
+  /** `gb2.MagicCaster` (offset 22) — the champion index whose rune panel is up. */
+  magicCaster: number;
 }
 
 const BLOCK1_SIZE = 512;
@@ -63,10 +81,33 @@ function readU32LE(buf: Uint8Array, off: number): number {
   return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
 }
 
+/**
+ * The save file's own byte order.
+ *
+ * Every word of GAMEBLOCK1, GAMEBLOCK2, `ITEM16`, the characters and the timers is
+ * **big-endian**, inherited from the Atari. CSBWin never says so outright; it says it
+ * by reading each word through `LE16()`, which on the little-endian build it ships
+ * as is a byte swap (`doc/CSBwin-src/CSBTypes.h:146`). So `Unscramble`'s hash
+ * arithmetic runs on `LE16(wordGear(A3))` (`doc/CSBwin-src/CSBCode.cpp:9057-9061`),
+ * `ReadUnscrambleBlock` sums `LE16(wordGear(...))` (`:9083-9098`), and `swapBlock2`
+ * `BO()`s every field afterwards (`doc/CSBwin-src/SaveGame.cpp:455-478`) — three
+ * statements of the same fact.
+ *
+ * The one part of the file that is *not* big-endian is the CSB "Extended Features"
+ * header, which is a PC-era addition written in native order:
+ * `SwapExtendedFeaturesBlock` swaps it only `#ifdef _bigEndian`
+ * (`doc/CSBwin-src/SaveGame.cpp:275-293`), so on the shipping build it is a no-op and
+ * the block stays little-endian. That is why `readU16LE`/`readU32LE` survive here and
+ * are used for exactly that block, and nothing else.
+ */
 function readU16BE(buf: Uint8Array, off: number): number {
   const hi = buf[off] ?? 0;
   const lo = buf[off + 1] ?? 0;
   return ((hi << 8) | lo) & 0xffff;
+}
+
+function readI16BE(buf: Uint8Array, off: number): number {
+  return (readU16BE(buf, off) << 16) >> 16;
 }
 
 function readU32BE(buf: Uint8Array, off: number): number {
@@ -94,9 +135,9 @@ function applyBigActuators(dungeon: DungeonData): void {
   dungeon.bigActuators = true;
 }
 
-function writeU16LE(buf: Uint8Array, off: number, value: number): void {
-  buf[off] = value & 0xff;
-  buf[off + 1] = (value >> 8) & 0xff;
+function writeU16BE(buf: Uint8Array, off: number, value: number): void {
+  buf[off] = (value >> 8) & 0xff;
+  buf[off + 1] = value & 0xff;
 }
 
 function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
@@ -105,7 +146,7 @@ function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): nu
   let count = numWords & 0xffff;
   let off = 0;
   while (count !== 0) {
-    const word = readU16LE(buf, off);
+    const word = readU16BE(buf, off);
     result = (result + word) & 0xffff;
     result = (result + (word ^ hash)) & 0xffff;
     hash = (hash + count) & 0xffff;
@@ -121,11 +162,11 @@ function scramble(buf: Uint8Array, initialHash: number, numWords: number): numbe
   let d5 = initialHash & 0xffff;
   let off = 0;
   while (d6 !== 0) {
-    const plain = readU16LE(buf, off);
+    const plain = readU16BE(buf, off);
     const word = plain ^ d7;
     d5 = (d5 + word) & 0xffff;
-    buf[off] = word & 0xff;
-    buf[off + 1] = (word >> 8) & 0xff;
+    buf[off] = (word >> 8) & 0xff;
+    buf[off + 1] = word & 0xff;
     d5 = (d5 + plain) & 0xffff;
     off += 2;
     d7 = (d7 + d6) & 0xffff;
@@ -554,11 +595,11 @@ function unscramble(buf: Uint8Array, initialHash: number, numWords: number): num
   let d5 = initialHash & 0xffff;
   let off = 0;
   while (d6 !== 0) {
-    const word = readU16LE(buf, off);
+    const word = readU16BE(buf, off);
     d5 = (d5 + word) & 0xffff;
     const xored = word ^ d7;
-    buf[off] = xored & 0xff;
-    buf[off + 1] = (xored >> 8) & 0xff;
+    buf[off] = (xored >> 8) & 0xff;
+    buf[off + 1] = xored & 0xff;
     d5 = (d5 + xored) & 0xffff;
     off += 2;
     d7 = (d7 + d6) & 0xffff;
@@ -575,23 +616,23 @@ function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Uint8Arra
   let d6 = 0;
   let pos = 0;
   for (let i = 0; i < 32; i++) {
-    d6 = (d6 + readU16LE(buf, pos)) & 0xffff;
+    d6 = (d6 + readU16BE(buf, pos)) & 0xffff;
     pos += 2;
-    d6 ^= readU16LE(buf, pos);
+    d6 ^= readU16BE(buf, pos);
     pos += 2;
-    d6 = (d6 - readU16LE(buf, pos)) & 0xffff;
+    d6 = (d6 - readU16BE(buf, pos)) & 0xffff;
     pos += 2;
-    d6 ^= readU16LE(buf, pos);
+    d6 ^= readU16BE(buf, pos);
     pos += 2;
   }
 
-  const hash = readU16LE(buf, 58);
+  const hash = readU16BE(buf, 58);
   unscramble(buf.subarray(256), hash, 128);
 
   let d5 = 0;
   pos = 256;
   for (let i = 0; i < 128; i++) {
-    d5 = (d5 + readU16LE(buf, pos)) & 0xffff;
+    d5 = (d5 + readU16BE(buf, pos)) & 0xffff;
     pos += 2;
   }
 
@@ -621,23 +662,32 @@ function unscrambleStream(
 
 function parseBlock1(buf: Uint8Array): Block1 {
   return {
-    block2Hash: readU16LE(buf, 312),
-    item16Hash: readU16LE(buf, 314),
-    characterHash: readU16LE(buf, 316),
-    timersHash: readU16LE(buf, 318),
-    timerQueueHash: readU16LE(buf, 320),
-    block2Checksum: readU16LE(buf, 344),
-    item16Checksum: readU16LE(buf, 346),
-    characterChecksum: readU16LE(buf, 348),
-    timersChecksum: readU16LE(buf, 350),
-    timerQueueChecksum: readU16LE(buf, 352),
+    block2Hash: readU16BE(buf, 312),
+    item16Hash: readU16BE(buf, 314),
+    characterHash: readU16BE(buf, 316),
+    timersHash: readU16BE(buf, 318),
+    timerQueueHash: readU16BE(buf, 320),
+    block2Checksum: readU16BE(buf, 344),
+    item16Checksum: readU16BE(buf, 346),
+    characterChecksum: readU16BE(buf, 348),
+    timersChecksum: readU16BE(buf, 350),
+    timerQueueChecksum: readU16BE(buf, 352),
   };
 }
 
+/**
+ * `GAMEBLOCK2`, read as `LoadGame` reads it (`doc/CSBwin-src/SaveGame.cpp:1617-1650`).
+ *
+ * `handChar` and `MagicCaster` are stored as `i16` and CSBWin assigns them straight to
+ * `d.HandChar` / `d.MagicCaster`, where -1 means "nobody" — so they are sign-extended
+ * here rather than read as unsigned.
+ */
 function parseBlock2(buf: Uint8Array): Block2 {
   return {
-    maxTimers: readU16LE(buf, 28),
-    maxItem16: readU16LE(buf, 46),
+    maxTimers: readU16BE(buf, 28),
+    maxItem16: readU16BE(buf, 46),
+    handChar: readI16BE(buf, 20),
+    magicCaster: readI16BE(buf, 22),
   };
 }
 
@@ -653,7 +703,7 @@ function parseItem16(buf: Uint8Array, maxItem16: number): Item16Record[] {
   for (let i = 0; i < maxItem16; i++) {
     const base = i * 16;
     out.push({
-      word0: (readU16LE(buf, base + 0) << 16) >> 16,
+      word0: (readU16BE(buf, base + 0) << 16) >> 16,
       facings: buf[base + 2] ?? 0,
       positions: buf[base + 3] ?? 0,
       uByte4: buf[base + 4] ?? 0,
@@ -680,7 +730,7 @@ function parseTimers(buf: Uint8Array, maxTimers: number, timerSize: number): Tim
   for (let i = 0; i < maxTimers; i++) {
     const base = i * timerSize;
     out.push({
-      timerWord8: readU16LE(buf, base + 8),
+      timerWord8: readU16BE(buf, base + 8),
     });
   }
   return out;
@@ -771,10 +821,27 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     extendedWallDecorations: extended.extendedWallDecorations,
     specialLocations: specialLocations ?? undefined,
     spellFilterLocation: extended.spellFilterLocation,
+    handChar: block2.handChar,
+    magicCaster: block2.magicCaster,
   };
 }
 
-export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): void {
+/**
+ * Restore a loaded save into the live world.
+ *
+ * `party` is optional only because the dungeon half of a load is useful on its own
+ * (`tools/` restores worlds with no party at all). When it is given, the two
+ * `GAMEBLOCK2` fields CSBWin restores at `doc/CSBwin-src/SaveGame.cpp:1636-1637` are
+ * applied to it. CSBWin assigns them **straight** to `d.HandChar` and `d.MagicCaster`
+ * rather than going through `SetHandOwner`/`SelectMagicCaster`, so this does too: the
+ * setters validate the champion and rewrite their facing, and a load is restoring a
+ * state that was already valid, not making a new choice.
+ */
+export function applySaveGameState(
+  dungeon: DungeonData,
+  save: SaveGameState,
+  party?: PartyState
+): void {
   dungeon.item16 = save.item16;
   if (save.timers) {
     dungeon.timerWord8Table = save.timers.map((rec) => rec.timerWord8 & 0xffff);
@@ -808,6 +875,10 @@ export function applySaveGameState(dungeon: DungeonData, save: SaveGameState): v
   if (save.spellFilterLocation !== undefined) {
     dungeon.spellFilterLocation = save.spellFilterLocation;
   }
+  if (party) {
+    if (save.handChar !== undefined) party.cursorOwner = save.handChar;
+    if (save.magicCaster !== undefined) party.magicCasterIndex = save.magicCaster;
+  }
 }
 
 export function saveSaveGameState(save: SaveGameState): Uint8Array {
@@ -818,16 +889,32 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timerSize = extendedTimers ? 16 : sequencedTimers ? 12 : 10;
 
   const block2 = new Uint8Array(BLOCK2_SIZE);
-  writeU16LE(block2, 28, maxTimers);
-  writeU16LE(block2, 46, maxItem16);
+  writeU16BE(block2, 28, maxTimers);
+  writeU16BE(block2, 46, maxItem16);
+  writeU16BE(block2, 20, save.handChar ?? -1);
+  writeU16BE(block2, 22, save.magicCaster ?? -1);
 
   const item16 = new Uint8Array(maxItem16 * 16);
   for (let i = 0; i < maxItem16; i++) {
     const base = i * 16;
     const rec = save.item16[i];
     if (!rec) continue;
+    // Every field `parseItem16` reads. This used to write bytes 2, 3 and 12-15 only,
+    // so a record's `word0` — the group's object RN — and its whole middle, the
+    // per-monster state at 4-11, came back as zero. Nothing noticed because the
+    // quick-save's runtime half carries `dungeon.item16` as well and is applied after
+    // this one, but a save with only these blocks in it lost the monster groups.
+    writeU16BE(item16, base + 0, rec.word0);
     item16[base + 2] = rec.facings & 0xff;
     item16[base + 3] = rec.positions & 0xff;
+    item16[base + 4] = rec.uByte4 & 0xff;
+    item16[base + 5] = rec.uByte5 & 0xff;
+    item16[base + 6] = rec.uByte6 & 0xff;
+    item16[base + 7] = rec.uByte7 & 0xff;
+    item16[base + 8] = rec.ubPrevX & 0xff;
+    item16[base + 9] = rec.ubPrevY & 0xff;
+    item16[base + 10] = rec.uByte10 & 0xff;
+    item16[base + 11] = rec.uByte11 & 0xff;
     item16[base + 12] = rec.singleMonsterStatus[0] ?? 0;
     item16[base + 13] = rec.singleMonsterStatus[1] ?? 0;
     item16[base + 14] = rec.singleMonsterStatus[2] ?? 0;
@@ -842,7 +929,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     const base = i * timerSize;
     const rec = timerRecords[i];
     if (!rec) continue;
-    writeU16LE(timers, base + 8, rec.timerWord8 ?? 0);
+    writeU16BE(timers, base + 8, rec.timerWord8 ?? 0);
   }
 
   const timerQueue = new Uint8Array(maxTimers * 2);
@@ -861,37 +948,37 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
 
   const block1Plain = new Uint8Array(BLOCK1_SIZE);
   const wordOffset = 256;
-  writeU16LE(block1Plain, wordOffset + 56, block2Hash);
-  writeU16LE(block1Plain, wordOffset + 58, item16Hash);
-  writeU16LE(block1Plain, wordOffset + 60, characterHash);
-  writeU16LE(block1Plain, wordOffset + 62, timersHash);
-  writeU16LE(block1Plain, wordOffset + 64, timerQueueHash);
-  writeU16LE(block1Plain, wordOffset + 88, block2Checksum);
-  writeU16LE(block1Plain, wordOffset + 90, item16Checksum);
-  writeU16LE(block1Plain, wordOffset + 92, characterChecksum);
-  writeU16LE(block1Plain, wordOffset + 94, timersChecksum);
-  writeU16LE(block1Plain, wordOffset + 96, timerQueueChecksum);
+  writeU16BE(block1Plain, wordOffset + 56, block2Hash);
+  writeU16BE(block1Plain, wordOffset + 58, item16Hash);
+  writeU16BE(block1Plain, wordOffset + 60, characterHash);
+  writeU16BE(block1Plain, wordOffset + 62, timersHash);
+  writeU16BE(block1Plain, wordOffset + 64, timerQueueHash);
+  writeU16BE(block1Plain, wordOffset + 88, block2Checksum);
+  writeU16BE(block1Plain, wordOffset + 90, item16Checksum);
+  writeU16BE(block1Plain, wordOffset + 92, characterChecksum);
+  writeU16BE(block1Plain, wordOffset + 94, timersChecksum);
+  writeU16BE(block1Plain, wordOffset + 96, timerQueueChecksum);
 
   let d6 = 0;
   let pos = 0;
   for (let i = 0; i < 32; i++) {
-    d6 = (d6 + readU16LE(block1Plain, pos)) & 0xffff;
+    d6 = (d6 + readU16BE(block1Plain, pos)) & 0xffff;
     pos += 2;
-    d6 ^= readU16LE(block1Plain, pos);
+    d6 ^= readU16BE(block1Plain, pos);
     pos += 2;
-    d6 = (d6 - readU16LE(block1Plain, pos)) & 0xffff;
+    d6 = (d6 - readU16BE(block1Plain, pos)) & 0xffff;
     pos += 2;
-    d6 ^= readU16LE(block1Plain, pos);
+    d6 ^= readU16BE(block1Plain, pos);
     pos += 2;
   }
 
   let sum = 0;
   for (let i = 258; i < BLOCK1_SIZE; i += 2) {
-    sum = (sum + readU16LE(block1Plain, i)) & 0xffff;
+    sum = (sum + readU16BE(block1Plain, i)) & 0xffff;
   }
-  writeU16LE(block1Plain, 256, (d6 - sum) & 0xffff);
+  writeU16BE(block1Plain, 256, (d6 - sum) & 0xffff);
 
-  const block1Hash = readU16LE(block1Plain, 58);
+  const block1Hash = readU16BE(block1Plain, 58);
   scramble(block1Plain.subarray(256), block1Hash, 128);
 
   scramble(block2, block2Hash, BLOCK2_SIZE / 2);

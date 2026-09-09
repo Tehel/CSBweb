@@ -538,6 +538,12 @@ export function createDevTools(host: DevHost): DevTools {
             maxTimers: timers.length,
             sequencedTimers: false,
             extendedTimers: false,
+            // `gb2.handChar` / `gb2.MagicCaster` (doc/CSBwin-src/SaveGame.cpp:1636).
+            // The runtime half serializes the whole `PartyState` and so carries these
+            // twice; the binary block is the one a CSBWin save would have, and writing
+            // it here is what keeps the two halves honest with each other.
+            handChar: runtime.party.cursorOwner ?? -1,
+            magicCaster: runtime.party.magicCasterIndex ?? -1,
         };
         const rawBytes = saveSaveGameState(saveGameState);
         const payload = {
@@ -571,7 +577,7 @@ export function createDevTools(host: DevHost): DevTools {
             }
             const saveBytes = decodeBase64ToBytes(parsed.raw);
             const saveState = loadSaveGameState(saveBytes);
-            applySaveGameState(host.game.state.dungeon, saveState);
+            applySaveGameState(host.game.state.dungeon, saveState, host.game.state.party);
             host.game.applyRuntimeSaveState(parsed.runtime);
             // Message timeouts are game-tick based, so a load that moves the clock would leave
             // rows that expire at the wrong time (or never). CSBWin serializes the text area

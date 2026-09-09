@@ -110,10 +110,16 @@ interface DropCursorOptions {
  * Version 3 replaced the champions' seven flat attribute numbers with CSBWin's
  * `(maximum, current, minimum)` triples (`ChampionAttributes.stats`).
  *
- * Neither bump has an upgrade path: `quickLoad` refuses an older save rather than
+ * Version 4 is not a change to this structure at all — it is the *binary* half beside
+ * it. `SaveGameLoader` used to read and write GAMEBLOCK1/2, `ITEM16` and the timers as
+ * little-endian words, a self-consistent format that was not CSBWin's; those blocks are
+ * big-endian in the file (`doc/CSBwin-src/CSBCode.cpp:9057`). Fixing that makes every
+ * v3 payload unreadable, so the version moves with it.
+ *
+ * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 3;
+export const RUNTIME_SAVE_VERSION = 4;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;

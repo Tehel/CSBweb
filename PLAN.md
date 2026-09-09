@@ -60,8 +60,7 @@ Verified against the code, not inherited from earlier revisions of this file.
    (Phase 13 step 4). All four of Phase 13's prerequisites are done: the `ATTRIBUTE`
    (maximum, current, minimum) triple, `AdjustStamina`, `SelectMagicCaster` +
    `gameIsLost`, and poison as a `TT_75` timer chain. What is left in Phase 13 is the
-   name-entry screen behind Reincarnate, the eye/mouth boxes (step 7) and `handChar`
-   from a real DM save (step 9).
+   name-entry screen behind Reincarnate and the eye/mouth boxes (step 7).
 4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
    ported, so clouds shrink, damage and expire (Phase 9 step 13).
 5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
@@ -88,10 +87,11 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twenty assertion-carrying verification tools** — the Phase 12 nine
+2. **Twenty-one assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
+   `dump-savegame-blocks.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
    `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts` and
    `dump-hall-of-champions.ts`.
@@ -934,14 +934,40 @@ one missing primitive.
    corpse.
    ⏳ Not modelled: the `charFlags` redraw bookkeeping (`CHARFLAG_*`), which this port
    has no equivalent for — the renderer redraws from state every frame.
-9. ⏳ **`handChar` is not read from a real DM save game.** `SaveGameLoader.parseBlock2`
-   reads only `maxTimers` and `maxItem16`; CSBWin restores the cursor owner from
-   `gb2.handChar` (`doc/CSBwin-src/SaveGame.cpp:1636`). Our own quick-saves carry it in
-   the runtime party state, and `ensureHandOwner` repairs a state that lacks it, but the
-   GAMEBLOCK2 offset has not been established so the real field is not parsed.
+9. ✅ **`handChar` is read from the save block.** The GAMEBLOCK2 offset was never
+   unknown — CSBWin's struct comments give the whole 128-byte layout
+   (`doc/CSBwin-src/SaveGame.cpp:107-133`): `handChar` at 20, `MagicCaster` at 22.
+   `parseBlock2` reads both, `saveSaveGameState` writes both, and
+   `applySaveGameState` takes an optional party and assigns them the way `LoadGame`
+   does (`:1636-1637`) — **directly**, not through `SetHandOwner`/`SelectMagicCaster`,
+   which validate and rewrite facing. The layout is now written up in
+   `doc/CSBWIN_SAVEGAME_REFERENCE.md`.
 
-Status: 🔄 in progress — prerequisites and steps 6 and 8 done; steps 1, 2, 3, 4 and 5
-done bar the gaps noted against each; steps 7 and 9 open.
+   Establishing the offset turned up **the reason a real DM save could not have been
+   read anyway**: the whole block codec was little-endian. CSBWin never says the file
+   is big-endian in words, it says it in `LE16`s — `Unscramble`'s hash arithmetic
+   (`doc/CSBwin-src/CSBCode.cpp:9057`), `ReadUnscrambleBlock`'s (`:9083`) and every
+   `BO()` in `swapBlock2` (`SaveGame.cpp:455`) — and `LE16` is a byte swap on the
+   little-endian build CSBWin ships as. Reader and writer agreed with each other, so
+   every checksum matched and the round trip was perfect, in a format no other program
+   could read. Blocks 1 and 2, `ITEM16`, the characters and the timers are now
+   big-endian; the CSB "Extended Features" header stays little-endian, because
+   `SwapExtendedFeaturesBlock` is a no-op unless `_bigEndian` (`SaveGame.cpp:275`). The
+   quick-save format went to v4 — old quick-saves are refused, not upgraded.
+
+   `tools/dump-savegame-blocks.ts` (22 checks) is the first test the binary half has
+   ever had; `dump-savegame.ts` only ever covered the runtime JSON. A round trip cannot
+   see a byte order, so the tool differences two saves instead: `scramble`'s keystream
+   depends on the hash and word index but never on the content, so changing
+   `handChar` from 2 to 3 must move **byte 21** of block 2 and nothing else, where a
+   little-endian writer would move byte 20. It caught a second defect on its first run:
+   the `ITEM16` writer wrote bytes 2, 3 and 12-15 only, dropping each record's `word0`
+   and its whole 4-11 middle, so a save carrying only these blocks lost its monster
+   groups. Masked until now because the runtime half also carries `dungeon.item16` and
+   is applied after.
+
+Status: 🔄 in progress — prerequisites and steps 6, 8 and 9 done; steps 1, 2, 3, 4 and 5
+done bar the gaps noted against each; step 7 open.
 
 ### Phase 15 — Verification
 
@@ -949,8 +975,8 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   twenty asserting tools, then four non-asserting dumps as crash-only smoke, then the
-   frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
+   twenty-one asserting tools, then four non-asserting dumps as crash-only smoke, then
+   the frames with `--frames`. ~6s, ~17s with frames. Failures print the tool's whole output,
    because the table above a failed assertion is what says which way the port went wrong.
    Tools are listed in the runner with the arguments their assertions were written for.
    `tsx` is now a devDependency — the suite used to depend on `npx` fetching it.
