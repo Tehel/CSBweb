@@ -1098,6 +1098,16 @@ miss:
 `DrawAttackButton` and `DrawCharacterState` are indexed by champion number
 (`doc/CSBwin-src/Character.cpp:4820`), which never moves.
 
+**Every click that names a champion names the box, never the corner.**
+`HandleClothingClick` resolves the champion it acts on as `d.CH16482[D7W]`
+(`doc/CSBwin-src/CSBCode.cpp:6956`), where `D7W` is `button/2` for the eight top-bar
+hands and `d.SelectedCharacterOrdinal-1` for the paper doll and the backpack
+(`:6933-6946`); `_HandleMagicClick` hands `SelectMagicCaster` the same kind of index
+(`doc/CSBwin-src/Magic.cpp:689-696`), and so does `SetHandOwner`. Matching a click
+against `charPosition` instead is invisible until the party turns and then silently
+routes it to a different champion — `tools/dump-inventory-routing.ts` is the standing
+check, since the inventory *drawn* is the right one either way.
+
 ## The attack menu's options are gated on mastery, the first one never
 
 `GetLegalAttackTypes` (`doc/CSBwin-src/Character.cpp:4772`) always offers

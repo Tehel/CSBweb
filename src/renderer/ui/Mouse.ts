@@ -17,7 +17,7 @@ import { handleAttackAreaClick } from './Attack';
 import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
 import { isReincarnateScreenOpen, reincarnateClick } from './ReIncarnate';
 import { UIMode, UIState } from './UIState';
-import { setHandOwner } from '../../engine/Party';
+import { getPartyChampion, setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
 
 export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
@@ -184,10 +184,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
     if ((ui.partyState.cursorOwner ?? -1) < 0) return;
     const selected = ui.partyState.selectedCharacterIndex ?? -1;
     if (selected < 0) return;
-    const champ =
-      ui.partyState.champions.find((c) => c.partyPosition === selected) ??
-      ui.partyState.champions[selected] ??
-      null;
+    const champ = getPartyChampion(ui.partyState, selected);
     if (!champ || champ.alive === false) return;
     const chestView = getActiveChestView(ui, champ);
     if (!chestView || chestView.source !== 'hand') return;
@@ -215,10 +212,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
     return;
   }
   if (button < 0 || button > 3) return;
-  const champ =
-    ui.partyState.champions.find((c) => c.partyPosition === button) ??
-    ui.partyState.champions[button] ??
-    null;
+  const champ = getPartyChampion(ui.partyState, button);
   if (!champ || champ.alive === false) return;
   const previous = ui.partyState.selectedCharacterIndex;
   ui.partyState.selectedCharacterIndex =
@@ -249,10 +243,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     chIdx = Math.floor(button / 2);
     if (chIdx >= ui.partyState.champions.length) return;
     if (ui.partyState.selectedCharacterIndex === chIdx) return;
-    const champ =
-      ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-      ui.partyState.champions[chIdx] ??
-      null;
+    const champ = getPartyChampion(ui.partyState, chIdx);
     if (!champ || champ.alive === false) return;
     slot = button & 1;
   } else {
@@ -262,10 +253,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   }
 
   if (slot < 0 || slot >= 38) return;
-  const champ =
-    ui.partyState.champions.find((c) => c.partyPosition === chIdx) ??
-    ui.partyState.champions[chIdx] ??
-    null;
+  const champ = getPartyChampion(ui.partyState, chIdx);
   if (!champ || champ.alive === false) return;
 
   const chestView = getActiveChestView(ui, champ);

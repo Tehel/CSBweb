@@ -12,6 +12,7 @@ import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer'
 import { Rect } from '../csbwin/UITables';
 import { pointInRect, searchButtonList } from './HitTest';
 import { UIState } from './UIState';
+import { selectMagicCaster } from '../../engine/Party';
 
 export function spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
     const isCaster = chIdx === casterIdx;
@@ -199,11 +200,17 @@ export function handleMagicClick(ui: UIState, clickX: number, clickY: number): v
   if (!ui.uiTables || !ui.partyState) return;
 
   const rect = ui.uiTables.graphic230.word20242;
-  for (const champion of ui.partyState.champions) {
+  // The tab belongs to the champion's **box**, not to the corner of the cell it stands
+  // in: `drawSpellControls` lays the tabs out by list index and `SelectMagicCaster`
+  // takes one (`doc/CSBwin-src/Magic.cpp:689-696`). Reading `partyPosition` here made
+  // the tabs pick the wrong caster as soon as the party turned.
+  const champions = ui.partyState.champions;
+  for (let chIdx = 0; chIdx < champions.length; chIdx++) {
+    const champion = champions[chIdx];
     if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
-    const rct = spellControlGetRect(rect, champion.partyPosition, ui.partyState.magicCasterIndex);
+    const rct = spellControlGetRect(rect, chIdx, ui.partyState.magicCasterIndex);
     if (pointInRect(clickX, clickY, rct)) {
-      ui.partyState.magicCasterIndex = champion.partyPosition;
+      selectMagicCaster(ui.partyState, chIdx);
       break;
     }
   }

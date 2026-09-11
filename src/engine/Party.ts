@@ -322,8 +322,12 @@ export function ensureHandOwner(party: PartyState): void {
  * drifted into corner 1 rather than the one in box 1. Every consumer of `cursorOwner`
  * and `magicCasterIndex` reads them as list indices (`party.champions[chIdx]`), and so
  * does CSBWin, so the list index is the one true meaning.
+ *
+ * Exported because the UI needs the same lookup: every click that names a champion —
+ * a portrait box, an inventory slot, a magic tab — names a *box*, and CSBWin resolves
+ * it as `d.CH16482[chIdx]` (`doc/CSBwin-src/CSBCode.cpp:6956`).
  */
-function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
+export function getPartyChampion(party: PartyState, chIdx: number): Champion | null {
     if (chIdx < 0) return null;
     return party.champions[chIdx] ?? null;
 }
