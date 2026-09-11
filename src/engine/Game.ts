@@ -2552,15 +2552,24 @@ export class Game {
         return cost;
     }
 
-    /** Write a possession slot without the UI's placement rules — used for CSBWin's
-     * temporary hand swap, where the object is put back immediately. */
+    /**
+     * Write a possession slot without the UI's placement rules — used for CSBWin's
+     * temporary hand swap, where the object is put back immediately, and by
+     * `RemoveCharacterPossession`.
+     *
+     * `shieldHand`, `weaponHand` and `quiver` mirror slots 0, 1 and 8, and
+     * `getChampionPossession` falls back to them when `possessions` reads null. Writing
+     * only the array therefore does not empty a hand: a thrown weapon flew as a missile
+     * *and* stayed in the fighting hand, so it could be picked up again where it landed
+     * and the party gained a second one.
+     */
     private setPossessionDirect(champion: Champion, slot: number, value: ObjectID | null): void {
         if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
             champion.possessions[slot] = value;
-            return;
         }
-        if (slot === 1) champion.weaponHand = value;
-        else if (slot === 0) champion.shieldHand = value;
+        if (slot === 0) champion.shieldHand = value;
+        else if (slot === 1) champion.weaponHand = value;
+        else if (slot === 8) champion.quiver = value;
     }
 
 

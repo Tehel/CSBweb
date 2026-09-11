@@ -144,6 +144,23 @@ archive section.
 
   </details>
 
+- ✅ *(playtest)* **A thrown or shot object no longer stays in the hand as well.**
+  `atk_THROW` launched the club *and* left it in the fighting hand, so the party got a
+  second one by walking to where the first landed; `atk_SHOOT` did the same with the
+  arrow, and `atk_FREEZELIFE` left a dangling reference to a magical box it had already
+  deleted from the database. All three go through `Game.removeCharacterPossession`,
+  whose `setPossessionDirect` wrote `possessions[slot]` and returned — never clearing
+  the `shieldHand` / `weaponHand` / `quiver` mirrors, which is exactly what every reader
+  falls back to when the array reads null (`src/renderer/ui/Character.ts:538`). The
+  removal therefore removed nothing. Fixed by mirroring slots 0, 1 and 8 the way
+  `setChampionPossession` and `DsaSystem` already do. `tools/dump-throwing.ts` section 7
+  covers it, deliberately reading the hands back through the UI's own accessor — reading
+  `possessions` directly would have passed while the club was still in hand.
+
+  ⏳ The dual storage itself is the real defect and is still there: `Champion` keeps
+  hands in both `possessions[0..1, 8]` and three named fields, and every writer has to
+  remember both. Collapsing it to the array alone is a Phase 15 candidate.
+
 **Rendering / UI**
 
 - ✅ *(playtest)* **A wall decoration one cell ahead and to the left is no longer cropped

@@ -37,6 +37,8 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { Game } from '../src/engine/Game';
+import { AttackType } from '../src/engine/monsterTypes';
+import { getChampionPossession } from '../src/renderer/ui/Character';
 import { check, finish } from './lib/check';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */
@@ -317,7 +319,15 @@ async function main(): Promise<void> {
       clothingWeights: objectTables.clothingWeights,
       miscWeights: objectTables.miscWeights,
     },
-    { monsterDesc: objectTables.monsterDesc, word1074: uiTables.graphic232.word1074 },
+    {
+      monsterDesc: objectTables.monsterDesc,
+      word1074: uiTables.graphic232.word1074,
+      // Section 7 goes through `championAttack`, which reads the attack tables.
+      experienceForAttacking: uiTables.graphic230.experienceForAttacking,
+      skillNumber: uiTables.graphic230.skillNumber,
+      byte20090: uiTables.graphic230.byte20090,
+      attackNames: uiTables.graphic230.attackNames,
+    },
   );
 
   const party = game.party.state;
@@ -363,6 +373,86 @@ async function main(): Promise<void> {
   const throwSkill = party.champions[0]!.skills?.[10]?.experience ?? 0;
   console.log(`skill 10 (Throw) experience after one throw: ${throwSkill}`);
   check(throwSkill > 0, 'the throw trained skill 10');
+
+  /* ------------------------- 7. the object actually leaves the champion ---------- */
+
+  // `atk_THROW` and `atk_SHOOT` both take an object off a champion and turn it into a
+  // missile. Nothing on screen distinguishes "the hand was emptied" from "the hand was
+  // not", because the missile is drawn either way — so the bug this section pins down
+  // was invisible until the thrown club was picked up again and the party owned two.
+  //
+  // The trap is that a champion's hands are stored **twice**: in `possessions[0..1]`
+  // and in the `shieldHand`/`weaponHand`/`quiver` mirrors, and every reader falls back
+  // to the mirror when the array reads null (`src/renderer/ui/Character.ts:538`). A
+  // removal that writes only the array therefore removes nothing at all. The check is
+  // deliberately made through the UI's own reader rather than through `possessions`
+  // directly — reading the array would have passed while the club was still in hand.
+  console.log('');
+  console.log('=== 7. the thrown object leaves the champion (atk_THROW, atk_SHOOT) ===');
+
+  const makeWeapon2 = (weaponType: number): ObjectID => {
+    const db = data2.databases.weapons;
+    db.records.push({
+      nextObject: 0xfffe, weaponType, charges: 0, litTorch: false,
+      important: false, cursed: false, poisoned: false, broken: false,
+    } as unknown as (typeof db.records)[number]);
+    db.count++;
+    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+  };
+
+  /** Put an object in a slot the way `AddCharacter` does — array *and* mirror. */
+  const equip = (ch: Champion, slot: number, obj: ObjectID | null): void => {
+    ch.possessions![slot] = obj;
+    if (slot === 0) ch.shieldHand = obj;
+    if (slot === 1) ch.weaponHand = obj;
+    if (slot === 8) ch.quiver = obj;
+  };
+
+  const WEAPON_CLUB = 23;
+  const WEAPON_BOW = 25;
+  const WEAPON_ARROW = 27;
+
+  // THROW: the club goes from the fighting hand into the air.
+  const thrower2 = champion();
+  thrower2.skills = Array.from({ length: 20 }, () => ({ tempAdjust: 0, experience: 1000 }));
+  party.champions = [thrower2];
+  const club = makeWeapon2(WEAPON_CLUB);
+  equip(thrower2, 1, club);
+
+  const missilesBeforeThrow = data2.databases.missiles.records.length;
+  const threw = game.championAttack(0, AttackType.atk_THROW);
+  const missilesAfterThrow = data2.databases.missiles.records.length;
+  const handAfterThrow = getChampionPossession(thrower2, 1);
+  console.log(`THROW: result ${threw}, missiles ${missilesBeforeThrow} -> ${missilesAfterThrow}, ` +
+    `fighting hand reads ${handAfterThrow === null ? 'empty' : handAfterThrow}`);
+  check(threw === 1, 'atk_THROW reports a successful attack');
+  check(missilesAfterThrow === missilesBeforeThrow + 1, 'atk_THROW launched exactly one missile');
+  check(handAfterThrow === null,
+    `the thrown club left the fighting hand (read back ${handAfterThrow}, thrown ${club})`);
+  check(thrower2.weaponHand === null, 'and left the weaponHand mirror too');
+
+  // SHOOT: the arrow goes from the shield hand, the bow stays in the fighting hand.
+  const archer = champion();
+  archer.skills = Array.from({ length: 20 }, () => ({ tempAdjust: 0, experience: 1000 }));
+  party.champions = [archer];
+  const bow = makeWeapon2(WEAPON_BOW);
+  const arrow = makeWeapon2(WEAPON_ARROW);
+  equip(archer, 1, bow);
+  equip(archer, 0, arrow);
+
+  const missilesBeforeShot = data2.databases.missiles.records.length;
+  const shot = game.championAttack(0, AttackType.atk_SHOOT);
+  const missilesAfterShot = data2.databases.missiles.records.length;
+  const ammoAfterShot = getChampionPossession(archer, 0);
+  const bowAfterShot = getChampionPossession(archer, 1);
+  console.log(`SHOOT: result ${shot}, missiles ${missilesBeforeShot} -> ${missilesAfterShot}, ` +
+    `shield hand reads ${ammoAfterShot === null ? 'empty' : ammoAfterShot}`);
+  check(shot === 1, 'atk_SHOOT reports a successful attack');
+  check(missilesAfterShot === missilesBeforeShot + 1, 'atk_SHOOT launched exactly one missile');
+  check(ammoAfterShot === null,
+    `the arrow left the shield hand (read back ${ammoAfterShot}, shot ${arrow})`);
+  check(archer.shieldHand === null, 'and left the shieldHand mirror too');
+  check(bowAfterShot === bow, 'the bow itself stays in the fighting hand');
 
   console.log('');
   finish();
