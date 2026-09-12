@@ -55,6 +55,10 @@ const CHECKS = [
   // The other half of a quick-save: the CSBWin-shaped binary blocks. Needs no
   // dungeon and no arguments — it builds its own records.
   { tool: 'dump-savegame-blocks.ts' },
+  // Genuine CSBWin save files from static/gamefiles/saves. The only check in the
+  // suite that reads bytes this project did not write, so the only one a bug
+  // symmetrical between our reader and our writer cannot satisfy.
+  { tool: 'dump-csbwin-save.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.

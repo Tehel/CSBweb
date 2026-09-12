@@ -68,7 +68,10 @@ Verified against the code, not inherited from earlier revisions of this file.
    through `isDebugFeaturesEnabled()`.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
    the UI now lives in `src/renderer/ui/`.
-8. **CSBWin-binary-compatible save files** not attempted (Phase 10).
+8. ⚠️ **CSBWin-binary-compatible save files** — the *reader* now handles genuine files
+   (three real saves in `static/gamefiles/saves/`, read by `tools/dump-csbwin-save.ts`
+   with every block checksum clean); the *writer* still stops after block 6. Phase 10
+   below is rescored.
 9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
    `supressPitDamage` now has something to suppress.
 
@@ -120,6 +123,30 @@ archive section.
 
 **Bugs found but not fixed**
 
+- ⚠️ **The quick-save's runtime snapshot is still hand-maintained, and the column-index
+  bug shows how that fails.** `DungeonSnapshot` enumerates what play can change, and it
+  omitted `data.columnIndex` — on the reasoning, written into the file as a comment, that
+  it was structural. It is not: `DungeonState.addObjectToCell` / `removeObjectFromCell`
+  rewrite it whenever a cell gains or loses its last object, as CSBWin does
+  (`doc/CSBwin-src/CSBCode.cpp:5211-5224`). `columnIndex`, `header.objectListSize` and
+  `header.objectCounts` are now captured, the save version is 5, and
+  `tools/dump-savegame.ts` compares the whole mutable `DungeonData` and asserts that
+  loading twice with play in between gives the same world. But the list is still a list:
+  any field added to `DungeonData` later has to be remembered here by hand. Deriving it
+  from the type, or snapshotting the whole structure and subtracting what is immutable,
+  is a Phase 10 / Phase 15 candidate.
+
+  <sub>Context: `doc/PROVEN_FACTS.md` → “The column index is saved state, not dungeon structure”.</sub>
+
+- ⏳ **Champion titles in genuine saves are missing their first character**, sometimes.
+  `SHE DEVIL` reads back as `\0HE DEVIL`, `THE BARBARIAN` as `\0HE BARBARIAN`, against
+  the preset names in `dungeon.dat`. It is in the files, not the reader: inside one save
+  `HALK` loses its `T` while `LEYLA` and `ALEX` keep `SHADOWSEEK` and `ANDER` whole, so
+  no offset error explains it. Suspicion is a champion-naming path writing its NUL at
+  `name[8]`, which is `title[0]` — unverified, and the reader must not be "corrected"
+  for it until the writing path is found. Matters for Phase 10 step 6.
+
+  <sub>Context: `doc/PROVEN_FACTS.md` → “`CHARDESC.title` is 20 bytes, not 16”.</sub>
 
 - ⏳ The dual storage itself is the real defect and is still there: `Champion` keeps
   hands in both `possessions[0..1, 8]` and three named fields, and every writer has to
@@ -345,8 +372,47 @@ Goal: ensure internal state and data structures are complete enough to write a b
    - Add a tool to load CSBWin save → re‑serialize → binary‑compare.
    - Add targeted checks for door/pit state, object chains, and timers after load.
 
-Status: ⏳ pending — not started. Note this is a large piece of work and is *not* a
-prerequisite for playability; quick-save/load via a runtime JSON snapshot already works.
+11. **Load/save menu behind the disk icon** (author request, September 2026):
+   the disk icon on the inventory screen should open a custom menu offering save and
+   load, to and from **both** browser storage and a real file on disk. The disk-to-file
+   half is what makes Phase 10's binary format visible to the player; the browser half
+   can ship first over the existing runtime snapshot. Not started, and deliberately not
+   worked on in the session that recorded it. Needs: the icon's hit rectangle
+   (`src/renderer/ui/HitTest.ts`), a menu drawn in the 320×200 buffer rather than in
+   DOM chrome, and File System Access / `<input type=file>` + blob download for the
+   disk half.
+
+Status: ⏳ mostly pending, but **rescored against the code in September 2026** — steps
+2-5 are in better shape than the list above implies, and step 1 is done:
+
+- Step 1 (inventory the blocks) — ✅ done. The full write order, every block's size and
+  the EXPOOL side-writes are tabulated in `doc/CSBWIN_SAVEGAME_REFERENCE.md`.
+- Steps 2-5 (runtime state, DB record layouts, object list, cell flags) — ✅ effectively
+  done, though not yet *serialized*. `src/engine/DungeonSnapshot.ts` captures exactly
+  what blocks 7-14 carry, and the column-index fix closed the last gap in step 4. What
+  remains for these is packing, not modelling.
+- Step 6 (character block) — ⏳ the one genuinely unported structure. `CHARDESC` is fully
+  declared and its title field is 20 bytes rather than the struct's 16
+  (`doc/PROVEN_FACTS.md`). Reading names out of a real save works; nothing is packed.
+- Step 9 (checksum/scramble parity) — ✅ proven for blocks 0-6 in both directions, and
+  now against files this project did not write.
+- Step 10 (round-trip validation) — ⚠️ half. `tools/dump-csbwin-save.ts` reads genuine
+  saves; the load → re-serialize → binary-compare half waits on the writer.
+- ⏳ **New blocker, found by reading real files: the text section of the dungeon image
+  does not parse.** Blocks 7-10 are fine — the image sits at
+  `SaveGameState.dungeonImageOffset`, plain and uncompressed, and its header, level
+  descriptors, column index and object list all read. The indirect text index that
+  follows is **little-endian** (unlike the rest of the image) and, worse, none of the
+  candidate lengths close: the section must be 5438 bytes and neither
+  `NumWordsInTextArray*2`, `*4`, nor `*4 + 4 + 2*sizeOfCompressedText` gets there. Until
+  it is solved, everything after it — all 16 databases and the cell flags — is
+  unreachable, which is why `parseMissileRecordsFromSaveData` and
+  `parseSpecialLocationsFromSaveData` return `null` on every genuine save. The `0`
+  those used to report was a failed parse, not an empty one; `tools/dump-csbwin-save.ts`
+  now asserts the failure so it cannot be mistaken for a result again.
+
+Note this is a large piece of work and is *not* a prerequisite for playability;
+quick-save/load via a runtime JSON snapshot already works.
 
 **The runtime snapshot now carries the world** (`src/engine/DungeonSnapshot.ts`,
 save format v2). It used to carry the party, the tick count, the `ITEM16` pool, the

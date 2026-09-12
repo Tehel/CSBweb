@@ -1,0 +1,255 @@
+/**
+ * Read genuine CSBWin save files and prove the reader understands them.
+ *
+ * Every other save-game tool in this directory tests the port against itself:
+ * `dump-savegame.ts` round-trips the runtime JSON snapshot, and
+ * `dump-savegame-blocks.ts` round-trips our own binary writer through our own binary
+ * reader. Neither can catch the failure that matters for Phase 10 — a self-consistent
+ * format that no CSBWin would recognise. That is not hypothetical: the blocks were
+ * once written little-endian, round-tripped perfectly, and were wrong (see the header
+ * of `dump-savegame-blocks.ts`).
+ *
+ * This tool is the other kind of evidence. It reads real files, produced by the real
+ * program, that this project did not write. It cannot be satisfied by a bug that is
+ * symmetrical between our reader and our writer.
+ *
+ * What a pass actually proves, because every scrambled block is checksum-verified as
+ * it is unscrambled (`unscrambleStream`, and `readUnscrambleBlock` for GAMEBLOCK1):
+ * the scramble keystream, the hash arithmetic, the big-endian word order and every
+ * block offset and size are all right. A single wrong byte anywhere in a block fails
+ * its checksum and throws.
+ *
+ * The files live in `static/gamefiles/saves/` and are read-only inputs — the tool
+ * never writes to them.
+ *
+ * Run: `npx tsx tools/dump-csbwin-save.ts [path-or-directory]`
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+import { loadSaveGameState } from '../src/data/SaveGameLoader';
+import { check, finish } from './lib/check';
+
+/**
+ * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2483-2594`, whose last member is
+ * `FILL337[800-337]`), and block 4 holds four of them followed by 128 bytes of
+ * party state.
+ */
+const CHARDESC_SIZE = 800;
+
+const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'clothing',
+  'scroll', 'potion', 'container', 'misc', 'EXPOOL', 'db12', 'db13', 'missile', 'cloud'];
+
+function readU16BE(b: Uint8Array, o: number): number {
+  return ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
+}
+
+/**
+ * `name` is `char[8]` at offset 0 and the title runs from 8 to 27 — **20 bytes, not
+ * the 16 the struct declares**. `AddCharacter` proves the span: it refuses a title
+ * character at `D6W >= 19` and then writes `title[D6W] = 0`, so index 19 is a legal
+ * write (`doc/CSBwin-src/Character.cpp:578-587`), and the next member, `facing`,
+ * sits at offset 28. The struct's `title[16]` + `wordx24` + `FILL26[2]` are one
+ * 20-byte field; Paul Stevens marked it `// size??` himself.
+ */
+const NAME_OFFSET = 0;
+const NAME_SIZE = 8;
+const TITLE_OFFSET = 8;
+const TITLE_SIZE = 20;
+
+/** Names and titles are plain `char` arrays — `swapCharacter` never touches them
+ *  (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so they need no byte-swapping. */
+function decodeCharField(bytes: Uint8Array): string {
+  let out = '';
+  for (const byte of bytes) {
+    if (byte === 0) continue;
+    out += byte >= 32 && byte < 127 ? String.fromCharCode(byte) : '?';
+  }
+  return out;
+}
+
+const DEFAULT_DIR = 'static/gamefiles/saves';
+
+/** The `:Zone.Identifier` files are Windows alternate-data-stream droppings, not saves. */
+function isSaveFile(name: string): boolean {
+  return name.toLowerCase().endsWith('.dat') && !name.includes(':');
+}
+
+function collectSaves(target: string): string[] {
+  const path = resolve(target);
+  if (!existsSync(path)) return [];
+  if (statSync(path).isDirectory()) {
+    return readdirSync(path)
+      .filter(isSaveFile)
+      .sort()
+      .map((name) => join(path, name));
+  }
+  return [path];
+}
+
+function main(): void {
+  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  if (saves.length === 0) {
+    // The fixtures are committed, so this should not happen; if someone strips the
+    // game files it must say so rather than pass silently on nothing.
+    check(false, `no save files found in ${process.argv[2] ?? DEFAULT_DIR}`);
+    finish();
+    return;
+  }
+  /** file name -> the party roster read out of its character block. */
+  const rosters = new Map<string, string>();
+
+  for (const path of saves) {
+    const bytes = new Uint8Array(readFileSync(path));
+    const name = path.split('/').pop() ?? path;
+    console.log(`\n=== ${name} — ${bytes.length} bytes ===`);
+
+    let state;
+    try {
+      state = loadSaveGameState(bytes);
+    } catch (error) {
+      check(false, `${name}: should load — ${(error as Error).message}`);
+      continue;
+    }
+    check(true, `${name}: every block unscrambled and checksummed clean`);
+
+    console.log(`  extended features  : sequencedTimers=${state.sequencedTimers} ` +
+      `extendedTimers=${state.extendedTimers} bigActuators=${state.bigActuators ?? false} ` +
+      `extendedWallDecorations=${state.extendedWallDecorations ?? false}`);
+    console.log(`  DSA programs       : ${state.dsaIndex?.entries.filter(Boolean).length ?? 0}`);
+    console.log(`  DSA level index    : ${state.dsaLevelIndex ? 'present' : 'absent'}`);
+    console.log(`  spellFilterLocation: ${state.spellFilterLocation ?? '—'}`);
+    console.log(`  MaxITEM16          : ${state.maxItem16}`);
+    console.log(`  MaxTimers          : ${state.maxTimers}`);
+    console.log(`  handChar           : ${state.handChar}`);
+    console.log(`  magicCaster        : ${state.magicCaster}`);
+    console.log(`  missile records    : ${state.missiles === undefined ? 'unreadable (see below)' : state.missiles.length}`);
+    console.log(`  special locations  : ${state.specialLocations === undefined ? 'unreadable (see below)' : Object.keys(state.specialLocations).length}`);
+
+    const gb2 = state.block2;
+    if (gb2) {
+      console.log(`  party              : (${gb2.partyX},${gb2.partyY}) level ${gb2.partyLevel} ` +
+        `facing ${gb2.partyFacing}, ${gb2.numCharacter} champions`);
+      console.log(`  clock / seed       : Time=${gb2.time} ranseed=${gb2.ranseed}`);
+      console.log(`  objectInHand       : 0x${gb2.objectInHand.toString(16)}`);
+      console.log(`  NumTimer           : ${gb2.numTimer} (firstAvail ${gb2.firstAvailTimer}, ` +
+        `sequence ${gb2.timerSequence})`);
+      console.log(`  ITEM16QueLen       : ${gb2.item16QueLen}`);
+      check(gb2.numCharacter >= 1 && gb2.numCharacter <= 4, `${name}: numcharacter ${gb2.numCharacter} is 1..4`);
+      check(gb2.partyLevel >= 0 && gb2.partyLevel < 64, `${name}: partyLevel ${gb2.partyLevel} is plausible`);
+      check(gb2.partyFacing >= 0 && gb2.partyFacing <= 3, `${name}: partyFacing ${gb2.partyFacing} is a direction`);
+      check(gb2.partyX >= 0 && gb2.partyX < 32, `${name}: partyX ${gb2.partyX} is in range`);
+      check(gb2.partyY >= 0 && gb2.partyY < 32, `${name}: partyY ${gb2.partyY} is in range`);
+    } else {
+      check(false, `${name}: GAMEBLOCK2 should have been parsed`);
+    }
+
+    const block = state.characterBlock;
+    if (block) {
+      check(block.length === 3328, `${name}: the character block is 3328 bytes`);
+      const roster: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        const base = i * CHARDESC_SIZE;
+        const champName = decodeCharField(block.subarray(base + NAME_OFFSET, base + NAME_OFFSET + NAME_SIZE));
+        const title = decodeCharField(block.subarray(base + TITLE_OFFSET, base + TITLE_OFFSET + TITLE_SIZE));
+        roster.push(champName);
+        console.log(`  champion ${i}         : ${champName || '(empty)'}${title ? ` — ${title}` : ''}`);
+      }
+      const named = roster.filter((n) => n.length > 0).length;
+      check(
+        named === (gb2?.numCharacter ?? named),
+        `${name}: ${named} champions have names, GAMEBLOCK2 says ${gb2?.numCharacter}`,
+      );
+      // A name decoded out of the wrong bytes would be full of '?' substitutions.
+      check(
+        roster.slice(0, gb2?.numCharacter ?? 0).every((n) => n.length > 0 && !n.includes('?')),
+        `${name}: every champion name is printable ASCII`,
+      );
+      rosters.set(name, roster.slice(0, gb2?.numCharacter ?? 4).join('/'));
+    } else {
+      check(false, `${name}: the character block should have been kept`);
+    }
+
+    // ---- The dungeon image (blocks 7-14) --------------------------------
+    //
+    // `LoadGame` calls `ReadDatabases()` immediately after the timer queue
+    // (`doc/CSBwin-src/SaveGame.cpp:1739`). A save is loaded with
+    // `d.gameState == GAMESTATE_ResumeSavedGame`, so that function skips its own
+    // extended-features/compression preamble (`:2345-2346`) and streams straight on
+    // from the current file position: the image is plain, uncompressed, big-endian.
+    const image = state.dungeonImageOffset;
+    if (image !== undefined) {
+      const seed = readU16BE(bytes, image);
+      const numMaps = bytes[image + 4] ?? 0;
+      const objectListSize = readU16BE(bytes, image + 10);
+      const counts = Array.from({ length: 16 }, (_, i) => readU16BE(bytes, image + 12 + i * 2));
+      console.log(`  dungeon image      : offset ${image}, ${bytes.length - image} bytes to EOF`);
+      console.log(`    header           : seed=${seed} numMaps=${numMaps} objectListSize=${objectListSize}`);
+      console.log(`    record counts    : ${counts.map((c, i) => (c ? `${DB_NAMES[i]}=${c}` : '')).filter(Boolean).join(' ')}`);
+      // The header is the proof that the offset is right: a save of DM carries
+      // `dungeon.dat`'s own 44-byte DUNGEONDATINDEX, seed and all.
+      check(seed === 99 || seed === 13 || seed === 8, `${name}: dungeon image seed ${seed} is a known dungeon`);
+      check(numMaps >= 1 && numMaps <= 32, `${name}: dungeon image numMaps ${numMaps} is plausible`);
+      check(objectListSize > 0, `${name}: dungeon image has a non-empty object list`);
+      check(
+        counts.reduce((a, b) => a + b, 0) > 0,
+        `${name}: dungeon image has database records`,
+      );
+    } else {
+      check(false, `${name}: the dungeon image offset should have been recorded`);
+    }
+
+    // ⚠️ Known gap, asserted so it cannot be forgotten: the two parsers that reach
+    // into the image both return null on every real save. They walk the text section
+    // as `NumWordsInTextArray*4 + 4 + compressedSize*2`, and that arithmetic does not
+    // close — see PLAN.md Phase 10. Until it does, `missiles` and `specialLocations`
+    // from a genuine file mean nothing, and reporting them as 0 would be a lie.
+    check(
+      state.missiles === undefined,
+      `${name}: missile records still unreadable (expected until the text section is solved)`,
+    );
+
+    const liveGroups = state.item16.filter((r) => r.word0 !== 0).length;
+    console.log(`  active monster groups: ${liveGroups} of ${state.item16.length}`);
+    const liveTimers = (state.timers ?? []).filter((t) => t.timerWord8 !== 0).length;
+    console.log(`  timers with word8 set: ${liveTimers} of ${state.timers?.length ?? 0}`);
+
+    // Sanity on the numbers themselves. A block that checksums clean but decodes to
+    // nonsense would mean the checksum is being computed over the wrong bytes.
+    check(state.maxItem16 > 0 && state.maxItem16 < 4096, `${name}: MaxITEM16 ${state.maxItem16} is plausible`);
+    check(state.maxTimers > 0 && state.maxTimers < 4096, `${name}: MaxTimers ${state.maxTimers} is plausible`);
+    check(state.item16.length === state.maxItem16, `${name}: the ITEM16 pool is MaxITEM16 records long`);
+    check(
+      (state.timers?.length ?? 0) === state.maxTimers,
+      `${name}: the timer table is MaxTimers records long`,
+    );
+    check(
+      (state.handChar ?? -1) >= -1 && (state.handChar ?? -1) <= 3,
+      `${name}: handChar ${state.handChar} is a champion index or -1`,
+    );
+    check(
+      (state.magicCaster ?? -1) >= -1 && (state.magicCaster ?? -1) <= 3,
+      `${name}: magicCaster ${state.magicCaster} is a champion index or -1`,
+    );
+  }
+
+  // The rosters, grouped. Two saves of the same party read as the same roster only if
+  // the character block was located and decoded identically in both, which is a
+  // stronger statement than either file passing on its own.
+  if (rosters.size > 1) {
+    console.log('\nparty rosters');
+    const byRoster = new Map<string, string[]>();
+    for (const [file, roster] of rosters) {
+      const list = byRoster.get(roster) ?? [];
+      list.push(file);
+      byRoster.set(roster, list);
+    }
+    for (const [roster, files] of byRoster) {
+      console.log(`  ${files.join(', ')}\n    ${roster}`);
+    }
+  }
+
+  finish();
+}
+
+main();

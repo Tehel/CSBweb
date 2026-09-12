@@ -149,6 +149,21 @@ async function main(): Promise<void> {
   }
   if (!carry) throw new Error(`no movable object with an open neighbour on level ${level}`);
 
+  // An OPEN cell with *no* objects at all, in a column that holds none of the cells
+  // above. Dropping something here is the mutation that grows `objectList` by one and
+  // so shifts `columnIndex` for every later column — the case the moved object above
+  // cannot produce, because a remove-then-add inside one column cancels its own shift.
+  let emptyCell: { x: number; y: number } | null = null;
+  for (let x = 0; x < width && !emptyCell; x++) {
+    if (x === carry.fromX || x === carry.toX) continue;
+    for (let y = 0; y < height && !emptyCell; y++) {
+      if (roomTypeAt(played, x, y, level) !== RoomType.OPEN) continue;
+      if (played.dungeonState.hasObjects(new Position(x, y, level))) continue;
+      emptyCell = { x, y };
+    }
+  }
+  if (!emptyCell) throw new Error(`no empty open cell on level ${level}`);
+
   // An actuator, whose counter play can change.
   const actuator = playedData.databases.actuators.records[0];
   if (!actuator) throw new Error('no actuator records');
@@ -189,6 +204,24 @@ async function main(): Promise<void> {
   playedData.databases.misc.count++;
   const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore) as ObjectID;
   played.dungeonState.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
+
+  // The column-index mutation. A second appended record, dropped into a cell that had
+  // nothing in it, so `addObjectToCell` takes its insert branch: it splices a new entry
+  // into `objectList` and decrements/increments every later `columnIndex` entry
+  // (CSBWin does the same, `doc/CSBwin-src/CSBCode.cpp:5211-5224`).
+  const loneCountBefore = playedData.databases.misc.records.length;
+  playedData.databases.misc.records.push({
+    nextObject: OBJECT_ID_EOF,
+    specialState: 0,
+    important: false,
+    miscType: 34,
+  });
+  playedData.databases.misc.count++;
+  const loneRn = encodeObjectID(0, DBType.MISC, loneCountBefore) as ObjectID;
+  const columnIndexBefore = [...playedData.columnIndex];
+  played.dungeonState.addObjectToCell(new Position(emptyCell.x, emptyCell.y, level), loneRn);
+  const columnIndexAfter = [...playedData.columnIndex];
+  const columnIndexMoved = columnIndexBefore.some((v, i) => v !== columnIndexAfter[i]);
   const miscCountAfter = playedData.databases.misc.records.length;
 
   // ---- Snapshot, and restore it into a world that never saw any of it ------
@@ -208,6 +241,8 @@ async function main(): Promise<void> {
   const freshMiscCount = reloadedData.databases.misc.records.length;
   const freshActuator = getActuatorValue(reloadedData.databases.actuators.records[0]);
   const freshCreatureHp = reloadedData.databases.creatures.records.find((r) => r.hp.length > 0)!.hp[0];
+  const freshColumnIndex = [...reloadedData.columnIndex];
+  const freshLone = objectsAt(reloaded, emptyCell.x, emptyCell.y, level).length > 0;
 
   reloaded.applyRuntimeSaveState(JSON.parse(serialized));
 
@@ -219,6 +254,7 @@ async function main(): Promise<void> {
   const restoredCreatureHp = reloadedData.databases.creatures.records.find((r) => r.hp.length > 0)!.hp[0];
   const restoredDropped = objectsAt(reloaded, carry.toX, carry.toY, level).includes(droppedRn);
   const restoredDroppedType = reloadedData.databases.misc.records[miscCountBefore]?.miscType;
+  const restoredLone = objectsAt(reloaded, emptyCell.x, emptyCell.y, level).includes(loneRn);
 
   // ---- Report -------------------------------------------------------------
 
@@ -233,6 +269,20 @@ async function main(): Promise<void> {
   row('actuator[0] value', actuatorBefore, actuatorAfter, freshActuator, restoredActuator);
   row('creature[?].hp[0]', creatureHpBefore, creatureHpAfter, freshCreatureHp, restoredCreatureHp);
   row('misc record count', miscCountBefore, miscCountAfter, freshMiscCount, restoredMiscCount);
+  row(
+    `object at empty (${emptyCell.x},${emptyCell.y})`,
+    false,
+    true,
+    freshLone,
+    restoredLone,
+  );
+  row(
+    'columnIndex differs from fresh',
+    false,
+    columnIndexMoved,
+    false,
+    reloadedData.columnIndex.some((v, i) => v !== freshColumnIndex[i]),
+  );
   console.log('');
 
   // ---- Assertions ---------------------------------------------------------
@@ -244,6 +294,7 @@ async function main(): Promise<void> {
   check(freshMiscCount === miscCountBefore, 'a fresh dungeon should not have the dropped record');
   check(freshActuator === actuatorBefore, 'a fresh dungeon should have the original actuator value');
   check(freshCreatureHp === creatureHpBefore, 'a fresh dungeon should have the original creature hit points');
+  check(columnIndexMoved, 'dropping into an empty cell should have shifted the column index');
 
   check(doorOpened !== 0, 'the test door should have opened');
   check(restoredDoor === doorOpened, 'the restored door should be as open as it was saved');
@@ -261,6 +312,7 @@ async function main(): Promise<void> {
   // The canary: a value that could only be right if the appended record round-tripped
   // at its own index rather than being confused with a `dungeon.dat` record.
   check(restoredDroppedType === 33, 'the appended record should come back as misc type 33, at its own index');
+  check(restoredLone, 'the object dropped into an empty cell should be there after the load');
 
   // The whole-world check. Anything mutable that the snapshot forgot shows up here
   // even though no case above names it.
@@ -275,6 +327,20 @@ async function main(): Promise<void> {
     JSON.stringify(reloadedData.databases) === JSON.stringify(playedData.databases),
     'every database record should round-trip',
   );
+  // `columnIndex` is *not* structural: `addObjectToCell` and `removeObjectFromCell`
+  // rewrite every later entry whenever a cell gains or loses its last object, exactly
+  // as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin saves the array
+  // beside the object list (`doc/CSBwin-src/SaveGame.cpp:1178`). A restore that puts
+  // `objectList` back without it reads every cell's chain at the wrong offset, so
+  // objects vanish from their cells and appear in unrelated ones.
+  check(
+    JSON.stringify(reloadedData.columnIndex) === JSON.stringify(playedData.columnIndex),
+    'the column index should round-trip',
+  );
+  check(
+    JSON.stringify(reloadedData.header) === JSON.stringify(playedData.header),
+    'the dungeon header (object list size, per-database counts) should round-trip',
+  );
   // Pinned because it is what the first draft of this tool got wrong: `Database.count`
   // tracks `records.length` because every engine append maintains it, so the restore
   // recomputing it is equivalent — not a divergence.
@@ -287,6 +353,62 @@ async function main(): Promise<void> {
     m.tiles.every((col, x) => col.every((tile, y) => tile.cellFlag === m.cellFlags[x][y])),
   );
   check(tilesAgree, 'the derived tiles should agree with the restored cell flags');
+
+  // ---- Loading twice, with play in between --------------------------------
+  //
+  // The author's report was not only that a load came back wrong, but that "two loads
+  // without save don't even always produce identical result". That is the same defect
+  // seen from the other side: a restore that puts `objectList` back but leaves
+  // `columnIndex` as play left it makes the result depend on what happened *between*
+  // the two loads, so a load is not idempotent. Reproduce it exactly — load, play,
+  // load again — and require the two loads to agree.
+  const fingerprint = (data: DungeonData): string =>
+    JSON.stringify([
+      data.maps.map((m) => m.cellFlags),
+      data.objectList,
+      data.columnIndex,
+      data.header,
+      data.databases,
+    ]);
+
+  const afterFirstLoad = fingerprint(reloadedData);
+
+  // Play: drop one more object into a cell that has none, which is what moves
+  // `columnIndex` out from under the next load.
+  let secondEmpty: { x: number; y: number } | null = null;
+  for (let x = 0; x < width && !secondEmpty; x++) {
+    for (let y = 0; y < height && !secondEmpty; y++) {
+      if (roomTypeAt(reloaded, x, y, level) !== RoomType.OPEN) continue;
+      if (reloaded.dungeonState.hasObjects(new Position(x, y, level))) continue;
+      secondEmpty = { x, y };
+    }
+  }
+  check(secondEmpty !== null, 'there should be an empty open cell to play into between the two loads');
+  if (secondEmpty) {
+    const idx = reloadedData.databases.misc.records.length;
+    reloadedData.databases.misc.records.push({
+      nextObject: OBJECT_ID_EOF,
+      specialState: 0,
+      important: false,
+      miscType: 35,
+    });
+    reloadedData.databases.misc.count++;
+    reloadedData.header.objectCounts[DBType.MISC] = (reloadedData.header.objectCounts[DBType.MISC] + 1) & 0xffff;
+    reloaded.dungeonState.addObjectToCell(
+      new Position(secondEmpty.x, secondEmpty.y, level),
+      encodeObjectID(0, DBType.MISC, idx) as ObjectID,
+    );
+    check(
+      fingerprint(reloadedData) !== afterFirstLoad,
+      'the play between the two loads should actually have changed the world',
+    );
+  }
+
+  reloaded.applyRuntimeSaveState(JSON.parse(serialized));
+  check(
+    fingerprint(reloadedData) === afterFirstLoad,
+    'loading the same save twice, with play in between, should give the same world both times',
+  );
 
   finish();
 }

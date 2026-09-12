@@ -31,6 +31,28 @@ export interface SaveGameState {
   handChar?: number;
   /** `gb2.MagicCaster`, restored on the next line of the same function (`:1637`). */
   magicCaster?: number;
+  /**
+   * The rest of `GAMEBLOCK2`, as `LoadGame` reads it
+   * (`doc/CSBwin-src/SaveGame.cpp:1617-1650`). Present when the block was parsed.
+   */
+  block2?: Block2;
+  /**
+   * Byte offset at which the plain, unscrambled dungeon image begins — immediately
+   * after the timer queue. `LoadGame` calls `ReadDatabases()` there
+   * (`doc/CSBwin-src/SaveGame.cpp:1739`), and because a save is loaded with
+   * `d.gameState == GAMESTATE_ResumeSavedGame` that function skips its own
+   * extended-features/compression preamble and reads straight on from the current
+   * file position (`doc/CSBwin-src/SaveGame.cpp:2345-2346`).
+   */
+  dungeonImageOffset?: number;
+  /**
+   * The raw, unscrambled 3328-byte block 4. It is **not** only the four champions:
+   * `CHARDESC[4]` is 3200 bytes and the remaining 128 are party-wide state
+   * (`Brightness`, `SeeThruWalls`, the shield timers, `PartyFootprints[24]`,
+   * `Invisible`, …), bracketed in `doc/CSBwin-src/Data.h:765-783`. Handed over raw
+   * because nothing unpacks `CHARDESC` yet — see PLAN.md Phase 10.
+   */
+  characterBlock?: Uint8Array;
 }
 
 interface Block1 {
@@ -53,12 +75,31 @@ interface Block1 {
  * nothing consumes it yet, not because the layout is unknown.
  */
 interface Block2 {
-  maxTimers: number;
-  maxItem16: number;
+  /** `gb2.Time` (offset 0) — `d.Time`, the game clock in ticks. */
+  time: number;
+  /** `gb2.ranseed` (offset 4) — `d.RandomNumber`. */
+  ranseed: number;
+  /** `gb2.ObjectInHand` (offset 8) — the RN on the cursor, 0 for none. */
+  objectInHand: number;
+  /** `gb2.numcharacter` (offset 10) — how many champions are in the party. */
+  numCharacter: number;
+  partyX: number;
+  partyY: number;
+  partyFacing: number;
+  partyLevel: number;
   /** `gb2.handChar` (offset 20) — the champion *index* holding the cursor. */
   handChar: number;
   /** `gb2.MagicCaster` (offset 22) — the champion index whose rune panel is up. */
   magicCaster: number;
+  numTimer: number;
+  firstAvailTimer: number;
+  maxTimers: number;
+  item16QueLen: number;
+  lastMonsterAttackTime: number;
+  lastPartyMoveTime: number;
+  partyMoveDisableTimer: number;
+  maxItem16: number;
+  timerSequence: number;
 }
 
 const BLOCK1_SIZE = 512;
@@ -349,12 +390,26 @@ function readExtendedFeatures(data: Uint8Array): {
     }
   }
 
+  // Offsets are `EXTENDEDFEATURESBLOCK` (`doc/CSBwin-src/CSB.h:463-511`), which is a
+  // plain naturally-aligned struct: sentinel[20] 0, dataMapLength 20, the three
+  // checksums 24/28/32, version 36, flags 37, numDSA 38, editingOptions 40,
+  // gameInfoSize 44, cellFlagArraySize 48, graphicsSignature1/2 52/56,
+  // spellFilterLocation 60, extendedFlags 64, overlayOrdinal 68.
   const dataMapLength = readU32LE(parsed, 20);
   const flags = parsed[37] ?? 0;
   const numDSA = readU16LE(parsed, 38);
-  const gameInfoSize = readU32LE(parsed, 44);
-  const spellFilterLocation = readU32LE(parsed, 64);
-  const extendedFlags = readU32LE(parsed, 68);
+  // `gameInfoSize` is `ui32` in the struct but the whole chain treats it as signed:
+  // the global is `i32` (`doc/CSBwin-src/Data.h:118`), and the writer sets
+  // `efb.gameInfoSize = gameInfoSize - 1` whenever `gameInfo != NULL`
+  // (`doc/CSBwin-src/SaveGame.cpp:977-978`), so an empty-but-allocated game info
+  // writes **-1**. `WriteGameInfo` then returns before writing anything for a
+  // non-positive size, so -1 occupies no bytes in the file and must advance nothing.
+  // A real save in `static/gamefiles/saves/` does exactly this; read unsigned, the
+  // 4294967295 walked the read head off the end of the file.
+  const gameInfoSizeRaw = readU32LE(parsed, 44) | 0;
+  const gameInfoSize = gameInfoSizeRaw > 0 ? gameInfoSizeRaw : 0;
+  const spellFilterLocation = readU32LE(parsed, 60);
+  const extendedFlags = readU32LE(parsed, 64);
 
   const sequencedTimers = (extendedFlags & 0x20) !== 0;
   const extendedTimers = (extendedFlags & 0x80) !== 0;
@@ -684,10 +739,25 @@ function parseBlock1(buf: Uint8Array): Block1 {
  */
 function parseBlock2(buf: Uint8Array): Block2 {
   return {
-    maxTimers: readU16BE(buf, 28),
-    maxItem16: readU16BE(buf, 46),
+    time: readU32BE(buf, 0),
+    ranseed: readU32BE(buf, 4),
+    objectInHand: readU16BE(buf, 8),
+    numCharacter: readI16BE(buf, 10),
+    partyX: readI16BE(buf, 12),
+    partyY: readI16BE(buf, 14),
+    partyFacing: readI16BE(buf, 16),
+    partyLevel: readI16BE(buf, 18),
     handChar: readI16BE(buf, 20),
     magicCaster: readI16BE(buf, 22),
+    numTimer: readI16BE(buf, 24),
+    firstAvailTimer: readI16BE(buf, 26),
+    maxTimers: readU16BE(buf, 28),
+    item16QueLen: readI16BE(buf, 30),
+    lastMonsterAttackTime: readU32BE(buf, 32),
+    lastPartyMoveTime: readU32BE(buf, 36),
+    partyMoveDisableTimer: readI16BE(buf, 40),
+    maxItem16: readU16BE(buf, 46),
+    timerSequence: readU16BE(buf, 48),
   };
 }
 
@@ -772,7 +842,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     offset = offset;
   }
 
-  const { next: afterCharacters } = unscrambleStream(
+  const { buf: characterBlock, next: afterCharacters } = unscrambleStream(
     saveData,
     offset,
     CHARACTER_SIZE,
@@ -823,6 +893,9 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     spellFilterLocation: extended.spellFilterLocation,
     handChar: block2.handChar,
     magicCaster: block2.magicCaster,
+    block2,
+    characterBlock,
+    dungeonImageOffset: afterTimerQueue,
   };
 }
 

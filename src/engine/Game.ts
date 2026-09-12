@@ -114,10 +114,18 @@ interface DropCursorOptions {
  * big-endian in the file (`doc/CSBwin-src/CSBCode.cpp:9057`). Fixing that makes every
  * v3 payload unreadable, so the version moves with it.
  *
+ * Version 5 adds `dungeon.snapshot.columnIndex` and the two header fields beside it.
+ * Their absence was not a missing feature but a live corruption: `columnIndex` is
+ * rewritten by every drop into an empty cell and every pick-up of a cell's last object
+ * (`DungeonState.addObjectToCell`), so a v4 payload restored `objectList` against
+ * whatever offsets play had left behind, and every cell's object chain was read from
+ * the wrong place. A v4 save cannot be repaired — the index it needed was never
+ * written — so it is refused like any other older format.
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 4;
+export const RUNTIME_SAVE_VERSION = 5;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;

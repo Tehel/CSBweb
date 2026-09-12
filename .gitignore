@@ -11,5 +11,8 @@ static/extracted
 # temporary
 static/backstory
 
+# WSL/NTFS alternate data stream droppings
+*:Zone.Identifier
+
 # CSBWin's source, fetched by npm run fetch-csbwin-src
 doc/CSBwin-src/

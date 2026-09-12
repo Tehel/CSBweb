@@ -17,8 +17,22 @@
  *   has-objects bit. `MapData.tiles` is a pure derivation of the cell flag byte
  *   (`DungeonLoader.parseMapData`), so it is rebuilt on restore rather than stored.
  * - `objectList` — the per-cell object chains. Every pick-up, drop and throw edits
- *   it. `columnIndex` / `levelIndex` are structural and never written, so they stay
- *   out.
+ *   it.
+ * - `columnIndex` — the per-column offset into `objectList`. It looks structural and
+ *   was left out of the first version of this file on that assumption, which was
+ *   simply wrong: `DungeonState.addObjectToCell` and `removeObjectFromCell` rewrite
+ *   every later entry whenever a cell gains or loses its *last* object, exactly as
+ *   CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin writes the array
+ *   into the save file beside the object list itself
+ *   (`doc/CSBwin-src/SaveGame.cpp:1178`). Restoring `objectList` without it makes
+ *   `GetObjectListIndex` read every cell's chain at the wrong offset, so objects
+ *   vanish from the cells that hold them and surface in cells that do not — missing
+ *   pressure plates, items on the wrong floor tile, monsters apparently out of bounds.
+ *   `levelIndex` really is structural: it is derived from the map descriptors by
+ *   `DungeonLoader.buildLevelIndex` and nothing writes it.
+ * - `header.objectListSize` and `header.objectCounts` — the same mutations maintain
+ *   both (`DungeonState:310`, `Game.createMiscObject`, `DsaSystem`, `TimerSystem`),
+ *   and CSBWin saves the 44-byte header too (`doc/CSBwin-src/SaveGame.cpp:1168`).
  * - every database's records — links, charges, container contents, creature hit
  *   points, actuator counters. The arrays also *grow*: `CreateAndDropObject`,
  *   `Game.createMiscObject` and `MonsterSystem.createMonster` all append.
@@ -52,6 +66,12 @@ export interface DungeonSnapshot {
     /** One base64 string per map: the cell flags in `[x][y]` order, row-major over x. */
     cellFlags: string[];
     objectList: ObjectID[];
+    /** `data.columnIndex` — the per-column offset into `objectList`. */
+    columnIndex: ui16[];
+    /** `data.header.objectListSize`. */
+    objectListSize: ui16;
+    /** `data.header.objectCounts`. */
+    objectCounts: ui16[];
     /** Every database's records, by key. A database absent from the map is left alone. */
     databases: Partial<Record<DatabaseKey, DatabaseRecord[]>>;
     /** `dsaIndex.entries[i].state`, or null where the entry is empty. */
@@ -113,6 +133,9 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
     const snapshot: DungeonSnapshot = {
         cellFlags: data.maps.map((map) => encodeCellFlags(map.cellFlags)),
         objectList: [...data.objectList],
+        columnIndex: [...data.columnIndex],
+        objectListSize: data.header.objectListSize,
+        objectCounts: [...data.header.objectCounts],
         databases,
     };
 
@@ -152,6 +175,15 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
 
     data.objectList.length = 0;
     data.objectList.push(...snapshot.objectList);
+
+    // The column index has to land with the object list it indexes: the two are one
+    // structure, and half of it is worse than none.
+    data.columnIndex.length = 0;
+    data.columnIndex.push(...snapshot.columnIndex);
+
+    data.header.objectListSize = snapshot.objectListSize;
+    data.header.objectCounts.length = 0;
+    data.header.objectCounts.push(...snapshot.objectCounts);
 
     for (const key of DATABASE_KEYS) {
         const records = snapshot.databases[key];

@@ -1270,3 +1270,135 @@ temporary adjustment from a spell or potion does not move it.
 
 Covered by `tools/dump-mastery-panel.ts`, which renders the real panel and compares the
 pixels against the strings spelled out independently in the tool.
+
+## The column index is saved state, not dungeon structure
+
+`d.objectListIndex` holds, for every column of every level, the index at which that
+column's run of entries begins in `d.objectList` (`doc/CSBwin-src/Data.h:1050`;
+`d.pCurrentLevelObjectIndex` is the pointer into it for the loaded level, repointed by
+`LoadLevel` at `doc/CSBwin-src/CSBCode.cpp:5785`). `GetObjectListIndex` walks from that
+base past every earlier cell in the column that carries the has-objects bit
+(`doc/CSBwin-src/CSBCode.cpp:5103-5127`), so **every** cell chain in the dungeon is read
+through it.
+
+It is not fixed at load time. When an object leaves a cell that then holds nothing, CSBWin
+clears the cell's `0x10` bit, memmoves the tail of `objectList` down over the vacated slot,
+and then decrements the index of **every following column, in this level and all higher
+ones** (`doc/CSBwin-src/CSBCode.cpp:5211-5224`):
+
+```
+      //Now we need to fix the column indexes.
+      puwA2 = &d.pCurrentLevelObjectIndex[mapX+1];
+      D5W = d.numColumnPointers; // for all levels
+      ...
+      while ((D5W--) != 0) (*(puwA2++))--;
+```
+
+Dropping into an empty cell is the mirror image. So an ordinary pick-up or drop rewrites
+the array, and it is state that play changes.
+
+`SaveGame` writes it accordingly, between the level descriptors and the object list it
+indexes (`doc/CSBwin-src/SaveGame.cpp:1178`):
+
+```
+    D0W = WriteAndChecksum((ui8 *)d.objectListIndex, pwA3, 2*d.numColumnPointers);
+    ...
+    D0W = WriteAndChecksum((ui8 *)d.objectList,      pwA3, 2*d.dungeonDatIndex->ObjectListLength());
+```
+
+The 44-byte header goes out with it (`:1168`), carrying `ObjectListLength()` and the
+per-database record counts, which the same mutations maintain.
+
+**Consequence for a save format.** `objectList` and `columnIndex` are one structure and
+must be restored together. Restoring the list against a stale index shifts the base of
+every column after the first divergence, so cells read their neighbours' chains: objects
+disappear from the cells that hold them (a pressure plate stops existing), surface in
+cells that never had them (a monster apparently out of bounds, an item on the wrong
+tile), and a load stops being idempotent — what happened *between* two loads changes what
+the second one produces.
+
+Note one deliberate difference in our port: CSBWin keeps `objectList` at a fixed
+allocation and nulls the vacated last entry, while `DungeonState` splices the array and
+tracks the length in `header.objectListSize`. Both are self-consistent; only the second
+needs the length saved.
+
+Covered by `tools/dump-savegame.ts`.
+
+## `EXTENDEDFEATURESBLOCK` offsets, and `gameInfoSize` is signed
+
+The block is a plain, naturally-aligned 512-byte struct
+(`doc/CSBwin-src/CSB.h:463-511`). Byte offsets:
+
+| Off | Field | Off | Field |
+| --- | --- | --- | --- |
+| 0 | `sentinel[20]` | 44 | `gameInfoSize` |
+| 20 | `dataMapLength` | 48 | `cellFlagArraySize` |
+| 24 | `dataTypeMapChecksum` | 52 | `graphicsSignature1` |
+| 28 | `dataIndexMapChecksum` | 56 | `graphicsSignature2` |
+| 32 | `extendedFeaturesChecksum` | 60 | `spellFilterLocation` |
+| 36 | `version` | 64 | `extendedFlags` |
+| 37 | `flags` | 68 | `overlayOrdinal` |
+| 38 | `numDSA` | 72.. | `overlayP1..P4` |
+| 40 | `editingOptions` | 92 | `CSBgraphicsSignature1` |
+
+This port read `spellFilterLocation` at 64 and `extendedFlags` at 68 — both one field
+too far — until three genuine saves were read. It went unnoticed because in the two
+older ones every word from 52 to 72 is zero. The third has
+`extendedFlags = 0xe0` (`SequencedTimers | DefaultDirectX | ExtendedTimers`), which
+at the wrong offset read as 0 and chose a 10-byte `TIMER` where the file has 16.
+
+**`gameInfoSize` is declared `ui32` but is signed everywhere it is used.** The global
+is `i32` (`doc/CSBwin-src/Data.h:118`, `doc/CSBwin-src/data.cpp:271`), `ReadGameInfo`
+and `WriteGameInfo` both take `i32 size`, and the writer sets
+
+```
+      efb.gameInfoSize = 0;
+      if (gameInfo != NULL) efb.gameInfoSize = gameInfoSize-1;
+```
+
+(`doc/CSBwin-src/SaveGame.cpp:977-978`), so an allocated-but-empty game info writes
+**-1**, i.e. `0xffffffff`. `WriteGameInfo` then writes nothing for it, so the field
+occupies **no bytes in the file** and the read head must not advance.
+`static/gamefiles/saves/csbgame3.dat` is exactly this case; read unsigned, the
+4294967295 walks past the end of the file and GAMEBLOCK1 never parses.
+
+Proved arithmetically as well as by checksum: across the three saves the distance from
+the end of the data maps to GAMEBLOCK1 is 3185, 3185 and 3153 bytes, and the DSA level
+index is 3153 bytes in all three — the 32-byte difference is precisely the two files
+whose `gameInfoSize` is 32. The one with `-1` contributes zero.
+
+Covered by `tools/dump-csbwin-save.ts`.
+
+## `CHARDESC.title` is 20 bytes, not 16
+
+`CHARDESC` (`doc/CSBwin-src/CSB.h:2483`) declares
+
+```
+  char  name[8];   // 00
+  char  title[16]; // 08 // size??
+  i16 wordx24;     // Not swapped because I don't see it used.
+  ui8 FILL26[28-26];
+  ui8 facing;      //28
+```
+
+Paul Stevens' own `// size??` is the tell. `AddCharacter` copies the title from the
+decoded `dbTEXT` record and rejects a character only at `D6W >= 19`, then writes the
+terminator with `title[D6W] = 0` (`doc/CSBwin-src/Character.cpp:578-587`), so index 19
+is a legal write. Title bytes therefore run 8..27 inclusive, and `facing` at 28 closes
+the span exactly. **`title[16]`, `wordx24` and `FILL26[2]` are one 20-byte field.**
+
+`name` is written by the same function's first loop, which rejects at `D6W >= 7` and
+terminates with `name[D6W] = 0`, so a name is at most 7 characters in an 8-byte field.
+
+Neither field is byte-swapped — `swapCharacter` lists every field it swaps and these
+are not among them (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so both are read as plain
+bytes regardless of endianness.
+
+⚠️ **Open question, not a fact.** In the committed saves several champions' titles read
+back with their first character replaced by 0: `SHE DEVIL` → `\0HE DEVIL`,
+`SHADOWSEEK` → `\0HADOWSEEK`, `THE BARBARIAN` → `\0HE BARBARIAN`, against the preset
+names `tools/dump-preset-heroes.ts` reads from `dungeon.dat`. It is a property of the
+files, not of the reader: within one save, `HALK` loses its `T` while `LEYLA` and
+`ALEX` keep `SHADOWSEEK` and `ANDER` intact, so no fixed offset explains it. The
+suspicion is a champion-naming path that writes its NUL at `name[8]`, which is
+`title[0]` — unverified. Do not "fix" the reader for it until the writing path is found.
