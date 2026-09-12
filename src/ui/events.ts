@@ -33,6 +33,17 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     canvas.addEventListener('mousedown', (e) => {
         const { x, y } = getEventPosition(canvas, e);
         const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
+        // The save/load screen is modal, the way `_WaitForMenuSelect` is modal: it
+        // replaces every button list while it runs, so nothing else may see the click
+        // (`doc/CSBWIN_MENU_REFERENCE.md`). Handling it here rather than through the
+        // game's mouse queue is also what keeps the browser's transient user
+        // activation alive — `showDirectoryPicker` refuses without it, and the queue is
+        // drained a frame later.
+        if (buttonMask !== 0 && ctx.renderer?.isSaveMenuOpen()) {
+            ctx.renderer.handleSaveMenuClick(x, y, buttonMask);
+            ctx.renderView();
+            return;
+        }
         if (buttonMask !== 0) {
             ctx.renderer.enqueueMouseClick(x, y, buttonMask);
             if (buttonMask === 2 && isViewportPoint(x, y) && !ctx.renderer.isInventoryOpen()) {
@@ -60,9 +71,16 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 
     canvas.addEventListener('mouseup', () => {
+        if (ctx.renderer?.isSaveMenuOpen()) return;
         ctx.renderer.enqueueMouseUnclick();
         ctx.renderView();
     });
+
+    canvas.addEventListener('wheel', (e) => {
+        if (!ctx.renderer?.isSaveMenuOpen()) return;
+        e.preventDefault();
+        ctx.renderer.handleSaveMenuWheel(e.deltaY);
+    }, { passive: false });
 
     canvas.addEventListener('contextmenu', (e) => {
         e.preventDefault();
@@ -160,6 +178,16 @@ export function bindUIEvents(): void {
             // it is up every key is a letter being typed, so none of the movement or
             // debug keys below may see one. 'W' would otherwise walk the party into a
             // wall while the player named their champion.
+            // The save/load screen takes the keyboard whole, for the reason the
+            // Reincarnate screen does: 'S' would otherwise walk the party backwards
+            // while the player scrolled a list of saves.
+            if (ctx.renderer?.isSaveMenuOpen()) {
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                ctx.renderer.handleSaveMenuKey(e.key);
+                ctx.renderView();
+                e.preventDefault();
+                return;
+            }
             if (ctx.renderer?.isReincarnateScreenOpen()) {
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
                 ctx.renderer.handleReincarnateKey(e.key);

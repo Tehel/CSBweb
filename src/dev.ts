@@ -2,16 +2,25 @@
  * Development-only scaffolding.
  *
  * None of this exists in CSBWin. It is the dev harness that keeps the port playable while
- * real features are still missing: a random party (until Phase 13's hall of champions), a
- * localStorage quick-save (until Phase 10's CSBWin-compatible save files), the attack-panel
- * toggle, and the missile trace and scenarios used to validate Phase 8.
+ * real features are still missing: a random party (until Phase 13's hall of champions), the
+ * F5/F9 quick-save keys, the attack-panel toggle, and the missile trace and scenarios used
+ * to validate Phase 8. The quick-save is no longer a feature of its own — it is a shortcut
+ * onto the save/load screen's stores (`src/data/saves/`).
  *
  * Everything here is reached only through `isDebugFeaturesEnabled()` — see PLAN.md Phase 14.
  * Delete a section as soon as the real feature lands.
  */
 import { DBType, Direction, Position, RoomType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF } from './core';
 import type { DungeonData, PresetHero } from './data';
-import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from './data/SaveGameLoader';
+import { browserSaveStore, findLatestSave, writableSaveStore } from './data/saves';
+import {
+    SavePayloadError,
+    applySavePayload,
+    buildSavePayload,
+    decodeSavePayload,
+    encodeSavePayload,
+    makeSaveFileName,
+} from './engine/SaveGamePayload';
 import {
     MovementAction,
     assignPresetHeroPossessions,
@@ -23,10 +32,8 @@ import {
     type Game,
     type MissileTraceEvent,
     type PartyState,
-    type RuntimeSaveState,
     type TimerTables,
 } from './engine';
-import { RUNTIME_SAVE_VERSION } from './engine';
 import type { ViewportRenderer } from './renderer/ViewportRenderer';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { appendLog, clearLog, updateDebug } from './ui';
@@ -41,7 +48,8 @@ export interface DevHost {
     renderView(): void;
 }
 
-const QUICK_SAVEGAME_RAW_KEY = 'dmweb_savegame_raw_v1';
+/** Where the quick-save used to live, before F5/F9 joined the save list. */
+const LEGACY_QUICK_SAVE_KEY = 'dmweb_savegame_raw_v1';
 const MISSILE_WEAPON_DAGGER = 8;
 const MISSILE_WEAPON_ARROW = 27;
 const POTION_FUL_BOMB = 19;
@@ -58,6 +66,12 @@ export interface DevTools {
     /** `MonsterSystemHooks.trace` sink; a no-op unless the AI trace is on. */
     onMonsterAITrace(line: string): void;
     toggleMonsterAITrace(): void;
+    /**
+     * F5 and F9. Both act on the same saves the disk-icon menu lists: one more save to
+     * the current source, and the most recent save from wherever it lives. Async because
+     * both stores are, and awaited by nobody — the outcome reaches the player through
+     * `updateDebug`.
+     */
     quickSave(): void;
     quickLoad(): void;
     injectRandomParty(): void;
@@ -69,25 +83,6 @@ export function createDevTools(host: DevHost): DevTools {
     let missileTraceEnabled = false;
     let aiTraceEnabled = false;
     let missileScenarioIndex = 0;
-
-    function decodeBase64ToBytes(data: string): Uint8Array {
-        const bin = atob(data);
-        const out = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) {
-            out[i] = bin.charCodeAt(i) & 0xff;
-        }
-        return out;
-    }
-
-    function encodeBytesToBase64(data: Uint8Array): string {
-        let bin = '';
-        const chunkSize = 0x8000;
-        for (let i = 0; i < data.length; i += chunkSize) {
-            const chunk = data.subarray(i, i + chunkSize);
-            bin += String.fromCharCode(...chunk);
-        }
-        return btoa(bin);
-    }
 
     const RANDOM_NAMES = [ 'Halk', 'Leif', 'Tiggy', 'Chani', 'Gothmog', 'Zed', 'Wuuuf', 'Nabi'];
     const RANDOM_PORTRAIT_COUNT = 24;
@@ -524,68 +519,104 @@ export function createDevTools(host: DevHost): DevTools {
         updateDebug('Random party injected');
     }
 
-    function quickSave(): void {
-        if (!host.game) return;
-        const runtime = host.game.getRuntimeSaveState();
-        const item16 = runtime.dungeon.item16 ?? [];
-        const timers = runtime.dungeon.timers ?? [];
-        const missiles = runtime.dungeon.missiles ?? [];
-        const saveGameState: SaveGameState = {
-            item16,
-            timers,
-            missiles,
-            maxItem16: item16.length,
-            maxTimers: timers.length,
-            sequencedTimers: false,
-            extendedTimers: false,
-            // `gb2.handChar` / `gb2.MagicCaster` (doc/CSBwin-src/SaveGame.cpp:1636).
-            // The runtime half serializes the whole `PartyState` and so carries these
-            // twice; the binary block is the one a CSBWin save would have, and writing
-            // it here is what keeps the two halves honest with each other.
-            handChar: runtime.party.cursorOwner ?? -1,
-            magicCaster: runtime.party.magicCasterIndex ?? -1,
-        };
-        const rawBytes = saveSaveGameState(saveGameState);
-        const payload = {
-            runtime,
-            raw: encodeBytesToBase64(rawBytes),
-        };
-        localStorage.setItem(QUICK_SAVEGAME_RAW_KEY, JSON.stringify(payload));
-        updateDebug('Quick-saved');
-    }
-
-    function quickLoad(): void {
-        if (!host.game) return;
-        const raw = localStorage.getItem(QUICK_SAVEGAME_RAW_KEY);
-        if (!raw) {
-            updateDebug('No quick-save found');
+    /**
+     * The quick-save used to live under one `localStorage` key of its own. Anything
+     * still in it is moved into the browser store once, so a playtest saved before this
+     * change is not stranded, and the key is dropped either way — a payload too old to
+     * decode was never loadable anyway.
+     */
+    let legacyMigrated = false;
+    async function migrateLegacyQuickSave(): Promise<void> {
+        if (legacyMigrated) return;
+        legacyMigrated = true;
+        let raw: string | null = null;
+        try {
+            raw = localStorage.getItem(LEGACY_QUICK_SAVE_KEY);
+        } catch {
             return;
         }
+        if (!raw) return;
         try {
-            const parsed = JSON.parse(raw) as { runtime: RuntimeSaveState; raw: string };
-            // Older formats are discarded, not upgraded. A v1 save has no world state
-            // in it at all, so restoring one would put the party back into a dungeon
-            // reset to `dungeon.dat`; a v2 save has champions whose attributes are
-            // flat numbers with no maximum or minimum to restore.
-            if (parsed.runtime?.version !== RUNTIME_SAVE_VERSION) {
-                updateDebug(
-                    `Quick-save is format v${parsed.runtime?.version ?? '?'}, this build reads ` +
-                        `v${RUNTIME_SAVE_VERSION} — discarded`,
-                );
-                localStorage.removeItem(QUICK_SAVEGAME_RAW_KEY);
+            const payload = decodeSavePayload(new TextEncoder().encode(raw));
+            const header = payload.header;
+            await browserSaveStore().write(
+                {
+                    name: makeSaveFileName(header.savedAt),
+                    savedAt: header.savedAt,
+                    level: header.level,
+                    champions: header.champions,
+                },
+                // Re-encoded rather than stored verbatim: a payload written before the
+                // header existed would otherwise be unlistable if it were ever copied to
+                // a directory, where the listing reads only the front of the file.
+                encodeSavePayload(payload),
+            );
+            updateDebug('Moved the old quick-save into the save list');
+        } catch {
+            updateDebug('Discarded an old quick-save this build cannot read');
+        }
+        try {
+            localStorage.removeItem(LEGACY_QUICK_SAVE_KEY);
+        } catch {
+            /* nothing to clean up */
+        }
+    }
+
+    // F5 and F9 act on the saves the disk-icon menu lists, not on a slot of their own:
+    // quick-save writes one more save to the current source, and quick-load takes the
+    // most recent one wherever it lives. The two used to disagree about what "the most
+    // recent save" meant.
+    async function quickSave(): Promise<void> {
+        if (!host.game) return;
+        await migrateLegacyQuickSave();
+        try {
+            const payload = buildSavePayload(host.game);
+            // `writableSaveStore` falls back to the browser when the file source is
+            // chosen but not connected: F5 must never raise a folder picker over the game.
+            const store = writableSaveStore();
+            const taken = new Set((await store.list().catch(() => [])).map((e) => e.name));
+            await store.write(
+                {
+                    name: makeSaveFileName(payload.header.savedAt, taken),
+                    savedAt: payload.header.savedAt,
+                    level: payload.header.level,
+                    champions: payload.header.champions,
+                },
+                encodeSavePayload(payload),
+            );
+            updateDebug(`Quick-saved (${store.kind === 'file' ? 'disk' : 'browser'})`);
+        } catch (error) {
+            console.warn('Quick-save failed:', error);
+            updateDebug('Quick-save failed (see console)');
+        }
+    }
+
+    async function quickLoad(): Promise<void> {
+        if (!host.game) return;
+        await migrateLegacyQuickSave();
+        try {
+            const latest = await findLatestSave();
+            if (!latest) {
+                updateDebug('No saved game found');
                 return;
             }
-            const saveBytes = decodeBase64ToBytes(parsed.raw);
-            const saveState = loadSaveGameState(saveBytes);
-            applySaveGameState(host.game.state.dungeon, saveState, host.game.state.party);
-            host.game.applyRuntimeSaveState(parsed.runtime);
-            // Message timeouts are game-tick based, so a load that moves the clock would leave
-            // rows that expire at the wrong time (or never). CSBWin serializes the text area
-            // (doc/CSBwin-src/Data.h:1666); until we do, discard it. See PLAN.md Phase 11.
+            // Older formats are refused, not upgraded. A v1 save has no world state in it
+            // at all, so restoring one would put the party back into a dungeon reset to
+            // `dungeon.dat`; a v2 save has champions whose attributes are flat numbers
+            // with no maximum or minimum to restore.
+            applySavePayload(host.game, decodeSavePayload(await latest.store.read(latest.entry.id)));
+            // Message timeouts are game-tick based, so a load that moves the clock would
+            // leave rows that expire at the wrong time (or never). CSBWin serializes the
+            // text area (doc/CSBwin-src/Data.h:1666); until we do, discard it. See
+            // PLAN.md Phase 11.
             scrollingText.discardText();
             host.renderView();
-            updateDebug('Quick-loaded');
+            updateDebug(`Quick-loaded ${latest.entry.name}`);
         } catch (error) {
+            if (error instanceof SavePayloadError) {
+                updateDebug(error.message);
+                return;
+            }
             console.warn('Failed to quick-load:', error);
             updateDebug('Quick-load failed (see console)');
         }

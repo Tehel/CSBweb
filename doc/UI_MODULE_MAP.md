@@ -33,6 +33,8 @@ A function that turns out not to need the state does not take it — the pure he
 | `ui/Mouse.ts` | `Mouse.cpp` | Click ring buffer, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, the cursor and hover highlights |
 | `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
 | `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `Mouse.ts` and the host's key handler hand it every click and every key |
+| `ui/Menu.ts` | `Menu.cpp` | `_DoMenu` and `_WaitForMenuSelect`: graphic 0, the four option layouts and their self-blits, `CenteredText`/`SplitLongLine`, the 210-213 button sets and the two-pass press animation. See `doc/CSBWIN_MENU_REFERENCE.md` |
+| `ui/SaveMenu.ts` | `SaveGame.cpp` (`_DisplayDiskMenu`), extended | The save/load screen behind the disk icon. Keeps `_DoMenu`'s art and animation and replaces the four-slot chooser with a scrolling list over `src/data/saves/`. **Modal** like `ReIncarnate.ts`, and clicks reach it straight from the DOM event so the folder picker keeps its user activation |
 | `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading, the Hall of Champions menu (`TAG0189a8`) |
 | `ui/Character.ts` | `Character.cpp` | Portraits, hand icons, shield dots, life/stamina/mana bars, attributes, food/water, carried load, possession slots |
 | `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it, through the `applyFeeding` hook |
@@ -64,7 +66,7 @@ dungeon.
 
 ## Verifying a change here
 
-`tools/check-frames.sh` byte-compares five live screen states against `tools/frames/`.
+`tools/check-frames.sh` byte-compares six live screen states against `tools/frames/`.
 See the header of `tools/probe-frames.mjs` for how to start the dev server and headless
 Chrome it needs. It covers rendering plus the inventory open/select click path; throwing,
 dropping, chests, feeding and casting are **not** exercised.

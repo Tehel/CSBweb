@@ -59,6 +59,10 @@ const CHECKS = [
   // suite that reads bytes this project did not write, so the only one a bug
   // symmetrical between our reader and our writer cannot satisfy.
   { tool: 'dump-csbwin-save.ts' },
+  // The save/load screen: the button-table offsets it hangs off, the list panel built
+  // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is
+  // visible to the golden frames until there are saves to list.
+  { tool: 'dump-save-menu.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.

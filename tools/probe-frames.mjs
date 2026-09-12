@@ -72,6 +72,11 @@ await send('Emulation.setDeviceMetricsOverride', {
 // the injected party is always the same. Frames are then byte-comparable across runs.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.clear(); } catch (e) {}
+  // The save/load screen lists IndexedDB, so a frame of it would otherwise carry
+  // whatever the last probe session saved. Both drivers of this script run Chrome on a
+  // throwaway profile (probe-ui.mjs and check-frames.sh both pass --user-data-dir), so
+  // there is no real save to lose here.
+  try { indexedDB.deleteDatabase('dmweb-saves'); } catch (e) {}
   let seed = 0x2545f491;
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                         return ((seed >>> 0) % 1000000) / 1000000; };
@@ -97,6 +102,14 @@ await canvasClick(15, 15, 2);  await wait(500);   // back out
 // placeholder panel; the panel is now `ui/Attack.ts` driven by `word20252`.
 await canvasClick(240, 100, 0); await wait(600);
 console.log('state: attack panel');      await shot('05-attack');
+// The disk icon (`buttons17760[1]`, id 140) raises the save/load screen over the
+// viewport. Reopen an inventory first — the attack-panel step backed out of it. The
+// browser store was emptied on boot, so the list is reliably empty and this frame pins
+// the panel itself: graphic 0, the interior band tiled down over the full-width button
+// frame, and the two bottom buttons with LOAD unlabelled because nothing is selected.
+await canvasClick(15, 15, 2);  await wait(600);
+await canvasClick(177, 40, 0); await wait(900);
+console.log('state: save menu');         await shot('06-savemenu');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

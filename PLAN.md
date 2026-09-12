@@ -84,20 +84,20 @@ Those items are now marked 🚫 where they were silently skipped; Phase 15 addre
 or ~12s with `--frames`. There is still no test *framework*; what there is:
 
 1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
-   DevTools Protocol and byte-compare five screen states against `tools/frames/`. Built
-   to make the Phase 14 split safe. Five frames, no assertions beyond equality. The
+   DevTools Protocol and byte-compare six screen states against `tools/frames/`. Built
+   to make the Phase 14 split safe. Six frames, no assertions beyond equality. The
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twenty-five assertion-carrying verification tools** — the Phase 12 nine
+2. **Twenty-six assertion-carrying verification tools** — the Phase 12 nine
    (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
    `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
    `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
    `dump-savegame-blocks.ts`,
    `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
    `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts`,
-   `dump-hall-of-champions.ts`, `dump-vi-altar.ts`, `dump-status-boxes.ts` and
-   `dump-reincarnate-entry.ts`.
+   `dump-hall-of-champions.ts`, `dump-vi-altar.ts`, `dump-status-boxes.ts`,
+   `dump-reincarnate-entry.ts` and `dump-save-menu.ts`.
    `tools/run-checks.mjs` is the authority on the list. These load the real game
    files, drive the real engine with a fixed RNG seed, print a human-readable table and
    assert invariants, exiting non-zero on failure. They are the de-facto regression
@@ -372,15 +372,66 @@ Goal: ensure internal state and data structures are complete enough to write a b
    - Add a tool to load CSBWin save → re‑serialize → binary‑compare.
    - Add targeted checks for door/pit state, object chains, and timers after load.
 
-11. **Load/save menu behind the disk icon** (author request, September 2026):
-   the disk icon on the inventory screen should open a custom menu offering save and
-   load, to and from **both** browser storage and a real file on disk. The disk-to-file
-   half is what makes Phase 10's binary format visible to the player; the browser half
-   can ship first over the existing runtime snapshot. Not started, and deliberately not
-   worked on in the session that recorded it. Needs: the icon's hit rectangle
-   (`src/renderer/ui/HitTest.ts`), a menu drawn in the 320×200 buffer rather than in
-   DOM chrome, and File System Access / `<input type=file>` + blob download for the
-   disk half.
+11. **Load/save menu behind the disk icon** (author request, September 2026) — ✅ done,
+   September 13th. The disk icon opens a menu drawn in the 320×200 buffer, listing saves
+   from browser storage or from a directory on disk, each row showing its date, level and
+   party, newest first; LOAD acts on the selection, SAVE always creates a new file rather
+   than overwriting one of four slots.
+
+   - `doc/CSBWIN_MENU_REFERENCE.md` is the new sourced account: the icon
+     (`buttons17760[1]`, id 140), graphic 0 and its four layout patches, the text
+     metrics, `_WaitForMenuSelect`'s modality and press animation, the four save slots,
+     and a numbered list of the five places this port deliberately diverges.
+   - `src/renderer/ui/Menu.ts` is a faithful `_DoMenu` / `_WaitForMenuSelect`, usable on
+     its own for the title-only and one-button menus and for the future title screen
+     (`I1 != 0`, button set 1, centred at screen (47,33)).
+   - `src/renderer/ui/SaveMenu.ts` is the extension on top. The list panel is made by
+     tiling graphic 0's own interior band down over the full-width button frame — the
+     same self-blit idiom the 1/2/4-option layouts use — which leaves the bottom pair of
+     frames for LOAD and SAVE, hit-tested and animated through CSBWin's own rectangles.
+   - `src/data/saves/` holds the two backends behind one interface, and
+     `src/engine/SaveGamePayload.ts` the payload both they and the quick-save now share.
+     `dev.ts` no longer has a save implementation of its own.
+   - **F5 and F9 act on the same saves** (September 13th, second pass). They used to own a
+     single `localStorage` key, so "the most recent save" meant one thing to the menu and
+     another to F9. F5 now writes one more save to the current source — falling back to
+     the browser when the file source is chosen but not connected, since a quick-save key
+     must never raise a folder picker over the game — and F9 loads the newest *loadable*
+     save across every store that can be listed without prompting, skipping a genuine
+     `.dat` rather than picking it and then refusing it. `src/data/saves/registry.ts`
+     holds the two singletons and the current source; `pickLatestLoadable` is pure and
+     asserted. Anything left under the old key is migrated into the browser store once.
+   - Evidence: `tools/dump-save-menu.ts` (120 checks — the table offsets as a canary, the
+     panel built for real and measured pixel by pixel, `SplitLongLine`, the row
+     formatting, and both metadata paths against the genuine saves) plus a sixth golden
+     frame, `tools/frames/06-savemenu.png`.
+
+   **What the file half can and cannot do**, measured rather than assumed: listing a real
+   directory needs `showDirectoryPicker`, which is Chromium-only and hands back a handle
+   for a directory *the player picks in the OS dialog*. There is no path access, so
+   `~/dm-saves` cannot be opened by name and cannot be created — `getDirectoryHandle(…,
+   {create:true})` only makes directories inside an already-granted handle. The handle is
+   structured-cloneable and is remembered in IndexedDB so the pick happens once; the
+   *permission* is not remembered, and Chrome re-asks with one click per page load. Both
+   calls need transient user activation, which is why a click while the menu is up is
+   handled straight from the DOM event instead of through the game's mouse queue.
+
+   **Deferred, deliberately:**
+   - **Genuine CSBWin `.dat` files are listed but not loadable.** The level and roster
+     come out of blocks 2 and 4 and are correct — `tools/dump-save-menu.ts` prints a row
+     for all seven saves in `static/gamefiles/saves/` — but the row is marked with a `*`
+     and LOAD stays inert, because the dungeon image's text section still does not parse
+     (see the blocker below). That row is now the most visible reminder of what the rest
+     of Phase 10 owes.
+   - **No `<input type=file>` / blob-download fallback** for Firefox and Safari. The menu
+     says `NEEDS A CHROMIUM BROWSER` on the file source and stays usable on the browser
+     source; a fallback that cannot list a directory would not fit this menu's shape.
+   - **No delete.** `BrowserSaveStore.remove` exists and nothing calls it, so the browser
+     store grows without bound. The list scrolls, so this is untidy rather than broken.
+   - **The sixth frame captures an empty list**, since the boot script clears IndexedDB to
+     keep the frame byte-stable. The row rendering is proven by `dump-save-menu.ts`
+     instead, not by pixels.
+   - **`SAVE AND QUIT`** has no equivalent: there is no credits screen to quit to.
 
 Status: ⏳ mostly pending, but **rescored against the code in September 2026** — steps
 2-5 are in better shape than the list above implies, and step 1 is done:

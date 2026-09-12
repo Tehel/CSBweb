@@ -20,6 +20,7 @@ import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import type { ObjectID, Position } from '../../core/types';
 import type { ReincarnateState } from './ReIncarnate';
+import type { SaveMenuState } from './SaveMenu';
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -63,6 +64,20 @@ export interface UIState {
    * key goes to that module, which is how `keyboardMode = 2` behaves in CSBWin.
    */
   reincarnate: ReincarnateState | null;
+  /**
+   * The save/load screen while it is up (`src/renderer/ui/SaveMenu.ts`). Non-null means
+   * modal in the same sense `_WaitForMenuSelect` is: the host routes every click and
+   * every key to that module and consults no other button list
+   * (`doc/CSBWIN_MENU_REFERENCE.md` -> "The modal loop").
+   */
+  saveMenu: SaveMenuState | null;
+  /**
+   * `DiskMenuNeeded` (`doc/CSBwin-src/Data.h:159`). The disk icon's handler cannot open
+   * the menu itself — CSBWin because that would recurse into `HandleMouseEvents`
+   * (`doc/CSBwin-src/Mouse.cpp:1712-1719`), this port because the click is being drained
+   * from the mouse queue — so it raises the flag and the caller acts on it.
+   */
+  diskMenuNeeded: boolean;
   pressingEye: boolean;
   hoverPoint: { x: number; y: number } | null;
 
@@ -139,6 +154,25 @@ export interface UIState {
    */
   onReincarnateNamed?: (chIdx: number, name: string, title: string) => void;
   viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
+  /**
+   * Stop and restart the clock around a modal menu. CSBWin needs no such hook: its menu
+   * loop simply never returns to the main loop, and `d.Time++` lives there
+   * (`doc/CSBwin-src/CSBCode.cpp:660`). This port's loop keeps running, so the pause is
+   * explicit.
+   */
+  onSetPaused?: (paused: boolean) => void;
+  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) — shade the panels, repack a chest. */
+  onEnterMenu?: () => void;
+  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) — the mirror, on the way out. */
+  onLeaveMenu?: () => void;
+  /**
+   * Build the bytes of a new save and the row it will be listed as
+   * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the
+   * engine's business, not the UI's.
+   */
+  onCreateSave?: () => { meta: { name: string; savedAt: number; level: number; champions: string[] }; bytes: Uint8Array };
+  /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
+  onRestoreSave?: (bytes: Uint8Array) => void;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -164,6 +198,8 @@ export function createUIState(
     uiMode: UIMode.Adventure,
 
     reincarnate: null,
+    saveMenu: null,
+    diskMenuNeeded: false,
     pressingEye: false,
     hoverPoint: null,
 

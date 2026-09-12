@@ -6,6 +6,13 @@ import { Direction } from './core';
 import { SoundManager } from './audio';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
 import { Game, type ActuatorTables, type TimerTables, type TimerHooks, type AddCharacterTables } from './engine';
+import {
+    applySavePayload,
+    buildSavePayload,
+    decodeSavePayload,
+    encodeSavePayload,
+    makeSaveFileName,
+} from './engine/SaveGamePayload';
 import { loadGlfx } from './lib/glfx-loader';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
 import { extractObjectTables } from './renderer/csbwin/ObjectTables';
@@ -318,6 +325,35 @@ async function init() {
             renderer.setReincarnateNamedHandler((chIdx, name, title) => {
                 game?.reincarnateNamed(chIdx, name, title);
                 renderView();
+            });
+            // The save/load screen behind the disk icon. The UI owns the list and the
+            // buttons; serializing and restoring the world is the engine's, so it comes
+            // back through these three.
+            renderer.setSaveHandlers({
+                onCreateSave: () => {
+                    if (!game) throw new Error('NOTHING TO SAVE');
+                    const payload = buildSavePayload(game);
+                    return {
+                        meta: {
+                            name: makeSaveFileName(payload.header.savedAt),
+                            savedAt: payload.header.savedAt,
+                            level: payload.header.level,
+                            champions: payload.header.champions,
+                        },
+                        bytes: encodeSavePayload(payload),
+                    };
+                },
+                onRestoreSave: (bytes) => {
+                    if (!game) throw new Error('NO GAME RUNNING');
+                    applySavePayload(game, decodeSavePayload(bytes));
+                    // Message timeouts are game-tick based, so a load that moves the
+                    // clock would leave rows that expire at the wrong time (or never).
+                    // CSBWin serializes the text area (`doc/CSBwin-src/Data.h:1666`);
+                    // until we do, discard it. See PLAN.md Phase 11.
+                    scrollingText.discardText();
+                    renderView();
+                },
+                onSetPaused: (paused) => game?.setPaused(paused),
             });
             await loadGlfx().catch((err) => {
                 console.warn('glfx failed to load; CRT effect disabled', err);

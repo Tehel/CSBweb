@@ -129,6 +129,14 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     handleEyePress(ui);
     return;
   }
+  if (id === 140) {
+    // The disk icon, `buttons17760[1]` (`doc/CSBWIN_MENU_REFERENCE.md`). Both guards are
+    // CSBWin's (`doc/CSBwin-src/Mouse.cpp:1708-1727`): an empty party, or a champion
+    // only provisionally in it, and the icon does nothing. The menu is not opened here —
+    // `DiskMenuNeeded` is raised and whoever drained the queue acts on it.
+    if (numChampions > 0 && !potential) ui.diskMenuNeeded = true;
+    return;
+  }
 }
 
 export function handleMouseUnclick(ui: UIState): void {

@@ -79,6 +79,16 @@ import {
   reincarnateKey,
 } from './ui/ReIncarnate';
 import {
+  closeSaveMenu,
+  drawSaveMenu,
+  isSaveMenuOpen,
+  openSaveMenu,
+  saveMenuClick,
+  saveMenuKey,
+  saveMenuWheel,
+  type SaveMenuMode,
+} from './ui/SaveMenu';
+import {
   drawInventoryBackground,
   drawInventoryScreen,
   syncOpenChest,
@@ -267,6 +277,56 @@ export class ViewportRenderer {
 
   processMouseQueue(): void {
     processMouseQueue(this.ui);
+    // `DiskMenuNeeded` is raised by the icon's handler and acted on by whoever drained
+    // the queue — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
+    // method here. The deferral is the whole reason the flag exists.
+    if (this.ui.diskMenuNeeded) {
+      this.ui.diskMenuNeeded = false;
+      openSaveMenu(this.ui);
+    }
+  }
+
+  /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
+
+  isSaveMenuOpen(): boolean {
+    return isSaveMenuOpen(this.ui);
+  }
+
+  /** `loadOnly` is what a title screen wants: the same list with no SAVE button. */
+  openSaveMenu(mode: SaveMenuMode = 'full'): void {
+    openSaveMenu(this.ui, mode);
+  }
+
+  closeSaveMenu(): void {
+    closeSaveMenu(this.ui);
+  }
+
+  /**
+   * A click while the save screen is up, taken **straight from the DOM event** rather
+   * than through the mouse queue. That is CSBWin's modality — `_WaitForMenuSelect`
+   * replaces every button list while it runs — and it is also what preserves the
+   * transient user activation `showDirectoryPicker` demands.
+   */
+  handleSaveMenuClick(x: number, y: number, buttons: number): void {
+    saveMenuClick(this.ui, x, y, buttons);
+  }
+
+  handleSaveMenuKey(key: string): boolean {
+    return saveMenuKey(this.ui, key);
+  }
+
+  handleSaveMenuWheel(delta: number): boolean {
+    return saveMenuWheel(this.ui, delta);
+  }
+
+  setSaveHandlers(handlers: {
+    onCreateSave: NonNullable<UIState['onCreateSave']>;
+    onRestoreSave: NonNullable<UIState['onRestoreSave']>;
+    onSetPaused: NonNullable<UIState['onSetPaused']>;
+  }): void {
+    this.ui.onCreateSave = handlers.onCreateSave;
+    this.ui.onRestoreSave = handlers.onRestoreSave;
+    this.ui.onSetPaused = handlers.onSetPaused;
   }
 
   /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
@@ -695,6 +755,17 @@ export class ViewportRenderer {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui);
+    if (isSaveMenuOpen(this.ui)) {
+      // `TAG02076e` shades the movement-arrow, magic and weapon-ready areas before any
+      // menu goes up (`doc/CSBwin-src/Character.cpp:5118-5131`). The screen itself then
+      // goes over the viewport, which is where `_DoMenu` leaves it when `I1 == 0`.
+      if (this.ui.uiTables) {
+        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
+        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
+        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
+      }
+      drawSaveMenu(this.ui);
+    }
     drawHoverHighlights(this.ui);
     drawCursorItem(this.ui);
 

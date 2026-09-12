@@ -65,7 +65,7 @@ was hiding among the type errors.
 There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` byte-compares five live screen states against `tools/frames/`.
+- `tools/check-frames.sh` byte-compares six live screen states against `tools/frames/`.
   The cheapest way to prove a renderer or UI change kept every pixel. It starts its own
   dev server and headless Chrome, so it needs no setup; it is out of the default run only
   because it costs a browser and ~7s. Run it before any renderer or UI commit.

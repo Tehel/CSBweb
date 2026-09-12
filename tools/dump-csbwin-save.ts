@@ -28,44 +28,23 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
+// The CHARDESC offsets and the name decode are shared with the save/load menu, which
+// lists genuine saves the same way; `src/data/CsbwinSaveInfo.ts` carries their proof.
+import {
+  CHARDESC_SIZE,
+  CHARDESC_NAME_OFFSET as NAME_OFFSET,
+  CHARDESC_NAME_SIZE as NAME_SIZE,
+  CHARDESC_TITLE_OFFSET as TITLE_OFFSET,
+  CHARDESC_TITLE_SIZE as TITLE_SIZE,
+  decodeCharField,
+} from '../src/data/CsbwinSaveInfo';
 import { check, finish } from './lib/check';
-
-/**
- * `CHARDESC` is 800 bytes (`doc/CSBwin-src/CSB.h:2483-2594`, whose last member is
- * `FILL337[800-337]`), and block 4 holds four of them followed by 128 bytes of
- * party state.
- */
-const CHARDESC_SIZE = 800;
 
 const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'clothing',
   'scroll', 'potion', 'container', 'misc', 'EXPOOL', 'db12', 'db13', 'missile', 'cloud'];
 
 function readU16BE(b: Uint8Array, o: number): number {
   return ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
-}
-
-/**
- * `name` is `char[8]` at offset 0 and the title runs from 8 to 27 — **20 bytes, not
- * the 16 the struct declares**. `AddCharacter` proves the span: it refuses a title
- * character at `D6W >= 19` and then writes `title[D6W] = 0`, so index 19 is a legal
- * write (`doc/CSBwin-src/Character.cpp:578-587`), and the next member, `facing`,
- * sits at offset 28. The struct's `title[16]` + `wordx24` + `FILL26[2]` are one
- * 20-byte field; Paul Stevens marked it `// size??` himself.
- */
-const NAME_OFFSET = 0;
-const NAME_SIZE = 8;
-const TITLE_OFFSET = 8;
-const TITLE_SIZE = 20;
-
-/** Names and titles are plain `char` arrays — `swapCharacter` never touches them
- *  (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so they need no byte-swapping. */
-function decodeCharField(bytes: Uint8Array): string {
-  let out = '';
-  for (const byte of bytes) {
-    if (byte === 0) continue;
-    out += byte >= 32 && byte < 127 ? String.fromCharCode(byte) : '?';
-  }
-  return out;
 }
 
 const DEFAULT_DIR = 'static/gamefiles/saves';
