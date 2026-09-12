@@ -322,6 +322,18 @@ archive section.
 
 **Champion lifecycle (Phase 13)**
 
+- ⏳ **A champion can still die without leaving bones.** Two paths zero `health` and set
+  `alive = false` directly instead of calling `KillCharacter`: `applyMissileDamageToParty`
+  (`src/engine/Game.ts:1189`), the stand-in for a missile striking the party, and
+  `Game.adjustStamina` (`:1445`), the exhaustion path in the per-tick upkeep. Neither
+  drops possessions, leaves bones, hands on the cursor, or sets `GameIsLost` — so a
+  champion killed by either is unresurrectable, and a wipe by either does not end the
+  game. CSBWin has no such path: `AdjustStamina` turns its overshoot into
+  `DamageCharacter(chIdx, overshoot/2, 0, 0)` (`doc/CSBwin-src/Code11f52.cpp:4413`), and
+  the missile goes through `DamageCharacter` too. Routing both through
+  `MonsterAttack.damageCharacter` is the fix; it was noticed while chasing the bones
+  naming and left because it is an attack-path change wanting its own tool.
+
 - ⏳ **The wings.** CSBWin keeps champions who have left the party in a store
   `CHARDESC::GetFromWings`/`SaveToWings` reach (`doc/CSBwin-src/Character.cpp:5239`).
   Two things consult it and cannot here: `CopyCharacter`, so bones dropped by a

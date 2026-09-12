@@ -873,6 +873,36 @@ dead champion's bones from an ordinary bones item. The object's position within 
 set from `pcA3->charPosition`, so the bones appear where that champion stood, and
 `expool.AddChampionBonesRecord` records the bones↔fingerprint pairing for resurrection.
 
+## `OBJ_NAME_INDEX` is commented in hex, and both places bones are named do the lookup
+
+CSBWin's object-name enum (`doc/CSBwin-src/Objects.h:438-659`) carries its values as **hex**
+comments, sometimes with the decimal beside them and sometimes not:
+
+```cpp
+objNI_OpenChest,      //91
+objNI_Bones_a,        //93
+objNI_Moonstone,      //7a 122
+```
+
+So `objNI_Bones_a` is 0x93 = **147**, not 93. Nine of `src/core/objectNameIndex.ts`'s
+constants had been read as decimal or taken off the neighbouring line. The name table in
+`graphics.dat` is the arbiter — `tools/dump-object-name-index.ts` asserts the string each
+constant lands on, which is the only thing that tells a right index from a plausible one.
+
+Two of the enumerators are named for the item's *powered* form while the table holds the
+plain one: `objNI_Storm_a` (23) is `BOLT BLADE` and `objNI_RABlade_a` (25) is `FURY`. Each
+modifiable object owns two or three consecutive slots that all carry the same name; only
+the icon changes with the charge (`doc/CSBwin-src/data.cpp:627-660`).
+
+**Bones are named in two places, and both do the same four-step lookup**: the eye's object
+panel (`doc/CSBwin-src/Character.cpp:3549-3580`) and `DrawNameOfHeldObject`
+(`doc/CSBwin-src/Code11f52.cpp:31-59`), the 14-character line at screen (0xe9, 0x25) naming
+what the cursor carries. Both key on the **name index** being `objNI_Bones_a` — not on the
+`DB10` misc type — both refuse bones whose `value()` is 0, and both prefix the champion's
+name with no separator: `StrCpy(name); StrCat(d.ObjectNames[objNID6])` gives `HALKBONES`.
+`DrawNameOfHeldObject` uses `RN::NameIndex()`, the resolved index, so a compass in hand
+reads the way the party faces and a lit torch reads its burn state.
+
 ## Every inventory click is gated on `d.HandChar`, and the party always owns it
 
 `doc/CSBwin-src/Mouse.cpp:1600-1606` — the button ids 28 to 65, which are the inventory

@@ -14,7 +14,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -545,6 +545,16 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
   }
 }
 
+/**
+ * `DrawNameOfHeldObject` (`doc/CSBwin-src/Code11f52.cpp:31`) — the 14-character line
+ * above the action area naming whatever the cursor is carrying.
+ *
+ * Two details are the function, not decoration. The index is `RN::NameIndex()`, the
+ * *resolved* one, so a compass reads the way the party faces and a lit torch reads its
+ * burn state. And bones carry the dead champion's name glued to the front, through the
+ * same lookup the eye's object panel uses — which is the only place a player ever
+ * learns whose remains they picked up.
+ */
 export function drawHeldObjectName(ui: UIState): void {
   if (!ui.uiTables || !ui.fontData || !ui.screenIndexBuffer) return;
 
@@ -554,8 +564,10 @@ export function drawHeldObjectName(ui: UIState): void {
   const objectId = normalizeObjectValue(ui.partyState?.objectInHand);
   let label = '';
   if (objectId !== null) {
-    const nameIndex = getBaseObjectNameIndex(ui, objectId);
+    const nameIndex = resolveObjectNameIndex(ui, objectId);
     label = objectNames[nameIndex] ?? '';
+    const owner = getBonesChampion(ui, objectId as ObjectID, nameIndex);
+    if (owner?.name) label = `${owner.name}${label}`;
   }
 
   const padded = (label || '').padEnd(14, ' ').slice(0, 14);

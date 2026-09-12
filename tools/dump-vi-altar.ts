@@ -44,8 +44,17 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import type { ObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import type { UITables } from '../src/renderer/csbwin/UITables';
+import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
+import type { UIState } from '../src/renderer/ui/UIState';
+import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
+import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
 import { check, fail, finish } from './lib/check';
+
+/** `if (decorationIndex == 2) d.OrnateAlcoveGraphicIndex = D5W` (`Code390e.cpp:218`). */
+const ORNATE_ALCOVE_DECORATION = 2;
 
 /** Every champion starts at 200/200, so a `MaxHP/64` cut is visible without rounding. */
 function champion(i: number, name: string): Champion {
@@ -64,7 +73,7 @@ function champion(i: number, name: string): Champion {
   };
 }
 
-function makeGame(): Game {
+function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITables } {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
@@ -104,7 +113,23 @@ function makeGame(): Game {
   );
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
-  return game;
+  return { game, objectTables, uiTables };
+}
+
+/**
+ * Just enough `UIState` for the two naming functions.
+ *
+ * Both read only the dungeon, the party and the object tables; nothing here draws, so
+ * no buffers, fonts or graphics are needed. Building it by hand keeps this tool out of
+ * the renderer while still exercising the code the player actually reads on screen.
+ */
+function makeUI(g: Game, objectTables: ObjectTables, uiTables: UITables): UIState {
+  return {
+    dungeonState: g.dungeonState,
+    partyState: g.party.state,
+    objectTables,
+    uiTables,
+  } as unknown as UIState;
 }
 
 /** Any ordinary walkable cell — the altar itself is a wall decoration, not a room type. */
@@ -137,6 +162,53 @@ function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectI
   });
   db.count++;
   return encodeObjectID(posInCell & 0x3, DBType.MISC, db.records.length - 1) as ObjectID;
+}
+
+/**
+ * The dungeon's own ornate alcoves — the Altars of Vi.
+ *
+ * `d.OrnateAlcoveGraphicIndex` is the level's decoration slot whose global decoration
+ * index is **2** (`doc/CSBwin-src/Code390e.cpp:218`), and `d.FacingViAltar` is set only
+ * while the party is looking straight at one (`doc/CSBwin-src/CSBCode.cpp:3301`). The
+ * decoration lives on an actuator inside the *wall* cell, with `pos` naming which face
+ * it is on, so the party stands in the neighbouring cell and faces it: a wall object is
+ * in front when `(pos - facing) & 3 == 2`, hence `facing = (pos + 2) & 3`.
+ *
+ * Found by scanning rather than written down, because the shipped dungeon is the
+ * authority and a hardcoded (level, x, y) would be a guess.
+ */
+function findViAltars(game: Game): Array<{ alcove: Position; party: Position; facing: number }> {
+  const DELTA = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
+  const out: Array<{ alcove: Position; party: Position; facing: number }> = [];
+  const dungeon = game.dungeonState;
+  for (let z = 0; z < dungeon.getMapCount(); z++) {
+    const map = dungeon.getMap(z);
+    if (!map?.wallDecorationTOC) continue;
+    // The decoration ordinal an actuator carries is 1-based into this level's TOC.
+    const ornateSlots = new Set(
+      map.wallDecorationTOC.flatMap((d, i) => (d === ORNATE_ALCOVE_DECORATION ? [i + 1] : [])),
+    );
+    if (ornateSlots.size === 0) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const alcove = new Position(x, y, z);
+        for (
+          let rn = dungeon.findFirstObject(alcove);
+          rn !== OBJECT_ID_EOF;
+          rn = dungeon.getDBRecordLink(rn)
+        ) {
+          if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+          const rec = dungeon.getActuatorRecord(rn);
+          if (!rec) continue;
+          if (!ornateSlots.has(getActuatorWallGraphicOrdinal(rec) | 0)) continue;
+          const facing = (decodeObjectID(rn).position + 2) & 0x3;
+          const [dx, dy] = DELTA[facing]!;
+          out.push({ alcove, party: new Position(x - dx, y - dy, z), facing });
+        }
+      }
+    }
+  }
+  return out;
 }
 
 function bonesAt(game: Game, cell: Position): ObjectID[] {
@@ -179,7 +251,7 @@ function main(): void {
 
   console.log('=== bones left by a death: resolved by fingerprint ===');
   {
-    const g = makeGame();
+    const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
     g.monsterSystem.loadPartyLevel(cell.z);
@@ -258,7 +330,7 @@ function main(): void {
   {
     // Champion 3, deliberately not index 2 — the value the old code demanded.
     const target = 3;
-    const g = makeGame();
+    const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
     g.monsterSystem.loadPartyLevel(cell.z);
@@ -287,7 +359,7 @@ function main(): void {
   console.log('=== the altar refuses a champion who is not dead ===');
   {
     const target = 3;
-    const g = makeGame();
+    const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
     g.monsterSystem.loadPartyLevel(cell.z);
@@ -310,7 +382,7 @@ function main(): void {
   console.log(['champion', 'corner before', 'corner after', 'alive'].join('\t'));
   {
     const target = 1;
-    const g = makeGame();
+    const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
     g.monsterSystem.loadPartyLevel(cell.z);
@@ -334,6 +406,110 @@ function main(): void {
       (o) => o.alive !== false && o.partyPosition === c.partyPosition,
     ).length;
     check(occupants === 1, 'and the corner they land in holds nobody else living');
+  }
+
+  /* ---------------------------------------- 5. the drop into the alcove ---------- */
+
+  console.log('');
+  console.log('=== a real Altar of Vi: pick the bones up, drop them in, wait ===');
+  {
+    const { game: g, objectTables, uiTables } = makeGame();
+    const altars = findViAltars(g);
+    console.log(['level', 'alcove', 'party stands', 'facing'].join('\t'));
+    for (const a of altars) {
+      console.log([a.alcove.z, `(${a.alcove.x},${a.alcove.y})`, `(${a.party.x},${a.party.y})`, a.facing].join('\t'));
+    }
+    check(altars.length > 0, 'the shipped dungeon has at least one ornate alcove');
+
+    // The one the player meets first: a few cells from the stairs down off level 0.
+    const altar = altars.find((a) => a.alcove.z === 0) ?? altars[0];
+    if (!altar) {
+      fail('no Altar of Vi to test against');
+    } else {
+      const victim = 2;
+      g.party.state.position = altar.party;
+      g.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.monsterSystem.loadPartyLevel(altar.party.z);
+      g.monsterAttack.killCharacter(victim);
+
+      const bones = bonesAt(g, altar.party)[0];
+      if (bones === undefined) {
+        fail('the death left no bones to carry');
+      } else {
+        const ui = makeUI(g, objectTables, uiTables);
+        const nameIndex = resolveObjectNameIndex(ui, bones | 0);
+
+        // The gate that decides whether a click in the alcove is an altar offering at
+        // all (`src/renderer/ui/ViewportPicking.ts`, `doc/CSBwin-src/Mouse.cpp:898`).
+        // `OBJNI_BONES_A` had been transcribed as decimal 93 out of a hex comment, so
+        // this read 147 !== 93 and the altar was never offered anything.
+        console.log('');
+        console.log(['', 'value'].join('\t'));
+        console.log(['name index of the bones', nameIndex].join('\t'));
+        console.log(['OBJNI_BONES_A', OBJNI_BONES_A].join('\t'));
+        check(nameIndex === OBJNI_BONES_A, "a death's bones are objNI_Bones_a, which is what offers them to the altar");
+
+        // What the player reads. Both places CSBWin prints a bones name put the dead
+        // champion's name in front of it, with no separator.
+        const shown = getObjectDisplayName(ui, bones, nameIndex);
+        console.log(['name shown for the bones', shown].join('\t'));
+        check(shown === `HERO${victim}BONES`, "and they are named for their owner, not just 'BONES'");
+
+        // Pick them up and drop them in, the way the viewport click does.
+        g.dungeonState.removeObjectFromCell(altar.party, bones);
+        g.party.state.objectInHand = bones;
+        g.party.state.cursorOwner = 0;
+        const dropped = g.dropObjectFromCursor(4, { viAltar: true });
+        check(dropped, 'the bones go into the alcove');
+        check(bonesAt(g, altar.alcove).length === 1, 'and land in the alcove cell, not the party cell');
+
+        console.log('');
+        console.log(['tick', 'bones in alcove', `HERO${victim} alive`, 'health'].join('\t'));
+        const row = (t: number): void => {
+          const c = g.party.state.champions[victim]!;
+          console.log([t, bonesAt(g, altar.alcove).length, c.alive !== false, c.attributes.health].join('\t'));
+        };
+        row(0);
+        runTicks(g, 8);
+        row(8);
+
+        const revived = g.party.state.champions[victim]!;
+        check(revived.alive !== false, 'and six ticks later the champion is back');
+        check(bonesAt(g, altar.alcove).length === 0, 'with the bones consumed');
+      }
+    }
+  }
+
+  /* ---------------------------------------- 6. inert bones are not remains ------- */
+
+  console.log('');
+  console.log('=== bones with value 0 dropped into the same alcove ===');
+  {
+    const { game: g } = makeGame();
+    const altar = findViAltars(g).find((a) => a.alcove.z === 0);
+    if (!altar) {
+      fail('no Altar of Vi on level 0');
+    } else {
+      g.party.state.position = altar.party;
+      g.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.monsterSystem.loadPartyLevel(altar.party.z);
+      g.monsterAttack.killCharacter(1);
+
+      // `if (value != 0)` — bones whose value is 0 are scenery, not anybody's remains
+      // (`doc/CSBwin-src/Code11f52.cpp:44`, `doc/CSBwin-src/CSB.h:1258-1264`). The
+      // altar's `value`-as-index arm must not read that 0 as "champion 0".
+      const inert = makeDungeonBones(g, 0, 0);
+      g.dungeonState.getMiscRecord(inert)!.specialState = 0;
+      g.party.state.objectInHand = inert;
+      g.party.state.cursorOwner = 0;
+      const dropped = g.dropObjectFromCursor(4, { viAltar: true });
+      check(dropped, 'inert bones still drop into the alcove like any other object');
+      runTicks(g, 8);
+      const c = g.party.state.champions[1]!;
+      console.log(`HERO1 alive after 8 ticks: ${c.alive !== false}, bones in alcove: ${bonesAt(g, altar.alcove).length}`);
+      check(c.alive === false, 'but they raise nobody');
+      check(bonesAt(g, altar.alcove).length === 1, 'and they stay in the alcove');
+    }
   }
 
   finish();

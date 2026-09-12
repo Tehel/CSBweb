@@ -5,7 +5,7 @@
  * `doc/CSBwin-src/Code17818.cpp`): resolving an object reference to its `OBJNI_*` name
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
-import { OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_EYE_OF_TIME_A, OBJNI_FIRST_FULL_FLASK, OBJNI_FIRST_MODIFIABLE, OBJNI_FLAMITT_A, OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_LAST_FULL_FLASK, OBJNI_LAST_MODIFIABLE, OBJNI_OPEN_SCROLL, OBJNI_RA_BLADE_A, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_STAFF_OF_CLAWS_A, OBJNI_STORM_A, OBJNI_STORM_RING_A, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
+import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_EYE_OF_TIME_A, OBJNI_FIRST_FULL_FLASK, OBJNI_FIRST_MODIFIABLE, OBJNI_FLAMITT_A, OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_LAST_FULL_FLASK, OBJNI_LAST_MODIFIABLE, OBJNI_OPEN_SCROLL, OBJNI_RA_BLADE_A, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_STAFF_OF_CLAWS_A, OBJNI_STORM_A, OBJNI_STORM_RING_A, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { TextDecodeTables } from '../../engine/DungeonState';
@@ -14,7 +14,6 @@ import { findChampionByFingerprint } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIMode, UIState } from './UIState';
-import { MISC_BONES_OF_HERO } from '@/core';
 export type ItemDescriptionLine = { text: string; color: number };
 const DEFAULT_CHEST_WEIGHT = 50;
 
@@ -198,22 +197,42 @@ export function getObjectName(ui: UIState, objectNameIndex: number): string {
   return `OBJECT ${objectNameIndex}`;
 }
 
+/**
+ * The champion a bones object belongs to, or `null`.
+ *
+ * The same four-step lookup CSBWin spells out twice — in the eye's object panel
+ * (`doc/CSBwin-src/Character.cpp:3549-3580`) and in `DrawNameOfHeldObject`
+ * (`doc/CSBwin-src/Code11f52.cpp:38-59`). Both key on the *name index* being
+ * `objNI_Bones_a` rather than on the `DB10` misc type, and both refuse bones whose
+ * `value()` is 0: those are inert scenery, not anybody's remains
+ * (`doc/CSBwin-src/CSB.h:1258-1264`).
+ *
+ * ⚠️ `CopyCharacter` searches the party and then `GetFromWings`; this port has no
+ * wings, so a fingerprint matching nobody still in the party goes unresolved and the
+ * bones keep their plain name — see `findChampionByFingerprint`.
+ */
+export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameIndex: number): Champion | null {
+  if (objectNameIndex !== OBJNI_BONES_A) return null;
+  const misc = ui.dungeonState.getMiscRecord(objectId);
+  if (!misc) return null;
+  // `value = pBones->value(); if (value != 0)` — are these bones a champion's at all?
+  if ((misc.specialState | 0) === 0) return null;
+  const fingerprint = ui.dungeonState.copyChampionBonesRecord(objectId);
+  if (fingerprint === null || !ui.partyState) return null;
+  const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
+  if (chIdx === -1) return null;
+  return ui.partyState.champions[chIdx] ?? null;
+}
+
 export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectNameIndex: number): string {
   let name = getObjectName(ui, objectNameIndex);
   if (!name) return name;
   const { category } = decodeObjectID(objectId);
 
-  if (category === DBType.MISC) {
-    const misc = ui.dungeonState.getMiscRecord(objectId);
-    if (misc?.miscType === MISC_BONES_OF_HERO) {
-      const fingerprint = ui.dungeonState.copyChampionBonesRecord(objectId);
-      if (fingerprint !== null && ui.partyState) {
-        const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
-        const champ = chIdx === -1 ? null : ui.partyState.champions[chIdx];
-        if (champ?.name) name = `${champ.name}${name}`;
-      }
-    }
-  }
+  // `StrCpy(descriptiveText, pcA0->name); StrCat(descriptiveText, d.ObjectNames[objNID6])`
+  // — no separator, so the two run together exactly as CSBWin prints them.
+  const owner = getBonesChampion(ui, objectId, objectNameIndex);
+  if (owner?.name) name = `${owner.name}${name}`;
 
   if (category === DBType.POTION) {
     if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
