@@ -38,6 +38,7 @@ const CHECKS = [
   { tool: 'dump-hand-owner.ts' },
   { tool: 'dump-inventory-routing.ts' },
   { tool: 'dump-champion-state.ts' },
+  { tool: 'dump-champion-death.ts' },
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-vi-altar.ts' },

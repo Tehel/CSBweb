@@ -5,6 +5,9 @@
  * The goal is to execute bytecode programs exactly as CSBWin does.
  */
 
+import {
+  RN_FIREBALL, RN_LIGHTNING, RN_POISON, RN_POISON_BOLT, RN_POISON_CLOUD, isMagicSpellRn,
+} from '../../core/spellRn';
 import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
 import {
@@ -1121,12 +1124,6 @@ export class BytecodeInterpreter {
   private static readonly floorDrawingLocations: number[] = [
     0, 0, 0, 0, 0, 0, 0, 0, 2, 1, 0, 0, 3, 5, 4, 6, 8, 7, 0, 0, 9,
   ];
-  private static readonly MAGIC_SPELL_BASE = 0xff80;
-  private static readonly RN_FIREBALL = 0xff80;
-  private static readonly RN_POISON = 0xff81;
-  private static readonly RN_LIGHTNING = 0xff82;
-  private static readonly RN_POISON_BOLT = 0xff86;
-  private static readonly RN_POISON_CLOUD = 0xff87;
 
   private opStdDrawRoomObjects(): boolean {
     const drawOrder = this.stack.pop();
@@ -2627,16 +2624,16 @@ export class BytecodeInterpreter {
   }
 
   private getGraphicClassForObject(rn: ObjectID, dungeon: DungeonState, tables: ObjectTables): number {
-    if (rn >= BytecodeInterpreter.MAGIC_SPELL_BASE) {
+    if (isMagicSpellRn(rn)) {
       switch (rn) {
-        case BytecodeInterpreter.RN_FIREBALL:
+        case RN_FIREBALL:
           return -11;
-        case BytecodeInterpreter.RN_POISON:
+        case RN_POISON:
           return -13;
-        case BytecodeInterpreter.RN_LIGHTNING:
+        case RN_LIGHTNING:
           return -4;
-        case BytecodeInterpreter.RN_POISON_BOLT:
-        case BytecodeInterpreter.RN_POISON_CLOUD:
+        case RN_POISON_BOLT:
+        case RN_POISON_CLOUD:
           return -14;
         default:
           return -12;

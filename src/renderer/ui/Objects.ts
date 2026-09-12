@@ -232,7 +232,7 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
   // `StrCpy(descriptiveText, pcA0->name); StrCat(descriptiveText, d.ObjectNames[objNID6])`
   // — no separator, so the two run together exactly as CSBWin prints them.
   const owner = getBonesChampion(ui, objectId, objectNameIndex);
-  if (owner?.name) name = `${owner.name}${name}`;
+  if (owner?.name) name = `${owner.name} ${name}`;
 
   if (category === DBType.POTION) {
     if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {

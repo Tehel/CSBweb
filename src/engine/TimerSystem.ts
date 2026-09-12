@@ -13,6 +13,11 @@ import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
 import { characterAtPosition } from './AddCharacter';
+import {
+  RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON,
+  RN_POISON_BOLT, RN_POISON_CLOUD, RN_ZO_SPELL, RN_FFE4,
+  isMagicSpellRn, isNonPhysicalSpellRn,
+} from '../core/spellRn';
 import { findChampionByFingerprint } from './Party';
 import type {
   ActuatorRecord,
@@ -64,16 +69,8 @@ import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { CloudType } from './cloudTypes';
 import { setPartyFacing } from './Party';
 
-const RN_FIREBALL = 0xff80;
-const RN_POISON = 0xff81;
-const RN_LIGHTNING = 0xff82;
-const RN_DISPELL_MISSILE = 0xff83;
-const RN_ZO_SPELL = 0xff84;
-const RN_POISON_BOLT = 0xff86;
-const RN_POISON_CLOUD = 0xff87;
-const RN_MONSTER_DEATH = 0xffa8;
-/** `RNffe4` — the Vi altar's resurrection cloud (`doc/CSBwin-src/Timer.cpp:2730`). */
-const RN_FFE4 = 0xffe4;
+/** Sign-extend to 16 bits, as CSBWin's `sw()` does on every intermediate. */
+const sw = (v: number): number => (v << 16) >> 16;
 
 
 const WEAPON_DAGGER = 8;
@@ -151,15 +148,25 @@ export interface TimerHooks {
   onDsaTimer5?: (rn: number, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer6?: (rn: number, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer7?: (rn: number, timer: TimerEntry, location: Position) => boolean;
+  /**
+   * A missile reached the party. `chIdx` is already `CharacterAtPosition(objectPos)`,
+   * and `damage`/`kind`/`poisonStrength` are already `DetermineMagicDamage`'s three
+   * outputs, because CSBWin computes all four inside `ProcessMissileEncounter`
+   * (`doc/CSBwin-src/Code11f52.cpp:1947-1958`, `:2044-2056`). The hook only applies
+   * them: `DamageCharacter` and, on a hit that drew blood, `PoisonCharacter`.
+   */
   onMissileHitParty?: (options: {
     missile: number;
     projectile: number;
     position: Position;
     posInCell: number;
     direction: number;
+    chIdx: number;
     damage: number;
+    kind: number;
+    poisonStrength: number;
     range: number;
-  }) => boolean;
+  }) => void;
   onMissileHitMonster?: (options: {
     missile: number;
     projectile: number;
@@ -223,6 +230,10 @@ export interface TimerHooks {
   }) => void;
   onMissileTrace?: (event: MissileTraceEvent) => void;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+  /** `GetObjectWeight(object)`, for `DetermineMagicDamage`'s thrown-object arm. */
+  objectWeight?: (rn: number) => number;
+  /** `TAG0099d2(object)->uByte3` — a thrown weapon's own damage contribution. */
+  weaponThrowDamage?: (rn: number) => number;
   /** `QueueSound` — a sound named by ordinal, attenuated by distance from the party. */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
@@ -1439,17 +1450,6 @@ export class TimerSystem {
     return pos.x === position.x && pos.y === position.y && pos.z === position.z;
   }
 
-  private getPartyIndexAtPosition(posInCell: number): number {
-    const target = posInCell & 0x3;
-    const party = this.getPartyState();
-    for (let i = 0; i < party.champions.length; i++) {
-      const champ = party.champions[i];
-      if (!champ.alive) continue;
-      if ((champ.partyPosition & 0x3) === target) return i;
-    }
-    return -1;
-  }
-
   /**
    * Mirrors CSBWin `FindFirstMonster()` + `RN::NonMaterial()`
    * (doc/CSBwin-src/Code11f52.cpp:533, doc/CSBwin-src/data.cpp:553).
@@ -2149,22 +2149,36 @@ export class TimerSystem {
         return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -2: {
-        const partyIndex = this.getPartyIndexAtPosition(objectPos);
-        if (this.missileEncounterFilter(7, position, objectPos, missileRn, filterProjectile, partyIndex) === 1) {
+        // `objectPos = CharacterAtPosition(objectPos); if (objectPos < 0) return 0;`
+        // (`doc/CSBwin-src/Code11f52.cpp:1948-1952`). The corner the missile arrived at
+        // names the champion, and an empty one — or one holding only a corpse, since
+        // `CharacterAtPosition` skips the dead — lets the missile fly on. From here on
+        // `objectPos` *is* a champion index, including in the filter call below.
+        const chIdx = characterAtPosition(this.getPartyState().champions, objectPos & 0x3);
+        if (chIdx < 0) return traceEncounter(false, 'party-empty-corner');
+        if (this.missileEncounterFilter(7, position, objectPos, missileRn, filterProjectile, chIdx) === 1) {
           return traceEncounter(false, 'party-filter');
         }
-        if (this.hooks?.onMissileHitParty) {
-          const consumed = this.hooks.onMissileHitParty({
+        // `D5W = DetermineMagicDamage(pDBmissile, RNprojectile); D4W = D5W;` — the
+        // party is the only arm that sets `D4W`, which is what makes the shared tail
+        // at `:2044` a party-only `DamageCharacter`.
+        const magic = this.determineMagicDamage(missile, projectile);
+        if (magic.damage !== 0) {
+          this.hooks?.onMissileHitParty?.({
             missile: missileRn,
             projectile,
             position,
             posInCell: objectPos,
             direction,
-            damage: missile.damageRemaining & 0xff,
+            chIdx,
+            damage: magic.damage,
+            kind: magic.kind,
+            poisonStrength: magic.poisonStrength,
             range: missile.rangeRemaining & 0xff,
           });
-          if (!consumed) return traceEncounter(false, 'party-ignored');
         }
+        // The missile is spent either way: a dispel missile does a champion no damage
+        // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
         this.emitMissileTrace({
           stage: 'encounter',
           missile: missileRn,
@@ -2173,7 +2187,7 @@ export class TimerSystem {
           posInCell: objectPos,
           direction,
           range: missile.rangeRemaining & 0xff,
-          damage: missile.damageRemaining & 0xff,
+          damage: magic.damage,
           detail: 'party-hit',
           hit: true,
         });
@@ -2707,8 +2721,85 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * `DetermineMagicDamage` (`doc/CSBwin-src/Code11f52.cpp:1557`) — how hard a missile
+   * lands, and the two globals that go with it.
+   *
+   * CSBWin returns the damage and leaves `d.Word12962` (a poison strength) and
+   * `d.Word12964` (the `DamageCharacter` *kind*, which selects how armour and the
+   * shields mitigate) behind in globals; they are returned together here because they
+   * are one answer and reading them separately is how they get out of step.
+   *
+   * The three arms are not variations on one formula:
+   *
+   * - **A thrown weapon** contributes its `WEAPONDESC.uByte3`, anything else thrown a
+   *   random 0-3, and both add half the object's weight. `kind` stays 3.
+   * - **Poison cloud** (`RNPoison`) rolls 0-15, keeps that + 10 as the *poison
+   *   strength*, and adds a further 0-31 to the damage.
+   * - **A non-physical spell** (`>= RNDispellMissile`) sets `kind` 5 and returns
+   *   early: 0 damage, except `RNPoisonBolt`, which returns **1** and carries the
+   *   missile's whole remaining range as poison. That early return is why a dispel
+   *   missile passes through a champion without hurting them.
+   * - **Anything else magical** is `2×(0..15) + 10` at `kind` 1, quintupled at `kind`
+   *   7 for lightning.
+   *
+   * The common tail then folds in the remaining range, adds two small random terms,
+   * and floors the result at half itself — so a nearly spent missile still stings.
+   *
+   * Public because CSBWin's is a free function used by both the party and the monster
+   * arm, and because `tools/dump-champion-death.ts` reads its three outputs directly —
+   * none of them is observable from outside once the damage has been applied.
+   */
+  determineMagicDamage(
+    missile: MissileRecord,
+    projectile: number,
+  ): { damage: number; kind: number; poisonStrength: number } {
+    let poisonStrength = 0;
+    let kind = 3;
+    const range = missile.rangeRemaining & 0xff;
+    // `if (object.IsMagicSpell()) dbType = dbCLOUD; else dbType = object.dbType();`
+    const dbType = this.isMagicSpell(projectile)
+      ? DBType.CLOUD
+      : decodeObjectID(projectile as ObjectID).category;
+
+    let d6: number;
+    if (dbType !== DBType.CLOUD) {
+      if (dbType === DBType.WEAPON) {
+        d6 = this.hooks?.weaponThrowDamage?.(projectile) ?? 0;
+        kind = 3;
+      } else {
+        d6 = this.random.zeroTo3();
+      }
+      d6 = sw(d6 + Math.trunc((this.hooks?.objectWeight?.(projectile) ?? 0) / 2));
+    } else if (projectile === RN_POISON) {
+      d6 = this.random.next() & 15;
+      poisonStrength = sw(d6 + 10);
+      d6 = sw(d6 + this.random.below(32));
+    } else if (isNonPhysicalSpellRn(projectile)) {
+      kind = 5;
+      if (projectile === RN_POISON_BOLT) return { damage: 1, kind, poisonStrength: range };
+      return { damage: 0, kind, poisonStrength };
+    } else {
+      kind = 1;
+      d6 = sw(this.random.below(16) + this.random.below(16) + 10);
+      if (projectile === RN_LIGHTNING) {
+        kind = 7;
+        d6 = sw(5 * d6);
+      }
+    }
+
+    d6 = sw(Math.trunc((d6 + range) / 16) + 1);
+    const spread = this.random.below(Math.trunc(d6 / 2) + 1);
+    d6 = sw(d6 + this.random.zeroTo3() + spread);
+    // `D1W = 32 - damageRemaining/8; D6W = Larger(D6W/2, D6W-D1W)` — the floor at half
+    // is what stops a long flight reducing the blow to nothing.
+    const falloff = sw(32 - Math.trunc((missile.damageRemaining & 0xff) / 8));
+    d6 = sw(Math.max(Math.trunc(d6 / 2), d6 - falloff));
+    return { damage: d6, kind, poisonStrength };
+  }
+
   private isMagicSpell(objectId: number): boolean {
-    return (objectId & 0xffff) >= RN_FIREBALL;
+    return isMagicSpellRn(objectId);
   }
 
   private addObjectToMonsterPossession(monsterRn: number, objectRn: number): void {

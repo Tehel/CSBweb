@@ -42,6 +42,9 @@ import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { characterAtPosition } from './AddCharacter';
+import {
+  RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON_BOLT, RN_POISON_CLOUD,
+} from '../core/spellRn';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterSystem } from './MonsterSystem';
@@ -87,17 +90,6 @@ export enum AttackDataType {
   ADT_Throw = 15,
   ADT_Default = 16,
 }
-
-/**
- * The predefined missile RNs the spell attacks throw (`doc/CSBwin-src/CSBTypes.h`).
- * Duplicated from `MonsterAttack` only in the sense that both name the same engine
- * constants; the values are the projectile RNs `constructPredefinedMissile` understands.
- */
-const RN_FIREBALL = 0xff80;
-const RN_POISON_BOLT = 0xff81;
-const RN_LIGHTNING = 0xff82;
-const RN_DISPELL_MISSILE = 0xff83;
-const RN_POISON_CLOUD = 0xff87;
 
 /** `misc_MagicalBoxA` / `misc_MagicalBoxB` (`doc/CSBwin-src/Objects.h:229`). */
 const MISC_MAGICAL_BOX_A = 42;

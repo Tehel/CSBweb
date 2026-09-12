@@ -32,16 +32,19 @@ import type { CharacterStats } from './CharacterStats';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 
 /**
- * The missile "projectile" RNs a monster can throw
- * (`doc/CSBwin-src/CSBTypes.h`, used at `doc/CSBwin-src/Monster.cpp:1029-1058`).
+ * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
+ * at `doc/CSBwin-src/Monster.cpp:1029-1074`). Re-exported for the callers that used to
+ * take them from here; the values live in `src/core/spellRn.ts`, which says why.
  */
-export const RN_FIREBALL = 0xff80;
-export const RN_POISON_BOLT = 0xff81;
-export const RN_LIGHTNING = 0xff82;
-export const RN_DISPELL_MISSILE = 0xff83;
-export const RN_ZO_SPELL = 0xff84;
-export const RN_POISON_CLOUD = 0xff87;
-export const RN_POISON = 0xff88;
+export {
+  RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,
+  RN_ZO_SPELL, RN_POISON_BOLT, RN_POISON_CLOUD,
+} from '../core/spellRn';
+
+import {
+  RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON,
+  RN_POISON_BOLT, RN_POISON_CLOUD, RN_ZO_SPELL,
+} from '../core/spellRn';
 
 const THROWABLE: ReadonlySet<number> = new Set([
   RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,

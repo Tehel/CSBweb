@@ -43,16 +43,14 @@ import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 
 /**
- * Champion wound sounds, in party-position order. CSBWin reaches these as sound
- * ordinals `chIdx + 9` (doc/CSBwin-src/Monster.cpp:4584); ordinals 9-12 resolve
- * through `graphic232.soundTable` to SND items 541-544.
+ * The wound mask a missile carries, a literal at `DamageCharacter(objectPos, D5W, 12,
+ * …)` (`doc/CSBwin-src/Code11f52.cpp:2046`). Bits 2 and 3 are the torso and the legs.
+ *
+ * (The champion *wound sound*, ordinal `chIdx + 9`, belongs to the monster's melee
+ * attack — `doc/CSBwin-src/Monster.cpp:4584`, ported in `MonsterAttack`. A missile
+ * strike queues no sound of its own.)
  */
-const CHAMP_WOUND_SOUNDS = [
-    SoundIndex.CHAMP_WOUND_1,
-    SoundIndex.CHAMP_WOUND_2,
-    SoundIndex.CHAMP_WOUND_3,
-    SoundIndex.CHAMP_WOUND_4,
-];
+const MISSILE_WOUND_MASK = 12;
 import {
     ActuatorAction,
     PORTRAIT_INACTIVE,
@@ -325,6 +323,9 @@ export class Game {
                 onDsaTimer6: (rn, timer, loc) => this.dsaSystem.processTimer6(rn, timer, loc),
                 onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
+                objectWeight: (rn) => this.characterStats.getObjectWeight(rn as ObjectID),
+                weaponThrowDamage: (rn) =>
+                    this.characterStats.weaponDescFor(rn as ObjectID)?.uByte3 ?? 0,
                 onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
                 onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
@@ -517,10 +518,7 @@ export class Game {
             hooks: {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
-                adjustStamina: (chIdx, decrement) => {
-                    const champ = this.party.state.champions[chIdx];
-                    if (champ) this.adjustStamina(champ, decrement);
-                },
+                adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
                 disableCharacterAction: (chIdx, timeDelay) => this.disableCharacterAction(chIdx, timeDelay),
                 hitDoor: (position, force, explosion) => this.timerSystem.hitDoor(position, force, explosion),
                 characterThrowsSpell: (chIdx, projectile, range, neededMana) =>
@@ -1169,29 +1167,46 @@ export class Game {
         );
     }
 
+    /**
+     * The tail of `ProcessMissileEncounter`'s party arm
+     * (`doc/CSBwin-src/Code11f52.cpp:2044-2056`):
+     *
+     * ```cpp
+     * if (D4W != 0) {
+     *   D0W = DamageCharacter(objectPos, D5W, 12, d.Word12964);
+     *   if (D0W != 0 && d.Word12962 != 0 && STRandomBool())
+     *     PoisonCharacter(objectPos, d.Word12962);
+     * }
+     * ```
+     *
+     * Everything above it — which champion, how much, which mitigation, how much
+     * poison — was decided in `TimerSystem.determineMagicDamage`; this only applies
+     * it. Going through `DamageCharacter` rather than subtracting from `health` is
+     * the whole point: it is what runs armour, wounds, the shields, the wake-up, and
+     * `KillCharacter`. Until it did, a champion killed by a missile left no bones and
+     * no possessions, and a party wiped by one did not lose the game.
+     *
+     * The **wound mask is 12**, a literal at the call site: bits 2 and 3, the torso
+     * and the legs. A missile cannot wound a hand, a head or a foot.
+     */
     private applyMissileDamageToParty(options: {
+        chIdx: number;
         damage: number;
-        position: PartyState['position'];
-    }): boolean {
-        const damage = options.damage | 0;
-        if (damage <= 0) return false;
-        const candidates = this.party.state.champions.filter((c) => c.alive);
-        if (candidates.length === 0) return false;
+        kind: number;
+        poisonStrength: number;
+    }): void {
         this.noteMonsterAttack();
-
-        const frontRow = candidates.filter((c) => c.partyPosition === 0 || c.partyPosition === 1);
-        const target = (frontRow[0] ?? candidates[0]) ?? null;
-        if (!target) return false;
-
-        const current = target.attributes.health | 0;
-        const next = Math.max(0, current - damage);
-        target.attributes.health = next;
-        if (next === 0) target.alive = false;
-        // Sound ordinal `chIdx + 9` (doc/CSBwin-src/Monster.cpp:4584), which is
-        // soundTable[9..12] = SND items 541-544. The wound sound identifies *which*
-        // champion was hurt; it was being picked at random here.
-        this.playSound?.(CHAMP_WOUND_SOUNDS[target.partyPosition & 0x3] ?? SoundIndex.CHAMP_WOUND_1);
-        return true;
+        const dealt = this.monsterAttack.damageCharacter(
+            options.chIdx,
+            options.damage | 0,
+            MISSILE_WOUND_MASK,
+            options.kind | 0,
+        );
+        if (dealt === 0) return;
+        // `STRandomBool()` — a poisoned missile infects only half the time.
+        if ((options.poisonStrength | 0) !== 0 && this.random.bool() !== 0) {
+            this.monsterAttack.poisonCharacter(options.chIdx, options.poisonStrength | 0);
+        }
     }
 
     /**
@@ -1399,7 +1414,8 @@ export class Game {
             return value >= 0 ? value : null;
         };
 
-        for (const champ of party.champions) {
+        for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
+            const champ = party.champions[chIdx];
             if (!champ || !champ.alive) continue;
             const attrs = champ.attributes;
             const maxMana = attrs.maxMana | 0;
@@ -1417,7 +1433,7 @@ export class Game {
                     let manaAdjust = Math.trunc(maxMana / 40);
                     manaAdjust += 1;
                     const staminaAdjust = manaAdjust * Math.max(7, 16 - magicMastery);
-                    this.adjustStamina(champ, staminaAdjust);
+                    this.monsterAttack.adjustStamina(chIdx, staminaAdjust);
                     const deltaMana = Math.min(manaAdjust, maxMana - mana);
                     attrs.mana = mana + deltaMana;
                 }
@@ -1431,23 +1447,6 @@ export class Game {
             }
             champ.skills = skills;
         }
-    }
-
-    private adjustStamina(champion: Champion, decrement: number): void {
-        const attrs = champion.attributes;
-        let newStamina = (attrs.stamina | 0) - (decrement | 0);
-        if (newStamina <= 0) {
-            const abs = -newStamina;
-            attrs.stamina = 0;
-            const health = attrs.health | 0;
-            const reduced = Math.max(0, health - Math.floor(abs / 2));
-            attrs.health = reduced;
-            if (reduced === 0) champion.alive = false;
-            return;
-        }
-        const maxStamina = attrs.maxStamina | 0;
-        if (newStamina > maxStamina) newStamina = maxStamina;
-        attrs.stamina = newStamina;
     }
 
     private getChampionPossession(champion: Champion, slot: number): ObjectID | null {
@@ -2497,7 +2496,7 @@ export class Game {
         const party = this.party.state;
 
         this.sounds.queueSound(16, party.position.x, party.position.y, 1);
-        this.adjustStamina(champion, this.throwStaminaCost(obj));
+        this.monsterAttack.adjustStamina(chIdx, this.throwStaminaCost(obj));
         // A negative disable time means "use the default", which is 4 ticks.
         const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
         this.disableCharacterAction(chIdx, disableTime);

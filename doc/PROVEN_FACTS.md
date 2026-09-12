@@ -873,6 +873,54 @@ dead champion's bones from an ordinary bones item. The object's position within 
 set from `pcA3->charPosition`, so the bones appear where that champion stood, and
 `expool.AddChampionBonesRecord` records the bones↔fingerprint pairing for resurrection.
 
+## `KillCharacter` is the only way a champion's hit points reach zero
+
+Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).
+Every path that can kill ends at `DamageCharacter` (`:2703`), which is what drops the
+possessions, leaves the bones, moves the cursor and the magic tab, and sets
+`d.GameIsLost`. Two are easy to miss because they do not look like attacks:
+
+- `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) clamps stamina at zero and turns
+  the **overshoot** into `DamageCharacter(chIdx, overshoot/2, 0, 0)`. Mask and kind are
+  both zero, so exhaustion ignores armour and cannot wound — but it kills.
+- `ProcessMissileEncounter`'s party arm (`:1947-1958`, `:2044-2056`) resolves the corner
+  the missile arrived at with `CharacterAtPosition` — returning if it holds nobody
+  living — and applies `DamageCharacter(chIdx, damage, 12, d.Word12964)`. The wound mask
+  **12** is a literal: a missile can mark the torso and the legs, nothing else.
+
+The missile is spent either way. A dispel missile does a champion no damage at all and
+still lands, because the consume happens after the `if (D4W != 0)` block, not inside it.
+
+## `DetermineMagicDamage` returns three things, two of them through globals
+
+`doc/CSBwin-src/Code11f52.cpp:1557`. It returns the damage and leaves `d.Word12962` (a
+poison strength) and `d.Word12964` (the `DamageCharacter` *kind*) behind. The arms are
+not variations on one formula, and the `kind` identifies which one a projectile took:
+
+| projectile | kind | damage | poison |
+| --- | --- | --- | --- |
+| a thrown weapon | 3 | `WEAPONDESC.uByte3` + weight/2 | — |
+| anything else thrown | 3 | random 0-3 + weight/2 | — |
+| `RNPoison` (cloud) | **3** | (0..15) + (0..31) | that first roll + 10 |
+| `RNDispellMissile` and up | 5 | **0**, returns early | — |
+| `RNPoisonBolt` | 5 | **1**, returns early | the whole remaining range |
+| `RNLightning` | 7 | 5 × (2×(0..15) + 10) | — |
+| any other spell | 1 | 2×(0..15) + 10 | — |
+
+`RNPoison` is the trap: it is handled *before* the kind is ever changed, so a poison
+cloud keeps the default 3 while every other spell does not. The common tail then folds
+in the remaining range and floors the result at half itself, so a nearly spent missile
+still stings.
+
+## The spell RNs have a gap at `0xff85`
+
+`doc/CSBwin-src/CSBTypes.h:236-249`. `RNFireball` 0xff80, `RNPoison` 0xff81,
+`RNLightning` 0xff82, `RNDispellMissile` 0xff83, `RNZoSpell` 0xff84, then **nothing at
+0xff85**, `RNPoisonBolt` 0xff86, `RNPoisonCloud` 0xff87. Counting through the enum
+instead of reading the values gives `RNPoisonBolt` = 0xff85 and everything after it is
+wrong; assuming `RNPoison` and `RNPoisonBolt` are adjacent gives the same result. They
+live in `src/core/spellRn.ts` once, for that reason.
+
 ## `OBJ_NAME_INDEX` is commented in hex, and both places bones are named do the lookup
 
 CSBWin's object-name enum (`doc/CSBwin-src/Objects.h:438-659`) carries its values as **hex**

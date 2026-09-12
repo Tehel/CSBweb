@@ -453,7 +453,7 @@ function main(): void {
         // champion's name in front of it, with no separator.
         const shown = getObjectDisplayName(ui, bones, nameIndex);
         console.log(['name shown for the bones', shown].join('\t'));
-        check(shown === `HERO${victim}BONES`, "and they are named for their owner, not just 'BONES'");
+        check(shown === `HERO${victim} BONES`, "and they are named for their owner, not just 'BONES'");
 
         // Pick them up and drop them in, the way the viewport click does.
         g.dungeonState.removeObjectFromCell(altar.party, bones);

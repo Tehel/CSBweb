@@ -322,17 +322,25 @@ archive section.
 
 **Champion lifecycle (Phase 13)**
 
-- ⏳ **A champion can still die without leaving bones.** Two paths zero `health` and set
-  `alive = false` directly instead of calling `KillCharacter`: `applyMissileDamageToParty`
-  (`src/engine/Game.ts:1189`), the stand-in for a missile striking the party, and
-  `Game.adjustStamina` (`:1445`), the exhaustion path in the per-tick upkeep. Neither
-  drops possessions, leaves bones, hands on the cursor, or sets `GameIsLost` — so a
-  champion killed by either is unresurrectable, and a wipe by either does not end the
-  game. CSBWin has no such path: `AdjustStamina` turns its overshoot into
-  `DamageCharacter(chIdx, overshoot/2, 0, 0)` (`doc/CSBwin-src/Code11f52.cpp:4413`), and
-  the missile goes through `DamageCharacter` too. Routing both through
-  `MonsterAttack.damageCharacter` is the fix; it was noticed while chasing the bones
-  naming and left because it is an attack-path change wanting its own tool.
+- 🚫 **Every death now goes through `KillCharacter`.** Two paths used to zero `health`
+  and set `alive = false` by hand — the missile-hits-party stand-in and a duplicate
+  `Game.adjustStamina` — so a champion killed by a missile or by exhaustion left no
+  bones and no possessions, and a party wiped by either did not lose the game. Both are
+  routed through `MonsterAttack.damageCharacter` now, `DetermineMagicDamage` is ported,
+  and `tools/dump-champion-death.ts` checks all three paths produce the same six
+  consequences. Closed, not debt.
+- ⏳ **`DamageCharacter` is missing two of CSBWin's three early guards**
+  (`doc/CSBwin-src/Character.cpp:2712-2714`): `chIdx+1 == d.PotentialCharacterOrdinal`,
+  which makes a champion still standing in a Hall of Champions mirror unhurtable, and
+  `d.Word11694`, a global damage suppressor. Both return early with a non-zero value, so
+  a caller reading the result sees "damage was dealt" — the mirror guard matters now
+  that missiles reach the party through this function.
+- ⏳ **`DetermineMagicDamage` is used by the party arm only.** The monster arm of
+  `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:2007-2015`) should divide
+  `64 * DetermineMagicDamage(...)` by the monster's `defense08` and add
+  `DeterminePoisonDamage`; `Game.applyMissileDamageToMonster` still passes the missile's
+  raw `damageRemaining` to `DamageMonster` and picks the first living group member
+  rather than `OrdinalOfMonsterAtPosition`. The function it needs now exists.
 
 - ⏳ **The wings.** CSBWin keeps champions who have left the party in a store
   `CHARDESC::GetFromWings`/`SaveToWings` reach (`doc/CSBwin-src/Character.cpp:5239`).
