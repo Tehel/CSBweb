@@ -163,6 +163,24 @@ archive section.
 
 **Rendering / UI**
 
+- ✅ *(playtest)* **The eye panel prints the mastery ranks again.** "NOVICE FIGHTER" and
+  its fifteen siblings were missing from the top of the attribute panel while the six
+  attributes below them drew fine. `MASTERY_LABELS` in `src/renderer/ui/Character.ts` was
+  an **empty array left in as an unmarked placeholder**, so the loop's
+  `if (!masteryLabel) continue;` skipped every role silently. The names are
+  `d.Pointer16770` (`doc/CSBwin-src/CSBCode.cpp:370-384`) — one of the rare tables that is
+  genuinely hardcoded in CSBWin rather than extracted from `graphics.dat`. Two smaller
+  faults went with it: the six master ranks start with `` ` `` and `a`..`e`, which are rune
+  glyphs in font `0x22d`, so they need `drawTextLineIndexRaw` rather than the upper-casing
+  `drawTextLineIndex`; and `getRoleMastery` dropped CSBWin's `0x8000`
+  (`doc/CSBwin-src/Character.cpp:4593`), so a potion or spell could have moved the printed
+  rank. Written up in `doc/PROVEN_FACTS.md`; `tools/dump-mastery-panel.ts` renders the real
+  panel and byte-compares the lines, since no golden frame covers this panel.
+
+  ⏳ **Other empty placeholder tables may be hiding the same way.** This one produced no
+  warning and no marker — worth a Phase 15 sweep for arrays and tables that are
+  initialised empty and read through a `continue`-on-falsy guard.
+
 - ✅ *(playtest)* **A wall decoration one cell ahead and to the left is no longer cropped
   on the wrong side.** Position 7 (the F2 front-left wall) scales to the width of the F2
   *centre* rectangle and is then drawn into a narrower slot flush against the left border,

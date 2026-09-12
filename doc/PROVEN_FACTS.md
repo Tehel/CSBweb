@@ -1156,3 +1156,39 @@ renderer had it right (`cloudType === 50`). The constants now live in
 `d.Time + 100`, which removes the record and frees it — and `TT_24` does nothing at all
 once `d.Word11694` (game won) is set, so the cage around Lord Chaos stays up through the
 endgame.
+
+## The mastery names are a code table, and six of them start with a rune
+
+`d.Pointer16770[17]` (`doc/CSBwin-src/CSBCode.cpp:370-384`) holds the rank names the eye
+panel prints, indexed directly by what `DetermineMastery` returns:
+
+```
+[2] NEOPHYTE   [3] NOVICE   [4] APPRENTICE  [5] JOURNEYMAN  [6] CRAFTSMAN
+[7] ARTISAN    [8] ADEPT    [9] EXPERT      [10] ` MASTER   [11] a MASTER
+[12] b MASTER  [13] c MASTER [14] d MASTER  [15] e MASTER   [16] ARCHMASTER
+```
+
+Slots 0 and 1 are never read: `drawAttributePanel`'s port of
+`doc/CSBwin-src/Character.cpp:4590-4605` clamps with `Smaller(16, mastery)`, skips a role
+whose mastery is 1, and CSBWin dies outright on 0.
+
+Two things about it are unusual:
+
+- **It is a hardcoded table, not extracted from `graphics.dat`.** One of the rare
+  exceptions to the extract-at-runtime rule — the strings live in the executable, so they
+  belong in code here too. (The same names appear again as `pnt4772` in
+  `doc/CSBwin-src/Chaos.cpp:513`, padded to 11 characters and **0-based**, for the CSB
+  editor's dialog. Do not confuse the two indexings.)
+- **The six master ranks begin with `` ` `` and `a`..`e`** (0x60, 0x61..0x65). In the DM
+  font, graphic `0x22d`, those codes hold rune glyphs — Lo, Um, On, Ee, Ux, Mon — so
+  "a MASTER" is the rune for Um followed by a space and MASTER, not a letter A.
+  `TextOut_OneLine` indexes the font with the raw byte (`doc/CSBwin-src/Graphics.cpp:335`)
+  and never changes case, so these lines must go through `drawTextLineIndexRaw`; the
+  upper-casing `drawTextLineIndex` turns the rune into an 'A'.
+
+The rank is read with the `0x8000` flag — `DetermineMastery(chIdx, role|0x8000)`
+(`doc/CSBwin-src/Character.cpp:4593`) — so the panel shows the **earned** rank and a
+temporary adjustment from a spell or potion does not move it.
+
+Covered by `tools/dump-mastery-panel.ts`, which renders the real panel and compares the
+pixels against the strings spelled out independently in the tool.

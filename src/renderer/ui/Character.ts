@@ -12,13 +12,37 @@ import { Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
-import { drawTextLineIndex } from '../csbwin/TextRenderer';
+import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
 import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
-const MASTERY_LABELS: string[] = [
+/**
+ * `d.Pointer16770` (`doc/CSBwin-src/CSBCode.cpp:370-384`), indexed by the mastery
+ * `DetermineMastery` returns, so slots 0 and 1 are never read (CSBWin leaves 1 out of the
+ * panel and dies on 0). The six master ranks begin with the characters `` ` `` and `a`..`e`,
+ * which in the DM font (graphic `0x22d`) are the rune glyphs for Lo, Um, On, Ee, Ux and
+ * Mon — they must reach the font as those exact codes, hence `drawTextLineIndexRaw`.
+ */
+export const MASTERY_LABELS: string[] = [
+  '',
+  '',
+  'NEOPHYTE',
+  'NOVICE',
+  'APPRENTICE',
+  'JOURNEYMAN',
+  'CRAFTSMAN',
+  'ARTISAN',
+  'ADEPT',
+  'EXPERT',
+  '` MASTER',
+  'a MASTER',
+  'b MASTER',
+  'c MASTER',
+  'd MASTER',
+  'e MASTER',
+  'ARCHMASTER',
 ];
 const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 
@@ -41,13 +65,16 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
 
+  // `for (D7W=0; D7W<=3; D7W++)` — one line per role, `Smaller(16, mastery)` capped and
+  // mastery 1 (no experience at all) left off the panel entirely
+  // (`doc/CSBwin-src/Character.cpp:4590-4605`).
   let lineY = 58;
   for (let role = 0; role < ROLE_LABELS.length; role++) {
-    const mastery = getRoleMastery(ui, champion, role);
+    const mastery = Math.min(16, getRoleMastery(ui, champion, role));
     if (mastery <= 1) continue;
     const masteryLabel = MASTERY_LABELS[mastery] ?? '';
     if (!masteryLabel) continue;
-    drawTextLineIndex(
+    drawTextLineIndexRaw(
       ui.screenIndexBuffer,
       ui.fontData,
       VIEWPORT_X + 107,

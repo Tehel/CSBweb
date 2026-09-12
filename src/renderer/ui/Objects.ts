@@ -458,6 +458,11 @@ export function determineMastery(ui: UIState, champion: Champion, skill: number)
   });
 }
 
+/**
+ * `DetermineMastery(chIdx, role|0x8000)` (`doc/CSBwin-src/Character.cpp:4593`) — the rank
+ * the eye panel prints is the earned one, so the `0x8000` flag drops the temporary
+ * adjustment a spell or potion may be carrying.
+ */
 export function getRoleMastery(ui: UIState, champion: Champion, roleIndex: number): number {
-  return determineMastery(ui, champion, roleIndex);
+  return determineMastery(ui, champion, roleIndex | 0x8000);
 }
