@@ -324,6 +324,19 @@ async function init() {
             });
             crtController = createCrtController(gameCanvasEl);
             console.log('✓ Viewport renderer initialized');
+            // Dev-only debug handle. `tools/probe-ui.mjs` drives the live app through this
+            // over CDP — see the `probe-app` skill. Module scope is invisible to the
+            // DevTools protocol, so a bug that only shows on screen is otherwise
+            // unreachable without hand-patching this file.
+            //
+            // Guarded on Vite's build-time DEV flag rather than `isDebugFeaturesEnabled()`,
+            // which the rest of the Phase 14 scaffolding uses: that toggle is applied from
+            // the saved UI settings *after* this init runs, so it always reads false here.
+            // `import.meta.env.DEV` is constant-folded to false by `vite build`, so the
+            // handle cannot reach a production bundle.
+            if (import.meta.env.DEV) {
+                (window as unknown as Record<string, unknown>).__probe = { game, renderer, renderView };
+            }
             bindUIContext({
                 renderer,
                 game,

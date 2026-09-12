@@ -31,6 +31,7 @@ Corollaries:
 | `doc/PLAN_ARCHIVE.md` | Working notes for completed phases. Reference only — read on demand. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
+| `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
 | `NOTES.md` | The author's personal scratchpad. **Do not edit.** Flag problems instead. |
 | `doc/CSBwin-src/` | The C++ reference (gitignored, not ours). |
 
@@ -77,6 +78,11 @@ When porting behaviour that is invisible on screen, write the tool in the same c
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and
 the "canary" technique for proving an extracted table sits at the right offset.
 
+`tools/probe-ui.mjs` is the third thing, and it is **not** evidence: it drives the running
+app over CDP to read live state, click the canvas and take screenshots, for bugs that only
+show up on screen. Use it to find out what is wrong, then prove it in a `dump-*.ts`. The
+`playtest-bug` and `probe-app` skills cover the debugging loop those two serve.
+
 ## Code layout (`src/`, ~30k LOC)
 
 ```
@@ -113,6 +119,32 @@ main.ts     Bootstrap and wiring
 - **Timing**: 60 Hz VBL loop, 4 game ticks/sec; a timer queue with CSBWin's duplicate-timer
   suppression drives doors, missiles, actuators, spells and (eventually) monsters.
 
+## Working economically
+
+A session is priced at roughly `tool calls × context size`, and context only grows, so the
+cost of a session is **quadratic in the number of round trips**. Measured on this project:
+the last quarter of a 211-call session cost 4.4× what the first quarter did. Long sessions
+are the expensive thing, not hard questions. So:
+
+- **One topic per session.** After a commit, `/clear`. Three bugs in one context cost about
+  twice what the same three bugs cost in three contexts.
+- **Batch independent tool calls** into a single message. Two greps that do not depend on
+  each other should never be two round trips.
+- **Read wide once, not narrow many times.** One `sed -n '1,400p'` beats eight `sed -n`
+  peeks at the same file: every peek re-sends the whole conversation.
+- **Consult `doc/CSBWIN_SYMBOL_INDEX.tsv` before grepping `doc/CSBwin-src/`.** One
+  `grep -P '^SummarizeRoomInfo\t'` replaces a grep of 120k lines plus the two peeks that
+  usually follow it. Regenerate with `node tools/gen-csbwin-index.mjs` if the tree changes.
+- **Delegate open-ended C++ searches to an `Explore` subagent** — "where does CSBWin decide
+  a missile has hit?" — and keep the ten greps and their output out of the main context.
+  This is a deliberate exception to the default of not spawning agents. Do it for *search*,
+  never for judgement: the subagent reports where the code is, and the porting decision is
+  still made here, against the source.
+
+Don't trade faithfulness for economy. Re-reading CSBWin to get a magic number right is
+always worth it; re-reading the same file for the fifth time because the first four peeks
+were three lines each is not.
+
 ## Conventions
 
 - Commits: **single short line, no JIRA prefix, no trailers** (e.g. `Pits on ceiling`).
@@ -126,8 +158,9 @@ main.ts     Bootstrap and wiring
 
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
 renderer, movement, timers, actuators, DSA scripting, missiles, skills/experience, magic
-casting, light levels, sound and most of the DM UI all work. The message area (Phase 11) and
-the structural cleanup (Phase 14) are done — the UI now lives in `src/renderer/ui/`, one
-module per CSBWin file. The largest gaps are **no monsters at all** (`Monster.cpp` unported
-— Phase 12, the current priority), no champion death/creation (Phase 13), and the validation
-debt (Phase 15).
+casting, light levels, sound and most of the DM UI all work. The message area (Phase 11),
+the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
+combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
+Champions, resurrection) are all done. What is left is **Phase 10**, the CSBWin-compatible
+save/load format, which is not started; the **validation debt** (Phase 15, steps 3–5); and
+the carried-over debt listed in `PLAN.md`.
