@@ -119,19 +119,6 @@ export interface LocationRel {
 
 type MissileDropTarget = { monster: number } | null;
 
-export interface MissileTraceEvent {
-  stage: 'tick' | 'move' | 'drop' | 'expire' | 'encounter';
-  missile: number;
-  projectile: number;
-  position: Position;
-  posInCell: number;
-  direction: number;
-  range: number;
-  damage: number;
-  detail?: string;
-  hit?: boolean;
-}
-
 export interface TimerHooks {
   /**
    * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion's action
@@ -228,7 +215,6 @@ export interface TimerHooks {
     mapX: number;
     mapY: number;
   }) => void;
-  onMissileTrace?: (event: MissileTraceEvent) => void;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   /** `GetObjectWeight(object)`, for `DetermineMagicDamage`'s thrown-object arm. */
   objectWeight?: (rn: number) => number;
@@ -1145,34 +1131,6 @@ export class TimerSystem {
     );
   }
 
-  launchDelayedMissile(
-    projectileObject: number,
-    position: Position,
-    posInCell: number,
-    direction: number,
-    rangeRemaining: number,
-    damageRemaining: number,
-    decayRate: number,
-    startTime: number,
-    delayTicks: number,
-  ): boolean {
-    const delay = Math.max(1, delayTicks | 0);
-    const scheduledTime = (startTime + delay - 1) >>> 0;
-    return this.launchMissile(
-      projectileObject,
-      position.x,
-      position.y,
-      position.z,
-      posInCell,
-      direction,
-      rangeRemaining,
-      damageRemaining,
-      decayRate,
-      scheduledTime,
-      true,
-    );
-  }
-
   throwMissile(
     missileType: number,
     launchLocation: LocationRel,
@@ -1700,18 +1658,6 @@ export class TimerSystem {
     const { x: origMapX, y: origMapY, dir: initialDir, deltaEnergy } = this.decodeMissileTimerWord8(word8);
     let curMapX = origMapX;
     let curMapY = origMapY;
-    const initialPosInCell = decoded.position & 0x3;
-    this.emitMissileTrace({
-      stage: 'tick',
-      missile: missileRn,
-      projectile: missile.projectileObject & 0xffff,
-      position: new Position(curMapX, curMapY, timer.level),
-      posInCell: initialPosInCell,
-      direction: initialDir & 0x3,
-      range: missile.rangeRemaining & 0xff,
-      damage: missile.damageRemaining & 0xff,
-      detail: timer.function === TimerFunction.TT_MISSILE0 ? 'missile0' : undefined,
-    });
 
     if (timer.function === TimerFunction.TT_MISSILE0) {
       timer.function = TimerFunction.TT_MISSILE;
@@ -1736,18 +1682,6 @@ export class TimerSystem {
       if ((missile.rangeRemaining & 0xff) <= deltaEnergy) {
         const filterProjectile = missile.projectileObject & 0xffff;
         this.missileEncounterFilter(5, current, curPos, missileRn, filterProjectile, -1);
-        this.emitMissileTrace({
-          stage: 'expire',
-          missile: missileRn,
-          projectile: missile.projectileObject & 0xffff,
-          position: current,
-          posInCell: curPos,
-          direction: initialDir & 0x3,
-          range: missile.rangeRemaining & 0xff,
-          damage: missile.damageRemaining & 0xff,
-          detail: 'range',
-          hit: true,
-        });
         this.processObjectFromMissile(missileRn, null, current, curPos);
         this.clearMissileFilterState();
         return;
@@ -1811,17 +1745,6 @@ export class TimerSystem {
     if (leavingThisCell) {
       if (outOfBounds) {
         const dropPos = new Position(origMapX, origMapY, timer.level);
-        this.emitMissileTrace({
-          stage: 'drop',
-          missile: missileRn,
-          projectile: missile.projectileObject & 0xffff,
-          position: dropPos,
-          posInCell: curPos,
-          direction: missileDir & 0x3,
-          range: missile.rangeRemaining & 0xff,
-          damage: missile.damageRemaining & 0xff,
-          detail: 'out-of-bounds',
-        });
         this.processObjectFromMissile(missileRn, null, dropPos, curPos);
         this.clearMissileFilterState();
         return;
@@ -1846,16 +1769,6 @@ export class TimerSystem {
       timer.uByte7 = newPos.y & 0xff;
       timer.level = newPos.z & 0xff;
       timer.timerWord8 = this.encodeMissileTimerWord8(newPos.x, newPos.y, newDir, deltaEnergy);
-      this.emitMissileTrace({
-        stage: 'move',
-        missile: newRn,
-        projectile: missile.projectileObject & 0xffff,
-        position: newPos,
-        posInCell: newPosInCell,
-        direction: newDir & 0x3,
-        range: missile.rangeRemaining & 0xff,
-        damage: missile.damageRemaining & 0xff,
-      });
     } else {
       const map = this.dungeon.getMap(timer.level);
       if (map) {
@@ -2085,31 +1998,15 @@ export class TimerSystem {
       projectile !== RN_POISON_BOLT;
 
     let absorbedMonster: number | null = null;
-    const traceEncounter = (hit: boolean, detail: string): boolean => {
-      this.emitMissileTrace({
-        stage: 'encounter',
-        missile: missileRn,
-        projectile,
-        position,
-        posInCell: objectPos,
-        direction,
-        range: missile.rangeRemaining & 0xff,
-        damage: missile.damageRemaining & 0xff,
-        detail,
-        hit,
-      });
-      return hit;
-    };
-
     switch (cellType) {
       case RoomType.FALSEWALL:
         if (this.missileEncounterFilter(3, position, objectPos, missileRn, filterProjectile, -1) === 1) {
-          return traceEncounter(false, 'falsewall-filter');
+          return false;
         }
         break;
       case RoomType.STONE:
         if (this.missileEncounterFilter(4, position, objectPos, missileRn, filterProjectile, -1) === 1) {
-          return traceEncounter(false, 'stone-filter');
+          return false;
         }
         break;
       case 8:
@@ -2129,23 +2026,11 @@ export class TimerSystem {
         }
 
         if (doorState === 5 || doorState <= 1) {
-          return traceEncounter(false, `door-pass state=${doorState}`);
+          return false;
         }
         if (this.missileEncounterFilter(2, position, objectPos, missileRn, filterProjectile, -1) === 1) {
-          return traceEncounter(false, 'door-filter');
+          return false;
         }
-        this.emitMissileTrace({
-          stage: 'encounter',
-          missile: missileRn,
-          projectile,
-          position,
-          posInCell: objectPos,
-          direction,
-          range: missile.rangeRemaining & 0xff,
-          damage: missile.damageRemaining & 0xff,
-          detail: 'door-hit',
-          hit: true,
-        });
         return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -2: {
@@ -2155,9 +2040,9 @@ export class TimerSystem {
         // `CharacterAtPosition` skips the dead — lets the missile fly on. From here on
         // `objectPos` *is* a champion index, including in the filter call below.
         const chIdx = characterAtPosition(this.getPartyState().champions, objectPos & 0x3);
-        if (chIdx < 0) return traceEncounter(false, 'party-empty-corner');
+        if (chIdx < 0) return false;
         if (this.missileEncounterFilter(7, position, objectPos, missileRn, filterProjectile, chIdx) === 1) {
-          return traceEncounter(false, 'party-filter');
+          return false;
         }
         // `D5W = DetermineMagicDamage(pDBmissile, RNprojectile); D4W = D5W;` — the
         // party is the only arm that sets `D4W`, which is what makes the shared tail
@@ -2179,34 +2064,22 @@ export class TimerSystem {
         }
         // The missile is spent either way: a dispel missile does a champion no damage
         // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
-        this.emitMissileTrace({
-          stage: 'encounter',
-          missile: missileRn,
-          projectile,
-          position,
-          posInCell: objectPos,
-          direction,
-          range: missile.rangeRemaining & 0xff,
-          damage: magic.damage,
-          detail: 'party-hit',
-          hit: true,
-        });
         return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -1: {
         const monsterRn = this.findFirstMonsterAt(position);
-        if (monsterRn === null) return traceEncounter(false, 'monster-missing');
+        if (monsterRn === null) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
         if (monster) {
           const monsterOrdinal = this.ordinalOfMonsterAtPosition(monster, objectPos);
           const filterIndex = monsterOrdinal > 0 ? monsterOrdinal - 1 : -1;
           if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, filterIndex) === 1) {
-            return traceEncounter(false, 'monster-filter');
+            return false;
           }
           const desc = this.tables?.monsterDesc?.[monster.creatureType];
           const nonMaterial = desc ? monsterNonMaterial(desc) : false;
           const absorbs = desc ? monsterAbsorbsDaggersEtc(desc) : false;
-          if (nonMaterial && projectile !== RN_DISPELL_MISSILE) return traceEncounter(false, 'monster-immune');
+          if (nonMaterial && projectile !== RN_DISPELL_MISSILE) return false;
 
           if (projectileDbType === DBType.WEAPON && absorbs) {
             const weapon = this.dungeon.getWeaponRecord(projectile as number);
@@ -2236,38 +2109,14 @@ export class TimerSystem {
             damage: missile.damageRemaining & 0xff,
             range: missile.rangeRemaining & 0xff,
           });
-          if (!consumed) return traceEncounter(false, 'monster-ignored');
+          if (!consumed) return false;
         }
-        this.emitMissileTrace({
-          stage: 'encounter',
-          missile: missileRn,
-          projectile,
-          position,
-          posInCell: objectPos,
-          direction,
-          range: missile.rangeRemaining & 0xff,
-          damage: missile.damageRemaining & 0xff,
-          detail: absorbedMonster ? 'monster-hit absorb' : 'monster-hit',
-          hit: true,
-        });
         return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       default:
         break;
     }
 
-    this.emitMissileTrace({
-      stage: 'encounter',
-      missile: missileRn,
-      projectile,
-      position,
-      posInCell: objectPos,
-      direction,
-      range: missile.rangeRemaining & 0xff,
-      damage: missile.damageRemaining & 0xff,
-      detail: `room-${cellType}`,
-      hit: true,
-    });
     return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
   }
 
@@ -2315,17 +2164,6 @@ export class TimerSystem {
       direction,
       index,
     }) | 0;
-  }
-
-  private emitMissileTrace(event: MissileTraceEvent): void {
-    if (!this.hooks?.onMissileTrace) return;
-    this.hooks.onMissileTrace({
-      ...event,
-      posInCell: event.posInCell & 0x3,
-      direction: event.direction & 0x3,
-      range: event.range & 0xff,
-      damage: event.damage & 0xff,
-    });
   }
 
   private clearMissileFilterState(): void {

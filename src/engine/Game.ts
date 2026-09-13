@@ -2597,29 +2597,6 @@ export class Game {
         return result;
     }
 
-    debugLaunchMissileDelayed(
-        projectileObject: ObjectID,
-        position: Position,
-        posInCell: number,
-        direction: number,
-        range: number,
-        damage: number,
-        decayRate: number,
-        delayTicks: number,
-    ): boolean {
-        return this.timerSystem.launchDelayedMissile(
-            projectileObject,
-            position,
-            posInCell,
-            direction,
-            range,
-            damage,
-            decayRate,
-            this.state.tickCount,
-            delayTicks,
-        );
-    }
-
     private normalizeObjectInHand(value: ObjectID | null): ObjectID | null {
         if (value === null || value === undefined) return null;
         if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return null;

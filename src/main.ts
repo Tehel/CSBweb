@@ -4,8 +4,8 @@
 
 import { Direction } from './core';
 import { SoundManager } from './audio';
-import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
-import { Game, type ActuatorTables, type TimerTables, type TimerHooks, type AddCharacterTables } from './engine';
+import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader } from './data';
+import { Game, type ActuatorTables, type TimerTables, type TimerHooks } from './engine';
 import {
     applySaveBytes,
     buildSavePayload,
@@ -29,9 +29,7 @@ let renderer: ViewportRenderer | null = null;
 let graphicsLoader: GraphicsLoader | null = null;
 let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
-let dungeonData: DungeonData | null = null;
 let soundManager: SoundManager | null = null;
-let addCharacterTables: AddCharacterTables | null = null;
 let actuatorTables: ActuatorTables | null = null;
 let timerTables: TimerTables | null = null;
 let crtController: CrtController | null = null;
@@ -39,10 +37,6 @@ let crtController: CrtController | null = null;
 // Dev-only harness (PLAN.md Phase 14). Reached only via isDebugFeaturesEnabled().
 const dev = createDevTools({
     get game() { return game; },
-    get renderer() { return renderer; },
-    get dungeonData() { return dungeonData; },
-    get timerTables() { return timerTables; },
-    getAddCharacterTables,
     renderView,
 });
 
@@ -145,20 +139,6 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
 }
 
 
-function getAddCharacterTables(): AddCharacterTables | null {
-    if (!graphicsLoader) return null;
-    if (addCharacterTables) return addCharacterTables;
-
-    const uiTables = extractUITables(graphicsLoader);
-    const viewportTables = extractViewportTables(graphicsLoader);
-    const objectTables = extractObjectTables(graphicsLoader, viewportTables.wallRectanglesOffset);
-    addCharacterTables = {
-        carryLocation: uiTables.graphic232.carryLocation,
-        objDescCarryMask: objectTables.objDescCarryMask,
-    };
-    return addCharacterTables;
-}
-
 function setCrtEnabled(enabled: boolean): boolean {
     if (!crtController) return false;
     return crtController.setEnabled(enabled);
@@ -194,7 +174,6 @@ async function init() {
             updateDebug('Loading dungeon.dat...');
             const dungeon = await dungeonLoader.load(`${GAME_DATA_DIR}/dungeon.dat`);
             console.log('heroes', dungeon.presetHeroes);
-            dungeonData = dungeon;
 
             console.log(`✓ Loaded dungeon:`, dungeon);
             console.log(`  - Seed: ${dungeon.header.randomSeed}`);
@@ -281,9 +260,7 @@ async function init() {
 
             // Initialize game engine
             console.log('Initializing game engine...');
-            const timerHooks: TimerHooks = {
-                onMissileTrace: dev.onMissileTrace,
-            };
+            const timerHooks: TimerHooks = {};
             if (soundManager) {
                 timerHooks.playSound = (soundId: number, rateIdx?: number, distance?: number) =>
                     soundManager?.playSound(soundId, rateIdx, distance);
@@ -291,9 +268,7 @@ async function init() {
             const playSound = soundManager
                 ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
-            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound, {
-                trace: dev.onMonsterAITrace,
-            });
+            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
             game.setSpellDefinitions(uiTables.graphic230.spells);
 
             // Initialize viewport renderer
@@ -379,10 +354,6 @@ async function init() {
                 renderView,
                 onQuickSave: dev.quickSave,
                 onQuickLoad: dev.quickLoad,
-                onInjectRandomParty: dev.injectRandomParty,
-                onToggleMonsterAITrace: dev.toggleMonsterAITrace,
-                onToggleMissileTrace: dev.toggleMissileTrace,
-                onRunMissileScenario: dev.runNextMissileScenario,
                 setCrtEnabled,
                 isCrtEnabled,
                 setSoundEnabled: (enabled) => {

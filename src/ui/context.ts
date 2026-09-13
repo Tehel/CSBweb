@@ -9,10 +9,6 @@ export interface UIContext {
     renderView: () => void;
     onQuickSave: () => void;
     onQuickLoad: () => void;
-    onInjectRandomParty: () => void;
-    onToggleMissileTrace: () => void;
-    onToggleMonsterAITrace: () => void;
-    onRunMissileScenario: () => void;
     setCrtEnabled: (enabled: boolean) => boolean;
     isCrtEnabled: () => boolean;
     setSoundEnabled: (enabled: boolean) => void;

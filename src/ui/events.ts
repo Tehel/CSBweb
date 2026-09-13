@@ -237,33 +237,11 @@ export function bindUIEvents(): void {
                     handled = true;
                     break;
                 case 'F5':
-                    if (isDebugFeaturesEnabled()) ctx.onQuickSave();
-                    else updateDebug('Enable Debug to quick-save');
+                    ctx.onQuickSave();
                     handled = true;
                     break;
                 case 'F9':
-                    if (isDebugFeaturesEnabled()) ctx.onQuickLoad();
-                    else updateDebug('Enable Debug to quick-load');
-                    handled = true;
-                    break;
-                case 'F8':
-                    if (isDebugFeaturesEnabled()) ctx.onInjectRandomParty();
-                    else updateDebug('Enable Debug to inject a random party');
-                    handled = true;
-                    break;
-                case 'F6':
-                    if (isDebugFeaturesEnabled()) ctx.onToggleMissileTrace();
-                    else updateDebug('Enable Debug to toggle missile trace');
-                    handled = true;
-                    break;
-                case 'F10':
-                    if (isDebugFeaturesEnabled()) ctx.onRunMissileScenario();
-                    else updateDebug('Enable Debug to run missile scenarios');
-                    handled = true;
-                    break;
-                case 'F4':
-                    if (isDebugFeaturesEnabled()) ctx.onToggleMonsterAITrace();
-                    else updateDebug('Enable Debug to toggle monster AI trace');
+                    ctx.onQuickLoad();
                     handled = true;
                     break;
             }

@@ -1,7 +1,8 @@
 // Golden-frame probe.
 //
 // Drives the running dev server over the Chrome DevTools Protocol — boot, enable Debug,
-// inject a party (F8), open a champion's inventory, select in it, open the attack menu —
+// build a party at the Hall of Champions mirrors, open a champion's inventory, select in
+// it, open the attack menu —
 // and writes a PNG per state. `Math.random` is seeded and localStorage cleared on every
 // load, so the frames are byte-identical run to run and can be compared directly.
 //
@@ -68,8 +69,9 @@ await send('Page.enable');
 await send('Emulation.setDeviceMetricsOverride', {
   width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false,
 });
-// Deterministic run: no persisted UI settings / quick-save, and a seeded Math.random so
-// the injected party is always the same. Frames are then byte-comparable across runs.
+// Deterministic run: no persisted UI settings / quick-save, and a seeded Math.random —
+// `AddCharacter` rolls food and water from it (`Game.addCharacter`), so without the seed
+// the status bars would differ run to run. Frames are then byte-comparable across runs.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.clear(); } catch (e) {}
   // The save/load screen lists IndexedDB, so a frame of it would otherwise carry
@@ -88,8 +90,36 @@ console.log('state: booted');            await shot('01-boot');
 await evaluate(`(()=>{const b=document.getElementById('btn-debug');
   if(!b.classList.contains('is-pressed')) b.click(); return b.classList.contains('is-pressed');})()`);
 await wait(200);
-await key('F8');             await wait(600);
-console.log('state: party injected');    await shot('02-party');
+// Build the party the way a player does: stand at each of the first four preset heroes'
+// mirrors, click the portrait (`AddCharacter`) and press Resurrect (button 160). This
+// used to press F8, a dev-only random-party key that no longer exists; driving the real
+// Hall of Champions needs no scaffolding in the app, only the public game API that
+// `tools/dump-hall-of-champions.ts` drives headlessly.
+await evaluate(`(()=>{
+  const { game, renderView } = window.__probe;
+  const DELTA_X = [0, 1, 0, -1], DELTA_Y = [-1, 0, 1, 0];
+  // HALK first: champion 0 is the one the frames below open an inventory and an attack
+  // panel on, and DAROOU (first in mirror order) is empty-handed, which would leave
+  // frame 05 showing PUNCH/KICK/WAR CRY instead of a weapon's attack list.
+  const all = game.dungeonState.getData().presetHeroes ?? [];
+  const halk = all.find(h => h.name === 'HALK');
+  const heroes = [halk, ...all.filter(h => h !== halk)].filter(Boolean).slice(0, 4);
+  for (const hero of heroes) {
+    // Face the mirror from the cell in front of it, as a player walking up would.
+    const facing = (hero.location.wall + 2) & 3;
+    const party = game.party.state;
+    party.position.x = hero.location.x - DELTA_X[facing];
+    party.position.y = hero.location.y - DELTA_Y[facing];
+    party.position.z = hero.location.map;
+    party.facing = facing;
+    game.handleWallClick();
+    game.resurrectReincarnateCancel(160);
+  }
+  renderView();
+  return game.party.state.champions.map(c => c.name).join(',');
+})()`).then(names => console.log('  party:', names));
+await wait(600);
+console.log('state: party built');       await shot('02-party');
 // Right-click a party block (DM mask 1, button id 7) opens that champion's inventory.
 await canvasClick(15, 15, 2);  await wait(700);
 console.log('state: inventory');         await shot('03-inventory');

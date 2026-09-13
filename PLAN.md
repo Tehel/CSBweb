@@ -262,13 +262,25 @@ archive section.
 
 **Dev scaffolding (Phase 14)**
 
-- ⚠️ F8 (random party) was **not** deleted, contrary to the phase's original wording. Its
-  justification — "the only way to get a playable party" — expired with Phase 13 step 4:
-  the Hall of Champions works. It is kept only because it is still convenient for
-  playtesting; deleting it is now a free choice, not a blocked one.
-- ✅ F5/F9 (quick-save/load) **stay**. They are not scaffolding to be removed: they are the
-  functional equivalent of the original save menu, and are kept for their convenience
-  whether or not that menu is ever ported (Phase 10).
+- ✅ F8 (random party) is **gone**, and with it F4/F6/F10 — the monster AI trace, the
+  missile trace and the five missile scenarios, all Phase 8/12 validation aids whose
+  phases have landed. The deletion reached the engine: `TimerHooks.onMissileTrace`,
+  `MissileTraceEvent` and the nine `emitMissileTrace` sites in `TimerSystem` had no other
+  consumer, nor did `Game.debugLaunchMissileDelayed` /
+  `TimerSystem.launchDelayedMissile`, nor `main.ts`'s `getAddCharacterTables` (`Game`
+  builds its own). `MonsterSystemHooks.trace` **stays** — `tools/dump-monster-ai.ts`
+  registers it. `src/dev.ts` is down to the F5/F9 quick-save from ~640 lines.
+- ✅ F5/F9 (quick-save/load) **stay**, and are no longer gated on `isDebugFeaturesEnabled()`
+  — they are not scaffolding to be removed but the functional equivalent of the original
+  save menu, kept for their convenience whether or not that menu is ever ported
+  (Phase 10). The boot-time restore in `main.ts` is still Debug-gated; that one *is* a
+  dev convenience.
+- ⚠️ `tools/probe-frames.mjs` used F8 to get a party, so all five non-boot golden frames
+  were rebuilt. It now drives the real Hall of Champions through the public game API —
+  stand at a mirror, `handleWallClick`, `resurrectReincarnateCancel(160)`, four times —
+  which needs no scaffolding in the app at all. HALK is added first so champion 0 holds a
+  weapon and frame 05 still exercises the weapon attack list rather than PUNCH/KICK/WAR
+  CRY.
 
 **Champion lifecycle (Phase 13)**
 
