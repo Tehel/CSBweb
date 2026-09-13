@@ -60,6 +60,29 @@ export function decodeCharField(bytes: Uint8Array): string {
     return out;
 }
 
+/**
+ * The inverse: a `char` field of exactly `size` bytes, NUL-terminated and zero-filled.
+ *
+ * `AddCharacter` writes the characters and then its terminator into a record
+ * `ClearMemory` has already zeroed (`doc/CSBwin-src/Character.cpp:478,567,587`), so
+ * every byte past the terminator is 0 — which is what the committed saves hold, with
+ * one exception that this function cannot express and callers must handle: a title
+ * whose first byte was zeroed by the editor bug still carries its text after the
+ * terminator. `Champion.titleField` keeps those bytes; see `writeCsbwinCharacter`.
+ *
+ * A character the field cannot hold is dropped rather than truncating the string
+ * silently: the string is written up to `size - 1` bytes, as CSBWin's own bounds do.
+ */
+export function encodeCharField(text: string, size: number): Uint8Array {
+    const out = new Uint8Array(size);
+    const limit = Math.min(text.length, size - 1);
+    for (let i = 0; i < limit; i++) {
+        const code = text.charCodeAt(i);
+        out[i] = code >= 32 && code < 127 ? code : 0x3f; // '?', as decodeCharField shows it
+    }
+    return out;
+}
+
 /** The four champions of a save's block 4, names and titles, empty slots included. */
 export function readCharacterNames(characterBlock: Uint8Array): Array<{ name: string; title: string }> {
     const out: Array<{ name: string; title: string }> = [];

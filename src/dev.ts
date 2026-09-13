@@ -18,6 +18,7 @@ import {
     makeSaveFileName,
 } from './engine/SaveGamePayload';
 import type { Game } from './engine';
+import type { Champion } from './engine/gameTypes';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { updateDebug } from './ui';
 
@@ -25,6 +26,12 @@ import { updateDebug } from './ui';
 export interface DevHost {
     readonly game: Game | null;
     renderView(): void;
+    /**
+     * The portrait pixels of a champion carrying only `portraitGraphic`, for the save
+     * writer — the renderer's, since only it holds graphic 26. See
+     * `SavePayloadOptions`.
+     */
+    portraitOf?: (champion: Champion) => number[] | undefined;
 }
 
 /** Where the quick-save used to live, before F5/F9 joined the save list. */
@@ -93,7 +100,7 @@ export function createDevTools(host: DevHost): DevTools {
         if (!host.game) return;
         await migrateLegacyQuickSave();
         try {
-            const payload = buildSavePayload(host.game);
+            const payload = buildSavePayload(host.game, { portraitOf: host.portraitOf });
             // `writableSaveStore` falls back to the browser when the file source is
             // chosen but not connected: F5 must never raise a folder picker over the game.
             const store = writableSaveStore();

@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, i16, i32, Direction, Position, ObjectID } from '../core/types';
+import type { ui8, ui16, ui32, i16, i32, Direction, Position, ObjectID } from '../core/types';
 import type { Attribute } from './attributes';
 
 // Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
@@ -104,6 +104,59 @@ export interface Champion {
     portrait?: ui8[];
     facing?: Direction;         // Optional facing for UI indicator
     fingerprint?: ui16;         // CSBWin CHARDESC.fingerPrint (used for bones mapping)
+    /**
+     * `CHARDESC.title` as its 20 raw bytes, kept only when they hold more than `title`
+     * does.
+     *
+     * A title whose first byte was zeroed by `EditCharacterName`'s insert bug still
+     * carries its text after that terminator — `\0HE DEVIL` — and CSBWin prints
+     * nothing for it, so `title` is the empty string (`doc/PROVEN_FACTS.md` → "A
+     * champion's title can lose its first character"). Every champion in the committed
+     * saves of the shipped party is in that state. Encoding `title` back would discard
+     * the tail, so the save writer prefers these bytes when they are here.
+     */
+    titleField?: ui8[];
+    /**
+     * `CHARDESC.incantation[4]` as its raw bytes, kept only when something survives
+     * past the terminator — `CastSpell` clears `incantation[0]` and leaves the rest
+     * (`doc/CSBwin-src/Magic.cpp:951`), so `00 69 6f 00` is a normal thing for a save
+     * to hold. Dead to the game, part of the file; the writer uses it only while it
+     * still agrees with `incantation`.
+     */
+    incantationField?: ui8[];
+    /**
+     * `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2461-2481`). Bit 4 is
+     * `CHARFLAG_male`; 0xff80 are redraw flags CSBWin sets as the game runs and saves
+     * as they stand. Nothing in this port reads them yet — they are carried so a save
+     * can be written back with the champion's gender intact.
+     */
+    charFlags?: i16;
+    /**
+     * `CHARDESC.timerIndex` — the timer that erases the damage readout over the
+     * champion's portrait (`doc/CSBwin-src/CSBCode.cpp:7176-7190`), or -1. This port
+     * draws that readout without a timer; the field is carried for the save writer.
+     */
+    timerIndex?: i16;
+    /**
+     * `CHARDESC.byte33` — how many symbols of the spell being composed have been
+     * entered, 0..3, wrapping (`doc/CSBwin-src/CSBCode.cpp:8988`,
+     * `doc/CSBwin-src/Magic.cpp:814-816`). It indexes `incantation`, so this port keeps
+     * the array's length instead; the field is carried for the save writer, which
+     * cannot derive the wrap at four symbols.
+     */
+    incantationCursor?: ui8;
+    /** `CHARDESC.talents` — a `ui32` `AddCharacter` zeroes (`Character.cpp:510`). */
+    talents?: ui32;
+    /** `CHARDESC.causeOfDamage` — `enum COD`, what last hurt the champion. */
+    causeOfDamage?: ui16;
+    /** `CHARDESC.monsterCausingDamage` — which monster it was. */
+    monsterCausingDamage?: ui16;
+    /**
+     * `CHARDESC.load` — tenths of a kilogram, which CSBWin keeps incrementally at each
+     * of its eight possession writers. This port re-sums it instead
+     * (`CharacterStats.characterLoad`), so the field only carries what a save said.
+     */
+    load?: ui16;
     incantation: number[];     // Magic incantation bytes (ASCII)
     food: i16;                 // Signed food level (CSBWin uses negative for starving)
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)

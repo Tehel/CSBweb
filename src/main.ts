@@ -38,6 +38,9 @@ let crtController: CrtController | null = null;
 const dev = createDevTools({
     get game() { return game; },
     renderView,
+    // F5 packs a `CHARDESC` like any other save, and that needs graphic 26 for the
+    // champions who carry only a portrait index.
+    portraitOf: (champion) => renderer?.portraitPixelsFor(champion),
 });
 
 const GAME_DATA_DIR = '/gamefiles/dm-atari';
@@ -306,7 +309,12 @@ async function init() {
             renderer.setSaveHandlers({
                 onCreateSave: () => {
                     if (!game) throw new Error('NOTHING TO SAVE');
-                    const payload = buildSavePayload(game);
+                    // The portrait pixels for champions created in play come from the
+                    // renderer: `CHARDESC` holds the picture, and only this side has
+                    // graphic 26 to cut it from.
+                    const payload = buildSavePayload(game, {
+                        portraitOf: (champion) => renderer?.portraitPixelsFor(champion),
+                    });
                     return {
                         meta: {
                             name: makeSaveFileName(payload.header.savedAt),

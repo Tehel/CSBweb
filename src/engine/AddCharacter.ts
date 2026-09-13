@@ -9,6 +9,7 @@
 
 import { DBType, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
+import { CHARFLAG_MALE } from '../data/CsbwinCharacters';
 import type { Champion } from './gameTypes';
 import { makeAddCharacterAttributes } from './attributes';
 import { createSkillsFromSubskillLevels } from './skills';
@@ -242,6 +243,9 @@ export function createChampionFromPreset(
       wizard,
     },
     alive: true,
+    // `if (D0W == 'M') pcA3->charFlags |= CHARFLAG_male;` — and a hero whose gender
+    // letter is neither M nor F is rejected outright (`Character.cpp:591-600`).
+    charFlags: hero.gender === 'M' ? CHARFLAG_MALE : 0,
     portraitGraphic: hero.portraitIndex,
     incantation: [],
     food: 1500,

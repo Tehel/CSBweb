@@ -65,6 +65,9 @@ const CHECKS = [
   // The champions inside those saves: the whole CHARDESC, not just the name.
   { tool: 'dump-csbwin-party.ts' },
   { tool: 'dump-csbwin-load.ts' },
+  // Block 4 packed and held up against the real thing: every committed save's
+  // character block, written again from the champions it yields, byte for byte.
+  { tool: 'dump-character-block.ts' },
   // The portraits of a party read out of a CSBWin save, drawn into a real screen
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.

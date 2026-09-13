@@ -74,7 +74,9 @@ export interface SaveGameState {
    * `CHARDESC[4]` is 3200 bytes and the remaining 128 are party-wide state
    * (`Brightness`, `SeeThruWalls`, the shield timers, `PartyFootprints[24]`,
    * `Invisible`, …), bracketed in `doc/CSBwin-src/Data.h:765-783`. Handed over raw
-   * because nothing unpacks `CHARDESC` yet — see PLAN.md Phase 10.
+   * because it is the unit both halves work in: `src/data/CsbwinCharacters.ts`
+   * unpacks it on the way in and packs it on the way out, and `saveSaveGameState`
+   * writes whatever is here into block 4 verbatim.
    */
   characterBlock?: Uint8Array;
 }
@@ -1145,7 +1147,10 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     item16[base + 15] = rec.singleMonsterStatus[3] ?? 0;
   }
 
+  // Block 4, from `buildCsbwinCharacterBlock` if the caller packed one. It used to be
+  // 3328 zero bytes unconditionally — no champions, no party state at all.
   const character = new Uint8Array(CHARACTER_SIZE);
+  if (save.characterBlock) character.set(save.characterBlock.subarray(0, CHARACTER_SIZE));
 
   // The whole `TIMER`, in the form the header's flags declare. This used to write byte
   // 8-9 and nothing else, so a file this project wrote said when nothing was due.

@@ -24,11 +24,11 @@
 import type { Champion, PartyState, Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
 import type { i16, ui8, ui16, ObjectID } from '../core/types';
-import { CHARDESC_SIZE, decodeCharField } from './CsbwinSaveInfo';
+import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 
 /** `CHARFLAG_male` — `AddCharacter` ORs it in for an 'M' hero (`Character.cpp:596`). */
-const CHARFLAG_MALE = 0x10;
+export const CHARFLAG_MALE = 0x10;
 
 /** The seven `ATTRIBUTE` triples start here, three bytes each, `FILL91` after them. */
 const ATTRIBUTES_OFFSET = 70;
@@ -57,6 +57,7 @@ const u16be = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 8) | (b[o + 
 const i16be = (b: Uint8Array, o: number): number => (u16be(b, o) << 16) >> 16;
 const i32be = (b: Uint8Array, o: number): number =>
   (((b[o] ?? 0) << 24) | ((b[o + 1] ?? 0) << 16) | ((b[o + 2] ?? 0) << 8) | (b[o + 3] ?? 0)) | 0;
+const u32be = (b: Uint8Array, o: number): number => i32be(b, o) >>> 0;
 
 /** Everything in one `CHARDESC` that this port has somewhere to put. */
 export interface CsbwinCharacter {
@@ -157,6 +158,12 @@ function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
   return any ? pixels : undefined;
 }
 
+/** The live part of `incantation`: everything before the terminating zero. */
+function incantationPrefix(bytes: ui8[]): ui8[] {
+  const end = bytes.indexOf(0);
+  return end < 0 ? [...bytes] : bytes.slice(0, end);
+}
+
 /** One `CHARDESC`, at `index` within the block. */
 export function readCsbwinCharacter(
   block: Uint8Array,
@@ -166,6 +173,8 @@ export function readCsbwinCharacter(
   const base = index * CHARDESC_SIZE;
   const name = decodeCharField(block.subarray(base, base + 8));
   const title = decodeCharField(block.subarray(base + 8, base + 28));
+  const titleBytes = Array.from(block.subarray(base + 8, base + 28)) as ui8[];
+  const incantationBytes = Array.from(block.subarray(base + 34, base + 38)) as ui8[];
   const slots = readPossessions(block, base, objectIndex);
   const charFlags = i16be(block, base + 48);
   const maxHealth = i16be(block, base + 54);
@@ -173,6 +182,10 @@ export function readCsbwinCharacter(
   const champion: Champion = {
     name,
     title,
+    // The raw bytes as well, but only when they say more than `title` does — which is
+    // exactly the `\0HE DEVIL` case. Keeping them for every champion would be dead
+    // weight in the runtime save.
+    titleField: titleBytes.some((b, i) => b !== 0 && i >= title.length) ? titleBytes : undefined,
     attributes: {
       health: i16be(block, base + 52),
       maxHealth,
@@ -196,7 +209,18 @@ export function readCsbwinCharacter(
     facing: u8(block, base + 28) as 0 | 1 | 2 | 3,
     partyPosition: u8(block, base + 29) as ui8,
     attackType: i8(block, base + 32),
-    incantation: Array.from(block.subarray(base + 34, base + 38)).filter((c) => c !== 0),
+    // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:812`) — a C string, so the
+    // first zero ends it. This used to filter the zeros *out*, which resurrected the
+    // symbols a cast leaves behind it: `CastSpell` clears `incantation[0]` and nothing
+    // else (`:951`), so a champion who has just cast holds bytes like `00 69 6f 00` and
+    // was being restored with two runes pending that CSBWin does not see.
+    incantation: incantationPrefix(incantationBytes),
+    // The four bytes as they stand, when the tail past the terminator is not zero —
+    // dead to the game, but part of the file. The writer uses them only while they
+    // still agree with `incantation`; see `writeCsbwinCharacter`.
+    incantationField: incantationBytes.some((b, i) => b !== 0 && i >= incantationPrefix(incantationBytes).length)
+      ? incantationBytes
+      : undefined,
     damageFromDirection: u8(block, base + 40),
     maxRecentDamage: u8(block, base + 41),
     poisonCount: u8(block, base + 42),
@@ -215,6 +239,15 @@ export function readCsbwinCharacter(
     possessions: slots,
     shieldStrength: u16be(block, base + 274),
     fingerprint: u16be(block, base + 280) as ui16,
+    // Carried, not used: the save writer needs every field back, and these have no
+    // reader in the engine yet. `charFlags` is where the champion's gender lives.
+    charFlags,
+    timerIndex: i16be(block, base + 46),
+    incantationCursor: u8(block, base + 33),
+    talents: u32be(block, base + 276),
+    load: u16be(block, base + 272),
+    causeOfDamage: u16be(block, base + 282),
+    monsterCausingDamage: u16be(block, base + 284),
     // The champion's own copy of their portrait. Champions this port creates instead
     // carry `portraitGraphic`, the graphic-26 cell `AddCharacter` blitted from; a save
     // has only the pixels, and for an externally supplied portrait that is all there
@@ -257,6 +290,8 @@ export interface CsbwinPartyTail {
 }
 
 const TAIL = 4 * CHARDESC_SIZE;
+/** Block 4 in full: four `CHARDESC` and the party tail (`doc/CSBwin-src/Data.h:765`). */
+export const CHARACTER_BLOCK_SIZE = TAIL + 128;
 
 export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
   const footprints: number[] = [];
@@ -291,6 +326,200 @@ export function readCsbwinParty(
     if (character.occupied) out.push(character);
   }
   return out;
+}
+
+/* ===========================================================================
+ * The write side. Every function below is the exact inverse of the one above it.
+ * =========================================================================== */
+
+const setU16BE = (b: Uint8Array, o: number, v: number): void => {
+  b[o] = (v >> 8) & 0xff;
+  b[o + 1] = v & 0xff;
+};
+const setU32BE = (b: Uint8Array, o: number, v: number): void => {
+  b[o] = (v >>> 24) & 0xff;
+  b[o + 1] = (v >>> 16) & 0xff;
+  b[o + 2] = (v >>> 8) & 0xff;
+  b[o + 3] = v & 0xff;
+};
+
+/**
+ * Pack 32x29 palette indices back into the four interleaved bitplanes `CHARDESC` holds.
+ *
+ * The inverse of `readPortrait`, byte for byte. A champion the engine created has no
+ * pixels — it carries `portraitGraphic`, the graphic-26 cell, because the engine holds
+ * no graphics to blit from — so the caller must resolve that to pixels first (the
+ * renderer's `getPortraitBitmap` does it); here, a missing portrait writes 464 zero
+ * bytes, which is what CSBWin's own `ClearMemory` leaves for a slot nobody filled.
+ */
+export function writePortrait(block: Uint8Array, base: number, pixels?: ui8[]): void {
+  if (!pixels || pixels.length !== PORTRAIT_WIDTH * PORTRAIT_HEIGHT) return;
+  const at = base + PORTRAIT_OFFSET;
+  for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+    for (let group = 0; group * 16 < PORTRAIT_WIDTH; group++) {
+      const planes = [0, 0, 0, 0];
+      for (let bit = 0; bit < 16; bit++) {
+        const colour = pixels[y * PORTRAIT_WIDTH + group * 16 + bit] ?? 0;
+        for (let plane = 0; plane < 4; plane++) {
+          planes[plane] |= ((colour >> plane) & 1) << (15 - bit);
+        }
+      }
+      const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
+      for (let plane = 0; plane < 4; plane++) setU16BE(block, word + plane * 2, planes[plane]);
+    }
+  }
+}
+
+/** What the packer needs that a `Champion` does not carry. */
+export interface CsbwinCharacterWriteOptions {
+  /**
+   * `CHARDESC.load`, in tenths of a kilogram. CSBWin keeps it incrementally; this port
+   * re-sums it (`CharacterStats.characterLoad`), so a live game passes that function
+   * here. Without it the champion's own `load` is written — what the save it came from
+   * said — and failing that, 0.
+   */
+  load?: (champion: Champion) => number;
+  /**
+   * `CHARDESC.portrait` for a champion the engine created, which carries
+   * `portraitGraphic` and no pixels. A live game passes the renderer's cell lookup;
+   * without it such a champion is written with a blank portrait.
+   */
+  portraitOf?: (champion: Champion) => ui8[] | undefined;
+}
+
+/**
+ * One `CHARDESC`, packed into `block` at `index`.
+ *
+ * Every field `readCsbwinCharacter` reads is written back at the offset it was read
+ * from, plus the six that only the writer needs — `byte30`, `byte31`, `uByte43`, the
+ * three `FILL` runs — which CSBWin fills with constants:
+ * `pcA3->byte30 = 1; pcA3->byte31 = 2;` (`doc/CSBwin-src/Character.cpp:515-516`) over a
+ * record `ClearMemory` has zeroed (`:478`).
+ *
+ * **Possessions are written as this port holds them.** In a save they are indirect slot
+ * numbers resolved through `dataTypeMap`/`dataIndexMap` (`doc/PROVEN_FACTS.md` -> "An
+ * RN in a save file is an indirect index"), and building those maps is part of writing
+ * the dungeon image, which this port does not do yet. So a block written from a live
+ * game holds packed `[pos][db][idx]` ids and is not yet loadable by CSBWin; a block
+ * written from champions read *without* an object index round-trips byte for byte,
+ * which is what `tools/dump-character-block.ts` proves the packing with.
+ */
+export function writeCsbwinCharacter(
+  block: Uint8Array,
+  index: number,
+  champion: Champion,
+  options: CsbwinCharacterWriteOptions = {},
+): void {
+  const base = index * CHARDESC_SIZE;
+
+  block.set(encodeCharField(champion.name ?? '', 8), base);
+  // The raw bytes when the title carries more than its decoded string does — but only
+  // while the two still agree. A champion renamed since the save was read (the
+  // reincarnate screen does exactly that) must be written from the *string*, or the
+  // rename would be silently dropped. Same rule for the incantation below.
+  const title = champion.titleField;
+  if (title && title.length === 20 && decodeCharField(Uint8Array.from(title)) === (champion.title ?? '')) {
+    block.set(Uint8Array.from(title), base + 8);
+  } else {
+    block.set(encodeCharField(champion.title ?? '', 20), base + 8);
+  }
+
+  block[base + 28] = (champion.facing ?? 0) & 0xff;
+  block[base + 29] = champion.partyPosition & 0xff;
+  block[base + 30] = 1;
+  block[base + 31] = 2;
+  block[base + 32] = (champion.attackType ?? -1) & 0xff;
+  block[base + 33] = (champion.incantationCursor ?? (champion.incantation?.length ?? 0)) & 3;
+  const incantation = champion.incantationField;
+  const live = champion.incantation ?? [];
+  const keepRaw = incantation?.length === 4
+    && incantationPrefix(incantation).length === live.length
+    && incantationPrefix(incantation).every((b, i) => b === live[i]);
+  for (let i = 0; i < 4; i++) {
+    block[base + 34 + i] = ((keepRaw ? incantation![i] : live[i] ?? 0) ?? 0) & 0xff;
+  }
+  block[base + 40] = (champion.damageFromDirection ?? 0) & 0xff;
+  block[base + 41] = (champion.maxRecentDamage ?? 0) & 0xff;
+  block[base + 42] = (champion.poisonCount ?? 0) & 0xff;
+  setU16BE(block, base + 44, champion.busyTimerIndex ?? -1);
+  setU16BE(block, base + 46, champion.timerIndex ?? -1);
+  setU16BE(block, base + 48, champion.charFlags ?? 0);
+  setU16BE(block, base + 50, champion.wounds ?? 0);
+  setU16BE(block, base + 52, champion.attributes.health);
+  setU16BE(block, base + 54, champion.attributes.maxHealth);
+  setU16BE(block, base + 56, champion.attributes.stamina);
+  setU16BE(block, base + 58, champion.attributes.maxStamina);
+  setU16BE(block, base + 60, champion.attributes.mana);
+  setU16BE(block, base + 62, champion.attributes.maxMana);
+  setU16BE(block, base + 64, champion.attackStatModifier ?? 0);
+  setU16BE(block, base + 66, champion.food);
+  setU16BE(block, base + 68, champion.water);
+
+  for (let i = 0; i < 7; i++) {
+    const at = base + ATTRIBUTES_OFFSET + i * 3;
+    const stat = champion.attributes.stats[i];
+    block[at] = (stat?.maximum ?? 0) & 0xff;
+    block[at + 1] = (stat?.current ?? 0) & 0xff;
+    block[at + 2] = (stat?.minimum ?? 0) & 0xff;
+  }
+
+  for (let i = 0; i < 20; i++) {
+    const at = base + SKILLS_OFFSET + i * SKILL_SIZE;
+    setU16BE(block, at, champion.skills?.[i]?.tempAdjust ?? 0);
+    setU32BE(block, at + 2, champion.skills?.[i]?.experience ?? 0);
+  }
+
+  for (let i = 0; i < 30; i++) {
+    const slot = champion.possessions?.[i];
+    // `RNnul`, which is what every empty slot holds in all twelve committed saves.
+    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, typeof slot === 'number' ? slot : 0xffff);
+  }
+
+  setU16BE(block, base + 272, options.load?.(champion) ?? champion.load ?? 0);
+  setU16BE(block, base + 274, champion.shieldStrength ?? 0);
+  setU32BE(block, base + 276, champion.talents ?? 0);
+  setU16BE(block, base + 280, champion.fingerprint ?? 0);
+  setU16BE(block, base + 282, champion.causeOfDamage ?? 0);
+  setU16BE(block, base + 284, champion.monsterCausingDamage ?? 0);
+
+  writePortrait(block, base, champion.portrait ?? options.portraitOf?.(champion));
+}
+
+/** The 128 bytes after the four `CHARDESC`s. The inverse of `readCsbwinPartyTail`. */
+export function writeCsbwinPartyTail(block: Uint8Array, tail: CsbwinPartyTail): void {
+  setU16BE(block, TAIL + 0, tail.brightness);
+  block[TAIL + 2] = tail.seeThruWalls & 0xff;
+  block[TAIL + 3] = tail.magicFootprintsActive & 0xff;
+  setU16BE(block, TAIL + 4, tail.partyShield);
+  setU16BE(block, TAIL + 6, tail.fireShield);
+  setU16BE(block, TAIL + 8, tail.spellShield);
+  block[TAIL + 10] = tail.numFootprintEnt & 0xff;
+  block[TAIL + 11] = tail.freezeLifeTimer & 0xff;
+  block[TAIL + 12] = tail.indexOfFirstMagicFootprint & 0xff;
+  block[TAIL + 13] = tail.indexOfLastMagicFootprint & 0xff;
+  for (let i = 0; i < 24; i++) setU16BE(block, TAIL + 14 + i * 2, tail.footprints[i] ?? 0);
+  for (let i = 0; i < 24; i++) block[TAIL + 62 + i] = (tail.footprintAges[i] ?? 0) & 0xff;
+  block[TAIL + 86] = tail.invisible & 0xff;
+  // `Byte13195[41]` at 87..127 closes the block and is zero in every committed save.
+}
+
+/**
+ * The whole of block 4: `CHARDESC[4]` then the 128-byte party tail, 3328 bytes.
+ *
+ * Slots past the party are left as `ClearMemory` leaves them — 800 zero bytes — which
+ * is what `AddCharacter` guarantees and what every committed save holds.
+ */
+export function buildCsbwinCharacterBlock(
+  champions: Champion[],
+  tail: CsbwinPartyTail,
+  options: CsbwinCharacterWriteOptions = {},
+): Uint8Array {
+  const block = new Uint8Array(CHARACTER_BLOCK_SIZE);
+  for (let i = 0; i < Math.min(4, champions.length); i++) {
+    writeCsbwinCharacter(block, i, champions[i], options);
+  }
+  writeCsbwinPartyTail(block, tail);
+  return block;
 }
 
 export type { PartyState };

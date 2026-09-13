@@ -9,7 +9,7 @@
  */
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
-import type { PartyState } from '../engine/gameTypes';
+import type { Champion, PartyState } from '../engine/gameTypes';
 import type { FeedParameters } from '../engine/Feeding';
 import type { CharacterStats } from '../engine/CharacterStats';
 import type { MapData } from '../data/dungeonTypes';
@@ -98,6 +98,7 @@ import {
 import {
   drawHeldObjectName,
   drawPartyStatus,
+  getChampionPortrait,
 } from './ui/Character';
 import {
   drawMessageLines,
@@ -317,6 +318,20 @@ export class ViewportRenderer {
 
   handleSaveMenuWheel(delta: number): boolean {
     return saveMenuWheel(this.ui, delta);
+  }
+
+  /**
+   * `AddCharacter`'s portrait blit, deferred to save time.
+   *
+   * CSBWin copies a cell of basic graphic 26 into the character record the moment a
+   * champion joins (`doc/CSBwin-src/Character.cpp:486-495`), so `CHARDESC` always holds
+   * pixels. This engine holds no graphics, so a champion it created carries the cell
+   * *index* instead and the pixels are resolved here — the save writer asks for them
+   * when it packs block 4.
+   */
+  portraitPixelsFor(champion: Champion): number[] | undefined {
+    const bitmap = getChampionPortrait(this.ui, champion);
+    return bitmap ? Array.from(bitmap.pixels) : undefined;
   }
 
   setSaveHandlers(handlers: {

@@ -1809,3 +1809,69 @@ status box prefers them. `Champion.portraitGraphic` — the graphic-26 cell — 
 champions this engine creates, because the engine holds no graphics to blit from, but it
 is this port's shortcut and not a CSBWin field. A champion out of a genuine save has
 pixels and no index at all, which is why a loaded party once showed four empty boxes.
+
+## `CHARDESC.incantation` is a C string, and a cast leaves the rest of it behind
+
+The four bytes at offset 34 are the spell being composed. Every reader of them measures
+with `StrLen`: `D0W = StrLen((char *)pcA3->incantation); if (D0W == 0) return;`
+(`doc/CSBwin-src/Magic.cpp:812-813`). The writer maintains the terminator by hand —
+`pcA3->incantation[D7W] = D0B; pcA3->incantation[D7W + 1] = 0;`
+(`doc/CSBwin-src/CSBCode.cpp:8985-8986`) — and `byte33` at offset 33 is `D7W`, the cursor
+into it, wrapping at four.
+
+**What a cast leaves behind matters.** `CastSpell` clears only the first byte:
+
+```c
+    pcA3->incantation[0] = 0;
+    pcA3->byte33 = 0;
+```
+
+(`doc/CSBwin-src/Magic.cpp:951-952`), so the symbols after it stay in the record. Real
+saves hold exactly that: `00 69 6f 00` and `00 66 00 76` are both in the committed
+files. To CSBWin those are an *empty* incantation — `StrLen` stops at byte 0 — with two
+dead bytes trailing.
+
+This port read the field as "the non-zero bytes", which resurrected them: a champion
+restored from `csbgame4.dat` had two runes pending that the real game does not show.
+Fixed by reading the terminated prefix, as CSBWin does. The dead tail is kept separately
+(`Champion.incantationField`) only so the save writer can put the record back byte for
+byte; it is used only while it still agrees with the live prefix, so a rune typed after
+the load is never overwritten by it.
+
+<sub>Note the terminator write at `incantation[D7W + 1]` with `D7W == 3`: `incantation`
+is `i8[4]`, so that is a write to `FILL38[0]`. It is zero in every committed save, and
+this port writes zero there.</sub>
+
+## Packing `CHARDESC` back: the six fields with no reader
+
+Writing block 4 needs the whole 800-byte record, including what the game never reads
+back. Everything below is verified by `tools/dump-character-block.ts`, which packs the
+block again for each of the fourteen committed saves and compares with the file's own
+bytes — all fourteen are byte-identical, empty slots, dead incantation tails and all.
+
+| Offset | Field | What to write |
+| --- | --- | --- |
+| 30 | `byte30` | **1** — `pcA3->byte30 = 1;` (`doc/CSBwin-src/Character.cpp:515`) |
+| 31 | `byte31` | **2** — `pcA3->byte31 = 2;` (`:516`) |
+| 43 | `uByte43` | 0 |
+| 38-39, 91, 286-335 | the `FILL` runs | 0 — `ClearMemory((ui8 *)pcA3, 800)` (`:478`) |
+| 212-271 | an empty possession slot | **0xffff** (`RNnul`), in all 656 empty slots of the committed saves |
+| 3287-3327 | `Byte13195[41]`, the party tail's own filler | 0 |
+
+An unused champion slot is 800 zero bytes, not a record with zero fields: `AddCharacter`
+clears it before it writes anything, and a save holds whatever the last `RemoveCharacter`
+compaction left, which is zeros.
+
+Two more, which have readers but not in this port, so they are carried rather than
+derived: `timerIndex` at 46 (the timer that erases the damage readout over a portrait,
+`doc/CSBwin-src/CSBCode.cpp:7176-7190`, -1 in every committed save) and `charFlags` at 48,
+whose bit 4 is the champion's **gender** — the only place it is recorded.
+
+### `CHARDESC.load` agrees with this port's own sum
+
+CSBWin keeps `load` (offset 272) incrementally, adjusting it at each of its eight
+possession writers; this port re-sums it from the object weights instead
+(`src/engine/CharacterStats.ts`). For all **42 champions of the fourteen committed
+saves** the two agree exactly (`tools/dump-csbwin-load.ts`). That is the only outside
+check the weight system has: `WEAPONDESC`, the clothing and misc weight arrays, the
+water-flask rule and the recursion into chests all have to be right for it to hold.

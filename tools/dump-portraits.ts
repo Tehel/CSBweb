@@ -31,7 +31,13 @@ import { resolve } from 'node:path';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { Direction, Position } from '../src/core/types';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
-import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../src/data/CsbwinCharacters';
+import {
+  PORTRAIT_HEIGHT,
+  PORTRAIT_WIDTH,
+  readCsbwinCharacter,
+  writePortrait,
+} from '../src/data/CsbwinCharacters';
+import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -166,6 +172,19 @@ function main(): void {
   check(
     new Set(drawn).size > 2,
     'and that cell is a picture too',
+  );
+
+  // And the save writer's side of the same path. `CHARDESC` holds bitplanes, so a
+  // champion created in play — who carries the index — has their portrait resolved
+  // here and packed by `writePortrait`; `ViewportRenderer.portraitPixelsFor` is this
+  // lookup plus an `Array.from`. Pack the pixels and read them back.
+  const packed = new Uint8Array(CHARDESC_SIZE);
+  writePortrait(packed, 0, cell ? Array.from(cell.pixels) : undefined);
+  const unpacked = readCsbwinCharacter(packed, 0).champion.portrait ?? [];
+  check(
+    cell !== null && unpacked.length === cell.pixels.length &&
+      unpacked.every((v, i) => v === cell.pixels[i]),
+    'the cell packs into CHARDESC bitplanes and reads back unchanged',
   );
 
   finish();

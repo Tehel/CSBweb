@@ -70,8 +70,9 @@ Verified against the code, not inherited from earlier revisions of this file.
    the UI now lives in `src/renderer/ui/`.
 8. ⚠️ **CSBWin-binary-compatible save files** — the **reader is done**: twelve genuine
    saves in `static/gamefiles/saves/` load into a running game, party, world, objects
-   and all (Phase 10 step 12, September 13th). The *writer* still stops after block 6,
-   which is what is left of Phase 10.
+   and all (Phase 10 step 12, September 13th). The *writer* still stops after block 6 —
+   though block 4, the champions, is now packed byte-identically to the real thing
+   (step 6). The dungeon image is what is left of Phase 10.
 9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
    `supressPitDamage` now has something to suppress.
 
@@ -539,14 +540,36 @@ code in September 2026, and again on the 13th when step 12 landed:
   done, though not yet *serialized*. `src/engine/DungeonSnapshot.ts` captures exactly
   what blocks 7-14 carry, and the column-index fix closed the last gap in step 4. What
   remains for these is packing, not modelling.
-- Step 6 (character block) — ⚠️ **read, not written.** `CsbwinCharacters.ts` unpacks a
-  whole `CHARDESC` — stats, skills, wounds, the thirty possessions, the portrait — and
-  its title field is 20 bytes rather than the struct's 16 (`doc/PROVEN_FACTS.md`).
-  Nothing is packed. The portrait is the one field that needs a *codec* rather than a
-  field write: `readPortrait` unpacks the bitplanes and no encoder exists yet, so the
-  writer owes a `writePortrait` that repacks `Champion.portrait` into 464 bytes — and,
-  for a champion created in play, resolves `portraitGraphic` against graphic 26 first,
-  since the engine never filled the pixels in.
+- Step 6 (character block) — ✅ **done, September 13th.** `CsbwinCharacters.ts` packs a
+  whole `CHARDESC` as well as unpacking one — stats, skills, wounds, the thirty
+  possessions, the portrait bitplanes — plus the 128-byte party tail, and
+  `saveSaveGameState` writes the result into block 4 instead of 3328 zeros.
+  `tools/dump-character-block.ts` packs the block again for each of the fourteen
+  committed saves and compares it with the file's own bytes: **all fourteen are
+  byte-identical**, which is the same argument `dump-csbwin-save.ts` makes for the
+  reader — the bytes were written by CSBWin, so no bug symmetrical between our reader
+  and our writer can satisfy it.
+
+  Getting there needed six fields with no reader in this port, all now carried on
+  `Champion` (`doc/PROVEN_FACTS.md` → "Packing `CHARDESC` back"): `charFlags` — which is
+  where a champion's **gender** lives, and was being dropped entirely on load —
+  `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage` and `load`.
+  `AddCharacter` now sets `charFlags` from the hero's gender letter, as CSBWin does.
+
+  It also found a live reader bug: `CHARDESC.incantation` is a C string, and this port
+  read it as "the non-zero bytes", so the runes a cast leaves behind it came back as a
+  spell in progress (`doc/PROVEN_FACTS.md` → "`CHARDESC.incantation` is a C string").
+
+  **Still owed here:** the thirty possession slots are written as this port's packed
+  object ids. A file wants indirect slot numbers, and the maps that define them travel
+  with the dungeon image, which steps 3-5 have yet to write — so this is a dependency,
+  not a defect, and the byte-identical proof above is made on champions read *without*
+  an object index.
+
+  <sub>A free result along the way: `CHARDESC.load` as CSBWin stored it matches what
+  `CharacterStats.characterLoad` re-sums, for all 42 champions of the committed saves —
+  asserted in `tools/dump-csbwin-load.ts`, and the only outside check the weight tables
+  have.</sub>
 - Step 9 (checksum/scramble parity) — ✅ proven for blocks 0-6 in both directions, and
   now against files this project did not write.
 - Step 10 (round-trip validation) — ⚠️ half. `tools/dump-csbwin-save.ts` reads genuine

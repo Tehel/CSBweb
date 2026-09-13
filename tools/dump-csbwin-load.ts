@@ -287,6 +287,21 @@ function main(): void {
       check(cell >= 0, `${name}/${champion.name}: the portrait is a cell of basic graphic 26`);
     }
 
+    // `CHARDESC.load` against the port's own sum. CSBWin keeps the total incrementally
+    // at its eight possession writers; this port re-sums it from the object weights
+    // instead (`CharacterStats.characterLoad`, whose module comment says why). The two
+    // agreeing on every champion of every committed save is the only outside check
+    // there is on the weight tables — `WEAPONDESC`, the clothing and misc weight
+    // arrays, the water-flask rule and the recursion into chests — since nothing else
+    // in the repository knows what a real party weighs.
+    for (const champion of party.champions) {
+      check(
+        game.characterStats.characterLoad(champion) === champion.load,
+        `${name}/${champion.name}: the load this port re-sums is the one CSBWin stored ` +
+          `(${game.characterStats.characterLoad(champion)} vs ${champion.load})`,
+      );
+    }
+
     // And the round trip that a player actually performs: load a CSBWin save, then
     // quick-save and reload. The quick-save carries the world through
     // `DungeonSnapshot`, which is a hand-maintained list of what play can change

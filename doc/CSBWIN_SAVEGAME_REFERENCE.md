@@ -148,10 +148,15 @@ and checksummed file **prefix** and stops at the end of block 6. Of what it emit
 
 - blocks 1, 3 — complete.
 - block 2 — offsets 20, 22, 28 and 46 only; the other eighteen fields are zero.
-- block 4 — 3328 zero bytes. Nothing of the champions or the party state is written.
-  When it is, note that the last 464 bytes of each `CHARDESC` are the portrait bitmap
-  and must be re-packed into bitplanes; the reader unpacks them into `Champion.portrait`
-  but the encoder does not exist yet.
+- block 4 — **complete**, and byte-identical to the real thing:
+  `buildCsbwinCharacterBlock` packs `CHARDESC[4]` and the 128-byte party tail, portrait
+  bitplanes included, and `tools/dump-character-block.ts` writes the block again for each
+  of the fourteen committed saves and compares it with the file's own bytes. The one
+  reservation is the thirty possession slots: in a file they are indirect slot numbers
+  (see "Every object reference in a save is an indirect index"), and re-encoding them
+  needs the `dataTypeMap`/`dataIndexMap` that travel with the dungeon image, which the
+  writer does not produce yet — so a block packed from a *live* game holds this port's
+  packed `[pos][db][idx]` ids. Everything else is CSBWin's layout exactly.
 - block 5 — `timerWord8` (offset 8) of each record only; the rest of each `TIMER` is zero.
 - block 6 — zeros.
 - blocks 0 and 7-15 — not written at all.

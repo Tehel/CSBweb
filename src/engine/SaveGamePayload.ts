@@ -20,8 +20,10 @@
  */
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from '../data/CsbwinSaveGame';
+import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './Game';
+import type { Champion } from './gameTypes';
 
 /** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
 export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
@@ -81,7 +83,17 @@ export function makeSaveHeader(runtime: RuntimeSaveState): SaveHeader {
  * Build the save. The `SaveGameState` half mirrors what `LoadGame` reads back out of
  * `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1636-1637`).
  */
-export function buildSavePayload(game: Game): SavePayload {
+export interface SavePayloadOptions {
+    /**
+     * The portrait pixels of a champion who carries only `portraitGraphic` — every
+     * champion this engine created, since the engine holds no graphics to blit from.
+     * `ViewportRenderer.portraitPixelsFor` is the one the app passes; without it such a
+     * champion's `CHARDESC.portrait` is written blank.
+     */
+    portraitOf?: (champion: Champion) => number[] | undefined;
+}
+
+export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): SavePayload {
     const runtime = game.getRuntimeSaveState();
     const item16 = runtime.dungeon.item16 ?? [];
     const timers = runtime.dungeon.timers ?? [];
@@ -98,12 +110,56 @@ export function buildSavePayload(game: Game): SavePayload {
         extendedTimers: false,
         handChar: runtime.party.cursorOwner ?? -1,
         magicCaster: runtime.party.magicCasterIndex ?? -1,
+        characterBlock: buildCharacterBlock(game, runtime, options),
     };
     return {
         header: makeSaveHeader(runtime),
         runtime,
         raw: encodeBytesToBase64(saveSaveGameState(saveGameState)),
     };
+}
+
+/**
+ * Block 4 — `CHARDESC[4]` and the 128 bytes of party state beside them — packed out of
+ * the live party.
+ *
+ * The two things a `Champion` does not carry are supplied here, both from the running
+ * game: `CHARDESC.load`, which CSBWin keeps incrementally and this port re-sums
+ * (`CharacterStats.characterLoad`), and the portrait pixels for a champion the *engine*
+ * created, who carries `portraitGraphic` — a cell of basic graphic 26 — because the
+ * engine holds no graphics to blit from. `AddCharacter` blits that cell into the
+ * character record once (`doc/CSBwin-src/Character.cpp:486-495`); this is where the
+ * port finally does the same.
+ */
+function buildCharacterBlock(
+    game: Game,
+    runtime: RuntimeSaveState,
+    options: SavePayloadOptions,
+): Uint8Array {
+    const party = runtime.party;
+    const footprints = runtime.game.footprints;
+    return buildCsbwinCharacterBlock(
+        party.champions ?? [],
+        {
+            brightness: party.brightness ?? 0,
+            seeThruWalls: party.seeThruWalls ?? 0,
+            magicFootprintsActive: party.magicFootprintsActive ?? 0,
+            partyShield: party.partyShield ?? 0,
+            fireShield: party.fireShield ?? 0,
+            spellShield: party.spellShield ?? 0,
+            numFootprintEnt: footprints?.count ?? party.numFootprintEnt ?? 0,
+            freezeLifeTimer: party.freezeLifeTimer ?? 0,
+            indexOfFirstMagicFootprint: party.indexOfFirstMagicFootprint ?? 0,
+            indexOfLastMagicFootprint: party.indexOfLastMagicFootprint ?? 0,
+            footprints: footprints?.prints ?? [],
+            footprintAges: footprints?.ages ?? [],
+            invisible: party.invisible ?? 0,
+        },
+        {
+            load: (champion) => game.characterStats?.characterLoad(champion) ?? champion.load ?? 0,
+            portraitOf: (champion) => options.portraitOf?.(champion),
+        },
+    );
 }
 
 export class SavePayloadError extends Error {}
