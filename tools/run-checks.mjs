@@ -69,11 +69,42 @@ const CHECKS = [
   // Block 4 packed and held up against the real thing: every committed save's
   // character block, written again from the champions it yields, byte for byte.
   { tool: 'dump-character-block.ts' },
+  // Every block the writer emits, held up against the bytes CSBWin wrote — the same
+  // argument as above, widened from block 4 to blocks 2, 3, 5 and 6, which were marked
+  // complete and had never been compared with a real file.
+  { tool: 'dump-save-blocks-vs-file.ts' },
+  // The same for the whole dungeon image — blocks 7 to 15 — against both dungeon.dat and
+  // every committed save. Six of the eight sections are byte-identical; blocks 10 and 13
+  // are full of RNs, whose slot numbering is ours, so their non-RN bytes are compared and
+  // their RNs resolved. It found thirteen fields the loader was dropping and the whole of
+  // EXPOOL, which had no parser at all.
+  { tool: 'dump-dungeon-image-blocks.ts' },
+  // The three conversions `ReadDatabases` runs over an original dungeon, measured
+  // against a dungeon CSBWin converted itself: every committed save was made from this
+  // same dungeon.dat, so its converted form is sitting in fourteen files. Without them a
+  // game started from dungeon.dat holds a world no save file can express.
+  { tool: 'dump-dungeon-conversions.ts' },
+  // The other half of that argument: a genuine save re-serialised in full — all sixteen
+  // blocks, image and closing checksum — and read back by this port's own reader. It is
+  // what covers the words the block-by-block comparisons have to hold out, by showing
+  // they still name the right objects after a whole trip through the file format.
+  { tool: 'dump-save-file-roundtrip.ts' },
+  // And the live half of that: a running game — played from dungeon.dat, and played on
+  // from a genuine save — writes all sixteen blocks through `buildSavePayload`, and the
+  // file loads back into a fresh game with the world, the party, the thrown object in
+  // flight and the object on the cursor intact.
+  { tool: 'dump-live-save-file.ts' },
   // The portraits of a party read out of a CSBWin save, drawn into a real screen
   // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
   // (which only ever see an injected party) cover the other path entirely.
   { tool: 'dump-portraits.ts' },
   { tool: 'dump-csbwin-timers.ts' },
+  // Our *own* save file, the JSON payload F5/F9 and both stores of the disk menu write.
+  // Nothing exercised `buildSavePayload`/`applySavePayload` before: `dump-savegame.ts`
+  // drives the runtime snapshot directly and the `dump-csbwin-*` tools drive the reader,
+  // so the layer in between had no evidence behind it — which is how a timer-table leak
+  // of two slots per save/load cycle went unnoticed.
+  { tool: 'dump-save-roundtrip.ts' },
   // The save/load screen: the button-table offsets it hangs off, the list panel built
   // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.

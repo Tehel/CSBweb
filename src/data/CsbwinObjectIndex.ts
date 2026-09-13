@@ -56,8 +56,9 @@
  *   it is rare — but where it happens, two RNs that CSBWin tells apart become one RN
  *   here. `countAliases` reports it; nothing in the shipped dungeon triggers it.
  */
-import { encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../core/types';
+import { DBType as DBTypeEnum, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../core/types';
 import type { DBType, TilePosition, ui16 } from '../core/types';
+import type { Databases, DungeonData } from './dungeonTypes';
 
 /**
  * The lowest `RNVAL`. Everything from here up is a literal, not a slot number:
@@ -137,6 +138,18 @@ export function readObjectIndirectIndex(
         indexMap[i] = (indexBytes[i * 2] ?? 0) | ((indexBytes[i * 2 + 1] ?? 0) << 8);
     }
 
+    return makeObjectIndirectIndex(typeMap, indexMap);
+}
+
+/**
+ * The read half of an index, over two maps that are already in hand — whether they were
+ * read from a file or built by `buildObjectIndirectIndex`.
+ */
+function makeObjectIndirectIndex(
+    typeMap: Uint8Array,
+    indexMap: Uint16Array,
+): CsbwinObjectIndex {
+    const dataMapLength = typeMap.length;
     return {
         length: dataMapLength,
         typeMap,
@@ -177,4 +190,147 @@ export function readObjectIndirectIndex(
 /** The two values a chain or a possession slot uses for "nothing here". */
 export function isEmptyObjectReference(rn: number): boolean {
     return rn === OBJECT_ID_NULL || rn === OBJECT_ID_EOF;
+}
+
+/**
+ * The map slot of one record, and a slot's contents. `buildObjectIndirectIndex`'s output.
+ */
+export interface CsbwinObjectIndexWriter extends CsbwinObjectIndex {
+    /**
+     * One packed RN as the slot number a file wants. `RNVAL`s (0xff00 and up — the spell
+     * literals, `RNeof`, `RNnul`) and `RNempty` pass through untouched, exactly as
+     * `CsbwinObjectIndex.resolve` passes them the other way.
+     *
+     * Throws for a reference to a record no database holds, which is a corrupt world
+     * rather than an encodable one.
+     */
+    encode(rn: ui16): ui16;
+}
+
+/** Which databases this port carries records for, in `DBType` order. */
+const WRITABLE_DATABASES: ReadonlyArray<{ db: DBType; key: keyof Databases }> = [
+    { db: DBTypeEnum.DOOR, key: 'doors' },
+    { db: DBTypeEnum.TELEPORTER, key: 'teleporters' },
+    { db: DBTypeEnum.TEXT, key: 'texts' },
+    { db: DBTypeEnum.ACTUATOR, key: 'actuators' },
+    { db: DBTypeEnum.CREATURE, key: 'creatures' },
+    { db: DBTypeEnum.WEAPON, key: 'weapons' },
+    { db: DBTypeEnum.CLOTHING, key: 'clothing' },
+    { db: DBTypeEnum.SCROLL, key: 'scrolls' },
+    { db: DBTypeEnum.POTION, key: 'potions' },
+    { db: DBTypeEnum.CHEST, key: 'containers' },
+    { db: DBTypeEnum.MISC, key: 'misc' },
+    { db: DBTypeEnum.MISSILE, key: 'missiles' },
+    { db: DBTypeEnum.CLOUD, key: 'clouds' },
+];
+
+/**
+ * Build the two maps a save's Extended Features block carries, for a world this port
+ * holds in memory.
+ *
+ * CSBWin builds them once, when an *original* dungeon is read: `ConvertListOfObjects`
+ * walks every chain, appends `(pos, db, idx)` to the maps and overwrites each packed RN
+ * with the slot number (`doc/CSBwin-src/SaveGame.cpp:1916-2018`). After that the maps are
+ * the authority and `AllocateIndirectIndex` extends them one slot at a time
+ * (`:2100-2140`). This port keeps packed RNs instead and so has to produce the maps at
+ * write time; the numbering it chooses is its own, which is allowed — nothing outside
+ * the file refers to a slot number, so a save only has to agree with itself.
+ *
+ * The scheme, and why:
+ *
+ * - **Slot 0 is left free.** `ConvertListOfObjects` starts at 1 with the comment "Don't
+ *   use entry zero" (`:1968-1973`), because `RNempty` is 0 and would otherwise name a
+ *   real object.
+ * - **Every record of every database gets a slot**, live or free, in `DBType` then index
+ *   order. CSBWin allocates only for objects it can reach and leaves 0xff/0xffff holes
+ *   where one has since been destroyed; both shapes read identically, and giving each
+ *   record a slot makes `encode` a pure function of `(db, idx)` — which is what lets a
+ *   reference be written without first walking every chain to discover it.
+ * - **The position rides in `dataTypeMap`, not in the slot number.** `RN::pos(p)` writes
+ *   `dataTypeMap[indirectIndex]` in place (`doc/CSBwin-src/CSBTypes.h:336-342`), so a
+ *   record has exactly one slot however often it moves within its cell, and
+ *   `ConvertListOfObjects` forbids two slots naming one `(db, idx)` except for a
+ *   missile's flying object. A pre-pass over every reference in the world therefore
+ *   fixes each record's position; a record nothing refers to keeps 0.
+ *
+ * `heldReferences` is the rest of that pre-pass, and it is not optional for a file that
+ * has to load: CSBWin converts the cell chains first (`:2736`), then the object-carrying
+ * timers (`ConvertTimers`, `:2745`), then the thirty possession slots of every champion
+ * (`ConvertCharacters`, `:2746`), and finally `d.objectInHand` (`:2760`) — and each of
+ * those records the reference's **position** into `dataTypeMap` exactly as a cell chain
+ * does. An object a champion is carrying is in no chain at all, so without this pass its
+ * slot keeps position 0 and the possession slot comes back naming the same record in the
+ * wrong corner of its cell. Pass the references in CSBWin's order; the last writer wins,
+ * which matches because no object is reachable from two of them.
+ */
+export function buildObjectIndirectIndex(
+    dungeon: DungeonData,
+    heldReferences: Iterable<number> = [],
+): CsbwinObjectIndexWriter {
+    // Slot numbers, by (db, idx). One pass to lay them out.
+    const slotOf = new Map<number, number>();
+    const key = (db: number, idx: number) => (db << 16) | idx;
+
+    let slots = 1; // slot 0 stays free
+    for (const { db, key: dbKey } of WRITABLE_DATABASES) {
+        const records = dungeon.databases[dbKey]?.records ?? [];
+        for (let i = 0; i < records.length; i++) slotOf.set(key(db, i), slots++);
+    }
+
+    const typeMap = new Uint8Array(slots).fill(0xff);
+    const indexMap = new Uint16Array(slots).fill(0xffff);
+    for (const { db, key: dbKey } of WRITABLE_DATABASES) {
+        const records = dungeon.databases[dbKey]?.records ?? [];
+        for (let i = 0; i < records.length; i++) {
+            const slot = slotOf.get(key(db, i))!;
+            typeMap[slot] = db & 0x0f;
+            indexMap[slot] = i & 0xffff;
+        }
+    }
+
+    // The pre-pass: every reference in the world, so each record's `pos` is the one its
+    // own RN carries. `notePosition` is deliberately last-writer-wins — an object appears
+    // in exactly one chain, and a free record's stale references are ignored below.
+    const notePosition = (rn: number): void => {
+        if (rn === RN_EMPTY || rn >= RN_LITERAL_FLOOR) return;
+        const { position, category, index } = decodeObjectID(rn);
+        const slot = slotOf.get(key(category, index));
+        if (slot === undefined) return;
+        typeMap[slot] = ((position & 3) << 4) | (category & 0x0f);
+    };
+    for (const rn of dungeon.objectList) notePosition(rn);
+    for (const { key: dbKey } of WRITABLE_DATABASES) {
+        for (const record of dungeon.databases[dbKey]?.records ?? []) {
+            const link = (record as { nextObject?: number }).nextObject;
+            if (link === undefined) continue;
+            notePosition(link);
+            // A free record's other references are stale by design — `DeleteDBEntry`
+            // writes `RNnul` over the link and leaves the rest (`data.cpp:993-1015`) —
+            // so they must not move a live record's position.
+            if (link === OBJECT_ID_NULL) continue;
+            const other = record as { containedObject?: number; possession?: number; projectileObject?: number };
+            if (other.containedObject !== undefined) notePosition(other.containedObject);
+            if (other.possession !== undefined) notePosition(other.possession);
+            if (other.projectileObject !== undefined) notePosition(other.projectileObject);
+        }
+    }
+    for (const rn of heldReferences) notePosition(rn);
+
+    return {
+        ...makeObjectIndirectIndex(typeMap, indexMap),
+        encode(rn: ui16): ui16 {
+            const value = rn & 0xffff;
+            if (value === RN_EMPTY) return RN_EMPTY;
+            if (value >= RN_LITERAL_FLOOR) return value;
+            const { category, index } = decodeObjectID(value);
+            const slot = slotOf.get(key(category, index));
+            if (slot === undefined) {
+                throw new Error(
+                    `object reference ${value} names ${DBTypeEnum[category] ?? category}[${index}], ` +
+                    'which no database holds',
+                );
+            }
+            return slot;
+        },
+    };
 }

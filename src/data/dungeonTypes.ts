@@ -21,7 +21,13 @@ import type {
 export interface DungeonHeader {
     randomSeed: ui16;           // 0x00: Dungeon ID (99=DM, 13=CSB, 8=CSB Prison)
     mapDataSize: ui16;          // 0x02: Total map data size in bytes
-    numMaps: ui8;               // 0x04: Number of maps/levels
+    numMaps: ui8;               // 0x04: Number of maps/levels — BITS8_15(word4)
+    /**
+     * The low byte of `DUNGEONDATINDEX::word4`, which CSBWin names nothing and reads
+     * nowhere (`doc/CSBwin-src/CSB.h:2057-2068`). Zero in `dungeon.dat` and in every
+     * committed save; kept so the header can be written back as it was read.
+     */
+    word4Low: ui8;
     textDataSize: ui16;         // 0x06: Text data size in words
     startPosition: Position;    // 0x08: Party start position (decoded)
     facing: Direction;
@@ -36,6 +42,13 @@ export interface DungeonHeader {
 export interface MapDescriptor {
     mapIndex: ui8;              // Map index (0-based)
     dataOffset: ui16;           // Offset in map data section
+    /**
+     * `LEVELDESC.FILL2[4]` (`doc/CSBwin-src/CSB.h:2092`) — four bytes between the cell
+     * offset and `offsetX` that CSBWin names nothing and never swaps. Zero in
+     * `dungeon.dat` and in every committed save, and kept only so that a descriptor can
+     * be written back as it was read; do not invent a meaning for it.
+     */
+    fill2: ui8[];
     offsetX: ui8;               // Map offset X in dungeon
     offsetY: ui8;               // Map offset Y in dungeon
     level: ui8;                 // Level number (0-63)
@@ -52,6 +65,13 @@ export interface MapDescriptor {
     difficulty: ui8;            // Map difficulty/depth (0-15)
     creatureTypesAllowed: ui8;  // Creature types bitmask
     doorDecorationCount: ui8;
+    /**
+     * `word12` bits 8-11. CSBWin declares accessors for bits 0-3 (`NumDoorDecorations`),
+     * 4-7 (`numMonsterType`) and 12-15 (`experienceMultiplier`) and none for these
+     * (`doc/CSBwin-src/CSB.h:2104-2126`) — but they are **not** zero in the data: the
+     * fourteen DM levels carry 0, 1, 3 and 4 between them. Preserved, unread.
+     */
+    word12Bits8_11: ui8;
 
     // Door and graphics indices
     doorType0Index: ui8;
@@ -97,6 +117,13 @@ export interface DoorRecord {
     vertical: boolean;          // bit 5: 0=horizontal, 1=vertical
     ornateNumber: ui8;          // bits 4-1
     doorType: ui8;              // bit 0: 0 or 1
+    /**
+     * `word2` bits 9-15, which `DB0` marks `????` and declares no accessor for
+     * (`doc/CSBwin-src/CSB.h:822-829`). Zero in `dungeon.dat` and in all fourteen
+     * committed saves, but not derivable from anything else, so it is carried rather
+     * than assumed. Absent on a record this engine created.
+     */
+    word2Bits9_15?: ui16;
 }
 
 /**
@@ -111,6 +138,12 @@ export interface TeleporterRecord {
     destX: ui8;                 // bits 9-5
     destY: ui8;                 // bits 4-0
     destMap: ui8;               // +0x04 bits 15-8
+    /**
+     * The low byte of `word4`. `DB1` names only `destLevel()` = `BITS8_15(word4)`
+     * (`doc/CSBwin-src/CSB.h:863-870`); bits 0-7 have no accessor. Zero everywhere
+     * measured, carried so the record can be written back as it was read.
+     */
+    word4Low?: ui8;
 }
 
 /**
@@ -118,9 +151,25 @@ export interface TeleporterRecord {
  */
 export interface TextRecord {
     nextObject: ObjectID;       // +0x00
-    textOffset: ui16;           // +0x02 bits 15-3 (offset in words)
+    /**
+     * `DB2::index()` — `word2` bits 3-15 (`doc/CSBwin-src/CSB.h:988-1002`). **One word
+     * with two meanings**, exactly as CSBWin has it: a word offset into `textWords`
+     * before `ConvertToIndirectText` has run, an entry number in `indirectTextIndex`
+     * after. `textStart` (`src/data/CsbwinDungeonConversions.ts`) is the one place that
+     * tells the two apart; nothing else may read this and assume either.
+     *
+     * It used to be shadowed by a second field, `textIndex`, which the conversion set
+     * and left `textOffset` alone. That made a genuine save's text undecodable — a save
+     * arrives already converted, so `textIndex` was never set for one and the fallback
+     * read the entry number as a word offset.
+     */
+    textOffset: ui16;           // +0x02 bits 15-3
     visible: boolean;           // bit 0
-    textIndex?: ui16;           // CSBWin indirect text index (post-conversion)
+    /**
+     * `word2` bits 1-2. `DB2` accesses bit 0 (`show`) and bits 3-15 (`index`) and
+     * nothing between (`doc/CSBwin-src/CSB.h:990-1002`). Zero everywhere measured.
+     */
+    word2Bits1_2?: ui8;
 }
 
 /**
@@ -171,6 +220,15 @@ export interface CreatureRecord {
     drawAsSize4: boolean;       // bit 12 (gated on the DrawAsSize4Monsters option)
     unique: boolean;            // bit 13: the designer tracks this monster by its ID
     poisoned: boolean;          // bit 14: DSAs only
+    /**
+     * `word14` bits 4, 7 and 15 — the three `DB4` declares no accessor for
+     * (`doc/CSBwin-src/CSB.h:1096-1139`, which names bits 0-3, 5-6 and 8-14). Bits 4
+     * and 7 are **not** zero: `dungeon.dat`'s `creature[38]` holds `word14 = 0x490`,
+     * and so does every save that still carries it. Nothing here reads them.
+     */
+    word14Bit4?: ui8;
+    word14Bit7?: ui8;
+    word14Bit15?: ui8;
 }
 
 /**
@@ -197,6 +255,11 @@ export interface ClothingRecord {
     cursed: boolean;            // bit 8
     important: boolean;         // bit 7
     clothingType: ui8;          // bits 6-0
+    /**
+     * `word2` bits 14-15, unnamed in `DB6` (`doc/CSBwin-src/CSB.h:1176-1192`).
+     * Zero everywhere measured.
+     */
+    word2Bits14_15?: ui8;
 }
 
 /**
@@ -206,6 +269,25 @@ export interface ScrollRecord {
     nextObject: ObjectID;       // +0x00
     open: boolean;              // +0x02 bits 15-10: 0=open, 1=closed
     textReference: ui16;        // bits 9-0
+    /**
+     * The whole `DB7::m_RNtext` of the six-byte form (`doc/CSBwin-src/CSB.h:1195-1216`),
+     * where `textReference` keeps only its record index. Absent in the four-byte form,
+     * which has no RN at all.
+     */
+    textObject?: ObjectID;
+    /**
+     * Six-byte form: `m_word4` bits 1-15, which the struct comment calls "unused" and
+     * `convertScrolls` never initialises — it writes bit 0 alone over whatever the
+     * record already held (`doc/CSBwin-src/SaveGame.cpp:2144-2166`), so these bits are
+     * allocation debris and carry arbitrary values in a genuine save. Carried verbatim.
+     */
+    word4Bits1_15?: ui16;
+    /**
+     * Four-byte form: `word2` bits 10-15, the old scroll's `b10_15()`
+     * (`doc/CSBwin-src/CSB.h:1199-1206`). `open` is `b10_15 == 0`, so the six bits are
+     * not recoverable from it; `dungeon.dat` has records with bit 10 set.
+     */
+    word2Bits10_15?: ui8;
 }
 
 /**
@@ -225,6 +307,14 @@ export interface ContainerRecord {
     nextObject: ObjectID;       // +0x00
     containedObject: ObjectID;  // +0x02: First object inside
     containerType: ui8;         // +0x04 bits 2-1: 0=chest
+    /**
+     * The whole `DB9::m_word4` (`doc/CSBwin-src/CSB.h:1250-1263`), of which
+     * `containerType` is bits 1-2. The other bits are not zero — bits 0 and 3-7 are
+     * used across `dungeon.dat` and the saves — and CSBWin names none of them.
+     */
+    word4?: ui16;
+    /** `DB9::m_uByte6[2]`, the two bytes that close the eight-byte record. */
+    uByte6?: ui8[];
 }
 
 /**
@@ -235,6 +325,10 @@ export interface MiscRecord {
     specialState: ui8;          // +0x02 bits 15-14 (waterskin/compass)
     important: boolean;         // bit 7
     miscType: ui8;              // bits 6-0
+    /** `DB10::cursed()` — bit 8 (`doc/CSBwin-src/CSB.h:1300-1301`). Nothing reads it here. */
+    cursed?: boolean;
+    /** `DB10::subType()` — bits 9-13 (`doc/CSBwin-src/CSB.h:1304-1305`). */
+    subType?: ui8;
 }
 
 /**
@@ -444,9 +538,31 @@ export interface DungeonData {
     item16?: Item16Record[];    // Save-game runtime monster state
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
     dsaIndex?: DsaIndex;        // Extended-feature DSA programs (DSAIndex)
+    /**
+     * Database 11 — `EXPOOL` — exactly as it sits in the file: `objectCounts[11]`
+     * blocks of 256 bytes (`DB11`, `doc/CSBwin-src/CSB.h:1307-1315`). This port has no
+     * parser for it and reads nothing out of it here; `parseSpecialLocationsFromSaveData`
+     * hashes its own copy straight out of the save. It is kept whole so a save can be
+     * written back with the EXPOOL it was read with — including the DSA global variables
+     * and the 24 overlay palette records `SaveGame` deposits there just before the image
+     * (`doc/CSBwin-src/SaveGame.cpp:1141-1162`), which this port does not maintain.
+     */
+    expool?: Uint8Array;
     specialLocations?: Record<number, number>; // EXPOOL special locations (EDT_SpecialLocations)
     extendedWallDecorations?: boolean; // Extended-feature flag
-    bigActuators?: boolean;     // Extended-feature flag
+    /**
+     * The three shape flags, all of them set by `convertOriginalDungeon`
+     * (`src/data/CsbwinDungeonConversions.ts`) or by a save load. Together they say
+     * whether this world is `dungeon.dat`-shaped or save-shaped, which is what the
+     * image writer and the Extended Features header both have to declare.
+     *
+     * `bigActuators` — ACTUATOR records carry `word8` (`EF_FLAGS.BigActuators`).
+     */
+    bigActuators?: boolean;
+    /** The text is an indirect index + compressed text (`EF_FLAGS.IndirectText`). */
+    indirectText?: boolean;
+    /** SCROLL records are six bytes with an RN (`ExtendedFeaturesVersion >= 'B'`). */
+    newScrolls?: boolean;
     spellFilterLocation?: number; // Extended-feature spell filter location
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }

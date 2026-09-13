@@ -385,6 +385,18 @@ export interface CsbwinCharacterWriteOptions {
    * without it such a champion is written with a blank portrait.
    */
   portraitOf?: (champion: Champion) => ui8[] | undefined;
+  /**
+   * One packed RN as the indirect slot number a file wants — the inverse of the
+   * `objectIndex.resolve` the reader applies to the same thirty words
+   * (`doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect index"). A live game
+   * passes `buildObjectIndirectIndex(dungeon).encode`, and it must be the **same** index
+   * whose maps go into block 0 and whose slot numbers go into the dungeon image.
+   *
+   * Without it the slots are written as this port's packed `[pos][db][idx]` ids, which
+   * is what `tools/dump-character-block.ts` compares against a file byte for byte —
+   * that tool reads its champions without an index, so the two forms coincide.
+   */
+  encodeRN?: (rn: number) => number;
 }
 
 /**
@@ -396,13 +408,14 @@ export interface CsbwinCharacterWriteOptions {
  * `pcA3->byte30 = 1; pcA3->byte31 = 2;` (`doc/CSBwin-src/Character.cpp:515-516`) over a
  * record `ClearMemory` has zeroed (`:478`).
  *
- * **Possessions are written as this port holds them.** In a save they are indirect slot
- * numbers resolved through `dataTypeMap`/`dataIndexMap` (`doc/PROVEN_FACTS.md` -> "An
- * RN in a save file is an indirect index"), and building those maps is part of writing
- * the dungeon image, which this port does not do yet. So a block written from a live
- * game holds packed `[pos][db][idx]` ids and is not yet loadable by CSBWin; a block
- * written from champions read *without* an object index round-trips byte for byte,
- * which is what `tools/dump-character-block.ts` proves the packing with.
+ * **Possessions go out through `options.encodeRN`.** In a save the thirty slots are
+ * indirect slot numbers resolved through `dataTypeMap`/`dataIndexMap`
+ * (`doc/PROVEN_FACTS.md` -> "An RN in a save file is an indirect index"), so a caller
+ * writing a real file passes `buildObjectIndirectIndex(dungeon).encode` — the same index
+ * whose maps go into block 0 and whose numbering the dungeon image uses. Left out, the
+ * slots are written as this port's packed `[pos][db][idx]` ids, which is the right thing
+ * for a block whose champions were read without an index: it round-trips byte for byte,
+ * and that is what `tools/dump-character-block.ts` proves the packing with.
  */
 export function writeCsbwinCharacter(
   block: Uint8Array,
@@ -472,7 +485,8 @@ export function writeCsbwinCharacter(
   for (let i = 0; i < 30; i++) {
     const slot = champion.possessions?.[i];
     // `RNnul`, which is what every empty slot holds in all twelve committed saves.
-    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, typeof slot === 'number' ? slot : 0xffff);
+    const rn = typeof slot === 'number' ? slot : 0xffff;
+    setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
   }
 
   setU16BE(block, base + 272, options.load?.(champion) ?? champion.load ?? 0);

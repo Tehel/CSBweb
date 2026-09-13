@@ -1,0 +1,252 @@
+/**
+ * Every block the writer emits, held up against the bytes CSBWin wrote.
+ *
+ * `tools/dump-savegame-blocks.ts` round-trips blocks 1-6 through this port's own reader
+ * and writer, which on its own proves nothing — it is the trap that tool was written to
+ * document. This is the other argument, the one `tools/dump-character-block.ts` makes
+ * for block 4: take a **genuine** save, parse it, write the blocks again from what came
+ * out, and compare with the file's own bytes. No bug symmetrical between our reader and
+ * our writer can satisfy it, because CSBWin wrote the bytes.
+ *
+ * The comparison is made on the *scrambled* bytes, straight out of both files, which is
+ * legitimate because `SaveGame` writes zero for all five block hashes
+ * (`doc/CSBwin-src/SaveGame.cpp:1063-1067`) and so does `saveSaveGameState`: with the
+ * same hash the keystream is the same, so equal plaintext is equal ciphertext and a
+ * diff is a diff either way.
+ *
+ * Block 0 is compared too, and it is where the `at` cursor starts: it is variable-length
+ * (512 bytes plus three per object-index slot plus the DSAs, the game info and the DSA
+ * level index), so getting its length wrong moves every block after it.
+ *
+ * Three things are **reported and not asserted**, each for a stated reason:
+ *
+ * - **Block 1** carries `RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount`
+ *   and `Word22592`/`Word22594`, none of which this port models. See `PLAN.md` Phase 10.
+ * - **`TIMER.unused13[3]`** in a slot that is *not* live. The three padding bytes hold
+ *   0xcd in every slot CSBWin has ever put a timer in and 0 in every slot it has not
+ *   (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is 0xcd in a slot that has been used"),
+ *   which is a high-water mark of allocation this port does not keep. A slot that is
+ *   live now *is* asserted, padding included.
+ * - **The timer queue past `NumTimer`.** CSBWin writes `MaxTimer` words and only the
+ *   first `NumTimer` mean anything; the rest are what a longer queue left behind. The
+ *   live prefix is asserted.
+ *
+ * Run: `npx tsx tools/dump-save-blocks-vs-file.ts [path-or-directory]`
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+
+import { loadSaveGameState, saveSaveGameState } from '../src/data/SaveGameLoader';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { buildObjectIndirectIndex, formChecksum, readObjectIndirectIndex } from '../src/data/CsbwinObjectIndex';
+import { OBJECT_ID_NULL } from '../src/core/types';
+import { check, finish } from './lib/check';
+
+const DEFAULT_DIR = 'static/gamefiles/saves';
+
+const BLOCK1_SIZE = 512;
+const BLOCK2_SIZE = 128;
+const CHARACTER_SIZE = 3328;
+
+/** Which `GAMEBLOCK2` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:107-133`). */
+const BLOCK2_FIELDS: Array<[number, number, string]> = [
+  [0, 4, 'Time'], [4, 8, 'ranseed'], [8, 10, 'ObjectInHand'], [10, 12, 'numcharacter'],
+  [12, 14, 'partyx'], [14, 16, 'partyy'], [16, 18, 'partyfacing'], [18, 20, 'partyLevel'],
+  [20, 22, 'handChar'], [22, 24, 'MagicCaster'], [24, 26, 'NumTimer'],
+  [26, 28, 'FirstAvailTimer'], [28, 30, 'MaxTimers'], [30, 32, 'ITEM16QueLen'],
+  [32, 36, 'LastMonsterAttackTime'], [36, 40, 'LastPartyMoveTime'],
+  [40, 42, 'partyMoveDisableTimer'], [42, 44, 'Word11712'], [44, 46, 'Word11714'],
+  [46, 48, 'MaxITEM16'], [48, 50, 'TimerSequence'], [50, 128, 'FILL180'],
+];
+
+function block2Field(offset: number): string {
+  return BLOCK2_FIELDS.find(([from, to]) => offset >= from && offset < to)?.[2] ?? `+${offset}`;
+}
+
+function collectSaves(target: string): string[] {
+  const path = resolve(target);
+  if (!existsSync(path)) return [];
+  if (statSync(path).isDirectory()) {
+    return readdirSync(path)
+      .filter((n) => n.toLowerCase().endsWith('.dat') && !n.includes(':'))
+      .sort()
+      .map((n) => join(path, n));
+  }
+  return [path];
+}
+
+interface Region {
+  name: string;
+  size: number;
+  /** Name the differing byte, for a diff a human can read. Optional. */
+  field?: (within: number) => string;
+  /** Assert equality, or merely report it. */
+  assert: boolean;
+  /** Why it is only reported, when it is. */
+  why?: string;
+  /** Within an asserted region, the bytes that are reported instead. */
+  exempt?: (within: number) => boolean;
+  /** Why those bytes are exempt. */
+  exemptWhy?: string;
+}
+
+/** At most eight fields of a diff, so a failure stays readable. */
+function summarize(diffs: Map<string, number>): string {
+  const all = [...diffs];
+  const shown = all.slice(0, 8).map(([f, n]) => `${f} (${n})`).join(', ');
+  return all.length > 8 ? `${shown}, +${all.length - 8} more` : shown;
+}
+
+function main(): void {
+  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  check(saves.length > 0, 'there should be save files to read');
+
+  for (const path of saves) {
+    const name = path.split('/').pop() ?? path;
+    const file = new Uint8Array(readFileSync(path));
+    const state = loadSaveGameState(file);
+    const written = saveSaveGameState(state);
+
+    // Block 0 is variable-length, so it is compared first and then becomes the origin
+    // both files' block 1 is measured from.
+    const prefix = state.extendedFeaturesSize ?? 0;
+    check(written.length >= prefix, `${name}: the written file carries a block-0 prefix`);
+    const timerSize = state.extendedTimers ? 16 : state.sequencedTimers ? 12 : 10;
+    const live = new Set(state.timerQueue ?? []);
+    const liveWords = (state.timerQueue ?? []).length * 2;
+    const dataMapLength = state.objectIndex?.length ?? 0;
+    const regions: Region[] = [
+      {
+        name: 'block 0  ext features', size: prefix, assert: true,
+        field: (i) =>
+          i < 512 ? `header +${i}`
+            : i < 512 + dataMapLength ? 'dataTypeMap'
+            : i < 512 + dataMapLength * 3 ? 'dataIndexMap'
+            : 'DSAs / game info / DSA level index',
+      },
+      {
+        name: 'block 1  GAMEBLOCK1', size: BLOCK1_SIZE, assert: false,
+        why: 'RandomGameID, Byte22808[132], SaveOption, totalMoveCount are not modelled',
+      },
+      { name: 'block 2  GAMEBLOCK2', size: BLOCK2_SIZE, assert: true, field: block2Field },
+      { name: 'block 3  ITEM16', size: 16 * state.maxItem16, assert: true },
+      { name: 'block 4  characters', size: CHARACTER_SIZE, assert: true },
+      {
+        name: 'block 5  timers', size: timerSize * state.maxTimers, assert: true,
+        field: (i) => `timer ${Math.floor(i / timerSize)} +${i % timerSize}`,
+        exempt: (i) =>
+          timerSize === 16 && i % 16 >= 13 && !live.has(Math.floor(i / 16)),
+        exemptWhy: 'unused13 of a freed slot',
+      },
+      {
+        name: 'block 6  timer queue', size: 2 * state.maxTimers, assert: true,
+        exempt: (i) => i >= liveWords,
+        exemptWhy: 'the queue past NumTimer',
+      },
+    ];
+
+    let at = 0;
+    const lines: string[] = [];
+    for (const region of regions) {
+      const mine = written.subarray(at, at + region.size);
+      const theirs = file.subarray(at, at + region.size);
+      check(mine.length === region.size && theirs.length === region.size,
+        `${name}: ${region.name} is ${region.size} bytes in both files`);
+
+      const diffs = new Map<string, number>();
+      let exempt = 0;
+      for (let i = 0; i < region.size; i++) {
+        if (mine[i] === theirs[i]) continue;
+        if (region.exempt?.(i)) { exempt++; continue; }
+        const field = region.field ? region.field(i) : `+${i}`;
+        diffs.set(field, (diffs.get(field) ?? 0) + 1);
+      }
+      const summary = summarize(diffs);
+      const note = exempt > 0 ? ` (${exempt} b differ in ${region.exemptWhy})` : '';
+      lines.push(`    ${region.name.padEnd(22)} ${String(region.size).padStart(6)} b  ` +
+        (!region.assert ? `differs (expected): ${region.why}`
+          : diffs.size === 0 ? `identical${note}`
+          : `DIFFERS: ${summary}${note}`));
+      if (region.assert) {
+        check(diffs.size === 0,
+          `${name}: ${region.name} is the file's own bytes${summary ? ` — ${summary}` : ''}`);
+      }
+      at += region.size;
+    }
+
+    console.log(`${name}  (block 0 prefix ${prefix} b, ${dataMapLength} index slots, ` +
+      `timer records ${timerSize} b)`);
+    for (const line of lines) console.log(line);
+  }
+
+  /* ---- block 0's maps, built from a world rather than read from a file ---- */
+
+  // Writing blocks 10-13 needs the *other* direction: an object index built for a world
+  // this port holds, so that every RN in the image can be written as a slot number. Its
+  // numbering is this port's own and cannot be compared with the file's, so what is
+  // asserted instead is that it is internally sound — which is the only property a save
+  // needs, since nothing outside the file refers to a slot.
+  console.log('\n=== the object index, built from a world ===');
+  console.log(['save', 'file slots', 'built slots', 'references'].join('\t'));
+  for (const path of saves) {
+    const name = path.split('/').pop() ?? path;
+    const { dungeon, save } = loadCsbwinWorld(new Uint8Array(readFileSync(path)));
+    const index = buildObjectIndirectIndex(dungeon);
+
+    // The canary: write the maps out as the prefix would, read them back through the
+    // *reader* with both `FormChecksum`s verified, and resolve through that. A map
+    // written at the wrong width, in the wrong byte order or one slot out fails here
+    // rather than producing a plausible wrong object.
+    const indexBytes = new Uint8Array(index.length * 2);
+    for (let i = 0; i < index.length; i++) {
+      indexBytes[i * 2] = index.indexMap[i] & 0xff;
+      indexBytes[i * 2 + 1] = (index.indexMap[i] >> 8) & 0xff;
+    }
+    const wire = new Uint8Array(index.length * 3);
+    wire.set(index.typeMap, 0);
+    wire.set(indexBytes, index.length);
+    const reread = readObjectIndirectIndex(
+      wire, 0, index.length, formChecksum(index.typeMap), formChecksum(indexBytes),
+    );
+
+    // Every reference the world actually holds: the object list and every record's link.
+    let references = 0;
+    const roundTrips = (rn: number): boolean => {
+      references++;
+      return reread.resolve(index.encode(rn)) === rn;
+    };
+    let broken = 0;
+    for (const rn of dungeon.objectList) {
+      if (rn === OBJECT_ID_NULL || rn === 0xfffe) continue;
+      if (!roundTrips(rn)) broken++;
+    }
+    for (const db of Object.values(dungeon.databases)) {
+      for (const record of db.records as Array<Record<string, unknown>>) {
+        const link = record.nextObject as number | undefined;
+        if (link === undefined || link === OBJECT_ID_NULL || link === 0xfffe) continue;
+        if (!roundTrips(link)) broken++;
+        for (const field of ['containedObject', 'possession', 'projectileObject'] as const) {
+          const other = record[field] as number | undefined;
+          if (other === undefined || other === OBJECT_ID_NULL || other === 0xfffe) continue;
+          if (!roundTrips(other)) broken++;
+        }
+      }
+    }
+
+    console.log([name, save.objectIndex?.length ?? 0, index.length, references].join('\t'));
+    check(references > 1000, `${name}: the world holds references worth checking (${references})`);
+    check(broken === 0,
+      `${name}: every reference survives encode → maps → resolve (${broken} did not)`);
+    check(index.typeMap[0] === 0xff && index.indexMap[0] === 0xffff,
+      `${name}: slot 0 is left free, as ConvertListOfObjects leaves it`);
+    check(index.countAliases() === 0,
+      `${name}: no two slots name the same record`);
+    // `RNVAL`s and `RNempty` are literals on the way out as well as on the way in.
+    check(index.encode(0) === 0 && index.encode(0xffff) === 0xffff && index.encode(0xff80) === 0xff80,
+      `${name}: RNempty, RNnul and a spell literal pass through encode untouched`);
+  }
+
+  finish();
+}
+
+main();

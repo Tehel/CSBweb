@@ -89,6 +89,11 @@ export class MonsterSystem {
   /** `d.ITEM16QueLen` — how many slots are in use. */
   private item16QueLen = 0;
 
+  /** The same counter, for `GAMEBLOCK2` offset 30 (`doc/CSBwin-src/SaveGame.cpp:1028`). */
+  getItem16QueLen(): number {
+    return this.item16QueLen;
+  }
+
   /**
    * The level whose monsters currently hold `ITEM16` slots. CSBWin tracks this
    * implicitly through `d.partyLevel`; here it is explicit so that a level change

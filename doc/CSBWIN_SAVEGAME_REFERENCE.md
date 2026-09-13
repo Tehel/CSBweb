@@ -74,11 +74,20 @@ the block keeps native PC order. A save file is therefore mixed-endian, and
 `SetHandOwner`/`SelectMagicCaster`: those validate the champion and rewrite their
 facing, which a load must not do to a state that was already valid.
 
-This port now parses **every** field in the table into `SaveGameState.block2`; the four
-it acts on are 20, 22, 28 and 46. The rest are read so a genuine save can be inspected
-(`tools/dump-csbwin-save.ts` prints the party position, clock, seed and timer counters
-from them) but nothing is restored from them yet — the runtime half of a quick-save
-still carries those values, and Phase 10 is where they move here.
+This port parses **every** field in the table into `SaveGameState.block2` and now writes
+every one of them back: `buildBlock2` in `src/data/SaveGameLoader.ts` is the exact
+inverse of `parseBlock2`, and `buildBlock2FromGame` in `src/engine/SaveGamePayload.ts`
+fills the struct from the live game — the clock and seed, the party position group,
+`FirstAvailTimer` from `TimerQueue`'s free cursor, `ITEM16QueLen` from `MonsterSystem`,
+and both times. Three fields go out as zero because this port models nothing for them:
+`partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44). `ObjectInHand` (8)
+goes out as an indirect slot number, re-encoded through the index `buildSavePayload`
+builds for the dungeon image beside it — the two have to be one numbering.
+
+The four the *loader* acts on are still 20, 22, 28 and 46; the rest are read so a genuine
+save can be inspected (`tools/dump-csbwin-save.ts` prints the party position, clock, seed
+and timer counters from them) but nothing is restored from them yet — the runtime half of
+a quick-save still carries those values.
 
 ## What a save file contains, in write order
 
@@ -105,6 +114,20 @@ single running checksum by `WriteAndChecksum` and closed by one final word.
 | 13 | all 16 databases' records | `DBSize(n)` × `dbEntrySizes[n]` | `:1203-1215` |
 | 14 | `d.cellFlagArray` | `cellflagArraySize` | `:1216` |
 | 15 | final checksum word | 2 | `:1222` |
+
+Block 11's index and block 12's size longword are **little-endian**, alone with the
+Extended Features header in an otherwise big-endian file: both go out through `BE32`
+(`:174-181`, `:1192-1194`), which is the identity on the little-endian build CSBWin ships
+as. The compressed text words after the size are written with no swap at all (`:1197`) —
+they are the Atari-era 5-bit text array, big-endian in memory and big-endian in the file.
+`NumWordsInTextArray` (header `word6`) counts block 11's **index entries**, not text
+words: `ConvertToIndirectText` overwrites it with the index length (`:2274`), which is why
+a save says 125 where `dungeon.dat` says 1749.
+
+Block 15 is the sum of every **byte** of blocks 7-14 modulo 65536 — `WriteAndChecksum`
+accumulates each section's bytes into a `ui16` from zero and adds that into a running
+total (`:679-698`), which is reset to 0 just before block 7 (`:1166`) — written
+big-endian.
 
 Blocks 7-14 are the dungeon image, and they are the bulk of the file.
 
@@ -144,25 +167,96 @@ reaches the status box.
 ## How much of this the port writes today
 
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) produces a real, correctly scrambled
-and checksummed file **prefix** and stops at the end of block 6. Of what it emits:
+and checksummed **whole file** — all sixteen blocks — and the game's own save button
+writes one. Of what it emits:
 
 - blocks 1, 3 — complete.
-- block 2 — offsets 20, 22, 28 and 46 only; the other eighteen fields are zero.
+- block 2 — **complete**, and byte-identical to all fourteen committed saves. It used to
+  be offsets 20, 22, 24, 28, 46 and 48 only, with the other fifteen fields at zero, so a
+  file this port wrote put the party at (0,0) facing north on level 0 with the clock
+  stopped. Three fields it writes as zero are zero because nothing here models them —
+  see the `GAMEBLOCK2` table above. `ObjectInHand` is an indirect slot number, encoded
+  through the same index as the image beside it.
 - block 4 — **complete**, and byte-identical to the real thing:
   `buildCsbwinCharacterBlock` packs `CHARDESC[4]` and the 128-byte party tail, portrait
   bitplanes included, and `tools/dump-character-block.ts` writes the block again for each
-  of the fourteen committed saves and compares it with the file's own bytes. The one
-  reservation is the thirty possession slots: in a file they are indirect slot numbers
-  (see "Every object reference in a save is an indirect index"), and re-encoding them
-  needs the `dataTypeMap`/`dataIndexMap` that travel with the dungeon image, which the
-  writer does not produce yet — so a block packed from a *live* game holds this port's
-  packed `[pos][db][idx]` ids. Everything else is CSBWin's layout exactly.
-- block 5 — `timerWord8` (offset 8) of each record only; the rest of each `TIMER` is zero.
-- block 6 — zeros.
-- blocks 0 and 7-15 — not written at all.
+  of the fourteen committed saves and compares it with the file's own bytes. The thirty
+  possession slots go out as indirect slot numbers through `encodeRN` (see "Every object
+  reference in a save is an indirect index"), in the same index the dungeon image beside
+  them uses — `buildSavePayload` builds the two together for exactly that reason.
+  Everything else is CSBWin's layout exactly.
+- block 5 — **complete**. The whole 16-byte `TIMER`, in whichever of the three sizes the
+  Extended Features flags select. It used to write `timerWord8` (offset 8) and nothing
+  else, so a file this project wrote said when nothing was due.
+- block 6 — **complete**: the queue order, which is the firing order CSBWin never
+  re-sorts on load.
+- block 0 — **complete**, and byte-identical to all fourteen committed saves. The
+  512-byte header, `dataTypeMap`, `dataIndexMap`, the game info and the DSA level index
+  with its three-byte 0xff terminator; `src/data/CsbwinExtendedFeatures.ts` has the whole
+  layout and the write order. Two things ride through verbatim rather than being
+  re-serialized — the DSA section and the game-info string — and one field had to be
+  carried rather than derived: `gameInfoSize` is signed and **-1** means "an empty game
+  info that still exists", which is not the same as the 0 that means "none"
+  (`csbgame3.dat` is the case).
 
-`readExtendedFeatures` reads block 0 in full, and blocks 7-14 are **located** but not
-yet parsed. An earlier revision of this file claimed the two functions that reach into
+  `buildObjectIndirectIndex` is the other half: it builds the two maps for a world this
+  port holds in memory, which is what blocks 10-13 will express their RNs through. Its
+  numbering is its own — CSBWin's cannot be reproduced, and does not need to be, since
+  nothing outside the file refers to a slot number. It gives every record of every
+  database a slot in `DBType` then index order, leaves slot 0 free as
+  `ConvertListOfObjects` does, and carries each object's position in `dataTypeMap` rather
+  than in the slot, because `RN::pos(p)` writes that byte in place
+  (`doc/CSBwin-src/CSBTypes.h:336-342`).
+- blocks 7-15 — **the whole dungeon image is built**, by
+  `src/data/CsbwinDungeonImageWriter.ts`, which is the inverse of the reader section by
+  section: the 44-byte `DUNGEONDATINDEX`, the 16-byte `LEVELDESC`s, the column index, the
+  object list, the little-endian indirect text index and the compressed text, all sixteen
+  databases, the cell flag array with its per-level monster-type and decoration tables,
+  and `WriteAndChecksum`'s closing word. `cellFlagArraySize` computes the length the
+  Extended Features block declares — 12366 on every file this project holds, which is also
+  `dungeon.dat`'s own `LegacyCellFlagArraySize`.
+
+  **Six of the eight sections are byte-identical**, to `dungeon.dat` as well as to all
+  fourteen saves. Blocks 10 and 13 cannot be: every word of the object list and the link
+  word of every database record is an RN, and an RN in a save is a slot number in an index
+  whose numbering is ours rather than CSBWin's (see "Every object reference in a save is
+  an indirect index"). For those words the check is different in kind — the maps are
+  written, read back through `readObjectIndirectIndex`, and each word resolved through
+  them must name the object the reader got out of CSBWin's word. Every byte that is not an
+  RN is still compared with the file, and `dungeon.dat`, which stores packed RNs and needs
+  no index at all, has those words byte-compared too.
+
+  Block 15 gets the sharpest check of the lot, and needs no caveat: the checksum is
+  computed over each save's **own** image bytes and compared with the word that save ends
+  with.
+
+  Writing all this found thirteen fields the loader had been discarding, none of them
+  reconstructible, plus the whole of `EXPOOL`, which had no parser at all. The list and
+  the citations are in `doc/PROVEN_FACTS.md` → "Three fields of the dungeon image header
+  no reader here was keeping" and "Ten more fields the record parsers were dropping".
+
+  `saveSaveGameState` takes the image as `SaveGameState.dungeonImage` and closes the file
+  with block 15, so **a whole file can be written** — and
+  `tools/dump-save-file-roundtrip.ts` writes all sixteen blocks of each committed save and
+  loads the result back with this port's own reader, world and party intact (605 checks).
+  Two things had to join it: `buildObjectIndirectIndex` takes the references CSBWin's
+  `ConvertTimers` / `ConvertCharacters` / `objectInHand` passes convert, so a carried
+  object's *position* lands in `dataTypeMap`, and `buildCsbwinCharacterBlock` takes an
+  `encodeRN` so the thirty possession slots go out as slot numbers.
+
+  **The live path is wired** (September 14th). `buildSavePayload` builds the object
+  indirect index, the image, the Extended Features header and the character block
+  together — they are one numbering — and `tools/dump-live-save-file.ts` writes a file
+  from a game played out of `dungeon.dat` and one from a game played on from a genuine
+  save, then loads both back into a running engine. What unblocked it was CSBWin's three
+  load-time conversions: `ConvertToIndirectText`, `MakeBigActuators` and `convertScrolls`
+  are ported (`src/data/CsbwinDungeonConversions.ts`) and run behind CSBWin's own gates,
+  so a world in memory is always save-shaped rather than `dungeon.dat`-shaped.
+  `PLAN.md` Phase 10 has the detail.
+
+`readExtendedFeatures` reads block 0 in full, and blocks 7-14 are now fully **read** —
+`src/data/CsbwinDungeonImage.ts` parses the image into a real `DungeonData`. An earlier
+revision of this file claimed the two functions that reach into
 the image, `parseSpecialLocationsFromSaveData` and `parseMissileRecordsFromSaveData`,
 "already navigate the whole dungeon image correctly". **That was wrong**, and reading
 genuine saves is what showed it: both return `null` on all three files, so the `0`
@@ -170,7 +264,7 @@ they used to report for missiles and special locations meant "parse failed", not
 "none present". See "Where the dungeon image parse stands" below.
 
 **The reader is now proven against genuine files.** `static/gamefiles/saves/` holds
-three real CSBWin saves and `tools/dump-csbwin-save.ts` reads all three: blocks 0-6
+fourteen real CSBWin saves and `tools/dump-csbwin-save.ts` reads them: blocks 0-6
 unscramble with every checksum clean, and the party position, clock, seed, timer
 counters and all four champions' names and titles come out of blocks 2 and 4. Two of
 the saves are the same party on different levels and read back as the same roster.
@@ -182,11 +276,23 @@ argument for keeping a real file in the repository: the two older saves happen t
 zero in the misread words, so it took the third to expose it.
 
 Everything blocks 7-14 would carry is held at runtime and captured by
-`src/engine/DungeonSnapshot.ts`, so Phase 10 is a serialization job rather than a
-state-modelling one. The one caveat is that nothing has ever been validated against a
-genuine CSBWin save file — there is none in `static/gamefiles/` — and a format that only
-round-trips through itself proves nothing, which is the trap `tools/dump-savegame-blocks.ts`
-was written to document.
+`src/engine/DungeonSnapshot.ts`, so what is left of Phase 10 is a serialization job rather
+than a state-modelling one. The caveat that used to sit here — that nothing had ever been
+validated against a genuine CSBWin file, and a format that only round-trips through itself
+proves nothing — is answered for the reader *and* for every block the writer emits.
+`tools/dump-save-blocks-vs-file.ts` parses each of the fourteen committed saves, writes
+blocks 2-6 again from what came out, and compares them with the file's own bytes: **all
+five are identical in all fourteen**. Two exemptions are named and sourced rather than
+compared away — `TIMER.unused13` in a freed slot and the timer queue past `NumTimer`, both
+allocation debris CSBWin never reads back (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is
+0xcd in a slot that has been used").
+
+Writing that harness immediately found two defects in blocks marked complete: block 5 wrote
+zeros into `unused13` where a real file holds 0xcd, and block 6's tail was never looked at
+at all. Block 1 remains the one region the writer emits and cannot reproduce — it carries
+`RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount` and
+`Word22592`/`Word22594`, none of which this port models. The tool reports it and does not
+assert it.
 
 
 ## Where the dungeon image parse stands

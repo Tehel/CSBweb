@@ -70,11 +70,17 @@ Verified against the code, not inherited from earlier revisions of this file.
    through `isDebugFeaturesEnabled()`.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
    the UI now lives in `src/renderer/ui/`.
-8. ⚠️ **CSBWin-binary-compatible save files** — the **reader is done**: twelve genuine
-   saves in `static/gamefiles/saves/` load into a running game, party, world, objects
-   and all (Phase 10 step 12, September 13th). The *writer* still stops after block 6 —
-   though block 4, the champions, is now packed byte-identically to the real thing
-   (step 6). The dungeon image is what is left of Phase 10.
+8. ⚠️ **CSBWin-binary-compatible save files** — the **reader is done** (Phase 10 step 12,
+   September 13th) and **the live path now writes a whole file** (September 14th): the
+   game's own save button emits all sixteen blocks, and
+   `tools/dump-live-save-file.ts` writes one from a game played out of `dungeon.dat` and
+   one from a game played on from a genuine save, and loads both back into a running
+   engine with the world, the party, a thrown object still in flight and the object on
+   the cursor intact. What that needed was not plumbing: CSBWin's three load-time
+   conversions are ported (`src/data/CsbwinDungeonConversions.ts`), so the in-memory
+   world is always save-shaped. What is left of the phase is **block 1**, which is still
+   a stub of valid checksums over fields this port does not model. See Phase 10's "What
+   is left, in one place".
 9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
    `supressPitDamage` now has something to suppress.
 
@@ -83,8 +89,8 @@ probes, pixel comparisons against CSBWin screenshots) that were **never carried 
 there is no test framework in the project at all. Verification has been visual and ad hoc.
 Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
 
-`npm test` now exists (Phase 15 step 1) and runs both standing forms of evidence in ~6s,
-or ~12s with `--frames`. There is still no test *framework*; what there is:
+`npm test` now exists (Phase 15 step 1) and runs both standing forms of evidence in ~14s,
+or ~33s with `--frames`. There is still no test *framework*; what there is:
 
 1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
    DevTools Protocol and byte-compare six screen states against `tools/frames/`. Built
@@ -92,18 +98,19 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
-2. **Twenty-six assertion-carrying verification tools** — the Phase 12 nine
-   (`dump-monster-{tables,activation,perception,damage,move,ai}.ts`,
-   `watch-monster{s,-attacks}.ts`, `dump-player-attacks.ts`) plus
-   `dump-hand-owner.ts`, `dump-throwing.ts`, `dump-clouds.ts`, `dump-savegame.ts`,
-   `dump-savegame-blocks.ts`,
-   `dump-party-collision.ts`, `dump-door-crush.ts`, `dump-attributes.ts` and
-   `dump-champion-state.ts`, `dump-feeding.ts`, `dump-pit-fall.ts`,
-   `dump-hall-of-champions.ts`, `dump-vi-altar.ts`, `dump-status-boxes.ts`,
-   `dump-reincarnate-entry.ts` and `dump-save-menu.ts`.
-   `tools/run-checks.mjs` is the authority on the list. These load the real game
-   files, drive the real engine with a fixed RNG seed, print a human-readable table and
-   assert invariants, exiting non-zero on failure. They are the de-facto regression
+2. **Forty assertion-carrying verification tools**, plus four run for crashes only.
+   **`tools/run-checks.mjs` is the authority on the list** — it is not repeated here,
+   because the hand-kept copy that used to sit in this bullet drifted to thirteen tools
+   out of date before anyone noticed. Run `npm test` to see the roll. Broadly: the save
+   and CSBWin-file group (`dump-savegame*.ts`, `dump-csbwin-*.ts`,
+   `dump-character-block.ts`, `dump-save-roundtrip.ts`, `dump-portraits.ts`), the monster
+   group (`dump-monster-*.ts`, `watch-monster*.ts`), the champion group
+   (`dump-champion-*.ts`, `dump-feeding.ts`, `dump-hall-of-champions.ts`,
+   `dump-vi-altar.ts`, `dump-pit-fall.ts`, `dump-reincarnate-entry.ts`), and the UI and
+   codec group (`dump-status-boxes.ts`, `dump-mastery-panel.ts`, `dump-save-menu.ts`,
+   `dump-intro.ts`, `dump-image-codec.ts`, `dump-key-bindings.ts`).
+   These load the real game files, drive the real engine with a fixed RNG seed, print a
+   human-readable table and assert invariants, exiting non-zero on failure. They are the de-facto regression
    suite for everything the frames cannot see, and they caught two real bugs and two
    wrong tests.
 
@@ -140,6 +147,23 @@ archive section.
   is a Phase 10 / Phase 15 candidate.
 
   <sub>Context: `doc/PROVEN_FACTS.md` → “The column index is saved state, not dungeon structure”.</sub>
+
+
+- ✅ **Resolved: the timer table leaked two slots on every save/load cycle.**
+  `TimerQueue.restore` minted new indices above the highest restored one, on the
+  reasoning — written into the comment — that CSBWin's `m_firstAvailTimer` free list
+  "costs nothing but the numbering". It cost more: `LoadGame` is followed by
+  `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
+  movement timers of every monster group on the party's level, so each load abandoned a
+  slot per re-created timer — `csbgame7.dat` went 78 → 80 → 82 → … over five quick-loads,
+  without bound. The free list is ported now: `addTimer` allocates at the cursor and
+  walks it forward, `deleteTimer` lowers it, `shiftNext` frees the fired timer's slot as
+  `GetNextTimerEntry` does, and `restore` derives the cursor from the holes rather than
+  needing the `gb2.FirstAvailTimer` the file carries. `shiftNext` not freeing was a
+  second bug in the same place: a fired timer's index stayed live to `getTimer`.
+
+  <sub>Context: `doc/PROVEN_FACTS.md` → “The timer array has a free list, and a save
+  carries its cursor”. Evidence: `tools/dump-save-roundtrip.ts`.</sub>
 
 
 - ✅ **Resolved: champion titles missing their first character — and it is not a bug.**
@@ -324,6 +348,16 @@ archive section.
   rectangle the same way, though the four boxes do not rotate. The same bug was fixed in
   `Party.getPartyChampion` (Phase 13 prerequisite 2); this half was left because it is a
   UI change wanting the golden frames re-examined, not because it is right.
+**Intro (Phase 16)**
+
+- ⏳ **The intro runs on wall-clock time** through `requestAnimationFrame`, not on a VBL
+  counter shared with the game loop. Nothing else exists yet when it plays, so there is
+  nothing to drift against; if a boot-time animation ever has to agree with `d.Time`, this
+  is the place that would have to change.
+- 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole sequence.** A
+  developer affordance with no CSBWin counterpart, kept deliberately: five of the eight
+  golden frames boot through it.
+
 **Monsters (Phase 12)**
 
 - ⚠️ *(step 2)* `CreateMovementTimer`'s overflow guard is not ported.
@@ -371,8 +405,217 @@ Full working notes in **`doc/PLAN_ARCHIVE.md`**. Open items from them are listed
 
 Only the phases with work left in them. Completed phases are in `doc/PLAN_ARCHIVE.md`.
 
-### Phase 10 — CSBWin-Compatible Save/Load (pre‑work checklist)
-Goal: ensure internal state and data structures are complete enough to write a binary‑compatible CSBWin save file.
+### Phase 10 — CSBWin-Compatible Save/Load
+
+Goal: read and write a save file CSBWin itself can load. **Reading is done. Writing is the
+only phase in this file with substantial engine work left in it.**
+
+#### What is left, in one place
+
+`saveSaveGameState` (`src/data/SaveGameLoader.ts`) emits all sixteen blocks, and
+`buildSavePayload` now hands it the three it used to leave out — the Extended Features
+header, the object indirect index and the dungeon image — so **the game's own save button
+writes a whole file**. Against the sixteen-block write order in
+`doc/CSBWIN_SAVEGAME_REFERENCE.md`:
+
+| Block | What it holds | State |
+| --- | --- | --- |
+| 0 | Extended Features, `dataTypeMap`/`dataIndexMap`, DSA blocks | ✅ written and byte-identical to all fourteen saves — header, both maps, the game info and the DSA level index with its 0xff terminator. `buildObjectIndirectIndex` builds the maps for a world this port holds, which is what blocks 10-13 will encode their RNs through |
+| 1 | GAMEBLOCK1 | ✅ |
+| 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. Three go out as zero because nothing models them: `partyMoveDisableTimer` (40), `Word11712` (42), `Word11714` (44). `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image |
+| 3 | ITEM16 | ✅ |
+| 4 | characters + party tail | ✅ byte-identical to all fourteen committed saves, the thirty possession slots included — they go out through `encodeRN` as slot numbers |
+| 5 | timers | ✅ the whole 16-byte `TIMER`, in all three sizes, byte-identical bar `unused13` in a freed slot |
+| 6 | timer queue | ✅ byte-identical over the live `NumTimer` entries; the debris past them is not reproduced |
+| 7 | image header (`DUNGEONDATINDEX`, 44 b) | ✅ built and byte-identical to `dungeon.dat` **and** all fourteen saves |
+| 8 | level descriptors (16 b x `NumLevel`) | ✅ same |
+| 9 | column index (`objectListIndex`) | ✅ same |
+| 10 | object list (`d.objectList`) | ✅ built. Nothing but RNs, so it **cannot** be byte-identical — our slot numbering is our own — and it is checked by resolving instead; see below |
+| 11 | indirect text index | ✅ built and byte-identical. Little-endian longwords, alone with the Extended Features header in a big-endian file |
+| 12 | `sizeOfCompressedText` + the text | ✅ built and byte-identical. Little-endian size word, big-endian text |
+| 13 | the sixteen databases | ✅ built. Every byte that is **not** an RN is the file's own, on `dungeon.dat` and all fourteen saves; the RNs are resolved and compared. This is 18-22 KB of the ~40 KB image |
+| 14 | cell flags (`cellFlagArray`) | ✅ built and byte-identical, and `cellFlagArraySize` computes the 12366 both `dungeon.dat` and every save declare |
+| 15 | final checksum word | ✅ `buildImageChecksum`, and proved against each save's **own** closing word |
+
+**A whole file now round-trips.** `tools/dump-save-file-roundtrip.ts` takes each of the
+fourteen committed saves, parses it completely, re-serialises **all sixteen blocks**
+through `saveSaveGameState` — dungeon image and closing checksum included — and hands the
+result back to this port's own reader. 605 checks: the header, the object list, the column
+index, every cell flag of all fourteen levels, every record of every database field for
+field, the indirect text, the compressed text, EXPOOL byte for byte, the party, all 120
+possession slots, `ObjectInHand` and the flying-sword timer. It is what covers the words
+the block-by-block comparisons have to hold out.
+
+Three things had to change for it, all of them real:
+
+- `buildObjectIndirectIndex` takes `heldReferences`. An object a champion carries is in no
+  cell chain, so without a pass over the possession slots (and the object-carrying timers,
+  and `ObjectInHand`) its slot keeps position 0 and the reference comes back naming the
+  right record in the wrong corner of its cell. CSBWin does exactly these four passes, in
+  this order (`doc/PROVEN_FACTS.md` → "Everything CSBWin converts to slot numbers").
+- `buildCsbwinCharacterBlock` takes `encodeRN`, so the thirty slots go out as slot
+  numbers. That closes the reservation block 4 has carried since it was written.
+- The **object-carrying timers** have to be translated by hand. `parseTimers` leaves a
+  timer's object RN as the raw word — nothing in this port consumes one — which is
+  harmless while a file is only read and wrong the moment it is rewritten with a new
+  numbering. `csbgame-flying-sword.dat` exercises it.
+
+The work is serialization, not modelling: `src/engine/DungeonSnapshot.ts` already captures
+everything blocks 7-14 carry, the image layout is solved and proven by parsing (see the
+resolved blocker at the end of this phase), and `FirstAvailTimer` — block 2 offset 26 —
+became available when `TimerQueue` gained CSBWin's free cursor.
+
+**Two sections cannot be byte-identical, and that is not a defect.** Every word of block
+10 and the link word of every record in block 13 is an RN, which in a save is a slot
+number in the object indirect index — and `buildObjectIndirectIndex` numbers those slots
+its own way, because CSBWin's order cannot be reproduced and nothing outside the file
+refers to a slot number. Those words are checked by resolving instead: the maps are
+written, read back through `readObjectIndirectIndex` (both `FormChecksum`s verified), and
+each word resolved through them must name the object the reader got out of CSBWin's word.
+That argument is weaker in kind than the byte comparisons around it — it would survive a
+bug our encode and our resolve shared — and `tools/dump-dungeon-image-blocks.ts` says so
+where it makes it. `dungeon.dat`, which stores packed RNs and needs no index at all, is
+the compensating case: for it those same words *are* byte-compared, all 1682 of them.
+<sub>`doc/PROVEN_FACTS.md` → "An RN in block 10 or block 13 cannot be byte-identical".</sub>
+
+**Mostly, but not entirely.** Writing blocks 7, 8 and 14 found three fields the *reader*
+was dropping, and a section cannot be written back from a model that does not hold it:
+`LEVELDESC.FILL2[4]`, the low byte of `DUNGEONDATINDEX::word4` — both zero everywhere, but
+neither guessable — and bits 8-11 of `LEVELDESC.word12`, which CSBWin declares no accessor
+for and which are **not** zero: the fourteen DM levels carry 0, 1, 3 and 4 between them.
+All three are now on `DungeonHeader` / `MapDescriptor`, named as CSBWin names them and
+documented as unread.
+
+Block 13 had the same disease and more of it. Ten further bit ranges across seven record
+types were being read past — the door's `word2` bits 9-15, the teleporter's low `word4`
+byte, the text record's `word2` bits 1-2, the creature's `word14` bits 4, 7 and 15, the
+clothing item's `word2` bits 14-15, both scroll forms' leftover bits, the chest's whole
+`m_word4` and its two trailing bytes, and the misc item's `cursed` and `subType` — plus
+the whole of **`EXPOOL`**, database 11, which had no parser at all and is now carried as
+raw bytes on `DungeonData.expool`. Four of the ten are not zero in the data, so four of
+them fail a canary; the rest are carried for the reason `FILL2` is.
+<sub>`doc/PROVEN_FACTS.md` → "Ten more fields the record parsers were dropping".</sub>
+
+**The evidence gap is closed for everything the writer builds.**
+`tools/dump-dungeon-image-blocks.ts` does it for the whole image — 687 checks over
+`dungeon.dat` and all fourteen saves — and `tools/dump-save-blocks-vs-file.ts` parses each
+of the fourteen committed saves, writes
+blocks 2-6 again from what came out, and compares them with the file's own bytes — the
+argument `tools/dump-character-block.ts` makes for block 4, widened to every block. All
+five are identical in all fourteen. Writing it found two defects in blocks that were
+marked complete: block 5 wrote zeros into `TIMER.unused13` where a real file holds 0xcd,
+and nothing had ever looked at block 6's tail. Two regions are reported rather than
+asserted, each for a sourced reason — `unused13` in a freed slot and the timer queue past
+`NumTimer`, both CSBWin allocation debris (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is
+0xcd in a slot that has been used"). **Block 1 is the exception**: it carries
+`RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount` and
+`Word22592`/`Word22594`, none of which this port models, so it is reported and not
+asserted. Any new block should arrive with the same comparison, and step 10's
+load → re-serialize → binary-compare is the end state.
+
+**Deferred on purpose, and none of it blocking:** the DSA global variables are not read from
+`EXPOOL`; `d.Word11694` (`gameWon`) and `d.PartySleeping` are not restored; a record index
+above 1023 cannot be expressed. All three are detailed under step 12.
+
+**Deferred by the block-2 work (September 13th):**
+
+- ⏳ **`partyMoveDisableTimer`, `Word11712` and `Word11714`** (`GAMEBLOCK2` offsets 40,
+  42, 44) are written as zero. This port models no equivalent of any of them, and the
+  loader restores none of them either, so the three are symmetrical gaps rather than a
+  writer defect.
+- ✅ **Resolved: `ObjectInHand`** (offset 8) goes out as an indirect slot number, through
+  the index `buildSavePayload` builds for the image — the same one block 4's thirty
+  possession slots use, which was always the same dependency rather than two.
+- ⏳ **DSA programs are not re-serialized.** A save that carries DSAs is written back
+  with the byte range it was read with (`SaveGameState.dsaBlock`), so a DSA whose state
+  machine has moved since the load would be written where it stood. `DSA::Write`
+  (`doc/CSBwin-src/Chaos.cpp`) is unported. No dungeon this project loads defines a DSA
+  — `numDSA` is 0 in every committed save — so nothing exercises it.
+- ⏳ **`SimpleEncryption` is neither written nor readable past the header.** The flag
+  (`EF_FLAGS.SimpleEncryption`, 0x04) puts the *whole* file behind RC4 with key `{1,0}`,
+  not just the 512-byte block the reader deciphers. No committed save sets it.
+- ✅ **The live path writes a whole file** (September 14th). `buildSavePayload` builds the
+  object indirect index, the dungeon image, the Extended Features header and the character
+  block together — they are one numbering — and `saveSaveGameState` closes the file with
+  block 15. `GAMEBLOCK2.ObjectInHand` and the thirty possession slots go out as slot
+  numbers, which retires the two reservations blocks 2 and 4 carried. The header is
+  `buildLiveExtendedFeatures` (`src/data/CsbwinExtendedFeatures.ts`), field for field
+  against `SaveGame` and with every zero measured rather than assumed
+  (`doc/PROVEN_FACTS.md` → "The Extended Features header a live game writes").
+  `sequencedTimers`/`extendedTimers` are true, so block 5 is the 16-byte `TIMER` the
+  header declares.
+
+  Evidence: `tools/dump-live-save-file.ts` (187 checks). A game played out of
+  `dungeon.dat` — champions recruited at two mirrors, the party walked, an object thrown
+  and still in flight, a second on the cursor — and a game played on from
+  `csbgame7.dat`, each written and loaded back into a fresh engine. Six of its seven
+  canaries fail when the field they blank is withheld; the seventh is named in the tool
+  with the reason it cannot.
+
+- ✅ **An original dungeon is converted on load, as CSBWin does** (September 14th).
+  `src/data/CsbwinDungeonConversions.ts` ports `ConvertToIndirectText`,
+  `MakeBigActuators` and `convertScrolls`, each behind CSBWin's own gate — the shape
+  flags, which are false only for a `dungeon.dat`. So the in-memory world is always
+  save-shaped and the writer never has to ask where it came from.
+  `TextRecord.textIndex` is gone: `textOffset` is `DB2::index()` and means a word offset
+  before the conversion and an index entry after, exactly as CSBWin's one field does.
+  That closed a live bug — a genuine save arrives already converted, so `textIndex` was
+  never set for one and every wall text, scroll and message was decoded from the wrong
+  place in the compressed array.
+
+  Evidence: `tools/dump-dungeon-conversions.ts` (143 checks). Every committed save was
+  made by CSBWin from this same `dungeon.dat`, so its converted form is the oracle: 0
+  differences in the 125-entry index, all 1749 words of compressed text, every TEXT
+  record's rewritten index word, every scroll's new RN and `open` bit, and every
+  actuator's `word8`. `DungeonImageOptions.noConvert` exists for exactly one caller,
+  `tools/dump-dungeon-image-blocks.ts`, which has to hold `dungeon.dat`'s own shape up
+  against the file.
+
+- ✅ **A quick-save carries the converted image** (September 14th).
+  `src/engine/DungeonSnapshot.ts` captures `textWords`, `indirectTextIndex`,
+  `compressedText` and `expool`; `RUNTIME_SAVE_VERSION` is 7 and an older payload is
+  refused rather than half-restored. `expool` is the one of the four that can be
+  canaried — `dungeon.dat` has none and every save carries blocks of it — and the three
+  text fields cannot, because this port's conversion of `dungeon.dat` reproduces the
+  saves' arrays exactly; `tools/dump-save-roundtrip.ts` says so where it makes the claim.
+
+- ✅ **A timer's object survives the file** (September 14th), which writing the live path
+  is what exposed. The live `TimerEntry` keeps a missile's RN on an `object` field with
+  no byte at all and puts the launch square in bytes 6-7 — where `ConvertTimers` says
+  the object lives — so a saved missile lost its object and its packed position word
+  both. `Game.collapseTimerBytes` and `restoreTimerQueue` are the two halves of the
+  collapse now, and `CsbwinSaveGame.resolveTimerObjects` turns a loaded timer's slot
+  number back into an RN, which `parseTimers` deliberately does not.
+  <sub>`doc/PROVEN_FACTS.md` → "A live timer keeps its object in three places".</sub>
+
+**Deferred by the live-path work (September 14th):**
+
+- ⏳ **A converted scroll's `m_word4` bits 1-15 go out as zero.** `convertScrolls` writes
+  bit 0 over two bytes nothing initialises, so a genuine save carries allocation debris
+  there — 28 of DM's 35 scrolls in `csbgame4.dat`. Zero is the only honest value for a
+  scroll this port converts; reported rather than asserted, like `TIMER.unused13`.
+- ⏳ **`buildSavePayload` refuses a dungeon with DSA programs** rather than writing a file
+  that silently lost them, because `DSA::Write` is unported. No dungeon this project
+  loads defines one.
+- ⏳ **`MakeBigActuators` reads the actuator type after the byte swap, CSBWin before it.**
+  A knowing divergence with no effect on DM, and asserted rather than assumed:
+  `tools/dump-dungeon-conversions.ts` fails if any actuator is type 47 under *either*
+  reading. <sub>`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap".</sub>
+- ⏳ **Scenario 2 of `dump-live-save-file.ts` holds the monster state to a fixed point**
+  rather than to the played game, because a load is not a no-op — `reloadAfterSaveGame`
+  re-creates every monster group's movement timers and re-rolls their walk offsets, as
+  CSBWin's does. Everything the reload does not touch is still compared one round trip
+  earlier.
+
+- ⏳ **Block 1 is still a stub with valid checksums.** `RandomGameID`, `Byte22808[132]`,
+  `SaveOption`, `totalMoveCount`, `Word22592`/`Word22594` and `Byte22596`/`Byte22598` are
+  all zero. `LoadGame` reads `RandomGameID` only to refuse a save from a different game
+  after the party has died (`doc/CSBwin-src/SaveGame.cpp:1602-1606`) and lets
+  `Byte22596 != 1` through, so this is untested rather than known-broken.
+
+#### The original pre-work checklist
+
+Kept because the rescoring below is written against its numbering.
 
 1. **Inventory all save file blocks (CSBWin `SaveGame.cpp`)**:
    - Block1 (512 bytes), Block2 (128 bytes), Item16, Characters, Timers, TimerQueue.
@@ -614,58 +857,17 @@ than half-restored, since the world state they would need was never written.
 Verified by `tools/dump-savegame.ts`. This does not shorten Phase 10 — the binary
 format is a separate job — but it removes the reason to rush it.
 
-### Phase 16 — Title screen and dungeon entrance ✅
-
-Goal: everything CSBWin does before the party is in the dungeon.
-
-Done, in `src/renderer/intro/` (`IntroHost.ts`, `TitleSequence.ts`, `PrisonDoor.ts`,
-`PrisonLevel.ts`, `BootSequence.ts`). Spec and citations:
-`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`; evidence: `tools/dump-intro.ts` (103 checks) and
-golden frames `07-entrance` / `08-credits`.
-
-1. ✅ **The title animation** — `_DisplayChaosStrikesBack` (`CSBCode.cpp:9203`). CSBWin's
-   name is Chaos Strikes Back's; the routine is the shared engine's and runs off graphic 1,
-   so with DM's data it plays DM's title: "Presents" fades up and out, the "Dungeon" logo
-   zooms from 48×12 to 320×80 over eighteen `ShrinkBLT` frames, then "Master" appears in red.
-   `ShrinkBLT`'s 16.16 fixed point is transcribed, truncation and all.
-2. ✅ **The dungeon entrance** — `_TAG01f746` / `_TAG01f5ea`. The corridor behind the doors
-   is the real viewport renderer over a synthetic 5×5 level, as CSBWin does it, which is why
-   `render` was split and `drawViewportFrame` extracted.
-3. ✅ **The door animation** — `_OpenPrisonDoors`, 31 frames × 6 VBL, the grind every third
-   frame, the eight pre-shifted door buffers, and the three-column sliver the right half
-   leaves at the frame edge because 31 frames of 4 pixels is not quite 123.
-4. ✅ **The credits scroll** — `_TAG01f928`, the hidden button 202. Rendering it turned up a
-   **codec bug**: `decodeIMG` had been written from the dmweb.free.fr format notes rather
-   than from `ExpandGraphic`, and three opcodes disagreed. Graphic 5 is the only image in
-   either data set that uses one of them, so the scroll slid right from (78,55) on while
-   everything else looked fine. `src/core/imageDecoder.ts` is now a transcription of
-   `doc/CSBwin-src/CSBCode.cpp:10836`, and `tools/dump-image-codec.ts` checks it against
-   `tools/reference/csbwin-credits.png` — a capture of CSBWin's own screen, and the only
-   ground truth in this project that did not come out of our own code.
-5. ✅ **"Resume"** — `openSaveMenu(ui, 'loadOnly')` on a cleared screen, which is what
-   `SelectSaveGame(_9_, 1, 1, 1)`'s leading 1 asks for. Cancelling puts the entrance back up.
-6. ✅ **The mouse pointer**, shown and hidden where `STShowCursor` / `STHideCursor` say. The
-   arrow is blitted with no colour mapping at all, so the screen's palette decides its
-   colour: index 4 is `0x654` beige against the entrance's stonework and `0x066` in the
-   dungeon. `withCursor` is `DrawCursor` + `RemoveCursor`, so it never enters the picture.
-
-Deliberately not ported, each with its reason in the reference doc: the
-`QUIT/DUNGEON/UTILITY/HINT` launcher menu (one binary, one program), `DiskMenuNeeded` in the
-entrance loop (unreachable — button 140 is not in `Buttons16932`), the low-memory guard at
-`CSBCode.cpp:9222`, `_TAG01f928`'s never-reset 65535-VBL counter, and CSBWin's fallback where
-"Resume" on an empty slot silently starts a new game (an unbounded list has no empty slots).
-
-One genuine divergence, and it is a *narrowing* of one: CSBWin mutates `d.Word68` / `d.Word76`
-in place while the doors slide and never restores them. This port walks local copies. The
-doors open once per run, so the two are equivalent.
-
-Left open:
-- The intro runs on wall-clock time through `requestAnimationFrame`, not on a VBL counter
-  shared with the game loop. Nothing else exists yet when it plays, so there is nothing to
-  drift against; if a boot-time animation ever needs to agree with `d.Time`, this is the
-  place that would have to change.
-- `?intro=0`, and Debug in the saved UI settings, skip the whole sequence. That is a
-  developer affordance with no CSBWin counterpart.
+**The payload layer now has evidence of its own** (`tools/dump-save-roundtrip.ts`). Until
+it was written nothing exercised `buildSavePayload` / `applySavePayload` — the JSON file
+F5, F9 and both stores of the disk menu actually write — because `dump-savegame.ts` drives
+the runtime snapshot directly and the `dump-csbwin-*` tools drive the CSBWin reader. The
+tool starts from a genuine CSBWin save, which is the hard case: such a party carries 928
+bytes of `CHARDESC.portrait` pixels where a party this engine created carries a single
+`portraitGraphic` index. 106 checks — portraits, possessions, `charFlags`, incantations,
+the world snapshot, ITEM16, missiles and the whole timer table round-trip; both
+`csbgame4-door-*.dat` doors still open and shut after being restored *through the payload*;
+and five save/load cycles on a level with live monsters leave the timer table the same size
+with no holes, which is the leak above.
 
 ### Phase 15 — Verification
 
@@ -673,7 +875,7 @@ Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation ste
 never carried out, because the project has **no test framework**.
 
 1. ✅ **Test runner.** `npm test` → `tools/run-checks.mjs`: `tsc --noEmit`, then the
-   asserting tools, then the frames with `--frames`. ~6s, ~17s with frames.
+   asserting tools, then the frames with `--frames`. ~14s, ~33s with frames.
    `tools/` is inside the type gate. Shared helpers in `tools/lib/check.ts`.
    <sub>How it went, and the two real bugs it surfaced: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
 2. ⚠️ **Golden-frame rendering tests.** `tools/check-frames.sh` starts its own dev server

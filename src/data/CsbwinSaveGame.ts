@@ -42,7 +42,7 @@ import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
 import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
 import { RUNTIME_SAVE_VERSION, type Game, type RuntimeSaveState } from '../engine/Game';
-import type { DungeonData } from './dungeonTypes';
+import type { DungeonData, TimerRecord } from './dungeonTypes';
 import { Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { PartyState } from '../engine/gameTypes';
@@ -110,6 +110,42 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
 }
 
 /**
+ * Turn the object a live timer is carrying from a slot number into a packed RN.
+ *
+ * `parseTimers` keeps `TIMER` bytes 6-9 as it finds them, because to every other timer
+ * function they are plain numbers — a map square, an action code. For the six functions
+ * `ConvertTimers` names they are an object reference, and in a save file that means a
+ * slot in the object indirect index (`doc/PROVEN_FACTS.md` → "An RN in a save file is an
+ * indirect index"). Nothing here consumed one until the engine started restoring a
+ * timer's object at all, which is why this is only now a defect rather than a gap: a
+ * missile restored with an unresolved slot number names whatever record our numbering
+ * happens to put there, and the thrown sword lands somewhere else entirely.
+ *
+ * 48 and 49 keep it in bytes 6-7, 24, 25, 60 and 61 in bytes 8-9
+ * (`doc/CSBwin-src/SaveGame.cpp:2027-2050`). Only a timer the queue names is live.
+ */
+function resolveTimerObjects(world: CsbwinWorld): TimerRecord[] | undefined {
+    const timers = world.save.timers;
+    if (!timers) return undefined;
+    const index = world.save.objectIndex;
+    if (!index) return timers;
+    const live = new Set(world.save.timerQueue ?? []);
+    return timers.map((timer, slot) => {
+        if (!live.has(slot)) return timer;
+        const fn = timer.function;
+        if (fn === 48 || fn === 49) {
+            const rn = index.resolve(timer.timerWord6 & 0xffff);
+            return { ...timer, timerWord6: rn, uByte6: (rn >> 8) & 0xff, uByte7: rn & 0xff };
+        }
+        if (fn === 24 || fn === 25 || fn === 60 || fn === 61) {
+            const rn = index.resolve(timer.timerWord8 & 0xffff);
+            return { ...timer, timerWord8: rn, uByte8: (rn >> 8) & 0xff, uByte9: rn & 0xff };
+        }
+        return timer;
+    });
+}
+
+/**
  * Everything a CSBWin save says, in the shape `Game.applyRuntimeSaveState` takes.
  *
  * Pure: no `Game` is touched, so a verification tool can build one and read it without
@@ -150,7 +186,7 @@ export function buildCsbwinRuntimeState(
         },
         dungeon: {
             item16: world.save.item16,
-            timers: world.save.timers,
+            timers: resolveTimerObjects(world),
             timerQueue: world.save.timerQueue,
             timerSequence: world.save.timerSequence,
             missiles: world.save.missiles,

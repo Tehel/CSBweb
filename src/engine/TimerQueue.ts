@@ -101,7 +101,16 @@ export interface TimerEntry {
 export class TimerQueue {
   private queue: TimerEntry[] = [];
   private nextSequence = 0;
-  private nextIndex = 0;
+  /**
+   * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) — the lowest slot of the timer
+   * array that holds no live timer, and the one the next `SetTimer` will take.
+   *
+   * It is a cursor, not a counter: `deleteTimer` lowers it whenever a slot below it
+   * frees, and `addTimer` walks it forward past whatever is occupied. The invariant is
+   * that it is always the *lowest* free slot, which is why `restore` can derive it
+   * rather than needing the `gb2.FirstAvailTimer` the file carries.
+   */
+  private firstAvailTimer = 0;
   private indexMap = new Map<number, TimerEntry>();
   private deleteDuplicateTimers = true; // CSBWin deleteDuplicateTimers default
 
@@ -113,14 +122,26 @@ export class TimerQueue {
     return this.queue[0];
   }
 
+  /**
+   * `GameTimers::GetNextTimerEntry` (`doc/CSBwin-src/Timer.cpp:1222`) — take the head
+   * of the queue and **free its slot**, which is what the `DeleteTimer(*index)` on its
+   * last line does. The entry is handed back by value, as CSBWin `memcpy`s it out
+   * before deleting, so a handler still sees the timer it was woken by.
+   *
+   * This used to pop the queue and leave `indexMap` alone, so a fired timer's index
+   * stayed live to `getTimer` and its slot was never reused.
+   */
   shiftNext(): TimerEntry | undefined {
-    return this.queue.shift();
+    const entry = this.queue.shift();
+    if (!entry) return undefined;
+    this.releaseIndex(entry.index);
+    return entry;
   }
 
   clear(): void {
     this.queue = [];
     this.nextSequence = 0;
-    this.nextIndex = 0;
+    this.firstAvailTimer = 0;
     this.indexMap.clear();
   }
 
@@ -201,8 +222,11 @@ export class TimerQueue {
     const deduped = this.applyDuplicateTimerRules(entry);
     if (deduped) return deduped;
 
-    const stored: TimerEntry = { ...entry, index: this.nextIndex++ };
+    // `D5L = m_firstAvailTimer` (`doc/CSBwin-src/Timer.cpp:1129`), then walk the cursor
+    // forward to the next empty entry (`Timer.cpp:1195-1198`).
+    const stored: TimerEntry = { ...entry, index: this.firstAvailTimer };
     this.indexMap.set(stored.index, stored);
+    while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
     const idx = this.queue.findIndex((existing) => compareTimers(stored, existing) < 0);
     if (idx === -1) {
       this.queue.push(stored);
@@ -225,25 +249,40 @@ export class TimerQueue {
    * `nextSequence` is `gb2.TimerSequence`, the counter CSBWin hands to the next timer it
    * queues. Indices are kept as the file numbered them, because other saved state points
    * at them: `CHARDESC.busyTimerIndex` names a champion's pending action, and
-   * `DungeonState`'s `timerWord8` lookup is by index. New timers are minted above the
-   * highest restored one — CSBWin reuses freed slots through `m_firstAvailTimer` and
-   * this port does not, which costs nothing but the numbering.
+   * `DungeonState`'s `timerWord8` lookup is by index.
+   *
+   * The free cursor is restored too — CSBWin saves it as `gb2.FirstAvailTimer` and reads
+   * it straight back (`doc/CSBwin-src/SaveGame.cpp:1023,1640`). Since the cursor is
+   * always the lowest free slot, deriving it from the holes in the restored table is the
+   * same value, and costs the save format nothing.
+   *
+   * It used to mint new timers above the highest restored index instead, on the grounds
+   * that it "costs nothing but the numbering". It cost more than that: `LoadGame` is
+   * followed by `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and
+   * re-creates the movement timers of every monster group on the party's level, so each
+   * load abandoned one slot per re-created timer. A quick-save/quick-load cycle on a
+   * level with monsters grew the table by two slots every time, for ever.
    */
   restore(entries: readonly TimerEntry[], nextSequence: number): void {
     this.queue = entries.map((entry) => ({ ...entry }));
     this.indexMap.clear();
-    let highest = -1;
-    for (const entry of this.queue) {
-      this.indexMap.set(entry.index, entry);
-      if (entry.index > highest) highest = entry.index;
-    }
-    this.nextIndex = highest + 1;
+    for (const entry of this.queue) this.indexMap.set(entry.index, entry);
+    this.firstAvailTimer = 0;
+    while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
     this.nextSequence = nextSequence >>> 0;
   }
 
   /** `gameTimers.TimerSequence()` — what the next queued timer will be stamped with. */
   getNextSequence(): number {
     return this.nextSequence;
+  }
+
+  /**
+   * `gameTimers.FirstAvailTimer()` — the cursor above. `SaveGame` writes it into
+   * `GAMEBLOCK2` offset 26 (`doc/CSBwin-src/SaveGame.cpp:1023`).
+   */
+  getFirstAvailTimer(): number {
+    return this.firstAvailTimer;
   }
 
   getTimer(index: number): TimerEntry | null {
@@ -284,9 +323,18 @@ export class TimerQueue {
   deleteTimer(index: number): void {
     const entry = this.indexMap.get(index);
     if (!entry) return;
-    this.indexMap.delete(index);
     const idx = this.queue.indexOf(entry);
     if (idx >= 0) this.queue.splice(idx, 1);
+    this.releaseIndex(index);
+  }
+
+  /**
+   * The tail of `GameTimers::DeleteTimer` (`doc/CSBwin-src/Timer.cpp:965-969`): the slot
+   * becomes `TT_EMPTY` and the free cursor drops to it if it is lower.
+   */
+  private releaseIndex(index: number): void {
+    this.indexMap.delete(index);
+    if (index < this.firstAvailTimer) this.firstAvailTimer = index;
   }
 
   private applyDuplicateTimerRules(entry: TimerEntry): TimerEntry | null {

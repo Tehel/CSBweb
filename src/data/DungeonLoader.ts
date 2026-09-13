@@ -31,6 +31,7 @@ import type {
     CloudRecord
 } from './dungeonTypes';
 import { extractPresetHeroes } from './HeroExtractor';
+import { convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -59,6 +60,16 @@ export interface DungeonImageOptions {
     indirectText?: boolean;
     /** EXPOOL (db 11) records exist and are 256 bytes each. Saves only. */
     expool?: boolean;
+    /**
+     * Read the image exactly as it stands, without the three load-time conversions
+     * `convertOriginalDungeon` runs (`src/data/CsbwinDungeonConversions.ts`).
+     *
+     * CSBWin has no such switch — it always converts — and neither does the game. This
+     * exists for `tools/dump-dungeon-image-blocks.ts`, which writes `dungeon.dat`'s own
+     * sections back out and byte-compares them with the file, and so needs the world in
+     * the file's shape rather than in the shape a save is written in.
+     */
+    noConvert?: boolean;
     /**
      * Translate one stored object reference into a packed RN.
      *
@@ -130,6 +141,9 @@ export class DungeonLoader {
 
         // Parse all databases
         const databases = this.parseDatabases(offsets.databases, header.objectCounts);
+        // Database 11 — `EXPOOL` — has no parser here. It is kept whole so the image can
+        // be written back with it (`DungeonData.expool`).
+        const expool = this.readExpool(offsets.databases[11], header.objectCounts[11]);
         console.log(`Parsed databases: ${header.objectCounts.reduce((a, b) => a + b, 0)} total objects`);
 
         // Parse map data (tiles)
@@ -139,23 +153,39 @@ export class DungeonLoader {
         // Build level index
         const levelIndex = this.buildLevelIndex(mapDescriptors);
 
-        const { indirectTextIndex, compressedText } = indirect
-            ? indirect
-            : this.buildIndirectText(textWords, databases.texts.records);
-
         const data: DungeonData = {
             header,
             maps,
             databases,
             textWords,
-            indirectTextIndex,
-            compressedText,
             objectList,
             columnIndex,
             levelIndex,
-            item16: []
+            item16: [],
+            bigActuators: this.options.bigActuators ?? false,
+            indirectText: this.options.indirectText ?? false,
+            newScrolls: this.options.newScrolls ?? false,
         };
+        if (indirect) {
+            data.indirectTextIndex = indirect.indirectTextIndex;
+            data.compressedText = indirect.compressedText;
+        }
 
+        if (expool) data.expool = expool;
+
+        // `ReadDatabases` converts an original dungeon into the shape a save is written
+        // in before it returns, so every world this port holds is save-shaped unless a
+        // tool has asked for the file's own (`src/data/CsbwinDungeonConversions.ts`).
+        if (!this.options.noConvert) {
+            convertOriginalDungeon(data, {
+                bigActuators: data.bigActuators,
+                indirectText: data.indirectText,
+                newScrolls: data.newScrolls,
+            });
+        }
+
+        // After the conversion, so a preset hero's text is looked up the same way every
+        // other text record's is.
         data.presetHeroes = extractPresetHeroes(data);
 
         this.data = data;
@@ -173,7 +203,8 @@ export class DungeonLoader {
         const randomSeed = this.file.readU16();
         const mapDataSize = this.file.readU16();
         const numMaps = this.file.readU8();
-        this.file.skip(1); // padding
+        // The low byte of `word4`. Unnamed and unread in CSBWin, preserved for the writer.
+        const word4Low = this.file.readU8();
         const textDataSize = this.file.readU16();
 
         // Decode starting position (word at 0x08)
@@ -198,6 +229,7 @@ export class DungeonLoader {
             randomSeed,
             mapDataSize,
             numMaps,
+            word4Low,
             textDataSize,
             startPosition,
             facing,
@@ -216,8 +248,11 @@ export class DungeonLoader {
 
         for (let i = 0; i < numMaps; i++) {
             const dataOffset = this.file.readU16();
-            this.file.readU16(); // Component flags (DM2 only)
-            this.file.readU16(); // Unused word
+            // `LEVELDESC.FILL2[4]` — four unnamed bytes CSBWin never swaps or reads.
+            const fill2 = [
+                this.file.readU8(), this.file.readU8(),
+                this.file.readU8(), this.file.readU8(),
+            ];
 
             const offsetX = this.file.readU8();
             const offsetY = this.file.readU8();
@@ -240,6 +275,7 @@ export class DungeonLoader {
             const difficulty = (difficultyWord >> 12) & 0xF;
             const creatureTypesAllowed = (difficultyWord >> 4) & 0xF;
             const doorDecorationCount = difficultyWord & 0xF;
+            const word12Bits8_11 = (difficultyWord >> 8) & 0xF;
 
             // Door and graphics indices
             const doorGraphicsWord = this.file.readU16();
@@ -251,6 +287,7 @@ export class DungeonLoader {
             descriptors.push({
                 mapIndex: i,
                 dataOffset,
+                fill2,
                 offsetX,
                 offsetY,
                 level,
@@ -263,6 +300,7 @@ export class DungeonLoader {
                 difficulty,
                 creatureTypesAllowed,
                 doorDecorationCount,
+                word12Bits8_11,
                 doorType0Index,
                 doorType1Index,
                 mapGraphicsStyle,
@@ -369,6 +407,24 @@ export class DungeonLoader {
     }
 
     /**
+     * Database 11 — `EXPOOL` — as raw bytes.
+     *
+     * `DB11` is a 256-byte block with a two-byte `size` and 63 `ui32`
+     * (`doc/CSBwin-src/CSB.h:1307-1315`), reached only through `EXPOOL::Locate`'s hash
+     * (`doc/CSBwin-src/data.cpp`). This port reads nothing out of it — the one consumer,
+     * `parseSpecialLocationsFromSaveData`, hashes its own copy straight out of the save
+     * file — so the block is kept byte for byte rather than modelled, which is what lets
+     * a save be written back carrying the EXPOOL it was read with.
+     */
+    private readExpool(offset: number, count: ui16): Uint8Array | null {
+        if (!this.options.expool || count <= 0) return null;
+        const bytes = new Uint8Array(count * EXPOOL_RECORD_SIZE);
+        this.file.seek(offset);
+        for (let i = 0; i < bytes.length; i++) bytes[i] = this.file.readU8();
+        return bytes;
+    }
+
+    /**
      * Parse column index
      */
     private parseColumnIndex(offset: number, count: number): ui16[] {
@@ -433,58 +489,6 @@ export class DungeonLoader {
         return { indirectTextIndex, compressedText };
     }
 
-    private computeTextLength(words: ui16[], startWord: number): number {
-        let len = 0;
-        let idx = startWord;
-        // CSBWin's loop has no bound (`ComputeTextLength`,
-        // `doc/CSBwin-src/SaveGame.cpp:2202-2217`) because its input is always a valid
-        // text array. Ours must stop at the end of the array regardless: a word read
-        // past it used to come back as `?? 0`, whose three 5-bit characters are all
-        // zero, so the terminator was never found and the loop never returned.
-        while (idx < words.length) {
-            const word = words[idx++];
-            const c1 = (word >> 10) & 0x1f;
-            const c2 = (word >> 5) & 0x1f;
-            const c3 = word & 0x1f;
-            len++;
-            if (c1 === 31 || c2 === 31 || c3 === 31) {
-                return len;
-            }
-        }
-        return len;
-    }
-
-    private buildIndirectText(words: ui16[], textRecords: TextRecord[]): {
-        indirectTextIndex: ui32[];
-        compressedText: ui16[];
-    } {
-        const indirectTextIndex: ui32[] = [];
-        const compressedText: ui16[] = [];
-        let sizeOfCompressedText = 0;
-
-        for (let i = 0; i < textRecords.length; i++) {
-            const rec = textRecords[i];
-            if (rec.nextObject === OBJECT_ID_NULL) continue;
-
-            const oldIndex = rec.textOffset;
-            if (oldIndex >= words.length) {
-                rec.textIndex = 0;
-                continue;
-            }
-
-            const len = this.computeTextLength(words, oldIndex);
-            const newIndex = indirectTextIndex.length;
-            indirectTextIndex.push(sizeOfCompressedText);
-            for (let w = 0; w < len; w++) {
-                compressedText.push(words[oldIndex + w]);
-            }
-            sizeOfCompressedText += len;
-            rec.textIndex = newIndex;
-        }
-
-        return { indirectTextIndex, compressedText };
-    }
-
     /**
      * Parse all databases
      */
@@ -523,7 +527,8 @@ export class DungeonLoader {
                 hasButton: (attributes & 0x40) !== 0,
                 vertical: (attributes & 0x20) !== 0,
                 ornateNumber: (attributes >> 1) & 0xF,
-                doorType: attributes & 0x1
+                doorType: attributes & 0x1,
+                word2Bits9_15: (attributes >> 9) & 0x7f
             });
         }
 
@@ -547,7 +552,8 @@ export class DungeonLoader {
                 rotation: (attributes >> 10) & 0x3,
                 destY: (attributes >> 5) & 0x1F,
                 destX: attributes & 0x1F,
-                destMap: (destination >> 8) & 0xFF
+                destMap: (destination >> 8) & 0xFF,
+                word4Low: destination & 0xff
             });
         }
 
@@ -565,7 +571,8 @@ export class DungeonLoader {
             records.push({
                 nextObject,
                 textOffset: (textRef >> 3) & 0x1FFF,
-                visible: (textRef & 0x1) !== 0
+                visible: (textRef & 0x1) !== 0,
+                word2Bits1_2: (textRef >> 1) & 0x3
             });
         }
 
@@ -628,7 +635,10 @@ export class DungeonLoader {
                 invisible: (word14 & 0x800) !== 0,
                 drawAsSize4: (word14 & 0x1000) !== 0,
                 unique: (word14 & 0x2000) !== 0,
-                poisoned: (word14 & 0x4000) !== 0
+                poisoned: (word14 & 0x4000) !== 0,
+                word14Bit4: (word14 >> 4) & 1,
+                word14Bit7: (word14 >> 7) & 1,
+                word14Bit15: (word14 >> 15) & 1
             });
         }
 
@@ -672,7 +682,8 @@ export class DungeonLoader {
                 charges: (attributes >> 9) & 0xF,
                 cursed: (attributes & 0x100) !== 0,
                 important: (attributes & 0x80) !== 0,
-                clothingType: attributes & 0x7F
+                clothingType: attributes & 0x7F,
+                word2Bits14_15: (attributes >> 14) & 0x3
             });
         }
 
@@ -695,7 +706,9 @@ export class DungeonLoader {
                 records.push({
                     nextObject,
                     open: (flags & 0x1) !== 0,
-                    textReference: textRn & 0x3FF
+                    textReference: textRn & 0x3FF,
+                    textObject: textRn,
+                    word4Bits1_15: (flags >> 1) & 0x7fff
                 });
                 continue;
             }
@@ -704,7 +717,8 @@ export class DungeonLoader {
             records.push({
                 nextObject,
                 open: ((attributes >> 10) & 0x3F) === 0,
-                textReference: attributes & 0x3FF
+                textReference: attributes & 0x3FF,
+                word2Bits10_15: (attributes >> 10) & 0x3F
             });
         }
 
@@ -737,13 +751,17 @@ export class DungeonLoader {
         for (let i = 0; i < count; i++) {
             const nextObject = this.readRN();
             const containedObject = this.readRNOfRecord(nextObject);
-            const containerType = this.file.readU16();
-            this.file.skip(2); // unused
+            const word4 = this.file.readU16();
+            // `DB9::m_uByte6[2]` — the two bytes that close the record, which used to be
+            // skipped. Zero in every file here, but no more derivable than `FILL2`.
+            const uByte6 = [this.file.readU8(), this.file.readU8()];
 
             records.push({
                 nextObject,
                 containedObject,
-                containerType: (containerType >> 1) & 0x3
+                containerType: (word4 >> 1) & 0x3,
+                word4,
+                uByte6
             });
         }
 
@@ -762,7 +780,9 @@ export class DungeonLoader {
                 nextObject,
                 specialState: (attributes >> 14) & 0x3,
                 important: (attributes & 0x80) !== 0,
-                miscType: attributes & 0x7F
+                miscType: attributes & 0x7F,
+                cursed: (attributes & 0x100) !== 0,
+                subType: (attributes >> 9) & 0x1F
             });
         }
 

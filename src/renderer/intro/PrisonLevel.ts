@@ -72,6 +72,7 @@ export function prisonMap(): MapData {
     descriptor: {
       mapIndex: 0,
       dataOffset: 0,
+      fill2: [0, 0, 0, 0],
       offsetX: 0,
       offsetY: 0,
       level: 0,
@@ -84,6 +85,7 @@ export function prisonMap(): MapData {
       difficulty: 0,
       creatureTypesAllowed: 0,
       doorDecorationCount: 0,
+      word12Bits8_11: 0,
       doorType0Index: 0,
       doorType1Index: 0,
       mapGraphicsStyle: 0,

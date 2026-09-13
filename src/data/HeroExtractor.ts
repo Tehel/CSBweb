@@ -6,6 +6,7 @@ import {
 } from '../core/types';
 import type { ObjectID, ui16 } from '../core/types';
 import { getActuatorType, getActuatorValue } from './actuatorHelpers';
+import { textStart } from './CsbwinDungeonConversions';
 import type {
   ContainerRecord,
   DatabaseRecord,
@@ -43,7 +44,12 @@ export function extractPresetHeroes(data: DungeonData): PresetHero[] {
           const textRef = scanTextRecords(data, map, mapIndex, x + DELTA_X[pos], y + DELTA_Y[pos], pos)
           if (!textRef) continue;
 
-          const text = decodeHeroText(data.textWords, textRef.record.textOffset);
+          // Through `textStart`, because `DB2::index()` is an entry number in the
+          // indirect index once `ConvertToIndirectText` has run and a word offset
+          // before it (`src/data/CsbwinDungeonConversions.ts`).
+          const start = textStart(data, textRef.record.textOffset);
+          if (!start) continue;
+          const text = decodeHeroText(start.words, start.at);
           if (!text) continue;
 
           const heroBase = parseHeroDefinition(text);
@@ -158,7 +164,7 @@ function scanTextRecords(
   return fallback;
 }
 
-function decodeHeroText(words: ui16[], startWord: number): string | null {
+function decodeHeroText(words: readonly ui16[], startWord: number): string | null {
   if (startWord < 0 || startWord >= words.length) return null;
 
   let wordIndex = startWord;

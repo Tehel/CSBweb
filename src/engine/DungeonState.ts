@@ -26,6 +26,7 @@ import type {
 } from '../data/dungeonTypes';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
+import { textStart } from '../data/CsbwinDungeonConversions';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
 
@@ -927,16 +928,11 @@ export class DungeonState {
         const force = (typeOfText & 0x8000) !== 0;
         if (!record.visible && !force) return null;
 
-        const indirectIndex = this.data.indirectTextIndex;
-        const compressed = this.data.compressedText;
-        if (indirectIndex && compressed && record.textIndex !== undefined) {
-            const startWord = indirectIndex[record.textIndex] ?? 0;
-            return this.decodeTextFromWords(compressed, startWord, typeOfText, max, tables);
-        }
-
-        const words = this.data.textWords;
-        if (!words) return null;
-        return this.decodeTextFromWords(words, record.textOffset, typeOfText, max, tables);
+        // `DB2::index()` means different things either side of `ConvertToIndirectText`,
+        // and `textStart` is the one place that knows which.
+        const start = textStart(this.data, record.textOffset);
+        if (!start) return null;
+        return this.decodeTextFromWords(start.words, start.at, typeOfText, max, tables);
     }
 
     decodeTextString(record: TextRecord, typeOfText: number, tables?: TextDecodeTables): string | null {
@@ -958,7 +954,7 @@ export class DungeonState {
     }
 
     private decodeTextFromWords(
-        words: ui16[],
+        words: readonly ui16[],
         startWord: number,
         typeOfText: number,
         max: number,

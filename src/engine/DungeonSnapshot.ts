@@ -39,8 +39,19 @@
  * - `dsaIndex` state machine positions (`DsaSystem` writes `dsa.state`) and the DSA
  *   global variables, which is where a dungeon keeps its puzzle progress.
  * - the champion-bones map, which is pure runtime state.
+ *
+ * And four things that do **not** mutate, but are here anyway, which needs its own
+ * reason: `textWords`, `indirectTextIndex`, `compressedText` and `expool`. They are not
+ * structural in the way `levelIndex` is — they are the *converted* form of an image, and
+ * which form a world is in depends on the file it came from
+ * (`src/data/CsbwinDungeonConversions.ts`). Leaving them out made a restored world a
+ * hybrid: the TEXT records came from the snapshot, carrying entry numbers into an index
+ * that was still the one `dungeon.dat` was converted into, and `expool` — which a save
+ * carries whole and this port cannot regenerate — stayed whatever the dungeon the engine
+ * was built on held. Carrying them makes a quick-load self-consistent, and lets the
+ * binary writer take blocks 11-13 from a world whatever its provenance.
  */
-import type { ui8, ui16, ObjectID } from '../core/types';
+import type { ui8, ui16, ui32, ObjectID } from '../core/types';
 import type { DungeonData, DatabaseRecord, Databases } from '../data/dungeonTypes';
 
 /** The database keys, fixed here so capture and restore cannot drift apart. */
@@ -80,6 +91,48 @@ export interface DungeonSnapshot {
     dsaGlobals?: number[];
     /** The champion-bones map, as `[key, fingerprint]` pairs. */
     championBones?: Array<[number, number]>;
+    /**
+     * `data.textWords`, base64 of big-endian words. After the load-time conversion this
+     * is the compressed text, which is why it and `compressedText` normally hold the
+     * same bytes; they are stored separately because nothing guarantees it.
+     */
+    textWords?: string;
+    /** `data.indirectTextIndex` — word offsets into `compressedText`. */
+    indirectTextIndex?: ui32[];
+    /** `data.compressedText`, base64 of big-endian words. */
+    compressedText?: string;
+    /** `data.expool` — database 11, base64, carried whole because nothing parses it. */
+    expool?: string;
+}
+
+function encodeBytes(bytes: Uint8Array): string {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+}
+
+function decodeBytes(encoded: string): Uint8Array {
+    const binary = atob(encoded);
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i) & 0xff;
+    return out;
+}
+
+/** Words as big-endian bytes, so a 1749-word text array costs 4.7 KB rather than 12. */
+function encodeWords(words: readonly ui16[]): string {
+    const bytes = new Uint8Array(words.length * 2);
+    for (let i = 0; i < words.length; i++) {
+        bytes[i * 2] = (words[i] >> 8) & 0xff;
+        bytes[i * 2 + 1] = words[i] & 0xff;
+    }
+    return encodeBytes(bytes);
+}
+
+function decodeWords(encoded: string): ui16[] {
+    const bytes = decodeBytes(encoded);
+    const words: ui16[] = [];
+    for (let i = 0; i + 1 < bytes.length; i += 2) words.push((bytes[i] << 8) | bytes[i + 1]);
+    return words;
 }
 
 /**
@@ -143,6 +196,11 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
         snapshot.dsaStates = data.dsaIndex.entries.map((entry) => (entry ? entry.state : null));
     }
 
+    if (data.textWords) snapshot.textWords = encodeWords(data.textWords);
+    if (data.indirectTextIndex) snapshot.indirectTextIndex = [...data.indirectTextIndex];
+    if (data.compressedText) snapshot.compressedText = encodeWords(data.compressedText);
+    if (data.expool) snapshot.expool = encodeBytes(data.expool);
+
     return snapshot;
 }
 
@@ -198,6 +256,18 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
         }
         database.count = database.records.length;
     }
+
+    // The converted image. A snapshot written before these were captured has none of
+    // them, and leaving what the world already holds is the right answer for such a file
+    // — it is `dungeon.dat`'s, which is what the save was taken against.
+    if (snapshot.textWords !== undefined) data.textWords = decodeWords(snapshot.textWords);
+    if (snapshot.indirectTextIndex !== undefined) {
+        data.indirectTextIndex = [...snapshot.indirectTextIndex];
+    }
+    if (snapshot.compressedText !== undefined) {
+        data.compressedText = decodeWords(snapshot.compressedText);
+    }
+    if (snapshot.expool !== undefined) data.expool = decodeBytes(snapshot.expool);
 
     if (snapshot.dsaStates && data.dsaIndex) {
         snapshot.dsaStates.forEach((state, index) => {

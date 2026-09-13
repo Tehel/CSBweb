@@ -125,7 +125,7 @@ interface DropCursorOptions {
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 6;
+export const RUNTIME_SAVE_VERSION = 7;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -2742,6 +2742,71 @@ export class Game {
      * function 0 — exactly as CSBWin's array has holes wherever `m_firstAvailTimer`'s
      * free list has slots.
      */
+    /**
+     * Which byte pair of `TIMER` holds an object reference, by timer function.
+     *
+     * `ConvertTimers` (`doc/CSBwin-src/SaveGame.cpp:2027-2050`): 48 and 49 — the missile
+     * in flight — keep it in bytes 6-7, and 24, 25, 60 and 61 in bytes 8-9. Every other
+     * function reads both pairs as plain numbers.
+     */
+    private static objectBytesOf(timerFunction: number): 6 | 8 | null {
+        if (timerFunction === 48 || timerFunction === 49) return 6;
+        if (timerFunction === 24 || timerFunction === 25 ||
+            timerFunction === 60 || timerFunction === 61) return 8;
+        return null;
+    }
+
+    /**
+     * Collapse a live timer's three representations into the four bytes a file has.
+     *
+     * `TIMER` has one pair of bytes at 6-7 and one at 8-9, and CSBWin reads each pair
+     * either as two bytes or as a word depending on the timer function
+     * (`timerObj6()`, `timerWord8()`, `doc/CSBwin-src/CSB.h:1818-1860`). This port's
+     * live `TimerEntry` carries *both* readings side by side, plus an `object` field
+     * that has no byte at all — convenient in the engine, and three things where the
+     * file has one. So the collapse has to happen somewhere, and this is the boundary.
+     *
+     * Three rules, each with a source:
+     *
+     * - The **object** goes into the pair `ConvertTimers` names for that function.
+     *   Without this a thrown sword was written with its launch square in bytes 6-7 and
+     *   the object nowhere, so the file lost it: `TimerSystem.launchMissile` puts the
+     *   RN on `TimerEntry.object` and passes the launch x,y as the bytes.
+     * - For 48 and 49, **bytes 8-9 are `timerWord8`** — the packed
+     *   `[x:5][y:5][direction:2][decay:4]` `processMissileTimer` reads back. Those two
+     *   bytes are passed as `pos` and `action`, which a missile timer leaves at zero,
+     *   so they have to come from the word instead. Measured in
+     *   `csbgame-flying-sword.dat`: function 49, bytes 6-7 = 0x079a (the object's slot)
+     *   and bytes 8-9 = 0xa909 (the packed word).
+     * - Where a **count** lives in `timerWord6` and nothing lives in the bytes — the
+     *   magic shield and poison timers, which `Game.queueUtilityTimer` creates with
+     *   x = y = 0 — the count is written into them. The two representations can only
+     *   ever conflict when one is zero, because no creator sets both; the guard says
+     *   exactly that rather than assuming it.
+     */
+    private static collapseTimerBytes(record: TimerRecord, object: number | undefined): TimerRecord {
+        const at = Game.objectBytesOf(record.function);
+        if (at === 6 && object !== undefined) {
+            record.timerWord6 = object & 0xffff;
+            record.uByte6 = (object >> 8) & 0xff;
+            record.uByte7 = object & 0xff;
+        } else if (at === 8 && object !== undefined) {
+            record.timerWord8 = object & 0xffff;
+            record.uByte8 = (object >> 8) & 0xff;
+            record.uByte9 = object & 0xff;
+        }
+        if (at === 6) {
+            record.uByte8 = (record.timerWord8 >> 8) & 0xff;
+            record.uByte9 = record.timerWord8 & 0xff;
+        }
+        const word6 = record.timerWord6 & 0xffff;
+        if (at === null && word6 !== 0 && record.uByte6 === 0 && record.uByte7 === 0) {
+            record.uByte6 = (word6 >> 8) & 0xff;
+            record.uByte7 = word6 & 0xff;
+        }
+        return record;
+    }
+
     private buildTimerRecords(): { records: TimerRecord[]; queue: number[] } {
         const entries = this.timerQueue.getTimers();
         let maxIndex = -1;
@@ -2751,7 +2816,7 @@ export class Game {
         if (maxIndex < 0) return { records: [], queue: [] };
         const records: TimerRecord[] = Array.from({ length: maxIndex + 1 }, () => emptyTimerRecord());
         for (const entry of entries) {
-            records[entry.index] = {
+            records[entry.index] = Game.collapseTimerBytes({
                 time: entry.time >>> 0,
                 level: entry.level & 0xff,
                 function: entry.function & 0xff,
@@ -2763,7 +2828,7 @@ export class Game {
                 sequence: entry.sequence & 0xffff,
                 timerWord8: entry.timerWord8 & 0xffff,
                 timerWord6: normalizeWord6(entry.timerWord6),
-            };
+            }, entry.object);
         }
         return { records, queue: entries.map((entry) => entry.index) };
     }
@@ -2780,6 +2845,15 @@ export class Game {
         for (const index of order) {
             const record = records[index];
             if (!record) continue;
+            // The inverse of `collapseTimerBytes`: an object-carrying timer's RN comes
+            // back off the byte pair `ConvertTimers` names and onto `TimerEntry.object`,
+            // which is where every handler in this port looks for it
+            // (`processMissileTimer`, `processTT_25`, `onMonsterAbeyance`). Without this
+            // a restored missile has no object and vanishes on its next tick.
+            const at = Game.objectBytesOf(record.function & 0xff);
+            const object =
+                at === 6 ? record.timerWord6 & 0xffff :
+                at === 8 ? record.timerWord8 & 0xffff : undefined;
             entries.push({
                 index,
                 time: record.time >>> 0,
@@ -2793,6 +2867,7 @@ export class Game {
                 sequence: record.sequence & 0xffff,
                 timerWord8: record.timerWord8 & 0xffff,
                 timerWord6: normalizeWord6(record.timerWord6),
+                object,
             });
         }
         this.timerQueue.restore(entries, nextSequence);

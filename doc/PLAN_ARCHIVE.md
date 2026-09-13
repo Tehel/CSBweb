@@ -1322,6 +1322,53 @@ Status: 🔄 in progress — steps 1 and 2 done; 3, 4 and 5 remain.
 
 ---
 
+### Phase 16 — Title screen and dungeon entrance ✅
+
+Goal: everything CSBWin does before the party is in the dungeon.
+
+Done, in `src/renderer/intro/` (`IntroHost.ts`, `TitleSequence.ts`, `PrisonDoor.ts`,
+`PrisonLevel.ts`, `BootSequence.ts`). Spec and citations:
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`; evidence: `tools/dump-intro.ts` (103 checks) and
+golden frames `07-entrance` / `08-credits`.
+
+1. ✅ **The title animation** — `_DisplayChaosStrikesBack` (`CSBCode.cpp:9203`). CSBWin's
+   name is Chaos Strikes Back's; the routine is the shared engine's and runs off graphic 1,
+   so with DM's data it plays DM's title: "Presents" fades up and out, the "Dungeon" logo
+   zooms from 48×12 to 320×80 over eighteen `ShrinkBLT` frames, then "Master" appears in red.
+   `ShrinkBLT`'s 16.16 fixed point is transcribed, truncation and all.
+2. ✅ **The dungeon entrance** — `_TAG01f746` / `_TAG01f5ea`. The corridor behind the doors
+   is the real viewport renderer over a synthetic 5×5 level, as CSBWin does it, which is why
+   `render` was split and `drawViewportFrame` extracted.
+3. ✅ **The door animation** — `_OpenPrisonDoors`, 31 frames × 6 VBL, the grind every third
+   frame, the eight pre-shifted door buffers, and the three-column sliver the right half
+   leaves at the frame edge because 31 frames of 4 pixels is not quite 123.
+4. ✅ **The credits scroll** — `_TAG01f928`, the hidden button 202. Rendering it turned up a
+   **codec bug**: `decodeIMG` had been written from the dmweb.free.fr format notes rather
+   than from `ExpandGraphic`, and three opcodes disagreed. Graphic 5 is the only image in
+   either data set that uses one of them, so the scroll slid right from (78,55) on while
+   everything else looked fine. `src/core/imageDecoder.ts` is now a transcription of
+   `doc/CSBwin-src/CSBCode.cpp:10836`, and `tools/dump-image-codec.ts` checks it against
+   `tools/reference/csbwin-credits.png` — a capture of CSBWin's own screen, and the only
+   ground truth in this project that did not come out of our own code.
+5. ✅ **"Resume"** — `openSaveMenu(ui, 'loadOnly')` on a cleared screen, which is what
+   `SelectSaveGame(_9_, 1, 1, 1)`'s leading 1 asks for. Cancelling puts the entrance back up.
+6. ✅ **The mouse pointer**, shown and hidden where `STShowCursor` / `STHideCursor` say. The
+   arrow is blitted with no colour mapping at all, so the screen's palette decides its
+   colour: index 4 is `0x654` beige against the entrance's stonework and `0x066` in the
+   dungeon. `withCursor` is `DrawCursor` + `RemoveCursor`, so it never enters the picture.
+
+Deliberately not ported, each with its reason in the reference doc: the
+`QUIT/DUNGEON/UTILITY/HINT` launcher menu (one binary, one program), `DiskMenuNeeded` in the
+entrance loop (unreachable — button 140 is not in `Buttons16932`), the low-memory guard at
+`CSBCode.cpp:9222`, `_TAG01f928`'s never-reset 65535-VBL counter, and CSBWin's fallback where
+"Resume" on an empty slot silently starts a new game (an unbounded list has no empty slots).
+
+One genuine divergence, and it is a *narrowing* of one: CSBWin mutates `d.Word68` / `d.Word76`
+in place while the doors slide and never restores them. This port walks local copies. The
+doors open once per run, so the two are equivalent.
+
+Open items from this phase are in `PLAN.md` → "Carried-over debt" → "Intro (Phase 16)".
+
 ### Resolved debt (moved out of `PLAN.md`)
 
 Entries that were carried as debt and are now closed. Any sub-item still open is also
