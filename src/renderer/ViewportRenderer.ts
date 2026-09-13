@@ -72,6 +72,7 @@ import {
   drawSpellPanel,
 } from './ui/MagicPanel';
 import { attackPanelTick, drawAttackPanel } from './ui/Attack';
+import { handleUIKey } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
   isReincarnateScreenOpen,
@@ -274,6 +275,14 @@ export class ViewportRenderer {
 
   setReincarnateNamedHandler(handler: (chIdx: number, name: string, title: string) => void): void {
     this.ui.onReincarnateNamed = handler;
+  }
+
+  /**
+   * Offer a key to the interface's own bindings (`src/renderer/ui/Keyboard.ts`).
+   * Returns whether it was claimed. The modal screens must be offered the key first.
+   */
+  handleUIKey(key: string): boolean {
+    return handleUIKey(this.ui, key);
   }
 
   processMouseQueue(): void {

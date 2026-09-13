@@ -1,0 +1,258 @@
+/**
+ * The keyboard bindings (`src/renderer/ui/Keyboard.ts`).
+ *
+ * A key press is invisible to `tools/check-frames.sh` — the frames are captured from a
+ * fixed state, and nothing here changes a pixel until the panel it opened is drawn — so
+ * this is where the table is proved. It presses the real keys against the real
+ * `UIState` and checks the state each one leaves behind: which attack menu is open,
+ * which champion's inventory, which rune the incantation just took.
+ *
+ * The three things worth watching in the output: `ordinal` is the 1-based champion whose
+ * attack menu is up (0 for none), `inv` is `selectedCharacterIndex`, and `runes` is the
+ * incantation being assembled. The replace-not-stack rule is the point of the middle
+ * block — a second attack or inventory key must move the panel, never leave two open.
+ *
+ * Run: `npx tsx tools/dump-key-bindings.ts`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { Direction, Position } from '../src/core/types';
+import { CsbRandom } from '../src/core/random';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { DungeonState } from '../src/engine/DungeonState';
+import { CharacterStats } from '../src/engine/CharacterStats';
+import { Party, setHandOwner } from '../src/engine/Party';
+import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
+import type { AddCharacterTables } from '../src/engine/AddCharacter';
+import type { Champion, PartyState } from '../src/engine/gameTypes';
+import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { getBaseObjectNameIndex } from '../src/renderer/ui/Objects';
+import { check, finish } from './lib/check';
+
+/**
+ * `ui/Keyboard` reaches `ui/Mouse`, which reaches the debug chrome through `@/ui` and
+ * touches `document` while its modules load. Nothing here needs a DOM, so stub the two
+ * accessors those module-scope lines use and import it once the stub is in place —
+ * the same dance `tools/dump-hand-owner.ts` does.
+ */
+async function importKeyboard(): Promise<typeof import('../src/renderer/ui/Keyboard')> {
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  if (!g.window) g.window = g;
+  return import('../src/renderer/ui/Keyboard');
+}
+
+function runes(party: PartyState): string {
+  const caster = party.magicCasterIndex >= 0 ? party.champions[party.magicCasterIndex] : null;
+  if (!caster || caster.incantation.length === 0) return '-';
+  return caster.incantation.map((c) => String.fromCharCode(c)).join('');
+}
+
+function row(ui: UIState, key: string, taken: boolean): void {
+  const party = ui.partyState as PartyState;
+  console.log([
+    key,
+    taken ? 'taken' : 'passed',
+    ui.attackingCharacterOrdinal,
+    party.selectedCharacterIndex,
+    party.magicCasterIndex,
+    runes(party),
+  ].join('\t'));
+}
+
+async function main(): Promise<void> {
+  const loader = new DungeonLoader();
+  await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = loader.getData();
+  if (!data) throw new Error('dungeon.dat did not load');
+
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const uiTables = extractUITables(graphics);
+  const viewportTables = extractViewportTables(graphics);
+  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const addTables: AddCharacterTables = {
+    carryLocation: uiTables.graphic232.carryLocation,
+    objDescCarryMask: objectTables.objDescCarryMask,
+  };
+
+  // Real champions out of the Hall of Champions, and the spell keys need someone who
+  // can actually cast: `drawSpellControls` gives no tab to a champion with no mana, and
+  // `selectCaster` refuses the same champion for the same reason.
+  const heroes = data.presetHeroes ?? [];
+  const casters = heroes
+    .map((hero, index) => ({ hero, index }))
+    .filter(({ hero }) => hero.mana > 0)
+    .sort((a, b) => b.hero.mana - a.hero.mana);
+  check(casters.length >= 2, 'dungeon.dat should carry at least two heroes with mana');
+  if (casters.length < 2) { finish(); return; }
+
+  const makeChampion = (heroIndex: number, partyPosition: number): Champion =>
+    createChampionFromPreset(
+      heroes[heroIndex],
+      partyPosition,
+      assignPresetHeroPossessions(heroes[heroIndex].inventory, addTables),
+    );
+
+  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  party.addChampion(makeChampion(casters[0].index, 0));
+  party.addChampion(makeChampion(casters[1].index, 1));
+  setHandOwner(party.state, 0);
+
+  const dungeon = new DungeonState(data);
+  const ui: UIState = createUIState(graphics, dungeon, {
+    getGraphicBitmap: () => null,
+    renderLastFrame: () => {},
+  });
+  ui.uiTables = uiTables;
+  ui.objectTables = objectTables;
+  ui.characterStats = new CharacterStats({
+    dungeon,
+    random: new CsbRandom(0x12345678),
+    tables: {
+      weaponDesc: objectTables.weaponDesc,
+      weaponWeights: objectTables.weaponWeights,
+      clothingWeights: objectTables.clothingWeights,
+      miscWeights: objectTables.miscWeights,
+    },
+    nameIndex: (rn) => getBaseObjectNameIndex(ui, rn),
+  });
+  ui.partyState = party.state;
+
+  let attacks: Array<{ chIdx: number; attackType: number }> = [];
+  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+    attacks.push({ chIdx, attackType });
+    return 0;
+  };
+  let casts: Array<{ chIdx: number; incantation: number[]; mana: number }> = [];
+  ui.onSpellCast = (chIdx: number, incantation: number[], mana: number) => {
+    casts.push({ chIdx, incantation, mana });
+    return 0;
+  };
+
+  const { handleUIKey } = await importKeyboard();
+  const press = (key: string): boolean => {
+    const taken = handleUIKey(ui, key);
+    row(ui, key, taken);
+    return taken;
+  };
+
+  console.log(`champions: ${party.state.champions[0].name} and ${party.state.champions[1].name}`);
+  console.log(['key', 'claimed', 'ordinal', 'inv', 'caster', 'runes'].join('\t'));
+
+  // ---- 1. The attack keys open, replace and close — never stack.
+  press('q');
+  check(ui.attackingCharacterOrdinal === 1, "'q' should open champion 1's attack menu");
+  check(ui.word20252 === 0, "'q' should put the panel into its option-list state");
+  check(ui.word20248 >= 1, 'an empty hand should still offer at least one attack');
+
+  press('w');
+  check(ui.attackingCharacterOrdinal === 2, "'w' should replace the open menu, not stack on it");
+
+  press('w');
+  check(ui.attackingCharacterOrdinal === 0, "'w' again should close champion 2's menu");
+  check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
+
+  // ---- 2. An attack option only fires while a menu is open, and only for a row that
+  //         `word20248` says is real (`handleAttackAreaClick`).
+  attacks = [];
+  check(press('a'), "'a' is bound, so it is claimed even with no menu open");
+  check(attacks.length === 0, 'no attack should fire while the menu is closed');
+
+  press('q');
+  const offered = ui.word20248;
+  press('a');
+  check(attacks.length === 1 && attacks[0].chIdx === 0,
+    "'a' should perform champion 1's first attack");
+  check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
+
+  attacks = [];
+  press('q');
+  press('d');
+  if (offered < 3) {
+    check(attacks.length === 0, `only ${offered} attack(s) offered, so 'd' must do nothing`);
+    check(ui.attackingCharacterOrdinal === 1, 'a dead option must leave the menu open');
+  } else {
+    check(attacks.length === 1, "'d' should perform the third attack when one is offered");
+  }
+  press('q'); // back to a closed panel for the blocks below
+  check(ui.attackingCharacterOrdinal === 0, 'the panel should be closed again');
+
+  // ---- 3. The inventory keys, the same toggle `handleInventoryToggle` gives a click.
+  press('z');
+  check(party.state.selectedCharacterIndex === 0, "'z' should open champion 1's inventory");
+  press('x');
+  check(party.state.selectedCharacterIndex === 1, "'x' should replace it with champion 2's");
+  press('x');
+  check(party.state.selectedCharacterIndex === -1, "'x' again should close it");
+  press('c');
+  check(party.state.selectedCharacterIndex === -1,
+    "'c' should do nothing — there is no third champion");
+
+  // ---- 4. The magic keys. No caster, no keypad (button id 100's guard in `Mouse.ts`).
+  check(party.state.magicCasterIndex === -1, 'no caster should be selected yet');
+  press('1');
+  check(runes(party.state) === '-', 'a rune key with no caster selected should do nothing');
+
+  press('F1');
+  check(party.state.magicCasterIndex === 0, 'F1 should select the first champion as caster');
+  press('F2');
+  check(party.state.magicCasterIndex === 1, 'F2 should move the caster to the second champion');
+  press('F1');
+  check(party.state.magicCasterIndex === 0, 'F1 should bring it back');
+
+  const caster = party.state.champions[0];
+  const manaBefore = caster.attributes.mana;
+  press('1');
+  check(caster.incantation.length === 1 && caster.incantation[0] === 96,
+    "'1' should push the first rune of the first step");
+  check(caster.attributes.mana < manaBefore, 'a rune should cost mana');
+
+  press('3');
+  check(caster.incantation.length === 2 && caster.incantation[1] === 96 + 6 + 2,
+    "'3' should push the third rune of the second step");
+
+  press('`');
+  check(caster.incantation.length === 1, 'the backspace key should take the last rune back');
+
+  casts = [];
+  press('Tab');
+  check(casts.length === 1, 'Tab should cast the incantation');
+  check(casts[0]?.chIdx === 0 && casts[0]?.incantation.length === 1,
+    'the cast should carry the caster and the runes assembled');
+  check(caster.incantation.length === 0, 'a cast that is not refused should clear the runes');
+
+  casts = [];
+  press('Tab');
+  check(casts.length === 0, 'Tab with an empty incantation should cast nothing');
+
+  // ---- 5. Case, and the keys the table does **not** claim: `ui/events.ts` routes those
+  //         to movement, so a bound key leaking through would walk the party instead.
+  check(press('Q'), "'Q' should be claimed the same as 'q'");
+  check(ui.attackingCharacterOrdinal === 1, 'a capital should reach the same binding');
+  press('q');
+
+  for (const key of ['k', 'j', 'l', 'm', ',', '.', 'Escape', 'F5', 'F9', 'ArrowUp']) {
+    check(!handleUIKey(ui, key), `'${key}' must be left for the movement and debug keys`);
+  }
+
+  // ---- 6. `d.PotentialCharacterOrdinal` makes every panel inert
+  //         (`doc/CSBwin-src/Mouse.cpp:1578-1650`), keys included.
+  party.state.potentialChampionIndex = 0;
+  press('q');
+  check(ui.attackingCharacterOrdinal === 0, 'no attack menu while a champion is only provisional');
+  press('z');
+  check(party.state.selectedCharacterIndex === -1, 'no inventory either');
+  press('1');
+  check(runes(party.state) === '-', 'and no runes');
+  party.state.potentialChampionIndex = -1;
+
+  finish();
+}
+
+main();

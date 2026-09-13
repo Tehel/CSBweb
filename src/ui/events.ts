@@ -195,39 +195,44 @@ export function bindUIEvents(): void {
                 e.preventDefault();
                 return;
             }
+            // A browser or OS shortcut keeps its key: nothing below is bound with a
+            // modifier, so Ctrl-R still reloads rather than opening a rune keypad.
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            // The panel bindings come first. They are the larger half of the table and
+            // they claim their keys whatever the game state, so the movement switch
+            // below never sees one.
+            if (ctx.renderer?.handleUIKey(e.key)) {
+                ctx.renderView();
+                e.preventDefault();
+                return;
+            }
             let handled = false;
-            switch (e.key) {
+            switch (e.key.length === 1 ? e.key.toLowerCase() : e.key) {
                 case 'ArrowUp':
-                case 'w':
-                case 'W':
+                case 'k':
                     ctx.game.enqueueMovement(MovementAction.MOVE_FORWARD);
                     handled = true;
                     break;
                 case 'ArrowDown':
-                case 's':
-                case 'S':
+                case ',':
                     ctx.game.enqueueMovement(MovementAction.MOVE_BACKWARD);
                     handled = true;
                     break;
                 case 'ArrowLeft':
-                case 'q':
-                case 'Q':
+                case 'j':
                     ctx.game.enqueueMovement(MovementAction.TURN_LEFT);
                     handled = true;
                     break;
                 case 'ArrowRight':
-                case 'e':
-                case 'E':
+                case 'l':
                     ctx.game.enqueueMovement(MovementAction.TURN_RIGHT);
                     handled = true;
                     break;
-                case 'a':
-                case 'A':
+                case 'm':
                     ctx.game.enqueueMovement(MovementAction.STRAFE_LEFT);
                     handled = true;
                     break;
-                case 'd':
-                case 'D':
+                case '.':
                     ctx.game.enqueueMovement(MovementAction.STRAFE_RIGHT);
                     handled = true;
                     break;

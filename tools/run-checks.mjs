@@ -37,6 +37,7 @@ const CHECKS = [
   { tool: 'dump-attributes.ts' },
   { tool: 'dump-hand-owner.ts' },
   { tool: 'dump-inventory-routing.ts' },
+  { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-champion-death.ts' },
   { tool: 'dump-feeding.ts' },

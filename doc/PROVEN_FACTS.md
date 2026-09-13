@@ -1875,3 +1875,34 @@ possession writers; this port re-sums it from the object weights instead
 saves** the two agree exactly (`tools/dump-csbwin-load.ts`). That is the only outside
 check the weight system has: `WEAPONDESC`, the clothing and misc weight arrays, the
 water-flask rule and the recursion into chests all have to be right for it to hold.
+
+## CSBWin has no keyboard controls — every key binding is a synthetic mouse click
+
+There is no key handler for the game panels anywhere in CSBWin. `ReadConfigFile`
+(`doc/CSBwin-src/CSBUI.cpp:741`) parses `config.txt` (`config.linux` on Linux,
+`:724-727`) into a `KEYXLATE` table (`:514`), whose rows are `(scancode, value, mode,
+type)` and whose `translate` is a linear search (`:544`). A `KEY` line binds a character,
+a `SCAN` line a scancode, and an **`MSCAN` line binds a key to a screen point and a mouse
+button**: it stores `(x<<16)+y` as the value, with type `TYPEMSCANL` or `TYPEMSCANR`
+(`:783-796`).
+
+`UIM_KEYDOWN` (`:1120`) then tries the table three times — `TYPESCAN` first, which queues
+a key, then `TYPEMSCANL` and `TYPEMSCANR`, which do not queue anything at all:
+
+```c
+OnMouseSwitchAction(2, key>>16, key & 0xffff);   // or 1, for the right button
+OnMouseSwitchAction(0);
+```
+
+(`:1147-1157`). That is the same pair `UIM_LEFT_BUTTON_DOWN` raises for a real click
+(`:1186`), and `OnMouseSwitchAction` with an explicit `x` writes `d.NewMouseX` /
+`d.NewMouseY` before calling `OnMouseClick` (`doc/CSBwin-src/system.cpp:464-472`). So a
+bound key is indistinguishable from the player clicking that pixel, and every guard on
+the panel — `d.PotentialCharacterOrdinal`, the caster test, `word20252` — applies to it
+for free.
+
+Two consequences for a port. A key can only ever mean *one* button list entry, because
+the point is fixed: no CSBWin binding can open an attack menu while another is open, since
+with one open the panel area is the option list (`handleAttackAreaClick`). And the shipped
+`config.txt` is not part of the source tree — the bindings are the player's, not the
+game's.
