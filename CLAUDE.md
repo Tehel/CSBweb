@@ -161,6 +161,7 @@ renderer, movement, timers, actuators, DSA scripting, missiles, skills/experienc
 casting, light levels, sound and most of the DM UI all work. The message area (Phase 11),
 the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
 combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
-Champions, resurrection) are all done. What is left is **Phase 10**, the CSBWin-compatible
-save/load format, which is not started; the **validation debt** (Phase 15, steps 3–5); and
-the carried-over debt listed in `PLAN.md`.
+Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step
+12). What is left is the other half of **Phase 10**, *writing* a CSBWin-compatible save;
+the **validation debt** (Phase 15, steps 3–5); and the carried-over debt listed in
+`PLAN.md`.

@@ -23,7 +23,7 @@ import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
-import { TimerQueue, TimerFunction } from './TimerQueue';
+import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import { SoundQueue } from './SoundQueue';
@@ -125,7 +125,7 @@ interface DropCursorOptions {
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 5;
+export const RUNTIME_SAVE_VERSION = 6;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -146,7 +146,12 @@ export interface RuntimeSaveState {
     };
     dungeon: {
         item16?: Item16Record[];
+        /** The timer table, by timer index — holes included, as CSBWin's array has them. */
         timers?: TimerRecord[];
+        /** Which of those timers are live, in firing order (`GameTimers::TimerQueue`). */
+        timerQueue?: number[];
+        /** `gameTimers.TimerSequence()` — the stamp the next queued timer will take. */
+        timerSequence?: number;
         missiles?: MissileRecord[];
         /** Everything play can change: cell flags, object chains, all DB records. */
         snapshot: DungeonSnapshot;
@@ -2645,6 +2650,15 @@ export class Game {
     // Get elapsed time in seconds
     getElapsedTime = () => (this.state.currentTime - this.state.startTime) / 1000;
 
+    /**
+     * The DSA global variables, where a dungeon keeps its puzzle progress. Public so a
+     * loader that cannot read a save's own copy of them can keep the ones in play
+     * rather than clear them (`src/data/CsbwinSaveGame.ts`).
+     */
+    getDsaGlobalVariables(): number[] {
+        return this.dsaSystem.getGlobalVariables();
+    }
+
     // Snapshot runtime state for quick-save.
     getRuntimeSaveState(): RuntimeSaveState {
         const item16 = this.state.dungeon.item16
@@ -2653,7 +2667,7 @@ export class Game {
                   singleMonsterStatus: [...r.singleMonsterStatus],
               }))
             : undefined;
-        const timers = this.buildTimerRecords();
+        const { records: timers, queue: timerQueue } = this.buildTimerRecords();
         const missiles = this.state.dungeon.databases.missiles.records.map((rec) => ({
             nextObject: rec.nextObject,
             projectileObject: rec.projectileObject,
@@ -2677,6 +2691,8 @@ export class Game {
             dungeon: {
                 item16,
                 timers,
+                timerQueue,
+                timerSequence: this.timerQueue.getNextSequence(),
                 missiles,
                 snapshot: this.dungeonState.captureSnapshot(),
             },
@@ -2712,6 +2728,13 @@ export class Game {
         const item16 = save.dungeon.item16 ?? [];
         const timers = save.dungeon.timers ?? [];
         const missiles = save.dungeon.missiles ?? [];
+        // The queue before `applySaveGameState`, which reads `timerWord8` back out of
+        // it through `DungeonState`'s lookup.
+        this.restoreTimerQueue(
+            timers,
+            save.dungeon.timerQueue ?? [],
+            save.dungeon.timerSequence ?? 0,
+        );
         const saveGameState: SaveGameState = {
             item16,
             timers,
@@ -2729,21 +2752,93 @@ export class Game {
         this.monsterSystem.reloadAfterSaveGame();
     }
 
-    private buildTimerRecords(): TimerRecord[] {
+    /**
+     * The timer table, laid out by timer index as CSBWin's array is, plus the queue
+     * order beside it.
+     *
+     * This used to write a single field per timer, `timerWord8`, so no save of any kind
+     * restored *when* anything was due: a door caught mid-close stayed put, a fuse
+     * stopped burning. The whole `TIMER` is written now, and `timerQueue` carries the
+     * firing order, which is what `TimerQueue.restore` puts back.
+     *
+     * An index with no live timer is filled with an empty record — `TT_EMPTY` is
+     * function 0 — exactly as CSBWin's array has holes wherever `m_firstAvailTimer`'s
+     * free list has slots.
+     */
+    private buildTimerRecords(): { records: TimerRecord[]; queue: number[] } {
         const entries = this.timerQueue.getTimers();
         let maxIndex = -1;
         for (const entry of entries) {
             if (entry.index > maxIndex) maxIndex = entry.index;
         }
-        if (maxIndex < 0) return [];
-        const records: TimerRecord[] = Array.from({ length: maxIndex + 1 }, () => ({ timerWord8: 0 }));
+        if (maxIndex < 0) return { records: [], queue: [] };
+        const records: TimerRecord[] = Array.from({ length: maxIndex + 1 }, () => emptyTimerRecord());
         for (const entry of entries) {
-            records[entry.index] = { timerWord8: entry.timerWord8 & 0xffff };
+            records[entry.index] = {
+                time: entry.time >>> 0,
+                level: entry.level & 0xff,
+                function: entry.function & 0xff,
+                uByte5: entry.uByte5 & 0xff,
+                uByte6: entry.uByte6 & 0xff,
+                uByte7: entry.uByte7 & 0xff,
+                uByte8: entry.uByte8 & 0xff,
+                uByte9: entry.uByte9 & 0xff,
+                sequence: entry.sequence & 0xffff,
+                timerWord8: entry.timerWord8 & 0xffff,
+                timerWord6: normalizeWord6(entry.timerWord6),
+            };
         }
-        return records;
+        return { records, queue: entries.map((entry) => entry.index) };
+    }
+
+    /**
+     * Rebuild the live queue from a saved table and firing order.
+     *
+     * The records are a table *by index*; the queue names which of them are live and in
+     * what order. Both readings of bytes 6-9 come back, because which one a timer means
+     * depends on its function and the queue entry carries both.
+     */
+    private restoreTimerQueue(records: TimerRecord[], order: number[], nextSequence: number): void {
+        const entries: TimerEntry[] = [];
+        for (const index of order) {
+            const record = records[index];
+            if (!record) continue;
+            entries.push({
+                index,
+                time: record.time >>> 0,
+                level: record.level & 0xff,
+                function: record.function & 0xff,
+                uByte5: record.uByte5 & 0xff,
+                uByte6: record.uByte6 & 0xff,
+                uByte7: record.uByte7 & 0xff,
+                uByte8: record.uByte8 & 0xff,
+                uByte9: record.uByte9 & 0xff,
+                sequence: record.sequence & 0xffff,
+                timerWord8: record.timerWord8 & 0xffff,
+                timerWord6: normalizeWord6(record.timerWord6),
+            });
+        }
+        this.timerQueue.restore(entries, nextSequence);
     }
 }
 
 function normalizeWord6(value: number): number {
     return (value << 16) >> 16;
+}
+
+/** A free slot in the timer table: `TT_EMPTY`, and nothing else set. */
+function emptyTimerRecord(): TimerRecord {
+    return {
+        time: 0,
+        level: 0,
+        function: 0,
+        uByte5: 0,
+        uByte6: 0,
+        uByte7: 0,
+        uByte8: 0,
+        uByte9: 0,
+        sequence: 0,
+        timerWord8: 0,
+        timerWord6: 0,
+    };
 }

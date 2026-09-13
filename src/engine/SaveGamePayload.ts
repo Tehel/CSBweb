@@ -1,10 +1,9 @@
 /**
  * What a DMweb save file contains, and how to build one from a live game.
  *
- * This is **not** the CSBWin binary format — that is Phase 10's remaining work, blocked
- * on the dungeon image's text section (`doc/CSBWIN_SAVEGAME_REFERENCE.md` →
- * "Where the dungeon image parse stands"). What this carries is the pair the quick-save
- * has carried since format v2:
+ * This is **not** the CSBWin binary format. Reading one of those is done — a genuine
+ * save loads through `applySaveBytes` below — but *writing* one is what is left of
+ * Phase 10. What this carries is the pair the quick-save has carried since format v2:
  *
  * - `runtime` — `Game.getRuntimeSaveState()`, the whole mutable world
  *   (`src/engine/DungeonSnapshot.ts`), which is what actually restores a game;
@@ -20,6 +19,7 @@
  * ignores the header entirely and restores from `runtime`.
  */
 import { loadSaveGameState, applySaveGameState, saveSaveGameState, type SaveGameState } from '../data/SaveGameLoader';
+import { applyCsbwinSave } from '../data/CsbwinSaveGame';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './Game';
 
@@ -89,6 +89,8 @@ export function buildSavePayload(game: Game): SavePayload {
     const saveGameState: SaveGameState = {
         item16,
         timers,
+        timerQueue: runtime.dungeon.timerQueue,
+        timerSequence: runtime.dungeon.timerSequence,
         missiles,
         maxItem16: item16.length,
         maxTimers: timers.length,
@@ -148,6 +150,43 @@ export function applySavePayload(game: Game, payload: SavePayload): void {
     const saveState = loadSaveGameState(decodeBase64ToBytes(payload.raw));
     applySaveGameState(game.state.dungeon, saveState, game.state.party);
     game.applyRuntimeSaveState(payload.runtime);
+}
+
+/**
+ * Is this one of our JSON saves, or a genuine CSBWin binary?
+ *
+ * A `SavePayload` is `JSON.stringify` output, so its first non-whitespace byte is `{`.
+ * A CSBWin save opens with the Extended Features block — and may open with an
+ * RC4-obfuscated one, which is why this asks the cheap, certain question about *our*
+ * format rather than trying to recognise theirs.
+ */
+function looksLikeJson(bytes: Uint8Array): boolean {
+    for (let i = 0; i < Math.min(bytes.length, 64); i++) {
+        const byte = bytes[i];
+        if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d) continue;
+        return byte === 0x7b; // '{'
+    }
+    return false;
+}
+
+/**
+ * Restore whatever the store handed back — one of our saves, or a genuine CSBWin one.
+ *
+ * The two menus and the quick-load all come through here so that the choice is made in
+ * one place. A CSBWin file goes to `applyCsbwinSave`, whose failures are turned into
+ * `SavePayloadError` because the menu's status line is the only place they can be
+ * shown, and it wants a short line rather than a stack.
+ */
+export function applySaveBytes(game: Game, bytes: Uint8Array): void {
+    if (looksLikeJson(bytes)) {
+        applySavePayload(game, decodeSavePayload(bytes));
+        return;
+    }
+    try {
+        applyCsbwinSave(game, bytes);
+    } catch (error) {
+        throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
+    }
 }
 
 /**

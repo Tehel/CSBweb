@@ -552,8 +552,7 @@ function checkCsbwinListing(): void {
       savedAt: statSync(path).mtimeMs,
       level: info.level,
       champions: info.champions,
-      loadable: false,
-      note: 'CSBWIN SAVE — NOT READABLE YET',
+      loadable: true,
     });
     console.log([file, JSON.stringify(row)].join('\t'));
     check(info.level >= 0 && info.level < 64, `${file}: level ${info.level} is plausible`);
@@ -562,7 +561,9 @@ function checkCsbwinListing(): void {
       info.champions.every((n) => n.length > 0 && !n.includes('?')),
       `${file}: every champion name is printable ASCII`,
     );
-    check(row.startsWith('*'), `${file}: listed as not loadable, because Phase 10's reader is unfinished`);
+    // Unmarked since the object indirect index was ported: these files load.
+    // `tools/dump-csbwin-load.ts` restores each of them into a real `Game`.
+    check(!row.startsWith('*'), `${file}: listed as loadable`);
   }
 
   // Not a save at all: the listing must drop it rather than show a row of nonsense.

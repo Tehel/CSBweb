@@ -247,6 +247,17 @@ async function readDmwebEntry(file: File, name: string): Promise<SaveEntry | nul
  * A genuine CSBWin save. The level and roster come out of blocks 2 and 4, which read
  * fine; the date has to come from the filesystem, because a CSBWin save carries no
  * wall-clock time at all — only `gb2.Time`, the virtual clock.
+ *
+ * **Loadable since the object indirect index was ported.** Listing one used to be as
+ * far as this went: the row was marked with a `*` and LOAD stayed inert, because every
+ * object reference in the file decoded to nonsense. `applySaveBytes` now routes these
+ * bytes to `applyCsbwinSave`, and `tools/dump-csbwin-load.ts` restores all twelve
+ * committed saves into a real `Game` and interrogates the result.
+ *
+ * `readCsbwinSaveInfo` is still the gate: it returns null for a `.dat` that is not a
+ * CSBWin save at all, so a stray file is dropped from the listing rather than offered.
+ * It does not parse the dungeon image, so a file whose *image* is damaged is listed and
+ * fails on LOAD, with the reason on the status line.
  */
 async function readCsbwinEntry(file: File, name: string): Promise<SaveEntry | null> {
     const info = readCsbwinSaveInfo(new Uint8Array(await file.arrayBuffer()));
@@ -257,7 +268,6 @@ async function readCsbwinEntry(file: File, name: string): Promise<SaveEntry | nu
         savedAt: file.lastModified,
         level: info.level,
         champions: info.champions,
-        loadable: false,
-        note: 'CSBWIN SAVE — NOT READABLE YET',
+        loadable: true,
     };
 }

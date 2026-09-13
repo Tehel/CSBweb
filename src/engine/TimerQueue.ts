@@ -212,6 +212,40 @@ export class TimerQueue {
     return stored;
   }
 
+  /**
+   * Replace the whole queue with a saved one.
+   *
+   * `LoadGame` restores CSBWin's timer array and its queue verbatim and then **does not
+   * re-sort**: the queue read out of the file already is the firing order, kept sorted
+   * by every insertion that built it (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). So this
+   * takes the order as given rather than re-inserting through `addTimer`, which would
+   * also run the duplicate-timer rules over a set of timers that legitimately coexist —
+   * two door steps on the same cell at different times, say — and quietly drop some.
+   *
+   * `nextSequence` is `gb2.TimerSequence`, the counter CSBWin hands to the next timer it
+   * queues. Indices are kept as the file numbered them, because other saved state points
+   * at them: `CHARDESC.busyTimerIndex` names a champion's pending action, and
+   * `DungeonState`'s `timerWord8` lookup is by index. New timers are minted above the
+   * highest restored one — CSBWin reuses freed slots through `m_firstAvailTimer` and
+   * this port does not, which costs nothing but the numbering.
+   */
+  restore(entries: readonly TimerEntry[], nextSequence: number): void {
+    this.queue = entries.map((entry) => ({ ...entry }));
+    this.indexMap.clear();
+    let highest = -1;
+    for (const entry of this.queue) {
+      this.indexMap.set(entry.index, entry);
+      if (entry.index > highest) highest = entry.index;
+    }
+    this.nextIndex = highest + 1;
+    this.nextSequence = nextSequence >>> 0;
+  }
+
+  /** `gameTimers.TimerSequence()` — what the next queued timer will be stamped with. */
+  getNextSequence(): number {
+    return this.nextSequence;
+  }
+
   getTimer(index: number): TimerEntry | null {
     return this.indexMap.get(index) ?? null;
   }

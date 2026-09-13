@@ -1,0 +1,208 @@
+/**
+ * Load a genuine CSBWin save into the running game.
+ *
+ * The pieces were all in place separately: `loadCsbwinWorld` parses the dungeon image
+ * into a real `DungeonData`, `readCsbwinParty` unpacks `CHARDESC[4]`, and
+ * `CsbwinObjectIndex` makes every object reference in either of them mean something.
+ * What was missing is this — turning the three into the `RuntimeSaveState` the engine
+ * already knows how to restore.
+ *
+ * Going through `RuntimeSaveState` rather than replacing `Game.state.dungeon` outright
+ * is deliberate. The live `DungeonData` is held by reference all over the engine — the
+ * renderer, `DungeonState`, every subsystem — so swapping the object would leave half
+ * the game looking at the old world. `applyRuntimeSaveState` already re-seats all of it
+ * from a snapshot, and has been doing so for the quick-save; a CSBWin save is simply
+ * another source for the same snapshot.
+ *
+ * What is restored, and from where:
+ *
+ * | Field | Source |
+ * | --- | --- |
+ * | Party position, facing, level, clock, `d.RandomNumber`, hand owner, magic caster, object in hand | `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1617-1650`) |
+ * | The four champions | block 4's `CHARDESC[4]` |
+ * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:766-782`) |
+ * | Cell flags, object chains, column index, every database record | the dungeon image, through `captureDungeonSnapshot` |
+ * | `ITEM16`, missiles | blocks 3 and the image, through `applySaveGameState` |
+ * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
+ * | The text arrays, `dsaLevelIndex`, `specialLocations`, the extended-feature flags | the save's own copies, which the snapshot does not carry |
+ *
+ * **What is not restored**, all of it recorded in `PLAN.md`:
+ *
+ * - **The DSA global variables.** CSBWin reads them out of `EXPOOL` under
+ *   `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` per record
+ *   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`), and `locateExpoolRecord` finds a record's
+ *   first word but does not hand back the run. No committed save needs it: the shipped
+ *   DM dungeon defines no DSAs at all — `numDSA` is 0 and there are no special-location
+ *   records in any of the twelve — so the live game's globals are kept rather than
+ *   cleared.
+ * - **`d.Word11694`** (`gameWon`) and `d.PartySleeping`, neither of which `GAMEBLOCK2`
+ *   carries where this reader looks.
+ */
+import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
+import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
+import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
+import { RUNTIME_SAVE_VERSION, type Game, type RuntimeSaveState } from '../engine/Game';
+import type { DungeonData } from './dungeonTypes';
+import { Position } from '../core/types';
+import type { Direction, ObjectID } from '../core/types';
+import type { PartyState } from '../engine/gameTypes';
+
+export interface CsbwinRuntimeOptions {
+    /**
+     * The DSA global variables to keep. CSBWin's live in `EXPOOL` and are not read yet
+     * (see the module comment); passing the running game's own leaves them untouched
+     * rather than zeroed.
+     */
+    dsaGlobals?: number[];
+}
+
+/**
+ * Build the party state out of `GAMEBLOCK2` and block 4.
+ *
+ * `LoadGame` assigns `d.HandChar` and `d.MagicCaster` **straight** from `GAMEBLOCK2`
+ * rather than through `SetHandOwner`/`SelectMagicCaster` (`:1636-1637`), so this does
+ * too — the setters would validate a champion and rewrite their facing, and a save is
+ * restoring a state that was already valid.
+ */
+function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartyState {
+    void dsaGlobalsUnused;
+    const block = world.save.characterBlock;
+    const gb2 = world.save.block2;
+    if (!block || !gb2) throw new Error('save has no character block or GAMEBLOCK2');
+
+    const party = readCsbwinParty(block, gb2.numCharacter, world.save.objectIndex);
+    const tail = readCsbwinPartyTail(block);
+
+    // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1642`) — the cursor's
+    // object is an indirect slot number like every other RN in the file. `RNempty` is 0.
+    const rawInHand = gb2.objectInHand & 0xffff;
+    const objectInHand =
+        rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe
+            ? null
+            : ((world.save.objectIndex ? world.save.objectIndex.resolve(rawInHand) : rawInHand) as ObjectID);
+
+    const position = new Position(gb2.partyX, gb2.partyY, gb2.partyLevel);
+
+    return {
+        champions: party.map((c) => c.champion),
+        position,
+        facing: (gb2.partyFacing & 3) as Direction,
+        magicCasterIndex: gb2.magicCaster,
+        cursorOwner: gb2.handChar,
+        selectedCharacterIndex: -1,
+        objectInHand,
+        partyShield: tail.partyShield,
+        fireShield: tail.fireShield,
+        spellShield: tail.spellShield,
+        brightness: tail.brightness,
+        invisible: tail.invisible,
+        seeThruWalls: tail.seeThruWalls,
+        magicFootprintsActive: tail.magicFootprintsActive,
+        indexOfFirstMagicFootprint: tail.indexOfFirstMagicFootprint,
+        indexOfLastMagicFootprint: tail.indexOfLastMagicFootprint,
+        numFootprintEnt: tail.numFootprintEnt,
+        lastMonsterAttackTime: gb2.lastMonsterAttackTime,
+        freezeLifeTimer: tail.freezeLifeTimer,
+        moving: false,
+        turning: false,
+        lastMoveTime: 0,
+    };
+}
+
+/**
+ * Everything a CSBWin save says, in the shape `Game.applyRuntimeSaveState` takes.
+ *
+ * Pure: no `Game` is touched, so a verification tool can build one and read it without
+ * standing a game up.
+ */
+export function buildCsbwinRuntimeState(
+    world: CsbwinWorld,
+    options: CsbwinRuntimeOptions = {},
+): RuntimeSaveState {
+    const gb2 = world.save.block2;
+    if (!gb2) throw new Error('save has no GAMEBLOCK2');
+    const block = world.save.characterBlock;
+    if (!block) throw new Error('save has no character block');
+    const tail = readCsbwinPartyTail(block);
+
+    return {
+        version: RUNTIME_SAVE_VERSION,
+        savedAt: Date.now(),
+        party: buildPartyState(world),
+        game: {
+            // `d.Time = d.Long11732 = b.gb2.Time` (`:1622`) — the game clock, in ticks.
+            tickCount: gb2.time,
+            paused: false,
+            elapsedTimeMs: 0,
+            // `d.RandomNumber = b.gb2.ranseed` (`:1624`), so the stream continues where
+            // the saved game left it rather than being reseeded from the host clock.
+            randomSeed: gb2.ranseed >>> 0,
+            gameWon: false,
+            footprints: {
+                prints: [...tail.footprints],
+                ages: [...tail.footprintAges],
+                count: tail.numFootprintEnt,
+                lastPartyMoveTime: gb2.lastPartyMoveTime,
+                indexOfFirstMagic: tail.indexOfFirstMagicFootprint,
+                indexOfLastMagic: tail.indexOfLastMagicFootprint,
+            },
+            dsaGlobals: options.dsaGlobals ?? [],
+        },
+        dungeon: {
+            item16: world.save.item16,
+            timers: world.save.timers,
+            timerQueue: world.save.timerQueue,
+            timerSequence: world.save.timerSequence,
+            missiles: world.save.missiles,
+            snapshot: captureDungeonSnapshot(world.dungeon),
+        },
+    };
+}
+
+/**
+ * The parts of the save that `DungeonSnapshot` does not carry, because they never
+ * change during play and so have no business in a runtime snapshot — but which *do*
+ * differ between `dungeon.dat` and a save, because the save holds the converted forms.
+ *
+ * The text is the one that matters. A save's text section is already in indirect form:
+ * `ConvertToIndirectText` has run, `DB2.index()` holds an index into `indirectTextIndex`
+ * rather than a word offset, and the words themselves have been repacked
+ * (`doc/CSBwin-src/SaveGame.cpp:2221-2274`). The live dungeon was converted by the same
+ * algorithm over the same input, so the two orderings agree today — but they agree by
+ * coincidence of input, not by construction, and a dungeon whose text records had been
+ * edited would not. Taking the save's own arrays removes the coincidence.
+ *
+ * `bigActuators` is set by hand rather than through `applySaveGameState`, which would
+ * call `applyBigActuators` and *re-derive* the word-8 of every type-47 actuator from
+ * records that already carry it.
+ */
+function applyStructuralExtras(live: DungeonData, world: CsbwinWorld): void {
+    const from = world.dungeon;
+    if (from.textWords) live.textWords = from.textWords;
+    if (from.indirectTextIndex) live.indirectTextIndex = from.indirectTextIndex;
+    if (from.compressedText) live.compressedText = from.compressedText;
+
+    if (world.save.dsaLevelIndex) live.dsaLevelIndex = world.save.dsaLevelIndex;
+    if (world.save.dsaIndex) live.dsaIndex = world.save.dsaIndex;
+    if (world.save.specialLocations) live.specialLocations = world.save.specialLocations;
+    if (world.save.extendedWallDecorations !== undefined) {
+        live.extendedWallDecorations = world.save.extendedWallDecorations;
+    }
+    if (world.save.spellFilterLocation !== undefined) {
+        live.spellFilterLocation = world.save.spellFilterLocation;
+    }
+    // The records restored by the snapshot are already big-actuator records.
+    if (world.save.bigActuators) live.bigActuators = true;
+}
+
+/** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
+export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
+    const world = loadCsbwinWorld(bytes);
+    const runtime = buildCsbwinRuntimeState(world, {
+        // Keep what the running game has; see the module comment on `EXPOOL`.
+        dsaGlobals: game.getDsaGlobalVariables(),
+    });
+    game.applyRuntimeSaveState(runtime);
+    applyStructuralExtras(game.state.dungeon, world);
+    return world;
+}

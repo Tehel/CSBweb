@@ -68,10 +68,10 @@ Verified against the code, not inherited from earlier revisions of this file.
    through `isDebugFeaturesEnabled()`.
 7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
    the UI now lives in `src/renderer/ui/`.
-8. ⚠️ **CSBWin-binary-compatible save files** — the *reader* now handles genuine files
-   (three real saves in `static/gamefiles/saves/`, read by `tools/dump-csbwin-save.ts`
-   with every block checksum clean); the *writer* still stops after block 6. Phase 10
-   below is rescored.
+8. ⚠️ **CSBWin-binary-compatible save files** — the **reader is done**: twelve genuine
+   saves in `static/gamefiles/saves/` load into a running game, party, world, objects
+   and all (Phase 10 step 12, September 13th). The *writer* still stops after block 6,
+   which is what is left of Phase 10.
 9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
    `supressPitDamage` now has something to suppress.
 
@@ -138,15 +138,28 @@ archive section.
 
   <sub>Context: `doc/PROVEN_FACTS.md` → “The column index is saved state, not dungeon structure”.</sub>
 
-- ⏳ **Champion titles in genuine saves are missing their first character**, sometimes.
-  `SHE DEVIL` reads back as `\0HE DEVIL`, `THE BARBARIAN` as `\0HE BARBARIAN`, against
-  the preset names in `dungeon.dat`. It is in the files, not the reader: inside one save
-  `HALK` loses its `T` while `LEYLA` and `ALEX` keep `SHADOWSEEK` and `ANDER` whole, so
-  no offset error explains it. Suspicion is a champion-naming path writing its NUL at
-  `name[8]`, which is `title[0]` — unverified, and the reader must not be "corrected"
-  for it until the writing path is found. Matters for Phase 10 step 6.
 
-  <sub>Context: `doc/PROVEN_FACTS.md` → “`CHARDESC.title` is 20 bytes, not 16”.</sub>
+- ✅ **Resolved: champion titles missing their first character — and it is not a bug.**
+  A reincarnated champion whose title was left empty. `_ReIncarnate` clears **one byte**
+  of each field to start, `pChar->name[0] = 0; pChar->title[0] = 0;`
+  (`doc/CSBwin-src/Code13ea4.cpp:57-58`) — not the array — and each keystroke advances the
+  terminator. Type the name back and skip the title, and `title[0]` stays 0 with the old
+  title's bytes 1..19 still behind it: `SHE DEVIL` becomes `\0HE DEVIL`. The name never
+  shows it because retyping the same name overwrites the same bytes over padding that was
+  already zero. So reincarnation was never ruled out; a *test* that types a title
+  overwrites the remnant, which is why the saves made to provoke it came back clean.
+
+  CSBWin prints the title as a C string (`TextToViewport(…, pcA3->title, false)`,
+  `doc/CSBwin-src/Character.cpp:1338`), so it shows a **blank** title — what the player
+  asked for. The reader is not corrected for it; `decodeCharField` now stops at the first
+  NUL for the same reason, where it used to skip zero bytes and show `HE DEVIL`.
+
+  A second path to the same byte exists and is a real off-by-one —
+  `EditCharacterName`'s insert branch (`doc/CSBwin-src/Chaos.cpp:5323-5324`) shifts from
+  `max_len` rather than the string's length, so `name[8] = name[7]` and `name[8]` *is*
+  `title[0]` — but that is the editor, not the game.
+
+  <sub>`doc/PROVEN_FACTS.md` → “A champion's title can lose its first character”.</sub>
 
 - ⏳ The dual storage itself is the real defect and is still there: `Champion` keeps
   hands in both `possessions[0..1, 8]` and three named fields, and every writer has to
@@ -417,12 +430,9 @@ Goal: ensure internal state and data structures are complete enough to write a b
    handled straight from the DOM event instead of through the game's mouse queue.
 
    **Deferred, deliberately:**
-   - **Genuine CSBWin `.dat` files are listed but not loadable.** The level and roster
-     come out of blocks 2 and 4 and are correct — `tools/dump-save-menu.ts` prints a row
-     for all seven saves in `static/gamefiles/saves/` — but the row is marked with a `*`
-     and LOAD stays inert, because the dungeon image's text section still does not parse
-     (see the blocker below). That row is now the most visible reminder of what the rest
-     of Phase 10 owes.
+   - ✅ **Genuine CSBWin `.dat` files load** (step 12, September 13th). They were listed
+     with a `*` and an inert LOAD while their object references were undecodable; the
+     star and the note are gone.
    - **No `<input type=file>` / blob-download fallback** for Firefox and Safari. The menu
      says `NEEDS A CHROMIUM BROWSER` on the file source and stays usable on the browser
      source; a fallback that cannot list a directory would not fit this menu's shape.
@@ -433,8 +443,69 @@ Goal: ensure internal state and data structures are complete enough to write a b
      instead, not by pixels.
    - **`SAVE AND QUIT`** has no equivalent: there is no credits screen to quit to.
 
-Status: ⏳ mostly pending, but **rescored against the code in September 2026** — steps
-2-5 are in better shape than the list above implies, and step 1 is done:
+12. **A genuine CSBWin save loads.** ✅ done, September 13th.
+   `src/data/CsbwinDungeonImage.ts` (`loadCsbwinWorld`) parses the dungeon image into a
+   real `DungeonData`, `src/data/CsbwinCharacters.ts` unpacks `CHARDESC[4]` and the
+   128-byte party tail, and `src/data/CsbwinSaveGame.ts` (`applyCsbwinSave`) turns the
+   two into the `RuntimeSaveState` the engine already restores from. The disk menu's
+   `.dat` rows are no longer starred; `applySaveBytes` sniffs our JSON against a binary
+   and dispatches, so LOAD and F9 both act on them.
+
+   **What unblocked it: an RN in a save file is an indirect index, not a packed RN.**
+   `class RN` holds one `ui16` and resolves it through two global arrays, `dataTypeMap`
+   and `dataIndexMap` (`doc/CSBwin-src/CSBTypes.h:268-370`); `ConvertListOfObjects`
+   rewrites every reference in an original dungeon into a slot number the first time it
+   is read (`doc/CSBwin-src/SaveGame.cpp:1916-2018`), and the two maps travel in the
+   save's Extended Features block. So the possession slots that "came out as category
+   0/1 with indices far past those databases" were never packed RNs — and neither was
+   anything else in the image. `src/data/CsbwinObjectIndex.ts` reads the maps, verifies
+   both `FormChecksum`s, and translates.
+   <sub>`doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect index".</sub>
+
+   Evidence, in three layers:
+   - `tools/dump-csbwin-world.ts` walks **every object chain** in all twelve committed
+     saves — 1783 to 1908 objects each, up to 31 deep, through chests and monster
+     possessions — and finds no free record, no index past a database, no category
+     without one and no cycle. An early save holds `dungeon.dat`'s 1911 objects less
+     exactly what the chosen heroes carried out of their mirrors.
+   - `tools/dump-csbwin-party.ts` asserts that all thirty possession slots of every
+     champion name a **live** record in one of the six carryable databases. This is the
+     check that used to be printed and not asserted.
+   - `tools/dump-csbwin-load.ts` is new and is the one that matters: it stands a real
+     `Game` up on `dungeon.dat`, restores each save into it, and then asks the *live
+     engine* where the party is, who it is, what its own cell holds, and whether every
+     cell flag in all fourteen maps is the save's. 746 checks. Confirmed on screen too
+     — `csbgame7.dat` loads in the running app with its four champions, their hands and
+     its own corridor.
+
+   ✅ **The timer queue is restored** (September 13th, second pass, on two save files
+   made to order). The whole 16-byte `TIMER` is read and written, in all three of the
+   sizes the Extended Features flags select, and the queue that orders it comes back
+   verbatim rather than being re-inserted — CSBWin never re-sorts on load, and
+   re-inserting would run the duplicate-timer rules over timers that legitimately
+   coexist. **The quick-save gained this too**: it wrote the same single `timerWord8`
+   field, so a door caught mid-close was lost across F5/F9 as well. Save format v6.
+   Evidence: `tools/dump-csbwin-timers.ts` restores `csbgame4-door-opening.dat` and
+   `csbgame4-door-closing.dat` — identical fresh games whose door timers differ in one
+   byte — into a real `Game`, turns the clock, and watches one door open and the other
+   shut. <sub>`doc/PROVEN_FACTS.md` → "The `TIMER` record".</sub>
+
+   ⏳ **Still deferred, and none of it new debt:**
+   - **The DSA global variables are not read from `EXPOOL`.** CSBWin takes them from
+     `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` a record
+     (`doc/CSBwin-src/SaveGame.cpp:1746-1763`); `locateExpoolRecord` finds a record but
+     returns only its first word. No committed save needs it — the shipped DM dungeon
+     defines no DSAs at all (`numDSA` is 0 in all twelve, and no special-location
+     records) — so the running game's globals are kept rather than cleared.
+   - **`d.Word11694` (`gameWon`) and `d.PartySleeping`** are not restored; neither is in
+     `GAMEBLOCK2` where this reader looks.
+   - **A record index above 1023 cannot be expressed.** `dataIndexMap` is 16 bits and
+     this port's RN index field is 10. CSBWin allows 64000. The largest index in any
+     committed save is 682; `CsbwinObjectIndex.resolve` throws rather than alias, so a
+     third-party dungeon that needed it would say so.
+
+Status: 🔄 **the reader is finished; the writer is what is left.** Rescored against the
+code in September 2026, and again on the 13th when step 12 landed:
 
 - Step 1 (inventory the blocks) — ✅ done. The full write order, every block's size and
   the EXPOOL side-writes are tabulated in `doc/CSBWIN_SAVEGAME_REFERENCE.md`.
@@ -442,25 +513,33 @@ Status: ⏳ mostly pending, but **rescored against the code in September 2026** 
   done, though not yet *serialized*. `src/engine/DungeonSnapshot.ts` captures exactly
   what blocks 7-14 carry, and the column-index fix closed the last gap in step 4. What
   remains for these is packing, not modelling.
-- Step 6 (character block) — ⏳ the one genuinely unported structure. `CHARDESC` is fully
-  declared and its title field is 20 bytes rather than the struct's 16
-  (`doc/PROVEN_FACTS.md`). Reading names out of a real save works; nothing is packed.
+- Step 6 (character block) — ⚠️ **read, not written.** `CsbwinCharacters.ts` unpacks a
+  whole `CHARDESC` — stats, skills, wounds, the thirty possessions — and its title field
+  is 20 bytes rather than the struct's 16 (`doc/PROVEN_FACTS.md`). Nothing is packed.
 - Step 9 (checksum/scramble parity) — ✅ proven for blocks 0-6 in both directions, and
   now against files this project did not write.
 - Step 10 (round-trip validation) — ⚠️ half. `tools/dump-csbwin-save.ts` reads genuine
   saves; the load → re-serialize → binary-compare half waits on the writer.
-- ⏳ **New blocker, found by reading real files: the text section of the dungeon image
-  does not parse.** Blocks 7-10 are fine — the image sits at
-  `SaveGameState.dungeonImageOffset`, plain and uncompressed, and its header, level
-  descriptors, column index and object list all read. The indirect text index that
-  follows is **little-endian** (unlike the rest of the image) and, worse, none of the
-  candidate lengths close: the section must be 5438 bytes and neither
-  `NumWordsInTextArray*2`, `*4`, nor `*4 + 4 + 2*sizeOfCompressedText` gets there. Until
-  it is solved, everything after it — all 16 databases and the cell flags — is
-  unreachable, which is why `parseMissileRecordsFromSaveData` and
-  `parseSpecialLocationsFromSaveData` return `null` on every genuine save. The `0`
-  those used to report was a failed parse, not an empty one; `tools/dump-csbwin-save.ts`
-  now asserts the failure so it cannot be mistaken for a result again.
+- ✅ **Resolved: the dungeon image layout is solved.** (Kept here because the route to it
+  is the lesson.) The blocker was never the text section alone — two database record
+  sizes differ from `dungeon.dat` (ACTUATOR is 10 bytes with `bigActuators`, SCROLL is 6
+  from extended-features version `'B'`), and the indirect-text block is little-endian
+  with a header field, `NumWordsInTextArray`, that `ConvertToIndirectText` repurposes to
+  mean "index entries". `tools/dump-csbwin-save.ts` now proves the whole layout by
+  summing every section and landing on `EOF - 2`, for twelve genuine saves. Every
+  database, the object list, the column index and the cell flags are read now (step 12);
+  when this was written only MISSILE was.
+  What found it: save files made to order — a fresh game diffed against `dungeon.dat`
+  gave hard anchors for the cell flags and the door database, and the gap between them
+  was the answer. <sub>`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file".</sub>
+
+- 🚫 **Superseded blocker (kept for the record): the text section of the dungeon image
+  did not parse.** The indirect text index is little-endian unlike the rest of the image
+  and none of the candidate lengths closed, so everything after it — all sixteen
+  databases and the cell flags — was unreachable, and
+  `parseMissileRecordsFromSaveData` / `parseSpecialLocationsFromSaveData` returned
+  `null` on every genuine save. Solved by the entry above; kept because the shape of the
+  mistake (assuming one section was wrong when three were) is the lesson.
 
 Note this is a large piece of work and is *not* a prerequisite for playability;
 quick-save/load via a runtime JSON snapshot already works.

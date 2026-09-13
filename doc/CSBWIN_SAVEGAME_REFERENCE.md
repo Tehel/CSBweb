@@ -173,43 +173,60 @@ was written to document.
 
 ## Where the dungeon image parse stands
 
-`LoadGame` calls `ReadDatabases()` immediately after the timer queue
-(`doc/CSBwin-src/SaveGame.cpp:1739`). That function opens with
+**Solved.** The image is plain and uncompressed — `LoadGame` calls `ReadDatabases()`
+after the timer queue (`doc/CSBwin-src/SaveGame.cpp:1739`) with
+`d.gameState == GAMESTATE_ResumeSavedGame`, which skips that function's own
+extended-features/compression preamble (`:2345-2374`); the `ExpandData` path with magic
+`33028` belongs to `dungeon.dat`, not to saves.
 
-```
-  d.inStreamBuffered = 0; // Read from file
-  if (d.gameState != GAMESTATE_ResumeSavedGame) { …extended features, magic, ExpandData… }
-```
+The full section layout, the two record sizes that differ from `dungeon.dat`
+(ACTUATOR 10 with `bigActuators`, SCROLL 6 from version `'B'`) and the little-endian
+indirect-text block are written up in `doc/PROVEN_FACTS.md` → "The dungeon image
+layout in a save file". `computeDungeonImageLayout` in `src/data/SaveGameLoader.ts`
+implements it, and `tools/dump-csbwin-save.ts` checks that the section lengths sum
+exactly to `EOF - 2` on every committed save — twelve of them, DM only so far.
 
-(`:2345-2374`), so when the caller is a save load the whole preamble is skipped and
-`StreamInput` reads straight on from the current file position. **The dungeon image in
-a save file is therefore plain and uncompressed** — the compression path with magic
-`33028` and `ExpandData` belongs to `dungeon.dat`, not to saves.
+**The whole image now parses.** `loadCsbwinWorld` in `src/data/CsbwinDungeonImage.ts`
+reads a genuine save into a real `DungeonData` — header, level descriptors, column
+index, object list, indirect text, all sixteen databases and the cell flags. It does
+not reimplement the record parsers: the image *is* `dungeon.dat`'s structure, so it
+hands the byte range to `DungeonLoader` with a `DungeonImageOptions` describing the
+three differences (big actuators, new scrolls, indirect text) that the Extended
+Features block declares.
 
-Confirmed on all three genuine saves: at `SaveGameState.dungeonImageOffset` sits
-`dungeon.dat`'s own 44-byte header, seed 99, 14 maps, followed by database counts that
-are plainly real — `door=170 telep=179 text=125 actuator=683 creature=257 weapon=207
-clothing=241 scroll=35 potion=61 container=12 misc=420 missile=60 cloud=50`, with
-`EXPOOL=2/3/11` varying per save. Header, level descriptors, column index and object
-list are all reachable.
+`tools/dump-csbwin-world.ts` is the evidence. The saves taken at the first moment the
+game allows one still hold `dungeon.dat`'s world, and they read back with **zero**
+differing cell flags across all 12087 cells of all 14 levels; the played saves differ
+by 82 to 733 cells, rising with how far into the game they were taken.
 
-**What does not work yet is the text section**, and it blocks everything after it —
-the databases and the cell flags, hence `parseMissileRecordsFromSaveData` and
-`parseSpecialLocationsFromSaveData` both returning `null`. Two things are known about
-it:
 
-- The section does begin with an indirect text index, and **that index is
-  little-endian** while the rest of the image is big-endian. Its first entries read
-  `00 00 00 00 | 13 00 00 00 | 29 00 00 00 | 40 00 00 00` — as LE32 that is
-  0, 19, 41, 64, a rising run of word offsets; as BE32 it is nonsense. `SaveGame.cpp`
-  has a `SwapIndirectTextIndex` around the write (`:1187-1189`), which on the
-  little-endian build is the usual no-op, exactly like `SwapExtendedFeaturesBlock`.
-- The length does not close under either candidate layout. Working back from the end
-  of the file — EOF, minus the 2-byte final checksum, minus the `cellFlagArraySize`
-  the extended block declares (12366) — the text section has to be **5438 bytes** in
-  both `csbgame.dat` and `csbgame3.dat`. Neither `NumWordsInTextArray*2` (250) nor
-  `NumWordsInTextArray*4` (500) nor `500 + 4 + 2*sizeOfCompressedText` reaches it, so
-  the header field at offset 6 is not the count this section is sized by.
+## Every object reference in a save is an indirect index
 
-Solving that is the next concrete step for Phase 10's read half, and it is a
-prerequisite for reading anything the player did to the world out of a real save.
+The last thing standing between "the image parses" and "the save loads", and the one
+that looked like a reader bug for longest: **an RN in a CSBWin save is not a packed
+`[position:2][category:4][index:10]`**. `class RN` holds a single `ui16` and resolves it
+through two global arrays, `dataTypeMap` and `dataIndexMap`, which travel in the save's
+Extended Features block immediately after the 512-byte header
+(`ReadExtendedFeatures`, `doc/CSBwin-src/SaveGame.cpp:355-376`). The full account, with
+the byte order, the free-slot marker and the two ways it can legitimately fail, is
+`doc/PROVEN_FACTS.md` → "An RN in a save file is an indirect index"; the implementation
+is `src/data/CsbwinObjectIndex.ts`, threaded into `DungeonLoader` through
+`DungeonImageOptions.resolveRN` so that every RN is translated as it is read.
+
+
+## Where the load stands
+
+**Done.** `src/data/CsbwinSaveGame.ts` (`applyCsbwinSave`) restores a genuine save into
+a running `Game`: it builds a `RuntimeSaveState` from `GAMEBLOCK2`, block 4 and the
+image, and hands it to `Game.applyRuntimeSaveState` — the same path the quick-save has
+used since format v2 — rather than swapping `Game.state.dungeon`, which half the engine
+holds by reference. `applySaveBytes` in `src/engine/SaveGamePayload.ts` decides between
+the two formats, so the disk menu's LOAD and F9 both act on a `.dat`.
+
+`tools/dump-csbwin-load.ts` is the evidence: all twelve committed saves are restored
+into a real `Game` and the *live engine* is then asked where the party is, who it is,
+what its cell holds, and whether every cell flag in all fourteen maps is the save's.
+
+What a load still does **not** carry is listed under Phase 10 step 12 in `PLAN.md`: the
+timer queue (a gap the port's own quick-save shares), the DSA global variables in
+`EXPOOL`, and `d.Word11694`.

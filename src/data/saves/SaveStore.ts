@@ -27,10 +27,11 @@ export interface SaveEntry {
     /** Champion names in party order. */
     champions: string[];
     /**
-     * False for a genuine CSBWin `.dat`: the dungeon image's text section does not parse
-     * yet, so loading one would restore a party into a world reset to `dungeon.dat`
-     * (`doc/CSBWIN_SAVEGAME_REFERENCE.md`). Listed all the same — the row is the most
-     * visible reminder of what Phase 10 still owes.
+     * Whether LOAD will act on this row. Genuine CSBWin `.dat` saves were listed with
+     * this false while their object references were undecodable; they load now
+     * (`src/data/CsbwinSaveGame.ts`). What still sets it false is a save this build
+     * cannot restore — a `SavePayload` from an older format version, say — and the row
+     * is then marked with a `*` and carries a `note` saying why.
      */
     loadable: boolean;
     /** Why not, when `loadable` is false. Shown on the detail line. */
@@ -87,8 +88,8 @@ export function sortSaveEntries(entries: SaveEntry[]): SaveEntry[] {
  *
  * This is what the quick-load acts on: "the most recent save" has to mean the most
  * recent one *anywhere*, or F9 would answer differently depending on which source the
- * menu happened to be showing. Entries that cannot be loaded — a genuine CSBWin `.dat`,
- * until Phase 10's reader is finished — are skipped rather than picked and refused.
+ * menu happened to be showing. Entries that cannot be loaded are skipped rather than
+ * picked and refused.
  *
  * Pure, and the ordering rule is `sortSaveEntries`'s, so the two cannot drift apart.
  */

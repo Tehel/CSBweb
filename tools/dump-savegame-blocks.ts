@@ -68,14 +68,37 @@ function makeItem16(): Item16Record {
   };
 }
 
+/**
+ * A `TIMER` with a distinct value in every field, so that a field written at a
+ * neighbour's offset shows up rather than round-tripping by luck. The same trick
+ * `makeItem16` uses, and it is what caught the writer emitting bytes 8-9 alone.
+ */
 function makeTimer(): TimerRecord {
-  return { timerWord8: 0xbeef };
+  return {
+    time: 0x00123456,
+    level: 0x0d,
+    function: 49,
+    uByte5: 0x51,
+    uByte6: 0x52,
+    uByte7: 0x53,
+    uByte8: 0xbe,
+    uByte9: 0xef,
+    // Zero because this round trip uses the **10-byte** `TIMER`: our writer emits no
+    // Extended Features block yet, so a file it writes declares neither sequenced nor
+    // extended timers and has no `m_timerSequence` field to carry. The 16-byte form is
+    // exercised against genuine saves by `tools/dump-csbwin-timers.ts`; the level still
+    // round-trips here because the short form folds it into the top byte of the time.
+    sequence: 0,
+    timerWord8: 0xbeef,
+    timerWord6: 0x5253,
+  };
 }
 
 function makeSave(handChar: number, magicCaster: number): SaveGameState {
   return {
     item16: [makeItem16()],
     timers: [makeTimer()],
+    timerQueue: [0],
     maxItem16: 1,
     maxTimers: 1,
     sequencedTimers: false,
@@ -115,7 +138,22 @@ function main(): void {
   check(read.magicCaster === 3, 'gb2.MagicCaster should round-trip');
   check(read.maxTimers === 1, 'gb2.MaxTimers should round-trip');
   check(read.maxItem16 === 1, 'gb2.MaxITEM16 should round-trip');
-  check(read.timers?.[0]?.timerWord8 === 0xbeef, 'the timer word should round-trip');
+  // Every `TIMER` field. A save that carries only `timerWord8` cannot say *when*
+  // anything fires, which is how doors and fuses used to be lost across a load.
+  const wroteTimer = makeTimer();
+  const gotTimer = read.timers?.[0];
+  if (!gotTimer) {
+    fail('the TIMER record should come back at all');
+  } else {
+    for (const key of Object.keys(wroteTimer) as Array<keyof TimerRecord>) {
+      row(`timers[0].${key}`, wroteTimer[key], gotTimer[key]);
+      check(wroteTimer[key] === gotTimer[key], `TIMER field ${key} should round-trip`);
+    }
+  }
+  check(
+    (read.timerQueue ?? []).join(',') === '0',
+    'the timer queue order should round-trip',
+  );
 
   // Every `ITEM16` field, not just the one that first showed the writer was partial.
   // `makeItem16` gives each byte a distinct value, so this also catches a field

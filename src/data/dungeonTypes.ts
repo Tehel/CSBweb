@@ -299,8 +299,56 @@ export const SMS_MIRROR = 0x40;
 /**
  * Save-game timer record (runtime)
  */
+/**
+ * One CSBWin `TIMER` (`doc/CSBwin-src/CSB.h:1799-2052`), and the whole of it.
+ *
+ * It used to be the single `timerWord8` field, which is why no save of any kind — ours
+ * or CSBWin's — restored *when* anything was due to happen: a door caught mid-close
+ * stayed where it was, a fuse stopped burning, a pending actuator action was lost.
+ *
+ * The struct is 10, 12 or 16 bytes depending on two Extended Features flags, and the
+ * shorter forms are not truncations but earlier versions that CSBWin converts on load
+ * (`ConvertToSequencedTimers` / `ConvertToExtendedTimers`,
+ * `doc/CSBwin-src/Timer.cpp:2878-2919`). This is the converted, 16-byte reading:
+ *
+ * ```
+ *  0  ui32 m_time            big-endian. In the 16-byte form the whole 32 bits are the
+ *                            time; in the shorter forms the top 8 bits are the level
+ *                            and the bottom 24 the time.
+ *  4  ui8  timerFunction     TIMERTYPE
+ *  5  ui8  m_timerUByte5     commonly 0; a champion index for 11/12/13/72/75
+ *  6  ui8  m_timerUByte6     commonly mapX
+ *  7  ui8  m_timerUByte7     commonly mapY
+ *  8  ui8  m_timerUByte8
+ *  9  ui8  m_timerUByte9     commonly the action: set / clear / toggle
+ * 10  ui16 m_timerSequence   big-endian; breaks ties between equal times
+ * 12  ui8  m_timerLevel      the dungeon level this timer refers to
+ * 13  ui8  unused13[3]
+ * ```
+ *
+ * Bytes 6-7 and 8-9 are read *both* ways depending on the function: `timerObj6` and
+ * `timerObj8` are RNs, `timerWord6`/`timerWord8` are 16-bit words, and `swapTimers`
+ * switches on the function code to decide which (`doc/CSBwin-src/SaveGame.cpp:565-607`).
+ * Both readings are kept here so a consumer does not have to re-derive them.
+ */
 export interface TimerRecord {
-    timerWord8: ui16;           // bits 0-4 x, 5-9 y, 10-11 direction, 12-15 delta energy
+    /** `m_time`. Absolute game ticks, on the same clock as `GAMEBLOCK2.Time`. */
+    time: ui32;
+    /** `m_timerLevel`, or the top byte of `m_time` in the pre-extended forms. */
+    level: ui8;
+    /** `timerFunction` — a `TIMERTYPE`. */
+    function: ui8;
+    uByte5: ui8;
+    uByte6: ui8;
+    uByte7: ui8;
+    uByte8: ui8;
+    uByte9: ui8;
+    /** `m_timerSequence`. Zero in a file written before sequenced timers. */
+    sequence: ui16;
+    /** Bytes 8-9 as one word: for a missile, bits 0-4 x, 5-9 y, 10-11 direction, 12-15 delta energy. */
+    timerWord8: ui16;
+    /** Bytes 6-7 as one word. Signed — `timerWord6()` returns `i16`. */
+    timerWord6: number;
 }
 
 export interface DsaAction {

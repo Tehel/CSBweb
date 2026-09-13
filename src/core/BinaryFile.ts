@@ -157,6 +157,23 @@ export class BinaryFile {
         return value >>> 0; // Ensure unsigned
     }
 
+    /**
+     * A little-endian 32-bit word at `position`, without moving the read head or
+     * touching `endianness`.
+     *
+     * The one place this is needed is the indirect-text block of a CSBWin save, which
+     * is little-endian inside an otherwise big-endian image: its swap helper is a no-op
+     * on the shipping build, exactly like the Extended Features header
+     * (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file").
+     */
+    peekU32LE(position: number): ui32 {
+        if (position < 0 || position + 4 > (this.data?.length ?? 0)) {
+            throw new Error(`peekU32LE out of range at ${position}`);
+        }
+        const d = this.data!;
+        return (d[position] | (d[position + 1] << 8) | (d[position + 2] << 16) | (d[position + 3] << 24)) >>> 0;
+    }
+
     readI8(position?: number): i8 {
         const value = this.readU8(position);
         return value > 127 ? value - 256 : value;

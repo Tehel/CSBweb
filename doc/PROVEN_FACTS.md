@@ -1394,11 +1394,367 @@ Neither field is byte-swapped — `swapCharacter` lists every field it swaps and
 are not among them (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so both are read as plain
 bytes regardless of endianness.
 
-⚠️ **Open question, not a fact.** In the committed saves several champions' titles read
-back with their first character replaced by 0: `SHE DEVIL` → `\0HE DEVIL`,
+The 20-byte span is now confirmed from data as well: in the saves made to test it,
+`IAIDO` carries `RUYITO CHIBURI` and `ELIJOH` carries `NO SPC AFTER NAME` — 17
+characters plus terminator — starting at offset 8 with nothing lost.
+
+⚠️ **Open question, not a fact.** In the three oldest committed saves several
+champions' titles read back with their first character replaced by 0: `SHE DEVIL` → `\0HE DEVIL`,
 `SHADOWSEEK` → `\0HADOWSEEK`, `THE BARBARIAN` → `\0HE BARBARIAN`, against the preset
 names `tools/dump-preset-heroes.ts` reads from `dungeon.dat`. It is a property of the
 files, not of the reader: within one save, `HALK` loses its `T` while `LEYLA` and
 `ALEX` keep `SHADOWSEEK` and `ANDER` intact, so no fixed offset explains it. The
-suspicion is a champion-naming path that writes its NUL at `name[8]`, which is
-`title[0]` — unverified. Do not "fix" the reader for it until the writing path is found.
+suspicion was a champion-naming path writing its NUL at `name[8]`, which is `title[0]`.
+**That has now been tested and ruled out.** Three saves were made specifically to
+provoke it — a champion resurrected and left alone, one reincarnated and renamed with
+the name field padded with spaces to walk the cursor into the title, and one
+reincarnated and renamed using Enter to move fields — and all three come back with
+name at 0 and title at 8, whole. So neither resurrection, nor reincarnation, nor
+renaming by either keyboard route clobbers `title[0]`; whatever does it is specific to
+how those older files were produced. Do not "fix" the reader for it.
+
+## The dungeon image layout in a save file, and the two record sizes that change
+
+Blocks 7-14 of a save (the dungeon image) are plain and uncompressed. This is the
+layout, all of it now verified: for **twelve genuine save files** the sum of every
+section length from the 44-byte header to the end of the cell flags lands exactly on
+`EOF - 2`, the byte before `WriteAndChecksum`'s final word
+(`doc/CSBwin-src/SaveGame.cpp:1222`). One wrong record size anywhere and it misses.
+
+```
+44                           DUNGEONDATINDEX
+16 * numMaps                 level descriptors
+2  * totalColumns            objectListIndex   (column index)
+2  * objectListSize          objectList
+   … text section, below …
+Σ  count[db] * size[db]      the 16 databases, in order
+cellFlagArraySize            cell flags        (from EXTENDEDFEATURESBLOCK+48)
+2                            final checksum
+```
+
+**Two record sizes are not the `dungeon.dat` ones.** This is what defeats the obvious
+arithmetic:
+
+- **ACTUATOR (db 3) is 10 bytes, not 8.** `dbEntrySizes[dbACTUATOR]` is the *big* size
+  and the small one is the special case — `ReadDatabases` writes it as a subtraction,
+  `if ((D6W==dbACTUATOR) & !bigActuators) D4W -= 2;`
+  (`doc/CSBwin-src/SaveGame.cpp:2571-2575`), and a file without the flag is fixed up on
+  load by `MakeBigActuators`, which inserts two zero bytes per record (`:2287-2301`).
+- **SCROLL (db 7) is 6 bytes, not 4**, from extended-features version `'B'` on.
+  `readScrollDatabase` branches on it and says why: "The old version had a 10-bit index
+  into the text database. The new version has an RN reference to the text."
+  (`:2189-2200`).
+
+**The text section is little-endian, and its header field means something else.**
+
+```
+4 * NumWordsInTextArray      indirectTextIndex   (LE32 word offsets)
+4                            sizeOfCompressedText (LE32)
+2 * sizeOfCompressedText      compressedText
+```
+
+Two traps in three lines:
+
+- `NumWordsInTextArray` (header offset 6) does **not** count text words in a save.
+  `ConvertToIndirectText` overwrites it with the index length
+  (`doc/CSBwin-src/SaveGame.cpp:2272`), so it counts index *entries*. In the DM saves
+  it reads 125 while `dungeon.dat`'s own value is 1749 — and 1749 reappears as
+  `sizeOfCompressedText`, because the compressed text is still the same text.
+- Both the index and the size word are **little-endian**, alone in an otherwise
+  big-endian image. `SwapIndirectTextIndex` guards the write the same way
+  `SwapExtendedFeaturesBlock` does, so on the shipping little-endian build it is a
+  no-op and the block keeps native order.
+
+Two independent confirmations beyond the closure sum: a 48-byte window lifted from
+`dungeon.dat`'s map-data section is found in an early save exactly at the computed cell
+flag offset, and its door database appears exactly at the computed database offset.
+
+Covered by `tools/dump-csbwin-save.ts`.
+
+## A thrown object keeps its id: `ObjectInHand` and `MISSILE.projectileObject`
+
+Two saves taken either side of a throw settle both fields at once. In
+`static/gamefiles/saves/csbgame-item-on-cursor.dat` a sword sits on the cursor and
+`gb2.ObjectInHand` is `0x4d`; in `csbgame-flying-sword.dat`, the same session moments
+later, the cursor is empty (`0xffff`) and the one live MISSILE record carries
+`projectileObject = 0x4d`, `rangeRemaining = 77`, `damageRemaining = 20`,
+`timerIndex = 2` against `NumTimer = 3`.
+
+`0xffff` in `gb2.ObjectInHand` is the empty hand, and **`timerIndex == 0xffff` marks a
+free slot** in the MISSILE pool. The pool is allocated at full size regardless of what
+is happening: all twelve sample saves carry 60 missile and 50 cloud records, so a
+record count says nothing about how many missiles are in flight — only a live
+`timerIndex` does.
+
+## The new scroll record, and where big actuators put their extra bytes
+
+Both of the record sizes that differ in a save also differ in *shape*, and getting the
+size right without the shape would read every field one word out.
+
+**ACTUATOR gains its two bytes at the end.** `MakeBigActuators` walks each record
+backwards from the top of its new slot, writing the two zero bytes *first* and then
+copying the old bytes beneath them (`doc/CSBwin-src/SaveGame.cpp:2287-2310`):
+
+```
+    //Insert two zero bytes.
+    *(--destination) = 0;
+    *(--destination) = 0;
+    //copy oldSize bytes;
+    for (j=0; j<oldSize; j++) *(--destination) = *(--source);
+```
+
+So the first four words are unchanged and the new word is appended — which is exactly
+what `ActuatorRecord.word8` was already reserved for.
+
+**SCROLL is re-laid-out, not extended.** `DB7` (`doc/CSBwin-src/CSB.h:1195-1216`) keeps
+its old form in comments beside the new one:
+
+```
+// old Scroll  i16 m_word2; // bits 0-9 = text index, bits 10-15 = ????
+  RN m_RNtext;
+  ui16 m_word4; // Bit 0 = open
+```
+
+So the 6-byte record is link, then a **full RN** to the text record, then a word whose
+bit 0 is "open" — where the 4-byte record packed both into one word, with "open" read
+from the high bits. Once that RN has been put back into packed form its low ten bits are
+the text record's index, so `rn & 0x3ff` recovers precisely what the old field held and
+every existing reader of `textReference` keeps working. *Put back into packed form* is
+not a formality: in a save file the stored RN is a slot number in the object indirect
+index, not a packed RN — see "An RN in a save file is an indirect index" below.
+
+`readNewScrollDatabase` reads the whole database flat at `dbEntrySizes[dbSCROLL]` per
+record (`doc/CSBwin-src/SaveGame.cpp:2168-2187`); the old-format branch beside it is
+what converts a pre-'B' file.
+
+Covered by `tools/dump-csbwin-world.ts`, which parses the image of every committed save
+into a real `DungeonData` and checks that the early ones' cell flags are **identical**
+to `dungeon.dat`'s. That is the sharpest available check on all of this: the cell flags
+are the last section in the image, so their position depends on every length before
+them, and one wrong record size moves them.
+
+One thing that is *not* a measure of play: **the object list is longer in every save
+than in `dungeon.dat`** — 1982 against 1682 for DM, in the earliest save as much as the
+latest. CSBWin grows it while loading. Compare cell flags, never object-list length.
+
+## An RN in a save file is an indirect index, not a packed `[pos][db][idx]`
+
+This is the fact that made every object reference inside a genuine CSBWin save read as
+nonsense, and it is not a quirk of the file format — it is how `RN` works in CSBWin at
+all. `dungeon.dat` stores an object reference as the Atari ST bitfield this port uses
+everywhere, `[position:2][category:4][index:10]`. CSBWin does not keep them that way.
+`class RN` holds one `ui16 indirectIndex` and nothing else
+(`doc/CSBwin-src/CSBTypes.h:268-370`); every accessor goes through two global arrays:
+
+```c
+DBTYPE dbType(void) const { return DBTYPE(dataTypeMap[indirectIndex] & 0xf); };
+ui8    pos   (void) const { return (dataTypeMap[indirectIndex] >> 4) & 3; };
+ui16   idx   (void) const { return dataIndexMap[indirectIndex]; };
+```
+
+The conversion happens once, when an original dungeon is read. `ConvertListOfObjects`
+walks every chain, splits each packed RN into `(pos, db, idx)`, appends the pair to the
+two maps and overwrites the RN with the map slot number
+(`doc/CSBwin-src/SaveGame.cpp:1916-2018`). `ConvertCharacters` (`:2046-2064`) does the
+same for all thirty possession slots of each champion and `ConvertTimers` (`:2021-2044`)
+for the object-carrying timers — functions 24/25, 48/49 and 60/61. From then on *every*
+RN in memory, and therefore every RN written into a save, is a slot number.
+
+The maps travel in the save so the numbering survives: `ReadExtendedFeatures` reads
+`dataMapLength` bytes of `dataTypeMap` and `2*dataMapLength` bytes of `dataIndexMap`
+immediately after the 512-byte Extended Features block and dies if either `FormChecksum`
+misses (`:355-376`). They are the first two sections of the file.
+
+**Byte order.** `dataTypeMap` is bytes. `dataIndexMap` is 16-bit **little-endian**:
+`SwapDataIndexMap` applies `BE16` (`:167-172`), which is a no-op on a little-endian host
+(`doc/CSBwin-src/CSBTypes.h:156-161`) — CSBWin's `BE16` means "stored in PC order", as
+in the Extended Features header and the indirect text index. Measured across the twelve
+committed saves: read little-endian the largest index is 682, read big-endian 0xff01.
+
+**Slot 0 is never used** ("Don't use entry zero", `:1968-1973`). Values from `0xff00` up
+are `RNVAL` literals — the spell RNs, `RNeof` 0xfffe, `RNnul` 0xffff — and are not slot
+numbers; `RN::CreateSpell` writes `0xff80 + n` straight into the field
+(`doc/CSBwin-src/data.cpp:533-537`).
+
+**A freed slot is `dataTypeMap[i] == 0xff`, `dataIndexMap[i] == 0xffff`.**
+`DeleteDBEntry` writes both, together with `RNnul` over the record's own link
+(`doc/CSBwin-src/data.cpp:993-1015`); `AllocateIndirectIndex` and `RN::RN(DBTYPE, idx)`
+reuse such slots. Three of the twelve committed saves reference one — `csbgame2.dat`'s
+`monster[158]` still points its possession chain at slot 361 — and in every case the
+referring record is itself free, its link `RNnul`. CSBWin never looks: a free record is
+reached only by the allocator, which clears it before handing it out. So a free record's
+other RNs are read and dropped rather than resolved; refusing them would make a
+perfectly good save unreadable.
+
+**Where this port draws the line.** `dataIndexMap` is 16 bits wide and a packed RN's
+index field is 10, so a database of more than 1024 records cannot be expressed here.
+CSBWin allows 64000. No shipped DM dungeon comes close — the largest index in any
+committed save is 682 — but `CsbwinObjectIndex.resolve` throws rather than alias. The
+same applies to two slots naming the same `(db, idx)`, which `ConvertListOfObjects`
+permits only for a missile's flying object (`DuplicateOK`, `:1918`): `countAliases`
+reports it, and the shipped dungeon has none.
+
+Evidence: `tools/dump-csbwin-world.ts` walks every object chain in all twelve saves —
+1783 to 1908 objects each, chains up to 31 deep, through chests and monster possessions
+— and finds no reference to a free record, no index past a database, no category without
+a database and no cycle. The early saves hold `dungeon.dat`'s 1911 objects less exactly
+what the chosen heroes carried out of their mirrors. `tools/dump-csbwin-party.ts` asserts
+that all 30 possession slots of every champion in every save name a **live** record in
+one of the six carryable databases; read as packed RNs they had been decoding to doors
+and teleporters with indices in the hundreds.
+
+## The `TIMER` record, and the two shapes a save can hold it in
+
+A timer is 10, 12 or 16 bytes depending on two Extended Features flags, and the short
+forms are not truncations — they are earlier versions that `LoadGame` upgrades in place
+before it does anything else with them (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). The
+16-byte form (`doc/CSBwin-src/CSB.h:1799-2052`):
+
+```
+ 0  ui32 m_time            big-endian
+ 4  ui8  timerFunction     TIMERTYPE
+ 5  ui8  m_timerUByte5     commonly 0; a champion index for functions 11/12/13/72/75
+ 6  ui8  m_timerUByte6     commonly mapX
+ 7  ui8  m_timerUByte7     commonly mapY
+ 8  ui8  m_timerUByte8
+ 9  ui8  m_timerUByte9     commonly the action: set / clear / toggle
+10  ui16 m_timerSequence   big-endian; breaks ties between equal times
+12  ui8  m_timerLevel
+13  ui8  unused13[3]
+```
+
+**Where the level lives depends on the form.** In the 16-byte form `m_time` is the whole
+32-bit clock and the level has byte 12. In the 10- and 12-byte forms the level is the
+*top* byte of `m_time` (`doc/CSBwin-src/CSB.h:1818-1821`). `ConvertToExtendedTimers`
+spells the split as `Level(time & 0xff)` and `Time(time & 0xffffff00)`
+(`doc/CSBwin-src/Timer.cpp:2899-2919`), which looks inverted until you notice its own
+comment — "the timers are still in big-endian order!" — so it is working on the unswapped
+word. Read straight from the file the same split is `level = value >>> 24`,
+`time = value & 0xffffff`.
+
+**Bytes 6-7 and 8-9 are read both ways.** `timerObj6`/`timerObj8` are RNs,
+`timerWord6`/`timerWord8` are 16-bit words, and `swapTimers` switches on the function
+code to decide which (`doc/CSBwin-src/SaveGame.cpp:565-607`). Same byte order either
+way, so a reader can simply take both.
+
+**The timer queue is `MaxTimer` big-endian words of which the first `NumTimer` are
+live**, each an index into the table, and the order **is** the firing order. CSBWin keeps
+it sorted as it inserts and restores it verbatim — it never re-sorts on load
+(`GameTimers::swapTimerQue`, `doc/CSBwin-src/Data.h:1582`). Re-inserting them through
+`SetTimer` instead would also run the duplicate-timer rules over timers that legitimately
+coexist, and drop some.
+
+Proven by two save files made to order: `csbgame4-door-opening.dat` and
+`csbgame4-door-closing.dat`, both a fresh game with the party at (1,15) facing north, one
+step from the door at (1,14), each saved while that door was in motion. Each carries two
+timers, and the door timer's sixteen bytes differ in exactly one:
+
+```
+opening  00 00 01 5d  01 00 01 0e 00 00  00 33 00 cd cd cd
+closing  00 00 00 fd  01 00 01 0e 00 01  00 19 00 cd cd cd
+         |m_time   |  |fn |u5 |x  |y  |u8 |u9| |seq | |lvl
+```
+
+`fn` is 1 (`TT_DOOR_STEP`), `x`,`y` are the cell the party faces, and `u9` is the action.
+The `0xcd` tail is `TIMER`'s constructor fill (`doc/CSBwin-src/CSB.h:1805-1816`), which
+is itself a check that byte 12 really is the level and 13-15 really are unused.
+`tools/dump-csbwin-timers.ts` restores each save into a real `Game`, turns the clock, and
+watches the door: one opens and the other shuts, from the same starting state, driven by
+nothing but that byte.
+
+A trap worth recording, because the tool's first assertions had it backwards: **a door's
+cell-flag state counts how far the door has come *down***. `0` is fully open and `4`
+fully shut (`doc/CSBwin-src/CSBTypes.h:185-192`: "00 = open, 01 = almost open, 02 = half
+open, 03 = almost closed, 04 = closed, 05 = door has been bashed open"). Both saves start
+at 2.
+
+
+## A champion's title can lose its first character, and CSBWin then prints none
+
+Several genuine saves hold a title whose first byte is a NUL: `SHE DEVIL` stored as
+`\0HE DEVIL`, `THE BARBARIAN` as `\0HE BARBARIAN`, `RUYITO CHIBURI` as
+`\0UYITO CHIBURI`. It is in the files, not in any reader — inside one save `HALK` loses
+the `T` of `THE BARBARIAN` while `LEYLA` keeps `SHADOWSEEK` and `ALEX` keeps `ANDER`
+whole, so no offset error can explain it.
+
+**It is not corruption. It is a reincarnated champion whose title was left empty**, and
+the "missing" letters are the *old* title showing through.
+
+`_ReIncarnate` opens by clearing **one byte** of each field
+(`doc/CSBwin-src/Code13ea4.cpp:57-58`):
+
+```c
+  D7W = 0;
+  pChar->name[0] = 0;
+  pChar->title[0] = 0;
+```
+
+Not `ClearMemory`, not the whole array — byte 0. Everything the champion was called
+before is still sitting in bytes 1..19. Each keystroke then writes
+`A2[D7W++] = D5B; A2[D7W] = 0;` (`:264-265`), advancing the terminator one character at a
+time. So a player who types a name and then presses Return through the title screen
+without typing a title leaves `title[0] == 0` with the previous title's bytes 1..19
+untouched:
+
+```
+before   S  H  E     D  E  V  I  L  \0 ...
+after    \0 H  E     D  E  V  I  L  \0 ...
+```
+
+The name never shows it, for the same reason it is invisible in play: the player retypes
+the same name over the same bytes, so the padding past its terminator was already zero
+from `AddCharacter`'s `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:481`)
+and stays zero. Only the title, which is *not* retyped, keeps its tail. Reincarnating a
+hero at the mirrors and keeping their name is an ordinary thing for a player to do, which
+is why several files have it and a save made to provoke it does **not** — a test that
+types a title overwrites the remnant and comes back clean.
+
+**Nothing repairs or tolerates it on the way out, and nothing needs to.** The title is a
+C string and `TextToViewport(LOCAL_6, 7, D4W, pcA3->title, false)`
+(`doc/CSBwin-src/Character.cpp:1338`) stops at the NUL, so CSBWin prints a **blank
+title** — exactly what the player asked for. The only decision taken from `title[0]` is
+whether to leave a 6-pixel gap after the name (`:1327-1337`), and a zero byte falls
+through all three of its tests and takes the gap.
+
+So this port must not "correct" the byte, and must not read past it either:
+`decodeCharField` now stops at the first NUL like the C string it is. Reading on — which
+it used to do — displayed `HE DEVIL` where the real game displays nothing.
+
+### A second, rarer path to the same byte
+
+Worth recording because it is a genuine bug rather than a consequence of a design, and it
+would produce an identical-looking file. `EditCharacterName`'s insert branch
+(`doc/CSBwin-src/Chaos.cpp:5273`, the write at `:5323-5324`):
+
+```c
+else
+{ // insert in the middle
+    i32 i;
+    for(i=max_len;i>=e.EditBoxPosition;i--)
+        name[i+1] = name[i];
+    name[e.EditBoxPosition] = key;
+}
+```
+
+The shift loop starts at `max_len` unconditionally rather than at the string's length.
+For the name field `max_len == 7` (`:5287`), so the **first iteration is
+`name[8] = name[7]`** — and `name` is `char[8]` immediately followed by the title
+(`name` at `+772`, title at `+780`, confirmed by `doc/CSBwin-src/Chaos.cpp:3997`), so
+`name[8]` *is* `title[0]`, and for any well-formed name the value copied is zero. It
+fires only when the caret is clicked *inside* the name (`:3979-3986`; clicking past the
+end clamps to the length and takes the safe append path), and the `max_len = 18` title
+branch is dead code — nothing ever sets `e.EditBoxSelected` to 1 — so every insert edit
+lands on `title[0]`. This is the editor, though, not the game: the reincarnate screen
+above is what a player actually touches.
+
+**Every other naming path is correctly bounded**, and this is worth knowing before
+porting any of them: `AddCharacter` stops at `D6W >= 7` and writes its terminator at
+`name[7]` at worst (`doc/CSBwin-src/Character.cpp:553-567`); the reincarnate screen gates
+the name at `D7W == 7` and the title at 19 (`doc/CSBwin-src/Code13ea4.cpp:64-68,266`);
+`CopyCharacter`, `SaveToWings`/`GetFromWings` and `RemoveCharacter`'s compaction all move
+the whole 800-byte struct; and `swapCharacter` touches nothing below offset 32
+(`doc/CSBwin-src/SaveGame.cpp:490-542`).
+
+<sub>One unrelated off-by-one found next door, worth knowing before porting the spacing
+rule: the Hall-of-Champions copy of it reads `*(A0+9)`, which is `title[1]`, not
+`title[0]` (`doc/CSBwin-src/Code1f9e6.cpp:186-198`).</sub>

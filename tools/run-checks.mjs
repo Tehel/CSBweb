@@ -59,6 +59,13 @@ const CHECKS = [
   // suite that reads bytes this project did not write, so the only one a bug
   // symmetrical between our reader and our writer cannot satisfy.
   { tool: 'dump-csbwin-save.ts' },
+  // The world inside those saves: the dungeon image parsed into a real DungeonData and
+  // held up against dungeon.dat. The early saves must still *be* dungeon.dat's world.
+  { tool: 'dump-csbwin-world.ts' },
+  // The champions inside those saves: the whole CHARDESC, not just the name.
+  { tool: 'dump-csbwin-party.ts' },
+  { tool: 'dump-csbwin-load.ts' },
+  { tool: 'dump-csbwin-timers.ts' },
   // The save/load screen: the button-table offsets it hangs off, the list panel built
   // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.

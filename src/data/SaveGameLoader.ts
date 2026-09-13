@@ -6,19 +6,32 @@
  */
 
 import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
-import { DBType } from '../core/types';
+import { DBType, OBJECT_ID_NULL } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
+import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
+import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import type { PartyState } from '../engine/gameTypes';
 
 export interface SaveGameState {
   item16: Item16Record[];
   timers?: TimerRecord[];
+  /**
+   * The live timer queue: `gb2.NumTimer` indices into `timers`, in firing order
+   * (`GameTimers::TimerQueue`). Empty when the file carries none.
+   */
+  timerQueue?: number[];
+  /** `gb2.TimerSequence` — the stamp the next queued timer takes. */
+  timerSequence?: number;
   missiles?: MissileRecord[];
   maxItem16: number;
   maxTimers: number;
   sequencedTimers: boolean;
   extendedTimers: boolean;
   bigActuators?: boolean;
+  /** `EXTENDEDFEATURESBLOCK.flags & IndirectText` — the text section's shape. */
+  indirectText?: boolean;
+  /** `EXTENDEDFEATURESBLOCK.version` (offset 36); `'B'` (0x42) and up use new scrolls. */
+  version?: number;
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
   extendedWallDecorations?: boolean;
@@ -45,6 +58,17 @@ export interface SaveGameState {
    * file position (`doc/CSBwin-src/SaveGame.cpp:2345-2346`).
    */
   dungeonImageOffset?: number;
+  /** Where every section of the dungeon image sits. Absent if the header did not parse. */
+  imageLayout?: DungeonImageLayout;
+  /** `EXTENDEDFEATURESBLOCK.cellFlagArraySize` — the last section's length. */
+  cellFlagArraySize?: number;
+  /**
+   * The object indirect index. Every RN in this file — the object list, every record's
+   * link, a chest's contents, a monster's possessions, a champion's thirty slots — is a
+   * slot number in it rather than a packed RN, so nothing that reads an object out of
+   * the file is meaningful without it (`src/data/CsbwinObjectIndex.ts`).
+   */
+  objectIndex?: CsbwinObjectIndex;
   /**
    * The raw, unscrambled 3328-byte block 4. It is **not** only the four champions:
    * `CHARDESC[4]` is 3200 bytes and the remaining 128 are party-wide state
@@ -179,6 +203,13 @@ function applyBigActuators(dungeon: DungeonData): void {
 function writeU16BE(buf: Uint8Array, off: number, value: number): void {
   buf[off] = (value >> 8) & 0xff;
   buf[off + 1] = value & 0xff;
+}
+
+function writeU32BE(buf: Uint8Array, off: number, value: number): void {
+  buf[off] = (value >>> 24) & 0xff;
+  buf[off + 1] = (value >>> 16) & 0xff;
+  buf[off + 2] = (value >>> 8) & 0xff;
+  buf[off + 3] = value & 0xff;
 }
 
 function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
@@ -370,12 +401,21 @@ function readExtendedFeatures(data: Uint8Array): {
   extendedWallDecorations: boolean;
   bigActuators: boolean;
   indirectText: boolean;
+  /** `EXTENDEDFEATURESBLOCK.version` (offset 36). `'B'` and up store new-style scrolls. */
+  version: number;
+  /** `EXTENDEDFEATURESBLOCK.cellFlagArraySize` (offset 48). */
+  cellFlagArraySize: number;
+  /**
+   * The object indirect index, present whenever the block is (`dataMapLength` is 0 in
+   * a file written before the feature existed, and then there is nothing to resolve).
+   */
+  objectIndex?: CsbwinObjectIndex;
   spellFilterLocation?: number;
   dsaLevelIndex?: number[][];
   dsaIndex?: DsaIndex;
 } {
   if (data.length < EXTENDED_FEATURES_SIZE) {
-    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false };
+    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
   }
 
   let block = data.subarray(0, EXTENDED_FEATURES_SIZE);
@@ -386,7 +426,7 @@ function readExtendedFeatures(data: Uint8Array): {
     if (hasExtendedSentinel(decoded)) {
       parsed = decoded;
     } else {
-      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false };
+      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
     }
   }
 
@@ -396,6 +436,9 @@ function readExtendedFeatures(data: Uint8Array): {
   // gameInfoSize 44, cellFlagArraySize 48, graphicsSignature1/2 52/56,
   // spellFilterLocation 60, extendedFlags 64, overlayOrdinal 68.
   const dataMapLength = readU32LE(parsed, 20);
+  const typeMapChecksum = readU32LE(parsed, 24);
+  const indexMapChecksum = readU32LE(parsed, 28);
+  const version = parsed[36] ?? 0;
   const flags = parsed[37] ?? 0;
   const numDSA = readU16LE(parsed, 38);
   // `gameInfoSize` is `ui32` in the struct but the whole chain treats it as signed:
@@ -408,6 +451,7 @@ function readExtendedFeatures(data: Uint8Array): {
   // 4294967295 walked the read head off the end of the file.
   const gameInfoSizeRaw = readU32LE(parsed, 44) | 0;
   const gameInfoSize = gameInfoSizeRaw > 0 ? gameInfoSizeRaw : 0;
+  const cellFlagArraySize = readU32LE(parsed, 48);
   const spellFilterLocation = readU32LE(parsed, 60);
   const extendedFlags = readU32LE(parsed, 64);
 
@@ -416,6 +460,32 @@ function readExtendedFeatures(data: Uint8Array): {
   const extendedWallDecorations = (extendedFlags & 0x10) !== 0;
   const bigActuators = (flags & 0x80) !== 0;
   const indirectText = (flags & 0x08) !== 0;
+
+  // `ReadExtendedFeatures` verifies the block against its own checksum before it
+  // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:344-353`): the stored
+  // value is lifted out, the field zeroed, and `FormChecksum` run over all 512 bytes.
+  // Worth doing here for the same reason CSBWin does it — the offsets below are only
+  // as trustworthy as the block they are read from.
+  const checked = parsed.slice();
+  const storedChecksum = readU32LE(checked, 32);
+  checked[32] = checked[33] = checked[34] = checked[35] = 0;
+  if (formChecksum(checked) !== (storedChecksum >>> 0)) {
+    throw new Error('extended features block checksum mismatch');
+  }
+
+  // The two maps that make every object reference in the file meaningful. See
+  // `CsbwinObjectIndex.ts`: an RN in a CSBWin save is a slot number in this index, not
+  // the packed `[pos:2][db:4][idx:10]` of `dungeon.dat`.
+  const objectIndex =
+    dataMapLength > 0
+      ? readObjectIndirectIndex(
+          data,
+          EXTENDED_FEATURES_SIZE,
+          dataMapLength,
+          typeMapChecksum,
+          indexMapChecksum,
+        )
+      : undefined;
 
   let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
 
@@ -464,75 +534,132 @@ function readExtendedFeatures(data: Uint8Array): {
     extendedWallDecorations,
     bigActuators,
     indirectText,
+    version,
+    cellFlagArraySize,
+    objectIndex,
     spellFilterLocation,
     dsaLevelIndex,
     dsaIndex,
   };
 }
 
-function parseSpecialLocationsFromSaveData(
+/**
+ * Where each section of the dungeon image sits, relative to `startOffset`.
+ *
+ * The image is blocks 7-14 of the save (`doc/CSBWIN_SAVEGAME_REFERENCE.md`), written
+ * plain by `WriteAndChecksum` and read back plain by `ReadDatabases` — a save is
+ * loaded with `d.gameState == GAMESTATE_ResumeSavedGame`, which skips that function's
+ * compression preamble (`doc/CSBwin-src/SaveGame.cpp:2345-2374`).
+ *
+ * Two record sizes are not the `dungeon.dat` ones, which is what made this arithmetic
+ * fail for years' worth of guesses:
+ *
+ * - **ACTUATOR is 2 bytes larger** unless the file predates big actuators.
+ *   `ReadDatabases` spells it as a subtraction from the *big* size —
+ *   `if ((D6W==dbACTUATOR) & !bigActuators) D4W -= 2;`
+ *   (`doc/CSBwin-src/SaveGame.cpp:2571-2575`) — so `dbEntrySizes[dbACTUATOR]` is the
+ *   big one and the small one is the special case.
+ * - **SCROLL is 2 bytes larger** from extended-features version `'B'` on.
+ *   `readScrollDatabase` branches to `readNewScrollDatabase` at `>= 'B'`, and its own
+ *   comment says why: "The old version had a 10-bit index into the text database. The
+ *   new version has an RN reference to the text."
+ *   (`doc/CSBwin-src/SaveGame.cpp:2189-2200`).
+ *
+ * And the indirect-text block is **little-endian** — both the index and the
+ * `sizeOfCompressedText` word after it — while every other word in the image is
+ * big-endian. It is a PC-era addition whose swap helper is a no-op on the shipping
+ * build, exactly like the Extended Features header.
+ */
+export interface DungeonImageLayout {
+  numMaps: number;
+  totalColumns: number;
+  objectListSize: number;
+  objectCounts: number[];
+  recordSizes: number[];
+  /** All absolute file offsets. */
+  columnIndex: number;
+  objectList: number;
+  text: number;
+  databases: number[];
+  cellFlags: number;
+}
+
+function computeDungeonImageLayout(
   data: Uint8Array,
   startOffset: number,
-  indirectText: boolean,
-): Record<number, number> | null {
+  options: { indirectText: boolean; bigActuators: boolean; newScrolls: boolean },
+): DungeonImageLayout | null {
   const HEADER_SIZE = 44;
   const MAP_DESCRIPTOR_SIZE = 16;
-  const dbRecordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
 
   if (startOffset + HEADER_SIZE > data.length) return null;
 
   const numMaps = data[startOffset + 4] ?? 0;
+  if (numMaps < 1 || numMaps > 32) return null;
   const textDataSize = readU16BE(data, startOffset + 6);
   const objectListSize = readU16BE(data, startOffset + 10);
 
   const objectCounts: number[] = [];
-  for (let i = 0; i < 16; i++) {
-    objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
-  }
+  for (let i = 0; i < 16; i++) objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
+
+  const recordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
+  if (options.bigActuators) recordSizes[DBType.ACTUATOR] += 2;
+  if (options.newScrolls) recordSizes[DBType.SCROLL] += 2;
 
   let totalColumns = 0;
-  const mapBase = startOffset + HEADER_SIZE;
   for (let i = 0; i < numMaps; i++) {
-    const offset = mapBase + i * MAP_DESCRIPTOR_SIZE;
+    const offset = startOffset + HEADER_SIZE + i * MAP_DESCRIPTOR_SIZE;
     if (offset + MAP_DESCRIPTOR_SIZE > data.length) return null;
-    const sizeWord = readU16BE(data, offset + 8);
-    const width = ((sizeWord >> 6) & 0x1f) + 1;
-    totalColumns += width;
+    totalColumns += ((readU16BE(data, offset + 8) >> 6) & 0x1f) + 1;
   }
 
-  const columnIndexOffset = HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
-  const objectListOffset = columnIndexOffset + totalColumns * 2;
-  const textDataOffset = objectListOffset + objectListSize * 2;
+  const columnIndex = startOffset + HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
+  const objectList = columnIndex + totalColumns * 2;
+  const text = objectList + objectListSize * 2;
 
-  let databaseOffset = textDataOffset;
-  if (indirectText) {
-    const indexBytes = textDataSize * 4;
-    const sizeOffset = startOffset + textDataOffset + indexBytes;
+  let databaseStart: number;
+  if (options.indirectText) {
+    // `NumWordsInTextArray` is repurposed by `ConvertToIndirectText`, which assigns it
+    // the index length (`doc/CSBwin-src/SaveGame.cpp:2272`), so in a save it counts
+    // index entries, not text words.
+    const sizeOffset = text + textDataSize * 4;
     if (sizeOffset + 4 > data.length) return null;
-    const compressedSize = readU32BE(data, sizeOffset);
-    databaseOffset = textDataOffset + indexBytes + 4 + compressedSize * 2;
+    const compressedSize = readU32LE(data, sizeOffset);
+    databaseStart = sizeOffset + 4 + compressedSize * 2;
   } else {
-    databaseOffset = textDataOffset + textDataSize * 2;
+    databaseStart = text + textDataSize * 2;
   }
 
-  let expoolOffset = -1;
-  let cursor = databaseOffset;
+  const databases: number[] = [];
+  let cursor = databaseStart;
   for (let db = 0; db < 16; db++) {
-    if (db === 11) expoolOffset = cursor;
-    cursor += objectCounts[db] * (dbRecordSizes[db] ?? 0);
+    databases.push(cursor);
+    cursor += objectCounts[db] * (recordSizes[db] ?? 0);
   }
+  if (cursor > data.length) return null;
 
-  const expoolCount = objectCounts[11] ?? 0;
-  if (expoolOffset < 0 || expoolCount <= 0) return null;
+  return {
+    numMaps, totalColumns, objectListSize, objectCounts, recordSizes,
+    columnIndex, objectList, text, databases, cellFlags: cursor,
+  };
+}
 
-  const expoolBytes = expoolCount * EXPOOL_RECORD_SIZE;
-  const expoolStart = startOffset + expoolOffset;
-  if (expoolStart + expoolBytes > data.length) return null;
+/** Translate one stored RN, or leave it alone when the file carries no indirect index. */
+function resolveRN(objectIndex: CsbwinObjectIndex | undefined, raw: number): number {
+  return objectIndex ? objectIndex.resolve(raw) : raw;
+}
+
+function parseSpecialLocationsFromSaveData(
+  data: Uint8Array,
+  layout: DungeonImageLayout,
+): Record<number, number> | null {
+  const expoolCount = layout.objectCounts[11] ?? 0;
+  if (expoolCount <= 0) return null;
+  const expoolStart = layout.databases[11];
+  if (expoolStart + expoolCount * EXPOOL_RECORD_SIZE > data.length) return null;
 
   const expool = new Uint32Array(expoolCount * EXPOOL_WORDS_PER_BLOCK);
-  for (let i = 0; i < expool.length; i++) {
-    expool[i] = readU32BE(data, expoolStart + i * 4);
-  }
+  for (let i = 0; i < expool.length; i++) expool[i] = readU32BE(data, expoolStart + i * 4);
 
   const locations: Record<number, number> = {};
   for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) {
@@ -540,81 +667,40 @@ function parseSpecialLocationsFromSaveData(
     const record = locateExpoolRecord(expool, key);
     if (record !== null) locations[key] = record;
   }
-
   return Object.keys(locations).length === 0 ? null : locations;
 }
 
 function parseMissileRecordsFromSaveData(
   data: Uint8Array,
-  startOffset: number,
-  indirectText: boolean,
+  layout: DungeonImageLayout,
+  objectIndex?: CsbwinObjectIndex,
 ): MissileRecord[] | null {
-  const HEADER_SIZE = 44;
-  const MAP_DESCRIPTOR_SIZE = 16;
-  const dbRecordSizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, EXPOOL_RECORD_SIZE, 0, 0, 8, 4];
-
-  if (startOffset + HEADER_SIZE > data.length) return null;
-
-  const numMaps = data[startOffset + 4] ?? 0;
-  const textDataSize = readU16BE(data, startOffset + 6);
-  const objectListSize = readU16BE(data, startOffset + 10);
-
-  const objectCounts: number[] = [];
-  for (let i = 0; i < 16; i++) {
-    objectCounts.push(readU16BE(data, startOffset + 12 + i * 2));
-  }
-
-  let totalColumns = 0;
-  const mapBase = startOffset + HEADER_SIZE;
-  for (let i = 0; i < numMaps; i++) {
-    const offset = mapBase + i * MAP_DESCRIPTOR_SIZE;
-    if (offset + MAP_DESCRIPTOR_SIZE > data.length) return null;
-    const sizeWord = readU16BE(data, offset + 8);
-    const width = ((sizeWord >> 6) & 0x1f) + 1;
-    totalColumns += width;
-  }
-
-  const columnIndexOffset = HEADER_SIZE + numMaps * MAP_DESCRIPTOR_SIZE;
-  const objectListOffset = columnIndexOffset + totalColumns * 2;
-  const textDataOffset = objectListOffset + objectListSize * 2;
-
-  let databaseOffset = textDataOffset;
-  if (indirectText) {
-    const indexBytes = textDataSize * 4;
-    const sizeOffset = startOffset + textDataOffset + indexBytes;
-    if (sizeOffset + 4 > data.length) return null;
-    const compressedSize = readU32BE(data, sizeOffset);
-    databaseOffset = textDataOffset + indexBytes + 4 + compressedSize * 2;
-  } else {
-    databaseOffset = textDataOffset + textDataSize * 2;
-  }
-
-  let missileOffset = -1;
-  let cursor = databaseOffset;
-  for (let db = 0; db < 16; db++) {
-    if (db === DBType.MISSILE) missileOffset = cursor;
-    cursor += objectCounts[db] * (dbRecordSizes[db] ?? 0);
-  }
-
-  const missileCount = objectCounts[DBType.MISSILE] ?? 0;
-  if (missileOffset < 0 || missileCount <= 0) return null;
-
-  const start = startOffset + missileOffset;
-  const total = missileCount * (dbRecordSizes[DBType.MISSILE] ?? 0);
-  if (start + total > data.length) return null;
+  const missileCount = layout.objectCounts[DBType.MISSILE] ?? 0;
+  if (missileCount <= 0) return null;
+  const start = layout.databases[DBType.MISSILE];
+  const size = layout.recordSizes[DBType.MISSILE];
+  if (start + missileCount * size > data.length) return null;
 
   const records: MissileRecord[] = [];
   for (let i = 0; i < missileCount; i++) {
-    const base = start + i * 8;
+    const base = start + i * size;
+    // Both are RNs, so both are indirect-index slot numbers in a save; a missile's
+    // flying object may also be a spell literal, which `resolve` passes through.
+    // A free record — link `RNnul` — keeps a stale flying object whose slot may have
+    // been freed since, so it is dropped rather than resolved, exactly as in
+    // `DungeonLoader.readRNOfRecord`. `csbgame3.dat` has one.
+    const nextObject = resolveRN(objectIndex, readU16BE(data, base));
     records.push({
-      nextObject: readU16BE(data, base),
-      projectileObject: readU16BE(data, base + 2),
+      nextObject,
+      projectileObject:
+        nextObject === OBJECT_ID_NULL
+          ? OBJECT_ID_NULL
+          : resolveRN(objectIndex, readU16BE(data, base + 2)),
       rangeRemaining: data[base + 4] ?? 0,
       damageRemaining: data[base + 5] ?? 0,
       timerIndex: readU16BE(data, base + 6),
     });
   }
-
   return records;
 }
 
@@ -795,14 +881,58 @@ function parseItem16(buf: Uint8Array, maxItem16: number): Item16Record[] {
   return out;
 }
 
+/**
+ * The timer table, in the 16-byte form, whatever form the file is in.
+ *
+ * `LoadGame` reads `MaxTimer * timerSize` bytes and then upgrades them in place —
+ * `ConvertToSequencedTimers` if the file predates sequenced timers,
+ * `ConvertToExtendedTimers` if it predates extended ones
+ * (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). Both conversions run over the *unswapped*
+ * big-endian bytes and say so in their own comments
+ * (`doc/CSBwin-src/Timer.cpp:2878-2919`), which is why `ConvertToExtendedTimers` can
+ * pull the level out with `time & 0xff`: on a little-endian host that byte is the
+ * big-endian word's *top* byte. Read straight from the file, as here, the same split is
+ * `level = value >>> 24`, `time = value & 0xffffff`.
+ *
+ * Every multi-byte field is big-endian. `swapTimers` switches on the function code to
+ * decide whether bytes 6-7 and 8-9 are an RN or a word, but both readings are the same
+ * byte order, so both are simply taken.
+ */
 function parseTimers(buf: Uint8Array, maxTimers: number, timerSize: number): TimerRecord[] {
+  const extended = timerSize >= 16;
+  const sequenced = timerSize >= 12;
   const out: TimerRecord[] = [];
   for (let i = 0; i < maxTimers; i++) {
     const base = i * timerSize;
+    const rawTime = readU32BE(buf, base) >>> 0;
     out.push({
+      time: extended ? rawTime : rawTime & 0xffffff,
+      level: extended ? (buf[base + 12] ?? 0) : (rawTime >>> 24) & 0xff,
+      function: buf[base + 4] ?? 0,
+      uByte5: buf[base + 5] ?? 0,
+      uByte6: buf[base + 6] ?? 0,
+      uByte7: buf[base + 7] ?? 0,
+      uByte8: buf[base + 8] ?? 0,
+      uByte9: buf[base + 9] ?? 0,
+      sequence: sequenced ? readU16BE(buf, base + 10) : 0,
       timerWord8: readU16BE(buf, base + 8),
+      timerWord6: readI16BE(buf, base + 6),
     });
   }
+  return out;
+}
+
+/**
+ * The timer *queue*: `MaxTimer` big-endian words, of which the first `NumTimer` are
+ * live, each the index of a timer in the table above
+ * (`doc/CSBwin-src/SaveGame.cpp:1694-1699`, `GameTimers::swapTimerQue`,
+ * `doc/CSBwin-src/Data.h:1582`). The order **is** the firing order; CSBWin keeps it
+ * sorted as it inserts and restores it verbatim rather than re-sorting.
+ */
+function parseTimerQueue(buf: Uint8Array, maxTimers: number, numTimer: number): number[] {
+  const out: number[] = [];
+  const live = Math.max(0, Math.min(numTimer, maxTimers));
+  for (let i = 0; i < live; i++) out.push(readU16BE(buf, i * 2));
   return out;
 }
 
@@ -866,7 +996,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
 
   const timers = parseTimers(timersBuf, block2.maxTimers, timerSize);
 
-  const { next: afterTimerQueue } = unscrambleStream(
+  const { buf: timerQueueBuf, next: afterTimerQueue } = unscrambleStream(
     saveData,
     offset,
     block2.maxTimers * 2,
@@ -874,8 +1004,17 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     block1.timerQueueChecksum
   );
 
-  const specialLocations = parseSpecialLocationsFromSaveData(saveData, afterTimerQueue, extended.indirectText);
-  const missiles = parseMissileRecordsFromSaveData(saveData, afterTimerQueue, extended.indirectText);
+  const timerQueue = parseTimerQueue(timerQueueBuf, block2.maxTimers, block2.numTimer);
+
+  const layout = computeDungeonImageLayout(saveData, afterTimerQueue, {
+    indirectText: extended.indirectText,
+    bigActuators: extended.bigActuators ?? false,
+    newScrolls: extended.version >= 0x42, // 'B'
+  });
+  const specialLocations = layout ? parseSpecialLocationsFromSaveData(saveData, layout) : null;
+  const missiles = layout
+    ? parseMissileRecordsFromSaveData(saveData, layout, extended.objectIndex)
+    : null;
 
   return {
     item16,
@@ -886,6 +1025,8 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     sequencedTimers,
     extendedTimers,
     bigActuators: extended.bigActuators,
+    indirectText: extended.indirectText,
+    version: extended.version,
     dsaLevelIndex: extended.dsaLevelIndex,
     dsaIndex: extended.dsaIndex,
     extendedWallDecorations: extended.extendedWallDecorations,
@@ -896,6 +1037,11 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     block2,
     characterBlock,
     dungeonImageOffset: afterTimerQueue,
+    imageLayout: layout ?? undefined,
+    cellFlagArraySize: extended.cellFlagArraySize,
+    objectIndex: extended.objectIndex,
+    timerQueue,
+    timerSequence: block2.timerSequence,
   };
 }
 
@@ -962,6 +1108,11 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timerSize = extendedTimers ? 16 : sequencedTimers ? 12 : 10;
 
   const block2 = new Uint8Array(BLOCK2_SIZE);
+  // `NumTimer` (24) says how much of the timer queue is live, and `TimerSequence` (48)
+  // what the next timer queued after the load will be stamped with. Without the first
+  // the queue reads back empty however many entries were written.
+  writeU16BE(block2, 24, save.timerQueue?.length ?? 0);
+  writeU16BE(block2, 48, save.timerSequence ?? 0);
   writeU16BE(block2, 28, maxTimers);
   writeU16BE(block2, 46, maxItem16);
   writeU16BE(block2, 20, save.handChar ?? -1);
@@ -996,16 +1147,37 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
 
   const character = new Uint8Array(CHARACTER_SIZE);
 
+  // The whole `TIMER`, in the form the header's flags declare. This used to write byte
+  // 8-9 and nothing else, so a file this project wrote said when nothing was due.
+  // `parseTimers` is the exact inverse; `tools/dump-savegame-blocks.ts` round-trips it.
   const timers = new Uint8Array(maxTimers * timerSize);
   const timerRecords = save.timers ?? [];
   for (let i = 0; i < maxTimers; i++) {
     const base = i * timerSize;
     const rec = timerRecords[i];
     if (!rec) continue;
-    writeU16BE(timers, base + 8, rec.timerWord8 ?? 0);
+    // In the 16-byte form the time is the whole longword and the level has its own
+    // byte; in the shorter forms the level rides in the top byte of the time
+    // (`doc/CSBwin-src/CSB.h:1818-1821`).
+    const time = extendedTimers
+      ? rec.time >>> 0
+      : (((rec.level & 0xff) << 24) | (rec.time & 0xffffff)) >>> 0;
+    writeU32BE(timers, base, time);
+    timers[base + 4] = rec.function & 0xff;
+    timers[base + 5] = rec.uByte5 & 0xff;
+    timers[base + 6] = rec.uByte6 & 0xff;
+    timers[base + 7] = rec.uByte7 & 0xff;
+    timers[base + 8] = rec.uByte8 & 0xff;
+    timers[base + 9] = rec.uByte9 & 0xff;
+    if (timerSize >= 12) writeU16BE(timers, base + 10, rec.sequence & 0xffff);
+    if (extendedTimers) timers[base + 12] = rec.level & 0xff;
   }
 
   const timerQueue = new Uint8Array(maxTimers * 2);
+  const queueOrder = save.timerQueue ?? [];
+  for (let i = 0; i < Math.min(queueOrder.length, maxTimers); i++) {
+    writeU16BE(timerQueue, i * 2, queueOrder[i] & 0xffff);
+  }
 
   const block2Hash = 0;
   const item16Hash = 0;

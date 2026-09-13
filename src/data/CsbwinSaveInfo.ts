@@ -6,12 +6,12 @@
  * `loadSaveGameState` already unscrambles and checksums — this module only unpacks the
  * champion names out of the raw character block it hands back.
  *
- * **These files cannot be loaded yet.** The dungeon image's text section does not parse,
- * which puts every database and the cell flags out of reach
- * (`doc/CSBWIN_SAVEGAME_REFERENCE.md` → "Where the dungeon image parse stands"), so the
- * menu lists them and refuses to load them rather than restoring a party into a world
- * reset to `dungeon.dat`. When Phase 10's reader is finished, this is where the rest of
- * the row comes from.
+ * **These files load** (`src/data/CsbwinSaveGame.ts`), but listing one must stay far
+ * cheaper than loading it: a directory of saves is read on every menu open, and the
+ * dungeon image behind each row is the best part of a megabyte. So this stops at blocks
+ * 2 and 4 and never touches the image. The consequence is deliberate: a file whose
+ * blocks unscramble but whose image is damaged is listed as loadable and fails on LOAD,
+ * with the reason on the menu's status line.
  */
 import { loadSaveGameState } from './SaveGameLoader';
 
@@ -39,11 +39,22 @@ export const CHARDESC_TITLE_SIZE = 20;
  * (`doc/CSBwin-src/SaveGame.cpp:490-521`) — so they need no byte-swapping. A byte
  * outside printable ASCII becomes `?`, which is what makes a misread block obvious
  * instead of plausible.
+ *
+ * **They are C strings, and the first NUL ends them.** `AddCharacter` terminates both
+ * (`doc/CSBwin-src/Character.cpp:567,587`) and the game prints them with
+ * `TextToViewport(…, pcA3->title, false)` (`:1338`), which stops there. This reader used
+ * to *skip* zero bytes and go on, which is why some genuine saves appeared to hold a
+ * title of `\0HE DEVIL`: CSBWin shows those champions a **blank** title, and so must we.
+ * The stray NUL is written by `EditCharacterName`'s insert branch
+ * (`doc/CSBwin-src/Chaos.cpp:5323-5324`), whose shift loop starts at `max_len` (7) rather
+ * than at the name's length, so its first move is `name[8] = name[7]` — and `name` is
+ * `char[8]`, so `name[8]` *is* `title[0]`. See `doc/PROVEN_FACTS.md` → "A champion's
+ * title can lose its first character".
  */
 export function decodeCharField(bytes: Uint8Array): string {
     let out = '';
     for (const byte of bytes) {
-        if (byte === 0) continue;
+        if (byte === 0) break;
         out += byte >= 32 && byte < 127 ? String.fromCharCode(byte) : '?';
     }
     return out;

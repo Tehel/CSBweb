@@ -77,6 +77,10 @@ function main(): void {
   }
   /** file name -> the party roster read out of its character block. */
   const rosters = new Map<string, string>();
+  /** file name -> the object ids of its in-flight missiles. */
+  const liveMissiles = new Map<string, number[]>();
+  /** file name -> `gb2.ObjectInHand`, where something is on the cursor. */
+  const onCursor = new Map<string, number>();
 
   for (const path of saves) {
     const bytes = new Uint8Array(readFileSync(path));
@@ -110,7 +114,9 @@ function main(): void {
       console.log(`  party              : (${gb2.partyX},${gb2.partyY}) level ${gb2.partyLevel} ` +
         `facing ${gb2.partyFacing}, ${gb2.numCharacter} champions`);
       console.log(`  clock / seed       : Time=${gb2.time} ranseed=${gb2.ranseed}`);
-      console.log(`  objectInHand       : 0x${gb2.objectInHand.toString(16)}`);
+      console.log(`  objectInHand       : 0x${gb2.objectInHand.toString(16)}` +
+        (gb2.objectInHand === 0xffff ? ' (empty hand)' : ''));
+      if (gb2.objectInHand !== 0xffff) onCursor.set(name, gb2.objectInHand);
       console.log(`  NumTimer           : ${gb2.numTimer} (firstAvail ${gb2.firstAvailTimer}, ` +
         `sequence ${gb2.timerSequence})`);
       console.log(`  ITEM16QueLen       : ${gb2.item16QueLen}`);
@@ -178,15 +184,43 @@ function main(): void {
       check(false, `${name}: the dungeon image offset should have been recorded`);
     }
 
-    // ⚠️ Known gap, asserted so it cannot be forgotten: the two parsers that reach
-    // into the image both return null on every real save. They walk the text section
-    // as `NumWordsInTextArray*4 + 4 + compressedSize*2`, and that arithmetic does not
-    // close — see PLAN.md Phase 10. Until it does, `missiles` and `specialLocations`
-    // from a genuine file mean nothing, and reporting them as 0 would be a lie.
-    check(
-      state.missiles === undefined,
-      `${name}: missile records still unreadable (expected until the text section is solved)`,
-    );
+    // The layout closure check, and the whole point of the exercise: the image's last
+    // section is the cell flags, whose length the extended block declares, and after it
+    // comes only `WriteAndChecksum`'s final word (`doc/CSBwin-src/SaveGame.cpp:1222`).
+    // If every section length from the header to the last database is right, the sum
+    // lands exactly on `EOF - 2`. One wrong record size anywhere and it does not.
+    const layout = state.imageLayout;
+    if (layout && state.cellFlagArraySize) {
+      const end = layout.cellFlags + state.cellFlagArraySize;
+      console.log(`    cell flags       : ${layout.cellFlags}..${end}, EOF-2 = ${bytes.length - 2}`);
+      check(
+        end === bytes.length - 2,
+        `${name}: the image layout closes on the final checksum word (got ${end}, want ${bytes.length - 2})`,
+      );
+    } else {
+      check(false, `${name}: the dungeon image layout should have been computed`);
+    }
+
+    check(state.missiles !== undefined, `${name}: the missile database should parse`);
+    if (state.missiles) {
+      // A record is only in flight if a timer is driving it. `timerIndex == 0xffff`
+      // marks a free slot in the pool, and the pool is always allocated at full size —
+      // all twelve sample saves carry 60 records whatever is happening on screen.
+      const live = state.missiles.filter((m) => m.timerIndex !== 0xffff);
+      console.log(`    missiles in flight: ${live.length} of ${state.missiles.length} pool slots`);
+      for (const m of live) {
+        console.log(`      projectile=0x${m.projectileObject.toString(16)} range=${m.rangeRemaining} ` +
+          `damage=${m.damageRemaining} timer=${m.timerIndex}`);
+      }
+      const gb = state.block2;
+      if (gb && live.length > 0) {
+        check(
+          live.every((m) => m.timerIndex < gb.maxTimers),
+          `${name}: every in-flight missile points at a timer inside the table`,
+        );
+      }
+      liveMissiles.set(name, live.map((m) => m.projectileObject));
+    }
 
     const liveGroups = state.item16.filter((r) => r.word0 !== 0).length;
     console.log(`  active monster groups: ${liveGroups} of ${state.item16.length}`);
@@ -226,6 +260,20 @@ function main(): void {
     for (const [roster, files] of byRoster) {
       console.log(`  ${files.join(', ')}\n    ${roster}`);
     }
+  }
+
+  // An object held on the cursor in one save and in flight in another is the same
+  // object id in `gb2.ObjectInHand` and in a MISSILE record's `projectileObject`.
+  // Two files that only differ by "the sword was thrown" prove both fields at once.
+  const held = new Set<number>();
+  for (const ids of onCursor.values()) held.add(ids);
+  const thrown = new Set<number>();
+  for (const ids of liveMissiles.values()) for (const id of ids) thrown.add(id);
+  const both = [...held].filter((id) => thrown.has(id));
+  if (both.length > 0) {
+    console.log(`\nheld then thrown: ${both.map((id) => `0x${id.toString(16)}`).join(', ')}`);
+    console.log('  (the same object id read out of GAMEBLOCK2 in one save and out of the');
+    console.log('   MISSILE database in another — both fields decoded correctly)');
   }
 
   finish();

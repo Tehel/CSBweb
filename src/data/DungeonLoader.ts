@@ -39,9 +39,42 @@ import {
 /**
  * Dungeon.dat loader class
  */
+/**
+ * How the image being parsed differs from a plain `dungeon.dat`.
+ *
+ * A CSBWin **save file** carries the same structure with three differences, all of
+ * them declared in its Extended Features block and all of them verified against
+ * genuine saves (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file").
+ * Defaults are `dungeon.dat`, so existing callers are unaffected.
+ */
+/** `EXPOOL` blocks are 256 bytes each (`doc/CSBwin-src/SaveGame.cpp`, EXPOOL records). */
+const EXPOOL_RECORD_SIZE = 256;
+
+export interface DungeonImageOptions {
+    /** ACTUATOR records carry a trailing word (`MakeBigActuators` appends two bytes). */
+    bigActuators?: boolean;
+    /** SCROLL records are 6 bytes with an RN text reference, not 4 with a 10-bit index. */
+    newScrolls?: boolean;
+    /** The text section is already an indirect index + compressed text, not raw words. */
+    indirectText?: boolean;
+    /** EXPOOL (db 11) records exist and are 256 bytes each. Saves only. */
+    expool?: boolean;
+    /**
+     * Translate one stored object reference into a packed RN.
+     *
+     * A `dungeon.dat` stores RNs as `[position:2][category:4][index:10]` and needs no
+     * translation, which is why this is optional. A CSBWin **save** stores every RN as
+     * a slot number in its object indirect index instead — see
+     * `src/data/CsbwinObjectIndex.ts` — and hands that index's `resolve` in here, so
+     * the records this loader produces are in the port's own form either way.
+     */
+    resolveRN?: (raw: ui16) => ui16;
+}
+
 export class DungeonLoader {
     private file: BinaryFile;
     private data: DungeonData | null = null;
+    private options: DungeonImageOptions = {};
 
     constructor() {
         this.file = new BinaryFile(Endianness.BIG_ENDIAN); // Atari ST format
@@ -58,7 +91,8 @@ export class DungeonLoader {
     /**
      * Load dungeon from Uint8Array
      */
-    loadFromArray(data: Uint8Array): DungeonData {
+    loadFromArray(data: Uint8Array, options: DungeonImageOptions = {}): DungeonData {
+        this.options = options;
         this.file.loadFromArray(data);
         return this.parse();
     }
@@ -86,8 +120,13 @@ export class DungeonLoader {
         // Parse object list
         const objectList = this.parseObjectList(offsets.objectList, header.objectListSize);
 
-        // Parse text data (raw words + debug decode)
-        const textWords = this.parseTextWords(offsets.textData, header.textDataSize);
+        // Parse text data. In a save it is already in indirect form and must be read as
+        // it stands; `buildIndirectText` below is the *conversion*, and running it over
+        // an already-converted array would decode the index as if it were text.
+        const indirect = this.options.indirectText
+            ? this.readIndirectText(offsets.textData, header.textDataSize)
+            : null;
+        const textWords = indirect ? indirect.compressedText : this.parseTextWords(offsets.textData, header.textDataSize);
 
         // Parse all databases
         const databases = this.parseDatabases(offsets.databases, header.objectCounts);
@@ -100,7 +139,9 @@ export class DungeonLoader {
         // Build level index
         const levelIndex = this.buildLevelIndex(mapDescriptors);
 
-        const { indirectTextIndex, compressedText } = this.buildIndirectText(textWords, databases.texts.records);
+        const { indirectTextIndex, compressedText } = indirect
+            ? indirect
+            : this.buildIndirectText(textWords, databases.texts.records);
 
         const data: DungeonData = {
             header,
@@ -241,7 +282,19 @@ export class DungeonLoader {
         const columnIndexOffset = DUNGEON_HEADER_SIZE + maps.length * MAP_DESCRIPTOR_SIZE;
         const objectListOffset = columnIndexOffset + totalColumns * 2;
         const textDataOffset = objectListOffset + header.objectListSize * 2;
-        const doorsOffset = textDataOffset + header.textDataSize * 2;
+        // In a save the text is already indirect: `NumWordsInTextArray` counts index
+        // entries (`ConvertToIndirectText` repurposes it,
+        // `doc/CSBwin-src/SaveGame.cpp:2272`), each 4 bytes, then a 4-byte
+        // `sizeOfCompressedText` and that many words of text. Both the index and the
+        // size word are little-endian, alone in a big-endian image.
+        let doorsOffset: number;
+        if (this.options.indirectText) {
+            const sizeAt = textDataOffset + header.textDataSize * 4;
+            const compressedWords = this.file.peekU32LE(sizeAt);
+            doorsOffset = sizeAt + 4 + compressedWords * 2;
+        } else {
+            doorsOffset = textDataOffset + header.textDataSize * 2;
+        }
 
         let offset = doorsOffset;
         const databaseOffsets: number[] = [];
@@ -270,7 +323,49 @@ export class DungeonLoader {
      */
     private getDatabaseRecordSize(dbType: number): number {
         const sizes = [4, 6, 4, 8, 16, 4, 4, 4, 4, 8, 4, 0, 0, 0, 8, 4];
+        // `dbEntrySizes[dbACTUATOR]` is the *big* size in CSBWin; the small one is the
+        // special case (`doc/CSBwin-src/SaveGame.cpp:2571-2575`). SCROLL grows the same
+        // way from extended-features version 'B' (`:2189-2200`).
+        if (dbType === DBType.ACTUATOR && this.options.bigActuators) return 10;
+        if (dbType === DBType.SCROLL && this.options.newScrolls) return 6;
+        if (dbType === 11 && this.options.expool) return EXPOOL_RECORD_SIZE;
         return sizes[dbType] || 0;
+    }
+
+    /**
+     * Read one object reference, translating it when the image is a save.
+     *
+     * Every RN in the image goes through here: the object list, each record's link,
+     * a chest's contents, a monster's possessions, a missile's flying object.
+     */
+    private readRN(): ObjectID {
+        const raw = this.file.readU16();
+        return this.options.resolveRN ? this.options.resolveRN(raw) : raw;
+    }
+
+    /**
+     * A second RN inside a record that may be free — a monster's possessions, a chest's
+     * contents, a missile's flying object, a scroll's text.
+     *
+     * CSBWin marks a record deleted by writing `RNnul` over its link and frees the
+     * indirect slot that named it in the same breath (`DeleteDBEntry`,
+     * `doc/CSBwin-src/data.cpp:993-1015`); everything else in the record is left as it
+     * was. So a free record routinely still holds a reference to a slot that has since
+     * been freed or reused, and three of the twelve committed saves contain exactly
+     * that — `csbgame2.dat`'s `monster[158]` still points its possession chain at slot
+     * 361, long after both were deleted. CSBWin never looks: a free record is reached
+     * only by the allocator, which clears it before handing it out.
+     *
+     * Resolving such a reference is meaningless, and *refusing* it would make a
+     * perfectly good save unreadable, so a free record's other RNs are read and
+     * dropped. They become `RNnul`, which is what the record means. A live record's
+     * reference is still resolved strictly, so a genuinely wrong offset still fails.
+     */
+    private readRNOfRecord(link: ObjectID): ObjectID {
+        const raw = this.file.readU16();
+        if (!this.options.resolveRN) return raw;
+        if (link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
+        return this.options.resolveRN(raw);
     }
 
     /**
@@ -292,7 +387,7 @@ export class DungeonLoader {
         this.file.seek(offset);
         const list: ObjectID[] = [];
         for (let i = 0; i < size; i++) {
-            list.push(this.file.readU16());
+            list.push(this.readRN());
         }
         return list;
     }
@@ -312,11 +407,42 @@ export class DungeonLoader {
         return words;
     }
 
+    /**
+     * The indirect text block of a CSBWin save: `count` 32-bit word offsets, then a
+     * 32-bit `sizeOfCompressedText`, then that many 16-bit words of packed text.
+     *
+     * The index and the size are **little-endian** — alone in an otherwise big-endian
+     * image, because their swap helper is a no-op on the shipping build. The text words
+     * themselves are big-endian like everything else.
+     */
+    private readIndirectText(offset: number, count: ui16): {
+        indirectTextIndex: ui32[];
+        compressedText: ui16[];
+    } {
+        const indirectTextIndex: ui32[] = [];
+        for (let i = 0; i < count; i++) {
+            indirectTextIndex.push(this.file.peekU32LE(offset + i * 4));
+        }
+        const sizeAt = offset + count * 4;
+        const sizeOfCompressedText = this.file.peekU32LE(sizeAt);
+        const compressedText: ui16[] = [];
+        this.file.seek(sizeAt + 4);
+        for (let i = 0; i < sizeOfCompressedText; i++) {
+            compressedText.push(this.file.readU16());
+        }
+        return { indirectTextIndex, compressedText };
+    }
+
     private computeTextLength(words: ui16[], startWord: number): number {
         let len = 0;
         let idx = startWord;
-        for (;;) {
-            const word = words[idx++] ?? 0;
+        // CSBWin's loop has no bound (`ComputeTextLength`,
+        // `doc/CSBwin-src/SaveGame.cpp:2202-2217`) because its input is always a valid
+        // text array. Ours must stop at the end of the array regardless: a word read
+        // past it used to come back as `?? 0`, whose three 5-bit characters are all
+        // zero, so the terminator was never found and the loop never returned.
+        while (idx < words.length) {
+            const word = words[idx++];
             const c1 = (word >> 10) & 0x1f;
             const c2 = (word >> 5) & 0x1f;
             const c3 = word & 0x1f;
@@ -325,6 +451,7 @@ export class DungeonLoader {
                 return len;
             }
         }
+        return len;
     }
 
     private buildIndirectText(words: ui16[], textRecords: TextRecord[]): {
@@ -386,7 +513,7 @@ export class DungeonLoader {
         const records: DoorRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({
@@ -408,7 +535,7 @@ export class DungeonLoader {
         const records: TeleporterRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
             const destination = this.file.readU16();
 
@@ -432,7 +559,7 @@ export class DungeonLoader {
         const records: TextRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const textRef = this.file.readU16();
 
             records.push({
@@ -450,17 +577,18 @@ export class DungeonLoader {
         const records: ActuatorRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const word2 = this.file.readU16();
             const word4 = this.file.readU16();
             const word6 = this.file.readU16();
+            const word8 = this.options.bigActuators ? this.file.readU16() : undefined;
 
             records.push({
                 nextObject,
                 word2,
                 word4,
                 word6,
-                word8: undefined
+                word8
             });
         }
 
@@ -472,8 +600,8 @@ export class DungeonLoader {
         const records: CreatureRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
-            const possession = this.file.readU16();
+            const nextObject = this.readRN();
+            const possession = this.readRNOfRecord(nextObject);
             const uByte4 = this.file.readU8();
             const groupIndex = this.file.readU8();
             const hp = [
@@ -512,7 +640,7 @@ export class DungeonLoader {
         const records: WeaponRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({
@@ -535,7 +663,7 @@ export class DungeonLoader {
         const records: ClothingRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({
@@ -556,7 +684,21 @@ export class DungeonLoader {
         const records: ScrollRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
+            if (this.options.newScrolls) {
+                // `DB7` (`doc/CSBwin-src/CSB.h:1195-1216`): link, then an RN to the text
+                // record, then a word whose bit 0 is "open". The RN's low ten bits are
+                // its record index, which is exactly what the old 10-bit field held, so
+                // storing that keeps every reader of `textReference` unchanged.
+                const textRn = this.readRNOfRecord(nextObject);
+                const flags = this.file.readU16();
+                records.push({
+                    nextObject,
+                    open: (flags & 0x1) !== 0,
+                    textReference: textRn & 0x3FF
+                });
+                continue;
+            }
             const attributes = this.file.readU16();
 
             records.push({
@@ -574,7 +716,7 @@ export class DungeonLoader {
         const records: PotionRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({
@@ -593,8 +735,8 @@ export class DungeonLoader {
         const records: ContainerRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
-            const containedObject = this.file.readU16();
+            const nextObject = this.readRN();
+            const containedObject = this.readRNOfRecord(nextObject);
             const containerType = this.file.readU16();
             this.file.skip(2); // unused
 
@@ -613,7 +755,7 @@ export class DungeonLoader {
         const records: MiscRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({
@@ -632,8 +774,8 @@ export class DungeonLoader {
         const records: MissileRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
-            const projectileObject = this.file.readU16();
+            const nextObject = this.readRN();
+            const projectileObject = this.readRNOfRecord(nextObject);
             const rangeRemaining = this.file.readU8();
             const damageRemaining = this.file.readU8();
             const timerIndex = this.file.readU16();
@@ -655,7 +797,7 @@ export class DungeonLoader {
         const records: CloudRecord[] = [];
 
         for (let i = 0; i < count; i++) {
-            const nextObject = this.file.readU16();
+            const nextObject = this.readRN();
             const attributes = this.file.readU16();
 
             records.push({

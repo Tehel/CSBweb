@@ -7,9 +7,8 @@ import { SoundManager } from './audio';
 import { CSBGraphicsLoader, DungeonData, DungeonLoader, GraphicsLoader } from './data';
 import { Game, type ActuatorTables, type TimerTables, type TimerHooks, type AddCharacterTables } from './engine';
 import {
-    applySavePayload,
+    applySaveBytes,
     buildSavePayload,
-    decodeSavePayload,
     encodeSavePayload,
     makeSaveFileName,
 } from './engine/SaveGamePayload';
@@ -345,7 +344,7 @@ async function init() {
                 },
                 onRestoreSave: (bytes) => {
                     if (!game) throw new Error('NO GAME RUNNING');
-                    applySavePayload(game, decodeSavePayload(bytes));
+                    applySaveBytes(game, bytes);
                     // Message timeouts are game-tick based, so a load that moves the
                     // clock would leave rows that expire at the wrong time (or never).
                     // CSBWin serializes the text area (`doc/CSBwin-src/Data.h:1666`);
