@@ -44,6 +44,8 @@ Verified against the code, not inherited from earlier revisions of this file.
 - Missiles and throwing (lifecycle, encounters, DSA filters).
 - Skills/experience (mastery, AdjustSkills, LevelUp), magic casting (all three spell classes).
 - Light levels / palette switching, sound, most of the DM UI.
+- The whole pre-game sequence (Phase 16): the title animation, the dungeon entrance with
+  its three buttons, the door-opening animation and the credits scroll.
 
 **Known-incomplete, in rough priority order:**
 1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
@@ -86,7 +88,7 @@ or ~12s with `--frames`. There is still no test *framework*; what there is:
 
 1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
    DevTools Protocol and byte-compare six screen states against `tools/frames/`. Built
-   to make the Phase 14 split safe. Six frames, no assertions beyond equality. The
+   to make the Phase 14 split safe. Eight frames, no assertions beyond equality. The
    script now starts its own dev server and headless Chrome, and the probe pins the
    viewport, so the frames reproduce on any machine rather than only on the browser
    the baseline happened to be captured in.
@@ -363,6 +365,7 @@ Full working notes in **`doc/PLAN_ARCHIVE.md`**. Open items from them are listed
 | 12 | Monsters: AI, movement, combat |
 | 13 | Champion lifecycle |
 | 14 | Structural cleanup |
+| 16 | Title screen and dungeon entrance |
 
 ## Next Steps (Phased)
 
@@ -611,6 +614,59 @@ than half-restored, since the world state they would need was never written.
 Verified by `tools/dump-savegame.ts`. This does not shorten Phase 10 — the binary
 format is a separate job — but it removes the reason to rush it.
 
+### Phase 16 — Title screen and dungeon entrance ✅
+
+Goal: everything CSBWin does before the party is in the dungeon.
+
+Done, in `src/renderer/intro/` (`IntroHost.ts`, `TitleSequence.ts`, `PrisonDoor.ts`,
+`PrisonLevel.ts`, `BootSequence.ts`). Spec and citations:
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`; evidence: `tools/dump-intro.ts` (103 checks) and
+golden frames `07-entrance` / `08-credits`.
+
+1. ✅ **The title animation** — `_DisplayChaosStrikesBack` (`CSBCode.cpp:9203`). CSBWin's
+   name is Chaos Strikes Back's; the routine is the shared engine's and runs off graphic 1,
+   so with DM's data it plays DM's title: "Presents" fades up and out, the "Dungeon" logo
+   zooms from 48×12 to 320×80 over eighteen `ShrinkBLT` frames, then "Master" appears in red.
+   `ShrinkBLT`'s 16.16 fixed point is transcribed, truncation and all.
+2. ✅ **The dungeon entrance** — `_TAG01f746` / `_TAG01f5ea`. The corridor behind the doors
+   is the real viewport renderer over a synthetic 5×5 level, as CSBWin does it, which is why
+   `render` was split and `drawViewportFrame` extracted.
+3. ✅ **The door animation** — `_OpenPrisonDoors`, 31 frames × 6 VBL, the grind every third
+   frame, the eight pre-shifted door buffers, and the three-column sliver the right half
+   leaves at the frame edge because 31 frames of 4 pixels is not quite 123.
+4. ✅ **The credits scroll** — `_TAG01f928`, the hidden button 202. Rendering it turned up a
+   **codec bug**: `decodeIMG` had been written from the dmweb.free.fr format notes rather
+   than from `ExpandGraphic`, and three opcodes disagreed. Graphic 5 is the only image in
+   either data set that uses one of them, so the scroll slid right from (78,55) on while
+   everything else looked fine. `src/core/imageDecoder.ts` is now a transcription of
+   `doc/CSBwin-src/CSBCode.cpp:10836`, and `tools/dump-image-codec.ts` checks it against
+   `tools/reference/csbwin-credits.png` — a capture of CSBWin's own screen, and the only
+   ground truth in this project that did not come out of our own code.
+5. ✅ **"Resume"** — `openSaveMenu(ui, 'loadOnly')` on a cleared screen, which is what
+   `SelectSaveGame(_9_, 1, 1, 1)`'s leading 1 asks for. Cancelling puts the entrance back up.
+6. ✅ **The mouse pointer**, shown and hidden where `STShowCursor` / `STHideCursor` say. The
+   arrow is blitted with no colour mapping at all, so the screen's palette decides its
+   colour: index 4 is `0x654` beige against the entrance's stonework and `0x066` in the
+   dungeon. `withCursor` is `DrawCursor` + `RemoveCursor`, so it never enters the picture.
+
+Deliberately not ported, each with its reason in the reference doc: the
+`QUIT/DUNGEON/UTILITY/HINT` launcher menu (one binary, one program), `DiskMenuNeeded` in the
+entrance loop (unreachable — button 140 is not in `Buttons16932`), the low-memory guard at
+`CSBCode.cpp:9222`, `_TAG01f928`'s never-reset 65535-VBL counter, and CSBWin's fallback where
+"Resume" on an empty slot silently starts a new game (an unbounded list has no empty slots).
+
+One genuine divergence, and it is a *narrowing* of one: CSBWin mutates `d.Word68` / `d.Word76`
+in place while the doors slide and never restores them. This port walks local copies. The
+doors open once per run, so the two are equivalent.
+
+Left open:
+- The intro runs on wall-clock time through `requestAnimationFrame`, not on a VBL counter
+  shared with the game loop. Nothing else exists yet when it plays, so there is nothing to
+  drift against; if a boot-time animation ever needs to agree with `d.Time`, this is the
+  place that would have to change.
+- `?intro=0`, and Debug in the saved UI settings, skip the whole sequence. That is a
+  developer affordance with no CSBWin counterpart.
+
 ### Phase 15 — Verification
 
 Goal: pay down the validation debt. Phases 2, 4, 5 and 7 all list validation steps that were
@@ -621,16 +677,23 @@ never carried out, because the project has **no test framework**.
    `tools/` is inside the type gate. Shared helpers in `tools/lib/check.ts`.
    <sub>How it went, and the two real bugs it surfaced: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
 2. ⚠️ **Golden-frame rendering tests.** `tools/check-frames.sh` starts its own dev server
-   and headless Chrome and takes `--update`. Still owed to make it a real test: a fixed set
-   of *party positions* rather than whatever the boot dungeon gives, and rendering straight
-   from the index buffer instead of a browser screenshot.
+   and headless Chrome and takes `--update`. Eight frames since Phase 16: the first six load
+   the app with `?intro=0`, and `07-entrance` / `08-credits` load it again without, which is
+   the only standing evidence that the corridor behind the prison doors actually renders.
+   Still owed to make it a real test: a fixed set of *party positions* rather than whatever
+   the boot dungeon gives, and rendering straight from the index buffer instead of a browser
+   screenshot.
    <sub>Baseline re-capture story: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
 
 3. ⏳ **Render probe tool** (Phase 5's skipped validation): render a single cell program with
    controlled inputs and dump the viewport as PNG.
-4. ⏳ **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
-   table regressions surface immediately.
+4. 🔄 **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
+   table regressions surface immediately. Part-paid by Phase 16: `tools/dump-image-codec.ts`
+   decodes every image in both data sets and asserts each one fills its own buffer exactly,
+   which is what caught the codec bug's blast radius, and checks each opcode on a hand-built
+   stream. The *table* extraction (`0x22e`..`0x232`) still has no round-trip check beyond the
+   canaries individual tools assert.
 5. ⏳ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
    validation).
 
-Status: 🔄 in progress — steps 1 and 2 done; 3, 4 and 5 remain.
+Status: 🔄 in progress — steps 1 and 2 done, 4 part-done; 3 and 5 remain.

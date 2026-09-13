@@ -1,6 +1,8 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { SpellDefinition } from '../../data/spellTypes';
 
+import type { IndexedBitmap } from './CanvasBlitter';
+
 export interface Rect {
   x1: number;
   x2: number;
@@ -135,10 +137,61 @@ export interface UITables {
     wRectPos926: WordRect;
     iconDisplay: IconDisplay[];
     word612: number[];
+    /** The prison door's right half on the static entrance screen. */
+    word100: WordRect;
+    /** The prison door's left half on the static entrance screen. */
+    word92: WordRect;
+    /** The entrance interior saved off before the doors go over it. */
+    word84: WordRect;
+    /** The prison door's right half while the doors slide; `x1` walks right. */
+    word76: WordRect;
+    /** The prison door's left half while the doors slide; `x2` walks left. */
+    word68: WordRect;
+    /** The viewport's place inside the door-animation working buffer. */
+    word60: WordRect;
+    /** The title animation's "Presents" band. */
+    word52: WordRect;
+    /** Where the title animation stashes the "Master" band out of graphic 1. */
+    word44: WordRect;
+    /** Where the title animation finally puts "Master". */
+    word36: WordRect;
     word28: WordRect;
     word20: WordRect;
     word12: WordRect;
   };
+}
+
+/**
+ * `d.Byte1222` (the arrow) and `d.Byte1350` (the hand) as pixels.
+ *
+ * Both are 128 bytes of Atari planar data: sixteen rows of four 16-bit bitplane words, so
+ * each row is eight bytes and each pixel a 4-bit index gathered across the planes. Colour
+ * 12 is transparent — `CreateCursorBitmap` floods its working buffer with it before
+ * blitting the shape in (`doc/CSBwin-src/CSBCode.cpp:2276`).
+ *
+ * The arrow is drawn straight from this bitmap with no colour mapping, which is why it
+ * changes colour with the screen: its body is palette index 4, and that is `0x654` beige
+ * under the dungeon entrance's `Palette360` and `0x066` teal under the adventure palette.
+ */
+export function decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
+  if (!raw || raw.length < 128) return null;
+  const pixels = new Uint8Array(16 * 16);
+  for (let row = 0; row < 16; row++) {
+    const base = row * 8;
+    const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
+    const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
+    const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
+    const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
+    for (let col = 0; col < 16; col++) {
+      const bit = 15 - col;
+      pixels[row * 16 + col] =
+        (((p0 >> bit) & 1) |
+          (((p1 >> bit) & 1) << 1) |
+          (((p2 >> bit) & 1) << 2) |
+          (((p3 >> bit) & 1) << 3)) & 0x0f;
+    }
+  }
+  return { width: 16, height: 16, pixels };
 }
 
 const GRAPHIC_230_INDEX = 0x230;
@@ -611,7 +664,20 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const defaultGraphicList = readU16Array(view, off, 70); off += 70 * 2;
   const identityColorMap = Array.from(raw.slice(off, off + 16)); off += 16;
 
+  // `Word140` down to `Word12`, in the file's own order. The names are the original
+  // Atari offsets and they run *downward* through the item, which is why an array read
+  // forward indexes them in reverse (`doc/CSBwin-src/Data.h:1475-1487`).
   const wordRects = readWordRectArray(view, off, 17);
+  // The title animation and the prison door (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`).
+  const word100 = wordRects[5];
+  const word92 = wordRects[6];
+  const word84 = wordRects[7];
+  const word76 = wordRects[8];
+  const word68 = wordRects[9];
+  const word60 = wordRects[10];
+  const word52 = wordRects[11];
+  const word44 = wordRects[12];
+  const word36 = wordRects[13];
   const word28 = wordRects[14];
   const word20 = wordRects[15];
   const word12 = wordRects[16];
@@ -658,6 +724,15 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos926,
     iconDisplay,
     word612,
+    word100,
+    word92,
+    word84,
+    word76,
+    word68,
+    word60,
+    word52,
+    word44,
+    word36,
     word28,
     word20,
     word12,

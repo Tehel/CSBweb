@@ -65,7 +65,7 @@ was hiding among the type errors.
 There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` byte-compares six live screen states against `tools/frames/`.
+- `tools/check-frames.sh` byte-compares eight live screen states against `tools/frames/`.
   The cheapest way to prove a renderer or UI change kept every pixel. It starts its own
   dev server and headless Chrome, so it needs no setup; it is out of the default run only
   because it costs a browser and ~7s. Run it before any renderer or UI commit.
@@ -95,6 +95,9 @@ renderer/   ViewportRenderer (viewport composition only), DrawViewport, Viewport
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
             SummarizeRoomInfo, CanvasBlitter, TextRenderer
+  intro/    Everything before the party is in the dungeon: the title animation, the
+            dungeon entrance, the door animation, the credits scroll. See
+            doc/CSBWIN_TITLE_SCREEN_REFERENCE.md.
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Light, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
@@ -158,7 +161,8 @@ were three lines each is not.
 
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
 renderer, movement, timers, actuators, DSA scripting, missiles, skills/experience, magic
-casting, light levels, sound and most of the DM UI all work. The message area (Phase 11),
+casting, light levels, sound, the pre-game screens (Phase 16 — title, dungeon entrance,
+doors, credits) and most of the DM UI all work. The message area (Phase 11),
 the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
 combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
 Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step

@@ -24,6 +24,8 @@
 import { writeFileSync } from 'node:fs';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
+const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
+const APP = `http://localhost:${DEV_PORT}/`;
 const res = await fetch(`http://127.0.0.1:${PORT}/json/list`);
 const page = (await res.json()).find(t => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -83,7 +85,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                         return ((seed >>> 0) % 1000000) / 1000000; };
 ` });
-await send('Page.reload', { ignoreCache: true });
+// `?intro=0` skips the title animation and the dungeon entrance
+// (`src/renderer/intro/BootSequence.ts`), so the six frames below still open on the
+// adventure screen. The entrance gets frames of its own at the end.
+await send('Page.navigate', { url: `${APP}?intro=0` });
 await wait(3500);
 console.log('state: booted');            await shot('01-boot');
 // Ensure Debug is ON (it persists in localStorage, so toggle only when needed).
@@ -140,6 +145,21 @@ console.log('state: attack panel');      await shot('05-attack');
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
+
+// The dungeon entrance, with the intro left on. The wait has to cover the whole title
+// animation — about 116 vertical blanks — plus the entrance's own fade; once that fade
+// finishes the screen is static until the player clicks, so the capture is stable.
+//
+// This is the only evidence that the corridor behind the doors actually renders. It is
+// drawn by the real viewport renderer over a synthetic 5x5 level
+// (`src/renderer/intro/PrisonLevel.ts`), and `tools/dump-intro.ts` can check the level and
+// the compositing but not the pixels the bytecode programs produce.
+await send('Page.navigate', { url: APP });
+await wait(7000);
+console.log('state: entrance');          await shot('07-entrance');
+// The scroll at the bottom of the button column (button id 202).
+await canvasClick(270, 192, 0); await wait(1500);
+console.log('state: credits');           await shot('08-credits');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

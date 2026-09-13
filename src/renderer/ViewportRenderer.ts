@@ -15,6 +15,12 @@ import type { CharacterStats } from '../engine/CharacterStats';
 import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { DrawViewport } from './DrawViewport';
+import {
+  PRISON_LEVEL_INDEX,
+  PRISON_PARTY_POSITION,
+  createPrisonDungeonState,
+  prisonPartyPosition,
+} from './intro/PrisonLevel';
 import { DungeonState } from '../engine/DungeonState';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
@@ -42,7 +48,7 @@ import {
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
 import { OBJECT_ID_EOF } from '../core/types';
-import { createUIState, UIMode, type ObjectMoveHandler, type UIState } from './ui/UIState';
+import { createUIState, UIMode, type ObjectMoveHandler, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import {
   drawStaticUIFrame,
 } from './ui/Draw';
@@ -516,18 +522,40 @@ export class ViewportRenderer {
     this.lastRenderPosition = new Position(x, y, z);
     this.lastRenderFacing = facing;
 
-    // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
     const map = this.ui.dungeonState.getMap(z);
+    if (this.lastPaletteLevel !== z) {
+      this.applyMonsterPaletteOverrides(map);
+      this.lastPaletteLevel = z;
+    }
+    this.drawViewportFrame(this.ui.dungeonState, position, facing, map);
+    this.presentViewport();
+  }
+
+  /**
+   * Everything `DrawViewport` needs set up around it, for one frame.
+   *
+   * Split out of `render` so the prison-door screen can run the same renderer over its
+   * synthetic 5x5 level (`renderPrisonInterior`, `intro/PrisonLevel.ts`) — which is what
+   * CSBWin does when it swaps `d.LevelCellFlags` and `d.pCurLevelDesc` and calls
+   * `DrawViewport(2, 2, 0)` (`doc/CSBwin-src/CSBCode.cpp:9556-9583`). The palette
+   * bookkeeping stays with `render`: it belongs to the level the party is on.
+   */
+  private drawViewportFrame(
+    dungeonState: DungeonState,
+    position: Position,
+    facing: number,
+    map: MapData | null,
+  ): void {
+    const { x, y, z } = position;
+    if (!this.ui.context?.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
+
+    // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
     const wallGraphicSet = map?.descriptor.mapGraphicsStyle ?? 0;
     const backgroundGraphicSet = map?.descriptor.floorCeilingStyle ?? 0;
     this.ui.context.wallGraphicSet = wallGraphicSet;
     this.ui.context.backgroundGraphicSet = backgroundGraphicSet;
     this.ui.context.frameMapIndex = z;
     this.ui.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
-    if (this.lastPaletteLevel !== z) {
-      this.applyMonsterPaletteOverrides(map);
-      this.lastPaletteLevel = z;
-    }
 
     // CSBWin `ReadGraphicsForLevel()` (Code390e.cpp:180-199): DoorGraphic[3][2] is derived from Door1Type/Door2Type.
     const doorType0 = map?.descriptor.doorType0Index ?? 0;
@@ -571,9 +599,7 @@ export class ViewportRenderer {
     this.ui.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
-    DrawViewport(this.ui.context, this.ui.dungeonState, position, facing);
-
-    this.presentViewport();
+    DrawViewport(this.ui.context, dungeonState, position, facing);
   }
 
 
@@ -832,6 +858,10 @@ export class ViewportRenderer {
   private onPaletteSelected?: (index: number) => void;
 
   private renderLastFrame(): void {
+    if (this.bootFrameRenderer) {
+      this.bootFrameRenderer();
+      return;
+    }
     if (!this.lastRenderPosition) return;
     this.render(this.lastRenderPosition, this.lastRenderFacing);
   }
@@ -853,6 +883,82 @@ export class ViewportRenderer {
       dst.pixels.set(src.pixels.subarray(srcRow, srcRow + maxWidth), dstRow);
     }
   }
+
+  /* ------------------------------------------------ the pre-game screens ---- */
+
+  /** The 320x200 screen the intro modules draw into (`d.LogicalScreenBase`). */
+  getScreenBuffer(): ScreenIndexBuffer {
+    if (!this.ui.screenIndexBuffer) throw new Error('Renderer not initialized');
+    return this.ui.screenIndexBuffer;
+  }
+
+  /** `ReadAndExpandGraphic(n, …)`. Throws rather than return a blank screen. */
+  getBitmap(graphicNum: number): IndexedBitmap {
+    const bitmap = this.getGraphicBitmap(graphicNum);
+    if (!bitmap) throw new Error(`graphics.dat item ${graphicNum} did not decode`);
+    return bitmap;
+  }
+
+  /** Push the screen buffer to the canvas through an explicit palette. */
+  presentScreen(palette: number[]): void {
+    if (!this.screenCtx || !this.screenImageData || !this.ui.screenIndexBuffer) return;
+    updateImageDataFromIndex(this.screenImageData, this.ui.screenIndexBuffer, palette);
+    this.screenCtx.putImageData(this.screenImageData, 0, 0);
+  }
+
+  /**
+   * `DrawViewport(2, 2, 0)` over the synthetic prison level — the corridor seen through the
+   * doorway on the entrance screen (`doc/CSBwin-src/CSBCode.cpp:9583`). Returns a copy of
+   * `d.pViewportBMP`, which the door animation re-blits on every frame.
+   *
+   * `lastPaletteLevel` is cleared so the first real frame after this re-applies the level's
+   * monster palette overrides; this level has none and must not be allowed to stand in for
+   * one.
+   */
+  renderPrisonInterior(): IndexedBitmap {
+    if (!this.initialized || !this.ui.context?.viewportIndexBuffer) {
+      throw new Error('Renderer not initialized. Call initialize() first.');
+    }
+    const seed = this.ui.dungeonState.getData().header.randomSeed ?? 0;
+    const dungeonState = createPrisonDungeonState(seed);
+    this.drawViewportFrame(
+      dungeonState,
+      prisonPartyPosition(),
+      PRISON_PARTY_POSITION.facing,
+      dungeonState.getMap(PRISON_LEVEL_INDEX),
+    );
+    this.lastPaletteLevel = null;
+    const src = this.ui.context.viewportIndexBuffer;
+    return { width: src.width, height: src.height, pixels: Uint8Array.from(src.pixels) };
+  }
+
+  /**
+   * The save/load screen alone on a cleared screen, for the entrance's "Resume".
+   *
+   * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
+   * (`doc/CSBwin-src/SaveGame.cpp:1563`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
+   * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`) — so unlike the in-game disk
+   * icon, this one does not sit over the picture behind it.
+   */
+  presentSaveMenuOnly(palette: number[]): void {
+    if (!this.ui.screenIndexBuffer) return;
+    clearIndex(this.ui.screenIndexBuffer, 0);
+    drawSaveMenu(this.ui);
+    this.presentScreen(palette);
+  }
+
+  /**
+   * Redraw hook for while a pre-game screen is up.
+   *
+   * `ui.renderLastFrame()` normally re-runs the last adventure frame; the save/load screen
+   * calls it whenever its list changes (`ui/SaveMenu.ts`). During the entrance screen there
+   * is no adventure frame to re-run, so the boot sequence installs its own.
+   */
+  setBootFrameRenderer(render: (() => void) | null): void {
+    this.bootFrameRenderer = render;
+  }
+
+  private bootFrameRenderer: (() => void) | null = null;
 
   // Get the viewport canvas element styling element
   getCanvasStyle(): CSSStyleDeclaration {

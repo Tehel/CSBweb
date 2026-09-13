@@ -20,6 +20,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/CSBWIN_DSA_REFERENCE.md` - DSA loading, timers, and STKOP behaviors.
 - `doc/CSBWIN_DECORATIONS_REFERENCE.md` - Wall/floor decoration eligibility and rendering rules.
 - `doc/CSBWIN_SAVEGAME_REFERENCE.md` - Extended features and save/load structures.
+- `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` - Everything before the party is in the dungeon: the title animation and `ShrinkBLT`, the dungeon entrance and the synthetic 5x5 level behind its doors, the 31-frame door animation, the credits scroll, and how "Resume" differs from the in-game disk icon.
 - `doc/CSBWIN_MENU_REFERENCE.md` - The disk icon and the menu system behind it: graphic 0, the four button layouts, text metrics, the modal loop and its press animation, the four save slots, and this port's deliberate divergences.
 
 ## Other CSBWin-sourced docs

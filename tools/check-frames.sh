@@ -19,6 +19,7 @@ update=0
 DEV_PORT="${DEV_PORT:-9000}"
 CDP_PORT="${CDP_PORT:-9222}"
 export CDP_PORT
+export DEV_PORT
 
 started_dev=0
 started_chrome=0

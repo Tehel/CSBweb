@@ -20,6 +20,8 @@ import { extractViewportTables } from './renderer/csbwin/ViewportTables';
 import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { createDevTools } from './dev';
+import { runBootSequence } from './renderer/intro/BootSequence';
+import { loadUISettings } from './ui/settings';
 
 console.log('Dungeon Master Web - Initializing...');
 
@@ -33,6 +35,8 @@ let soundManager: SoundManager | null = null;
 let actuatorTables: ActuatorTables | null = null;
 let timerTables: TimerTables | null = null;
 let crtController: CrtController | null = null;
+/** Set by `onRestoreSave`, read and cleared by the boot sequence. */
+let restoredFromSave = false;
 
 // Dev-only harness (PLAN.md Phase 14). Reached only via isDebugFeaturesEnabled().
 const dev = createDevTools({
@@ -328,6 +332,10 @@ async function init() {
                 onRestoreSave: (bytes) => {
                     if (!game) throw new Error('NO GAME RUNNING');
                     applySaveBytes(game, bytes);
+                    // The entrance screen's "Resume" needs to know whether a save actually
+                    // came back: CSBWin loops on `ReadEntireGame`'s result and re-shows the
+                    // door when it did not (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
+                    restoredFromSave = true;
                     // Message timeouts are game-tick based, so a load that moves the
                     // clock would leave rows that expire at the wrong time (or never).
                     // CSBWin serializes the text area (`doc/CSBwin-src/Data.h:1666`);
@@ -355,6 +363,28 @@ async function init() {
             if (import.meta.env.DEV) {
                 (window as unknown as Record<string, unknown>).__probe = { game, renderer, renderView };
             }
+            // The title animation and the dungeon entrance, before anything is playable
+            // (`src/renderer/intro/BootSequence.ts`). It runs before `bindUIContext` so the
+            // adventure screen's own canvas handlers cannot see the entrance's clicks.
+            //
+            // `?intro=0` skips it, and so does Debug: that mode quick-loads straight into a
+            // saved game, where an entrance screen would only be in the way. The
+            // golden-frame probe passes the query parameter.
+            const skipIntro =
+                new URLSearchParams(window.location.search).get('intro') === '0'
+                || loadUISettings().debug;
+            await runBootSequence({
+                canvas: gameCanvasEl,
+                renderer,
+                playSound,
+                consumeRestored: () => {
+                    const restored = restoredFromSave;
+                    restoredFromSave = false;
+                    return restored;
+                },
+                skip: skipIntro,
+            });
+
             bindUIContext({
                 renderer,
                 game,

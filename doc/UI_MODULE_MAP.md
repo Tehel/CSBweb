@@ -46,6 +46,23 @@ A function that turns out not to need the state does not take it — the pure he
 | `ui/Draw.ts` | `CSBUI.cpp` | Screen-buffer primitives (`fillRect`, shading, object icons, bars) and the static chrome |
 | `ui/ViewportPicking.ts` | `Mouse.cpp`, `Viewport.cpp` | What the point under the cursor refers to |
 
+## The pre-game screens
+
+`src/renderer/intro/` is a separate directory rather than another row above, because these
+screens run before there is a party, a level or a main loop and they talk to the Atari
+hardware directly — the logical screen base, the shifter's colour registers, the VBL counter,
+the sound chip — and to nothing else. `IntroHost.ts` is that hardware as an interface;
+`ViewportRenderer` and `src/main.ts` supply it. Spec:
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
+
+| Module | CSBWin counterpart | Holds |
+| --- | --- | --- |
+| `intro/IntroHost.ts` | the ST, and `Graphics.cpp` (`_FadeToPalette`) | The interface the screens draw through, the eight-step palette fade, `d.Palette11914` (black), and the Timer-A → sample-rate mapping |
+| `intro/TitleSequence.ts` | `CSBCode.cpp:9203` (`_DisplayChaosStrikesBack`) | The title animation and `ShrinkBLT`'s 16.16 fixed point |
+| `intro/PrisonDoor.ts` | `CSBCode.cpp:9459` / `:9545` / `:9379` / `:9629` | The dungeon entrance, its three buttons, the 31-frame door animation and the credits scroll |
+| `intro/PrisonLevel.ts` | `CSBCode.cpp:9556-9576` | The synthetic 5×5 level behind the doors, as a `DungeonState` the real viewport renderer can read |
+| `intro/BootSequence.ts` | `CSBCode.cpp:11338` (`_AskWhatToDo`) | The input queue, the VBL clock and the order the screens run in |
+
 ## What `ViewportRenderer` still owns
 
 Viewport composition, and only that: initialisation and table extraction, the palette sets
@@ -57,6 +74,11 @@ It also keeps thin public wrappers — `enqueueMouseClick`, `processMouseQueue`,
 `main.ts` call the renderer, not the UI modules. Those wrappers delegate and do nothing
 else.
 
+`render()` is split: `drawViewportFrame()` is everything `DrawViewport` needs set up around
+it for one frame, taking the `DungeonState` as a parameter, so the entrance screen can run the
+same renderer over `intro/PrisonLevel.ts`. The palette bookkeeping stays in `render()` — it
+belongs to the level the party is on.
+
 ## Picking is a reverse lookup, not a projection
 
 Worth knowing before touching `ViewportPicking.ts`: the bytecode renderer records, for every
@@ -67,7 +89,7 @@ dungeon.
 
 ## Verifying a change here
 
-`tools/check-frames.sh` byte-compares six live screen states against `tools/frames/`.
+`tools/check-frames.sh` byte-compares eight live screen states against `tools/frames/`.
 See the header of `tools/probe-frames.mjs` for how to start the dev server and headless
 Chrome it needs. It covers rendering plus the inventory open/select click path; throwing,
 dropping, chests, feeding and casting are **not** exercised.

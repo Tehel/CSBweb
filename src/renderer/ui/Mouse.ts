@@ -7,6 +7,7 @@
  * `handleMouseButton` is the dispatcher on the `word0` ids that `searchButtonList` returns.
  */
 import { IndexedBitmap } from '../csbwin/CanvasBlitter';
+import { decodeCursorBitmap } from '../csbwin/UITables';
 import { canPlaceInSlot, getChampionPossession, setChampionPossession } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
@@ -19,6 +20,8 @@ import { isReincarnateScreenOpen, reincarnateClick } from './ReIncarnate';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
+
+export { decodeCursorBitmap };
 
 export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
   // The Reincarnate name-entry screen reads the mouse queue itself and does its own
@@ -385,27 +388,6 @@ export function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
   return ui.cursorHandBitmap;
 }
 
-export function decodeCursorBitmap(raw: Uint8Array): IndexedBitmap | null {
-  if (!raw || raw.length < 128) return null;
-  const pixels = new Uint8Array(16 * 16);
-  for (let row = 0; row < 16; row++) {
-    const base = row * 8;
-    const p0 = ((raw[base] ?? 0) << 8) | (raw[base + 1] ?? 0);
-    const p1 = ((raw[base + 2] ?? 0) << 8) | (raw[base + 3] ?? 0);
-    const p2 = ((raw[base + 4] ?? 0) << 8) | (raw[base + 5] ?? 0);
-    const p3 = ((raw[base + 6] ?? 0) << 8) | (raw[base + 7] ?? 0);
-    for (let col = 0; col < 16; col++) {
-      const bit = 15 - col;
-      const v =
-        ((p0 >> bit) & 1) |
-        (((p1 >> bit) & 1) << 1) |
-        (((p2 >> bit) & 1) << 2) |
-        (((p3 >> bit) & 1) << 3);
-      pixels[row * 16 + col] = v & 0x0f;
-    }
-  }
-  return { width: 16, height: 16, pixels };
-}
 
 export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
   if (!ui.screenIndexBuffer) return;

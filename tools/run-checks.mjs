@@ -78,6 +78,15 @@ const CHECKS = [
   // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is
   // visible to the golden frames until there are saves to list.
   { tool: 'dump-save-menu.ts' },
+  // The title animation and the dungeon entrance. The golden frames can see the entrance
+  // once it is up; the nine 0x232 rectangles it hangs off, the hardcoded button list DM's
+  // graphics.dat forces, the synthetic 5x5 level behind the doors, the 31-frame slide and
+  // ShrinkBLT's fixed point are all invisible to them.
+  { tool: 'dump-intro.ts' },
+  // `ExpandGraphic`, the codec every picture in the game goes through, against a real
+  // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
+  // and only one image in the data used them, so nothing else could have caught it.
+  { tool: 'dump-image-codec.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.

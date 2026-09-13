@@ -279,6 +279,93 @@ The door sound specifically was verified correct in DMweb: the divergence toward
 pitch has already been applied and matches the real game. (`NOTES.md` still carries an
 older entry saying doors sound wrong — that entry is stale.)
 
+## The Timer-A values in `StartSound` are the sample rates
+
+`StartSound`'s second argument is the Atari ST Timer-A data value the original loaded to clock
+the sample out. CSBWin throws it away:
+
+```cpp
+void StartSound(ui8 *SoundBytes,
+                i32  /*timerData*/,
+                i32  highVolume)      // doc/CSBwin-src/Sound.cpp:647
+```
+
+and then hard-codes 6000 Hz in `SoundDecode` (`doc/CSBwin-src/Sound.cpp:293`,
+`WavBuf->nSamplesPerSecond = 6000;`). So the pitch information survives only in the call
+sites, and only two of them pass anything but the table value — the dungeon entrance:
+
+- `doc/CSBwin-src/CSBCode.cpp:9536` — `StartSound(d.Pointer22968, 112, 1)`, the latch click.
+- `doc/CSBwin-src/CSBCode.cpp:9399` — `StartSound(d.Pointer22964, 145, 1)`, the door grind.
+
+With the MFP's 1:4 prescaler the rate is `2457600 / 4 / timerData`:
+
+| timer data | rate |
+| --- | --- |
+| 112 | 5485.7 Hz |
+| 145 | 4237.2 Hz |
+
+Those are, to the Hertz, `ratesDefault[0]` and the door sound's second variant in
+`src/audio/soundsIndex.ts` — the two rates the entry above says came from the hand-made JS
+proof-of-concept and were validated against real hardware. Two independent derivations landing
+on the same pair is as close to a proof as this project gets that the divergence from CSBWin's
+6000 Hz is the right one, and it also fixes which variant is which: **index 0 is timer 112,
+index 1 is timer 145**. `timerDataToRateIndex` (`src/renderer/intro/IntroHost.ts`) is that
+mapping, asserted in `tools/dump-intro.ts`.
+
+## `ExpandGraphic`'s `0x20` opcode bit is never consulted
+
+The image codec's extended opcodes (`doc/CSBwin-src/CSBCode.cpp:10884-10896`) branch like
+this:
+
+```c
+tag0214be:
+  D2W &= 15;  D1L = 0;  D1B = *(A0++);
+  if ((D3W & 0x40)==0) goto tag0214d0;
+  D1W <<= 8;  D1B = *(A0++);
+tag0214d0:
+  D1W += 1;
+  if ((D3W&0x10)==0) goto tag021482;   // a solid colour run
+  if ((D3W&0x20)==0) goto tag021558;   // literal nibbles
+  A2 = A1-D7W;                          // copy the line above
+```
+
+`0x40` is "the count is 16-bit" and `0x10` splits run from not-run. **`0x20` is only tested
+once `0x10` is already set**, so on the run branch it means nothing: `0xA` is `0x8` and `0xE`
+is `0xC`. A decoder that gives `0xA` or `0xE` a meaning of its own desynchronises the stream.
+Graphic 5, the credits scroll, is the only image in either shipped data set that uses one.
+
+## The copy-the-previous-line opcode ends with a pixel of its own colour
+
+`0xB` and `0xF` are "copy N pixels from the line above" — and then one more pixel, of the
+colour in the opcode's low nibble. That trailing pixel is a **fall-through**, not a separate
+step: the copy loop at `tag0214e4` runs off its end straight into `tag0214f2`, which is the
+same `BSR(021570)` "place one pixel" subroutine the single-pixel opcode uses
+(`doc/CSBwin-src/CSBCode.cpp:10914-10924`):
+
+```c
+tag0214e4:
+  BSR(0214fa,0214e6);
+  if (D5L == 0) goto tag0214ec;
+  A2 = (pnt)D5L;
+tag0214ec:
+  A2 += 8;
+  if (D1W != 0) goto tag0214e4;
+tag0214f2:                       // <- no jump here; the loop above falls in
+  BSR(021570,0214f6);
+  goto tag021470;
+```
+
+Dropping it costs one pixel per opcode, which on a 320-wide image with hundreds of them puts
+the whole picture out of register. Asserted in `tools/dump-image-codec.ts`.
+
+## `d.Palette11914` is black
+
+Nothing in CSBWin ever writes it. Its only references in the whole tree are its declaration at
+`doc/CSBwin-src/Data.h:868` and five `FadeToPalette` reads (`Menu.cpp:287`,
+`CSBCode.cpp:9578`, `:9639`, and the two in `Code1f9e6.cpp`), and `d` is a zero-initialised
+global. So every "fade to `Palette11914`" in the source is a fade to black, and the name
+carries no other meaning.
+
 ## See-Thru-Walls is a counter read as a boolean
 
 `d.SeeThruWalls` (`doc/CSBwin-src/Data.h:768`, an `i8`) is a **counter**, not a flag:

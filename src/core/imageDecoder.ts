@@ -1,12 +1,10 @@
 /**
- * IMG1/IMG2 image format decoder
+ * The `graphics.dat` image codec — CSBWin's `ExpandGraphic`.
  *
- * IMG1/IMG2 are RLE-compressed 16-color images.
- *
- * Reference: CSBWin Bitmaps.cpp, dmweb.free.fr documentation
+ * IMG1 and IMG2 name the two byte orders the 4-byte header can come in, nothing more.
  */
 
-import type { ui8, ui16, ImageDimensions, Palette } from './types';
+import type { ui8, ImageDimensions, Palette } from './types';
 import { atariToRGBA } from './types';
 
 /**
@@ -23,213 +21,131 @@ export enum ImageFormat {
  * Decoded image data
  */
 export interface DecodedImage extends ImageDimensions {
-    pixels: ui8[];  // Pixel indices (0-15) into palette
+    pixels: Uint8Array;  // Pixel indices (0-15) into palette
 }
 
 /**
- * Decode IMG1/IMG2 format image
+ * `ExpandGraphic` — the `graphics.dat` image codec.
  *
- * Format:
- * - 2 bytes: width (big/little endian depending on format)
- * - 2 bytes: height
- * - N bytes: RLE-compressed nibble data
+ * A transcription of `doc/CSBwin-src/CSBCode.cpp:10836`. The 68000 original writes into
+ * Atari planar memory through 16-pixel groups and a running bit mask; this works in chunky
+ * bytes, which is the only liberty taken. Every opcode, count and fall-through is the C++'s.
  *
- * RLE Algorithm (reference: CSBWin Bitmaps.cpp):
- * Each block starts with 2 nibbles: [nib1][nib2]
+ * This file used to hold a decoder written from the dmweb.free.fr format notes instead, and
+ * three of its opcodes disagreed with CSBWin: `0xA` and `0xE` were "transparent pixels" where
+ * CSBWin has a plain colour run, and `0xD` threw. Only one real image in either data set
+ * exercises any of them — graphic 5, the credits scroll, which uses `0xA` four times — and it
+ * came out with the whole picture sliding right from (78,55) on. Items 558..562 use the
+ * others, but they are the tables `0x22e`..`0x232`, not images at all.
  *
- * nib1 determines action:
- * 0x0-0x7: Add (nib1+1) pixels of color nib2
- * 0x8:     Read byte, add (byte+1) pixels of color nib2
- * 0x9:     Read byte, add pixels (mixed mode)
- * 0xA:     Add (nib2+1) transparent pixels
- * 0xB:     Read byte, copy (byte+1) pixels from previous line, then 1× nib2
- * 0xC:     Read word, add (word+1) pixels of color nib2
- * 0xD:     Unused
- * 0xE:     Transparent pixels (extended)
- * 0xF:     Read word, copy (word+1) pixels from previous line, then 1× nib2
+ * ## The format
+ *
+ * Four bytes of `width`, `height`, then a byte-oriented opcode stream. Pixels are 4-bit
+ * palette indices written left to right, top to bottom, into a buffer whose line pitch is
+ * rounded **up to a whole 16-pixel group** — `D7W = ((width+15)>>1) & 0x7ff8` bytes
+ * (`CSBCode.cpp:10857`). Every image in `graphics.dat` happens to be a multiple of 16 wide,
+ * so the padding never shows; it is here because the "copy the previous line" opcode is
+ * defined in terms of that pitch.
+ *
+ * | first byte | count | emits |
+ * | --- | --- | --- |
+ * | `0x00`..`0x7F` | `(b >> 4) + 1` | that many pixels of colour `b & 0xf` |
+ * | `0x8X`, `0xAX` | next byte, +1 | that many pixels of colour `X` |
+ * | `0xCX`, `0xEX` | next **two** bytes, +1 | that many pixels of colour `X` |
+ * | `0x9X` | next byte, +1 | that many literal nibbles |
+ * | `0xDX` | next two bytes, +1 | that many literal nibbles |
+ * | `0xBX` | next byte, +1 | that many pixels copied from the line above, **then one of colour `X`** |
+ * | `0xFX` | next two bytes, +1 | the same, with a 16-bit count |
+ *
+ * Bit `0x40` is "the count is 16-bit" and bits `0x30` pick the mode: `0x00` and `0x20` are
+ * both a solid run, `0x10` is the literal stream, `0x30` copies the line above. That is why
+ * `0xA` behaves as `0x8` and `0xE` as `0xC` — the `0x20` bit is simply not consulted on that
+ * branch (`CSBCode.cpp:10891-10894`).
+ *
+ * The trailing pixel on `0xB`/`0xF` is a **fall-through**, not a separate opcode: the copy
+ * loop at `tag0214e4` runs off its end into `tag0214f2`, which is the same "place one pixel"
+ * subroutine the single-pixel opcode uses (`CSBCode.cpp:10917-10924`).
  */
 export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IMG1): DecodedImage {
-    let offset = 0;
+    const width = format === ImageFormat.IMG1
+        ? (data[0] << 8) | data[1]
+        : data[0] | (data[1] << 8);
+    const height = format === ImageFormat.IMG1
+        ? (data[2] << 8) | data[3]
+        : data[2] | (data[3] << 8);
 
-    // Read dimensions
-    let width: ui16, height: ui16;
-    if (format === ImageFormat.IMG1) {
-        // Big-endian
-        width = (data[0] << 8) | data[1];
-        height = (data[2] << 8) | data[3];
-    } else {
-        // Little-endian
-        width = data[0] | (data[1] << 8);
-        height = data[2] | (data[3] << 8);
-    }
-    offset = 4;
+    // `D7W = (I16)(((D7W+15)>>1)&0x7ff8)` bytes per line; two pixels to the byte.
+    const stride = ((((width + 15) >> 1) & 0x7ff8)) * 2;
+    const total = stride * height;
+    const buffer = new Uint8Array(total);
 
-    const pixels: ui8[] = [];
-    const totalPixels = width * height;
+    let off = 4;
+    let p = 0;
 
-    /**
-     * Helper: Read next byte
-     */
-    function readByte(): ui8 {
-        return data[offset++];
-    }
-
-    /**
-     * Helper: Read next word (big-endian)
-     */
-    function readWord(): ui16 {
-        const hi = data[offset++];
-        const lo = data[offset++];
-        return (hi << 8) | lo;
-    }
-
-    /**
-     * Helper: Copy pixels from previous line
-     * Previous line starts at (currentPos - width)
-     */
-    function copyFromPreviousLine(count: ui16): void {
-        const startPos = pixels.length - width;
-        if (startPos < 0) {
-            // No previous line, fill with transparent/black
-            for (let i = 0; i < count; i++) {
-                pixels.push(0);
-            }
-        } else {
-            for (let i = 0; i < count; i++) {
-                pixels.push(pixels[startPos + i]);
-            }
-        }
-    }
-
-    /**
-     * Helper: Add pixels of given color
-     */
-    function addPixels(count: ui16, color: ui8): void {
-        for (let i = 0; i < count; i++) {
-            pixels.push(color & 0xF); // Ensure 4-bit value
-        }
-    }
-
-    // Decode RLE stream
-    while (offset < data.length && pixels.length < totalPixels) {
-        const nib1 = data[offset] >> 4;
-        const nib2 = data[offset] & 0xF;
-        offset++;
-
-        if ((nib1 & 0x8) === 0) {
-            // 0x0-0x7: Simple repeat (nib1+1) times color nib2
-            addPixels(nib1 + 1, nib2);
-        } else {
-            switch (nib1) {
-                case 0x8: {
-                    // Read byte, add (byte+1) pixels of color nib2
-                    const count = readByte() + 1;
-                    addPixels(count, nib2);
-                    break;
-                }
-
-                case 0x9: {
-                    // Mixed mode: read byte for count
-                    const byte1 = readByte();
-                    if ((byte1 & 1) === 0) {
-                        // Even: 1 pixel of nib2, then byte1 raw nibbles
-                        addPixels(1, nib2);
-                        for (let i = 0; i < byte1; i++) {
-                            const nibble = (i & 1) === 0
-                                ? data[offset] >> 4
-                                : data[offset++] & 0xF;
-                            pixels.push(nibble);
-                        }
-                        if ((byte1 & 1) !== 0) offset++; // Skip last nibble if odd count
-                    } else {
-                        // Odd: nib2 ignored, (byte1+1) raw nibbles
-                        for (let i = 0; i < byte1 + 1; i++) {
-                            const nibble = (i & 1) === 0
-                                ? data[offset] >> 4
-                                : data[offset++] & 0xF;
-                            pixels.push(nibble);
-                        }
-                        if (((byte1 + 1) & 1) !== 0) offset++; // Skip last nibble if odd count
-                    }
-                    break;
-                }
-
-                case 0xA: {
-                    // Transparent pixels: (nib2+1) count
-                    // For non-animation images, treat as color 0
-                    addPixels(nib2 + 1, 0);
-                    break;
-                }
-
-                case 0xB: {
-                    // Copy (byte+1) pixels from previous line, then 1× nib2
-                    const count = readByte() + 1;
-                    copyFromPreviousLine(count);
-                    addPixels(1, nib2);
-                    break;
-                }
-
-                case 0xC: {
-                    // Read word, add (word+1) pixels of color nib2
-                    const count = readWord() + 1;
-                    addPixels(count, nib2);
-                    break;
-                }
-
-                case 0xD: {
-                    // Unused in documentation
-                    throw new Error(`Unsupported IMG opcode: 0xD at offset ${offset - 1}`);
-                }
-
-                case 0xE: {
-                    // Extended transparent pixels (for animations)
-                    // Sub-modes based on nib2
-                    if (nib2 <= 0xC) {
-                        // 0-C: (nib2+17) transparent pixels
-                        addPixels(nib2 + 17, 0);
-                    } else if (nib2 === 0xD) {
-                        // Read byte: (byte+1) transparent
-                        const count = readByte() + 1;
-                        addPixels(count, 0);
-                    } else if (nib2 === 0xE) {
-                        // Read byte: (byte+257) transparent
-                        const count = readByte() + 257;
-                        addPixels(count, 0);
-                    } else if (nib2 === 0xF) {
-                        // Read word: (word+1) transparent
-                        const count = readWord() + 1;
-                        addPixels(count, 0);
-                    }
-                    break;
-                }
-
-                case 0xF: {
-                    // Read word, copy (word+1) pixels from previous line, then 1× nib2
-                    const count = readWord() + 1;
-                    copyFromPreviousLine(count);
-                    addPixels(1, nib2);
-                    break;
-                }
-            }
-        }
-    }
-
-    // Verify we got the right number of pixels
-    if (pixels.length < totalPixels) {
-        // Pad with zeros if short (some images are slightly truncated)
-        while (pixels.length < totalPixels) {
-            pixels.push(0);
-        }
-    } else if (pixels.length > totalPixels) {
-        // Truncate if too many
-        pixels.length = totalPixels;
-    }
-
-    return {
-        width,
-        height,
-        pixels
+    const emit = (value: ui8): void => {
+        if (p < total) buffer[p++] = value & 0xf;
     };
+
+    while (off < data.length && p < total) {
+        const op = data[off++];
+        const colour = op & 0xf;
+
+        // `if (D2B < 0) goto tag0214be;` — the short form, its count in the high nibble.
+        // A high nibble of 0 takes `tag0214f2`, one pixel, which is `(0 >> 4) + 1`.
+        if (op < 0x80) {
+            const count = (op >> 4) + 1;
+            for (let i = 0; i < count; i++) emit(colour);
+            continue;
+        }
+
+        // `D1B = *(A0++); if (D3W & 0x40) { D1W <<= 8; D1B = *(A0++); }; D1W += 1;`
+        let count = data[off++];
+        if (op & 0x40) count = ((count << 8) | data[off++]) & 0xffff;
+        count += 1;
+
+        switch (op & 0x30) {
+            case 0x10: {
+                // `tag021558` — a stream of literal nibbles, high then low. An odd count
+                // opens with one pixel of the opcode's own colour so the rest pairs up.
+                if (count & 1) emit(colour);
+                for (let i = 0; i < (count >> 1); i++) {
+                    const pair = data[off++];
+                    emit(pair >> 4);
+                    emit(pair);
+                }
+                break;
+            }
+            case 0x30: {
+                // `A2 = A1 - D7W` — the same column one line up, advancing in step. Then
+                // the fall-through into `tag0214f2`.
+                for (let i = 0; i < count && p < total; i++, p++) {
+                    buffer[p] = p >= stride ? buffer[p - stride] : 0;
+                }
+                emit(colour);
+                break;
+            }
+            default: {
+                // `tag021482` — a solid run. Both 0x00 and 0x20 land here.
+                for (let i = 0; i < count; i++) emit(colour);
+            }
+        }
+    }
+
+    // A stream that stops short leaves the rest at colour 0. CSBWin has no such guard — it
+    // runs until the destination is full and reads off the end of the source if it has to —
+    // and graphic 5 is four pixels short of 320x200, so the real game shows four pixels of
+    // whatever followed the buffer in the heap. They are the bottom-right corner of a border.
+    const pixels = stride === width
+        ? buffer
+        : (() => {
+            const cropped = new Uint8Array(width * height);
+            for (let y = 0; y < height; y++) {
+                cropped.set(buffer.subarray(y * stride, y * stride + width), y * width);
+            }
+            return cropped;
+        })();
+
+    return { width, height, pixels };
 }
 
 /**
