@@ -124,6 +124,12 @@ export interface UIState {
   cursorHandBitmap: IndexedBitmap | null;
   portraitSheet: IndexedBitmap | null | undefined;
   portraitCache: Map<number, IndexedBitmap>;
+  /**
+   * `CHARDESC.portrait` unpacked, keyed by the champion's own pixel array — champions
+   * loaded from a genuine CSBWin save carry their picture rather than a graphic-26
+   * index, and it must not be rebuilt on every frame.
+   */
+  championPortraitCache: WeakMap<object, IndexedBitmap>;
 
   /* ---- hooks out to the engine / host ---- */
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
@@ -232,6 +238,7 @@ export function createUIState(
     cursorHandBitmap: null,
     portraitSheet: undefined,
     portraitCache: new Map(),
+    championPortraitCache: new WeakMap(),
 
     getGraphicBitmap: hooks.getGraphicBitmap,
     renderLastFrame: hooks.renderLastFrame,

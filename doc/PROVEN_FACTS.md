@@ -1758,3 +1758,54 @@ the whole 800-byte struct; and `swapCharacter` touches nothing below offset 32
 <sub>One unrelated off-by-one found next door, worth knowing before porting the spacing
 rule: the Hall-of-Champions copy of it reads `*(A0+9)`, which is `title[1]`, not
 `title[0]` (`doc/CSBwin-src/Code1f9e6.cpp:186-198`).</sub>
+
+## `CHARDESC` carries the champion's portrait as pixels, not an index
+
+`CHARDESC` declares `i8 portrait[1]` at offset **336** followed by
+`ui8 FILL337[800-337]` (`doc/CSBwin-src/CSB.h:2593-2594`). The two are one field: 464
+bytes, which is exactly `32*29/2` — a 32x29 four-bitplane bitmap, and the last thing in
+the 800-byte record.
+
+There is no portrait *index* anywhere in the struct. `AddCharacter` blits the picture in
+once, at the moment the champion joins, and the character record owns it from then on
+(`doc/CSBwin-src/Character.cpp:486-508`):
+
+```c
+  if (charID <= 23)
+  {
+    TAG0088b2(GetBasicGraphicAddress(26), (ui8 *)pcA3->portrait,
+              (RectPos *)d.Byte1390, (charID&7)<<5, (charID>>3)*29, 128, 16, -1);
+  }
+  else
+  {
+    TAG0088b2((ui8 *)GetExternalPortraitAddress(charID), (ui8 *)pcA3->portrait,
+              (RectPos *)d.Byte1390, 0, 0, 16, 16, -1);
+  };
+```
+
+`charID <= 23` cuts basic graphic 26, a 256x87 sheet of 24 cells at `(charID&7)<<5` by
+`(charID>>3)*29`; anything above 23 comes from `CSBgraphics.dat`
+(`GetExternalPortraitAddress`, `doc/CSBwin-src/Bitmaps.cpp:540-569`, which insists on
+32 by 29 at `:561`) and **has no cell to be an index into**. Every later draw copies the
+record's own bytes back out at 16 bytes per line — `CharacterPortraitToStatusBox`
+(`doc/CSBwin-src/Character.cpp:4644-4656`), called from `DrawCharacterStatusBox` only
+when that champion's inventory is open (`:1289-1293`).
+
+**The bytes are not swapped on save.** `swapCharacter` lists every field it byte-swaps
+and the portrait is not among them (`doc/CSBwin-src/SaveGame.cpp:490-521`), so a save
+file holds the Atari layout verbatim: per group of 16 pixels, four big-endian plane
+words; plane 0 carries bit 0 of the colour index, and the leftmost pixel is bit 15. That
+is the format `TAG0088b2` reads, four consecutive `LE16(*puwA0++)` per group
+(`doc/CSBwin-src/Graphics.cpp:764-779`).
+
+Verified, not inferred: decoded that way, the portrait of **every champion in every
+committed save** in `static/gamefiles/saves/` reproduces a cell of basic graphic 26
+pixel for pixel, 928 of 928 (`tools/dump-csbwin-load.ts`). A wrong offset, a reversed
+plane order or a byte swap each still yield a plausible 32x29 block, and none of them
+match.
+
+Consequence for the port: `Champion.portrait` holds those 928 palette indices, and the
+status box prefers them. `Champion.portraitGraphic` — the graphic-26 cell — remains for
+champions this engine creates, because the engine holds no graphics to blit from, but it
+is this port's shortcut and not a CSBWin field. A champion out of a genuine save has
+pixels and no index at all, which is why a loaded party once showed four empty boxes.

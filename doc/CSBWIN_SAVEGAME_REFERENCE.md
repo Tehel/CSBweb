@@ -131,6 +131,16 @@ So the footprint trail (`src/engine/PartyFootprints.ts`) and the shield/light ti
 part of the *character* block, not a block of their own — worth knowing before going
 looking for them elsewhere.
 
+### The last 464 bytes of each `CHARDESC` are the portrait bitmap
+
+`i8 portrait[1]` at 336 plus `FILL337[800-337]` is one field of 464 bytes — `32*29/2`,
+a four-bitplane 32x29 picture, unswapped, in Atari order. The champion carries the
+picture itself; there is no portrait index in the struct, and for a portrait supplied
+from `CSBgraphics.dat` there never was one. `doc/PROVEN_FACTS.md`, "`CHARDESC` carries
+the champion's portrait as pixels, not an index", has the citations and the plane
+layout; `src/data/CsbwinCharacters.ts` reads it and `tools/dump-portraits.ts` proves it
+reaches the status box.
+
 ## How much of this the port writes today
 
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) produces a real, correctly scrambled
@@ -139,6 +149,9 @@ and checksummed file **prefix** and stops at the end of block 6. Of what it emit
 - blocks 1, 3 — complete.
 - block 2 — offsets 20, 22, 28 and 46 only; the other eighteen fields are zero.
 - block 4 — 3328 zero bytes. Nothing of the champions or the party state is written.
+  When it is, note that the last 464 bytes of each `CHARDESC` are the portrait bitmap
+  and must be re-packed into bitplanes; the reader unpacks them into `Champion.portrait`
+  but the encoder does not exist yet.
 - block 5 — `timerWord8` (offset 8) of each record only; the rest of each `TIMER` is zero.
 - block 6 — zeros.
 - blocks 0 and 7-15 — not written at all.

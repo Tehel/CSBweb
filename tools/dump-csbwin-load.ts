@@ -43,6 +43,8 @@ import { Game } from '../src/engine/Game';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../src/data/CsbwinCharacters';
+import { ImageFormat } from '../src/core/imageDecoder';
 import { check, finish } from './lib/check';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -96,6 +98,36 @@ function loadWorld(): Game {
   );
 }
 
+/**
+ * Basic graphic 26, the sheet of 24 standard portraits, as a grid of 32x29 cells.
+ *
+ * `AddCharacter` cuts it at `(charID&7)<<5` by `(charID>>3)*29`
+ * (`doc/CSBwin-src/Character.cpp:486-495`), which is this grid.
+ */
+function portraitCells(): number[][] {
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
+  const sheet = graphics.getImage(26, ImageFormat.IMG1);
+  const cols = Math.floor(sheet.width / PORTRAIT_WIDTH);
+  const rows = Math.floor(sheet.height / PORTRAIT_HEIGHT);
+  const cells: number[][] = [];
+  for (let cell = 0; cell < cols * rows; cell++) {
+    const sx = (cell % cols) * PORTRAIT_WIDTH;
+    const sy = Math.floor(cell / cols) * PORTRAIT_HEIGHT;
+    const pixels: number[] = [];
+    for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+      for (let x = 0; x < PORTRAIT_WIDTH; x++) pixels.push(sheet.pixels[(sy + y) * sheet.width + sx + x]);
+    }
+    cells.push(pixels);
+  }
+  return cells;
+}
+
+/** Which cell of graphic 26 this bitmap *is*, or -1 — nothing partial counts. */
+function matchPortraitCell(cells: number[][], pixels: number[]): number {
+  return cells.findIndex((cell) => cell.every((value, i) => value === pixels[i]));
+}
+
 function snapshotCellFlags(data: DungeonData): number[][] {
   return data.maps.map((map) => {
     const { width, height } = map.descriptor;
@@ -145,6 +177,7 @@ function main(): void {
   const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
   check(saves.length > 0, 'there should be save files to read');
 
+  const cells = portraitCells();
   let playedSeen = 0;
 
   for (const path of saves) {
@@ -234,6 +267,26 @@ function main(): void {
     }
     check(carried > 0, `${name}: the party carries something`);
 
+    // The portraits. `CHARDESC` carries the picture, not an index to one, so a
+    // champion restored from a save has pixels or has nothing — and until this was
+    // read the status box drew no portrait at all for a loaded party.
+    //
+    // Demanding an *exact* cell of graphic 26 is the canary: the 464 bytes at offset
+    // 336 are four interleaved big-endian bitplanes, and a wrong offset, a wrong plane
+    // order or a byte swap all still decode to a plausible-looking 32x29 block. Only
+    // the right reading of all three reproduces a sheet cell pixel for pixel.
+    for (const champion of party.champions) {
+      const pixels = champion.portrait;
+      check(
+        pixels !== undefined && pixels.length === PORTRAIT_WIDTH * PORTRAIT_HEIGHT,
+        `${name}/${champion.name}: carries a 32x29 portrait out of CHARDESC`,
+      );
+      if (!pixels) continue;
+      const cell = matchPortraitCell(cells, pixels);
+      console.log(`  portrait ${champion.name}: graphic 26 cell ${cell}`);
+      check(cell >= 0, `${name}/${champion.name}: the portrait is a cell of basic graphic 26`);
+    }
+
     // And the round trip that a player actually performs: load a CSBWin save, then
     // quick-save and reload. The quick-save carries the world through
     // `DungeonSnapshot`, which is a hand-maintained list of what play can change
@@ -250,6 +303,11 @@ function main(): void {
       second.party.state.champions.map((c) => c.name).join('|') ===
         party.champions.map((c) => c.name).join('|'),
       `${name}: and so does the party`,
+    );
+    check(
+      second.party.state.champions.every((c, i) =>
+        (c.portrait ?? []).join(',') === (party.champions[i]?.portrait ?? []).join(',')),
+      `${name}: and their portraits`,
     );
     check(
       objectsAt(second, cell).join(',') === chain.join(','),

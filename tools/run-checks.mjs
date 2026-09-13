@@ -65,6 +65,10 @@ const CHECKS = [
   // The champions inside those saves: the whole CHARDESC, not just the name.
   { tool: 'dump-csbwin-party.ts' },
   { tool: 'dump-csbwin-load.ts' },
+  // The portraits of a party read out of a CSBWin save, drawn into a real screen
+  // buffer: CHARDESC carries the picture rather than a graphic-26 index, so the frames
+  // (which only ever see an injected party) cover the other path entirely.
+  { tool: 'dump-portraits.ts' },
   { tool: 'dump-csbwin-timers.ts' },
   // The save/load screen: the button-table offsets it hangs off, the list panel built
   // out of graphic 0, the row formatting, and the two metadata paths. Nothing here is

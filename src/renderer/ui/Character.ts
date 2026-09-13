@@ -8,6 +8,7 @@
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
+import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -317,8 +318,8 @@ export function drawPartyStatus(ui: UIState): void {
       drawLifeBars(ui, chIdx, champion);
     }
 
-    if (champion && typeof champion.portraitGraphic === 'number' && selected === chIdx) {
-      const portraitGraphic = getPortraitBitmap(ui, champion.portraitGraphic);
+    if (champion && selected === chIdx) {
+      const portraitGraphic = getChampionPortrait(ui, champion);
       if (portraitGraphic) {
         const portraitRect = { x1: baseX + 7, y1: 0, x2: baseX + 38, y2: 28 };
         fillRectIndex(ui.screenIndexBuffer, portraitRect, 1);
@@ -413,6 +414,35 @@ export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): 
   }
 }
 
+/**
+ * `&d.CH16482[chIdx].portrait` — the picture `CharacterPortraitToStatusBox` blits
+ * (`doc/CSBwin-src/Character.cpp:4644`).
+ *
+ * A champion read from a genuine CSBWin save carries the pixels themselves, because
+ * that is all `CHARDESC` holds; one this engine created carries the graphic-26 cell
+ * `AddCharacter` would have blitted from, because the engine has no graphics of its
+ * own. Prefer the pixels: they are the faithful field, and an external portrait
+ * (`charID > 23`, `:498`) has no cell to fall back to.
+ */
+export function getChampionPortrait(ui: UIState, champion: Champion): IndexedBitmap | null {
+  const pixels = champion.portrait;
+  if (pixels && pixels.length === PORTRAIT_WIDTH * PORTRAIT_HEIGHT) {
+    const cached = ui.championPortraitCache.get(pixels);
+    if (cached) return cached;
+    const bmp: IndexedBitmap = {
+      width: PORTRAIT_WIDTH,
+      height: PORTRAIT_HEIGHT,
+      pixels: Uint8Array.from(pixels),
+    };
+    ui.championPortraitCache.set(pixels, bmp);
+    return bmp;
+  }
+  if (typeof champion.portraitGraphic === 'number') {
+    return getPortraitBitmap(ui, champion.portraitGraphic);
+  }
+  return null;
+}
+
 export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBitmap | null {
   if (portraitIndex < 0) return null;
   const cached = ui.portraitCache.get(portraitIndex);
@@ -421,8 +451,8 @@ export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBi
   const sheet = getPortraitSheet(ui);
   if (!sheet) return null;
 
-  const w = 32;
-  const h = 29;
+  const w = PORTRAIT_WIDTH;
+  const h = PORTRAIT_HEIGHT;
   const cols = Math.floor(sheet.width / w);
   const rows = Math.floor(sheet.height / h);
   if (cols <= 0 || rows <= 0) return null;
@@ -447,12 +477,12 @@ export function getPortraitBitmap(ui: UIState, portraitIndex: number): IndexedBi
 export function getPortraitSheet(ui: UIState): IndexedBitmap | null {
   if (ui.portraitSheet !== undefined) return ui.portraitSheet;
   const img1 = ui.getGraphicBitmap(26, ImageFormat.IMG1);
-  if (img1 && img1.width >= 32 && img1.height >= 29) {
+  if (img1 && img1.width >= PORTRAIT_WIDTH && img1.height >= PORTRAIT_HEIGHT) {
     ui.portraitSheet = img1;
     return img1;
   }
   const img2 = ui.getGraphicBitmap(26, ImageFormat.IMG2);
-  if (img2 && img2.width >= 32 && img2.height >= 29) {
+  if (img2 && img2.width >= PORTRAIT_WIDTH && img2.height >= PORTRAIT_HEIGHT) {
     ui.portraitSheet = img2;
     return img2;
   }

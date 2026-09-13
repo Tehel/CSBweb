@@ -18,6 +18,8 @@
  * - `name` and `title` are plain `char` arrays and are **not** byte-swapped;
  *   `swapCharacter` lists every field it swaps and they are not among them
  *   (`doc/CSBwin-src/SaveGame.cpp:490-521`). Everything else here is big-endian.
+ * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
+ *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
 import type { Champion, PartyState, Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
@@ -35,6 +37,19 @@ const SKILLS_OFFSET = 92;
 const SKILL_SIZE = 6;
 /** `RN possessions[30]`, two bytes each. */
 const POSSESSIONS_OFFSET = 212;
+/**
+ * `i8 portrait[1]` at 336 (`doc/CSBwin-src/CSB.h:2593`), with `FILL337[800-337]` after
+ * it: 464 bytes, which is exactly `32*29/2` — the champion carries their **portrait
+ * bitmap**, not an index to one. `AddCharacter` blits it out of basic graphic 26 for a
+ * standard hero and out of `GetExternalPortraitAddress` for `charID > 23`
+ * (`doc/CSBwin-src/Character.cpp:486-508`), and `CharacterPortraitToStatusBox` blits it
+ * straight back to the status box at 16 bytes per line (`:4644-4656`).
+ */
+const PORTRAIT_OFFSET = 336;
+/** 32 pixels wide, 29 rows, four bitplanes: 16 bytes per line, 464 in all. */
+export const PORTRAIT_WIDTH = 32;
+export const PORTRAIT_HEIGHT = 29;
+const PORTRAIT_BYTES_PER_LINE = (PORTRAIT_WIDTH / 16) * 8;
 
 const u8 = (b: Uint8Array, o: number): number => b[o] ?? 0;
 const i8 = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 24) >> 24;
@@ -98,6 +113,50 @@ function readPossessions(
   return slots;
 }
 
+/**
+ * The portrait bitmap, unpacked from Atari bitplanes into this port's one-byte-per-pixel
+ * form.
+ *
+ * `swapCharacter` lists every field it byte-swaps and the portrait is not among them
+ * (`doc/CSBwin-src/SaveGame.cpp:490-521`), so these 464 bytes are the Atari layout the
+ * graphics were loaded in: per 16 pixels, four big-endian plane words, plane 0 carrying
+ * bit 0 of the colour index and the leftmost pixel in bit 15. That is what `TAG0088b2`
+ * reads — `LE16(*puwA0)` over four consecutive words per group
+ * (`doc/CSBwin-src/Graphics.cpp:764-779`).
+ *
+ * Proven, not inferred: `tools/dump-csbwin-load.ts` decodes the four champions of every
+ * committed save this way and every one of them matches a cell of basic graphic 26
+ * pixel for pixel.
+ *
+ * Returns `undefined` for an all-zero block, which is a slot `AddCharacter` cleared
+ * rather than a champion drawn entirely in colour 0.
+ */
+function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
+  const at = base + PORTRAIT_OFFSET;
+  const pixels: ui8[] = new Array(PORTRAIT_WIDTH * PORTRAIT_HEIGHT).fill(0);
+  let any = false;
+  for (let y = 0; y < PORTRAIT_HEIGHT; y++) {
+    for (let group = 0; group * 16 < PORTRAIT_WIDTH; group++) {
+      const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
+      const planes = [
+        u16be(block, word),
+        u16be(block, word + 2),
+        u16be(block, word + 4),
+        u16be(block, word + 6),
+      ];
+      for (let bit = 0; bit < 16; bit++) {
+        let colour = 0;
+        for (let plane = 0; plane < 4; plane++) {
+          colour |= ((planes[plane] >> (15 - bit)) & 1) << plane;
+        }
+        if (colour !== 0) any = true;
+        pixels[y * PORTRAIT_WIDTH + group * 16 + bit] = colour as ui8;
+      }
+    }
+  }
+  return any ? pixels : undefined;
+}
+
 /** One `CHARDESC`, at `index` within the block. */
 export function readCsbwinCharacter(
   block: Uint8Array,
@@ -156,6 +215,11 @@ export function readCsbwinCharacter(
     possessions: slots,
     shieldStrength: u16be(block, base + 274),
     fingerprint: u16be(block, base + 280) as ui16,
+    // The champion's own copy of their portrait. Champions this port creates instead
+    // carry `portraitGraphic`, the graphic-26 cell `AddCharacter` blitted from; a save
+    // has only the pixels, and for an externally supplied portrait that is all there
+    // ever was.
+    portrait: readPortrait(block, base),
   };
 
   // An unused slot is `ClearMemory`'d to 800 zero bytes by `AddCharacter`

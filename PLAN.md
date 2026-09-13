@@ -502,6 +502,20 @@ Goal: ensure internal state and data structures are complete enough to write a b
    byte — into a real `Game`, turns the clock, and watches one door open and the other
    shut. <sub>`doc/PROVEN_FACTS.md` → "The `TIMER` record".</sub>
 
+   ✅ **The portraits load too** (September 13th, third pass). `CHARDESC` carries the
+   picture rather than an index — 464 bytes of four-bitplane 32x29 at offset 336
+   (`doc/PROVEN_FACTS.md` → "`CHARDESC` carries the champion's portrait as pixels") —
+   so a loaded party had nothing for the status box to draw and showed four empty
+   boxes, while a quick-saved party, whose champions still carried this port's
+   `portraitGraphic`, drew correctly. `readPortrait` unpacks the bitplanes into
+   `Champion.portrait` and `getChampionPortrait` prefers them, keeping the index as the
+   fallback for champions the engine creates (it holds no graphics to blit from).
+   Evidence: `tools/dump-csbwin-load.ts` decodes all four champions of every committed
+   save and each is a cell of basic graphic 26 pixel for pixel — a canary that fails on
+   a wrong offset, plane order or byte swap — and `tools/dump-portraits.ts` draws the
+   real status bar into a real screen buffer and reads the portrait rectangle back, on
+   both paths.
+
    ⏳ **Still deferred, and none of it new debt:**
    - **The DSA global variables are not read from `EXPOOL`.** CSBWin takes them from
      `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` a record
@@ -526,8 +540,13 @@ code in September 2026, and again on the 13th when step 12 landed:
   what blocks 7-14 carry, and the column-index fix closed the last gap in step 4. What
   remains for these is packing, not modelling.
 - Step 6 (character block) — ⚠️ **read, not written.** `CsbwinCharacters.ts` unpacks a
-  whole `CHARDESC` — stats, skills, wounds, the thirty possessions — and its title field
-  is 20 bytes rather than the struct's 16 (`doc/PROVEN_FACTS.md`). Nothing is packed.
+  whole `CHARDESC` — stats, skills, wounds, the thirty possessions, the portrait — and
+  its title field is 20 bytes rather than the struct's 16 (`doc/PROVEN_FACTS.md`).
+  Nothing is packed. The portrait is the one field that needs a *codec* rather than a
+  field write: `readPortrait` unpacks the bitplanes and no encoder exists yet, so the
+  writer owes a `writePortrait` that repacks `Champion.portrait` into 464 bytes — and,
+  for a champion created in play, resolves `portraitGraphic` against graphic 26 first,
+  since the engine never filled the pixels in.
 - Step 9 (checksum/scramble parity) — ✅ proven for blocks 0-6 in both directions, and
   now against files this project did not write.
 - Step 10 (round-trip validation) — ⚠️ half. `tools/dump-csbwin-save.ts` reads genuine

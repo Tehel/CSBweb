@@ -89,6 +89,19 @@ export interface Champion {
     attributes: ChampionAttributes;
     alive: boolean;
     portraitGraphic?: ui16;     // Optional portrait index in graphic 26
+    /**
+     * `CHARDESC.portrait` (`doc/CSBwin-src/CSB.h:2593`) — the champion's own copy of
+     * their portrait, 32x29 palette indices, one byte each.
+     *
+     * CSBWin keeps no index: `AddCharacter` blits the picture into the character record
+     * once (`doc/CSBwin-src/Character.cpp:486-508`) and every later draw copies it back
+     * out (`CharacterPortraitToStatusBox`, `:4644`). A champion read from a genuine save
+     * therefore arrives with pixels and nothing else — an externally supplied portrait
+     * is not a cell of graphic 26 at all — so this is what the status box prefers.
+     * Champions this engine creates carry `portraitGraphic` instead, because the engine
+     * holds no graphics to blit from; the renderer resolves it there.
+     */
+    portrait?: ui8[];
     facing?: Direction;         // Optional facing for UI indicator
     fingerprint?: ui16;         // CSBWin CHARDESC.fingerPrint (used for bones mapping)
     incantation: number[];     // Magic incantation bytes (ASCII)
