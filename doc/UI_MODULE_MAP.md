@@ -89,7 +89,8 @@ dungeon.
 
 ## Verifying a change here
 
-`tools/check-frames.sh` byte-compares eight live screen states against `tools/frames/`.
+`tools/check-frames.sh` compares eight live screen states, pixel by pixel, against
+`tools/frames/`.
 See the header of `tools/probe-frames.mjs` for how to start the dev server and headless
 Chrome it needs. It covers rendering plus the inventory open/select click path; throwing,
 dropping, chests, feeding and casting are **not** exercised.

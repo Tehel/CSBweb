@@ -1,5 +1,10 @@
 #!/bin/bash
-# Re-run the golden-frame probe and byte-compare against tools/frames/.
+# Re-run the golden-frame probe and compare against tools/frames/.
+#
+# The frames are the 320x200 game canvas, read back as pixels, and the comparison decodes
+# both sides and compares pixels. Neither end depends on the host's fonts, widget theme,
+# window size, GPU or PNG encoder, so a baseline captured on one machine is checkable on
+# another. See the header of tools/probe-frames.mjs.
 #
 # This used to require two daemons started by hand — `npm run dev` on :9000 and a
 # headless Chrome on :9222 — which meant it was never actually run before a commit.
@@ -100,10 +105,9 @@ fi
 out="$(mktemp -d)"
 node "$root/tools/probe-frames.mjs" "$out" || { rm -rf "$out"; exit 1; }
 echo "--- frame comparison ---"
-rc=0
-for f in "$root"/tools/frames/*.png; do
-  n="$(basename "$f")"
-  if cmp -s "$f" "$out/$n"; then echo "  same  $n"; else echo "  DIFF  $n  ($out/$n)"; rc=1; fi
-done
+# Pixels, not bytes: `cmp` here used to make this a test of Chrome's PNG encoder, which is
+# why the same rendering on another machine failed on every frame.
+node "$root/tools/compare-frames.mjs" "$root/tools/frames" "$out"
+rc=$?
 [ "$rc" = 0 ] && rm -rf "$out"
 exit $rc

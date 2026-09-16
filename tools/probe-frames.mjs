@@ -3,8 +3,19 @@
 // Drives the running dev server over the Chrome DevTools Protocol — boot, enable Debug,
 // build a party at the Hall of Champions mirrors, open a champion's inventory, select in
 // it, open the attack menu —
-// and writes a PNG per state. `Math.random` is seeded and localStorage cleared on every
-// load, so the frames are byte-identical run to run and can be compared directly.
+// and writes a PNG per state.
+//
+// What it captures is the **320x200 game canvas**, read back with `getImageData` — not a
+// screenshot of the page. The page around the canvas is DOM debug chrome (buttons, a
+// slider, a scrollbar, the log panel), all of it drawn with the host's fonts and widget
+// theme, so a full-page shot could only ever be compared on the machine that took it. The
+// canvas is written solely by `putImageData` (the CRT effect is a separate GL canvas, and
+// it is off unless switched on), which makes the read-back exact and host-independent.
+// `compare-frames.mjs` then compares decoded *pixels*, so the PNG encoder does not enter
+// into it either.
+//
+// `Math.random` is seeded and localStorage cleared on every load, so the frames are
+// identical run to run.
 //
 // Usage:
 //   bash tools/check-frames.sh                     # normally: it starts both daemons
@@ -22,6 +33,7 @@
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
 import { writeFileSync } from 'node:fs';
+import { encodePng } from './lib/png.mjs';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
 const DEV_PORT = Number(process.env.DEV_PORT ?? 9000);
@@ -48,10 +60,23 @@ const evaluate = async (expr) => {
   if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails));
   return r.result?.result?.value;
 };
+// Read the canvas back as raw pixels. Base64 is built in 32k slices because
+// `String.fromCharCode(...bytes)` on a whole 256000-byte frame overflows the argument
+// limit, and character-by-character concatenation is far slower than it looks.
+const CAPTURE_CANVAS = `(() => {
+  const c = document.getElementById('game-canvas');
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let s = '';
+  for (let i = 0; i < d.length; i += 0x8000)
+    s += String.fromCharCode.apply(null, d.subarray(i, Math.min(i + 0x8000, d.length)));
+  return { width: c.width, height: c.height, data: btoa(s) };
+})()`;
+
 const shot = async (name) => {
-  const r = await send('Page.captureScreenshot', { format: 'png' });
-  writeFileSync(`${process.argv[2]}/${name}.png`, Buffer.from(r.result.data, 'base64'));
-  console.log('  wrote', name + '.png');
+  const cap = await evaluate(CAPTURE_CANVAS);
+  const rgba = Buffer.from(cap.data, 'base64');
+  writeFileSync(`${process.argv[2]}/${name}.png`, encodePng(cap.width, cap.height, rgba));
+  console.log('  wrote', name + '.png', `(${cap.width}x${cap.height})`);
 };
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true})),1`);
 const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
@@ -64,16 +89,15 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 
 await send('Runtime.enable');
 await send('Page.enable');
-// Pin the viewport instead of inheriting whatever --window-size the browser was started
-// with. Without this the frames are only comparable against captures from an identically
-// launched Chrome — the committed baseline was 1600x861 purely because of one instance's
-// window decoration, and any freshly started browser diffed on all five frames.
+// Pin the viewport. The frames no longer depend on it — they are the canvas, not the page —
+// but the click helper maps game coordinates through the canvas's bounding rect, so a
+// window too small to lay the page out as intended would send clicks somewhere else.
 await send('Emulation.setDeviceMetricsOverride', {
   width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false,
 });
 // Deterministic run: no persisted UI settings / quick-save, and a seeded Math.random —
 // `AddCharacter` rolls food and water from it (`Game.addCharacter`), so without the seed
-// the status bars would differ run to run. Frames are then byte-comparable across runs.
+// the status bars would differ run to run.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.clear(); } catch (e) {}
   // The save/load screen lists IndexedDB, so a frame of it would otherwise carry
@@ -128,9 +152,19 @@ console.log('state: party built');       await shot('02-party');
 // Right-click a party block (DM mask 1, button id 7) opens that champion's inventory.
 await canvasClick(15, 15, 2);  await wait(700);
 console.log('state: inventory');         await shot('03-inventory');
-// The eye: hovering an item shows the object-info panel.
-await canvasClick(15, 15, 0);  await wait(400);
+// Take an item out of the inventory. (41,66) is button id 30, body slot 2, which the Hall
+// of Champions fills for HALK with object 39027; selecting moves it out of the grid and
+// into the cursor, so this frame differs from 03 by the vacated slot.
+//
+// It used to click (15,15) — the same point as the right-click above, which is button id
+// 12, champion 0's *party block* in the top bar, not the inventory grid at all. Nothing
+// moved on screen and 04 came out identical to 03, so the frame proved nothing beyond
+// what 03 already proved. `compare-frames.mjs` now refuses a baseline with two identical
+// frames, which is what makes that mistake visible instead of silent.
+await canvasClick(41, 66, 0);  await wait(400);
 console.log('state: inventory+select');  await shot('04-inventory-sel');
+// Put it back, so the frames below are unaffected by the detour.
+await canvasClick(41, 66, 0);  await wait(400);
 await canvasClick(15, 15, 2);  await wait(500);   // back out
 // Champion 0's attack button (233-252 x 86-120) opens the real attack menu, listing
 // that champion's legal attacks. This used to be a dev-only F7 preview of a

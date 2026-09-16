@@ -65,10 +65,12 @@ was hiding among the type errors.
 There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` byte-compares eight live screen states against `tools/frames/`.
-  The cheapest way to prove a renderer or UI change kept every pixel. It starts its own
-  dev server and headless Chrome, so it needs no setup; it is out of the default run only
-  because it costs a browser and ~7s. Run it before any renderer or UI commit.
+- `tools/check-frames.sh` compares eight live screen states against `tools/frames/` — the
+  cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
+  server and headless Chrome, so it needs no setup; it is out of the default run only
+  because it costs a browser and ~7s. Run it before any renderer or UI commit. A frame is
+  the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
+  captured on one machine is checkable on another.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`

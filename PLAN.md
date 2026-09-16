@@ -93,11 +93,25 @@ Those items are now marked 🚫 where they were silently skipped; Phase 15 addre
 or ~33s with `--frames`. There is still no test *framework*; what there is:
 
 1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
-   DevTools Protocol and byte-compare six screen states against `tools/frames/`. Built
-   to make the Phase 14 split safe. Eight frames, no assertions beyond equality. The
-   script now starts its own dev server and headless Chrome, and the probe pins the
-   viewport, so the frames reproduce on any machine rather than only on the browser
-   the baseline happened to be captured in.
+   DevTools Protocol and compare eight screen states against `tools/frames/`. Built
+   to make the Phase 14 split safe. No assertions beyond equality. The script starts
+   its own dev server and headless Chrome.
+
+   Pinning the viewport was **not** enough to make the frames portable, as a move to a
+   second machine showed: a full-page screenshot carries the DOM debug chrome, drawn with
+   the host's fonts and widget theme, and `cmp` on two PNGs tests the Chrome build's
+   encoder rather than the rendering. The probe now reads the 320x200 canvas back with
+   `getImageData`, writes the PNG itself (`tools/lib/png.mjs`), and
+   `tools/compare-frames.mjs` decodes both sides and compares pixels. Nothing in the
+   comparison depends on the host any more.
+
+   The same pass found `04-inventory-sel` had been identical to `03-inventory` since it
+   was captured: it clicked (15,15), which is champion 0's party block (button id 12),
+   not the inventory grid, so no selection ever happened and the frame could not fail.
+   It now clicks (41,66) — body slot 2, HALK's Bezerker Helm — and covers the three
+   things a selection changes: the vacated slot, the held object's name in the top-right
+   line, and the `LOAD` readout. `compare-frames.mjs` fails a baseline containing two
+   identical frames, so a dead frame cannot come back unnoticed.
 2. **Forty assertion-carrying verification tools**, plus four run for crashes only.
    **`tools/run-checks.mjs` is the authority on the list** — it is not repeated here,
    because the hand-kept copy that used to sit in this bullet drifted to thirteen tools
