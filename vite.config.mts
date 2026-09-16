@@ -9,7 +9,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html')
+        main: resolve(import.meta.dirname, 'index.html')
       }
     }
   },
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src')
+      '@': resolve(import.meta.dirname, './src')
     }
   }
 });
