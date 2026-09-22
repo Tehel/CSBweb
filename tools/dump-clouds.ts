@@ -17,6 +17,12 @@
  *    whatever is standing in it on every one of those ticks.
  *  - A fireball bursts a door open (cell flag bottom bits 4 → 5) and does not linger at
  *    all — one tick and gone.
+ *  - `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1432-1440`) is
+ *    `QueueSound(size>80 ? 5 : 20, ...)` for a fireball — two *ordinals* into the sound
+ *    table that both resolve to the same SND item, so a small blast is meant to be a
+ *    quieter version of the same explosion, not a different sound. `playCloudSound`
+ *    used to call `playSound(SoundIndex.SPELL_EXPLODE)` for the small case — a
+ *    different sample entirely (ordinal 13's, not 20's).
  *
  * Run: `npx tsx tools/dump-clouds.ts`
  */
@@ -27,6 +33,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomTy
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
@@ -250,6 +257,28 @@ async function main(): Promise<void> {
     check(after === 5, `the fireball burst it open (state ${after})`);
     check(cloudIn(gameF, doorAt) === null, 'the fireball did not linger');
   }
+
+  /* ------------------------------------ 4b. the sound ordinal a blast plays ------ */
+
+  console.log('');
+  console.log('=== fireball impact sound: ordinal by blast size ===');
+  const soundOrdinal = async (size: number): Promise<number | null> => {
+    const game = await makeGame();
+    let ordinal: number | null = null;
+    const original = SoundQueue.prototype.queueSound;
+    SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime) {
+      ordinal = o;
+      return original.call(this, o, mapX, mapY, deltaTime);
+    };
+    game.timerSystem.createDeathCloud(RN_FIREBALL, size, at, 255);
+    SoundQueue.prototype.queueSound = original;
+    return ordinal;
+  };
+  const bigOrdinal = await soundOrdinal(200);
+  const smallOrdinal = await soundOrdinal(40);
+  console.log(`size 200 (>80): ordinal ${bigOrdinal}; size 40 (<=80): ordinal ${smallOrdinal}`);
+  check(bigOrdinal === 5, `a big blast plays ordinal 5 (got ${bigOrdinal})`);
+  check(smallOrdinal === 20, `a small blast plays ordinal 20, not ordinal 13's sample (got ${smallOrdinal})`);
 
   /* ------------------------------------- 5. the real thing: kill a monster -------- */
 

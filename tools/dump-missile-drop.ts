@@ -34,6 +34,16 @@
  * missile's own resting corner the tick before the door blocks it, and checks the
  * landed item sits at that exact corner — not the one `objectPos` would have used.
  *
+ * A fourth scenario covers the sound that plays on that same impact.
+ * `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/Code11f52.cpp:2101-2121`)
+ * calls `QueueSound` with an *ordinal* into the sound table — 0 for a weapon, 4 for
+ * anything else physical (food, a scroll, …) — not a raw SND item number.
+ * `TimerSystem.playMissileImpactSound` used to skip that table and call `playSound`
+ * with a hand-picked `SoundIndex` constant instead, and got the non-weapon case wrong:
+ * `SoundIndex.FIREBALL_EXPLODE` is ordinal 5's sample, not ordinal 4's, so a dropped
+ * scroll or piece of food played an explosion. This throws a weapon and a misc item at
+ * the same closed door and checks the ordinal `queueSound` actually receives.
+ *
  * Run: `npx tsx tools/dump-missile-drop.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -45,6 +55,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
+import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
@@ -222,6 +233,26 @@ function findClosedDoor(game: Game): { at: Position; south: Position } | null {
   return null;
 }
 
+/** Any floor item of a specific DB category, lifted off it. */
+function findFloorItemOfCategory(game: Game, category: DBType, avoid: Position[]): { rn: ObjectID; at: Position } | null {
+  const dungeon = game.dungeonState;
+  for (let z = 0; z < dungeon.getMapCount(); z++) {
+    const map = dungeon.getMap(z);
+    if (!map) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if (avoid.some((p) => p.x === x && p.y === y && p.z === z)) continue;
+        const at = new Position(x, y, z);
+        for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+          if (decodeObjectID(rn).category !== category) continue;
+          return { rn, at };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 function sameObject(a: ObjectID, b: ObjectID): boolean {
   return decodeObjectID(a).category === decodeObjectID(b).category && decodeObjectID(a).index === decodeObjectID(b).index;
 }
@@ -357,6 +388,41 @@ function main(): void {
         );
       }
     }
+  }
+
+  /* ---------------------------------- 4. the sound a door-blocked item plays ---- */
+  {
+    const soundOrdinal = (category: DBType): number | null => {
+      const game = makeGame();
+      const door = findClosedDoor(game);
+      if (!door) return null;
+      const item = findFloorItemOfCategory(game, category, [door.at, door.south]);
+      if (!item) return null;
+      game.dungeonState.removeObjectFromCell(item.at, item.rn);
+
+      const party = game.party.state;
+      party.position = door.south;
+      party.facing = 0;
+
+      let ordinal: number | null = null;
+      const original = SoundQueue.prototype.queueSound;
+      SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime) {
+        if (mapX === door.at.x && mapY === door.at.y) ordinal = o;
+        return original.call(this, o, mapX, mapY, deltaTime);
+      };
+      game.timerSystem.throwObjectFromHand(item.rn, party.position, 0, 0, 40, 100, 5, 0);
+      for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);
+      SoundQueue.prototype.queueSound = original;
+      return ordinal;
+    };
+
+    console.log('=== the sound ordinal a closed door plays for what hits it ===');
+    const weaponOrdinal = soundOrdinal(DBType.WEAPON);
+    const miscOrdinal = soundOrdinal(DBType.MISC);
+    console.log(`weapon: ordinal ${weaponOrdinal}; misc item: ordinal ${miscOrdinal}`);
+
+    check(weaponOrdinal === 0, `a thrown weapon plays ordinal 0, the falling-item sound (got ${weaponOrdinal})`);
+    check(miscOrdinal === 4, `a thrown misc item plays ordinal 4, not the explosion ordinal (got ${miscOrdinal})`);
   }
 
   finish();

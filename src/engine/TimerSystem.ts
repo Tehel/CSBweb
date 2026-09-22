@@ -2236,7 +2236,7 @@ export class TimerSystem {
       const cloudPos = projectile === RN_POISON_CLOUD ? 255 : objectPos & 0xff;
       this.createCloud(projectile, size, objX, objY, position, cloudPos);
     } else {
-      this.playMissileImpactSound(projectile);
+      this.playMissileImpactSound(projectile, position);
     }
 
     if (convertedPotion) {
@@ -2320,7 +2320,7 @@ export class TimerSystem {
     if (objX < 0 || objY < 0) return;
     const rn = this.createCloudRecord(projectile, size, posInCell);
     if (rn === null) return;
-    this.playCloudSound(projectile, size);
+    this.playCloudSound(projectile, size, position);
     this.dungeon.addObjectToCell(position, rn);
 
     // The Vi altar's cloud gets 5 ticks before its first turn; everything else 1.
@@ -2544,27 +2544,48 @@ export class TimerSystem {
     return encodeObjectID(bit7 ? 0 : (posInCell & 0x3), DBType.CLOUD, index);
   }
 
-  private playMissileImpactSound(projectile: number): void {
-    if (!this.hooks?.playSound) return;
+  /**
+   * The tail of `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/
+   * Code11f52.cpp:2101-2121`) — the sound for a plain object's impact, when nothing
+   * spawned a cloud. These `soundNum` values are **ordinals** into `d.sound1772`
+   * (`graphic232`'s sound table), not raw SND item numbers — `queueSound` is what
+   * resolves an ordinal to the actual sample and its distance falloff. This used to
+   * call `playSound` with a hand-picked `SoundIndex` constant per branch, which
+   * silently substituted a *different* sample for the non-weapon, non-poison-bolt
+   * case (`SoundIndex.FIREBALL_EXPLODE`, ordinal 5's sound, instead of ordinal 4's) —
+   * so a dropped scroll or piece of food played an explosion.
+   */
+  private playMissileImpactSound(projectile: number, position: Position): void {
+    if (!this.hooks?.queueSound) return;
+    let soundNum: number;
     if (!this.isMagicSpell(projectile) && decodeObjectID(projectile).category === DBType.WEAPON) {
-      this.hooks.playSound(SoundIndex.FALLING_ITEM);
-      return;
+      soundNum = 0;
+    } else if (projectile === RN_POISON_BOLT) {
+      soundNum = 13;
+    } else {
+      soundNum = 4;
     }
-    if (projectile === RN_POISON_BOLT) {
-      this.hooks.playSound(SoundIndex.SPELL_EXPLODE);
-      return;
-    }
-    this.hooks.playSound(SoundIndex.FIREBALL_EXPLODE);
+    this.hooks.queueSound(soundNum, position.x, position.y, 1);
   }
 
-  private playCloudSound(projectile: number, size: number): void {
-    if (!this.hooks?.playSound) return;
+  /**
+   * `CreateCloud`'s own sound (`doc/CSBwin-src/Code11f52.cpp:1432-1447`) —
+   * `QueueSound(size>80 ? 5 : 20, missileX, missileY, 1)` for a fireball, poison
+   * bolt or lightning bolt, `QueueSound(13, ...)` for anything else (skipping a
+   * monster-death cloud, which is silent). Ordinals 5 and 20 both resolve to the
+   * same SND item — a small blast is the same sample at a shorter falloff distance,
+   * not a different one — so this used to substitute `SoundIndex.SPELL_EXPLODE`
+   * (ordinal 13's sample) for the small case, turning a modest fireball into
+   * whatever ordinal 13 sounds like instead of a quieter version of its own blast.
+   */
+  private playCloudSound(projectile: number, size: number, position: Position): void {
+    if (!this.hooks?.queueSound) return;
     if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
-      this.hooks.playSound(size > 80 ? SoundIndex.FIREBALL_EXPLODE : SoundIndex.SPELL_EXPLODE);
+      this.hooks.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1);
       return;
     }
     if (projectile !== RN_MONSTER_DEATH) {
-      this.hooks.playSound(SoundIndex.SPELL_EXPLODE);
+      this.hooks.queueSound(13, position.x, position.y, 1);
     }
   }
 

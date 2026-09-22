@@ -208,6 +208,34 @@ archive section.
   before the door blocks it, and checks the landed item sits at that exact corner.
   Fails on the pre-fix code (landed corner 0 where the resting corner was 3).
 
+- ✅ **Resolved: the sound a thrown item makes on impact was often the wrong sample**
+  — found by the author while verifying the corner fix above: a sword or torch
+  sounded right, but corn, bread, cheese, an apple, a waterskin and scrolls all
+  played an explosion, and a fireball's blast seemed to pick at random between an
+  explosion, a "zap" like the door-opening spell, and a third, unidentified sound.
+  `QueueSound(soundNum, x, y, dt)`'s `soundNum` is an **ordinal** into `d.sound1772`
+  (`graphic232`'s sound table), resolved to an actual SND item, playback rate and
+  distance falloff by table lookup — not a raw sound-resource number.
+  `TimerSystem.playMissileImpactSound` (the tail of `ProcessMissileEncounter`,
+  `doc/CSBwin-src/Code11f52.cpp:2101-2121`) and `playCloudSound` (`CreateCloud`,
+  `Code11f52.cpp:1432-1447`) instead called `playSound` with a hand-picked
+  `SoundIndex` graphics.dat item per branch, and two of those picks named the wrong
+  item: a plain object's impact (`soundNum` 4, for anything that is not a weapon or
+  a poison bolt) played `SoundIndex.FIREBALL_EXPLODE` — ordinal 5's sample, not
+  ordinal 4's — and a small fireball/poison/lightning blast (`size<=80`, `soundNum`
+  20) played `SoundIndex.SPELL_EXPLODE` — ordinal 13's sample, not ordinal 20's.
+  Ordinals 5 and 20 turn out to resolve to the *same* SND item (537) at different
+  volume falloff distances — a small blast is meant to be a quieter version of the
+  same explosion, not a different sound — so this also likely explains the "random"
+  third fireball sound the author heard: `SoundIndex.SPELL_EXPLODE`'s sample (545)
+  standing in for it on the small-blast tick. Both functions now call
+  `hooks.queueSound(ordinal, x, y, 1)` with CSBWin's literal `soundNum`, exactly as
+  the door and teleport code already did elsewhere in `TimerSystem`.
+  Evidence: `tools/dump-missile-drop.ts` scenario 4 throws a weapon and a misc item
+  at a real closed door and checks the ordinal `queueSound` receives (0 and 4);
+  `tools/dump-clouds.ts` throws a big and a small fireball and checks the same (5
+  and 20). Both fail on the pre-fix code.
+
 - ✅ **Resolved: the teleporter/energy shimmer never animated, for two independent
   reasons.**
   1. `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) is a C function-static, so

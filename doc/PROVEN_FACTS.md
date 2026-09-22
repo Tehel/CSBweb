@@ -2414,3 +2414,29 @@ there, collapsing the two into one value; it now derives the drop corner from th
 RN it already holds. `tools/dump-missile-drop.ts`'s door scenario is the evidence: it
 records the missile's resting corner the tick before a real closed door blocks it, then
 checks the landed item sits there and not at the corner `objectPos` would have used.
+
+## `QueueSound`'s argument is an ordinal into the sound table, not a SND item number
+
+Every `QueueSound(soundNum, x, y, dt)` call in CSBWin passes a small integer — 0, 4, 5,
+13, 20, … — that indexes `d.sound1772`, the sound table `graphic232` carries
+(`TimerSystem.SoundQueue`'s own doc comment already established this for the monster
+code; it holds just as much for the impact/cloud code). Each table entry supplies the
+actual SND item (`word0`), a playback-rate variant, and the two distance thresholds that
+decide volume and audibility — the ordinal is a lookup key, not the sound.
+
+Two ordinals used by a thrown object's impact resolve to specific SND items worth
+knowing, confirmed by extracting the real `graphics.dat` table: ordinal 0 → item 533
+(a falling item), ordinal 4 → item 536, ordinal 5 → item 537, ordinal 13 → item 545, and
+ordinal 20 → item **537 again** — the same SND item as ordinal 5, at a shorter falloff
+distance (`byte7`: 4 against 7) and a slightly different playback-rate byte. `CreateCloud`
+(`doc/CSBwin-src/Code11f52.cpp:1436`) picks between exactly these two, `size>80 ? 5 : 20`,
+for a fireball, poison bolt or lightning bolt — so a small blast is the *same* explosion
+sample, just quieter, never ordinal 13's unrelated sample.
+
+`ProcessMissileEncounter`'s shared ending (`Code11f52.cpp:2101-2121`) and `CreateCloud`'s
+own sound (`Code11f52.cpp:1432-1447`) are the two call sites `TimerSystem` used to read
+past — `playMissileImpactSound` and `playCloudSound` called `playSound` with a hand-typed
+`SoundIndex` graphics.dat item instead of `queueSound` with CSBWin's literal ordinal, and
+along the way substituted ordinal 5's item for ordinal 4's (a plain object's impact) and
+ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
+evidence.
