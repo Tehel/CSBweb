@@ -2385,3 +2385,32 @@ and wrong for the six that do not: in a save those two bytes are an indirect slo
 RN. Nothing consumed one until the engine started restoring a timer's object at all;
 `CsbwinSaveGame.resolveTimerObjects` is where the translation happens now, and without it
 a restored missile names whatever record our own numbering put at that slot.
+
+## A door-blocked missile drops at its own `.pos()`, not at the `objectPos` it filters with
+
+`MissileTimer` (`doc/CSBwin-src/Timer.cpp:302-423`) tracks a flying missile's position
+within a cell as one of four corners, hopping to the adjacent corner every tick along the
+direction of travel. On the tick that transition would carry it out of its *current* cell
+(`leavingThisCell` true), the missile's own RN gets `.pos(curPos)` written before
+`MoveObject` carries it into the new cell (`:382`, `:393`) — an explicit write. On the tick
+a closed door instead blocks that same kind of internal transition (`leavingThisCell`
+false, `:399-419`), no such write happens: the RN's `.pos()` bits are simply left at
+whatever they already were, one hop behind.
+
+But `curPos` itself *is* still advanced first, unconditionally, at `:370-377`, and that
+advanced value is what gets threaded into `ProcessMissileEncounter` as its `objectPos`
+parameter (`:411`) — used there for `MissileEncounterFilter` and, for a shattered potion,
+`CreateCloud`'s position. `ProcessObjectFromMissile`, the function every encounter path
+ends in, ignores that parameter entirely and drops the object at `missile.pos()`
+(`:156-157`, `objD6.pos(missile.pos())`) — the *unadvanced* value, since `missile` is the
+same RN whose position field the door-blocked path never touched.
+
+So a plain thrown weapon or misc item that a closed door stops lands one corner short of
+where the same call's `objectPos` points — proven by contrast: a shattered potion's cloud
+(which *does* use `objectPos`) and the dropped-but-not-shattered item it would have left
+behind sit at two different corners of the same door cell for the identical encounter.
+`TimerSystem.processObjectFromMissile` used to take a caller-supplied `posInCell` and drop
+there, collapsing the two into one value; it now derives the drop corner from the missile
+RN it already holds. `tools/dump-missile-drop.ts`'s door scenario is the evidence: it
+records the missile's resting corner the tick before a real closed door blocks it, then
+checks the landed item sits there and not at the corner `objectPos` would have used.

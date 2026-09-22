@@ -1682,7 +1682,7 @@ export class TimerSystem {
       if ((missile.rangeRemaining & 0xff) <= deltaEnergy) {
         const filterProjectile = missile.projectileObject & 0xffff;
         this.missileEncounterFilter(5, current, curPos, missileRn, filterProjectile, -1);
-        this.processObjectFromMissile(missileRn, null, current, curPos);
+        this.processObjectFromMissile(missileRn, null, current);
         this.clearMissileFilterState();
         return;
       }
@@ -1745,7 +1745,7 @@ export class TimerSystem {
     if (leavingThisCell) {
       if (outOfBounds) {
         const dropPos = new Position(origMapX, origMapY, timer.level);
-        this.processObjectFromMissile(missileRn, null, dropPos, curPos);
+        this.processObjectFromMissile(missileRn, null, dropPos);
         this.clearMissileFilterState();
         return;
       }
@@ -2120,12 +2120,21 @@ export class TimerSystem {
     return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
   }
 
-  private processObjectFromMissile(
-    missileRn: number,
-    dest: MissileDropTarget,
-    position: Position,
-    posInCell: number,
-  ): void {
+  /**
+   * `ProcessObjectFromMissile`'s no-monster arm drops the object at `missile.pos()`
+   * (`doc/CSBwin-src/Timer.cpp:156-157`) — the *missile RN's own* stored corner, not
+   * the `objectPos`/`curPos` a caller threads through for filtering and cloud
+   * placement. The two diverge exactly once: `MissileTimer`'s door branch computes an
+   * advanced `curPos` (`Timer.cpp:370-377`) to pass as `ProcessMissileEncounter`'s
+   * `objectPos` — CSBWin uses that advanced value for a shattered-potion's cloud, but
+   * the missile's own `.pos()` is never written to it (that write is guarded by
+   * `leavingThisCell`, which is false on this path) — so a weapon or misc item stopped
+   * by a closed door falls at the corner it was already resting at, one hop short of
+   * where `objectPos` points. Deriving the drop corner from `missileRn` here, instead
+   * of trusting the caller's `posInCell`, reproduces that split without threading a
+   * second parameter through every encounter path.
+   */
+  private processObjectFromMissile(missileRn: number, dest: MissileDropTarget, position: Position): void {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
     const projectile = missile.projectileObject & 0xffff;
@@ -2138,7 +2147,7 @@ export class TimerSystem {
       if (dest && dest.monster !== OBJECT_ID_EOF) {
         this.addObjectToMonsterPossession(dest.monster, projectile);
       } else {
-        this.dropMissileObject(projectile, position, posInCell);
+        this.dropMissileObject(projectile, position, decodeObjectID(missileRn).position & 0x3);
       }
     }
 
@@ -2220,7 +2229,7 @@ export class TimerSystem {
       if (projectile === RN_LIGHTNING) {
         size = Math.floor(size / 2);
         if (size <= 0) {
-          this.processObjectFromMissile(missileRn, dest, position, objectPos);
+          this.processObjectFromMissile(missileRn, dest, position);
           return true;
         }
       }
@@ -2235,7 +2244,7 @@ export class TimerSystem {
       missile.projectileObject = projectile & 0xffff;
     }
 
-    this.processObjectFromMissile(missileRn, dest, position, objectPos);
+    this.processObjectFromMissile(missileRn, dest, position);
     return true;
   }
 

@@ -183,6 +183,31 @@ archive section.
   `MoveObject` call does at that point, and it is the one that matters when a throw's
   range runs out exactly on the landing cell rather than mid-flight).
 
+- ✅ **Resolved: a thrown object that hit a closed door landed on the far corner of
+  its cell, half a cell past where it should sit** — reported by the author as
+  fully reproducible for every closed door, both orientations: throw at a closed
+  door, open it, and the item sits at the back corner rather than the front one; a
+  save/load round-trip keeps it there, so it is a database misplacement, not a
+  rendering artifact. `MissileTimer` computes two different positions on the tick a
+  door blocks the flight (`doc/CSBwin-src/Timer.cpp:370-377`): an advanced `curPos`
+  it threads through `ProcessMissileEncounter` as `objectPos` (used for a shattered
+  potion's cloud placement and for `MissileEncounterFilter`), and the missile RN's
+  own `.pos()` bits, which the `leavingThisCell` write that would normally advance
+  them never runs on this path (it is gated on `leavingThisCell`, which is false
+  here) — so `ProcessObjectFromMissile` (`Timer.cpp:156-157`, `objD6.pos(missile
+  .pos())`) drops a plain weapon or misc item at the corner the missile was already
+  resting at, one hop short of `objectPos`. `TimerSystem.processObjectFromMissile`
+  had collapsed these into one value, dropping at the threaded-through `objectPos`
+  for every caller. It now derives the drop corner from the missile RN's own stored
+  position instead of a passed-in `posInCell`, matching CSBWin's split; the same fix
+  also corrects a latent twin of the same bug for a missile that runs out of range
+  exactly as it flies off the edge of the map (`nextRoomType` 8/exterior), which had
+  been using the advanced position too.
+  Evidence: `tools/dump-missile-drop.ts` scenario 3 throws a floor item at a real
+  closed door in `dungeon.dat`, records the missile's own resting corner the tick
+  before the door blocks it, and checks the landed item sits at that exact corner.
+  Fails on the pre-fix code (landed corner 0 where the resting corner was 3).
+
 - ✅ **Resolved: the teleporter/energy shimmer never animated, for two independent
   reasons.**
   1. `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) is a C function-static, so
