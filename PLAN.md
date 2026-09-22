@@ -147,6 +147,24 @@ archive section.
 
 **Bugs found but not fixed**
 
+- ✅ **Resolved: attributes raised by a level gain stayed red forever.** `LevelUp`
+  raises only an attribute's Maximum (`doc/CSBwin-src/Magic.cpp:98-148`); Current is
+  drawn back up one point every 256 ticks (64 asleep) by `TenSecondUpdate`
+  (`doc/CSBwin-src/Code17818.cpp:384-414`). Our `processTenSecondUpdate` had only the
+  mana and `tempAdjust` parts, and ran every 40 ticks instead of CSBWin's
+  `(d.Time & (sleeping ? 15 : 63)) == 0` (`doc/CSBwin-src/CSBCode.cpp:686-688`). It
+  is now fully ported: footprint aging, food/water consumption paid in stamina, HP
+  regeneration (with the Ekkhard Cross bonus), attribute recovery and the facing
+  reset. Food and water therefore now actually go down. Evidence:
+  `tools/dump-ten-second-update.ts`. The `d.Word11750` countdown is not ported: it
+  is a cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no
+  counterpart here, so the branch is dead.
+
+- ⏳ **`NinetySecondUpdate` runs on the wrong cadence.** CSBWin calls it when
+  `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`); `Game.processNinetySecondUpdate`
+  uses `tickCount % 360`. Its body (torch burn-down) was not audited against
+  `NinetySecondUpdate` either. Found while fixing the entry above; not fixed.
+
 - ✅ **Resolved: dropping an object onto an active teleporter did not teleport it.**
   `DropObject` (`doc/CSBwin-src/Mouse.cpp:882`) always calls `MoveObject(objD4, -1, 0,
   x, y, NULL, NULL)`, the same teleporter/pit-resolution loop a walking party or

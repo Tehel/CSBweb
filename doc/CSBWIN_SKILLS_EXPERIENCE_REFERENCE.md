@@ -89,7 +89,7 @@ This document lists skill/experience behavior directly visible in the CSBWin C++
 
 ## Timed effects and decay
 
-- `TenSecondUpdate` (called every ~10 seconds / 2.5 seconds while sleeping) uses `DetermineMastery(Wizard) + DetermineMastery(Priest)` and Wisdom to drive mana regeneration, while reducing `tempAdjust` by 1 for each skill each update (`doc/CSBwin-src/Code17818.cpp`).
+- `TenSecondUpdate` (called when `(d.Time & 63) == 0`, or `& 15` while sleeping — `doc/CSBwin-src/CSBCode.cpp:686-688`) uses `DetermineMastery(Wizard) + DetermineMastery(Priest)` and Wisdom to drive mana regeneration, while reducing `tempAdjust` by 1 for each skill each update (`doc/CSBwin-src/Code17818.cpp`). It also steps each attribute's Current one point toward its Maximum when `(d.Time & 255) == 0` (`& 63` asleep), which is how the red left by a level gain fades (`doc/CSBwin-src/Code17818.cpp:384-414`).
 
 ## DSA and scripting hooks
 

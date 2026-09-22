@@ -64,6 +64,7 @@ import { CharacterStats } from './CharacterStats';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
 import {
+    OBJNI_EKKHARD_CROSS,
     OBJNI_EMPTY_FLASK,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
@@ -74,6 +75,7 @@ import {
     attributeMaximum,
     attributeMinimum,
     championAttribute,
+    incrAttributeCurrent,
     setAttributeCurrent,
     setAttributeMaximum,
 } from './attributes';
@@ -1423,15 +1425,36 @@ export class Game {
         }
     }
 
+    /**
+     * `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:160-436`), called from the game
+     * tick whenever `(d.Time & (d.PartySleeping ? 15 : 63)) == 0`
+     * (`doc/CSBwin-src/CSBCode.cpp:686-688`) — every 16 s awake, 4 s asleep, despite
+     * the name.
+     *
+     * Per living champion: mana regeneration, `tempAdjust` decay, food and water
+     * consumption paid for in stamina, HP regeneration, and — every 256 ticks (64
+     * asleep) — one point of each attribute's Current drawn back toward its Maximum.
+     * That last step is what clears the red a level gain paints on the stats panel:
+     * `LevelUp` raises only Maximum (`doc/CSBwin-src/Magic.cpp:98-148`).
+     *
+     * Not ported: the `d.Word11750` countdown (`:375-383`). It is a cursor-redraw
+     * counter armed only by `CSBCode.cpp:959-965`, which this port has no equivalent
+     * of, so it is always zero and the branch is dead. The trailing
+     * `charFlags |= CHARFLAG_statsChanged` has no counterpart either: the panels are
+     * redrawn from live state every frame.
+     */
     private processTenSecondUpdate(): void {
-        const updateTicks = GAME_TIMING.TICKS_PER_SECOND * 10;
-        if (updateTicks <= 0) return;
-        if ((this.state.tickCount % updateTicks) !== 0) return;
-
         const party = this.party.state;
-        const random112 = (this.state.tickCount & 0x40)
-            | ((this.state.tickCount & 0x80) >> 2)
-            | ((this.state.tickCount & 0x100) >> 4);
+        const time = this.state.tickCount;
+        const sleeping = party.sleeping === true;
+        if ((time & (sleeping ? 15 : 63)) !== 0) return;
+        if (party.champions.length === 0) return;
+
+        this.footprints.ageFootprints();
+
+        const random112 = (time & 0x40)
+            | ((time & 0x80) >> 2)
+            | ((time & 0x100) >> 4);
         const getObjectNameIndex = (objectId: number): number | null => {
             const value = this.getBaseObjectNameIndex(objectId as ObjectID);
             return value >= 0 ? value : null;
@@ -1439,8 +1462,10 @@ export class Game {
 
         for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
             const champ = party.champions[chIdx];
-            if (!champ || !champ.alive) continue;
+            if (!champ) continue;
             const attrs = champ.attributes;
+            if ((attrs.health | 0) === 0) continue;
+            if (party.potentialChampionIndex === chIdx) continue;
             const maxMana = attrs.maxMana | 0;
             const mana = attrs.mana | 0;
             if (mana < maxMana) {
@@ -1454,6 +1479,7 @@ export class Game {
                     }
                 } else {
                     let manaAdjust = Math.trunc(maxMana / 40);
+                    if (sleeping) manaAdjust *= 2;
                     manaAdjust += 1;
                     const staminaAdjust = manaAdjust * Math.max(7, 16 - magicMastery);
                     this.monsterAttack.adjustStamina(chIdx, staminaAdjust);
@@ -1469,6 +1495,86 @@ export class Game {
                 if (entry.tempAdjust > 0) entry.tempAdjust -= 1;
             }
             champ.skills = skills;
+
+            // Food and water (`:291-344`). D6 grows by 2 for each halving of
+            // MaxStamina that Stamina is still below — a tired champion eats more.
+            let d6 = 4;
+            for (let d4 = attrs.maxStamina | 0; (d4 >>= 1), (attrs.stamina | 0) < d4; d6 += 2) {
+                // empty
+            }
+            let d4 = 0;
+            // `ApplyLimits(1, (MaxStamina>>8)-1, 6)`
+            let local4 = Math.min(6, Math.max(1, ((attrs.maxStamina | 0) >> 8) - 1));
+            if (sleeping) local4 <<= 1;
+            const sinceMove = ((time - this.footprints.getLastPartyMoveTime()) << 16) >> 16;
+            if (sinceMove > 80) {
+                local4++;
+                if (sinceMove > 250) local4++;
+            }
+            do {
+                const d5 = d6 <= 4;
+                if (champ.food < -512) {
+                    if (d5) {
+                        d4 += local4;
+                        champ.food -= 2;
+                    }
+                } else {
+                    if (champ.food >= 0) d4 -= local4;
+                    champ.food -= d5 ? 2 : Math.trunc(d6 / 2);
+                }
+                if (champ.water < -512) {
+                    if (d5) {
+                        d4 += local4;
+                        champ.water -= 1;
+                    }
+                } else {
+                    if (champ.water >= 0) d4 -= local4;
+                    champ.water -= d5 ? 1 : Math.trunc(d6 / 2);
+                }
+                d6--;
+                if (d6 === 0) break;
+            } while ((attrs.stamina | 0) < (attrs.maxStamina | 0) + d4);
+
+            this.monsterAttack.adjustStamina(chIdx, d4);
+            if (champ.food < -1024) champ.food = -1024;
+            if (champ.water < -1024) champ.water = -1024;
+
+            // HP regeneration (`:350-372`).
+            if ((attrs.health | 0) < (attrs.maxHealth | 0)) {
+                if ((attrs.stamina | 0) >= Math.trunc((attrs.maxStamina | 0) / 4)) {
+                    if (random112 < championAttribute(champ, AttributeIndex.Vitality) + 12) {
+                        let local4Hp = ((attrs.maxHealth | 0) >> 7) + 1;
+                        if (sleeping) local4Hp *= 2;
+                        const necklace = this.getChampionPossession(champ, 10);
+                        if (necklace !== null && this.getBaseObjectNameIndex(necklace) === OBJNI_EKKHARD_CROSS) {
+                            local4Hp = local4Hp + Math.trunc(local4Hp / 2) + 1;
+                        }
+                        attrs.health += Math.min(local4Hp, (attrs.maxHealth | 0) - (attrs.health | 0));
+                    }
+                }
+            }
+
+            // Attributes drift back to Maximum, one point at a time (`:384-414`).
+            if ((time & (sleeping ? 63 : 255)) === 0) {
+                for (const attr of attrs.stats) {
+                    const maximum = attributeMaximum(attr);
+                    const current = attributeCurrent(attr);
+                    if (current < maximum) {
+                        incrAttributeCurrent(attr, 1);
+                    } else if (current > maximum) {
+                        incrAttributeCurrent(attr, -Math.trunc(current / (maximum === 0 ? 1 : maximum)));
+                    }
+                }
+            }
+
+            // A champion left facing elsewhere turns back with the party once no
+            // monster has struck for 60 ticks (`:416-430`).
+            if (!sleeping && champ.facing !== party.facing) {
+                if (party.lastMonsterAttackTime < time - 60) {
+                    champ.facing = party.facing;
+                    champ.maxRecentDamage = 0;
+                }
+            }
         }
     }
 

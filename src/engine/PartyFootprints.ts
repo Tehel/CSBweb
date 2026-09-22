@@ -180,6 +180,28 @@ export class PartyFootprints {
     }
   }
 
+  /** `d.LastPartyMoveTime` — `TenSecondUpdate` reads it to eat more when idle. */
+  getLastPartyMoveTime(): number {
+    return this.lastPartyMoveTime;
+  }
+
+  /**
+   * The footprint half of `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:181-195`):
+   * every age byte but the newest ticks one step toward zero, and the moment the
+   * *oldest* one reaches zero it is dropped. (CSBWin's `SearchWordNE` call in the
+   * loop is commented out — "This does nothing that I can see".)
+   */
+  ageFootprints(): void {
+    for (let i = 0; i < this.count - 1; i++) {
+      const age = Math.max(0, (this.ages[i] ?? 0) - 1);
+      this.ages[i] = age;
+      if (age !== 0) continue;
+      if (i !== 0) continue;
+      this.deleteFootprintEntry(0);
+      break;
+    }
+  }
+
   /** Reset the trail — used when a save game is restored. */
   reset(): void {
     this.prints = [];
