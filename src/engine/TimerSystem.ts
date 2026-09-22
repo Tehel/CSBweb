@@ -2659,12 +2659,27 @@ export class TimerSystem {
     this.dungeon.setDBRecordLink(objectRn as number, OBJECT_ID_EOF);
   }
 
+  /**
+   * `ProcessObjectFromMissile`'s no-monster arm (`doc/CSBwin-src/Timer.cpp:151-159`):
+   * a thrown object landing at the end of its flight is
+   * `MoveObject(objD6.pos(missile.pos()), -2, 0, mapX, mapY, NULL, NULL)` — the same
+   * teleporter/pit-resolution loop a drop from the cursor goes through — which in turn
+   * places the object through `PlaceOrRemoveObjectInRoom`
+   * (`doc/CSBwin-src/Code11f52.cpp:3438-3446`), the function that fires a pressure
+   * plate under whatever just arrived on it. A thrown item landing on an active
+   * teleporter has to move on again immediately, exactly as a dropped one does, and
+   * a thrown item landing on a pressure plate has to trigger it, exactly as a walked-
+   * or wiggled-onto one does — `dropMissileObject` did neither, so a puzzle solved by
+   * throwing rather than carrying an item never fired.
+   */
   private dropMissileObject(projectileObject: number, position: Position, posInCell: number): void {
     if (projectileObject >= 0xff80) return;
     const decoded = decodeObjectID(projectileObject as number);
     if (decoded.category === DBType.CLOUD) return;
-    const dropped = encodeObjectID(posInCell & 0x3, decoded.category, decoded.index);
-    this.dungeon.addObjectToCell(position, dropped);
+    const resolved = this.resolveDroppedObjectPosition(position, decoded.category, posInCell, 0);
+    const dropped = encodeObjectID(resolved.objectPos, decoded.category, decoded.index);
+    this.dungeon.addObjectToCell(resolved.position, dropped);
+    this.actuators.triggerObjectMove(resolved.position, dropped, true, false, this.getPartyState().facing);
   }
 
   private findFirstMonsterAt(position: Position): number | null {
@@ -2748,6 +2763,25 @@ export class TimerSystem {
   ): { position: Position; facing: number; moved: boolean } {
     const result = this.resolveCellEffects(position, -1, 0, facing, undefined, true, undefined, teleporter);
     return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
+  }
+
+  /**
+   * `MoveObject(objD4, -1, 0, x, y, NULL, NULL)`, as `DropObject` calls it
+   * (`doc/CSBwin-src/Mouse.cpp:882`) — an object landing on the floor for the first
+   * time runs through the same active-teleporter / open-pit loop a walking object
+   * does, so dropping it onto (or into) one moves it on again immediately. `oldX`
+   * is negative for a drop, so `PlaceOrRemoveObjectInRoom` is only ever the 'place'
+   * half — there is no prior cell to remove it from.
+   */
+  resolveDroppedObjectPosition(
+    position: Position,
+    objectType: number,
+    objectPos: number,
+    facing: number,
+  ): { position: Position; objectPos: number; moved: boolean } {
+    const canFall = objectType !== DBType.MISSILE && objectType !== DBType.CLOUD;
+    const result = this.resolveCellEffects(position, objectType, objectPos, facing, undefined, canFall);
+    return { position: result.position, objectPos: result.objectPos & 0x3, moved: result.moved };
   }
 
   /**

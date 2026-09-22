@@ -28,6 +28,7 @@ import {
 } from '../csbwin/ObjectTables';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
+import { CsbRandom } from '../../core/random';
 
 const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
@@ -83,6 +84,7 @@ export interface InterpreterContext {
   frameFacing?: number;
   frameMapIndex?: number;
   doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)
+  doorTOC?: number[]; // d.DoorTOC[2], resolved from DoorCharacteristics for the current level
   numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5798)
   useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6740)
 
@@ -287,7 +289,6 @@ export class BytecodeInterpreter {
   private stack: number[] = [];
   private mirrorCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
   private flipCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
-  private graphicRandomState = 12345;
   private removeMortarJoint = true;
   private hasAlcove = 0;
 
@@ -1221,7 +1222,7 @@ export class BytecodeInterpreter {
     const viewport = this.context.viewportIndexBuffer;
     if (!getGraphic || !viewport) return true;
 
-    const bitmap = getGraphic(doorGraphicNum);
+    let bitmap = getGraphic(doorGraphicNum);
     if (!bitmap) {
       // (skip) StdDrawDoor could not load door graphic ${doorGraphicNum}
       return true;
@@ -1230,8 +1231,21 @@ export class BytecodeInterpreter {
     const s = doorState | 0;
     if (s === 0) return true; // fully open
 
+    // A "lightning door" (`d.DoorTOC[doorType] & 0x400`) redraws with a random
+    // mirror and a random vertical flip every frame it isn't bashed
+    // (`doc/CSBwin-src/CSBCode.cpp:4156-4166`) — CSBWin's cheap energy-field
+    // shimmer. `STRandomBool()` there reads whatever stream is currently swapped
+    // into `d.RandomNumber`, which `DrawViewport` sets to a viewport-only stream for
+    // exactly this reason (`doc/CSBwin-src/Viewport.cpp:6706-6707`) — rendering must
+    // never perturb the game's own RNG, so this draws from a dedicated instance.
+    const isLightningDoor = ((this.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
+    if (isLightningDoor && s !== 5) {
+      if (BytecodeInterpreter.viewportRandom.bool()) bitmap = this.getMirroredBitmap(bitmap);
+      if (BytecodeInterpreter.viewportRandom.bool()) bitmap = this.getFlippedBitmapVertical(bitmap);
+    }
+
     const blit = (r: RectPos | undefined) => {
-      if (!r) return;
+      if (!r || !bitmap) return;
       bltShapeToViewportIndex(bitmap, viewport, r);
     };
 
@@ -1809,10 +1823,44 @@ export class BytecodeInterpreter {
     bltShapeToViewportIndex(bitmap, viewport, rect);
   }
 
+  /**
+   * `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) keeps its state in a C
+   * function-static, which lives for the whole process rather than one call — the
+   * source of the teleporter/energy-effect shimmer is this counter advancing frame
+   * over frame, not the caller re-seeding it. `DrawViewport` builds a fresh
+   * `BytecodeInterpreter` every redraw, so this has to be a class-static, not an
+   * instance field, or every frame would replay the same jitter and the effect
+   * would render as a frozen pattern instead of animating.
+   */
+  private static graphicRandomState = 12345;
+
+  /**
+   * `viewportRandom` (`doc/CSBwin-src/Viewport.cpp:6706-6707`): CSBWin saves
+   * `d.RandomNumber`, swaps this stream in for the duration of `DrawViewport`, and
+   * restores the game's own value afterward, so every `STRandomBool()` a drawing
+   * function calls — the lightning door's mirror/flip, for one — reads this and
+   * never the sequence monster AI and combat depend on. A class-static for the same
+   * reason `graphicRandomState` is: it has to survive past the one
+   * `BytecodeInterpreter` that calls it, or every frame would reroll from the same
+   * point and the effect would never move.
+   */
+  private static viewportRandom = new CsbRandom();
+
+  /**
+   * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
+   * JS's `*` operator is not: `state` and `0xbb40e62d` are each up to ~2^32, so their
+   * exact product needs up to 64 bits, and a float64 mantissa only holds 53. The
+   * plain multiply silently rounds away exactly the low bits `>>> 7 % n` reads,
+   * which is why this returned the same value on every call — every state ever
+   * reached was a multiple of 4096 after the previous rounding, canceling both the
+   * `% 32` used for the teleporter/energy shimmer's row jitter and the `% 2` used
+   * for cloud/decoration mirroring. `Math.imul` truncates to 32 bits *before*
+   * rounding, matching the C `ui32` multiply exactly.
+   */
   private graphicRandom(maxExclusive: number): number {
     if (maxExclusive <= 0) return 0;
-    this.graphicRandomState = (this.graphicRandomState * 0xbb40e62d + 11) >>> 0;
-    return ((this.graphicRandomState >>> 7) % maxExclusive) >>> 0;
+    BytecodeInterpreter.graphicRandomState = (Math.imul(BytecodeInterpreter.graphicRandomState, 0xbb40e62d) + 11) >>> 0;
+    return ((BytecodeInterpreter.graphicRandomState >>> 7) % maxExclusive) >>> 0;
   }
 
   private cropBitmap(src: IndexedBitmap, width: number, height: number): IndexedBitmap {

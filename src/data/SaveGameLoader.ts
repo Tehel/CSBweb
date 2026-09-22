@@ -351,7 +351,10 @@ class RcsReader {
     if (end > this.data.length) throw new Error('savegame truncated while reading DSA data');
     const buf = this.data.subarray(this.offset, end);
     for (let i = 0; i < buf.length; i++) {
-      this.checksum = (this.checksum * 0xbb40e62d + 11 + buf[i]) >>> 0;
+      // Plain `*` loses precision here (see `BytecodeInterpreter.graphicRandom`'s
+      // comment for why): `Math.imul` gives the exact 32-bit-wraparound product
+      // `ui32(0xbb40e62d)` means in C.
+      this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + buf[i]) >>> 0;
     }
     this.offset = end;
     return buf;

@@ -27,7 +27,11 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
         if (!ctx.renderer) return;
         const { x, y } = getEventPosition(canvas, e);
         ctx.renderer.setHoverPoint({ x, y });
-        ctx.renderView();
+        // Cursor tracking only — never a full `renderView()`. That would re-run
+        // `DrawViewport` (and its animated-texture randomness) on every pixel of
+        // mouse travel; CSBWin's own cursor moves independently of the dungeon
+        // redraw, which happens once per game tick, never on a mouse event.
+        ctx.renderer.refreshOverlay();
     });
 
     canvas.addEventListener('mousedown', (e) => {

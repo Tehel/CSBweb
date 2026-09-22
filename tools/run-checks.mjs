@@ -47,6 +47,8 @@ const CHECKS = [
   { tool: 'dump-mastery-panel.ts' },
   { tool: 'dump-reincarnate-entry.ts' },
   { tool: 'dump-pit-fall.ts' },
+  { tool: 'dump-teleporter-drop.ts' },
+  { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },
   { tool: 'dump-player-attacks.ts' },
@@ -118,6 +120,8 @@ const CHECKS = [
   // CSBWin screen capture plus a hand-built stream per opcode. Three opcodes were wrong
   // and only one image in the data used them, so nothing else could have caught it.
   { tool: 'dump-image-codec.ts' },
+  { tool: 'dump-graphic-random.ts' },
+  { tool: 'dump-door-lightning.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.

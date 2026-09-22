@@ -428,6 +428,28 @@ export class ViewportRenderer {
     this.ui.hoverPoint = point;
   }
 
+  /**
+   * Recomposite the screen — cursor, hover highlights, every UI panel — over
+   * whatever `viewportIndexBuffer` already holds, without calling `DrawViewport`
+   * again.
+   *
+   * `render()` always redraws the dungeon view itself, which in CSBWin happens once
+   * per game tick (`doc/CSBwin-src/CSBCode.cpp:638`) — never in response to the
+   * mouse. Nothing in CSBWin's own mouse handling calls `DrawViewport`; the cursor
+   * is a hardware/software sprite tracked independently of it. This is the
+   * equivalent for mousemove: it exists so the custom-drawn cursor can follow the
+   * pointer at input rate without also re-running the bytecode interpreter — and
+   * with it `BytecodeInterpreter.graphicRandom`/`viewportRandom` — on every pixel of
+   * mouse travel, which turned a teleporter's or a lightning door's shimmer into
+   * something that changed only when the mouse moved and far too fast otherwise.
+   */
+  refreshOverlay(): void {
+    if (!this.initialized || !this.ui.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
+      return;
+    }
+    this.presentViewport();
+  }
+
   /** Attack menu → engine: `Attack()` and `d.attackDamageToDisplay`. */
   setChampionAttackHandler(
     attack: (chIdx: number, attackType: number) => number,
@@ -568,6 +590,15 @@ export class ViewportRenderer {
       [base0 + 1, base1 + 1],
       [base0 + 0, base1 + 0],
     ];
+
+    // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`
+    // (`doc/CSBwin-src/CSBCode.cpp:5780-5783`) — the level's two door "types" resolved
+    // to their characteristics word, bit 10 of which flags a "lightning door" and
+    // drives `DrawDoor`'s per-frame random mirror/flip (`CSBCode.cpp:4156-4166`).
+    const doorCharacteristics = this.ui.objectTables?.doorCharacteristics;
+    this.ui.context.doorTOC = doorCharacteristics
+      ? [doorCharacteristics[doorType0] ?? 0, doorCharacteristics[doorType1] ?? 0]
+      : [0, 0];
 
     // CSBWin reads the See-Thru-Walls counter as a boolean each frame:
     // `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).

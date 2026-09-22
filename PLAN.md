@@ -147,6 +147,142 @@ archive section.
 
 **Bugs found but not fixed**
 
+- ✅ **Resolved: dropping an object onto an active teleporter did not teleport it.**
+  `DropObject` (`doc/CSBwin-src/Mouse.cpp:882`) always calls `MoveObject(objD4, -1, 0,
+  x, y, NULL, NULL)`, the same teleporter/pit-resolution loop a walking party or
+  monster goes through — `Game.dropObjectFromCursor` skipped straight to
+  `DungeonState.addObjectToCell` on the raw drop target instead, so a "place the item
+  on the plate" puzzle placed the item and nothing else happened.
+  `TimerSystem.resolveDroppedObjectPosition` is the new public wrapper around the
+  existing `resolveCellEffects` (already used by `wiggleObject`/the actuator path;
+  nothing about the teleporter logic itself was wrong), and `dropObjectFromCursor`
+  now lands the object wherever that resolves to.
+  Evidence: `tools/dump-teleporter-drop.ts` finds a real active, item-scoped
+  teleporter in `dungeon.dat`, drops a floor item onto it, and checks the item ends
+  up at the destination rather than the drop cell — it fails on the pre-fix code.
+
+- ✅ **Resolved: a thrown object landing on an active teleporter or a pressure plate
+  did nothing.** `ProcessObjectFromMissile`'s no-monster arm
+  (`doc/CSBwin-src/Timer.cpp:151-159`) is `MoveObject(objD6.pos(missile.pos()), -2, 0,
+  mapX, mapY, NULL, NULL)` — the same call `DropObject` makes, which places the
+  landed object through `PlaceOrRemoveObjectInRoom`
+  (`doc/CSBwin-src/Code11f52.cpp:3438-3446`), the function that fires a pressure
+  plate under whatever just arrived. `TimerSystem.dropMissileObject` did neither: it
+  called `DungeonState.addObjectToCell` on the raw landing cell with no teleporter
+  resolution and — this is the one that actually bites, since a missile's own
+  in-flight movement already resolves any teleporter it flies through
+  (`moveMissileToCell` → `resolveCellEffects`) — no actuator trigger at all, so a
+  puzzle solved by throwing an item onto a plate you cannot stand on (or cannot walk
+  to, with a pit in the way) never fired. Now calls the same
+  `resolveDroppedObjectPosition` the cursor-drop fix uses, then
+  `ActuatorSystem.triggerObjectMove` at the landing cell.
+  Evidence: `tools/dump-missile-drop.ts` throws a floor item at a real teleporter and
+  at a real floor actuator in `dungeon.dat`; the actuator-trigger check fails on the
+  pre-fix code (the teleporter check does not, in isolation, only because the
+  in-flight path already covered it — kept anyway since it is what CSBWin's own
+  `MoveObject` call does at that point, and it is the one that matters when a throw's
+  range runs out exactly on the landing cell rather than mid-flight).
+
+- ✅ **Resolved: the teleporter/energy shimmer never animated, for two independent
+  reasons.**
+  1. `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) is a C function-static, so
+     its counter advances once per *process*, not once per draw call.
+     `BytecodeInterpreter.graphicRandom` had reseeded to 12345 as an *instance*
+     field, and `DrawViewport` builds a fresh `BytecodeInterpreter` every redraw, so
+     every frame replayed the identical jitter sequence. Moved to a `static` field on
+     the class so it persists across instances, matching the C static's lifetime.
+  2. `Game`'s main loop paced itself with `requestAnimationFrame`, which browsers
+     **fully suspend** — not merely throttle — the moment a tab is backgrounded or
+     occluded, unlike `setTimeout`. CSBWin's own VBL timer (and with it `d.Time`, and
+     the `GraphicRandom` counter that rides on every `DrawViewport` it triggers) never
+     stops just because the window lost focus. Confirmed live: with the old
+     `requestAnimationFrame` scheduling, an out-of-focus tab's tick loop measured
+     **zero** further iterations over several seconds — it had died outright, not
+     slowed down — while a `setTimeout`-paced version of the same loop kept
+     advancing (throttled to roughly 1/sec while backgrounded, full rate once
+     focused). That standing-dead loop, occasionally kicked back to life by whatever
+     browser-internal event a mouse click or move triggers, is the whole story
+     behind "changes only on mouse events." `gameLoop` now reschedules itself with
+     `setTimeout` instead.
+  CSBWin redraws the viewport once per game tick — `DrawViewport(d.partyFacing,
+  d.partyX, d.partyY)` sits directly in the "for each tick of the clock" handler
+  (`doc/CSBwin-src/CSBCode.cpp:638`) — and a tick is 15 VBL at normal speed, i.e. 4
+  Hz; this port's own `GAME_TIMING.TICKS_PER_SECOND = 4` already matches that, so the
+  shimmer should change about **4 times a second**, not ~1 Hz.
+
+  **Both of the above were real, and neither was the actual bug.** The pressure-plate
+  fix confirmed ticks were running; the shimmer was still frozen anyway. The real
+  defect was arithmetic, not scheduling: `graphicRandom`'s `state * 0xbb40e62d + 11`
+  uses JS's plain `*`, and `state` and the multiplier are each up to ~2^32 — their
+  exact product needs up to 64 bits, more than a float64 mantissa's 53, so the
+  multiply silently rounded away exactly the low bits `>>> 7 % n` reads. Every state
+  the LCG could reach turned out to be a multiple of 4096 once rounded, so `% 32`
+  (the teleporter's row jitter) and `% 2` (cloud/decoration mirror-flip, the same
+  method) both always came out **0** — a redraw every tick, always painting the
+  identical pixels, invisible on any single frame and only showing up as a sequence.
+  `core/random.ts`'s own `CsbRandom.advance()` already had the fix and the comment
+  explaining it (`Math.imul` truncates to 32 bits *before* rounding, matching C's
+  `ui32` multiply exactly) — `graphicRandom` just didn't follow it. Fixed the same
+  way, and the identical pattern turned up in `SaveGameLoader.ts`'s DSA checksum
+  reader (`this.checksum * 0xbb40e62d + 11 + buf[i]`), fixed too; it is currently
+  dead code (no dungeon this project loads defines a DSA, per the note below), so it
+  had no test to catch it.
+  Evidence: `tools/dump-graphic-random.ts` drives the LCG against an exact BigInt
+  oracle from five seeds, then checks the specific failure mode directly — 64 draws
+  of `% 32` from the class's own starting state must not land on one value. Fails
+  on the pre-fix code (all draws land on 0); the `Math.imul` version spreads across
+  26 of the 32 possible values.
+
+- ✅ **Added: the "lightning door" energy shimmer was never ported at all** — not a
+  bug in existing code, a missing feature. `DrawDoor`'s bit-10 branch of
+  `d.DoorTOC[doorType]` (`doc/CSBwin-src/CSBCode.cpp:4156-4166`) redraws with a
+  random mirror and a random vertical flip on every frame the door isn't bashed;
+  `opStdDrawDoor` had no notion of `DoorTOC` at all and always drew the same
+  bitmap. The shipped `dungeon.dat` sets the bit —
+  `doorCharacteristics[3] == 0x5ff` — so any level whose `doorType0Index`/
+  `doorType1Index` selects entry 3 has doors that should shimmer and silently
+  didn't. `ViewportRenderer.drawViewportFrame` now resolves `context.doorTOC` from
+  the level's door characteristics next to where it already resolved
+  `doorGraphics`, and `opStdDrawDoor` rolls the mirror/flip through a new
+  `BytecodeInterpreter.viewportRandom` — a dedicated `CsbRandom` instance, per
+  CSBWin's own `d.RandomNumber`-swap around `DrawViewport`
+  (`doc/CSBwin-src/Viewport.cpp:6706-6707`), so drawing a door can never perturb the
+  sequence monster AI and combat depend on.
+  Evidence: `tools/dump-door-lightning.ts` confirms the shipped dungeon actually
+  sets the bit, then drives `opStdDrawDoor` directly across 40 redraws of the same
+  closed door and checks the drawn bitmap doesn't sit at a single, frozen pattern.
+  Fails on the pre-fix code (always 1 distinct pattern); passes with 13 of 40 draws
+  distinct.
+
+  **Left open:** whether the cloud- and missile-sprite mirror/flip randomization
+  elsewhere in `BytecodeInterpreter` (`this.graphicRandom(2)` for `mirror`/`flip` at
+  the cloud-drawing site) is even drawing from the right generator. `GraphicRandom`
+  has exactly two call sites in all of CSBWin, both inside `DrawTeleporter` — nothing
+  in cloud or missile drawing calls it, so that code's choice of `graphicRandom`
+  over a `viewportRandom`-style `STRandomBool()` (or over reading a monster's own
+  precomputed mirror bit, set once by game logic rather than re-rolled every frame —
+  `NextMonsterUpdateTime`, `doc/CSBwin-src/CSBCode.cpp:5877-5941`, is a real example
+  of the latter) was not verified while fixing this. Not touched here — it was
+  discovered by contrast while tracing what `GraphicRandom` is and is not used for,
+  not by anything reported broken, and changing it needs its own read of the actual
+  cloud/missile drawing source first.
+
+- ✅ **Resolved: moving the mouse changed the teleporter/door animation state, at
+  mouse-input rate.** With both bugs above fixed, the shimmer visibly *worked* — and
+  then turned out to advance on every `mousemove` pixel, far faster than the once a
+  tick CSBWin actually redraws at. `ui/events.ts`'s mousemove handler called the
+  same `renderView()` movement and ticks use, which always calls
+  `ViewportRenderer.render()` → `drawViewportFrame()` → `DrawViewport`, consuming a
+  `graphicRandom`/`viewportRandom` draw on every call. CSBWin's cursor is a
+  sprite tracked independently of the dungeon redraw — nothing in its mouse handling
+  calls `DrawViewport` — so the fix is a narrower `ViewportRenderer.refreshOverlay()`
+  that recomposites the screen (cursor, hover highlights, every UI panel) over
+  whatever `viewportIndexBuffer` already holds, without calling `drawViewportFrame`
+  at all; mousemove now calls that instead of `renderView()`.
+  Evidence: live in a real tab, counting calls separately — eight `hover` moves
+  produced exactly eight `refreshOverlay` calls and zero additional
+  `drawViewportFrame` calls, which kept advancing on its own from the tick loop only.
+
 - ⚠️ **The quick-save's runtime snapshot is still hand-maintained, and the column-index
   bug shows how that fails.** `DungeonSnapshot` enumerates what play can change, and it
   omitted `data.columnIndex` — on the reasoning, written into the file as a comment, that

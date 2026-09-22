@@ -1,0 +1,79 @@
+/**
+ * The "lightning door" energy shimmer — a random mirror and a random vertical flip
+ * applied to the door bitmap on every redraw it isn't bashed
+ * (`doc/CSBwin-src/CSBCode.cpp:4156-4166`).
+ *
+ * This was never ported at all: `opStdDrawDoor` drew the same bitmap every time,
+ * with no notion of `d.DoorTOC`'s bit 10 or the `STRandomBool()` calls CSBWin makes
+ * for it. The shipped `dungeon.dat` actually uses this — `doorCharacteristics[3] ==
+ * 0x5ff` has the bit set — so any level whose `doorType0Index`/`doorType1Index`
+ * selects entry 3 has doors that should visibly shimmer and did not.
+ *
+ * `ViewportRenderer.drawViewportFrame` now resolves `context.doorTOC` from the
+ * level's door characteristics the same way it already resolved `doorGraphics`, and
+ * `opStdDrawDoor` rolls two `BytecodeInterpreter.viewportRandom.bool()` draws — a
+ * dedicated `CsbRandom` instance, never the game's own, exactly as CSBWin swaps in a
+ * viewport-only stream for `DrawViewport` so rendering can't perturb monster AI or
+ * combat — when the resolved `DoorTOC` entry has bit 0x400 set.
+ *
+ * This confirms the real dungeon data has the bit, then drives `opStdDrawDoor`
+ * directly (bypassing only rectangle-pointer resolution, which is proven elsewhere)
+ * across many redraws of the same closed door and checks the drawn bitmap doesn't
+ * sit at a single, frozen identity.
+ *
+ * Run: `npx tsx tools/dump-door-lightning.ts`
+ */
+import { readFileSync } from 'node:fs';
+
+import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import { check, finish } from './lib/check';
+
+const graphics = new GraphicsLoader();
+graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
+const viewportTables = extractViewportTables(graphics);
+const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+
+console.log('doorCharacteristics:', Array.from(objectTables.doorCharacteristics).map((v) => `0x${(v & 0xffff).toString(16)}`));
+const lightningIndex = Array.from(objectTables.doorCharacteristics).findIndex((v) => (v & 0x400) !== 0);
+check(lightningIndex >= 0, 'the shipped dungeon.dat defines at least one lightning-door characteristic (bit 0x400)');
+
+// Non-uniform on purpose: mirroring or flipping a solid-color bitmap is a no-op,
+// which would make this test pass or fail by accident rather than on the mechanism.
+const doorGraphicBitmap = { width: 8, height: 8, pixels: new Uint8Array(64).map((_, i) => (i % 8) + Math.floor(i / 8)) };
+const viewportIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
+
+const context: any = {
+  viewportIndexBuffer,
+  roomData: [],
+  viewportContext: {} as any,
+  doorGraphics: [[0, 0], [0, 0], [0, 0]],
+  doorTOC: [objectTables.doorCharacteristics[lightningIndex] ?? 0, 0],
+  getGraphicBitmap: () => doorGraphicBitmap,
+  dungeonState: {
+    getDoorRecordByIndex: () => ({ doorType: 0, vertical: false }),
+  },
+};
+
+const interp = new BytecodeInterpreter(context) as any;
+// Rectangle-pointer resolution is proven by the other opcode tools; here it would
+// only need real `graphics.dat` geometry to reach the code this tool cares about,
+// so it is stubbed to a fixed door rect set.
+const fakeRect = { x1: 100, x2: 107, y1: 50, y2: 57 };
+interp.resolveStdRectanglePointer = () => [fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect, fakeRect];
+
+function drawClosedDoorOnce(): string {
+  interp.stack = [0 /* doorRecordIndex */, 4 /* doorState: closed */, 0 /* doorGraphicIndex */, 0 /* rectPtr, ignored */];
+  interp.opStdDrawDoor();
+  return Buffer.from(viewportIndexBuffer.pixels).toString('hex');
+}
+
+const snapshots = Array.from({ length: 40 }, () => drawClosedDoorOnce());
+const distinct = new Set(snapshots).size;
+console.log(`40 redraws of the same closed lightning door: ${distinct} distinct pixel patterns`);
+check(distinct > 1, 'a closed lightning door does not always redraw identically (the exact pre-fix symptom)');
+
+finish();

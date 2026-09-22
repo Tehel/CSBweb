@@ -630,7 +630,7 @@ export class Game {
         this.state.running = false;
 
         if (this.animationFrameId !== null) {
-            cancelAnimationFrame(this.animationFrameId);
+            clearTimeout(this.animationFrameId);
             this.animationFrameId = null;
         }
 
@@ -645,7 +645,17 @@ export class Game {
     }
 
     /**
-     * Main game loop (VBL-style at 60Hz)
+     * Main game loop (VBL-style at 60Hz).
+     *
+     * Paced with `setTimeout` rather than `requestAnimationFrame`. CSBWin's VBL timer
+     * keeps advancing `d.Time` — and with it the teleporter/energy shimmer's
+     * `GraphicRandom` counter, the party's food and water, every monster timer —
+     * whether or not the window has focus; `requestAnimationFrame` callbacks are
+     * fully suspended by the browser the moment the tab is backgrounded or occluded
+     * (unlike `setTimeout`, which is only throttled), so an rAF-driven loop goes
+     * completely idle exactly when a real VBL wouldn't, and only catches up again on
+     * the next thing that nudges the browser into repainting — a mouse move, a click.
+     * That was the whole story behind "the animation only changes on mouse events."
      */
     private gameLoop = (): void => {
         if (!this.running) {
@@ -669,7 +679,7 @@ export class Game {
         }
 
         // Schedule next frame (60 FPS)
-        this.animationFrameId = requestAnimationFrame(this.gameLoop);
+        this.animationFrameId = setTimeout(this.gameLoop, 1000 / 60) as unknown as number;
     };
 
     /**
@@ -2396,13 +2406,19 @@ export class Game {
 
         const decoded = decodeObjectID(obj);
         const newPos = (facing + dropPos) & 0x3;
-        const newObj = encodeObjectID(newPos, decoded.category, decoded.index);
+
+        // `MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)` (`doc/CSBwin-src/Mouse.cpp:882`):
+        // a freshly-dropped object still walks through an active teleporter or open pit
+        // sitting on the cell it lands on before it is placed.
+        const resolved = this.timerSystem.resolveDroppedObjectPosition(target, decoded.category, newPos, facing);
+        const landing = resolved.position;
+        const newObj = encodeObjectID(resolved.objectPos, decoded.category, decoded.index);
 
         party.objectInHand = null;
-        const added = this.dungeonState.addObjectToCell(target, newObj);
+        const added = this.dungeonState.addObjectToCell(landing, newObj);
         if (!added) party.objectInHand = obj;
         if (added) {
-            this.actuators.triggerObjectMove(target, newObj, true, false, facing);
+            this.actuators.triggerObjectMove(landing, newObj, true, false, facing);
             this.monsterSystem.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
         }
