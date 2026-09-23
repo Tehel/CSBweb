@@ -87,8 +87,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
 | C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ✅ |
-| C23 | The other object movers are not `MoveObject` either | M | ⏳ 2 of 5 bullets paid |
+| C23 | The other object movers are not `MoveObject` either | M | ✅ |
 | C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
+| C25 | The stairs do not turn a monster's corner | S | ⚠️ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -792,45 +793,52 @@ monster's path (`tools/dump-dsa-move.ts` sections 6-8 build a group). Size M.
 
 </details>
 
-### C23 ⏳ The other object movers are not `MoveObject` either
+### C23 ✅ The other object movers are not `MoveObject` either
 
-Found paying C15, which ported `MoveObject` for objects once, as `TimerSystem.moveObject`
-(`doc/CSBwin-src/Code11f52.cpp:2796`). The other callers still hand-roll it, and each
-differs from it somewhere:
+**Paid in `298d869`, `42ccf79`, `68a21b5`, `e1cf787` and `9152c0b`.** Every mover CSBWin sends
+through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`) now goes through
+`TimerSystem.moveObject` or, for a group, `MonsterSystem.moveMonster`:
 
-- ✅ **Paid in `298d869`.** `TimerSystem.wiggleEverything` (`WiggleEverything`,
-  `Timer.cpp:2428-2512`) moves each object through `moveObject`, walking the chain as
-  CSBWin does (`FindFirstDrawableObject`, then a counted number of links, `:2451-2466`),
-  and re-aims a missile's timer from what `moveObject` reports (`d.NewDir` is its new
-  `newDir`). `wiggleObject` is gone. It had passed "same square" as `unchangedRoom`,
-  pressed pads for a missile and kept a cloud out of pits. Evidence:
-  `tools/dump-wiggle-objects.ts`, new (4 of 9 checks fail before); the fact is in
-  `doc/PROVEN_FACTS.md`.
-- ✅ **Paid in `42ccf79`.** `TimerSystem.wiggleEverything` moves the first monster through
-  `MonsterSystem.moveMonster` (a new `moveMonster` hook), as `MoveObject(objD4, x, y, x, y)`
-  (`Timer.cpp:2446-2450`); `wiggleMonster` and C24's stopgap in it are gone. `moveMonster`
-  gained the unchanged-room return (`Code11f52.cpp:3183-3213`): a group that ends on its own
-  square is not lifted, pressed or set down. So a wiggled group now gets its AI timers where
-  it lands, gives its `ITEM16` back on another level, is deleted on a level it may not live
-  on, and presses no pad when it goes nowhere. Evidence: `tools/dump-wiggle-monster.ts`, new
-  (5 of 9 checks fail before); the fact is added to the `WiggleEverything` entry in
-  `doc/PROVEN_FACTS.md`.
-- `Game`'s drop from the cursor (`Mouse.cpp:882`) and `TimerSystem.dropMissileObject`
-  (`Timer.cpp:151-159`) pass `unchangedRoom = false`, and `resolveCellEffects` turns a
-  dropped item's corner on a relative teleporter although `oldX == -1` (`:3000-3006`).
-- `resolveCellEffects` has no stairs arm: `MoveObject` moves a monster or an item that
-  lands on stairs one level down when bit 2 of the cell is clear, then one square out
-  through `ExitStairsDirection`, turning its corner (`:3108-3131`).
-- `MonsterDamage.deleteMonster` (`DeleteMonster`, `Code11f52.cpp:1026-1047`) takes the group
-  off its square with `removeObjectFromCell`, where CSBWin calls
-  `MoveObject(obj, x, y, -1, 0)` (`:1038`): that runs `CheckMoveFromMissile` on the party's
-  level and releases the square's pads through `PlaceOrRemoveObjectInRoom` for a group
-  that does not levitate. So a monster killed on a pad leaves it pressed. Needs
-  `moveMonster` to take `newX < 0` (`:3257-3297`: lift, then `return 0`). Found paying C24.
+- **`298d869`.** `TimerSystem.wiggleEverything` (`WiggleEverything`, `Timer.cpp:2428-2512`)
+  moves each object through `moveObject`, walking the chain as CSBWin does, and re-aims a
+  missile's timer from what `moveObject` reports. Evidence: `tools/dump-wiggle-objects.ts`
+  (4 of 9 checks fail before).
+- **`42ccf79`.** It moves the first monster through `moveMonster`, which gained the
+  unchanged-room return (`Code11f52.cpp:3183-3213`). Evidence: `tools/dump-wiggle-monster.ts`
+  (5 of 9 fail before).
+- **`68a21b5`.** `Game.dropObjectFromCursor` is `moveObject(obj, -1, 0, x, y)`
+  (`Mouse.cpp:881-889`) and `TimerSystem.dropMissileObject` is `moveObject(obj, -2, 0, x, y)`
+  (`Timer.cpp:151-159`). Both had placed with `unchangedRoom` false where `MoveObject` passes
+  "the party stands here" (`:3433-3448`), and the cursor drop had turned the item's corner on
+  a relative teleporter although `oldX == -1` (`:3000-3006`). `resolveDroppedObjectPosition`
+  is gone. Evidence: `tools/dump-drop-move-object.ts`, new (3 of 8 fail before).
+- **`e1cf787`.** `MonsterDamage.deleteMonster` lifts the group with `moveMonster(obj, x, y,
+  -1, 0)` (`:1038`, a new `moveMonster` hook), and `moveMonster` has the `newX < 0` path:
+  `CheckMoveFromMissile` (which finds the cleared hit points and returns at once,
+  `:2593-2596`), the lift through `PlaceOrRemoveObjectInRoom` or, levitating,
+  `RemoveObjectFromRoom`, then `return 0` (`:3257-3297`). So a group killed on a pad releases
+  it. Evidence: `tools/dump-monster-pad.ts` section 6 (1 of 4 fails before).
+- **`9152c0b`.** `resolveCellEffects` has the stairs arm (`:3108-3131`): a monster or an
+  object, not the party or a missile, goes one level down unless bit 2 says up, then one
+  square out through `ExitStairsDirection`, its corner turned to face the stairs; the loop
+  goes on from there. The `oldX != -1` teleporter rule moved into the loop, since the stairs
+  turn a corner whatever `oldX` is. Evidence: `tools/dump-stairs-move.ts`, new (5 of 6 fail
+  before).
 
-Routing each through `TimerSystem.moveObject` fixes the drops; `DeleteMonster` needs
-`moveMonster`'s `newX < 0` path; the stairs arm is its own fix. One commit per caller, each
-with a `tools/` scenario. Size M.
+The facts are in `doc/PROVEN_FACTS.md`. Found on the way: C25.
+
+<details><summary>original entry</summary>
+
+Found paying C15, which ported `MoveObject` for objects once, as `TimerSystem.moveObject`.
+The other callers hand-rolled it, and each differed from it somewhere: the object and the
+monster wiggle; `Game`'s drop from the cursor and `TimerSystem.dropMissileObject`, which
+passed `unchangedRoom = false` and turned a dropped item's corner on a relative teleporter
+although `oldX == -1`; `resolveCellEffects` had no stairs arm; and
+`MonsterDamage.deleteMonster` took the group off its square with `removeObjectFromCell`
+where CSBWin calls `MoveObject(obj, x, y, -1, 0)`, so a monster killed on a pad left it
+pressed (found paying C24). Size M.
+
+</details>
 
 ### C24 ✅ `moveMonster`'s return value, and what the AI does with it
 
@@ -886,6 +894,19 @@ callers. Extend `tools/dump-monster-pad.ts` or `tools/dump-monster-move.ts`. Siz
 </details>
 
 ---
+
+### C25 ⚠️ The stairs do not turn a monster's corner
+
+Found paying C23. `MoveObject`'s stairs arm turns whatever it moves to face the stairs with
+`objD7.pos(LOCAL_28)` (`doc/CSBwin-src/Code11f52.cpp:3124-3130`), and `RN::pos` writes the
+corner into the global `dataTypeMap` (`CSBTypes.h:336-341`), so a monster's corner changes
+too. The port's `resolveCellEffects` computes the turned corner for a monster, but
+`MonsterSystem.moveMonster` sets the group down under the ID it came with: the corner is
+part of the port's `ObjectID`, and `removeObjectFromCell` and every caller holding the ID
+compare it whole, where CSBWin's `RN ==` compares only the indirect index (`:349-356`).
+Believed invisible — a group's members are placed by `ITEM16`/`uByte5`, not by the RN's
+corner — but not verified. Revisit with D4 (`ObjectID` as a distinct type), which is where
+an ID whose corner is not part of its identity belongs.
 
 ## D — State representation
 

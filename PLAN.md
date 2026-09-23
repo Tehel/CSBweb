@@ -29,8 +29,8 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C20,
-C22 and C24, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C20
+and C22–C24, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a two-deep queue, the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -45,15 +45,21 @@ through `TimerSystem.moveObject` (a cloud falls down an opening pit, a missile p
 pad). C24: `moveMonster` returns CSBWin's value and `d.NewX/NewY`, and the AI stops on any
 non-zero value; a fatal fall or a forbidden level deletes the group; `CreateMonster` is `RNnul`
 on the party's level. C23's second bullet: `WiggleEverything` moves a monster through
-`moveMonster`, which leaves a group on its own square alone. Recorded along the way: C18 (a Fluxcage never expired and freed door record 0 — found
+`moveMonster`, which leaves a group on its own square alone. The rest of C23: the cursor
+drop and a thrown item's landing go through `moveObject` (`unchangedRoom` is "the party
+stands here", and a dropped item keeps its corner on a relative teleporter);
+`DeleteMonster` lifts the group through `moveMonster`'s new `newX < 0` path, so a group
+killed on a pad releases it; and `resolveCellEffects` has the stairs arm. Recorded along the way: C18 (a Fluxcage never expired and freed door record 0 — found
 and paid with C17); C21 (clicks do not go through the input queue); C23 (the other object
 movers — the monster wiggle, drop, a thrown object landing — are not `MoveObject`, and no
 mover has its stairs arm); C24 (`moveMonster`'s return value and what the AI does with it,
 its `ITEM16` bookkeeping, and the pit / level-ban deletions); D5 (cell flags stored twice);
 G1 and G4 gained the unported `STKOP_Throw` and the monster design options; C23 gained
-`DeleteMonster` (not a `MoveObject`, so no pad release), and G2 `ProcessMonsterDeleteFilter`.
-Next: what is left of tier C is size M — the rest of C23 (the drops, `DeleteMonster`, the stairs
-arm), then C21 — one per session.
+`DeleteMonster` (not a `MoveObject`, so no pad release), and G2 `ProcessMonsterDeleteFilter`;
+C25 (the stairs do not turn a monster's corner, because the port's `ObjectID` carries it —
+knowingly left for D4).
+Next: what is left of tier C is C21 (size M, clicks through the input queue) and C25 (⚠️,
+waits for D4); then tier D.
 
 ## Ground rules
 
