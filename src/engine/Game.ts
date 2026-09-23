@@ -607,6 +607,9 @@ export class Game {
                     timeUntilAlternateUpdate: 0,
                 });
             },
+            getCharacterToDamage: (x, y, corner) => this.monsterAttack.getCharacterToDamage(x, y, corner),
+            damageCharacter: (chIdx, damage, woundMask, kind) =>
+                this.monsterAttack.damageCharacter(chIdx, damage, woundMask, kind),
         });
 
     }

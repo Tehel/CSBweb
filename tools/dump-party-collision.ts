@@ -11,6 +11,8 @@
  * - `FindFirstMonster` does not test `NonMaterial()`, so an immaterial monster blocks
  *   the party even though it does not stop a closing door.
  * - the whole block is gated on `d.NumCharacter != 0`.
+ * - a wall bump hurts up to two champions on the wall side, and the sound is queued only
+ *   if one of them was hurt (`:8263-8291`).
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -82,6 +84,11 @@ async function main(): Promise<void> {
       doorCharacteristics: objectTables.doorCharacteristics,
       monsterDroppings: objectTables.monsterDroppings,
       facingReplication: objectTables.facingReplication,
+      // `GetCharacterToDamage` picks the wall-bump victims through `Byte586`; without it
+      // `determineAttackOrder` falls back to a placeholder order.
+      byte586: uiTables.graphic232.byte586,
+      clothingArmour: objectTables.clothingArmour,
+      clothingFlags: objectTables.clothingFlags,
     },
   );
   game.setRandomSeed(0x12345678);
@@ -254,6 +261,50 @@ async function main(): Promise<void> {
   console.log(`  AI timers after:  ${timersAfterBump || '(none)'}`);
   console.log('');
 
+  // ---- Case 5: a wall bump hurts the champions on the wall side -----------
+  // `MoveParty`'s inhibited-move arm (doc/CSBwin-src/CSBCode.cpp:8263-8291): the side of
+  // the new cell being crossed is `direction + partyFacing + 2`, and
+  // `GetCharacterToDamage` on that corner and the next picks up to two champions for
+  // `DamageCharacter(ch, 1, 24, 2)`. Sound 18 is queued only if one of them was hurt.
+  // With `P4 == 2` and no armour a blow of 1 comes out as `1 * (130 - 0) >> 6 = 2`
+  // (`Character.cpp:2780-2789`), on the legs and feet (mask 24).
+  let wallHurt: { front: number[]; back: number[]; soundId: number | undefined; moved: boolean } | null = null;
+  let emptyWall: { moved: boolean; soundId: number | undefined } | null = null;
+  if (wall) {
+    const standAtWall = (): void => {
+      game.party.state.position = new Position(wall!.px, wall!.py, level);
+      game.party.setFacing(wall!.facing);
+      game.party.state.lastMoveTime = 0;
+      lastResult = undefined;
+    };
+    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    standAtWall();
+    const moved = game.move(MovementAction.MOVE_FORWARD);
+    // Corners are absolute, 0=NW 1=NE 2=SE 3=SW, so the two facing the wall are
+    // `facing` and `facing + 1`.
+    const frontCorners = [wall.facing & 3, (wall.facing + 1) & 3];
+    const lost = (c: Champion): number => 200 - c.attributes.health;
+    const champs = game.party.state.champions;
+    wallHurt = {
+      front: champs.filter((c) => frontCorners.includes(c.partyPosition)).map(lost),
+      back: champs.filter((c) => !frontCorners.includes(c.partyPosition)).map(lost),
+      soundId: soundOfLastMove(),
+      moved,
+    };
+    console.log(
+      `wall bump, party of four facing ${wall.facing}: front lost ${wallHurt.front.join('/')}, ` +
+        `back lost ${wallHurt.back.join('/')}, sound ${wallHurt.soundId ?? 'none'}`,
+    );
+
+    // The sound is `if (k != 0)` — nobody hurt, no sound. An empty party is the
+    // simplest way there: `d.NumCharacter == 0` skips the damage entirely.
+    game.party.state.champions = [];
+    standAtWall();
+    emptyWall = { moved: game.move(MovementAction.MOVE_FORWARD), soundId: soundOfLastMove() };
+    console.log(`wall bump, no champions: ${emptyWall.moved ? 'moved' : 'blocked'}, sound ${emptyWall.soundId ?? 'none'}`);
+    console.log('');
+  }
+
   // ---- Assertions ---------------------------------------------------------
 
   check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');
@@ -270,6 +321,20 @@ async function main(): Promise<void> {
     check(wallResult.soundId === SoundIndex.WALL_BUMP, 'the wall bump should carry a sound, unlike the monster bump');
   }
   check(bumps === 20, 'twenty bumps should all be refused — the party never gets through');
+
+  if (wallHurt && emptyWall) {
+    check(!wallHurt.moved, 'the party of four should be blocked by the wall');
+    check(
+      wallHurt.front.length === 2 && wallHurt.front.every((n) => n === 2),
+      `both champions on the wall side should lose 2 HP to the bump (lost ${wallHurt.front.join('/')})`,
+    );
+    check(wallHurt.back.every((n) => n === 0), `the back row should be unhurt (lost ${wallHurt.back.join('/')})`);
+    check(wallHurt.soundId === SoundIndex.WALL_BUMP, 'a bump that hurt someone should queue sound 18');
+    check(!emptyWall.moved, 'an empty party should still be stopped by the wall');
+    check(emptyWall.soundId === undefined, 'a bump that hurt nobody should be silent — CSBWin gates the sound on k != 0');
+  } else {
+    check(false, 'the level should have an open cell beside a wall');
+  }
 
   // The bump must actually reach the AI. Counting the TT_31 timers it left is the
   // direct evidence that `ProcessTimers29to41(x, y, TT_M1, 0)` ran, once per bump.

@@ -2539,3 +2539,17 @@ game is won" (`doc/CSBwin-src/Data.h:927`) and only ever set to 1 (`Attack.cpp:2
 after the win, cannot be hurt — yet the call reports non-zero, and a caller such as a
 missile's poison coin toss (`Code11f52.cpp:2046-2054`) proceeds as if damage was dealt.
 Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards".
+
+## A wall bump hurts the two champions on the wall side, and is silent if nobody is hurt
+
+`MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944`) inhibits a move into stone, a door whose
+state is not 0, 1 or 5, or a false wall with neither bit 0 nor bit 2 set (`:8224-8261`).
+Off the map, `GetCellFlags` returns 0, 1, 2, 4 or 8 (`:4609-4662`) — room type 0, stone —
+so the edge of a level is bumped like a wall. With `d.NumCharacter != 0`
+(`:8263-8291`), the side of the new cell being crossed is `direction + partyFacing + 2`,
+and `GetCharacterToDamage(newX, newY, side & 3)` and `(side + 1) & 3` pick two champions
+through `DetermineAttackOrder` / `Byte586` — the two nearest the wall. Each gets
+`DamageCharacter(ch, 1, 24, 2)`: one point on the legs and feet, with armour halved, which
+an unarmoured champion takes as `1 × 130 >> 6 = 2` (`Character.cpp:2780-2789`). Sound 18 is
+queued **only if** either call returned non-zero (`:8287-8290`), so an empty party, or a
+blow the armour absorbs, bumps silently. Evidence: `tools/dump-party-collision.ts`.

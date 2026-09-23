@@ -410,9 +410,15 @@ party through this function. `PartyState` already carries the potential-characte
 
 All in CSBWin's move handler in `doc/CSBwin-src/CSBCode.cpp`:
 
-- **Wall-bump damage.** CSBWin answers a terrain-blocked move with
-  `DamageCharacter(…, 1, 24, 2)` on up to two champions and only then queues sound 18
-  (`:8288-8299`). We queue the sound unconditionally and nobody is hurt.
+- ✅ **Wall-bump damage.** Paid in the commit "Wall bumps hurt the champions on the wall
+  side". `MovementSystem.bumpWall` is `:8263-8291`: `GetCharacterToDamage` on the two
+  corners of the crossed side, `DamageCharacter(ch, 1, 24, 2)` on each, and sound 18 only
+  if `k != 0`. The map edge is bumped the same way (`GetCellFlags` answers stone there).
+  `MovementHooks` became required — only `Game` builds a `MovementSystem`. Evidence:
+  `tools/dump-party-collision.ts` case 5 (2 of 15 checks fail before); the fact is in
+  `doc/PROVEN_FACTS.md`. Found on the way: the tool built its `Game` without `byte586`,
+  and `MonsterAttack.determineAttackOrder` then silently uses `[0, 1, 2, 3]` — an F1
+  placeholder.
 - **`DiscardAllInput()` / `d.clockTick = 0`** on any inhibited move (`:8311-8315`). Not
   ported because `DiscardAllInput` drains CSBWin's raw keyboard and mouse queues (`:7532`),
   which is not obviously our 3-deep `movementQueue` — that one mirrors `CSBUI.cpp`'s key

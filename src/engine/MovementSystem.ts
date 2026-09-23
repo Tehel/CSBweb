@@ -12,19 +12,20 @@ import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, Position, RoomType } from '../core/types';
 import type { ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
+import { sw } from '../core/intCast';
 
 /**
- * What `MoveParty` needs from the monster system.
- *
- * Optional so that a `MovementSystem` built without monsters (some `tools/`) keeps
- * working; when it is absent the monster block below is simply not reached, which is
- * the behaviour this file had before the block existed.
+ * What `MoveParty` needs from the monster and champion systems.
  */
 export interface MovementHooks {
-    /** `FindFirstMonster(newX, newY)` (doc/CSBwin-src/CSBCode.cpp:8290). */
+    /** `FindFirstMonster(newX, newY)` (doc/CSBwin-src/CSBCode.cpp:8296). */
     findFirstMonster(position: Position): ObjectID;
     /** `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8302). */
     activateMonster(position: Position): void;
+    /** `GetCharacterToDamage` (doc/CSBwin-src/CSBCode.cpp:6884). */
+    getCharacterToDamage(x: number, y: number, corner: number): number;
+    /** `DamageCharacter` (doc/CSBwin-src/Character.cpp:2703). */
+    damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number;
 }
 
 /**
@@ -33,9 +34,9 @@ export interface MovementHooks {
 export class MovementSystem {
     private party: Party;
     private dungeon: DungeonState;
-    private hooks?: MovementHooks;
+    private hooks: MovementHooks;
 
-    constructor(party: Party, dungeon: DungeonState, hooks?: MovementHooks) {
+    constructor(party: Party, dungeon: DungeonState, hooks: MovementHooks) {
         this.party = party;
         this.dungeon = dungeon;
         this.hooks = hooks;
@@ -88,7 +89,8 @@ export class MovementSystem {
         const position = this.party.state.position;
         const cellFlagsFrom = this.dungeon.getCellFlag(position);
         const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
-        const relDirection = this.getRelativeDirection(action);
+        // `move` sends only the four moves here, never a turn.
+        const relDirection = this.getRelativeDirection(action)!;
 
         if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
             return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0);
@@ -96,35 +98,20 @@ export class MovementSystem {
 
         const newPosition = this.party.calculateNewPosition(action);
 
-        // Check if new position is within map bounds
+        // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4609),
+        // so the party bumps the edge of the map as it bumps a wall.
         const dimensions = this.dungeon.getMapDimensions(newPosition.z);
-        if (!dimensions) {
-            return {
-                success: false,
-                blocked: true,
-                soundId: SoundIndex.WALL_BUMP,
-            };
-        }
+        if (!dimensions) return this.bumpWall(newPosition, relDirection);
 
         if (newPosition.x < 0 || newPosition.x >= dimensions.width ||
             newPosition.y < 0 || newPosition.y >= dimensions.height) {
-            return {
-                success: false,
-                blocked: true,
-                soundId: SoundIndex.WALL_BUMP,
-            };
+            return this.bumpWall(newPosition, relDirection);
         }
 
         // Check if new position is walkable.
         // CSBWin answers a blocked move with a sound only — there is no message
         // (`doc/CSBwin-src/Movement.cpp`, `doc/CSBwin-src/Mouse.cpp`).
-        if (!this.dungeon.isWalkable(newPosition)) {
-            return {
-                success: false,
-                blocked: true,
-                soundId: SoundIndex.WALL_BUMP,
-            };
-        }
+        if (!this.dungeon.isWalkable(newPosition)) return this.bumpWall(newPosition, relDirection);
 
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
@@ -150,7 +137,7 @@ export class MovementSystem {
         //   through monsters as CSBWin lets it;
         // - `FindFirstMonster` does not test `NonMaterial()`, unlike the door-crush in
         //   `ProcessTT_1` — even an immaterial monster blocks the party;
-        // - blocking is *silent*. The wall bump queues sound 18; this queues nothing.
+        // - blocking is *silent*. The wall bump can queue sound 18; this queues nothing.
         //   It pokes the group instead, so the monster gets a turn out of being bumped
         //   into. `TT_M1` is CSBWin's "monster attacked, or the party bumped into it".
         //
@@ -158,8 +145,8 @@ export class MovementSystem {
         // directions 0-3 (see `getRelativeDirection`), so the `direction <= 3` test is
         // always true at this point. CSBWin's `direction > 3` arm — the Move Up /
         // Move Down buttons, which refuse outright rather than poking the group
-        // (`:8200-8204`) — has no entry point here yet; see PLAN.md.
-        if (this.hooks && this.party.state.champions.length !== 0) {
+        // (`:8200-8204`) — has no entry point here yet; see DEBT.md C5.
+        if (this.party.state.champions.length !== 0) {
             if (this.hooks.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
                 this.hooks.activateMonster(newPosition);
                 return {
@@ -173,6 +160,41 @@ export class MovementSystem {
         return {
             success: true,
             newPosition,
+        };
+    }
+
+    /**
+     * `MoveParty`'s inhibited-move arm for terrain — stone, a shut door, a solid false
+     * wall (doc/CSBwin-src/CSBCode.cpp:8263-8291):
+     *
+     *   direction = direction + (d.partyFacing + 2);
+     *   LOCAL_8 = GetCharacterToDamage(newX, newY, direction & 3);
+     *   k = sw(DamageCharacter(LOCAL_8, 1, 24, 2));
+     *   LOCAL_10 = GetCharacterToDamage(newX, newY, (direction+1) & 3);
+     *   LOCAL_30 = LOCAL_10;
+     *   if (LOCAL_8 != LOCAL_30) k |= DamageCharacter(LOCAL_10, 1, 24, 2);
+     *   if (k != 0) QueueSound(18, d.partyX, d.partyY, 0);
+     *
+     * The corners are the two of the new cell on the party's side, so the champions
+     * who walked into the wall are the ones hurt, on the legs and feet (mask 24). The
+     * bump is silent when nobody was hurt — an empty party, or a blow armour absorbed.
+     * `LOCAL_30` is a `ui16`, so a -1 in both compares unequal and `DamageCharacter(-1)`
+     * runs, returning 0; the port keeps the comparison as written.
+     */
+    private bumpWall(newPosition: Position, relDirection: number): MovementResult {
+        let k = 0;
+        if (this.party.state.champions.length !== 0) {
+            const direction = relDirection + ((this.party.state.facing & 3) + 2);
+            const local8 = this.hooks.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
+            k = sw(this.hooks.damageCharacter(local8, 1, 24, 2));
+            const local10 = this.hooks.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
+            const local30 = local10 & 0xffff;
+            if (local8 !== local30) k |= this.hooks.damageCharacter(local10, 1, 24, 2);
+        }
+        return {
+            success: false,
+            blocked: true,
+            soundId: k !== 0 ? SoundIndex.WALL_BUMP : undefined,
         };
     }
 
