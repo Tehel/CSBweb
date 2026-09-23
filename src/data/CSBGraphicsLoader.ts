@@ -5,7 +5,8 @@
  * Used for extended wall/floor decorations (ReadWallDecoration/ReadFloorDecoration).
  */
 
-import type { ui16, ui32 } from '../core/types';
+import type { ui32 } from '../core/types';
+import { readU16LE, readU32LE } from '../core/bytes';
 
 export enum CSBGraphicType {
   ViewportOverlay = 0,
@@ -60,17 +61,6 @@ const CSBGRAPHICS_SENTINEL = 'CSBg';
 const SECTION_HEADER_SIZE = 36; // 5 * u32 + 16-byte name
 const WALL_DEC_MIN_SIZE = 92;
 const FLOOR_DEC_MIN_SIZE = 92;
-
-function readU32LE(data: Uint8Array, off: number): ui32 {
-  return ((data[off] ?? 0) |
-    ((data[off + 1] ?? 0) << 8) |
-    ((data[off + 2] ?? 0) << 16) |
-    ((data[off + 3] ?? 0) << 24)) >>> 0;
-}
-
-function readU16LE(data: Uint8Array, off: number): ui16 {
-  return ((data[off] ?? 0) | ((data[off + 1] ?? 0) << 8)) & 0xffff;
-}
 
 function readAsciiZ(data: Uint8Array, off: number, len: number): string {
   let out = '';

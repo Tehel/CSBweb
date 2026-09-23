@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { readI8, readU16BE } from '../src/core/bytes';
 
 interface ToolOptions {
   graphics: string;
@@ -96,17 +97,6 @@ function parseArgs(argv: string[]): ToolOptions {
   }
 
   return options;
-}
-
-function readU16BE(raw: Uint8Array, off: number): number {
-  const hi = raw[off] ?? 0;
-  const lo = raw[off + 1] ?? 0;
-  return (hi << 8) | lo;
-}
-
-function readI8(raw: Uint8Array, off: number): number {
-  const v = raw[off] ?? 0;
-  return v >= 0x80 ? v - 0x100 : v;
 }
 
 function parseObjectNames(raw: Uint8Array): string[] {

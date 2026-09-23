@@ -1,5 +1,6 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { RectPos } from './CanvasBlitter';
+import { readI16BE, readI8, readU16BE } from '../../core/bytes';
 
 export interface GraphicClass {
   objectGraphicIndex: number; // i8
@@ -297,22 +298,6 @@ const ABS_MONSTER_DESC = 9664; // MonsterDescriptor[27]
 const ABS_BYTE10336 = 10336; // Byte10336[256]
 const ABS_BYTE10080 = 10080; // Byte10080[64]
 const ABS_BYTE10016 = 10016; // Byte10016[256]
-
-function readI8(buf: Uint8Array, off: number): number {
-  const v = buf[off] ?? 0;
-  return v >= 0x80 ? v - 0x100 : v;
-}
-
-function readU16BE(buf: Uint8Array, off: number): number {
-  const hi = buf[off] ?? 0;
-  const lo = buf[off + 1] ?? 0;
-  return (hi << 8) | lo;
-}
-
-function readI16BE(buf: Uint8Array, off: number): number {
-  const v = readU16BE(buf, off);
-  return v >= 0x8000 ? v - 0x10000 : v;
-}
 
 function readGraphicClasses22e(raw: Uint8Array, off: number): GraphicClass[] {
   const count = 85;

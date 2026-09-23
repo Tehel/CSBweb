@@ -18,6 +18,7 @@ import {
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import type { PartyState } from '../engine/gameTypes';
+import { readI16BE, readU16BE, readU16LE, readU32BE, readU32LE } from '../core/bytes';
 
 export interface SaveGameState {
   item16: Item16Record[];
@@ -188,21 +189,7 @@ const BLOCK2_SIZE = 128;
 const CHARACTER_SIZE = 3328;
 const EXTENDED_SENTINEL = ' Extended Features ';
 
-function readU16LE(buf: Uint8Array, off: number): number {
-  const lo = buf[off] ?? 0;
-  const hi = buf[off + 1] ?? 0;
-  return lo | (hi << 8);
-}
-
-function readU32LE(buf: Uint8Array, off: number): number {
-  const b0 = buf[off] ?? 0;
-  const b1 = buf[off + 1] ?? 0;
-  const b2 = buf[off + 2] ?? 0;
-  const b3 = buf[off + 3] ?? 0;
-  return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
-}
-
-/**
+/*
  * The save file's own byte order.
  *
  * Every word of GAMEBLOCK1, GAMEBLOCK2, `ITEM16`, the characters and the timers is
@@ -218,26 +205,9 @@ function readU32LE(buf: Uint8Array, off: number): number {
  * header, which is a PC-era addition written in native order:
  * `SwapExtendedFeaturesBlock` swaps it only `#ifdef _bigEndian`
  * (`doc/CSBwin-src/SaveGame.cpp:275-293`), so on the shipping build it is a no-op and
- * the block stays little-endian. That is why `readU16LE`/`readU32LE` survive here and
- * are used for exactly that block, and nothing else.
+ * the block stays little-endian. That is why `readU16LE`/`readU32LE` are used here for
+ * exactly that block, and nothing else.
  */
-function readU16BE(buf: Uint8Array, off: number): number {
-  const hi = buf[off] ?? 0;
-  const lo = buf[off + 1] ?? 0;
-  return ((hi << 8) | lo) & 0xffff;
-}
-
-function readI16BE(buf: Uint8Array, off: number): number {
-  return (readU16BE(buf, off) << 16) >> 16;
-}
-
-function readU32BE(buf: Uint8Array, off: number): number {
-  const b0 = buf[off] ?? 0;
-  const b1 = buf[off + 1] ?? 0;
-  const b2 = buf[off + 2] ?? 0;
-  const b3 = buf[off + 3] ?? 0;
-  return ((b0 << 24) | (b1 << 16) | (b2 << 8) | b3) >>> 0;
-}
 
 const EXPOOL_RECORD_SIZE = 256;
 const EXPOOL_WORDS_PER_BLOCK = 64;

@@ -31,6 +31,7 @@
  * bytes the reader would eat the first three bytes of GAMEBLOCK1.
  */
 import { formChecksum } from './CsbwinObjectIndex';
+import { readU16LE, readU32LE } from '../core/bytes';
 
 /** `strcpy(efb.sentinel, " Extended Features ")` — 19 characters and a terminator. */
 export const EXTENDED_SENTINEL = ' Extended Features ';
@@ -110,19 +111,6 @@ export interface ExtendedFeaturesBlock {
     csbGraphicsSignature2: number;
     /** `efb.hintKey[8]`, as bytes. */
     hintKey: Uint8Array;
-}
-
-function readU16LE(buf: Uint8Array, off: number): number {
-    return (buf[off] ?? 0) | ((buf[off + 1] ?? 0) << 8);
-}
-
-function readU32LE(buf: Uint8Array, off: number): number {
-    return (
-        (buf[off] ?? 0) |
-        ((buf[off + 1] ?? 0) << 8) |
-        ((buf[off + 2] ?? 0) << 16) |
-        ((buf[off + 3] ?? 0) << 24)
-    ) >>> 0;
 }
 
 function writeU16LE(buf: Uint8Array, off: number, value: number): void {

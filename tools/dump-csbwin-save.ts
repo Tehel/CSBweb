@@ -39,13 +39,10 @@ import {
   decodeCharField,
 } from '../src/data/CsbwinSaveInfo';
 import { check, finish } from './lib/check';
+import { readU16BE } from '../src/core/bytes';
 
 const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'clothing',
   'scroll', 'potion', 'container', 'misc', 'EXPOOL', 'db12', 'db13', 'missile', 'cloud'];
-
-function readU16BE(b: Uint8Array, o: number): number {
-  return ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
-}
 
 const DEFAULT_DIR = 'static/gamefiles/saves';
 

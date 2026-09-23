@@ -26,6 +26,7 @@ import type { Attribute } from '../engine/attributes';
 import type { i16, ui8, ui16, ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
+import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
 
 /** `CHARFLAG_male` — `AddCharacter` ORs it in for an 'M' hero (`Character.cpp:596`). */
 export const CHARFLAG_MALE = 0x10;
@@ -51,13 +52,6 @@ export const PORTRAIT_WIDTH = 32;
 export const PORTRAIT_HEIGHT = 29;
 const PORTRAIT_BYTES_PER_LINE = (PORTRAIT_WIDTH / 16) * 8;
 
-const u8 = (b: Uint8Array, o: number): number => b[o] ?? 0;
-const i8 = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 24) >> 24;
-const u16be = (b: Uint8Array, o: number): number => ((b[o] ?? 0) << 8) | (b[o + 1] ?? 0);
-const i16be = (b: Uint8Array, o: number): number => (u16be(b, o) << 16) >> 16;
-const i32be = (b: Uint8Array, o: number): number =>
-  (((b[o] ?? 0) << 24) | ((b[o + 1] ?? 0) << 16) | ((b[o + 2] ?? 0) << 8) | (b[o + 3] ?? 0)) | 0;
-const u32be = (b: Uint8Array, o: number): number => i32be(b, o) >>> 0;
 
 /** Everything in one `CHARDESC` that this port has somewhere to put. */
 export interface CsbwinCharacter {
@@ -72,7 +66,7 @@ function readAttributes(block: Uint8Array, base: number): Attribute[] {
   const stats: Attribute[] = [];
   for (let i = 0; i < 7; i++) {
     const at = base + ATTRIBUTES_OFFSET + i * 3;
-    stats.push({ maximum: u8(block, at), current: u8(block, at + 1), minimum: u8(block, at + 2) });
+    stats.push({ maximum: readU8(block, at), current: readU8(block, at + 1), minimum: readU8(block, at + 2) });
   }
   return stats;
 }
@@ -81,7 +75,7 @@ function readSkills(block: Uint8Array, base: number): Skill[] {
   const skills: Skill[] = [];
   for (let i = 0; i < 20; i++) {
     const at = base + SKILLS_OFFSET + i * SKILL_SIZE;
-    skills.push({ tempAdjust: i16be(block, at), experience: i32be(block, at + 2) });
+    skills.push({ tempAdjust: readI16BE(block, at), experience: readI32BE(block, at + 2) });
   }
   return skills;
 }
@@ -103,7 +97,7 @@ function readPossessions(
 ): Array<ObjectID | null> {
   const slots: Array<ObjectID | null> = [];
   for (let i = 0; i < 30; i++) {
-    const rn = u16be(block, base + POSSESSIONS_OFFSET + i * 2);
+    const rn = readU16BE(block, base + POSSESSIONS_OFFSET + i * 2);
     // `RNeof` (0xfffe) and `RNnul` (0xffff) both mean "empty slot" here.
     if (rn === 0xffff || rn === 0xfffe) {
       slots.push(null);
@@ -140,10 +134,10 @@ function readPortrait(block: Uint8Array, base: number): ui8[] | undefined {
     for (let group = 0; group * 16 < PORTRAIT_WIDTH; group++) {
       const word = at + y * PORTRAIT_BYTES_PER_LINE + group * 8;
       const planes = [
-        u16be(block, word),
-        u16be(block, word + 2),
-        u16be(block, word + 4),
-        u16be(block, word + 6),
+        readU16BE(block, word),
+        readU16BE(block, word + 2),
+        readU16BE(block, word + 4),
+        readU16BE(block, word + 6),
       ];
       for (let bit = 0; bit < 16; bit++) {
         let colour = 0;
@@ -176,8 +170,8 @@ export function readCsbwinCharacter(
   const titleBytes = Array.from(block.subarray(base + 8, base + 28)) as ui8[];
   const incantationBytes = Array.from(block.subarray(base + 34, base + 38)) as ui8[];
   const slots = readPossessions(block, base, objectIndex);
-  const charFlags = i16be(block, base + 48);
-  const maxHealth = i16be(block, base + 54);
+  const charFlags = readI16BE(block, base + 48);
+  const maxHealth = readI16BE(block, base + 54);
 
   const champion: Champion = {
     name,
@@ -187,12 +181,12 @@ export function readCsbwinCharacter(
     // weight in the runtime save.
     titleField: titleBytes.some((b, i) => b !== 0 && i >= title.length) ? titleBytes : undefined,
     attributes: {
-      health: i16be(block, base + 52),
+      health: readI16BE(block, base + 52),
       maxHealth,
-      stamina: i16be(block, base + 56),
-      maxStamina: i16be(block, base + 58),
-      mana: i16be(block, base + 60),
-      maxMana: i16be(block, base + 62),
+      stamina: readI16BE(block, base + 56),
+      maxStamina: readI16BE(block, base + 58),
+      mana: readI16BE(block, base + 60),
+      maxMana: readI16BE(block, base + 62),
       stats: readAttributes(block, base),
       // CSBWin keeps no single "experience" number — a champion's standing is the
       // twenty `SKILL` records. This field is the port's own summary and is left at 0
@@ -205,10 +199,10 @@ export function readCsbwinCharacter(
     },
     // CSBWin has no "alive" flag: a champion is dead when their health is gone
     // (`KillCharacter` zeroes it), and `causeOfDamage` at 282 says how.
-    alive: i16be(block, base + 52) > 0,
-    facing: u8(block, base + 28) as 0 | 1 | 2 | 3,
-    partyPosition: u8(block, base + 29) as ui8,
-    attackType: i8(block, base + 32),
+    alive: readI16BE(block, base + 52) > 0,
+    facing: readU8(block, base + 28) as 0 | 1 | 2 | 3,
+    partyPosition: readU8(block, base + 29) as ui8,
+    attackType: readI8(block, base + 32),
     // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:812`) — a C string, so the
     // first zero ends it. This used to filter the zeros *out*, which resurrected the
     // symbols a cast leaves behind it: `CastSpell` clears `incantation[0]` and nothing
@@ -221,14 +215,14 @@ export function readCsbwinCharacter(
     incantationField: incantationBytes.some((b, i) => b !== 0 && i >= incantationPrefix(incantationBytes).length)
       ? incantationBytes
       : undefined,
-    damageFromDirection: u8(block, base + 40),
-    maxRecentDamage: u8(block, base + 41),
-    poisonCount: u8(block, base + 42),
-    busyTimerIndex: i16be(block, base + 44),
-    wounds: u16be(block, base + 50),
-    attackStatModifier: i16be(block, base + 64),
-    food: i16be(block, base + 66),
-    water: i16be(block, base + 68),
+    damageFromDirection: readU8(block, base + 40),
+    maxRecentDamage: readU8(block, base + 41),
+    poisonCount: readU8(block, base + 42),
+    busyTimerIndex: readI16BE(block, base + 44),
+    wounds: readU16BE(block, base + 50),
+    attackStatModifier: readI16BE(block, base + 64),
+    food: readI16BE(block, base + 66),
+    water: readI16BE(block, base + 68),
     skills: readSkills(block, base),
     actionDisabledUntil: 0,
     // The three named hand fields mirror `possessions`; every writer has to maintain
@@ -237,17 +231,17 @@ export function readCsbwinCharacter(
     shieldHand: slots[0] ?? null,
     quiver: slots[8] ?? null,
     possessions: slots,
-    shieldStrength: u16be(block, base + 274),
-    fingerprint: u16be(block, base + 280) as ui16,
+    shieldStrength: readU16BE(block, base + 274),
+    fingerprint: readU16BE(block, base + 280) as ui16,
     // Carried, not used: the save writer needs every field back, and these have no
     // reader in the engine yet. `charFlags` is where the champion's gender lives.
     charFlags,
-    timerIndex: i16be(block, base + 46),
-    incantationCursor: u8(block, base + 33),
-    talents: u32be(block, base + 276),
-    load: u16be(block, base + 272),
-    causeOfDamage: u16be(block, base + 282),
-    monsterCausingDamage: u16be(block, base + 284),
+    timerIndex: readI16BE(block, base + 46),
+    incantationCursor: readU8(block, base + 33),
+    talents: readU32BE(block, base + 276),
+    load: readU16BE(block, base + 272),
+    causeOfDamage: readU16BE(block, base + 282),
+    monsterCausingDamage: readU16BE(block, base + 284),
     // The champion's own copy of their portrait. Champions this port creates instead
     // carry `portraitGraphic`, the graphic-26 cell `AddCharacter` blitted from; a save
     // has only the pixels, and for an externally supplied portrait that is all there
@@ -295,22 +289,22 @@ export const CHARACTER_BLOCK_SIZE = TAIL + 128;
 
 export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
   const footprints: number[] = [];
-  for (let i = 0; i < 24; i++) footprints.push(u16be(block, TAIL + 14 + i * 2));
+  for (let i = 0; i < 24; i++) footprints.push(readU16BE(block, TAIL + 14 + i * 2));
   const footprintAges = Array.from(block.subarray(TAIL + 62, TAIL + 86));
   return {
-    brightness: i16be(block, TAIL + 0),
-    seeThruWalls: u8(block, TAIL + 2),
-    magicFootprintsActive: u8(block, TAIL + 3),
-    partyShield: i16be(block, TAIL + 4),
-    fireShield: i16be(block, TAIL + 6),
-    spellShield: i16be(block, TAIL + 8),
-    numFootprintEnt: u8(block, TAIL + 10),
-    freezeLifeTimer: u8(block, TAIL + 11),
-    indexOfFirstMagicFootprint: u8(block, TAIL + 12),
-    indexOfLastMagicFootprint: u8(block, TAIL + 13),
+    brightness: readI16BE(block, TAIL + 0),
+    seeThruWalls: readU8(block, TAIL + 2),
+    magicFootprintsActive: readU8(block, TAIL + 3),
+    partyShield: readI16BE(block, TAIL + 4),
+    fireShield: readI16BE(block, TAIL + 6),
+    spellShield: readI16BE(block, TAIL + 8),
+    numFootprintEnt: readU8(block, TAIL + 10),
+    freezeLifeTimer: readU8(block, TAIL + 11),
+    indexOfFirstMagicFootprint: readU8(block, TAIL + 12),
+    indexOfLastMagicFootprint: readU8(block, TAIL + 13),
     footprints,
     footprintAges,
-    invisible: u8(block, TAIL + 86),
+    invisible: readU8(block, TAIL + 86),
   };
 }
 

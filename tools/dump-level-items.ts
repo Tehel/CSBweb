@@ -8,6 +8,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF } from '../src/core/types';
 import { Position } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import type { ContainerRecord, DatabaseRecord, DungeonData } from '../src/data/dungeonTypes';
+import { readU16BE } from '../src/core/bytes';
 
 interface ToolOptions {
   file: string;
@@ -78,12 +79,6 @@ function parseArgs(argv: string[]): ToolOptions {
   }
 
   return options;
-}
-
-function readU16BE(raw: Uint8Array, off: number): number {
-  const hi = raw[off] ?? 0;
-  const lo = raw[off + 1] ?? 0;
-  return (hi << 8) | lo;
 }
 
 function parseObjectNames(raw: Uint8Array): string[] {
