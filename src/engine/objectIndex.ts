@@ -87,6 +87,26 @@ export function DescIndex(dungeon: DungeonState, rn: number): number {
 }
 
 /**
+ * Does `rn` index an existing record of one of the six object databases (weapon,
+ * clothing, scroll, potion, chest, misc)? CSBWin has no such check — its callers already
+ * know they hold an object. This is the port's guard for values that may be something
+ * else (an object-type number, a stale slot), until D2 gives "no object" one spelling.
+ */
+export function isLikelyObjectRecord(dungeon: DungeonState, rn: number): boolean {
+  const { category, index } = decodeObjectID(rn as ObjectID);
+  const db = dungeon.getData().databases;
+  switch (category) {
+    case DBType.WEAPON: return index < db.weapons.records.length;
+    case DBType.CLOTHING: return index < db.clothing.records.length;
+    case DBType.SCROLL: return index < db.scrolls.records.length;
+    case DBType.POTION: return index < db.potions.records.length;
+    case DBType.CHEST: return index < db.containers.records.length;
+    case DBType.MISC: return index < db.misc.records.length;
+    default: return false;
+  }
+}
+
+/**
  * `DescIndex`'s switch over a record already in hand, for the one caller that has an
  * object but no `DungeonState` to find it in: `AddCharacter`'s slot choice over a
  * pre-scanned hero inventory.

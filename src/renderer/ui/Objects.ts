@@ -6,7 +6,7 @@
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
 import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_FIRST_FULL_FLASK, OBJNI_LAST_FULL_FLASK, OBJNI_OPEN_SCROLL, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
-import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
+import { DescIndex, GetBasicObjectType, isLikelyObjectRecord, NameIndex } from '../../engine/objectIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { TextDecodeTables } from '../../engine/DungeonState';
@@ -68,26 +68,6 @@ export function getDescIndexForObjectType(ui: UIState, objectType: number): numb
   return null;
 }
 
-export function isLikelyObjectRecord(ui: UIState, value: number): boolean {
-  const { category, index } = decodeObjectID(value as ObjectID);
-  switch (category) {
-    case DBType.WEAPON:
-      return index < ui.dungeonState.getData().databases.weapons.records.length;
-    case DBType.CLOTHING:
-      return index < ui.dungeonState.getData().databases.clothing.records.length;
-    case DBType.SCROLL:
-      return index < ui.dungeonState.getData().databases.scrolls.records.length;
-    case DBType.POTION:
-      return index < ui.dungeonState.getData().databases.potions.records.length;
-    case DBType.CHEST:
-      return index < ui.dungeonState.getData().databases.containers.records.length;
-    case DBType.MISC:
-      return index < ui.dungeonState.getData().databases.misc.records.length;
-    default:
-      return false;
-  }
-}
-
 export function normalizeObjectValue(value: number | null | undefined): number | null {
   if (value === undefined || value === null) return null;
   if (value === OBJECT_ID_NULL || value === OBJECT_ID_EOF) return null;
@@ -96,7 +76,7 @@ export function normalizeObjectValue(value: number | null | undefined): number |
 
 export function isChestRecord(ui: UIState, value: number | null): value is ObjectID {
   if (value === null || value === undefined) return false;
-  if (!isLikelyObjectRecord(ui, value)) return false;
+  if (!isLikelyObjectRecord(ui.dungeonState, value)) return false;
   const { category } = decodeObjectID(value as ObjectID);
   return category === DBType.CHEST;
 }
@@ -178,7 +158,7 @@ export function formatWeightText(weight: number): string {
 export function getObjectWeight(ui: UIState, value: number, visited: Set<number>): number {
   if (!ui.objectTables) return 0;
   if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return 0;
-  if (isLikelyObjectRecord(ui, value)) {
+  if (isLikelyObjectRecord(ui.dungeonState, value)) {
     return getObjectWeightForRecord(ui, value as ObjectID, visited);
   }
   return getObjectWeightForObjectType(ui, value | 0);

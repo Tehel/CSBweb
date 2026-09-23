@@ -16,7 +16,8 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -637,7 +638,7 @@ export function setChampionPossession(ui: UIState, champion: Champion, slot: num
 
 export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boolean {
   if (!ui.objectTables || !ui.uiTables) return true;
-  const descIndex = isLikelyObjectRecord(ui, objectId)
+  const descIndex = isLikelyObjectRecord(ui.dungeonState, objectId)
     ? descIndexForObject(ui, objectId as ObjectID)
     : getDescIndexForObjectType(ui, objectId | 0);
   if (descIndex === null) return true;
@@ -689,7 +690,7 @@ export function updateLightForPossessionChange(ui: UIState, slot: number, previo
 
 export function setTorchLitState(ui: UIState, objectId: number | null, lit: boolean): void {
   if (objectId === null) return;
-  if (!isLikelyObjectRecord(ui, objectId)) return;
+  if (!isLikelyObjectRecord(ui.dungeonState, objectId)) return;
   if (!isBaseObjectNameIndex(ui, objectId, OBJNI_TORCH_A, OBJNI_TORCH_A)) return;
   const weapon = ui.dungeonState.getWeaponRecord(objectId as ObjectID);
   if (!weapon) return;

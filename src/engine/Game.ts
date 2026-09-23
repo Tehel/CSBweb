@@ -42,7 +42,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { GetBasicObjectType, NameIndex } from './objectIndex';
+import { GetBasicObjectType, isLikelyObjectRecord, NameIndex } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -1332,7 +1332,7 @@ export class Game {
             if (value === null || value === undefined) continue;
             slots[i] = null;
             const rn = value as ObjectID;
-            if (!this.isLikelyObjectRecord(rn)) continue;
+            if (!isLikelyObjectRecord(this.dungeonState, rn)) continue;
             this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
         }
         champ.weaponHand = null;
@@ -1423,7 +1423,7 @@ export class Game {
             for (let hand = 0; hand < 2; hand++) {
                 const obj = this.getChampionPossession(champion, hand);
                 if (!obj) continue;
-                if (!this.isLikelyObjectRecord(obj)) continue;
+                if (!isLikelyObjectRecord(this.dungeonState, obj)) continue;
                 if (!this.isTorchObject(obj)) continue;
                 const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
                 if (!weapon) continue;
@@ -1880,7 +1880,7 @@ export class Game {
         for (let slot = 0; slot < 2; slot += 1) {
             const obj = this.getChampionPossession(champion, slot);
             if (!obj) continue;
-            if (!this.isLikelyObjectRecord(obj)) continue;
+            if (!isLikelyObjectRecord(this.dungeonState, obj)) continue;
             if (this.getBaseObjectNameIndex(obj) === OBJNI_EMPTY_FLASK) return obj;
         }
         return null;
@@ -2359,26 +2359,6 @@ export class Game {
         return this.random.below(maxExclusive);
     }
 
-    private isLikelyObjectRecord(value: ObjectID): boolean {
-        const { category, index } = decodeObjectID(value);
-        switch (category) {
-            case DBType.WEAPON:
-                return index >= 0 && index < this.dungeonState.getData().databases.weapons.records.length;
-            case DBType.CLOTHING:
-                return index >= 0 && index < this.dungeonState.getData().databases.clothing.records.length;
-            case DBType.SCROLL:
-                return index >= 0 && index < this.dungeonState.getData().databases.scrolls.records.length;
-            case DBType.POTION:
-                return index >= 0 && index < this.dungeonState.getData().databases.potions.records.length;
-            case DBType.CHEST:
-                return index >= 0 && index < this.dungeonState.getData().databases.containers.records.length;
-            case DBType.MISC:
-                return index >= 0 && index < this.dungeonState.getData().databases.misc.records.length;
-            default:
-                return false;
-        }
-    }
-
 
     private isTorchObject(rn: ObjectID): boolean {
         const base = this.getBaseObjectNameIndex(rn);
@@ -2473,7 +2453,7 @@ export class Game {
 
         const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
         if (!obj) return false;
-        if (!this.isLikelyObjectRecord(obj)) return false;
+        if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         let dropPos = relativePos | 0;
         if (dropPos < 0 || dropPos > 4) return false;
@@ -2567,7 +2547,7 @@ export class Game {
 
         const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
         if (!obj) return false;
-        if (!this.isLikelyObjectRecord(obj)) return false;
+        if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         const champion = party.champions[owner] ?? null;
         if (!champion) return false;

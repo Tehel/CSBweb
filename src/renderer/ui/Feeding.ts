@@ -11,7 +11,8 @@ import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '.
 import { DBType, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
-import { descIndexForObject, getDescIndexForObjectType, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getDescIndexForObjectType, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState, nowMs } from './UIState';
 import { SoundIndex } from '@/core';
 
@@ -32,7 +33,7 @@ export function computeFeedParameters(
   const champ = ui.partyState.champions[chIdx];
   if (!champ) return null;
 
-  const isRecord = isLikelyObjectRecord(ui, objectId);
+  const isRecord = isLikelyObjectRecord(ui.dungeonState, objectId);
   const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : objectId | 0;
   if (nameIndex < 0) return null;
   const category = isRecord ? decodeObjectID(objectId as ObjectID).category : null;
@@ -116,7 +117,7 @@ export function handleMouthPress(ui: UIState): void {
   const applied = ui.applyFeeding?.(selected, fp) ?? false;
   if (!applied) return;
 
-  const isRecord = isLikelyObjectRecord(ui, objectId);
+  const isRecord = isLikelyObjectRecord(ui.dungeonState, objectId);
   if (fp.chew) {
     startMouthChewAnimation(ui);
   } else if (fp.emptyFlask) {

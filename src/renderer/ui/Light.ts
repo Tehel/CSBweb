@@ -9,7 +9,8 @@
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
 import { getChampionPossession } from './Character';
-import { getBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue } from './Objects';
+import { getBaseObjectNameIndex, normalizeObjectValue } from './Objects';
+import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 
 export function selectPaletteIndexForLightLevel(ui: UIState): number {
@@ -101,7 +102,7 @@ export function collectTorchCharges(ui: UIState): number[] {
 }
 
 export function getTorchCharge(ui: UIState, objectId: number): number {
-  if (!isLikelyObjectRecord(ui, objectId)) return 0;
+  if (!isLikelyObjectRecord(ui.dungeonState, objectId)) return 0;
   const weapon = ui.dungeonState.getWeaponRecord(objectId as ObjectID);
   if (!weapon) return 0;
   return weapon.charges & 0xf;

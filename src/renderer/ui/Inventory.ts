@@ -18,7 +18,8 @@ import { Rect } from '../csbwin/UITables';
 import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getChampionPossession, getInventoryItemIndex } from './Character';
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
-import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 
 const MAX_LINES_IN_SCROLL = 9;
@@ -423,7 +424,7 @@ export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
   const filter = applyViewingFilter(ui, objectId, 0);
   if (filter) {
     const candidate = filter.objectId | 0;
-    if (candidate >= 0 && isLikelyObjectRecord(ui, candidate)) {
+    if (candidate >= 0 && isLikelyObjectRecord(ui.dungeonState, candidate)) {
       const decoded = decodeObjectID(candidate as ObjectID);
       if (decoded.category === DBType.SCROLL) scrollId = candidate as ObjectID;
     }
