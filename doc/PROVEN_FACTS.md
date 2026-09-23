@@ -2941,6 +2941,21 @@ whether the party stands on the square on the loaded level; arriving, it is hard
 
 Evidence: `tools/dump-monster-pad.ts` sections 1-4, on a type-1 pad from `dungeon.dat`.
 
+## A dropped and a thrown object are set down by `MoveObject`, with `oldX` -1 and -2
+
+`DropObject` sets the cursor's object down with `objD4.pos(w_4); MoveObject(objD4, -1, 0,
+D6W, D5W, NULL, NULL)` (`doc/CSBwin-src/Mouse.cpp:881-889`), and `ProcessObjectFromMissile`
+sets a thrown object down, when no monster takes it, with `MoveObject(objD6.pos(missile.pos()),
+-2, 0, mapX, mapY, NULL, NULL)` (`Timer.cpp:151-159`; a spell or a cloud is never set down,
+`:138`). Both go through the teleporter / pit loop and `PlaceOrRemoveObjectInRoom`, whose
+`unchangedRoom` is "the party stands on that square" (`Code11f52.cpp:3433-3448`, see "A DSA
+cell move is two low-level `MoveObject`s") — so an item dropped at the party's feet does not
+press a type-1 pad the party is already on. The two differ at a relative teleporter: it turns
+the object's corner only when `oldX != -1` (`:3000-3006`), so a dropped object keeps the
+corner it was dropped at and a thrown one (`-2`) is turned.
+
+Evidence: `tools/dump-drop-move-object.ts` (3 of 8 checks fail before).
+
 ## `WiggleEverything` moves each object with `MoveObject`, and walks a counted stretch of the chain
 
 When a teleporter switches on or a pit opens, `WiggleEverything` (`doc/CSBwin-src/Timer.cpp:2428`)

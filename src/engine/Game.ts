@@ -2609,25 +2609,18 @@ export class Game {
         const decoded = decodeObjectID(obj);
         const newPos = (facing + dropPos) & 0x3;
 
-        // `MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)` (`doc/CSBwin-src/Mouse.cpp:882`):
-        // a freshly-dropped object still walks through an active teleporter or open pit
-        // sitting on the cell it lands on before it is placed.
-        const resolved = this.timerSystem.resolveDroppedObjectPosition(target, decoded.category, newPos, facing);
-        const landing = resolved.position;
-        const newObj = encodeObjectID(resolved.objectPos, decoded.category, decoded.index);
-
+        // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
+        // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
+        // through an active teleporter or open pit on the cell it lands on.
+        const dropped = encodeObjectID(newPos, decoded.category, decoded.index) as ObjectID;
         party.objectInHand = null;
-        const added = this.dungeonState.addObjectToCell(landing, newObj);
-        if (!added) party.objectInHand = obj;
-        if (added) {
-            this.actuators.triggerObjectMove(landing, newObj, true, false, facing);
-            this.loadPartyLevelIfChanged();
-            this.timerSystem.processTimers(this.state.tickCount);
+        this.timerSystem.moveObject(dropped, -1, 0, target.x, target.y, target.z);
+        this.loadPartyLevelIfChanged();
+        this.timerSystem.processTimers(this.state.tickCount);
+        if (options?.viAltar) {
+            this.maybeScheduleViAltar(dropped, target, newPos);
         }
-        if (added && options?.viAltar) {
-            this.maybeScheduleViAltar(newObj, target, newPos);
-        }
-        return added;
+        return true;
     }
 
     /**
