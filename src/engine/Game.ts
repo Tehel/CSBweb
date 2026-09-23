@@ -465,6 +465,8 @@ export class Game {
                     this.timerSystem.checkMonsterMoveFromMissile(from, to, monsterRn),
                 resolveMonsterDestination: (destination, monsterRn) =>
                     this.timerSystem.resolveMonsterDestination(destination, monsterRn),
+                triggerObjectMove: (position, object, place, unchangedRoom) =>
+                    this.actuators.triggerObjectMove(position, object, place, unchangedRoom, this.party.state.facing),
                 ...monsterHooks,
             },
         );

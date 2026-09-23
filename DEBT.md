@@ -86,8 +86,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C19 | `CastSpell` under a spell filter's overrides | S | ✅ |
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
-| C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ⏳ |
+| C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ✅ |
 | C23 | The other object movers are not `MoveObject` either | M | ⏳ |
+| C24 | `moveMonster`'s return value, and what the AI does with it | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -758,7 +759,24 @@ fill a queue slot a key would then be refused. Porting it means turning
 `processMovementQueue` into `HandleMouseEvents`' dispatcher for every button. Size M; no
 save or `tools/` scenario depends on it yet.
 
-### C22 ⏳ A monster's own move presses no pads, and drags timers the AI does not
+### C22 ✅ A monster's own move presses no pads, and drags timers the AI does not
+
+**Paid in `COMMIT_C22`.** `MonsterSystem.moveMonster` lifts and sets down a group that does
+not levitate through `PlaceOrRemoveObjectInRoom` (a new `triggerObjectMove` hook, wired to
+`ActuatorSystem.triggerObjectMove`): leaving with `unchangedRoom` = "the party stands
+here", arriving with `false` (`doc/CSBwin-src/Code11f52.cpp:3287`, `:3392`); a flying
+group presses nothing (`:3274`, `:3386`). The removal now comes before the occupancy test,
+as in CSBWin (`:3257-3296`, `:3335-3358`), so a group that goes into abeyance releases its
+pad. The AI-timer retarget left `moveMonster`: CSBWin's AI re-aims only `timer_70`
+(`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`), which `MonsterAI` already did, and the
+DSA's re-aim of the rest (`MoveObject.cpp:539-571`) now lives in `DsaSystem.
+findCellDestination`. Evidence: `tools/dump-monster-pad.ts`, new, on a real type-1 pad
+(6 of 12 checks fail before); `tools/dump-monster-move.ts` case 1 now expects the timers to
+stay; `tools/dump-dsa-move.ts` section 6 still passes. The fact is in
+`doc/PROVEN_FACTS.md`, and the "must retarget" entry there is corrected. Found on the way:
+C24.
+
+<details><summary>original entry</summary>
 
 Found paying C15. `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3327-3424`)
 removes and places a non-levitating group through `PlaceOrRemoveObjectInRoom`
@@ -771,6 +789,8 @@ it too, where CSBWin's AI (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`) leaves
 timers behind. The DSA path now relies on it (C15); moving the retarget out means giving
 `DsaSystem.findCellDestination` its own. Needs a `tools/` scenario with a pad under a
 monster's path (`tools/dump-dsa-move.ts` sections 6-8 build a group). Size M.
+
+</details>
 
 ### C23 ⏳ The other object movers are not `MoveObject` either
 
@@ -792,6 +812,35 @@ differs from it somewhere:
 
 Routing each through `TimerSystem.moveObject` fixes the first two; the stairs arm is its
 own fix. One commit per caller, each with a `tools/` scenario. Size M.
+
+### C24 ⏳ `moveMonster`'s return value, and what the AI does with it
+
+Found paying C22. `MoveObject`'s monster branch returns `LOCAL_14`
+(`doc/CSBwin-src/Code11f52.cpp:3423`) and each AI caller stops on anything non-zero
+(`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`); the port's value and its callers differ:
+
+- **The AI ignores a non-zero `code`.** `MonsterAI` returns only on `removed`, so after a
+  teleport or a level change (`code >= 1`, when `moveMonster` has already started fresh
+  timers and deleted the old square's) it goes on, re-aims `timer_70` at the square it
+  asked for and re-queues it. CSBWin drops `timer_70` there. It also re-aims to `newX`
+  where CSBWin uses `d.NewX` — the same square whenever `code` is 0.
+- **`resolveMonsterDestination`'s `code` is 1 for any move**, a pit fall included, where
+  `LOCAL_14` is set only by `TeleportMonster` (`:2988`); and an attach sets `code = 1`
+  where CSBWin does `LOCAL_14++` (`:3376`), so a group teleported onto the party's level
+  gets `2` and `ClearAttacking_DeleteMovementTimers(&d.Item16[0], …)` (`:3411-3413`) —
+  slot 0's attacking bits, a CSBWin quirk to keep.
+- **`moveMonster` rewrites the `ITEM16`'s `uByte10`/`uByte11` and `ubPrevX`/`ubPrevY`.**
+  `MoveObject` touches neither; `uByte10`/`uByte11` is set only by `AttachItem16ToMonster`
+  (`CSBCode.cpp:6088-6090`), and a frightened group heads back to it
+  (`Monster.cpp:2273-2277`), so in the port it heads for the square it is on. `ubPrev*` is
+  the AI caller's to set, which `MonsterAI` does.
+- **A pit that kills the whole group, or a level the monster is not allowed on**, deletes
+  it after the loop, dropping its remains (`LOCAL_18`, `:3099-3100`; `:3147-3176`). The port
+  ignores `monsterFallsIntoPit`'s result, and `applyTeleporterToMonster` refuses the
+  teleport instead (`TimerSystem.ts`, `blocked`), leaving the group on the teleporter.
+
+Each is small; together they are one pass over `moveMonster` and its three `MonsterAI`
+callers. Extend `tools/dump-monster-pad.ts` or `tools/dump-monster-move.ts`. Size M.
 
 ---
 

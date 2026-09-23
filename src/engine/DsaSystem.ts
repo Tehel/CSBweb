@@ -2820,10 +2820,23 @@ export class DsaSystem {
           }
         }
       } else if (srcLocr) {
-        // `MoveObject(object, srcX, srcY, x, y)`, and the group's AI timers follow it
-        // when its `ITEM16` did not change (`:539-571`) — which `moveMonster` does
-        // itself on `code === 0`.
-        mover.moveMonster(object as ObjectID, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
+        // `MoveObject(object, srcX, srcY, x, y)`, and when it returns 0 — the group
+        // is still there and its `ITEM16` did not change — every monster AI timer on
+        // the level that named the source square is pointed at the destination
+        // (`:539-571`). `MoveObject` itself leaves them behind, as the AI's own
+        // steps do.
+        const moved = mover.moveMonster(object as ObjectID, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
+        if (!moved.removed && moved.code === 0) {
+          for (const timer of this.timers.getTimers()) {
+            if (timer.level !== (locr.l & 0xff)) continue;
+            if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
+            if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
+            if (timer.uByte6 !== (srcLocr.x & 0xff)) continue;
+            if (timer.uByte7 !== (srcLocr.y & 0xff)) continue;
+            timer.uByte6 = locr.x & 0xff;
+            timer.uByte7 = locr.y & 0xff;
+          }
+        }
       }
       if (decoded.category === DBType.MISSILE) {
         const missile = this.dungeon.getMissileRecord(placed as ObjectID);

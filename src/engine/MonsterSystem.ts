@@ -28,6 +28,7 @@ import {
   monsterDelayFromAttackToMove,
   monsterDelayFromMoveToAttack,
   monsterHorizontalSize,
+  monsterLevitating,
   monsterNibble12,
   monsterNibble14,
   monsterNonAttackingMirrorOK,
@@ -79,6 +80,12 @@ export interface MonsterSystemHooks {
     destination: Position,
     monsterRn: ObjectID,
   ) => { position: Position; code: number; audible: boolean };
+  /**
+   * The actuator half of `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3882`),
+   * `ActuatorSystem.triggerObjectMove`: the pads of `position` see the group arrive
+   * (`place`) or leave. The chain itself is spliced here, before the call.
+   */
+  triggerObjectMove?: (position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean) => void;
   /** `QueueSound(ordinal, mapX, mapY, deltaTime)` (`doc/CSBwin-src/CSBCode.cpp:1819`). */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** Dev-only AI trace sink; mirrors CSBWin's `AITraceActive` output. */
@@ -455,11 +462,24 @@ export class MonsterSystem {
   /* ------------------------------------------------------------ moving ------- */
 
   /**
-   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3325-3424`).
+   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3258-3424`).
    *
    * Moves a group from one square to another, taking the destination cell's effects
    * — teleporters, pits — through the same resolution the party uses, and keeping the
    * `ITEM16` and the AI timers in step with the result.
+   *
+   * A group that does not levitate is lifted and set down through
+   * `PlaceOrRemoveObjectInRoom` (`:3287`, `:3392`), so it presses and
+   * releases pressure pads: leaving, `unchangedRoom` is whether the party stands on the
+   * square; arriving, it is always false. A levitating one uses `RemoveObjectFromRoom`
+   * / `AddObjectToRoom` (`:3274`, `:3386`) and presses nothing. The group
+   * leaves its square before the destination is checked, so a group that goes into
+   * abeyance has released its pad (`:3257-3296`, `:3335-3358`).
+   *
+   * Nothing here touches the group's other AI timers when its `ITEM16` did not
+   * change: the AI caller re-aims only the timer it is processing (`Monster.cpp:1711`,
+   * `:2105`, `:2440`, `:2908`), and a DSA's cell move re-aims the rest itself
+   * (`MoveObject.cpp:539-571`, `DsaSystem.findCellDestination`).
    *
    * Returns CSBWin's `LOCAL_14`, whose encoding is worth spelling out because two of
    * its values overlap in meaning:
@@ -483,11 +503,15 @@ export class MonsterSystem {
     const monster = this.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return { removed: false, code: 0 };
 
-    const partyLevel = this.getPartyState().position.z | 0;
+    const party = this.getPartyState().position;
+    const partyLevel = party.z | 0;
     const fromDungeon = oldX >= 0;
     // "Proper level && oldX >= 0 means an ITEM16 exists"
     // (doc/CSBwin-src/Code11f52.cpp:3122).
     const item16Attached = level === partyLevel && fromDungeon;
+    // `Levitating(objD7)` (`:2841`, `:2417-2437`): a flying monster.
+    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const levitated = desc !== undefined && monsterLevitating(desc);
 
     // A monster leaving a square may run into a missile sitting in it.
     if (fromDungeon && level === partyLevel) {
@@ -509,17 +533,26 @@ export class MonsterSystem {
     const destLevel = destination.z | 0;
     let code = resolved.code;
 
+    // Lift it off the square it leaves (`:3257-3296`).
+    if (fromDungeon) {
+      const old = new Position(oldX, oldY, level);
+      this.dungeon.removeObjectFromCell(old, monsterRn);
+      if (!levitated) {
+        const partyThere = level === partyLevel && oldX === (party.x | 0) && oldY === (party.y | 0);
+        this.hooks?.triggerObjectMove?.(old, monsterRn, false, partyThere);
+      }
+    }
+
     // The destination is unusable if the party is standing there or another monster
     // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
     const blockedByParty =
       destLevel === partyLevel &&
-      destination.x === (this.getPartyState().position.x | 0) &&
-      destination.y === (this.getPartyState().position.y | 0);
+      destination.x === (party.x | 0) &&
+      destination.y === (party.y | 0);
     const occupant = this.dungeon.findFirstMonster(destination);
     if (blockedByParty || occupant !== OBJECT_ID_EOF) {
       if (fromDungeon) this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       if (item16Attached) this.detachItem16(monster.groupIndex);
-      if (fromDungeon) this.dungeon.removeObjectFromCell(new Position(oldX, oldY, level), monsterRn);
       this.createMovementTimer(monsterRn, destination, resolved.audible);
       return { removed: true, code: 0 };
     }
@@ -533,8 +566,9 @@ export class MonsterSystem {
       code = 1;
     }
 
-    if (fromDungeon) this.dungeon.removeObjectFromCell(new Position(oldX, oldY, level), monsterRn);
+    // Set it down (`:3384-3399`): "Not current room. Room changed."
     this.dungeon.addObjectToCell(destination, monsterRn);
+    if (!levitated) this.hooks?.triggerObjectMove?.(destination, monsterRn, true, false);
 
     // A freshly attached group, or one placed from nowhere, needs its first timer.
     if (code !== 0 || !fromDungeon) {
@@ -547,10 +581,6 @@ export class MonsterSystem {
         this.clearAttackingAndDeleteMovementTimers(code - 2, oldX, oldY, level);
       } else if (code !== 0) {
         this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
-      } else {
-        // Same level, still attached: the timers stay but must follow the group to
-        // its new square (doc/CSBwin-src/MoveObject.cpp:551-565).
-        this.retargetMonsterMovementTimers(oldX, oldY, destination.x, destination.y, level);
       }
     }
 
@@ -578,32 +608,6 @@ export class MonsterSystem {
       }
     }
     this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
-  }
-
-  /**
-   * Point a group's existing AI timers at its new square.
-   *
-   * CSBWin does this in the DSA move path (`doc/CSBwin-src/MoveObject.cpp:551-565`)
-   * by rewriting `uByte6`/`uByte7` in place — the timers are addressed by map square,
-   * so a group that moved without changing its `ITEM16` would otherwise keep waking
-   * up at the square it left.
-   */
-  private retargetMonsterMovementTimers(
-    oldX: number,
-    oldY: number,
-    newX: number,
-    newY: number,
-    level: number,
-  ): void {
-    for (const timer of this.timers.getTimers()) {
-      if (timer.level !== (level & 0xff)) continue;
-      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
-      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
-      if (timer.uByte6 !== (oldX & 0xff)) continue;
-      if (timer.uByte7 !== (oldY & 0xff)) continue;
-      timer.uByte6 = newX & 0xff;
-      timer.uByte7 = newY & 0xff;
-    }
   }
 
   /**

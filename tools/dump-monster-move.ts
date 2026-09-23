@@ -3,8 +3,8 @@
  *
  * Four things need to hold when a group moves, and none of them are visible without
  * looking: the record leaves one cell and appears in the other; its `ITEM16` learns
- * the new square (and remembers the previous one); its AI timers follow it, rather
- * than staying behind at the square it left; and a move onto an occupied square parks
+ * the new square (and remembers the previous one); its AI timers stay behind at the
+ * square it left, since `MoveObject` never re-aims them; and a move onto an occupied square parks
  * the group on an abeyance timer instead of losing it — up to 31 of them per square, past
  * which an ordinary group is deleted.
  *
@@ -113,7 +113,9 @@ async function main(): Promise<void> {
     check(!result.removed, 'the move should have succeeded');
     check(!monsterAt(mx, my), 'the old cell should no longer hold the creature');
     check(monsterAt(nx, ny), 'the new cell should hold the creature');
-    check(timersAtOld === 0 && timersAtNew === timersBefore, 'the AI timers should have followed the group');
+    // `MoveObject` does not re-aim them; the AI caller re-aims the one it is processing
+    // (doc/CSBwin-src/Monster.cpp:2440), and only a DSA move re-aims the rest.
+    check(timersAtOld === timersBefore && timersAtNew === 0, 'the AI timers should stay where they were');
     check(mover.slot.uByte10 === nx && mover.slot.uByte11 === ny, 'ITEM16 should record the new square');
     check(mover.slot.ubPrevX === mx && mover.slot.ubPrevY === my, 'ITEM16 should remember the old square');
     console.log('');

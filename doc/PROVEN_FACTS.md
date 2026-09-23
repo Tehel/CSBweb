@@ -770,11 +770,16 @@ step one square at random and try there instead, provided the new square is open
 teleporter, a pit or a door (`OpenTeleporterPitOrDoor`, `doc/CSBwin-src/Timer.cpp:625`). That
 is how he escapes a corner he has been walled into.
 
-## Monster AI timers are addressed by map square, so a move must retarget them
+## Monster AI timers are addressed by map square, and only a DSA move re-aims them all
 
 Timer types 29-41 are found by `uByte6`/`uByte7` (`doc/CSBwin-src/Monster.cpp:1320-1327`).
-A group that moves without its `ITEM16` changing keeps its timers, so CSBWin rewrites their
-coordinates in place rather than recreating them (`doc/CSBwin-src/MoveObject.cpp:551-565`):
+`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3327-3424`) never re-aims
+them: it starts fresh ones and deletes the old square's only when the `ITEM16` was
+attached, detached or teleported (`LOCAL_14 != 0`, `:3402-3421`). The AI's own steps
+(`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`) re-aim just the timer being processed,
+`timer_70`, to `d.NewX` / `d.NewY` once `MoveObject` returned 0, so any other AI timer of
+the group stays at the square it left. Only a DSA cell move rewrites them all in place,
+when `MoveObject` returned 0 (`doc/CSBwin-src/MoveObject.cpp:539-571`):
 
 ```cpp
 if (pTimerA->timerUByte6() != srcLocr.x) continue;
@@ -783,7 +788,7 @@ pTimerA->timerUByte6(ub(locr.x));
 pTimerA->timerUByte7(ub(locr.y));
 ```
 
-Miss this and the group goes on waking up at the square it left.
+Evidence: `tools/dump-monster-pad.ts` section 5, `tools/dump-dsa-move.ts` section 6.
 
 ## `CheckMoveFromMissile` reports only a total wipe-out
 
@@ -2927,3 +2932,16 @@ walks the 30 possessions of every champion whose `HP() != 0`, comparing each one
 `w_4 = 1`, loads `d.objectInHand` and jumps back into the loop body (`goto tag012e14`,
 `:3672-3678`), so the object on the cursor — and, if it is a chest, its contents — counts too,
 whoever holds the cursor. Evidence: `tools/dump-does-party-have.ts`.
+
+## A walking monster presses and releases floor pads; a flying one does not
+
+`MoveObject`'s monster branch lifts and sets down a group that is not `Levitating` through
+`PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3287` to remove,
+`:3392` to place), so its actuators run as for an item. Leaving, `unchangedRoom` is
+whether the party stands on the square on the loaded level; arriving, it is hard-wired
+`false` ("Not current room. Room changed."). A flying group uses `RemoveObjectFromRoom` /
+`AddObjectToRoom` (`:3274`, `:3386`) and presses nothing. The removal
+(`:3257-3296`) comes before the test for a party or monster on the destination
+(`:3335-3358`), so a group that goes into abeyance has released its pad first.
+
+Evidence: `tools/dump-monster-pad.ts` sections 1-4, on a type-1 pad from `dungeon.dat`.
