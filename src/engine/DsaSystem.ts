@@ -56,7 +56,7 @@ export interface DsaObjectMover {
   ): { removed: boolean; placed: ObjectID | null; position: Position | null };
   moveMonster(
     monster: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
-  ): { removed: boolean; code: number };
+  ): { code: number; position: Position };
 }
 
 export interface DsaTables {
@@ -2826,7 +2826,7 @@ export class DsaSystem {
         // (`:539-571`). `MoveObject` itself leaves them behind, as the AI's own
         // steps do.
         const moved = mover.moveMonster(object as ObjectID, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
-        if (!moved.removed && moved.code === 0) {
+        if (moved.code === 0) {
           for (const timer of this.timers.getTimers()) {
             if (timer.level !== (locr.l & 0xff)) continue;
             if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;

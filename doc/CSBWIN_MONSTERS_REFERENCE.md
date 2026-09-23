@@ -114,7 +114,7 @@ level only**. This is where all the live movement state lives:
 | 5 | `uByte5` | Pause countdown (a giggler gets `Random(64) + 20`) |
 | 6-7 | `uByte6`, `uByte7` | mapX / mapY of the square being approached |
 | 8-9 | `ubPrevX`, `ubPrevY` | Previous mapX / mapY |
-| 10-11 | `uByte10`, `uByte11` | Current mapX / mapY |
+| 10-11 | `uByte10`, `uByte11` | mapX / mapY where the slot was attached — set only by `AttachItem16ToMonster` (`CSBCode.cpp:6088-6091`); a frightened group heads back there (`Monster.cpp:2273-2277`) |
 | 12-15 | `singleMonsterStatus[4]` | Per-member status byte |
 
 `word0` is the one swapped field, byte-swapped on load from a save game
@@ -227,26 +227,31 @@ describes as broken but which is the only writer of the age bytes smelling reads
 
 ## Moving a group
 
-`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3325-3424`), ported as
+`MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`), ported as
 `MonsterSystem.moveMonster`. In order:
 
 1. If the group is leaving a real square on the party's level, `CheckMoveFromMissile`
    runs first — a missile sitting in that square gets its encounter as the group
-   walks out of it. Only a total wipe-out aborts the move.
+   walks out of it. If that removed the group, the move returns 1.
 2. The destination goes through the same cell-effect resolution the party uses, so
    teleporter chains and pit falls apply identically. A monster teleport also rotates
-   the group's facings and positions (`TeleportMonster`, `:2308`).
-3. If the resolved destination holds the party or another monster, the group is
-   parked in abeyance rather than placed.
-4. Otherwise, crossing on or off the party's level attaches or detaches the `ITEM16`,
-   the record is moved between cells, and the AI timers are started, dropped, or
-   retargeted depending on what happened to the slot.
-5. The slot's `uByte10`/`uByte11` learn the new square and `ubPrevX`/`ubPrevY`
-   remember the old one.
+   the group's facings and positions (`TeleportMonster`, `:2308`), through the `ITEM16`
+   of the level the group is attached to. A fall hurts the group at its old square
+   with the death deferred; if all of it died, the loop stops.
+3. A group the fall killed, or one on a level its type may not live on, is deleted:
+   remains at the new square, `DeleteMonster` at the old (`:3147-3176`).
+4. The group is lifted off its old square (pads released). If the resolved destination
+   holds the party or another monster, it is parked in abeyance rather than placed.
+5. Otherwise, crossing on or off the party's level attaches or detaches the `ITEM16`,
+   the group is set down (pads pressed), and the AI timers are started and the old
+   square's dropped when the value is non-zero. Nothing re-aims the group's other
+   timers, and the slot's `uByte10`/`uByte11` and `ubPrevX`/`ubPrevY` are not touched.
 
-See `doc/PROVEN_FACTS.md` for the three-way meaning of the return value, the abeyance
-mechanism and Lord Chaos's escape from a walled-in corner, why the AI timers have to
-be retargeted, and what `item16Attached` actually tests.
+The value it returns decides what the caller does next: the AI and a DSA go on only when
+it is 0. See `doc/PROVEN_FACTS.md` → "What `MoveObject` returns for a monster, and the AI
+stops on anything but 0", and the entries on the abeyance mechanism and Lord Chaos's
+escape from a walled-in corner, on which AI timers are re-aimed, and on what
+`item16Attached` actually tests.
 
 ## Damage and death
 

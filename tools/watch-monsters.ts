@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Position, RoomType } from '../src/core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -66,7 +66,21 @@ async function main(): Promise<void> {
 
   const dungeon = game.dungeonState;
   const pool = dungeon.getItem16Pool();
-  const start = pool.map((s) => (s.word0 >= 0 ? { db4: s.word0, x: s.uByte10, y: s.uByte11 } : null));
+  // Where a group stands. Not its ITEM16's uByte10/11: only AttachItem16ToMonster sets
+  // those (doc/CSBwin-src/CSBCode.cpp:6088-6090), and MoveObject leaves them behind.
+  const map = dungeon.getMap(level)!;
+  const where = (db4: number): { x: number; y: number } => {
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        for (let rn = dungeon.findFirstObject(new Position(x, y, level)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+          const d = decodeObjectID(rn);
+          if (d.category === DBType.CREATURE && d.index === db4) return { x, y };
+        }
+      }
+    }
+    return { x: -1, y: -1 };
+  };
+  const start = pool.map((s) => (s.word0 >= 0 ? { db4: s.word0, ...where(s.word0) } : null));
   const startFear = pool.map((s) => {
     if (s.word0 < 0) return -1;
     return dungeon.getCreatureRecordByIndex(s.word0)?.fear ?? -1;
@@ -77,7 +91,7 @@ async function main(): Promise<void> {
   let bestDist = 1e9;
   pool.forEach((s, i) => {
     if (s.word0 < 0) return;
-    const d = Math.abs(s.uByte10 - px) + Math.abs(s.uByte11 - py);
+    const d = Math.abs(start[i]!.x - px) + Math.abs(start[i]!.y - py);
     if (d < bestDist) { bestDist = d; followed = i; }
   });
   const path: string[] = [];
@@ -87,7 +101,8 @@ async function main(): Promise<void> {
     game.timerSystem.processTimers(t);
     if (followed >= 0) {
       const s = pool[followed]!;
-      const here = `${s.uByte10},${s.uByte11}`;
+      const at = where(s.word0);
+      const here = `${at.x},${at.y}`;
       if (path[path.length - 1] !== here) path.push(here);
     }
   }
@@ -105,20 +120,21 @@ async function main(): Promise<void> {
     if (!s0 || s.word0 < 0) return;
     const rec = dungeon.getCreatureRecordByIndex(s.word0);
     if (!rec) return;
-    const moved = Math.abs(s.uByte10 - s0.x) + Math.abs(s.uByte11 - s0.y);
+    const now = where(s.word0);
+    const moved = Math.abs(now.x - s0.x) + Math.abs(now.y - s0.y);
     const d0 = Math.abs(s0.x - px) + Math.abs(s0.y - py);
-    const d1 = Math.abs(s.uByte10 - px) + Math.abs(s.uByte11 - py);
+    const d1 = Math.abs(now.x - px) + Math.abs(now.y - py);
     groupsTotal++;
     if (moved > 0) moversTotal++;
     if (d1 < d0) closedIn++;
     if (rec.fear === StateOfFear.StateOfFear6) inFear6++;
     if (d1 < nearestFinalDist) nearestFinalDist = d1;
-    const rt = (dungeon.getCellFlag(new Position(s.uByte10, s.uByte11, level)) >> 5) & 7;
+    const rt = (dungeon.getCellFlag(new Position(now.x, now.y, level)) >> 5) & 7;
     if (rt === RoomType.STONE) { inWall++; }
     console.log([
       MonsterType[rec.creatureType] ?? rec.creatureType,
       `(${s0.x},${s0.y})`,
-      `(${s.uByte10},${s.uByte11})`,
+      `(${now.x},${now.y})`,
       moved,
       d0,
       d1,

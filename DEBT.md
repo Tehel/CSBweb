@@ -88,7 +88,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C21 | Clicks do not go through the input queue | M | ⏳ |
 | C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ✅ |
 | C23 | The other object movers are not `MoveObject` either | M | ⏳ |
-| C24 | `moveMonster`'s return value, and what the AI does with it | M | ⏳ |
+| C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -812,7 +812,10 @@ differs from it somewhere:
   `MonsterSystem.moveMonster` needs `moveMonster` to take the unchanged-room early return
   first (`:3180-3215`: same level, square and corner → return 0 before anything is
   lifted), which it lacks — today a monster moved onto its own square is lifted, pressed
-  and set down again. Best done with, or after, C24.
+  and set down again. Since C24, `wiggleMonster` also skips a group the move would
+  delete (a fatal fall, a forbidden level) instead of deleting it, because
+  `resolveCellEffects` no longer refuses the teleport; routing it through `moveMonster`
+  removes that stopgap.
 - `Game`'s drop from the cursor (`Mouse.cpp:882`) and `TimerSystem.dropMissileObject`
   (`Timer.cpp:151-159`) pass `unchangedRoom = false`, and `resolveCellEffects` turns a
   dropped item's corner on a relative teleporter although `oldX == -1` (`:3000-3006`).
@@ -820,10 +823,38 @@ differs from it somewhere:
   lands on stairs one level down when bit 2 of the cell is clear, then one square out
   through `ExitStairsDirection`, turning its corner (`:3108-3131`).
 
+- `MonsterDamage.deleteMonster` (`DeleteMonster`, `Code11f52.cpp:1026-1047`) takes the group
+  off its square with `removeObjectFromCell`, where CSBWin calls
+  `MoveObject(obj, x, y, -1, 0)` (`:1038`): that runs `CheckMoveFromMissile` on the party's
+  level and releases the square's pads through `PlaceOrRemoveObjectInRoom` for a group
+  that does not levitate. So a monster killed on a pad leaves it pressed. Needs
+  `moveMonster` to take `newX < 0` (`:3257-3297`: lift, then `return 0`). Found paying C24.
+
 Routing each through `TimerSystem.moveObject` fixes the drops; the stairs arm is its
 own fix. One commit per caller, each with a `tools/` scenario. Size M.
 
-### C24 ⏳ `moveMonster`'s return value, and what the AI does with it
+### C24 ✅ `moveMonster`'s return value, and what the AI does with it
+
+**Paid in `COMMIT_C24`.** `MonsterSystem.moveMonster` returns `{ code, position }`: CSBWin's
+value (`LOCAL_14`, or 1 for a group that left the dungeon) and `d.NewX/NewY/NewLevel`. The
+three `MonsterAI` callers end the turn on any non-zero `code` and re-aim `timer_70` to
+`position` (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`); the DSA and `createMonster`
+test `code !== 0` too, so a group made on the party's level is `RNnul` with no sound, as
+in CSBWin (`Monster.cpp:222-231`), and an audible generator now queues its own
+(`Timer.cpp:1797-1800`). `code` comes from `TeleportMonster` only (`Code11f52.cpp:2988`),
+the attach is `code++` (`:3376`), and `moveMonster` no longer writes `uByte10/11` or
+`ubPrev*`. The pit fall hurts the group at its old square with `P5 = 0` (`:3096-3097`),
+drops dead members' remains where it landed (`TAG00b522`, `:3103`), and a fatal fall or a
+forbidden level deletes the group after the loop (`:3147-3176`); a chained teleport reads
+the attached level's `ITEM16` (`:2988`). `DamageMonsterGroup` now empties the deferred
+droppings first (`:1333`). Evidence: `tools/dump-monster-move-code.ts`, new (13 of 17
+checks fail before); `tools/dump-monster-move.ts` case 1 (2 of 18 fail before);
+`tools/watch-monsters.ts` now finds groups on the map instead of in `uByte10/11`; the other
+tools that made a group get it through `tools/lib/createMonster.ts`. The facts are in
+`doc/PROVEN_FACTS.md`, and the older return-value entry there is corrected. Found on the
+way: the `DeleteMonster` bullet under C23, and `ProcessMonsterDeleteFilter` under G2.
+
+<details><summary>original entry</summary>
 
 Found paying C22. `MoveObject`'s monster branch returns `LOCAL_14`
 (`doc/CSBwin-src/Code11f52.cpp:3423`) and each AI caller stops on anything non-zero
@@ -851,6 +882,8 @@ Found paying C22. `MoveObject`'s monster branch returns `LOCAL_14`
 
 Each is small; together they are one pass over `moveMonster` and its three `MonsterAI`
 callers. Extend `tools/dump-monster-pad.ts` or `tools/dump-monster-move.ts`. Size M.
+
+</details>
 
 ---
 
@@ -1105,7 +1138,7 @@ it.
   Wall and floor decoration selection follows `TAG00a4a2` plus the actuator's
   `wallGraphicOrdinal` for stone and open rooms.
 
-### G2 ⏳ Three DSA filters
+### G2 ⏳ Four DSA filters
 
 No dungeon we load defines any of them, so none could be verified if written:
 `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`, Phase 13 step 1),
@@ -1113,6 +1146,14 @@ No dungeon we load defines any of them, so none could be verified if written:
 `handleMouthPress`), and `PortraitTranslateDisable`'s `QueueDSASwitchAction`
 (`CSBCode.cpp:6540-6612`, step 4). The last one only fires on a `DisableMessage` that the
 shipped dungeon never carries.
+
+The fourth is `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`), found paying C24: it
+counts each kill in `expool`'s statistics and, when the dungeon has an
+`ESL_DELETEMONSTERFILTER`, runs its type-47 DSA, which may set `deathCloud` and
+`dropResidue`. `MonsterDamage` has a `monsterDeleteFilter` hook that nothing wires, and
+`MoveObject`'s two deletions (`:3147-3176`, `:3298-3308`) do not call it; both use the
+defaults. `MonsterDamage`'s `DMW_DAMAGE` is 0 where CSBWin's `DMW_Damage` is 3
+(`CSB.h:2922`); `DMW_Movement1` is 4, `DMW_Movement2` 5.
 
 ### G3 ⏳ The wings
 

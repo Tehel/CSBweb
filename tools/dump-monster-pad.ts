@@ -37,6 +37,7 @@ import { extractObjectTables, monsterLevitating } from '../src/renderer/csbwin/O
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
+import { createMonsterAt } from './lib/createMonster';
 
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
@@ -152,7 +153,7 @@ async function main(): Promise<void> {
     let type = 0;
     while (!dungeon.monsterAllowedOnLevel(type, pad.z)) type++;
     const where = at(squares);
-    const rn = game.monsterSystem.createMonster({
+    const rn = createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: where.x, mapY: where.y, level: where.z, invisible: false, drawAsSize4: false,
     });
@@ -167,10 +168,10 @@ async function main(): Promise<void> {
     const before = actionTimers(game);
     const onto = game.monsterSystem.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
     const after = actionTimers(game);
-    console.log(`1. group (${beside.x},${beside.y}) -> pad (${pad.x},${pad.y}) L${pad.z}: removed ${onto.removed}, `
+    console.log(`1. group (${beside.x},${beside.y}) -> pad (${pad.x},${pad.y}) L${pad.z}: removed ${onto.code !== 0}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}, action timers ${before} -> ${after}`);
     check(!levitating, 'the test group walks');
-    check(!onto.removed && game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF, 'the group stands on the pad');
+    check(onto.code === 0 && game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF, 'the group stands on the pad');
     check(called(calls, beside, false), 'it leaves its square through PlaceOrRemoveObjectInRoom (remove, room changed)');
     check(called(calls, pad, true), 'it arrives through PlaceOrRemoveObjectInRoom (place, room changed)');
     check(after > before, "the pad's action is queued");
@@ -186,15 +187,15 @@ async function main(): Promise<void> {
     const { game, pad, beside, rn, calls } = await setUp((s) => s.pad);
     let type = 0;
     while (!game.dungeonState.monsterAllowedOnLevel(type, pad.z)) type++;
-    game.monsterSystem.createMonster({
+    createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: beside.x, mapY: beside.y, level: beside.z, invisible: false, drawAsSize4: false,
     });
     calls.length = 0;
     const result = game.monsterSystem.moveMonster(rn, pad.x, pad.y, beside.x, beside.y, pad.z);
-    console.log(`3. group on the pad -> occupied (${beside.x},${beside.y}): removed ${result.removed}, `
+    console.log(`3. group on the pad -> occupied (${beside.x},${beside.y}): removed ${result.code !== 0}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place]))}`);
-    check(result.removed, 'the group goes into abeyance');
+    check(result.code !== 0, 'the group goes into abeyance');
     check(called(calls, pad, false), 'having left the pad, which it released');
   }
 
@@ -217,7 +218,7 @@ async function main(): Promise<void> {
     const result = game.monsterSystem.moveMonster(rn, beside.x, beside.y, beyond.x, beyond.y, beside.z);
     console.log(`5. group (${beside.x},${beside.y}) -> (${beyond.x},${beyond.y}): code ${result.code}, AI timers `
       + `${before} at the old square -> ${aiTimersAt(game, beside)}, ${aiTimersAt(game, beyond)} at the new`);
-    check(!result.removed && result.code === 0, 'an ordinary step changes no ITEM16');
+    check(result.code === 0, 'an ordinary step changes no ITEM16');
     check(before > 0 && aiTimersAt(game, beside) === before && aiTimersAt(game, beyond) === 0,
       'MoveObject leaves the AI timers at the square the group left');
   }

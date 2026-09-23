@@ -26,6 +26,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
+import { createMonsterAt } from './lib/createMonster';
 
 const MISSILE_TYPE_ARROW = 51;
 const MISSILE_TYPE_BOULDER = 128;
@@ -161,7 +162,7 @@ async function main(): Promise<void> {
     }
     const creatures = dungeon.getData().databases.creatures;
     const before = creatures.records.length;
-    const rn = game.monsterSystem.createMonster({
+    const rn = createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: 0, mapY: 0, level, invisible: false, drawAsSize4: false,
     });

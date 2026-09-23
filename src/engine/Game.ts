@@ -410,10 +410,12 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 damageAllCharacters: (damage, woundMask, kind) =>
                     this.monsterAttack.damageAllCharacters(damage, woundMask, kind),
-                damageMonsterGroup: (monster, level, mapX, mapY, damage, noItem16) =>
+                damageMonsterGroup: (monster, level, mapX, mapY, damage, noItem16, apply) =>
                     this.monsterDamage.damageMonsterGroup(
-                        monster, level, mapX, mapY, damage, true, noItem16 ?? false,
+                        monster, level, mapX, mapY, damage, apply ?? true, noItem16 ?? false,
                     ),
+                flushPendingDroppings: (monsterType, level, mapX, mapY) =>
+                    this.monsterDamage.flushPendingDroppings(monsterType, level, mapX, mapY),
                 adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
                 maxLoad: (champ) => this.characterStats.maxLoad(champ),
                 characterLoad: (champ) => this.characterStats.characterLoad(champ),
@@ -463,8 +465,13 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 checkMoveFromMissile: (from, to, monsterRn) =>
                     this.timerSystem.checkMonsterMoveFromMissile(from, to, monsterRn),
-                resolveMonsterDestination: (destination, monsterRn) =>
-                    this.timerSystem.resolveMonsterDestination(destination, monsterRn),
+                resolveMonsterDestination: (destination, monsterRn, oldX, oldY) =>
+                    this.timerSystem.resolveMonsterDestination(destination, monsterRn, oldX, oldY),
+                flushPendingDroppings: (monsterType, level, mapX, mapY) =>
+                    this.monsterDamage.flushPendingDroppings(monsterType, level, mapX, mapY),
+                dropMonsterRemains: (level, mapX, mapY, monsterRn, delay, attachedLevel, dropResidue) =>
+                    this.monsterDamage.dropMonsterRemains(level, mapX, mapY, monsterRn, delay, attachedLevel, dropResidue),
+                deleteMonster: (level, mapX, mapY) => this.monsterDamage.deleteMonster(level, mapX, mapY),
                 triggerObjectMove: (position, object, place, unchangedRoom) =>
                     this.actuators.triggerObjectMove(position, object, place, unchangedRoom, this.party.state.facing),
                 ...monsterHooks,

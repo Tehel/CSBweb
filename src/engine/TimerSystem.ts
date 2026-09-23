@@ -8,6 +8,8 @@ import { PotionType, SoundIndex } from '../core/constants';
 const SOUND_DOOR_OPENING = 18;
 /** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
 const SOUND_DOOR_STRUGGLE = 4;
+/** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
+const SOUND_TELEPORT = 17;
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
@@ -76,6 +78,20 @@ const WEAPON_ARROW = 27;
 const WEAPON_SLAYER = 28;
 const WEAPON_POISON_DART = 31;
 const WEAPON_THROWING_STAR = 32;
+
+/**
+ * What `MoveObject`'s loop knows about a monster group it is moving
+ * (`doc/CSBwin-src/Code11f52.cpp:2796-3131`): where it stands (`oldX < 0`: nowhere
+ * yet), the level its `ITEM16` belongs to (`AttachedLevel_4`), and whether it has none
+ * (`!item16Attached`).
+ */
+interface MonsterMove {
+  record: CreatureRecord;
+  oldX: number;
+  oldY: number;
+  attachedLevel: number;
+  noItem16: boolean;
+}
 
 export interface TimerTables {
   monsterDesc?: ArrayLike<MonsterDesc>;
@@ -238,7 +254,17 @@ export interface TimerHooks {
     damage: number,
     /** CSBWin's `noItem16`; only the pit fall passes it, and only when true. */
     noItem16?: boolean,
+    /**
+     * CSBWin's `P5`, false only for the pit fall (`Code11f52.cpp:3097`): the last
+     * member's death is not applied, and droppings wait for `flushPendingDroppings`.
+     */
+    apply?: boolean,
   ) => number;
+  /**
+   * `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:806`) — drop the remains a
+   * `damageMonsterGroup(apply = false)` deferred, at the square the group fell to.
+   */
+  flushPendingDroppings?: (monsterType: number, level: number, mapX: number, mapY: number) => void;
   /** `DeterminePoisonDamage` (doc/CSBwin-src/Code11f52.cpp:1358). */
   determinePoisonDamage?: (monsterType: number, damage: number) => number;
 }
@@ -1489,6 +1515,9 @@ export class TimerSystem {
         audible,
       });
     }
+    // `CreateMonster` makes its own sound only off the party's level; an audible
+    // generator always queues one (`doc/CSBwin-src/Timer.cpp:1797-1800`).
+    if (audible) this.hooks?.queueSound?.(SOUND_TELEPORT, target.x, target.y, 1);
 
     if (isActuatorOnceOnly(actuator)) {
       setActuatorType(actuator, 0);
@@ -2984,24 +3013,36 @@ export class TimerSystem {
   }
 
   /**
-   * Take a monster's intended destination through the destination cell's effects,
-   * for `MonsterSystem.moveMonster`.
+   * The loop of `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2896-3131`) for a monster,
+   * for `MonsterSystem.moveMonster`: the destination taken through teleporter chains and
+   * pit falls by the same `resolveCellEffects` the party and every object go through.
    *
-   * This is the same `resolveCellEffects` the party and every other object goes
-   * through, so a monster follows teleporter chains and falls down pits by the same
-   * rules. The returned `code` mirrors `TeleportMonster`'s value: `groupIndex + 2`
-   * for a fear-state-6 group so the caller can find its slot again, otherwise 1 when
-   * a teleport happened, or 0 when none did
-   * (`doc/CSBwin-src/Code11f52.cpp:2377-2384`).
+   * `oldX, oldY` on `level` is where the group stands (`oldX < 0`: it is being placed
+   * from nowhere). Its `ITEM16` is attached when that is the party's level and the group
+   * is in the dungeon (`item16Attached`, `:2864`), and every teleporter of a chain
+   * rotates the group through that `ITEM16`, however far the chain has taken it (`:2988`).
+   *
+   * The result is CSBWin's locals at the end of the loop:
+   *
+   * - `code` is `LOCAL_14`, set only by `TeleportMonster` (`:2988`): `groupIndex + 2`
+   *   for a fear-state-6 group on the party's level, 1 for any other teleport, 0 when
+   *   none happened. A pit fall leaves it alone.
+   * - `audible` is `LOCAL_26`, whether the last teleporter buzzed (`:2965`).
+   * - `groupDied` is `LOCAL_18` (`:3099-3100`): the fall killed the whole group, and
+   *   the loop stopped at the square below.
    */
   resolveMonsterDestination(
     destination: Position,
     monsterRn: number,
-  ): { position: Position; code: number; audible: boolean } {
+    oldX: number,
+    oldY: number,
+  ): { position: Position; code: number; audible: boolean; groupDied: boolean } {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = decodeObjectID(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
     const facing = rec?.facing ?? 0;
+    const partyLevel = this.getPartyState().position.z;
+    const item16Attached = destination.z === partyLevel && oldX >= 0;
     const result = this.resolveCellEffects(
       destination,
       DBType.CREATURE,
@@ -3009,18 +3050,14 @@ export class TimerSystem {
       facing,
       undefined,
       canFall,
-      rec ?? undefined,
+      rec ? { record: rec, oldX, oldY, attachedLevel: destination.z, noItem16: !item16Attached } : undefined,
     );
-    if (!result.moved) {
-      return { position: destination, code: 0, audible: false };
-    }
-    if (rec && !result.usedItem16) rec.facing = result.facing & 0x3;
-
-    let code = 1;
-    if (rec && result.usedItem16 && rec.fear === StateOfFear.StateOfFear6) {
-      code = rec.groupIndex + 2;
-    }
-    return { position: result.position, code, audible: result.teleportAudible };
+    return {
+      position: result.position,
+      code: result.teleportCode,
+      audible: result.teleportAudible,
+      groupDied: result.groupDied,
+    };
   }
 
   /**
@@ -3081,15 +3118,22 @@ export class TimerSystem {
     const decoded = decodeObjectID(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
     const facing = rec?.facing ?? 0;
-    const result = this.resolveCellEffects(position, DBType.CREATURE, decoded.position & 0x3, facing, undefined, canFall, rec ?? undefined);
+    const noItem16 = rec === null || this.getMonsterItem16(rec, position.z) === null;
+    const result = this.resolveCellEffects(
+      position, DBType.CREATURE, decoded.position & 0x3, facing, undefined, canFall,
+      rec ? { record: rec, oldX: position.x, oldY: position.y, attachedLevel: position.z, noItem16 } : undefined,
+    );
     if (!result.moved) return;
+    // Until it goes through `MonsterSystem.moveMonster` (DEBT.md C23), a group the move
+    // would delete (`:3147-3176`) is left where it is.
+    if (result.groupDied) return;
+    if (rec && !this.dungeon.monsterAllowedOnLevel(rec.creatureType, result.position.z)) return;
 
     const oldPos = new Position(position.x, position.y, position.z);
     this.checkMoveFromMissile(oldPos, result.position, monsterRn);
     const newRn = encodeObjectID(result.objectPos & 0x3, DBType.CREATURE, decoded.index);
     this.dungeon.removeObjectFromCell(oldPos, monsterRn);
     this.dungeon.addObjectToCell(result.position, newRn);
-    if (rec && !result.usedItem16) rec.facing = result.facing & 0x3;
 
     const unchanged = this.isSamePosition(oldPos, result.position);
     this.actuators.triggerObjectMove(oldPos, monsterRn, false, unchanged, result.facing);
@@ -3103,7 +3147,7 @@ export class TimerSystem {
     facing: number,
     missileDir: number | undefined,
     allowFall: boolean,
-    monster?: CreatureRecord,
+    monster?: MonsterMove,
     pretendTeleporter?: TeleporterRecord,
   ): {
     position: Position;
@@ -3111,15 +3155,19 @@ export class TimerSystem {
     facing: number;
     missileDir?: number;
     moved: boolean;
-    usedItem16?: boolean;
     teleportAudible: boolean;
+    /** `LOCAL_14`: `TeleportMonster`'s value for the last teleport, else 0. */
+    teleportCode: number;
+    /** `LOCAL_18`: a pit fall killed the whole group. */
+    groupDied: boolean;
   } {
     let position = new Position(start.x, start.y, start.z);
     let curFacing = facing & 0x3;
     let curPos = objectPos & 0x3;
     let curDir = missileDir;
     let moved = false;
-    let usedItem16 = false;
+    let teleportCode = 0;
+    let groupDied = false;
     // `LOCAL_26 = DB1A2->audible()` — remembered because it decides TT_60 vs TT_61
     // if the monster then has to wait for its destination (Code11f52.cpp:2965).
     let teleportAudible = false;
@@ -3151,11 +3199,10 @@ export class TimerSystem {
             curPos = (curPos + rotation) & 0x3;
           }
         } else if (objectType === DBType.CREATURE) {
-          const result = monster ? this.applyTeleporterToMonster(monster, teleporter, position.z) : null;
+          const result = monster ? this.teleportMonster(monster, teleporter) : null;
           if (result) {
-            if (result.blocked) break;
             curFacing = result.facing & 0x3;
-            usedItem16 = result.usedItem16;
+            teleportCode = result.code;
             teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
@@ -3188,18 +3235,26 @@ export class TimerSystem {
         if (!next) break;
         position = next;
         moved = true;
-        // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3053-3106`). `start` is
-        // CSBWin's `oldX, oldY`: nothing has been moved in the database yet, so a
-        // falling monster group is still linked at the cell it came from.
+        // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3053-3106`). A group is hurt
+        // at `oldX, oldY`, where it is still linked: nothing has moved in the database yet.
         if (objectType === -1) this.partyFallsIntoPit();
-        else if (objectType === DBType.CREATURE && monster) this.monsterFallsIntoPit(monster, start);
+        else if (objectType === DBType.CREATURE && monster) {
+          const hurt = this.monsterFallsIntoPit(monster);
+          groupDied = hurt === MonsterDamageResult.ALL_MONSTERS_DIED;
+          if (groupDied) break;
+          if (hurt === MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
+            this.hooks?.flushPendingDroppings?.(monster.record.creatureType, position.z, position.x, position.y);
+          }
+        }
         continue;
       }
 
       break;
     }
 
-    return { position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved, usedItem16, teleportAudible };
+    return {
+      position, objectPos: curPos, facing: curFacing, missileDir: curDir, moved, teleportAudible, teleportCode, groupDied,
+    };
   }
 
   private getActiveTeleporterAt(position: Position): TeleporterRecord | null {
@@ -3298,13 +3353,17 @@ export class TimerSystem {
   }
 
   /**
-   * A monster group falls (`doc/CSBwin-src/Code11f52.cpp:3091-3100`). Damaged at the
-   * cell it fell *from*, on the level its `ITEM16` is attached to, and with
-   * `noItem16` set when it has none.
+   * A monster group falls (`doc/CSBwin-src/Code11f52.cpp:3088-3104`):
+   * `DamageMonsterGroup(pDB4, oldX, oldY, 20, 0, !item16Attached)` on the level its
+   * `ITEM16` belongs to. `P5 = 0` defers the last member's death to `MoveObject`, which
+   * deletes the group after the loop, and a dead member's droppings to `TAG00b522`,
+   * which drops them where the group landed. A group placed from nowhere (`oldX < 0`)
+   * is hurt at `(-1, 0)`, so its death clouds are not made (`CreateCloud`, `:1400`).
    */
-  private monsterFallsIntoPit(monster: CreatureRecord, from: Position): void {
-    const noItem16 = this.getMonsterItem16(monster, from.z) === null;
-    this.hooks?.damageMonsterGroup?.(monster, from.z, from.x, from.y, 20, noItem16);
+  private monsterFallsIntoPit(monster: MonsterMove): number {
+    return this.hooks?.damageMonsterGroup?.(
+      monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, monster.noItem16, false,
+    ) ?? MonsterDamageResult.NO_MONSTER_DIED;
   }
 
   private isActivePitAt(position: Position): boolean {
@@ -3329,12 +3388,23 @@ export class TimerSystem {
     return a.x === b.x && a.y === b.y && a.z === b.z;
   }
 
-  private applyTeleporterToMonster(
-    monster: CreatureRecord,
+  /**
+   * `TeleportMonster` (`doc/CSBwin-src/Code11f52.cpp:2308-2387`) — turn the group, and
+   * each member's corner, as the teleporter says. The facing and position bytes are
+   * the `ITEM16`'s unless `noItem16`, whatever level the chain has reached: CSBWin
+   * passes `AttachedLevel_4` and `!item16Attached` for every teleporter (`:2988`).
+   *
+   * Returns `groupIndex() + 2` for a fear-state-6 group whose attached level is the
+   * party's — read after the write, so with `noItem16` it is the new position byte —
+   * and 1 otherwise. Whether the monster may live on the destination level is not
+   * this function's business: `MoveObject` asks after the loop (`:3147`).
+   */
+  private teleportMonster(
+    move: MonsterMove,
     teleporter: TeleporterRecord,
-    level: number,
-  ): { facing: number; usedItem16: boolean; blocked: boolean } {
-    const item16 = this.getMonsterItem16(monster, level);
+  ): { facing: number; code: number } {
+    const monster = move.record;
+    const item16 = move.noItem16 ? null : this.getMonsterItem16(monster, move.attachedLevel);
     const useItem16 = item16 !== null;
     const rotation = teleporter.rotation & 0x3;
     const absolute = teleporter.absoluteRotation;
@@ -3381,9 +3451,11 @@ export class TimerSystem {
       if (positions !== 0xff) monster.groupIndex = newPositions & 0xff;
     }
 
-    const destLevel = teleporter.destMap & 0xff;
-    const blocked = !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel);
-    return { facing: newFacings & 0x3, usedItem16: useItem16, blocked };
+    const partyLevel = this.getPartyState().position.z;
+    const code = move.attachedLevel === partyLevel && monster.fear === StateOfFear.StateOfFear6
+      ? monster.groupIndex + 2
+      : 1;
+    return { facing: newFacings & 0x3, code };
   }
 
   private getMonsterItem16(monster: CreatureRecord, level: number): Item16Record | null {

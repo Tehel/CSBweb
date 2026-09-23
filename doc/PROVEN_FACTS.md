@@ -742,20 +742,15 @@ rather than the origin.
 
 ## `MoveObject`'s monster return value encodes the `ITEM16` slot
 
-`doc/CSBwin-src/Code11f52.cpp` returns `LOCAL_14` from the monster branch (`:3424`), and the
-value carries three different meanings:
-
-- `1` from `return (1)` at `:3358` means the group is **no longer in the dungeon** — the
-  destination held the party or another monster, so it went into abeyance.
-- `0` means nothing about the `ITEM16` changed.
-- `1` (as `LOCAL_14`) means the slot was attached or detached by this move.
-- `> 1` comes only from `TeleportMonster`, which returns `groupIndex + 2` when the group is on
-  the party's level and in `StateOfFear6` (`doc/CSBwin-src/Code11f52.cpp:2377-2384`) — so the
-  caller can recover the slot index as `LOCAL_14 - 2` and call
-  `ClearAttacking_DeleteMovementTimers` on it (`:3411`).
-
-The overlap between "returned 1 because removed" and "LOCAL_14 == 1" is only safe because the
-two are reached by different `return` statements.
+`doc/CSBwin-src/Code11f52.cpp` returns `LOCAL_14` from the monster branch (`:3423`), or 1 from
+an earlier `return (1)` when the group left the dungeon (a missile on the way out, `:2852`; a
+fatal fall or a forbidden level, `:3171`; abeyance, `:3356`). Every caller treats any non-zero
+value alike. `LOCAL_14` is 0 for a plain step, `TeleportMonster`'s value after a teleport (1,
+or `groupIndex + 2` for a fear-state-6 group on the party's level, `:2377-2384`), 1 after a
+detach, and one more after an attach. A value above 1 selects the slot handed to
+`ClearAttacking_DeleteMovementTimers` (`:3413`). The whole derivation, and the slot-0 quirk
+it leads to, is under "What `MoveObject` returns for a monster, and the AI stops on anything
+but 0".
 
 ## A monster whose destination is occupied is parked, not dropped
 
@@ -2962,3 +2957,42 @@ uses up one step, so the last object is not moved. A moved missile's timer gets 
 `d.NewLevel` (`:2474-2489`).
 
 Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario).
+
+## What `MoveObject` returns for a monster, and the AI stops on anything but 0
+
+`MoveObject`'s monster branch returns `LOCAL_14` (`doc/CSBwin-src/Code11f52.cpp:3423`), or 1
+for a group that left the dungeon on the way. `LOCAL_14` is set in the loop only by
+`TeleportMonster` (`:2988`), which returns `groupIndex() + 2` for a fear-state-6 group whose
+attached level is the party's and 1 otherwise (`:2377-2386`); a pit fall does not touch it.
+After the loop, leaving the party's level with an `ITEM16` sets it to 1 (`:3364-3369`) and
+arriving there without one does `LOCAL_14++` (`:3370-3378`). So a plain step is 0, a teleport
+1, a group placed from nowhere onto the party's level 1, and a teleport onto the party's
+level from another 2. Anything above 1 runs `ClearAttacking_DeleteMovementTimers(
+&d.Item16[LOCAL_14 - 2], oldX, oldY)` (`:3409-3414`): for that last case, slot 0, whoever
+owns it. `MoveObject` never writes the `ITEM16`'s `uByte10`/`uByte11` or `ubPrevX`/`ubPrevY`;
+only `AttachItem16ToMonster` sets the first pair (`CSBCode.cpp:6088-6091`).
+
+Every teleporter of a chain turns the group through the `ITEM16` of its attached level:
+`TeleportMonster(DB1A2, objD7, AttachedLevel_4, !item16Attached)` (`:2988`), whatever level
+the chain has reached.
+
+A group that falls is hurt by `DamageMonsterGroup(pDB4, oldX, oldY, 20, 0, !item16Attached)`
+(`:3096-3097`) — its old square, and `P5 = 0`, so the last member's death is not applied
+(`:1110`) and dead members' droppings wait in `d.Byte13050` for `TAG00b522`, which drops
+them at the square the group fell to (`:3101-3104`). `DamageMonsterGroup` empties that list
+first (`d.Word13046 = 0`, `:1333`). If the whole group died the loop stops (`:3100`). After the
+loop, a group the fall killed, or one whose type is not allowed on the level it ended on,
+is deleted (`:3147-3176`): `TAG00b522`, `DropMonsterRemains` at the new square, and
+`DeleteMonster` at the old one when it had one — a group placed from nowhere keeps its
+record. `MoveObject` returns 1.
+
+The AI's four `MoveObject` calls (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`) all end the
+turn on a non-zero value, and otherwise re-aim only `timer_70`'s square, to `d.NewX`,
+`d.NewY` (`:1719-1720`, `:2111-2112`, `:2448-2449`, `:2927-2928`). `CreateMonster` returns
+`RNnul` whenever `MoveObject` is non-zero (`Monster.cpp:222-231`), which includes every group
+made on the party's level, and only otherwise queues the teleport sound; its one caller, the
+generator, ignores the value and queues the sound itself when it is audible
+(`Timer.cpp:1787-1800`).
+
+Evidence: `tools/dump-monster-move-code.ts` (13 of 17 checks fail before the fix),
+`tools/dump-monster-move.ts` case 1.

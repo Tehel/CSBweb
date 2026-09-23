@@ -71,15 +71,25 @@ export interface MonsterSystemHooks {
    */
   checkMoveFromMissile?: (from: Position, to: Position, monsterRn: ObjectID) => boolean;
   /**
-   * Take a monster's intended destination through the cell's effects — teleporter
-   * chains and pit falls — the way the party's move is resolved. `code` carries
-   * `TeleportMonster`'s return value (`groupIndex + 2` for a fear-6 group, else 1,
-   * or 0 for no teleport), and `audible` whether the teleporter buzzed.
+   * `MoveObject`'s loop for a monster (`TimerSystem.resolveMonsterDestination`):
+   * teleporter chains and pit falls. `code` is `LOCAL_14` as `TeleportMonster` left it,
+   * `audible` is `LOCAL_26`, and `groupDied` is `LOCAL_18`, a fall that killed them all.
    */
   resolveMonsterDestination?: (
     destination: Position,
     monsterRn: ObjectID,
-  ) => { position: Position; code: number; audible: boolean };
+    oldX: number,
+    oldY: number,
+  ) => { position: Position; code: number; audible: boolean; groupDied: boolean };
+  /** `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:806`), `MonsterDamage.flushPendingDroppings`. */
+  flushPendingDroppings?: (monsterType: number, level: number, mapX: number, mapY: number) => void;
+  /** `DropMonsterRemains` (`doc/CSBwin-src/Code11f52.cpp:830`), `MonsterDamage.dropMonsterRemains`. */
+  dropMonsterRemains?: (
+    level: number, mapX: number, mapY: number, monsterRn: ObjectID,
+    bodyPartSoundDelay: number, monsterAttachedToLevel: number, dropResidue: boolean,
+  ) => void;
+  /** `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1026`), `MonsterDamage.deleteMonster`. */
+  deleteMonster?: (level: number, mapX: number, mapY: number) => void;
   /**
    * The actuator half of `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3882`),
    * `ActuatorSystem.triggerObjectMove`: the pads of `position` see the group arrive
@@ -462,11 +472,16 @@ export class MonsterSystem {
   /* ------------------------------------------------------------ moving ------- */
 
   /**
-   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3258-3424`).
+   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`).
    *
-   * Moves a group from one square to another, taking the destination cell's effects
-   * — teleporters, pits — through the same resolution the party uses, and keeping the
+   * Moves a group from one square to another (`oldX < 0`: places it from nowhere),
+   * taking the destination through teleporter chains and pit falls, and keeping the
    * `ITEM16` and the AI timers in step with the result.
+   *
+   * A group the fall killed, or one that ends on a level its type may not live on, is
+   * deleted before anything else moves (`:3147-3176`): its remains are dropped where it
+   * ended, and it is taken off its old square. A group placed from nowhere is not
+   * deleted — CSBWin's `DeleteMonster` needs a square — and its record stays allocated.
    *
    * A group that does not levitate is lifted and set down through
    * `PlaceOrRemoveObjectInRoom` (`:3287`, `:3392`), so it presses and
@@ -479,18 +494,26 @@ export class MonsterSystem {
    * Nothing here touches the group's other AI timers when its `ITEM16` did not
    * change: the AI caller re-aims only the timer it is processing (`Monster.cpp:1711`,
    * `:2105`, `:2440`, `:2908`), and a DSA's cell move re-aims the rest itself
-   * (`MoveObject.cpp:539-571`, `DsaSystem.findCellDestination`).
+   * (`MoveObject.cpp:539-571`, `DsaSystem.findCellDestination`). Nor does it touch the
+   * `ITEM16`'s `uByte10`/`uByte11` — only `AttachItem16ToMonster` sets them
+   * (`CSBCode.cpp:6088-6090`), and a frightened group heads back there
+   * (`Monster.cpp:2273-2277`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
    *
-   * Returns CSBWin's `LOCAL_14`, whose encoding is worth spelling out because two of
-   * its values overlap in meaning:
+   * Returns `code`, CSBWin's return value, and `position`, its `d.NewX`, `d.NewY` and
+   * `d.NewLevel` (`:3174-3176`) — where the group ended up. Every caller that goes on
+   * after a move does so only when `code` is 0 (`Monster.cpp:1711`, `:2105`, `:2440`,
+   * `:2908`, `MoveObject.cpp:547`, `Monster.cpp:222`):
    *
-   * - `removed: true` is CSBWin's `return 1` — the group is no longer in the dungeon,
-   *   because the destination was occupied and it has gone into abeyance.
-   * - `code === 0` means nothing about the `ITEM16` changed.
-   * - `code === 1` means the slot was attached or detached by this move.
-   * - `code > 1` comes only from `TeleportMonster`, which returns `groupIndex + 2`
-   *   for a fear-state-6 group so the caller can find its slot again
-   *   (`doc/CSBwin-src/Code11f52.cpp:2377-2384`).
+   * - 0: the group is on the square it was sent to, or the one a pit dropped it on,
+   *   and its `ITEM16` did not change.
+   * - 1: it is gone (a missile killed it on the way out, the fall killed it, the level
+   *   refused it, the square was taken and it went into abeyance); or it teleported;
+   *   or it left the party's level, or arrived on it from nowhere.
+   * - `LOCAL_14` > 1: `TeleportMonster`'s `groupIndex + 2` for a fear-state-6 group
+   *   (`:2377-2384`), or a teleport onto the party's level (1) plus the attach
+   *   (`LOCAL_14++`, `:3376`). Either way `ClearAttacking_DeleteMovementTimers` runs on
+   *   `d.Item16[LOCAL_14 - 2]` (`:3411-3413`) — slot 0 in the second case, a CSBWin
+   *   quirk kept as it is.
    */
   moveMonster(
     monsterRn: ObjectID,
@@ -499,39 +522,50 @@ export class MonsterSystem {
     newX: number,
     newY: number,
     level: number,
-  ): { removed: boolean; code: number } {
+  ): { code: number; position: Position } {
+    const requested = new Position(newX, newY, level);
     const monster = this.dungeon.getCreatureRecord(monsterRn);
-    if (!monster) return { removed: false, code: 0 };
+    if (!monster) return { code: 0, position: requested };
 
     const party = this.getPartyState().position;
     const partyLevel = party.z | 0;
     const fromDungeon = oldX >= 0;
     // "Proper level && oldX >= 0 means an ITEM16 exists"
-    // (doc/CSBwin-src/Code11f52.cpp:3122).
+    // (doc/CSBwin-src/Code11f52.cpp:2864).
     const item16Attached = level === partyLevel && fromDungeon;
     // `Levitating(objD7)` (`:2841`, `:2417-2437`): a flying monster.
     const desc = this.tables?.monsterDesc?.[monster.creatureType];
     const levitated = desc !== undefined && monsterLevitating(desc);
 
-    // A monster leaving a square may run into a missile sitting in it.
+    // A monster leaving a square may run into a missile sitting in it (`:2843-2849`).
     if (fromDungeon && level === partyLevel) {
       const hit = this.hooks?.checkMoveFromMissile?.(
         new Position(oldX, oldY, level),
-        new Position(newX, newY, level),
+        requested,
         monsterRn,
       );
-      if (hit) return { removed: true, code: 0 };
+      if (hit) return { code: 1, position: requested };
     }
 
     // Follow teleporters and fall down pits, exactly as the party does.
-    const resolved = this.hooks?.resolveMonsterDestination?.(
-      new Position(newX, newY, level),
-      monsterRn,
-    ) ?? { position: new Position(newX, newY, level), code: 0, audible: false };
+    const resolved = this.hooks?.resolveMonsterDestination?.(requested, monsterRn, oldX, oldY)
+      ?? { position: requested, code: 0, audible: false, groupDied: false };
 
     const destination = resolved.position;
     const destLevel = destination.z | 0;
     let code = resolved.code;
+
+    // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`).
+    // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
+    // default, `0 < 2`.
+    if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
+      this.hooks?.flushPendingDroppings?.(monster.creatureType, destLevel, destination.x, destination.y);
+      this.hooks?.dropMonsterRemains?.(
+        destLevel, destination.x, destination.y, monsterRn, 2, fromDungeon ? level : -1, true,
+      );
+      if (fromDungeon) this.hooks?.deleteMonster?.(level, oldX, oldY);
+      return { code: 1, position: destination };
+    }
 
     // Lift it off the square it leaves (`:3257-3296`).
     if (fromDungeon) {
@@ -554,16 +588,16 @@ export class MonsterSystem {
       if (fromDungeon) this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       if (item16Attached) this.detachItem16(monster.groupIndex);
       this.createMovementTimer(monsterRn, destination, resolved.audible);
-      return { removed: true, code: 0 };
+      return { code: 1, position: destination };
     }
 
-    // Crossing on or off the party's level attaches or detaches the slot.
+    // Crossing on or off the party's level detaches or attaches the slot (`:3364-3378`).
     if (item16Attached && destLevel !== partyLevel) {
       this.detachItem16(monster.groupIndex);
       code = 1;
     } else if (destLevel === partyLevel && !item16Attached) {
       this.attachItem16ToMonster(monsterRn, destination.x, destination.y);
-      code = 1;
+      code++;
     }
 
     // Set it down (`:3384-3399`): "Not current room. Room changed."
@@ -577,23 +611,13 @@ export class MonsterSystem {
 
     if (fromDungeon) {
       if (code > 1) {
-        // A teleported fear-6 group: stop it attacking and drop its old timers.
         this.clearAttackingAndDeleteMovementTimers(code - 2, oldX, oldY, level);
       } else if (code !== 0) {
         this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       }
     }
 
-    // Keep the slot's idea of where it is in step.
-    const slot = this.dungeon.getAttachedItem16(monster);
-    if (slot) {
-      slot.ubPrevX = slot.uByte10;
-      slot.ubPrevY = slot.uByte11;
-      slot.uByte10 = destination.x & 0xff;
-      slot.uByte11 = destination.y & 0xff;
-    }
-
-    return { removed: false, code };
+    return { code, position: destination };
   }
 
   /**
@@ -726,9 +750,11 @@ export class MonsterSystem {
    * can have at most two, a whole-cell monster at most one — CSBWin shows a message
    * box and carries on rather than refusing.
    *
-   * Placement is left to `moveMonster`, which is what attaches the `ITEM16`; if the
-   * destination turns out to be occupied the group goes straight into abeyance and
-   * this returns null.
+   * Placement is left to `moveMonster`, which is what attaches the `ITEM16`. This
+   * returns null whenever `MoveObject` returned non-zero (`Monster.cpp:222-231`): the
+   * destination was occupied and the group went into abeyance — or the group was
+   * placed on the party's level, where the attach alone makes the value 1. Only a
+   * group made on another level gets the teleport sound from here.
    */
   createMonster(options: {
     value: number;
@@ -800,8 +826,11 @@ export class MonsterSystem {
     }
     monster.groupIndex = positions & 0xff;
 
+    // `MoveObject` returns 1 for a group placed on the party's level, which the attach
+    // makes non-zero (`Code11f52.cpp:3376`), so that is `RNnul` too, with no sound: a
+    // generator queues its own when it is audible (`Timer.cpp:1797-1800`).
     const placed = this.moveMonster(rn, -1, 0, options.mapX, options.mapY, options.level);
-    if (placed.removed) return null;
+    if (placed.code !== 0) return null;
     this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
     return rn;
   }

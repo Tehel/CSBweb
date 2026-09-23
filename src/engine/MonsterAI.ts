@@ -1040,10 +1040,12 @@ export class MonsterAI {
     const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
     frame.bool36 = remaining <= 0;
     if (frame.bool36) {
+      // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
+      // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1711-1720`).
       const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
-      if (moved.removed) return true;
-      frame.timer.uByte6 = newX & 0xff;
-      frame.timer.uByte7 = newY & 0xff;
+      if (moved.code !== 0) return true;
+      frame.timer.uByte6 = moved.position.x & 0xff;
+      frame.timer.uByte7 = moved.position.y & 0xff;
       c.slot.ubPrevX = c.mapX & 0xff;
       c.slot.ubPrevY = c.mapY & 0xff;
       c.slot.uByte4 = this.deps.getTime() & 0xff;
@@ -1131,10 +1133,12 @@ export class MonsterAI {
       frame.sinceLastUpdate = -1;
       return true;
     }
+    // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
+    // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2105-2112`, `:2440-2449`).
     const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
-    if (moved.removed) return false;
-    frame.timer.uByte6 = newX & 0xff;
-    frame.timer.uByte7 = newY & 0xff;
+    if (moved.code !== 0) return false;
+    frame.timer.uByte6 = moved.position.x & 0xff;
+    frame.timer.uByte7 = moved.position.y & 0xff;
     c.slot.ubPrevX = c.mapX & 0xff;
     c.slot.ubPrevY = c.mapY & 0xff;
     c.slot.uByte4 = this.deps.getTime() & 0xff;
@@ -1296,13 +1300,15 @@ export class MonsterAI {
         const newX = mapX + (DELTA_X[direction] ?? 0);
         const newY = mapY + (DELTA_Y[direction] ?? 0);
         const moved = this.deps.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level);
-        this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.removed ? 1 : 0}`);
-        if (moved.removed) {
+        this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
+        if (moved.code !== 0) {
           this.trace('      MAI Skip monster AI because MoveObject non-zero');
           return blank();
         }
-        timer.uByte6 = newX & 0xff;
-        timer.uByte7 = newY & 0xff;
+        // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2908-2928`): a pit may have
+        // dropped the group a level, and only the square is re-aimed.
+        timer.uByte6 = moved.position.x & 0xff;
+        timer.uByte7 = moved.position.y & 0xff;
       } else {
         this.trace('      MAI  No attempt to move monster. Que 37 timer');
       }

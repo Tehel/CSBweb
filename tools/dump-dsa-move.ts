@@ -40,6 +40,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
+import { createMonsterAt } from './lib/createMonster';
 
 const RN_POISON_CLOUD = 0xff87;
 const RN_POISON_BOLT = 0xff86;
@@ -287,26 +288,33 @@ async function main(): Promise<void> {
 
   /* --------------------------------------------------------- 6-8. monsters ---- */
   {
-    /** A game with the party on level `a` and a group made on `level` at `at`. */
-    const withMonster = async (level: number, at: (g: Game) => Position): Promise<{
+    /**
+     * A game with the party on level `a` and a group made on `level` at `at`. Its type
+     * is allowed on both `a` and `b`: `MoveObject` deletes a group that ends on a level
+     * its type may not live on (`doc/CSBwin-src/Code11f52.cpp:3147-3176`).
+     */
+    const withMonster = async (level: number, at: (g: Game, z: number) => Position): Promise<{
       game: Game; party: number; other: number; rn: ObjectID; where: Position;
     }> => {
       const game = await makeGame();
       const dungeon = game.dungeonState;
-      const allowed = (z: number): number => {
-        for (let t = 0; t < 27; t++) if (dungeon.monsterAllowedOnLevel(t, z)) return t;
-        return -1;
-      };
-      const levels: number[] = [];
-      for (let z = 0; z < dungeon.getMapCount() && levels.length < 2; z++) if (allowed(z) >= 0) levels.push(z);
-      const [a, b] = levels as [number, number];
+      let pick: [number, number, number] | null = null;
+      for (let a = 0; a < dungeon.getMapCount() && !pick; a++) {
+        for (let b = a + 1; b < dungeon.getMapCount() && !pick; b++) {
+          for (let t = 0; t < 27 && !pick; t++) {
+            if (dungeon.monsterAllowedOnLevel(t, a) && dungeon.monsterAllowedOnLevel(t, b)) pick = [a, b, t];
+          }
+        }
+      }
+      if (!pick) throw new Error('no monster type is allowed on two levels');
+      const [a, b, type] = pick;
       const partySquare = findSquare(game, (p) => p.z === a && emptyOpen(game, p))!;
       game.party.state.position = partySquare;
       game.monsterSystem.loadPartyLevel(a);
       const z = level === 0 ? a : b;
-      const where = at(game);
-      const rn = game.monsterSystem.createMonster({
-        value: allowed(z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
+      const where = at(game, z);
+      const rn = createMonsterAt(game, {
+        value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
         mapX: where.x, mapY: where.y, level: z, invisible: false, drawAsSize4: false,
       });
       if (rn === null) throw new Error('createMonster failed');
@@ -320,7 +328,7 @@ async function main(): Promise<void> {
       && !(game.party.state.position.x === p.x && game.party.state.position.y === p.y && game.party.state.position.z === p.z))!;
 
     {
-      const { game, rn, where, party } = await withMonster(0, (g) => openOn(g, g.party.state.position.z, []));
+      const { game, rn, where, party } = await withMonster(0, (g, z) => openOn(g, z, []));
       const group = game.dungeonState.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const timersBefore = aiTimersAt(game, where);
@@ -334,7 +342,7 @@ async function main(): Promise<void> {
         'its AI timers follow it to the new square');
     }
     {
-      const { game, rn, where, other } = await withMonster(0, (g) => openOn(g, g.party.state.position.z, []));
+      const { game, rn, where, other } = await withMonster(0, (g, z) => openOn(g, z, []));
       const group = game.dungeonState.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const to = openOn(game, other, []);
@@ -344,14 +352,7 @@ async function main(): Promise<void> {
       check(group.groupIndex === 0xd8 || group.groupIndex === 0xff, 'groupIndex becomes 0xd8 / 0xff: it has no ITEM16 there');
     }
     {
-      const { game, rn, where, party } = await withMonster(1, (g) => {
-        const dungeon = g.dungeonState;
-        let b = -1;
-        for (let z = g.party.state.position.z + 1; z < dungeon.getMapCount() && b < 0; z++) {
-          for (let t = 0; t < 27; t++) if (dungeon.monsterAllowedOnLevel(t, z)) { b = z; break; }
-        }
-        return openOn(g, b, []);
-      });
+      const { game, rn, where, party } = await withMonster(1, (g, z) => openOn(g, z, []));
       const group = game.dungeonState.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const to = openOn(game, party, []);

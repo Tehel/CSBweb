@@ -373,8 +373,8 @@ export interface Item16Record {
     uByte7: ui8;                // +0x07: mapY of the square being approached
     ubPrevX: ui8;               // +0x08: previous mapX
     ubPrevY: ui8;               // +0x09: previous mapY
-    uByte10: ui8;               // +0x0A: current mapX
-    uByte11: ui8;               // +0x0B: current mapY
+    uByte10: ui8;               // +0x0A: mapX when attached (AttachItem16ToMonster only)
+    uByte11: ui8;               // +0x0B: mapY when attached (AttachItem16ToMonster only)
     singleMonsterStatus: ui8[]; // +0x0C: 4 bytes (attacking/mirror/offset nibbles)
 }
 

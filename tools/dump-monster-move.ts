@@ -2,8 +2,9 @@
  * Exercise the monster form of `MoveObject`.
  *
  * Four things need to hold when a group moves, and none of them are visible without
- * looking: the record leaves one cell and appears in the other; its `ITEM16` learns
- * the new square (and remembers the previous one); its AI timers stay behind at the
+ * looking: the record leaves one cell and appears in the other; its `ITEM16` keeps
+ * `uByte10`/`uByte11` and `ubPrevX`/`ubPrevY` — only `AttachItem16ToMonster` sets the
+ * first pair (`CSBCode.cpp:6088-6090`), the AI caller the second; its AI timers stay behind at the
  * square it left, since `MoveObject` never re-aims them; and a move onto an occupied square parks
  * the group on an abeyance timer instead of losing it — up to 31 of them per square, past
  * which an ordinary group is deleted.
@@ -92,6 +93,7 @@ async function main(): Promise<void> {
       isOpen(mx + ddx!, my + ddy!) && !monsterAt(mx + ddx!, my + ddy!))!;
     const nx = mx + dx!, ny = my + dy!;
     const rn = game.dungeonState.findFirstMonster(new Position(mx, my, level));
+    const [prevX, prevY] = [mover.slot.ubPrevX, mover.slot.ubPrevY];
 
     const timersBefore = game.timerQueue.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
@@ -99,7 +101,7 @@ async function main(): Promise<void> {
 
     console.log(`Case 1 — move a ${MonsterType[rec.creatureType]} from (${mx},${my}) to (${nx},${ny})`);
     const result = game.monsterSystem.moveMonster(rn, mx, my, nx, ny, level);
-    console.log(`  removed=${result.removed} code=${result.code}`);
+    console.log(`  code=${result.code}`);
 
     const timersAtOld = game.timerQueue.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
@@ -110,14 +112,15 @@ async function main(): Promise<void> {
     console.log(`  AI timers: (${mx},${my})=${timersAtOld} (${nx},${ny})=${timersAtNew} (was ${timersBefore})`);
     console.log(`  ITEM16 now at (${mover.slot.uByte10},${mover.slot.uByte11}), prev (${mover.slot.ubPrevX},${mover.slot.ubPrevY})`);
 
-    check(!result.removed, 'the move should have succeeded');
+    check(result.code === 0, 'the move should have succeeded');
     check(!monsterAt(mx, my), 'the old cell should no longer hold the creature');
     check(monsterAt(nx, ny), 'the new cell should hold the creature');
     // `MoveObject` does not re-aim them; the AI caller re-aims the one it is processing
     // (doc/CSBwin-src/Monster.cpp:2440), and only a DSA move re-aims the rest.
     check(timersAtOld === timersBefore && timersAtNew === 0, 'the AI timers should stay where they were');
-    check(mover.slot.uByte10 === nx && mover.slot.uByte11 === ny, 'ITEM16 should record the new square');
-    check(mover.slot.ubPrevX === mx && mover.slot.ubPrevY === my, 'ITEM16 should remember the old square');
+    check(mover.slot.uByte10 === mx && mover.slot.uByte11 === my,
+      "MoveObject leaves ITEM16's uByte10/11 alone (only AttachItem16ToMonster sets them)");
+    check(mover.slot.ubPrevX === prevX && mover.slot.ubPrevY === prevY, "MoveObject leaves ITEM16's ubPrevX/Y alone");
     console.log('');
   }
 
@@ -133,8 +136,8 @@ async function main(): Promise<void> {
       const result = game.monsterSystem.moveMonster(rn, ax, ay, bx, by, level);
       const abeyance = game.timerQueue.getTimers()
         .filter(t => t.function === TimerFunction.TT_60 || t.function === TimerFunction.TT_61);
-      console.log(`  removed=${result.removed}, abeyance timers: ${abeyance.length}`);
-      check(result.removed, 'the group should have been removed to abeyance');
+      console.log(`  code=${result.code}, abeyance timers: ${abeyance.length}`);
+      check(result.code === 1, 'the group should have been removed to abeyance');
       check(abeyance.length === 1, 'exactly one abeyance timer should exist');
       check(abeyance[0]?.object === rn, 'the abeyance timer should carry the monster');
       check(!monsterAt(ax, ay), 'the group should have left its old cell');

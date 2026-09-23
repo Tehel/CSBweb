@@ -202,7 +202,7 @@ async function main(): Promise<void> {
       const desc = objectTables.monsterDesc[rec.creatureType];
       if (!desc || monsterNonMaterial(desc)) continue;
       const result = game.monsterSystem.moveMonster(rn, x, y, door.x, door.y, level);
-      if (result.removed) continue;
+      if (result.code !== 0) continue;
       moved = { rn, type: rec.creatureType };
     }
   }

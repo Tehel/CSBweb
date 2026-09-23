@@ -431,6 +431,9 @@ export class MonsterDamage {
     apply: boolean,
     noItem16: boolean,
   ): MonsterDamageResult {
+    // `d.Word13046 = 0` (`doc/CSBwin-src/Code11f52.cpp:1333`): whatever an earlier call
+    // left for `TAG00b522` is forgotten.
+    this.pendingDroppings.length = 0;
     if (damage <= 0) return MonsterDamageResult.NO_MONSTER_DIED;
 
     let allDied = true;

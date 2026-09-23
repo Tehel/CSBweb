@@ -44,6 +44,7 @@ import {
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
+import { createMonsterAt } from './lib/createMonster';
 
 const WEAPON_FALCHION = 9;
 const EAST = 1;
@@ -168,7 +169,7 @@ function makeArena(members: number): Arena | null {
       if (!range) continue;
       game.party.state.position = range.party;
       game.monsterSystem.loadPartyLevel(level);
-      const rn = game.monsterSystem.createMonster({
+      const rn = createMonsterAt(game, {
         value: type, hitPointMultiplier: 1, numMonM1: members - 1, facing: 0,
         mapX: range.target.x, mapY: range.target.y, level, invisible: false, drawAsSize4: false,
       });
