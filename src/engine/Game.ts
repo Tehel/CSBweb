@@ -686,7 +686,17 @@ export class Game {
             return;
         }
 
-        const currentTime = Date.now();
+        this.runFrame(Date.now());
+
+        // Schedule next frame (60 FPS)
+        this.animationFrameId = setTimeout(this.gameLoop, 1000 / 60) as unknown as number;
+    };
+
+    /**
+     * One VBL of the loop: drain the movement queue, then run a game tick if one is due.
+     * Public so that `tools/` can step frames at chosen times.
+     */
+    runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
         this.processMovementQueue(currentTime);
 
@@ -701,10 +711,7 @@ export class Game {
             }
             this.lastTickTime = currentTime;
         }
-
-        // Schedule next frame (60 FPS)
-        this.animationFrameId = setTimeout(this.gameLoop, 1000 / 60) as unknown as number;
-    };
+    }
 
     /**
      * Process one game tick (~4 times per second)
