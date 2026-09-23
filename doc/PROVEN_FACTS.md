@@ -2945,3 +2945,20 @@ whether the party stands on the square on the loaded level; arriving, it is hard
 (`:3335-3358`), so a group that goes into abeyance has released its pad first.
 
 Evidence: `tools/dump-monster-pad.ts` sections 1-4, on a type-1 pad from `dungeon.dat`.
+
+## `WiggleEverything` moves each object with `MoveObject`, and walks a counted stretch of the chain
+
+When a teleporter switches on or a pit opens, `WiggleEverything` (`doc/CSBwin-src/Timer.cpp:2428`)
+moves the party, then the first monster, then every object of a type above `dbMONSTER`, each
+with `MoveObject(obj, x, y, x, y)` — so a cloud falls down the pit (it is not `Levitating`),
+a missile presses no pad, and `unchangedRoom` is "the party stands on that square" (see "A DSA
+cell move is two low-level `MoveObject`s"). The object loop starts at `FindFirstDrawableObject`
+(the first object of type `dbMONSTER` or above, `CSBCode.cpp:5140-5149`), counts the objects
+above `dbMONSTER` from there (`Timer.cpp:2451-2460`), and then walks that many links, reading
+each one's successor before moving it (`:2461-2466`). The count stops an object moved back
+into the same cell from being moved twice; it also means that a monster still in the chain
+uses up one step, so the last object is not moved. A moved missile's timer gets `d.NewX`,
+`d.NewY`, `d.NewDir` in `timerWord8`, keeping bits 12-15, the ID with `d.NewPos`, and
+`d.NewLevel` (`:2474-2489`).
+
+Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario).

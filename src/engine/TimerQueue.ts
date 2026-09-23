@@ -299,12 +299,6 @@ export class TimerQueue {
     return entry ? entry.timerWord8 & 0xffff : null;
   }
 
-  setTimerWord8(index: number, value: number): void {
-    const entry = this.indexMap.get(index);
-    if (!entry) return;
-    entry.timerWord8 = value & 0xffff;
-  }
-
   /**
    * `TIMER_SEARCH::AdjustTimerPriority` (`doc/CSBwin-src/Code11f52.cpp:1194`).
    *

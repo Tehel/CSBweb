@@ -53,6 +53,7 @@ const CHECKS = [
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-teleporter-drop.ts' },
   { tool: 'dump-wiggle-cloud.ts' },
+  { tool: 'dump-wiggle-objects.ts' },
   { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-local-action.ts' },
   { tool: 'dump-does-party-have.ts' },

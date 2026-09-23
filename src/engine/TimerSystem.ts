@@ -2768,10 +2768,6 @@ export class TimerSystem {
     return this.timers.getTimerWord8(missile.timerIndex);
   }
 
-  private setMissileTimerWord8(missile: { timerIndex: number }, word8: number): void {
-    this.timers.setTimerWord8(missile.timerIndex, word8);
-  }
-
   private decodeMissileTimerWord8(word8: number): { x: number; y: number; dir: number; deltaEnergy: number } {
     return {
       x: word8 & 0x1f,
@@ -2797,15 +2793,54 @@ export class TimerSystem {
       this.wiggleMonster(monster, position);
     }
 
-    const objects: number[] = [];
-    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
-      if (decoded.category <= DBType.CREATURE) continue;
-      objects.push(rn);
+    // `FindFirstDrawableObject` (`doc/CSBwin-src/CSBCode.cpp:5140`), then count what
+    // lies beyond a monster: that many links are walked, whatever they hold, so an
+    // object moved back into this cell is not moved twice (`Timer.cpp:2451-2465`).
+    let first = this.dungeon.findFirstObject(position);
+    while (first !== OBJECT_ID_EOF && decodeObjectID(first).category < DBType.CREATURE) {
+      first = this.dungeon.getDBRecordLink(first);
     }
-
-    for (const rn of objects) {
-      this.wiggleObject(rn, position);
+    let count = 0;
+    for (let rn = first; rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category > DBType.CREATURE) count++;
+    }
+    for (let rn = first, next = first; rn !== OBJECT_ID_EOF && count !== 0; rn = next) {
+      count--;
+      next = this.dungeon.getDBRecordLink(rn);
+      const type = decodeObjectID(rn).category;
+      if (type <= DBType.CREATURE) continue;
+      // `MoveObject(objD4, mapX, mapY, mapX, mapY)`: `placed` / `position` are
+      // `d.NewPos` / `d.NewX`, `d.NewY`, `d.NewLevel`, or null when the object stayed.
+      const moved = this.moveObject(rn as ObjectID, mapX, mapY, mapX, mapY, level);
+      if (moved.placed === null || moved.position === null) continue;
+      const to = moved.position;
+      if (type === DBType.MISSILE) {
+        // Its timer's square and direction in `timerWord8`, the placed ID, the level
+        // (`:2474-2489`).
+        const missile = this.dungeon.getMissileRecord(moved.placed);
+        const timer = missile ? this.timers.getTimer(missile.timerIndex) : null;
+        if (timer) {
+          timer.timerWord8 = (timer.timerWord8 & 0xf000) | (to.x & 0x1f) | ((to.y & 0x1f) << 5)
+            | (((moved.newDir ?? 0) & 0x3) << 10);
+          timer.object = moved.placed;
+          timer.uByte6 = to.x & 0xff;
+          timer.uByte7 = to.y & 0xff;
+          timer.level = to.z & 0xff;
+        }
+      } else if (type === DBType.CLOUD) {
+        // Every `TT_25` / `TT_24` naming the cloud follows it (`:2491-2510`). CSBWin's
+        // `RN` compare ignores the corner, which lives in the indirect index; here it
+        // is part of the ID, so the timer is handed the placed ID outright.
+        for (const entry of this.timers.getTimers()) {
+          if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
+          if (entry.object === undefined
+            || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(rn as ObjectID, 0)) continue;
+          entry.uByte6 = to.x & 0xff;
+          entry.uByte7 = to.y & 0xff;
+          entry.object = moved.placed;
+          entry.level = to.z & 0xff;
+        }
+      }
     }
   }
 
@@ -2880,7 +2915,8 @@ export class TimerSystem {
    *
    * Returns CSBWin's `1` as `removed` when `CheckMoveFromMissile` destroyed the group,
    * and otherwise the ID as it was placed and where, or `null` for a lift or an
-   * unchanged room (`:3180-3215`).
+   * unchanged room (`:3180-3215`). For a missile, `newDir` is `d.NewDir`: its timer's
+   * direction as `TeleportMissile` left it (`:2878-2884`, `:2392-2411`).
    */
   moveObject(
     object: ObjectID,
@@ -2889,7 +2925,7 @@ export class TimerSystem {
     newX: number,
     newY: number,
     level: number,
-  ): { removed: boolean; placed: ObjectID | null; position: Position | null } {
+  ): { removed: boolean; placed: ObjectID | null; position: Position | null; newDir?: number } {
     const decoded = decodeObjectID(object);
     const type = decoded.category;
     if (type === DBType.CREATURE && newX >= 0) {
@@ -2910,6 +2946,7 @@ export class TimerSystem {
 
     let moved = object;
     let destination: Position | null = null;
+    let newDir: number | undefined;
     if (newX >= 0) {
       let missileDir: number | undefined;
       if (type === DBType.MISSILE) {
@@ -2921,6 +2958,7 @@ export class TimerSystem {
         new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated,
       );
       destination = result.position;
+      newDir = result.missileDir;
       const corner = (type !== DBType.MISSILE && oldX === -1 ? decoded.position : result.objectPos) & 0x3;
       moved = encodeObjectID(corner, type, decoded.index) as ObjectID;
       const unchangedRoom = destination.z === level && destination.x === oldX && destination.y === oldY;
@@ -2942,7 +2980,7 @@ export class TimerSystem {
         destination, moved, true, partyOn(destination.x, destination.y, destination.z), party.facing,
       );
     }
-    return { removed: false, placed: moved, position: destination };
+    return { removed: false, placed: moved, position: destination, newDir };
   }
 
   /**
@@ -3056,58 +3094,6 @@ export class TimerSystem {
     const unchanged = this.isSamePosition(oldPos, result.position);
     this.actuators.triggerObjectMove(oldPos, monsterRn, false, unchanged, result.facing);
     this.actuators.triggerObjectMove(result.position, newRn, true, unchanged, result.facing);
-  }
-
-  private wiggleObject(rn: number, position: Position): void {
-    const decoded = decodeObjectID(rn);
-    const posInCell = decoded.position & 0x3;
-    const partyFacing = this.getPartyState().facing;
-
-    let missileDir: number | undefined;
-    let deltaEnergy = 0;
-    let missile: MissileRecord | null = null;
-
-    if (decoded.category === DBType.MISSILE) {
-      missile = this.dungeon.getMissileRecord(rn);
-      if (!missile) return;
-      const word8 = this.getMissileTimerWord8(missile);
-      if (word8 === null) return;
-      const decodedWord = this.decodeMissileTimerWord8(word8);
-      missileDir = decodedWord.dir;
-      deltaEnergy = decodedWord.deltaEnergy;
-    }
-
-    const canFall = decoded.category !== DBType.MISSILE && decoded.category !== DBType.CLOUD;
-    const result = this.resolveCellEffects(position, decoded.category, posInCell, partyFacing, missileDir, canFall);
-    if (!result.moved) return;
-
-    const oldPos = new Position(position.x, position.y, position.z);
-    const newRn = encodeObjectID(result.objectPos & 0x3, decoded.category, decoded.index);
-    this.dungeon.removeObjectFromCell(oldPos, rn);
-    this.dungeon.addObjectToCell(result.position, newRn);
-
-    const unchanged = this.isSamePosition(oldPos, result.position);
-    this.actuators.triggerObjectMove(oldPos, rn, false, unchanged, partyFacing);
-    this.actuators.triggerObjectMove(result.position, newRn, true, unchanged, partyFacing);
-
-    if (decoded.category === DBType.MISSILE) {
-      const dir = result.missileDir ?? missileDir ?? 0;
-      const updatedWord8 = this.encodeMissileTimerWord8(result.position.x, result.position.y, dir, deltaEnergy);
-      if (missile) this.setMissileTimerWord8(missile, updatedWord8);
-      this.updateMissileTimerEntry(rn, newRn, result.position);
-    } else if (decoded.category === DBType.CLOUD) {
-      // Every `TT_25` / `TT_24` naming the cloud follows it (`Timer.cpp:2491-2510`).
-      // CSBWin's `RN` compare ignores the corner, which lives in the indirect index;
-      // here it is part of the ID, so the timer is handed the placed ID outright.
-      for (const entry of this.timers.getTimers()) {
-        if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
-        if (entry.object === undefined || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(rn as ObjectID, 0)) continue;
-        entry.uByte6 = result.position.x & 0xff;
-        entry.uByte7 = result.position.y & 0xff;
-        entry.object = newRn;
-        entry.level = result.position.z & 0xff;
-      }
-    }
   }
 
   private resolveCellEffects(
@@ -3337,16 +3323,6 @@ export class TimerSystem {
     const desc = this.tables?.monsterDesc?.[rec.creatureType];
     if (!desc) return false;
     return monsterLevitating(desc);
-  }
-
-  private updateMissileTimerEntry(oldRn: number, newRn: number, position: Position): void {
-    const missile = this.dungeon.getMissileRecord(newRn);
-    const entry = missile ? this.timers.getTimer(missile.timerIndex) : null;
-    if (!entry) return;
-    if (entry.object !== oldRn) entry.object = newRn;
-    entry.uByte6 = position.x & 0xff;
-    entry.uByte7 = position.y & 0xff;
-    entry.level = position.z & 0xff;
   }
 
   private isSamePosition(a: Position, b: Position): boolean {
