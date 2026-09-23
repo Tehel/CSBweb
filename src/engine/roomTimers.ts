@@ -7,4 +7,9 @@
  * (`UITables.graphic232.byte1596`) and passed in via `roomTimerFunctions`; this literal is
  * only used when the tables have not been wired yet.
  */
-export const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
+const DEFAULT_ROOM_TIMER_FUNCTIONS = [6, 5, 9, 0, 10, 8, 7, 0];
+
+/** `d.Byte1596[roomType]`, from the extracted table when there is one. */
+export function roomTimerFunction(table: ArrayLike<number> | null, roomType: number): number {
+  return (table ?? DEFAULT_ROOM_TIMER_FUNCTIONS)[roomType] ?? 0;
+}

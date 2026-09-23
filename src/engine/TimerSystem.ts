@@ -1139,14 +1139,14 @@ export class TimerSystem {
     decayRate: number,
     startTime: number,
   ): boolean {
-    if (!this.isValidLocation(launchLocation.position)) return false;
+    if (!this.dungeon.isValidLocation(launchLocation.position.z, launchLocation.position.x, launchLocation.position.y)) return false;
 
     const missileTypeWord = missileType & 0xffff;
     let projectileObject = OBJECT_ID_EOF;
 
     if (missileTypeWord === 0) {
       if (!objectLocation) return false;
-      if (!this.isValidLocation(objectLocation.position)) return false;
+      if (!this.dungeon.isValidLocation(objectLocation.position.z, objectLocation.position.x, objectLocation.position.y)) return false;
       for (
         let rn = this.dungeon.findFirstObject(objectLocation.position);
         rn !== OBJECT_ID_EOF;
@@ -3182,14 +3182,6 @@ export class TimerSystem {
     entry.uByte6 = position.x & 0xff;
     entry.uByte7 = position.y & 0xff;
     entry.level = position.z & 0xff;
-  }
-
-  private isValidLocation(position: Position): boolean {
-    const map = this.dungeon.getMap(position.z);
-    if (!map) return false;
-    if (position.x < 0 || position.y < 0) return false;
-    if (position.x >= map.descriptor.width || position.y >= map.descriptor.height) return false;
-    return true;
   }
 
   private isSamePosition(a: Position, b: Position): boolean {

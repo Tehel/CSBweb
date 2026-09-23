@@ -637,6 +637,18 @@ export class DungeonState {
         return false;
     }
 
+    /**
+     * `LOCATIONREL::IsValid` (doc/CSBwin-src/DSA.cpp:310) — a level that exists and a
+     * cell inside its bounds.
+     */
+    isValidLocation(level: number, x: number, y: number): boolean {
+        const map = this.getMap(level);
+        if (!map) return false;
+        if (x < 0 || y < 0) return false;
+        if (x >= map.descriptor.width || y >= map.descriptor.height) return false;
+        return true;
+    }
+
     getTextRecord(rn: ObjectID): TextRecord | null {
         const { category, index } = decodeObjectID(rn);
         if (category !== DBType.TEXT) return null;

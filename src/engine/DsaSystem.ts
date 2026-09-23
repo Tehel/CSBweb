@@ -29,7 +29,7 @@ import {
 import type { DungeonState, TextDecodeTables } from './DungeonState';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
-import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
+import { roomTimerFunction } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
 import type { CsbRandom } from '../core/random';
@@ -474,7 +474,7 @@ export class DsaSystem {
     const special = this.dungeon.getSpecialLocation(MISSILE_ENCOUNTER_FILTER_KEY);
     if (special === null) return 0;
     const locrFilter = intToLocation(special);
-    if (!this.isValidLocation(locrFilter)) return 0;
+    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return 0;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const dsaActuator = this.findFirstDsaActuator(filterPos);
     if (dsaActuator === OBJECT_ID_EOF) return 0;
@@ -519,7 +519,7 @@ export class DsaSystem {
     const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
     if (special === null) return null;
     const locrFilter = intToLocation(special);
-    if (!this.isValidLocation(locrFilter)) return null;
+    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const dsaActuator = this.findFirstDsaActuator(filterPos);
     if (dsaActuator === OBJECT_ID_EOF) return null;
@@ -574,7 +574,7 @@ export class DsaSystem {
     const special = this.dungeon.getSpecialLocation(ADJUST_SKILLS_FILTER_KEY);
     if (special === null) return null;
     const locrFilter = intToLocation(special);
-    if (!this.isValidLocation(locrFilter)) return null;
+    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
 
     const timer: TimerEntry = {
@@ -637,7 +637,7 @@ export class DsaSystem {
     const special = this.dungeon.getSpecialLocation(PARTY_ATTACK_FILTER_KEY);
     if (special === null) return null;
     const locrFilter = intToLocation(special);
-    if (!this.isValidLocation(locrFilter)) return null;
+    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
     const position = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
@@ -692,7 +692,7 @@ export class DsaSystem {
     const location = this.dungeon.getSpellFilterLocation();
     if ((location & 0x80000000) === 0) return null;
     const locrFilter = intToLocation(location & 0x7fffffff);
-    if (!this.isValidLocation(locrFilter)) return null;
+    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
 
     const timer: TimerEntry = {
@@ -1216,7 +1216,7 @@ export class DsaSystem {
             const location = bank.stack.pop();
             let depth = bank.stack.pop();
             const locr = intToLocation(location);
-            if (!this.isValidLocation(locr)) {
+            if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
               bank.stack.push(-1);
               break;
             }
@@ -1329,7 +1329,7 @@ export class DsaSystem {
           break;
         }
         const locr = intToLocation(location);
-        if (!this.isValidLocation(locr)) {
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
           console.warn('Illegal location in DSA &DEL');
           break;
         }
@@ -1357,7 +1357,7 @@ export class DsaSystem {
         if (cloned === null) break;
         if (location >= 0) {
           const locr = intToLocation(location);
-          if (!this.isValidLocation(locr)) break;
+          if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
@@ -1407,7 +1407,7 @@ export class DsaSystem {
         const value = bank.stack.pop();
         const loc = bank.stack.pop();
         const locr = intToLocation(loc);
-        if (!this.isValidLocation(locr)) break;
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1420,7 +1420,7 @@ export class DsaSystem {
         const location = bank.stack.pop();
         const delay = bank.stack.pop();
         const locr = intToLocation(location);
-        if (!this.isValidLocation(locr)) break;
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1451,7 +1451,7 @@ export class DsaSystem {
       case StkOp.I_TELEPORT_PARTY: {
         const location = bank.stack.pop();
         const locr = intToLocation(location);
-        if (!this.isValidLocation(locr)) break;
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
         if (this.teleportPartyHandler) {
           this.teleportPartyHandler(locr);
         } else if (!this.warnedOps.has(subcode)) {
@@ -1619,7 +1619,7 @@ export class DsaSystem {
       case StkOp.GENERATOR_DELAY_FETCH: {
         const loc = bank.stack.pop();
         const locr = intToLocation(loc);
-        if (!this.isValidLocation(locr)) {
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
           bank.stack.push(-1);
           break;
         }
@@ -1702,7 +1702,7 @@ export class DsaSystem {
         }
         const loc = bank.stack.pop();
         const locr = intToLocation(loc);
-        if (!this.isValidLocation(locr)) break;
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1778,7 +1778,7 @@ export class DsaSystem {
         const arrayIndex = bank.stack.pop();
         const loc = bank.stack.pop();
         const locr = intToLocation(loc);
-        if (!this.isValidLocation(locr)) break;
+        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
@@ -2009,7 +2009,7 @@ export class DsaSystem {
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
-      const mapping = this.getRoomTimerFunction(roomType);
+      const mapping = roomTimerFunction(this.roomTimerFunctions, roomType);
       if (mapping === 0) {
         console.warn('Illegal DSA timer target', { level: locr.l, x: locr.x, y: locr.y });
         return;
@@ -2020,11 +2020,6 @@ export class DsaSystem {
     }
 
     this.timers.createTimer(functionType, locr.x, locr.y, locr.p, action, actionTime, locr.l);
-  }
-
-  private getRoomTimerFunction(roomType: number): number {
-    const table = this.roomTimerFunctions ?? DEFAULT_ROOM_TIMER_FUNCTIONS;
-    return table[roomType] ?? 0;
   }
 
   private loadParameter(where: number, rnMaster: number): number {
@@ -2162,7 +2157,7 @@ export class DsaSystem {
     }
     if (locrInt < 0) return;
     const locr = intToLocation(locrInt);
-    if (!this.isValidLocation(locr)) return;
+    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) return;
     const record = this.findTextRecordAtLocation(locr);
     if (!record) return;
     const text = this.dungeon.decodeTextString(record, 0x8001, ctx.textTables);
@@ -2273,7 +2268,7 @@ export class DsaSystem {
   private canAddToLocation(location: number): boolean {
     if (location >= 0) {
       const locr = intToLocation(location);
-      return this.isValidLocation(locr);
+      return this.dungeon.isValidLocation(locr.l, locr.x, locr.y);
     }
     const party = this.getPartyState?.();
     if (!party) return false;
@@ -2548,7 +2543,7 @@ export class DsaSystem {
     doit: boolean,
   ): { error: number; object: number } {
     const locr = intToLocation(srcLoc);
-    if (!this.isValidLocation(locr)) {
+    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
       return { error: DsaMoveError.SER_InvalidCellLocation, object: OBJECT_ID_EOF };
     }
     let positionMask = srcPosMsk;
@@ -2704,7 +2699,7 @@ export class DsaSystem {
   ): number {
     void dstObjMsk;
     const locr = intToLocation(dstLoc);
-    if (!this.isValidLocation(locr)) return DsaMoveError.DER_InvalidCellLocation;
+    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) return DsaMoveError.DER_InvalidCellLocation;
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     const pos = this.choosePositionFromMask(dstPosMsk, locr.p & 3);
     if (doit) {
@@ -2904,14 +2899,6 @@ export class DsaSystem {
         break;
     }
     return category * 10000 + id;
-  }
-
-  private isValidLocation(locr: DsaLocation): boolean {
-    const map = this.dungeon.getMap(locr.l);
-    if (!map) return false;
-    if (locr.x < 0 || locr.y < 0) return false;
-    if (locr.x >= map.descriptor.width || locr.y >= map.descriptor.height) return false;
-    return true;
   }
 
   private getActuator(rn: number): ActuatorRecord | null {

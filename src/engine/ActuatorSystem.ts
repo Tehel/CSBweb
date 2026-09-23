@@ -36,7 +36,7 @@ import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
 import type { MonsterDesc, WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import type { CsbRandom } from '../core/random';
-import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
+import { roomTimerFunction } from './roomTimers';
 import {
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
@@ -602,7 +602,7 @@ export class ActuatorSystem {
       ? getActuatorTargetPos(actuator)
       : 0;
 
-    const timerFunction = this.getRoomTimerFunction(targetRoomType);
+    const timerFunction = roomTimerFunction(this.roomTimerFunctions, targetRoomType);
     if (timerFunction === 0) {
       console.warn('Illegal actuator timer target', {
         source,
@@ -625,11 +625,6 @@ export class ActuatorSystem {
       });
     }
     this.timers.createTimer(timerFunction, targetX, targetY, targetPos, action, actionTime, source.z);
-  }
-
-  private getRoomTimerFunction(roomType: number): number {
-    const table = this.roomTimerFunctions ?? DEFAULT_ROOM_TIMER_FUNCTIONS;
-    return table[roomType] ?? 0;
   }
 
   private scanObjectMoveContext(
