@@ -2689,3 +2689,12 @@ placed `RN` at `d.NewPos` and `d.NewLevel` (`:2476-2489`); for a cloud, a `TIMER
 `!=`, which ignores the corner (`CSBTypes.h:349-356`); nothing checks the level. A cloud
 cannot fall, so in practice this is a teleporter's doing. Evidence:
 `tools/dump-wiggle-cloud.ts`.
+
+## A Fluxcage lasts 100 ticks, and its `TT_24` names the cage in bytes 8-9
+
+`CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515-1539`) takes a DB15 slot, adds it to the
+square at `RNempty` (centred), sets `CT_FLUXCAGE`, and queues a `TT_24` at `d.Time + 100` on
+`d.LoadedLevel` with `timerObj8()` = the cage and `uByte6/7` = the square. `TT_24`
+(`CSBCode.cpp:6494-6510`) does nothing once `d.Word11694` (game won) is set; otherwise it
+`RemoveObjectFromRoom(timerObj8(), uByte6, uByte7)` and frees the record by writing -1 to its
+link. Evidence: `tools/dump-clouds.ts` section 6.

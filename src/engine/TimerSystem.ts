@@ -2340,7 +2340,9 @@ export class TimerSystem {
    */
   private processExpireObject(timer: TimerEntry): void {
     if (this.hooks?.isGameWon?.()) return;
-    const rn = timer.timerWord8 & 0xffff;
+    // `timeEnt.timerObj8()`: the object, which this port keeps on `object`, as every
+    // creator of a `TT_24` / `TT_25` puts it there (`CreateFluxcage`, Code11f52.cpp:1535).
+    const rn = timer.object ?? OBJECT_ID_EOF;
     if (rn === OBJECT_ID_EOF || rn === OBJECT_ID_NULL) return;
     const position = new Position(timer.uByte6 & 0xff, timer.uByte7 & 0xff, timer.level & 0xff);
     this.dungeon.removeObjectFromCell(position, rn);

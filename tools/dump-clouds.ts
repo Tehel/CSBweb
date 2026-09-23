@@ -319,6 +319,31 @@ async function main(): Promise<void> {
     }
   }
 
+  /* ------------------------------------------- 6. a Fluxcage runs out ---------- */
+
+  // `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515-1539`) queues a `TT_24` at
+  // `d.Time + 100` whose `timerObj8()` is the cage; `TT_24` (`CSBCode.cpp:6494-6510`)
+  // takes that object out of its square and frees its record. The port used to read the
+  // object off `timerWord8`, which a live cage's timer leaves at 0 — so the cage stayed,
+  // and `DeleteDBEntry(0)` freed door record 0, cutting its cell's chain.
+  console.log('');
+  console.log('=== a Fluxcage runs out ===');
+  const gameX = await makeGame();
+  const dungeonX = gameX.dungeonState;
+  const door0 = dungeonX.getDoorRecordByIndex(0);
+  const door0Link = door0?.nextObject;
+  const cage = gameX.timerSystem.createFluxcage(at, 0);
+  check(cage !== null && cloudIn(gameX, at) === cage, 'the cage stands in the cell');
+  for (let t = 1; t <= 99; t++) gameX.timerSystem.processTimers(t);
+  check(cloudIn(gameX, at) === cage, 'it is still there at tick 99');
+  gameX.timerSystem.processTimers(100);
+  check(cloudIn(gameX, at) === null, 'it leaves the cell at tick 100');
+  const cageRec = cage === null ? null : dungeonX.getCloudRecord(cage);
+  check(cageRec !== null && cageRec.nextObject === OBJECT_ID_NULL,
+    `its record is freed (link 0x${(cageRec?.nextObject ?? -1).toString(16)})`);
+  check(door0?.nextObject === door0Link,
+    `door record 0 is untouched (link 0x${(door0Link ?? -1).toString(16)} -> 0x${(door0?.nextObject ?? -1).toString(16)})`);
+
   console.log('');
   finish();
 }

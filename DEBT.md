@@ -82,6 +82,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
 | C16 | Freed database slots are never reused | M | ⏳ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
+| C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -531,7 +532,7 @@ allocator through it.
 **Paid in `COMMIT_C17`.** `TimerSystem.wiggleObject` now retargets every `TT_25` / `TT_24`
 naming a moved cloud (corner ignored, as CSBWin's `RN` compare does) to the new square,
 level and placed ID (`Timer.cpp:2491-2510`). Evidence: `tools/dump-wiggle-cloud.ts` (2 of 12
-checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
+checks fail before); the fact is in `doc/PROVEN_FACTS.md`. Found on the way: C18.
 
 <details><summary>original entry</summary>
 
@@ -545,6 +546,17 @@ corner) and frees a record still linked in the new cell. The C8 cloud fix in `Ds
 findCellDestination` is the pattern.
 
 </details>
+
+### C18 ✅ A Fluxcage never expires, and frees door record 0
+
+**Paid in `COMMIT_C18`.** Found while paying C17. `CreateFluxcage` puts the cage in the
+`TT_24`'s `timerObj8()` (`Code11f52.cpp:1535`) and `TT_24` removes and frees that object
+(`CSBCode.cpp:6494-6510`). `TimerSystem.createFluxcage` put it on `TimerEntry.object`, as
+every `TT_25` does, but `processExpireObject` read `timerWord8` — 0 on a live timer — so the
+cage stood forever and `DeleteDBEntry(0)` freed door record 0, cutting that cell's chain
+after the door. Only a cage restored from a save worked: `restoreTimerQueue` fills both.
+`processExpireObject` reads `object` now. Evidence: `tools/dump-clouds.ts` section 6 (3 of
+27 checks fail before).
 
 ---
 
