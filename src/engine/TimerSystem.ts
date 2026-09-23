@@ -9,6 +9,7 @@ const SOUND_DOOR_OPENING = 18;
 /** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
 const SOUND_DOOR_STRUGGLE = 4;
 import type { CsbRandom } from '../core/random';
+import { sw } from '../core/intCast';
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
@@ -68,9 +69,6 @@ import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { CloudType } from './cloudTypes';
 import { setPartyFacing } from './Party';
-
-/** Sign-extend to 16 bits, as CSBWin's `sw()` does on every intermediate. */
-const sw = (v: number): number => (v << 16) >> 16;
 
 
 const WEAPON_DAGGER = 8;
@@ -430,14 +428,14 @@ export class TimerSystem {
     if (idx >= word1074.length) idx = word1074.length - 1;
     const delta = (word1074[idx] ?? 0) * (sign >= 0 ? 1 : -1);
     const party = this.getPartyState();
-    party.brightness = normalizeWord6((party.brightness ?? 0) + delta);
+    party.brightness = sw((party.brightness ?? 0) + delta);
   }
 
   private processLightLevelTimer(timer: TimerEntry): void {
     const word1074 = this.tables?.word1074;
     if (!word1074 || word1074.length < 2) return;
 
-    let steps = normalizeWord6(timer.timerWord6);
+    let steps = sw(timer.timerWord6);
     if (steps === 0) return;
 
     const negative = steps < 0;
@@ -452,7 +450,7 @@ export class TimerSystem {
 
     const party = this.getPartyState();
     const current = party.brightness ?? 0;
-    party.brightness = normalizeWord6(current + change);
+    party.brightness = sw(current + change);
 
     if (newSteps !== 0) {
       const nextSteps = negative ? -newSteps : newSteps;
@@ -486,7 +484,7 @@ export class TimerSystem {
   private processPartyShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
     const current = party.partyShield ?? 0;
-    const next = current - normalizeWord6(timer.timerWord6);
+    const next = current - sw(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
   }
 
@@ -498,7 +496,7 @@ export class TimerSystem {
     const champ = this.getPartyState().champions[timer.uByte5 & 0xff];
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
-    champ.shieldStrength = ((champ.shieldStrength ?? 0) - normalizeWord6(timer.timerWord6)) & 0xffff;
+    champ.shieldStrength = ((champ.shieldStrength ?? 0) - sw(timer.timerWord6)) & 0xffff;
   }
 
   /**
@@ -533,7 +531,7 @@ export class TimerSystem {
     const champ = this.getPartyState().champions[chIdx];
     if (!champ) return;
     champ.poisonCount = Math.max(0, (champ.poisonCount ?? 0) - 1);
-    this.hooks?.onPoisonTick?.(chIdx, normalizeWord6(timer.timerWord6));
+    this.hooks?.onPoisonTick?.(chIdx, sw(timer.timerWord6));
   }
 
   /**
@@ -576,14 +574,14 @@ export class TimerSystem {
   private processSpellShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
     const current = party.spellShield ?? 0;
-    const next = current - normalizeWord6(timer.timerWord6);
+    const next = current - sw(timer.timerWord6);
     party.spellShield = next < 0 ? 0 : next;
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
     const current = party.fireShield ?? 0;
-    const next = current - normalizeWord6(timer.timerWord6);
+    const next = current - sw(timer.timerWord6);
     party.fireShield = next < 0 ? 0 : next;
   }
 
@@ -3316,8 +3314,4 @@ export class TimerSystem {
   }
 
 
-}
-
-function normalizeWord6(value: number): number {
-  return (value << 16) >> 16;
 }

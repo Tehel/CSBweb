@@ -106,10 +106,6 @@ export function isBaseObjectNameIndex(ui: UIState, objectId: number, min: number
   return base >= min && base <= max;
 }
 
-export function normalizeWord6(value: number): number {
-  return (value << 16) >> 16;
-}
-
 export function getObjectName(ui: UIState, objectNameIndex: number): string {
   const names = ui.objectTables?.objectNames ?? [];
   if (objectNameIndex >= 0 && objectNameIndex < names.length) {

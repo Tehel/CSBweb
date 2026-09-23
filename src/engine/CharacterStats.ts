@@ -19,6 +19,7 @@
  * spread across the UI and the engine can. Recorded in PLAN.md.
  */
 import type { CsbRandom } from '../core/random';
+import { sw } from '../core/intCast';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type { DungeonState } from './DungeonState';
 import type { Champion } from './gameTypes';
@@ -63,8 +64,6 @@ export interface CharacterStatsDeps {
 
 /** C's integer division: truncate toward zero, not toward negative infinity. */
 const div = (a: number, b: number): number => Math.trunc(a / b);
-/** `sw()` — signed 16-bit truncation, which CSBWin applies to every intermediate. */
-const sw = (v: number): number => (v << 16) >> 16;
 /** `ApplyLimits(min, value, max)`. */
 const applyLimits = (min: number, value: number, max: number): number =>
   Math.min(max, Math.max(min, value));

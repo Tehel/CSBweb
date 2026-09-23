@@ -41,6 +41,7 @@ import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from '.
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
+import { sw } from '../core/intCast';
 import { GetBasicObjectType, NameIndex } from './objectIndex';
 
 import {
@@ -1392,13 +1393,13 @@ export class Game {
     }
 
     setBrightness(value: number): void {
-        this.party.state.brightness = normalizeWord6(value);
+        this.party.state.brightness = sw(value);
         this.state.party = this.party.state;
     }
 
     adjustBrightness(delta: number): void {
         const current = this.party.state.brightness ?? 0;
-        this.party.state.brightness = normalizeWord6(current + delta);
+        this.party.state.brightness = sw(current + delta);
         this.state.party = this.party.state;
     }
 
@@ -1516,7 +1517,7 @@ export class Game {
             // `ApplyLimits(1, (MaxStamina>>8)-1, 6)`
             let local4 = Math.min(6, Math.max(1, ((attrs.maxStamina | 0) >> 8) - 1));
             if (sleeping) local4 <<= 1;
-            const sinceMove = ((time - this.footprints.getLastPartyMoveTime()) << 16) >> 16;
+            const sinceMove = sw(time - this.footprints.getLastPartyMoveTime());
             if (sinceMove > 80) {
                 local4++;
                 if (sinceMove > 250) local4++;
@@ -2934,7 +2935,7 @@ export class Game {
                 uByte9: entry.uByte9 & 0xff,
                 sequence: entry.sequence & 0xffff,
                 timerWord8: entry.timerWord8 & 0xffff,
-                timerWord6: normalizeWord6(entry.timerWord6),
+                timerWord6: sw(entry.timerWord6),
             }, entry.object);
         }
         return { records, queue: entries.map((entry) => entry.index) };
@@ -2973,16 +2974,12 @@ export class Game {
                 uByte9: record.uByte9 & 0xff,
                 sequence: record.sequence & 0xffff,
                 timerWord8: record.timerWord8 & 0xffff,
-                timerWord6: normalizeWord6(record.timerWord6),
+                timerWord6: sw(record.timerWord6),
                 object,
             });
         }
         this.timerQueue.restore(entries, nextSequence);
     }
-}
-
-function normalizeWord6(value: number): number {
-    return (value << 16) >> 16;
 }
 
 /** A free slot in the timer table: `TT_EMPTY`, and nothing else set. */

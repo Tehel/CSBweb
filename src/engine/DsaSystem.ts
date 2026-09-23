@@ -33,6 +33,7 @@ import { DEFAULT_ROOM_TIMER_FUNCTIONS } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
 import type { CsbRandom } from '../core/random';
+import { sw } from '../core/intCast';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
 import {
@@ -2358,7 +2359,7 @@ export class DsaSystem {
     if (delta === 0) return;
 
     const current = party.brightness ?? 0;
-    party.brightness = this.normalizeWord6(current + delta);
+    party.brightness = sw(current + delta);
   }
 
   private isBaseObjectNameIndex(objectId: number, min: number, max: number): boolean {
@@ -2369,10 +2370,6 @@ export class DsaSystem {
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
   private getBaseObjectNameIndex(objectId: number): number {
     return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], objectId);
-  }
-
-  private normalizeWord6(value: number): number {
-    return (value << 16) >> 16;
   }
 
   private isEmptyObject(value: number | null | undefined): boolean {

@@ -1,3 +1,5 @@
+import { sw } from '../core/intCast';
+
 /**
  * CSBWin `TIMERTYPE` (doc/CSBwin-src/CSB.h:1741-1797).
  *
@@ -169,7 +171,7 @@ export class TimerQueue {
       uByte9: action & 0xff,
       sequence: this.nextSequence++,
       timerWord8: timerWord8 & 0xffff,
-      timerWord6: normalizeWord6(timerWord6),
+      timerWord6: sw(timerWord6),
       object,
     };
     return this.addTimer(entry);
@@ -200,7 +202,7 @@ export class TimerQueue {
       uByte9: action & 0xff,
       sequence: this.nextSequence++,
       timerWord8: timerWord8 & 0xffff,
-      timerWord6: normalizeWord6(timerWord6),
+      timerWord6: sw(timerWord6),
       object,
     };
     return this.addTimer(entry);
@@ -393,10 +395,6 @@ export class TimerQueue {
   private isMapTimer(functionType: number): boolean {
     return functionType >= TimerFunction.TT_OPENROOM && functionType <= TimerFunction.TT_DOOR;
   }
-}
-
-function normalizeWord6(value: number): number {
-  return (value << 16) >> 16;
 }
 
 function compareTimers(a: TimerEntry, b: TimerEntry): number {

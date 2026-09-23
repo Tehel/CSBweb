@@ -8,6 +8,7 @@
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
+import { sw } from '../../core/intCast';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
@@ -15,7 +16,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, normalizeWord6, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -675,7 +676,7 @@ export function updateLightForPossessionChange(ui: UIState, slot: number, previo
       const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
       if (delta !== 0) {
         const current = ui.partyState.brightness ?? 0;
-        ui.partyState.brightness = normalizeWord6(current + delta);
+        ui.partyState.brightness = sw(current + delta);
       }
     }
   }
