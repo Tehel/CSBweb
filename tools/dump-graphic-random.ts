@@ -8,7 +8,8 @@
  * to do exactly that, and the bits it lost were exactly the ones `>>> 7 % n` reads:
  * every state the LCG could reach turned out to be a multiple of 4096, so `% 32` and
  * `% 2` always came out 0. The teleporter/energy shimmer's row jitter and the
- * cloud/decoration mirror-flip randomization were both permanently frozen at their
+ * cloud mirror-flip (which has since moved to the viewport stream, as CSBWin has it —
+ * `tools/dump-cloud-draw.ts`) were both permanently frozen at their
  * zero value — a redraw every tick, always painting the identical pixels. Nothing
  * about the tick loop or the caching was wrong; this is invisible on any single
  * frame and only shows up as a sequence, which is why it needed its own tool rather

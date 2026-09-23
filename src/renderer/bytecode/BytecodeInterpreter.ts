@@ -30,6 +30,7 @@ import {
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 import { CsbRandom } from '../../core/random';
+import { applyLimits } from '../../core/intCast';
 
 const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
@@ -1845,7 +1846,7 @@ export class BytecodeInterpreter {
    * `BytecodeInterpreter` that calls it, or every frame would reroll from the same
    * point and the effect would never move.
    */
-  private static viewportRandom = new CsbRandom();
+  private static viewportRandom = new CsbRandom(0x34175432); // `Viewport.cpp:6697`
 
   /**
    * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
@@ -1853,10 +1854,10 @@ export class BytecodeInterpreter {
    * exact product needs up to 64 bits, and a float64 mantissa only holds 53. The
    * plain multiply silently rounds away exactly the low bits `>>> 7 % n` reads,
    * which is why this returned the same value on every call — every state ever
-   * reached was a multiple of 4096 after the previous rounding, canceling both the
-   * `% 32` used for the teleporter/energy shimmer's row jitter and the `% 2` used
-   * for cloud/decoration mirroring. `Math.imul` truncates to 32 bits *before*
-   * rounding, matching the C `ui32` multiply exactly.
+   * reached was a multiple of 4096 after the previous rounding, canceling the
+   * `% 32` and `% 2` of the teleporter/energy shimmer's jitter. `Math.imul`
+   * truncates to 32 bits *before* rounding, matching the C `ui32` multiply exactly.
+   * `DrawTeleporter` is its only caller in CSBWin; clouds use `viewportRandom`.
    */
   private graphicRandom(maxExclusive: number): number {
     if (maxExclusive <= 0) return 0;
@@ -2608,11 +2609,14 @@ export class BytecodeInterpreter {
 
       if (!base || width <= 0 || height <= 0) continue;
 
-      const mirror = this.graphicRandom(2) !== 0;
-      const flip = this.graphicRandom(2) !== 0;
-      let src = base;
-      if (mirror) src = this.getMirroredBitmap(src);
-      if (flip) src = this.getFlippedBitmapVertical(src);
+      // tag006932 (`doc/CSBwin-src/Code51a4.cpp:257-313`). Both coin flips come from
+      // the viewport's stream, the flip first; `GraphicRandom` is DrawTeleporter's alone.
+      const flip = BytecodeInterpreter.viewportRandom.bool() !== 0; // w_142 → TAG008840
+      const mirror = BytecodeInterpreter.viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
+      const halfWidth = width >> 1; // LOCAL_22
+      // LOCAL_30: CSBWin's rows are padded to 16 pixels and `Mirror` moves the padding to
+      // the left, so the blit skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer.
+      const mirrorPad = mirror ? 2 * (7 - ((halfWidth - 1) & 7)) : 0;
 
       let px = 0;
       let py = 0;
@@ -2630,13 +2634,19 @@ export class BytecodeInterpreter {
         py = tables.cloudPositions7162[baseIndex + 1] ?? 0;
       }
 
-      let x1 = Math.max(0, px - (width >> 1) + 1);
-      let x2 = Math.min(223, px + (width >> 1));
-      let y2 = Math.min(135, py + (height >> 1));
-      let y1 = Math.max(0, py - (height >> 1));
+      const y2 = Math.min(135, py + (height >> 1));
+      const y1 = Math.max(0, py - (height >> 1) + ((height & 1) === 0 ? 1 : 0));
+      if (y1 >= 136) continue;
+      const x2 = Math.min(223, px + halfWidth);
+      if (x2 < 0) continue;
+      const x1 = applyLimits(0, px - halfWidth + 1, 223);
+      const srcX = x1 !== 0 ? mirrorPad : Math.max(mirrorPad, halfWidth - px - 1);
+      if (!(x2 > x1)) continue;
 
-      if (x2 <= x1 || y2 <= y1) continue;
-      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2 }, 10);
+      let src = base;
+      if (mirror) src = this.getMirroredBitmap(src);
+      if (flip) src = this.getFlippedBitmapVertical(src);
+      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
     }
 
     return fluxcage;

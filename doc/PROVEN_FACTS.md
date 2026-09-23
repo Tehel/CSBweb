@@ -2583,3 +2583,24 @@ other three (`CSB.h:1125-1132`) — read from a save's extended-features block
 (`SaveGame.cpp:394-400`) and `false` by default (`data.cpp:77-78`). None of the 182
 creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
 `tools/dump-monster-move.ts` case 4.
+
+## A cloud's flip and mirror are two viewport coin flips; a missile's are not random at all
+
+`DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:257-260`) sets `w_142 = STRandomBool() != 0`
+(the vertical flip, `TAG008840`, `:2787`) and then `LOCAL_36 = STRandomBool() != 0` (the
+`Mirror`, `CSBCode.cpp:4361`) for every cloud that reaches `tag006932`. Inside `DrawViewport`
+`d.RandomNumber` is swapped for a function-static `viewportRandom`, initialised to
+`0x34175432` (`Viewport.cpp:6697`, `:6705-6707`, restored at `:7174-7175`), so these draws
+never touch the game's stream. `GraphicRandom` (`CSBCode.cpp:564`) is a different generator
+(`>> 7`, not `STRandomBool`'s `>> 8`) whose only callers are in `DrawTeleporter`.
+
+When mirrored, `LOCAL_30 = 2 * (7 - ((LOCAL_22-1) & 7))` (`:261-264`) skips the row padding
+that `Mirror` moved to the left of a 16-pixel-aligned row, and at the left edge the source
+column is `Larger(LOCAL_30, LOCAL_22 - x - 1)` (`:280-287`) — a maximum, not a sum, so a
+mirrored cloud is clipped by less than its overhang. The rectangle is
+`y1 = Larger(0, y - LOCAL_24/2 + (LOCAL_24 even))`, `y2 = Smaller(135, y + LOCAL_24/2)`,
+`x1 = ApplyLimits(0, x - LOCAL_22 + 1, 223)`, `x2 = Smaller(223, x + LOCAL_22)` (`:265-279`).
+
+Missiles (`Code51a4.cpp:2356-2465`) derive their mirror (`LOCAL_36`) and flip (`w_142`)
+from the graphic's `word4`, the timer's direction bits, the relative position and
+`(mapX + mapY) & 1`; nothing in them is random. Evidence: `tools/dump-cloud-draw.ts`.

@@ -70,7 +70,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
 | C4 | `DamageCharacter` is missing two early guards | S | ✅ |
 | C5 | Three movement deferrals | M | ✅ |
-| C6 | Which generator cloud and missile sprites flip with | S | ⏳ |
+| C6 | Which generator cloud and missile sprites flip with | S | ✅ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
 | C8 | Phase 8 DSA leftovers | M | ⚠️ re-audit |
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
@@ -78,6 +78,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
+| C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -273,7 +274,21 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “Monsters block the party”.</sub>
 
-### C6 ⏳ Which generator cloud and missile sprites flip with
+### C6 ✅ Which generator cloud and missile sprites flip with
+
+**Paid in `<C6>`.** Missiles were already right: CSBWin derives their mirror and flip from
+the graphic's `word4`, the timer's direction, the relative position and `(mapX+mapY)&1`
+(`Code51a4.cpp:2356-2465`), with no randomness, and `drawMissilesAtPosition` already did
+that. Clouds were wrong three ways: they rolled `GraphicRandom` instead of the viewport's
+`STRandomBool()`, rolled mirror before flip (CSBWin: flip first, `Code51a4.cpp:258-260`),
+and ignored `tag006932`'s placement — the even-height `+1` on `y1` and the left-edge source
+column `Larger(LOCAL_30, LOCAL_22 - x - 1)` (`:265-287`). While there: `viewportRandom`
+starts at CSBWin's `0x34175432` (`Viewport.cpp:6697`) instead of a host random seed. No
+golden frame shows a cloud, so none moved. Evidence: `tools/dump-cloud-draw.ts` (7 of 14
+checks fail before); the fact is in `doc/PROVEN_FACTS.md`. The rest of `DrawClouds`' drift
+is C14.
+
+<details><summary>original entry</summary>
 
 Lifted from inside the resolved "teleporter shimmer" entry (now in the archive), where it
 was left open. `GraphicRandom` has exactly two call sites in all of CSBWin, both inside
@@ -284,6 +299,8 @@ is unverified: a `viewportRandom`-style `STRandomBool()`, or a mirror bit precom
 game logic rather than re-rolled every frame (`NextMonsterUpdateTime`,
 `doc/CSBwin-src/CSBCode.cpp:5877-5941`, is an example of the latter). Read the cloud and
 missile drawing source in `Viewport.cpp` first, then port what it does.
+
+</details>
 
 ### C7 ✅ `CreateMovementTimer`'s overflow guard is not ported
 
@@ -407,6 +424,29 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
 
 Evidence for each will extend `tools/dump-party-collision.ts`, which now steps frames with
 `Game.runFrame`.
+
+### C14 ⏳ `DrawClouds`: size, colour map, lightning position, the cell under the party
+
+Found while porting C6's placement block; nothing here is fixed. All in
+`doc/CSBwin-src/Code51a4.cpp`, against `BytecodeInterpreter.drawClouds`.
+
+- **The size clamp is on the wrong thing.** `TAG005088` clamps the *scale* to 32 (`:29`);
+  the port clamps the resulting width and height to 1..32, which crops every full-size
+  cloud whose graphic is larger (graphic 348's table size is 160×111).
+- **The scale.** `w_156 = Larger(4, Byte5758[group] * Larger(48, value+1) >> 8) & 0xfffe`
+  (`:251-254`). The port has no `& 0xfffe`, and treats `value == 0` as a full-size 32 that
+  CSBWin does not have.
+- **The shrink's colour map** is `d.IdentityColorMap` for types 0-2 (`:52-58`); the port
+  passes `colorMapMedium`.
+- **Lightning (type 100) is placed from `d.Word7246`** (`:143`, `x, y, scale`); the port
+  takes only the scale from it and the position from `Word7042` / `Word7162`.
+- **The cell under the party** (`RelativeCellNumber == 12`, `:178-218`) picks graphic
+  `351 + 3·D4W + (value>>5 != 0) + (value>>5 > 3)`, where `D4W` is the type index with
+  type 40 counted as 2 (`:180-191`), shrinks the type-40 one through
+  `d.Byte5712`, and draws it with `TAG008c98` at `STRandom0_3() + 87`, `STRandom() & 63` —
+  two more viewport-stream draws. The port blits `351 + typeIndex` into a fixed rectangle.
+
+Extend `tools/dump-cloud-draw.ts`, which already stubs the tables it needs.
 
 ---
 

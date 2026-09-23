@@ -126,6 +126,7 @@ const CHECKS = [
   { tool: 'dump-image-codec.ts' },
   { tool: 'dump-graphic-random.ts' },
   { tool: 'dump-door-lightning.ts' },
+  { tool: 'dump-cloud-draw.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-party-collision.ts', args: ['2'] },
   // Level 2's door at (0,25) is up-down, which is the mode that exercises VerticalSize.
