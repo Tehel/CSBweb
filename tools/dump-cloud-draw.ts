@@ -24,11 +24,27 @@
  * reads at `srcX - LOCAL_30`, which is `max(0, clip - LOCAL_30)` when mirrored: a
  * mirrored cloud at the left edge is clipped by less than its overhang, as in CSBWin.
  *
+ * Then the rest of `DrawClouds` (C14), against the real tables and a synthetic graphic
+ * of each real graphic's size:
+ *
+ *  4. the scale: `Larger(4, Byte5758[cell/3] * Larger(48, value+1) >> 8) & 0xfffe`
+ *     (`:251-254`), clamped to 32 as a *scale* in `TAG005088` (`:29`) — a full-size cloud
+ *     is the whole graphic, and a value-0 cloud is small, not full size;
+ *  5. `TAG005088`'s source graphic `348 + Smaller(type, 2)` and colour map — identity
+ *     for types 0-2, `d.Byte5712` for type 3 (poison), always (`:39-66`);
+ *  6. lightning (type 100): size *and position* from `d.Word7246`, which runs on into
+ *     `d.Word7222` for cells 7-9, shrunk through the identity map (`:139-170`);
+ *  7. the cell under the party (`RelativeCellNumber == 12`, `:178-218`): graphic
+ *     `351 + 3·D4W + (value>>5 != 0) + (value>>5 > 3)`, tiled over `d.Word2530` by
+ *     `TAG008c98` (`Graphics.cpp:1169`) from group `STRandom() & 63`, wrapping at
+ *     `STRandom0_3() + 87`.
+ *
  * Run: `npx tsx tools/dump-cloud-draw.ts`
  */
 import { readFileSync } from 'node:fs';
 
 import { DBType, OBJECT_ID_EOF } from '../src/core/types';
+import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
@@ -176,6 +192,188 @@ for (const mirror of [false, true]) {
   console.log(`clipped at x=${clipX}, ${mirror ? 'mirrored' : 'plain'}: overhang ${clip}, LOCAL_30 ${mirror ? pad : 0}, drawn x ${d.x1}..${d.x2}, read from column ${srcX}`);
   check(d.x1 === 0 && d.x2 === clipX + halfWidth, `a ${mirror ? 'mirrored' : 'plain'} cloud clipped at the left spans x 0..x+LOCAL_22`);
   check(same(d.rows, expected), `a ${mirror ? 'mirrored' : 'plain'} cloud clipped at the left reads from column ${mirror ? 'max(LOCAL_30, overhang) - LOCAL_30' : 'overhang'}`);
+}
+
+// ---------------------------------------------------------------------------------------
+// 4-7. The rest of DrawClouds, against the real tables.
+
+const IDENTITY = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
+const lightningDesc = realTables.missileGraphics[3]; // GetGraphicClass(RNLightning) = -4
+const LIGHTNING_GRAPHIC = (lightningDesc.uByte0 & 0xff) + 317;
+
+// Canary: the tables sit at the right offsets if they describe the real graphics' sizes.
+for (let t = 0; t < 3; t++) {
+  const img = graphics.getImage(348 + t);
+  check(img.width === 2 * realTables.cloudScaleBase[2 * t] && img.height === realTables.cloudScaleBase[2 * t + 1],
+    `graphic ${348 + t} is 2·Byte5696[${2 * t}] × Byte5696[${2 * t + 1}] (${img.width}×${img.height})`);
+}
+check(realTables.cloudScaleBase[6] === realTables.cloudScaleBase[4] && realTables.cloudScaleBase[7] === realTables.cloudScaleBase[5],
+  "type 3's Byte5696 entry is type 2's: poison borrows graphic 350");
+for (let n = 351; n <= 359; n++) {
+  const img = graphics.getImage(n);
+  // CSBWin asks for 48×32 and pads the missing row: "This error occurs in the standard
+  // Graphic.dat" (Graphics.cpp:2560). The tiling never reads it (see 7).
+  check(img.width === 48 && img.height === 31, `graphic ${n} is 48×31 (${img.width}×${img.height})`);
+}
+{
+  const img = graphics.getImage(LIGHTNING_GRAPHIC);
+  check(img.width === 2 * lightningDesc.widthBytes && img.height === lightningDesc.height,
+    `lightning graphic ${LIGHTNING_GRAPHIC} is 2·${lightningDesc.widthBytes} × ${lightningDesc.height}`);
+}
+check(realTables.cloudPositions7246.length === 21
+  && [9, 10, 11, 12, 13, 14, 15, 16, 17].every((i) => realTables.cloudPositions7246[12 + i - 9] === realTables.cloudPositions7222[i - 9]),
+  'Word7246 read as 21 words runs on into Word7222 (7246 - 2·12 = 7222)');
+const rawItem = graphics.getRawGraphic(0x22e);
+const w2530 = realTables.cloudUnderPartyRect;
+check(rawItem.length === 0x1270 && [w2530.x1, w2530.x2, w2530.y1, w2530.y2].join() === Array.from(rawItem.slice(-4)).join(),
+  `Word2530 is the last 4 bytes of graphic 0x22e: x ${w2530.x1}..${w2530.x2}, y ${w2530.y1}..${w2530.y2}`);
+
+const patternFor = (id: number, w: number, h: number) => ({
+  width: w,
+  height: h,
+  pixels: new Uint8Array(w * h).map((_, i) => {
+    const v = 1 + (((i % w) * 7 + Math.floor(i / w) * 13 + (i % w) * Math.floor(i / w) + id * 5) % 14);
+    return v >= 10 ? v + 1 : v; // never 0 (the cleared viewport) nor 10 (transparent)
+  }),
+});
+const graphicCache = new Map<number, { width: number; height: number; pixels: Uint8Array }>();
+function fakeGraphic(id: number) {
+  let b = graphicCache.get(id);
+  if (!b) {
+    const img = graphics.getImage(id);
+    b = patternFor(id, img.width, img.height);
+    graphicCache.set(id, b);
+  }
+  return b;
+}
+const shrinkOracle = new BytecodeInterpreter({} as any) as any;
+const shrink = (src: any, w: number, h: number, map: Uint8Array) => shrinkOracle.shrinkBltIndexedBitmap(src, w, h, map);
+
+interface Scene {
+  relCell: number; // CSBWin's RelativeCellNumber
+  cloudType: number;
+  value: number;
+  place?: [number, number]; // overrides d.Word7042[relCell]
+  seed?: number;
+}
+interface SceneResult { requested: number[]; pixels: Uint8Array; width: number; drawn: Drawn | null; seedAfter: number }
+function drawScene(sc: Scene): SceneResult {
+  const cloudPositions7042 = new Int16Array(realTables.cloudPositions7042);
+  if (sc.place) {
+    cloudPositions7042[sc.relCell * 2] = sc.place[0];
+    cloudPositions7042[sc.relCell * 2 + 1] = sc.place[1];
+  }
+  const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
+  const requested: number[] = [];
+  const rec = { nextObject: OBJECT_ID_EOF, value: sc.value, cloudType: sc.cloudType, bit7: true };
+  const context: any = {
+    viewportIndexBuffer,
+    objectTables: { ...realTables, cloudPositions7042 },
+    getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
+    dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+  };
+  (BytecodeInterpreter as any).viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
+  (new BytecodeInterpreter(context) as any).drawClouds(sc.relCell - 3, cloudRn, 0, 0);
+  const { width, pixels } = viewportIndexBuffer;
+  let x1 = 999, y1 = 999, x2 = -1, y2 = -1;
+  for (let y = 0; y < 136; y++) {
+    for (let x = 0; x < 224; x++) {
+      if (pixels[y * width + x] === 0) continue;
+      x1 = Math.min(x1, x); x2 = Math.max(x2, x);
+      y1 = Math.min(y1, y); y2 = Math.max(y2, y);
+    }
+  }
+  const rows: number[][] = [];
+  for (let y = y1; y <= y2; y++) rows.push(Array.from(pixels.slice(y * width + x1, y * width + x2 + 1)));
+  return {
+    requested, pixels, width,
+    drawn: x2 < 0 ? null : { x1, y1, x2, y2, rows },
+    seedAfter: (BytecodeInterpreter as any).viewportRandom.getSeed(),
+  };
+}
+const toRows = (b: { width: number; height: number; pixels: Uint8Array }) =>
+  Array.from({ length: b.height }, (_, y) => Array.from(b.pixels.slice(y * b.width, (y + 1) * b.width)));
+
+/** tag006932's rectangle for a cloud at (px, py), unclipped. */
+const expectedRect = (px: number, py: number, hw: number, h: number) => ({
+  x1: applyLimits(0, px - hw + 1, 223), x2: Math.min(223, px + hw),
+  y1: Math.max(0, py - (h >> 1) + ((h & 1) === 0 ? 1 : 0)), y2: Math.min(135, py + (h >> 1)),
+});
+const sameRect = (d: Drawn | null, r: { x1: number; y1: number; x2: number; y2: number }) =>
+  !!d && d.x1 === r.x1 && d.x2 === r.x2 && d.y1 === r.y1 && d.y2 === r.y2;
+
+// 4 + 5. The scale, the size, the source graphic and the colour map. Centred at (112, 68)
+// so that even the full-size graphic (160×111) is not clipped.
+console.log('\nscale (Code51a4.cpp:251-254) and TAG005088 (:21-74):');
+for (const [relCell, cloudType, value] of [[9, 0, 255], [7, 0, 255], [3, 0, 0], [6, 3, 90], [6, 40, 255], [9, 40, 255]]) {
+  const type = cloudType === 40 ? 3 : cloudType === 0 ? 0 : 1;
+  const scaleIn = Math.max(4, (realTables.cloudScale[Math.floor(relCell / 3)] * Math.max(48, value + 1)) >> 8) & 0xfffe;
+  const p2 = Math.min(32, scaleIn);
+  const hw = Math.trunc((p2 * realTables.cloudScaleBase[2 * type] + Math.trunc(p2 / 2)) / 32);
+  const h = Math.trunc((p2 * realTables.cloudScaleBase[2 * type + 1] + Math.trunc(p2 / 2)) / 32);
+  const graphic = 348 + Math.min(type, 2);
+  const full = p2 === 32 && type !== 3;
+  const expected = full
+    ? fakeGraphic(graphic)
+    : shrink(fakeGraphic(graphic), 2 * hw, h, type === 3 ? realTables.cloudColorMap : IDENTITY);
+  const r = drawScene({ relCell, cloudType, value, place: [112, 68] });
+  const what = `cell ${relCell}, type ${cloudType}, value ${value}: scale ${scaleIn}, ${2 * hw}×${h} from graphic ${graphic}` +
+    (full ? ' as is' : ` through ${type === 3 ? 'Byte5712' : 'the identity map'}`);
+  console.log(`  ${what}; drawn ${r.drawn ? `${r.drawn.x2 - r.drawn.x1 + 1}×${r.drawn.y2 - r.drawn.y1 + 1}` : 'nothing'}`);
+  check(r.requested.includes(graphic) && r.requested.every((n) => n >= 348 && n <= 350), `${what}: reads graphic ${graphic} only`);
+  check(sameRect(r.drawn, expectedRect(112, 68, hw, h)), `${what}: drawn at the size TAG005088 gives`);
+  check(!!r.drawn && same(r.drawn.rows, toRows(expected)), `${what}: pixel for pixel`);
+}
+
+// 6. Lightning: from d.Word7246 — position too — for every cell 3..9, identity map.
+console.log('\nlightning (Code51a4.cpp:139-170):');
+for (let relCell = 3; relCell <= 9; relCell++) {
+  const pw = 3 * (relCell - 3);
+  const [px, py, scale] = [0, 1, 2].map((i) => realTables.cloudPositions7246[pw + i]);
+  const hw = (lightningDesc.widthBytes * scale + (scale >> 1)) >> 5;
+  const h = (lightningDesc.height * scale + (scale >> 1)) >> 5;
+  const src = fakeGraphic(LIGHTNING_GRAPHIC);
+  const expected = relCell === 9 ? src : shrink(src, 2 * hw, h, IDENTITY);
+  const rect = expectedRect(px, py, hw, h);
+  // Word7042 moved out of the way, so a cloud placed from it would show elsewhere.
+  const r = drawScene({ relCell, cloudType: 100, value: 0, place: [5, 5] });
+  const what = `cell ${relCell}: Word7246 (${px}, ${py}, ${scale}) → x ${rect.x1}..${rect.x2}, y ${rect.y1}..${rect.y2}`;
+  console.log(`  ${what}; drawn ${r.drawn ? `x ${r.drawn.x1}..${r.drawn.x2}, y ${r.drawn.y1}..${r.drawn.y2}` : 'nothing'}`);
+  check(sameRect(r.drawn, rect), `lightning ${what}`);
+  const srcX = rect.x1 !== 0 ? 0 : Math.max(0, hw - px - 1);
+  const cropped = toRows(expected).slice(0, rect.y2 - rect.y1 + 1).map((row) => row.slice(srcX, srcX + rect.x2 - rect.x1 + 1));
+  check(!!r.drawn && same(r.drawn.rows, cropped), `lightning at cell ${relCell}: graphic ${LIGHTNING_GRAPHIC}${relCell === 9 ? ' as is' : ' through the identity map'}`);
+}
+
+// 7. The cell under the party.
+console.log('\nthe cell under the party (Code51a4.cpp:178-218, TAG008c98):');
+const rect = realTables.cloudUnderPartyRect;
+for (const [cloudType, value, graphic] of [[0, 0, 351], [0, 40, 352], [2, 200, 353], [3, 255, 356], [7, 0, 357], [40, 31, 357], [40, 128, 359]]) {
+  const seed = 0x5eed0000 + graphic * 17 + value;
+  const r = drawScene({ relCell: 12, cloudType, value, seed });
+  const oracle = new CsbRandom(seed);
+  const start = oracle.next() & 63; // the right-hand argument first
+  const wrap = oracle.zeroTo3() + 87;
+  let src = fakeGraphic(graphic);
+  if (cloudType === 40) src = shrink(src, 48, 31, realTables.cloudColorMap);
+  check(wrap <= 30 * 3, 'the tiling wraps within the 30 rows every graphic has');
+  const groupsPerRow = Math.trunc((rect.x2 - rect.x1) / 16) + 1;
+  const expected = new Uint8Array(224 * 136);
+  let g = start;
+  for (let y = rect.y1; y <= rect.y2; y++) {
+    for (let c = 0; c < groupsPerRow; c++) {
+      for (let i = 0; i < 16; i++) {
+        const x = rect.x1 + c * 16 + i;
+        if (x <= rect.x2) expected[y * 224 + x] = src.pixels[Math.floor(g / 3) * 48 + (g % 3) * 16 + i];
+      }
+      if (++g === wrap) g = 0;
+    }
+  }
+  const what = `type ${cloudType}, value ${value} → graphic ${graphic}${cloudType === 40 ? ' through Byte5712' : ''}, groups from ${start}, wrapping at ${wrap}`;
+  console.log(`  ${what}`);
+  check(r.requested.length === 1 && r.requested[0] === graphic, `under the party, ${what}: reads graphic ${graphic} only (read ${r.requested.join()})`);
+  check(Array.from(r.pixels).join() === Array.from(expected).join(), `under the party, ${what}: tiles Word2530 pixel for pixel`);
+  check(r.seedAfter === oracle.getSeed(), `under the party, ${what}: exactly two viewport-stream draws`);
 }
 
 finish();

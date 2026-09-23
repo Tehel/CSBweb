@@ -2685,6 +2685,48 @@ Missiles (`Code51a4.cpp:2356-2465`) derive their mirror (`LOCAL_36`) and flip (`
 from the graphic's `word4`, the timer's direction bits, the relative position and
 `(mapX + mapY) & 1`; nothing in them is random. Evidence: `tools/dump-cloud-draw.ts`.
 
+## A cloud's size, graphic and colour map, and the cloud under the party
+
+All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21-74`).
+
+- **Scale.** An ordinary cloud's scale is
+  `Larger(4, Byte5758[RelativeCellNumber/3] * Larger(48, value+1) >> 8) & 0xfffe`
+  (`:251-254`); a type-101 cloud's is `d.Word7222[3·cell + 2]` (`:230-234`). `Byte5758` is
+  `10, 16, 23, 32, 32, 0`, so a value-0 cloud is drawn at scale 4, not full size.
+- **Size.** `TAG005088(type, scale)` clamps the *scale* to 32 (`:29`), then half-width
+  `(scale·Byte5696[2·type] + scale/2) / 32` and height `(scale·Byte5696[2·type+1] + scale/2) / 32`.
+  `Byte5696` is `80,111, 64,97, 80,91, 80,91` — the three graphics 348-350 are 160×111,
+  128×97 and 160×91 — so a full-size cloud is 160 pixels wide.
+- **Graphic and colour map.** At scale 32 a type 0-2 cloud is graphic `348 + type` as is.
+  Anything else is `ShrinkBLT` of graphic `348 + Smaller(type, 2)` (`:50`): type 3, the
+  poison cloud (cloud type 40), borrows graphic 350 and is always recoloured through
+  `d.Byte5712`; types 0-2 go through `d.IdentityColorMap` (`:52-58`).
+- **Lightning** (cloud type 100) takes its position *and* its scale from
+  `d.Word7246[3·(RelativeCellNumber-3)]` (`:143-150`), shrunk through the identity map
+  except in cell 9 (`:151-160`). `Word7246` is declared 12 words, but cells 3-9 index it up
+  to word 20: it runs on into `d.Word7222`, which follows it in the struct (7246 − 2·12 =
+  7222). Read as 21 words it is 3 triples per row — `(112,53,15) (24,53,15) (194,53,15)`,
+  `(112,59,20) (15,59,20) (208,59,20)`, `(112,70,32)` — each x, y, scale.
+- **The cell under the party** (`RelativeCellNumber == 12`, `:178-218`) draws graphic
+  `351 + 3·D4W + (value>>5 != 0) + (value>>5 > 3)`, where `D4W` is 0 for cloud types 0/2,
+  1 for most, 2 for types 6/7 and for 40 (poison, counted `3 - 1`). The poison one is
+  recoloured through `d.Byte5712`. `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1169-1326`,
+  with `P9 = 138`, which is `-118` as a byte, so `P9 &= 0x7f` = 10 is the transparent colour and
+  no mask is read) fills `d.Word2530` 16 pixels at a time, row by row, from the graphic
+  read as one run of 16-pixel groups: it starts at group `STRandom() & 63` and goes back
+  to group 0 on reaching group `STRandom0_3() + 87`. `d.Word2530` is the last 4 bytes of
+  graphic 0x22e (`Data.h:1316`), a byte `RectPos`, `x 0..223, y 0..135`: the whole
+  viewport. Both draws come from the viewport's stream (see the section above). C++ leaves
+  the order of the two argument draws unspecified; the port evaluates them right to left
+  (`STRandom()` first), the order of the 68000 original and of the x86 compilers. That order
+  is an assumption, not a verified fact.
+- **Graphics 351-359 are 48×31**, not the 48×32 that `GetBasicGraphicAddress(n, 48, 32)`
+  asks for. CSBWin pads the buffer with a garbage row ("This error occurs in the standard
+  Graphic.dat", `Graphics.cpp:2560-2570`). The tiling wraps within 90 groups, which is 30
+  rows, so it never reads the padding row.
+
+Evidence: `tools/dump-cloud-draw.ts` sections 4-7.
+
 ## A skill-increaser actuator credits the cursor's owner, and an alcove passes it no position
 
 `PerformLocalAction` (`doc/CSBwin-src/Mouse.cpp:238-256`) runs local action 10 at once as

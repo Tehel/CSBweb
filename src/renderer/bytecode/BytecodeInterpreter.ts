@@ -2514,6 +2514,10 @@ export class BytecodeInterpreter {
     }
   }
 
+  /**
+   * `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`). Returns whether a Fluxcage stands
+   * in the cell (CSBWin returns its record, `pdb_150`).
+   */
   private drawClouds(relativeCellNumber: number, firstObject: ObjectID, facing: number, curAbsPos: number): boolean {
     const tables = this.context.objectTables;
     const dungeon = this.context.dungeonState;
@@ -2521,8 +2525,8 @@ export class BytecodeInterpreter {
     const getGraphic = this.context.getGraphicBitmap;
     if (!tables || !dungeon || !viewport || !getGraphic) return false;
 
-    let relCell = relativeCellNumber + 3;
-    let relCellGroup = Math.floor(relCell / 3);
+    const relCell = relativeCellNumber + 3; // RelativeCellNumber
+    const relCellGroup = Math.floor(relCell / 3); // RelativeCell_46
     let fluxcage = false;
 
     for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
@@ -2531,108 +2535,85 @@ export class BytecodeInterpreter {
       const cloud = dungeon.getCloudRecord(rn);
       if (!cloud) continue;
 
-      let cloudType = cloud.cloudType | 0;
-      const isSpecial = cloudType >= 100;
+      let d4 = cloud.cloudType | 0; // D4W
+      const isSpecial = d4 >= 100; // w_160
       if (isSpecial && (relCell < 3 || relCell > 9 || position !== curAbsPos)) continue;
+      let poison = false; // w_162
 
-      let typeIndex = 0;
-      let specialPos: { x: number; y: number; scale: number } | null = null;
+      let base: IndexedBitmap | null;
+      let halfWidth: number; // LOCAL_22
+      let height: number; // LOCAL_24
+      let px: number; // pw_154[0]
+      let py: number; // pw_154[1]
 
-      if (cloudType === 0 || cloudType === 2 || cloudType === 101) {
-        typeIndex = 0;
-      } else if (cloudType === 6 || cloudType === 7) {
-        typeIndex = 2;
-      } else if (cloudType === 40) {
-        typeIndex = 3;
-      } else if (cloudType === 100) {
-        typeIndex = 4;
-      } else if (cloudType === 50) {
-        if (relCell >= 4) fluxcage = true;
-        continue;
-      } else {
-        typeIndex = 1;
-      }
-
-      if (isSpecial && cloudType !== 100) {
-        const baseIdx = relCell * 3;
-        const px = tables.cloudPositions7222[baseIdx + 0] ?? 0;
-        const py = tables.cloudPositions7222[baseIdx + 1] ?? 0;
-        const scale = tables.cloudPositions7222[baseIdx + 2] ?? 0;
-        specialPos = { x: px, y: py, scale };
-      }
-
-      if (relCell === 12) {
-        const baseGraphic = getGraphic(351 + typeIndex);
-        if (!baseGraphic) continue;
-        const rect: RectPos = { x1: 64, y1: 106, x2: 159, y2: 135 };
-        this.blitShapeToViewportIndexWithTransparent(baseGraphic, rect, 10);
-        continue;
-      }
-
-      let width = 0;
-      let height = 0;
-      let base: IndexedBitmap | null = null;
-
-      if (cloudType === 100) {
-        const md = tables.missileGraphics[3];
+      if (d4 === 100) {
+        // Lightning: graphic, size and position all from d.Word7246 (`:139-170`).
+        const gc = this.getGraphicClassForObject(RN_LIGHTNING, dungeon, tables);
+        const md = tables.missileGraphics[-gc - 1];
         if (!md) continue;
         base = getGraphic((md.uByte0 & 0xff) + 317);
         if (!base) continue;
-        const idx = Math.max(0, relCell - 3);
-        const scale = tables.cloudPositions7246[idx * 3 + 2] ?? 0;
-        width = Math.floor((md.widthBytes * scale + (scale >> 1)) >> 5) * 2;
-        height = Math.floor((md.height * scale + (scale >> 1)) >> 5);
-        if (relCell !== 9) base = this.shrinkChunky(base, width, height, tables.colorMapMedium);
+        const pw = 3 * (relCell - 3);
+        const scale = tables.cloudPositions7246[pw + 2] ?? 0;
+        halfWidth = (md.widthBytes * scale + (scale >> 1)) >> 5;
+        height = (md.height * scale + (scale >> 1)) >> 5;
+        if (relCell !== 9) base = this.shrinkChunky(base, 2 * halfWidth, height, IDENTITY_COLOR_MAP);
+        px = tables.cloudPositions7246[pw] ?? 0;
+        py = tables.cloudPositions7246[pw + 1] ?? 0;
       } else {
-        const scaleBase = tables.cloudScaleBase;
-        const idx = Math.min(3, Math.max(0, typeIndex));
-        const baseX = scaleBase[idx * 2] ?? 0;
-        const baseY = scaleBase[idx * 2 + 1] ?? 0;
-        const clamp = (v: number) => Math.max(1, Math.min(32, v));
-        const scale = specialPos
-          ? specialPos.scale
-          : cloud.value > 0
-            ? Math.max(4, ((tables.cloudScale[relCellGroup] ?? 0) * Math.max(48, cloud.value + 1)) >> 8)
-            : 32;
-        width = clamp(((scale * baseX + (scale >> 1)) >> 5) * 2);
-        height = clamp((scale * baseY + (scale >> 1)) >> 5);
-
-        const baseGraphicNum = typeIndex === 3 ? 351 + typeIndex : 348 + Math.min(typeIndex, 2);
-        base = getGraphic(baseGraphicNum);
-        if (!base) continue;
-
-        if (scale !== 32 || typeIndex === 3) {
-          const colorMap = typeIndex === 3 ? tables.cloudColorMap : undefined;
-          base = colorMap ? this.shrinkChunky(base, width, height, colorMap) : this.shrinkChunky(base, width, height, tables.colorMapMedium);
+        if (d4 === 0 || d4 === 2 || d4 === 101) {
+          d4 = 0;
+        } else if (d4 === 6 || d4 === 7) {
+          d4 = 2;
+        } else if (d4 === 40) {
+          poison = true;
+          d4 = 3;
+        } else if (d4 === 50) {
+          if (relCell >= 4) fluxcage = true;
+          continue;
+        } else {
+          d4 = 1;
         }
-      }
 
-      if (!base || width <= 0 || height <= 0) continue;
+        // tag006774
+        if (relCell === 12) {
+          this.drawCloudUnderParty(d4, poison, cloud.value, tables, getGraphic);
+          continue;
+        }
+
+        let scale: number; // w_156
+        if (isSpecial) {
+          const pw = 3 * relCell;
+          px = tables.cloudPositions7222[pw] ?? 0;
+          py = tables.cloudPositions7222[pw + 1] ?? 0;
+          scale = tables.cloudPositions7222[pw + 2] ?? 0;
+        } else {
+          if (cloud.bit7) {
+            px = tables.cloudPositions7042[2 * relCell] ?? 0;
+            py = tables.cloudPositions7042[2 * relCell + 1] ?? 0;
+          } else {
+            const side = position === facing || position === ((facing - 1) & 3) ? 0 : 1;
+            const pw = 4 * relCell + 2 * side;
+            px = tables.cloudPositions7162[pw] ?? 0;
+            py = tables.cloudPositions7162[pw + 1] ?? 0;
+          }
+          const d0 = Math.max(48, cloud.value + 1);
+          const d1 = tables.cloudScale[relCellGroup] ?? 0;
+          scale = Math.max(4, (d1 * d0) >> 8) & 0xfffe;
+        }
+
+        const shape = this.tag005088(d4, scale, tables, getGraphic);
+        if (!shape) continue;
+        ({ base, halfWidth, height } = shape);
+      }
 
       // tag006932 (`doc/CSBwin-src/Code51a4.cpp:257-313`). Both coin flips come from
       // the viewport's stream, the flip first; `GraphicRandom` is DrawTeleporter's alone.
       const flip = BytecodeInterpreter.viewportRandom.bool() !== 0; // w_142 → TAG008840
       const mirror = BytecodeInterpreter.viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
-      const halfWidth = width >> 1; // LOCAL_22
       // LOCAL_30: CSBWin's rows are padded to 16 pixels and `Mirror` moves the padding to
       // the left, so the blit skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer.
       const mirrorPad = mirror ? 2 * (7 - ((halfWidth - 1) & 7)) : 0;
-
-      let px = 0;
-      let py = 0;
-      if (specialPos) {
-        px = specialPos.x;
-        py = specialPos.y;
-      } else if (cloud.bit7) {
-        const posIndex = relCell * 2;
-        px = tables.cloudPositions7042[posIndex + 0] ?? 0;
-        py = tables.cloudPositions7042[posIndex + 1] ?? 0;
-      } else {
-        const side = position === facing || position === ((facing - 1) & 3) ? 0 : 1;
-        const baseIndex = relCell * 4 + side * 2;
-        px = tables.cloudPositions7162[baseIndex + 0] ?? 0;
-        py = tables.cloudPositions7162[baseIndex + 1] ?? 0;
-      }
 
       const y2 = Math.min(135, py + (height >> 1));
       const y1 = Math.max(0, py - (height >> 1) + ((height & 1) === 0 ? 1 : 0));
@@ -2650,6 +2631,99 @@ export class BytecodeInterpreter {
     }
 
     return fluxcage;
+  }
+
+  /**
+   * `TAG005088` (`doc/CSBwin-src/Code51a4.cpp:21-74`): cloud graphic `type` at `scale`/32.
+   * The scale is clamped to 32, not the size; full size is the graphic itself, except
+   * for type 3 (poison), which is always recoloured through `d.Byte5712`. Types 0-2 are
+   * shrunk through `d.IdentityColorMap`, and type 3 borrows type 2's graphic (350).
+   */
+  private tag005088(
+    type: number,
+    scale: number,
+    tables: ObjectTables,
+    getGraphic: (graphicNum: number) => IndexedBitmap | null
+  ): { base: IndexedBitmap; halfWidth: number; height: number } | null {
+    const p2 = Math.min(32, scale);
+    const a0 = tables.cloudScaleBase[2 * type] ?? 0; // d.Byte5696[2*type]
+    const a1 = tables.cloudScaleBase[2 * type + 1] ?? 0;
+    const halfWidth = Math.trunc((p2 * a0 + Math.trunc(p2 / 2)) / 32); // D6W
+    const height = Math.trunc((p2 * a1 + Math.trunc(p2 / 2)) / 32); // D5W
+    if (p2 === 32 && type !== 3) {
+      const base = getGraphic(type + 348);
+      return base ? { base, halfWidth, height } : null;
+    }
+    // The derived graphic's number, `14*type + P2/2 + 436`, keys our cache.
+    const key = `derived:${14 * type + Math.trunc(p2 / 2) + 436}`;
+    const cache = this.context.graphicCache;
+    let base = cache?.get(key) ?? null;
+    if (!base) {
+      const src = getGraphic(Math.min(type, 2) + 348);
+      if (!src) return null;
+      const colorMap = type === 3 ? tables.cloudColorMap : IDENTITY_COLOR_MAP;
+      base = this.shrinkChunky(src, 2 * halfWidth, height, colorMap);
+      cache?.set(key, base);
+    }
+    return { base, halfWidth, height };
+  }
+
+  /**
+   * `DrawClouds`' cell under the party (`doc/CSBwin-src/Code51a4.cpp:178-218`): one of
+   * graphics 351-359 (48×31), picked by type and `value >> 5`, the poison one recoloured
+   * through `d.Byte5712`, laid over `d.Word2530` by `TAG008c98`
+   * (`doc/CSBwin-src/Graphics.cpp:1169`), transparent colour 10.
+   *
+   * `TAG008c98` fills the rectangle 16 pixels at a time, row by row, from the graphic
+   * read as one run of 16-pixel groups: it starts at group `STRandom() & 63` and wraps
+   * back to group 0 on reaching group `STRandom0_3() + 87`. Both draws are from the
+   * viewport's stream. C++ leaves argument evaluation order unspecified; the port takes
+   * right to left, the 68000 original's and the x86 compilers' order, so `STRandom()`
+   * is drawn first.
+   */
+  private drawCloudUnderParty(
+    d4: number,
+    poison: boolean,
+    value: number,
+    tables: ObjectTables,
+    getGraphic: (graphicNum: number) => IndexedBitmap | null
+  ): void {
+    if (poison) d4--;
+    d4 *= 3;
+    const d5 = value >> 5;
+    if (d5 !== 0) {
+      d4++;
+      if (d5 > 3) d4++;
+    }
+    let src = getGraphic(d4 + 351);
+    if (!src) return;
+    // CSBWin shrinks 48×32 to 48×32 — a pure recolour. The graphics are 48×31, and
+    // `GetBasicGraphicAddress(n, 48, 32)` pads the buffer with a garbage row
+    // (`doc/CSBwin-src/Graphics.cpp:2560-2570`), which the tiling never reaches: it wraps
+    // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
+    if (poison) src = this.shrinkChunky(src, src.width, src.height, tables.cloudColorMap);
+
+    const start = BytecodeInterpreter.viewportRandom.next() & 63; // P7
+    const wrap = BytecodeInterpreter.viewportRandom.zeroTo3() + 87; // P6
+
+    const rect = tables.cloudUnderPartyRect; // d.Word2530
+    const groupsPerRow = Math.trunc((rect.x2 - rect.x1) / 16) + 1; // w_2
+    const rows = rect.y2 - rect.y1 + 1;
+    const srcGroupsPerRow = (src.width + 15) >> 4;
+    const out = new Uint8Array(groupsPerRow * 16 * rows);
+    let group = start;
+    for (let k = 0; k < groupsPerRow * rows; k++) {
+      const srcRow = Math.floor(group / srcGroupsPerRow);
+      const srcCol = (group % srcGroupsPerRow) * 16;
+      const dstOff = Math.floor(k / groupsPerRow) * groupsPerRow * 16 + (k % groupsPerRow) * 16;
+      for (let i = 0; i < 16; i++) {
+        const x = srcCol + i;
+        out[dstOff + i] = x < src.width && srcRow < src.height ? src.pixels[srcRow * src.width + x] : 0;
+      }
+      if (++group === wrap) group = 0;
+    }
+    const derived: IndexedBitmap = { width: groupsPerRow * 16, height: rows, pixels: out };
+    this.blitShapeToViewportIndexWithTransparent(derived, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 10);
   }
 
   private getGraphicClassForObject(rn: ObjectID, dungeon: DungeonState, tables: ObjectTables): number {

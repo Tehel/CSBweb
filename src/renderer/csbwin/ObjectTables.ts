@@ -182,7 +182,11 @@ export interface ObjectTables {
   cloudPositions7042: Int16Array; // d.Word7042[30]
   cloudPositions7162: Int16Array; // d.Word7162[60]
   cloudPositions7222: Int16Array; // d.Word7222[30]
-  cloudPositions7246: Int16Array; // d.Word7246[12]
+  // d.Word7246[12], read as 21 words: `DrawClouds` indexes it `[3*(RelativeCellNumber-3)]`
+  // for cells 3..9 (`doc/CSBwin-src/Code51a4.cpp:143`), running on into d.Word7222,
+  // which follows it in the struct.
+  cloudPositions7246: Int16Array;
+  cloudUnderPartyRect: RectPos; // d.Word2530, a byte RectPos: `DrawClouds`' cell 12
   objDescGraphicClass: Uint8Array; // d.ObjDesc[180].graphicClass
   objDescAttackClass: Int8Array; // d.ObjDesc[180].attackClass
   objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
@@ -251,6 +255,7 @@ const GRAPHIC_22F_INDEX = 0x22f; // 559
 const ABS_WALL_RECTANGLES = 3074;
 const ABS_WORD7246 = 7246;
 const ABS_WORD7222 = 7222;
+const ABS_WORD2530 = 2530; // Word2530[2], the last 4 bytes of graphic 0x22e (Data.h:1316)
 const ABS_WORD7162 = 7162;
 const ABS_WORD7042 = 7042;
 const ABS_S6982 = 6982; // ITEM110[3]
@@ -856,7 +861,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const cloudScaleBase = raw22e.slice(cloudScaleBaseOffset, cloudScaleBaseOffset + 8);
   const cloudScale = raw22e.slice(cloudScaleOffset, cloudScaleOffset + 6);
   const missileScale = raw22e.slice(missileScaleOffset, missileScaleOffset + 8);
-  const cloudPositions7246 = readI16Array(raw22e, word7246Offset, 12);
+  const cloudPositions7246 = readI16Array(raw22e, word7246Offset, 21);
+  const cloudUnderPartyRect = readRectPosByte4(raw22e, computeOffsetFromWall(wallRectanglesOffset, ABS_WORD2530));
   const cloudPositions7222 = readI16Array(raw22e, word7222Offset, 30);
   const cloudPositions7162 = readI16Array(raw22e, word7162Offset, 60);
   const cloudPositions7042 = readI16Array(raw22e, word7042Offset, 30);
@@ -952,6 +958,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     cloudPositions7162,
     cloudPositions7222,
     cloudPositions7246,
+    cloudUnderPartyRect,
     objDescGraphicClass,
     objDescAttackClass,
     objDescCarryMask,
