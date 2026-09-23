@@ -2607,7 +2607,11 @@ handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1066-1077`), an
 `vblCount` is reset only at the top of a tick (`:617`). So zeroing it cancels nothing: a
 tick already due runs one VBL later. The key queue is a 3-slot ring that refuses a key
 when `next == keyQueueStart` (`CSBUI.cpp:143-145`, `:1131-1139`), so it holds at most two
-keys. Evidence: `tools/dump-party-collision.ts` case 6.
+keys — and the main loop moves each key on at once (`CSBCode.cpp:707-712`) into the mouse
+queue, `MOUSEQLEN` 3 (`Data.h:1515`), where `TAG0196da` refuses it when
+`MouseQEnd + 2 == MouseQStart` (`CSBCode.cpp:8439-8443`): at most two moves wait. A click
+is queued only when `numEnt < MOUSEQLEN-2`, an empty queue, to leave room for its
+button-up (`:7626-7630`). Evidence: `tools/dump-party-collision.ts` cases 6 and 9.
 
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
 

@@ -534,9 +534,16 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
   stamps `lastTime` for every mouse event, clicks included; the port queues only
   movement, so a click does not hold the next turn or step to the next tick — part of the
   queue-depth bullet below.
-- **The key queue holds two keys, not three.** `CSBUI.cpp:143-145` is a 3-slot ring that
-  refuses a key when `next == keyQueueStart` (`:1131-1139`); `Game.movementQueueLen` is 3
-  and the port's check lets three in.
+- ✅ **The key queue holds two keys, not three.** `CSBUI.cpp:143-145` is a 3-slot ring that
+  refuses a key when `next == keyQueueStart` (`:1131-1139`), and the mouse queue each key
+  moves on to at once is too: `TAG0196da` refuses a key when `MouseQEnd + 2 ==
+  MouseQStart` (`CSBCode.cpp:8439-8443`). `Game.enqueueMovement` now lets two in.
+  Evidence: `tools/dump-party-collision.ts` case 9 (1 of 39 checks fails before).
+  **Left, with the move delay's leftover:** the port has one queue for movement only;
+  CSBWin's mouse queue also carries clicks (queued only into an empty queue, with a
+  button-up behind them, `:7626-7630`, `:7586-7598`), and every event it handles stamps
+  `lastTime`. Porting that means routing clicks through `processMovementQueue`'s
+  successor — an input-queue item, not a movement one.
 - **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
   pit or a teleporter to another level also throw away queued input. Not ported.
 - **Room type 7.** `D5W` is set only for stone, a shut door and a solid false wall

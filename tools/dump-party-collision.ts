@@ -342,7 +342,7 @@ async function main(): Promise<void> {
     game.runFrame(T0 - 20_000);
     const monsterQueue = internals.movementQueue.length;
 
-    queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
+    queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 1000; // a tick is due this frame
     const ticks0 = game.state.tickCount;
     game.runFrame(T0);
@@ -553,6 +553,18 @@ async function main(): Promise<void> {
         'a wounded foot should add 1, or 2 when overloaded');
       check(slowestLiving === 3, `the delay should be the slowest *living* champion's (${slowestLiving})`);
     }
+  }
+
+  // ---- Case 9: two moves wait, not three -----------------------------------
+  // `TAG0196da` puts a key into the 3-slot mouse queue only if `MouseQEnd + 2 !=
+  // MouseQStart` (doc/CSBwin-src/CSBCode.cpp:8439-8443, `MOUSEQLEN` Data.h:1515).
+  {
+    internals.movementQueue.length = 0;
+    const accepted = [0, 1, 2].map(() => game.enqueueMovement(MovementAction.TURN_LEFT));
+    console.log(`queue depth: ${accepted.map((a) => (a ? 'in' : 'refused')).join(', ')}`);
+    console.log('');
+    check(accepted[0] && accepted[1] && !accepted[2], `two moves should queue and a third be refused (${accepted.join('/')})`);
+    internals.movementQueue.length = 0;
   }
 
   // ---- Assertions ---------------------------------------------------------

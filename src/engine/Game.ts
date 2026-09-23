@@ -195,7 +195,14 @@ export class Game {
     dungeonState: DungeonState;
     private movementSystem: MovementSystem;
     private movementQueue: MovementAction[] = [];
-    private readonly movementQueueLen = 3; // CSBUI.cpp keyQueueLen
+    /**
+     * `MOUSEQLEN` (doc/CSBwin-src/Data.h:1515). A key reaches the mouse queue through
+     * `TAG0196da`, which refuses it when `MouseQEnd + 2 == MouseQStart`
+     * (`CSBCode.cpp:8439-8443`) — the ring keeps one slot empty, so two keys wait at most.
+     * The key queue in front of it is a 3-slot ring of the same kind (`CSBUI.cpp:143-145`,
+     * `:1131-1139`).
+     */
+    private readonly movementQueueLen = 3;
     /**
      * `HandleMouseEvents`' `static i32 lastTime` (doc/CSBwin-src/Mouse.cpp:1351): the
      * `d.Time` of the last turn or step it handled. Zeroed by its initialise call, which
@@ -782,7 +789,7 @@ export class Game {
     }
 
     enqueueMovement(action: MovementAction): boolean {
-        if (this.movementQueue.length >= this.movementQueueLen) {
+        if (this.movementQueue.length >= this.movementQueueLen - 1) {
             return false;
         }
         this.movementQueue.push(action);
