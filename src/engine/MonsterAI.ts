@@ -632,10 +632,10 @@ export class MonsterAI {
       // branch deliberately does nothing but consume the die roll.
     } else {
       pos = ((preferredDirection & 1) === (pos & 1) ? pos - 1 : pos + 1) & 0x3;
-      let ordinal = this.ordinalOfMonsterAtPosition(c.monster, pos);
+      let ordinal = ordinalOfMonsterAtPosition(this.deps.dungeon, this.deps.monsterDesc(), c.monster, pos);
       if (ordinal !== 0 && this.deps.random.bool() !== 0) {
         pos = (pos + 2) & 0x3;
-        ordinal = this.ordinalOfMonsterAtPosition(c.monster, pos);
+        ordinal = ordinalOfMonsterAtPosition(this.deps.dungeon, this.deps.monsterDesc(), c.monster, pos);
       }
       if (ordinal === 0) {
         if (this.checkMonsterVersusMissiles(c)) return true;
@@ -1185,19 +1185,6 @@ export class MonsterAI {
 
   /** `d.MonsterDamageResult`, as the AI sees it. */
   private lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
-
-  /** `OrdinalOfMonsterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:619`). */
-  private ordinalOfMonsterAtPosition(monster: CreatureRecord, position: number): number {
-    const render = this.deps.dungeon.getMonsterRenderState(monster);
-    const desc = this.deps.monsterDesc()?.[monster.creatureType];
-    return ordinalOfMonsterAtPosition({
-      positions: render.positions,
-      facings: render.facings,
-      numMonM1: monster.numMonM1,
-      horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
-      position,
-    });
-  }
 
   /**
    * `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2730`).

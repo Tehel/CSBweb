@@ -17,8 +17,34 @@
  *    the corner's parity matches the group's facing.
  */
 
-/** `OrdinalOfMonsterAtPosition` (`doc/CSBwin-src/Code11f52.cpp:619`). */
-export function ordinalOfMonsterAtPosition(options: {
+import type { CreatureRecord } from '../data/dungeonTypes';
+import { monsterHorizontalSize, type MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { DungeonState } from './DungeonState';
+
+/**
+ * `OrdinalOfMonsterAtPosition(pDB4, pos)` (`doc/CSBwin-src/Code11f52.cpp:619`): reads the
+ * group's position and facing bytes and its descriptor's `horizontalSize`, then asks
+ * {@link ordinalAtPositionBytes}.
+ */
+export function ordinalOfMonsterAtPosition(
+  dungeon: DungeonState,
+  monsterDesc: ArrayLike<MonsterDesc> | null | undefined,
+  monster: CreatureRecord,
+  position: number,
+): number {
+  const render = dungeon.getMonsterRenderState(monster);
+  const desc = monsterDesc?.[monster.creatureType];
+  return ordinalAtPositionBytes({
+    positions: render.positions,
+    facings: render.facings,
+    numMonM1: monster.numMonM1,
+    horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
+    position,
+  });
+}
+
+/** The body of `OrdinalOfMonsterAtPosition`, over the bytes it reads. */
+export function ordinalAtPositionBytes(options: {
   /** `MonsterPositionByte` — four 2-bit corners, one per member. */
   positions: number;
   /** `MonsterFacingByte` — only bit 0 is read, and only for a wide monster. */

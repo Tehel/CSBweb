@@ -52,7 +52,6 @@ import type { MonsterSystem } from './MonsterSystem';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import {
   monsterBravery,
-  monsterHorizontalSize,
   monsterNonMaterial,
   monsterWord16_8_11,
 } from '../renderer/csbwin/ObjectTables';
@@ -444,16 +443,8 @@ export class AttackSystem {
     if (!monster) return 0;
 
     const order = this.deps.monsterAttack.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
-    const render = this.deps.dungeon.getMonsterRenderState(monster);
-    const desc = this.descFor(monster.creatureType);
     for (const pos of order) {
-      const ordinal = ordinalOfMonsterAtPosition({
-        positions: render.positions,
-        facings: render.facings,
-        numMonM1: monster.numMonM1,
-        horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
-        position: pos,
-      });
+      const ordinal = ordinalOfMonsterAtPosition(this.deps.dungeon, this.deps.tables.monsterDesc, monster, pos);
       if (ordinal !== 0) return ordinal;
     }
     return 0;

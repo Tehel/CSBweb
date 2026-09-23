@@ -1848,7 +1848,7 @@ export class TimerSystem {
       const hasHp = (monster.hp ?? []).some((hp) => (hp ?? 0) > 0);
       if (!hasHp) return;
       for (let pos = 0; pos < 4; pos++) {
-        if (this.ordinalOfMonsterAtPosition(monster, pos) !== 0) {
+        if (ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, pos) !== 0) {
           whoLeavesCell[pos] = (pos + 1) & 0xff;
         }
       }
@@ -2069,7 +2069,7 @@ export class TimerSystem {
         if (monsterRn === OBJECT_ID_EOF) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
         if (monster) {
-          const monsterOrdinal = this.ordinalOfMonsterAtPosition(monster, objectPos);
+          const monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, objectPos);
           const filterIndex = monsterOrdinal > 0 ? monsterOrdinal - 1 : -1;
           if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, filterIndex) === 1) {
             return false;
@@ -2192,18 +2192,6 @@ export class TimerSystem {
     if (newPos.x < oldPos.x) return Direction.WEST;
     if (newPos.y > oldPos.y) return Direction.SOUTH;
     return Direction.NORTH;
-  }
-
-  private ordinalOfMonsterAtPosition(monster: CreatureRecord, pos: number): number {
-    const render = this.dungeon.getMonsterRenderState(monster);
-    const desc = this.tables?.monsterDesc?.[monster.creatureType];
-    return ordinalOfMonsterAtPosition({
-      positions: render.positions,
-      facings: render.facings,
-      numMonM1: monster.numMonM1,
-      horizontalSize: desc ? monsterHorizontalSize(desc) : 0,
-      position: pos,
-    });
   }
 
   private finishMissileEncounter(
