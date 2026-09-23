@@ -261,6 +261,14 @@ export interface TimerHooks {
     apply?: boolean,
   ) => number;
   /**
+   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`),
+   * `MonsterSystem.moveMonster`: `code` is its return value, `position` is `d.NewX`,
+   * `d.NewY`, `d.NewLevel`.
+   */
+  moveMonster?: (
+    monsterRn: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
+  ) => { code: number; position: Position };
+  /**
    * `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:806`) — drop the remains a
    * `damageMonsterGroup(apply = false)` deferred, at the square the group fell to.
    */
@@ -2817,9 +2825,10 @@ export class TimerSystem {
       this.wiggleParty(position);
     }
 
+    // `MoveObject(objD4, mapX, mapY, mapX, mapY)` (`Timer.cpp:2446-2450`).
     const monster = this.dungeon.findFirstMonster(position);
     if (monster !== OBJECT_ID_EOF) {
-      this.wiggleMonster(monster, position);
+      this.hooks?.moveMonster?.(monster, mapX, mapY, mapX, mapY, level);
     }
 
     // `FindFirstDrawableObject` (`doc/CSBwin-src/CSBCode.cpp:5140`), then count what
@@ -3111,33 +3120,6 @@ export class TimerSystem {
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
     this.checkMoveFromMissile(from, to, monsterRn);
     return this.movedObjectWasDestroyed;
-  }
-
-  private wiggleMonster(monsterRn: number, position: Position): void {
-    const rec = this.dungeon.getCreatureRecord(monsterRn);
-    const decoded = decodeObjectID(monsterRn);
-    const canFall = !this.isMonsterLevitating(rec);
-    const facing = rec?.facing ?? 0;
-    const noItem16 = rec === null || this.getMonsterItem16(rec, position.z) === null;
-    const result = this.resolveCellEffects(
-      position, DBType.CREATURE, decoded.position & 0x3, facing, undefined, canFall,
-      rec ? { record: rec, oldX: position.x, oldY: position.y, attachedLevel: position.z, noItem16 } : undefined,
-    );
-    if (!result.moved) return;
-    // Until it goes through `MonsterSystem.moveMonster` (DEBT.md C23), a group the move
-    // would delete (`:3147-3176`) is left where it is.
-    if (result.groupDied) return;
-    if (rec && !this.dungeon.monsterAllowedOnLevel(rec.creatureType, result.position.z)) return;
-
-    const oldPos = new Position(position.x, position.y, position.z);
-    this.checkMoveFromMissile(oldPos, result.position, monsterRn);
-    const newRn = encodeObjectID(result.objectPos & 0x3, DBType.CREATURE, decoded.index);
-    this.dungeon.removeObjectFromCell(oldPos, monsterRn);
-    this.dungeon.addObjectToCell(result.position, newRn);
-
-    const unchanged = this.isSamePosition(oldPos, result.position);
-    this.actuators.triggerObjectMove(oldPos, monsterRn, false, unchanged, result.facing);
-    this.actuators.triggerObjectMove(result.position, newRn, true, unchanged, result.facing);
   }
 
   private resolveCellEffects(

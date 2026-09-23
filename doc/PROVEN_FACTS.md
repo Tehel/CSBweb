@@ -2956,7 +2956,15 @@ uses up one step, so the last object is not moved. A moved missile's timer gets 
 `d.NewY`, `d.NewDir` in `timerWord8`, keeping bits 12-15, the ID with `d.NewPos`, and
 `d.NewLevel` (`:2474-2489`).
 
-Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario).
+The monster goes through the same `MoveObject`, so it is teleported, falls, detaches or
+attaches its `ITEM16` and gets fresh AI timers like any other monster move. A group that ends
+on the square it started on — a teleporter not open to monsters, or one aimed at its own square
+— takes `MoveObject`'s unchanged-room return (`Code11f52.cpp:3183-3213`): `return 0` before
+anything is lifted, so no pad sees it leave or arrive. Only the stairs turn a monster's corner
+(`:3122-3129`), and they always move it to another square.
+
+Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario),
+`tools/dump-wiggle-monster.ts` (the monster; 5 of 9 checks fail before).
 
 ## What `MoveObject` returns for a monster, and the AI stops on anything but 0
 

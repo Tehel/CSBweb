@@ -31,7 +31,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../src/core/types';
 import { SMS_ATTACKING } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -43,6 +43,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
+import { rigTeleporter } from './lib/teleporter';
 
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 
@@ -125,37 +126,7 @@ async function main(): Promise<void> {
     game.party.state.position = far;
     game.monsterSystem.loadPartyLevel(z);
   };
-  /** Move a real teleporter record onto `at` and aim it at `to`, for monsters. */
-  const teleporter = (game: Game, at: Position, to: Position): void => {
-    const dungeon = game.dungeonState;
-    const records = dungeon.getData().databases.teleporters.records;
-    const index = records.findIndex((r) => r.nextObject !== OBJECT_ID_NULL);
-    const rn = ((DBType.TELEPORTER << 10) | index) as ObjectID;
-    for (let z = 0; z < dungeon.getMapCount(); z++) {
-      const map = dungeon.getMap(z)!;
-      for (let x = 0; x < map.descriptor.width; x++) {
-        for (let y = 0; y < map.descriptor.height; y++) {
-          const p = new Position(x, y, z);
-          for (let o = dungeon.findFirstObject(p); o !== OBJECT_ID_EOF; o = dungeon.getDBRecordLink(o)) {
-            if (decodeObjectID(o).category === DBType.TELEPORTER && decodeObjectID(o).index === index) {
-              dungeon.removeObjectFromCell(p, o);
-            }
-          }
-        }
-      }
-    }
-    const rec = records[index]!;
-    rec.scope = 3;
-    rec.sound = false;
-    rec.rotation = 0;
-    rec.absoluteRotation = false;
-    rec.destX = to.x;
-    rec.destY = to.y;
-    rec.destMap = dungeon.getMap(to.z)!.descriptor.level;
-    dungeon.addObjectToCell(at, rn);
-    const map = dungeon.getMap(at.z)!;
-    map.cellFlags[at.x]![at.y] = (RoomType.TELEPORTER << 5) | 0x08 | (map.cellFlags[at.x]![at.y]! & 0x10);
-  };
+  const teleporter = rigTeleporter;
   const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
     t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
     && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;

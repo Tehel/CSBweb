@@ -416,6 +416,8 @@ export class Game {
                     ),
                 flushPendingDroppings: (monsterType, level, mapX, mapY) =>
                     this.monsterDamage.flushPendingDroppings(monsterType, level, mapX, mapY),
+                moveMonster: (monster, oldX, oldY, newX, newY, level) =>
+                    this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
                 adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
                 maxLoad: (champ) => this.characterStats.maxLoad(champ),
                 characterLoad: (champ) => this.characterStats.characterLoad(champ),

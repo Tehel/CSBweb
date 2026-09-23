@@ -476,7 +476,9 @@ export class MonsterSystem {
    *
    * Moves a group from one square to another (`oldX < 0`: places it from nowhere),
    * taking the destination through teleporter chains and pit falls, and keeping the
-   * `ITEM16` and the AI timers in step with the result.
+   * `ITEM16` and the AI timers in step with the result. A group that ends on the square
+   * it started on is left alone and the move returns 0 — which is what `WiggleEverything`
+   * relies on when it moves a group onto its own square (`Timer.cpp:2446-2450`).
    *
    * A group the fall killed, or one that ends on a level its type may not live on, is
    * deleted before anything else moves (`:3147-3176`): its remains are dropped where it
@@ -565,6 +567,13 @@ export class MonsterSystem {
       );
       if (fromDungeon) this.hooks?.deleteMonster?.(level, oldX, oldY);
       return { code: 1, position: destination };
+    }
+
+    // Still on the square it started on, in the same corner: nothing is lifted, pressed
+    // or set down (`:3183-3213`). Only the stairs turn a monster's corner (`:3122-3129`),
+    // and they always take it to another square, so the square alone decides.
+    if (destLevel === level && destination.x === oldX && destination.y === oldY) {
+      return { code: 0, position: destination };
     }
 
     // Lift it off the square it leaves (`:3257-3296`).
