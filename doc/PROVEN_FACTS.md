@@ -2604,3 +2604,15 @@ mirrored cloud is clipped by less than its overhang. The rectangle is
 Missiles (`Code51a4.cpp:2356-2465`) derive their mirror (`LOCAL_36`) and flip (`w_142`)
 from the graphic's `word4`, the timer's direction bits, the relative position and
 `(mapX + mapY) & 1`; nothing in them is random. Evidence: `tools/dump-cloud-draw.ts`.
+
+## A skill-increaser actuator credits the cursor's owner, and an alcove passes it no position
+
+`PerformLocalAction` (`doc/CSBwin-src/Mouse.cpp:238-256`) runs local action 10 at once as
+`SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1)` and stores every other type for
+`RotateActuatorList` (`Code11f52.cpp:3466-3526`). `SkillIncreaser` (`Mouse.cpp:209-230`)
+with a position gives all 300 to `d.HandChar` — the champion who owns the cursor — and to
+nobody if it is `-1`; there is no cell lookup. Without one it gives `sw(300 / d.NumCharacter)`
+to each champion whose `HP() != 0`, so the dead count in the divisor. Wall actuators touched
+by hand pass their wall position (`Mouse.cpp:402`, `:411`, `:462`, `:593-595`), but
+`PressurePadOrAlcove` always passes `-1` (`Code11f52.cpp:3875`), for an alcove as much as for
+a floor pad. Evidence: `tools/dump-local-action.ts`.

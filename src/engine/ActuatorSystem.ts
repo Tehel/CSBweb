@@ -567,7 +567,8 @@ export class ActuatorSystem {
       this.playSound?.(SoundIndex.SWITCH);
     }
 
-    this.queueSwitchAction(rec, padAction, position, switchPosition);
+    // Always -1, an alcove's wall position included (doc/CSBwin-src/Code11f52.cpp:3875).
+    this.queueSwitchAction(rec, padAction, position, -1);
     return true;
   }
 
@@ -718,24 +719,24 @@ export class ActuatorSystem {
 
   private performLocalAction(localActionType: number, mapX: number, mapY: number, mapZ: number, mapPos: number): void {
     if (localActionType === 10) {
-      const adjustment = 300;
+      // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:209-230).
+      let adjustment = 300;
       const party = this.getPartyState();
-      const divisor = party.champions.length > 0 ? party.champions.length : 1;
-      const perChampion = Math.floor(adjustment / divisor);
       const experienceMultiplier = this.dungeon.getMap(mapZ)?.descriptor.difficulty ?? 0;
 
-      if (mapPos === -1) {
-        for (let i = 0; i < party.champions.length; i++) {
-          const champ = party.champions[i];
-          if (!champ.alive) continue;
-          this.applySkillIncrease(champ, i, 8, perChampion, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
+      if (mapPos !== -1) {
+        // The champion who owns the cursor, d.HandChar — not whoever stands in cell mapPos.
+        const handChar = party.cursorOwner ?? -1;
+        if (handChar !== -1) {
+          this.applySkillIncrease(party.champions[handChar], handChar, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
         }
-      } else {
-        const targetIndex = party.champions.findIndex((c) => c.alive && c.partyPosition === (mapPos & 3));
-        if (targetIndex >= 0) {
-          const target = party.champions[targetIndex];
-          this.applySkillIncrease(target, targetIndex, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser1);
-        }
+        return;
+      }
+      adjustment = Math.trunc(adjustment / (party.champions.length || 1));
+      for (let i = 0; i < party.champions.length; i++) {
+        const champ = party.champions[i];
+        if (!champ.alive) continue;
+        this.applySkillIncrease(champ, i, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
       }
       return;
     }
