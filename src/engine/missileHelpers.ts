@@ -1,5 +1,5 @@
 import { encodeObjectID, OBJECT_ID_EOF, type ObjectID, DBType } from '../core/types';
-import type { DungeonData } from '../data/dungeonTypes';
+import type { DungeonState } from './DungeonState';
 
 const TORCH_NAME_INDEX = 4;
 const MISSILE_TYPE_TORCH_MIN = 4;
@@ -27,7 +27,7 @@ export function spellObjectId(missileType: number): ObjectID {
   return ((MAGIC_SPELL_BASE + (missileType & 0x7f)) & 0xffff) as ObjectID;
 }
 
-export function constructPredefinedMissile(data: DungeonData, missileType: number): ObjectID | null {
+export function constructPredefinedMissile(dungeon: DungeonState, missileType: number): ObjectID | null {
   let normalized = missileType | 0;
   if (normalized >= MISSILE_TYPE_TORCH_MIN && normalized <= MISSILE_TYPE_TORCH_MAX) {
     normalized = TORCH_NAME_INDEX;
@@ -74,15 +74,8 @@ export function constructPredefinedMissile(data: DungeonData, missileType: numbe
       return null;
   }
 
-  const maxIndex = 1023;
-  const bumpCount = (): void => {
-    const prev = data.header.objectCounts[dbType] ?? 0;
-    data.header.objectCounts[dbType] = (prev + 1) & 0xffff;
-  };
-
   if (dbType === DBType.WEAPON && weaponType !== null) {
-    if (data.databases.weapons.records.length >= maxIndex + 1) return null;
-    data.databases.weapons.records.push({
+    const newIndex = dungeon.findEmptyDBEntry('weapons', {
       nextObject: OBJECT_ID_EOF,
       broken: false,
       charges: 0,
@@ -92,24 +85,17 @@ export function constructPredefinedMissile(data: DungeonData, missileType: numbe
       important: false,
       weaponType,
     });
-    data.databases.weapons.count++;
-    bumpCount();
-    const newIndex = data.databases.weapons.records.length - 1;
-    return encodeObjectID(0, DBType.WEAPON, newIndex);
+    return newIndex === null ? null : encodeObjectID(0, DBType.WEAPON, newIndex);
   }
 
   if (dbType === DBType.MISC && miscType !== null) {
-    if (data.databases.misc.records.length >= maxIndex + 1) return null;
-    data.databases.misc.records.push({
+    const newIndex = dungeon.findEmptyDBEntry('misc', {
       nextObject: OBJECT_ID_EOF,
       specialState: 0,
       important: false,
       miscType,
     });
-    data.databases.misc.count++;
-    bumpCount();
-    const newIndex = data.databases.misc.records.length - 1;
-    return encodeObjectID(0, DBType.MISC, newIndex);
+    return newIndex === null ? null : encodeObjectID(0, DBType.MISC, newIndex);
   }
 
   return null;

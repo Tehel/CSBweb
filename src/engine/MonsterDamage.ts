@@ -256,21 +256,13 @@ export class MonsterDamage {
   }
 
   /**
-   * Allocate a weapon, clothing or misc record for a dropping.
-   *
-   * ⚠️ CSBWin reuses a freed slot via `FindEmptyDB5Entry` and friends; this port
-   * appends instead, matching what `Game.createMiscObject` and `DsaSystem`'s copy
-   * already do. The difference is invisible in play but means object indices drift
-   * from CSBWin's, so a save file will not be binary-compatible (PLAN.md Phase 10).
+   * Allocate a weapon, clothing or misc record for a dropping — `FindEmptyDB5Entry`,
+   * `FindEmptyDB6Entry`, `FindEmptyDB10Entry` (`doc/CSBwin-src/CSBCode.cpp:4990-5054`).
    */
   private createDroppedRecord(category: DBType, type: number, cursed: boolean): ObjectID | null {
-    const data = this.dungeon.getData();
-    const maxIndex = 1023;
     switch (category) {
       case DBType.WEAPON: {
-        const db = data.databases.weapons;
-        if (db.records.length >= maxIndex + 1) return null;
-        db.records.push({
+        const index = this.dungeon.findEmptyDBEntry('weapons', {
           nextObject: OBJECT_ID_EOF,
           broken: false,
           charges: 0,
@@ -280,13 +272,10 @@ export class MonsterDamage {
           important: false,
           weaponType: type & 0x7f,
         });
-        db.count++;
-        return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.WEAPON, index) as ObjectID;
       }
       case DBType.CLOTHING: {
-        const db = data.databases.clothing;
-        if (db.records.length >= maxIndex + 1) return null;
-        db.records.push({
+        const index = this.dungeon.findEmptyDBEntry('clothing', {
           nextObject: OBJECT_ID_EOF,
           broken: false,
           charges: 0,
@@ -294,20 +283,16 @@ export class MonsterDamage {
           important: false,
           clothingType: type & 0x7f,
         });
-        db.count++;
-        return encodeObjectID(0, DBType.CLOTHING, db.records.length - 1) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.CLOTHING, index) as ObjectID;
       }
       case DBType.MISC: {
-        const db = data.databases.misc;
-        if (db.records.length >= maxIndex + 1) return null;
-        db.records.push({
+        const index = this.dungeon.findEmptyDBEntry('misc', {
           nextObject: OBJECT_ID_EOF,
           specialState: 0,
           important: false,
           miscType: type & 0x7f,
         });
-        db.count++;
-        return encodeObjectID(0, DBType.MISC, db.records.length - 1) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.MISC, index) as ObjectID;
       }
       default:
         return null;

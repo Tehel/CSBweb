@@ -802,17 +802,9 @@ export class MonsterSystem {
     return rn;
   }
 
-  /**
-   * `FindEmptyDB4Entry` — a free creature record.
-   *
-   * ⚠️ CSBWin reuses freed slots; this appends, as the rest of this port does. See
-   * the note on `MonsterDamage.createDroppedRecord`.
-   */
+  /** `FindEmptyDB4Entry` (`doc/CSBwin-src/CSBCode.cpp:4974`) — a free creature record. */
   private findEmptyCreatureEntry(): ObjectID | null {
-    const data = this.dungeon.getData();
-    const db = data.databases.creatures;
-    if (db.records.length >= 1024) return null;
-    db.records.push({
+    const index = this.dungeon.findEmptyDBEntry('creatures', {
       nextObject: OBJECT_ID_EOF,
       possession: OBJECT_ID_EOF,
       creatureType: 0,
@@ -828,8 +820,7 @@ export class MonsterSystem {
       unique: false,
       poisoned: false,
     });
-    db.count++;
-    return encodeObjectID(0, DBType.CREATURE, db.records.length - 1) as ObjectID;
+    return index === null ? null : encodeObjectID(0, DBType.CREATURE, index) as ObjectID;
   }
 
   /* ----------------------------------------------------------------- misc ---- */

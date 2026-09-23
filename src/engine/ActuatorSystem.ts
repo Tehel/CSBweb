@@ -446,7 +446,7 @@ export class ActuatorSystem {
             } else if (emptyHanded && actuatorType === 12) {
               const allow = this.applyCursorFilter(CursorFilterType.GiftFromGod, OBJECT_ID_NULL, position, actuatorPos);
               if (allow) {
-                const gift = constructPredefinedMissile(this.dungeon.getData(), getActuatorValue(rec));
+                const gift = constructPredefinedMissile(this.dungeon, getActuatorValue(rec));
                 if (gift !== null) {
                   party.objectInHand = gift;
                   objectInHand = gift;

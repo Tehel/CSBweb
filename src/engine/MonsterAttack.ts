@@ -636,18 +636,14 @@ export class MonsterAttack {
   }
 
   private createBonesRecord(): ObjectID | null {
-    const data = this.dungeon.getData();
-    const db = data.databases.misc;
-    if (db.records.length >= 1024) return null;
-    db.records.push({
+    const index = this.dungeon.findEmptyDBEntry('misc', {
       nextObject: OBJECT_ID_EOF,
       // `value(2)` marks these as a dead champion's bones.
       specialState: 2,
       important: true,
       miscType: MISC_BONES_OF_HERO,
     });
-    db.count++;
-    return withObjectPosition(encodeMisc(db.records.length - 1), 0);
+    return index === null ? null : withObjectPosition(encodeMisc(index), 0);
   }
 
   /**

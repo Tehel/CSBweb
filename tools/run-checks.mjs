@@ -57,6 +57,7 @@ const CHECKS = [
   { tool: 'dump-does-party-have.ts' },
   { tool: 'dump-dsa-move.ts' },
   { tool: 'dump-dsa-delete.ts' },
+  { tool: 'dump-db-reuse.ts' },
   { tool: 'dump-missile-monster.ts' },
   { tool: 'dump-missile-door.ts' },
   { tool: 'dump-last-monster-attack.ts' },

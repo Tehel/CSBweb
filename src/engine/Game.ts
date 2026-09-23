@@ -2126,19 +2126,13 @@ export class Game {
     }
 
     private createMiscObject(miscType: number): ObjectID | null {
-        const data = this.dungeonState.getData();
-        const maxIndex = 1023;
-        if (data.databases.misc.records.length >= maxIndex + 1) return null;
-        data.databases.misc.records.push({
+        const newIndex = this.dungeonState.findEmptyDBEntry('misc', {
             nextObject: OBJECT_ID_EOF,
             specialState: 0,
             important: false,
             miscType: miscType & 0x7f,
         });
-        data.databases.misc.count = (data.databases.misc.count + 1) & 0xffff;
-        data.header.objectCounts[DBType.MISC] = (data.header.objectCounts[DBType.MISC] + 1) & 0xffff;
-        const newIndex = data.databases.misc.records.length - 1;
-        return encodeObjectID(0, DBType.MISC, newIndex);
+        return newIndex === null ? null : encodeObjectID(0, DBType.MISC, newIndex);
     }
 
     private disableCharacterAction(chIdx: number, timeDelay: number): void {
@@ -2245,7 +2239,7 @@ export class Game {
         const facing = (champion.facing ?? this.party.state.facing) & 3;
         const posInCell = ((((champion.partyPosition - facing + 1) & 2) >> 1) + facing) & 3;
         const projectile = (object & 0xffff) >= 0xff80
-            ? constructPredefinedMissile(this.dungeonState.getData(), object & 0xffff)
+            ? constructPredefinedMissile(this.dungeonState, object & 0xffff)
             : object;
         if (projectile === null) return 0;
         const launched = this.timerSystem.launchThrownMissile(

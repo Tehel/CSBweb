@@ -2797,6 +2797,27 @@ Evidence: `tools/dump-dsa-move.ts`.
 
 Evidence: `tools/dump-dsa-move.ts` sections 4-8.
 
+## A new object takes the lowest freed record from index 1; record 0 is never reused
+
+Every `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:4942-5084`) calls
+`DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:919-993`), and only if that returns
+`RNnul` falls back on `MakeMoreRoomInDB`. `FindEmptyDBEntry` takes the record at the
+lowest index **from 1** whose link is `RNnul` (`:954-966`); only when there is none does it
+`Enlarge` the database (`:967-972`), which grows it by 100 records, clears them to link
+`RNnul`, sets the first to `RNeof` and returns its index — the old length
+(`data.cpp:862-876`). So record 0 of a database is handed out only by `Enlarge` on an
+empty database (the missile and cloud databases of `dungeon.dat` are empty), and once
+freed is never taken again. The record is cleared and its link set to `RNeof` (`:989-991`).
+
+`DeleteDBEntry` is what frees a record: link `RNnul`, and its indirect slot freed with it
+(`data.cpp:995-1016`). The loop over the indirect index that comes first (`:934-953`)
+looks for a slot whose record's link is `RNnul`; since `DeleteDBEntry` frees both at once,
+it finds only a free slot, and the record is the second loop's.
+
+`dungeon.dat` ships free records: weapon 105 (of 107), scroll 33, potion 37, misc 8 and
+116 (of 280). The first arrow `ConstructPredefinedMissile` (`Mouse.cpp:105`) makes is weapon 105.
+Evidence: `tools/dump-db-reuse.ts`.
+
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
 
 `EX_DEL` (`doc/CSBwin-src/DSA.cpp:1643-1737`) removes the object from its square, the cursor

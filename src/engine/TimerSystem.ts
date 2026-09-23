@@ -1091,7 +1091,7 @@ export class TimerSystem {
     level: number;
     startTime: number;
   }): void {
-    const projectileObject = constructPredefinedMissile(this.dungeon.getData(), options.projectile);
+    const projectileObject = constructPredefinedMissile(this.dungeon, options.projectile);
     if (projectileObject === null) return;
     this.launchMissile(
       projectileObject,
@@ -1374,20 +1374,15 @@ export class TimerSystem {
     timerIndex: number,
     position: number,
   ): number | null {
-    const data = this.dungeon.getData();
-    const maxIndex = 1023;
-    if (data.databases.missiles.records.length >= maxIndex + 1) return null;
-    data.databases.missiles.records.push({
+    // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
+    const index = this.dungeon.findEmptyDBEntry('missiles', {
       nextObject: OBJECT_ID_EOF,
       projectileObject: projectileObject & 0xffff,
       rangeRemaining: rangeRemaining & 0xff,
       damageRemaining: damageRemaining & 0xff,
       timerIndex: timerIndex & 0xffff,
     });
-    data.databases.missiles.count++;
-    data.header.objectCounts[DBType.MISSILE] = ((data.header.objectCounts[DBType.MISSILE] ?? 0) + 1) & 0xffff;
-    const index = data.databases.missiles.records.length - 1;
-    return encodeObjectID(position & 0x3, DBType.MISSILE, index);
+    return index === null ? null : encodeObjectID(position & 0x3, DBType.MISSILE, index);
   }
 
 
@@ -1584,11 +1579,11 @@ export class TimerSystem {
         if (secondObject === OBJECT_ID_EOF) singleMissile = true;
       }
     } else {
-      const constructed = constructPredefinedMissile(this.dungeon.getData(), missileType);
+      const constructed = constructPredefinedMissile(this.dungeon, missileType);
       if (constructed === null) return;
       firstObject = constructed;
       if (!singleMissile) {
-        const constructedSecond = constructPredefinedMissile(this.dungeon.getData(), missileType);
+        const constructedSecond = constructPredefinedMissile(this.dungeon, missileType);
         if (constructedSecond === null) {
           singleMissile = true;
         } else {
@@ -2589,21 +2584,16 @@ export class TimerSystem {
   }
 
   private createCloudRecord(projectile: number, size: number, posInCell: number): number | null {
-    const data = this.dungeon.getData();
-    const maxIndex = 1023;
-    if (data.databases.clouds.records.length >= maxIndex + 1) return null;
     const cloudType = projectile & 0x7f;
     const bit7 = (posInCell & 0xff) === 255;
-    data.databases.clouds.records.push({
+    // `FindEmptyDB15Entry` (`doc/CSBwin-src/CSBCode.cpp:5073`).
+    const index = this.dungeon.findEmptyDBEntry('clouds', {
       nextObject: OBJECT_ID_EOF,
       value: size & 0xff,
       cloudType: cloudType & 0x7f,
       bit7,
     });
-    data.databases.clouds.count++;
-    data.header.objectCounts[DBType.CLOUD] = ((data.header.objectCounts[DBType.CLOUD] ?? 0) + 1) & 0xffff;
-    const index = data.databases.clouds.records.length - 1;
-    return encodeObjectID(bit7 ? 0 : (posInCell & 0x3), DBType.CLOUD, index);
+    return index === null ? null : encodeObjectID(bit7 ? 0 : (posInCell & 0x3), DBType.CLOUD, index);
   }
 
   /**

@@ -3062,84 +3062,50 @@ export class DsaSystem {
     if (!this.isValidObjectId(objectId)) return null;
     const { category, index, position } = decodeObjectID(objectId);
     const data = this.dungeon.getData();
-    const maxIndex = 1023;
-
-    const bumpCount = (): void => {
-      data.header.objectCounts[category] = ((data.header.objectCounts[category] ?? 0) + 1) & 0xffff;
-    };
+    // Each copy takes a record through `FindEmptyDB<n>Entry` (`DungeonState.findEmptyDBEntry`).
+    const placed = (newIndex: number | null): number | null =>
+      newIndex === null ? null : encodeObjectID(position, category, newIndex);
 
     switch (category) {
       case DBType.ACTUATOR: {
         const rec = data.databases.actuators.records[index];
         if (!rec) return null;
-        if (data.databases.actuators.records.length >= maxIndex + 1) return null;
-        data.databases.actuators.records.push({ ...rec, nextObject: OBJECT_ID_EOF });
-        data.databases.actuators.count++;
-        bumpCount();
-        const newIndex = data.databases.actuators.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+        return placed(this.dungeon.findEmptyDBEntry('actuators', { ...rec, nextObject: OBJECT_ID_EOF }));
       }
       case DBType.MISC: {
         const rec = data.databases.misc.records[index];
         if (!rec) return null;
-        if (data.databases.misc.records.length >= maxIndex + 1) return null;
-        data.databases.misc.records.push({ ...rec, nextObject: OBJECT_ID_EOF });
-        data.databases.misc.count++;
-        bumpCount();
-        const newIndex = data.databases.misc.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+        return placed(this.dungeon.findEmptyDBEntry('misc', { ...rec, nextObject: OBJECT_ID_EOF }));
       }
       case DBType.WEAPON: {
         const rec = data.databases.weapons.records[index];
         if (!rec) return null;
-        if (data.databases.weapons.records.length >= maxIndex + 1) return null;
-        data.databases.weapons.records.push({ ...rec, nextObject: OBJECT_ID_EOF });
-        data.databases.weapons.count++;
-        bumpCount();
-        const newIndex = data.databases.weapons.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+        return placed(this.dungeon.findEmptyDBEntry('weapons', { ...rec, nextObject: OBJECT_ID_EOF }));
       }
       case DBType.CLOTHING: {
         const rec = data.databases.clothing.records[index];
         if (!rec) return null;
-        if (data.databases.clothing.records.length >= maxIndex + 1) return null;
-        data.databases.clothing.records.push({ ...rec, nextObject: OBJECT_ID_EOF });
-        data.databases.clothing.count++;
-        bumpCount();
-        const newIndex = data.databases.clothing.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+        return placed(this.dungeon.findEmptyDBEntry('clothing', { ...rec, nextObject: OBJECT_ID_EOF }));
       }
       case DBType.POTION: {
         const rec = data.databases.potions.records[index];
         if (!rec) return null;
-        if (data.databases.potions.records.length >= maxIndex + 1) return null;
-        data.databases.potions.records.push({ ...rec, nextObject: OBJECT_ID_EOF });
-        data.databases.potions.count++;
-        bumpCount();
-        const newIndex = data.databases.potions.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+        return placed(this.dungeon.findEmptyDBEntry('potions', { ...rec, nextObject: OBJECT_ID_EOF }));
       }
       case DBType.CREATURE: {
         const rec = data.databases.creatures.records[index];
         if (!rec) return null;
-        if (data.databases.creatures.records.length >= maxIndex + 1) return null;
         const copiedPossessions = this.copyItemList(rec.possession);
         // The copy must not inherit the original's ITEM16 slot. CSBWin parks it at
         // 0xd8, or 0xff for a monster that fills the whole cell, so that every
         // `groupIndex() < d.MaxITEM16` test reads it as unattached
         // (doc/CSBwin-src/DSA.cpp:1884-1887).
-        const desc = this.monsterDesc?.[rec.creatureType];
-        const fillsCell = desc ? monsterHorizontalSize(desc) === 2 : false;
-        data.databases.creatures.records.push({
+        return placed(this.dungeon.findEmptyDBEntry('creatures', {
           ...rec,
           nextObject: OBJECT_ID_EOF,
           possession: copiedPossessions,
-          groupIndex: fillsCell ? 0xff : 0xd8,
-        });
-        data.databases.creatures.count++;
-        bumpCount();
-        const newIndex = data.databases.creatures.records.length - 1;
-        return encodeObjectID(position, category, newIndex);
+          groupIndex: this.detachedGroupIndex(rec),
+        }));
       }
       default:
         console.warn('DSA &ADD unsupported object type', category);

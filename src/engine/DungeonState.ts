@@ -23,6 +23,9 @@ import type {
     TileData,
     WeaponRecord,
     ActuatorRecord,
+    Database,
+    DatabaseRecord,
+    Databases,
 } from '../data/dungeonTypes';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
@@ -39,6 +42,23 @@ export interface TextDecodeTables {
 /**
  * DungeonState - manages dungeon data and queries
  */
+/** The database each `Databases` key holds. */
+const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
+    doors: DBType.DOOR,
+    teleporters: DBType.TELEPORTER,
+    texts: DBType.TEXT,
+    actuators: DBType.ACTUATOR,
+    creatures: DBType.CREATURE,
+    weapons: DBType.WEAPON,
+    clothing: DBType.CLOTHING,
+    scrolls: DBType.SCROLL,
+    potions: DBType.POTION,
+    containers: DBType.CHEST,
+    misc: DBType.MISC,
+    missiles: DBType.MISSILE,
+    clouds: DBType.CLOUD,
+};
+
 export class DungeonState {
     private data: DungeonData;
     private championBonesRecords = new Map<number, number>();
@@ -505,6 +525,39 @@ export class DungeonState {
             default:
                 break;
         }
+    }
+
+    /**
+     * `DATABASES::FindEmptyDBEntry` (`doc/CSBwin-src/data.cpp:919-993`): store `record`
+     * in the record a new object of database `db` goes into, and return that index.
+     *
+     * CSBWin takes the lowest record from index 1 whose link is `RNnul` (`:954-966`) —
+     * record 0 is never reused — and only when there is none `Enlarge`s the database by
+     * 100 cleared records and takes the first, the old length (`:967-972`,
+     * `data.cpp:813-876`). Appending gives that index, and the next append is CSBWin's
+     * next free record. The loop over the indirect index before it (`:934-953`) can only
+     * find a slot still naming a record whose link is `RNnul`, and `DeleteDBEntry` frees
+     * the slot with the record (`:1011-1015`); this port has no live indirect index, and
+     * only `deleteDBEntry` writes `RNnul` into a link.
+     *
+     * Appending keeps `count` and the header's `objectCounts` — the size the image
+     * writer declares — equal to the number of records. ⚠️ At 1024 records, the ten-bit
+     * index, this returns `null` where CSBWin would call `MakeMoreRoomInDB`
+     * (`Character.cpp:182`), which is not ported.
+     */
+    findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number]): number | null {
+        const database = this.data.databases[db] as Database<DatabaseRecord>;
+        for (let i = 1; i < database.records.length; i++) {
+            if (database.records[i].nextObject !== OBJECT_ID_NULL) continue;
+            database.records[i] = record;
+            return i;
+        }
+        if (database.records.length >= 1024) return null;
+        database.records.push(record);
+        database.count = database.records.length;
+        const category = DATABASE_CATEGORY[db];
+        this.data.header.objectCounts[category] = database.records.length & 0xffff;
+        return database.records.length - 1;
     }
 
     /**
