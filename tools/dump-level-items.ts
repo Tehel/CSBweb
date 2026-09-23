@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { DescIndexOfRecord } from '../src/engine/objectIndex';
 import { resolve } from 'node:path';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -114,32 +115,11 @@ function parseObjDescObjectType(raw: Uint8Array): number[] {
   return out;
 }
 
+/** `DescIndex` as the engine has it, with `null` for -1 and for a missing record. */
 function getObjDescIndex(category: DBType, record: DatabaseRecord | null): number | null {
   if (!record) return null;
-  switch (category) {
-    case DBType.SCROLL:
-      return 0;
-    case DBType.CHEST:
-      return 1;
-    case DBType.POTION:
-      return typeof (record as { potionType?: number }).potionType === 'number'
-        ? 2 + (record as { potionType: number }).potionType
-        : null;
-    case DBType.WEAPON:
-      return typeof (record as { weaponType?: number }).weaponType === 'number'
-        ? 23 + (record as { weaponType: number }).weaponType
-        : null;
-    case DBType.CLOTHING:
-      return typeof (record as { clothingType?: number }).clothingType === 'number'
-        ? 69 + (record as { clothingType: number }).clothingType
-        : null;
-    case DBType.MISC:
-      return typeof (record as { miscType?: number }).miscType === 'number'
-        ? 127 + (record as { miscType: number }).miscType
-        : null;
-    default:
-      return null;
-  }
+  const descIndex = DescIndexOfRecord(category, record);
+  return descIndex === -1 ? null : descIndex;
 }
 
 function isItemCategory(category: DBType): boolean {

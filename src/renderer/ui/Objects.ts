@@ -5,7 +5,8 @@
  * `doc/CSBwin-src/Code17818.cpp`): resolving an object reference to its `OBJNI_*` name
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
-import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_EYE_OF_TIME_A, OBJNI_FIRST_FULL_FLASK, OBJNI_FIRST_MODIFIABLE, OBJNI_FLAMITT_A, OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_LAST_FULL_FLASK, OBJNI_LAST_MODIFIABLE, OBJNI_OPEN_SCROLL, OBJNI_RA_BLADE_A, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_STAFF_OF_CLAWS_A, OBJNI_STORM_A, OBJNI_STORM_RING_A, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
+import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_FIRST_FULL_FLASK, OBJNI_LAST_FULL_FLASK, OBJNI_OPEN_SCROLL, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
+import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { TextDecodeTables } from '../../engine/DungeonState';
@@ -17,127 +18,47 @@ import { UIMode, UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
 const DEFAULT_CHEST_WEIGHT = 50;
 
+/**
+ * `RN::NameIndex` (`src/engine/objectIndex.ts`) with the UI's tables and the party's
+ * facing. -1 for a negative value, which some callers pass for "no object".
+ */
 export function resolveObjectNameIndex(ui: UIState, value: number): number {
-  if (value < 0) return -1;
-  if (!ui.objectTables) return value | 0;
-  const descIndex = descIndexForObject(ui, value as ObjectID);
-  if (descIndex === null) return value | 0;
-  let objectType = ui.objectTables.objDescObjectType[descIndex];
-  if (typeof objectType !== 'number') return value | 0;
-
-  objectType |= 0;
-  if (
-    objectType > OBJNI_LAST_MODIFIABLE ||
-    objectType < OBJNI_FIRST_MODIFIABLE
-  ) {
-    if (objectType < OBJNI_FIRST_FULL_FLASK || objectType > OBJNI_LAST_FULL_FLASK) {
-      if (objectType !== OBJNI_EMPTY_FLASK) return objectType;
-    }
-  }
-
-  if (objectType === OBJNI_COMPASS_N) {
-    const facing = ui.partyState?.facing ?? 0;
-    return (objectType + (facing & 0x3)) | 0;
-  }
-
-  if (objectType === OBJNI_TORCH_A) {
-    const weapon = ui.dungeonState.getWeaponRecord(value as ObjectID);
-    if (weapon?.litTorch) {
-      const charge = weapon.charges ?? 0;
-      const byte640 = ui.uiTables?.graphic232.byte640 ?? [];
-      const offset = byte640[charge] ?? 0;
-      return (objectType + (offset & 0xff)) | 0;
-    }
-    return objectType;
-  }
-
-  if (objectType === OBJNI_OPEN_SCROLL) {
-    const scroll = ui.dungeonState.getScrollRecord(value as ObjectID);
-    if (scroll && !scroll.open) return OBJNI_SCROLL;
-    return objectType;
-  }
-
-  if (
-    objectType === OBJNI_WATERSKIN ||
-    objectType === OBJNI_ILLUMULET_A ||
-    objectType === OBJNI_JEWEL_SYMAL_A
-  ) {
-    const misc = ui.dungeonState.getMiscRecord(value as ObjectID);
-    if (misc && misc.specialState !== 0) return objectType + 1;
-    return objectType;
-  }
-
-  if (
-    objectType === OBJNI_STORM_A ||
-    objectType === OBJNI_FLAMITT_A ||
-    objectType === OBJNI_STORM_RING_A ||
-    objectType === OBJNI_RA_BLADE_A ||
-    objectType === OBJNI_EYE_OF_TIME_A ||
-    objectType === OBJNI_STAFF_OF_CLAWS_A
-  ) {
-    const weapon = ui.dungeonState.getWeaponRecord(value as ObjectID);
-    if (weapon && weapon.charges > 0) return objectType + 1;
-    return objectType;
-  }
-
-  return objectType;
+  if (value < 0 || !ui.objectTables) return -1;
+  return NameIndex(
+    ui.dungeonState,
+    {
+      objDescObjectType: ui.objectTables.objDescObjectType,
+      byte640: ui.uiTables?.graphic232.byte640 ?? [],
+    },
+    ui.partyState?.facing ?? 0,
+    value,
+  );
 }
 
-export function getBaseObjectNameIndex(ui: UIState, value: number): number {
-  if (value < 0) return -1;
-  if (!ui.objectTables) return value | 0;
-
-  const descIndex = isLikelyObjectRecord(ui, value)
-    ? descIndexForObject(ui, value as ObjectID)
-    : getDescIndexForObjectType(ui, value | 0);
-  if (descIndex === null) return value | 0;
-
-  const objectType = ui.objectTables.objDescObjectType[descIndex];
-  return typeof objectType === 'number' ? objectType | 0 : value | 0;
+/** `GetBasicObjectType` (`src/engine/objectIndex.ts`). -1 as `resolveObjectNameIndex`. */
+export function getBaseObjectNameIndex(ui: UIState, rn: number): number {
+  if (rn < 0 || !ui.objectTables) return -1;
+  return GetBasicObjectType(ui.dungeonState, ui.objectTables.objDescObjectType, rn);
 }
 
-export function getAttackClass(ui: UIState, value: number): number {
-  if (!ui.objectTables) return 0;
-  if (value < 0) return 0;
-
-  const descIndex = isLikelyObjectRecord(ui, value)
-    ? descIndexForObject(ui, value as ObjectID)
-    : getDescIndexForObjectType(ui, value | 0);
-  if (descIndex === null) return 0;
-
+/** `d.ObjDesc[rn.DescIndex()].attackClass`; 0, "no attacks", when there is no row. */
+export function getAttackClass(ui: UIState, rn: number): number {
+  if (!ui.objectTables || rn < 0) return 0;
+  const descIndex = DescIndex(ui.dungeonState, rn);
+  if (descIndex === -1) return 0;
   return ui.objectTables.objDescAttackClass[descIndex] ?? 0;
 }
 
+/** `RN::DescIndex` (`src/engine/objectIndex.ts`), with `null` for -1. */
 export function descIndexForObject(ui: UIState, rn: ObjectID): number | null {
-  const { category } = decodeObjectID(rn);
-  switch (category) {
-    case DBType.SCROLL:
-      return 0;
-    case DBType.CHEST: {
-      const rec = ui.dungeonState.getContainerRecord(rn);
-      return rec ? 1 + (rec.containerType & 0xff) : null;
-    }
-    case DBType.POTION: {
-      const rec = ui.dungeonState.getPotionRecord(rn);
-      return rec ? 2 + (rec.potionType & 0xff) : null;
-    }
-    case DBType.WEAPON: {
-      const rec = ui.dungeonState.getWeaponRecord(rn);
-      return rec ? 23 + (rec.weaponType & 0xff) : null;
-    }
-    case DBType.CLOTHING: {
-      const rec = ui.dungeonState.getClothingRecord(rn);
-      return rec ? 69 + (rec.clothingType & 0xff) : null;
-    }
-    case DBType.MISC: {
-      const rec = ui.dungeonState.getMiscRecord(rn);
-      return rec ? 127 + (rec.miscType & 0xff) : null;
-    }
-    default:
-      return null;
-  }
+  const descIndex = DescIndex(ui.dungeonState, rn);
+  return descIndex === -1 ? null : descIndex;
 }
 
+/**
+ * The first `d.ObjDesc` row whose `objectType` is `objectType` — for the icon and eye
+ * paths that hold an object *type* rather than an object.
+ */
 export function getDescIndexForObjectType(ui: UIState, objectType: number): number | null {
   if (!ui.objectTables) return null;
   const table = ui.objectTables.objDescObjectType;

@@ -9,6 +9,7 @@ import {
   Position,
   RoomType,
 } from '../core/types';
+import { DescIndex, GetBasicObjectType } from './objectIndex';
 import type { ActuatorRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -2365,11 +2366,9 @@ export class DsaSystem {
     return base >= min && base <= max;
   }
 
+  /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
   private getBaseObjectNameIndex(objectId: number): number {
-    const descIndex = this.getObjectDescIndex(objectId);
-    if (descIndex === null) return objectId | 0;
-    const value = this.objDescObjectType?.[descIndex];
-    return typeof value === 'number' ? value | 0 : objectId | 0;
+    return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], objectId);
   }
 
   private normalizeWord6(value: number): number {
@@ -2759,8 +2758,9 @@ export class DsaSystem {
   }
 
   private getObjectCarryMask(objectId: number): number | null {
-    const descIndex = this.getObjectDescIndex(objectId);
-    if (descIndex === null) return null;
+    if (!this.isValidObjectId(objectId)) return null;
+    const descIndex = DescIndex(this.dungeon, objectId);
+    if (descIndex === -1) return null;
     const mask = this.objDescCarryMask?.[descIndex];
     return typeof mask === 'number' ? mask : null;
   }
@@ -2770,38 +2770,6 @@ export class DsaSystem {
     return typeof value === 'number' ? value : 0;
   }
 
-  private getObjectDescIndex(objectId: number): number | null {
-    if (!this.isValidObjectId(objectId)) return null;
-    const decoded = decodeObjectID(objectId);
-    switch (decoded.category) {
-      case DBType.SCROLL:
-        return 0;
-      case DBType.CHEST:
-        return 1;
-      case DBType.POTION: {
-        const rec = this.dungeon.getPotionRecord(objectId);
-        if (!rec) return null;
-        return 2 + (rec.potionType & 0x7f);
-      }
-      case DBType.WEAPON: {
-        const rec = this.dungeon.getWeaponRecord(objectId);
-        if (!rec) return null;
-        return 23 + (rec.weaponType & 0x7f);
-      }
-      case DBType.CLOTHING: {
-        const rec = this.dungeon.getClothingRecord(objectId);
-        if (!rec) return null;
-        return 69 + (rec.clothingType & 0x7f);
-      }
-      case DBType.MISC: {
-        const rec = this.dungeon.getMiscRecord(objectId);
-        if (!rec) return null;
-        return 127 + (rec.miscType & 0x7f);
-      }
-      default:
-        return null;
-    }
-  }
 
   private isObjectInCharactersOrCursor(objectId: number): boolean {
     const party = this.getPartyState?.();

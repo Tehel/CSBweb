@@ -5,6 +5,7 @@
  * The goal is to execute bytecode programs exactly as CSBWin does.
  */
 
+import { DescIndex } from '../../engine/objectIndex';
 import {
   RN_FIREBALL, RN_LIGHTNING, RN_POISON, RN_POISON_BOLT, RN_POISON_CLOUD, isMagicSpellRn,
 } from '../../core/spellRn';
@@ -2071,8 +2072,8 @@ export class BytecodeInterpreter {
         continue;
       }
 
-      const descIndex = this.descIndexForObject(dungeon, rn);
-      if (descIndex === null) continue;
+      const descIndex = DescIndex(dungeon, rn);
+      if (descIndex === -1) continue;
       const graphicClassIndex = tables.objDescGraphicClass[descIndex] ?? 0;
       const gc = tables.graphicClasses[graphicClassIndex];
       if (!gc) continue;
@@ -2105,36 +2106,6 @@ export class BytecodeInterpreter {
         rn
       );
       currentSmallOffset = r.nextSmallOffset;
-    }
-  }
-
-  private descIndexForObject(dungeon: DungeonState, rn: ObjectID): number | null {
-    const { category } = decodeObjectID(rn);
-    switch (category) {
-      case DBType.SCROLL:
-        return 0;
-      case DBType.CHEST: {
-        const rec = dungeon.getContainerRecord(rn);
-        return rec ? 1 + (rec.containerType & 0xff) : null;
-      }
-      case DBType.POTION: {
-        const rec = dungeon.getPotionRecord(rn);
-        return rec ? 2 + (rec.potionType & 0xff) : null;
-      }
-      case DBType.WEAPON: {
-        const rec = dungeon.getWeaponRecord(rn);
-        return rec ? 23 + (rec.weaponType & 0xff) : null;
-      }
-      case DBType.CLOTHING: {
-        const rec = dungeon.getClothingRecord(rn);
-        return rec ? 69 + (rec.clothingType & 0xff) : null;
-      }
-      case DBType.MISC: {
-        const rec = dungeon.getMiscRecord(rn);
-        return rec ? 127 + (rec.miscType & 0xff) : null;
-      }
-      default:
-        return null;
     }
   }
 
@@ -2688,8 +2659,8 @@ export class BytecodeInterpreter {
       }
     }
 
-    const descIndex = this.descIndexForObject(dungeon, rn);
-    if (descIndex === null) return -1;
+    const descIndex = DescIndex(dungeon, rn);
+    if (descIndex === -1) return -1;
     return tables.objDescGraphicClass[descIndex] ?? -1;
   }
 

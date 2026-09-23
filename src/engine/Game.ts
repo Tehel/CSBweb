@@ -41,6 +41,7 @@ import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from '.
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
+import { GetBasicObjectType, NameIndex } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -251,7 +252,9 @@ export class Game {
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
-    private objDescObjectType: ArrayLike<number> | null = null;
+    private objDescObjectType: ArrayLike<number> = [];
+    /** `d.Byte640`, which `NameIndex` reads for a lit torch. */
+    private byte640: ArrayLike<number> = [];
     /**
      * `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two tables `AddCharacter` needs
      * to pick a possession slot. Taken from the actuator tables, which already carry
@@ -496,7 +499,8 @@ export class Game {
             trace: monsterHooks?.trace,
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
-        this.objDescObjectType = actuatorTables?.objDescObjectType ?? null;
+        this.objDescObjectType = actuatorTables?.objDescObjectType ?? [];
+        this.byte640 = actuatorTables?.byte640 ?? [];
         this.addCharacterTables =
             actuatorTables?.objDescCarryMask && actuatorTables.carryLocation
                 ? {
@@ -515,7 +519,7 @@ export class Game {
                 clothingWeights: actuatorTables?.clothingWeights,
                 miscWeights: actuatorTables?.miscWeights,
             },
-            nameIndex: (rn) => this.getBaseObjectNameIndex(rn),
+            nameIndex: (rn) => this.nameIndex(rn),
         });
         this.monsterAttack.setCharacterStats(this.characterStats);
 
@@ -579,7 +583,7 @@ export class Game {
                 },
                 adjustSkills: (chIdx, skillNumber, experience, why) =>
                     this.applySpellSkillGain(chIdx, skillNumber, experience, why),
-                nameIndex: (rn) => this.getBaseObjectNameIndex(rn),
+                nameIndex: (rn) => this.nameIndex(rn),
                 possession: (champ, slot) => this.getChampionPossession(champ, slot),
                 trace: monsterHooks?.trace,
             },
@@ -1464,10 +1468,7 @@ export class Game {
         const random112 = (time & 0x40)
             | ((time & 0x80) >> 2)
             | ((time & 0x100) >> 4);
-        const getObjectNameIndex = (objectId: number): number | null => {
-            const value = this.getBaseObjectNameIndex(objectId as ObjectID);
-            return value >= 0 ? value : null;
-        };
+        const getObjectNameIndex = (objectId: number): number => this.nameIndex(objectId);
 
         for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
             const champ = party.champions[chIdx];
@@ -1679,7 +1680,7 @@ export class Game {
         const required = skillRequired + spellPower;
         const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
         const mastery = determineMastery(champion, spellByte5, {
-            getObjectNameIndex: (objectId) => this.getObjectNameIndex(objectId),
+            getObjectNameIndex: (objectId) => this.nameIndex(objectId),
         });
 
         if (mastery < required) {
@@ -1878,11 +1879,6 @@ export class Game {
             if (this.getBaseObjectNameIndex(obj) === OBJNI_EMPTY_FLASK) return obj;
         }
         return null;
-    }
-
-    private getObjectNameIndex(objectId: number): number | null {
-        const value = this.getBaseObjectNameIndex(objectId as ObjectID);
-        return value >= 0 ? value : null;
     }
 
     private applySpellSkillGain(chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy): void {
@@ -2389,42 +2385,19 @@ export class Game {
         return base >= OBJNI_TORCH_A && base <= OBJNI_TORCH_D;
     }
 
+    /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
     private getBaseObjectNameIndex(rn: ObjectID): number {
-        if (!this.objDescObjectType) return -1;
-        const descIndex = this.getObjectDescIndex(rn);
-        if (descIndex === null || descIndex < 0 || descIndex >= this.objDescObjectType.length) return -1;
-        const value = this.objDescObjectType[descIndex];
-        return typeof value === 'number' ? value | 0 : -1;
+        return GetBasicObjectType(this.dungeonState, this.objDescObjectType, rn);
     }
 
-    private getObjectDescIndex(rn: ObjectID): number | null {
-        const { category } = decodeObjectID(rn);
-        switch (category) {
-            case DBType.SCROLL:
-                return 0;
-            case DBType.CHEST: {
-                const rec = this.dungeonState.getContainerRecord(rn);
-                return rec ? 1 + (rec.containerType & 0x7f) : null;
-            }
-            case DBType.POTION: {
-                const rec = this.dungeonState.getPotionRecord(rn);
-                return rec ? 2 + (rec.potionType & 0x7f) : null;
-            }
-            case DBType.WEAPON: {
-                const rec = this.dungeonState.getWeaponRecord(rn);
-                return rec ? 23 + (rec.weaponType & 0x7f) : null;
-            }
-            case DBType.CLOTHING: {
-                const rec = this.dungeonState.getClothingRecord(rn);
-                return rec ? 69 + (rec.clothingType & 0x7f) : null;
-            }
-            case DBType.MISC: {
-                const rec = this.dungeonState.getMiscRecord(rn);
-                return rec ? 127 + (rec.miscType & 0x7f) : null;
-            }
-            default:
-                return null;
-        }
+    /** `RN::NameIndex` (`src/engine/objectIndex.ts`). */
+    private nameIndex(rn: number): number {
+        return NameIndex(
+            this.dungeonState,
+            { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
+            this.party.state.facing,
+            rn,
+        );
     }
 
     /**
@@ -2663,7 +2636,7 @@ export class Game {
         const base = throwingDistance + weaponBonus;
         const mastery = determineMastery(champion, 10, {
             partySleeping: party.sleeping ?? false,
-            getObjectNameIndex: (objectId: number) => this.getBaseObjectNameIndex(objectId as ObjectID),
+            getObjectNameIndex: (objectId: number) => this.nameIndex(objectId),
         });
         const range = base + this.random.below(16) + Math.trunc(base / 2) + mastery;
         const damage = this.applyLimits(40, 8 * mastery + (this.random.next() & 31), 200);

@@ -35,7 +35,7 @@ import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { Rect } from '../csbwin/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
-import { getAttackClass, getBaseObjectNameIndex } from './Objects';
+import { getAttackClass, getBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
 import { getChampionPossession } from './Character';
 import { nowMs, UIState } from './UIState';
 
@@ -118,7 +118,7 @@ function masteryOf(ui: UIState, champ: NonNullable<ReturnType<typeof championAt>
   return determineMastery(champ, skill, {
     partySleeping: ui.partyState?.sleeping ?? false,
     getObjectNameIndex: (objectId: number) => {
-      const value = getBaseObjectNameIndex(ui, objectId);
+      const value = resolveObjectNameIndex(ui, objectId);
       return value >= 0 ? value : null;
     },
   });

@@ -231,6 +231,7 @@ async function init() {
                 objDescObjectType: objectTables.objDescObjectType,
                 objDescCarryMask: objectTables.objDescCarryMask,
                 carryLocation: uiTables.graphic232.carryLocation,
+                byte640: uiTables.graphic232.byte640,
                 word1074: uiTables.graphic232.word1074,
                 monsterDesc: objectTables.monsterDesc,
                 cursorFilter: handleCursorFilter,

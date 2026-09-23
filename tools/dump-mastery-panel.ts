@@ -59,7 +59,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
-import { getBaseObjectNameIndex } from '../src/renderer/ui/Objects';
+import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
@@ -189,7 +189,7 @@ async function main(): Promise<void> {
       clothingWeights: objectTables.clothingWeights,
       miscWeights: objectTables.miscWeights,
     },
-    nameIndex: (rn) => getBaseObjectNameIndex(ui, rn),
+    nameIndex: (rn) => resolveObjectNameIndex(ui, rn),
   });
 
   /** Draw the panel for the champion as it stands and hand back the screen buffer. */

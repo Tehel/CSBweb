@@ -11,7 +11,7 @@ import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '.
 import { DBType, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
-import { descIndexForObject, getBaseObjectNameIndex, getDescIndexForObjectType, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getDescIndexForObjectType, isLikelyObjectRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
 import { UIState, nowMs } from './UIState';
 import { SoundIndex } from '@/core';
 
@@ -33,7 +33,7 @@ export function computeFeedParameters(
   if (!champ) return null;
 
   const isRecord = isLikelyObjectRecord(ui, objectId);
-  const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : getBaseObjectNameIndex(ui, objectId);
+  const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : objectId | 0;
   if (nameIndex < 0) return null;
   const category = isRecord ? decodeObjectID(objectId as ObjectID).category : null;
 

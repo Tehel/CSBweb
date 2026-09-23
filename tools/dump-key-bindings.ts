@@ -31,7 +31,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
-import { getBaseObjectNameIndex } from '../src/renderer/ui/Objects';
+import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { check, finish } from './lib/check';
 
 /**
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
       clothingWeights: objectTables.clothingWeights,
       miscWeights: objectTables.miscWeights,
     },
-    nameIndex: (rn) => getBaseObjectNameIndex(ui, rn),
+    nameIndex: (rn) => resolveObjectNameIndex(ui, rn),
   });
   ui.partyState = party.state;
 

@@ -28,6 +28,7 @@ const TSC = resolve(ROOT, 'node_modules/.bin/tsc');
 // tools take a level, and the wrong level activates no monsters and checks nothing.
 const CHECKS = [
   { tool: 'dump-object-name-index.ts' },
+  { tool: 'dump-object-index.ts' },
   { tool: 'dump-monster-tables.ts' },
   { tool: 'dump-monster-activation.ts', args: ['3'] },
   { tool: 'dump-monster-perception.ts' },

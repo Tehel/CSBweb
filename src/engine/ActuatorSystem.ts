@@ -1,3 +1,4 @@
+import { GetBasicObjectType } from './objectIndex';
 import {
   decodeObjectID,
   encodeObjectID,
@@ -11,14 +12,7 @@ import {
 import type { DungeonState } from './DungeonState';
 import type { PartyState } from './gameTypes';
 import { adjustSkills, AdjustSkillsWhy } from './skills';
-import type {
-  ActuatorRecord,
-  ContainerRecord,
-  MiscRecord,
-  PotionRecord,
-  WeaponRecord,
-  ClothingRecord,
-} from '../data/dungeonTypes';
+import type { ActuatorRecord } from '../data/dungeonTypes';
 import {
   ActuatorAction,
   getActuatorAction,
@@ -98,6 +92,8 @@ export const MSG_COLOR_ROOM_TEXT = 15;
 export interface ActuatorTables {
   roomTimerFunctions?: ArrayLike<number>;
   objDescObjectType?: ArrayLike<number>;
+  /** `d.Byte640`, for `NameIndex` (`src/engine/objectIndex.ts`). */
+  byte640?: ArrayLike<number>;
   objDescCarryMask?: ArrayLike<number>;
   carryLocation?: ArrayLike<number>;
   word1074?: ArrayLike<number>;
@@ -302,7 +298,7 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            const objType = this.getBasicObjectTypeFromValue(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+            const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
             switchOpen = isActuatorNormallyClosed(rec) === (getActuatorValue(rec) === objType);
             if (!switchOpen && actuatorType === 11) {
               this.performLocalAction(2, position.x, position.y, position.z, actuatorPos);
@@ -339,7 +335,7 @@ export class ActuatorSystem {
               party.objectInHand = found;
               emptyHanded = false;
             } else {
-              const objType = this.getBasicObjectTypeFromValue(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+              const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
               if (objType !== actuatorValue) {
                 skip = true;
                 break;
@@ -375,7 +371,7 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            const objType = this.getBasicObjectTypeFromValue(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+            const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
             if (objType !== getActuatorValue(rec)) {
               skip = true;
               break;
@@ -705,16 +701,16 @@ export class ActuatorSystem {
       const possessions = champ.possessions ?? [];
       for (const item of possessions) {
         if (item === null || item === undefined) continue;
-        if (this.getBasicObjectTypeFromValue(item) === targetObjectNameIndex) return true;
+        if (this.getBasicObjectType(item) === targetObjectNameIndex) return true;
       }
       if (champ.weaponHand !== null && champ.weaponHand !== undefined) {
-        if (this.getBasicObjectTypeFromValue(champ.weaponHand) === targetObjectNameIndex) return true;
+        if (this.getBasicObjectType(champ.weaponHand) === targetObjectNameIndex) return true;
       }
       if (champ.shieldHand !== null && champ.shieldHand !== undefined) {
-        if (this.getBasicObjectTypeFromValue(champ.shieldHand) === targetObjectNameIndex) return true;
+        if (this.getBasicObjectType(champ.shieldHand) === targetObjectNameIndex) return true;
       }
       if (champ.quiver !== null && champ.quiver !== undefined) {
-        if (this.getBasicObjectTypeFromValue(champ.quiver) === targetObjectNameIndex) return true;
+        if (this.getBasicObjectType(champ.quiver) === targetObjectNameIndex) return true;
       }
     }
     return false;
@@ -873,78 +869,9 @@ export class ActuatorSystem {
     return value;
   }
 
-  private getBasicObjectTypeFromValue(value: number): number {
-    const id = value & 0xffff;
-    const decoded = decodeObjectID(id as ObjectID);
-    if (decoded.category >= 0 && decoded.category < DBType.UNKNOWN) {
-      if (this.hasRecord(decoded.category, decoded.index)) {
-        return this.getBasicObjectType(id as ObjectID);
-      }
-    }
-    return value | 0;
-  }
-
-  private hasRecord(category: DBType, index: number): boolean {
-    switch (category) {
-      case DBType.WEAPON:
-        return index >= 0 && index < this.dungeon.getData().databases.weapons.records.length;
-      case DBType.CLOTHING:
-        return index >= 0 && index < this.dungeon.getData().databases.clothing.records.length;
-      case DBType.SCROLL:
-        return index >= 0 && index < this.dungeon.getData().databases.scrolls.records.length;
-      case DBType.POTION:
-        return index >= 0 && index < this.dungeon.getData().databases.potions.records.length;
-      case DBType.CHEST:
-        return index >= 0 && index < this.dungeon.getData().databases.containers.records.length;
-      case DBType.MISC:
-        return index >= 0 && index < this.dungeon.getData().databases.misc.records.length;
-      default:
-        return false;
-    }
-  }
-
-  private getBasicObjectType(rn: ObjectID): number {
-    if (!this.objDescObjectType) return OBJNI_NOT_AN_OBJECT;
-    if (rn === OBJECT_ID_NULL || rn === OBJECT_ID_EOF) return OBJNI_NOT_AN_OBJECT;
-
-    const decoded = decodeObjectID(rn);
-    const descIndex = this.getDescIndex(decoded.category, decoded.index);
-    if (descIndex < 0 || descIndex >= this.objDescObjectType.length) return OBJNI_NOT_AN_OBJECT;
-    return this.objDescObjectType[descIndex] ?? OBJNI_NOT_AN_OBJECT;
-  }
-
-  private getDescIndex(category: DBType, index: number): number {
-    switch (category) {
-      case DBType.SCROLL:
-        return 0;
-      case DBType.CHEST: {
-        const record = this.dungeon.getData().databases.containers.records[index] as ContainerRecord | undefined;
-        if (!record) return -1;
-        return (record.containerType & 0x3) + 1;
-      }
-      case DBType.MISC: {
-        const record = this.dungeon.getData().databases.misc.records[index] as MiscRecord | undefined;
-        if (!record) return -1;
-        return (record.miscType | 0) + 127;
-      }
-      case DBType.WEAPON: {
-        const record = this.dungeon.getData().databases.weapons.records[index] as WeaponRecord | undefined;
-        if (!record) return -1;
-        return (record.weaponType | 0) + 23;
-      }
-      case DBType.CLOTHING: {
-        const record = this.dungeon.getData().databases.clothing.records[index] as ClothingRecord | undefined;
-        if (!record) return -1;
-        return (record.clothingType | 0) + 69;
-      }
-      case DBType.POTION: {
-        const record = this.dungeon.getData().databases.potions.records[index] as PotionRecord | undefined;
-        if (!record) return -1;
-        return (record.potionType | 0) + 2;
-      }
-      default:
-        return -1;
-    }
+  /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
+  private getBasicObjectType(rn: number): number {
+    return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], rn);
   }
 
   private applyCursorFilter(

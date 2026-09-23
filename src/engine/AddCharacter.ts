@@ -7,6 +7,7 @@
  * other end (`doc/CSBwin-src/CSBCode.cpp:6615`).
  */
 
+import { DescIndexOfRecord } from './objectIndex';
 import { DBType, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
 import { CHARFLAG_MALE } from '../data/CsbwinCharacters';
@@ -292,36 +293,9 @@ function getCarryLocation(carryLocation: ArrayLike<number>, slot: number): numbe
 }
 
 function getCarryMask(item: AddCharacterItem, masks: ArrayLike<number>): number | null {
-  const objDescIndex = getObjDescIndex(item.category, item.record);
-  if (objDescIndex === null) return null;
+  const objDescIndex = DescIndexOfRecord(item.category, item.record);
+  if (objDescIndex === -1) return null;
   const mask = masks[objDescIndex];
   return typeof mask === 'number' ? mask : null;
 }
 
-function getObjDescIndex(category: DBType, record: DatabaseRecord | null): number | null {
-  if (!record) return null;
-  switch (category) {
-    case DBType.SCROLL:
-      return 0;
-    case DBType.CHEST:
-      return 1;
-    case DBType.POTION: {
-      const potionType = (record as { potionType?: number }).potionType;
-      return typeof potionType === 'number' ? 2 + potionType : null;
-    }
-    case DBType.WEAPON: {
-      const weaponType = (record as { weaponType?: number }).weaponType;
-      return typeof weaponType === 'number' ? 23 + weaponType : null;
-    }
-    case DBType.CLOTHING: {
-      const clothingType = (record as { clothingType?: number }).clothingType;
-      return typeof clothingType === 'number' ? 69 + clothingType : null;
-    }
-    case DBType.MISC: {
-      const miscType = (record as { miscType?: number }).miscType;
-      return typeof miscType === 'number' ? 127 + miscType : null;
-    }
-    default:
-      return null;
-  }
-}
