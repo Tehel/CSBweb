@@ -109,4 +109,19 @@ function survivors(q: TimerQueue): TimerEntry[] {
   check(survivors(q).length === 2, `5: another square does not clash (${describe(q)})`);
 }
 
+// 6. The sequence stamp is SetTimer's `m_timerSequence++` on the slot it inserts into
+// (Timer.cpp:1189): a dropped duplicate consumes none, and a timer queued through
+// addTimer — as MonsterSystem, MonsterAI and the DSA do — gets a fresh one.
+{
+  const { q } = queue(TimerFunction.TT_DOOR, 0);
+  const before = q.getNextSequence();
+  q.createTimer(TimerFunction.TT_DOOR_STEP, X, Y, 0, 1, T, LEVEL); // dropped: clashes with the TT_DOOR
+  check(q.getNextSequence() === before, `6: a dropped duplicate consumes no sequence number (${before} -> ${q.getNextSequence()})`);
+  const template = { ...q.getTimers()[0]!, index: -1, function: TimerFunction.TT_29, time: 50, sequence: 0 };
+  const a = q.addTimer(template);
+  const b = q.addTimer({ ...template, uByte6: 9 });
+  check(a.sequence === before && b.sequence === before + 1,
+    `6: addTimer stamps the next numbers (${a.sequence}, ${b.sequence}; expected ${before}, ${before + 1})`);
+}
+
 finish();

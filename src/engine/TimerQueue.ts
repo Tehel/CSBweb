@@ -170,7 +170,7 @@ export class TimerQueue {
       uByte7: y & 0xff,
       uByte8: pos & 0xff,
       uByte9: action & 0xff,
-      sequence: this.nextSequence++,
+      sequence: 0, // stamped by addTimer, if it is queued at all
       timerWord8: timerWord8 & 0xffff,
       timerWord6: sw(timerWord6),
       object,
@@ -201,7 +201,7 @@ export class TimerQueue {
       uByte7: y & 0xff,
       uByte8: pos & 0xff,
       uByte9: action & 0xff,
-      sequence: this.nextSequence++,
+      sequence: 0, // stamped by addTimer, if it is queued at all
       timerWord8: timerWord8 & 0xffff,
       timerWord6: sw(timerWord6),
       object,
@@ -225,9 +225,11 @@ export class TimerQueue {
     const deduped = this.applyDuplicateTimerRules(entry);
     if (deduped) return deduped;
 
-    // `D5L = m_firstAvailTimer` (`doc/CSBwin-src/Timer.cpp:1129`), then walk the cursor
-    // forward to the next empty entry (`Timer.cpp:1195-1198`).
-    const stored: TimerEntry = { ...entry, index: this.firstAvailTimer };
+    // `D5L = m_firstAvailTimer` (`doc/CSBwin-src/Timer.cpp:1129`), stamped with
+    // `m_timerSequence++` (`:1189`) — so a duplicate dropped above consumes no number, and
+    // a timer queued again gets a fresh one — then walk the cursor forward to the next
+    // empty entry (`Timer.cpp:1195-1198`).
+    const stored: TimerEntry = { ...entry, index: this.firstAvailTimer, sequence: this.nextSequence++ };
     this.indexMap.set(stored.index, stored);
     while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
     const idx = this.queue.findIndex((existing) => compareTimers(stored, existing) < 0);

@@ -76,7 +76,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C9 | Door pass-through rules and magic formulas | M | ✅ |
 | C10 | Phase 9.5 refinements | S | ✅ |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
-| C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ sequence stamp left |
+| C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ✅ |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
@@ -453,16 +453,18 @@ CSBWin timer search walks the **queue from its end** (`TIMER_SEARCH`, `:1209-121
 `:2924-2933`), not the slots. `TimerQueue.searchOrder()` is that order; the duplicate rules
 and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
 `tools/dump-timer-dedupe.ts` (3 of 15 checks fail before); the facts are in
-`doc/PROVEN_FACTS.md`, and `doc/CSBWIN_TIMERS_REFERENCE.md` is corrected. The sequence stamp
-`SetTimer` gives a timer on insertion is the second half of this entry, below.
+`doc/PROVEN_FACTS.md`, and `doc/CSBWIN_TIMERS_REFERENCE.md` is corrected.
 
-- ⏳ **The sequence number is stamped at the wrong time.** `SetTimer` stamps
-  `m_timerSequence++` on the slot it inserts into (`Timer.cpp:1189`, `SEQUENCED_TIMERS` is
-  defined in `stdafx.h:17`), so a dropped duplicate consumes none and a requeued timer
-  gets a fresh one. `TimerQueue.createTimer` stamps before the duplicate rules run, and
-  `addTimer` — which `MonsterSystem`, `MonsterAI` and `DsaSystem` call with their own
-  entries — keeps whatever the entry carried (the DSA passes 0). The stamp breaks ties
-  between timers due on the same tick, and is saved (`gb2.TimerSequence`).
+- ✅ **The sequence number was stamped at the wrong time.** Paid in `COMMIT_C12b`.
+  `SetTimer` stamps `m_timerSequence++` on the slot it inserts into (`Timer.cpp:1189`;
+  `SEQUENCED_TIMERS` is defined in `stdafx.h:17`), so a dropped duplicate consumes none and
+  a requeued timer gets a fresh one. `TimerQueue.createTimer` stamped before the duplicate
+  rules ran, and `addTimer` — which `MonsterSystem`, `MonsterAI` and `DsaSystem` call with
+  their own entries — kept whatever the entry carried (the DSA passed 0, a requeued monster
+  timer its old number). The stamp breaks ties between timers due on the same tick, and is
+  saved (`gb2.TimerSequence`). `addTimer` stamps now. Evidence: `tools/dump-timer-dedupe.ts`
+  case 6 (2 of 17 checks fail before). **Not ported:** the repack when the counter reaches
+  0xffff (`:1135-1188`) — the port's counter grows past 16 bits, and a save masks it.
 
 <details><summary>original entry</summary>
 
