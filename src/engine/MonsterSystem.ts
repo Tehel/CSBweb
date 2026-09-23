@@ -295,11 +295,12 @@ export class MonsterSystem {
     return this.loadedLevel !== (this.getPartyState().position.z | 0);
   }
 
-  /** Run `loadPartyLevel` if, and only if, the party's level has changed. */
-  loadPartyLevelIfChanged(): void {
+  /** Run `loadPartyLevel` if, and only if, the party's level has changed; say whether it ran. */
+  loadPartyLevelIfChanged(): boolean {
     const level = this.getPartyState().position.z | 0;
-    if (this.loadedLevel === level) return;
+    if (this.loadedLevel === level) return false;
     this.loadPartyLevel(level);
+    return true;
   }
 
   /**

@@ -209,6 +209,8 @@ export class Game {
      * a game load makes (`SaveGame.cpp:1661`).
      */
     private lastInputTime = 0;
+    /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */
+    private newPartyLevel = false;
     /** The timer queue. Public like the other subsystems; `tools/` drives it. */
     readonly timerQueue: TimerQueue;
     /**
@@ -772,7 +774,13 @@ export class Game {
             callback(this);
         }
 
-        this.monsterSystem.loadPartyLevelIfChanged();
+        // The top of a tick: `if (d.newPartyLevel != -1) { LoadPartyLevel(...); ...;
+        // DiscardAllInput(); }` (doc/CSBwin-src/CSBCode.cpp:615-623). A level the port
+        // already loaded mid-tick still owes its discard here.
+        if (this.monsterSystem.loadPartyLevelIfChanged() || this.newPartyLevel) {
+            this.newPartyLevel = false;
+            this.discardAllInput();
+        }
         this.timerSystem.processTimers(this.state.tickCount);
         this.processNinetySecondUpdate();
         this.processTenSecondUpdate();
@@ -828,7 +836,7 @@ export class Game {
                 this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
             this.notePartyMoved();
-            this.monsterSystem.loadPartyLevelIfChanged();
+            this.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
 
             // Update party state in game state
@@ -843,10 +851,7 @@ export class Game {
         } else {
             if (result.inhibited) {
                 // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
-                // `DiscardAllInput` empties CSBWin's key and mouse queues (`:7532`); the
-                // port's only queued input is the movement queue — clicks are handled as
-                // they arrive.
-                this.movementQueue.length = 0;
+                this.discardAllInput();
                 this.clockTickCleared = true;
             }
             // Notify callbacks of failure
@@ -893,7 +898,7 @@ export class Game {
      */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
-        this.monsterSystem.loadPartyLevelIfChanged();
+        this.loadPartyLevelIfChanged();
         this.timerSystem.processTimers(this.state.tickCount);
     }
 
@@ -919,6 +924,25 @@ export class Game {
         }
         party.partyMoveDisableTimer = time2move;
         party.word11712 = 0;
+    }
+
+    /**
+     * `DiscardAllInput` (doc/CSBwin-src/CSBCode.cpp:7532) empties CSBWin's key and mouse
+     * queues; the port's only queued input is the movement queue — clicks are handled as
+     * they arrive.
+     */
+    private discardAllInput(): void {
+        this.movementQueue.length = 0;
+    }
+
+    /**
+     * The port loads a new party level as soon as the party arrives on it; CSBWin only
+     * sets `d.newPartyLevel` there and loads it at the top of the next tick, where
+     * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623). So the discard is
+     * left for `gameTick`: input queued between the arrival and that tick is lost too.
+     */
+    private loadPartyLevelIfChanged(): void {
+        if (this.monsterSystem.loadPartyLevelIfChanged()) this.newPartyLevel = true;
     }
 
     /**
@@ -2341,7 +2365,7 @@ export class Game {
         if (!unchanged) this.notePartyMoved();
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
-        this.monsterSystem.loadPartyLevelIfChanged();
+        this.loadPartyLevelIfChanged();
         this.state.party = this.party.state;
     }
 
@@ -2560,7 +2584,7 @@ export class Game {
         if (!added) party.objectInHand = obj;
         if (added) {
             this.actuators.triggerObjectMove(landing, newObj, true, false, facing);
-            this.monsterSystem.loadPartyLevelIfChanged();
+            this.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
         }
         if (added && options?.viAltar) {

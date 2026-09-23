@@ -544,8 +544,13 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
   button-up behind them, `:7626-7630`, `:7586-7598`), and every event it handles stamps
   `lastTime`. Porting that means routing clicks through `processMovementQueue`'s
   successor — an input-queue item, not a movement one.
-- **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
-  pit or a teleporter to another level also throw away queued input. Not ported.
+- ✅ **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
+  pit or a teleporter to another level also throw away queued input. The port loads the
+  level on arrival, so `Game.loadPartyLevelIfChanged` notes the change and `gameTick`
+  discards at its top, where CSBWin does. Evidence: `tools/dump-party-collision.ts` case
+  10 (1 of 43 checks fails before); the fact is in `doc/PROVEN_FACTS.md`. Found on the
+  way: a level change made *inside* `ProcessTimers` is loaded at the next tick, not at
+  once — C20.
 - **Room type 7.** `D5W` is set only for stone, a shut door and a solid false wall
   (`:8224-8261`), so any other room type is entered; `DungeonState.isWalkable` refuses
   `RoomType.EMPTY` (7). Check whether any dungeon we load has such a cell before changing it.

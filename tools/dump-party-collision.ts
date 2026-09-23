@@ -567,6 +567,64 @@ async function main(): Promise<void> {
     internals.movementQueue.length = 0;
   }
 
+  // ---- Case 10: a level change discards all input, at the next tick ---------
+  // CSBWin sets `d.newPartyLevel` when the party changes level and, at the top of the
+  // next tick, `LoadPartyLevel(...); MoveObject(...); d.newPartyLevel = -1;
+  // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:615-623). A turn queued behind a step
+  // onto the stairs is therefore lost.
+  {
+    let stairs: { px: number; py: number; dir: number } | null = null;
+    for (let x = 0; x < width && !stairs; x++) {
+      for (let y = 0; y < height && !stairs; y++) {
+        if (roomTypeAt(x, y) !== RoomType.OPEN || monsterAt(x, y)) continue;
+        for (let dir = 0; dir < 4; dir++) {
+          const [ddx, ddy] = DIRS[dir];
+          const nx = x + ddx;
+          const ny = y + ddy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (roomTypeAt(nx, ny) === RoomType.STAIRS) { stairs = { px: x, py: y, dir }; break; }
+        }
+      }
+    }
+    check(stairs !== null, 'the level should have an open cell beside a stairway');
+    if (stairs) {
+      const party = game.party.state;
+      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.position = new Position(stairs.px, stairs.py, level);
+      game.party.setFacing(stairs.dir);
+      game.monsterSystem.loadPartyLevel(level);
+      party.partyMoveDisableTimer = 0;
+      internals.lastInputTime = 0;
+      internals.movementQueue.length = 0;
+      game.enqueueMovement(MovementAction.MOVE_FORWARD);
+      game.enqueueMovement(MovementAction.TURN_LEFT);
+      let t = T0 + 200_000;
+      const frame = (tickDue: boolean): void => {
+        t += 17;
+        internals.lastTickTime = tickDue ? t - 1000 : t;
+        game.runFrame(t);
+      };
+      frame(false);
+      const newLevel = party.position.z;
+      const queuedAfterStairs = internals.movementQueue.length;
+      frame(true);
+      const queuedAfterTick = internals.movementQueue.length;
+      const facingAfter = party.facing;
+      for (let i = 0; i < 6; i++) frame(i % 2 === 0);
+      const turned = party.facing !== facingAfter;
+      console.log(
+        `stairs: level ${level} -> ${newLevel}; queued after the step ${queuedAfterStairs}, ` +
+          `after the next tick ${queuedAfterTick}; the queued turn ran ${turned}`,
+      );
+      console.log('');
+      check(newLevel !== level, 'the step onto the stairs should change level');
+      check(queuedAfterStairs === 1, 'the turn should still be queued until the next tick');
+      check(queuedAfterTick === 0 && !turned, 'the next tick should discard the queued turn (DiscardAllInput)');
+      game.party.state.position = new Position(scene.px, scene.py, level);
+      game.monsterSystem.loadPartyLevel(level);
+    }
+  }
+
   // ---- Assertions ---------------------------------------------------------
 
   check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');

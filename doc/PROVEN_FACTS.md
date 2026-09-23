@@ -2613,6 +2613,17 @@ queue, `MOUSEQLEN` 3 (`Data.h:1515`), where `TAG0196da` refuses it when
 is queued only when `numEnt < MOUSEQLEN-2`, an empty queue, to leave room for its
 button-up (`:7626-7630`). Evidence: `tools/dump-party-collision.ts` cases 6 and 9.
 
+## A level change discards all input, at the top of the next tick
+
+Taking a stairway, falling or being teleported to another level only sets
+`d.newPartyLevel`. The main loop acts on it at the top of the next tick —
+`LoadPartyLevel(d.newPartyLevel); MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY);
+d.newPartyLevel = -1; DiscardAllInput();` (`doc/CSBwin-src/CSBCode.cpp:615-623`) — and,
+if `ProcessTimers` changed level again, loops back there in the same tick
+(`if (d.newPartyLevel != -1) goto tag0006a4;`, `:635`). So every key or click queued
+between the arrival and that tick is lost. Evidence: `tools/dump-party-collision.ts`
+case 10.
+
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
 
 `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) counts the active timers of its
