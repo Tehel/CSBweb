@@ -62,7 +62,8 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | A1 | Documentation pointers to things that no longer exist | S | ✅ archived |
 | A2 | Stale comments, a dead parameter, console noise | S | ✅ archived |
 | B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ |
-| B2 | Small helpers defined in several files | M | ⏳ |
+| B2 | Small helpers defined in several files | M | ✅ |
+| B3 | `LOCATIONREL` has three shapes | S | ⏳ |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ⏳ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ⏳ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ⏳ |
@@ -181,7 +182,38 @@ since the renderer and UI copies move.
 
 </details>
 
-### B2 ⏳ Small helpers defined in several files
+### B2 ✅ Small helpers defined in several files
+
+**Paid in `6f8b47c`..`4934252`, one commit per helper.** Every name below has one
+definition; each commit ran `npm test`, and the ones touching `src/renderer` or `src/ui`
+ran the golden frames too. No behaviour changed — where copies differed, the difference is
+shown unreachable below.
+
+| Helper | Now | Notes |
+| --- | --- | --- |
+| `normalizeWord6` ×5, private `sw` ×3 | `sw()` in `src/core/intCast.ts` | CSBWin's own name for the `(i16)` cast (`CSBTypes.h:136`); `i16` is already a type name in `core/types.ts`. `div` (×2) and `applyLimits` (×2, `CSBCode.cpp:1173`) moved beside it. `ApplyLimits` lets `min` win when `min > max`, `CharacterStats`' copy let `max` win; every caller passes constants with `min < max`. `Feeding.limit` stays: it is `LIMIT` (`CSB.h:3109`), a different macro. |
+| `findFirstMonsterAt` ×6 | `DungeonState.findFirstMonster` | A sixth copy was in `ui/ViewportPicking.ts`. `TimerSystem`'s returned `null`; its callers now test `OBJECT_ID_EOF`. Stopping on `OBJECT_ID_NULL` or not is the same walk: category 15 is never a creature and `getDBRecordLink(NULL)` is `EOF`. `AttackSystem` keeps a one-line wrapper for CSBWin's two-argument overload, on the party's level. |
+| `ordinalOfMonsterAtPosition` ×2 (+1 inline) | `monsterPosition.ts` | The body was already single; the three adapters that unpacked a `CreatureRecord` for it are now its record-level form, `(dungeon, monsterDesc, monster, pos)`. **C2 can use it.** |
+| `isMonsterAllowedOnLevel` ×3 | `DungeonState.monsterAllowedOnLevel` | The third was `MonsterPerception.monsterAllowedOnLevel`. |
+| `isValidLocation` ×2 | `DungeonState.isValidLocation(l, x, y)` | `LOCATIONREL::IsValid`, `DSA.cpp:310`. |
+| `getRoomTimerFunction` ×2 | `roomTimerFunction()` in `roomTimers.ts` | `d.Byte1596`. Its hardcoded fallback is an F1 candidate. |
+| `deleteMonsterMovementTimers` ×2 | `TimerQueue.deleteMonsterMovementTimers` | Takes the trace sink; `MonsterDamage`'s path now writes CSBWin's trace line too (trace output only). |
+| `quickness` ×2 | `CharacterStats.quickness` | `MonsterAttack.quickness` passes `d.PartySleeping` through. Its load-free fallback is gone; it could not run, since `Game` injects `CharacterStats` right after building `MonsterAttack`. |
+| `championAt` ×3 | `Party.getPartyChampion` | It already existed, exported for this. |
+| `triggerObjectMove` ×3 | `ActuatorSystem.triggerObjectMove` | That one is CSBWin's `PlaceOrRemoveObjectInRoom` (`Code11f52.cpp:3882`), now said so. `DsaSystem`'s wrapper went; it passed facing `0`, harmless because the facing is read only for actuator type 3, which requires the party itself (`OBJECT_ID_NULL`) as the mover. `Game.triggerObjectMove` stays: it is the UI drop (the walk, then level load and timers), documented as such. |
+| `setObjectPosition` ×2, `withPosition` | `withObjectPosition()` in `core/types.ts` | `RN::pos(p)`, `CSBTypes.h:336`. `ActuatorSystem`'s copy passed `NULL`/`EOF` through; both its callers are in branches where the hand is full. |
+| `isLikelyObjectRecord` ×2 | `engine/objectIndex.ts` | Takes a `DungeonState`. |
+| `readU16LE/BE`, `readU32LE/BE`, `readI16BE`, `readI8`, … | `src/core/bytes.ts` | Eight copies across five `src` files (`SaveGameLoader`, `CSBGraphicsLoader`, `CsbwinExtendedFeatures`, `CsbwinCharacters`, `ObjectTables`) and three tools. |
+
+Left alone, deliberately:
+
+- `ActuatorSystem.triggerObjectMove` takes `facing` as a parameter where CSBWin reads
+  `d.partyFacing` (`Code11f52.cpp:3776`). Every party-move caller passes the facing the
+  party has at that point; reading it inside would be tidier but needs each caller's
+  ordering checked against CSBWin's — not a dedupe.
+- `LOCATIONREL` has three shapes — B3.
+
+<details><summary>original entry</summary>
 
 Found by name. **Compare the bodies before merging**; where copies differ, find which one
 matches CSBWin before choosing.
@@ -220,6 +252,17 @@ merged here. `ordinalOfMonsterAtPosition` must be single before C2, which needs 
 
 Done when each name has one definition — or two, with a comment citing CSBWin for why they
 differ — and `npm test` passes.
+
+</details>
+
+### B3 ⏳ `LOCATIONREL` has three shapes
+
+Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`, `x`, `y`,
+`p`, with `Integer()` and `IsValid()`). The port has `TimerSystem.LocationRel`
+(`{ position, posInCell }`), `DsaSystem`'s `DsaLocation` (`{ l, x, y, p }`) and its
+`TeleportPartyLocation` (the same four fields again). Pick one, next to
+`DungeonState.isValidLocation`, and give it CSBWin's `Integer()` decoding
+(`DsaSystem`'s `intToLocation`). Size S.
 
 ---
 
@@ -550,6 +593,10 @@ The eye panel's mastery ranks vanished because a table was initialised empty and
 through a `continue`-on-falsy guard, which produced no warning and no marker. Other tables
 may be hiding the same way: sweep for arrays and tables initialised empty and read through
 such a guard.
+
+Known candidate: `DEFAULT_ROOM_TIMER_FUNCTIONS` (`src/engine/roomTimers.ts`), a hardcoded
+copy of `d.Byte1596` used when the extracted table is not wired. Find out whether any
+path still reaches it; if not, delete it.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “The eye panel prints the mastery ranks again”.</sub>
 
