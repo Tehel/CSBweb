@@ -1,7 +1,7 @@
 import { GetBasicObjectType } from './objectIndex';
 import {
   decodeObjectID,
-  encodeObjectID,
+  withObjectPosition,
   DBType,
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
@@ -354,7 +354,7 @@ export class ActuatorSystem {
                 skip = true;
                 break;
               }
-              const placed = this.setObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
+              const placed = withObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
               this.dungeon.addObjectToCell(position, placed);
               party.objectInHand = null;
               objectInHand = null;
@@ -391,7 +391,7 @@ export class ActuatorSystem {
               break;
             }
             this.dungeon.removeObjectFromCell(position, firstObject);
-            const placed = this.setObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
+            const placed = withObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
             this.dungeon.addObjectToCell(position, placed);
             this.applyCursorFilter(CursorFilterType.SwapReplace, firstObject, position, actuatorPos);
             party.objectInHand = firstObject;
@@ -910,12 +910,6 @@ export class ActuatorSystem {
       if (this.getBasicObjectType(rn) === objectNameIndex) return rn;
     }
     return null;
-  }
-
-  private setObjectPosition(rn: ObjectID, pos: number): ObjectID {
-    if (rn === OBJECT_ID_NULL || rn === OBJECT_ID_EOF) return rn;
-    const decoded = decodeObjectID(rn);
-    return encodeObjectID(pos & 0x3, decoded.category, decoded.index);
   }
 
 }

@@ -38,7 +38,7 @@ import { AttackType } from './monsterTypes';
 import { constructPredefinedMissile } from './missileHelpers';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -1333,7 +1333,7 @@ export class Game {
             slots[i] = null;
             const rn = value as ObjectID;
             if (!this.isLikelyObjectRecord(rn)) continue;
-            this.dungeonState.addObjectToCell(here, this.setObjectPosition(rn, champ.partyPosition & 0x3));
+            this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
         }
         champ.weaponHand = null;
         champ.shieldHand = null;
@@ -1808,7 +1808,7 @@ export class Game {
                             } else {
                                 const placed = this.dungeonState.addObjectToCell(
                                     this.party.state.position,
-                                    this.setObjectPosition(zokathra, 0),
+                                    withObjectPosition(zokathra, 0),
                                 );
                                 if (!placed) this.dungeonState.deleteDBEntry(zokathra);
                             }
@@ -1989,11 +1989,6 @@ export class Game {
         if (slot === 0) champion.shieldHand = obj;
         if (slot === 1) champion.weaponHand = obj;
         return true;
-    }
-
-    private setObjectPosition(rn: ObjectID, pos: number): ObjectID {
-        const decoded = decodeObjectID(rn);
-        return encodeObjectID((pos & 3) as number, decoded.category, decoded.index);
     }
 
     private createMiscObject(miscType: number): ObjectID | null {

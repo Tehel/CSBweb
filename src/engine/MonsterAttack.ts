@@ -16,7 +16,7 @@
  * amend, and only then acts on it. That indirection is the whole reason the block
  * exists as a struct in CSBWin, so it is kept as one here.
  */
-import { OBJECT_ID_EOF, Position, type ObjectID } from '../core/types';
+import { OBJECT_ID_EOF, Position, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
@@ -583,7 +583,7 @@ export class MonsterAttack {
     if (bones !== null) {
       const placed = this.dungeon.addObjectToCell(
         new Position(party.position.x, party.position.y, party.position.z),
-        withPosition(bones, champ.partyPosition & 0x3),
+        withObjectPosition(bones, champ.partyPosition & 0x3),
       );
       if (placed) this.hooks?.registerBones?.(bones, chIdx);
       else this.dungeon.deleteDBEntry(bones);
@@ -638,7 +638,7 @@ export class MonsterAttack {
       miscType: MISC_BONES_OF_HERO,
     });
     db.count++;
-    return withPosition(encodeMisc(db.records.length - 1), 0);
+    return withObjectPosition(encodeMisc(db.records.length - 1), 0);
   }
 
   /**
@@ -890,8 +890,4 @@ export function scaledMultiply(value: number, shift: number, factor: number): nu
 function encodeMisc(index: number): ObjectID {
   // DBType.MISC is 10; the position bits are set separately.
   return ((10 << 10) | (index & 0x3ff)) as ObjectID;
-}
-
-function withPosition(rn: ObjectID, position: number): ObjectID {
-  return (((position & 0x3) << 14) | (rn & 0x3fff)) as ObjectID;
 }

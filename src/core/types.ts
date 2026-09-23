@@ -137,6 +137,13 @@ export function encodeObjectID(position: TilePosition, category: DBType, index: 
 }
 
 /**
+ * `RN::pos(p)` (doc/CSBwin-src/CSBTypes.h:336) — the same object, moved to corner `p`.
+ */
+export function withObjectPosition(rn: ObjectID, position: number): ObjectID {
+    return ((position & 0x03) << 14) | (rn & 0x3FFF);
+}
+
+/**
  * Cell flags (1 byte per tile)
  * CSBTypes.h CELLFLAG line ~177
  *
