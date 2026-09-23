@@ -2486,3 +2486,31 @@ the door at once.
 every `TT_1` or `TT_DOOR` timer with the same `timerWord6` (the cell) and level is deleted,
 whatever its time — so a door that was opening or closing stops being animated before it
 shatters. Evidence: `tools/dump-player-attacks.ts` case 8.
+
+## A missile hits the monster in its corner, for `64 × magic / defense`
+
+`ProcessMissileEncounter`'s monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`):
+
+- The victim is `OrdinalOfMonsterAtPosition(group, objectPos)` (`:1961-1962`) — the member
+  in the corner the missile reached. An ordinal of 0 returns 0, and the missile flies on,
+  unless the group is `drawAsSize4()`, when member 1 is hit (`:1963-1967`).
+- A **fireball reaching a Black Flame heals it**: `hitPoints6[i] = Smaller(1000, hp +
+  DetermineMagicDamage(...))`, then the missile is removed and returns 1 — no damage, no
+  sound, no cloud (`:1976-1996`).
+- A non-material monster ignores everything but `RNDispellMissile` (`:1998-2001`).
+- The blow is `D0L = 64 * (DetermineMagicDamage(...) & 0xffff)`, then `D5W = sw((D0L &
+  0xffff) / defense08)` with a `defense08` of 0 read as 1 (`:2006-2012`). A blow of 0
+  `break`s out of the switch: no `DamageMonster`, but the missile still lands through the
+  shared tail. Otherwise it adds `DeterminePoisonDamage(type, d.Word12962)` — the poison
+  strength `DetermineMagicDamage` just set — and calls `DamageMonster(group, ordinal-1, x,
+  y, D5W + D1W, 1, false, pmmr)` (`:2013-2024`).
+- If anyone survives, `ProcessTimers29to41(x, y, TT_M2, 0)` (`:2025-2028`).
+- A dagger, arrow, slayer, poison dart or throwing star sticks in a monster that
+  `absorbsDaggersEtc` only when the blow killed nobody (`:2031-2041`).
+
+**A thrown potion is a potion until the tail.** `RNprojectile` keeps the Ven or Ful
+potion's own RN through the whole switch (`:1771-1810`); only the tail swaps in the cloud
+(`if (w_56 != 0) RNprojectile = obj_26`, `:2060-2063`). So the blow a bomb lands on a
+monster, a champion or a door is `DetermineMagicDamage` of the potion — a random 0-3 plus
+half its weight — and the explosion comes after it, and `nonPoison_Spell` is false for a
+potion. Evidence: `tools/dump-missile-monster.ts`.

@@ -55,7 +55,7 @@ import {
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterFireResistance } from '../renderer/csbwin/ObjectTables';
-import { StateOfFear } from './monsterTypes';
+import { MonsterType, StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import {
   monsterAbsorbsDaggersEtc,
@@ -152,16 +152,18 @@ export interface TimerHooks {
     poisonStrength: number;
     range: number;
   }) => void;
-  onMissileHitMonster?: (options: {
-    missile: number;
-    projectile: number;
-    monster: number;
-    position: Position;
-    posInCell: number;
-    direction: number;
-    damage: number;
-    range: number;
-  }) => boolean;
+  /**
+   * `DamageMonster(pMonster, indexInGroup, x, y, damage, 1, false, pmmr)` — the missile
+   * arm's call (`doc/CSBwin-src/Code11f52.cpp:2016-2024`).
+   */
+  damageMonster?: (
+    monster: CreatureRecord,
+    indexInGroup: number,
+    level: number,
+    mapX: number,
+    mapY: number,
+    damage: number,
+  ) => MonsterDamageResult;
   onMissileEncounterFilter?: (options: {
     type: number;
     position: Position;
@@ -194,7 +196,7 @@ export interface TimerHooks {
     level: number;
     timerFunction: number;
     timeUntilAlternateUpdate: number;
-    timer: TimerEntry;
+    timer?: TimerEntry;
   }) => void;
   onSpawnMonster?: (options: {
     type: number;
@@ -1812,17 +1814,13 @@ export class TimerSystem {
    */
   private monsterDamageResult: MonsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
 
-  reportMonsterDamageResult(result: MonsterDamageResult): void {
-    this.monsterDamageResult = result;
-  }
-
   /**
    * Whether the last `DamageMonster` wiped out the whole group.
    *
-   * A method rather than an inline comparison because the field is only ever written
-   * from a hook — `Game.applyMissileDamageToMonster` calls
-   * `reportMonsterDamageResult` — which `tsc` cannot see, so it narrows the field to
-   * its initialiser and rejects the comparison.
+   * A method rather than an inline comparison because the field changes inside
+   * `processMissileEncounter`, which `tsc`'s narrowing does not see through: after the
+   * reset beside a call, it would narrow the field to `NO_MONSTER_DIED` and reject the
+   * comparison.
    */
   private groupWasWipedOut(): boolean {
     return (this.monsterDamageResult as number) === MonsterDamageResult.ALL_MONSTERS_DIED;
@@ -1964,8 +1962,13 @@ export class TimerSystem {
     const position = new Position(missileX, missileY, this.missileFilterTimer?.level ?? 0);
     const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
     const filterProjectile = missile.projectileObject & 0xffff;
-    let projectile = missile.projectileObject & 0xffff;
-    let projectileDbType = this.isMagicSpell(projectile)
+    // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1770`).
+    this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+    // `RNprojectile` stays the potion all through the switch below: a Ven or Ful potion
+    // becomes its cloud (`obj_26`) only in the shared tail (`:2060-2063`), so the blow it
+    // lands first — on a champion, a monster or a door — is a thrown object's.
+    const projectile = missile.projectileObject & 0xffff;
+    const projectileDbType = this.isMagicSpell(projectile)
       ? DBType.CLOUD
       : decodeObjectID(projectile).category;
 
@@ -1988,10 +1991,7 @@ export class TimerSystem {
       }
     }
 
-    if (convertedPotion) {
-      projectile = convertedProjectile & 0xffff;
-      projectileDbType = DBType.CLOUD;
-    }
+    const tailProjectile = convertedPotion ? convertedProjectile & 0xffff : projectile;
 
     const nonPoisonSpell =
       projectileDbType === DBType.CLOUD &&
@@ -2032,7 +2032,7 @@ export class TimerSystem {
         if (this.missileEncounterFilter(2, position, objectPos, missileRn, filterProjectile, -1) === 1) {
           return false;
         }
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -2: {
         // `objectPos = CharacterAtPosition(objectPos); if (objectPos < 0) return 0;`
@@ -2065,60 +2065,92 @@ export class TimerSystem {
         }
         // The missile is spent either way: a dispel missile does a champion no damage
         // at all (`DetermineMagicDamage` returns 0 for it) and still lands.
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -1: {
+        // The monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`).
         const monsterRn = this.dungeon.findFirstMonster(position);
         if (monsterRn === OBJECT_ID_EOF) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
-        if (monster) {
-          const monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, objectPos);
-          const filterIndex = monsterOrdinal > 0 ? monsterOrdinal - 1 : -1;
-          if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, filterIndex) === 1) {
-            return false;
-          }
-          const desc = this.tables?.monsterDesc?.[monster.creatureType];
-          const nonMaterial = desc ? monsterNonMaterial(desc) : false;
-          const absorbs = desc ? monsterAbsorbsDaggersEtc(desc) : false;
-          if (nonMaterial && projectile !== RN_DISPELL_MISSILE) return false;
+        if (!monster) return false;
+        // The member in the corner the missile reached. Nobody there lets it fly on —
+        // unless the group is drawn as one full-cell figure, when member 1 takes it.
+        let monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, objectPos);
+        if (monsterOrdinal === 0) {
+          if (!monster.drawAsSize4) return false;
+          monsterOrdinal = 1;
+        }
+        if (this.missileEncounterFilter(1, position, objectPos, missileRn, filterProjectile, monsterOrdinal - 1) === 1) {
+          return false;
+        }
+        const monsterType = monster.creatureType;
+        const desc = this.tables?.monsterDesc?.[monsterType];
+        if (!desc) return false;
 
-          if (projectileDbType === DBType.WEAPON && absorbs) {
-            const weapon = this.dungeon.getWeaponRecord(projectile as number);
-            if (weapon) {
-              const wt = weapon.weaponType | 0;
-              if (
-                wt === WEAPON_DAGGER ||
-                wt === WEAPON_ARROW ||
-                wt === WEAPON_SLAYER ||
-                wt === WEAPON_POISON_DART ||
-                wt === WEAPON_THROWING_STAR
-              ) {
-                absorbedMonster = monsterRn;
-              }
+        // A fireball feeds a Black Flame: `hitPoints6 = Smaller(1000, hp + magic)`, and
+        // the missile is simply gone — no damage, no sound, no explosion (`:1976-1996`).
+        // CSBWin's potion bookkeeping in this branch is unreachable: `RNprojectile` is
+        // the potion itself, never `RNFireball`, while a bomb is in flight.
+        if (projectile === RN_FIREBALL && monsterType === MonsterType.mon_BlackFlame) {
+          const i = monsterOrdinal - 1;
+          const magic = this.determineMagicDamage(missile, projectile);
+          monster.hp[i] = sw(Math.min(1000, (monster.hp[i] ?? 0) + magic.damage)) & 0xffff;
+          this.processObjectFromMissile(missileRn, null, position);
+          return true;
+        }
+        if (monsterNonMaterial(desc) && projectile !== RN_DISPELL_MISSILE) return false;
+
+        // `D0L = 64 * (DetermineMagicDamage(...) & 0xffff); D5W = (D0L & 0xffff) / D1W`,
+        // with `D1W = defense08`, 0 read as 1 (`:2006-2012`). A blow that rounds to 0
+        // skips `DamageMonster` but the missile still lands.
+        const magic = this.determineMagicDamage(missile, projectile);
+        const defense = desc.defense08 === 0 ? 1 : desc.defense08;
+        const blow = sw(Math.trunc(((64 * (magic.damage & 0xffff)) & 0xffff) / defense));
+        if (blow !== 0 && this.hooks?.damageMonster) {
+          // `DeterminePoisonDamage(mt_60, d.Word12962)` — the poison strength the
+          // `DetermineMagicDamage` call above just set.
+          const poison = sw(this.hooks.determinePoisonDamage?.(monsterType, magic.poisonStrength) ?? 0);
+          const result = this.hooks.damageMonster(
+            monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison,
+          );
+          // "At least one monster in group remains": the survivors react.
+          if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
+            this.hooks.onMonsterAI?.({
+              mapX: objX,
+              mapY: objY,
+              level: position.z,
+              timerFunction: TimerFunction.TT_M2,
+              timeUntilAlternateUpdate: 0,
+            });
+          }
+          this.monsterDamageResult = result;
+          // A dagger, arrow, slayer, poison dart or throwing star sticks in a monster
+          // that absorbs them — but only if nobody died of the blow (`:2031-2042`).
+          if (
+            !nonPoisonSpell &&
+            result === MonsterDamageResult.NO_MONSTER_DIED &&
+            projectileDbType === DBType.WEAPON &&
+            monsterAbsorbsDaggersEtc(desc)
+          ) {
+            const wt = (this.dungeon.getWeaponRecord(projectile as number)?.weaponType ?? -1) | 0;
+            if (
+              wt === WEAPON_DAGGER ||
+              wt === WEAPON_ARROW ||
+              wt === WEAPON_SLAYER ||
+              wt === WEAPON_POISON_DART ||
+              wt === WEAPON_THROWING_STAR
+            ) {
+              absorbedMonster = monsterRn;
             }
           }
         }
-
-        if (this.hooks?.onMissileHitMonster) {
-          const consumed = this.hooks.onMissileHitMonster({
-            missile: missileRn,
-            projectile,
-            monster: monsterRn,
-            position,
-            posInCell: objectPos,
-            direction,
-            damage: missile.damageRemaining & 0xff,
-            range: missile.rangeRemaining & 0xff,
-          });
-          if (!consumed) return false;
-        }
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       default:
         break;
     }
 
-    return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+    return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
   }
 
   /**

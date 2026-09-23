@@ -30,7 +30,7 @@ import { SoundQueue } from './SoundQueue';
 import { PartyFootprints, type FootprintsSnapshot } from './PartyFootprints';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { MonsterPerception } from './MonsterPerception';
-import { MonsterDamage, MonsterDamageResult } from './MonsterDamage';
+import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
 import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
@@ -355,7 +355,10 @@ export class Game {
                 objectWeight: (rn) => this.characterStats.getObjectWeight(rn as ObjectID),
                 weaponThrowDamage: (rn) =>
                     this.characterStats.weaponDescFor(rn as ObjectID)?.uByte3 ?? 0,
-                onMissileHitMonster: (options) => this.applyMissileDamageToMonster(options),
+                damageMonster: (monster, indexInGroup, level, mapX, mapY, damage) =>
+                    this.monsterDamage.damageMonster(
+                        monster, indexInGroup, level, mapX, mapY, damage, true, false,
+                    ),
                 onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
                 // The cloud machinery: `ProcessTT_25` needs to hurt whatever is standing
@@ -1251,52 +1254,6 @@ export class Game {
         if ((options.poisonStrength | 0) !== 0 && this.random.bool() !== 0) {
             this.monsterAttack.poisonCharacter(options.chIdx, options.poisonStrength | 0);
         }
-    }
-
-    /**
-     * A missile hit a monster. Now routed through the real `DamageMonster`
-     * (`doc/CSBwin-src/Code11f52.cpp:1054`) instead of the stand-in that used to live
-     * here — so a hit now produces the death cloud, the droppings, the dropped
-     * possessions, the survivors' fear reaction and the per-member timer
-     * renumbering, none of which the stand-in did.
-     *
-     * The damaged member is the first with hit points left, which is what the
-     * compaction in `DamageMonster` maintains: survivors are always packed down to
-     * the low indices.
-     */
-    private applyMissileDamageToMonster(options: {
-        damage: number;
-        monster: number;
-        position: PartyState['position'];
-    }): boolean {
-        const damage = options.damage | 0;
-        if (damage <= 0) return false;
-        const record = this.dungeonState.getCreatureRecord(options.monster);
-        if (!record) return false;
-
-        const hp = record.hp ?? [];
-        let targetIndex = -1;
-        for (let i = 0; i <= (record.numMonM1 & 0x3); i++) {
-            if ((hp[i] ?? 0) > 0) {
-                targetIndex = i;
-                break;
-            }
-        }
-        if (targetIndex === -1) return false;
-
-        const position = options.position;
-        const result = this.monsterDamage.damageMonster(
-            record,
-            targetIndex,
-            position.z,
-            position.x,
-            position.y,
-            damage,
-            true,
-            this.dungeonState.getAttachedItem16(record) === null,
-        );
-        this.timerSystem.reportMonsterDamageResult(result);
-        return result !== MonsterDamageResult.NO_MONSTER_DIED || damage > 0;
     }
 
     /**

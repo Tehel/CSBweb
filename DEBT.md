@@ -66,7 +66,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | B2 | Small helpers defined in several files | M | ✅ |
 | B3 | `LOCATIONREL` has three shapes | S | ⏳ |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
-| C2 | Missile→monster damage skips the magic and poison formulas | M | ⏳ |
+| C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ⏳ |
 | C4 | `DamageCharacter` is missing two early guards | S | ⏳ |
 | C5 | Three movement deferrals | M | ⏳ |
@@ -307,7 +307,28 @@ door and check its state on the attack tick and after the delay.
 
 </details>
 
-### C2 ⏳ Missile→monster damage skips the magic and poison formulas
+### C2 ✅ Missile→monster damage skips the magic and poison formulas
+
+**Paid in the commit "Missiles hit the monster in their corner, through CSBWin's formula".**
+`TimerSystem.processMissileEncounter`'s monster arm is now CSBWin's, line for line
+(`Code11f52.cpp:1960-2042`): the victim is `ordinalOfMonsterAtPosition` of the arrival
+corner (an empty corner lets the missile fly on unless the group is `drawAsSize4`); a
+fireball heals a Black Flame (capped at 1000) and vanishes; the blow is
+`sw(((64 * magic) & 0xffff) / defense08) + DeterminePoisonDamage`, and a blow of 0 skips
+`DamageMonster` but still spends the missile; survivors get `ProcessTimers29to41(TT_M2)`;
+the dagger-absorption arm runs only when nobody died. `Game.applyMissileDamageToMonster`
+is gone — a `damageMonster` hook takes its place, passing CSBWin's `noItem16 = false` —
+and `d.MonsterDamageResult` is reset at the top of each encounter, as CSBWin does.
+
+Found on the way and fixed in the same commit, because the monster arm's formula depends
+on it: the port turned a thrown Ven or Ful potion into its cloud **before** the switch,
+while CSBWin keeps `RNprojectile` as the potion until the tail (`:2060-2063`). So a bomb's
+first blow — on a monster *and* on a champion — was a fireball's instead of a thrown
+object's. The door arm will read the potion too once C9 ports its pass-through test.
+Evidence: `tools/dump-missile-monster.ts` (9 of 15 checks fail before); the fact is in
+`doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 The monster arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:2007-2015`)
 divides `64 * DetermineMagicDamage(...)` by the monster's `defense08`, adds
@@ -323,6 +344,8 @@ scenario that fires at a real group and checks the damage against a hand computa
 the formula, and which member took it.
 
 <sub>Recorded in Phase 13. Context: `doc/PLAN_ARCHIVE.md` → "Phase 13 — Champion lifecycle".</sub>
+
+</details>
 
 ### C3 ⏳ `NinetySecondUpdate` cadence, and its body unaudited
 
@@ -401,7 +424,11 @@ missiles) and the magic damage and poison formulas, including Black Flame fireba
 (`doc/CSBwin-src/Code11f52.cpp:1870+`, `:1488+`). Partly overtaken since:
 `DetermineMagicDamage` exists now (`src/engine/TimerSystem.ts:2621`), and commit `83cccd0`
 ("Thrown items colliding doors wall on the right side") worked on the door path. Audit what
-is actually left before starting. C2 covers the monster arm.
+is actually left before starting. C2 paid the monster arm, Black Flame healing included;
+what C2 saw of the door arm (`TimerSystem.processMissileEncounter`, `case RoomType.DOOR`)
+is that it has neither the `DoorTOC & 2` pass-through test nor the `HitDoor` with
+`DetermineMagicDamage + 1` force (`Code11f52.cpp:1867-1945`) — a missile at a shut door
+just stops.
 
 ### C10 ⚠️ Phase 9.5 refinements *(re-audit)*
 
