@@ -29,6 +29,8 @@
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, decodeObjectID, type ObjectID } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
+import { getPartyChampion } from '../../engine/Party';
+import type { Champion } from '../../engine/gameTypes';
 import { determineMastery } from '../../engine/skills';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -48,12 +50,6 @@ export function attackButtonRect(chIdx: number): Rect {
   return { x1, y1: 86, x2: x1 + 19, y2: 120 };
 }
 
-function championAt(ui: UIState, chIdx: number) {
-  const party = ui.partyState;
-  if (!party) return null;
-  return party.champions[chIdx] ?? null;
-}
-
 /**
  * `ItemHasChargesLeft` (`doc/CSBwin-src/Character.cpp:4745`).
  *
@@ -63,7 +59,7 @@ function championAt(ui: UIState, chIdx: number) {
  * charge field at all.
  */
 export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
-  const champ = championAt(ui, chIdx);
+  const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return true;
   const obj = getChampionPossession(champ, 1);
   if (obj === null) return true;
@@ -90,7 +86,7 @@ export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
  * while the object still has charges.
  */
 export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<number>): void {
-  const champ = championAt(ui, chIdx);
+  const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   ui.possibleAttackTypes[0] = row[0] ?? 0;
   ui.byte20256[0] = 1;
 
@@ -114,7 +110,7 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
   for (let i = count; i < 3; i++) ui.possibleAttackTypes[i] = -1;
 }
 
-function masteryOf(ui: UIState, champ: NonNullable<ReturnType<typeof championAt>>, skill: number): number {
+function masteryOf(ui: UIState, champ: Champion, skill: number): number {
   return determineMastery(champ, skill, {
     partySleeping: ui.partyState?.sleeping ?? false,
     getObjectNameIndex: (objectId: number) => {
@@ -132,7 +128,7 @@ function masteryOf(ui: UIState, champ: NonNullable<ReturnType<typeof championAt>
  * row. A held object whose attack class is 0 has none at all and the click is ignored.
  */
 export function prepareAttack(ui: UIState, chIdx: number): void {
-  const champ = championAt(ui, chIdx);
+  const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return;
   if (champ.alive === false || (champ.attributes.health | 0) === 0) return;
 
@@ -277,7 +273,7 @@ export function attackPanelTick(ui: UIState): void {
 export function drawAttackButton(ui: UIState, chIdx: number): void {
   if (!ui.screenIndexBuffer || !ui.uiTables) return;
   const rect = attackButtonRect(chIdx);
-  const champ = championAt(ui, chIdx);
+  const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   const alive = !!champ && champ.alive !== false && (champ.attributes.health | 0) !== 0;
 
   if (!alive) {
@@ -335,7 +331,7 @@ export function drawAttackPanel(ui: UIState): void {
   }
 
   if (ui.attackingCharacterOrdinal === 0) return;
-  const champ = championAt(ui, ui.attackingCharacterOrdinal - 1);
+  const champ = ui.partyState && getPartyChampion(ui.partyState, ui.attackingCharacterOrdinal - 1);
   if (!champ) return;
 
   let numAttackOption = 3;

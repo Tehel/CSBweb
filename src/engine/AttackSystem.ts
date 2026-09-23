@@ -34,6 +34,7 @@ import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
+import { getPartyChampion } from './Party';
 import type { CharacterStats } from './CharacterStats';
 import type { MonsterAttack } from './MonsterAttack';
 import type { MonsterDamage } from './MonsterDamage';
@@ -387,11 +388,6 @@ export class AttackSystem {
     return this.deps.getPartyState().champions;
   }
 
-  private championAt(chIdx: number): Champion | null {
-    if (chIdx < 0) return null;
-    return this.champions()[chIdx] ?? null;
-  }
-
   private possession(champ: Champion | null, slot: number): ObjectID | null {
     if (!champ) return null;
     return this.hooks.possession?.(champ, slot) ?? null;
@@ -528,7 +524,7 @@ export class AttackSystem {
     vorpalOrDisrupt: boolean,
   ): number {
     const random = this.deps.random;
-    const champ = this.championAt(params.charIdx);
+    const champ = getPartyChampion(this.deps.getPartyState(), params.charIdx);
     const phys = params.attdep.physicalAttack;
 
     this.trace(
@@ -672,7 +668,7 @@ export class AttackSystem {
   private attackWithPhysicalForce(params: PartyAttackParameters, filter: PartyAttackFilter | null): number {
     const party = this.deps.getPartyState();
     const tables = this.deps.tables;
-    const champ = this.championAt(params.charIdx);
+    const champ = getPartyChampion(this.deps.getPartyState(), params.charIdx);
     const phys = params.attdep.physicalAttack;
 
     this.trace(`Enter AttackWithPhysicalForce (attackType=${params.attackType}, skillNumber=${params.skillNumber})`);
@@ -770,7 +766,7 @@ export class AttackSystem {
       default: break;
     }
 
-    const champ = this.championAt(params.charIdx);
+    const champ = getPartyChampion(this.deps.getPartyState(), params.charIdx);
     wc.mastery = sw(wc.mastery + sw(champ ? this.masteryOf(champ, 14) : 0));
 
     const monster = this.deps.dungeon.getCreatureRecord(this.monsterUnderAttack);
@@ -815,7 +811,7 @@ export class AttackSystem {
     range: number,
     projectile: number,
   ): number {
-    const champ = this.championAt(params.charIdx);
+    const champ = getPartyChampion(this.deps.getPartyState(), params.charIdx);
     if (!champ) return 0;
     this.setCharToPartyFacing(champ);
 
@@ -855,7 +851,7 @@ export class AttackSystem {
    * different fields, and a count of zero is left alone rather than wrapping.
    */
   decrementChargesRemaining(chIdx: number): void {
-    const obj = this.possession(this.championAt(chIdx), 1);
+    const obj = this.possession(getPartyChampion(this.deps.getPartyState(), chIdx), 1);
     if (obj === null) return;
     const dungeon = this.deps.dungeon;
     switch (decodeObjectID(obj).category) {

@@ -22,6 +22,7 @@ import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
+import { getPartyChampion } from './Party';
 import { MonsterType } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
 import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
@@ -225,7 +226,7 @@ export class MonsterAttack {
         this.hooks?.stealFromCharacter?.(monster, chIdx);
       } else {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
-        const champ = this.championAt(chIdx);
+        const champ = getPartyChampion(this.getPartyState(), chIdx);
         // `maxRecentDamage` drives which way the portrait's damage flash points.
         if (champ && dealt > (champ.maxRecentDamage ?? 0)) {
           champ.maxRecentDamage = dealt & 0xff;
@@ -298,7 +299,7 @@ export class MonsterAttack {
     if (monsterWord2Bit4(desc)) {
       let target = this.random.zeroTo3();
       let tries = 0;
-      while (tries < 4 && (this.championAt(target)?.attributes.health ?? 0) === 0) {
+      while (tries < 4 && (getPartyChampion(this.getPartyState(), target)?.attributes.health ?? 0) === 0) {
         target = (target + 1) & 0x3;
         tries++;
       }
@@ -358,7 +359,7 @@ export class MonsterAttack {
    */
   monsterDamagesCharacter(monster: CreatureRecord, chIdx: number, supressPoison: boolean): number {
     const party = this.getPartyState();
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
     if (party.sleeping) this.hooks?.wakeUp?.();
@@ -461,7 +462,7 @@ export class MonsterAttack {
    */
   adjustStamina(chIdx: number, decrement: number): void {
     if (chIdx === -1) return;
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return;
 
     const newStamina = (champ.attributes.stamina | 0) - (decrement | 0);
@@ -488,7 +489,7 @@ export class MonsterAttack {
   damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number {
     const party = this.getPartyState();
     if (chIdx === -1) return 0;
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
     let dealt = damage;
@@ -569,7 +570,7 @@ export class MonsterAttack {
    */
   killCharacter(chIdx: number): void {
     const party = this.getPartyState();
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return;
 
     champ.alive = false;
@@ -731,25 +732,12 @@ export class MonsterAttack {
   /* ------------------------------------------------------------ champion ---- */
 
   /**
-   * `Quickness` (`doc/CSBwin-src/Character.cpp:2209`) — roughly
-   * `0.5 * Dexterity * (1 - load/maxLoad/2)`, with random limits near 5 and 95.
-   *
-   * Delegated to `CharacterStats`, which owns the `MaxLoad` chain. Until that existed
-   * the load term was simply missing and a fully-laden champion dodged as well as an
-   * empty-handed one.
+   * `Quickness` (`doc/CSBwin-src/Character.cpp:2209`) lives in `CharacterStats`, which
+   * owns the `MaxLoad` chain; this supplies `d.PartySleeping`.
    */
   quickness(champ: Champion): number {
-    const party = this.getPartyState();
-    if (this.characterStats) {
-      return this.characterStats.quickness(champ, party.sleeping ?? false);
-    }
-    // No tables yet (a partially constructed engine): the pre-load behaviour.
-    let quickness = attributeCurrent(champ.attributes.stats[AttributeIndex.Dexterity]) + this.random.below(8);
-    if (party.sleeping) quickness = Math.trunc(quickness / 2);
-    quickness = Math.trunc(quickness / 2);
-    const loLimit = this.random.below(8) + 1;
-    const hiLimit = 100 - this.random.below(8);
-    return Math.min(hiLimit, Math.max(loLimit, quickness));
+    if (!this.characterStats) throw new Error('MonsterAttack.quickness before setCharacterStats');
+    return this.characterStats.quickness(champ, this.getPartyState().sleeping ?? false);
   }
 
   /**
@@ -856,7 +844,7 @@ export class MonsterAttack {
     if (chIdx === -1) return;
     const party = this.getPartyState();
     if ((party.potentialChampionIndex ?? -1) === chIdx) return;
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return;
 
     this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
@@ -875,7 +863,7 @@ export class MonsterAttack {
   curePoison(chIdx: number): void {
     if (chIdx === -1) return;
     this.hooks?.cancelPoisonTimers?.(chIdx);
-    const champ = this.championAt(chIdx);
+    const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (champ) champ.poisonCount = 0;
   }
 
@@ -888,11 +876,6 @@ export class MonsterAttack {
     });
     if (live.length === 0) return -1;
     return live[this.random.below(live.length)] ?? -1;
-  }
-
-  private championAt(chIdx: number): Champion | null {
-    if (chIdx < 0) return null;
-    return this.getPartyState().champions[chIdx] ?? null;
   }
 }
 
