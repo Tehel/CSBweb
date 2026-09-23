@@ -18,8 +18,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 
 ## How to work this list
 
-1. **One item per session**, in index order, then `/clear` (`CLAUDE.md` → "Working
-   economically"). An item marked *bundle* goes with its partner.
+1. **One item per commit, a few per session**, in index order, then `/clear` (`CLAUDE.md`
+   → "Working economically"). Stop before a size-M item would overrun the session. An item
+   marked *bundle* goes with its partner.
 2. **Re-verify first.** Pointers were checked on 2026-09-23 unless the item says
    *(re-audit)*, and line numbers drift. If an item turns out to be already paid, mark it ✅
    and say how you know.
@@ -64,7 +65,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ |
 | B2 | Small helpers defined in several files | M | ✅ |
 | B3 | `LOCATIONREL` has three shapes | S | ⏳ |
-| C1 | The melee door bash ignores `HitDoor`'s delay | S | ⏳ |
+| C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ⏳ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ⏳ |
 | C4 | `DamageCharacter` is missing two early guards | S | ⏳ |
@@ -75,6 +76,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
+| C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -268,7 +270,25 @@ Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`
 
 ## C — Known divergences from CSBWin
 
-### C1 ⏳ The melee door bash ignores `HitDoor`'s delay
+### C1 ✅ The melee door bash ignores `HitDoor`'s delay
+
+**Paid in `ca34722`.** `TimerSystem.hitDoor` takes CSBWin's `delay` (and the `d.Time` it
+counts from); `AttackSystem`'s door arm passes 2. A delayed hit queues `TT_BASH_DOOR`
+(= 2, new in `TimerFunction`), and `processBashDoor` — `ProcessTT_BASH_DOOR`,
+`Timer.cpp:1492` — shatters the door when it fires. `TimerQueue` gained `SetTimer`'s
+`TT_BASH_DOOR` rule: queueing one deletes every `TT_1` / `TT_DOOR` timer on the cell
+(`Timer.cpp:1102-1123`). Evidence: `tools/dump-player-attacks.ts` case 8 (fails four checks
+before the fix); the fact is in `doc/PROVEN_FACTS.md`.
+
+Found on the way and fixed in `cbba108`: `hitDoor` compared the force with
+`DoorCharacteristics[doorType]` instead of the level's `DoorTOC[doorType]`
+(`CSBCode.cpp:5780-5783`). Levels 6, 12 and 13 map door type 0 to entries 3 and 2, so a
+door there needed 110 force instead of 255 or 230 — invisible in stock DM, which has no
+breakable door on those levels. `DungeonState.doorTOC` is now the one copy, shared with
+`MonsterPerception`. Evidence: case 8b. Found too, and recorded as C12: the port's other
+duplicate-timer rules.
+
+<details><summary>original entry</summary>
 
 `Attack.cpp`'s door-bash arm calls `HitDoor(attackX, attackY, strength, 0 /*not a ZO
 spell*/, 2 /*delay*/)` (`doc/CSBwin-src/Attack.cpp:1803-1808`). Our `AttackSystem` calls
@@ -284,6 +304,8 @@ Port the `delay` arm and whatever it queues, and fix the stale comment at
 door and check its state on the attack tick and after the delay.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “Clouds are alive”.</sub>
+
+</details>
 
 ### C2 ⏳ Missile→monster damage skips the magic and poison formulas
 
@@ -403,6 +425,32 @@ Port it line for line (the hand/quiver fields go with D1). Evidence: a `tools/` 
 that puts the matching object in a carried chest and checks the actuator fires.
 
 <sub>Found while paying B1, 2026-09-23.</sub>
+
+### C12 ⚠️ `SetTimer`'s duplicate-timer rules keep the wrong timer *(re-audit)*
+
+Seen while paying C1, not yet worked. `GameTimers::SetTimer` (`doc/CSBwin-src/Timer.cpp:989`)
+resolves a clash by **keeping the timer already queued** and dropping the new one;
+`TimerQueue.applyDuplicateTimerRules` mostly deletes the old one and queues the new.
+`doc/CSBWIN_TIMERS_REFERENCE.md` → "Timer insertion and de-duplication" already states
+CSBWin's rule correctly; the code does not follow it.
+
+- *A map timer (5–10) meets a map timer* with the same time, level and cell (and, for
+  `TT_STONEROOM`, `uByte8`): CSBWin copies the new `uByte9` into the existing one and
+  returns it (`Timer.cpp:1022-1036`). The port deletes the existing and queues the new —
+  which also keeps the new *function* where CSBWin keeps the old.
+- *A `TT_1` meets a `TT_DOOR`* at the same time, level and cell: CSBWin keeps the
+  `TT_DOOR`, setting its `uByte9` to `1 - new.uByte9` if it was 2, and returns it
+  (`Timer.cpp:1073-1085`). The port flips the *new* timer's own `uByte9` and deletes the
+  `TT_DOOR`.
+- *A `TT_1` meets a `TT_1`*: CSBWin copies `uByte9` into the existing one and returns it
+  (`Timer.cpp:1087-1092`); the port replaces it.
+- The map-timer-meets-`TT_1` arm (`Timer.cpp:1038-1051`) and the new `TT_BASH_DOOR` rule
+  match.
+
+Re-read `Timer.cpp:989-1130` whole before changing anything — these line ranges come from
+reading it in pieces. The visible effect is on doors toggled twice in one tick. Evidence:
+a `tools/` scenario queuing each clashing pair and checking which entry survives, with
+which function, `uByte9` and slot index. Size S–M.
 
 ---
 

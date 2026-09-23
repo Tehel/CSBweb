@@ -91,8 +91,9 @@ show up on screen. Use it to find out what is wrong, then prove it in a `dump-*.
 ## Code layout (`src/`, ~30k LOC)
 
 ```
-core/       BinaryFile (big-endian), compression (LZW/RLE/SND), imageDecoder (IMG1/IMG2),
-            types, objectNameIndex (shared OBJNI_* constants)
+core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
+            (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
+            RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
 engine/     Game, DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
             ActuatorSystem, DsaSystem, skills, AddCharacter, objectIndex (the one
@@ -174,4 +175,4 @@ combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the
 Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step
 12). What is left is the other half of **Phase 10**, *writing* a CSBWin-compatible save;
 the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT.md` —
-**paying that off is the current priority**, one item per session, in the order it gives.
+**paying that off is the current priority**, one item per commit, in the order it gives.
