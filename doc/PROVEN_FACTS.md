@@ -2568,3 +2568,18 @@ handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1066-1077`), an
 tick already due runs one VBL later. The key queue is a 3-slot ring that refuses a key
 when `next == keyQueueStart` (`CSBUI.cpp:143-145`, `:1131-1139`), so it holds at most two
 keys. Evidence: `tools/dump-party-collision.ts` case 6.
+
+## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
+
+`CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) counts the active timers of its
+own kind — `TT_60`, or `TT_61` for an audible arrival — whose `uByte6`, `uByte7` and level
+are the target square (`:2463-2472`). At `count >= 31` (`:2473`) it deletes the object with
+`DeleteDBEntry` and returns without a timer (`:2508-2512`) — unless the object is a
+monster that is `Unique()` or whose `possession()` is not `RNeof` (`:2488-2506`), which is
+queued anyway. The `static bool error` guards only a commented-out message box. `DB4`'s
+`invisible()`, `drawAsSize4()`, `Unique()` and `Poisoned()` each AND their `word14` bit
+with a design option — `invisibleMonsters` for the first, `drawAsSize4Monsters` for the
+other three (`CSB.h:1125-1132`) — read from a save's extended-features block
+(`SaveGame.cpp:394-400`) and `false` by default (`data.cpp:77-78`). None of the 182
+creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
+`tools/dump-monster-move.ts` case 4.

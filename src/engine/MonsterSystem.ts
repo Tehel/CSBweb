@@ -85,6 +85,17 @@ export interface MonsterSystemHooks {
   trace?: (line: string) => void;
 }
 
+/**
+ * `DB4::Unique()` (doc/CSBwin-src/CSB.h:1129) — `drawAsSize4Monsters && BITS13_13(word14)`.
+ * `drawAsSize4Monsters` is a design option from a save's extended-features block
+ * (`SaveGame.cpp:399-400`) that defaults to `false` (`data.cpp:78`). The port does not
+ * model it (DEBT.md G4), so no monster is unique, whatever bit 13 says.
+ */
+const DRAW_AS_SIZE4_MONSTERS = false;
+function monsterUnique(monster: CreatureRecord): boolean {
+  return DRAW_AS_SIZE4_MONSTERS && monster.unique;
+}
+
 export class MonsterSystem {
   /** `d.ITEM16QueLen` — how many slots are in use. */
   private item16QueLen = 0;
@@ -598,14 +609,34 @@ export class MonsterSystem {
    * `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) — park a monster that
    * could not be placed, to retry later.
    *
-   * ⚠️ CSBWin also counts how many are already waiting at that square and, past 31,
-   * deletes the monster outright unless it is `Unique()` or carries something
-   * (`doc/CSBwin-src/Code11f52.cpp:2474-2510`). That overflow guard is **not** ported
-   * — see PLAN.md Phase 12.
+   * With 31 or more timers of the same kind already waiting on that square, the object
+   * is deleted instead — unless it is a monster that is `Unique()` or carries something
+   * (`:2473-2512`). CSBWin's `static bool error` only guarded a message box that is
+   * commented out, so nothing of it is ported.
    */
   createMovementTimer(monsterRn: ObjectID, destination: Position, audible: boolean): void {
+    const tt = audible ? TimerFunction.TT_61 : TimerFunction.TT_60;
+    let count = 0;
+    for (const timer of this.timers.getTimers()) {
+      if (timer.function !== tt) continue;
+      if (timer.uByte6 !== destination.x) continue;
+      if (timer.uByte7 !== destination.y) continue;
+      if (timer.level !== destination.z) continue;
+      count++;
+    }
+    if (count >= 31) {
+      let delObj = true;
+      if (decodeObjectID(monsterRn).category === DBType.CREATURE) {
+        const monster = this.dungeon.getCreatureRecord(monsterRn);
+        if (monster && (monsterUnique(monster) || monster.possession !== OBJECT_ID_EOF)) delObj = false;
+      }
+      if (delObj) {
+        this.dungeon.deleteDBEntry(monsterRn);
+        return;
+      }
+    }
     this.timers.createTimer(
-      audible ? TimerFunction.TT_61 : TimerFunction.TT_60,
+      tt,
       destination.x,
       destination.y,
       0,

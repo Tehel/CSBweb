@@ -5,14 +5,15 @@
  * looking: the record leaves one cell and appears in the other; its `ITEM16` learns
  * the new square (and remembers the previous one); its AI timers follow it, rather
  * than staying behind at the square it left; and a move onto an occupied square parks
- * the group on an abeyance timer instead of losing it.
+ * the group on an abeyance timer instead of losing it — up to 31 of them per square, past
+ * which an ordinary group is deleted.
  *
  * Run: `npx tsx tools/dump-monster-move.ts [level]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -160,6 +161,53 @@ async function main(): Promise<void> {
       check(monsterAt(bx, by), 'the group should now be placed');
       console.log('');
     }
+  }
+
+  // ---- Case 4: CreateMovementTimer's overflow guard ------------------------
+  // `CreateMovementTimer` (doc/CSBwin-src/Code11f52.cpp:2446-2524) counts the
+  // TT_60/TT_61 timers of its own kind already waiting on the square; from 31 up it
+  // deletes the group instead of queueing a 32nd, unless the group is `Unique()` or
+  // carries something (`:2473-2512`). `Unique()` is `drawAsSize4Monsters && bit 13`
+  // (`CSB.h:1129`), and that design option is off in every dungeon we load, so a raw
+  // bit 13 must not save a group.
+  {
+    const dest = new Position(1, 1, level);
+    const parked = (): number => game.timerQueue.getTimers()
+      .filter(t => t.function === TimerFunction.TT_60 && t.uByte6 === dest.x && t.uByte7 === dest.y
+        && t.level === dest.z).length;
+    const creatures = data.databases.creatures.records;
+    const pick = (i: number) => {
+      const rn = encodeObjectID(0, DBType.CREATURE, i);
+      const rec = dungeon.getCreatureRecord(rn)!;
+      return { rn, rec };
+    };
+    const filler = pick(creatures.length - 1);
+    const plain = pick(creatures.length - 2);
+    const carrier = pick(creatures.length - 3);
+    plain.rec.possession = OBJECT_ID_EOF;
+    plain.rec.unique = true; // bit 13 set, option off: CSBWin's Unique() is false
+    carrier.rec.possession = encodeObjectID(0, DBType.WEAPON, 0);
+    carrier.rec.unique = false;
+
+    const before = parked();
+    for (let i = 0; i < 31; i++) game.monsterSystem.createMovementTimer(filler.rn, dest, false);
+    const full = parked() - before;
+    game.monsterSystem.createMovementTimer(plain.rn, dest, false);
+    const afterPlain = parked() - before;
+    const plainDeleted = plain.rec.nextObject === OBJECT_ID_NULL;
+    game.monsterSystem.createMovementTimer(carrier.rn, dest, false);
+    const afterCarrier = parked() - before;
+    const carrierDeleted = carrier.rec.nextObject === OBJECT_ID_NULL;
+    console.log(
+      `Case 4 — 31 parked at (${dest.x},${dest.y}): ${full}; a 32nd plain group -> ${afterPlain}` +
+        ` (deleted ${plainDeleted}); one carrying an object -> ${afterCarrier} (deleted ${carrierDeleted})`,
+    );
+    check(full === 31, 'the first 31 abeyance timers on a square should all be queued');
+    check(afterPlain === 31, 'a 32nd group with nothing to carry should not be queued');
+    check(plainDeleted, 'that group should be deleted — a raw bit 13 is not Unique() with the option off');
+    check(afterCarrier === 32, 'a group carrying something should be queued even past 31');
+    check(!carrierDeleted, 'the group carrying something should survive');
+    console.log('');
   }
 
   finish();

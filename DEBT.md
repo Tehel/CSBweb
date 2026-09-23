@@ -71,7 +71,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C4 | `DamageCharacter` is missing two early guards | S | ✅ |
 | C5 | Three movement deferrals | M | ✅ |
 | C6 | Which generator cloud and missile sprites flip with | S | ⏳ |
-| C7 | `CreateMovementTimer`'s overflow guard | S | ⏳ |
+| C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
 | C8 | Phase 8 DSA leftovers | M | ⚠️ re-audit |
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
@@ -453,10 +453,22 @@ game logic rather than re-rolled every frame (`NextMonsterUpdateTime`,
 `doc/CSBwin-src/CSBCode.cpp:5877-5941`, is an example of the latter). Read the cloud and
 missile drawing source in `Viewport.cpp` first, then port what it does.
 
-### C7 ⏳ `CreateMovementTimer`'s overflow guard is not ported
+### C7 ✅ `CreateMovementTimer`'s overflow guard is not ported
+
+**Paid in the commit "At most 31 groups wait on a square".**
+`MonsterSystem.createMovementTimer` counts the waiting `TT_60` / `TT_61` timers of its kind
+on the square and, from 31, deletes the group unless it is `Unique()` or carries something
+(`Code11f52.cpp:2473-2512`). `Unique()` goes through `monsterUnique`, which applies
+CSBWin's `drawAsSize4Monsters` gate — a constant `false` until G4 models the option.
+Evidence: `tools/dump-monster-move.ts` case 4 (3 of 18 checks fail before); the fact is in
+`doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 `doc/CSBwin-src/Code11f52.cpp:2474-2510`; the gap is noted in place at
 `src/engine/MonsterSystem.ts:636`. Recorded in Phase 12 step 2.
+
+</details>
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → "Phase 12 — Monsters".</sub>
 
@@ -840,6 +852,16 @@ Phase 13 step 4:
 - external portraits for `charID > 23`.
 
 No shipped DM hero touches any of them.
+
+**The monster design options** *(found in C7)*. `DB4::invisible()` is gated on
+`invisibleMonsters`, and `drawAsSize4()`, `Unique()` and `Poisoned()` on
+`drawAsSize4Monsters` (`CSB.h:1125-1132`), both read from a save's `extendedFlags`
+(`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
+holds the raw bits, and `monster.drawAsSize4` is read ungated in
+`TimerSystem.processMissileEncounter` and `MonsterDamage` (`:555`, `:591`). Only
+`MonsterSystem.monsterUnique` applies a gate, as a constant `false`. Harmless for now:
+no creature in `dm-atari/dungeon.dat` sets any of bits 11-14. Modelling it means reading
+`extendedFlags & 0x02` / `& 0x04` in `SaveGameLoader` and gating every accessor.
 
 ### G5 ⏳ Messages and sleep
 
