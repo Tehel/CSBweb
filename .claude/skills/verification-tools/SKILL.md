@@ -151,6 +151,16 @@ dedicated counter for totals and cap only the sample lines you print.
 **Give the clock enough ticks.** Monster move intervals run to 185 ticks; a 60-tick
 window legitimately observes nothing. Size the window from the slowest thing involved.
 
+**A target that walks away.** `createMonster` arms the group's AI, so a few ticks of
+`processTimers` can move it out of the cell before your missile arrives — the scenario
+then silently tests nothing. Call `game.timerQueue.deleteMonsterMovementTimers(x, y, level)`
+after placing it (`dump-missile-monster.ts`).
+
+**Spy on the real call, don't re-derive it.** When a formula consumes random numbers,
+wrap the instance method (`game.timerSystem.determineMagicDamage = …`) to record its
+inputs and outputs, then check the arithmetic the engine did with them. Recomputing the
+draws in the tool would need the RNG state and proves less.
+
 **Make output diffable.** Tab-separated columns, stable ordering, no timestamps.
 
 ## Existing tools worth copying from
@@ -166,3 +176,4 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 | `watch-monsters.ts` | Emergent behaviour over time, with a safety invariant |
 | `watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
 | `dump-monster-tables.ts` | Asserting the canary rather than only printing it |
+| `dump-missile-monster.ts` | Firing real missiles at a placed group; spying on engine calls |

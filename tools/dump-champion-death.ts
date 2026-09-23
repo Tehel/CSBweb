@@ -23,6 +23,10 @@
  * projectile kinds, where the interesting part is not the numbers — they are random —
  * but which *arm* each projectile takes, which the `kind` and poison columns give away.
  *
+ * Last, it checks `DamageCharacter`'s early guards (`Character.cpp:2712-2717`): the
+ * recruit in a Hall of Champions mirror and a won game are unhurtable, and the blow is
+ * cut to 16 bits first.
+ *
  * What to look for: the death table's columns should be identical across all three
  * rows. Anything that reads `false` in one row and `true` in the others is a path that
  * has slipped out of `KillCharacter` again.

@@ -309,7 +309,7 @@ door and check its state on the attack tick and after the delay.
 
 ### C2 ✅ Missile→monster damage skips the magic and poison formulas
 
-**Paid in the commit "Missiles hit the monster in their corner, through CSBWin's formula".**
+**Paid in `4393754`.**
 `TimerSystem.processMissileEncounter`'s monster arm is now CSBWin's, line for line
 (`Code11f52.cpp:1960-2042`): the victim is `ordinalOfMonsterAtPosition` of the arrival
 corner (an empty corner lets the missile fly on unless the group is `drawAsSize4`); a
@@ -349,7 +349,7 @@ the formula, and which member took it.
 
 ### C3 ✅ `NinetySecondUpdate` cadence, and its body unaudited
 
-**Paid in the commit "Torches burn down every 512 ticks".** `Game.processNinetySecondUpdate`
+**Paid in `f507904`.** `Game.processNinetySecondUpdate`
 gates on `(tickCount & 511) == 0`. Auditing the body against `CSBCode.cpp:7339-7387` found
 one more divergence: CSBWin loops over `d.NumCharacter` less one while
 `d.PotentialCharacterOrdinal != 0`, so a Hall of Champions recruit's torch does not burn;
@@ -373,7 +373,7 @@ the evidence.
 
 ### C4 ✅ `DamageCharacter` is missing two of CSBWin's three early guards
 
-**Paid in the commit "DamageCharacter spares the mirror recruit and a won game".**
+**Paid in `be5fcb5`.**
 `MonsterAttack.damageCharacter` now opens as CSBWin does (`Character.cpp:2712-2717`):
 `sw(damage)`, then `chIdx == -1` → 0, the recruit → `chIdx + 1`, a won game → 1 (through a
 new `isGameWon` hook), a non-positive blow → 0, and only then the missing-champion and
