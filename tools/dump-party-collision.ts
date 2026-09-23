@@ -317,7 +317,7 @@ async function main(): Promise<void> {
   // one input queue is `movementQueue`. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1066-1077`), so the tick runs one frame later.
-  type Internals = { movementQueue: MovementAction[]; lastTickTime: number; lastInputTime: number };
+  type Internals = { movementQueue: MovementAction[]; lastTickTime: number; lastInputTime: number; newPartyLevel: boolean };
   const internals = game as unknown as Internals;
   const T0 = Date.now() + 60_000;
   let discard: {
@@ -662,6 +662,78 @@ async function main(): Promise<void> {
       console.log(`room type 7: ${entered ? 'entered' : 'refused'}`);
       console.log('');
       check(entered, 'a room-type-7 cell should be walked into, as CSBWin does');
+    }
+  }
+
+  // ---- Case 12: a level change inside ProcessTimers is loaded in the same tick
+  // The main loop runs `ProcessTimers()` and then `if (d.newPartyLevel != -1) goto
+  // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:635): a pit a timer opens under the party has
+  // the new level loaded, the input discarded and `ProcessTimers` run again, all before
+  // the tick ends (`:615-635`). A turn queued before the pit opened is lost, and never
+  // runs on the new level.
+  {
+    let pit: { x: number; y: number } | null = null;
+    for (let x = 0; x < width && !pit; x++) {
+      for (let y = 0; y < height && !pit; y++) {
+        if (roomTypeAt(x, y) !== RoomType.PIT || monsterAt(x, y)) continue;
+        if (dungeon.incrementLevel(new Position(x, y, level), 1)) pit = { x, y };
+      }
+    }
+    check(pit !== null, 'the level should have a pit with a level under it');
+    if (pit) {
+      const cells = map.cellFlags;
+      const saved = cells[pit.x][pit.y];
+      const savedTile = map.tiles[pit.x][pit.y];
+      const setCell = (v: number): void => {
+        cells[pit.x][pit.y] = v;
+        map.tiles[pit.x][pit.y] = { ...savedTile, cellFlag: v };
+      };
+      setCell(saved & 0xf7); // closed: the party stands on it
+      const party = game.party.state;
+      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.position = new Position(pit.x, pit.y, level);
+      game.monsterSystem.loadPartyLevel(level);
+      party.partyMoveDisableTimer = 0;
+      internals.lastInputTime = 0;
+      internals.movementQueue.length = 0;
+      internals.newPartyLevel = false;
+      // An event was handled this tick, so the turn waits for the next one
+      // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
+      internals.lastInputTime = game.state.tickCount;
+      game.enqueueMovement(MovementAction.TURN_LEFT);
+      const facingBefore = party.facing;
+      // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick.
+      game.timerQueue.addTimer({
+        index: 0, function: TimerFunction.TT_PIT, time: game.state.tickCount + 1, level,
+        uByte5: 0, uByte6: pit.x, uByte7: pit.y, uByte8: 0, uByte9: 0,
+        sequence: 0, timerWord8: 0, timerWord6: 0,
+      });
+      let t = T0 + 400_000;
+      const frame = (tickDue: boolean): void => {
+        t += 17;
+        internals.lastTickTime = tickDue ? t - 1000 : t;
+        game.runFrame(t);
+      };
+      frame(true);
+      const newLevel = party.position.z;
+      const queuedAfterTick = internals.movementQueue.length;
+      const loadedAfterTick = game.monsterSystem.needsLevelReload() ? 'not yet' : 'loaded';
+      const owedAfterTick = internals.newPartyLevel;
+      frame(false);
+      const turned = party.facing !== facingBefore;
+      console.log(
+        `pit timer at (${pit.x},${pit.y}): level ${level} -> ${newLevel}; after the tick the level is ` +
+          `${loadedAfterTick}, ${queuedAfterTick} move(s) queued; the queued turn ran ${turned}`,
+      );
+      console.log('');
+      check(newLevel !== level, 'the pit timer should drop the party a level');
+      check(loadedAfterTick === 'loaded' && !owedAfterTick, 'the new level should be loaded in the tick the timer ran (CSBCode.cpp:635)');
+      check(queuedAfterTick === 0, 'the queued turn should be discarded in that same tick');
+      check(!turned, 'the queued turn should never run on the new level');
+      setCell(saved);
+      map.tiles[pit.x][pit.y] = savedTile;
+      game.party.state.position = new Position(scene.px, scene.py, level);
+      game.monsterSystem.loadPartyLevel(level);
     }
   }
 

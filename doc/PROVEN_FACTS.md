@@ -2644,10 +2644,12 @@ Taking a stairway, falling or being teleported to another level only sets
 `d.newPartyLevel`. The main loop acts on it at the top of the next tick —
 `LoadPartyLevel(d.newPartyLevel); MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY);
 d.newPartyLevel = -1; DiscardAllInput();` (`doc/CSBwin-src/CSBCode.cpp:615-623`) — and,
-if `ProcessTimers` changed level again, loops back there in the same tick
-(`if (d.newPartyLevel != -1) goto tag0006a4;`, `:635`). So every key or click queued
-between the arrival and that tick is lost. Evidence: `tools/dump-party-collision.ts`
-case 10.
+if `ProcessTimers` changed level, loops back there in the same tick
+(`if (d.newPartyLevel != -1) goto tag0006a4;`, `:635`) and runs `ProcessTimers` again.
+`HandleMouseEvents` comes later in the loop (`:748`). So every key or click queued
+between the arrival and that tick is lost. A move queued before a timer — an opening
+pit, a teleporter switched on — carries the party to another level is lost too, and never
+runs on the new level. Evidence: `tools/dump-party-collision.ts` cases 10 and 12.
 
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
 

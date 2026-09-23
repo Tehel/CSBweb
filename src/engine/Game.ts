@@ -774,14 +774,14 @@ export class Game {
             callback(this);
         }
 
-        // The top of a tick: `if (d.newPartyLevel != -1) { LoadPartyLevel(...); ...;
-        // DiscardAllInput(); }` (doc/CSBwin-src/CSBCode.cpp:615-623). A level the port
-        // already loaded mid-tick still owes its discard here.
-        if (this.monsterSystem.loadPartyLevelIfChanged() || this.newPartyLevel) {
-            this.newPartyLevel = false;
-            this.discardAllInput();
-        }
-        this.timerSystem.processTimers(this.state.tickCount);
+        // The top of a tick, then `ProcessTimers()` and `if (d.newPartyLevel != -1) goto
+        // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:615-635): a timer that moved the party
+        // to another level has it loaded, input discarded and the timers run again, all
+        // in this tick.
+        this.loadNewPartyLevel();
+        do {
+            this.timerSystem.processTimers(this.state.tickCount);
+        } while (this.loadNewPartyLevel());
         this.processNinetySecondUpdate();
         this.processTenSecondUpdate();
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
@@ -933,6 +933,21 @@ export class Game {
      */
     private discardAllInput(): void {
         this.movementQueue.length = 0;
+    }
+
+    /**
+     * `tag0006a4` (doc/CSBwin-src/CSBCode.cpp:615-623): `if (d.newPartyLevel != -1)`,
+     * `LoadPartyLevel(...); MoveObject(RN(RNnul), -1, 0, ...); d.newPartyLevel = -1;
+     * DiscardAllInput();`. The port has already placed the party — it resolves a whole
+     * pit and teleporter chain at once — and may already have loaded the level (see
+     * `loadPartyLevelIfChanged`), in which case only the discard is still owed. Says
+     * whether it ran.
+     */
+    private loadNewPartyLevel(): boolean {
+        if (!this.monsterSystem.loadPartyLevelIfChanged() && !this.newPartyLevel) return false;
+        this.newPartyLevel = false;
+        this.discardAllInput();
+        return true;
     }
 
     /**
