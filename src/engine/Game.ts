@@ -1278,7 +1278,8 @@ export class Game {
         kind: number;
         poisonStrength: number;
     }): void {
-        this.noteMonsterAttack();
+        // No `d.LastMonsterAttackTime` here: only `MonsterAttacks` sets it
+        // (`doc/CSBwin-src/Monster.cpp:982`), and this port does so in `MonsterAttack`.
         const dealt = this.monsterAttack.damageCharacter(
             options.chIdx,
             options.damage | 0,
@@ -1370,11 +1371,6 @@ export class Game {
         if (this.party.state.selectedCharacterIndex === chIdx) {
             this.party.state.selectedCharacterIndex = -1;
         }
-        this.state.party = this.party.state;
-    }
-
-    private noteMonsterAttack(): void {
-        this.party.state.lastMonsterAttackTime = this.state.tickCount | 0;
         this.state.party = this.party.state;
     }
 

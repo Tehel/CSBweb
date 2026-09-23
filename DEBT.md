@@ -74,7 +74,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
 | C8 | Phase 8 DSA leftovers | M | ✅ |
 | C9 | Door pass-through rules and magic formulas | M | ✅ |
-| C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
+| C10 | Phase 9.5 refinements | S | ✅ |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
@@ -83,6 +83,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C16 | Freed database slots are never reused | M | ⏳ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
+| C19 | `CastSpell` under a spell filter's overrides | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -397,13 +398,34 @@ the monster arm; the door arm had neither the `DoorTOC & 2` pass-through test no
 
 </details>
 
-### C10 ⚠️ Phase 9.5 refinements *(re-audit)*
+### C10 ✅ Phase 9.5 refinements
+
+Re-audited 2026-09-23; one of the three was live, the other two were overtaken.
+
+- ✅ **`LastMonsterAttackTime`'s source.** Paid in `COMMIT_C10`. CSBWin's one writer is
+  `MonsterAttacks` (`Monster.cpp:982`), which `MonsterAttack` has ported since Phase 12;
+  the Phase 9.5 stand-in in `Game.applyMissileDamageToParty` stamped it on every missile
+  that reached the party, too — even a champion's own spell — so `AdjustSkills` doubled
+  experience and the facing reset held off for a monster that had not attacked. It is
+  gone. Evidence: `tools/dump-last-monster-attack.ts` (1 of 2 checks fails before); the
+  fact is in `doc/PROVEN_FACTS.md`.
+- ✅ **The throw skill gain** was already CSBWin's: `Game.throwByCharacter` is
+  `Mouse.cpp:722-756` line for line — 8 experience, +4 for a weapon, + `uByte3 / 4` when
+  its class is 12 or less, into `AdjustSkills(chIdx, 10, …, ASW_ThrowByCharacter)` before
+  the mastery is read. The move lock it ends with (`d.Word11712 = 4`) is C13's.
+- ✅ **Spell skill selection** was ported with the spell table: `castSpell` reads
+  `spellByte5` (or its filter override) into `DetermineMastery` and `AdjustSkills`, as
+  `Magic.cpp:1216-1229` does. Re-reading `CastSpell` for it found other drift: C19.
+
+<details><summary>original entry</summary>
 
 "Refine spell skill selection once spell definitions exist, replace the throw skill gain
 with CSBWin's tables, and refine the `LastMonsterAttackTime` source now that monster AI is
 in." Possibly overtaken: `Game.awardThrowSkill` (`src/engine/Game.ts:2728`) now documents
 itself as `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. Check each of the
 three against CSBWin, then close or narrow this entry.
+
+</details>
 
 ### C11 ⏳ `DoesPartyHave` does not look inside chests
 
@@ -557,6 +579,24 @@ cage stood forever and `DeleteDBEntry(0)` freed door record 0, cutting that cell
 after the door. Only a cage restored from a save worked: `restoreTimerQueue` fills both.
 `processExpireObject` reads `object` now. Evidence: `tools/dump-clouds.ts` section 6 (3 of
 27 checks fail before).
+
+### C19 ⏳ `CastSpell` under a spell filter's overrides
+
+Found re-reading `CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`) for C10. All three need a DSA
+spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defines one, so a
+`tools/` scenario has to build it (`tools/dump-dsa-move.ts` shows how) or call
+`Game.castSpell` with the parameters directly.
+
+- **The difficulty uses the spell's own skill.** `D4W = pSpell->skillRequired + spellPower`
+  (`:1207`) — the unfiltered value — while the experience's middle term uses the filtered
+  `skillRequired` (`:1210`). `Game.castSpell` builds both from the filtered one.
+- **`missileType` can be overridden** (`:1201-1205`); `Game.castSpell` always reads
+  `spell.word6`, so a filter cannot change what a class-2 or class-3 spell does.
+  (The class-1 potion type is `pSpell->word6` in CSBWin too, `:1250`.)
+- **The abort messages come before the caster checks.** CSBWin handles
+  `spellParameters.action` (`:1110-1149`) before `chIdx >= d.NumCharacter` and `HP() == 0`
+  (`:1150`, `:1153`); the port checks the caster first, so a filter's abort on a dead caster
+  prints nothing.
 
 ---
 

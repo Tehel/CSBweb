@@ -2698,3 +2698,15 @@ square at `RNempty` (centred), sets `CT_FLUXCAGE`, and queues a `TT_24` at `d.Ti
 (`CSBCode.cpp:6494-6510`) does nothing once `d.Word11694` (game won) is set; otherwise it
 `RemoveObjectFromRoom(timerObj8(), uByte6, uByte7)` and frees the record by writing -1 to its
 link. Evidence: `tools/dump-clouds.ts` section 6.
+
+## Only `MonsterAttacks` sets `d.LastMonsterAttackTime`
+
+Outside the save code (`SaveGame.cpp:1027`, `:1643`) and its start value of -200
+(`CSBCode.cpp:353`), the one writer is `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:982`),
+`d.LastMonsterAttackTime = d.Time`, right after the `d.NumCharacter == 0` guard and before the
+attack is chosen. A missile reaching the party does not set it. Its readers are `AdjustSkills`
+(`Magic.cpp:219-247`: skills 4-11 earn half when the last attack is more than 150 ticks old,
+and skills 4 and up earn double when it is less than 25 ticks old)
+and the per-champion facing reset in the tick (`Code17818.cpp:420-428`: a champion turned away
+from the party's facing turns back once 60 ticks pass without one). Evidence:
+`tools/dump-last-monster-attack.ts`.
