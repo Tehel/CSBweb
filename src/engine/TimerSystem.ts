@@ -2502,7 +2502,7 @@ export class TimerSystem {
     if (!door) return false;
 
     if (explosion ? !door.destructibleByFireball : !door.destructibleByChop) return false;
-    const toc = (this.tables?.doorCharacteristics?.[door.doorType & 0x3] ?? 0) & 0xff;
+    const toc = this.dungeon.doorTOC(position.z, door.doorType, this.tables?.doorCharacteristics) & 0xff;
     if (force < toc) return false;
 
     const map = this.dungeon.getMap(position.z);

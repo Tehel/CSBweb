@@ -18,7 +18,8 @@
  *     worth pinning, including FREEZE LIFE's 200 cap.
  *  8. A blow at a breakable door: `HitDoor`'s delay of 2 — the door holds on the tick
  *     of the blow and shatters when `TT_BASH_DOOR` fires, and queueing that timer
- *     cancels the door's own timers.
+ *     cancels the door's own timers. And the force it needs is `DoorTOC`'s, the
+ *     level's own choice of door characteristics.
  *
  * Run: `npx tsx tools/dump-player-attacks.ts`
  */
@@ -481,6 +482,27 @@ async function main(): Promise<void> {
     check(doorState() === 4, `one tick later the door still holds (state ${doorState()})`);
     tick();
     check(doorState() === 5, `two ticks later it is shattered (state ${doorState()})`);
+  }
+
+  // `HitDoor` compares the force with `d.DoorTOC[doorType]` (`Code11f52.cpp:2277`), and
+  // `DoorTOC` is the level's pick of two `DoorCharacteristics` entries
+  // (`CSBCode.cpp:5780-5783`), not `DoorCharacteristics[doorType]`. Stock DM has no
+  // breakable door on the three levels whose mapping differs (6, 12, 13), so remap
+  // level 1's type-1 slot to entry 3 (force 255) and hit the same door with force 100.
+  console.log('\n=== 8b. HitDoor reads DoorTOC, not DoorCharacteristics ===');
+  {
+    const game = await makeGame();
+    const level = 1;
+    const door = new Position(11, 0, level);
+    const map = game.dungeonState.getMap(level)!;
+    const characteristics = objectTables.doorCharacteristics;
+    console.log(`DoorCharacteristics force: ${Array.from(characteristics, (v) => v & 0xff).join(', ')}; level 1 maps type 1 to entry ${map.descriptor.doorType1Index}`);
+    map.descriptor.doorType1Index = 3;
+    const held = !game.timerSystem.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 4;
+    check(held, 'force 100 does not break a door the level maps to entry 3 (force 255)');
+    map.descriptor.doorType1Index = 1;
+    const broke = game.timerSystem.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
+    check(broke, 'and does break it through entry 1 (force 42)');
   }
 
   finish();

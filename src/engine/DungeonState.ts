@@ -649,6 +649,22 @@ export class DungeonState {
         return true;
     }
 
+    /**
+     * `d.DoorTOC[doorType]` for `level` — built at level load from the level descriptor's
+     * two door type indices into `DoorCharacteristics[4]`
+     * (doc/CSBwin-src/CSBCode.cpp:5780-5783). The low byte is the force needed to bash
+     * the door; bit 8 marks a door monsters may walk through.
+     */
+    doorTOC(level: number, doorType: number, doorCharacteristics: ArrayLike<number> | null | undefined): number {
+        if (!doorCharacteristics) return 0;
+        const map = this.getMap(level);
+        if (!map) return 0;
+        const index = (doorType & 0x1) === 0
+            ? map.descriptor.doorType0Index
+            : map.descriptor.doorType1Index;
+        return doorCharacteristics[index & 0x3] ?? 0;
+    }
+
     getTextRecord(rn: ObjectID): TextRecord | null {
         const { category, index } = decodeObjectID(rn);
         if (category !== DBType.TEXT) return null;

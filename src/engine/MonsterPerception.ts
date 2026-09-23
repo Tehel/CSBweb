@@ -171,7 +171,7 @@ export class MonsterPerception {
       if (doorPosition === 3 || doorPosition === 4) {
         const doorRn = this.dungeon.findFirstDoor(position);
         const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
-        const toc = door ? this.doorTocFor(level, door.doorType) : 0;
+        const toc = door ? this.dungeon.doorTOC(level, door.doorType, this.doorCharacteristics()) : 0;
         return (toc & 0x100) === 0; // blocked unless special
       }
       return false;
@@ -630,22 +630,6 @@ export class MonsterPerception {
 
   /* ------------------------------------------------------------- internals ---- */
 
-  /**
-   * `d.DoorTOC[doorType]` — built at level load from the level descriptor's two door
-   * type indices into `DoorCharacteristics[4]`
-   * (`doc/CSBwin-src/CSBCode.cpp:5780-5783`). The low byte is the force needed to
-   * bash the door; bit 8 marks a door monsters may walk through.
-   */
-  private doorTocFor(level: number, doorType: number): number {
-    const table = this.doorCharacteristics();
-    if (!table) return 0;
-    const map = this.dungeon.getMap(level);
-    if (!map) return 0;
-    const index = (doorType & 0x1) === 0
-      ? map.descriptor.doorType0Index
-      : map.descriptor.doorType1Index;
-    return table[index & 0x3] ?? 0;
-  }
 }
 
 /** What `PossibleMove` answers, gathered from CSBWin's `d.` scratch globals. */
