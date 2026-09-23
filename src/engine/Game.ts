@@ -626,6 +626,9 @@ export class Game {
             getCharacterToDamage: (x, y, corner) => this.monsterAttack.getCharacterToDamage(x, y, corner),
             damageCharacter: (chIdx, damage, woundMask, kind) =>
                 this.monsterAttack.damageCharacter(chIdx, damage, woundMask, kind),
+            maxLoad: (champ) => this.characterStats.maxLoad(champ),
+            characterLoad: (champ) => this.characterStats.characterLoad(champ),
+            adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
         });
 
     }

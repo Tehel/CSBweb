@@ -15,6 +15,8 @@
  *   if one of them was hurt (`:8263-8291`).
  * - either bump discards all queued input and postpones a due tick by a frame
  *   (`:8310-8314`).
+ * - every attempted step costs each champion `3 * load / MaxLoad + 1` stamina, bump or
+ *   not (`:8088-8101`, `:8129-8135`); a turn costs nothing.
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -37,6 +39,7 @@ import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { sw } from '../src/core/intCast';
 import { check, finish } from './lib/check';
 
 /** A plain champion — the party only has to exist for `d.NumCharacter != 0`. */
@@ -360,6 +363,67 @@ async function main(): Promise<void> {
         `after a turn: ${turnQueue}; due tick held ${tickHeld}, ran next frame ${tickNextFrame}`,
     );
     console.log('');
+  }
+
+  // ---- Case 7: every attempted step costs stamina --------------------------
+  // `sw((3*load)/MaxLoad + 1)` for each champion, charged after the party-move filter and
+  // before the destination is looked at (doc/CSBwin-src/CSBCode.cpp:8088-8101,
+  // `:8129-8135`), so a bump pays as much as a step. A turn is `TurnParty`: free.
+  // `AdjustStamina` turns whatever overshoots zero into `DamageCharacter(ch, over/2, 0, 0)`.
+  let stamina: {
+    bump: number[]; turn: number[]; loaded: number; loadedCost: number; exhaustedHp: number; exhaustedSt: number;
+  } | null = null;
+  if (wall) {
+    const standAtWall = (): void => {
+      game.party.state.position = new Position(wall!.px, wall!.py, level);
+      game.party.setFacing(wall!.facing);
+      game.party.state.lastMoveTime = 0;
+    };
+    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    const champs = game.party.state.champions;
+    const st = (): number[] => champs.map((c) => c.attributes.stamina);
+    standAtWall();
+    game.move(MovementAction.MOVE_FORWARD);
+    const bump = st().map((s) => 100 - s);
+    game.party.state.lastMoveTime = 0;
+    const beforeTurn = st();
+    game.move(MovementAction.TURN_LEFT);
+    const turn = st().map((s, i) => beforeTurn[i] - s);
+
+    // A load makes the formula non-trivial: 3 * 400 / MaxLoad + 1.
+    const stats = game.characterStats;
+    const realLoad = stats.characterLoad.bind(stats);
+    const back = champs.findIndex((c) => ![wall!.facing & 3, (wall!.facing + 1) & 3].includes(c.partyPosition));
+    const laden = champs.findIndex((_c, i) => i !== back);
+    stats.characterLoad = (c: Champion) => (c === champs[laden] ? 400 : c === champs[back] ? 2000 : 0);
+    for (const c of champs) c.attributes.stamina = 100;
+    champs[back].attributes.stamina = 1;
+    // After the stamina is set: `MaxLoad` is stamina-adjusted, so the tired champion's is lower.
+    const loadedCost = sw(Math.trunc((3 * 400) / stats.maxLoad(champs[laden])) + 1);
+    const exhaustCost = sw(Math.trunc((3 * 2000) / stats.maxLoad(champs[back])) + 1);
+    standAtWall();
+    game.move(MovementAction.MOVE_FORWARD);
+    stats.characterLoad = realLoad;
+    stamina = {
+      bump, turn, loaded: 100 - champs[laden].attributes.stamina, loadedCost,
+      // The back-row champion is not hurt by the bump, so all the HP lost is exhaustion.
+      exhaustedHp: 200 - champs[back].attributes.health,
+      exhaustedSt: champs[back].attributes.stamina,
+    };
+    console.log(
+      `stamina: a bump cost ${bump.join('/')}, a turn ${turn.join('/')}; ` +
+        `load 400 cost ${stamina.loaded} (formula ${loadedCost}); ` +
+        `stamina 1 against a cost of ${exhaustCost}: stamina ${stamina.exhaustedSt}, lost ${stamina.exhaustedHp} HP`,
+    );
+    console.log('');
+    check(bump.every((n) => n === 1), `an unladen champion should pay 1 stamina for a bump (${bump.join('/')})`);
+    check(turn.every((n) => n === 0), `a turn should cost no stamina (${turn.join('/')})`);
+    check(stamina.loaded === loadedCost, `a load of 400 should cost 3*400/MaxLoad+1 = ${loadedCost} (paid ${stamina.loaded})`);
+    check(stamina.exhaustedSt === 0, 'stamina should bottom out at 0');
+    check(
+      stamina.exhaustedHp === Math.trunc((exhaustCost - 1) / 2),
+      `the overshoot should come off health at half rate: ${Math.trunc((exhaustCost - 1) / 2)} (lost ${stamina.exhaustedHp})`,
+    );
   }
 
   // ---- Assertions ---------------------------------------------------------

@@ -513,10 +513,12 @@ which function, `uByte9` and slot index. Size S–M.
 Found while re-reading `MoveParty` for C5; none is fixed yet. All in
 `doc/CSBwin-src/CSBCode.cpp` unless said otherwise.
 
-- **Every attempted step costs stamina.** Before the destination is even looked at, each
+- ✅ **Every attempted step costs stamina.** Before the destination is even looked at, each
   champion's `staminaAdjustment` is `sw((3 * load) / MaxLoad + 1)` (`:8088-8101`), and
   `AdjustStamina` is applied to each after the party-move filter (`:8129-8135`) — for a
-  blocked step as much as for a taken one. The port charges nothing for walking.
+  blocked step as much as for a taken one. Now `MovementSystem.chargeStamina`, at the top
+  of every move (turns are free). Evidence: `tools/dump-party-collision.ts` case 7 (4 of
+  26 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
 - **The move delay.** A taken step sets `d.partyMoveDisableTimer` to the slowest living
   champion's `TimeToMove` (`:8326-8347`); the tick counts it down (`:689-692`), and
   `Mouse.cpp:1482-1491` refuses a step while it is non-zero — or while `d.Word11712` is

@@ -7,12 +7,12 @@
 
 import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
-import type { MovementResult } from './gameTypes';
+import type { Champion, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, Position, RoomType } from '../core/types';
 import type { ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
-import { sw } from '../core/intCast';
+import { div, sw } from '../core/intCast';
 
 /**
  * What `MoveParty` needs from the monster and champion systems.
@@ -26,6 +26,12 @@ export interface MovementHooks {
     getCharacterToDamage(x: number, y: number, corner: number): number;
     /** `DamageCharacter` (doc/CSBwin-src/Character.cpp:2703). */
     damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number;
+    /** `MaxLoad` (doc/CSBwin-src/Code11f52.cpp:4280). */
+    maxLoad(champ: Champion): number;
+    /** `CHARDESC.load`, in tenths of a kilogram (doc/CSBwin-src/CSB.h:2584). */
+    characterLoad(champ: Champion): number;
+    /** `AdjustStamina` (doc/CSBwin-src/Code11f52.cpp:4413). */
+    adjustStamina(chIdx: number, decrement: number): void;
 }
 
 /**
@@ -91,6 +97,8 @@ export class MovementSystem {
         const roomTypeFrom = (cellFlagsFrom >> 5) & 0x7;
         // `move` sends only the four moves here, never a turn.
         const relDirection = this.getRelativeDirection(action)!;
+
+        this.chargeStamina();
 
         if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
             return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0);
@@ -164,6 +172,36 @@ export class MovementSystem {
             success: true,
             newPosition,
         };
+    }
+
+    /**
+     * Every step `MoveParty` attempts costs each champion stamina, before the destination
+     * decides anything — a step into a wall or a monster as much as a step taken, and the
+     * climb out of a stairwell too (doc/CSBwin-src/CSBCode.cpp:8088-8101, `:8129-8135`):
+     *
+     *   maxLoad = MaxLoad(pCharacter);
+     *   D0W = sw((3*pCharacter->load)/maxLoad + 1);
+     *   partyMoveData.staminaAdjustment[charIdx] = D0W;
+     *   ...CallPartyMoveFilter(&partyMoveData)...
+     *   for (charIdx = 0; charIdx < d.NumCharacter; charIdx++)
+     *     AdjustStamina(charIdx, partyMoveData.staminaAdjustment[charIdx]);
+     *
+     * Every champion pays, the dead included (`AdjustStamina` on zero stamina costs a dead
+     * champion nothing more). `CallPartyMoveFilter` is a DSA party-move filter, which can
+     * rewrite the adjustments or refuse the move; no loaded dungeon defines one (DEBT.md
+     * G2). A turn is `TurnParty`, which costs nothing.
+     */
+    private chargeStamina(): void {
+        const champions = this.party.state.champions;
+        const staminaAdjustment: number[] = [];
+        for (let charIdx = 0; charIdx < champions.length; charIdx++) {
+            const champ = champions[charIdx];
+            const maxLoad = this.hooks.maxLoad(champ);
+            staminaAdjustment[charIdx] = sw(div(3 * this.hooks.characterLoad(champ), maxLoad) + 1);
+        }
+        for (let charIdx = 0; charIdx < champions.length; charIdx++) {
+            this.hooks.adjustStamina(charIdx, staminaAdjustment[charIdx]);
+        }
     }
 
     /**

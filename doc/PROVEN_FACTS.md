@@ -2554,6 +2554,20 @@ an unarmoured champion takes as `1 × 130 >> 6 = 2` (`Character.cpp:2780-2789`).
 queued **only if** either call returned non-zero (`:8287-8290`), so an empty party, or a
 blow the armour absorbs, bumps silently. Evidence: `tools/dump-party-collision.ts`.
 
+## Every attempted step costs stamina, bump or not; a turn costs nothing
+
+Before `MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944`) looks at the destination, it sets
+each champion's `staminaAdjustment` to `sw((3 * load) / MaxLoad(pCharacter) + 1)`
+(`:8088-8101`; `load` is `CHARDESC`'s `ui16`, `CSB.h:2584`), passes them to the party-move
+filter, and — unless the filter inhibits the move — calls `AdjustStamina(charIdx, …)` for
+every `charIdx < d.NumCharacter` (`:8129-8135`). That is before the stairwell exit, the
+wall and the monster checks, so a step refused by any of them costs as much as a step
+taken. `MaxLoad` is stamina-adjusted (`Code11f52.cpp:4287`), so a tired champion pays
+more for the same load. `AdjustStamina` (`Code11f52.cpp:4413`) floors stamina at 0 and
+turns the overshoot into `DamageCharacter(chIdx, over / 2, 0, 0)`. A turn is
+`TurnParty` (`:7854`), which charges nothing. Evidence: `tools/dump-party-collision.ts`
+case 7.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the
