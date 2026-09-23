@@ -1,5 +1,6 @@
 import type { Champion, Skill } from './gameTypes';
 import { CsbRandom } from '../core/random';
+import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
 import {
     OBJNI_EKKHARD_CROSS,
@@ -407,12 +408,6 @@ export function levelUp(champion: Champion, basicSkill: number, random?: CsbRand
 }
 
 function clampMax(value: number, max: number): number {
-  if (value > max) return max;
-  return value | 0;
-}
-
-function applyLimits(min: number, value: number, max: number): number {
-  if (value < min) return min;
   if (value > max) return max;
   return value | 0;
 }

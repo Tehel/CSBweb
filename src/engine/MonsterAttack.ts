@@ -16,6 +16,7 @@
  * amend, and only then acts on it. That indirection is the whole reason the block
  * exists as a struct in CSBWin, so it is kept as one here.
  */
+import { applyLimits } from '../core/intCast';
 import { OBJECT_ID_EOF, Position, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
@@ -193,8 +194,8 @@ export class MonsterAttack {
           mapY: amended.monsterY,
           posInCell: amended.missileOriginPosition,
           direction: amended.directionToParty,
-          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1206).
-          range: Math.min(255, Math.max(20, amended.missileRange)),
+          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
+          range: applyLimits(20, amended.missileRange, 255),
           damage: amended.missileDamage,
           decayRate: amended.missileDecayRate,
           level: context.level,
