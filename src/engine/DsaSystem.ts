@@ -11,6 +11,7 @@ import {
   locationRelToInteger,
   Position,
   RoomType,
+  withObjectPosition,
 } from '../core/types';
 import { DescIndex, GetBasicObjectType } from './objectIndex';
 import type { ActuatorRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
@@ -2391,6 +2392,8 @@ export class DsaSystem {
       false,
     );
     if (sourceCheck.error !== 0) return sourceCheck.error;
+    // `hTimer`: the cloud's timer, found by the check pass only (MoveObject.cpp:721-790).
+    const hTimer = sourceCheck.timer ?? -1;
     const destCheck = this.checkDestination(
       dstType,
       dstObjMsk,
@@ -2400,6 +2403,7 @@ export class DsaSystem {
       sourceCheck.object,
       srcType,
       srcLoc,
+      hTimer,
       false,
     );
     if (destCheck !== 0) return destCheck;
@@ -2423,6 +2427,7 @@ export class DsaSystem {
       sourceMove.object,
       srcType,
       srcLoc,
+      hTimer,
       true,
     );
     return destMove;
@@ -2437,7 +2442,7 @@ export class DsaSystem {
     dstType: number,
     dstLoc: number,
     doit: boolean,
-  ): { error: number; object: number } {
+  ): { error: number; object: number; timer?: number } {
     switch (srcType) {
       case 2:
         return this.findCursorSource(doit);
@@ -2463,6 +2468,7 @@ export class DsaSystem {
     object: number,
     srcType: number,
     srcLoc: number,
+    hTimer: number,
     doit: boolean,
   ): number {
     switch (dstType) {
@@ -2471,7 +2477,7 @@ export class DsaSystem {
       case 2:
         return this.checkObjectToCursor(object, doit);
       case 1:
-        return this.findCellDestination(dstObjMsk, dstPosMsk, dstLoc, dstDepth, object, srcType, srcLoc, doit);
+        return this.findCellDestination(dstObjMsk, dstPosMsk, dstLoc, dstDepth, object, srcType, srcLoc, hTimer, doit);
       case 5:
         return this.findChestDestination(dstLoc, dstDepth, object, doit);
       case 3:
@@ -2511,6 +2517,14 @@ export class DsaSystem {
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
+  /**
+   * `FindCellSource` (`doc/CSBwin-src/MoveObject.cpp:166-251`). Unlike the character,
+   * monster and chest sources, a cell hands a cloud over: the check pass finds the
+   * cloud's `TT_25` (or a Fluxcage's `TT_24`) and returns it as `hTimer` for
+   * `FindCellDestination` to retarget, or `SER_BadCloudTimer` when there is none.
+   * `TIMER_SEARCH` walks the slots in order, so the lowest slot wins, and `RN`'s `!=`
+   * compares the indirect index only (`CSBTypes.h:353`) — the corner is not part of it.
+   */
   private findCellSource(
     srcObjMsk: number,
     srcPosMsk: number,
@@ -2519,7 +2533,7 @@ export class DsaSystem {
     dstType: number,
     dstLoc: number,
     doit: boolean,
-  ): { error: number; object: number } {
+  ): { error: number; object: number; timer?: number } {
     const locr = locationRelFromInteger(srcLoc);
     if (!this.dungeon.isValidLocation(locr)) {
       return { error: DsaMoveError.SER_InvalidCellLocation, object: OBJECT_ID_EOF };
@@ -2528,23 +2542,32 @@ export class DsaSystem {
     if (positionMask === -1) positionMask = 1 << (locr.p & 3);
     let depth = srcDepth;
     const pos = new Position(locr.x, locr.y, locr.l);
+    let object = OBJECT_ID_EOF;
     for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
       if (((1 << decoded.position) & positionMask) === 0) continue;
       if (((1 << decoded.category) & srcObjMsk) === 0) continue;
       if (depth === 0) {
-        if (decoded.category === DBType.CLOUD) {
-          return { error: DsaMoveError.SER_NoCloudsPlease, object: OBJECT_ID_EOF };
-        }
-        if (doit) {
-          this.dungeon.removeObjectFromCell(pos, rn);
-          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, dstType === 1 && dstLoc === srcLoc, this.getPartyState?.().facing ?? 0);
-        }
-        return { error: DsaMoveError.SER_OK, object: rn };
+        object = rn;
+        break;
       }
       depth -= 1;
     }
-    return { error: DsaMoveError.SER_NoSuchObjectInCell, object: OBJECT_ID_EOF };
+    if (object === OBJECT_ID_EOF) return { error: DsaMoveError.SER_NoSuchObjectInCell, object: OBJECT_ID_EOF };
+    if (doit) {
+      this.dungeon.removeObjectFromCell(pos, object as ObjectID);
+      this.actuators?.triggerObjectMove(pos, object as ObjectID, false, dstType === 1 && dstLoc === srcLoc, this.getPartyState?.().facing ?? 0);
+    } else if (decodeObjectID(object).category === DBType.CLOUD) {
+      let timer = -1;
+      for (const entry of this.timers.getTimers()) {
+        if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
+        if (entry.object === undefined || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(object as ObjectID, 0)) continue;
+        if (timer === -1 || entry.index < timer) timer = entry.index;
+      }
+      if (timer === -1) return { error: DsaMoveError.SER_BadCloudTimer, object };
+      return { error: DsaMoveError.SER_OK, object, timer };
+    }
+    return { error: DsaMoveError.SER_OK, object };
   }
 
   private findMonsterSource(
@@ -2665,6 +2688,18 @@ export class DsaSystem {
     return DsaMoveError.DER_OK;
   }
 
+  /**
+   * `FindCellDestination` (`doc/CSBwin-src/MoveObject.cpp:477-599`). A cloud's timer
+   * (`hTimer`, from `FindCellSource`) follows it to the new square and level
+   * (`:522-529`); a missile's timer gets the new square in `timerWord8`'s low ten bits
+   * and the new level (`:574-596`).
+   *
+   * CSBWin sets the cloud timer's corner from `d.NewPos` and then `object.pos(p)`
+   * overwrites it, because the corner lives in the indirect-index table rather than in
+   * the `RN` (`CSBTypes.h:336-341`). Here the corner is part of the ID, so both timers
+   * are handed the placed ID outright — the one `ProcessTT_25` and the missile's
+   * removal will look for.
+   */
   private findCellDestination(
     dstObjMsk: number,
     dstPosMsk: number,
@@ -2673,6 +2708,7 @@ export class DsaSystem {
     object: number,
     srcType: number,
     srcLoc: number,
+    hTimer: number,
     doit: boolean,
   ): number {
     void dstObjMsk;
@@ -2681,12 +2717,34 @@ export class DsaSystem {
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     const pos = this.choosePositionFromMask(dstPosMsk, locr.p & 3);
     if (doit) {
-      if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
       const decoded = decodeObjectID(object);
       const placed = encodeObjectID(pos, decoded.category, decoded.index);
+      if (decoded.category === DBType.CLOUD) {
+        const timer = this.timers.getTimer(hTimer);
+        if (timer) {
+          timer.uByte6 = locr.x & 0xff;
+          timer.uByte7 = locr.y & 0xff;
+          timer.object = placed;
+          timer.level = locr.l & 0xff;
+        }
+      }
       this.dungeon.setDBRecordLink(placed, OBJECT_ID_EOF);
       this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed as ObjectID, true, srcType === 1 && srcLoc === dstLoc, this.getPartyState?.().facing ?? 0);
       this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
+      if (decoded.category === DBType.MISSILE) {
+        const missile = this.dungeon.getMissileRecord(placed as ObjectID);
+        const timer = missile ? this.timers.getTimer(missile.timerIndex) : null;
+        if (timer) {
+          timer.timerWord8 = (timer.timerWord8 & 0xffe0) | (locr.x & 31);
+          timer.timerWord8 = (timer.timerWord8 & 0xfc1f) | ((locr.y & 31) << 5);
+          timer.level = locr.l & 0xff;
+          // The port's missile timer also carries the ID and the square, which CSBWin's
+          // `timerObj6` does through the indirect index (see `updateMissileTimerEntry`).
+          timer.object = placed;
+          timer.uByte6 = locr.x & 0xff;
+          timer.uByte7 = locr.y & 0xff;
+        }
+      }
     }
     return DsaMoveError.DER_OK;
   }

@@ -2616,3 +2616,26 @@ to each champion whose `HP() != 0`, so the dead count in the divisor. Wall actua
 by hand pass their wall position (`Mouse.cpp:402`, `:411`, `:462`, `:593-595`), but
 `PressurePadOrAlcove` always passes `-1` (`Code11f52.cpp:3875`), for an alcove as much as for
 a floor pad. Evidence: `tools/dump-local-action.ts`.
+
+## A DSA can move a cloud out of a cell, and the cloud's timer goes with it
+
+`MoveObject` (`doc/CSBwin-src/MoveObject.cpp:721-790`) runs `CheckSource` / `CheckDestination`
+twice, once to check and once to do it. Only the cell source lets a cloud go: the character,
+monster and chest sources and every destination but a cell refuse one with
+`SER_NoCloudsPlease` / `DER_NoCloudsPlease` (`:156`, `:290`, `:349`, `:426`, `:446`, `:618`,
+`:658`). On the **check** pass `FindCellSource` finds the cloud's `TT_25` or `TT_24` timer
+with a `TIMER_SEARCH` over the slots and returns its handle, or `SER_BadCloudTimer` if there
+is none (`:227-245`); the doing pass does not search again, so the handle from the check is
+the one used. `FindCellDestination` then sets that timer's `uByte6/7` to the new square and
+its level to the new level (`:522-529`).
+
+The timer's corner is set from `d.NewPos` there — a leftover from whichever `MoveObject`
+last had a destination — but it does not survive: an `RN`'s corner lives in the indirect
+index table (`CSBTypes.h:336-341`), not in the `RN`, and `FindCellDestination` ends with
+`object.pos(p)` (`MoveObject.cpp:538`), which overwrites it for every holder of that `RN`.
+`RN`'s `==` / `!=` compare the indirect index alone (`CSBTypes.h:349-356`), so the timer
+search ignores the corner too.
+
+A missile moved by a DSA has its timer's `timerWord8` low ten bits set to the new square —
+direction and decay kept — and its level to the new level (`MoveObject.cpp:574-596`).
+Evidence: `tools/dump-dsa-move.ts`.

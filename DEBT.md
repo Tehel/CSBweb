@@ -332,13 +332,14 @@ it is **paid in `600811e`**. What is left of the second is narrower than it read
   alcove's position (`Code11f52.cpp:3875`), which also changes `RotateActuatorList`'s
   filter. Evidence: `tools/dump-local-action.ts` (3 of 6 checks fail before); the fact is
   in `doc/PROVEN_FACTS.md`.
-- ⏳ **DSA cloud moves.** CSBWin's `FindCellSource` (`MoveObject.cpp:166`) lets a DSA move
-  a cloud: it finds the cloud's `TT_24` / `TT_25` timer (`:227-245`, `SER_BadCloudTimer`
-  if there is none), and `FindCellDestination` retargets it — `uByte6/7`, the object's
-  position, the level (`:522-529`). `DsaSystem.findCellSource` refuses a cloud with
-  `SER_NoCloudsPlease` instead. (The character, monster and chest sources do refuse
-  clouds in CSBWin too, `:156`, `:290`, `:349`.) **Missiles need nothing:** CSBWin's
-  `MoveObject.cpp` has no missile timer update, so that half of the old entry was wrong.
+- ✅ **DSA cloud moves.** `DsaSystem.findCellSource` now hands a cloud over: the check
+  pass finds its `TT_25` / `TT_24` (lowest slot, index compare) or returns
+  `SER_BadCloudTimer` (`MoveObject.cpp:227-245`), and `findCellDestination` retargets
+  it — square, level and the placed ID (`:522-529`). **The old note that missiles need
+  nothing was wrong:** `FindCellDestination` has a `dbMISSILE` arm (`:574-596`) that
+  writes the new square into `timerWord8` and the new level; that is ported too.
+  Evidence: `tools/dump-dsa-move.ts` (8 of 13 checks fail before); the fact is in
+  `doc/PROVEN_FACTS.md`. What is still not CSBWin's about a DSA cell move is C15.
 - ⏳ **Deferred deletes.** `&DEL` queues the record on `m_objectDeleteList`
   (`DSA.cpp:157-163`) and `ConsumateDeletes` frees the lot after the run (`:178-191`,
   called at `:5483`), returning whether the DSA deleted its own actuator — which the
