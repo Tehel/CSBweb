@@ -1825,3 +1825,55 @@ already fixed during the move.
   which needs no scaffolding in the app at all. HALK is added first so champion 0 holds a
   weapon and frame 05 still exercises the weapon attack list rather than PUNCH/KICK/WAR
   CRY.
+
+
+#### `DEBT.md` tier A — Housekeeping (paid 2026-09-23)
+
+- ✅ **A1 — Documentation pointers to things that no longer exist.** Fixed in the commit
+  that created `DEBT.md`: `CLAUDE.md` sent project memory to
+  `~/.claude/projects/-home-thomas-tmp-dmweb/memory/`, the directory from before the
+  repository moved to `~/dev/DMweb` (now `-home-thomas-dev-DMweb`); `PLAN.md` said "see the
+  TODOs in `src/engine/DsaSystem.ts`" and "…in `src/engine/TimerSystem.ts`", and neither
+  file has any. The DSA entry was rewritten as `DEBT.md` G1; the `TimerSystem` one was
+  already paid.
+
+- ✅ **A2 — Stale comments, a dead parameter, console noise.** Paid in `1c0f132`. The
+  save-version comment now explains versions 6 (the timer table by index, `timerQueue`,
+  `timerSequence`) and 7 (a timer's object in the byte pair `ConvertTimers` names); the
+  two `random` doc comments are one; `MISSILE_WOUND_MASK` sits below the imports;
+  `BytecodeInterpreter` is no longer a "Prototype" and its bitmaps are `IndexedBitmap[]`;
+  the `Game initialized at position…` log is gone. `castSpellFromUi` lost its third
+  argument — CSBWin's cast button calls `CastMagic(0)` with no mana cost
+  (`doc/CSBwin-src/Magic.cpp:564`), since each rune's mana was spent as it was added — and
+  with it the UI's now-unused `computeIncantationManaCost`. The stale `HitDoor` comment in
+  `TimerSystem` now points at `DEBT.md` C1 rather than claiming melee does not exist; C1
+  itself removes it. The same session made `tools/check-frames.sh` run on Node 20, which
+  hides the global `WebSocket` behind `--experimental-websocket` (`f36cbbc`).
+
+  <details><summary>original entry</summary>
+
+
+Each of these misleads a reader today:
+
+- `src/engine/Game.ts:130` — `RUNTIME_SAVE_VERSION = 7`, but the doc comment above it
+  explains versions 2–5 only. Version 6 came with `a149db7` ("Now loading CSBWin save
+  files") and 7 with `c6f038c` ("Save file to disk"); `git show` both and write the two
+  missing paragraphs.
+- `src/engine/Game.ts:178-188` — the `random` field carries two stacked doc comments, the
+  first orphaned. Merge them.
+- `src/engine/Game.ts:53` — `MISSILE_WOUND_MASK` is declared between two import blocks.
+- `src/renderer/bytecode/BytecodeInterpreter.ts:2` calls itself a "Prototype", and
+  `:40-41` type `wallBitmaps` / `doorBitmaps` as `any[]` with "mock in tests" — there are
+  no tests. Type them `IndexedBitmap[]`.
+- `src/engine/TimerSystem.ts:2505-2507` says the delayed `HitDoor` belongs to a melee
+  attack that "does not exist yet". It does; this one is fixed with C1.
+- `src/engine/Game.ts:2710-2713` — `castSpellFromUi(chIdx, incantation, totalManaCost)`
+  throws its third argument away with `void totalManaCost;` to satisfy
+  `noUnusedParameters`. Drop the parameter (and the caller's argument), unless CSBWin's
+  caller uses it — check `Magic.cpp`.
+- `Game`'s constructor `console.log`s `Game initialized at position…`, which every
+  `tools/` run prints. Remove it or send it to the debug log.
+
+Done when none of the above remains and `npm test` passes.
+
+  </details>

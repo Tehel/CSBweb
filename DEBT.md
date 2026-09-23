@@ -59,9 +59,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| A1 | Documentation pointers to things that no longer exist | S | ✅ |
-| A2 | Stale comments, a dead parameter, console noise | S | ⏳ |
-| B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ⏳ |
+| A1 | Documentation pointers to things that no longer exist | S | ✅ archived |
+| A2 | Stale comments, a dead parameter, console noise | S | ✅ archived |
+| B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ |
 | B2 | Small helpers defined in several files | M | ⏳ |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ⏳ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ⏳ |
@@ -73,6 +73,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C8 | Phase 8 DSA leftovers | M | ⚠️ re-audit |
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
+| C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -95,47 +96,42 @@ it and record the split here).
 
 ## A — Housekeeping
 
-### A1 ✅ Documentation pointers to things that no longer exist
-
-Fixed in the commit that created this file:
-
-- `CLAUDE.md` sent project memory to `~/.claude/projects/-home-thomas-tmp-dmweb/memory/`,
-  the directory from before the repository moved to `~/dev/DMweb`. It is now
-  `-home-thomas-dev-DMweb`.
-- `PLAN.md` said "see the TODOs in `src/engine/DsaSystem.ts`" and "…in
-  `src/engine/TimerSystem.ts`". Neither file has any. The DSA entry is rewritten as G1; the
-  `TimerSystem` one was already paid (see the archive).
-
-### A2 ⏳ Stale comments, a dead parameter, console noise
-
-Each of these misleads a reader today:
-
-- `src/engine/Game.ts:130` — `RUNTIME_SAVE_VERSION = 7`, but the doc comment above it
-  explains versions 2–5 only. Version 6 came with `a149db7` ("Now loading CSBWin save
-  files") and 7 with `c6f038c` ("Save file to disk"); `git show` both and write the two
-  missing paragraphs.
-- `src/engine/Game.ts:178-188` — the `random` field carries two stacked doc comments, the
-  first orphaned. Merge them.
-- `src/engine/Game.ts:53` — `MISSILE_WOUND_MASK` is declared between two import blocks.
-- `src/renderer/bytecode/BytecodeInterpreter.ts:2` calls itself a "Prototype", and
-  `:40-41` type `wallBitmaps` / `doorBitmaps` as `any[]` with "mock in tests" — there are
-  no tests. Type them `IndexedBitmap[]`.
-- `src/engine/TimerSystem.ts:2505-2507` says the delayed `HitDoor` belongs to a melee
-  attack that "does not exist yet". It does; this one is fixed with C1.
-- `src/engine/Game.ts:2710-2713` — `castSpellFromUi(chIdx, incantation, totalManaCost)`
-  throws its third argument away with `void totalManaCost;` to satisfy
-  `noUnusedParameters`. Drop the parameter (and the caller's argument), unless CSBWin's
-  caller uses it — check `Magic.cpp`.
-- `Game`'s constructor `console.log`s `Game initialized at position…`, which every
-  `tools/` run prints. Remove it or send it to the debug log.
-
-Done when none of the above remains and `npm test` passes.
+✅ Paid on 2026-09-23 (A1 with the commit that created this file, A2 in `1c0f132`). Both
+entries, with their outcomes, are in `doc/PLAN_ARCHIVE.md` → "Resolved debt" → "`DEBT.md`
+tier A".
 
 ---
 
 ## B — Duplicate implementations
 
-### B1 ⏳ One `DescIndex`, one `GetBasicObjectType`, one `NameIndex`
+### B1 ✅ One `DescIndex`, one `GetBasicObjectType`, one `NameIndex`
+
+**Paid in `779ae8b`.** `src/engine/objectIndex.ts` holds `DescIndex`, `GetBasicObjectType`
+and `NameIndex`, transcribed from `data.cpp:568-700` and `CSBCode.cpp:1245`, plus
+`DescIndexOfRecord` — the same switch over a record in hand, for `AddCharacter`'s preset
+path, which has no `DungeonState`. Every copy listed below is gone or is a one-line wrapper
+over the module (`ui/Objects.ts`' `resolveObjectNameIndex`, `getBaseObjectNameIndex`,
+`descIndexForObject`; `Game`, `DsaSystem`, `ActuatorSystem` each keep a private one-liner
+that supplies their tables). A seventh copy the entry missed, in `ActuatorSystem`
+(`getBasicObjectType` / `getDescIndex` / `getBasicObjectTypeFromValue`), went too, as did
+the one in `tools/dump-level-items.ts`. The UI's `getBaseObjectNameIndex` and
+`getAttackClass` take an RN only; `Feeding`'s explicit object-type path keeps the type as
+its name index, which is what the old guess returned. Every `DetermineMastery` hook
+(`CharacterStats`, `AttackSystem`, `Game`'s three, the UI's attack menu) and
+`CharacterStats`' `MaxLoad` now get `NameIndex`, as CSBWin does (`Code17818.cpp:76,98`,
+`Code11f52.cpp:4303`). `Game` receives `d.Byte640` through `ActuatorTables.byte640`.
+
+Behaviour: unchanged on the stock dungeon — every DM chest is type 0, and none of the
+mastery or load objects (Firestaff, talismans, Elven Boots) is modifiable, so `NameIndex`
+and `GetBasicObjectType` agree on them. The failure value is now `OBJNI_NOT_AN_OBJECT`
+everywhere. Evidence: `tools/dump-object-index.ts` (new, in `npm test`) walks all 1950
+records of `dungeon.dat` and forces the compass, torch, scroll, waterskin and charged-weapon
+states; the golden frames are unchanged.
+
+Found on the way: `ActuatorSystem.doesPartyHave` is not `DoesPartyHave` — C11.
+
+<details><summary>original entry</summary>
+
 
 **What.** CSBWin has exactly one of each: `RN::DescIndex` (`doc/CSBwin-src/data.cpp:568`),
 `GetBasicObjectType` (`doc/CSBwin-src/CSBCode.cpp:1245`), and `RN::NameIndex`
@@ -183,6 +179,8 @@ object record in `dungeon.dat` and assert the three functions over it — a ches
 an unlit torch, a compass at each facing, an open scroll. Then `npm test -- --frames`,
 since the renderer and UI copies move.
 
+</details>
+
 ### B2 ⏳ Small helpers defined in several files
 
 Found by name. **Compare the bodies before merging**; where copies differ, find which one
@@ -210,6 +208,10 @@ matches CSBWin before choosing.
   `championAt` (`MonsterAttack.ts`, `AttackSystem.ts`),
   `triggerObjectMove` (`ActuatorSystem.ts`, `DsaSystem.ts`, `Game.ts`),
   `setObjectPosition` (`ActuatorSystem.ts`, `Game.ts`).
+- `isLikelyObjectRecord` — "does this RN index a real record of an object database" —
+  in `Game.ts` and `src/renderer/ui/Objects.ts` (`ActuatorSystem`'s `hasRecord` went with
+  B1). CSBWin has no such check; it is the port's guard. One copy, next to `DescIndex` in
+  `src/engine/objectIndex.ts`, is the natural home.
 - `src/data/SaveGameLoader.ts:191-240` has its own `readU16LE/BE` and `readU32LE/BE`
   beside `src/core/BinaryFile.ts`.
 
@@ -343,6 +345,21 @@ with CSBWin's tables, and refine the `LastMonsterAttackTime` source now that mon
 in." Possibly overtaken: `Game.awardThrowSkill` (`src/engine/Game.ts:2728`) now documents
 itself as `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. Check each of the
 three against CSBWin, then close or narrow this entry.
+
+### C11 ⏳ `DoesPartyHave` does not look inside chests
+
+`DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3623-3670`), which answers actuator type 8,
+walks the 30 possessions of every champion with `HP() != 0` and, for each one whose basic
+type is `objNI_Chest`, walks the chest's `contents()` chain too, comparing
+`GetBasicObjectType` against the actuator's value at every step. The port's
+`ActuatorSystem.doesPartyHave` checks the possessions and the three hand/quiver fields but
+never opens a chest, and filters on `champ.alive` rather than on hit points. A key carried
+in a chest therefore fails to trip a type-8 sensor that CSBWin would trip.
+
+Port it line for line (the hand/quiver fields go with D1). Evidence: a `tools/` scenario
+that puts the matching object in a carried chest and checks the actuator fires.
+
+<sub>Found while paying B1, 2026-09-23.</sub>
 
 ---
 

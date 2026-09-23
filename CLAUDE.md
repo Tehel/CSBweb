@@ -69,8 +69,9 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
 
 - `tools/check-frames.sh` compares eight live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
-  server and headless Chrome, so it needs no setup; it is out of the default run only
-  because it costs a browser and ~7s. Run it before any renderer or UI commit. A frame is
+  server and headless Chrome, so it needs no setup (on Node 20 it turns on
+  `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
+  out of the default run only because it costs a browser and ~7s. Run it before any renderer or UI commit. A frame is
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
@@ -94,7 +95,8 @@ core/       BinaryFile (big-endian), compression (LZW/RLE/SND), imageDecoder (IM
             types, objectNameIndex (shared OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
 engine/     Game, DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
-            ActuatorSystem, DsaSystem, skills, AddCharacter
+            ActuatorSystem, DsaSystem, skills, AddCharacter, objectIndex (the one
+            DescIndex / GetBasicObjectType / NameIndex)
 renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,

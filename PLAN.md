@@ -29,6 +29,9 @@ how to work an item. **One item per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
+Progress (the index at the top of `DEBT.md` is the live status): tier A and B1 paid on
+2026-09-23. Next: B2.
+
 ## Ground rules
 
 1. **The build must stay clean.** `npm run build` runs `tsc && vite build`; `tsc --noEmit`

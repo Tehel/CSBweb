@@ -1038,6 +1038,36 @@ name with no separator: `StrCpy(name); StrCat(d.ObjectNames[objNID6])` gives `HA
 `DrawNameOfHeldObject` uses `RN::NameIndex()`, the resolved index, so a compass in hand
 reads the way the party faces and a lit torch reads its burn state.
 
+## `DescIndex`, `GetBasicObjectType` and `NameIndex` — three steps, three sentinels
+
+Ported once, in `src/engine/objectIndex.ts`; `tools/dump-object-index.ts` asserts them over
+every record of `dungeon.dat`.
+
+- **`RN::DescIndex`** (`doc/CSBwin-src/data.cpp:568-600`) returns -1 for `RNempty`, which is
+  **0x0000** (`doc/CSBwin-src/CSBTypes.h:249`) — not `RNnul` (0xffff, `:238`) nor `RNeof`
+  (0xfffe, `:237`). Those two fall to the `default` arm anyway, since their `dbType()` is
+  15. A chest's row is `BITS1_2(word4) + objDI_Chest` (`:582`), not a constant 1; a
+  scroll's is `objDI_Scroll` without reading the record at all.
+- **`GetBasicObjectType`** (`doc/CSBwin-src/CSBCode.cpp:1245-1258`) tests `RNnul` itself,
+  then answers `objNI_NotAnObject` (0xff) for a -1 row, else `d.ObjDesc[row].objectType()`.
+  A scroll's basic type is `objNI_OpenScroll` (30): only `NameIndex` turns a closed one
+  into `objNI_Scroll`.
+- **`RN::NameIndex`** (`doc/CSBwin-src/data.cpp:612-700`) is the only one of the three
+  that reads object *state*: compass + `d.partyFacing`, lit torch + `d.Byte640[charges]`,
+  closed scroll, a waterskin / Illumulet / Jewel Symal whose `value()` (`BITS14_15(word2)`,
+  `doc/CSBwin-src/CSB.h:1273`) is non-zero, and the six charged weapons.
+- **Who uses which.** `DetermineMastery` reads the weapon and the neck through
+  `NameIndex` (`doc/CSBwin-src/Code17818.cpp:76`, `:98`), and so does `MaxLoad` for the
+  feet (`doc/CSBwin-src/Code11f52.cpp:4303`). `DoesPartyHave`
+  (`doc/CSBwin-src/Code11f52.cpp:3623-3670`) uses `GetBasicObjectType`, and opens every
+  carried chest to compare its contents too.
+
+## The cast button passes `CastMagic` no mana cost
+
+`doc/CSBwin-src/Magic.cpp:564`: `d.clockTick = CastMagic(0);` — the argument is an unnamed
+`const i32` (`Magic.cpp:928`). The mana was already spent rune by rune as the incantation
+was built, so casting totals nothing.
+
 ## Every inventory click is gated on `d.HandChar`, and the party always owns it
 
 `doc/CSBwin-src/Mouse.cpp:1600-1606` — the button ids 28 to 65, which are the inventory
