@@ -38,6 +38,7 @@ import type { MonsterDesc, WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import type { CsbRandom } from '../core/random';
 import { roomTimerFunction } from './roomTimers';
 import {
+    OBJNI_CHEST,
     OBJNI_NOT_AN_OBJECT,
 } from '../core/objectNameIndex';
 
@@ -695,26 +696,33 @@ export class ActuatorSystem {
     };
   }
 
-  private doesPartyHave(targetObjectNameIndex: number): boolean {
+  /**
+   * `DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3622-3680`), for actuator type 8: the 30
+   * possessions of every champion with hit points, then the cursor — which the `goto` back
+   * into the loop checks whoever holds it — and, for each one that is a chest, the chest's
+   * contents too.
+   */
+  private doesPartyHave(actuatorValue: number): boolean {
+    const matches = (obj: number | null | undefined): boolean => {
+      if (obj === null || obj === undefined) return false;
+      const objNI = this.getBasicObjectType(obj);
+      if (objNI === actuatorValue) return true;
+      if (objNI !== OBJNI_CHEST) return false;
+      const chest = this.dungeon.getContainerRecord(obj as ObjectID);
+      for (let rn = chest?.containedObject ?? OBJECT_ID_EOF; rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+        if (this.getBasicObjectType(rn) === actuatorValue) return true;
+      }
+      return false;
+    };
     const party = this.getPartyState();
     for (const champ of party.champions) {
-      if (!champ.alive) continue;
+      if ((champ.attributes.health | 0) === 0) continue;
       const possessions = champ.possessions ?? [];
-      for (const item of possessions) {
-        if (item === null || item === undefined) continue;
-        if (this.getBasicObjectType(item) === targetObjectNameIndex) return true;
-      }
-      if (champ.weaponHand !== null && champ.weaponHand !== undefined) {
-        if (this.getBasicObjectType(champ.weaponHand) === targetObjectNameIndex) return true;
-      }
-      if (champ.shieldHand !== null && champ.shieldHand !== undefined) {
-        if (this.getBasicObjectType(champ.shieldHand) === targetObjectNameIndex) return true;
-      }
-      if (champ.quiver !== null && champ.quiver !== undefined) {
-        if (this.getBasicObjectType(champ.quiver) === targetObjectNameIndex) return true;
+      for (let slot = 0; slot < 30; slot++) {
+        if (matches(possessions[slot])) return true;
       }
     }
-    return false;
+    return matches(party.objectInHand);
   }
 
   private performLocalAction(localActionType: number, mapX: number, mapY: number, mapZ: number, mapPos: number): void {

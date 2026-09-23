@@ -2739,3 +2739,13 @@ A timer that is queued is stamped `m_timerSequence++` as it goes into its slot (
 `SEQUENCED_TIMERS`, defined in `stdafx.h:17`); a dropped duplicate consumes no number. The
 counter is repacked when it reaches 0xffff (`:1135-1188`).
 Evidence: `tools/dump-timer-dedupe.ts`.
+
+## Actuator type 8 counts what is in a carried chest, and what is on the cursor
+
+`DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3622-3680`), the test of a type-8 floor sensor,
+walks the 30 possessions of every champion whose `HP() != 0`, comparing each one's
+`GetBasicObjectType` with the actuator's value; a possession that is `objNI_Chest` (0x90,
+`Objects.h:585`) has its `contents()` chain compared as well. After the last champion it sets
+`w_4 = 1`, loads `d.objectInHand` and jumps back into the loop body (`goto tag012e14`,
+`:3672-3678`), so the object on the cursor — and, if it is a chest, its contents — counts too,
+whoever holds the cursor. Evidence: `tools/dump-does-party-have.ts`.

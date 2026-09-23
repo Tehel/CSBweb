@@ -34,6 +34,7 @@ export const OBJNI_OPEN_SCROLL = 30;
 export const OBJNI_LAST_MODIFIABLE = 31;
 export const OBJNI_SCROLL = 31;
 export const OBJNI_SCEPTRE_OF_LYF = 66;    // 0x42
+export const OBJNI_CHEST = 144;            // 0x90
 export const OBJNI_OPEN_CHEST = 145;       // 0x91
 export const OBJNI_BONES_A = 147;          // 0x93
 export const OBJNI_ELVEN_BOOTS = 119;      // 0x77

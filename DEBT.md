@@ -75,7 +75,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C8 | Phase 8 DSA leftovers | M | ✅ |
 | C9 | Door pass-through rules and magic formulas | M | ✅ |
 | C10 | Phase 9.5 refinements | S | ✅ |
-| C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
+| C11 | `DoesPartyHave` does not look inside chests | S | ✅ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ✅ |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
@@ -427,7 +427,19 @@ three against CSBWin, then close or narrow this entry.
 
 </details>
 
-### C11 ⏳ `DoesPartyHave` does not look inside chests
+### C11 ✅ `DoesPartyHave` does not look inside chests
+
+**Paid in `COMMIT_C11`.** `ActuatorSystem.doesPartyHave` is `Code11f52.cpp:3622-3680` now: the
+30 possessions of every champion with hit points, then the cursor, each compared by
+`GetBasicObjectType` and, when it is a chest (`OBJNI_CHEST`, 0x90, new), its contents too. Two
+gaps beyond the entry: CSBWin's `goto` back into the loop checks **`d.objectInHand`** as
+well (`:3672-3678`), which the port never did, and the champion filter is `HP() != 0`, not
+the `alive` flag. The named hand/quiver fields are no longer read — `possessions[0]`, `[1]`
+and `[8]` hold the same objects (D1). The shipped dungeon has 22 type-8 sensors. Evidence:
+`tools/dump-does-party-have.ts` (4 of 7 checks fail before); the fact is in
+`doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 `DoesPartyHave` (`doc/CSBwin-src/Code11f52.cpp:3623-3670`), which answers actuator type 8,
 walks the 30 possessions of every champion with `HP() != 0` and, for each one whose basic
@@ -441,6 +453,8 @@ Port it line for line (the hand/quiver fields go with D1). Evidence: a `tools/` 
 that puts the matching object in a carried chest and checks the actuator fires.
 
 <sub>Found while paying B1, 2026-09-23.</sub>
+
+</details>
 
 ### C12 ✅ `SetTimer`'s duplicate-timer rules keep the wrong timer
 

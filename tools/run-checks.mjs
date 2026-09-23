@@ -54,6 +54,7 @@ const CHECKS = [
   { tool: 'dump-wiggle-cloud.ts' },
   { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-local-action.ts' },
+  { tool: 'dump-does-party-have.ts' },
   { tool: 'dump-dsa-move.ts' },
   { tool: 'dump-dsa-delete.ts' },
   { tool: 'dump-missile-monster.ts' },
