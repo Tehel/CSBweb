@@ -1339,7 +1339,7 @@ export class DsaSystem {
           const { category } = decodeObjectID(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
-          this.triggerObjectMove(pos, rn, false, false);
+          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, false, this.getPartyState?.().facing ?? 0);
           this.deleteLinkedScrollText(rn);
           this.dungeon.deleteDBEntry(rn);
           break;
@@ -1361,7 +1361,7 @@ export class DsaSystem {
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
-          this.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false);
+          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed as ObjectID, true, false, this.getPartyState?.().facing ?? 0);
           this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
         } else if (location === -1) {
           const party = this.getPartyState?.();
@@ -2260,10 +2260,6 @@ export class DsaSystem {
     this.dungeon.deleteDBEntry(textRn);
   }
 
-  private triggerObjectMove(position: Position, object: number, place: boolean, unchangedRoom: boolean): void {
-    if (!this.actuators) return;
-    this.actuators.triggerObjectMove(position, object as ObjectID, place, unchangedRoom, 0);
-  }
 
   private canAddToLocation(location: number): boolean {
     if (location >= 0) {
@@ -2560,7 +2556,7 @@ export class DsaSystem {
         }
         if (doit) {
           this.dungeon.removeObjectFromCell(pos, rn);
-          this.triggerObjectMove(pos, rn, false, dstType === 1 && dstLoc === srcLoc);
+          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, dstType === 1 && dstLoc === srcLoc, this.getPartyState?.().facing ?? 0);
         }
         return { error: DsaMoveError.SER_OK, object: rn };
       }
@@ -2707,7 +2703,7 @@ export class DsaSystem {
       const decoded = decodeObjectID(object);
       const placed = encodeObjectID(pos, decoded.category, decoded.index);
       this.dungeon.setDBRecordLink(placed, OBJECT_ID_EOF);
-      this.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, srcType === 1 && srcLoc === dstLoc);
+      this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed as ObjectID, true, srcType === 1 && srcLoc === dstLoc, this.getPartyState?.().facing ?? 0);
       this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
     }
     return DsaMoveError.DER_OK;

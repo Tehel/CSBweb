@@ -180,6 +180,11 @@ export class ActuatorSystem {
     return this.triggerObjectMove(position, OBJECT_ID_NULL, pressed, unchangedRoom, facing);
   }
 
+  /**
+   * `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3882`): every actuator in
+   * the cell gets `PressurePadOrAlcove`. `facing` stands in for the `d.partyFacing` that
+   * `PressurePadOrAlcove` reads (`:3776`), and only matters when the party itself moves.
+   */
   triggerObjectMove(
     position: Position,
     object: ObjectID,

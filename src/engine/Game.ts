@@ -814,6 +814,10 @@ export class Game {
         this.state.party = this.party.state;
     }
 
+    /**
+     * The UI's object drop: `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`),
+     * then whatever it set in motion — a level change, the timers it queued.
+     */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
         this.monsterSystem.loadPartyLevelIfChanged();
