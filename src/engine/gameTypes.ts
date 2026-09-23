@@ -292,6 +292,11 @@ export interface MovementResult {
     newPosition?: Position;  // New position (if moved)
     newFacing?: Direction;      // New facing (if turned)
     blocked?: boolean;          // Was movement blocked by wall?
+    /**
+     * `MoveParty`'s `D5W != 0`: terrain or a monster refused the move, and
+     * `DiscardAllInput(); d.clockTick = 0;` follow (doc/CSBwin-src/CSBCode.cpp:8310-8314).
+     */
+    inhibited?: boolean;
     soundId?: number;           // Optional sound effect to play
     soundRateIdx?: number;      // Optional rate index for sound playback
 }

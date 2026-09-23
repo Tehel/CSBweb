@@ -280,6 +280,12 @@ export class Game {
     // Game loop
     private running: boolean = false;
     private lastTickTime: number = 0;
+    /**
+     * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313). The VBL
+     * sets `clockTick` again on every VBL once `vblCount >= d.Speed` (`:1066-1077`), so
+     * a tick that was due waits one frame.
+     */
+    private clockTickCleared = false;
     private animationFrameId: number | null = null;
 
     // Event callbacks
@@ -698,6 +704,7 @@ export class Game {
      */
     runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
+        this.clockTickCleared = false;
         this.processMovementQueue(currentTime);
 
         // Calculate time since last tick
@@ -705,7 +712,7 @@ export class Game {
         const tickInterval = 1000 / GAME_TIMING.TICKS_PER_SECOND;
 
         // Process game ticks
-        if (timeSinceLastTick >= tickInterval) {
+        if (timeSinceLastTick >= tickInterval && !this.clockTickCleared) {
             if (!this.state.paused) {
                 this.gameTick();
             }
@@ -791,6 +798,14 @@ export class Game {
 
             return true;
         } else {
+            if (result.inhibited) {
+                // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
+                // `DiscardAllInput` empties CSBWin's key and mouse queues (`:7532`); the
+                // port's only queued input is the movement queue — clicks are handled as
+                // they arrive.
+                this.movementQueue.length = 0;
+                this.clockTickCleared = true;
+            }
             // Notify callbacks of failure
             for (const callback of this.onMoveCallbacks) {
                 callback(false, result);

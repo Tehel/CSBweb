@@ -419,11 +419,17 @@ All in CSBWin's move handler in `doc/CSBwin-src/CSBCode.cpp`:
   `doc/PROVEN_FACTS.md`. Found on the way: the tool built its `Game` without `byte586`,
   and `MonsterAttack.determineAttackOrder` then silently uses `[0, 1, 2, 3]` — an F1
   placeholder.
-- **`DiscardAllInput()` / `d.clockTick = 0`** on any inhibited move (`:8311-8315`). Not
-  ported because `DiscardAllInput` drains CSBWin's raw keyboard and mouse queues (`:7532`),
-  which is not obviously our 3-deep `movementQueue` — that one mirrors `CSBUI.cpp`'s key
-  queue. Establishing the mapping needs `CSBUI.cpp` read properly; guessing it would change
-  how queued moves behave after every bump.
+- ✅ **`DiscardAllInput()` / `d.clockTick = 0`** on any inhibited move (`:8310-8314`).
+  Paid in the commit "A refused move discards queued input and holds the tick a frame",
+  after `Game.runFrame` was split out of the loop so a tool can step frames. The mapping,
+  read rather than guessed: `DiscardAllInput` drains the key queue and resets the mouse
+  queue (`:7532`, `CSBUI.cpp:1374-1391`), and every move the port queues is in
+  `movementQueue` (clicks are handled as they arrive), so the port clears that.
+  `d.clockTick` is "a tick is due", and the VBL sets it again on every VBL once
+  `vblCount >= d.Speed` (`:1066-1077`), so zeroing it holds a due tick for one VBL —
+  `Game.clockTickCleared` skips the tick for the rest of the frame. `MovementResult`
+  carries CSBWin's `D5W` as `inhibited`. Evidence: `tools/dump-party-collision.ts` case 6
+  (4 of 21 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
 - **The vertical-move guard** (`:8200-8204`), which refuses a Move Up / Move Down into a
   monster's cell outright. `MovementAction` has no up/down member, so there is no entry
   point to attach it to yet.

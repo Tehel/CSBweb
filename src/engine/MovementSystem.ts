@@ -152,6 +152,7 @@ export class MovementSystem {
                 return {
                     success: false,
                     blocked: true,
+                    inhibited: true,
                 };
             }
         }
@@ -194,6 +195,7 @@ export class MovementSystem {
         return {
             success: false,
             blocked: true,
+            inhibited: true,
             soundId: k !== 0 ? SoundIndex.WALL_BUMP : undefined,
         };
     }

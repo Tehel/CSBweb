@@ -2553,3 +2553,18 @@ through `DetermineAttackOrder` / `Byte586` — the two nearest the wall. Each ge
 an unarmoured champion takes as `1 × 130 >> 6 = 2` (`Character.cpp:2780-2789`). Sound 18 is
 queued **only if** either call returned non-zero (`:8287-8290`), so an empty party, or a
 blow the armour absorbs, bumps silently. Evidence: `tools/dump-party-collision.ts`.
+
+## A refused move throws away all queued input, and postpones a due tick by one VBL
+
+When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the
+cell — it ends `DiscardAllInput(); d.clockTick = 0;` (`doc/CSBwin-src/CSBCode.cpp:8310-8314`),
+whether or not the party is empty. `DiscardAllInput` (`:7532`) drains the key queue
+through `UI_CONSTAT` / `UI_DIRECT_CONIN` (`CSBUI.cpp:1374-1391`) and resets the mouse
+queue (`d.MouseQStart = 0`, `d.MouseQEnd = MOUSEQLEN-1`), so every move keyed or clicked
+behind the bump is lost. `d.clockTick` is the "a tick is due" flag: the main loop runs a
+tick only when it is non-zero (`:763-764`) and clears it after each (`:704`); the VBL
+handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1066-1077`), and
+`vblCount` is reset only at the top of a tick (`:617`). So zeroing it cancels nothing: a
+tick already due runs one VBL later. The key queue is a 3-slot ring that refuses a key
+when `next == keyQueueStart` (`CSBUI.cpp:143-145`, `:1131-1139`), so it holds at most two
+keys. Evidence: `tools/dump-party-collision.ts` case 6.

@@ -13,6 +13,8 @@
  * - the whole block is gated on `d.NumCharacter != 0`.
  * - a wall bump hurts up to two champions on the wall side, and the sound is queued only
  *   if one of them was hurt (`:8263-8291`).
+ * - either bump discards all queued input and postpones a due tick by a frame
+ *   (`:8310-8314`).
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -305,6 +307,61 @@ async function main(): Promise<void> {
     console.log('');
   }
 
+  // ---- Case 6: an inhibited move discards all input and postpones the tick --
+  // `if (D5W != 0) { DiscardAllInput(); d.clockTick = 0; }`
+  // (doc/CSBwin-src/CSBCode.cpp:8310-8314), for a wall and for a monster alike.
+  // `DiscardAllInput` empties the key queue and the mouse queue (`:7532`); the port's
+  // one input queue is `movementQueue`. `d.clockTick = 0` cancels a tick that was due:
+  // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
+  // (`:1066-1077`), so the tick runs one frame later.
+  type Internals = { movementQueue: MovementAction[]; lastTickTime: number };
+  const internals = game as unknown as Internals;
+  const T0 = Date.now() + 60_000;
+  let discard: {
+    wallQueue: number; tickHeld: boolean; tickNextFrame: boolean; facingKept: boolean;
+    monsterQueue: number; turnQueue: number;
+  } | null = null;
+  if (wall) {
+    const queueAt = (px: number, py: number, dir: number, actions: MovementAction[]): void => {
+      game.party.state.position = new Position(px, py, level);
+      game.party.setFacing(dir);
+      game.party.state.lastMoveTime = 0;
+      internals.movementQueue.length = 0;
+      for (const a of actions) game.enqueueMovement(a);
+    };
+    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+
+    // The monster first, with no tick due, so that it is still where the scene found it.
+    queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
+    internals.lastTickTime = T0 - 20_000;
+    game.runFrame(T0 - 20_000);
+    const monsterQueue = internals.movementQueue.length;
+
+    queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
+    internals.lastTickTime = T0 - 1000; // a tick is due this frame
+    const ticks0 = game.state.tickCount;
+    game.runFrame(T0);
+    const wallQueue = internals.movementQueue.length;
+    const tickHeld = game.state.tickCount === ticks0;
+    game.runFrame(T0 + 17);
+    const tickNextFrame = game.state.tickCount === ticks0 + 1;
+    game.runFrame(T0 + 5_000);
+    game.runFrame(T0 + 10_000);
+    const facingKept = game.party.state.facing === wall.facing;
+
+    // Control: a move that is not inhibited leaves the rest of the queue alone.
+    queueAt(wall.px, wall.py, wall.facing, [MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
+    game.runFrame(T0 + 30_000);
+    const turnQueue = internals.movementQueue.length;
+
+    discard = { wallQueue, tickHeld, tickNextFrame, facingKept, monsterQueue, turnQueue };
+    console.log(
+      `queued input after a wall bump: ${wallQueue}, after a monster bump: ${monsterQueue}, ` +
+        `after a turn: ${turnQueue}; due tick held ${tickHeld}, ran next frame ${tickNextFrame}`,
+    );
+    console.log('');
+  }
+
   // ---- Assertions ---------------------------------------------------------
 
   check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');
@@ -334,6 +391,14 @@ async function main(): Promise<void> {
     check(emptyWall.soundId === undefined, 'a bump that hurt nobody should be silent — CSBWin gates the sound on k != 0');
   } else {
     check(false, 'the level should have an open cell beside a wall');
+  }
+  if (discard) {
+    check(discard.wallQueue === 0, `a wall bump should discard the queued moves (${discard.wallQueue} left)`);
+    check(discard.facingKept, 'the turns queued behind a wall bump should never run');
+    check(discard.monsterQueue === 0, `a monster bump should discard the queued moves (${discard.monsterQueue} left)`);
+    check(discard.turnQueue === 1, `a turn should leave the next queued move in place (${discard.turnQueue} left)`);
+    check(discard.tickHeld, 'the bump should postpone the tick that was due (d.clockTick = 0)');
+    check(discard.tickNextFrame, 'the postponed tick should run on the next frame');
   }
 
   // The bump must actually reach the AI. Counting the TT_31 timers it left is the
