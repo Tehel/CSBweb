@@ -956,7 +956,7 @@ export class Game {
      *   step heads in direction `d.Word11714` (`:1482-1496`). Turns are never held.
      *
      * CSBWin's `lastTime` is stamped by every mouse event it handles, clicks included;
-     * the port queues only movement, so only a turn or a step stamps it (DEBT.md C13).
+     * the port queues only movement, so only a turn or a step stamps it (DEBT.md C21).
      */
     private processMovementQueue(): void {
         if (this.movementQueue.length === 0) return;

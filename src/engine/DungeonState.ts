@@ -841,42 +841,6 @@ export class DungeonState {
         };
     }
 
-    /**
-     * Check if a position is walkable (not a wall)
-     * @returns True if position is walkable
-     */
-    isWalkable(position: Position): boolean {
-        const tile = this.getTile(position);
-        if (!tile) {
-            return false; // Out of bounds = not walkable
-        }
-
-        // Check room type
-        switch (tile.roomType) {
-            case RoomType.STONE:
-                return false; // Wall
-            case RoomType.OPEN:
-                return true;  // Floor
-            case RoomType.DOOR:
-                {
-                    const doorState = tile.attributes & 0x7;
-                    return doorState <= 1 || doorState === 5;
-                }
-            case RoomType.STAIRS:
-                return true;  // Stairs are walkable
-            case RoomType.PIT:
-                return true;  // Pits are "walkable" (you fall in)
-            case RoomType.TELEPORTER:
-                return true;  // Teleporters are walkable
-            case RoomType.FALSEWALL:
-                // CSBWin treats false walls as solid when (cellFlag & 0x05) == 0.
-                return (tile.cellFlag & 0x05) !== 0;
-            case RoomType.EMPTY:
-                return false; // Empty space (void)
-            default:
-                return false;
-        }
-    }
 
     private applyDoorActionAt(map: MapData, x: number, y: number, cellFlag: CellFlag, action: number): boolean {
         const doorState = cellFlag & 0x7;

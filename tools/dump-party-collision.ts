@@ -625,6 +625,46 @@ async function main(): Promise<void> {
     }
   }
 
+  // ---- Case 11: room type 7 is entered -------------------------------------
+  // `MoveParty` inhibits a move only into stone, a shut door or a solid false wall
+  // (doc/CSBwin-src/CSBCode.cpp:8224-8261); any other room type is walked into. No
+  // dungeon or save this port loads has a type-7 cell, so the case makes one.
+  {
+    let spot: { px: number; py: number; dir: number } | null = null;
+    for (let x = 0; x < width && !spot; x++) {
+      for (let y = 0; y < height && !spot; y++) {
+        if (roomTypeAt(x, y) !== RoomType.OPEN || monsterAt(x, y)) continue;
+        for (let dir = 0; dir < 4; dir++) {
+          const [ddx, ddy] = DIRS[dir];
+          const nx = x + ddx;
+          const ny = y + ddy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (roomTypeAt(nx, ny) === RoomType.OPEN && !monsterAt(nx, ny)) { spot = { px: x, py: y, dir }; break; }
+        }
+      }
+    }
+    check(spot !== null, 'the level should have two open cells side by side');
+    if (spot) {
+      const [ddx, ddy] = DIRS[spot.dir];
+      // The cell is stored twice — `cellFlags` and `tiles` (DEBT.md D5) — so both change.
+      const [tx, ty] = [spot.px + ddx, spot.py + ddy];
+      const cells = map.cellFlags;
+      const saved = cells[tx][ty];
+      const savedTile = map.tiles[tx][ty];
+      cells[tx][ty] = (RoomType.EMPTY << 5) | (saved & 0x1f);
+      map.tiles[tx][ty] = { ...savedTile, cellFlag: cells[tx][ty], roomType: RoomType.EMPTY };
+      game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+      game.party.state.position = new Position(spot.px, spot.py, level);
+      game.party.setFacing(spot.dir);
+      const entered = game.move(MovementAction.MOVE_FORWARD);
+      cells[tx][ty] = saved;
+      map.tiles[tx][ty] = savedTile;
+      console.log(`room type 7: ${entered ? 'entered' : 'refused'}`);
+      console.log('');
+      check(entered, 'a room-type-7 cell should be walked into, as CSBWin does');
+    }
+  }
+
   // ---- Assertions ---------------------------------------------------------
 
   check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');

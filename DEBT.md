@@ -77,17 +77,20 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C10 | Phase 9.5 refinements | S | ✅ |
 | C11 | `DoesPartyHave` does not look inside chests | S | ✅ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ✅ |
-| C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
+| C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ✅ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
 | C16 | Freed database slots are never reused | M | ⏳ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
 | C19 | `CastSpell` under a spell filter's overrides | S | ⏳ |
+| C20 | A level change inside `ProcessTimers` waits for the next tick | S | ⏳ |
+| C21 | Clicks do not go through the input queue | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
+| D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
 | E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
@@ -508,10 +511,11 @@ which function, `uByte9` and slot index. Size S–M.
 
 </details>
 
-### C13 ⏳ The rest of `MoveParty`: stamina, move delay, queue depth
+### C13 ✅ The rest of `MoveParty`: stamina, move delay, queue depth
 
-Found while re-reading `MoveParty` for C5; none is fixed yet. All in
-`doc/CSBwin-src/CSBCode.cpp` unless said otherwise.
+**Paid in `1dc4c1d`, `49c953e`, `263786a`, `f9d72b0` and `ed189fa`,** one bullet each.
+What they left is C20 and C21; found on the way, D5. All in `doc/CSBwin-src/CSBCode.cpp`
+unless said otherwise.
 
 - ✅ **Every attempted step costs stamina.** Before the destination is even looked at, each
   champion's `staminaAdjustment` is `sw((3 * load) / MaxLoad + 1)` (`:8088-8101`), and
@@ -531,19 +535,13 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
   and loaded, which closes `PLAN.md` Phase 10's gap. Evidence:
   `tools/dump-party-collision.ts` case 8 (it crashes before), `tools/dump-live-save-file.ts`
   (2 of 191 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. **Left:** CSBWin
-  stamps `lastTime` for every mouse event, clicks included; the port queues only
-  movement, so a click does not hold the next turn or step to the next tick — part of the
-  queue-depth bullet below.
+  stamps `lastTime` for every mouse event, clicks included — C21.
 - ✅ **The key queue holds two keys, not three.** `CSBUI.cpp:143-145` is a 3-slot ring that
   refuses a key when `next == keyQueueStart` (`:1131-1139`), and the mouse queue each key
   moves on to at once is too: `TAG0196da` refuses a key when `MouseQEnd + 2 ==
   MouseQStart` (`CSBCode.cpp:8439-8443`). `Game.enqueueMovement` now lets two in.
   Evidence: `tools/dump-party-collision.ts` case 9 (1 of 39 checks fails before).
-  **Left, with the move delay's leftover:** the port has one queue for movement only;
-  CSBWin's mouse queue also carries clicks (queued only into an empty queue, with a
-  button-up behind them, `:7626-7630`, `:7586-7598`), and every event it handles stamps
-  `lastTime`. Porting that means routing clicks through `processMovementQueue`'s
-  successor — an input-queue item, not a movement one.
+  **Left:** CSBWin's mouse queue also carries clicks — C21.
 - ✅ **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
   pit or a teleporter to another level also throw away queued input. The port loads the
   level on arrival, so `Game.loadPartyLevelIfChanged` notes the change and `gameTick`
@@ -551,14 +549,16 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
   10 (1 of 43 checks fails before); the fact is in `doc/PROVEN_FACTS.md`. Found on the
   way: a level change made *inside* `ProcessTimers` is loaded at the next tick, not at
   once — C20.
-- **Room type 7.** `D5W` is set only for stone, a shut door and a solid false wall
-  (`:8224-8261`), so any other room type is entered; `DungeonState.isWalkable` refuses
-  `RoomType.EMPTY` (7). Check whether any dungeon we load has such a cell before changing it.
-- `CallPartyMoveFilter` (`:8119`) is a DSA filter — G2's kind, and no loaded dungeon
-  defines one.
-
-Evidence for each will extend `tools/dump-party-collision.ts`, which now steps frames with
-`Game.runFrame`.
+- ✅ **Room type 7.** `D5W` is set only for stone, a shut door and a solid false wall
+  (`:8224-8261`), so any other room type is entered; `DungeonState.isWalkable` refused
+  `RoomType.EMPTY` (7). Neither `dungeon.dat` nor any of the fourteen saves has a type-7
+  cell, so nothing loaded changes. `MovementSystem.handleMovement` now computes `D5W` as
+  CSBWin does, and `isWalkable` (its only caller) is gone. Evidence:
+  `tools/dump-party-collision.ts` case 11 (1 of 45 checks fails before). Found on the way:
+  D5.
+- 🚫 `CallPartyMoveFilter` (`:8119`) is a DSA filter — G2's kind, and no loaded dungeon
+  defines one. Its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`, `:8336-8346`) are
+  G2's too.
 
 ### C14 ⏳ `DrawClouds`: size, colour map, lightning position, the cell under the party
 
@@ -664,6 +664,30 @@ spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defin
 
 ## D — State representation
 
+### C20 ⏳ A level change inside `ProcessTimers` waits for the next tick
+
+Found paying C13. The main loop runs `ProcessTimers()` and then
+`if (d.newPartyLevel != -1) goto tag0006a4;` (`doc/CSBwin-src/CSBCode.cpp:635`): a timer that
+moves the party to another level — a pit opening under it, a teleporter an actuator
+switched on — has the level loaded, the party placed with `MoveObject(RN(RNnul), -1, 0, x,
+y)`, input discarded, and `ProcessTimers` run again, all in the same tick (`:615-635`).
+`Game.gameTick` calls `loadPartyLevelIfChanged` only before `processTimers`, so such a level
+is loaded, and its input discarded, a tick late; a turn or step queued in between runs on
+the new level first. Evidence: a `tools/` scenario with a pit timer under a party that has
+a turn queued (`tools/dump-party-collision.ts` case 10 is the pattern).
+
+### C21 ⏳ Clicks do not go through the input queue
+
+Found paying C13. CSBWin has one mouse queue (`MOUSEQLEN` 3, `doc/CSBwin-src/Data.h:1515`)
+for keys and clicks alike: a click is queued only into an empty queue, with its button-up
+behind it (`CSBCode.cpp:7626-7630`, `:7586-7598`), and `HandleMouseEvents` handles one entry
+per tick, stamping `lastTime` for each (`Mouse.cpp:1468-1476`). The port queues only
+movement (`Game.movementQueue`) and handles clicks as they arrive, so a click neither waits
+for the tick nor holds the next turn or step back to the next one, and a click does not
+fill a queue slot a key would then be refused. Porting it means turning
+`processMovementQueue` into `HandleMouseEvents`' dispatcher for every button. Size M; no
+save or `tools/` scenario depends on it yet.
+
 ### D1 ⏳ Hands stored twice *(bundle with D2)*
 
 `Champion` keeps its hands in both `possessions[0]`, `[1]` and `[8]` and three named
@@ -734,6 +758,17 @@ group, and record the split here. If `RuntimeSaveState`'s shape changes, bump
 ID silently. After D2, decide: brand it (`number & { readonly __rn: unique symbol }`),
 which would make `tsc` catch RN/type confusion like B1's overload, or drop the casts.
 Measure the churn on a branch first.
+
+### D5 ⏳ Cell flags stored twice (`cellFlags` and `tiles`)
+
+Found paying C13. `MapData` keeps each cell's flag byte in `cellFlags[x][y]` and again,
+unpacked, in `tiles[x][y]` (`TileData`: `cellFlag`, `roomType`, `hasObjects`,
+`attributes`, `src/data/dungeonTypes.ts:87`). `getCellFlag` reads the first,
+`getTile` the second; `DungeonState.setCellHasObjects` and the door writers keep them in
+step, and `tiles` has readers in `DungeonSnapshot`, `TimerSystem`, `DsaSystem` and
+`ui/mapPreview`. CSBWin has one byte per cell. A writer that updates one copy leaves
+the other stale — C13's type-7 scenario had to write both. Keep `cellFlags`, derive the
+rest where it is read.
 
 ---
 

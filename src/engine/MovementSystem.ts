@@ -115,16 +115,26 @@ export class MovementSystem {
             return this.bumpWall(newPosition, relDirection);
         }
 
-        // Check if new position is walkable.
-        // CSBWin answers a blocked move with a sound only — there is no message
-        // (`doc/CSBwin-src/Movement.cpp`, `doc/CSBwin-src/Mouse.cpp`).
-        if (!this.dungeon.isWalkable(newPosition)) return this.bumpWall(newPosition, relDirection);
-
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         if (roomTypeTo === RoomType.STAIRS) {
             return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0);
         }
+
+        // `D5W` — terrain inhibits the move for stone, a door whose state is not 0, 1 or 5,
+        // and a false wall with neither bit 0 nor bit 2 set; every other room type,
+        // `EMPTY` (7) included, is entered (doc/CSBwin-src/CSBCode.cpp:8224-8261).
+        // CSBWin answers a blocked move with the bump and no message.
+        let d5w = false;
+        if (roomTypeTo === RoomType.STONE) {
+            d5w = true;
+        } else if (roomTypeTo === RoomType.DOOR) {
+            const doorCondition = cellFlagsTo & 7;
+            d5w = doorCondition !== 0 && doorCondition !== 1 && doorCondition !== 5;
+        } else if (roomTypeTo === RoomType.FALSEWALL) {
+            d5w = (cellFlagsTo & 4) === 0 && (cellFlagsTo & 1) === 0;
+        }
+        if (d5w) return this.bumpWall(newPosition, relDirection);
 
         // A monster in the destination cell inhibits the move exactly as a wall does
         // — `MoveParty` sets the same `D5W` flag for both

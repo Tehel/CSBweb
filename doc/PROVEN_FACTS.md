@@ -2594,6 +2594,16 @@ party cannot step in the direction it threw. `lastTime` is reset by the initiali
 words are saved in `GAMEBLOCK2` (`SaveGame.cpp:1029-1031`, `:1645-1647`). Evidence:
 `tools/dump-party-collision.ts` case 8, `tools/dump-live-save-file.ts`.
 
+## Only stone, a shut door and a solid false wall stop a step
+
+`MoveParty` sets its inhibit flag `D5W` for `roomSTONE`, for `roomDOOR` whose state
+(`cellFlags & 7`) is not 0, 1 or 5, and for `roomFALSEWALL` with neither bit 2 nor bit 0
+set (`doc/CSBwin-src/CSBCode.cpp:8224-8261`); `roomSTAIRS` is handled before it
+(`:8206-8221`). Every other room type — open, pit, teleporter, and type 7, which
+`ROOMTYPE` does not even name (`CSB.h:560-566`) — is entered. Neither the Atari
+`dungeon.dat` nor any save in `static/gamefiles/saves/` has a type-7 cell. Evidence:
+`tools/dump-party-collision.ts` case 11.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the
