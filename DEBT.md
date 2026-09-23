@@ -64,7 +64,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | A2 | Stale comments, a dead parameter, console noise | S | ✅ archived |
 | B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ |
 | B2 | Small helpers defined in several files | M | ✅ |
-| B3 | `LOCATIONREL` has three shapes | S | ⏳ |
+| B3 | `LOCATIONREL` has three shapes | S | ✅ |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
@@ -257,7 +257,17 @@ differ — and `npm test` passes.
 
 </details>
 
-### B3 ⏳ `LOCATIONREL` has three shapes
+### B3 ✅ `LOCATIONREL` has three shapes
+
+**Paid in the commit "One LocationRel".** `LocationRel { l, x, y, p }` lives in
+`src/core/types.ts` with `locationRelToInteger` / `locationRelFromInteger` (CSBWin's two
+`Integer()`s); `DungeonState.isValidLocation` takes one, as `IsValid()` does. `DsaLocation`,
+`TeleportPartyLocation`, `TimerSystem.LocationRel` and `DsaSystem`'s private
+`locationToInt` / `intToLocation` are gone. No behaviour changed: the masks are the old
+ones, and `npm test` passed before and after. Found on the way: `TimerSystem.throwMissile`
+has no caller — see G1.
+
+<details><summary>original entry</summary>
 
 Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`, `x`, `y`,
 `p`, with `Integer()` and `IsValid()`). The port has `TimerSystem.LocationRel`
@@ -265,6 +275,8 @@ Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`
 `TeleportPartyLocation` (the same four fields again). Pick one, next to
 `DungeonState.isValidLocation`, and give it CSBWin's `Integer()` decoding
 (`DsaSystem`'s `intToLocation`). Size S.
+
+</details>
 
 ---
 
@@ -730,6 +742,13 @@ it.
   `warnedOps` (`src/engine/DsaSystem.ts:1275`, `:1884`), and slave DSAs are not
   implemented (`:1921`). The old pointer to "the TODOs in `DsaSystem.ts`" was stale; these
   warnings are what there is.
+- **`STKOP_Throw`** (`DSA.cpp:4558`) is one of them, so `TimerSystem.throwMissile`
+  (`ThrowMissile`, `Timer.cpp:2016`) has no caller. When the opcode is ported, re-port the
+  function's missile-type switch first: CSBWin throws a spell only for the eight words
+  it lists (`RNFireball` … `RNPoisonCloud`, `RNMonsterDeath`) and nothing for any other
+  non-zero word (`Timer.cpp:2029-2040`), where the port takes every word `>= 0xff80` as-is
+  and maps the rest through `spellObjectId`. CSBWin also `LoadLevel`s the launch level
+  around the launch (`:2065-2077`). Found in B3.
 - **Decoration gating and footprints** *(Phase 4)*. DSA-based decoration gating and
   footprints / extended cell flags are not ported (`src/renderer/csbwin/SummarizeRoomInfo.ts:515`).
   Wall and floor decoration selection follows `TAG00a4a2` plus the actuator's

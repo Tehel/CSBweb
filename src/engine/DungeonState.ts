@@ -5,7 +5,7 @@
  * Based on CSBWin's dungeon data access
  */
 
-import { ui8, ui16, Position, CellFlag, ObjectID, Direction } from '../core/types';
+import { ui8, ui16, Position, CellFlag, ObjectID, Direction, type LocationRel } from '../core/types';
 import type {
     ClothingRecord,
     ContainerRecord,
@@ -641,11 +641,11 @@ export class DungeonState {
      * `LOCATIONREL::IsValid` (doc/CSBwin-src/DSA.cpp:310) — a level that exists and a
      * cell inside its bounds.
      */
-    isValidLocation(level: number, x: number, y: number): boolean {
-        const map = this.getMap(level);
+    isValidLocation(locr: LocationRel): boolean {
+        const map = this.getMap(locr.l);
         if (!map) return false;
-        if (x < 0 || y < 0) return false;
-        if (x >= map.descriptor.width || y >= map.descriptor.height) return false;
+        if (locr.x < 0 || locr.y < 0) return false;
+        if (locr.x >= map.descriptor.width || locr.y >= map.descriptor.height) return false;
         return true;
     }
 

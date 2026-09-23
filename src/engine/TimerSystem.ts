@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type LocationRel, type ObjectID } from '../core/types';
 import { PotionType, SoundIndex } from '../core/constants';
 
 /**
@@ -108,11 +108,6 @@ export interface TimerTables {
   byte19914?: ArrayLike<number>;
   byte20090?: ArrayLike<number>;
   attackNames?: ArrayLike<string>;
-}
-
-export interface LocationRel {
-  position: Position;
-  posInCell: number;
 }
 
 type MissileDropTarget = { monster: number } | null;
@@ -1134,6 +1129,11 @@ export class TimerSystem {
     );
   }
 
+  /**
+   * `ThrowMissile` (doc/CSBwin-src/Timer.cpp:2016). Its one CSBWin caller is the DSA's
+   * `STKOP_Throw` (`DSA.cpp:4558`), which `DsaSystem` does not implement yet, so nothing
+   * calls this — see DEBT.md G1 before wiring it.
+   */
   throwMissile(
     missileType: number,
     launchLocation: LocationRel,
@@ -1144,23 +1144,24 @@ export class TimerSystem {
     decayRate: number,
     startTime: number,
   ): boolean {
-    if (!this.dungeon.isValidLocation(launchLocation.position.z, launchLocation.position.x, launchLocation.position.y)) return false;
+    if (!this.dungeon.isValidLocation(launchLocation)) return false;
 
     const missileTypeWord = missileType & 0xffff;
     let projectileObject = OBJECT_ID_EOF;
 
     if (missileTypeWord === 0) {
       if (!objectLocation) return false;
-      if (!this.dungeon.isValidLocation(objectLocation.position.z, objectLocation.position.x, objectLocation.position.y)) return false;
+      if (!this.dungeon.isValidLocation(objectLocation)) return false;
+      const objectPosition = new Position(objectLocation.x, objectLocation.y, objectLocation.l);
       for (
-        let rn = this.dungeon.findFirstObject(objectLocation.position);
+        let rn = this.dungeon.findFirstObject(objectPosition);
         rn !== OBJECT_ID_EOF;
         rn = this.dungeon.getDBRecordLink(rn)
       ) {
         const decoded = decodeObjectID(rn);
         if (decoded.category <= DBType.CREATURE || decoded.category > DBType.MISC) continue;
-        if ((decoded.position & 0x3) !== (objectLocation.posInCell & 0x3)) continue;
-        this.dungeon.removeObjectFromCell(objectLocation.position, rn);
+        if ((decoded.position & 0x3) !== (objectLocation.p & 0x3)) continue;
+        this.dungeon.removeObjectFromCell(objectPosition, rn);
         projectileObject = rn;
         break;
       }
@@ -1172,10 +1173,10 @@ export class TimerSystem {
 
     return this.launchMissile(
       projectileObject,
-      launchLocation.position.x,
-      launchLocation.position.y,
-      launchLocation.position.z,
-      launchLocation.posInCell & 0x3,
+      launchLocation.x,
+      launchLocation.y,
+      launchLocation.l,
+      launchLocation.p & 0x3,
       direction & 0x3,
       range,
       damage,

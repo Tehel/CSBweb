@@ -144,6 +144,33 @@ export function withObjectPosition(rn: ObjectID, position: number): ObjectID {
 }
 
 /**
+ * `LOCATIONREL` (doc/CSBwin-src/CSB.h:423) — a level, a cell and a corner. CSBWin packs it
+ * into 18 bits as `p:2 l:6 x:5 y:5` for DSA stacks, actuator parameters and filter
+ * locations.
+ */
+export interface LocationRel {
+    l: number;
+    x: number;
+    y: number;
+    p: number;
+}
+
+/** `LOCATIONREL::Integer(void)` (doc/CSBwin-src/DSA.cpp:292) — pack into 18 bits. */
+export function locationRelToInteger(locr: LocationRel): number {
+    return ((locr.p & 3) << 16) | ((locr.l & 0x3f) << 10) | ((locr.x & 0x1f) << 5) | (locr.y & 0x1f);
+}
+
+/** `LOCATIONREL::Integer(i32)` (doc/CSBwin-src/DSA.cpp:301) — unpack from 18 bits. */
+export function locationRelFromInteger(t: number): LocationRel {
+    return {
+        p: (t >> 16) & 3,
+        l: (t >> 10) & 63,
+        x: (t >> 5) & 31,
+        y: t & 31,
+    };
+}
+
+/**
  * Cell flags (1 byte per tile)
  * CSBTypes.h CELLFLAG line ~177
  *

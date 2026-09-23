@@ -38,7 +38,7 @@ import { AttackType } from './monsterTypes';
 import { constructPredefinedMissile } from './missileHelpers';
 import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -790,7 +790,7 @@ export class Game {
         }
     }
 
-    private handleDsaTeleportParty(locr: { l: number; x: number; y: number; p: number }): void {
+    private handleDsaTeleportParty(locr: LocationRel): void {
         const party = this.party.state;
         const oldPos = new Position(party.position.x, party.position.y, party.position.z);
         const oldFacing = party.facing & 0x3;

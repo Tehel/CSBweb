@@ -6,6 +6,9 @@ import {
   OBJECT_ID_EOF,
   OBJECT_ID_NULL,
   type ObjectID,
+  type LocationRel,
+  locationRelFromInteger,
+  locationRelToInteger,
   Position,
   RoomType,
 } from '../core/types';
@@ -69,15 +72,6 @@ export interface ViewingFilterResult {
   phraseTextOverrides: Array<string | null>;
   phraseColorOverrides: Array<number | null>;
 }
-
-interface DsaLocation {
-  l: number;
-  x: number;
-  y: number;
-  p: number;
-}
-
-type TeleportPartyLocation = { l: number; x: number; y: number; p: number };
 
 enum DsaCommand {
   MESSAGE = 1,
@@ -362,8 +356,8 @@ interface ExecutionPacket {
   nextState: number;
   transferState: number;
   transferCol: number;
-  locrMaster: DsaLocation;
-  locrSlave: DsaLocation;
+  locrMaster: LocationRel;
+  locrSlave: LocationRel;
   rnMaster: number;
   rnSlave: number;
   master: DsaDefinition;
@@ -381,18 +375,6 @@ function readSignedWord(word: number): number {
   return value & 0x8000 ? value - 0x10000 : value;
 }
 
-function locationToInt(locr: DsaLocation): number {
-  return ((locr.p & 3) << 16) | ((locr.l & 0x3f) << 10) | ((locr.x & 0x1f) << 5) | (locr.y & 0x1f);
-}
-
-function intToLocation(value: number): DsaLocation {
-  return {
-    p: (value >> 16) & 3,
-    l: (value >> 10) & 0x3f,
-    x: (value >> 5) & 0x1f,
-    y: value & 0x1f,
-  };
-}
 
 export class DsaSystem {
   private roomTimerFunctions: ArrayLike<number> | null;
@@ -413,7 +395,7 @@ export class DsaSystem {
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
   private monsterDesc: ArrayLike<MonsterDesc> | null = null;
-  private teleportPartyHandler?: (location: TeleportPartyLocation) => void;
+  private teleportPartyHandler?: (location: LocationRel) => void;
 
   constructor(
     private dungeon: DungeonState,
@@ -458,7 +440,7 @@ export class DsaSystem {
     return this.adjustSkillsParameters;
   }
 
-  setTeleportPartyHandler(handler: (location: TeleportPartyLocation) => void): void {
+  setTeleportPartyHandler(handler: (location: LocationRel) => void): void {
     this.teleportPartyHandler = handler;
   }
 
@@ -473,8 +455,8 @@ export class DsaSystem {
   }): number {
     const special = this.dungeon.getSpecialLocation(MISSILE_ENCOUNTER_FILTER_KEY);
     if (special === null) return 0;
-    const locrFilter = intToLocation(special);
-    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return 0;
+    const locrFilter = locationRelFromInteger(special);
+    if (!this.dungeon.isValidLocation(locrFilter)) return 0;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const dsaActuator = this.findFirstDsaActuator(filterPos);
     if (dsaActuator === OBJECT_ID_EOF) return 0;
@@ -494,7 +476,7 @@ export class DsaSystem {
       timerWord6: 0,
     };
 
-    const encounterLoc = locationToInt({
+    const encounterLoc = locationRelToInteger({
       l: options.position.z & 0x3f,
       x: options.position.x & 0x1f,
       y: options.position.y & 0x1f,
@@ -518,8 +500,8 @@ export class DsaSystem {
   processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
     const special = this.dungeon.getSpecialLocation(VIEWING_FILTER_KEY);
     if (special === null) return null;
-    const locrFilter = intToLocation(special);
-    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
+    const locrFilter = locationRelFromInteger(special);
+    if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     const dsaActuator = this.findFirstDsaActuator(filterPos);
     if (dsaActuator === OBJECT_ID_EOF) return null;
@@ -573,8 +555,8 @@ export class DsaSystem {
   }): { chIdx: number; skillNumber: number; experience: number } | null {
     const special = this.dungeon.getSpecialLocation(ADJUST_SKILLS_FILTER_KEY);
     if (special === null) return null;
-    const locrFilter = intToLocation(special);
-    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
+    const locrFilter = locationRelFromInteger(special);
+    if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
 
     const timer: TimerEntry = {
@@ -636,8 +618,8 @@ export class DsaSystem {
   findPartyAttackFilter(): PartyAttackFilter | null {
     const special = this.dungeon.getSpecialLocation(PARTY_ATTACK_FILTER_KEY);
     if (special === null) return null;
-    const locrFilter = intToLocation(special);
-    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
+    const locrFilter = locationRelFromInteger(special);
+    if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const position = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
@@ -691,8 +673,8 @@ export class DsaSystem {
   processSpellFilter(params: SpellParameters): SpellParameters | null {
     const location = this.dungeon.getSpellFilterLocation();
     if ((location & 0x80000000) === 0) return null;
-    const locrFilter = intToLocation(location & 0x7fffffff);
-    if (!this.dungeon.isValidLocation(locrFilter.l, locrFilter.x, locrFilter.y)) return null;
+    const locrFilter = locationRelFromInteger(location & 0x7fffffff);
+    if (!this.dungeon.isValidLocation(locrFilter)) return null;
     const filterPos = new Position(locrFilter.x, locrFilter.y, locrFilter.l);
 
     const timer: TimerEntry = {
@@ -801,7 +783,7 @@ export class DsaSystem {
     const slaveDsa = this.getDsa(slaveIndex);
     if (!slaveDsa) return false;
 
-    const locrSlave: DsaLocation = {
+    const locrSlave: LocationRel = {
       l: level,
       x: location.x,
       y: location.y,
@@ -1121,7 +1103,7 @@ export class DsaSystem {
               wordsRemaining--;
               bank.stack.push(next);
             } else if (where === 28) {
-              bank.stack.push(locationToInt(exPkt.locrMaster));
+              bank.stack.push(locationRelToInteger(exPkt.locrMaster));
             } else if (where === 30) {
               const lo = program[pc++] ?? 0;
               const hi = program[pc++] ?? 0;
@@ -1215,8 +1197,8 @@ export class DsaSystem {
             const posMask = bank.stack.pop();
             const location = bank.stack.pop();
             let depth = bank.stack.pop();
-            const locr = intToLocation(location);
-            if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
+            const locr = locationRelFromInteger(location);
+            if (!this.dungeon.isValidLocation(locr)) {
               bank.stack.push(-1);
               break;
             }
@@ -1328,8 +1310,8 @@ export class DsaSystem {
           }
           break;
         }
-        const locr = intToLocation(location);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
+        const locr = locationRelFromInteger(location);
+        if (!this.dungeon.isValidLocation(locr)) {
           console.warn('Illegal location in DSA &DEL');
           break;
         }
@@ -1356,8 +1338,8 @@ export class DsaSystem {
         bank.mostRecentInterestingObjectID = cloned ?? OBJECT_ID_EOF;
         if (cloned === null) break;
         if (location >= 0) {
-          const locr = intToLocation(location);
-          if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+          const locr = locationRelFromInteger(location);
+          if (!this.dungeon.isValidLocation(locr)) break;
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
@@ -1406,8 +1388,8 @@ export class DsaSystem {
       case StkOp.FALSE_PIT: {
         const value = bank.stack.pop();
         const loc = bank.stack.pop();
-        const locr = intToLocation(loc);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+        const locr = locationRelFromInteger(loc);
+        if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1419,8 +1401,8 @@ export class DsaSystem {
       case StkOp.GENERATOR_DELAY_STORE: {
         const location = bank.stack.pop();
         const delay = bank.stack.pop();
-        const locr = intToLocation(location);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+        const locr = locationRelFromInteger(location);
+        if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1450,8 +1432,8 @@ export class DsaSystem {
       case StkOp.TELEPORT_PARTY:
       case StkOp.I_TELEPORT_PARTY: {
         const location = bank.stack.pop();
-        const locr = intToLocation(location);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+        const locr = locationRelFromInteger(location);
+        if (!this.dungeon.isValidLocation(locr)) break;
         if (this.teleportPartyHandler) {
           this.teleportPartyHandler(locr);
         } else if (!this.warnedOps.has(subcode)) {
@@ -1467,9 +1449,9 @@ export class DsaSystem {
         if (this.overrideP) {
           this.overrideP = false;
           if (locrInt >= 0) {
-            const locr = intToLocation(locrInt);
+            const locr = locationRelFromInteger(locrInt);
             locr.p = this.overridePos & 0x3;
-            locrInt = locationToInt(locr);
+            locrInt = locationRelToInteger(locr);
           }
         }
         this.modifyDescription(locrInt, index, color);
@@ -1618,8 +1600,8 @@ export class DsaSystem {
         break;
       case StkOp.GENERATOR_DELAY_FETCH: {
         const loc = bank.stack.pop();
-        const locr = intToLocation(loc);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
+        const locr = locationRelFromInteger(loc);
+        if (!this.dungeon.isValidLocation(locr)) {
           bank.stack.push(-1);
           break;
         }
@@ -1701,8 +1683,8 @@ export class DsaSystem {
           bank.setVar(arrayIndex + i, 0);
         }
         const loc = bank.stack.pop();
-        const locr = intToLocation(loc);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+        const locr = locationRelFromInteger(loc);
+        if (!this.dungeon.isValidLocation(locr)) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
@@ -1730,7 +1712,7 @@ export class DsaSystem {
             if (arraySize < 4) break;
             bank.setVar(arrayIndex + 3, tp.scope & 0x3);
             if (arraySize < 5) break;
-            const destLoc = locationToInt({
+            const destLoc = locationRelToInteger({
               l: tp.destMap & 0x3f,
               x: tp.destX & 0x1f,
               y: tp.destY & 0x1f,
@@ -1777,8 +1759,8 @@ export class DsaSystem {
         const arraySize = bank.stack.pop();
         const arrayIndex = bank.stack.pop();
         const loc = bank.stack.pop();
-        const locr = intToLocation(loc);
-        if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) break;
+        const locr = locationRelFromInteger(loc);
+        if (!this.dungeon.isValidLocation(locr)) break;
         if (arrayIndex < 0 || arrayIndex + arraySize > 100) break;
         const map = this.dungeon.getMap(locr.l);
         if (!map) break;
@@ -1858,7 +1840,7 @@ export class DsaSystem {
         let result = 0;
         if (which === 1 && this.getPartyState) {
           const party = this.getPartyState();
-          result = locationToInt({
+          result = locationRelToInteger({
             l: party.position.z,
             x: party.position.x,
             y: party.position.y,
@@ -1913,9 +1895,9 @@ export class DsaSystem {
     return idx;
   }
 
-  private findMaster(slave: DsaDefinition, rnSlave: number, x: number, y: number, locrSlave: DsaLocation): {
+  private findMaster(slave: DsaDefinition, rnSlave: number, x: number, y: number, locrSlave: LocationRel): {
     rn: number;
-    locr: DsaLocation;
+    locr: LocationRel;
   } {
     if (slave.localState !== 3) {
       return { rn: rnSlave, locr: { l: locrSlave.l, x, y, p: locrSlave.p } };
@@ -1961,7 +1943,7 @@ export class DsaSystem {
     readWord: () => number,
     bank: DsaBank,
     rnMaster: number,
-  ): DsaLocation | null {
+  ): LocationRel | null {
     let target = 0;
     switch (targetType) {
       case TargetType.A: {
@@ -1987,7 +1969,7 @@ export class DsaSystem {
       default:
         return null;
     }
-    const locr = intToLocation(target);
+    const locr = locationRelFromInteger(target);
     if (this.overrideP) {
       locr.p = this.overridePos & 3;
       this.overrideP = false;
@@ -1995,7 +1977,7 @@ export class DsaSystem {
     return locr;
   }
 
-  private queueDsaSwitchAction(delay: number, action: number, locr: DsaLocation, morD: 'M' | 'D'): void {
+  private queueDsaSwitchAction(delay: number, action: number, locr: LocationRel, morD: 'M' | 'D'): void {
     const actionTime = (this.getTime() + delay) >>> 0;
     let functionType = TimerFunction.TT_DESSAGE;
 
@@ -2059,7 +2041,7 @@ export class DsaSystem {
     else setActuatorParameterB(rec, value);
   }
 
-  private copyTeleporter(src: DsaLocation, dst: DsaLocation): void {
+  private copyTeleporter(src: LocationRel, dst: LocationRel): void {
     const srcPos = new Position(src.x, src.y, src.l);
     const dstPos = new Position(dst.x, dst.y, dst.l);
     const srcRn = this.findFirstTeleporter(srcPos);
@@ -2125,7 +2107,7 @@ export class DsaSystem {
     return this.dungeon.getDoorRecordByIndex(index);
   }
 
-  private updateCellFlag(locr: DsaLocation, cellFlag: number): void {
+  private updateCellFlag(locr: LocationRel, cellFlag: number): void {
     const map = this.dungeon.getMap(locr.l);
     if (!map) return;
     if (locr.x < 0 || locr.y < 0) return;
@@ -2156,8 +2138,8 @@ export class DsaSystem {
       return;
     }
     if (locrInt < 0) return;
-    const locr = intToLocation(locrInt);
-    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) return;
+    const locr = locationRelFromInteger(locrInt);
+    if (!this.dungeon.isValidLocation(locr)) return;
     const record = this.findTextRecordAtLocation(locr);
     if (!record) return;
     const text = this.dungeon.decodeTextString(record, 0x8001, ctx.textTables);
@@ -2167,7 +2149,7 @@ export class DsaSystem {
     ctx.modified = true;
   }
 
-  private findTextRecordAtLocation(locr: DsaLocation): TextRecord | null {
+  private findTextRecordAtLocation(locr: LocationRel): TextRecord | null {
     const pos = new Position(locr.x, locr.y, locr.l);
     for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
@@ -2263,8 +2245,8 @@ export class DsaSystem {
 
   private canAddToLocation(location: number): boolean {
     if (location >= 0) {
-      const locr = intToLocation(location);
-      return this.dungeon.isValidLocation(locr.l, locr.x, locr.y);
+      const locr = locationRelFromInteger(location);
+      return this.dungeon.isValidLocation(locr);
     }
     const party = this.getPartyState?.();
     if (!party) return false;
@@ -2538,8 +2520,8 @@ export class DsaSystem {
     dstLoc: number,
     doit: boolean,
   ): { error: number; object: number } {
-    const locr = intToLocation(srcLoc);
-    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) {
+    const locr = locationRelFromInteger(srcLoc);
+    if (!this.dungeon.isValidLocation(locr)) {
       return { error: DsaMoveError.SER_InvalidCellLocation, object: OBJECT_ID_EOF };
     }
     let positionMask = srcPosMsk;
@@ -2694,8 +2676,8 @@ export class DsaSystem {
     doit: boolean,
   ): number {
     void dstObjMsk;
-    const locr = intToLocation(dstLoc);
-    if (!this.dungeon.isValidLocation(locr.l, locr.x, locr.y)) return DsaMoveError.DER_InvalidCellLocation;
+    const locr = locationRelFromInteger(dstLoc);
+    if (!this.dungeon.isValidLocation(locr)) return DsaMoveError.DER_InvalidCellLocation;
     if (dstDepth !== 0) return DsaMoveError.DER_IllegalDepth;
     const pos = this.choosePositionFromMask(dstPosMsk, locr.p & 3);
     if (doit) {
