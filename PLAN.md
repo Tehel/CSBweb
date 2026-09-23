@@ -29,10 +29,10 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C20
-and C22–C24, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C24
+and C26, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
-words), a two-deep queue, the input discard on a level change, and room type 7. C14 closed
+words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
 never been drawn one or two cells ahead) and the cloud under the party, which tiles the
 whole viewport. C20 loads a level a timer moved the party to in the same tick. C15 ported
@@ -58,8 +58,17 @@ G1 and G4 gained the unported `STKOP_Throw` and the monster design options; C23 
 `DeleteMonster` (not a `MoveObject`, so no pad release), and G2 `ProcessMonsterDeleteFilter`;
 C25 (the stairs do not turn a monster's corner, because the port's `ObjectID` carries it —
 knowingly left for D4).
-Next: what is left of tier C is C21 (size M, clicks through the input queue) and C25 (⚠️,
-waits for D4); then tier D.
+C21: clicks and keys share CSBWin's one mouse queue, which lives in `Game`. It is 8 entries
+long, not 3: `Data.h:1513` leaves `NoKeyQue` undefined, so C13's depth of two was read off
+a dead `#ifdef` branch. `Game.handleMouseEvents` takes one entry per tick. It handles
+turns and steps itself and gives every other button to the UI's dispatcher. A click
+stamps `lastTime` just as a turn does, and a held step blocks the entries behind it. The
+viewport click (button 80) goes through the queue, and the on-screen arrows (buttons 1-6),
+which the queue used to drop, work. C26: the disk icon waits for the eye to be let go.
+Recorded with them: G9 (the marching-order buttons 125-128). G5 gained the sleep and
+freeze buttons (145-148). G6 gained `FlashButton`.
+Next: tier C is done except C25 (⚠️, waits for D4). Tier D starts with D1+D2 (bundled,
+size L together, so split it first and record the split in `DEBT.md`).
 
 ## Ground rules
 

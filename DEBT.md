@@ -808,7 +808,7 @@ save or `tools/` scenario depends on it yet.
 
 ### C26 ✅ The disk icon ignores `HandleMouseEvents`' eye and mouth gate
 
-**Paid in the commit after `efce48e`** (see `git log`). `handleMouseButton` now returns
+**Paid in `7d19e09`.** `handleMouseButton` now returns
 before the 140 branch while `ui.pressingEye` is set (`Mouse.cpp:1679-1680`). The port
 has no pressed mouth, so only the eye is tested.
 
