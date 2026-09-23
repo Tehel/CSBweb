@@ -623,6 +623,20 @@ export class DungeonState {
         return OBJECT_ID_EOF;
     }
 
+    /**
+     * `MonsterAllowedOnLevel` (doc/CSBwin-src/Code11f52.cpp:120) — is `monsterType` among
+     * the creature types the level's descriptor lists. CSBWin also accepts an RN and
+     * reads the type from its record; callers here resolve the record first.
+     */
+    monsterAllowedOnLevel(monsterType: number, level: number): boolean {
+        const map = this.getMap(level);
+        if (!map) return false;
+        for (const entry of map.monsterTypes ?? []) {
+            if ((entry & 0xff) === (monsterType & 0xff)) return true;
+        }
+        return false;
+    }
+
     getTextRecord(rn: ObjectID): TextRecord | null {
         const { category, index } = decodeObjectID(rn);
         if (category !== DBType.TEXT) return null;

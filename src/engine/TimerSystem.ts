@@ -3249,19 +3249,8 @@ export class TimerSystem {
     }
 
     const destLevel = teleporter.destMap & 0xff;
-    const blocked = !this.isMonsterAllowedOnLevel(monster, destLevel);
+    const blocked = !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel);
     return { facing: newFacings & 0x3, usedItem16: useItem16, blocked };
-  }
-
-  private isMonsterAllowedOnLevel(monster: CreatureRecord, level: number): boolean {
-    const map = this.dungeon.getMap(level);
-    if (!map) return false;
-    const allowed = map.monsterTypes ?? [];
-    const mt = monster.creatureType & 0xff;
-    for (const entry of allowed) {
-      if ((entry & 0xff) === mt) return true;
-    }
-    return false;
   }
 
   private getMonsterItem16(monster: CreatureRecord, level: number): Item16Record | null {

@@ -481,7 +481,8 @@ export class MonsterPerception {
     if (roomType === RoomType.TELEPORTER && (flag & 8) !== 0 && monsterWord16_12_15(desc) >= TELEPORTER_WILLINGNESS) {
       const teleporter = this.dungeon.getTeleporterRecord(this.dungeon.findFirstObject(target));
       if (teleporter && teleporter.scope !== 0) {
-        if (!this.monsterAllowedOnLevel(monsterRn, teleporter.destMap & 0xff)) {
+        const monster = this.dungeon.getCreatureRecord(monsterRn);
+        if (!monster || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, teleporter.destMap & 0xff)) {
           probe.impossible = true;
           return probe;
         }
@@ -628,22 +629,6 @@ export class MonsterPerception {
   }
 
   /* ------------------------------------------------------------- internals ---- */
-
-  /**
-   * `MonsterAllowedOnLevel` — the destination level's `monsterTypes` list gates which
-   * creature types may exist there.
-   */
-  private monsterAllowedOnLevel(monsterRn: ObjectID, level: number): boolean {
-    const monster = this.dungeon.getCreatureRecord(monsterRn);
-    if (!monster) return false;
-    const map = this.dungeon.getMap(level);
-    if (!map) return false;
-    const allowed = map.monsterTypes ?? [];
-    for (const entry of allowed) {
-      if ((entry & 0xff) === (monster.creatureType & 0xff)) return true;
-    }
-    return false;
-  }
 
   /**
    * `d.DoorTOC[doorType]` — built at level load from the level descriptor's two door

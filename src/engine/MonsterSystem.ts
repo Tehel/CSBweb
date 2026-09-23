@@ -726,7 +726,7 @@ export class MonsterSystem {
     const monsterType = options.value & 0x1f;
     const alternateGraphics = (options.value >> 5) & 0x3;
 
-    if (!this.isMonsterAllowedOnLevel(monsterType, options.level)) return null;
+    if (!this.dungeon.monsterAllowedOnLevel(monsterType, options.level)) return null;
 
     this.ensureItem16Available();
     if (this.isItem16PoolFull()) return null;
@@ -786,18 +786,6 @@ export class MonsterSystem {
     if (placed.removed) return null;
     this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
     return rn;
-  }
-
-  /**
-   * `MonsterAllowedOnLevel` — a level lists which creature types may exist on it.
-   */
-  private isMonsterAllowedOnLevel(monsterType: number, level: number): boolean {
-    const map = this.dungeon.getMap(level);
-    if (!map) return false;
-    for (const entry of map.monsterTypes ?? []) {
-      if ((entry & 0xff) === (monsterType & 0xff)) return true;
-    }
-    return false;
   }
 
   /**
