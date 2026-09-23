@@ -68,7 +68,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
-| C4 | `DamageCharacter` is missing two early guards | S | ⏳ |
+| C4 | `DamageCharacter` is missing two early guards | S | ✅ |
 | C5 | Three movement deferrals | M | ⏳ |
 | C6 | Which generator cloud and missile sprites flip with | S | ⏳ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ⏳ |
@@ -371,7 +371,17 @@ the evidence.
 
 </details>
 
-### C4 ⏳ `DamageCharacter` is missing two of CSBWin's three early guards
+### C4 ✅ `DamageCharacter` is missing two of CSBWin's three early guards
+
+**Paid in the commit "DamageCharacter spares the mirror recruit and a won game".**
+`MonsterAttack.damageCharacter` now opens as CSBWin does (`Character.cpp:2712-2717`):
+`sw(damage)`, then `chIdx == -1` → 0, the recruit → `chIdx + 1`, a won game → 1 (through a
+new `isGameWon` hook), a non-positive blow → 0, and only then the missing-champion and
+zero-health checks. The `sw` was a third, unlisted gap: a blow of `0x10005` now hurts for 5.
+Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards" (5 checks fail
+before); the fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 `doc/CSBwin-src/Character.cpp:2712-2714`: `chIdx+1 == d.PotentialCharacterOrdinal`, which
 makes a champion still standing in a Hall of Champions mirror unhurtable, and
@@ -381,6 +391,8 @@ with a non-zero value, so a caller reading the result sees "damage was dealt".
 missing champion and zero health. The mirror guard matters now that missiles reach the
 party through this function. `PartyState` already carries the potential-character ordinal
 (`src/engine/gameTypes.ts:218`).
+
+</details>
 
 ### C5 ⏳ Three movement deferrals
 

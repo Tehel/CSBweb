@@ -2527,3 +2527,15 @@ lies in `objNI_Torch_a..objNI_Torch_d` with non-zero `charges()` gets `(charges 
 and loses `important` when that reaches 0 (`:7356-7373`). `SelectPaletteForLightLevel` and
 `DrawEightHands` follow unconditionally — the `if (D5W != 0)` around them is commented out
 (`:7382-7386`). Evidence: `tools/dump-ninety-second-update.ts`.
+
+## `DamageCharacter` spares a mirror recruit and everyone once the game is won
+
+`DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`) opens with `D7W = sw(damage)` and
+four guards, in this order (`:2712-2717`): `chIdx == -1` returns 0; `chIdx+1 ==
+d.PotentialCharacterOrdinal` returns `chIdx+1`; `d.Word11694 != 0` returns `d.Word11694`;
+`D7W <= 0` returns 0. Only then is `HP() == 0` checked (`:2725`). `d.Word11694` is "set when
+game is won" (`doc/CSBwin-src/Data.h:927`) and only ever set to 1 (`Attack.cpp:2268`,
+`Timer.cpp:2371`). So the recruit standing in a Hall of Champions mirror, and every champion
+after the win, cannot be hurt — yet the call reports non-zero, and a caller such as a
+missile's poison coin toss (`Code11f52.cpp:2046-2054`) proceeds as if damage was dealt.
+Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards".

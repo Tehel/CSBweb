@@ -341,6 +341,43 @@ function main(): void {
     check(poison.damage > 0, 'and it does physical damage too');
   }
 
+  /* ------------------------------------ 6. who cannot be hurt ------------------- */
+  //
+  // `DamageCharacter`'s early guards (`doc/CSBwin-src/Character.cpp:2712-2717`), in
+  // order: no champion, the recruit standing in a Hall of Champions mirror
+  // (`return chIdx+1`), a won game (`return d.Word11694`), and a blow that is not
+  // positive once cut to 16 bits (`D7W = sw(damage)`). The first two return non-zero,
+  // so a caller reading the result sees "damage was dealt" — and a missile's poison
+  // still gets its coin toss.
+  console.log('');
+  console.log('=== DamageCharacter\'s early guards ===');
+  {
+    const g = makeGame(2);
+    const cell = findCellWithWestNeighbour(g)!;
+    g.party.state.position = cell;
+    g.monsterSystem.loadPartyLevel(cell.z);
+    const recruit = g.party.state.champions[1]!;
+    g.party.state.potentialChampionIndex = 1;
+    const r = g.monsterAttack.damageCharacter(1, 999, 0, 0);
+    console.log(`recruit: returned ${r}, health ${recruit.attributes.health}`);
+    check(recruit.attributes.health === 20 && recruit.alive !== false,
+      'a recruit still in the mirror cannot be hurt');
+    check(r === 2, 'and DamageCharacter says chIdx+1');
+    g.party.state.potentialChampionIndex = -1;
+
+    const hero = g.party.state.champions[0]!;
+    g.gameWon = true;
+    const w = g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    console.log(`game won: returned ${w}, health ${hero.attributes.health}`);
+    check(hero.attributes.health === 20 && hero.alive !== false, 'once the game is won nobody can be hurt');
+    check(w === 1, 'and DamageCharacter returns d.Word11694, 1');
+    g.gameWon = false;
+
+    const big = g.monsterAttack.damageCharacter(0, 0x10000 + 5, 0, 0);
+    console.log(`damage 0x10005: returned ${big}, health ${hero.attributes.health}`);
+    check(big === 5 && hero.attributes.health === 15, 'the blow is cut to 16 bits first: 0x10005 is 5');
+  }
+
   finish();
 }
 

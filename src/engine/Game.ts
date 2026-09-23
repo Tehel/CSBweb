@@ -474,6 +474,7 @@ export class Game {
                 registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
                 dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
                 onChampionDied: (chIdx) => this.onChampionDied(chIdx),
+                isGameWon: () => this.gameWon,
                 schedulePoison: (chIdx, remaining) =>
                     this.timerSystem.schedulePoison(chIdx, remaining, this.party.state.position.z),
                 cancelPoisonTimers: (chIdx) => this.timerSystem.cancelPoisonTimers(chIdx),

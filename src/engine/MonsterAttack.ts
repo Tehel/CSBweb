@@ -16,7 +16,7 @@
  * amend, and only then acts on it. That indirection is the whole reason the block
  * exists as a struct in CSBWin, so it is kept as one here.
  */
-import { applyLimits } from '../core/intCast';
+import { applyLimits, sw } from '../core/intCast';
 import { OBJECT_ID_EOF, Position, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
@@ -127,6 +127,8 @@ export interface MonsterAttackHooks {
   dropAllPossessions?: (chIdx: number) => void;
   /** `WakeUp` (`doc/CSBwin-src/CSBCode.cpp`). */
   wakeUp?: () => void;
+  /** `d.Word11694` — set when the game is won; `DamageCharacter` then hurts nobody. */
+  isGameWon?: () => boolean;
   /** Arm the `TT_75` poison timer (`doc/CSBwin-src/CSBCode.cpp:7228`). */
   schedulePoison?: (chIdx: number, remaining: number) => void;
   /** Delete this champion's `TT_75` timers (`doc/CSBwin-src/Character.cpp:3016`). */
@@ -489,12 +491,18 @@ export class MonsterAttack {
    */
   damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number {
     const party = this.getPartyState();
+    // The early guards, in CSBWin's order (`doc/CSBwin-src/Character.cpp:2712-2717`).
+    // The recruit standing in a Hall of Champions mirror and a won game both return
+    // non-zero, so a caller reading the result sees "damage was dealt".
+    let dealt = sw(damage);
     if (chIdx === -1) return 0;
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    if ((party.potentialChampionIndex ?? -1) === chIdx) return chIdx + 1;
+    // `d.Word11694`, only ever set to 1 (`Attack.cpp:2268`, `Timer.cpp:2371`).
+    if (this.hooks?.isGameWon?.()) return 1;
+    if (dealt <= 0) return 0;
+    const champ = getPartyChampion(party, chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
-    let dealt = damage;
-    if (dealt <= 0) return 0;
 
     if (kind !== 0) {
       // Average the armour over every body part the blow could land on.
