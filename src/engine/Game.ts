@@ -1741,21 +1741,27 @@ export class Game {
         };
     }
 
+    /**
+     * `CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`). A spell filter's `action` is handled
+     * before the caster is even looked at (`:1110-1149`), so its message prints for a
+     * dead caster too; an `action` with no message (0, or 8 and up) casts normally.
+     */
     private castSpell(chIdx: number, spellParameters: SpellParameters): number {
         let casterIdx = chIdx;
         if (spellParameters.chIdx !== -1) casterIdx = spellParameters.chIdx & 0xffff;
         const champion = this.party.state.champions[casterIdx];
-        if (!champion || champion.alive === false) return 0;
-        if ((champion.attributes.health | 0) <= 0) return 0;
 
-        if (spellParameters.action !== 0) {
+        const abortText = this.getSpellAbortMessage(spellParameters.action);
+        if (abortText !== null) {
+            if (abortText !== '') this.emitSpellMessage(this.substituteSpellName(abortText, champion));
             if (spellParameters.disableTime !== -1) {
                 this.disableCharacterAction(casterIdx, spellParameters.disableTime);
             }
-            const message = this.getSpellAbortMessage(spellParameters.action, champion);
-            if (message !== null) this.emitSpellMessage(message);
             return 0;
         }
+        // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1150-1153`).
+        if (!champion || champion.alive === false) return 0;
+        if ((champion.attributes.health | 0) <= 0) return 0;
 
         let facing = this.party.state.facing;
         if (spellParameters.facing !== -1) facing = spellParameters.facing;
@@ -1784,7 +1790,13 @@ export class Game {
         let spellByte5 = spell.byte5;
         if (spellParameters.spellByte5 !== -1) spellByte5 = spellParameters.spellByte5;
 
-        const required = skillRequired + spellPower;
+        let missileType = (spell.word6 >> 4) & 0x3f;
+        if (spellParameters.missileType !== -1) missileType = spellParameters.missileType;
+
+        // `D4W = sw(pSpell->skillRequired + spellPower)` — the spell's *own* skill sets the
+        // difficulty; a filter's `skillRequired` only enters the experience's middle term
+        // (`:1206-1211`).
+        const required = sw(spell.skillRequired + spellPower);
         const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
         const mastery = determineMastery(champion, spellByte5, {
             getObjectNameIndex: (objectId) => this.nameIndex(objectId),
@@ -1807,7 +1819,6 @@ export class Game {
         let spellClass = spell.word6 & 0xf;
         if (spellParameters.spellClass !== -1) spellClass = spellParameters.spellClass;
 
-        const missileType = (spell.word6 >> 4) & 0x3f;
         switch (spellClass) {
             case 1: {
                 const flask = this.getFlaskInHand(champion);
@@ -2369,7 +2380,8 @@ export class Game {
         this.state.party = this.party.state;
     }
 
-    private getSpellAbortMessage(action: number, champion: Champion): string | null {
+    /** `CastSpell`'s `spellParameters.action` switch (`doc/CSBwin-src/Magic.cpp:1110-1136`): '' aborts silently, null casts. */
+    private getSpellAbortMessage(action: number): string | null {
         let msg: string | null = null;
         switch (action | 0) {
             case 1:
@@ -2397,14 +2409,13 @@ export class Game {
                 msg = null;
                 break;
         }
-        if (!msg || msg === '') return null;
-        return this.substituteSpellName(msg, champion);
+        return msg;
     }
 
-    private substituteSpellName(text: string, champion: Champion): string {
+    private substituteSpellName(text: string, champion: Champion | undefined): string {
         const idx = text.indexOf('%');
         if (idx < 0) return text;
-        return `${text.slice(0, idx)}${champion.name}${text.slice(idx + 1)}`;
+        return `${text.slice(0, idx)}${champion?.name ?? ''}${text.slice(idx + 1)}`;
     }
 
     /**

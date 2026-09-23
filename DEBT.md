@@ -83,7 +83,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C16 | Freed database slots are never reused | M | ⏳ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
-| C19 | `CastSpell` under a spell filter's overrides | S | ⏳ |
+| C19 | `CastSpell` under a spell filter's overrides | S | ✅ |
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ⏳ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
@@ -642,7 +642,15 @@ after the door. Only a cage restored from a save worked: `restoreTimerQueue` fil
 `processExpireObject` reads `object` now. Evidence: `tools/dump-clouds.ts` section 6 (3 of
 27 checks fail before).
 
-### C19 ⏳ `CastSpell` under a spell filter's overrides
+### C19 ✅ `CastSpell` under a spell filter's overrides
+
+**Paid in `C19HASH`.** `Game.castSpell` handles the filter's `action` first — its message
+prints for a dead caster, and an action with no message (8 and up) now casts instead of
+aborting — then takes the difficulty from the spell's own `skillRequired` and the
+`missileType` from the filter. Evidence: `tools/dump-cast-spell.ts`, new (5 of 8 checks
+fail before); the fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 Found re-reading `CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`) for C10. All three need a DSA
 spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defines one, so a
@@ -659,6 +667,8 @@ spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defin
   `spellParameters.action` (`:1110-1149`) before `chIdx >= d.NumCharacter` and `HP() == 0`
   (`:1150`, `:1153`); the port checks the caster first, so a filter's abort on a dead caster
   prints nothing.
+
+</details>
 
 ---
 

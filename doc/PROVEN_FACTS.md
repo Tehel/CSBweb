@@ -416,6 +416,21 @@ CSBWin passes `spellByte5` as the skill number for both spell `AdjustSkills` cal
 `ASW_CastSpell2` on success (`doc/CSBwin-src/Magic.cpp:1396`). `byte5` comes from the
 `SPELL` record in graphics `0x230`; it is not derived from the champion's class.
 
+## A spell filter's overrides: what `CastSpell` takes from them, and when
+
+`CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`) switches on `spellParameters.action` first
+(`:1110-1136`): 1 aborts silently, 2-7 print their message (6 with the caster's name for
+`%`, `StandardSpellMessage`, `:1059`) and abort, applying the filter's `disableTime` if it
+is not -1 (`:1137-1149`); 0 and every other value print nothing and carry on. Only then
+come `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;`
+(`:1150-1153`), so an abort prints even for a dead caster. The difficulty is
+`D4W = sw(pSpell->skillRequired + spellPower)` — the spell's own skill — while the
+filter's `skillRequired` replaces the spell's only in the experience,
+`(STRandom() & 7) + 16 * D4W + 8 * (spellPower - 1) * skillRequired + D4W * D4W`
+(`:1197-1211`). A filter's `missileType` replaces `BITS4_9(pSpell->word6)` (`:1201-1205`),
+which is what classes 2 and 3 act on; the class-1 potion type is `pSpell->word6` whatever
+the filter says (`:1250`). Evidence: `tools/dump-cast-spell.ts`.
+
 ## Blocked movement has no message
 
 CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of
