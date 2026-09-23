@@ -402,7 +402,7 @@ the monster arm; the door arm had neither the `DoorTOC & 2` pass-through test no
 
 Re-audited 2026-09-23; one of the three was live, the other two were overtaken.
 
-- ✅ **`LastMonsterAttackTime`'s source.** Paid in `COMMIT_C10`. CSBWin's one writer is
+- ✅ **`LastMonsterAttackTime`'s source.** Paid in `dc627b9`. CSBWin's one writer is
   `MonsterAttacks` (`Monster.cpp:982`), which `MonsterAttack` has ported since Phase 12;
   the Phase 9.5 stand-in in `Game.applyMissileDamageToParty` stamped it on every missile
   that reached the party, too — even a champion's own spell — so `AdjustSkills` doubled
@@ -429,7 +429,7 @@ three against CSBWin, then close or narrow this entry.
 
 ### C11 ✅ `DoesPartyHave` does not look inside chests
 
-**Paid in `COMMIT_C11`.** `ActuatorSystem.doesPartyHave` is `Code11f52.cpp:3622-3680` now: the
+**Paid in `f1b71a4`.** `ActuatorSystem.doesPartyHave` is `Code11f52.cpp:3622-3680` now: the
 30 possessions of every champion with hit points, then the cursor, each compared by
 `GetBasicObjectType` and, when it is a chest (`OBJNI_CHEST`, 0x90, new), its contents too. Two
 gaps beyond the entry: CSBWin's `goto` back into the loop checks **`d.objectInHand`** as
@@ -459,7 +459,7 @@ that puts the matching object in a carried chest and checks the actuator fires.
 ### C12 ✅ `SetTimer`'s duplicate-timer rules keep the wrong timer
 
 Re-audited 2026-09-23 against `Timer.cpp:989-1130` read whole; every claim held.
-**Paid in `COMMIT_C12`.** `TimerQueue.applyDuplicateTimerRules` is `SetTimer`'s head line
+**Paid in `21855bc`.** `TimerQueue.applyDuplicateTimerRules` is `SetTimer`'s head line
 for line: a map timer meeting a map timer, and a `TT_1` meeting a `TT_DOOR` or a `TT_1`,
 keep and return the old timer (a `TT_DOOR`'s `uByte9` flipped only if it was 2); only a map
 timer meeting a `TT_1` deletes and requeues. The re-reading found one more thing: every
@@ -469,7 +469,7 @@ and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
 `tools/dump-timer-dedupe.ts` (3 of 15 checks fail before); the facts are in
 `doc/PROVEN_FACTS.md`, and `doc/CSBWIN_TIMERS_REFERENCE.md` is corrected.
 
-- ✅ **The sequence number was stamped at the wrong time.** Paid in `COMMIT_C12b`.
+- ✅ **The sequence number was stamped at the wrong time.** Paid in `438c652`.
   `SetTimer` stamps `m_timerSequence++` on the slot it inserts into (`Timer.cpp:1189`;
   `SEQUENCED_TIMERS` is defined in `stdafx.h:17`), so a dropped duplicate consumes none and
   a requeued timer gets a fresh one. `TimerQueue.createTimer` stamped before the duplicate
@@ -478,7 +478,7 @@ and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
   timer its old number). The stamp breaks ties between timers due on the same tick, and is
   saved (`gb2.TimerSequence`). `addTimer` stamps now. Evidence: `tools/dump-timer-dedupe.ts`
   case 6 (2 of 17 checks fail before). **Not ported:** the repack when the counter reaches
-  0xffff (`:1135-1188`) — the port's counter grows past 16 bits, and a save masks it.
+  0xffff (`:1136-1188`) — the port's counter grows past 16 bits, and a save masks it.
 
 <details><summary>original entry</summary>
 
@@ -591,7 +591,7 @@ allocator through it.
 
 ### C17 ✅ `WiggleEverything` leaves a moved cloud's timer behind
 
-**Paid in `COMMIT_C17`.** `TimerSystem.wiggleObject` now retargets every `TT_25` / `TT_24`
+**Paid in `7bfa5f6`.** `TimerSystem.wiggleObject` now retargets every `TT_25` / `TT_24`
 naming a moved cloud (corner ignored, as CSBWin's `RN` compare does) to the new square,
 level and placed ID (`Timer.cpp:2491-2510`). Evidence: `tools/dump-wiggle-cloud.ts` (2 of 12
 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. Found on the way: C18.
@@ -611,7 +611,7 @@ findCellDestination` is the pattern.
 
 ### C18 ✅ A Fluxcage never expires, and frees door record 0
 
-**Paid in `COMMIT_C18`.** Found while paying C17. `CreateFluxcage` puts the cage in the
+**Paid in `51223c3`.** Found while paying C17. `CreateFluxcage` puts the cage in the
 `TT_24`'s `timerObj8()` (`Code11f52.cpp:1535`) and `TT_24` removes and frees that object
 (`CSBCode.cpp:6494-6510`). `TimerSystem.createFluxcage` put it on `TimerEntry.object`, as
 every `TT_25` does, but `processExpireObject` read `timerWord8` — 0 on a live timer — so the

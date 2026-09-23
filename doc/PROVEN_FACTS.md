@@ -2737,7 +2737,7 @@ cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
 The returned handle is the kept timer's, so a caller storing the index stores the old slot.
 A timer that is queued is stamped `m_timerSequence++` as it goes into its slot (`:1189`, under
 `SEQUENCED_TIMERS`, defined in `stdafx.h:17`); a dropped duplicate consumes no number. The
-counter is repacked when it reaches 0xffff (`:1135-1188`).
+counter is repacked when it reaches 0xffff (`:1136-1188`).
 Evidence: `tools/dump-timer-dedupe.ts`.
 
 ## Actuator type 8 counts what is in a carried chest, and what is on the cursor
