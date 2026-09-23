@@ -168,7 +168,7 @@ were three lines each is not.
 
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
 renderer, movement (stamina, the move delay in ticks; clicks still bypass the input
-queue — `DEBT.md` C21), timers, actuators, DSA scripting (less `MoveObject` on a cell move — C15), missiles,
+queue — `DEBT.md` C21), timers, actuators, DSA scripting, missiles,
 skills/experience, magic casting, light levels, sound, the pre-game screens (Phase 16 —
 title, dungeon entrance, doors, credits) and most of the DM UI all work. The message area (Phase 11),
 the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and

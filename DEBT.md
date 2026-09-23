@@ -79,13 +79,15 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ✅ |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ✅ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ✅ |
-| C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
-| C16 | Freed database slots are never reused | M | ⏳ |
+| C15 | A DSA cell move does not go through `MoveObject` | M | ✅ |
+| C16 | Freed database slots are never reused | M | ✅ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
 | C19 | `CastSpell` under a spell filter's overrides | S | ✅ |
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
+| C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ⏳ |
+| C23 | The other object movers are not `MoveObject` either | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -599,7 +601,18 @@ Extend `tools/dump-cloud-draw.ts`, which already stubs the tables it needs.
 
 </details>
 
-### C15 ⏳ A DSA cell move does not go through `MoveObject`
+### C15 ✅ A DSA cell move does not go through `MoveObject`
+
+**Paid in `ff6e578`.** CSBWin's low-level `MoveObject` is ported once for objects, as
+`TimerSystem.moveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`), and `DsaSystem.
+findCellSource` / `findCellDestination` lift and set down through it and, for a monster,
+through `MonsterSystem.moveMonster` (its monster branch), with `groupIndex` reset to
+`0xd8` / `0xff` off the party's level (`MoveObject.cpp:504-521`) and a same-level monster
+moved square to square (`:539-571`). The pads' `unchangedRoom` is now "the party stands
+here", not "source is destination". Evidence: `tools/dump-dsa-move.ts` sections 4-8 (8 of
+26 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. Found on the way: C22, C23.
+
+<details><summary>original entry</summary>
 
 `FindCellSource` / `FindCellDestination` (`doc/CSBwin-src/MoveObject.cpp:166-251`,
 `:460-600`) move the object with the low-level `MoveObject` (`Code11f52.cpp:2796`) —
@@ -614,7 +627,28 @@ monster arm. The port's equivalent of `MoveObject`'s cell-effect loop is
 `TimerSystem.resolveCellEffects`. Found while paying C8; no dungeon here has a DSA, so a
 `tools/` scenario has to build one (`tools/dump-dsa-move.ts` shows how).
 
-### C16 ⏳ Freed database slots are never reused
+</details>
+
+### C16 ✅ Freed database slots are never reused
+
+**Paid in `6ae2afa`.** `DungeonState.findEmptyDBEntry` is `FindEmptyDBEntry`
+(`doc/CSBwin-src/data.cpp:919-993`): the lowest record from index 1 whose link is `RNnul`,
+else an append, which is the index `Enlarge` returns. Every allocator goes through it —
+`MonsterSystem.findEmptyCreatureEntry`, `MonsterDamage.createDroppedRecord`,
+`MonsterAttack.createBonesRecord`, `TimerSystem`'s missile and cloud records,
+`Game.createMiscObject`, `constructPredefinedMissile` and `DsaSystem.copyItem` — and an
+append keeps `count` and the header's `objectCounts` equal to the records, which the
+image writer declares (`MonsterSystem`, `MonsterDamage` and the bones never bumped the
+header). `AllocateIndirectIndex` needed nothing: the port has no live indirect index, and
+the save writer numbers its own (see `doc/PROVEN_FACTS.md`, "An RN in block 10 or block 13
+cannot be byte-identical"). C8's deferred deletes are now observable:
+`tools/dump-dsa-delete.ts` shows a condemned record keeps its link for the rest of the run,
+so nothing can take it. ⚠️ At 1024 records the allocator returns `null`, where CSBWin
+calls `MakeMoreRoomInDB` (`Character.cpp:182`) — unported, and unreachable in the shipped
+dungeons. Evidence: `tools/dump-db-reuse.ts` (7 of 11 checks fail before; the first arrow
+`dungeon.dat` makes is weapon 105, not 107); the fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 CSBWin allocates a record with `FindEmptyDB<n>Entry` → `DATABASES::FindEmptyDBEntry`
 (`doc/CSBwin-src/data.cpp:919`), which takes a freed slot (`DeleteDBEntry`, `data.cpp:995`,
@@ -626,6 +660,8 @@ createCloudRecord` / `createMissileRecord`, `Game.createMiscObject`, `DsaSystem.
 anything is freed, which matters to a written save (Phase 10) and makes C8's deferred
 deletes observable. Port `FindEmptyDB<n>Entry` once, in `DungeonState`, and route every
 allocator through it.
+
+</details>
 
 ### C17 ✅ `WiggleEverything` leaves a moved cloud's timer behind
 
@@ -686,10 +722,6 @@ spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defin
 
 </details>
 
----
-
-## D — State representation
-
 ### C20 ✅ A level change inside `ProcessTimers` waits for the next tick
 
 **Paid in `9e742ac`.** `Game.gameTick` now loops as CSBWin's main loop does:
@@ -725,6 +757,45 @@ for the tick nor holds the next turn or step back to the next one, and a click d
 fill a queue slot a key would then be refused. Porting it means turning
 `processMovementQueue` into `HandleMouseEvents`' dispatcher for every button. Size M; no
 save or `tools/` scenario depends on it yet.
+
+### C22 ⏳ A monster's own move presses no pads, and drags timers the AI does not
+
+Found paying C15. `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:3327-3424`)
+removes and places a non-levitating group through `PlaceOrRemoveObjectInRoom`
+(`:3287`, `:3392`), so a monster walking onto or off a pressure pad fires it.
+`MonsterSystem.moveMonster` splices the chains with `removeObjectFromCell` /
+`addObjectToCell` and calls no actuator at all. It also points the group's AI timers at
+the new square whenever its `ITEM16` did not change — which is what the *DSA* does after
+`MoveObject` (`MoveObject.cpp:539-571`), not `MoveObject` itself — so every AI step does
+it too, where CSBWin's AI (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`) leaves the other
+timers behind. The DSA path now relies on it (C15); moving the retarget out means giving
+`DsaSystem.findCellDestination` its own. Needs a `tools/` scenario with a pad under a
+monster's path (`tools/dump-dsa-move.ts` sections 6-8 build a group). Size M.
+
+### C23 ⏳ The other object movers are not `MoveObject` either
+
+Found paying C15, which ported `MoveObject` for objects once, as `TimerSystem.moveObject`
+(`doc/CSBwin-src/Code11f52.cpp:2796`). The other callers still hand-roll it, and each
+differs from it somewhere:
+
+- `TimerSystem.wiggleObject` (`WiggleEverything`, `Timer.cpp:2428-2512`) passes
+  "same square" as `unchangedRoom` where `MoveObject` passes "the party stands here"
+  (`:3278-3293`, `:3433-3448`); presses pads for a missile, which is levitating and uses
+  `RemoveObjectFromRoom` / `AddObjectToRoom` (`:3272-3274`, `:3427-3429`); and keeps a
+  cloud out of pits, where `Levitating` (`:2417-2437`) lets it fall.
+- `Game`'s drop from the cursor (`Mouse.cpp:882`) and `TimerSystem.dropMissileObject`
+  (`Timer.cpp:151-159`) pass `unchangedRoom = false`, and `resolveCellEffects` turns a
+  dropped item's corner on a relative teleporter although `oldX == -1` (`:3000-3006`).
+- `resolveCellEffects` has no stairs arm: `MoveObject` moves a monster or an item that
+  lands on stairs one level down when bit 2 of the cell is clear, then one square out
+  through `ExitStairsDirection`, turning its corner (`:3108-3131`).
+
+Routing each through `TimerSystem.moveObject` fixes the first two; the stairs arm is its
+own fix. One commit per caller, each with a `tools/` scenario. Size M.
+
+---
+
+## D — State representation
 
 ### D1 ⏳ Hands stored twice *(bundle with D2)*
 

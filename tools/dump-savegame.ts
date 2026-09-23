@@ -188,8 +188,8 @@ async function main(): Promise<void> {
   creature.hp[0] = (creatureHpBefore + 13) & 0xffff;
   const creatureHpAfter = creature.hp[0];
 
-  // Growth: `CreateAndDropObject` appends rather than reusing a freed slot, so the
-  // record arrays get longer during play and the snapshot has to follow.
+  // Growth: with no free record left, `FindEmptyDBEntry` appends, so the record
+  // arrays get longer during play and the snapshot has to follow.
   const miscCountBefore = playedData.databases.misc.records.length;
   playedData.databases.misc.records.push({
     nextObject: OBJECT_ID_EOF,
@@ -197,11 +197,12 @@ async function main(): Promise<void> {
     important: false,
     miscType: 33, // misc_ScreamerSlice — a value a fresh dungeon.dat will not have here
   });
-  // Every engine append site bumps `count` alongside the push — `createBonesRecord`,
-  // `findEmptyCreatureEntry`, `Game.createMiscObject`, the `DsaSystem` object copies.
-  // The first draft of this tool pushed without it and the whole-world check below
-  // duly failed: the tool had built a state the game cannot reach.
+  // Every engine append goes through `DungeonState.findEmptyDBEntry`, which keeps
+  // `count` and the header's `objectCounts` equal to the records. The first draft of
+  // this tool pushed without `count` and the whole-world check below duly failed: the
+  // tool had built a state the game cannot reach.
   playedData.databases.misc.count++;
+  playedData.header.objectCounts[DBType.MISC] = playedData.databases.misc.records.length;
   const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore) as ObjectID;
   played.dungeonState.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
 
