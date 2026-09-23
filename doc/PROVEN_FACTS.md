@@ -2653,3 +2653,26 @@ DSA — `TT_5` (`Timer.cpp:1757`), `TT_6` (`:2230`) and `TT_7` (`:1433`) — `br
 the cell's object chain when it is true, since the slave's link now belongs to the delete
 list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
 `tools/dump-dsa-delete.ts`.
+
+## A missile at a door: Zo works the button, grates let small things through, the rest hit it
+
+The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-1935`), in order:
+
+1. A Zo spell (`RNZoSpell`) at a door whose state is not 5 queues
+   `CreateTimer(TT_DOOR, x, y, 0, 2, d.Time + 1)` if the door has its switch bit
+   (`DB0::doorSwitch`, `word2` bit 6, `CSB.h:843`), and then `break`s to the shared tail
+   whether or not it did — so the spell is spent even at an open door (`:1852-1864`).
+2. A door that is broken (5) or open (0, 1) lets the missile on (`return 0`, `:1865`).
+3. `D0B = BITS8_15(d.DoorTOC[doorType]); if (D0W & 2)` (`:1869-1870`) — bit 1 of the
+   **high** byte (0x200) marks a door missiles may pass (`Monster.cpp:323` reads bit 0,
+   0x100, for monsters). A cloud-typed projectile (a spell) passes if
+   `IsNonPhysicalSpell()`, i.e. `>= RNDispellMissile` (0xff83, `CSBTypes.h:373`). A thrown
+   object draws `STRandom(128)` and passes if `rangeRemaining` beats it, its
+   `ObjDesc.word4 & 0x100` (pouch) is set, and it is not a key (`RN::IsAKey`, a misc whose
+   name index is 0xb0-0xbf, `data.cpp:686-694`) (`:1912-1917`). Passing is `return 0`.
+   In `graphics.dat` only `DoorCharacteristics[0] = 0x36e` has the bit.
+4. Otherwise `D5W = DetermineMagicDamage + 1`, then the type-2 missile filter, then
+   `HitDoor(x, y, D5W + (STRandom() & 0xffff) % D5W, false, 0)` (`:1922-1934`) — not an
+   explosion, so it needs `canOpenWithAxe`, and the force must reach `DoorTOC & 0xff`.
+
+Evidence: `tools/dump-missile-door.ts`.

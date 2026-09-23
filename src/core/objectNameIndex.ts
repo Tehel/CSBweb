@@ -46,6 +46,9 @@ export const OBJNI_LAST_FULL_FLASK = 163;
 export const OBJNI_WATER_FLASK = 163;
 export const OBJNI_APPLE = 168;
 export const OBJNI_DRAGON_STEAK = 175;
+/** `objNI_FirstKey` / `objNI_LastKey` (`doc/CSBwin-src/Objects.h:620`, `:636`). */
+export const OBJNI_FIRST_KEY = 176;        // 0xb0, objNI_IronKey
+export const OBJNI_LAST_KEY = 191;         // 0xbf, objNI_MasterKey
 export const OBJNI_EMPTY_FLASK = 195;
 export const OBJNI_SPECIAL_C = 201;
 export const OBJNI_SPECIAL_D = 202;

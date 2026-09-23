@@ -21,11 +21,13 @@ import {
   OBJNI_EMPTY_FLASK,
   OBJNI_EYE_OF_TIME_A,
   OBJNI_FIRST_FULL_FLASK,
+  OBJNI_FIRST_KEY,
   OBJNI_FIRST_MODIFIABLE,
   OBJNI_FLAMITT_A,
   OBJNI_ILLUMULET_A,
   OBJNI_JEWEL_SYMAL_A,
   OBJNI_LAST_FULL_FLASK,
+  OBJNI_LAST_KEY,
   OBJNI_LAST_MODIFIABLE,
   OBJNI_NOT_AN_OBJECT,
   OBJNI_OPEN_SCROLL,
@@ -197,4 +199,18 @@ export function NameIndex(
     if (dungeon.getWeaponRecord(object)?.charges) objNID7++;
   }
   return objNID7;
+}
+
+/** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686-694`) — a misc object named as a key. */
+export function IsAKey(
+  dungeon: DungeonState,
+  tables: ObjectIndexTables,
+  partyFacing: number,
+  rn: number,
+): boolean {
+  if (decodeObjectID(rn as ObjectID).category !== DBType.MISC) return false;
+  const objNI = NameIndex(dungeon, tables, partyFacing, rn);
+  if (objNI < OBJNI_FIRST_KEY) return false;
+  if (objNI > OBJNI_LAST_KEY) return false;
+  return true;
 }

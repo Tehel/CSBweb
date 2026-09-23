@@ -73,7 +73,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C6 | Which generator cloud and missile sprites flip with | S | ✅ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
 | C8 | Phase 8 DSA leftovers | M | ✅ |
-| C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
+| C9 | Door pass-through rules and magic formulas | M | ✅ |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
@@ -174,7 +174,7 @@ Found on the way and fixed in the same commit, because the monster arm's formula
 on it: the port turned a thrown Ven or Ful potion into its cloud **before** the switch,
 while CSBWin keeps `RNprojectile` as the potion until the tail (`:2060-2063`). So a bomb's
 first blow — on a monster *and* on a champion — was a fireball's instead of a thrown
-object's. The door arm will read the potion too once C9 ports its pass-through test.
+object's. The door arm reads the potion too since C9.
 Evidence: `tools/dump-missile-monster.ts` (9 of 15 checks fail before); the fact is in
 `doc/PROVEN_FACTS.md`.
 
@@ -370,18 +370,31 @@ divergences.
 
 </details>
 
-### C9 ⚠️ Door pass-through rules and the magic damage/poison formulas *(re-audit)*
+### C9 ✅ Door pass-through rules and the magic damage/poison formulas
+
+Re-audited 2026-09-23: the magic damage and poison formulas and Black Flame healing were
+C2's; what was left was the door arm, and none of it was there. `TimerSystem.
+processMissileEncounter`'s `case RoomType.DOOR` is now CSBWin's line for line
+(`Code11f52.cpp:1844-1935`): a Zo spell works a door's button at `d.Time + 1` and is spent
+either way (the port let it fly on at an open door, and read the time off the missile
+timer); `DoorTOC`'s high-byte bit 1 lets a non-physical spell through, and a thrown object
+that out-ranges `STRandom(128)`, fits in a pouch and is not a key; everything else hits
+the door with `HitDoor(DetermineMagicDamage + 1 + STRandom % that)`. `RN::IsAKey` is
+`objectIndex.IsAKey` now, and `TimerSystem` gets it and `ObjDesc.word4` as hooks from
+`Game`. The shipped data has one door type missiles pass (`0x36e`). Evidence:
+`tools/dump-missile-door.ts` (8 of 13 checks fail before, plus a data canary); the fact is
+in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 Recorded in Phase 9 step 12: door pass-through (the `DoorTOC` and `ObjDesc` checks for
 missiles) and the magic damage and poison formulas, including Black Flame fireball healing
 (`doc/CSBwin-src/Code11f52.cpp:1870+`, `:1488+`). Partly overtaken since:
-`DetermineMagicDamage` exists now (`src/engine/TimerSystem.ts:2621`), and commit `83cccd0`
-("Thrown items colliding doors wall on the right side") worked on the door path. Audit what
-is actually left before starting. C2 paid the monster arm, Black Flame healing included;
-what C2 saw of the door arm (`TimerSystem.processMissileEncounter`, `case RoomType.DOOR`)
-is that it has neither the `DoorTOC & 2` pass-through test nor the `HitDoor` with
-`DetermineMagicDamage + 1` force (`Code11f52.cpp:1867-1945`) — a missile at a shut door
-just stops.
+`DetermineMagicDamage` exists now, and commit `83cccd0` worked on the door path. C2 paid
+the monster arm; the door arm had neither the `DoorTOC & 2` pass-through test nor the
+`HitDoor` with `DetermineMagicDamage + 1` force — a missile at a shut door just stopped.
+
+</details>
 
 ### C10 ⚠️ Phase 9.5 refinements *(re-audit)*
 

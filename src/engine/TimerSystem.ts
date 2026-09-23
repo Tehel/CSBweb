@@ -215,6 +215,10 @@ export interface TimerHooks {
   objectWeight?: (rn: number) => number;
   /** `TAG0099d2(object)->uByte3` — a thrown weapon's own damage contribution. */
   weaponThrowDamage?: (rn: number) => number;
+  /** `d.ObjDesc[object.DescIndex()].word4` — where the object may be carried. */
+  objDescWord4?: (rn: number) => number;
+  /** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686`). */
+  isAKey?: (rn: number) => boolean;
   /** `QueueSound` — a sound named by ordinal, attenuated by distance from the party. */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
@@ -2015,25 +2019,48 @@ export class TimerSystem {
         this.missileEncounterFilter(6, position, objectPos, missileRn, filterProjectile, -1);
         break;
       case RoomType.DOOR: {
+        // `doc/CSBwin-src/Code11f52.cpp:1844-1935`.
         const map = this.dungeon.getMap(position.z);
         if (!map) return false;
         const cellFlag = map.cellFlags[objX]?.[objY] ?? 0;
         const doorState = cellFlag & 0x7;
         const doorRn = this.dungeon.findFirstDoor(new Position(objX, objY, position.z));
         const door = doorRn !== OBJECT_ID_EOF ? this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index) : null;
+        if (!door) return false;
 
-        if (doorState !== 5 && projectile === RN_ZO_SPELL && door?.hasButton) {
-          const time = (this.missileFilterTimer?.time ?? 0) + 1;
-          this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, time >>> 0, position.z);
+        // A Zo spell at a door that is not broken works its button, if it has one, and
+        // is spent either way.
+        if (doorState !== 5 && projectile === RN_ZO_SPELL) {
+          if (door.hasButton) {
+            this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, (this.now + 1) >>> 0, position.z);
+          }
+          break;
         }
-
-        if (doorState === 5 || doorState <= 1) {
-          return false;
+        if (doorState === 5 || doorState <= 1) return false;
+        // `D0B = BITS8_15(d.DoorTOC[doorType]); if (D0W & 2)` — bit 1 of the high byte
+        // marks a door missiles can pass: a non-physical spell always does, a thrown
+        // object if it still has range to beat `STRandom(128)`, fits in a pouch and is
+        // not a key.
+        const tocHigh = (this.dungeon.doorTOC(position.z, door.doorType, this.tables?.doorCharacteristics) >> 8) & 0xff;
+        if (tocHigh & 2) {
+          let passes: boolean;
+          if (projectileDbType === DBType.CLOUD) {
+            passes = isNonPhysicalSpellRn(projectile);
+          } else {
+            const w72 = this.random.below(128);
+            passes =
+              (missile.rangeRemaining & 0xff) > w72 &&
+              ((this.hooks?.objDescWord4?.(projectile) ?? 0) & 0x100) !== 0 &&
+              !(this.hooks?.isAKey?.(projectile) ?? false);
+          }
+          if (passes) return false;
         }
+        const force = sw(this.determineMagicDamage(missile, projectile).damage + 1);
         if (this.missileEncounterFilter(2, position, objectPos, missileRn, filterProjectile, -1) === 1) {
           return false;
         }
-        return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, tailProjectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
+        this.hitDoor(new Position(objX, objY, position.z), force + this.random.below(force), false, 0);
+        break;
       }
       case -2: {
         // `objectPos = CharacterAtPosition(objectPos); if (objectPos < 0) return 0;`

@@ -42,7 +42,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { GetBasicObjectType, isLikelyObjectRecord, NameIndex } from './objectIndex';
+import { DescIndex, GetBasicObjectType, IsAKey, isLikelyObjectRecord, NameIndex } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -361,6 +361,16 @@ export class Game {
                 objectWeight: (rn) => this.characterStats.getObjectWeight(rn as ObjectID),
                 weaponThrowDamage: (rn) =>
                     this.characterStats.weaponDescFor(rn as ObjectID)?.uByte3 ?? 0,
+                objDescWord4: (rn) => {
+                    const descIndex = DescIndex(this.dungeonState, rn);
+                    return descIndex === -1 ? 0 : this.addCharacterTables?.objDescCarryMask[descIndex] ?? 0;
+                },
+                isAKey: (rn) => IsAKey(
+                    this.dungeonState,
+                    { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
+                    this.party.state.facing,
+                    rn,
+                ),
                 damageMonster: (monster, indexInGroup, level, mapX, mapY, damage) =>
                     this.monsterDamage.damageMonster(
                         monster, indexInGroup, level, mapX, mapY, damage, true, false,
