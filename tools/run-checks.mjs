@@ -54,6 +54,7 @@ const CHECKS = [
   { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-local-action.ts' },
   { tool: 'dump-dsa-move.ts' },
+  { tool: 'dump-dsa-delete.ts' },
   { tool: 'dump-missile-monster.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },

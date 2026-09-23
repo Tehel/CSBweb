@@ -314,6 +314,11 @@ class DsaBank {
   mostRecentInterestingObjectID = -1;
   filter = false;
   indirectActionDelay = -1;
+  /**
+   * `m_objectDeleteList` (`doc/CSBwin-src/DSA.cpp:132`) — what `&DEL` has condemned,
+   * chained through the records' own links, freed only once the run is over.
+   */
+  objectDeleteList: number = OBJECT_ID_EOF;
 
   constructor(public vars: DsaVars) {}
 
@@ -827,7 +832,35 @@ export class DsaSystem {
     if (nextState >= 0) {
       this.putState(masterRecord, masterDsa, nextState);
     }
-    return false;
+    // `ProcessDSATimer6` returns `deletedSlave` (`doc/CSBwin-src/DSA.cpp:5483-5486`),
+    // and every timer walk that runs a DSA breaks out of the cell's chain on it
+    // (`Timer.cpp:1433`, `:1757`, `:2230`) — the slave's link is no longer the cell's.
+    return this.consumateDeletes(bank, rn);
+  }
+
+  /**
+   * `DSADBANK::DeleteObject` (`doc/CSBwin-src/DSA.cpp:157-163`) — condemn a record by
+   * pushing it on the run's delete list through its own link. Nothing is freed yet.
+   */
+  private deleteObject(bank: DsaBank, rn: number): void {
+    this.dungeon.setDBRecordLink(rn, bank.objectDeleteList);
+    bank.objectDeleteList = rn;
+  }
+
+  /**
+   * `DSADBANK::ConsumateDeletes` (`doc/CSBwin-src/DSA.cpp:178-191`) — free everything
+   * `&DEL` condemned during the run, and say whether the DSA's own actuator was among
+   * it. `==` on an `RN` compares the indirect index alone (`CSBTypes.h:349`).
+   */
+  private consumateDeletes(bank: DsaBank, rnSlave: number): boolean {
+    let result = false;
+    while (bank.objectDeleteList !== OBJECT_ID_EOF) {
+      const obj = bank.objectDeleteList;
+      if (withObjectPosition(obj as ObjectID, 0) === withObjectPosition(rnSlave as ObjectID, 0)) result = true;
+      bank.objectDeleteList = this.dungeon.getDBRecordLink(obj as ObjectID);
+      this.dungeon.deleteDBEntry(obj as ObjectID);
+    }
+    return result;
   }
 
   private execute(exPkt: ExecutionPacket, bank: DsaBank): number {
@@ -1306,8 +1339,8 @@ export class DsaSystem {
         if (location < 0) {
           const removed = this.deleteFromNegativeLocation(location);
           if (removed !== null && removed !== undefined) {
-            this.deleteLinkedScrollText(removed);
-            this.dungeon.deleteDBEntry(removed);
+            this.deleteLinkedScrollText(removed, bank);
+            this.deleteObject(bank, removed);
           }
           break;
         }
@@ -1323,8 +1356,8 @@ export class DsaSystem {
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
           this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, false, this.getPartyState?.().facing ?? 0);
-          this.deleteLinkedScrollText(rn);
-          this.dungeon.deleteDBEntry(rn);
+          this.deleteLinkedScrollText(rn, bank);
+          this.deleteObject(bank, rn);
           break;
         }
         break;
@@ -2229,7 +2262,8 @@ export class DsaSystem {
     return removed;
   }
 
-  private deleteLinkedScrollText(rn: number): void {
+  /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1715-1722`): its text goes first. */
+  private deleteLinkedScrollText(rn: number, bank: DsaBank): void {
     if (!this.isValidObjectId(rn)) return;
     const { category } = decodeObjectID(rn);
     if (category !== DBType.SCROLL) return;
@@ -2240,7 +2274,7 @@ export class DsaSystem {
     const textRn = decoded.category === DBType.TEXT
       ? (raw as ObjectID)
       : encodeObjectID(0, DBType.TEXT, raw & 0x3ff);
-    this.dungeon.deleteDBEntry(textRn);
+    this.deleteObject(bank, textRn);
   }
 
 

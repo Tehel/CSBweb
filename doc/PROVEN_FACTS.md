@@ -2639,3 +2639,17 @@ search ignores the corner too.
 A missile moved by a DSA has its timer's `timerWord8` low ten bits set to the new square —
 direction and decay kept — and its level to the new level (`MoveObject.cpp:574-596`).
 Evidence: `tools/dump-dsa-move.ts`.
+
+## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
+
+`EX_DEL` (`doc/CSBwin-src/DSA.cpp:1643-1737`) removes the object from its square, the cursor
+or a champion's possessions, then hands it to `DSADBANK::DeleteObject` (`:157-163`), which
+only pushes it on the run's `m_objectDeleteList` **through the record's own link**; a
+scroll's text is pushed first (`:1715-1722`). The records stay allocated for the rest of the
+run. `ProcessDSATimer6` calls `ConsumateDeletes` (`:178-191`) after `PutState` (`:5483`):
+it frees the whole list and returns whether the DSA's own actuator (`objSlave`) was on it,
+and that is `ProcessDSATimer6`'s return value (`:5486`). All three timer walks that run a
+DSA — `TT_5` (`Timer.cpp:1757`), `TT_6` (`:2230`) and `TT_7` (`:1433`) — `break` out of
+the cell's object chain when it is true, since the slave's link now belongs to the delete
+list. Filters (`ProcessDSAFilter`, `DSA.cpp:5315-5325`) ignore it. Evidence:
+`tools/dump-dsa-delete.ts`.

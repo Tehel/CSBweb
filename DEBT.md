@@ -72,13 +72,16 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C5 | Three movement deferrals | M | ✅ |
 | C6 | Which generator cloud and missile sprites flip with | S | ✅ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
-| C8 | Phase 8 DSA leftovers | M | ⚠️ bullet 1 paid |
+| C8 | Phase 8 DSA leftovers | M | ✅ |
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
+| C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
+| C16 | Freed database slots are never reused | M | ⏳ |
+| C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -321,10 +324,11 @@ Evidence: `tools/dump-monster-move.ts` case 4 (3 of 18 checks fail before); the 
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → "Phase 12 — Monsters".</sub>
 
-### C8 ⚠️ Phase 8 DSA leftovers
+### C8 ✅ Phase 8 DSA leftovers
 
 Re-audited 2026-09-23. The first bullet was not DSA at all but the actuator local action;
-it is **paid in `600811e`**. What is left of the second is narrower than it read.
+it is **paid in `600811e`**. The second is paid in two commits; what it uncovered is C15
+and C16.
 
 - ✅ **`PerformLocalAction`'s champion.** `SkillIncreaser` (`Mouse.cpp:209-230`) credits
   `d.HandChar`, the cursor's owner; the port matched a living champion's `partyPosition`
@@ -340,14 +344,17 @@ it is **paid in `600811e`**. What is left of the second is narrower than it read
   writes the new square into `timerWord8` and the new level; that is ported too.
   Evidence: `tools/dump-dsa-move.ts` (8 of 13 checks fail before); the fact is in
   `doc/PROVEN_FACTS.md`. What is still not CSBWin's about a DSA cell move is C15.
-- ⏳ **Deferred deletes.** `&DEL` queues the record on `m_objectDeleteList`
-  (`DSA.cpp:157-163`) and `ConsumateDeletes` frees the lot after the run (`:178-191`,
-  called at `:5483`), returning whether the DSA deleted its own actuator — which the
-  caller turns into `ERF_DeletedSlave` (`:153-156`). The port calls `deleteDBEntry` at
-  once, mid-run. Find what the callers do with the flag before porting.
+- ✅ **Deferred deletes.** `&DEL` now condemns through `DsaSystem.deleteObject` onto the
+  bank's `objectDeleteList`, and `processTimer6Internal` ends with `consumateDeletes`,
+  returning whether the slave went — which the three timer walks already `break` on.
+  Before, the walks stopped only by accident: the freed slave's link read `0xFFFF`,
+  which decodes as a cloud and was skipped. The deferral itself is not yet observable
+  in play, because the port never reuses a freed slot; it will be once slot reuse is
+  ported (C16). Evidence: `tools/dump-dsa-delete.ts` (4 of 9 checks fail before); the
+  fact is in `doc/PROVEN_FACTS.md`.
 
 The archived shimmer entry notes that no dungeon this project loads defines a DSA, so
-neither remaining bullet can show in play today.
+neither DSA bullet could show in play; both tools build their own DSA.
 
 <details><summary>original entry</summary>
 
@@ -477,6 +484,45 @@ Found while porting C6's placement block; nothing here is fixed. All in
   two more viewport-stream draws. The port blits `351 + typeIndex` into a fixed rectangle.
 
 Extend `tools/dump-cloud-draw.ts`, which already stubs the tables it needs.
+
+### C15 ⏳ A DSA cell move does not go through `MoveObject`
+
+`FindCellSource` / `FindCellDestination` (`doc/CSBwin-src/MoveObject.cpp:166-251`,
+`:460-600`) move the object with the low-level `MoveObject` (`Code11f52.cpp:2796`) —
+`MoveObject(obj, x, y, -1, 0)` to lift it, `MoveObject(obj, -1, 0, x, y)` to set it down —
+so an object a DSA drops on an open teleporter or pit is carried on at once, and a
+monster moved within the party's level keeps its state: it is not lifted at the source
+(`:205-219`), `MoveObject(object, srcX, srcY, x, y)` moves it, and its AI timers follow
+(`:547-570`); moved off that level its `groupIndex` becomes `0xd8` / `0xff` (`:506-520`).
+`DsaSystem.findCellSource` / `findCellDestination` splice the chain directly
+(`removeObjectFromCell`, `addObjectToCell`) with only the actuator triggers, and have no
+monster arm. The port's equivalent of `MoveObject`'s cell-effect loop is
+`TimerSystem.resolveCellEffects`. Found while paying C8; no dungeon here has a DSA, so a
+`tools/` scenario has to build one (`tools/dump-dsa-move.ts` shows how).
+
+### C16 ⏳ Freed database slots are never reused
+
+CSBWin allocates a record with `FindEmptyDB<n>Entry` → `DATABASES::FindEmptyDBEntry`
+(`doc/CSBwin-src/data.cpp:919`), which takes a freed slot (`DeleteDBEntry`, `data.cpp:995`,
+is what frees one), and `AllocateIndirectIndex` (`SaveGame.cpp:2101`) reuses freed indirect
+indices. Read both before porting; this entry has not audited their search order. Every allocator in the port appends instead — `MonsterSystem.
+findEmptyCreatureEntry`, `MonsterDamage.createDroppedRecord`, `TimerSystem.
+createCloudRecord` / `createMissileRecord`, `Game.createMiscObject`, `DsaSystem.copyItem`
+— and two of them say so with a ⚠️. Object indices therefore drift from CSBWin's as soon as
+anything is freed, which matters to a written save (Phase 10) and makes C8's deferred
+deletes observable. Port `FindEmptyDB<n>Entry` once, in `DungeonState`, and route every
+allocator through it.
+
+### C17 ⏳ `WiggleEverything` leaves a moved cloud's timer behind
+
+When a teleporter or pit opens under objects, `WiggleEverything` (`doc/CSBwin-src/
+Timer.cpp:2428-2512`) moves each one with `MoveObject` and, for a cloud, retargets every
+`TT_25` / `TT_24` naming it to `d.NewX`, `d.NewY`, `d.NewPos`, `d.NewLevel` (`:2491-2510`),
+as it does a missile's timer (`:2476-2489`). `TimerSystem.wiggleObject` does the missile
+and not the cloud, so a fireball's cloud carried off by a teleporter keeps burning at the
+old square, and `processTT_25` then fails to unlink it (the ID it holds has the old
+corner) and frees a record still linked in the new cell. The C8 cloud fix in `DsaSystem.
+findCellDestination` is the pattern.
 
 ---
 
