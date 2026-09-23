@@ -177,6 +177,18 @@ export interface RuntimeSaveState {
 /**
  * Game class - main game controller
  */
+/**
+ * `MoveParty`'s relative direction for each step — `D6W - 3` in `HandleMouseEvents`, where
+ * buttons 3-6 are forward, right, backward, left (doc/CSBwin-src/CSBCode.cpp:7946-7951).
+ * Turns have none.
+ */
+const MOVE_RELATIVE_DIRECTION: Partial<Record<MovementAction, number>> = {
+    [MovementAction.MOVE_FORWARD]: 0,
+    [MovementAction.STRAFE_RIGHT]: 1,
+    [MovementAction.MOVE_BACKWARD]: 2,
+    [MovementAction.STRAFE_LEFT]: 3,
+};
+
 export class Game {
     state: GameState;
     party: Party;
@@ -184,6 +196,12 @@ export class Game {
     private movementSystem: MovementSystem;
     private movementQueue: MovementAction[] = [];
     private readonly movementQueueLen = 3; // CSBUI.cpp keyQueueLen
+    /**
+     * `HandleMouseEvents`' `static i32 lastTime` (doc/CSBwin-src/Mouse.cpp:1351): the
+     * `d.Time` of the last turn or step it handled. Zeroed by its initialise call, which
+     * a game load makes (`SaveGame.cpp:1661`).
+     */
+    private lastInputTime = 0;
     /** The timer queue. Public like the other subsystems; `tools/` drives it. */
     readonly timerQueue: TimerQueue;
     /**
@@ -718,7 +736,7 @@ export class Game {
     runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
         this.clockTickCleared = false;
-        this.processMovementQueue(currentTime);
+        this.processMovementQueue();
 
         // Calculate time since last tick
         const timeSinceLastTick = currentTime - this.lastTickTime;
@@ -754,6 +772,10 @@ export class Game {
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
         // (doc/CSBwin-src/CSBCode.cpp:684).
         if (this.party.state.freezeLifeTimer !== 0) this.party.state.freezeLifeTimer--;
+        // `if (d.partyMoveDisableTimer != 0) d.partyMoveDisableTimer--;` and the same for
+        // `d.Word11712` (doc/CSBwin-src/CSBCode.cpp:689-695).
+        if (this.party.state.partyMoveDisableTimer !== 0) this.party.state.partyMoveDisableTimer--;
+        if (this.party.state.word11712 !== 0) this.party.state.word11712--;
 
         // Update party state in game state
         this.state.party = this.party.state;
@@ -790,6 +812,7 @@ export class Game {
                 }
             }
             this.party.applyMovement(result);
+            if (result.stepped) this.setPartyMoveDelay();
             if (resolvedPosition) {
                 const unchanged = oldPos.x === resolvedPosition.x
                     && oldPos.y === resolvedPosition.y
@@ -867,12 +890,57 @@ export class Game {
         this.timerSystem.processTimers(this.state.tickCount);
     }
 
-    private processMovementQueue(currentTime: number): void {
+    /**
+     * The tail of `MoveParty`'s step (doc/CSBwin-src/CSBCode.cpp:8326-8349), after
+     * `MoveObject` — so a champion a pit just killed no longer counts:
+     *
+     *   time2move = 1;
+     *   for (i = 0; i < d.NumCharacter; i++)
+     *     if (pCharacter->HP() != 0) time2move = sw(Larger(time2move, TimeToMove(pCharacter)));
+     *   ...d.partyMoveDisableTimer = time2move;   // unless a party-move filter set a delay
+     *   d.Word11712 = 0;
+     *
+     * A stairway is not a step: taking one sets neither.
+     */
+    private setPartyMoveDelay(): void {
+        const party = this.party.state;
+        let time2move = 1;
+        for (const champ of party.champions) {
+            if (champ.attributes.health !== 0) {
+                time2move = sw(Math.max(time2move, this.characterStats.timeToMove(champ)));
+            }
+        }
+        party.partyMoveDisableTimer = time2move;
+        party.word11712 = 0;
+    }
+
+    /**
+     * The movement half of `HandleMouseEvents` (doc/CSBwin-src/Mouse.cpp:1349), which
+     * the main loop calls with `delta = 1` (`CSBCode.cpp:748`). The head of the queue
+     * waits, rather than being dropped, while
+     *
+     * - an event was handled this tick: `lastTime != 0 && d.Time < lastTime + delta`
+     *   (`Mouse.cpp:1468-1476`) — one turn or step per tick;
+     * - it is a step and `d.partyMoveDisableTimer != 0`, or `d.Word11712 != 0` and the
+     *   step heads in direction `d.Word11714` (`:1482-1496`). Turns are never held.
+     *
+     * CSBWin's `lastTime` is stamped by every mouse event it handles, clicks included;
+     * the port queues only movement, so only a turn or a step stamps it (DEBT.md C13).
+     */
+    private processMovementQueue(): void {
         if (this.movementQueue.length === 0) return;
+        const time = this.state.tickCount;
+        if (this.lastInputTime !== 0 && time < this.lastInputTime + 1) return;
         const next = this.movementQueue[0];
-        if (!this.party.canMove(next, currentTime)) return;
+        const party = this.party.state;
+        const relDirection = MOVE_RELATIVE_DIRECTION[next];
+        if (relDirection !== undefined && (
+            party.partyMoveDisableTimer !== 0 ||
+            (party.word11712 !== 0 && ((party.facing + relDirection) & 3) === party.word11714)
+        )) return;
         this.movementQueue.shift();
         this.move(next);
+        this.lastInputTime = time;
     }
 
     /**
@@ -2620,7 +2688,7 @@ export class Game {
         const damage = this.applyLimits(40, 8 * mastery + (this.random.next() & 31), 200);
         const decayRate = Math.max(5, 11 - mastery);
 
-        return this.timerSystem.throwObjectFromHand(
+        const launched = this.timerSystem.throwObjectFromHand(
             obj,
             party.position,
             leftOrRight,
@@ -2630,6 +2698,11 @@ export class Game {
             overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,
             this.state.tickCount,
         );
+        // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (doc/CSBwin-src/Mouse.cpp:753-754):
+        // for 4 ticks the party cannot step after what it threw.
+        party.word11712 = 4;
+        party.word11714 = party.facing;
+        return launched;
     }
 
     /**
@@ -2775,6 +2848,9 @@ export class Game {
 
         this.state.paused = save.game.paused;
         this.state.tickCount = save.game.tickCount;
+        // `HandleMouseEvents(_16_, -999887)` — `lastTime = 0` (doc/CSBwin-src/SaveGame.cpp:1661,
+        // `Mouse.cpp:1372-1376`).
+        this.lastInputTime = 0;
         const now = Date.now();
         this.state.currentTime = now;
         this.state.startTime = now - save.game.elapsedTimeMs;

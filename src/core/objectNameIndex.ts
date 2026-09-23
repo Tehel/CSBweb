@@ -38,6 +38,8 @@ export const OBJNI_CHEST = 144;            // 0x90
 export const OBJNI_OPEN_CHEST = 145;       // 0x91
 export const OBJNI_BONES_A = 147;          // 0x93
 export const OBJNI_ELVEN_BOOTS = 119;      // 0x77
+/** `objNI_BootsOfSpeed` (`doc/CSBwin-src/Objects.h:639`). */
+export const OBJNI_BOOTS_OF_SPEED = 194;   // 0xc2
 export const OBJNI_GEM_OF_AGES = 120;      // 0x78
 export const OBJNI_EKKHARD_CROSS = 121;    // 0x79
 export const OBJNI_MOONSTONE = 122;        // 0x7a

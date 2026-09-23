@@ -2568,6 +2568,32 @@ turns the overshoot into `DamageCharacter(chIdx, over / 2, 0, 0)`. A turn is
 `TurnParty` (`:7854`), which charges nothing. Evidence: `tools/dump-party-collision.ts`
 case 7.
 
+## The move delay is `d.partyMoveDisableTimer`, in ticks, from the slowest living champion
+
+A step `MoveParty` takes — the `D5W == 0` arm, after `MoveObject` — sets
+`d.partyMoveDisableTimer` to `time2move`, which starts at 1 and takes `Larger` with
+`TimeToMove` of every champion whose `HP() != 0`, and clears `d.Word11712`
+(`doc/CSBwin-src/CSBCode.cpp:8315-8349`); a party-move filter's `PM_SETDELAY` /
+`PM_ADDDELAY` can override it (`:8122-8128`, `:8336-8346`). A stairway, taken by walking
+in or backing out, sets neither. `TimeToMove` (`:7003`) is 2, or 3 once
+`8 * load > 5 * MaxLoad`, while `MaxLoad > load`; otherwise
+`4 + ((4 * (load - MaxLoad)) & 0xffff) / MaxLoad`. `ouches & 32` adds 1 (2 when
+overloaded) and Boots of Speed (`objNI_BootsOfSpeed`, 0xc2, `Objects.h:639`) on the feet
+take 1 off. Each tick decrements the timer and `d.Word11712` while non-zero
+(`:689-695`). `HandleMouseEvents` (`Mouse.cpp:1349`), called by the main loop with
+`delta = 1` (`CSBCode.cpp:748`), leaves the head of the mouse queue in place — it is
+retried, not dropped — while `lastTime != 0 && d.Time < lastTime + delta`
+(`Mouse.cpp:1468-1476`), and, for buttons 3-6 (the steps), while
+`d.partyMoveDisableTimer != 0` or `d.Word11712 != 0` and
+`((d.partyFacing + button - 3) & 3) == d.Word11714` (`:1482-1496`). Every event it handles
+stamps `lastTime = d.Time`, so turns and steps run at most one per tick, and a turn
+(buttons 1-2, `TurnParty`) ignores the move delay. A throw ends
+`d.Word11712 = 4; d.Word11714 = d.partyFacing;` (`Mouse.cpp:753-754`): for 4 ticks the
+party cannot step in the direction it threw. `lastTime` is reset by the initialise call
+(`delta == -999887`, `:1372-1376`) a game load makes (`SaveGame.cpp:1661`); the three
+words are saved in `GAMEBLOCK2` (`SaveGame.cpp:1029-1031`, `:1645-1647`). Evidence:
+`tools/dump-party-collision.ts` case 8, `tools/dump-live-save-file.ts`.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the

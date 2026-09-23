@@ -24,7 +24,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } 
 import type { DungeonState } from './DungeonState';
 import type { Champion } from './gameTypes';
 import { determineMastery } from './skills';
-import { OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
+import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import { AttributeIndex, championAttribute } from './attributes';
 import { PotionType } from '../core/constants';
@@ -166,6 +166,32 @@ export class CharacterStats {
     maxLoad += 9;
     maxLoad = sw(maxLoad - ((maxLoad & 0xffff) % 10));
     return maxLoad;
+  }
+
+  /**
+   * `TimeToMove` (`doc/CSBwin-src/CSBCode.cpp:7003`) — the ticks this champion needs
+   * between steps. 2 unladen, 3 past five-eighths of `MaxLoad`, and past `MaxLoad`
+   * 4 plus a quarter-load per excess `MaxLoad`; a wounded foot (`ouches & 32`) adds 1,
+   * or 2 when overloaded, and Boots of Speed take 1 off.
+   */
+  timeToMove(champ: Champion): number {
+    const maxLoad = this.maxLoad(champ);
+    const load = this.characterLoad(champ);
+    let time: number;
+    let footPenalty: number;
+    if (maxLoad > load) {
+      time = 2;
+      if (8 * (load & 0xffff) > 5 * (maxLoad & 0xffff)) time++;
+      footPenalty = 1;
+    } else {
+      time = 4;
+      time = sw(time + div((4 * (load - maxLoad)) & 0xffff, maxLoad));
+      footPenalty = 2;
+    }
+    if (((champ.wounds ?? 0) & 32) !== 0) time = sw(time + footPenalty);
+    const feet = this.possession(champ, 5);
+    if (feet !== null && this.deps.nameIndex(feet) === OBJNI_BOOTS_OF_SPEED) time--;
+    return time;
   }
 
   /**

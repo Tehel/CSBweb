@@ -273,13 +273,7 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
  * the block (`doc/CSBwin-src/SaveGame.cpp:1010-1031`); this is the same list in the same
  * order, against this port's equivalents.
  *
- * Three fields have no equivalent here and are written as zero, which is recorded in
- * `PLAN.md` Phase 10:
- *
- * - `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44) — nothing in
- *   this port models them, and nothing reads them back either.
- *
- * And one is written in this port's own terms rather than the file's:
+ * One is written in this port's own terms rather than the file's:
  *
  * - `ObjectInHand` (8) is an RN, which in a file is a slot number in the object
  *   indirect index (`src/data/CsbwinObjectIndex.ts`). This returns the port's packed
@@ -306,9 +300,9 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
         item16QueLen: game.monsterSystem.getItem16QueLen(),
         lastMonsterAttackTime: party.lastMonsterAttackTime >>> 0,
         lastPartyMoveTime: runtime.game.footprints.lastPartyMoveTime >>> 0,
-        partyMoveDisableTimer: 0,
-        word11712: 0,
-        word11714: 0,
+        partyMoveDisableTimer: (party.partyMoveDisableTimer ?? 0) & 0xffff,
+        word11712: (party.word11712 ?? 0) & 0xffff,
+        word11714: (party.word11714 ?? 0) & 0xffff,
         maxItem16: runtime.dungeon.item16?.length ?? 0,
         timerSequence: runtime.dungeon.timerSequence ?? 0,
     };

@@ -55,9 +55,8 @@ export class MovementSystem {
      * @returns Movement result
      */
     move(action: MovementAction): MovementResult {
-        // Check timing - can we move yet?
-        const currentTime = Date.now();
-        if (!this.party.canMove(action, currentTime)) return { success: false };
+        // No timing gate here: `MoveParty` and `TurnParty` have none. The move delay is
+        // `HandleMouseEvents`', and so `Game.processMovementQueue`'s.
 
         // Handle turns (no collision detection needed)
         if (action === MovementAction.TURN_LEFT || action === MovementAction.TURN_RIGHT) {
@@ -171,6 +170,7 @@ export class MovementSystem {
         return {
             success: true,
             newPosition,
+            stepped: true,
         };
     }
 

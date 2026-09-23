@@ -67,7 +67,6 @@ export function handleMapCanvasClick(e: MouseEvent): void {
         position: new Position(gx, gy, state.position.z),
         moving: false,
         turning: false,
-        lastMoveTime: 0,
     });
     ctx.renderView();
     drawMapPreview(state.position.z);

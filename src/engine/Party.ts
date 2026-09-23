@@ -7,7 +7,7 @@
 
 import { ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion, MovementResult } from './gameTypes';
-import { GAME_TIMING, MovementAction } from './gameTypes';
+import { MovementAction } from './gameTypes';
 import { Direction as Dir } from '../core/types';
 
 /**
@@ -36,9 +36,11 @@ export class Party {
             numFootprintEnt: 0,
             lastMonsterAttackTime: -200,
             freezeLifeTimer: 0,
+            partyMoveDisableTimer: 0,
+            word11712: 0,
+            word11714: 0,
             moving: false,
             turning: false,
-            lastMoveTime: 0,
         };
     }
 
@@ -134,21 +136,6 @@ export class Party {
     }
 
     /**
-     * Check if enough time has passed since last movement
-     *
-     * @param action - Movement action
-     * @param currentTime - Current timestamp
-     * @returns True if movement is allowed
-     */
-    canMove(action: MovementAction, currentTime: number): boolean {
-        const delay = action === MovementAction.TURN_LEFT || action === MovementAction.TURN_RIGHT
-            ? GAME_TIMING.TURN_DELAY_MS
-            : GAME_TIMING.MOVE_DELAY_MS;
-
-        return currentTime - this.state.lastMoveTime >= delay;
-    }
-
-    /**
      * Apply validated movement
      *
      * This should only be called after collision detection has validated the move
@@ -171,9 +158,6 @@ export class Party {
             this.setFacing(result.newFacing);
             this.state.turning = true;
         }
-
-        // Update last move time
-        this.state.lastMoveTime = Date.now();
     }
 
     /**
@@ -231,9 +215,11 @@ export class Party {
             numFootprintEnt: state.numFootprintEnt ?? 0,
             lastMonsterAttackTime: state.lastMonsterAttackTime ?? -200,
             freezeLifeTimer: state.freezeLifeTimer ?? 0,
+            partyMoveDisableTimer: state.partyMoveDisableTimer ?? 0,
+            word11712: state.word11712 ?? 0,
+            word11714: state.word11714 ?? 0,
             moving: state.moving,
             turning: state.turning,
-            lastMoveTime: state.lastMoveTime,
         };
     }
 

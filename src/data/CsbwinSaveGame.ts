@@ -103,9 +103,13 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         numFootprintEnt: tail.numFootprintEnt,
         lastMonsterAttackTime: gb2.lastMonsterAttackTime,
         freezeLifeTimer: tail.freezeLifeTimer,
+        // `d.partyMoveDisableTimer = b.gb2.partyMoveDisableTimer`, `d.Word11712`,
+        // `d.Word11714` (doc/CSBwin-src/SaveGame.cpp:1645-1647).
+        partyMoveDisableTimer: gb2.partyMoveDisableTimer,
+        word11712: gb2.word11712,
+        word11714: gb2.word11714,
         moving: false,
         turning: false,
-        lastMoveTime: 0,
     };
 }
 

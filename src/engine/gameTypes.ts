@@ -253,13 +253,25 @@ export interface PartyState {
      * counted down one per game tick (`doc/CSBwin-src/CSBCode.cpp:684`).
      */
     freezeLifeTimer: ui8;
+    /**
+     * `d.partyMoveDisableTimer` — the ticks before the party may step again. A step sets
+     * it to the slowest living champion's `TimeToMove` (`doc/CSBwin-src/CSBCode.cpp:8326-8347`),
+     * each tick counts it down (`:689-692`), and `HandleMouseEvents` holds a queued step
+     * while it is non-zero (`doc/CSBwin-src/Mouse.cpp:1482-1491`). Turns ignore it.
+     */
+    partyMoveDisableTimer: i16;
+    /**
+     * `d.Word11712` / `d.Word11714` — a throw's move lock: for 4 ticks
+     * (`doc/CSBwin-src/Mouse.cpp:753-754`, counted down at `CSBCode.cpp:694-695`) a
+     * step heading in direction `word11714` — the facing the object was thrown in — is
+     * held, so the party cannot walk into its own missile.
+     */
+    word11712: i16;
+    word11714: i16;
 
     // Movement state
     moving: boolean;            // Is party currently moving?
     turning: boolean;           // Is party currently turning?
-
-    // Timing
-    lastMoveTime: number;       // Timestamp of last move (for throttling)
 }
 
 /**
@@ -268,8 +280,6 @@ export interface PartyState {
 export const GAME_TIMING = {
     VBL_FREQUENCY: 60,          // 60 Hz VBL timer
     TICKS_PER_SECOND: 4,        // ~4 game ticks per second
-    MOVE_DELAY_MS: 250,         // Minimum ms between moves
-    TURN_DELAY_MS: 200,         // Minimum ms between turns
 } as const;
 
 /**
@@ -297,6 +307,12 @@ export interface MovementResult {
      * `DiscardAllInput(); d.clockTick = 0;` follow (doc/CSBwin-src/CSBCode.cpp:8310-8314).
      */
     inhibited?: boolean;
+    /**
+     * `MoveParty`'s `D5W == 0` arm: the party stepped into the next cell (not a stairway),
+     * so `d.partyMoveDisableTimer` is set once `MoveObject` has run
+     * (doc/CSBwin-src/CSBCode.cpp:8315-8349).
+     */
+    stepped?: boolean;
     soundId?: number;           // Optional sound effect to play
     soundRateIdx?: number;      // Optional rate index for sound playback
 }

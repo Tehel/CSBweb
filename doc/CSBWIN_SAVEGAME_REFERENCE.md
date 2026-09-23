@@ -79,8 +79,8 @@ every one of them back: `buildBlock2` in `src/data/SaveGameLoader.ts` is the exa
 inverse of `parseBlock2`, and `buildBlock2FromGame` in `src/engine/SaveGamePayload.ts`
 fills the struct from the live game — the clock and seed, the party position group,
 `FirstAvailTimer` from `TimerQueue`'s free cursor, `ITEM16QueLen` from `MonsterSystem`,
-and both times. Three fields go out as zero because this port models nothing for them:
-`partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44). `ObjectInHand` (8)
+and both times, and `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44)
+from `PartyState`. `ObjectInHand` (8)
 goes out as an indirect slot number, re-encoded through the index `buildSavePayload`
 builds for the dungeon image beside it — the two have to be one numbering.
 

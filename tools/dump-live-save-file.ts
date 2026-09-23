@@ -198,6 +198,12 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     `${label}: the object on the cursor is the same record ` +
     `(${b.objectInHand ?? 'none'} vs ${a.objectInHand ?? 'none'})`);
   check(before.getTickCount() === after.getTickCount(), `${label}: the clock`);
+  // `gb2.partyMoveDisableTimer`, `Word11712`, `Word11714` (SaveGame.cpp:1029-1031, :1645-1647).
+  check(b.partyMoveDisableTimer === a.partyMoveDisableTimer && b.word11712 === a.word11712 &&
+    b.word11714 === a.word11714,
+    `${label}: the move delay and the throw's move lock ` +
+    `(${b.partyMoveDisableTimer}/${b.word11712}/${b.word11714} vs ` +
+    `${a.partyMoveDisableTimer}/${a.word11712}/${a.word11714})`);
 
   check(b.champions.length === a.champions.length && b.champions.length > 0,
     `${label}: ${b.champions.length} champions come back`);
@@ -389,10 +395,6 @@ function playFromDungeonDat(): Game {
   ];
   let moved = 0;
   for (const action of walk) {
-    // `MovementSystem.move` gates on `Party.canMove`, which is a **wall-clock**
-    // cooldown (`Date.now()`), so a tool that moves in a tight loop is refused after the
-    // first step. Clearing the stamp is the headless equivalent of waiting.
-    party.lastMoveTime = 0;
     if (game.move(action)) moved++;
     advance(game, 4);
   }
@@ -416,6 +418,9 @@ function playFromDungeonDat(): Game {
     const thrown = game.throwObjectFromCursor(0);
     console.log(`  threw 0x${(toThrow as number).toString(16)}: ${thrown}`);
     check(thrown, 'the object left the cursor as a missile');
+    // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (Mouse.cpp:753-754).
+    check(party.word11712 === 4 && party.word11714 === party.facing,
+      `the throw locks steps in its direction for 4 ticks (${party.word11712}, ${party.word11714})`);
   } else {
     fail('the first champion should have carried something to throw');
   }

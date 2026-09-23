@@ -17,6 +17,9 @@
  *   (`:8310-8314`).
  * - every attempted step costs each champion `3 * load / MaxLoad + 1` stamina, bump or
  *   not (`:8088-8101`, `:8129-8135`); a turn costs nothing.
+ * - a step sets a move delay, in ticks, from the slowest living champion's `TimeToMove`;
+ *   a throw locks steps in its direction for 4 ticks; one turn or step per tick
+ *   (`:8326-8349`, `Mouse.cpp:1468-1496`).
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -155,7 +158,6 @@ async function main(): Promise<void> {
   const stand = (): void => {
     game.party.state.position = new Position(scene!.px, scene!.py, level);
     game.party.setFacing(facing);
-    game.party.state.lastMoveTime = 0;
   };
 
   const rows: string[][] = [];
@@ -199,7 +201,6 @@ async function main(): Promise<void> {
   if (wall) {
     game.party.state.position = new Position(wall.px, wall.py, level);
     game.party.setFacing(wall.facing);
-    game.party.state.lastMoveTime = 0;
     lastResult = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const pos = game.party.state.position;
@@ -279,7 +280,6 @@ async function main(): Promise<void> {
     const standAtWall = (): void => {
       game.party.state.position = new Position(wall!.px, wall!.py, level);
       game.party.setFacing(wall!.facing);
-      game.party.state.lastMoveTime = 0;
       lastResult = undefined;
     };
     game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
   // one input queue is `movementQueue`. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1066-1077`), so the tick runs one frame later.
-  type Internals = { movementQueue: MovementAction[]; lastTickTime: number };
+  type Internals = { movementQueue: MovementAction[]; lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
   const T0 = Date.now() + 60_000;
   let discard: {
@@ -328,7 +328,9 @@ async function main(): Promise<void> {
     const queueAt = (px: number, py: number, dir: number, actions: MovementAction[]): void => {
       game.party.state.position = new Position(px, py, level);
       game.party.setFacing(dir);
-      game.party.state.lastMoveTime = 0;
+      // The headless equivalent of waiting out the last step's delay (case 8).
+      game.party.state.partyMoveDisableTimer = 0;
+      internals.lastInputTime = 0;
       internals.movementQueue.length = 0;
       for (const a of actions) game.enqueueMovement(a);
     };
@@ -377,7 +379,6 @@ async function main(): Promise<void> {
     const standAtWall = (): void => {
       game.party.state.position = new Position(wall!.px, wall!.py, level);
       game.party.setFacing(wall!.facing);
-      game.party.state.lastMoveTime = 0;
     };
     game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
     const champs = game.party.state.champions;
@@ -385,7 +386,6 @@ async function main(): Promise<void> {
     standAtWall();
     game.move(MovementAction.MOVE_FORWARD);
     const bump = st().map((s) => 100 - s);
-    game.party.state.lastMoveTime = 0;
     const beforeTurn = st();
     game.move(MovementAction.TURN_LEFT);
     const turn = st().map((s, i) => beforeTurn[i] - s);
@@ -424,6 +424,135 @@ async function main(): Promise<void> {
       stamina.exhaustedHp === Math.trunc((exhaustCost - 1) / 2),
       `the overshoot should come off health at half rate: ${Math.trunc((exhaustCost - 1) / 2)} (lost ${stamina.exhaustedHp})`,
     );
+  }
+
+  // ---- Case 8: the move delay is counted in ticks ---------------------------
+  // A step sets `d.partyMoveDisableTimer` to the slowest living champion's `TimeToMove`
+  // (doc/CSBwin-src/CSBCode.cpp:8326-8347), each tick counts it down (`:689-692`), and
+  // `HandleMouseEvents` holds a queued *step* while it is non-zero, or while a throw's
+  // `d.Word11712` lock is on and the step heads in direction `d.Word11714`
+  // (Mouse.cpp:1482-1496). Any turn or step also waits for the next tick
+  // (`d.Time < lastTime + 1`, `:1468-1476`). A turn ignores the move delay.
+  {
+    const open = (x: number, y: number): boolean =>
+      x >= 0 && y >= 0 && x < width && y < height && roomTypeAt(x, y) === RoomType.OPEN &&
+      (dungeon.getCellFlag(new Position(x, y, level)) & 0x10) === 0 && !monsterAt(x, y);
+    let run: { x: number; y: number; dir: number } | null = null;
+    for (let x = 0; x < width && !run; x++) {
+      for (let y = 0; y < height && !run; y++) {
+        for (let dir = 0; dir < 4 && !run; dir++) {
+          const [ddx, ddy] = DIRS[dir];
+          if (open(x, y) && open(x + ddx, y + ddy) && open(x + 2 * ddx, y + 2 * ddy)) run = { x, y, dir };
+        }
+      }
+    }
+    check(run !== null, 'the level should have three open, empty cells in a row');
+    if (run) {
+      const party = game.party.state;
+      party.champions = [champion(0), champion(1), champion(2), champion(3)];
+      party.position = new Position(run.x, run.y, level);
+      game.party.setFacing(run.dir);
+      party.partyMoveDisableTimer = 0;
+      party.word11712 = 0;
+      internals.lastInputTime = 0;
+      internals.movementQueue.length = 0;
+      let t = T0 + 100_000;
+      const frame = (tickDue: boolean): void => {
+        t += 17;
+        internals.lastTickTime = tickDue ? t - 1000 : t;
+        game.runFrame(t);
+      };
+      const stepsFrom = (): number => Math.abs(party.position.x - run!.x) + Math.abs(party.position.y - run!.y);
+
+      game.enqueueMovement(MovementAction.MOVE_FORWARD);
+      game.enqueueMovement(MovementAction.MOVE_FORWARD);
+      frame(false);
+      const firstStep = stepsFrom();
+      const delayAfterStep = party.partyMoveDisableTimer;
+      const ticks0 = game.state.tickCount;
+      frame(false);
+      const heldSameTick = stepsFrom();
+      let frames = 0;
+      while (stepsFrom() < 2 && frames < 40) {
+        frame(frames % 2 === 1);
+        frames++;
+      }
+      const ticksToSecond = game.state.tickCount - ticks0;
+
+      // A turn waits for the next tick, but not for the move delay.
+      game.enqueueMovement(MovementAction.TURN_LEFT);
+      frame(false);
+      const turnedSameTick = party.facing !== run.dir;
+      frame(true);
+      frame(false);
+      const turnedUnderDelay = party.facing !== run.dir && party.partyMoveDisableTimer !== 0;
+
+      // The throw lock holds a step in the thrown direction and lets others through.
+      internals.movementQueue.length = 0;
+      party.partyMoveDisableTimer = 0;
+      party.word11712 = 4;
+      party.word11714 = party.facing;
+      game.enqueueMovement(MovementAction.MOVE_FORWARD);
+      frame(true);
+      frame(false);
+      const lockHeld = internals.movementQueue.length === 1;
+      internals.movementQueue.length = 0;
+      game.enqueueMovement(MovementAction.MOVE_BACKWARD);
+      frame(true);
+      frame(false);
+      const otherWayPassed = internals.movementQueue.length === 0;
+      party.word11712 = 0;
+      internals.movementQueue.length = 0;
+
+      // `TimeToMove` (CSBCode.cpp:7003) and the slowest-living rule.
+      const stats = game.characterStats;
+      const realLoad = stats.characterLoad.bind(stats);
+      const c0 = party.champions[0];
+      const max = stats.maxLoad(c0);
+      const ttm = (load: number, wounds = 0): number => {
+        stats.characterLoad = () => load;
+        c0.wounds = wounds;
+        const v = stats.timeToMove(c0);
+        c0.wounds = 0;
+        return v;
+      };
+      const table = {
+        empty: ttm(0), laden: ttm(Math.trunc((max * 6) / 8)), over: ttm(Math.trunc((max * 3) / 2)),
+        emptyFoot: ttm(0, 32), overFoot: ttm(Math.trunc((max * 3) / 2), 32),
+      };
+      const overExpected = sw(4 + Math.trunc(((4 * (Math.trunc((max * 3) / 2) - max)) & 0xffff) / max));
+      // Champion 1 laden, champion 2 overloaded but dead: the delay is champion 1's.
+      stats.characterLoad = (c: Champion) =>
+        c === party.champions[1] ? Math.trunc((max * 6) / 8) : c === party.champions[2] ? max * 2 : 0;
+      party.champions[2].attributes.health = 0;
+      party.position = new Position(run.x, run.y, level);
+      game.party.setFacing(run.dir);
+      game.move(MovementAction.MOVE_FORWARD);
+      const slowestLiving = party.partyMoveDisableTimer;
+      stats.characterLoad = realLoad;
+
+      console.log(
+        `move delay: first step ${firstStep}, delay ${delayAfterStep}, second step held in the same tick ` +
+          `${heldSameTick === 1}, taken after ${ticksToSecond} tick(s); a turn in the same tick ${turnedSameTick}, ` +
+          `under the delay ${turnedUnderDelay}; throw lock held ${lockHeld}, the other way passed ${otherWayPassed}`,
+      );
+      console.log(`TimeToMove: ${JSON.stringify(table)} (over expected ${overExpected}); slowest living ${slowestLiving}`);
+      console.log('');
+
+      check(firstStep === 1, 'the first queued step should be taken at once');
+      check(delayAfterStep === 2, `an unladen party's step should set a delay of 2 ticks (${delayAfterStep})`);
+      check(heldSameTick === 1, 'the second step should be held while the delay runs');
+      check(ticksToSecond === 2, `the second step should come 2 ticks after the first (${ticksToSecond})`);
+      check(!turnedSameTick, 'a turn should wait for the next tick (one event per tick)');
+      check(turnedUnderDelay, 'a turn should not wait for the move delay');
+      check(lockHeld, "a step in the thrown direction should be held while d.Word11712 is set");
+      check(otherWayPassed, 'a step the other way should not be held by the throw lock');
+      check(table.empty === 2 && table.laden === 3 && table.over === overExpected,
+        `TimeToMove should be 2 unladen, 3 past 5/8 of MaxLoad, ${overExpected} overloaded (${JSON.stringify(table)})`);
+      check(table.emptyFoot === 3 && table.overFoot === overExpected + 2,
+        'a wounded foot should add 1, or 2 when overloaded');
+      check(slowestLiving === 3, `the delay should be the slowest *living* champion's (${slowestLiving})`);
+    }
   }
 
   // ---- Assertions ---------------------------------------------------------

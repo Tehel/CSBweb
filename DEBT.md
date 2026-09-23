@@ -519,13 +519,21 @@ Found while re-reading `MoveParty` for C5; none is fixed yet. All in
   blocked step as much as for a taken one. Now `MovementSystem.chargeStamina`, at the top
   of every move (turns are free). Evidence: `tools/dump-party-collision.ts` case 7 (4 of
   26 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
-- **The move delay.** A taken step sets `d.partyMoveDisableTimer` to the slowest living
+- ✅ **The move delay.** A taken step sets `d.partyMoveDisableTimer` to the slowest living
   champion's `TimeToMove` (`:8326-8347`); the tick counts it down (`:689-692`), and
   `Mouse.cpp:1482-1491` refuses a step while it is non-zero — or while `d.Word11712` is
-  set and the step heads towards `d.Word11714`. The port gates on wall-clock
-  milliseconds instead (`Party.canMove`, `GAME_TIMING.MOVE_DELAY_MS` / `TURN_DELAY_MS`).
-  `PLAN.md` Phase 10 already lists `partyMoveDisableTimer` as not modelled for saves;
-  modelling it closes both.
+  set and the step heads towards `d.Word11714`. The wall-clock gate (`Party.canMove`,
+  `GAME_TIMING.MOVE_DELAY_MS` / `TURN_DELAY_MS`, `lastMoveTime`) is gone:
+  `Game.processMovementQueue` holds a step on the timer or the throw lock, and any turn or
+  step on `HandleMouseEvents`' one-event-per-tick `lastTime` (`Mouse.cpp:1468-1476`);
+  `Game.setPartyMoveDelay` is the step's tail, `CharacterStats.timeToMove` is
+  `TimeToMove`, and a throw sets the lock. All three words are `PartyState` fields, saved
+  and loaded, which closes `PLAN.md` Phase 10's gap. Evidence:
+  `tools/dump-party-collision.ts` case 8 (it crashes before), `tools/dump-live-save-file.ts`
+  (2 of 191 checks fail before); the fact is in `doc/PROVEN_FACTS.md`. **Left:** CSBWin
+  stamps `lastTime` for every mouse event, clicks included; the port queues only
+  movement, so a click does not hold the next turn or step to the next tick — part of the
+  queue-depth bullet below.
 - **The key queue holds two keys, not three.** `CSBUI.cpp:143-145` is a 3-slot ring that
   refuses a key when `next == keyQueueStart` (`:1131-1139`); `Game.movementQueueLen` is 3
   and the port's check lets three in.

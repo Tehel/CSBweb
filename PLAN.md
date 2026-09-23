@@ -213,7 +213,7 @@ writes a whole file**. Against the sixteen-block write order in
 | --- | --- | --- |
 | 0 | Extended Features, `dataTypeMap`/`dataIndexMap`, DSA blocks | ✅ written and byte-identical to all fourteen saves — header, both maps, the game info and the DSA level index with its 0xff terminator. `buildObjectIndirectIndex` builds the maps for a world this port holds, which is what blocks 10-13 will encode their RNs through |
 | 1 | GAMEBLOCK1 | ✅ |
-| 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. Three go out as zero because nothing models them: `partyMoveDisableTimer` (40), `Word11712` (42), `Word11714` (44). `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image |
+| 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44) are `PartyState`'s since DEBT.md C13. `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image |
 | 3 | ITEM16 | ✅ |
 | 4 | characters + party tail | ✅ byte-identical to all fourteen committed saves, the thirty possession slots included — they go out through `encodeRN` as slot numbers |
 | 5 | timers | ✅ the whole 16-byte `TIMER`, in all three sizes, byte-identical bar `unused13` in a freed slot |
@@ -310,10 +310,10 @@ above 1023 cannot be expressed. All three are detailed under step 12.
 
 **Deferred by the block-2 work (September 13th):**
 
-- ⏳ **`partyMoveDisableTimer`, `Word11712` and `Word11714`** (`GAMEBLOCK2` offsets 40,
-  42, 44) are written as zero. This port models no equivalent of any of them, and the
-  loader restores none of them either, so the three are symmetrical gaps rather than a
-  writer defect.
+- ✅ **Resolved: `partyMoveDisableTimer`, `Word11712` and `Word11714`** (`GAMEBLOCK2`
+  offsets 40, 42, 44) are `PartyState` fields since `DEBT.md` C13 modelled the move delay
+  and the throw's move lock; both the writer and the loader carry them
+  (`tools/dump-live-save-file.ts` round-trips them).
 - ✅ **Resolved: `ObjectInHand`** (offset 8) goes out as an indirect slot number, through
   the index `buildSavePayload` builds for the image — the same one block 4's thirty
   possession slots use, which was always the same dependency rather than two.

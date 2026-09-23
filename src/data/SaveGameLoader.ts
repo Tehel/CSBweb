@@ -164,10 +164,11 @@ export interface Block2 {
   item16QueLen: number;
   lastMonsterAttackTime: number;
   lastPartyMoveTime: number;
+  /** `gb2.partyMoveDisableTimer` (offset 40) — `PartyState.partyMoveDisableTimer`. */
   partyMoveDisableTimer: number;
-  /** `gb2.Word11712` (offset 42). Nothing in this port models it yet. */
+  /** `gb2.Word11712` (offset 42) — `PartyState.word11712`, a throw's move lock. */
   word11712: number;
-  /** `gb2.Word11714` (offset 44). Nothing in this port models it yet. */
+  /** `gb2.Word11714` (offset 44) — `PartyState.word11714`, the direction it locks. */
   word11714: number;
   maxItem16: number;
   timerSequence: number;
