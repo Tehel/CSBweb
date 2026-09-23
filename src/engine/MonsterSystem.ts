@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -309,28 +309,13 @@ export class MonsterSystem {
       for (let mapY = 0; mapY < height; mapY++) {
         const position = new Position(mapX, mapY, level);
         if (!this.dungeon.hasObjects(position)) continue;
-        const rn = this.findFirstMonsterAt(position);
+        const rn = this.dungeon.findFirstMonster(position);
         if (rn === OBJECT_ID_EOF) continue;
         this.deleteMonsterMovementTimers(mapX, mapY, level);
         this.attachItem16ToMonster(rn, mapX, mapY);
         this.startMonsterMovementTimers(mapX, mapY, level);
       }
     }
-  }
-
-  /**
-   * `FindFirstMonster` (`doc/CSBwin-src/Code11f52.cpp:533`) — the first creature in
-   * the cell's object chain, or `OBJECT_ID_EOF`.
-   */
-  findFirstMonsterAt(position: Position): ObjectID {
-    for (
-      let rn = this.dungeon.findFirstObject(position);
-      rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-      rn = this.dungeon.getDBRecordLink(rn)
-    ) {
-      if (decodeObjectID(rn).category === DBType.CREATURE) return rn;
-    }
-    return OBJECT_ID_EOF;
   }
 
   /* ---------------------------------------------------------------- timers ---- */
@@ -362,7 +347,7 @@ export class MonsterSystem {
    */
   startMonsterMovementTimers(mapX: number, mapY: number, level: number): void {
     const position = new Position(mapX, mapY, level);
-    const rn = this.findFirstMonsterAt(position);
+    const rn = this.dungeon.findFirstMonster(position);
     let uByte5 = 255;
 
     if (rn !== OBJECT_ID_EOF) {
@@ -536,7 +521,7 @@ export class MonsterSystem {
       destLevel === partyLevel &&
       destination.x === (this.getPartyState().position.x | 0) &&
       destination.y === (this.getPartyState().position.y | 0);
-    const occupant = this.findFirstMonsterAt(destination);
+    const occupant = this.dungeon.findFirstMonster(destination);
     if (blockedByParty || occupant !== OBJECT_ID_EOF) {
       if (fromDungeon) this.deleteMonsterMovementTimers(oldX, oldY, level);
       if (item16Attached) this.detachItem16(monster.groupIndex);
@@ -669,7 +654,7 @@ export class MonsterSystem {
     for (;;) {
       const free =
         !(level === partyLevel && (party.x | 0) === mapX && (party.y | 0) === mapY) &&
-        this.findFirstMonsterAt(new Position(mapX, mapY, level)) === OBJECT_ID_EOF;
+        this.dungeon.findFirstMonster(new Position(mapX, mapY, level)) === OBJECT_ID_EOF;
       if (free) {
         if (timer.function === TimerFunction.TT_61) {
           this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);

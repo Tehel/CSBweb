@@ -225,7 +225,7 @@ export class MonsterAI {
     // set some of these things." (doc/CSBwin-src/Monster.cpp:3298-3305)
     s.monsterMoveInhibit.fill(0);
 
-    const monsterRn = this.deps.monsters.findFirstMonsterAt(new Position(mapX, mapY, level));
+    const monsterRn = this.deps.dungeon.findFirstMonster(new Position(mapX, mapY, level));
 
     this.trace(
       `MonsterAI [0x${(monsterRn === OBJECT_ID_EOF ? 0xffff : monsterRn).toString(16).padStart(4, '0')}] ` +

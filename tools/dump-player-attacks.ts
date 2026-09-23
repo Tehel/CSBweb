@@ -165,7 +165,7 @@ async function main(): Promise<void> {
     const level = 3;
     standParty(game, level, 3, 2, 0); // facing north, into (3,1)
 
-    const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level));
+    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
     if (monsterRn === OBJECT_ID_EOF) {
       console.log('(no monster at (3,1) on level 3 — skipping)');
     } else {
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
       giveSword(game, 0);
       const champ = game.party.state.champions[0]!;
 
-      const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level));
+      const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
       const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
       if (!monster) { console.log('(no monster at (3,1) — skipping)'); break; }
 
@@ -248,16 +248,16 @@ async function main(): Promise<void> {
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
     const champ = game.party.state.champions[0]!;
-    const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level));
+    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
     const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
     const hpBefore = monster ? [...monster.hp] : [];
     let swings = 0;
     for (; swings < 3000; swings++) {
       champ.attributes.stamina = champ.attributes.maxStamina;
       swingOnce(game, 0, AttackType.atk_SWING);
-      if (game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level)) === OBJECT_ID_EOF) break;
+      if (game.dungeonState.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF) break;
     }
-    const cleared = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level)) === OBJECT_ID_EOF;
+    const cleared = game.dungeonState.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF;
     console.log(`\ngroup hp [${hpBefore.join(',')}] wiped after ${cleared ? swings + 1 : '(never)'} swings`);
     check(cleared, 'sustained melee eventually kills the group');
   }
@@ -312,7 +312,7 @@ async function main(): Promise<void> {
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
 
-    const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level));
+    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
     const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
     if (!monster) {
       console.log('(no monster to convert — skipping)');
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
     const level = 3;
     standParty(game, level, 3, 2, 0);
 
-    const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(3, 1, level));
+    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
     const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
     if (!monster) {
       console.log('(no monster at (3,1) — skipping)');

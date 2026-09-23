@@ -592,7 +592,7 @@ export class Game {
 
         // Initialize movement system
         this.movementSystem = new MovementSystem(this.party, this.dungeonState, {
-            findFirstMonster: (position) => this.monsterSystem.findFirstMonsterAt(position),
+            findFirstMonster: (position) => this.dungeonState.findFirstMonster(position),
             activateMonster: (position) => {
                 this.monsterAI.processTimers29to41({
                     mapX: position.x,

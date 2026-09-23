@@ -852,8 +852,8 @@ export class TimerSystem {
       //
       // A sideways door catches anything (`D1W = 1`); an up-down one only catches a
       // monster at least as tall as the gap that is left.
-      const monsterRn = this.findFirstMonsterAt(target);
-      if (monsterRn !== null) {
+      const monsterRn = this.dungeon.findFirstMonster(target);
+      if (monsterRn !== OBJECT_ID_EOF) {
         const creature = this.dungeon.getCreatureRecord(monsterRn);
         const desc = creature ? this.tables?.monsterDesc?.[creature.creatureType] : undefined;
         if (creature && desc && !monsterNonMaterial(desc)) {
@@ -1669,8 +1669,8 @@ export class TimerSystem {
         }
       }
 
-      const monster = this.findFirstMonsterAt(current);
-      if (monster !== null) {
+      const monster = this.dungeon.findFirstMonster(current);
+      if (monster !== OBJECT_ID_EOF) {
         if (this.processMissileEncounter(-1, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
           this.clearMissileFilterState();
           return;
@@ -2065,8 +2065,8 @@ export class TimerSystem {
         return this.finishMissileEncounter(missileRn, absorbedMonster, position, objectPos, projectile, convertedPotion, convertedPower, nonPoisonSpell, objX, objY);
       }
       case -1: {
-        const monsterRn = this.findFirstMonsterAt(position);
-        if (monsterRn === null) return false;
+        const monsterRn = this.dungeon.findFirstMonster(position);
+        if (monsterRn === OBJECT_ID_EOF) return false;
         const monster = this.dungeon.getCreatureRecord(monsterRn);
         if (monster) {
           const monsterOrdinal = this.ordinalOfMonsterAtPosition(monster, objectPos);
@@ -2350,8 +2350,8 @@ export class TimerSystem {
       return;
     }
 
-    const monsterRn = this.findFirstMonsterAt(new Position(objX, objY, position.z));
-    if (monsterRn === null) return;
+    const monsterRn = this.dungeon.findFirstMonster(new Position(objX, objY, position.z));
+    if (monsterRn === OBJECT_ID_EOF) return;
     const monster = this.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return;
     const desc = this.tables?.monsterDesc?.[monster.creatureType];
@@ -2397,8 +2397,8 @@ export class TimerSystem {
     const partyHere =
       timer.level === party.position.z && x === party.position.x && y === party.position.y;
 
-    const monsterRn = this.findFirstMonsterAt(position);
-    const monster = monsterRn !== null ? this.dungeon.getCreatureRecord(monsterRn) : null;
+    const monsterRn = this.dungeon.findFirstMonster(position);
+    const monster = monsterRn !== OBJECT_ID_EOF ? this.dungeon.getCreatureRecord(monsterRn) : null;
     const monsterType = monster ? monster.creatureType : -1;
     const desc = monster ? this.tables?.monsterDesc?.[monsterType] : null;
 
@@ -2710,14 +2710,6 @@ export class TimerSystem {
     this.actuators.triggerObjectMove(resolved.position, dropped, true, false, this.getPartyState().facing);
   }
 
-  private findFirstMonsterAt(position: Position): number | null {
-    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      const decoded = decodeObjectID(rn);
-      if (decoded.category === DBType.CREATURE) return rn;
-    }
-    return null;
-  }
-
   private getMissileTimerWord8(missile: { timerIndex: number }): number | null {
     return this.timers.getTimerWord8(missile.timerIndex);
   }
@@ -2746,8 +2738,8 @@ export class TimerSystem {
       this.wiggleParty(position);
     }
 
-    const monster = this.findFirstMonsterAt(position);
-    if (monster !== null) {
+    const monster = this.dungeon.findFirstMonster(position);
+    if (monster !== OBJECT_ID_EOF) {
       this.wiggleMonster(monster, position);
     }
 

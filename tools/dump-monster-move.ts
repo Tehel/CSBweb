@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     const [dx, dy] = [[0,-1],[1,0],[0,1],[-1,0]].find(([ddx, ddy]) =>
       isOpen(mx + ddx!, my + ddy!) && !monsterAt(mx + ddx!, my + ddy!))!;
     const nx = mx + dx!, ny = my + dy!;
-    const rn = game.monsterSystem.findFirstMonsterAt(new Position(mx, my, level));
+    const rn = game.dungeonState.findFirstMonster(new Position(mx, my, level));
 
     const timersBefore = game.timerQueue.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     const a = pair[0]!, b = pair[1]!;
     const ax = a.slot.uByte10, ay = a.slot.uByte11;
     const bx = b.slot.uByte10, by = b.slot.uByte11;
-    const rn = game.monsterSystem.findFirstMonsterAt(new Position(ax, ay, level));
+    const rn = game.dungeonState.findFirstMonster(new Position(ax, ay, level));
     if (rn !== OBJECT_ID_EOF && !(ax === bx && ay === by)) {
       console.log(`Case 2 — move a group from (${ax},${ay}) onto the occupied (${bx},${by})`);
       const result = game.monsterSystem.moveMonster(rn, ax, ay, bx, by, level);
@@ -148,7 +148,7 @@ async function main(): Promise<void> {
       check(still.length === 1, 'the group should still be waiting');
 
       // Now clear the destination and retry: it should be placed.
-      const bRn = game.monsterSystem.findFirstMonsterAt(new Position(bx, by, level));
+      const bRn = game.dungeonState.findFirstMonster(new Position(bx, by, level));
       dungeon.removeObjectFromCell(new Position(bx, by, level), bRn);
       const t2 = still[0]!;
       game.timerQueue.deleteTimer(t2.index);

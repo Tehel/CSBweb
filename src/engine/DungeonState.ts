@@ -612,6 +612,17 @@ export class DungeonState {
         return OBJECT_ID_EOF;
     }
 
+    /**
+     * `FindFirstMonster` (doc/CSBwin-src/Code11f52.cpp:533, :604) — the first creature in
+     * the cell's object chain, or `OBJECT_ID_EOF`.
+     */
+    findFirstMonster(position: Position): ObjectID {
+        for (let rn = this.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.getDBRecordLink(rn)) {
+            if (decodeObjectID(rn).category === DBType.CREATURE) return rn;
+        }
+        return OBJECT_ID_EOF;
+    }
+
     getTextRecord(rn: ObjectID): TextRecord | null {
         const { category, index } = decodeObjectID(rn);
         if (category !== DBType.TEXT) return null;

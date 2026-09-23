@@ -392,7 +392,7 @@ export class MonsterDamage {
    */
   deleteMonster(level: number, mapX: number, mapY: number): void {
     const position = new Position(mapX, mapY, level);
-    const rn = this.findFirstMonsterAt(position);
+    const rn = this.dungeon.findFirstMonster(position);
     if (rn === OBJECT_ID_EOF) return;
     const monster = this.dungeon.getCreatureRecord(rn);
     if (!monster) return;
@@ -526,7 +526,7 @@ export class MonsterDamage {
     if (numMonM1 === 0) {
       // The last member of the group.
       if (apply) {
-        const rn = this.findFirstMonsterAt(new Position(attackX, attackY, level));
+        const rn = this.dungeon.findFirstMonster(new Position(attackX, attackY, level));
         if (rn !== OBJECT_ID_EOF) {
           this.dropMonsterRemains(level, attackX, attackY, rn, 2, level, dropResidue);
         }
@@ -706,17 +706,6 @@ export class MonsterDamage {
       const position = this.pendingDroppings.pop()!;
       this.createAndDropObject(monsterType, level, newX, newY, position, 2);
     }
-  }
-
-  private findFirstMonsterAt(position: Position): ObjectID {
-    for (
-      let rn = this.dungeon.findFirstObject(position);
-      rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-      rn = this.dungeon.getDBRecordLink(rn)
-    ) {
-      if (decodeObjectID(rn).category === DBType.CREATURE) return rn;
-    }
-    return OBJECT_ID_EOF;
   }
 
   private getDesc(monster: CreatureRecord): MonsterDesc | null {

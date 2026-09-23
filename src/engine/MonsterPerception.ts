@@ -505,7 +505,7 @@ export class MonsterPerception {
       }
     }
 
-    probe.monsterInTheWay = this.findFirstMonsterAt(target);
+    probe.monsterInTheWay = this.dungeon.findFirstMonster(target);
     probe.possible = probe.monsterInTheWay === OBJECT_ID_EOF;
     return probe;
   }
@@ -628,17 +628,6 @@ export class MonsterPerception {
   }
 
   /* ------------------------------------------------------------- internals ---- */
-
-  private findFirstMonsterAt(position: Position): ObjectID {
-    for (
-      let rn = this.dungeon.findFirstObject(position);
-      rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-      rn = this.dungeon.getDBRecordLink(rn)
-    ) {
-      if (decodeObjectID(rn).category === DBType.CREATURE) return rn;
-    }
-    return OBJECT_ID_EOF;
-  }
 
   /**
    * `MonsterAllowedOnLevel` — the destination level's `monsterTypes` list gates which

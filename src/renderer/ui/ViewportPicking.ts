@@ -8,7 +8,7 @@
  * rather than projecting the click back into the dungeon.
  */
 import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, ObjectID, RoomType, decodeObjectID } from '../../core/types';
+import { OBJECT_ID_EOF, ObjectID, RoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { GraphicRoomType } from '../bytecode/Types';
@@ -230,7 +230,7 @@ export function getPickupCellForRelativePos(ui: UIState, relativeLocation: numbe
 
 export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, position: Position): boolean {
   if (!ui.partyState || relativeLocation < 2) return false;
-  const rn = findFirstMonsterAt(ui, position);
+  const rn = ui.dungeonState.findFirstMonster(position);
   if (rn === OBJECT_ID_EOF) return false;
   const creature = ui.dungeonState.getCreatureRecord(rn);
   if (!creature || isMonsterLevitating(ui, creature)) return false;
@@ -240,14 +240,6 @@ export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, p
   // is attached the live positions live there and `groupIndex` is the slot number.
   const positions = ui.dungeonState.getMonsterRenderState(creature).positions;
   return monsterOccupiesPosition(positions, absPos, monsterCount);
-}
-
-export function findFirstMonsterAt(ui: UIState, position: Position): ObjectID {
-  for (let rn = ui.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = ui.dungeonState.getDBRecordLink(rn)) {
-    const { category } = decodeObjectID(rn);
-    if (category === DBType.CREATURE) return rn;
-  }
-  return OBJECT_ID_EOF;
 }
 
 export function isMonsterLevitating(ui: UIState, creature: CreatureRecord): boolean {

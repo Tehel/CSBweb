@@ -415,16 +415,7 @@ export class AttackSystem {
 
   /** `FindFirstMonster(x, y)` on the party's level. */
   private findFirstMonsterAt(mapX: number, mapY: number): ObjectID {
-    const party = this.deps.getPartyState();
-    const position = new Position(mapX, mapY, party.position.z);
-    for (
-      let rn = this.deps.dungeon.findFirstObject(position);
-      rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-      rn = this.deps.dungeon.getDBRecordLink(rn)
-    ) {
-      if (decodeObjectID(rn).category === DBType.CREATURE) return rn;
-    }
-    return OBJECT_ID_EOF as ObjectID;
+    return this.deps.dungeon.findFirstMonster(new Position(mapX, mapY, this.deps.getPartyState().position.z));
   }
 
   /**

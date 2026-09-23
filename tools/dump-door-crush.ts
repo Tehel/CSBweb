@@ -195,7 +195,7 @@ async function main(): Promise<void> {
   let moved: { rn: number; type: number } | null = null;
   for (let x = 0; x < width && !moved; x++) {
     for (let y = 0; y < height && !moved; y++) {
-      const rn = game.monsterSystem.findFirstMonsterAt(new Position(x, y, level));
+      const rn = game.dungeonState.findFirstMonster(new Position(x, y, level));
       if (rn === OBJECT_ID_EOF) continue;
       const rec = dungeon.getCreatureRecord(rn);
       if (!rec) continue;
@@ -209,7 +209,7 @@ async function main(): Promise<void> {
   if (!moved) throw new Error(`could not move a material monster onto the door on level ${level}`);
 
   const creature = dungeon.getCreatureRecord(
-    game.monsterSystem.findFirstMonsterAt(new Position(door.x, door.y, level)),
+    game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)),
   );
   const desc = objectTables.monsterDesc[moved.type];
   const vSize = monsterVerticalSize(desc);
@@ -227,11 +227,11 @@ async function main(): Promise<void> {
     tick();
     states.push(doorStateAt(door.x, door.y));
     hpTrace.push(hpTotal());
-    if (game.monsterSystem.findFirstMonsterAt(new Position(door.x, door.y, level)) === OBJECT_ID_EOF) break;
+    if (game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)) === OBJECT_ID_EOF) break;
   }
   console.log(`  door state per tick: ${states.join(' ')}`);
   console.log(`  group HP per tick:   ${hpTrace.join(' ')}`);
-  const stillThere = game.monsterSystem.findFirstMonsterAt(new Position(door.x, door.y, level)) !== OBJECT_ID_EOF;
+  const stillThere = game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)) !== OBJECT_ID_EOF;
   console.log(`  monster still under the door: ${stillThere}`);
   console.log('');
 

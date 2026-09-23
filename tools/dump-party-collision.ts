@@ -96,7 +96,7 @@ async function main(): Promise<void> {
   const roomTypeAt = (x: number, y: number): number =>
     (dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7;
   const monsterAt = (x: number, y: number): boolean =>
-    game.monsterSystem.findFirstMonsterAt(new Position(x, y, level)) !== OBJECT_ID_EOF;
+    game.dungeonState.findFirstMonster(new Position(x, y, level)) !== OBJECT_ID_EOF;
 
   // Find a monster with an open, monster-free neighbour: the party stands on the
   // neighbour and walks into the monster. Real dungeon geometry throughout.
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   const dx = scene.mx - scene.px;
   const dy = scene.my - scene.py;
   const facing = dy === -1 ? 0 : dx === 1 ? 1 : dy === 1 ? 2 : 3;
-  const monsterRn = game.monsterSystem.findFirstMonsterAt(new Position(scene.mx, scene.my, level));
+  const monsterRn = game.dungeonState.findFirstMonster(new Position(scene.mx, scene.my, level));
   const creature = dungeon.getCreatureRecord(monsterRn)!;
 
   console.log(
@@ -214,7 +214,7 @@ async function main(): Promise<void> {
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x === scene.mx && y === scene.my) continue;
-        const rn = game.monsterSystem.findFirstMonsterAt(new Position(x, y, level));
+        const rn = game.dungeonState.findFirstMonster(new Position(x, y, level));
         if (rn !== OBJECT_ID_EOF) return rn;
       }
     }
