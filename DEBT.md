@@ -72,7 +72,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C5 | Three movement deferrals | M | ✅ |
 | C6 | Which generator cloud and missile sprites flip with | S | ✅ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ✅ |
-| C8 | Phase 8 DSA leftovers | M | ⚠️ re-audit |
+| C8 | Phase 8 DSA leftovers | M | ⚠️ bullet 1 paid |
 | C9 | Door pass-through rules and magic formulas | M | ⚠️ re-audit |
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
@@ -276,7 +276,7 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
 
 ### C6 ✅ Which generator cloud and missile sprites flip with
 
-**Paid in `<C6>`.** Missiles were already right: CSBWin derives their mirror and flip from
+**Paid in `d9877ef`.** Missiles were already right: CSBWin derives their mirror and flip from
 the graphic's `word4`, the timer's direction, the relative position and `(mapX+mapY)&1`
 (`Code51a4.cpp:2356-2465`), with no randomness, and `drawMissilesAtPosition` already did
 that. Clouds were wrong three ways: they rolled `GraphicRandom` instead of the viewport's
@@ -321,7 +321,34 @@ Evidence: `tools/dump-monster-move.ts` case 4 (3 of 18 checks fail before); the 
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → "Phase 12 — Monsters".</sub>
 
-### C8 ⚠️ Phase 8 DSA leftovers *(re-audit)*
+### C8 ⚠️ Phase 8 DSA leftovers
+
+Re-audited 2026-09-23. The first bullet was not DSA at all but the actuator local action;
+it is **paid in `600811e`**. What is left of the second is narrower than it read.
+
+- ✅ **`PerformLocalAction`'s champion.** `SkillIncreaser` (`Mouse.cpp:209-230`) credits
+  `d.HandChar`, the cursor's owner; the port matched a living champion's `partyPosition`
+  against the actuator's wall position. And `PressurePadOrAlcove` passes `-1`, not the
+  alcove's position (`Code11f52.cpp:3875`), which also changes `RotateActuatorList`'s
+  filter. Evidence: `tools/dump-local-action.ts` (3 of 6 checks fail before); the fact is
+  in `doc/PROVEN_FACTS.md`.
+- ⏳ **DSA cloud moves.** CSBWin's `FindCellSource` (`MoveObject.cpp:166`) lets a DSA move
+  a cloud: it finds the cloud's `TT_24` / `TT_25` timer (`:227-245`, `SER_BadCloudTimer`
+  if there is none), and `FindCellDestination` retargets it — `uByte6/7`, the object's
+  position, the level (`:522-529`). `DsaSystem.findCellSource` refuses a cloud with
+  `SER_NoCloudsPlease` instead. (The character, monster and chest sources do refuse
+  clouds in CSBWin too, `:156`, `:290`, `:349`.) **Missiles need nothing:** CSBWin's
+  `MoveObject.cpp` has no missile timer update, so that half of the old entry was wrong.
+- ⏳ **Deferred deletes.** `&DEL` queues the record on `m_objectDeleteList`
+  (`DSA.cpp:157-163`) and `ConsumateDeletes` frees the lot after the run (`:178-191`,
+  called at `:5483`), returning whether the DSA deleted its own actuator — which the
+  caller turns into `ERF_DeletedSlave` (`:153-156`). The port calls `deleteDBEntry` at
+  once, mid-run. Find what the callers do with the flag before porting.
+
+The archived shimmer entry notes that no dungeon this project loads defines a DSA, so
+neither remaining bullet can show in play today.
+
+<details><summary>original entry</summary>
 
 - `PerformLocalAction()` does not map `HandChar` precisely; it matches on `partyPosition`
   when `mapPos` is specified. Suspect it of the same confusion between cell position and
@@ -332,6 +359,8 @@ Evidence: `tools/dump-monster-move.ts` case 4 (3 of 18 checks fail before); the 
 The archived shimmer entry notes that no dungeon this project loads defines a DSA. If that
 holds, neither can show in play today, which is why this sits last among the verified
 divergences.
+
+</details>
 
 ### C9 ⚠️ Door pass-through rules and the magic damage/poison formulas *(re-audit)*
 

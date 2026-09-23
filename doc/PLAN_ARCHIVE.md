@@ -133,7 +133,7 @@ Status:
 - ✅ Monster palette special-colors now applied per level: `specialColors[13][7]` + `ITEM12.uByte11` drive `ModifyPalettes` for colors 9/10, updating `Palette552` and `Byte6628/Byte6612` (`doc/CSBwin-src/Code390e.cpp:323-343`, `doc/CSBwin-src/CSBCode.cpp:2839-2854`).
 - ✅ Timer-driven missile orientation and Item16/SINGLE_MONSTER_STATUS plumbing added (falls back safely when save-game state is absent).
 - ✅ Minimal save-game loader added for Item16/timer tables (non-extended saves) (`src/data/SaveGameLoader.ts`).
-- ✅ Deterministic `GraphicRandom()` implemented for teleporter/cloud randomness (`doc/CSBwin-src/CSBCode.cpp:564`).
+- ✅ Deterministic `GraphicRandom()` implemented for teleporter/cloud randomness (`doc/CSBwin-src/CSBCode.cpp:564`). (Clouds have since moved to the viewport stream — `DEBT.md` C6.)
 - ⚠️ Remaining fidelity gaps: extended-feature save games (sequenced/extended timers + DSA blocks), full monster attack/alternate-graphics state, and exact missile mirror/flip edge cases.
 
 Next steps (Phase 5 follow-up):
@@ -1737,7 +1737,8 @@ already fixed during the move.
   Fails on the pre-fix code (always 1 distinct pattern); passes with 13 of 40 draws
   distinct.
 
-  **Left open:** whether the cloud- and missile-sprite mirror/flip randomization
+  **Left open** (since answered — `DEBT.md` C6, `d9877ef`: clouds take two viewport
+  `STRandomBool()`s, missiles are not random at all): whether the cloud- and missile-sprite mirror/flip randomization
   elsewhere in `BytecodeInterpreter` (`this.graphicRandom(2)` for `mirror`/`flip` at
   the cloud-drawing site) is even drawing from the right generator. `GraphicRandom`
   has exactly two call sites in all of CSBWin, both inside `DrawTeleporter` — nothing
