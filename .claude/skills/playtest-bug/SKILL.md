@@ -14,7 +14,7 @@ One bug per session. `/clear` after the commit — see "Working economically" in
 
 ## 1. Is it already known?
 
-Before anything else, grep `PLAN.md`'s **Carried-over debt** for the area. A good share of
+Before anything else, grep **`DEBT.md`** for the area. A good share of
 what looks like a new bug is a deferral someone already wrote down, and the entry usually
 names the CSBWin function that was skipped. `doc/PLAN_ARCHIVE.md` is worth a look too: if
 the symptom matches a ✅ entry, you are looking at a regression, and that entry says what

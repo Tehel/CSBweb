@@ -27,7 +27,8 @@ Corollaries:
 | File | Role |
 | --- | --- |
 | `CLAUDE.md` | This file. High-level orientation only; keep it short. |
-| `PLAN.md` | **Authority on detailed project status.** Live phases + carried-over debt. |
+| `PLAN.md` | **Authority on detailed project status.** Live phases. |
+| `DEBT.md` | **Authority on technical debt**, in payoff order. Paying it off is the current priority. |
 | `doc/PLAN_ARCHIVE.md` | Working notes for completed phases. Reference only — read on demand. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
@@ -40,6 +41,7 @@ fact in the C++ source, write it down with a `doc/CSBwin-src/<File>.cpp:<line>` 
 Only 100%-certain facts go in; speculation stays out. Update `PLAN.md` progress markers as
 you go, and **record every deferral** — a phase marked done with silent gaps is worse than
 one marked incomplete.
+Debt — a deferral from a closed phase, a divergence found along the way — goes in `DEBT.md`.
 
 ## Tech stack
 
@@ -169,5 +171,5 @@ the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI,
 combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
 Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step
 12). What is left is the other half of **Phase 10**, *writing* a CSBWin-compatible save;
-the **validation debt** (Phase 15, steps 3–5); and the carried-over debt listed in
-`PLAN.md`.
+the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT.md` —
+**paying that off is the current priority**, one item per session, in the order it gives.

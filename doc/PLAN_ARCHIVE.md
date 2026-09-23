@@ -4,10 +4,10 @@ Full working notes for the phases that are **done**. Split out of `PLAN.md` so t
 live plan stays small — this file is reference material, read it only when you need the
 detail of how a finished phase was actually carried out.
 
-**`PLAN.md` remains the authority on status.** Every item in these archived phases that is
-still open is also listed in `PLAN.md` under "Carried-over debt"; this file holds the
-surrounding context for those items, not their status. If the two ever disagree, `PLAN.md`
-wins and this file is stale.
+**`PLAN.md` remains the authority on status, and `DEBT.md` on debt.** Every item in these
+archived phases that is still open is listed in `DEBT.md`; this file holds the surrounding
+context for those items, not their status. If the two ever disagree, `DEBT.md` wins and
+this file is stale.
 
 Marker meanings are the same as in `PLAN.md`: ✅ done · ⚠️ diverges/incomplete ·
 ⏳ not started · 🚫 deliberately skipped.
@@ -1367,12 +1367,12 @@ One genuine divergence, and it is a *narrowing* of one: CSBWin mutates `d.Word68
 in place while the doors slide and never restores them. This port walks local copies. The
 doors open once per run, so the two are equivalent.
 
-Open items from this phase are in `PLAN.md` → "Carried-over debt" → "Intro (Phase 16)".
+Open items from this phase are in `DEBT.md` → tier H (the intro's wall-clock time and `?intro=0`).
 
 ### Resolved debt (moved out of `PLAN.md`)
 
-Entries that were carried as debt and are now closed. Any sub-item still open is also
-listed in `PLAN.md`; this is the surrounding context, not the status.
+Entries that were carried as debt and are now closed. Any sub-item still open is listed in
+`DEBT.md`; this is the surrounding context, not the status.
 
 - ✅ **The level-3 monster timer stall — no longer reproduces.** Re-checked after
   Phase 12 closed: `npx tsx tools/watch-monsters.ts 3 10 25 200` runs the documented
@@ -1528,3 +1528,300 @@ listed in `PLAN.md`; this is the surrounding context, not the status.
   custom backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.
 - 🚫 The never-executed validation steps of phases 2, 4, 5 and 7 (render probe, scripted
   room-info checks, CSBWin screenshot comparison) are **all** folded into Phase 15 below.
+
+#### Moved with the rest of the list on 2026-09-23
+
+`PLAN.md`'s "Carried-over debt" section was replaced by `DEBT.md` on 2026-09-23. Its open
+entries moved there; the resolved ones below moved here verbatim, together with two found
+already fixed during the move.
+
+- ✅ **Found resolved on 2026-09-23: `MagicPanel` conflated `partyPosition` with the champion
+  index.** `handleMagicClick` now walks the champions by list index, the comment at
+  `src/renderer/ui/MagicPanel.ts:203-206` records why, and nothing in the file reads
+  `partyPosition` any more.
+
+  <details><summary>original entry</summary>
+
+- ⏳ **`MagicPanel.ts:204-206` still conflates `partyPosition` with the champion
+  index** — it writes `magicCasterIndex = champion.partyPosition` and picks the rune
+  rectangle the same way, though the four boxes do not rotate. The same bug was fixed in
+  `Party.getPartyChampion` (Phase 13 prerequisite 2); this half was left because it is a
+  UI change wanting the golden frames re-examined, not because it is right.
+
+  </details>
+
+- ✅ **Found resolved on 2026-09-23: "missile launch, monster creation and `WiggleEverything`
+  still need concrete engine hooks".** All three are wired: `onSpawnMonster`
+  (`src/engine/TimerSystem.ts:1476`, handled in `Game`), `launchMonsterMissile`
+  (`TimerSystem.ts:1080`, reached from `MonsterAttack` through `Game`), and
+  `wiggleEverything` (called from the teleporter and pit timers, `TimerSystem.ts:735`,
+  `:760`). The TODOs the entry pointed at no longer exist.
+
+  <details><summary>original entry</summary>
+
+- ⚠️ *(Phase 8)* Missile launch, monster creation and `WiggleEverything` still need concrete
+  engine hooks — see the TODOs in `src/engine/TimerSystem.ts`.
+
+  </details>
+
+- ✅ **Resolved: attributes raised by a level gain stayed red forever.** `LevelUp`
+  raises only an attribute's Maximum (`doc/CSBwin-src/Magic.cpp:98-148`); Current is
+  drawn back up one point every 256 ticks (64 asleep) by `TenSecondUpdate`
+  (`doc/CSBwin-src/Code17818.cpp:384-414`). Our `processTenSecondUpdate` had only the
+  mana and `tempAdjust` parts, and ran every 40 ticks instead of CSBWin's
+  `(d.Time & (sleeping ? 15 : 63)) == 0` (`doc/CSBwin-src/CSBCode.cpp:686-688`). It
+  is now fully ported: footprint aging, food/water consumption paid in stamina, HP
+  regeneration (with the Ekkhard Cross bonus), attribute recovery and the facing
+  reset. Food and water therefore now actually go down. Evidence:
+  `tools/dump-ten-second-update.ts`. The `d.Word11750` countdown is not ported: it
+  is a cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no
+  counterpart here, so the branch is dead.
+
+- ✅ **Resolved: dropping an object onto an active teleporter did not teleport it.**
+  `DropObject` (`doc/CSBwin-src/Mouse.cpp:882`) always calls `MoveObject(objD4, -1, 0,
+  x, y, NULL, NULL)`, the same teleporter/pit-resolution loop a walking party or
+  monster goes through — `Game.dropObjectFromCursor` skipped straight to
+  `DungeonState.addObjectToCell` on the raw drop target instead, so a "place the item
+  on the plate" puzzle placed the item and nothing else happened.
+  `TimerSystem.resolveDroppedObjectPosition` is the new public wrapper around the
+  existing `resolveCellEffects` (already used by `wiggleObject`/the actuator path;
+  nothing about the teleporter logic itself was wrong), and `dropObjectFromCursor`
+  now lands the object wherever that resolves to.
+  Evidence: `tools/dump-teleporter-drop.ts` finds a real active, item-scoped
+  teleporter in `dungeon.dat`, drops a floor item onto it, and checks the item ends
+  up at the destination rather than the drop cell — it fails on the pre-fix code.
+
+- ✅ **Resolved: a thrown object landing on an active teleporter or a pressure plate
+  did nothing.** `ProcessObjectFromMissile`'s no-monster arm
+  (`doc/CSBwin-src/Timer.cpp:151-159`) is `MoveObject(objD6.pos(missile.pos()), -2, 0,
+  mapX, mapY, NULL, NULL)` — the same call `DropObject` makes, which places the
+  landed object through `PlaceOrRemoveObjectInRoom`
+  (`doc/CSBwin-src/Code11f52.cpp:3438-3446`), the function that fires a pressure
+  plate under whatever just arrived. `TimerSystem.dropMissileObject` did neither: it
+  called `DungeonState.addObjectToCell` on the raw landing cell with no teleporter
+  resolution and — this is the one that actually bites, since a missile's own
+  in-flight movement already resolves any teleporter it flies through
+  (`moveMissileToCell` → `resolveCellEffects`) — no actuator trigger at all, so a
+  puzzle solved by throwing an item onto a plate you cannot stand on (or cannot walk
+  to, with a pit in the way) never fired. Now calls the same
+  `resolveDroppedObjectPosition` the cursor-drop fix uses, then
+  `ActuatorSystem.triggerObjectMove` at the landing cell.
+  Evidence: `tools/dump-missile-drop.ts` throws a floor item at a real teleporter and
+  at a real floor actuator in `dungeon.dat`; the actuator-trigger check fails on the
+  pre-fix code (the teleporter check does not, in isolation, only because the
+  in-flight path already covered it — kept anyway since it is what CSBWin's own
+  `MoveObject` call does at that point, and it is the one that matters when a throw's
+  range runs out exactly on the landing cell rather than mid-flight).
+
+- ✅ **Resolved: a thrown object that hit a closed door landed on the far corner of
+  its cell, half a cell past where it should sit** — reported by the author as
+  fully reproducible for every closed door, both orientations: throw at a closed
+  door, open it, and the item sits at the back corner rather than the front one; a
+  save/load round-trip keeps it there, so it is a database misplacement, not a
+  rendering artifact. `MissileTimer` computes two different positions on the tick a
+  door blocks the flight (`doc/CSBwin-src/Timer.cpp:370-377`): an advanced `curPos`
+  it threads through `ProcessMissileEncounter` as `objectPos` (used for a shattered
+  potion's cloud placement and for `MissileEncounterFilter`), and the missile RN's
+  own `.pos()` bits, which the `leavingThisCell` write that would normally advance
+  them never runs on this path (it is gated on `leavingThisCell`, which is false
+  here) — so `ProcessObjectFromMissile` (`Timer.cpp:156-157`, `objD6.pos(missile
+  .pos())`) drops a plain weapon or misc item at the corner the missile was already
+  resting at, one hop short of `objectPos`. `TimerSystem.processObjectFromMissile`
+  had collapsed these into one value, dropping at the threaded-through `objectPos`
+  for every caller. It now derives the drop corner from the missile RN's own stored
+  position instead of a passed-in `posInCell`, matching CSBWin's split; the same fix
+  also corrects a latent twin of the same bug for a missile that runs out of range
+  exactly as it flies off the edge of the map (`nextRoomType` 8/exterior), which had
+  been using the advanced position too.
+  Evidence: `tools/dump-missile-drop.ts` scenario 3 throws a floor item at a real
+  closed door in `dungeon.dat`, records the missile's own resting corner the tick
+  before the door blocks it, and checks the landed item sits at that exact corner.
+  Fails on the pre-fix code (landed corner 0 where the resting corner was 3).
+
+- ✅ **Resolved: the sound a thrown item makes on impact was often the wrong sample**
+  — found by the author while verifying the corner fix above: a sword or torch
+  sounded right, but corn, bread, cheese, an apple, a waterskin and scrolls all
+  played an explosion, and a fireball's blast seemed to pick at random between an
+  explosion, a "zap" like the door-opening spell, and a third, unidentified sound.
+  `QueueSound(soundNum, x, y, dt)`'s `soundNum` is an **ordinal** into `d.sound1772`
+  (`graphic232`'s sound table), resolved to an actual SND item, playback rate and
+  distance falloff by table lookup — not a raw sound-resource number.
+  `TimerSystem.playMissileImpactSound` (the tail of `ProcessMissileEncounter`,
+  `doc/CSBwin-src/Code11f52.cpp:2101-2121`) and `playCloudSound` (`CreateCloud`,
+  `Code11f52.cpp:1432-1447`) instead called `playSound` with a hand-picked
+  `SoundIndex` graphics.dat item per branch, and two of those picks named the wrong
+  item: a plain object's impact (`soundNum` 4, for anything that is not a weapon or
+  a poison bolt) played `SoundIndex.FIREBALL_EXPLODE` — ordinal 5's sample, not
+  ordinal 4's — and a small fireball/poison/lightning blast (`size<=80`, `soundNum`
+  20) played `SoundIndex.SPELL_EXPLODE` — ordinal 13's sample, not ordinal 20's.
+  Ordinals 5 and 20 turn out to resolve to the *same* SND item (537) at different
+  volume falloff distances — a small blast is meant to be a quieter version of the
+  same explosion, not a different sound — so this also likely explains the "random"
+  third fireball sound the author heard: `SoundIndex.SPELL_EXPLODE`'s sample (545)
+  standing in for it on the small-blast tick. Both functions now call
+  `hooks.queueSound(ordinal, x, y, 1)` with CSBWin's literal `soundNum`, exactly as
+  the door and teleport code already did elsewhere in `TimerSystem`.
+  Evidence: `tools/dump-missile-drop.ts` scenario 4 throws a weapon and a misc item
+  at a real closed door and checks the ordinal `queueSound` receives (0 and 4);
+  `tools/dump-clouds.ts` throws a big and a small fireball and checks the same (5
+  and 20). Both fail on the pre-fix code.
+
+- ✅ **Resolved: the teleporter/energy shimmer never animated, for two independent
+  reasons.**
+  1. `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) is a C function-static, so
+     its counter advances once per *process*, not once per draw call.
+     `BytecodeInterpreter.graphicRandom` had reseeded to 12345 as an *instance*
+     field, and `DrawViewport` builds a fresh `BytecodeInterpreter` every redraw, so
+     every frame replayed the identical jitter sequence. Moved to a `static` field on
+     the class so it persists across instances, matching the C static's lifetime.
+  2. `Game`'s main loop paced itself with `requestAnimationFrame`, which browsers
+     **fully suspend** — not merely throttle — the moment a tab is backgrounded or
+     occluded, unlike `setTimeout`. CSBWin's own VBL timer (and with it `d.Time`, and
+     the `GraphicRandom` counter that rides on every `DrawViewport` it triggers) never
+     stops just because the window lost focus. Confirmed live: with the old
+     `requestAnimationFrame` scheduling, an out-of-focus tab's tick loop measured
+     **zero** further iterations over several seconds — it had died outright, not
+     slowed down — while a `setTimeout`-paced version of the same loop kept
+     advancing (throttled to roughly 1/sec while backgrounded, full rate once
+     focused). That standing-dead loop, occasionally kicked back to life by whatever
+     browser-internal event a mouse click or move triggers, is the whole story
+     behind "changes only on mouse events." `gameLoop` now reschedules itself with
+     `setTimeout` instead.
+  CSBWin redraws the viewport once per game tick — `DrawViewport(d.partyFacing,
+  d.partyX, d.partyY)` sits directly in the "for each tick of the clock" handler
+  (`doc/CSBwin-src/CSBCode.cpp:638`) — and a tick is 15 VBL at normal speed, i.e. 4
+  Hz; this port's own `GAME_TIMING.TICKS_PER_SECOND = 4` already matches that, so the
+  shimmer should change about **4 times a second**, not ~1 Hz.
+
+  **Both of the above were real, and neither was the actual bug.** The pressure-plate
+  fix confirmed ticks were running; the shimmer was still frozen anyway. The real
+  defect was arithmetic, not scheduling: `graphicRandom`'s `state * 0xbb40e62d + 11`
+  uses JS's plain `*`, and `state` and the multiplier are each up to ~2^32 — their
+  exact product needs up to 64 bits, more than a float64 mantissa's 53, so the
+  multiply silently rounded away exactly the low bits `>>> 7 % n` reads. Every state
+  the LCG could reach turned out to be a multiple of 4096 once rounded, so `% 32`
+  (the teleporter's row jitter) and `% 2` (cloud/decoration mirror-flip, the same
+  method) both always came out **0** — a redraw every tick, always painting the
+  identical pixels, invisible on any single frame and only showing up as a sequence.
+  `core/random.ts`'s own `CsbRandom.advance()` already had the fix and the comment
+  explaining it (`Math.imul` truncates to 32 bits *before* rounding, matching C's
+  `ui32` multiply exactly) — `graphicRandom` just didn't follow it. Fixed the same
+  way, and the identical pattern turned up in `SaveGameLoader.ts`'s DSA checksum
+  reader (`this.checksum * 0xbb40e62d + 11 + buf[i]`), fixed too; it is currently
+  dead code (no dungeon this project loads defines a DSA, per the note below), so it
+  had no test to catch it.
+  Evidence: `tools/dump-graphic-random.ts` drives the LCG against an exact BigInt
+  oracle from five seeds, then checks the specific failure mode directly — 64 draws
+  of `% 32` from the class's own starting state must not land on one value. Fails
+  on the pre-fix code (all draws land on 0); the `Math.imul` version spreads across
+  26 of the 32 possible values.
+
+- ✅ **Added: the "lightning door" energy shimmer was never ported at all** — not a
+  bug in existing code, a missing feature. `DrawDoor`'s bit-10 branch of
+  `d.DoorTOC[doorType]` (`doc/CSBwin-src/CSBCode.cpp:4156-4166`) redraws with a
+  random mirror and a random vertical flip on every frame the door isn't bashed;
+  `opStdDrawDoor` had no notion of `DoorTOC` at all and always drew the same
+  bitmap. The shipped `dungeon.dat` sets the bit —
+  `doorCharacteristics[3] == 0x5ff` — so any level whose `doorType0Index`/
+  `doorType1Index` selects entry 3 has doors that should shimmer and silently
+  didn't. `ViewportRenderer.drawViewportFrame` now resolves `context.doorTOC` from
+  the level's door characteristics next to where it already resolved
+  `doorGraphics`, and `opStdDrawDoor` rolls the mirror/flip through a new
+  `BytecodeInterpreter.viewportRandom` — a dedicated `CsbRandom` instance, per
+  CSBWin's own `d.RandomNumber`-swap around `DrawViewport`
+  (`doc/CSBwin-src/Viewport.cpp:6706-6707`), so drawing a door can never perturb the
+  sequence monster AI and combat depend on.
+  Evidence: `tools/dump-door-lightning.ts` confirms the shipped dungeon actually
+  sets the bit, then drives `opStdDrawDoor` directly across 40 redraws of the same
+  closed door and checks the drawn bitmap doesn't sit at a single, frozen pattern.
+  Fails on the pre-fix code (always 1 distinct pattern); passes with 13 of 40 draws
+  distinct.
+
+  **Left open:** whether the cloud- and missile-sprite mirror/flip randomization
+  elsewhere in `BytecodeInterpreter` (`this.graphicRandom(2)` for `mirror`/`flip` at
+  the cloud-drawing site) is even drawing from the right generator. `GraphicRandom`
+  has exactly two call sites in all of CSBWin, both inside `DrawTeleporter` — nothing
+  in cloud or missile drawing calls it, so that code's choice of `graphicRandom`
+  over a `viewportRandom`-style `STRandomBool()` (or over reading a monster's own
+  precomputed mirror bit, set once by game logic rather than re-rolled every frame —
+  `NextMonsterUpdateTime`, `doc/CSBwin-src/CSBCode.cpp:5877-5941`, is a real example
+  of the latter) was not verified while fixing this. Not touched here — it was
+  discovered by contrast while tracing what `GraphicRandom` is and is not used for,
+  not by anything reported broken, and changing it needs its own read of the actual
+  cloud/missile drawing source first.
+
+- ✅ **Resolved: moving the mouse changed the teleporter/door animation state, at
+  mouse-input rate.** With both bugs above fixed, the shimmer visibly *worked* — and
+  then turned out to advance on every `mousemove` pixel, far faster than the once a
+  tick CSBWin actually redraws at. `ui/events.ts`'s mousemove handler called the
+  same `renderView()` movement and ticks use, which always calls
+  `ViewportRenderer.render()` → `drawViewportFrame()` → `DrawViewport`, consuming a
+  `graphicRandom`/`viewportRandom` draw on every call. CSBWin's cursor is a
+  sprite tracked independently of the dungeon redraw — nothing in its mouse handling
+  calls `DrawViewport` — so the fix is a narrower `ViewportRenderer.refreshOverlay()`
+  that recomposites the screen (cursor, hover highlights, every UI panel) over
+  whatever `viewportIndexBuffer` already holds, without calling `drawViewportFrame`
+  at all; mousemove now calls that instead of `renderView()`.
+  Evidence: live in a real tab, counting calls separately — eight `hover` moves
+  produced exactly eight `refreshOverlay` calls and zero additional
+  `drawViewportFrame` calls, which kept advancing on its own from the tick loop only.
+
+- ✅ **Resolved: the timer table leaked two slots on every save/load cycle.**
+  `TimerQueue.restore` minted new indices above the highest restored one, on the
+  reasoning — written into the comment — that CSBWin's `m_firstAvailTimer` free list
+  "costs nothing but the numbering". It cost more: `LoadGame` is followed by
+  `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
+  movement timers of every monster group on the party's level, so each load abandoned a
+  slot per re-created timer — `csbgame7.dat` went 78 → 80 → 82 → … over five quick-loads,
+  without bound. The free list is ported now: `addTimer` allocates at the cursor and
+  walks it forward, `deleteTimer` lowers it, `shiftNext` frees the fired timer's slot as
+  `GetNextTimerEntry` does, and `restore` derives the cursor from the holes rather than
+  needing the `gb2.FirstAvailTimer` the file carries. `shiftNext` not freeing was a
+  second bug in the same place: a fired timer's index stayed live to `getTimer`.
+
+  <sub>Context: `doc/PROVEN_FACTS.md` → “The timer array has a free list, and a save
+  carries its cursor”. Evidence: `tools/dump-save-roundtrip.ts`.</sub>
+
+- ✅ **Resolved: champion titles missing their first character — and it is not a bug.**
+  A reincarnated champion whose title was left empty. `_ReIncarnate` clears **one byte**
+  of each field to start, `pChar->name[0] = 0; pChar->title[0] = 0;`
+  (`doc/CSBwin-src/Code13ea4.cpp:57-58`) — not the array — and each keystroke advances the
+  terminator. Type the name back and skip the title, and `title[0]` stays 0 with the old
+  title's bytes 1..19 still behind it: `SHE DEVIL` becomes `\0HE DEVIL`. The name never
+  shows it because retyping the same name overwrites the same bytes over padding that was
+  already zero. So reincarnation was never ruled out; a *test* that types a title
+  overwrites the remnant, which is why the saves made to provoke it came back clean.
+
+  CSBWin prints the title as a C string (`TextToViewport(…, pcA3->title, false)`,
+  `doc/CSBwin-src/Character.cpp:1338`), so it shows a **blank** title — what the player
+  asked for. The reader is not corrected for it; `decodeCharField` now stops at the first
+  NUL for the same reason, where it used to skip zero bytes and show `HE DEVIL`.
+
+  A second path to the same byte exists and is a real off-by-one —
+  `EditCharacterName`'s insert branch (`doc/CSBwin-src/Chaos.cpp:5323-5324`) shifts from
+  `max_len` rather than the string's length, so `name[8] = name[7]` and `name[8]` *is*
+  `title[0]` — but that is the editor, not the game.
+
+  <sub>`doc/PROVEN_FACTS.md` → “A champion's title can lose its first character”.</sub>
+
+**Dev scaffolding (Phase 14)**
+
+- ✅ F8 (random party) is **gone**, and with it F4/F6/F10 — the monster AI trace, the
+  missile trace and the five missile scenarios, all Phase 8/12 validation aids whose
+  phases have landed. The deletion reached the engine: `TimerHooks.onMissileTrace`,
+  `MissileTraceEvent` and the nine `emitMissileTrace` sites in `TimerSystem` had no other
+  consumer, nor did `Game.debugLaunchMissileDelayed` /
+  `TimerSystem.launchDelayedMissile`, nor `main.ts`'s `getAddCharacterTables` (`Game`
+  builds its own). `MonsterSystemHooks.trace` **stays** — `tools/dump-monster-ai.ts`
+  registers it. `src/dev.ts` is down to the F5/F9 quick-save from ~640 lines.
+- ✅ F5/F9 (quick-save/load) **stay**, and are no longer gated on `isDebugFeaturesEnabled()`
+  — they are not scaffolding to be removed but the functional equivalent of the original
+  save menu, kept for their convenience whether or not that menu is ever ported
+  (Phase 10). The boot-time restore in `main.ts` is still Debug-gated; that one *is* a
+  dev convenience.
+- ⚠️ `tools/probe-frames.mjs` used F8 to get a party, so all five non-boot golden frames
+  were rebuilt. It now drives the real Hall of Champions through the public game API —
+  stand at a mirror, `handleWallClick`, `resurrectReincarnateCancel(160)`, four times —
+  which needs no scaffolding in the app at all. HALK is added first so champion 0 holds a
+  weapon and frame 05 still exercises the weapon attack list rather than PUNCH/KICK/WAR
+  CRY.
