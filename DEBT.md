@@ -69,7 +69,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
 | C4 | `DamageCharacter` is missing two early guards | S | ✅ |
-| C5 | Three movement deferrals | M | ⏳ |
+| C5 | Three movement deferrals | M | ✅ |
 | C6 | Which generator cloud and missile sprites flip with | S | ⏳ |
 | C7 | `CreateMovementTimer`'s overflow guard | S | ⏳ |
 | C8 | Phase 8 DSA leftovers | M | ⚠️ re-audit |
@@ -77,6 +77,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C10 | Phase 9.5 refinements | S | ⚠️ re-audit |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
+| C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -406,9 +407,10 @@ party through this function. `PartyState` already carries the potential-characte
 
 </details>
 
-### C5 ⏳ Three movement deferrals
+### C5 ✅ Three movement deferrals
 
-All in CSBWin's move handler in `doc/CSBwin-src/CSBCode.cpp`:
+All in CSBWin's move handler, `MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944`). Two were
+fixes, one needed nothing; what the re-reading found beyond them is C13.
 
 - ✅ **Wall-bump damage.** Paid in the commit "Wall bumps hurt the champions on the wall
   side". `MovementSystem.bumpWall` is `:8263-8291`: `GetCharacterToDamage` on the two
@@ -430,9 +432,12 @@ All in CSBWin's move handler in `doc/CSBwin-src/CSBCode.cpp`:
   `Game.clockTickCleared` skips the tick for the rest of the frame. `MovementResult`
   carries CSBWin's `D5W` as `inhibited`. Evidence: `tools/dump-party-collision.ts` case 6
   (4 of 21 checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
-- **The vertical-move guard** (`:8200-8204`), which refuses a Move Up / Move Down into a
-  monster's cell outright. `MovementAction` has no up/down member, so there is no entry
-  point to attach it to yet.
+- 🚫 **The vertical-move guard** (`:8200-8204`), which refuses a Move Up / Move Down into
+  a monster's cell outright. Nothing to port: CSBWin cannot reach it either. Move Up / Down
+  (`0x1124` / `0x1125`) come only from `ThreeDMovements` keys (`:8476-8487`) and
+  `GravityMove` (`Mouse.cpp:1259`, `:1334-1336`, called only while `gravityMove`, which
+  only `if (GravityGame)` sets, `:8079-8083`). Both flags are the 3DMaze extension's,
+  initialised `false` (`data.cpp:239-240`) and assigned nowhere in the tree.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “Monsters block the party”.</sub>
 
@@ -528,6 +533,36 @@ Re-read `Timer.cpp:989-1130` whole before changing anything — these line range
 reading it in pieces. The visible effect is on doors toggled twice in one tick. Evidence:
 a `tools/` scenario queuing each clashing pair and checking which entry survives, with
 which function, `uByte9` and slot index. Size S–M.
+
+### C13 ⏳ The rest of `MoveParty`: stamina, move delay, queue depth
+
+Found while re-reading `MoveParty` for C5; none is fixed yet. All in
+`doc/CSBwin-src/CSBCode.cpp` unless said otherwise.
+
+- **Every attempted step costs stamina.** Before the destination is even looked at, each
+  champion's `staminaAdjustment` is `sw((3 * load) / MaxLoad + 1)` (`:8088-8101`), and
+  `AdjustStamina` is applied to each after the party-move filter (`:8129-8135`) — for a
+  blocked step as much as for a taken one. The port charges nothing for walking.
+- **The move delay.** A taken step sets `d.partyMoveDisableTimer` to the slowest living
+  champion's `TimeToMove` (`:8326-8347`); the tick counts it down (`:689-692`), and
+  `Mouse.cpp:1482-1491` refuses a step while it is non-zero — or while `d.Word11712` is
+  set and the step heads towards `d.Word11714`. The port gates on wall-clock
+  milliseconds instead (`Party.canMove`, `GAME_TIMING.MOVE_DELAY_MS` / `TURN_DELAY_MS`).
+  `PLAN.md` Phase 10 already lists `partyMoveDisableTimer` as not modelled for saves;
+  modelling it closes both.
+- **The key queue holds two keys, not three.** `CSBUI.cpp:143-145` is a 3-slot ring that
+  refuses a key when `next == keyQueueStart` (`:1131-1139`); `Game.movementQueueLen` is 3
+  and the port's check lets three in.
+- **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
+  pit or a teleporter to another level also throw away queued input. Not ported.
+- **Room type 7.** `D5W` is set only for stone, a shut door and a solid false wall
+  (`:8224-8261`), so any other room type is entered; `DungeonState.isWalkable` refuses
+  `RoomType.EMPTY` (7). Check whether any dungeon we load has such a cell before changing it.
+- `CallPartyMoveFilter` (`:8119`) is a DSA filter — G2's kind, and no loaded dungeon
+  defines one.
+
+Evidence for each will extend `tools/dump-party-collision.ts`, which now steps frames with
+`Game.runFrame`.
 
 ---
 
@@ -722,6 +757,11 @@ such a guard.
 Known candidate: `DEFAULT_ROOM_TIMER_FUNCTIONS` (`src/engine/roomTimers.ts`), a hardcoded
 copy of `d.Byte1596` used when the extracted table is not wired. Find out whether any
 path still reaches it; if not, delete it.
+
+Second candidate, found in C5: `MonsterAttack.determineAttackOrder` returns `[0, 1, 2, 3]`
+when `byte586` was not passed in, with no warning. `tools/dump-party-collision.ts` hit it
+(its wall bump hurt the wrong champion) until the tool passed the table; other tools that
+build a `Game` without `byte586` still would.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “The eye panel prints the mastery ranks again”.</sub>
 

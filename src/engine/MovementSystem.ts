@@ -143,9 +143,11 @@ export class MovementSystem {
         //
         // Every `MovementAction` that reaches here is one of CSBWin's relative
         // directions 0-3 (see `getRelativeDirection`), so the `direction <= 3` test is
-        // always true at this point. CSBWin's `direction > 3` arm — the Move Up /
-        // Move Down buttons, which refuse outright rather than poking the group
-        // (`:8200-8204`) — has no entry point here yet; see DEBT.md C5.
+        // always true at this point. CSBWin's `direction > 3` arm — Move Up / Move
+        // Down, which refuse outright rather than poking the group (`:8200-8204`) — is
+        // unreachable in CSBWin too: only the 3DMaze flags `ThreeDMovements` and
+        // `GravityGame` produce those moves, and both are `false` and never assigned
+        // (doc/CSBwin-src/data.cpp:239-240).
         if (this.party.state.champions.length !== 0) {
             if (this.hooks.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
                 this.hooks.activateMonster(newPosition);
