@@ -62,9 +62,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | --- | --- | --- | --- |
 | A1 | Documentation pointers to things that no longer exist | S | ✅ archived |
 | A2 | Stale comments, a dead parameter, console noise | S | ✅ archived |
-| B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ |
-| B2 | Small helpers defined in several files | M | ✅ |
-| B3 | `LOCATIONREL` has three shapes | S | ✅ |
+| B1 | One `DescIndex`, one `GetBasicObjectType`, one `NameIndex` | M | ✅ archived |
+| B2 | Small helpers defined in several files | M | ✅ archived |
+| B3 | `LOCATIONREL` has three shapes | S | ✅ archived |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
 | C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
@@ -108,176 +108,9 @@ tier A".
 
 ## B — Duplicate implementations
 
-### B1 ✅ One `DescIndex`, one `GetBasicObjectType`, one `NameIndex`
-
-**Paid in `779ae8b`.** `src/engine/objectIndex.ts` holds `DescIndex`, `GetBasicObjectType`
-and `NameIndex`, transcribed from `data.cpp:568-700` and `CSBCode.cpp:1245`, plus
-`DescIndexOfRecord` — the same switch over a record in hand, for `AddCharacter`'s preset
-path, which has no `DungeonState`. Every copy listed below is gone or is a one-line wrapper
-over the module (`ui/Objects.ts`' `resolveObjectNameIndex`, `getBaseObjectNameIndex`,
-`descIndexForObject`; `Game`, `DsaSystem`, `ActuatorSystem` each keep a private one-liner
-that supplies their tables). A seventh copy the entry missed, in `ActuatorSystem`
-(`getBasicObjectType` / `getDescIndex` / `getBasicObjectTypeFromValue`), went too, as did
-the one in `tools/dump-level-items.ts`. The UI's `getBaseObjectNameIndex` and
-`getAttackClass` take an RN only; `Feeding`'s explicit object-type path keeps the type as
-its name index, which is what the old guess returned. Every `DetermineMastery` hook
-(`CharacterStats`, `AttackSystem`, `Game`'s three, the UI's attack menu) and
-`CharacterStats`' `MaxLoad` now get `NameIndex`, as CSBWin does (`Code17818.cpp:76,98`,
-`Code11f52.cpp:4303`). `Game` receives `d.Byte640` through `ActuatorTables.byte640`.
-
-Behaviour: unchanged on the stock dungeon — every DM chest is type 0, and none of the
-mastery or load objects (Firestaff, talismans, Elven Boots) is modifiable, so `NameIndex`
-and `GetBasicObjectType` agree on them. The failure value is now `OBJNI_NOT_AN_OBJECT`
-everywhere. Evidence: `tools/dump-object-index.ts` (new, in `npm test`) walks all 1950
-records of `dungeon.dat` and forces the compass, torch, scroll, waterskin and charged-weapon
-states; the golden frames are unchanged.
-
-Found on the way: `ActuatorSystem.doesPartyHave` is not `DoesPartyHave` — C11.
-
-<details><summary>original entry</summary>
-
-
-**What.** CSBWin has exactly one of each: `RN::DescIndex` (`doc/CSBwin-src/data.cpp:568`),
-`GetBasicObjectType` (`doc/CSBwin-src/CSBCode.cpp:1245`), and `RN::NameIndex`
-(`doc/CSBwin-src/data.cpp:612`) — the *modified* name index, which accounts for the
-compass's facing, a lit torch's charge, an open scroll and so on. The port has:
-
-| CSBWin | Our copies |
-| --- | --- |
-| `RN::DescIndex` | `Game.getObjectDescIndex` (`src/engine/Game.ts:2391`), `DsaSystem.getObjectDescIndex` (`src/engine/DsaSystem.ts:2773`), `BytecodeInterpreter.descIndexForObject` (`src/renderer/bytecode/BytecodeInterpreter.ts:2111`), `descIndexForObject` (`src/renderer/ui/Objects.ts:111`), `getObjDescIndex` (`src/engine/AddCharacter.ts:301`) |
-| `GetBasicObjectType` | `Game.getBaseObjectNameIndex` (`src/engine/Game.ts:2383`), `DsaSystem.getBaseObjectNameIndex` (`src/engine/DsaSystem.ts:2368`), `getBaseObjectNameIndex` (`src/renderer/ui/Objects.ts:86`) |
-| `RN::NameIndex` | `resolveObjectNameIndex` (`src/renderer/ui/Objects.ts:20`) — the UI only; the engine has none |
-
-**They have drifted.**
-
-- *Chests.* CSBWin returns `BITS1_2(word4) + objDI_Chest` (`data.cpp:582`). `DsaSystem`
-  and `AddCharacter` return a constant `1`.
-- *Masks.* The renderer and UI copies mask the type with `0xff`, the engine copies with
-  `0x7f`. Neither mask does anything: the loader already masks with `0x7f`
-  (`src/data/DungeonLoader.ts:664-783`).
-- *Failure value.* `GetBasicObjectType` returns `objNI_NotAnObject`. `Game`'s copy returns
-  -1, `DsaSystem`'s returns the object ID itself, the UI's returns its argument.
-- *One parameter, two meanings.* The UI's `getBaseObjectNameIndex` accepts either an RN or
-  a bare object-type number and uses `isLikelyObjectRecord` to guess which
-  (`ui/Objects.ts:90-92`).
-- *No engine `NameIndex`.* That is why `CharacterStats`' `nameIndex` hook is fed the
-  *base* index — the second half of the ⚠️ that used to sit in `PLAN.md` under
-  `src/engine/CharacterStats.ts`. Only `determineMastery`'s Firestaff A/B bonus can see
-  the difference (a modifiable object, name index 0–31); the Elven Boots check in
-  `MaxLoad` (index 119) cannot.
-
-None of this shows in play today — DM chests are type 0 and the masks are no-ops — which
-is exactly how it will bite later.
-
-**Fix.** One module (suggestion: `src/engine/objectIndex.ts`, beside the `OBJNI_*`
-constants in `src/core/objectNameIndex.ts`) exporting `DescIndex`, `GetBasicObjectType`
-and `NameIndex`, named as CSBWin names them and transcribed from the C++, not from any of
-our copies. `resolveObjectNameIndex` is probably most of `NameIndex` already: check it line
-by line against `data.cpp:612+` and move it. Give the UI's object-type path its own
-function — `getDescIndexForObjectType` (`ui/Objects.ts:141`) already exists. Point every
-caller at the new functions, including `CharacterStats`' hook at `NameIndex`, which closes
-that ⚠️.
-
-**Evidence.** Extend `tools/dump-object-name-index.ts` (or add a sibling) to walk every
-object record in `dungeon.dat` and assert the three functions over it — a chest, a lit and
-an unlit torch, a compass at each facing, an open scroll. Then `npm test -- --frames`,
-since the renderer and UI copies move.
-
-</details>
-
-### B2 ✅ Small helpers defined in several files
-
-**Paid in `6f8b47c`..`4934252`, one commit per helper.** Every name below has one
-definition; each commit ran `npm test`, and the ones touching `src/renderer` or `src/ui`
-ran the golden frames too. No behaviour changed — where copies differed, the difference is
-shown unreachable below.
-
-| Helper | Now | Notes |
-| --- | --- | --- |
-| `normalizeWord6` ×5, private `sw` ×3 | `sw()` in `src/core/intCast.ts` | CSBWin's own name for the `(i16)` cast (`CSBTypes.h:136`); `i16` is already a type name in `core/types.ts`. `div` (×2) and `applyLimits` (×2, `CSBCode.cpp:1173`) moved beside it. `ApplyLimits` lets `min` win when `min > max`, `CharacterStats`' copy let `max` win; every caller passes constants with `min < max`. `Feeding.limit` stays: it is `LIMIT` (`CSB.h:3109`), a different macro. |
-| `findFirstMonsterAt` ×6 | `DungeonState.findFirstMonster` | A sixth copy was in `ui/ViewportPicking.ts`. `TimerSystem`'s returned `null`; its callers now test `OBJECT_ID_EOF`. Stopping on `OBJECT_ID_NULL` or not is the same walk: category 15 is never a creature and `getDBRecordLink(NULL)` is `EOF`. `AttackSystem` keeps a one-line wrapper for CSBWin's two-argument overload, on the party's level. |
-| `ordinalOfMonsterAtPosition` ×2 (+1 inline) | `monsterPosition.ts` | The body was already single; the three adapters that unpacked a `CreatureRecord` for it are now its record-level form, `(dungeon, monsterDesc, monster, pos)`. **C2 can use it.** |
-| `isMonsterAllowedOnLevel` ×3 | `DungeonState.monsterAllowedOnLevel` | The third was `MonsterPerception.monsterAllowedOnLevel`. |
-| `isValidLocation` ×2 | `DungeonState.isValidLocation(l, x, y)` | `LOCATIONREL::IsValid`, `DSA.cpp:310`. |
-| `getRoomTimerFunction` ×2 | `roomTimerFunction()` in `roomTimers.ts` | `d.Byte1596`. Its hardcoded fallback is an F1 candidate. |
-| `deleteMonsterMovementTimers` ×2 | `TimerQueue.deleteMonsterMovementTimers` | Takes the trace sink; `MonsterDamage`'s path now writes CSBWin's trace line too (trace output only). |
-| `quickness` ×2 | `CharacterStats.quickness` | `MonsterAttack.quickness` passes `d.PartySleeping` through. Its load-free fallback is gone; it could not run, since `Game` injects `CharacterStats` right after building `MonsterAttack`. |
-| `championAt` ×3 | `Party.getPartyChampion` | It already existed, exported for this. |
-| `triggerObjectMove` ×3 | `ActuatorSystem.triggerObjectMove` | That one is CSBWin's `PlaceOrRemoveObjectInRoom` (`Code11f52.cpp:3882`), now said so. `DsaSystem`'s wrapper went; it passed facing `0`, harmless because the facing is read only for actuator type 3, which requires the party itself (`OBJECT_ID_NULL`) as the mover. `Game.triggerObjectMove` stays: it is the UI drop (the walk, then level load and timers), documented as such. |
-| `setObjectPosition` ×2, `withPosition` | `withObjectPosition()` in `core/types.ts` | `RN::pos(p)`, `CSBTypes.h:336`. `ActuatorSystem`'s copy passed `NULL`/`EOF` through; both its callers are in branches where the hand is full. |
-| `isLikelyObjectRecord` ×2 | `engine/objectIndex.ts` | Takes a `DungeonState`. |
-| `readU16LE/BE`, `readU32LE/BE`, `readI16BE`, `readI8`, … | `src/core/bytes.ts` | Eight copies across five `src` files (`SaveGameLoader`, `CSBGraphicsLoader`, `CsbwinExtendedFeatures`, `CsbwinCharacters`, `ObjectTables`) and three tools. |
-
-Left alone, deliberately:
-
-- `ActuatorSystem.triggerObjectMove` takes `facing` as a parameter where CSBWin reads
-  `d.partyFacing` (`Code11f52.cpp:3776`). Every party-move caller passes the facing the
-  party has at that point; reading it inside would be tidier but needs each caller's
-  ordering checked against CSBWin's — not a dedupe.
-- `LOCATIONREL` has three shapes — B3.
-
-<details><summary>original entry</summary>
-
-Found by name. **Compare the bodies before merging**; where copies differ, find which one
-matches CSBWin before choosing.
-
-- `normalizeWord6` — a 16-bit sign extension, five identical copies:
-  `src/engine/TimerQueue.ts:398`, `src/engine/TimerSystem.ts:3321`,
-  `src/engine/Game.ts:2999`, `src/renderer/ui/Objects.ts:188`, and
-  `DsaSystem.normalizeWord6` (`src/engine/DsaSystem.ts:2375`). It is misnamed too: it is
-  applied to brightness, not only to a timer's `word6`. Make it one `i16()` in
-  `src/core/` — CSBWin simply casts `(i16)`.
-- `findFirstMonsterAt` — five copies: the public `MonsterSystem.findFirstMonsterAt`
-  (`src/engine/MonsterSystem.ts:325`) and private ones in `MonsterDamage.ts:711`,
-  `MonsterPerception.ts:632`, `TimerSystem.ts:2715` and `AttackSystem.ts:418`. The
-  `TimerSystem` copy differs: it returns `null` rather than `OBJECT_ID_EOF`, and does not
-  stop on `OBJECT_ID_NULL`. CSBWin's is `FindFirstMonster` (look it up in
-  `doc/CSBWIN_SYMBOL_INDEX.tsv`). It probably belongs on `DungeonState`.
-- Same name in two or three files, bodies not yet compared:
-  `ordinalOfMonsterAtPosition` (`MonsterAI.ts`, `TimerSystem.ts`),
-  `isMonsterAllowedOnLevel` (`MonsterSystem.ts`, `TimerSystem.ts`),
-  `isValidLocation` (`DsaSystem.ts`, `TimerSystem.ts`),
-  `getRoomTimerFunction` (`ActuatorSystem.ts`, `DsaSystem.ts`),
-  `deleteMonsterMovementTimers` (`MonsterSystem.ts`, `MonsterDamage.ts`),
-  `quickness` (`CharacterStats.ts`, `MonsterAttack.ts`),
-  `championAt` (`MonsterAttack.ts`, `AttackSystem.ts`),
-  `triggerObjectMove` (`ActuatorSystem.ts`, `DsaSystem.ts`, `Game.ts`),
-  `setObjectPosition` (`ActuatorSystem.ts`, `Game.ts`).
-- `isLikelyObjectRecord` — "does this RN index a real record of an object database" —
-  in `Game.ts` and `src/renderer/ui/Objects.ts` (`ActuatorSystem`'s `hasRecord` went with
-  B1). CSBWin has no such check; it is the port's guard. One copy, next to `DescIndex` in
-  `src/engine/objectIndex.ts`, is the natural home.
-- `src/data/SaveGameLoader.ts:191-240` has its own `readU16LE/BE` and `readU32LE/BE`
-  beside `src/core/BinaryFile.ts`.
-
-The "no object" normalizers are copies too, but they disappear in D2 rather than being
-merged here. `ordinalOfMonsterAtPosition` must be single before C2, which needs it.
-
-Done when each name has one definition — or two, with a comment citing CSBWin for why they
-differ — and `npm test` passes.
-
-</details>
-
-### B3 ✅ `LOCATIONREL` has three shapes
-
-**Paid in the commit "One LocationRel".** `LocationRel { l, x, y, p }` lives in
-`src/core/types.ts` with `locationRelToInteger` / `locationRelFromInteger` (CSBWin's two
-`Integer()`s); `DungeonState.isValidLocation` takes one, as `IsValid()` does. `DsaLocation`,
-`TeleportPartyLocation`, `TimerSystem.LocationRel` and `DsaSystem`'s private
-`locationToInt` / `intToLocation` are gone. No behaviour changed: the masks are the old
-ones, and `npm test` passed before and after. Found on the way: `TimerSystem.throwMissile`
-has no caller — see G1.
-
-<details><summary>original entry</summary>
-
-Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`, `x`, `y`,
-`p`, with `Integer()` and `IsValid()`). The port has `TimerSystem.LocationRel`
-(`{ position, posInCell }`), `DsaSystem`'s `DsaLocation` (`{ l, x, y, p }`) and its
-`TeleportPartyLocation` (the same four fields again). Pick one, next to
-`DungeonState.isValidLocation`, and give it CSBWin's `Integer()` decoding
-(`DsaSystem`'s `intToLocation`). Size S.
-
-</details>
+✅ Paid on 2026-09-23 (B1 in `779ae8b`, B2 in `6f8b47c`..`4934252`, B3 in `5f77cc5`). All
+three entries, with their outcomes, are in `doc/PLAN_ARCHIVE.md` → "Resolved debt" →
+"`DEBT.md` tier B".
 
 ---
 
@@ -412,8 +245,7 @@ party through this function. `PartyState` already carries the potential-characte
 All in CSBWin's move handler, `MoveParty` (`doc/CSBwin-src/CSBCode.cpp:7944`). Two were
 fixes, one needed nothing; what the re-reading found beyond them is C13.
 
-- ✅ **Wall-bump damage.** Paid in the commit "Wall bumps hurt the champions on the wall
-  side". `MovementSystem.bumpWall` is `:8263-8291`: `GetCharacterToDamage` on the two
+- ✅ **Wall-bump damage.** Paid in `73f6a86`. `MovementSystem.bumpWall` is `:8263-8291`: `GetCharacterToDamage` on the two
   corners of the crossed side, `DamageCharacter(ch, 1, 24, 2)` on each, and sound 18 only
   if `k != 0`. The map edge is bumped the same way (`GetCellFlags` answers stone there).
   `MovementHooks` became required — only `Game` builds a `MovementSystem`. Evidence:
@@ -422,8 +254,8 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
   and `MonsterAttack.determineAttackOrder` then silently uses `[0, 1, 2, 3]` — an F1
   placeholder.
 - ✅ **`DiscardAllInput()` / `d.clockTick = 0`** on any inhibited move (`:8310-8314`).
-  Paid in the commit "A refused move discards queued input and holds the tick a frame",
-  after `Game.runFrame` was split out of the loop so a tool can step frames. The mapping,
+  Paid in `d9eceae`, after `8159938` split `Game.runFrame` out of the loop so a tool can
+  step frames. The mapping,
   read rather than guessed: `DiscardAllInput` drains the key queue and resets the mouse
   queue (`:7532`, `CSBUI.cpp:1374-1391`), and every move the port queues is in
   `movementQueue` (clicks are handled as they arrive), so the port clears that.
@@ -455,7 +287,7 @@ missile drawing source in `Viewport.cpp` first, then port what it does.
 
 ### C7 ✅ `CreateMovementTimer`'s overflow guard is not ported
 
-**Paid in the commit "At most 31 groups wait on a square".**
+**Paid in `7a90d0c`.**
 `MonsterSystem.createMovementTimer` counts the waiting `TT_60` / `TT_61` timers of its kind
 on the square and, from 31, deletes the group unless it is `Unique()` or carries something
 (`Code11f52.cpp:2473-2512`). `Unique()` goes through `monsterUnique`, which applies

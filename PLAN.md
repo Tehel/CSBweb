@@ -29,9 +29,11 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tier A, B1, B2, C1, C2,
-C3 and C4 paid on 2026-09-23; B3 and C12 recorded along the way, and C9 narrowed to the
-missile door arm by C2. Next: B3, then C5.
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C5
+and C7, paid on 2026-09-23. Recorded along the way: C12, and C13 (the rest of `MoveParty`:
+stamina per step, the move delay, the key queue's depth); C9 narrowed to the missile door
+arm by C2; G1 and G4 gained the unported `STKOP_Throw` and the monster design options.
+Next: C6, then C8.
 
 ## Ground rules
 

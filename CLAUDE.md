@@ -167,9 +167,10 @@ were three lines each is not.
 ## Current state
 
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
-renderer, movement, timers, actuators, DSA scripting, missiles, skills/experience, magic
-casting, light levels, sound, the pre-game screens (Phase 16 — title, dungeon entrance,
-doors, credits) and most of the DM UI all work. The message area (Phase 11),
+renderer, movement (less its stamina cost and CSBWin's move delay — `DEBT.md` C13),
+timers, actuators, DSA scripting, missiles, skills/experience, magic casting, light
+levels, sound, the pre-game screens (Phase 16 — title, dungeon entrance, doors, credits)
+and most of the DM UI all work. The message area (Phase 11),
 the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
 combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
 Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step

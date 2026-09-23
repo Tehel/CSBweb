@@ -136,7 +136,9 @@ behaviour with an extra case explaining why it looks like an omission.
 **Tools build their own tables.** Each tool constructs its own `timerTables` /
 `actuatorTables`. Adding a field in `main.ts` does **not** reach them — the armour test
 silently measured nothing until the tool got the same tables. When you add a table,
-grep `tools/` and update every constructor.
+grep `tools/` and update every constructor. A missing `byte586` does the same to `GetCharacterToDamage`:
+`determineAttackOrder` falls back to `[0, 1, 2, 3]`, and a wall bump hurt the back row.
+Copy the tables the code under test reads, not only the ones the tool's model needed.
 
 **Seed fixed, always.** `new CsbRandom(0x12345678)`. An unseeded run is not a test.
 
@@ -155,6 +157,12 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 `processTimers` can move it out of the cell before your missile arrives — the scenario
 then silently tests nothing. Call `game.timerQueue.deleteMonsterMovementTimers(x, y, level)`
 after placing it (`dump-missile-monster.ts`).
+
+**Stepping frames.** `game.runFrame(t)` is one VBL at a time you choose: drain the
+movement queue, then a tick if `t - lastTickTime` reaches the tick interval. Reach
+`movementQueue` / `lastTickTime` through a cast (`dump-party-collision.ts` case 6). Every
+tick runs the monsters too, so do anything that needs a monster where you found it
+before the frames that tick, or set `lastTickTime = t` so none is due.
 
 **Spy on the real call, don't re-derive it.** When a formula consumes random numbers,
 wrap the instance method (`game.timerSystem.determineMagicDamage = …`) to record its
@@ -177,3 +185,4 @@ draws in the tool would need the RNG state and proves less.
 | `watch-monster-attacks.ts` | Whole-system outcome plus isolated formula probes |
 | `dump-monster-tables.ts` | Asserting the canary rather than only printing it |
 | `dump-missile-monster.ts` | Firing real missiles at a placed group; spying on engine calls |
+| `dump-party-collision.ts` | Stepping `Game.runFrame` at chosen times; queued input |
