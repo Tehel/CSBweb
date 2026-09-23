@@ -14,6 +14,7 @@ export enum TimerFunction {
   TT_M1 = -1, // Monster attacked, or the party bumped into it
   TT_EMPTY = 0,
   TT_DOOR_STEP = 1,
+  TT_BASH_DOOR = 2, // `HitDoor`'s delayed arm: the door shatters when this fires
   TT_MISSILE0 = 48,
   TT_MISSILE = 49,
   TT_OPENROOM = 5,
@@ -399,6 +400,17 @@ export class TimerQueue {
         }
       }
       if (toDelete) this.deleteTimer(toDelete.index);
+    }
+
+    // A bashed door cancels every door timer on its cell, whenever it was due
+    // (`doc/CSBwin-src/Timer.cpp:1102-1123`).
+    if (entry.function === TimerFunction.TT_BASH_DOOR) {
+      const doomed = this.queue.filter((existing) =>
+        existing.level === entry.level
+        && existing.uByte6 === entry.uByte6
+        && existing.uByte7 === entry.uByte7
+        && (existing.function === TimerFunction.TT_DOOR_STEP || existing.function === TimerFunction.TT_DOOR));
+      for (const existing of doomed) this.deleteTimer(existing.index);
     }
 
     return null;

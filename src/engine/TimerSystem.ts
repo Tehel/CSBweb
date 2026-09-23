@@ -313,6 +313,9 @@ export class TimerSystem {
       case TimerFunction.TT_DOOR_STEP:
         this.processDoorStep(timer);
         break;
+      case TimerFunction.TT_BASH_DOOR:
+        this.processBashDoor(timer);
+        break;
       case TimerFunction.TT_LIGHT:
         this.processLightLevelTimer(timer);
         break;
@@ -2488,11 +2491,11 @@ export class TimerSystem {
    * a fireball's blast tests `canOpenWithFireball`, an axe blow `canOpenWithAxe`. The
    * force must also beat the door type's entry in `DoorTOC`.
    *
-   * ⚠️ CSBWin's `delay` argument is not ported: only its zero case is. `Attack.cpp`'s
-   * melee door bash passes a delay of 2 (`doc/CSBwin-src/Attack.cpp:1803-1808`) and
-   * currently lands immediately — `DEBT.md` C1.
+   * With a `delay` — `Attack.cpp`'s melee bash passes 2 (`doc/CSBwin-src/Attack.cpp:1803-1808`)
+   * — the door does not shatter now: a `TT_BASH_DOOR` timer at `time + delay` does it.
+   * A fireball passes none and the door goes at once.
    */
-  hitDoor(position: Position, force: number, explosion: boolean): boolean {
+  hitDoor(position: Position, force: number, explosion: boolean, delay = 0, time = this.now): boolean {
     const doorRn = this.dungeon.findFirstObject(position);
     if (doorRn === OBJECT_ID_EOF) return false;
     const door = this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
@@ -2508,8 +2511,19 @@ export class TimerSystem {
     if (cellFlag === undefined) return false;
     // Bottom three bits 4 means a closed door; 5 is the shattered state.
     if ((cellFlag & 7) !== 4) return false;
-    this.setDoorState(map, position.x, position.y, 5);
+    if (delay !== 0) {
+      this.timers.createTimer(TimerFunction.TT_BASH_DOOR, position.x, position.y, 0, 0, (time + delay) >>> 0, position.z);
+    } else {
+      this.setDoorState(map, position.x, position.y, 5);
+    }
     return true;
+  }
+
+  /** `ProcessTT_BASH_DOOR` (`doc/CSBwin-src/Timer.cpp:1492`) — `HitDoor`'s delayed arm lands. */
+  private processBashDoor(timer: TimerEntry): void {
+    const map = this.dungeon.getMap(timer.level);
+    if (!map) return;
+    this.setDoorState(map, timer.uByte6, timer.uByte7, 5);
   }
 
   private createCloudRecord(projectile: number, size: number, posInCell: number): number | null {

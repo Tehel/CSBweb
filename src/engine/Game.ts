@@ -550,7 +550,8 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
                 disableCharacterAction: (chIdx, timeDelay) => this.disableCharacterAction(chIdx, timeDelay),
-                hitDoor: (position, force, explosion) => this.timerSystem.hitDoor(position, force, explosion),
+                hitDoor: (position, force, explosion, delay) =>
+                    this.timerSystem.hitDoor(position, force, explosion, delay, this.state.tickCount),
                 characterThrowsSpell: (chIdx, projectile, range, neededMana) =>
                     this.characterThrowsSpell(chIdx, projectile, range, neededMana),
                 launchObject: (chIdx, object, range, damage, decayRate) =>

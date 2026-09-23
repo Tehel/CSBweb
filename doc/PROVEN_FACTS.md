@@ -2470,3 +2470,19 @@ past — `playMissileImpactSound` and `playCloudSound` called `playSound` with a
 along the way substituted ordinal 5's item for ordinal 4's (a plain object's impact) and
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
+
+## A melee blow shatters a door two ticks late, and cancels the door's own timers
+
+`Attack.cpp`'s door arm — `BASH`, `HACK`, `BERZERK`, `KICK`, `SWING` or `CHOP` aimed at a
+shut breakable door — calls `HitDoor(x, y, strength, 0 /*not a ZO spell*/, 2 /*delay*/)`
+(`doc/CSBwin-src/Attack.cpp:1803-1808`). With a non-zero delay `HitDoor` does not touch the
+cell: it queues a `TT_BASH_DOOR` (= 2, `doc/CSBwin-src/CSB.h:1748`) at `d.Time + delay` on
+the loaded level with the cell in `timerUByte6/7` (`doc/CSBwin-src/Code11f52.cpp:2285-2292`),
+and still returns 1. `ProcessTT_BASH_DOOR` then sets the cell's low three bits to 5
+(`doc/CSBwin-src/Timer.cpp:1492-1498`). Only the zero-delay call — a fireball's — shatters
+the door at once.
+
+`SetTimer` gives `TT_BASH_DOOR` a rule of its own (`doc/CSBwin-src/Timer.cpp:1102-1123`):
+every `TT_1` or `TT_DOOR` timer with the same `timerWord6` (the cell) and level is deleted,
+whatever its time — so a door that was opening or closing stops being animated before it
+shatters. Evidence: `tools/dump-player-attacks.ts` case 8.

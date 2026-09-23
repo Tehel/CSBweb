@@ -16,6 +16,9 @@
  *  6. `WarCryEtc` — a shout puts the group into fear state 5.
  *  7. `atk_HEAL` and `atk_FREEZELIFE` — the two non-combat attacks with arithmetic
  *     worth pinning, including FREEZE LIFE's 200 cap.
+ *  8. A blow at a breakable door: `HitDoor`'s delay of 2 — the door holds on the tick
+ *     of the blow and shatters when `TT_BASH_DOOR` fires, and queueing that timer
+ *     cancels the door's own timers.
  *
  * Run: `npx tsx tools/dump-player-attacks.ts`
  */
@@ -29,6 +32,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType, MonsterType, StateOfFear } from '../src/engine/monsterTypes';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { extractObjectTables, monsterInvincible, monsterNonMaterial } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -418,6 +422,65 @@ async function main(): Promise<void> {
     check(steps[0] === 70, `one FREEZE LIFE is worth 70 (got ${steps[0]})`);
     check(steps[2] === 200, `three reach the 200 cap (got ${steps[2]})`);
     check(steps[3] === 200, 'and a fourth adds nothing');
+  }
+
+  // ---------------------------------------------------------------- case 8
+  // `Attack.cpp`'s door arm calls `HitDoor(x, y, strength, 0, 2)`
+  // (`doc/CSBwin-src/Attack.cpp:1803-1808`). With a delay, `HitDoor` queues a
+  // `TT_BASH_DOOR` at `d.Time + 2` (`Code11f52.cpp:2285-2292`) and `ProcessTT_BASH_DOOR`
+  // shatters the door when it fires (`Timer.cpp:1492`). `SetTimer` meanwhile deletes
+  // every `TT_1` / `TT_DOOR` timer on that cell (`Timer.cpp:1102-1123`).
+  console.log('\n=== 8. Door bash: HitDoor\'s two-tick delay ===');
+  {
+    const game = await makeGame();
+    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 40000));
+    // Level 1's (11,0): a shut door of type 1 (DoorTOC 42, breakable by a blow) in an
+    // east-west corridor. The party stands west of it, facing east.
+    const level = 1;
+    const doorX = 11;
+    const doorY = 0;
+    standParty(game, level, 10, 0, 1);
+    giveSword(game, 0);
+    const champ = game.party.state.champions[0]!;
+    const map = game.dungeonState.getMap(level)!;
+    const doorState = (): number => map.cellFlags[doorX]![doorY]! & 7;
+    const onDoor = (fn: number) => game.timerQueue.getTimers().filter((t) =>
+      t.function === fn && t.level === level && t.uByte6 === doorX && t.uByte7 === doorY);
+    check(doorState() === 4, `the door starts shut (state ${doorState()})`);
+
+    // A door-step timer due long after the blow: the bash must cancel it.
+    game.timerQueue.addTimer({
+      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount + 50, level,
+      uByte5: 0, uByte6: doorX, uByte7: doorY, uByte8: 0, uByte9: 0,
+      sequence: 0, timerWord8: 0, timerWord6: 0,
+    });
+
+    let blowTick = -1;
+    let stateOnBlowTick = -1;
+    for (let blow = 0; blow < 100; blow++) {
+      champ.attributes.stamina = champ.attributes.maxStamina;
+      game.championAttack(0, AttackType.atk_CHOP);
+      if (doorState() !== 4 || onDoor(TimerFunction.TT_BASH_DOOR).length > 0) {
+        blowTick = game.state.tickCount;
+        stateOnBlowTick = doorState();
+        break;
+      }
+    }
+    check(blowTick >= 0, 'some CHOP breaks the door');
+    const bash = onDoor(TimerFunction.TT_BASH_DOOR);
+    console.log(`blow at t=${blowTick}: door state ${stateOnBlowTick}, TT_BASH_DOOR at ${bash.map((t) => `t=${t.time}`).join(', ') || '-'}`);
+    check(stateOnBlowTick === 4, `the door still holds on the tick of the blow (state ${stateOnBlowTick})`);
+    check(bash.length === 1 && bash[0]!.time === blowTick + 2, 'one TT_BASH_DOOR is queued for two ticks later');
+    check(onDoor(TimerFunction.TT_DOOR_STEP).length === 0, 'queueing it cancelled the door-step timer');
+
+    const tick = (): void => {
+      game.state.tickCount++;
+      game.timerSystem.processTimers(game.state.tickCount);
+    };
+    tick();
+    check(doorState() === 4, `one tick later the door still holds (state ${doorState()})`);
+    tick();
+    check(doorState() === 5, `two ticks later it is shattered (state ${doorState()})`);
   }
 
   finish();

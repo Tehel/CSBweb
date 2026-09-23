@@ -292,7 +292,7 @@ export interface AttackSystemHooks {
   /** `DisableCharacterAction` (`doc/CSBwin-src/Character.cpp:2380`). */
   disableCharacterAction?: (chIdx: number, timeDelay: number) => void;
   /** `HitDoor` (`doc/CSBwin-src/Code11f52.cpp:2263`). */
-  hitDoor?: (position: Position, force: number, explosion: boolean) => boolean;
+  hitDoor?: (position: Position, force: number, explosion: boolean, delay: number) => boolean;
   /** `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:470`). */
   characterThrowsSpell?: (chIdx: number, projectile: number, range: number, neededMana: number) => number;
   /** `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — a real object, not a spell. */
@@ -1061,7 +1061,8 @@ export class AttackSystem {
           this.hooks.hitDoor?.(
             new Position(params.attackX, params.attackY, party.position.z),
             params.attdep.hitDoor.strength,
-            false,
+            false, // not a ZO spell
+            2, // delay
           );
           this.hooks.queueSound?.(4, party.position.x, party.position.y, 2);
           break;
