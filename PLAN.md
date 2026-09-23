@@ -29,8 +29,8 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C20,
-paid on 2026-09-23. C13 closed `MoveParty`: stamina per step, the move delay as
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C20
+and C22, paid on 2026-09-23. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a two-deep queue, the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -39,13 +39,16 @@ whole viewport. C20 loads a level a timer moved the party to in the same tick. C
 CSBWin's low-level `MoveObject` for objects (`TimerSystem.moveObject`) and put a DSA cell
 move through it and `MonsterSystem.moveMonster`. C16 ported `FindEmptyDBEntry` as
 `DungeonState.findEmptyDBEntry`, which every allocator now uses: the lowest freed record
-from index 1, else append. Recorded along the way: C18 (a Fluxcage never expired and freed door record 0 — found and paid with
-C17); C21 (clicks do not go through the input queue); C22 (a monster's own move presses
-no pads, and drags AI timers CSBWin's AI leaves behind); C23 (the other object movers —
-wiggle, drop, a thrown object landing — are not `MoveObject`, and no mover has its stairs
-arm); D5 (cell flags stored twice); G1 and G4 gained the unported `STKOP_Throw` and the
-monster design options.
-Next: what is left of tier C is size M — C21, C22, C23 — one per session.
+from index 1, else append. C22: a walking monster presses and releases floor pads, and only
+a DSA move re-aims its AI timers. C23's first bullet: `WiggleEverything` moves each object
+through `TimerSystem.moveObject` (a cloud falls down an opening pit, a missile presses no
+pad). Recorded along the way: C18 (a Fluxcage never expired and freed door record 0 — found
+and paid with C17); C21 (clicks do not go through the input queue); C23 (the other object
+movers — the monster wiggle, drop, a thrown object landing — are not `MoveObject`, and no
+mover has its stairs arm); C24 (`moveMonster`'s return value and what the AI does with it,
+its `ITEM16` bookkeeping, and the pit / level-ban deletions); D5 (cell flags stored twice);
+G1 and G4 gained the unported `STKOP_Throw` and the monster design options.
+Next: what is left of tier C is size M — C24, the rest of C23, C21 — one per session.
 
 ## Ground rules
 

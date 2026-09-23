@@ -761,7 +761,7 @@ save or `tools/` scenario depends on it yet.
 
 ### C22 ✅ A monster's own move presses no pads, and drags timers the AI does not
 
-**Paid in `COMMIT_C22`.** `MonsterSystem.moveMonster` lifts and sets down a group that does
+**Paid in `593febf`.** `MonsterSystem.moveMonster` lifts and sets down a group that does
 not levitate through `PlaceOrRemoveObjectInRoom` (a new `triggerObjectMove` hook, wired to
 `ActuatorSystem.triggerObjectMove`): leaving with `unchangedRoom` = "the party stands
 here", arriving with `false` (`doc/CSBwin-src/Code11f52.cpp:3287`, `:3392`); a flying
@@ -798,11 +798,21 @@ Found paying C15, which ported `MoveObject` for objects once, as `TimerSystem.mo
 (`doc/CSBwin-src/Code11f52.cpp:2796`). The other callers still hand-roll it, and each
 differs from it somewhere:
 
-- `TimerSystem.wiggleObject` (`WiggleEverything`, `Timer.cpp:2428-2512`) passes
-  "same square" as `unchangedRoom` where `MoveObject` passes "the party stands here"
-  (`:3278-3293`, `:3433-3448`); presses pads for a missile, which is levitating and uses
-  `RemoveObjectFromRoom` / `AddObjectToRoom` (`:3272-3274`, `:3427-3429`); and keeps a
-  cloud out of pits, where `Levitating` (`:2417-2437`) lets it fall.
+- ✅ **Paid in `298d869`.** `TimerSystem.wiggleEverything` (`WiggleEverything`,
+  `Timer.cpp:2428-2512`) moves each object through `moveObject`, walking the chain as
+  CSBWin does (`FindFirstDrawableObject`, then a counted number of links, `:2451-2466`),
+  and re-aims a missile's timer from what `moveObject` reports (`d.NewDir` is its new
+  `newDir`). `wiggleObject` is gone. It had passed "same square" as `unchangedRoom`,
+  pressed pads for a missile and kept a cloud out of pits. Evidence:
+  `tools/dump-wiggle-objects.ts`, new (4 of 9 checks fail before); the fact is in
+  `doc/PROVEN_FACTS.md`.
+- **`TimerSystem.wiggleMonster`** hand-rolls `MoveObject(objD4, x, y, x, y)`'s monster
+  branch: pads with `unchangedRoom` = "same square", no `ITEM16` attach or detach on a
+  level change, no abeyance, and a missile check with the wrong `to`. Routing it through
+  `MonsterSystem.moveMonster` needs `moveMonster` to take the unchanged-room early return
+  first (`:3180-3215`: same level, square and corner → return 0 before anything is
+  lifted), which it lacks — today a monster moved onto its own square is lifted, pressed
+  and set down again. Best done with, or after, C24.
 - `Game`'s drop from the cursor (`Mouse.cpp:882`) and `TimerSystem.dropMissileObject`
   (`Timer.cpp:151-159`) pass `unchangedRoom = false`, and `resolveCellEffects` turns a
   dropped item's corner on a relative teleporter although `oldX == -1` (`:3000-3006`).
@@ -810,7 +820,7 @@ differs from it somewhere:
   lands on stairs one level down when bit 2 of the cell is clear, then one square out
   through `ExitStairsDirection`, turning its corner (`:3108-3131`).
 
-Routing each through `TimerSystem.moveObject` fixes the first two; the stairs arm is its
+Routing each through `TimerSystem.moveObject` fixes the drops; the stairs arm is its
 own fix. One commit per caller, each with a `tools/` scenario. Size M.
 
 ### C24 ⏳ `moveMonster`'s return value, and what the AI does with it
