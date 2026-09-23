@@ -29,17 +29,18 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C13,
-C17–C19, paid on 2026-09-23. C13 closed `MoveParty`: stamina per step, the move delay as
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C14,
+C17–C20, paid on 2026-09-23. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
-words), a two-deep queue, the input discard on a level change, and room type 7. Recorded
-along the way: C14 (the rest of `DrawClouds`: size, colour map, lightning position, the
-cell under the party); C15 (a DSA cell move bypasses `MoveObject`); C16 (freed database
-slots are never reused); C18 (a Fluxcage never expired and freed door record 0 — found
-and paid with C17); C20 (a level change inside `ProcessTimers` is loaded a tick late);
-C21 (clicks do not go through the input queue); D5 (cell flags stored twice); G1 and G4
-gained the unported `STKOP_Throw` and the monster design options.
-Next: C14 (S), then C20 (S); C15, C16 and C21 are M.
+words), a two-deep queue, the input discard on a level change, and room type 7. C14 closed
+`DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
+never been drawn one or two cells ahead) and the cloud under the party, which tiles the
+whole viewport. C20 loads a level a timer moved the party to in the same tick. Recorded
+along the way: C15 (a DSA cell move bypasses `MoveObject`); C16 (freed database slots are
+never reused); C18 (a Fluxcage never expired and freed door record 0 — found and paid with
+C17); C21 (clicks do not go through the input queue); D5 (cell flags stored twice); G1 and
+G4 gained the unported `STKOP_Throw` and the monster design options.
+Next: what is left of tier C is size M — C15, then C16, then C21 — one per session.
 
 ## Ground rules
 

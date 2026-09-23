@@ -78,13 +78,13 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C11 | `DoesPartyHave` does not look inside chests | S | ✅ |
 | C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ✅ |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ✅ |
-| C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
+| C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ✅ |
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
 | C16 | Freed database slots are never reused | M | ⏳ |
 | C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
 | C19 | `CastSpell` under a spell filter's overrides | S | ✅ |
-| C20 | A level change inside `ProcessTimers` waits for the next tick | S | ⏳ |
+| C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
@@ -560,7 +560,21 @@ unless said otherwise.
   defines one. Its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`, `:8336-8346`) are
   G2's too.
 
-### C14 ⏳ `DrawClouds`: size, colour map, lightning position, the cell under the party
+### C14 ✅ `DrawClouds`: size, colour map, lightning position, the cell under the party
+
+**Paid in `a1ed379`.** All five, and two more found on the way: a poison cloud drew
+graphic 354 (one of the party-cell graphics) instead of `TAG005088`'s `348 + Smaller(3, 2)`
+= 350; and `Word7246` was read as its declared 12 words, but lightning indexes it up to
+word 20, running on into `Word7222`. So lightning one and two cells ahead had scale 0 and
+was never drawn. The cell under the party is now a tiling of the whole viewport
+(`d.Word2530`), not a 96×30 box. One assumption remains, recorded in the code and in
+`doc/PROVEN_FACTS.md`: C++ does not fix the order of `TAG008c98`'s two random arguments,
+and the port draws them right to left. The graphics are 48×31, not 48×32; CSBWin pads the
+missing row, and the tiling never reaches it. Evidence: `tools/dump-cloud-draw.ts`
+sections 4-7 (47 of 90 checks fail before). No golden frame shows a cloud; they all
+still pass.
+
+<details><summary>original entry</summary>
 
 Found while porting C6's placement block; nothing here is fixed. All in
 `doc/CSBwin-src/Code51a4.cpp`, against `BytecodeInterpreter.drawClouds`.
@@ -582,6 +596,8 @@ Found while porting C6's placement block; nothing here is fixed. All in
   two more viewport-stream draws. The port blits `351 + typeIndex` into a fixed rectangle.
 
 Extend `tools/dump-cloud-draw.ts`, which already stubs the tables it needs.
+
+</details>
 
 ### C15 ⏳ A DSA cell move does not go through `MoveObject`
 
@@ -674,7 +690,17 @@ spell filter (`DsaSystem.processSpellFilter`) to show, and no dungeon here defin
 
 ## D — State representation
 
-### C20 ⏳ A level change inside `ProcessTimers` waits for the next tick
+### C20 ✅ A level change inside `ProcessTimers` waits for the next tick
+
+**Paid in `9e742ac`.** `Game.gameTick` now loops as CSBWin's main loop does:
+`loadNewPartyLevel()` (`tag0006a4`: load, discard) at the top, then `processTimers` again
+for as long as a pass changed level. The port resolves the pit/teleporter chain when the
+party moves, so the `MoveObject(RNnul, -1, 0, x, y)` placement has nothing left to do.
+Evidence: `tools/dump-party-collision.ts` case 12, new: a `TT_PIT` opens under a party
+with a turn queued. Before the fix, 3 of its 4 checks failed, and the turn ran on the new
+level. The fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 Found paying C13. The main loop runs `ProcessTimers()` and then
 `if (d.newPartyLevel != -1) goto tag0006a4;` (`doc/CSBwin-src/CSBCode.cpp:635`): a timer that
@@ -685,6 +711,8 @@ y)`, input discarded, and `ProcessTimers` run again, all in the same tick (`:615
 is loaded, and its input discarded, a tick late; a turn or step queued in between runs on
 the new level first. Evidence: a `tools/` scenario with a pit timer under a party that has
 a turn queued (`tools/dump-party-collision.ts` case 10 is the pattern).
+
+</details>
 
 ### C21 ⏳ Clicks do not go through the input queue
 
