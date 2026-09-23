@@ -410,7 +410,7 @@ export class MonsterDamage {
         this.onItem16Freed?.();
       }
     }
-    this.deleteMonsterMovementTimers(mapX, mapY, level);
+    this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
   }
 
   /** Set by `MonsterSystem` so `d.ITEM16QueLen` stays in step. */
@@ -674,23 +674,6 @@ export class MonsterDamage {
       timer.function = fn;
       this.timers.reprioritizeTimer(index);
     }
-  }
-
-  /**
-   * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1297`), duplicated
-   * here rather than reached through `MonsterSystem` to keep the dependency one-way.
-   */
-  private deleteMonsterMovementTimers(mapX: number, mapY: number, level: number): void {
-    const doomed: number[] = [];
-    for (const timer of this.timers.getTimers()) {
-      if (timer.level !== (level & 0xff)) continue;
-      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
-      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
-      if (timer.uByte6 !== (mapX & 0xff)) continue;
-      if (timer.uByte7 !== (mapY & 0xff)) continue;
-      doomed.push(timer.index);
-    }
-    for (const index of doomed) this.timers.deleteTimer(index);
   }
 
   /**

@@ -311,7 +311,7 @@ export class MonsterSystem {
         if (!this.dungeon.hasObjects(position)) continue;
         const rn = this.dungeon.findFirstMonster(position);
         if (rn === OBJECT_ID_EOF) continue;
-        this.deleteMonsterMovementTimers(mapX, mapY, level);
+        this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
         this.attachItem16ToMonster(rn, mapX, mapY);
         this.startMonsterMovementTimers(mapX, mapY, level);
       }
@@ -319,24 +319,6 @@ export class MonsterSystem {
   }
 
   /* ---------------------------------------------------------------- timers ---- */
-
-  /**
-   * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1297`) — drop every
-   * timer of type 29-41 on this level at this square.
-   */
-  deleteMonsterMovementTimers(mapX: number, mapY: number, level: number): void {
-    this.trace(`      MAI Delete all Monster Timers at (${mapX},${mapY})`);
-    const doomed: number[] = [];
-    for (const timer of this.timers.getTimers()) {
-      if (timer.level !== (level & 0xff)) continue;
-      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
-      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
-      if (timer.uByte6 !== (mapX & 0xff)) continue;
-      if (timer.uByte7 !== (mapY & 0xff)) continue;
-      doomed.push(timer.index);
-    }
-    for (const index of doomed) this.timers.deleteTimer(index);
-  }
 
   /**
    * `StartMonsterMovementTimers` (`doc/CSBwin-src/CSBCode.cpp:5988`).
@@ -523,7 +505,7 @@ export class MonsterSystem {
       destination.y === (this.getPartyState().position.y | 0);
     const occupant = this.dungeon.findFirstMonster(destination);
     if (blockedByParty || occupant !== OBJECT_ID_EOF) {
-      if (fromDungeon) this.deleteMonsterMovementTimers(oldX, oldY, level);
+      if (fromDungeon) this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       if (item16Attached) this.detachItem16(monster.groupIndex);
       if (fromDungeon) this.dungeon.removeObjectFromCell(new Position(oldX, oldY, level), monsterRn);
       this.createMovementTimer(monsterRn, destination, resolved.audible);
@@ -552,7 +534,7 @@ export class MonsterSystem {
         // A teleported fear-6 group: stop it attacking and drop its old timers.
         this.clearAttackingAndDeleteMovementTimers(code - 2, oldX, oldY, level);
       } else if (code !== 0) {
-        this.deleteMonsterMovementTimers(oldX, oldY, level);
+        this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       } else {
         // Same level, still attached: the timers stay but must follow the group to
         // its new square (doc/CSBwin-src/MoveObject.cpp:551-565).
@@ -583,7 +565,7 @@ export class MonsterSystem {
         slot.singleMonsterStatus[i] = (slot.singleMonsterStatus[i] ?? 0) & ~SMS_ATTACKING;
       }
     }
-    this.deleteMonsterMovementTimers(mapX, mapY, level);
+    this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
   }
 
   /**

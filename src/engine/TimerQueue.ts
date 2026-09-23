@@ -331,6 +331,25 @@ export class TimerQueue {
   }
 
   /**
+   * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1297`) — drop every
+   * timer of type 29-41 on this level at this square. `trace` receives CSBWin's
+   * `AITraceActive` line.
+   */
+  deleteMonsterMovementTimers(mapX: number, mapY: number, level: number, trace?: (line: string) => void): void {
+    trace?.(`      MAI Delete all Monster Timers at (${mapX},${mapY})`);
+    const doomed: number[] = [];
+    for (const timer of this.queue) {
+      if (timer.level !== (level & 0xff)) continue;
+      if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
+      if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
+      if (timer.uByte6 !== (mapX & 0xff)) continue;
+      if (timer.uByte7 !== (mapY & 0xff)) continue;
+      doomed.push(timer.index);
+    }
+    for (const index of doomed) this.deleteTimer(index);
+  }
+
+  /**
    * The tail of `GameTimers::DeleteTimer` (`doc/CSBwin-src/Timer.cpp:965-969`): the slot
    * becomes `TT_EMPTY` and the free cursor drops to it if it is lower.
    */

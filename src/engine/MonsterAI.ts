@@ -326,7 +326,7 @@ export class MonsterAI {
       c.timerFunction = TimerFunction.TT_M1;
       if (fearFactor !== StateOfFear.StateOfFear6 && fearFactor !== StateOfFear.StateOfFear5) {
         this.trace('      MAI timeFunc 31.  FearFactor not 5 or 6. So Delete all timers and set fear to 6.');
-        this.deps.monsters.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level);
+        this.deps.timers.deleteMonsterMovementTimers(c.mapX, c.mapY, c.level, (line) => this.trace(line));
         this.maybeDelTimersFear6TurnIndividuals(
           c.monster, c.slot, c.slotIndex, frame.timer, c.timeUntilAlternateUpdate,
           c.timerFunction, c.mapX, c.mapY, c.level, c.desc,
@@ -1513,7 +1513,7 @@ export class MonsterAI {
     processingATimer: boolean,
   ): void {
     if (timerFunction === TimerFunction.TT_M2) {
-      this.deps.monsters.deleteMonsterMovementTimers(mapX, mapY, level);
+      this.deps.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
     }
     const party = this.deps.getPartyState();
     slot.uByte6 = party.position.x & 0xff;
