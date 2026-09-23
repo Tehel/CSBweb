@@ -97,6 +97,8 @@ export interface MonsterDamageHooks {
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `CreateCloud(RNMonsterDeath, …)`. */
   createCloud?: (projectile: number, size: number, position: Position, posInCell: number) => void;
+  /** `MoveObject` for a group, `MonsterSystem.moveMonster`. */
+  moveMonster?: (monsterRn: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number) => void;
   /**
    * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926`) — a DSA may
    * suppress the death cloud (`deathCloud == 2`) or the dropped remains
@@ -372,8 +374,10 @@ export class MonsterDamage {
    * `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1026`) — remove the whole group
    * from the dungeon and give its `ITEM16` slot back.
    *
-   * The HP array is cleared *before* the record is freed, so that anything still
-   * holding a pointer sees a dead group rather than stale hit points.
+   * The HP array is cleared *before* the group is lifted with `MoveObject(obj, x, y,
+   * -1, 0)` (`:1037-1038`) — so `CheckMoveFromMissile` finds no hit points and returns
+   * at once (`:2593-2596`) — and the lift releases the square's pads. Without the hook
+   * (a standalone `MonsterDamage`) the group is only unlinked.
    */
   deleteMonster(level: number, mapX: number, mapY: number): void {
     const position = new Position(mapX, mapY, level);
@@ -384,7 +388,8 @@ export class MonsterDamage {
 
     this.trace(`Deleting monster ${rn.toString(16)} ${level}(${mapX},${mapY})`);
     monster.hp = [0, 0, 0, 0];
-    this.dungeon.removeObjectFromCell(position, rn);
+    if (this.hooks?.moveMonster) this.hooks.moveMonster(rn, mapX, mapY, -1, 0, level);
+    else this.dungeon.removeObjectFromCell(position, rn);
     const groupIndex = monster.groupIndex;
     this.dungeon.deleteDBEntry(rn);
 

@@ -69,7 +69,7 @@ export interface MonsterSystemHooks {
    * square may be struck by a missile sitting in it. Returns true if that removed
    * the monster from the dungeon.
    */
-  checkMoveFromMissile?: (from: Position, to: Position, monsterRn: ObjectID) => boolean;
+  checkMoveFromMissile?: (from: Position, to: Position | null, monsterRn: ObjectID) => boolean;
   /**
    * `MoveObject`'s loop for a monster (`TimerSystem.resolveMonsterDestination`):
    * teleporter chains and pit falls. `code` is `LOCAL_14` as `TeleportMonster` left it,
@@ -474,8 +474,9 @@ export class MonsterSystem {
   /**
    * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`).
    *
-   * Moves a group from one square to another (`oldX < 0`: places it from nowhere),
-   * taking the destination through teleporter chains and pit falls, and keeping the
+   * Moves a group from one square to another (`oldX < 0`: places it from nowhere;
+   * `newX < 0`: lifts it off its square and returns 0 before the monster branch, as
+   * `DeleteMonster` does, `:3257-3297`, `:1038`), taking the destination through teleporter chains and pit falls, and keeping the
    * `ITEM16` and the AI timers in step with the result. A group that ends on the square
    * it started on is left alone and the move returns 0 — which is what `WiggleEverything`
    * relies on when it moves a group onto its own square (`Timer.cpp:2446-2450`).
@@ -543,10 +544,16 @@ export class MonsterSystem {
     if (fromDungeon && level === partyLevel) {
       const hit = this.hooks?.checkMoveFromMissile?.(
         new Position(oldX, oldY, level),
-        requested,
+        newX >= 0 ? requested : null,
         monsterRn,
       );
       if (hit) return { code: 1, position: requested };
+    }
+
+    // Lifted and not set down again (`:3297`).
+    if (newX < 0) {
+      if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated);
+      return { code: 0, position: requested };
     }
 
     // Follow teleporters and fall down pits, exactly as the party does.
@@ -576,15 +583,7 @@ export class MonsterSystem {
       return { code: 0, position: destination };
     }
 
-    // Lift it off the square it leaves (`:3257-3296`).
-    if (fromDungeon) {
-      const old = new Position(oldX, oldY, level);
-      this.dungeon.removeObjectFromCell(old, monsterRn);
-      if (!levitated) {
-        const partyThere = level === partyLevel && oldX === (party.x | 0) && oldY === (party.y | 0);
-        this.hooks?.triggerObjectMove?.(old, monsterRn, false, partyThere);
-      }
-    }
+    if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated);
 
     // The destination is unusable if the party is standing there or another monster
     // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
@@ -627,6 +626,20 @@ export class MonsterSystem {
     }
 
     return { code, position: destination };
+  }
+
+  /**
+   * The removal half of `MoveObject` for a group (`doc/CSBwin-src/Code11f52.cpp:3257-3296`):
+   * a levitating group through `RemoveObjectFromRoom`, any other through
+   * `PlaceOrRemoveObjectInRoom` with `unchangedRoom` = "the party stands here".
+   */
+  private liftMonster(monsterRn: ObjectID, oldX: number, oldY: number, level: number, levitated: boolean): void {
+    const old = new Position(oldX, oldY, level);
+    this.dungeon.removeObjectFromCell(old, monsterRn);
+    if (levitated) return;
+    const party = this.getPartyState().position;
+    const partyThere = level === (party.z | 0) && oldX === (party.x | 0) && oldY === (party.y | 0);
+    this.hooks?.triggerObjectMove?.(old, monsterRn, false, partyThere);
   }
 
   /**

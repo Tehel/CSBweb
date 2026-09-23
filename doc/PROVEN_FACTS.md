@@ -2939,7 +2939,14 @@ whether the party stands on the square on the loaded level; arriving, it is hard
 (`:3257-3296`) comes before the test for a party or monster on the destination
 (`:3335-3358`), so a group that goes into abeyance has released its pad first.
 
-Evidence: `tools/dump-monster-pad.ts` sections 1-4, on a type-1 pad from `dungeon.dat`.
+A group that is **deleted** leaves its pad the same way. `DeleteMonster` clears the group's
+hit points (`doc/CSBwin-src/Code11f52.cpp:1037`) and then lifts it with `MoveObject(obj, x, y,
+-1, 0)` (`:1038`), before freeing the record and its `ITEM16`. With no hit points left,
+`CheckMoveFromMissile` returns 0 at once (`:2593-2596`); with `newX < 0`, `MoveObject` skips the
+loop, lifts the group as above (`:3257-3296`) and returns 0 before the monster branch (`:3297`).
+
+Evidence: `tools/dump-monster-pad.ts` sections 1-4 and 6 (6: 1 of 4 checks fails before), on a
+type-1 pad from `dungeon.dat`.
 
 ## A dropped and a thrown object are set down by `MoveObject`, with `oldX` -1 and -2
 

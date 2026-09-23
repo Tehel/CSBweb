@@ -494,6 +494,9 @@ export class Game {
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 createCloud: (projectile, size, position, posInCell) =>
                     this.timerSystem.createDeathCloud(projectile, size, position, posInCell),
+                moveMonster: (monsterRn, oldX, oldY, newX, newY, level) => {
+                    this.monsterSystem.moveMonster(monsterRn, oldX, oldY, newX, newY, level);
+                },
                 trace: monsterHooks?.trace,
             },
         );

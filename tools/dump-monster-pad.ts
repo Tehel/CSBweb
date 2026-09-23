@@ -17,6 +17,11 @@
  *     `MoveObject` never re-aims them, and the AI caller re-aims only the timer it is
  *     processing (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`). Only a DSA's cell move
  *     re-aims the rest (`MoveObject.cpp:539-571`; `tools/dump-dsa-move.ts` section 6).
+ *  6. A group deleted on a pad releases it: `DeleteMonster` takes it off its square with
+ *     `MoveObject(obj, x, y, -1, 0)` (`Code11f52.cpp:1038`), which lifts it through
+ *     `PlaceOrRemoveObjectInRoom` and returns before the monster branch (`:3257-3297`).
+ *     The port spliced the chain and released nothing. A levitating group is lifted with
+ *     `RemoveObjectFromRoom` and releases nothing (`:3274`).
  *
  * The pad is a real one from `dungeon.dat`: the first actuator of type 1 (party,
  * monster or object) on an open square with an open neighbour.
@@ -221,6 +226,30 @@ async function main(): Promise<void> {
     check(result.code === 0, 'an ordinary step changes no ITEM16');
     check(before > 0 && aiTimersAt(game, beside) === before && aiTimersAt(game, beyond) === 0,
       'MoveObject leaves the AI timers at the square the group left');
+  }
+
+  /* ------------------------------------------------- 6. a group deleted on the pad ---- */
+  {
+    const { game, pad, rn, calls } = await setUp((s) => s.pad);
+    const groupIndex = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
+    game.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
+    const slot = game.dungeonState.getItem16Record(groupIndex);
+    console.log(`6. group deleted on the pad (${pad.x},${pad.y}) L${pad.z}: still there `
+      + `${game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF}, ITEM16 ${groupIndex} word0 ${slot?.word0}, `
+      + `AI timers ${aiTimersAt(game, pad)}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
+    check(game.dungeonState.findFirstMonster(pad) === OBJECT_ID_EOF && aiTimersAt(game, pad) === 0,
+      'the group is gone, and so are its AI timers');
+    check(slot?.word0 === -1, 'its ITEM16 is given back');
+    check(calls.length === 1 && called(calls, pad, false),
+      'it leaves the pad through PlaceOrRemoveObjectInRoom (remove, the party is not there)');
+
+    const flying = await setUp((s) => s.pad);
+    const flyer = objectTables.monsterDesc.findIndex((d) => monsterLevitating(d));
+    flying.game.dungeonState.getCreatureRecord(flying.rn)!.creatureType = flyer;
+    flying.game.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
+    console.log(`   levitating type ${flyer} deleted on the pad: pad calls ${flying.calls.length}`);
+    check(flying.game.dungeonState.findFirstMonster(pad) === OBJECT_ID_EOF && flying.calls.length === 0,
+      'a levitating group is lifted with RemoveObjectFromRoom: no pad sees it go');
   }
 
   finish();
