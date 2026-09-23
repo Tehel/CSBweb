@@ -77,7 +77,9 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
   files, print what happened, and assert invariants. **They are the regression suite for
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
-  runs them all; run one on its own with `npx tsx tools/<name>.ts`.
+  runs every tool **listed** in `tools/run-checks.mjs` — there is no discovery, so a new
+  tool is not evidence until it is added there. Run one on its own with
+  `npx tsx tools/<name>.ts`.
 
 When porting behaviour that is invisible on screen, write the tool in the same commit.
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and

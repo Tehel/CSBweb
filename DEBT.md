@@ -87,7 +87,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
 | C21 | Clicks do not go through the input queue | M | ⏳ |
 | C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ✅ |
-| C23 | The other object movers are not `MoveObject` either | M | ⏳ |
+| C23 | The other object movers are not `MoveObject` either | M | ⏳ 2 of 5 bullets paid |
 | C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
@@ -806,23 +806,21 @@ differs from it somewhere:
   pressed pads for a missile and kept a cloud out of pits. Evidence:
   `tools/dump-wiggle-objects.ts`, new (4 of 9 checks fail before); the fact is in
   `doc/PROVEN_FACTS.md`.
-- **`TimerSystem.wiggleMonster`** hand-rolls `MoveObject(objD4, x, y, x, y)`'s monster
-  branch: pads with `unchangedRoom` = "same square", no `ITEM16` attach or detach on a
-  level change, no abeyance, and a missile check with the wrong `to`. Routing it through
-  `MonsterSystem.moveMonster` needs `moveMonster` to take the unchanged-room early return
-  first (`:3180-3215`: same level, square and corner → return 0 before anything is
-  lifted), which it lacks — today a monster moved onto its own square is lifted, pressed
-  and set down again. Since C24, `wiggleMonster` also skips a group the move would
-  delete (a fatal fall, a forbidden level) instead of deleting it, because
-  `resolveCellEffects` no longer refuses the teleport; routing it through `moveMonster`
-  removes that stopgap.
+- ✅ **Paid in `42ccf79`.** `TimerSystem.wiggleEverything` moves the first monster through
+  `MonsterSystem.moveMonster` (a new `moveMonster` hook), as `MoveObject(objD4, x, y, x, y)`
+  (`Timer.cpp:2446-2450`); `wiggleMonster` and C24's stopgap in it are gone. `moveMonster`
+  gained the unchanged-room return (`Code11f52.cpp:3183-3213`): a group that ends on its own
+  square is not lifted, pressed or set down. So a wiggled group now gets its AI timers where
+  it lands, gives its `ITEM16` back on another level, is deleted on a level it may not live
+  on, and presses no pad when it goes nowhere. Evidence: `tools/dump-wiggle-monster.ts`, new
+  (5 of 9 checks fail before); the fact is added to the `WiggleEverything` entry in
+  `doc/PROVEN_FACTS.md`.
 - `Game`'s drop from the cursor (`Mouse.cpp:882`) and `TimerSystem.dropMissileObject`
   (`Timer.cpp:151-159`) pass `unchangedRoom = false`, and `resolveCellEffects` turns a
   dropped item's corner on a relative teleporter although `oldX == -1` (`:3000-3006`).
 - `resolveCellEffects` has no stairs arm: `MoveObject` moves a monster or an item that
   lands on stairs one level down when bit 2 of the cell is clear, then one square out
   through `ExitStairsDirection`, turning its corner (`:3108-3131`).
-
 - `MonsterDamage.deleteMonster` (`DeleteMonster`, `Code11f52.cpp:1026-1047`) takes the group
   off its square with `removeObjectFromCell`, where CSBWin calls
   `MoveObject(obj, x, y, -1, 0)` (`:1038`): that runs `CheckMoveFromMissile` on the party's
@@ -830,12 +828,13 @@ differs from it somewhere:
   that does not levitate. So a monster killed on a pad leaves it pressed. Needs
   `moveMonster` to take `newX < 0` (`:3257-3297`: lift, then `return 0`). Found paying C24.
 
-Routing each through `TimerSystem.moveObject` fixes the drops; the stairs arm is its
-own fix. One commit per caller, each with a `tools/` scenario. Size M.
+Routing each through `TimerSystem.moveObject` fixes the drops; `DeleteMonster` needs
+`moveMonster`'s `newX < 0` path; the stairs arm is its own fix. One commit per caller, each
+with a `tools/` scenario. Size M.
 
 ### C24 ✅ `moveMonster`'s return value, and what the AI does with it
 
-**Paid in `COMMIT_C24`.** `MonsterSystem.moveMonster` returns `{ code, position }`: CSBWin's
+**Paid in `6480bd4`.** `MonsterSystem.moveMonster` returns `{ code, position }`: CSBWin's
 value (`LOCAL_14`, or 1 for a group that left the dungeon) and `d.NewX/NewY/NewLevel`. The
 three `MonsterAI` callers end the turn on any non-zero `code` and re-aim `timer_70` to
 `position` (`Monster.cpp:1711`, `:2105`, `:2440`, `:2908`); the DSA and `createMonster`
@@ -850,7 +849,8 @@ the attached level's `ITEM16` (`:2988`). `DamageMonsterGroup` now empties the de
 droppings first (`:1333`). Evidence: `tools/dump-monster-move-code.ts`, new (13 of 17
 checks fail before); `tools/dump-monster-move.ts` case 1 (2 of 18 fail before);
 `tools/watch-monsters.ts` now finds groups on the map instead of in `uByte10/11`; the other
-tools that made a group get it through `tools/lib/createMonster.ts`. The facts are in
+tools that made a group get it through `tools/lib/createMonster.ts`. (The new tool joined
+`tools/run-checks.mjs`'s list only in `42ccf79`: the runner has no discovery.) The facts are in
 `doc/PROVEN_FACTS.md`, and the older return-value entry there is corrected. Found on the
 way: the `DeleteMonster` bullet under C23, and `ProcessMonsterDeleteFilter` under G2.
 
