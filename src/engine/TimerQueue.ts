@@ -359,47 +359,60 @@ export class TimerQueue {
     if (index < this.firstAvailTimer) this.firstAvailTimer = index;
   }
 
+  /**
+   * `TIMER_SEARCH`'s order: a snapshot of the queue (`CreateSearchList`,
+   * `doc/CSBwin-src/Timer.cpp:1209-1215`) walked from its **end** (`FindNextTimer`,
+   * `:2924-2933`) — the timer due last comes first. It is a snapshot, so deleting the
+   * current entry does not disturb the walk.
+   */
+  searchOrder(): TimerEntry[] {
+    return this.queue.slice().reverse();
+  }
+
+  /**
+   * The duplicate-timer rules at the top of `GameTimers::SetTimer`
+   * (`doc/CSBwin-src/Timer.cpp:1011-1125`). A clash with a timer already queued mostly
+   * **keeps the old one**: it takes the new `uByte9` (or, for a `TT_DOOR`, a flipped one)
+   * and is returned in place of the new timer, which is dropped. Only a map timer meeting
+   * a `TT_1`, and a `TT_BASH_DOOR`, delete the old ones and queue the new.
+   */
   private applyDuplicateTimerRules(entry: TimerEntry): TimerEntry | null {
     if (this.isMapTimer(entry.function)) {
       if (this.deleteDuplicateTimers) {
-        let toDelete: TimerEntry | null = null;
-        for (const existing of this.queue) {
+        for (const existing of this.searchOrder()) {
           if (this.isMapTimer(existing.function)) {
             if (!this.matchTimeLevelWord6(entry, existing)) continue;
             if (existing.function === TimerFunction.TT_STONEROOM && existing.uByte8 !== entry.uByte8) continue;
-            toDelete = existing;
-            break;
+            existing.uByte9 = entry.uByte9 & 0xff;
+            return existing;
           }
           if (existing.function !== TimerFunction.TT_DOOR_STEP) continue;
           if (!this.matchTimeLevelWord6(entry, existing)) continue;
           if ((entry.uByte9 & 0xff) === 2) {
-            entry.uByte9 = 1 - (existing.uByte9 & 0xff);
+            entry.uByte9 = (1 - (existing.uByte9 & 0xff)) & 0xff;
           }
-          toDelete = existing;
+          this.deleteTimer(existing.index);
           break;
         }
-        if (toDelete) this.deleteTimer(toDelete.index);
       }
       return null;
     }
 
     if (entry.function === TimerFunction.TT_DOOR_STEP) {
-      let toDelete: TimerEntry | null = null;
-      for (const existing of this.queue) {
+      for (const existing of this.searchOrder()) {
         if (!this.matchTimeLevelWord6(entry, existing)) continue;
         if (existing.function === TimerFunction.TT_DOOR) {
           if ((existing.uByte9 & 0xff) === 2) {
-            entry.uByte9 = 1 - (entry.uByte9 & 0xff);
+            existing.uByte9 = (1 - (entry.uByte9 & 0xff)) & 0xff;
           }
-          toDelete = existing;
-          break;
+          return existing;
         }
         if (existing.function === TimerFunction.TT_DOOR_STEP) {
-          toDelete = existing;
-          break;
+          existing.uByte9 = entry.uByte9 & 0xff;
+          return existing;
         }
       }
-      if (toDelete) this.deleteTimer(toDelete.index);
+      return null;
     }
 
     // A bashed door cancels every door timer on its cell, whenever it was due

@@ -2592,14 +2592,13 @@ export class DsaSystem {
       this.dungeon.removeObjectFromCell(pos, object as ObjectID);
       this.actuators?.triggerObjectMove(pos, object as ObjectID, false, dstType === 1 && dstLoc === srcLoc, this.getPartyState?.().facing ?? 0);
     } else if (decodeObjectID(object).category === DBType.CLOUD) {
-      let timer = -1;
-      for (const entry of this.timers.getTimers()) {
+      // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
+      for (const entry of this.timers.searchOrder()) {
         if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
         if (entry.object === undefined || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(object as ObjectID, 0)) continue;
-        if (timer === -1 || entry.index < timer) timer = entry.index;
+        return { error: DsaMoveError.SER_OK, object, timer: entry.index };
       }
-      if (timer === -1) return { error: DsaMoveError.SER_BadCloudTimer, object };
-      return { error: DsaMoveError.SER_OK, object, timer };
+      return { error: DsaMoveError.SER_BadCloudTimer, object };
     }
     return { error: DsaMoveError.SER_OK, object };
   }

@@ -2624,8 +2624,8 @@ twice, once to check and once to do it. Only the cell source lets a cloud go: th
 monster and chest sources and every destination but a cell refuse one with
 `SER_NoCloudsPlease` / `DER_NoCloudsPlease` (`:156`, `:290`, `:349`, `:426`, `:446`, `:618`,
 `:658`). On the **check** pass `FindCellSource` finds the cloud's `TT_25` or `TT_24` timer
-with a `TIMER_SEARCH` over the slots and returns its handle, or `SER_BadCloudTimer` if there
-is none (`:227-245`); the doing pass does not search again, so the handle from the check is
+with a `TIMER_SEARCH` — the first match in its order, see "`TIMER_SEARCH` walks the queue
+backwards" — and returns its handle, or `SER_BadCloudTimer` if there is none (`:227-245`); the doing pass does not search again, so the handle from the check is
 the one used. `FindCellDestination` then sets that timer's `uByte6/7` to the new square and
 its level to the new level (`:522-529`).
 
@@ -2710,3 +2710,29 @@ and skills 4 and up earn double when it is less than 25 ticks old)
 and the per-champion facing reset in the tick (`Code17818.cpp:420-428`: a champion turned away
 from the party's facing turns back once 60 ticks pass without one). Evidence:
 `tools/dump-last-monster-attack.ts`.
+
+## `TIMER_SEARCH` walks the queue backwards, and `SetTimer` mostly keeps the old timer
+
+`TIMER_SEARCH`'s constructor copies the **queue** (`m_timerQueue`, in firing order) into
+`m_searchList` (`CreateSearchList`, `doc/CSBwin-src/Timer.cpp:1209-1215`), and `FindNextTimer`
+(`:2924-2933`) starts at its end and counts down: the timer due last is visited first, and
+slot numbers play no part. Because it walks a copy, `DeleteTimer` on the current entry is safe.
+Every "first match" in CSBWin's timer searches — `SetTimer`'s duplicate rules, the DSA's
+cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
+
+`SetTimer`'s duplicate rules (`Timer.cpp:1011-1125`), with "matches" meaning same `Time()`,
+`Level()` and `timerWord6()` (the square):
+
+- **New map timer (5-10)**, only while `deleteDuplicateTimers != 0` (initialised -1,
+  `data.cpp:64`; a save may set it, `SaveGame.cpp:1802-1804`): the first matching **map timer
+  of any function** — a `TT_STONEROOM` only with the same `uByte8` — takes the new `uByte9`
+  and is returned; the new one is not queued. Failing that, the first matching `TT_1` is
+  deleted — the new `uByte9` becoming `1 - old.uByte9` if it was 2 — and the new one is queued.
+- **New `TT_1`**: the first matching `TT_DOOR` or `TT_1` is returned and the new one dropped.
+  A `TT_DOOR` changes only if its `uByte9` is 2, to `1 - new.uByte9`; a `TT_1` takes the new
+  `uByte9`. Matching timers of other functions are passed over.
+- **New `TT_BASH_DOOR`**: every `TT_1` / `TT_DOOR` on the square and level is deleted, at any
+  time (already in "A melee blow shatters a door two ticks late").
+
+The returned handle is the kept timer's, so a caller storing the index stores the old slot.
+Evidence: `tools/dump-timer-dedupe.ts`.

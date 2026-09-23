@@ -59,6 +59,7 @@ const CHECKS = [
   { tool: 'dump-missile-monster.ts' },
   { tool: 'dump-missile-door.ts' },
   { tool: 'dump-last-monster-attack.ts' },
+  { tool: 'dump-timer-dedupe.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },
   { tool: 'dump-player-attacks.ts' },

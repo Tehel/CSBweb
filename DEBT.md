@@ -76,7 +76,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C9 | Door pass-through rules and magic formulas | M | ✅ |
 | C10 | Phase 9.5 refinements | S | ✅ |
 | C11 | `DoesPartyHave` does not look inside chests | S | ⏳ |
-| C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ re-audit |
+| C12 | `SetTimer`'s duplicate-timer rules keep the wrong timer | S | ⚠️ sequence stamp left |
 | C13 | The rest of `MoveParty`: stamina, move delay, queue depth | M | ⏳ |
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
@@ -442,7 +442,29 @@ that puts the matching object in a carried chest and checks the actuator fires.
 
 <sub>Found while paying B1, 2026-09-23.</sub>
 
-### C12 ⚠️ `SetTimer`'s duplicate-timer rules keep the wrong timer *(re-audit)*
+### C12 ✅ `SetTimer`'s duplicate-timer rules keep the wrong timer
+
+Re-audited 2026-09-23 against `Timer.cpp:989-1130` read whole; every claim held.
+**Paid in `COMMIT_C12`.** `TimerQueue.applyDuplicateTimerRules` is `SetTimer`'s head line
+for line: a map timer meeting a map timer, and a `TT_1` meeting a `TT_DOOR` or a `TT_1`,
+keep and return the old timer (a `TT_DOOR`'s `uByte9` flipped only if it was 2); only a map
+timer meeting a `TT_1` deletes and requeues. The re-reading found one more thing: every
+CSBWin timer search walks the **queue from its end** (`TIMER_SEARCH`, `:1209-1215`,
+`:2924-2933`), not the slots. `TimerQueue.searchOrder()` is that order; the duplicate rules
+and C8's DSA cloud-timer lookup (which took the lowest slot) use it. Evidence:
+`tools/dump-timer-dedupe.ts` (3 of 15 checks fail before); the facts are in
+`doc/PROVEN_FACTS.md`, and `doc/CSBWIN_TIMERS_REFERENCE.md` is corrected. The sequence stamp
+`SetTimer` gives a timer on insertion is the second half of this entry, below.
+
+- ⏳ **The sequence number is stamped at the wrong time.** `SetTimer` stamps
+  `m_timerSequence++` on the slot it inserts into (`Timer.cpp:1189`, `SEQUENCED_TIMERS` is
+  defined in `stdafx.h:17`), so a dropped duplicate consumes none and a requeued timer
+  gets a fresh one. `TimerQueue.createTimer` stamps before the duplicate rules run, and
+  `addTimer` — which `MonsterSystem`, `MonsterAI` and `DsaSystem` call with their own
+  entries — keeps whatever the entry carried (the DSA passes 0). The stamp breaks ties
+  between timers due on the same tick, and is saved (`gb2.TimerSequence`).
+
+<details><summary>original entry</summary>
 
 Seen while paying C1, not yet worked. `GameTimers::SetTimer` (`doc/CSBwin-src/Timer.cpp:989`)
 resolves a clash by **keeping the timer already queued** and dropping the new one;
@@ -467,6 +489,8 @@ Re-read `Timer.cpp:989-1130` whole before changing anything — these line range
 reading it in pieces. The visible effect is on doors toggled twice in one tick. Evidence:
 a `tools/` scenario queuing each clashing pair and checking which entry survives, with
 which function, `uByte9` and slot index. Size S–M.
+
+</details>
 
 ### C13 ⏳ The rest of `MoveParty`: stamina, move delay, queue depth
 
