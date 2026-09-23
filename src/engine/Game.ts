@@ -42,15 +42,6 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 
-/**
- * The wound mask a missile carries, a literal at `DamageCharacter(objectPos, D5W, 12,
- * …)` (`doc/CSBwin-src/Code11f52.cpp:2046`). Bits 2 and 3 are the torso and the legs.
- *
- * (The champion *wound sound*, ordinal `chIdx + 9`, belongs to the monster's melee
- * attack — `doc/CSBwin-src/Monster.cpp:4584`, ported in `MonsterAttack`. A missile
- * strike queues no sound of its own.)
- */
-const MISSILE_WOUND_MASK = 12;
 import {
     ActuatorAction,
     PORTRAIT_INACTIVE,
@@ -90,6 +81,16 @@ import {
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 
 /**
+ * The wound mask a missile carries, a literal at `DamageCharacter(objectPos, D5W, 12,
+ * …)` (`doc/CSBwin-src/Code11f52.cpp:2046`). Bits 2 and 3 are the torso and the legs.
+ *
+ * (The champion *wound sound*, ordinal `chIdx + 9`, belongs to the monster's melee
+ * attack — `doc/CSBwin-src/Monster.cpp:4584`, ported in `MonsterAttack`. A missile
+ * strike queues no sound of its own.)
+ */
+const MISSILE_WOUND_MASK = 12;
+
+/**
  * Game event callback types
  */
 export type GameEventCallback = (game: Game) => void;
@@ -123,6 +124,17 @@ interface DropCursorOptions {
  * whatever offsets play had left behind, and every cell's object chain was read from
  * the wrong place. A v4 save cannot be repaired — the index it needed was never
  * written — so it is refused like any other older format.
+ *
+ * Version 6 stores the timer table as CSBWin's array has it — by timer index, holes
+ * included — and adds `timerQueue` (which of those timers are live, in firing order)
+ * and `timerSequence` (the stamp the next queued timer takes), so a restored queue
+ * fires in the same order it would have. It came with loading genuine CSBWin save
+ * files, whose timer blocks have that shape.
+ *
+ * Version 7 moves a timer's object reference into the byte pair `ConvertTimers` names
+ * for its function (`doc/CSBwin-src/SaveGame.cpp:2027-2050`; see
+ * `collapseTimerBytes`). A v6 payload kept the RN only on the live `TimerEntry.object`,
+ * which has no byte in the file, so a restored missile came back without its object.
  *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
@@ -173,17 +185,15 @@ export class Game {
     /** The timer queue. Public like the other subsystems; `tools/` drives it. */
     readonly timerQueue: TimerQueue;
     /**
-     * The game's random stream, CSBWin's `d.RandomNumber`. Everything with a
-     * game-visible outcome draws from this one instance, in CSBWin's order, so a
-     * seeded run is reproducible and an AI trace is comparable with CSBWin's.
-     * Rendering must never draw from it — CSBWin keeps a separate `viewportRandom`
-     * precisely so drawing "doesn't upset the game"
+     * The game's random stream, CSBWin's `d.RandomNumber`
+     * (`doc/CSBwin-src/CSBCode.cpp:351`). Everything with a game-visible outcome draws
+     * from this one instance, in CSBWin's order, so a seeded run is reproducible and an
+     * AI trace is comparable with CSBWin's. Rendering must never draw from it — CSBWin
+     * keeps a separate `viewportRandom` precisely so drawing "doesn't upset the game"
      * (doc/CSBwin-src/Viewport.cpp:6706).
-     */
-    /**
-     * `d.RandomNumber` (`doc/CSBwin-src/CSBCode.cpp:351`). Seeded from the host on first
-     * draw; `setRandomSeed` exists so a verification tool can pin the stream, which is
-     * what makes a run repeatable.
+     *
+     * Seeded from the host on first draw; `setRandomSeed` exists so a verification tool
+     * can pin the stream, which is what makes a run repeatable.
      */
     private random = new CsbRandom();
     private actuators: ActuatorSystem;
@@ -589,7 +599,6 @@ export class Game {
             },
         });
 
-        console.log('Game initialized at position:', startPos, 'facing:', startFacing);
     }
 
     processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
@@ -2707,10 +2716,13 @@ export class Game {
     }
 
 
-    castSpellFromUi(chIdx: number, incantation: number[], totalManaCost: number): number {
+    /**
+     * The magic panel's cast button. CSBWin's caller hands `CastMagic` nothing but the
+     * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune.
+     */
+    castSpellFromUi(chIdx: number, incantation: number[]): number {
         if (chIdx < 0 || chIdx >= this.party.state.champions.length) return 0;
         if (!incantation || incantation.length === 0) return 0;
-        void totalManaCost;
         const champion = this.party.state.champions[chIdx];
         if (!champion || champion.alive === false) return 0;
         champion.incantation = [...incantation];

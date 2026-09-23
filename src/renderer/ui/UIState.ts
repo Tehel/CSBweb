@@ -134,7 +134,7 @@ export interface UIState {
   /* ---- hooks out to the engine / host ---- */
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   onObjectMove?: ObjectMoveHandler;
-  onSpellCast?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void;
+  onSpellCast?: (chIdx: number, incantation: number[]) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
   onChampionAttack?: (chIdx: number, attackType: number) => number;
   /** `d.attackDamageToDisplay`, read and cleared. */

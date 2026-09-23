@@ -142,15 +142,10 @@ export function applyMagicSelection(ui: UIState, buttonId: number): void {
   // Cast
   if (buttonId === 108) {
     if (champion.incantation.length === 0) return;
-    const totalManaCost = computeIncantationManaCost(
-      champion.incantation,
-      ui.uiTables.graphic230.spellBaseMana,
-      ui.uiTables.graphic230.spellFirstRuneScale,
-    );
     const chIdx = ui.partyState.champions.indexOf(champion);
     let result: number | void = undefined;
     if (chIdx >= 0) {
-      result = ui.onSpellCast?.(chIdx, [...champion.incantation], totalManaCost);
+      result = ui.onSpellCast?.(chIdx, [...champion.incantation]);
     }
     if (result !== 3) {
       champion.incantation = [];
@@ -177,23 +172,6 @@ export function applyMagicSelection(ui: UIState, buttonId: number): void {
   // apply cost en enqueue rune
   champion.attributes.mana -= manaCost;
   champion.incantation.push(96 + step * 6 + runeId);
-}
-
-export function computeIncantationManaCost(incantation: number[], baseMana: number[], scaleMana: number[]): number {
-  if (incantation.length === 0) return 0;
-  const powerIndex = Math.max(0, Math.min(5, (incantation[0] ?? 96) - 96));
-  let total = 0;
-  for (let step = 0; step < incantation.length; step++) {
-    const value = incantation[step] ?? 96;
-    const runeId = value - 96 - step * 6;
-    if (runeId < 0 || runeId > 5) continue;
-    let cost = baseMana[step * 6 + runeId] ?? 0;
-    if (step > 0) {
-      cost = Math.floor((cost * (scaleMana[powerIndex] ?? 0)) / 8);
-    }
-    total += cost;
-  }
-  return total;
 }
 
 export function handleMagicClick(ui: UIState, clickX: number, clickY: number): void {

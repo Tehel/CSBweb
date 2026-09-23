@@ -1,5 +1,5 @@
 /**
- * Bytecode Interpreter Prototype - Direct port from CSBWin
+ * Bytecode Interpreter - Direct port from CSBWin
  *
  * This is a mechanical port of the Interpret() function from CSBWin's Viewport.cpp
  * The goal is to execute bytecode programs exactly as CSBWin does.
@@ -37,8 +37,8 @@ const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90
  */
 export interface InterpreterContext {
   // Graphics data
-  wallBitmaps: any[]; // IndexedBitmap in browser, mock in tests
-  doorBitmaps?: any[]; // IndexedBitmap[8] in browser (pDoorBitmaps[0..7])
+  wallBitmaps: IndexedBitmap[];
+  doorBitmaps?: IndexedBitmap[]; // pDoorBitmaps[0..7]
   wallRectangles: RectPos[];
   floorBitmap?: ImageData;   // Floor graphic (optional)
   ceilingBitmap?: ImageData; // Ceiling graphic (optional)
@@ -3006,8 +3006,8 @@ export class BytecodeInterpreter {
 
   private resolveStdBitmapPointer(ptr: number): IndexedBitmap | null {
     // Port of CSBWin `StdBitmapPointers()` (Viewport.cpp:2261+).
-    const wall = this.context.wallBitmaps as unknown as IndexedBitmap[];
-    const door = (this.context.doorBitmaps ?? []) as unknown as IndexedBitmap[];
+    const wall = this.context.wallBitmaps;
+    const door = this.context.doorBitmaps ?? [];
 
     switch (ptr) {
       case StdBitmapPtr.BMP_StdWallBitmapF3L2:

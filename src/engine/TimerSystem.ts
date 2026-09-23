@@ -2502,9 +2502,9 @@ export class TimerSystem {
    * a fireball's blast tests `canOpenWithFireball`, an axe blow `canOpenWithAxe`. The
    * force must also beat the door type's entry in `DoorTOC`.
    *
-   * ⚠️ CSBWin's `delay` argument is not ported: only its zero case is reachable, since
-   * the delayed form belongs to `Attack.cpp`'s melee (`TT_BASH_DOOR`), which does not
-   * exist yet. Recorded in PLAN.md.
+   * ⚠️ CSBWin's `delay` argument is not ported: only its zero case is. `Attack.cpp`'s
+   * melee door bash passes a delay of 2 (`doc/CSBwin-src/Attack.cpp:1803-1808`) and
+   * currently lands immediately — `DEBT.md` C1.
    */
   hitDoor(position: Position, force: number, explosion: boolean): boolean {
     const doorRn = this.dungeon.findFirstObject(position);

@@ -405,7 +405,7 @@ export class ViewportRenderer {
     this.ui.onObjectMove = handler;
   }
 
-  setSpellCastHandler(handler?: (chIdx: number, incantation: number[], totalManaCost: number) => number | void): void {
+  setSpellCastHandler(handler?: (chIdx: number, incantation: number[]) => number | void): void {
     this.ui.onSpellCast = handler;
   }
 

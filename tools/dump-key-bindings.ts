@@ -129,9 +129,9 @@ async function main(): Promise<void> {
     attacks.push({ chIdx, attackType });
     return 0;
   };
-  let casts: Array<{ chIdx: number; incantation: number[]; mana: number }> = [];
-  ui.onSpellCast = (chIdx: number, incantation: number[], mana: number) => {
-    casts.push({ chIdx, incantation, mana });
+  let casts: Array<{ chIdx: number; incantation: number[] }> = [];
+  ui.onSpellCast = (chIdx: number, incantation: number[]) => {
+    casts.push({ chIdx, incantation });
     return 0;
   };
 

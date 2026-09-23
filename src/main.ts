@@ -292,8 +292,8 @@ async function init() {
             renderer.setObjectMoveHandler((position, object, place, unchangedRoom, facing) => {
                 game?.triggerObjectMove(position, object, place, unchangedRoom, facing);
             });
-            renderer.setSpellCastHandler((chIdx, incantation, totalManaCost) => {
-                return game?.castSpellFromUi(chIdx, incantation, totalManaCost) ?? 0;
+            renderer.setSpellCastHandler((chIdx, incantation) => {
+                return game?.castSpellFromUi(chIdx, incantation) ?? 0;
             });
             renderer.setFeedingHandler((chIdx, fp) => game?.applyFeeding(chIdx, fp) ?? false);
             renderer.setResurrectReincarnateCancelHandler((button) => {
