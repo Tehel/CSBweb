@@ -31,7 +31,7 @@
  */
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
-import { sw } from '../core/intCast';
+import { div, sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { Champion, PartyState } from './gameTypes';
 import { getPartyChampion } from './Party';
@@ -57,8 +57,6 @@ import {
   monsterWord16_8_11,
 } from '../renderer/csbwin/ObjectTables';
 
-/** C's integer division: truncate toward zero. */
-const div = (a: number, b: number): number => Math.trunc(a / b);
 
 /**
  * `objNI_*` for the three named blades the damage formula singles out

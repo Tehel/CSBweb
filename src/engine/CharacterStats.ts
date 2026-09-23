@@ -19,7 +19,7 @@
  * spread across the UI and the engine can. Recorded in PLAN.md.
  */
 import type { CsbRandom } from '../core/random';
-import { applyLimits, sw } from '../core/intCast';
+import { applyLimits, div, sw } from '../core/intCast';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import type { DungeonState } from './DungeonState';
 import type { Champion } from './gameTypes';
@@ -61,8 +61,6 @@ export interface CharacterStatsDeps {
   nameIndex(rn: ObjectID): number;
 }
 
-/** C's integer division: truncate toward zero, not toward negative infinity. */
-const div = (a: number, b: number): number => Math.trunc(a / b);
 
 export class CharacterStats {
   constructor(private deps: CharacterStatsDeps) {}

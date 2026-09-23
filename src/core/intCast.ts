@@ -3,6 +3,9 @@
  * relies on 16-bit wrap-around.
  */
 
+/** C's integer division: truncates toward zero, where `Math.floor` would not. */
+export const div = (a: number, b: number): number => Math.trunc(a / b);
+
 /** `sw(x)` — `(i16)(x)`: truncate to 16 bits and sign-extend. */
 export const sw = (v: number): number => (v << 16) >> 16;
 
