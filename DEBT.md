@@ -67,7 +67,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | B3 | `LOCATIONREL` has three shapes | S | ⏳ |
 | C1 | The melee door bash ignores `HitDoor`'s delay | S | ✅ |
 | C2 | Missile→monster damage skips the magic and poison formulas | M | ✅ |
-| C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ⏳ |
+| C3 | `NinetySecondUpdate` cadence, and its body unaudited | S | ✅ |
 | C4 | `DamageCharacter` is missing two early guards | S | ⏳ |
 | C5 | Three movement deferrals | M | ⏳ |
 | C6 | Which generator cloud and missile sprites flip with | S | ⏳ |
@@ -347,7 +347,19 @@ the formula, and which member took it.
 
 </details>
 
-### C3 ⏳ `NinetySecondUpdate` cadence, and its body unaudited
+### C3 ✅ `NinetySecondUpdate` cadence, and its body unaudited
+
+**Paid in the commit "Torches burn down every 512 ticks".** `Game.processNinetySecondUpdate`
+gates on `(tickCount & 511) == 0`. Auditing the body against `CSBCode.cpp:7339-7387` found
+one more divergence: CSBWin loops over `d.NumCharacter` less one while
+`d.PotentialCharacterOrdinal != 0`, so a Hall of Champions recruit's torch does not burn;
+the port burned it. The torch test now uses `NameIndex` as CSBWin does (it used
+`GetBasicObjectType`, which agrees for every torch), and hands go 1 then 0.
+`SelectPaletteForLightLevel` / `DrawEightHands` need no call: both are derived from live
+state every frame. Evidence: `tools/dump-ninety-second-update.ts` (5 of 6 checks fail
+before); the fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 CSBWin calls `NinetySecondUpdate` when `(d.Time & 511) == 0`
 (`doc/CSBwin-src/CSBCode.cpp:680-683`). `Game.processNinetySecondUpdate`
@@ -356,6 +368,8 @@ ticks instead of every 512, so about 1.4 times too often. Its body (torch burn-d
 never audited against `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339`). Port both,
 the way `processTenSecondUpdate` was; `tools/dump-ten-second-update.ts` is the model for
 the evidence.
+
+</details>
 
 ### C4 ⏳ `DamageCharacter` is missing two of CSBWin's three early guards
 

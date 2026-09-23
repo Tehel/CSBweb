@@ -2514,3 +2514,16 @@ potion's own RN through the whole switch (`:1771-1810`); only the tail swaps in 
 monster, a champion or a door is `DetermineMagicDamage` of the potion — a random 0-3 plus
 half its weight — and the explosion comes after it, and `nonPoison_Spell` is false for a
 potion. Evidence: `tools/dump-missile-monster.ts`.
+
+## Torches burn down every 512 ticks, and a recruit's does not
+
+The game tick calls `NinetySecondUpdate` when `(d.Time & 511) == 0`
+(`doc/CSBwin-src/CSBCode.cpp:680-683`, commented "about every 85 seconds") — every 512
+ticks, not every 90 × 4 = 360. `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`)
+loops over `d.NumCharacter` champions, **one fewer while `d.PotentialCharacterOrdinal != 0`**
+(`:7351-7352`) — the recruit standing in a Hall of Champions mirror is always the last
+champion, so their torch does not burn. For hand 1 then hand 0, an object whose `NameIndex`
+lies in `objNI_Torch_a..objNI_Torch_d` with non-zero `charges()` gets `(charges - 1) & 15`,
+and loses `important` when that reaches 0 (`:7356-7373`). `SelectPaletteForLightLevel` and
+`DrawEightHands` follow unconditionally — the `if (D5W != 0)` around them is commented out
+(`:7382-7386`). Evidence: `tools/dump-ninety-second-update.ts`.

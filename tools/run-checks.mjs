@@ -43,6 +43,7 @@ const CHECKS = [
   { tool: 'dump-champion-death.ts' },
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-ten-second-update.ts' },
+  { tool: 'dump-ninety-second-update.ts' },
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-vi-altar.ts' },
   { tool: 'dump-status-boxes.ts' },

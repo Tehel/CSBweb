@@ -1370,34 +1370,44 @@ export class Game {
         this.timerSystem.queueBrightnessTimer(deltaSteps, time);
     }
 
+    /**
+     * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`), called from the
+     * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`) —
+     * every 512 ticks, about 85 seconds, despite the name.
+     *
+     * Each torch in a champion's hands loses one charge, and one that burns out loses its
+     * `important` flag. The loop runs over `d.NumCharacter`, less one while
+     * `d.PotentialCharacterOrdinal != 0`: a Hall of Champions recruit is always the last
+     * champion, and their torch does not burn. The dead are not skipped (their hands are
+     * empty anyway).
+     *
+     * CSBWin then calls `SelectPaletteForLightLevel` and `DrawEightHands` whether or not
+     * a torch changed. Both have no counterpart here: the light palette and the hands
+     * are derived from live state every frame (`src/renderer/ui/Light.ts`).
+     */
     private processNinetySecondUpdate(): void {
-        const decayTicks = GAME_TIMING.TICKS_PER_SECOND * 90;
-        if (decayTicks <= 0) return;
-        if ((this.state.tickCount % decayTicks) !== 0) return;
-
-        let changed = false;
-        for (const champion of this.party.state.champions) {
+        if ((this.state.tickCount & 511) !== 0) return;
+        const party = this.party.state;
+        let count = party.champions.length;
+        if ((party.potentialChampionIndex ?? -1) >= 0) count--;
+        for (let chIdx = 0; chIdx < count; chIdx++) {
+            const champion = party.champions[chIdx];
             if (!champion) continue;
-            for (let hand = 0; hand < 2; hand++) {
+            // `for (D6W=2; (D6W--) != 0;)` — hand 1, then hand 0.
+            for (let hand = 1; hand >= 0; hand--) {
                 const obj = this.getChampionPossession(champion, hand);
                 if (!obj) continue;
                 if (!isLikelyObjectRecord(this.dungeonState, obj)) continue;
-                if (!this.isTorchObject(obj)) continue;
+                const nameIndex = this.nameIndex(obj);
+                if (nameIndex < OBJNI_TORCH_A || nameIndex > OBJNI_TORCH_D) continue;
                 const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
                 if (!weapon) continue;
                 const charges = weapon.charges & 0x0f;
                 if (charges === 0) continue;
                 const next = (charges - 1) & 0x0f;
                 weapon.charges = next;
-                if (next === 0) {
-                    weapon.important = false;
-                }
-                changed = true;
+                if (next === 0) weapon.important = false;
             }
-        }
-
-        if (changed) {
-            this.state.party = this.party.state;
         }
     }
 
@@ -2317,11 +2327,6 @@ export class Game {
         return this.random.below(maxExclusive);
     }
 
-
-    private isTorchObject(rn: ObjectID): boolean {
-        const base = this.getBaseObjectNameIndex(rn);
-        return base >= OBJNI_TORCH_A && base <= OBJNI_TORCH_D;
-    }
 
     /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
     private getBaseObjectNameIndex(rn: ObjectID): number {

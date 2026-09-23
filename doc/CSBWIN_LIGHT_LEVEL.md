@@ -65,7 +65,9 @@ legacy quirk in CSBWin (`CSBCode.cpp:7283+`).
 Torch charge burn-down:
 - `NinetySecondUpdate` decrements torch charges in hands and calls
   `SelectPaletteForLightLevel` afterward
-  (`doc/CSBwin-src/CSBCode.cpp:7360+`).
+  (`doc/CSBwin-src/CSBCode.cpp:7339-7387`). It runs every 512 ticks,
+  `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`), and skips a Hall of
+  Champions recruit — see `doc/PROVEN_FACTS.md` → "Torches burn down every 512 ticks".
 
 ### 2) Ambient Brightness (`d.Brightness`)
 After summing torch contributions, CSBWin adds `d.Brightness`:
