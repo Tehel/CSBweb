@@ -72,7 +72,7 @@ export interface MonsterSystemHooks {
   checkMoveFromMissile?: (from: Position, to: Position | null, monsterRn: ObjectID) => boolean;
   /**
    * `MoveObject`'s loop for a monster (`TimerSystem.resolveMonsterDestination`):
-   * teleporter chains and pit falls. `code` is `LOCAL_14` as `TeleportMonster` left it,
+   * teleporter chains, pit falls and stairs. `code` is `LOCAL_14` as `TeleportMonster` left it,
    * `audible` is `LOCAL_26`, and `groupDied` is `LOCAL_18`, a fall that killed them all.
    */
   resolveMonsterDestination?: (
@@ -476,8 +476,9 @@ export class MonsterSystem {
    *
    * Moves a group from one square to another (`oldX < 0`: places it from nowhere;
    * `newX < 0`: lifts it off its square and returns 0 before the monster branch, as
-   * `DeleteMonster` does, `:3257-3297`, `:1038`), taking the destination through teleporter chains and pit falls, and keeping the
-   * `ITEM16` and the AI timers in step with the result. A group that ends on the square
+   * `DeleteMonster` does, `:3257-3297`, `:1038`), taking the destination through
+   * teleporter chains, pit falls and stairs, and keeping the `ITEM16` and the AI timers
+   * in step with the result. A group that ends on the square
    * it started on is left alone and the move returns 0 — which is what `WiggleEverything`
    * relies on when it moves a group onto its own square (`Timer.cpp:2446-2450`).
    *
@@ -578,7 +579,8 @@ export class MonsterSystem {
 
     // Still on the square it started on, in the same corner: nothing is lifted, pressed
     // or set down (`:3183-3213`). Only the stairs turn a monster's corner (`:3122-3129`),
-    // and they always take it to another square, so the square alone decides.
+    // and they always take it to another square, so the square alone decides. That turn
+    // is not applied to the group's ID here (DEBT.md C25).
     if (destLevel === level && destination.x === oldX && destination.y === oldY) {
       return { code: 0, position: destination };
     }

@@ -59,6 +59,7 @@ import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterFireResistance } from '../renderer/csbwin/ObjectTables';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
+import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import {
   monsterAbsorbsDaggersEtc,
   monsterHorizontalSize,
@@ -2922,8 +2923,9 @@ export class TimerSystem {
    * `:3272-3274`, `:3427-3429`), and a cloud is not levitating (`Levitating`,
    * `:2417-2437`), so it falls. `PlaceOrRemoveObjectInRoom`'s `unchangedRoom` is whether
    * the party stands on the square (`:3278-3293`, `:3433-3448`). A teleporter turns an
-   * object's corner only when `oldX != -1` (`:3000-3006`). The missile's timer is its
-   * caller's business.
+   * object's corner only when `oldX != -1` (`:3000-3006`); stairs take anything but a
+   * missile down and out, and turn its corner whatever `oldX` is (`:3108-3131`). The
+   * missile's timer is its caller's business.
    *
    * Returns CSBWin's `1` as `removed` when `CheckMoveFromMissile` destroyed the group,
    * and otherwise the ID as it was placed and where, or `null` for a lift or an
@@ -2967,11 +2969,11 @@ export class TimerSystem {
         if (word8 !== null) missileDir = this.decodeMissileTimerWord8(word8).dir;
       }
       const result = this.resolveCellEffects(
-        new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated,
+        new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated, undefined, undefined, oldX,
       );
       destination = result.position;
       newDir = result.missileDir;
-      const corner = (type !== DBType.MISSILE && oldX === -1 ? decoded.position : result.objectPos) & 0x3;
+      const corner = result.objectPos & 0x3;
       moved = encodeObjectID(corner, type, decoded.index) as ObjectID;
       const unchangedRoom = destination.z === level && destination.x === oldX && destination.y === oldY;
       if (unchangedRoom && corner === decoded.position && type !== DBType.MISSILE) {
@@ -2997,8 +2999,8 @@ export class TimerSystem {
 
   /**
    * The loop of `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2896-3131`) for a monster,
-   * for `MonsterSystem.moveMonster`: the destination taken through teleporter chains and
-   * pit falls by the same `resolveCellEffects` the party and every object go through.
+   * for `MonsterSystem.moveMonster`: the destination taken through teleporter chains, pit
+   * falls and stairs by the same `resolveCellEffects` the party and every object go through.
    *
    * `oldX, oldY` on `level` is where the group stands (`oldX < 0`: it is being placed
    * from nowhere). Its `ITEM16` is attached when that is the party's level and the group
@@ -3105,6 +3107,8 @@ export class TimerSystem {
     allowFall: boolean,
     monster?: MonsterMove,
     pretendTeleporter?: TeleporterRecord,
+    /** `MoveObject`'s `oldX`: -1 keeps an item's corner through a teleporter (`:3000-3006`). */
+    oldX?: number,
   ): {
     position: Position;
     objectPos: number;
@@ -3173,7 +3177,7 @@ export class TimerSystem {
             }
           }
         } else {
-          if (!teleporter.absoluteRotation) {
+          if (!teleporter.absoluteRotation && oldX !== -1) {
             curPos = (curPos + rotation) & 0x3;
           }
         }
@@ -3202,6 +3206,27 @@ export class TimerSystem {
             this.hooks?.flushPendingDroppings?.(monster.record.creatureType, position.z, position.x, position.y);
           }
         }
+        continue;
+      }
+
+      // The stairs (`:3108-3131`): a monster or an object — not the party, not a missile
+      // — goes one level down unless bit 2 says the stairs go up, then one square out
+      // through `ExitStairsDirection`, its corner turned to face the stairs. The loop
+      // goes on from the square it lands on.
+      const cellFlag = this.dungeon.getCellFlag(position);
+      if (((cellFlag >> 5) & 0x7) === RoomType.STAIRS && objectType >= DBType.CREATURE && objectType !== DBType.MISSILE) {
+        if ((cellFlag & 0x04) === 0) {
+          // `IncrementLevel` finds no level only in a malformed dungeon, where CSBWin would
+          // `LoadLevel(-1)`; the object stays on the stairs instead.
+          const below = this.dungeon.incrementLevel(position, 1);
+          if (!below) break;
+          position = below;
+        }
+        const exit = this.dungeon.getExitStairsDirection(position, this.getPartyState().facing as Direction);
+        position = new Position(position.x + DELTA_X[exit]!, position.y + DELTA_Y[exit]!, position.z);
+        const back = (exit + 2) & 0x3;
+        curPos = ((((curPos - back + 1) & 2) >> 1) + back) & 0x3;
+        moved = true;
         continue;
       }
 

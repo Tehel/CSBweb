@@ -2963,6 +2963,26 @@ corner it was dropped at and a thrown one (`-2`) is turned.
 
 Evidence: `tools/dump-drop-move-object.ts` (3 of 8 checks fail before).
 
+## `MoveObject` takes a monster or an object down stairs and out, turning its corner
+
+In `MoveObject`'s loop (`doc/CSBwin-src/Code11f52.cpp:3108-3131`), a square that is neither an
+active teleporter nor a pit the thing falls into ends the loop unless it is stairs
+(`D5W != 3`, `:3110`). The party (`RNnul`), a missile and any type below `dbMONSTER` break there too;
+so a monster, an item or a cloud on stairs goes on: one level down with `IncrementLevel` when
+bit 2 of the cell is clear (`:3114-3118`; bit 2 set means the stairs go up, and then the level
+does not change), then one square out in `ExitStairsDirection`'s direction on the level it is
+now on (`:3119-3123`; the first neighbour, N-E-S-W, that is not stone, not stairs, and not a
+false wall with bits 0 and 2 clear, else `d.partyFacing`, `:290-325`). Its corner becomes
+`((((pos - back + 1) & 2) >> 1) + back) & 3`, where `back = (dir + 2) & 3` faces the stairs
+(`:3124-3130`), and the loop goes on from the new square. There is no levitation test, so a
+flying monster takes the stairs too.
+
+`objD7.pos(p)` changes the object itself, not a copy: `RN::pos(p)` writes the corner into the
+global `dataTypeMap` entry for the RN's indirect index (`CSBTypes.h:336-341`), and `RN`
+equality compares only that index (`:349-356`).
+
+Evidence: `tools/dump-stairs-move.ts` (5 of 6 checks fail before).
+
 ## `WiggleEverything` moves each object with `MoveObject`, and walks a counted stretch of the chain
 
 When a teleporter switches on or a pit opens, `WiggleEverything` (`doc/CSBwin-src/Timer.cpp:2428`)

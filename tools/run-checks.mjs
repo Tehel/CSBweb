@@ -58,6 +58,7 @@ const CHECKS = [
   { tool: 'dump-wiggle-monster.ts' },
   { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-drop-move-object.ts' },
+  { tool: 'dump-stairs-move.ts' },
   { tool: 'dump-local-action.ts' },
   { tool: 'dump-does-party-have.ts' },
   { tool: 'dump-dsa-move.ts' },
