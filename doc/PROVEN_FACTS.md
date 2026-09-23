@@ -2663,8 +2663,12 @@ is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
   the movement keys become; `HandleMouseEvents` sends 1-2 to `TurnParty` and 3-6 to
   `MoveParty` (`:1550-1570`). Button 80 is the viewport, `HandleClickInViewport`
   (`:1665-1670`).
+- While `d.PressingEye` or `d.PressingMouth` is set, every button tested after 81 —
+  140 the disk icon, 145-148, 200-216 — is swallowed, `lastTime` stamped
+  (`Mouse.cpp:1679-1680`); only the button-up, which comes before, lets go.
 
-Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue),
+Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue; case 8
+fails before the eye gate),
 `tools/dump-party-collision.ts` case 9.
 
 ## A level change discards all input, at the top of the next tick

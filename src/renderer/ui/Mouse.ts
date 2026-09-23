@@ -93,6 +93,11 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     handleEyePress(ui);
     return;
   }
+  // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` and the same for
+  // the mouth (doc/CSBwin-src/Mouse.cpp:1679-1680): every button after 81 is swallowed
+  // until the button-up lets go. The port has no pressed mouth — `handleMouthPress`
+  // feeds on the press — so only the eye is tested.
+  if (ui.pressingEye) return;
   if (id === 140) {
     // The disk icon, `buttons17760[1]` (`doc/CSBWIN_MENU_REFERENCE.md`). Both guards are
     // CSBWin's (`doc/CSBwin-src/Mouse.cpp:1708-1727`): an empty party, or a champion

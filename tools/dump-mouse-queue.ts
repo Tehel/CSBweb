@@ -18,6 +18,8 @@
  * - The on-screen arrows are buttons 1-6 (`buttons17304`); `HandleMouseEvents` sends
  *   1-2 to `TurnParty` and 3-6 to `MoveParty` (`Mouse.cpp:1550-1570`).
  * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7532-7544`).
+ * - While the eye or the mouth is pressed, every button after 81 — the disk icon, 140,
+ *   among them — is swallowed (`Mouse.cpp:1679-1680`), until the button-up.
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
@@ -28,11 +30,38 @@ import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
+import type { Champion } from '../src/engine/gameTypes';
+import { createUIState } from '../src/renderer/ui/UIState';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
+
+/** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
+async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  if (!g.window) g.window = g;
+  return import('../src/renderer/ui/Mouse');
+}
+
+/** A plain champion: the disk icon wants a party, the eye a champion to look through. */
+function champion(): Champion {
+  return {
+    name: 'HERO',
+    attributes: {
+      health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
+      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
+      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
+    },
+    alive: true, incantation: [], food: 1500, water: 1500,
+    skills: [], weaponHand: null, shieldHand: null, quiver: null,
+    possessions: new Array(30).fill(null),
+    partyPosition: 0,
+  };
+}
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -228,6 +257,38 @@ async function main(): Promise<void> {
   frame();
   console.log(`click then DiscardAllInput: handled ${handled.length}, queue ${game.queuedInputCount()}`);
   check(handled.length === 0 && game.queuedInputCount() === 0, 'DiscardAllInput should drop a queued click');
+
+  // ---- 8: the disk icon waits for the eye to be let go ----------------------------
+  // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
+  // and before 140 (doc/CSBwin-src/Mouse.cpp:1679-1680). Through the real dispatcher.
+  const { handleMouseButton, handleMouseUnclick } = await importMouse();
+  const ui = createUIState(graphics, dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  ui.uiTables = uiTables;
+  ui.partyState = party;
+  game.setMouseEventHandlers({
+    button: (num, x, y) => handleMouseButton(ui, num, x, y),
+    unclick: () => handleMouseUnclick(ui),
+  });
+  const diskAfter = (withButtonUp: boolean): boolean => {
+    reset();
+    party.champions = [champion()];
+    party.selectedCharacterIndex = 0;
+    ui.pressingEye = false;
+    ui.diskMenuNeeded = false;
+    game.onMouseClick(71, 20, 50);
+    if (withButtonUp) game.onMouseUnClick();
+    game.onMouseClick(140, 178, 40);
+    for (let i = 0; i < 3; i++) { frame(true); frame(); }
+    return ui.diskMenuNeeded;
+  };
+  const diskWhilePressing = diskAfter(false);
+  const diskAfterRelease = diskAfter(true);
+  console.log(`disk icon behind an eye press: ${diskWhilePressing ? 'menu' : 'swallowed'}; ` +
+    `behind its button-up: ${diskAfterRelease ? 'menu' : 'swallowed'}`);
+  check(!diskWhilePressing, 'the disk icon should do nothing while the eye is pressed');
+  check(diskAfterRelease, 'the disk icon should ask for the menu once the eye is let go');
+  party.champions = [];
+  party.selectedCharacterIndex = -1;
 
   finish();
 }

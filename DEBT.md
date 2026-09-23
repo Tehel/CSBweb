@@ -90,7 +90,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C23 | The other object movers are not `MoveObject` either | M | ✅ |
 | C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
 | C25 | The stairs do not turn a monster's corner | S | ⚠️ |
-| C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ⏳ |
+| C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -755,7 +755,7 @@ a turn queued (`tools/dump-party-collision.ts` case 10 is the pattern).
 
 ### C21 ✅ Clicks do not go through the input queue
 
-**Paid in the commit after `426c0a0`** (see `git log`). `Game` now has CSBWin's one
+**Paid in `efce48e`.** `Game` now has CSBWin's one
 mouse queue, a ring of `MOUSEQLEN` entries, and it holds keys and clicks alike.
 
 - **The queue is 8 long.** `MOUSEQLEN` is 8, not 3. `Data.h:1513` leaves `NoKeyQue`
@@ -806,7 +806,16 @@ save or `tools/` scenario depends on it yet.
 
 </details>
 
-### C26 ⏳ The disk icon ignores `HandleMouseEvents`' eye and mouth gate
+### C26 ✅ The disk icon ignores `HandleMouseEvents`' eye and mouth gate
+
+**Paid in the commit after `efce48e`** (see `git log`). `handleMouseButton` now returns
+before the 140 branch while `ui.pressingEye` is set (`Mouse.cpp:1679-1680`). The port
+has no pressed mouth, so only the eye is tested.
+
+Evidence: `tools/dump-mouse-queue.ts` case 8 queues 71 and then 140, once without a
+button-up between them and once with one. Before the fix, 1 of 17 checks fails.
+
+<details><summary>original entry</summary>
 
 Found paying C21. After button 81, `HandleMouseEvents` returns at once, stamping
 `lastTime`, while `d.PressingEye` or `d.PressingMouth` is set
@@ -819,6 +828,8 @@ test. It also has no `pressingMouth` at all: the mouth is handled on the press
 
 The fix is one guard before the 140 branch. Evidence would be a `tools/` check that
 queues 71, then 140, with no button-up between, and sees no save menu requested.
+
+</details>
 
 ### C22 ✅ A monster's own move presses no pads, and drags timers the AI does not
 
