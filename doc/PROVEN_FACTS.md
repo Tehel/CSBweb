@@ -2764,6 +2764,39 @@ A missile moved by a DSA has its timer's `timerWord8` low ten bits set to the ne
 direction and decay kept — and its level to the new level (`MoveObject.cpp:574-596`).
 Evidence: `tools/dump-dsa-move.ts`.
 
+## A DSA cell move is two low-level `MoveObject`s, except for a monster that stays on the party's level
+
+`FindCellSource` lifts the object with `MoveObject(obj, x, y, -1, 0)` on the source level
+(`doc/CSBwin-src/MoveObject.cpp:203-220`) and `FindCellDestination` sets it down with
+`MoveObject(obj, -1, 0, x, y)` on the destination level, then `object.pos(p)`
+(`:531-538`). Both are the low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`), so:
+
+- What is set down runs the teleporter / pit loop at once: an item on an active teleporter
+  is carried on, an item on an open pit falls. So does a **cloud**: `Levitating`
+  (`Code11f52.cpp:2417-2437`) is true for a missile and a flying monster only — the
+  cloud-type-50 test is commented out — and the pit arm wants `!levitated` and a type of
+  `dbMONSTER` or more (`:3015-3021`). A missile goes through teleporters and not pits.
+- Lifting and setting down press pads through `PlaceOrRemoveObjectInRoom`, except for a
+  levitating thing, which uses `RemoveObjectFromRoom` / `AddObjectToRoom` (`:3272-3274`,
+  `:3427-3429`). Its `unchangedRoom` argument is whether **the party stands on that
+  square** on the loaded level (`:3278-3293`, `:3433-3448`), not whether source and
+  destination are the same.
+- A teleporter turns an item's corner only when `oldX != -1` (`:3000-3006`), so a DSA
+  drop keeps the corner it came with through the loop and the pads, and `object.pos(p)`
+  sets the final one afterwards.
+- A **monster** is not lifted when the destination is a cell, and the source and
+  destination are both on the party's level (`MoveObject.cpp:203-220`). Instead
+  `MoveObject(object, srcX, srcY, x, y)` moves it square to square, keeping its `ITEM16`,
+  and when that returns 0 every monster-AI timer (`TT_FIRST_MONSTER_AI`..`TT_LAST_MONSTER_AI`)
+  on the old square is pointed at the new one (`:539-571`). Otherwise its `groupIndex` is
+  set to `0xd8`, or `0xff` for a monster whose `horizontalSize` is 2 (`:504-521`), before
+  `MoveObject(-1, 0, x, y)`, whose monster branch attaches an `ITEM16` and starts the AI
+  timers if it lands on the party's level (`Code11f52.cpp:3363-3405`). A monster lifted
+  *off* the party's level is not detached — `MoveObject` with `newX < 0` returns before
+  its monster branch (`:3297`).
+
+Evidence: `tools/dump-dsa-move.ts` sections 4-8.
+
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
 
 `EX_DEL` (`doc/CSBwin-src/DSA.cpp:1643-1737`) removes the object from its square, the cursor

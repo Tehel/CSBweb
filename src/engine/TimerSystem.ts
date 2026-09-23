@@ -2869,6 +2869,93 @@ export class TimerSystem {
   }
 
   /**
+   * `MoveObject(object, oldX, oldY, newX, newY, NULL, NULL)`
+   * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`) for anything that is not the party, on
+   * level `level` (`d.LoadedLevel`, CSBWin's `AttachedLevel_4`). `oldX < 0` places an
+   * object that lies nowhere, `newX < 0` lifts one without placing it.
+   *
+   * A monster may be lifted here — `CheckMoveFromMissile` on the party's level
+   * (`:2847-2853`), then the removal (`:3258-3296`); nothing of the monster branch runs
+   * for `newX < 0` (`:3297`). *Placing* a monster is that branch
+   * (`:3327-3424`), which is `MonsterSystem.moveMonster`; it is refused here.
+   *
+   * What is placed goes through the teleporter / pit loop (`resolveCellEffects`); a
+   * levitating thing — a missile, a flying monster — neither falls nor presses a pad
+   * (`RemoveObjectFromRoom` / `AddObjectToRoom` instead of `PlaceOrRemoveObjectInRoom`,
+   * `:3272-3274`, `:3427-3429`), and a cloud is not levitating (`Levitating`,
+   * `:2417-2437`), so it falls. `PlaceOrRemoveObjectInRoom`'s `unchangedRoom` is whether
+   * the party stands on the square (`:3278-3293`, `:3433-3448`). A teleporter turns an
+   * object's corner only when `oldX != -1` (`:3000-3006`). The missile's timer is its
+   * caller's business.
+   *
+   * Returns CSBWin's `1` as `removed` when `CheckMoveFromMissile` destroyed the group,
+   * and otherwise the ID as it was placed and where, or `null` for a lift or an
+   * unchanged room (`:3180-3215`).
+   */
+  moveObject(
+    object: ObjectID,
+    oldX: number,
+    oldY: number,
+    newX: number,
+    newY: number,
+    level: number,
+  ): { removed: boolean; placed: ObjectID | null; position: Position | null } {
+    const decoded = decodeObjectID(object);
+    const type = decoded.category;
+    if (type === DBType.CREATURE && newX >= 0) {
+      throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
+    }
+    const party = this.getPartyState();
+    const levitated = type === DBType.MISSILE
+      || (type === DBType.CREATURE && this.isMonsterLevitating(this.dungeon.getCreatureRecord(object)));
+    const partyOn = (x: number, y: number, z: number): boolean =>
+      z === (party.position.z | 0) && x === (party.position.x | 0) && y === (party.position.y | 0);
+
+    if (oldX >= 0 && type === DBType.CREATURE && level === (party.position.z | 0)) {
+      const to = newX >= 0 ? new Position(newX, newY, level) : null;
+      if (this.checkMonsterMoveFromMissile(new Position(oldX, oldY, level), to, object)) {
+        return { removed: true, placed: null, position: null };
+      }
+    }
+
+    let moved = object;
+    let destination: Position | null = null;
+    if (newX >= 0) {
+      let missileDir: number | undefined;
+      if (type === DBType.MISSILE) {
+        const missile = this.dungeon.getMissileRecord(object);
+        const word8 = missile ? this.getMissileTimerWord8(missile) : null;
+        if (word8 !== null) missileDir = this.decodeMissileTimerWord8(word8).dir;
+      }
+      const result = this.resolveCellEffects(
+        new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated,
+      );
+      destination = result.position;
+      const corner = (type !== DBType.MISSILE && oldX === -1 ? decoded.position : result.objectPos) & 0x3;
+      moved = encodeObjectID(corner, type, decoded.index) as ObjectID;
+      const unchangedRoom = destination.z === level && destination.x === oldX && destination.y === oldY;
+      if (unchangedRoom && corner === decoded.position && type !== DBType.MISSILE) {
+        return { removed: false, placed: null, position: null };
+      }
+    }
+
+    if (oldX >= 0) {
+      const old = new Position(oldX, oldY, level);
+      this.dungeon.removeObjectFromCell(old, object);
+      if (!levitated) this.actuators.triggerObjectMove(old, moved, false, partyOn(oldX, oldY, level), party.facing);
+    }
+    if (!destination) return { removed: false, placed: null, position: null };
+
+    this.dungeon.addObjectToCell(destination, moved);
+    if (type !== DBType.MISSILE) {
+      this.actuators.triggerObjectMove(
+        destination, moved, true, partyOn(destination.x, destination.y, destination.z), party.facing,
+      );
+    }
+    return { removed: false, placed: moved, position: destination };
+  }
+
+  /**
    * Take a monster's intended destination through the destination cell's effects,
    * for `MonsterSystem.moveMonster`.
    *
@@ -2954,7 +3041,7 @@ export class TimerSystem {
   }
 
   /** `CheckMoveFromMissile` for a monster leaving a square. */
-  checkMonsterMoveFromMissile(from: Position, to: Position, monsterRn: number): boolean {
+  checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: number): boolean {
     this.movedObjectWasDestroyed = false;
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
     this.checkMoveFromMissile(from, to, monsterRn);

@@ -12,6 +12,18 @@
  *     its direction and energy, and the new level (`:574-596`). The port left the
  *     timer at the old square, so the missile flew on from where it no longer was.
  *
+ * The move itself is the low-level `MoveObject` (`Code11f52.cpp:2796`): lift with
+ * `MoveObject(obj, x, y, -1, 0)`, set down with `MoveObject(obj, -1, 0, x, y)`
+ * (`MoveObject.cpp:203-220`, `:531-538`). The port spliced the chains directly, so:
+ *  4. an item set down on an active teleporter stayed on it instead of being carried on;
+ *  5. an item set down on an open pit stayed on it instead of falling — and so did a
+ *     cloud, which is not `Levitating` (`Code11f52.cpp:2417-2437`);
+ *  6. a monster moved within the party's level keeps its `ITEM16`, and its AI timers
+ *     follow it to the new square (`MoveObject.cpp:539-571`); the port left them behind;
+ *  7. a monster moved off the party's level has `groupIndex` 0xd8 / 0xff (`:504-521`);
+ *  8. a monster moved onto the party's level gets an `ITEM16` and its first AI timers
+ *     (`Code11f52.cpp:3363-3405`); the port gave it neither.
+ *
  * Run: `npx tsx tools/dump-dsa-move.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -185,6 +197,171 @@ async function main(): Promise<void> {
     check((after & 0x1f) === to.x && ((after >> 5) & 0x1f) === to.y, 'timerWord8 carries the new square');
     check((after & 0xfc00) === (before & 0xfc00), 'direction and energy bits are kept');
     check(timer?.level === to.z, 'the timer carries the new level');
+  }
+
+  /** The first square on any level that `pred` accepts. */
+  const findSquare = (game: Game, pred: (p: Position) => boolean): Position | null => {
+    const dungeon = game.dungeonState;
+    for (let z = 0; z < dungeon.getMapCount(); z++) {
+      const map = dungeon.getMap(z);
+      if (!map) continue;
+      for (let x = 0; x < map.descriptor.width; x++) {
+        for (let y = 0; y < map.descriptor.height; y++) {
+          const p = new Position(x, y, z);
+          if (pred(p)) return p;
+        }
+      }
+    }
+    return null;
+  };
+  const roomType = (game: Game, p: Position): number => (game.dungeonState.getCellFlag(p) >> 5) & 7;
+  const emptyOpen = (game: Game, p: Position): boolean =>
+    roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+  const holding = (game: Game, p: Position, rn: ObjectID): boolean =>
+    inCell(game, p, decodeObjectID(rn).category).some((r) => (r & 0x3fff) === (rn & 0x3fff));
+  /** An item lying on a floor somewhere: the thing the DSA moves. */
+  const anItem = (game: Game): { at: Position; rn: ObjectID } => {
+    let found: { at: Position; rn: ObjectID } | null = null;
+    findSquare(game, (p) => {
+      if (roomType(game, p) !== RoomType.OPEN) return false;
+      const rn = inCell(game, p, DBType.WEAPON)[0];
+      if (rn === undefined) return false;
+      found = { at: p, rn };
+      return true;
+    });
+    if (!found) throw new Error('no weapon on any floor');
+    return found;
+  };
+
+  /* ------------------------------------- 4. an item onto an active teleporter ---- */
+  {
+    const game = await makeGame();
+    const dungeon = game.dungeonState;
+    const { at, rn } = anItem(game);
+    let dest: Position | null = null;
+    const tele = findSquare(game, (p) => {
+      if (roomType(game, p) !== RoomType.TELEPORTER || (dungeon.getCellFlag(p) & 0x08) === 0) return false;
+      const t = inCell(game, p, DBType.TELEPORTER)[0];
+      const rec = t !== undefined ? dungeon.getTeleporterRecord(t) : null;
+      if (!rec || (rec.scope & 3) === 1) return false;
+      const level = findSquare(game, (q) => q.x === 0 && q.y === 0 && dungeon.getMap(q.z)?.descriptor.level === (rec.destMap & 0xff));
+      if (!level) return false;
+      dest = new Position(rec.destX & 0x1f, rec.destY & 0x1f, level.z);
+      return roomType(game, dest) !== RoomType.TELEPORTER && !(dest.x === p.x && dest.y === p.y && dest.z === p.z);
+    });
+    if (!tele || !dest) throw new Error('no active item teleporter');
+    const to: Position = dest;
+    const result = move(game, DBType.WEAPON, at, tele, 0);
+    console.log(`4. item ${rn.toString(16)} (${at.x},${at.y}) L${at.z} -> teleporter (${tele.x},${tele.y}) L${tele.z}, `
+      + `which sends to (${to.x},${to.y}) L${to.z}: result ${result}, on the teleporter ${holding(game, tele, rn)}, at its destination ${holding(game, to, rn)}`);
+    check(result === 0 && !holding(game, at, rn), 'the item leaves its square');
+    check(!holding(game, tele, rn), 'it does not stay on the active teleporter');
+    check(holding(game, to, rn), "it is carried on to the teleporter's destination");
+  }
+
+  /* ------------------------------------------- 5. an item and a cloud down a pit ---- */
+  {
+    const game = await makeGame();
+    const dungeon = game.dungeonState;
+    const { at, rn } = anItem(game);
+    const pit = findSquare(game, (p) => {
+      const flag = dungeon.getCellFlag(p);
+      return roomType(game, p) === RoomType.PIT && (flag & 0x08) !== 0 && (flag & 0x01) === 0
+        && dungeon.incrementLevel(p, 1) !== null;
+    });
+    if (!pit) throw new Error('no open pit');
+    const below = dungeon.incrementLevel(pit, 1)!;
+    const result = move(game, DBType.WEAPON, at, pit, 0);
+    console.log(`5. item -> pit (${pit.x},${pit.y}) L${pit.z}: result ${result}, on the pit ${holding(game, pit, rn)}, `
+      + `below (${below.x},${below.y}) L${below.z} ${holding(game, below, rn)}`);
+    check(!holding(game, pit, rn) && holding(game, below, rn), 'an item set down on an open pit falls to the level below');
+
+    const start = dungeon.getStartPosition();
+    const from = new Position(start.x, start.y, start.z);
+    game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
+    const cloud = inCell(game, from, DBType.CLOUD)[0]!;
+    const cloudResult = move(game, DBType.CLOUD, from, pit, 0);
+    console.log(`5b. cloud -> the same pit: result ${cloudResult}, on the pit ${holding(game, pit, cloud)}, below ${holding(game, below, cloud)}`);
+    check(!holding(game, pit, cloud) && holding(game, below, cloud), 'so does a cloud: only a missile or a flying monster is Levitating');
+  }
+
+  /* --------------------------------------------------------- 6-8. monsters ---- */
+  {
+    /** A game with the party on level `a` and a group made on `level` at `at`. */
+    const withMonster = async (level: number, at: (g: Game) => Position): Promise<{
+      game: Game; party: number; other: number; rn: ObjectID; where: Position;
+    }> => {
+      const game = await makeGame();
+      const dungeon = game.dungeonState;
+      const allowed = (z: number): number => {
+        for (let t = 0; t < 27; t++) if (dungeon.monsterAllowedOnLevel(t, z)) return t;
+        return -1;
+      };
+      const levels: number[] = [];
+      for (let z = 0; z < dungeon.getMapCount() && levels.length < 2; z++) if (allowed(z) >= 0) levels.push(z);
+      const [a, b] = levels as [number, number];
+      const partySquare = findSquare(game, (p) => p.z === a && emptyOpen(game, p))!;
+      game.party.state.position = partySquare;
+      game.monsterSystem.loadPartyLevel(a);
+      const z = level === 0 ? a : b;
+      const where = at(game);
+      const rn = game.monsterSystem.createMonster({
+        value: allowed(z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
+        mapX: where.x, mapY: where.y, level: z, invisible: false, drawAsSize4: false,
+      });
+      if (rn === null) throw new Error('createMonster failed');
+      return { game, party: a, other: b, rn, where };
+    };
+    const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
+      t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
+      && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;
+    const openOn = (game: Game, z: number, not: Position[]): Position => findSquare(game, (p) =>
+      p.z === z && emptyOpen(game, p) && !not.some((q) => q.x === p.x && q.y === p.y && q.z === p.z)
+      && !(game.party.state.position.x === p.x && game.party.state.position.y === p.y && game.party.state.position.z === p.z))!;
+
+    {
+      const { game, rn, where, party } = await withMonster(0, (g) => openOn(g, g.party.state.position.z, []));
+      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const before = group.groupIndex;
+      const timersBefore = aiTimersAt(game, where);
+      const to = openOn(game, party, [where]);
+      const result = move(game, DBType.CREATURE, where, to, 0);
+      console.log(`6. monster on the party's level (${where.x},${where.y}) -> (${to.x},${to.y}) L${party}: result ${result}, `
+        + `groupIndex ${before} -> ${group.groupIndex}, AI timers ${timersBefore} at the old square -> ${aiTimersAt(game, where)}, ${aiTimersAt(game, to)} at the new`);
+      check(result === 0 && holding(game, to, rn) && !holding(game, where, rn), 'the group moves');
+      check(before < 60 && group.groupIndex === before, 'it keeps its ITEM16');
+      check(timersBefore > 0 && aiTimersAt(game, where) === 0 && aiTimersAt(game, to) === timersBefore,
+        'its AI timers follow it to the new square');
+    }
+    {
+      const { game, rn, where, other } = await withMonster(0, (g) => openOn(g, g.party.state.position.z, []));
+      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const before = group.groupIndex;
+      const to = openOn(game, other, []);
+      const result = move(game, DBType.CREATURE, where, to, 0);
+      console.log(`7. monster off the party's level -> (${to.x},${to.y}) L${other}: result ${result}, groupIndex ${before} -> ${group.groupIndex}`);
+      check(result === 0 && holding(game, to, rn), 'the group moves to the other level');
+      check(group.groupIndex === 0xd8 || group.groupIndex === 0xff, 'groupIndex becomes 0xd8 / 0xff: it has no ITEM16 there');
+    }
+    {
+      const { game, rn, where, party } = await withMonster(1, (g) => {
+        const dungeon = g.dungeonState;
+        let b = -1;
+        for (let z = g.party.state.position.z + 1; z < dungeon.getMapCount() && b < 0; z++) {
+          for (let t = 0; t < 27; t++) if (dungeon.monsterAllowedOnLevel(t, z)) { b = z; break; }
+        }
+        return openOn(g, b, []);
+      });
+      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const before = group.groupIndex;
+      const to = openOn(game, party, []);
+      const result = move(game, DBType.CREATURE, where, to, 0);
+      console.log(`8. monster from L${where.z} onto the party's level (${to.x},${to.y}) L${party}: result ${result}, `
+        + `groupIndex ${before} -> ${group.groupIndex}, AI timers at the new square ${aiTimersAt(game, to)}`);
+      check(result === 0 && holding(game, to, rn), "the group moves onto the party's level");
+      check(before >= 60 && group.groupIndex < 60, 'it gets an ITEM16');
+      check(aiTimersAt(game, to) > 0, 'and its first AI timers');
+    }
   }
 
   finish();

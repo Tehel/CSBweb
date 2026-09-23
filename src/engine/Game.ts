@@ -547,6 +547,12 @@ export class Game {
             trace: monsterHooks?.trace,
         });
         this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
+        this.dsaSystem.setObjectMover({
+            moveObject: (object, oldX, oldY, newX, newY, level) =>
+                this.timerSystem.moveObject(object, oldX, oldY, newX, newY, level),
+            moveMonster: (monster, oldX, oldY, newX, newY, level) =>
+                this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
+        });
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? [];
         this.byte640 = actuatorTables?.byte640 ?? [];
         this.addCharacterTables =

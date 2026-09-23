@@ -14,7 +14,7 @@ import {
   withObjectPosition,
 } from '../core/types';
 import { DescIndex, GetBasicObjectType } from './objectIndex';
-import type { ActuatorRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
+import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
   getActuatorDsaSelector,
@@ -44,6 +44,20 @@ import {
     OBJNI_ILLUMULET_A,
     OBJNI_ILLUMULET_B,
 } from '../core/objectNameIndex';
+
+/**
+ * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`)
+ * a DSA cell move needs: `TimerSystem.moveObject`, and its monster branch,
+ * `MonsterSystem.moveMonster`.
+ */
+export interface DsaObjectMover {
+  moveObject(
+    object: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
+  ): { removed: boolean; placed: ObjectID | null; position: Position | null };
+  moveMonster(
+    monster: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
+  ): { removed: boolean; code: number };
+}
 
 export interface DsaTables {
   roomTimerFunctions?: ArrayLike<number>;
@@ -402,6 +416,7 @@ export class DsaSystem {
   private viewingFilterContext: ViewingFilterContext | null = null;
   private monsterDesc: ArrayLike<MonsterDesc> | null = null;
   private teleportPartyHandler?: (location: LocationRel) => void;
+  private objectMover?: DsaObjectMover;
 
   constructor(
     private dungeon: DungeonState,
@@ -444,6 +459,15 @@ export class DsaSystem {
 
   getAdjustSkillsParameters(): Int32Array {
     return this.adjustSkillsParameters;
+  }
+
+  /**
+   * CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`), which a DSA
+   * cell move goes through. `Game` wires it: the DSA is built before the systems that
+   * own it.
+   */
+  setObjectMover(mover: DsaObjectMover): void {
+    this.objectMover = mover;
   }
 
   setTeleportPartyHandler(handler: (location: LocationRel) => void): void {
@@ -2589,8 +2613,14 @@ export class DsaSystem {
     }
     if (object === OBJECT_ID_EOF) return { error: DsaMoveError.SER_NoSuchObjectInCell, object: OBJECT_ID_EOF };
     if (doit) {
-      this.dungeon.removeObjectFromCell(pos, object as ObjectID);
-      this.actuators?.triggerObjectMove(pos, object as ObjectID, false, dstType === 1 && dstLoc === srcLoc, this.getPartyState?.().facing ?? 0);
+      // A monster moved within the party's level is not lifted: `FindCellDestination`
+      // moves it square to square (`MoveObject.cpp:203-220`).
+      const partyLevel = this.getPartyState?.().position.z;
+      const sameLevelMonsterMove = decodeObjectID(object).category === DBType.CREATURE
+        && dstType === 1
+        && locationRelFromInteger(dstLoc).l === partyLevel
+        && locr.l === partyLevel;
+      if (!sameLevelMonsterMove) this.requireObjectMover().moveObject(object as ObjectID, locr.x, locr.y, -1, 0, locr.l);
     } else if (decodeObjectID(object).category === DBType.CLOUD) {
       // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
       for (const entry of this.timers.searchOrder()) {
@@ -2752,6 +2782,18 @@ export class DsaSystem {
     if (doit) {
       const decoded = decodeObjectID(object);
       const placed = encodeObjectID(pos, decoded.category, decoded.index);
+      const partyLevel = this.getPartyState?.().position.z;
+      const srcLocr = srcType === 1 ? locationRelFromInteger(srcLoc) : null;
+      const sameLevelMonsterMove = decoded.category === DBType.CREATURE
+        && locr.l === partyLevel
+        && srcLocr !== null
+        && srcLocr.l === locr.l;
+      if (decoded.category === DBType.CREATURE && !sameLevelMonsterMove) {
+        // Off the party's level, or arriving on it from elsewhere: the group has no
+        // `ITEM16` until `MoveObject` attaches one (`:504-521`).
+        const monster = this.dungeon.getCreatureRecord(object);
+        if (monster) monster.groupIndex = this.detachedGroupIndex(monster);
+      }
       if (decoded.category === DBType.CLOUD) {
         const timer = this.timers.getTimer(hTimer);
         if (timer) {
@@ -2761,9 +2803,28 @@ export class DsaSystem {
           timer.level = locr.l & 0xff;
         }
       }
-      this.dungeon.setDBRecordLink(placed, OBJECT_ID_EOF);
-      this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed as ObjectID, true, srcType === 1 && srcLoc === dstLoc, this.getPartyState?.().facing ?? 0);
-      this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
+      const mover = this.requireObjectMover();
+      if (!sameLevelMonsterMove) {
+        this.dungeon.setDBRecordLink(object, OBJECT_ID_EOF);
+        if (decoded.category === DBType.CREATURE) {
+          // `object.pos(p)` rewrites the indirect index, so the monster's corner is `p`
+          // wherever it ends up; nothing in the monster branch reads it before.
+          mover.moveMonster(placed as ObjectID, -1, 0, locr.x, locr.y, locr.l);
+        } else {
+          // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
+          // pads see the corner the object came with, and it lies in corner `p`.
+          const result = mover.moveObject(object as ObjectID, -1, 0, locr.x, locr.y, locr.l);
+          if (result.placed !== null && result.position && result.placed !== placed) {
+            this.dungeon.removeObjectFromCell(result.position, result.placed);
+            this.dungeon.addObjectToCell(result.position, placed);
+          }
+        }
+      } else if (srcLocr) {
+        // `MoveObject(object, srcX, srcY, x, y)`, and the group's AI timers follow it
+        // when its `ITEM16` did not change (`:539-571`) — which `moveMonster` does
+        // itself on `code === 0`.
+        mover.moveMonster(object as ObjectID, srcLocr.x, srcLocr.y, locr.x, locr.y, locr.l);
+      }
       if (decoded.category === DBType.MISSILE) {
         const missile = this.dungeon.getMissileRecord(placed as ObjectID);
         const timer = missile ? this.timers.getTimer(missile.timerIndex) : null;
@@ -2780,6 +2841,17 @@ export class DsaSystem {
       }
     }
     return DsaMoveError.DER_OK;
+  }
+
+  private requireObjectMover(): DsaObjectMover {
+    if (!this.objectMover) throw new Error('DsaSystem: a cell move needs setObjectMover');
+    return this.objectMover;
+  }
+
+  /** `groupIndex(0xd8)`, or `0xff` for a monster that fills the cell (`MoveObject.cpp:511-518`). */
+  private detachedGroupIndex(monster: CreatureRecord): number {
+    const desc = this.monsterDesc?.[monster.creatureType];
+    return desc && monsterHorizontalSize(desc) === 2 ? 0xff : 0xd8;
   }
 
   private findChestDestination(dstLoc: number, dstDepth: number, object: number, doit: boolean): number {
