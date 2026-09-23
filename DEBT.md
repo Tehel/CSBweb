@@ -81,7 +81,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C14 | `DrawClouds`: size, colour map, lightning position, the cell under the party | S | ⏳ |
 | C15 | A DSA cell move does not go through `MoveObject` | M | ⏳ |
 | C16 | Freed database slots are never reused | M | ⏳ |
-| C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ⏳ |
+| C17 | `WiggleEverything` leaves a moved cloud's timer behind | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -526,7 +526,14 @@ anything is freed, which matters to a written save (Phase 10) and makes C8's def
 deletes observable. Port `FindEmptyDB<n>Entry` once, in `DungeonState`, and route every
 allocator through it.
 
-### C17 ⏳ `WiggleEverything` leaves a moved cloud's timer behind
+### C17 ✅ `WiggleEverything` leaves a moved cloud's timer behind
+
+**Paid in `COMMIT_C17`.** `TimerSystem.wiggleObject` now retargets every `TT_25` / `TT_24`
+naming a moved cloud (corner ignored, as CSBWin's `RN` compare does) to the new square,
+level and placed ID (`Timer.cpp:2491-2510`). Evidence: `tools/dump-wiggle-cloud.ts` (2 of 12
+checks fail before); the fact is in `doc/PROVEN_FACTS.md`.
+
+<details><summary>original entry</summary>
 
 When a teleporter or pit opens under objects, `WiggleEverything` (`doc/CSBwin-src/
 Timer.cpp:2428-2512`) moves each one with `MoveObject` and, for a cloud, retargets every
@@ -536,6 +543,8 @@ and not the cloud, so a fireball's cloud carried off by a teleporter keeps burni
 old square, and `processTT_25` then fails to unlink it (the ID it holds has the old
 corner) and frees a record still linked in the new cell. The C8 cloud fix in `DsaSystem.
 findCellDestination` is the pattern.
+
+</details>
 
 ---
 

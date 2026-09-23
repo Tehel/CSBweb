@@ -2676,3 +2676,16 @@ The door arm of `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1844-19
    explosion, so it needs `canOpenWithAxe`, and the force must reach `DoorTOC & 0xff`.
 
 Evidence: `tools/dump-missile-door.ts`.
+
+## A teleporter that switches on under a cloud takes the cloud's timer along too
+
+`WiggleEverything` (`doc/CSBwin-src/Timer.cpp:2428-2512`) — run when a teleporter or pit
+switches on (`ProcessTT_TELEPORTER`, `ProcessTT_PITROOM`) — moves every object above
+`dbMONSTER` in the cell with `MoveObject(obj, x, y, x, y)`, then fixes up the timers that
+name it: a missile's own timer gets `d.NewX` / `d.NewY` / `d.NewDir` in `timerWord8`, the
+placed `RN` at `d.NewPos` and `d.NewLevel` (`:2476-2489`); for a cloud, a `TIMER_SEARCH` over
+**every** timer sets each `TT_25` or `TT_24` whose `timerObj8()` is the cloud to `d.NewX`,
+`d.NewY`, the cloud at `d.NewPos` and `d.NewLevel` (`:2491-2510`). The compare is `RN`'s
+`!=`, which ignores the corner (`CSBTypes.h:349-356`); nothing checks the level. A cloud
+cannot fall, so in practice this is a teleporter's doing. Evidence:
+`tools/dump-wiggle-cloud.ts`.

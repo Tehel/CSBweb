@@ -51,6 +51,7 @@ const CHECKS = [
   { tool: 'dump-reincarnate-entry.ts' },
   { tool: 'dump-pit-fall.ts' },
   { tool: 'dump-teleporter-drop.ts' },
+  { tool: 'dump-wiggle-cloud.ts' },
   { tool: 'dump-missile-drop.ts' },
   { tool: 'dump-local-action.ts' },
   { tool: 'dump-dsa-move.ts' },

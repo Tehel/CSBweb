@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type LocationRel, type ObjectID } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
 import { PotionType, SoundIndex } from '../core/constants';
 
 /**
@@ -3016,6 +3016,18 @@ export class TimerSystem {
       const updatedWord8 = this.encodeMissileTimerWord8(result.position.x, result.position.y, dir, deltaEnergy);
       if (missile) this.setMissileTimerWord8(missile, updatedWord8);
       this.updateMissileTimerEntry(rn, newRn, result.position);
+    } else if (decoded.category === DBType.CLOUD) {
+      // Every `TT_25` / `TT_24` naming the cloud follows it (`Timer.cpp:2491-2510`).
+      // CSBWin's `RN` compare ignores the corner, which lives in the indirect index;
+      // here it is part of the ID, so the timer is handed the placed ID outright.
+      for (const entry of this.timers.getTimers()) {
+        if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
+        if (entry.object === undefined || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(rn as ObjectID, 0)) continue;
+        entry.uByte6 = result.position.x & 0xff;
+        entry.uByte7 = result.position.y & 0xff;
+        entry.object = newRn;
+        entry.level = result.position.z & 0xff;
+      }
     }
   }
 
