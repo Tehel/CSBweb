@@ -314,10 +314,10 @@ async function main(): Promise<void> {
   // `if (D5W != 0) { DiscardAllInput(); d.clockTick = 0; }`
   // (doc/CSBwin-src/CSBCode.cpp:8310-8314), for a wall and for a monster alike.
   // `DiscardAllInput` empties the key queue and the mouse queue (`:7532`); the port's
-  // one input queue is `movementQueue`. `d.clockTick = 0` cancels a tick that was due:
+  // one input queue is `Game`'s mouse queue. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1066-1077`), so the tick runs one frame later.
-  type Internals = { movementQueue: MovementAction[]; lastTickTime: number; lastInputTime: number; newPartyLevel: boolean };
+  type Internals = { lastTickTime: number; lastInputTime: number; newPartyLevel: boolean };
   const internals = game as unknown as Internals;
   const T0 = Date.now() + 60_000;
   let discard: {
@@ -331,7 +331,7 @@ async function main(): Promise<void> {
       // The headless equivalent of waiting out the last step's delay (case 8).
       game.party.state.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
       for (const a of actions) game.enqueueMovement(a);
     };
     game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
@@ -340,13 +340,13 @@ async function main(): Promise<void> {
     queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 20_000;
     game.runFrame(T0 - 20_000);
-    const monsterQueue = internals.movementQueue.length;
+    const monsterQueue = game.queuedInputCount();
 
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 1000; // a tick is due this frame
     const ticks0 = game.state.tickCount;
     game.runFrame(T0);
-    const wallQueue = internals.movementQueue.length;
+    const wallQueue = game.queuedInputCount();
     const tickHeld = game.state.tickCount === ticks0;
     game.runFrame(T0 + 17);
     const tickNextFrame = game.state.tickCount === ticks0 + 1;
@@ -357,7 +357,7 @@ async function main(): Promise<void> {
     // Control: a move that is not inhibited leaves the rest of the queue alone.
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
     game.runFrame(T0 + 30_000);
-    const turnQueue = internals.movementQueue.length;
+    const turnQueue = game.queuedInputCount();
 
     discard = { wallQueue, tickHeld, tickNextFrame, facingKept, monsterQueue, turnQueue };
     console.log(
@@ -455,7 +455,7 @@ async function main(): Promise<void> {
       party.partyMoveDisableTimer = 0;
       party.word11712 = 0;
       internals.lastInputTime = 0;
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
       let t = T0 + 100_000;
       const frame = (tickDue: boolean): void => {
         t += 17;
@@ -488,21 +488,21 @@ async function main(): Promise<void> {
       const turnedUnderDelay = party.facing !== run.dir && party.partyMoveDisableTimer !== 0;
 
       // The throw lock holds a step in the thrown direction and lets others through.
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
       party.partyMoveDisableTimer = 0;
       party.word11712 = 4;
       party.word11714 = party.facing;
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       frame(true);
       frame(false);
-      const lockHeld = internals.movementQueue.length === 1;
-      internals.movementQueue.length = 0;
+      const lockHeld = game.queuedInputCount() === 1;
+      game.discardAllInput();
       game.enqueueMovement(MovementAction.MOVE_BACKWARD);
       frame(true);
       frame(false);
-      const otherWayPassed = internals.movementQueue.length === 0;
+      const otherWayPassed = game.queuedInputCount() === 0;
       party.word11712 = 0;
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
 
       // `TimeToMove` (CSBCode.cpp:7003) and the slowest-living rule.
       const stats = game.characterStats;
@@ -555,16 +555,18 @@ async function main(): Promise<void> {
     }
   }
 
-  // ---- Case 9: two moves wait, not three -----------------------------------
-  // `TAG0196da` puts a key into the 3-slot mouse queue only if `MouseQEnd + 2 !=
-  // MouseQStart` (doc/CSBwin-src/CSBCode.cpp:8439-8443, `MOUSEQLEN` Data.h:1515).
+  // ---- Case 9: seven moves wait, not eight --------------------------------
+  // `TAG0196da` puts a key into the mouse queue only if `MouseQEnd + 2 != MouseQStart`
+  // (doc/CSBwin-src/CSBCode.cpp:8439-8443), and `MOUSEQLEN` is 8 (Data.h:1517 — the 3 on
+  // `:1515` is behind `NoKeyQue`, which `:1513` leaves undefined). The clicks that share
+  // the queue are `tools/dump-mouse-queue.ts`'.
   {
-    internals.movementQueue.length = 0;
-    const accepted = [0, 1, 2].map(() => game.enqueueMovement(MovementAction.TURN_LEFT));
+    game.discardAllInput();
+    const accepted = Array.from({ length: 8 }, () => game.enqueueMovement(MovementAction.TURN_LEFT));
     console.log(`queue depth: ${accepted.map((a) => (a ? 'in' : 'refused')).join(', ')}`);
     console.log('');
-    check(accepted[0] && accepted[1] && !accepted[2], `two moves should queue and a third be refused (${accepted.join('/')})`);
-    internals.movementQueue.length = 0;
+    check(accepted.slice(0, 7).every(Boolean) && !accepted[7], `seven moves should queue and an eighth be refused (${accepted.join('/')})`);
+    game.discardAllInput();
   }
 
   // ---- Case 10: a level change discards all input, at the next tick ---------
@@ -595,7 +597,7 @@ async function main(): Promise<void> {
       game.monsterSystem.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       game.enqueueMovement(MovementAction.TURN_LEFT);
       let t = T0 + 200_000;
@@ -606,9 +608,9 @@ async function main(): Promise<void> {
       };
       frame(false);
       const newLevel = party.position.z;
-      const queuedAfterStairs = internals.movementQueue.length;
+      const queuedAfterStairs = game.queuedInputCount();
       frame(true);
-      const queuedAfterTick = internals.movementQueue.length;
+      const queuedAfterTick = game.queuedInputCount();
       const facingAfter = party.facing;
       for (let i = 0; i < 6; i++) frame(i % 2 === 0);
       const turned = party.facing !== facingAfter;
@@ -695,7 +697,7 @@ async function main(): Promise<void> {
       game.monsterSystem.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
-      internals.movementQueue.length = 0;
+      game.discardAllInput();
       internals.newPartyLevel = false;
       // An event was handled this tick, so the turn waits for the next one
       // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
@@ -716,7 +718,7 @@ async function main(): Promise<void> {
       };
       frame(true);
       const newLevel = party.position.z;
-      const queuedAfterTick = internals.movementQueue.length;
+      const queuedAfterTick = game.queuedInputCount();
       const loadedAfterTick = game.monsterSystem.needsLevelReload() ? 'not yet' : 'loaded';
       const owedAfterTick = internals.newPartyLevel;
       frame(false);

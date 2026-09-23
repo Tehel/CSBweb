@@ -164,7 +164,6 @@ function renderView() {
     const facing = party.state.facing;
 
     renderer.setPartyState(party.state);
-    renderer.processMouseQueue();
     renderer.render(pos, facing);
 }
 

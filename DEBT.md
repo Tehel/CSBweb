@@ -85,11 +85,12 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C18 | A Fluxcage never expires, and frees door record 0 | S | ✅ |
 | C19 | `CastSpell` under a spell filter's overrides | S | ✅ |
 | C20 | A level change inside `ProcessTimers` waits for the next tick | S | ✅ |
-| C21 | Clicks do not go through the input queue | M | ⏳ |
+| C21 | Clicks do not go through the input queue | M | ✅ |
 | C22 | A monster's own move presses no pads, and drags timers the AI does not | M | ✅ |
 | C23 | The other object movers are not `MoveObject` either | M | ✅ |
 | C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
 | C25 | The stairs do not turn a monster's corner | S | ⚠️ |
+| C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -103,7 +104,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | F1 | Sweep for empty placeholder tables | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
-| G1–G8 | Unported CSBWin features | — | ⏳ |
+| G1–G9 | Unported CSBWin features | — | ⏳ |
 | H | Deliberate divergences | — | 🚫 |
 
 Size: **S** well under a session · **M** about one session · **L** several sessions (split
@@ -271,7 +272,8 @@ fixes, one needed nothing; what the re-reading found beyond them is C13.
   step frames. The mapping,
   read rather than guessed: `DiscardAllInput` drains the key queue and resets the mouse
   queue (`:7532`, `CSBUI.cpp:1374-1391`), and every move the port queues is in
-  `movementQueue` (clicks are handled as they arrive), so the port clears that.
+  `movementQueue` (clicks are handled as they arrive), so the port clears that. (Since
+  C21 that is `Game`'s one mouse queue, keys and clicks alike.)
   `d.clockTick` is "a tick is due", and the VBL sets it again on every VBL once
   `vblCount >= d.Speed` (`:1066-1077`), so zeroing it holds a due tick for one VBL —
   `Game.clockTickCleared` skips the tick for the rest of the frame. `MovementResult`
@@ -532,7 +534,7 @@ unless said otherwise.
   `Mouse.cpp:1482-1491` refuses a step while it is non-zero — or while `d.Word11712` is
   set and the step heads towards `d.Word11714`. The wall-clock gate (`Party.canMove`,
   `GAME_TIMING.MOVE_DELAY_MS` / `TURN_DELAY_MS`, `lastMoveTime`) is gone:
-  `Game.processMovementQueue` holds a step on the timer or the throw lock, and any turn or
+  `Game.processMovementQueue` (since C21, `Game.handleMouseEvents`) holds a step on the timer or the throw lock, and any turn or
   step on `HandleMouseEvents`' one-event-per-tick `lastTime` (`Mouse.cpp:1468-1476`);
   `Game.setPartyMoveDelay` is the step's tail, `CharacterStats.timeToMove` is
   `TimeToMove`, and a throw sets the lock. All three words are `PartyState` fields, saved
@@ -545,7 +547,10 @@ unless said otherwise.
   moves on to at once is too: `TAG0196da` refuses a key when `MouseQEnd + 2 ==
   MouseQStart` (`CSBCode.cpp:8439-8443`). `Game.enqueueMovement` now lets two in.
   Evidence: `tools/dump-party-collision.ts` case 9 (1 of 39 checks fails before).
-  **Left:** CSBWin's mouse queue also carries clicks — C21.
+  **Left:** CSBWin's mouse queue also carries clicks — C21. **Corrected by C21:** the
+  mouse queue is 8 long, not 3 (`Data.h:1513` leaves `NoKeyQue` undefined, so `:1515` is
+  the dead branch), and the key queue in front is emptied one key per message, so
+  *seven* moves wait. The bullet's premise was wrong; case 9 now checks seven.
 - ✅ **`DiscardAllInput()` on a level change** (`:623`, after `LoadPartyLevel`): stairs, a
   pit or a teleporter to another level also throw away queued input. The port loads the
   level on arrival, so `Game.loadPartyLevelIfChanged` notes the change and `gameTick`
@@ -748,7 +753,46 @@ a turn queued (`tools/dump-party-collision.ts` case 10 is the pattern).
 
 </details>
 
-### C21 ⏳ Clicks do not go through the input queue
+### C21 ✅ Clicks do not go through the input queue
+
+**Paid in the commit after `426c0a0`** (see `git log`). `Game` now has CSBWin's one
+mouse queue, a ring of `MOUSEQLEN` entries, and it holds keys and clicks alike.
+
+- **The queue is 8 long.** `MOUSEQLEN` is 8, not 3. `Data.h:1513` leaves `NoKeyQue`
+  undefined, so `:1515` is dead, and this entry and C13 had cited it without its
+  `#ifdef`.
+- **Queueing.** `Game.onMouseClick` queues a button while fewer than six entries wait
+  (`OnMouseClick`, `CSBCode.cpp:7607-7696`). `Game.onMouseUnClick` queues `0x0add` while
+  fewer than seven wait (`:7581-7600`). `Game.enqueueMovement` refuses a key only when
+  seven wait (`TAG0196da`, `:8439-8443`).
+- **Dispatch.** `Game.handleMouseEvents` replaces `processMovementQueue`. It handles the
+  head once per tick and turns and steps itself (`Mouse.cpp:1550-1570`); every other
+  button goes to the UI's `handleMouseButton`, and the button-up goes to
+  `handleMouseUnclick`. Every button stamps `lastTime`. The button-up does not, and it
+  lets the next entry through in the same pass (`:1523-1549`). A held step blocks
+  whatever is behind it.
+- **The viewport.** Button 80, `HandleClickInViewport`, is now `src/ui/events.ts`'s
+  `handleClickInViewport`, reached through the queue instead of from the DOM event.
+- **The on-screen arrows (buttons 1-6).** They were queued but dropped; they now work.
+- **Removed.** `ui.mouseQueue` and the renderer's `processMouseQueue` are gone.
+
+Still direct, and deliberately so:
+
+- the save menu and the Reincarnate screen, which are modal;
+- the panel keys in `ui/Keyboard.ts`, whose module comment gives the reason.
+
+**Evidence:**
+
+- `tools/dump-mouse-queue.ts` is new, with 15 checks. It crashes before the fix, which
+  had no queue API.
+- `tools/dump-party-collision.ts` case 9 now expects seven keys.
+- `npm test -- --frames` passes. The frames click through the queue.
+- Probed live: the forward and turn-left arrows move the party.
+
+The fact is in `doc/PROVEN_FACTS.md`, and the "two moves" entry there is corrected.
+Found on the way: C26, G9, and additions to G5 and G6.
+
+<details><summary>original entry</summary>
 
 Found paying C13. CSBWin has one mouse queue (`MOUSEQLEN` 3, `doc/CSBwin-src/Data.h:1515`)
 for keys and clicks alike: a click is queued only into an empty queue, with its button-up
@@ -759,6 +803,22 @@ for the tick nor holds the next turn or step back to the next one, and a click d
 fill a queue slot a key would then be refused. Porting it means turning
 `processMovementQueue` into `HandleMouseEvents`' dispatcher for every button. Size M; no
 save or `tools/` scenario depends on it yet.
+
+</details>
+
+### C26 ⏳ The disk icon ignores `HandleMouseEvents`' eye and mouth gate
+
+Found paying C21. After button 81, `HandleMouseEvents` returns at once, stamping
+`lastTime`, while `d.PressingEye` or `d.PressingMouth` is set
+(`doc/CSBwin-src/Mouse.cpp:1679-1680`). Every later button is swallowed: 140 (the disk
+icon), 145-148, 200-216.
+
+The port's `handleMouseButton` (`src/renderer/ui/Mouse.ts`) handles 140 without that
+test. It also has no `pressingMouth` at all: the mouth is handled on the press
+(`handleMouthPress`).
+
+The fix is one guard before the 140 branch. Evidence would be a `tools/` check that
+queues 71, then 140, with no button-up between, and sees no save menu requested.
 
 ### C22 ✅ A monster's own move presses no pads, and drags timers the AI does not
 
@@ -1221,13 +1281,22 @@ From Phase 11:
 - `SCROLLING_TEXT::Serialize` — message state in save games
   (`doc/CSBwin-src/Data.h:1666`). Quick-load calls `discardText()` instead.
 - `d.PartySleeping` is plumbed (`setPartySleeping`) but never set: there is no sleep
-  system yet.
+  system yet. Its buttons are queued but have no handler (found paying C21):
+  - 145 sleeps, 146 wakes (`doc/CSBwin-src/Mouse.cpp:1683-1730`);
+  - 147 freezes, 148 thaws (`:1731-1773`);
+  - nor has the frozen game's filter on the queue, which throws away every entry but 148
+    (`:1433-1444`).
+
+  `UIMode.Sleeping` and `UIMode.Frozen` are never entered.
 
 ### G6 ⏳ UI effects
 
 - **Rune click flash** in the magic panel (Phase 7).
 - **Interaction highlights** — button press and selection effects (flash, shading, invert)
   across UI regions, consistent with the hit-test rectangles (Phase 7).
+- **`FlashButton`** on a movement arrow that was clicked or keyed: `MoveParty` returns
+  the button and `HandleMouseEvents` flashes it (`doc/CSBwin-src/Mouse.cpp:1560-1567`).
+  Found paying C21.
 - **The viewport flash on a blow**, and a light-level trace hook (Phase 7.5). `atk_LIGHT`
   itself works; this is the flash, not the LIGHT attack.
 
@@ -1241,6 +1310,17 @@ Save work lives in `PLAN.md` → "Phase 10"; take these up there.
 
 Phase 12 step 7 deferred several things, all deliberately; they are listed under the step
 in `doc/PLAN_ARCHIVE.md` → "Phase 12 — Monsters".
+
+### G9 ⏳ Changing the marching order
+
+Found paying C21. Buttons 125-128, the four position squares at the top right of
+`buttons17196`, go to `TAG0025a6` (`doc/CSBwin-src/Mouse.cpp:1586-1597`,
+`CSBCode.cpp:2053`). That function picks up the champion at that position so the player
+can drag the champion to another square. The drag's "cursor left the rectangle" event is
+button -1 (`Mouse.cpp:1800-1805`).
+
+The port queues these buttons, and `handleMouseButton` drops them. The marching order
+cannot be changed.
 
 ---
 

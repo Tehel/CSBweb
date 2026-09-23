@@ -4,7 +4,7 @@ import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from '.
 import { updateDebug } from './messages';
 import { handleMapCanvasClick } from './mapPreview';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
-import { getEventPosition, isViewportPoint } from './utils';
+import { getEventPosition } from './utils';
 
 let uiBound = false;
 
@@ -48,36 +48,20 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
             ctx.renderView();
             return;
         }
-        if (buttonMask !== 0) {
-            ctx.renderer.enqueueMouseClick(x, y, buttonMask);
-            if (buttonMask === 2 && isViewportPoint(x, y) && !ctx.renderer.isInventoryOpen()) {
-                const cursorAction = ctx.renderer.resolveViewportCursorAction(x, y);
-                if (cursorAction) {
-                    if (cursorAction.kind === 'drop') ctx.game.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
-                    else if (cursorAction.kind === 'throw') ctx.game.throwObjectFromCursor(cursorAction.side);
-                    else if (cursorAction.kind === 'wall') {
-                        if (!ctx.renderer.tryUseFrontWallItem(x, y)) {
-                            ctx.game.handleWallClick();
-                        }
-                    }
-                } else if (!ctx.renderer.hasCursorObject()) {
-                    if (ctx.renderer.isDoorSwitchHit(x, y)) {
-                        if (ctx.game.handleDoorSwitchClick()) ctx.renderView();
-                    } else if (ctx.renderer.isWallDecorationHit(x, y) && ctx.game.handleWallClick()) {
-                        ctx.renderView();
-                    } else {
-                        ctx.renderer.tryPickViewportObject(x, y);
-                    }
-                }
-            }
+        if (buttonMask === 0) return;
+        if (ctx.renderer.isReincarnateScreenOpen()) {
+            ctx.renderer.handleReincarnateClick(x, y);
             ctx.renderView();
+            return;
         }
+        // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
+        // behind any key or click already waiting, and hands it to `handleMouseButton`.
+        ctx.game.onMouseClick(ctx.renderer.searchMouseButtons(x, y, buttonMask), x, y);
     });
 
     canvas.addEventListener('mouseup', () => {
         if (ctx.renderer?.isSaveMenuOpen()) return;
-        ctx.renderer.enqueueMouseUnclick();
-        ctx.renderView();
+        ctx.game.onMouseUnClick();
     });
 
     canvas.addEventListener('wheel', (e) => {
@@ -96,6 +80,33 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 }
 
+/**
+ * Button 80, `HandleClickInViewport` (doc/CSBwin-src/Mouse.cpp:1031), reached through
+ * `HandleMouseEvents` (`:1665-1670`): a drop, a throw, a wall, a door switch or an object
+ * picked up. The eye, when the inventory hides the viewport, is `handleMouseButton`'s.
+ */
+function handleClickInViewport(ctx: UIContext, x: number, y: number): void {
+    if (ctx.renderer.isInventoryOpen()) return;
+    const cursorAction = ctx.renderer.resolveViewportCursorAction(x, y);
+    if (cursorAction) {
+        if (cursorAction.kind === 'drop') ctx.game.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
+        else if (cursorAction.kind === 'throw') ctx.game.throwObjectFromCursor(cursorAction.side);
+        else if (cursorAction.kind === 'wall') {
+            if (!ctx.renderer.tryUseFrontWallItem(x, y)) {
+                ctx.game.handleWallClick();
+            }
+        }
+    } else if (!ctx.renderer.hasCursorObject()) {
+        if (ctx.renderer.isDoorSwitchHit(x, y)) {
+            ctx.game.handleDoorSwitchClick();
+        } else if (ctx.renderer.isWallDecorationHit(x, y)) {
+            ctx.game.handleWallClick();
+        } else {
+            ctx.renderer.tryPickViewportObject(x, y);
+        }
+    }
+}
+
 export function bindUIEvents(): void {
     const ctx = getUIContext();
     if (!ctx) return;
@@ -107,6 +118,18 @@ export function bindUIEvents(): void {
 
     if (!uiBound) {
         uiBound = true;
+
+        ctx.game.setMouseEventHandlers({
+            button: (num, x, y) => {
+                if (num === 80) handleClickInViewport(ctx, x, y);
+                ctx.renderer.handleMouseButton(num, x, y);
+                ctx.renderView();
+            },
+            unclick: () => {
+                ctx.renderer.handleMouseUnclick();
+                ctx.renderView();
+            },
+        });
 
         document.getElementById('btn-qsave')?.addEventListener('click', () => ctx.onQuickSave());
         document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());

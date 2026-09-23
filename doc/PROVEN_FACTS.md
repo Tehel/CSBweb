@@ -2630,13 +2630,42 @@ behind the bump is lost. `d.clockTick` is the "a tick is due" flag: the main loo
 tick only when it is non-zero (`:763-764`) and clears it after each (`:704`); the VBL
 handler sets it on **every** VBL once `d.vblCount >= d.Speed` (`:1066-1077`), and
 `vblCount` is reset only at the top of a tick (`:617`). So zeroing it cancels nothing: a
-tick already due runs one VBL later. The key queue is a 3-slot ring that refuses a key
-when `next == keyQueueStart` (`CSBUI.cpp:143-145`, `:1131-1139`), so it holds at most two
-keys — and the main loop moves each key on at once (`CSBCode.cpp:707-712`) into the mouse
-queue, `MOUSEQLEN` 3 (`Data.h:1515`), where `TAG0196da` refuses it when
-`MouseQEnd + 2 == MouseQStart` (`CSBCode.cpp:8439-8443`): at most two moves wait. A click
-is queued only when `numEnt < MOUSEQLEN-2`, an empty queue, to leave room for its
-button-up (`:7626-7630`). Evidence: `tools/dump-party-collision.ts` cases 6 and 9.
+tick already due runs one VBL later. How much input that can be is the next entry.
+Evidence: `tools/dump-party-collision.ts` case 6.
+
+## Clicks and keys share one mouse queue of 8, handled one entry per tick
+
+`MOUSEQLEN` is **8**: `doc/CSBwin-src/Data.h:1513` is `//#define NoKeyQue`, commented out,
+so `#define MOUSEQLEN 3` (`:1515`) is the dead branch and `#define MOUSEQLEN 8` (`:1517`)
+the live one — `NoKeyQue` is defined nowhere in the tree. (This entry used to say 3,
+reading `:1515` without its `#ifdef`.) The ring keeps one slot empty: `MouseQStart` is
+the next entry to handle, `MouseQEnd` the last one queued, `MouseQEnd + 1 == MouseQStart`
+is empty, and `numEnt = (MouseQEnd - MouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN`.
+
+- **A click** is turned into a button by `SearchButtonList` over the primary, then the
+  secondary list, and queued with its point only if it hit one and `numEnt < MOUSEQLEN-2`
+  — "no room for a matching 'UnClick'" otherwise (`OnMouseClick`,
+  `doc/CSBwin-src/CSBCode.cpp:7607-7696`). So a click is taken while fewer than six wait.
+- **The button-up** is `0x0add`, queued while `numEnt < MOUSEQLEN-1` (`OnMouseUnClick`,
+  `:7581-7600`), whether or not its click was.
+- **A key** is translated to its button by `TAG0196da` and refused only when
+  `MouseQEnd + 2 == MouseQStart` (`:8439-8443`) — seven waiting. The key queue in front
+  (`CSBUI.cpp:143-145`, a 3-slot ring) is emptied into it one key per message by the main
+  loop (`CSBCode.cpp:707-712`), so it is not what refuses a key.
+- **`HandleMouseEvents`** (`doc/CSBwin-src/Mouse.cpp:1349`) handles at most the head, and
+  the main loop calls it again while its result has bit 0 set (`CSBCode.cpp:746-761`). A
+  step held by the move delay stays at the head (the previous entry), and everything
+  behind it waits too. The button-up clears the mouse and eye/mouth state and returns
+  `result |= 1` without stamping `lastTime`, so the next entry follows in the same pass
+  (`Mouse.cpp:1523-1549`). Every other button stamps `lastTime = d.Time` (`:1550-1807`):
+  a click holds the turn or step behind it to the next tick exactly as a turn does.
+- The on-screen arrows are buttons 1-6 in `buttons17304` (graphic 231), the same numbers
+  the movement keys become; `HandleMouseEvents` sends 1-2 to `TurnParty` and 3-6 to
+  `MoveParty` (`:1550-1570`). Button 80 is the viewport, `HandleClickInViewport`
+  (`:1665-1670`).
+
+Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue),
+`tools/dump-party-collision.ts` case 9.
 
 ## A level change discards all input, at the top of the next tick
 

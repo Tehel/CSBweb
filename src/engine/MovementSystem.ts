@@ -56,7 +56,7 @@ export class MovementSystem {
      */
     move(action: MovementAction): MovementResult {
         // No timing gate here: `MoveParty` and `TurnParty` have none. The move delay is
-        // `HandleMouseEvents`', and so `Game.processMovementQueue`'s.
+        // `HandleMouseEvents`', and so `Game.handleMouseEvents`'.
 
         // Handle turns (no collision detection needed)
         if (action === MovementAction.TURN_LEFT || action === MovementAction.TURN_RIGHT) {

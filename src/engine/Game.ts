@@ -175,38 +175,71 @@ export interface RuntimeSaveState {
 }
 
 /**
+ * `MOUSEQLEN` — 8, because `Data.h:1513` leaves `#define NoKeyQue` commented out; the 3 on
+ * `:1515` is the dead branch (doc/CSBwin-src/Data.h:1513-1518).
+ */
+const MOUSEQLEN = 8;
+
+/** The button-up `OnMouseUnClick` queues (doc/CSBwin-src/CSBCode.cpp:7594). */
+const MOUSE_UNCLICK = 0x0add;
+
+/** One `pMouseQueue` entry: a button number and the point clicked (0,0 for a key). */
+export interface MouseQueueEntry { num: number; x: number; y: number }
+
+/** Where `HandleMouseEvents` sends the buttons it does not handle itself. */
+export interface MouseEventHandlers {
+    /** Any button but a turn, a step or the button-up, with the point clicked. */
+    button(num: number, x: number, y: number): void;
+    /** `0x0add`, the button-up. */
+    unclick(): void;
+}
+
+/**
+ * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:7946-7951):
+ * 1-2 turn left and right; 3-6 step forward, right, backward, left, so `num - 3` is the
+ * step's direction relative to the party's facing. The on-screen arrows are these
+ * buttons (`buttons17304`), and so are the movement keys.
+ */
+const MOVEMENT_BUTTON: Record<MovementAction, number> = {
+    [MovementAction.TURN_LEFT]: 1,
+    [MovementAction.TURN_RIGHT]: 2,
+    [MovementAction.MOVE_FORWARD]: 3,
+    [MovementAction.STRAFE_RIGHT]: 4,
+    [MovementAction.MOVE_BACKWARD]: 5,
+    [MovementAction.STRAFE_LEFT]: 6,
+};
+const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
+    Object.entries(MOVEMENT_BUTTON).map(([action, num]) => [num, Number(action) as MovementAction]),
+);
+
+/**
  * Game class - main game controller
  */
-/**
- * `MoveParty`'s relative direction for each step — `D6W - 3` in `HandleMouseEvents`, where
- * buttons 3-6 are forward, right, backward, left (doc/CSBwin-src/CSBCode.cpp:7946-7951).
- * Turns have none.
- */
-const MOVE_RELATIVE_DIRECTION: Partial<Record<MovementAction, number>> = {
-    [MovementAction.MOVE_FORWARD]: 0,
-    [MovementAction.STRAFE_RIGHT]: 1,
-    [MovementAction.MOVE_BACKWARD]: 2,
-    [MovementAction.STRAFE_LEFT]: 3,
-};
-
 export class Game {
     state: GameState;
     party: Party;
     dungeonState: DungeonState;
     private movementSystem: MovementSystem;
-    private movementQueue: MovementAction[] = [];
     /**
-     * `MOUSEQLEN` (doc/CSBwin-src/Data.h:1515). A key reaches the mouse queue through
-     * `TAG0196da`, which refuses it when `MouseQEnd + 2 == MouseQStart`
-     * (`CSBCode.cpp:8439-8443`) — the ring keeps one slot empty, so two keys wait at most.
-     * The key queue in front of it is a 3-slot ring of the same kind (`CSBUI.cpp:143-145`,
-     * `:1131-1139`).
+     * CSBWin's one mouse queue, `pMouseQueue` (doc/CSBwin-src/Mouse.cpp): clicks, their
+     * button-ups and keys alike, as button numbers. A ring of `MOUSEQLEN` entries that
+     * keeps one slot empty — `MouseQStart` is the next entry to handle, `MouseQEnd` the
+     * last one queued, and `MouseQEnd + 1 == MouseQStart` means empty.
      */
-    private readonly movementQueueLen = 3;
+    private readonly mouseQueue: MouseQueueEntry[] =
+        Array.from({ length: MOUSEQLEN }, () => ({ num: 0, x: 0, y: 0 }));
+    private mouseQStart = 0;
+    private mouseQEnd = MOUSEQLEN - 1;
+    /**
+     * Where `HandleMouseEvents` sends every button that is not its own (the turns and the
+     * steps): the UI's dispatcher, and the button-up. Headless, nobody is listening and
+     * the entry is still consumed and still takes its tick.
+     */
+    private mouseEventHandlers: MouseEventHandlers | null = null;
     /**
      * `HandleMouseEvents`' `static i32 lastTime` (doc/CSBwin-src/Mouse.cpp:1351): the
-     * `d.Time` of the last turn or step it handled. Zeroed by its initialise call, which
-     * a game load makes (`SaveGame.cpp:1661`).
+     * `d.Time` of the last button it handled, click, turn or step. Zeroed by its
+     * initialise call, which a game load makes (`SaveGame.cpp:1661`).
      */
     private lastInputTime = 0;
     /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */
@@ -759,13 +792,15 @@ export class Game {
     };
 
     /**
-     * One VBL of the loop: drain the movement queue, then run a game tick if one is due.
+     * One VBL of the loop: the mouse queue, then a game tick if one is due.
      * Public so that `tools/` can step frames at chosen times.
      */
     runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
         this.clockTickCleared = false;
-        this.processMovementQueue();
+        // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
+        // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
+        while (this.handleMouseEvents(1) & 1) { /* the next entry, in the same pass */ }
 
         // Calculate time since last tick
         const timeSinceLastTick = currentTime - this.lastTickTime;
@@ -816,12 +851,55 @@ export class Game {
         this.state.party = this.party.state;
     }
 
+    /**
+     * A movement key, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8429): translated to its
+     * button and queued, unless the queue is full — `MouseQEnd + 2 == MouseQStart`, seven
+     * entries waiting (`:8439-8443`). The key queue in front of it (`CSBUI.cpp:143-145`)
+     * is emptied into it one key per message (`CSBCode.cpp:707-712`), so it is never
+     * what refuses a key.
+     */
     enqueueMovement(action: MovementAction): boolean {
-        if (this.movementQueue.length >= this.movementQueueLen - 1) {
-            return false;
-        }
-        this.movementQueue.push(action);
+        let end = this.mouseQEnd + 2;
+        if (end > MOUSEQLEN - 1) end -= MOUSEQLEN;
+        if (end === this.mouseQStart) return false;
+        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
+        this.mouseQueue[this.mouseQEnd] = { num: MOVEMENT_BUTTON[action], x: 0, y: 0 };
         return true;
+    }
+
+    /**
+     * The queueing half of `OnMouseClick` (doc/CSBwin-src/CSBCode.cpp:7607): the caller
+     * has already searched the UI's button lists (`SearchButtonList`) for `num`. Queued
+     * only while fewer than `MOUSEQLEN-2` entries wait — there must be room left for the
+     * button-up — and never for a click that hit no button (`:7626-7690`). Says whether
+     * it was queued.
+     */
+    onMouseClick(num: number, x: number, y: number): boolean {
+        if (num === 0) return false;
+        if (this.queuedInputCount() >= MOUSEQLEN - 2) return false;
+        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
+        this.mouseQueue[this.mouseQEnd] = { num, x, y };
+        return true;
+    }
+
+    /**
+     * `OnMouseUnClick` (doc/CSBwin-src/CSBCode.cpp:7581): the button-up, `0x0add`, queued
+     * while fewer than `MOUSEQLEN-1` entries wait — whether or not its click was.
+     */
+    onMouseUnClick(): void {
+        if (this.queuedInputCount() >= MOUSEQLEN - 1) return;
+        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
+        this.mouseQueue[this.mouseQEnd] = { num: MOUSE_UNCLICK, x: 0, y: 0 };
+    }
+
+    /** `numEnt`: how many entries wait in the mouse queue (doc/CSBwin-src/CSBCode.cpp:7589-7590). */
+    queuedInputCount(): number {
+        return (this.mouseQEnd - this.mouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN;
+    }
+
+    /** Who handles the buttons that are not movement (see `MouseEventHandlers`). */
+    setMouseEventHandlers(handlers: MouseEventHandlers | null): void {
+        this.mouseEventHandlers = handlers;
     }
 
     /**
@@ -947,12 +1025,13 @@ export class Game {
     }
 
     /**
-     * `DiscardAllInput` (doc/CSBwin-src/CSBCode.cpp:7532) empties CSBWin's key and mouse
-     * queues; the port's only queued input is the movement queue — clicks are handled as
-     * they arrive.
+     * `DiscardAllInput` (doc/CSBwin-src/CSBCode.cpp:7532-7544): the mouse queue is reset
+     * to empty, `MouseQStart = 0`, `MouseQEnd = MOUSEQLEN-1` — every key and click that
+     * was waiting is lost.
      */
-    private discardAllInput(): void {
-        this.movementQueue.length = 0;
+    discardAllInput(): void {
+        this.mouseQStart = 0;
+        this.mouseQEnd = MOUSEQLEN - 1;
     }
 
     /**
@@ -981,32 +1060,49 @@ export class Game {
     }
 
     /**
-     * The movement half of `HandleMouseEvents` (doc/CSBwin-src/Mouse.cpp:1349), which
-     * the main loop calls with `delta = 1` (`CSBCode.cpp:748`). The head of the queue
-     * waits, rather than being dropped, while
+     * `HandleMouseEvents` (doc/CSBwin-src/Mouse.cpp:1349), which the main loop calls with
+     * `delta = 1` (`CSBCode.cpp:748`): at most one entry of the mouse queue, and a result
+     * whose bit 0 asks to be called again at once. The head waits, rather than being
+     * taken, while
      *
-     * - an event was handled this tick: `lastTime != 0 && d.Time < lastTime + delta`
-     *   (`Mouse.cpp:1468-1476`) — one turn or step per tick;
+     * - an entry was handled this tick: `lastTime != 0 && d.Time < lastTime + delta`
+     *   (`Mouse.cpp:1468-1476`);
      * - it is a step and `d.partyMoveDisableTimer != 0`, or `d.Word11712 != 0` and the
-     *   step heads in direction `d.Word11714` (`:1482-1496`). Turns are never held.
+     *   step heads in direction `d.Word11714` (`:1485-1498`) — and everything queued
+     *   behind it waits too.
      *
-     * CSBWin's `lastTime` is stamped by every mouse event it handles, clicks included;
-     * the port queues only movement, so only a turn or a step stamps it (DEBT.md C21).
+     * The turns and steps are handled here (`TurnParty`, `MoveParty`, `:1550-1570`), the
+     * button-up and every other button by `mouseEventHandlers`. Every button stamps
+     * `lastTime`; the button-up does not, and lets the next entry follow (`:1523-1549`).
+     *
+     * Not ported: the frozen game's filter (`:1433-1444`) and the stairs buttons
+     * `0x1124`/`0x1125`, for want of either in the port.
      */
-    private processMovementQueue(): void {
-        if (this.movementQueue.length === 0) return;
+    private handleMouseEvents(delta: number): number {
+        const result = 0;
+        if (this.queuedInputCount() === 0) return result;
         const time = this.state.tickCount;
-        if (this.lastInputTime !== 0 && time < this.lastInputTime + 1) return;
-        const next = this.movementQueue[0];
+        if (this.lastInputTime !== 0 && time < this.lastInputTime + delta) return result;
+        const entry = this.mouseQueue[this.mouseQStart];
+        const num = entry.num;
         const party = this.party.state;
-        const relDirection = MOVE_RELATIVE_DIRECTION[next];
-        if (relDirection !== undefined && (
+        if (num >= 3 && num <= 6 && (
             party.partyMoveDisableTimer !== 0 ||
-            (party.word11712 !== 0 && ((party.facing + relDirection) & 3) === party.word11714)
-        )) return;
-        this.movementQueue.shift();
-        this.move(next);
+            (party.word11712 !== 0 && ((party.facing + num - 3) & 3) === party.word11714)
+        )) return result;
+        this.mouseQStart = (this.mouseQStart + 1) % MOUSEQLEN;
+        if (num === MOUSE_UNCLICK) {
+            this.mouseEventHandlers?.unclick();
+            return result | 1;
+        }
+        const action = BUTTON_MOVEMENT[num];
+        if (action !== undefined) {
+            this.move(action);
+        } else {
+            this.mouseEventHandlers?.button(num, entry.x, entry.y);
+        }
         this.lastInputTime = time;
+        return result;
     }
 
     /**

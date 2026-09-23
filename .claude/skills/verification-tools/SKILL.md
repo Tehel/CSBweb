@@ -158,9 +158,13 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 then silently tests nothing. Call `game.timerQueue.deleteMonsterMovementTimers(x, y, level)`
 after placing it (`dump-missile-monster.ts`).
 
-**Stepping frames.** `game.runFrame(t)` is one VBL at a time you choose: drain the
-movement queue, then a tick if `t - lastTickTime` reaches the tick interval. Reach
-`movementQueue` / `lastTickTime` through a cast (`dump-party-collision.ts` case 6). Every
+**Stepping frames.** `game.runFrame(t)` is one VBL at a time you choose: the mouse queue
+(`HandleMouseEvents`), then a tick if `t - lastTickTime` reaches the tick interval. Queue
+input with `enqueueMovement` (a key) or `onMouseClick(num, x, y)` / `onMouseUnClick()`,
+catch the non-movement buttons with `setMouseEventHandlers`, empty the queue with
+`discardAllInput()`, and reach `lastTickTime` / `lastInputTime` through a cast
+(`dump-mouse-queue.ts`, `dump-party-collision.ts` case 6). `lastInputTime == 0` disables
+the one-per-tick gate, as `lastTime == 0` does in CSBWin, so start the clock first. Every
 tick runs the monsters too, so do anything that needs a monster where you found it
 before the frames that tick, or set `lastTickTime = t` so none is due.
 

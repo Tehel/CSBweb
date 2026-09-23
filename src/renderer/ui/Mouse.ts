@@ -1,10 +1,11 @@
 /**
  * The mouse: CSBWin's click ring buffer, the button dispatcher, and the cursor.
  *
- * Mirrors `doc/CSBwin-src/Mouse.cpp`. Clicks are not handled where they arrive — they are
- * pushed onto a small ring buffer (`ui.mouseQueue`) and drained once per frame by
- * `processMouseQueue`, so a click always acts on the state the frame was drawn from.
- * `handleMouseButton` is the dispatcher on the `word0` ids that `searchButtonList` returns.
+ * Mirrors `doc/CSBwin-src/Mouse.cpp`. Clicks are not handled where they arrive: the host
+ * turns one into a button with `searchMouseButtons` and queues it on the game's one mouse
+ * queue (`Game.onMouseClick`), where it waits its turn behind keys and other clicks.
+ * `Game.handleMouseEvents` handles the turns and steps itself and hands every other button
+ * to `handleMouseButton`, the dispatcher on the `word0` ids `searchButtonList` returns.
  */
 import { IndexedBitmap } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../csbwin/UITables';
@@ -16,60 +17,20 @@ import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { handleAttackAreaClick } from './Attack';
 import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
-import { isReincarnateScreenOpen, reincarnateClick } from './ReIncarnate';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
 
 export { decodeCursorBitmap };
 
-export function enqueueMouseClick(ui: UIState, x: number, y: number, buttons: number): void {
-  // The Reincarnate name-entry screen reads the mouse queue itself and does its own
-  // geometry (`doc/CSBwin-src/Code13ea4.cpp:114-212`) — it never consults a button
-  // list, and while it is up nothing else may act on a click. Handled here, before the
-  // lists, rather than in the dispatcher: `searchButtonList` would throw the click
-  // away as unmatched long before the dispatcher saw it.
-  if (isReincarnateScreenOpen(ui)) {
-    reincarnateClick(ui, x, y);
-    return;
-  }
-
-  const mouseQueueLength = ui.mouseQueue.length;
-  const numEnt = (ui.mouseQEnd - ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
-  if (numEnt >= mouseQueueLength - 2) return;
-
-  let id = searchButtonList(ui.primaryButtons, x, y, buttons);
-  if (id === 0) {
-    id = searchButtonList(ui.secondaryButtons, x, y, buttons);
-  }
-  if (id === 0) return;
-
-  ui.mouseQEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
-  ui.mouseQueue[ui.mouseQEnd] = { num: id, x, y };
-}
-
-export function enqueueMouseUnclick(ui: UIState): void {
-  const mouseQueueLength = ui.mouseQueue.length;
-  const numEnt = (ui.mouseQEnd - ui.mouseQStart + 1 + mouseQueueLength) % mouseQueueLength;
-  if (numEnt >= mouseQueueLength - 1) return;
-
-  ui.mouseQEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
-  ui.mouseQueue[ui.mouseQEnd] = { num: 0xadd, x: 0, y: 0 };
-}
-
-export function processMouseQueue(ui: UIState): void {
-  const mouseQueueLength = ui.mouseQueue.length;
-  const nextEnd = (ui.mouseQEnd + 1) % mouseQueueLength;
-  if (nextEnd === ui.mouseQStart) return;
-
-  const entry = ui.mouseQueue[ui.mouseQStart];
-  ui.mouseQStart = (ui.mouseQStart + 1) % mouseQueueLength;
-  if (entry.num === 0xadd) {
-    handleMouseUnclick(ui);
-    return;
-  }
-
-  handleMouseButton(ui, entry.num, entry.x, entry.y);
+/**
+ * `OnMouseClick`'s button search (doc/CSBwin-src/CSBCode.cpp:7631-7676): the primary list,
+ * then the secondary. 0 for a click that hit no button, which is never queued.
+ */
+export function searchMouseButtons(ui: UIState, x: number, y: number, buttons: number): number {
+  const id = searchButtonList(ui.primaryButtons, x, y, buttons);
+  if (id !== 0) return id;
+  return searchButtonList(ui.secondaryButtons, x, y, buttons);
 }
 
 export function handleMouseButton(ui: UIState, id: number, x: number, y: number): void {

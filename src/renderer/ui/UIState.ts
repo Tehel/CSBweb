@@ -113,11 +113,6 @@ export interface UIState {
   primaryButtons: UIButton[] | null;   // graphic231 -> buttons17196
   secondaryButtons: UIButton[] | null; // graphic231 -> buttons17304
 
-  /* ---- CSBWin's mouse ring buffer (Mouse.cpp) ---- */
-  mouseQueue: Array<{ num: number; x: number; y: number }>;
-  mouseQStart: number;
-  mouseQEnd: number;
-
   /* ---- bitmap caches ---- */
   graphicCache: Map<string, IndexedBitmap>;
   cursorArrowBitmap: IndexedBitmap | null;
@@ -228,10 +223,6 @@ export function createUIState(
     mouthChewFrameHandle: null,
     primaryButtons: null,
     secondaryButtons: null,
-
-    mouseQueue: [],
-    mouseQStart: 0,
-    mouseQEnd: 0,
 
     graphicCache: new Map(),
     cursorArrowBitmap: null,

@@ -17,7 +17,6 @@ against each other.
 - **interaction state**: `pressingEye`, `hoverPoint`, `showAttackPanel`, the open chest,
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
-- **CSBWin's mouse ring buffer**: `mouseQueue`, `mouseQStart`, `mouseQEnd`
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
 - **hooks out**: `playSound`, `onObjectMove`, `onSpellCast`, `viewingFilter`,
   `onResurrectReincarnateCancel`, `onReincarnateNamed`
@@ -30,7 +29,7 @@ A function that turns out not to need the state does not take it — the pure he
 
 | Module | CSBWin counterpart | Holds |
 | --- | --- | --- |
-| `ui/Mouse.ts` | `Mouse.cpp` | Click ring buffer, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, the cursor and hover highlights |
+| `ui/Mouse.ts` | `Mouse.cpp` | The button search a click is queued by, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, the cursor and hover highlights |
 | `ui/Keyboard.ts` | `CSBUI.cpp` (`KEYXLATE`, `UIM_KEYDOWN`) | The panel key bindings — attack menus, attack options, inventories, runes, cast, caster. CSBWin has no keys of its own: `config.txt` binds a scancode to a screen point and a mouse button, and `UIM_KEYDOWN` clicks there. This binds the handlers those clicks reach |
 | `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
 | `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `Mouse.ts` and the host's key handler hand it every click and every key |
@@ -69,7 +68,7 @@ Viewport composition, and only that: initialisation and table extraction, the pa
 and per-level monster colour overrides, the wall / floor-ceiling / mirrored-bitmap caches,
 `render()`, `presentViewport()`, `blitViewportToScreen()`, and monster attack-sound state.
 
-It also keeps thin public wrappers — `enqueueMouseClick`, `processMouseQueue`,
+It also keeps thin public wrappers — `searchMouseButtons`, `handleMouseButton`,
 `tryPickViewportObject`, `resolveViewportCursorAction`, … — because `src/ui/events.ts` and
 `main.ts` call the renderer, not the UI modules. Those wrappers delegate and do nothing
 else.

@@ -67,9 +67,9 @@ import {
 import {
   drawCursorItem,
   drawHoverHighlights,
-  enqueueMouseClick,
-  enqueueMouseUnclick,
-  processMouseQueue,
+  handleMouseButton,
+  handleMouseUnclick,
+  searchMouseButtons,
   syncInventoryButtons,
   updateButtonLists,
 } from './ui/Mouse';
@@ -83,6 +83,7 @@ import {
   drawReincarnateScreen,
   isReincarnateScreenOpen,
   openReincarnateScreen,
+  reincarnateClick,
   reincarnateKey,
 } from './ui/ReIncarnate';
 import {
@@ -206,10 +207,6 @@ export class ViewportRenderer {
 
     const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
     this.ui.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-    const mouseQueueLength = 8;
-    this.ui.mouseQueue = Array.from({ length: mouseQueueLength }, () => ({ num: 0, x: 0, y: 0 }));
-    this.ui.mouseQStart = 0;
-    this.ui.mouseQEnd = mouseQueueLength - 1;
     updateButtonLists(this.ui);
 
     // Create interpreter context
@@ -253,12 +250,18 @@ export class ViewportRenderer {
 
   /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
 
-  enqueueMouseClick(x: number, y: number, buttons: number): void {
-    enqueueMouseClick(this.ui, x, y, buttons);
+  /** The button a click hits, 0 for none; the host queues it with `Game.onMouseClick`. */
+  searchMouseButtons(x: number, y: number, buttons: number): number {
+    return searchMouseButtons(this.ui, x, y, buttons);
   }
 
-  enqueueMouseUnclick(): void {
-    enqueueMouseUnclick(this.ui);
+  /**
+   * A click on the Reincarnate name-entry screen. That screen reads the mouse itself and
+   * does its own geometry (`doc/CSBwin-src/Code13ea4.cpp:114-212`) — it never consults a
+   * button list, and while it is up nothing else may act on a click.
+   */
+  handleReincarnateClick(x: number, y: number): void {
+    reincarnateClick(this.ui, x, y);
   }
 
   /**
@@ -291,15 +294,23 @@ export class ViewportRenderer {
     return handleUIKey(this.ui, key);
   }
 
-  processMouseQueue(): void {
-    processMouseQueue(this.ui);
-    // `DiskMenuNeeded` is raised by the icon's handler and acted on by whoever drained
-    // the queue — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
-    // method here. The deferral is the whole reason the flag exists.
+  /**
+   * A button `Game.handleMouseEvents` took off the mouse queue and does not handle itself.
+   * `DiskMenuNeeded` is raised by the disk icon's handler and acted on by whoever called
+   * `HandleMouseEvents` — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
+   * method here. The deferral is the whole reason the flag exists.
+   */
+  handleMouseButton(num: number, x: number, y: number): void {
+    handleMouseButton(this.ui, num, x, y);
     if (this.ui.diskMenuNeeded) {
       this.ui.diskMenuNeeded = false;
       openSaveMenu(this.ui);
     }
+  }
+
+  /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1523-1549`). */
+  handleMouseUnclick(): void {
+    handleMouseUnclick(this.ui);
   }
 
   /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
