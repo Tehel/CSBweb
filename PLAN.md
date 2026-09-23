@@ -29,15 +29,17 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C12,
-C17 and C18, paid on 2026-09-23. Recorded along the way: C13 (the rest of `MoveParty`:
-stamina per step, the move delay, the key queue's depth); C14 (the rest of `DrawClouds`:
-size, colour map, lightning position, the cell under the party); C15 (a DSA cell move
-bypasses `MoveObject`); C16 (freed database slots are never reused); C18 (a Fluxcage never
-expired and freed door record 0 — found and paid with C17); C19 (`CastSpell` under a spell
-filter's overrides); G1 and G4 gained the unported `STKOP_Throw` and the monster design
-options.
-Next: C13, then C14 and C19 (both S) if there is room.
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C13,
+C17–C19, paid on 2026-09-23. C13 closed `MoveParty`: stamina per step, the move delay as
+`d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
+words), a two-deep queue, the input discard on a level change, and room type 7. Recorded
+along the way: C14 (the rest of `DrawClouds`: size, colour map, lightning position, the
+cell under the party); C15 (a DSA cell move bypasses `MoveObject`); C16 (freed database
+slots are never reused); C18 (a Fluxcage never expired and freed door record 0 — found
+and paid with C17); C20 (a level change inside `ProcessTimers` is loaded a tick late);
+C21 (clicks do not go through the input queue); D5 (cell flags stored twice); G1 and G4
+gained the unported `STKOP_Throw` and the monster design options.
+Next: C14 (S), then C20 (S); C15, C16 and C21 are M.
 
 ## Ground rules
 

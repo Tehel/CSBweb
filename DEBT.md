@@ -513,7 +513,7 @@ which function, `uByte9` and slot index. Size S–M.
 
 ### C13 ✅ The rest of `MoveParty`: stamina, move delay, queue depth
 
-**Paid in `1dc4c1d`, `49c953e`, `263786a`, `f9d72b0` and `ed189fa`,** one bullet each.
+**Paid in `1dc4c1d`, `49c953e`, `263786a`, `f9d72b0` and `bbbc8a0`,** one bullet each.
 What they left is C20 and C21; found on the way, D5. All in `doc/CSBwin-src/CSBCode.cpp`
 unless said otherwise.
 
@@ -644,7 +644,7 @@ after the door. Only a cage restored from a save worked: `restoreTimerQueue` fil
 
 ### C19 ✅ `CastSpell` under a spell filter's overrides
 
-**Paid in `C19HASH`.** `Game.castSpell` handles the filter's `action` first — its message
+**Paid in `2a5761e`.** `Game.castSpell` handles the filter's `action` first — its message
 prints for a dead caster, and an action with no message (8 and up) now casts instead of
 aborting — then takes the difficulty from the spell's own `skillRequired` and the
 `missileType` from the filter. Evidence: `tools/dump-cast-spell.ts`, new (5 of 8 checks
