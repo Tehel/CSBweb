@@ -407,7 +407,25 @@ AdjustSkills(chIdx, 10, D6W, ASW_ThrowByCharacter);
 ```
 
 The skill number is the literal `10` — there is no lookup table for it. The experience is
-`8`, `+4` for a weapon, and `+ uByte3/4` for a weapon whose `uByte1 <= 12`.
+`8`, `+4` for a weapon, and `+ uByte3/4` for a weapon whose `uByte1 <= 12`. That test
+includes classes 0 and 2, so swords, maces, clubs, the dagger and the axes get the bonus
+too, not only the throwing weapons. The object's weight plays no part; it only sets the
+stamina cost (`TAG016382`, `Mouse.cpp:653-667`) and the distance.
+
+## An attack at an empty square is a miss; one at any closed door is a hit
+
+`AttackWithPhysicalForce` returns 0 when no monster is in the square, and `_Attack` treats
+that 0 as a miss, halving both `experienceGained` and `disableTime`
+(`doc/CSBwin-src/Attack.cpp:1834-1838`). A wall is no different from empty air.
+
+BASH, HACK, BERZERK, KICK, SWING and CHOP first check the cell in front for
+`roomDOOR` with `(flags & 7) == 4`, a closed door (`Attack.cpp:1794-1812`); CSBWin's comment
+"Is it a breakable door?" is wrong. Breakability is checked afterwards in `HitDoor`, which
+returns 0 for a door `canOpenWithAxe()` refuses or a force below `DoorTOC`
+(`doc/CSBwin-src/Code11f52.cpp:2276-2281`). The arm then `break`s with `successfulAttack`
+still at its initial 1, so every blow at a closed door, breakable or not, earns the full
+`experienceForAttacking` with a busy time of 6. See `doc/TRAINING.md` for what that means in
+play.
 
 ## Spell experience uses the spell record's `byte5`
 

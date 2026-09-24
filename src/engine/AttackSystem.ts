@@ -1048,8 +1048,10 @@ export class AttackSystem {
       case AttackType.atk_KICK:
       case AttackType.atk_SWING:
       case AttackType.atk_CHOP:
-        // These six can be aimed at a door instead of a monster — but only a breakable
-        // one that is currently shut. Anything else falls through to the melee code.
+        // These six can be aimed at a door instead of a monster: any door that is shut,
+        // breakable or not — `HitDoor` checks breakability, and the blow is a hit either
+        // way (CSBWin's own "breakable" comment is wrong). Anything else falls through
+        // to the melee code.
         if (((cellFlag & 0xff) >> 5) === RoomType.DOOR && (cellFlag & 7) === 4) {
           this.hooks.queueSound?.(16, party.position.x, party.position.y, 1);
           params.dataType = AttackDataType.ADT_HitDoor;

@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training in Dungeon Master</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #faf8f5;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f1ede7;
+    --ink: #23201c;
+    --ink-soft: #5c554c;
+    --ink-faint: #8a8177;
+    --rule: #e0d9cf;
+    --accent: #8c3a1e;
+    --accent-bg: #f6ece7;
+    --mystery: #6b4423;
+    --mystery-bg: #f7f0e6;
+    --mystery-rule: #d9c4a3;
+    --measure: 40rem;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --serif: Charter, "Bitstream Charter", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17161a;
+      --bg-raised: #1e1d22;
+      --bg-sunken: #131216;
+      --ink: #e6e2dc;
+      --ink-soft: #a9a49c;
+      --ink-faint: #7d786f;
+      --rule: #302e35;
+      --accent: #e8916a;
+      --accent-bg: #2a201c;
+      --mystery: #d8b78a;
+      --mystery-bg: #221d17;
+      --mystery-rule: #4a3d2c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17161a;
+    --bg-raised: #1e1d22;
+    --bg-sunken: #131216;
+    --ink: #e6e2dc;
+    --ink-soft: #a9a49c;
+    --ink-faint: #7d786f;
+    --rule: #302e35;
+    --accent: #e8916a;
+    --accent-bg: #2a201c;
+    --mystery: #d8b78a;
+    --mystery-bg: #221d17;
+    --mystery-rule: #4a3d2c;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+  }
+
+  .page { max-width: var(--measure); margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+
+  header.masthead { margin-bottom: 3rem; }
+  header.masthead h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem);
+    line-height: 1.12;
+    margin: 0 0 .9rem;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+  .standfirst { color: var(--ink-soft); font-size: 1.05rem; margin: 0 0 1.4rem; }
+  .provenance {
+    font-family: var(--mono);
+    font-size: .74rem;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    margin: 3.4rem 0 1rem;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+  h2::before {
+    content: "";
+    display: block;
+    width: 2.2rem;
+    height: 2px;
+    background: var(--accent);
+    margin-bottom: 1.1rem;
+    opacity: .8;
+  }
+  h3 {
+    font-size: 1.12rem;
+    margin: 2.2rem 0 .6rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  p { margin: 0 0 1.05rem; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  a { color: var(--accent); }
+
+  code {
+    font-family: var(--mono);
+    font-size: .84em;
+    background: var(--bg-sunken);
+    padding: .12em .38em;
+    border-radius: 3px;
+    border: 1px solid var(--rule);
+  }
+
+  ul, ol { margin: 0 0 1.05rem; padding-left: 1.3rem; }
+  li { margin-bottom: .5rem; }
+  li > ul, li > ol { margin-top: .5rem; }
+
+  /* --- The decision trees --------------------------------------------- */
+  .tree {
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.55;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1.1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--ink);
+    tab-size: 2;
+  }
+  .tree .q { color: var(--accent); }
+  .tree .act { font-weight: 600; }
+
+  /* --- Tables ---------------------------------------------------------- */
+  .table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  /* The creature table has seven columns and does not belong inside the prose
+     measure. Let it break out, centred, bounded by the viewport. */
+  .table-wrap.wide {
+    --wide: min(58rem, calc(100vw - 3rem));
+    width: var(--wide);
+    margin-left: calc((var(--wide) - 100%) / -2);
+  }
+  .table-wrap.wide td.notes { min-width: 13rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+    font-family: var(--serif);
+  }
+  caption {
+    caption-side: bottom;
+    text-align: left;
+    font-size: .82rem;
+    color: var(--ink-faint);
+    padding-top: .7rem;
+    font-style: italic;
+  }
+  th, td {
+    text-align: left;
+    padding: .5rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  thead th {
+    font-size: .72rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    border-bottom: 1.5px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-size: .84em; text-align: right; white-space: nowrap; padding-left: .45rem; padding-right: .45rem; }
+  td.name { white-space: nowrap; font-weight: 600; }
+  .peak { color: var(--accent); font-weight: 700; }
+  .dash { color: var(--ink-faint); }
+  tbody tr.lord td { background: var(--accent-bg); }
+
+  /* --- Callouts -------------------------------------------------------- */
+  .note {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 1rem 1.2rem;
+    margin: 0 0 1.4rem;
+    font-size: .95rem;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: .5rem;
+  }
+
+  .mystery {
+    background: var(--mystery-bg);
+    border: 1px solid var(--mystery-rule);
+    border-left: 3px solid var(--mystery);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1rem;
+    font-size: .95rem;
+  }
+  .mystery h4 {
+    margin: 0 0 .45rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--mystery);
+    font-family: var(--serif);
+  }
+  .mystery p { margin-bottom: .6rem; }
+  .mystery p:last-child { margin-bottom: 0; }
+  .quote {
+    font-style: italic;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--mystery-rule);
+    padding-left: .8rem;
+    margin: .7rem 0;
+  }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 3rem 0;
+  }
+
+  .lede {
+    font-size: 1.06rem;
+    color: var(--ink-soft);
+    border-left: 3px solid var(--rule);
+    padding-left: 1.1rem;
+    margin: 0 0 1.6rem;
+  }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid var(--rule);
+    font-size: .84rem;
+    color: var(--ink-faint);
+  }
+  footer.colophon p { margin-bottom: .5rem; }
+
+  @media (max-width: 34rem) {
+    body { font-size: 17px; }
+    .page { padding: 2.5rem 1.1rem 4rem; }
+    .tree { font-size: .68rem; }
+  }
+
+  /* --- Training page additions ----------------------------------------- */
+  .levels { width: 100%; table-layout: fixed; font-family: var(--mono); font-size: .8rem; }
+  .levels th, .levels td { text-align: center; padding: .45rem 0; border-bottom: none; }
+  .levels thead th { font-size: .66rem; }
+  .levels td { border-top: 1px solid var(--rule); }
+  .levels td.m1 { color: var(--ink-faint); }
+  .levels td.m2 { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .levels td.m3 { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .levels td.m4 { background: color-mix(in srgb, var(--accent) 32%, transparent); }
+  .levels td.m5 { background: color-mix(in srgb, var(--accent) 44%, transparent); font-weight: 600; }
+  .levels td.m6 { background: color-mix(in srgb, var(--accent) 58%, transparent); font-weight: 700; color: var(--bg); }
+  .levels tr.stairs td { font-size: .9rem; font-weight: 700; color: var(--accent); border-top: none; padding-top: .2rem; }
+
+  .factors { display: grid; grid-template-columns: repeat(3, 1fr); gap: .8rem; margin: 0 0 1.6rem; }
+  .factor {
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .9rem 1rem;
+    font-size: .9rem;
+    line-height: 1.45;
+  }
+  .factor .big {
+    display: block;
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: .3rem;
+    letter-spacing: -0.02em;
+  }
+
+  .recipe {
+    background: var(--accent-bg);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: .95rem 1.15rem;
+    margin: 0 0 1.4rem;
+    font-size: .97rem;
+  }
+  .recipe p:last-child { margin-bottom: 0; }
+  .recipe .label {
+    display: block;
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: .4rem;
+  }
+
+  .wins { counter-reset: win; list-style: none; padding: 0; margin: 0 0 1.6rem; }
+  .wins > li {
+    counter-increment: win;
+    position: relative;
+    padding: 0 0 1.1rem 2.6rem;
+    margin: 0;
+  }
+  .wins > li::before {
+    content: counter(win);
+    position: absolute;
+    left: 0;
+    top: .1rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: .85rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wins h3 { margin: 0 0 .3rem; font-size: 1.05rem; }
+  .wins p { margin-bottom: .5rem; font-size: .97rem; }
+
+  .formula {
+    font-family: var(--mono);
+    font-size: .82rem;
+    background: var(--bg-sunken);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .8rem 1rem;
+    margin: 0 0 1.2rem;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  tr.best td { background: var(--accent-bg); }
+  tr.best td.name { color: var(--accent); }
+
+  @media (max-width: 34rem) {
+    .factors { grid-template-columns: 1fr; }
+    .levels { font-size: .66rem; }
+    .levels thead th { font-size: .56rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <h1>Training in Dungeon Master</h1>
+  <p class="standfirst">How to gain Fighter, Ninja, Priest and Wizard levels as fast as the
+  game allows: what earns experience, what only looks like it does, and the multipliers
+  that matter more than either.</p>
+  <p class="provenance">Read from Paul R. Stevens' CSBWin C++ source · Numbers computed
+  from the Atari graphics.dat and dungeon.dat · Two observations from play, marked as such</p>
+</header>
+
+<p class="lede">The short version: <strong>the weight of what you throw earns nothing, and
+where you train matters more than what you do.</strong> A Ninja practising at the bottom
+of the dungeon while a monster attacks earns 24 times what the same Ninja earns alone near
+the top.</p>
+
+<hr>
+
+<h2>Three factors on every gain</h2>
+
+<p>Every experience gain goes through one routine, which scales it three ways before adding
+it to the skill.</p>
+
+<div class="factors">
+  <div class="factor"><span class="big">×½</span>Fighter and Ninja skills, when no monster
+  has attacked the party for 150 ticks (about 40 seconds).</div>
+  <div class="factor"><span class="big">×1–6</span>Every skill, by the dungeon level the
+  party is on.</div>
+  <div class="factor"><span class="big">×2</span>Every sub-skill, when a monster attacked
+  in the last 25 ticks (about 6 seconds). Priest and Wizard spells included.</div>
+</div>
+
+<h3>The level multipliers</h3>
+
+<div class="table-wrap">
+<table class="levels">
+  <thead><tr><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th></tr></thead>
+  <tbody>
+    <tr><td class="m1">×1</td><td class="m1">×1</td><td class="m1">×1</td><td class="m2">×2</td><td class="m2">×2</td><td class="m2">×2</td><td class="m3">×3</td><td class="m3">×3</td><td class="m3">×3</td><td class="m4">×4</td><td class="m5">×5</td><td class="m5">×5</td><td class="m6">×6</td><td class="m6">×6</td></tr>
+    <tr class="stairs"><td></td><td></td><td></td><td></td><td></td><td>↓</td><td>↓</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </tbody>
+  <caption>Dungeon levels, numbered from 1 (the Hall of Champions). ↓ marks where the two long staircases to the bottom start. Multipliers read from each level's
+  descriptor in dungeon.dat.</caption>
+</table>
+</div>
+
+<p>A class's level is the mastery of its base skill, and every sub-skill's experience is
+added to that base as well. Mastery goes up by one each time the experience, halved at
+every step, is still at least 500. So level <em>m</em> needs 500 × 2<sup><em>m</em>−2</sup>.
+<strong>Each level costs twice the last</strong>, so the multipliers matter more the higher
+a champion gets.</p>
+
+<hr>
+
+<h2>Quick wins</h2>
+
+<ol class="wins">
+  <li>
+    <h3>Take the long stairs down</h3>
+    <p>Two staircases, starting on levels 6 and 7, go straight down to the bottom levels.
+    Once you can reach them, training at the bottom is a free win: ×2 or ×3 becomes ×5 or
+    ×6, for every skill. <em>(From play.)</em></p>
+  </li>
+  <li>
+    <h3>Hit a closed door, not the air</h3>
+    <p>KICK, BASH, HACK, BERZERK, SWING and CHOP go at the door when the square in front
+    holds a closed door. The game checks whether the door can be broken only afterwards,
+    and either way the attack counts as a hit, not a miss. So it earns its
+    <strong>full</strong> experience, with the busy time fixed at 6.</p>
+    <p><strong>A door that can't be broken can be kicked for ever.</strong> A breakable one
+    gives way after a hard enough blow, and then the training is over. KICK earns 13 at a
+    door against 6 in the air. BERZERK earns 40, busy for 6 ticks instead of 30.</p>
+  </li>
+  <li>
+    <h3>Throw at the wall in front of you</h3>
+    <p>A thrown object checks for a wall before it leaves your square, so it drops back at
+    your feet. It's the same reason a fireball cast at an adjacent wall explodes on the
+    party. Each throw costs two clicks, picking it up and throwing it, and you never walk
+    after it.</p>
+  </li>
+  <li>
+    <h3>Let the priest feed the fighters</h3>
+    <p>YA potions are the best priest training, and they give back exactly what kicking and
+    throwing use up: stamina. The priest casts YA and hands it over, the kicker drinks it,
+    and the empty flask goes back for the next cast. Mana goes in; two classes' experience
+    comes out.</p>
+  </li>
+  <li>
+    <h3>Sleep to get mana back</h3>
+    <p>Mana comes back every 64 ticks when awake and every 16 asleep: four times as
+    fast.</p>
+  </li>
+  <li>
+    <h3>Keep a harmless monster busy on you</h3>
+    <p>Next to a monster that keeps attacking, every sub-skill earns double. Fighter and
+    Ninja skills also lose their ×½, so they earn ×4. Only the monster's own attack counts;
+    a missile arriving from elsewhere does not.</p>
+  </li>
+</ol>
+
+<div class="note">
+  <span class="label">What doesn't help</span>
+  <p><strong>Weight</strong>: it earns nothing when thrown. <strong>Punching the
+  air</strong>: it counts as a miss, and a miss earns half. <strong>Skill increasers</strong>:
+  the engine has one, but no actuator in Dungeon Master's dungeon uses it.
+  <strong>Gear</strong>: the Firestaff, Pendant Feral, Ekkhard Cross, Moonstone, Gem of Ages
+  and Sceptre of Lyf add mastery when casting, but the level-up check ignores them. They
+  only let you cast one power higher without failing.</p>
+</div>
+
+<hr>
+
+<h2>Ninja</h2>
+
+<h3>Throwing</h3>
+
+<p>A throw earns <strong>8</strong> for anything that is not a weapon, <strong>12</strong>
+for a weapon, and <strong>12 + a quarter of its throw damage</strong> for most weapons.
+That includes swords, maces, clubs, daggers and axes, not only the throwing weapons.
+<strong>Weight never enters it.</strong> Weight only costs stamina, and heavy things fly a
+shorter distance. Using THROW from the attack menu instead of the cursor adds
+<strong>+5</strong> to the same skill. Each throw makes the champion busy for 4 ticks.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Item</th><th>Weight</th><th>Exp</th><th>Stamina</th></tr></thead>
+  <tbody>
+    <tr class="best"><td class="name">Slayer</td><td class="num">0.2 kg</td><td class="num">19</td><td class="num">1</td></tr>
+    <tr><td class="name">Poison dart</td><td class="num">0.3 kg</td><td class="num">17</td><td class="num">1</td></tr>
+    <tr><td class="name">Dagger</td><td class="num">0.5 kg</td><td class="num">16</td><td class="num">2</td></tr>
+    <tr><td class="name">Throwing star</td><td class="num">0.1 kg</td><td class="num">16</td><td class="num">1</td></tr>
+    <tr><td class="name">Rock</td><td class="num">1.0 kg</td><td class="num">16</td><td class="num">5</td></tr>
+    <tr><td class="name">Arrow</td><td class="num">0.2 kg</td><td class="num">14</td><td class="num">1</td></tr>
+    <tr><td class="name">Sword</td><td class="num">3.2 kg</td><td class="num">14</td><td class="num">13</td></tr>
+    <tr><td class="name">Axe</td><td class="num">4.3 kg</td><td class="num">20</td><td class="num">15</td></tr>
+    <tr><td class="name">Hardcleave</td><td class="num">6.5 kg</td><td class="num">23</td><td class="num">28</td></tr>
+    <tr><td class="name">Stone club</td><td class="num">11.0 kg</td><td class="num">17</td><td class="num">70</td></tr>
+    <tr><td class="name">Boulder</td><td class="num">8.1 kg</td><td class="num">8</td><td class="num">40</td></tr>
+  </tbody>
+  <caption>Before the multipliers. Without a monster attacking, throwing earns half. The Slayer
+  is the better kind of arrow; there are only four, three on level 5 and one on level 11.
+  Poison darts (level 4) and throwing stars (levels 1 and 5) are nearly as good.</caption>
+</table>
+</div>
+
+<h3>Hand-to-hand</h3>
+
+<p>An attack with no monster in the square is a miss, and a miss halves both the
+experience and the busy time. A wall counts the same as empty air, unless it's a closed
+door.</p>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Attack</th><th>At the air</th><th>At a closed door</th><th>Busy (air)</th><th>Stamina</th></tr></thead>
+  <tbody>
+    <tr><td class="name">PUNCH</td><td class="num">4</td><td class="num"><span class="dash">4</span></td><td class="num">0</td><td class="num">1–2</td></tr>
+    <tr><td class="name">HIT</td><td class="num">5</td><td class="num"><span class="dash">5</span></td><td class="num">2</td><td class="num">3–4</td></tr>
+    <tr class="best"><td class="name">KICK</td><td class="num">6</td><td class="num"><span class="peak">13</span></td><td class="num">2</td><td class="num">3–4</td></tr>
+    <tr><td class="name">STAB (Fight)</td><td class="num">7</td><td class="num"><span class="dash">7</span></td><td class="num">2</td><td class="num">3–4</td></tr>
+  </tbody>
+  <caption>PUNCH, HIT and STAB are not door attacks, so a door is just a wall to them.</caption>
+</table>
+</div>
+
+<div class="recipe">
+  <span class="label">Recipe</span>
+  <p>Clicks are the real limit, not busy time. Each attack takes two clicks, and the game
+  handles one click per tick for the whole party. With champions taking turns, a busy time
+  of up to about 6 ticks costs nothing. <strong>Kick a closed door that can't be broken</strong>,
+  with a YA potion to hand for stamina. For the Throw skill, <strong>throw slayers at the
+  wall in front of you</strong>.</p>
+</div>
+
+<h3>Fighters too</h3>
+
+<p>The door works for the Fighter's attacks as well, all at full experience and a busy
+time of 6: <strong>BERZERK 40</strong> (and 26 stamina or more), BASH 11, CHOP 10, HACK 9,
+SWING 6.</p>
+
+<hr>
+
+<h2>Priest</h2>
+
+<p>Casting has no busy time, so mana is the only limit, and the measure that counts is
+experience per point of mana. A spell's experience grows with its difficulty,
+<em>D</em> = the spell's required skill + power (LO = 1 … MON = 6):</p>
+
+<div class="formula">exp = random(0–7) + 16·D + 8·(power − 1)·required + D²</div>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Potion</th><th>Trains</th><th>Exp per mana, LO → MON</th></tr></thead>
+  <tbody>
+    <tr class="best"><td class="name">YA (stamina)</td><td>Heal</td><td class="num">20.2 → 21.2</td></tr>
+    <tr><td class="name">VI (health)</td><td>Heal</td><td class="num">9.9 → 12.8</td></tr>
+    <tr><td class="name">YA BRO DAIN (wisdom)</td><td>Heal</td><td class="num">8.3 → 9.0</td></tr>
+    <tr><td class="name">YA BRO NETA (vitality)</td><td>Heal</td><td class="num">7.8 → 8.3</td></tr>
+    <tr><td class="name">OH BRO ROS (dexterity)</td><td>Heal</td><td class="num">7.8 → 8.3</td></tr>
+    <tr><td class="name">FUL BRO KU (strength)</td><td>Heal</td><td class="num">7.2 → 7.8</td></tr>
+    <tr><td class="name">YA BRO (shield)</td><td>Defend</td><td class="num">6.0 → 7.4</td></tr>
+    <tr><td class="name">VI BRO (cure poison)</td><td>Heal</td><td class="num">3.6 → 5.1</td></tr>
+    <tr><td class="name">ZO BRO RA (mana)</td><td>Priest base</td><td class="num">4.0 → 4.6</td></tr>
+  </tbody>
+  <caption>ZO BRO RA trains the base skill directly, so the monster doubling never applies
+  to it. HEAL from a staff earns about 1 per mana.</caption>
+</table>
+</div>
+
+<div class="recipe">
+  <span class="label">Recipe</span>
+  <p><strong>YA, at the highest power you can cast without risk.</strong> Exp per mana
+  hardly changes with power, so a higher power mostly saves casts and flasks. What costs
+  you is failing. For each mastery level you are short of <em>required + power</em>, the
+  game makes a wisdom test. Each is passed with chance (min(Wisdom + 15, 115) + 1) / 128.
+  A failure burns the mana, makes no potion, and halves the experience once for every
+  missing level. Each potion needs an empty flask in hand: cast, drink (or hand it to a
+  fighter), cast again.</p>
+</div>
+
+<hr>
+
+<h2>Wizard</h2>
+
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Spell</th><th>Trains</th><th>Needs (LO)</th><th>Exp per mana, LO → MON</th></tr></thead>
+  <tbody>
+    <tr class="best"><td class="name">OH VEN (poison cloud)</td><td>Water</td><td class="num">4</td><td class="num">9.3 → 10.2</td></tr>
+    <tr class="best"><td class="name">FUL (light)</td><td>Fire</td><td class="num">2</td><td class="num">6.6 → 8.9</td></tr>
+    <tr><td class="name">FUL IR (fireball)</td><td>Fire</td><td class="num">4</td><td class="num">6.4 → 7.4</td></tr>
+    <tr><td class="name">OH KATH RA (lightning)</td><td>Air</td><td class="num">5</td><td class="num">6.4 → 6.8</td></tr>
+    <tr><td class="name">OH IR RA</td><td>Air</td><td class="num">5</td><td class="num">6.0 → 6.5</td></tr>
+    <tr><td class="name">ZO (open door)</td><td>Air</td><td class="num">2</td><td class="num">4.9 → 6.8</td></tr>
+    <tr><td class="name">ZO VEN (poison potion)</td><td>Water</td><td class="num">3</td><td class="num">5.0 → 6.3</td></tr>
+    <tr><td class="name">OH EW SAR</td><td>Air</td><td class="num">4</td><td class="num">4.9 → 5.7</td></tr>
+    <tr><td class="name">DES VEN (poison bolt)</td><td>Water</td><td class="num">2</td><td class="num">3.6 → 5.0</td></tr>
+    <tr><td class="name">DES EW, YA BRO ROS</td><td>Earth</td><td class="num">2</td><td class="num">3.3 → 4.6</td></tr>
+    <tr><td class="name">ZO KATH RA</td><td>Wizard base</td><td class="num">1</td><td class="num">1.0 → 1.9</td></tr>
+  </tbody>
+  <caption>"Needs" is the mastery to cast at LO without risking failure; add one per step of
+  power. All four elements feed the Wizard level equally.</caption>
+</table>
+</div>
+
+<div class="recipe">
+  <span class="label">Recipe</span>
+  <p><strong>FUL while the wizard is young.</strong> It's harmless, works anywhere, and
+  earns more per mana at higher power. <strong>Move to OH VEN at mastery 4</strong>, but
+  cast it down a long corridor. Cast at a wall in front of you, the cloud lands on the
+  party, just as a fireball explodes on it.</p>
+</div>
+
+<hr>
+
+<h2>What it adds up to</h2>
+
+<p>A priest with mastery 8 in Heal stands on level 13 while a monster attacks and casts YA
+at MON: 276 × 6 × 2 ≈ <strong>3,300 experience for 13 mana</strong>. The same cast alone on
+level 2 earns 276.</p>
+
+<footer class="colophon">
+  <p>Sources: <code>AdjustSkills</code> (Magic.cpp), <code>_Attack</code> and
+  <code>AttackWithPhysicalForce</code> (Attack.cpp), <code>HitDoor</code> (Code11f52.cpp),
+  <code>ThrowByCharacter</code> (Mouse.cpp), <code>CastSpell</code> (Magic.cpp),
+  <code>TAG01b990</code> (CSBCode.cpp). The attack, spell, rune and weapon tables come from
+  graphics.dat item 0x230 and 0x22f; the level multipliers from dungeon.dat.</p>
+  <p>Line-by-line citations are in <code>doc/TRAINING.md</code>.</p>
+</footer>
+
+</div>
+</body>
+</html>
