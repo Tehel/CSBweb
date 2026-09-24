@@ -58,8 +58,7 @@ import {
 import {
   ViewportCursorAction,
   hasCursorObject,
-  isDoorSwitchHit,
-  isWallDecorationHit,
+  resolveEmptyHandedViewportClick,
   resolveViewportCursorAction,
   tryPickViewportObject,
   tryUseFrontWallItem,
@@ -373,12 +372,8 @@ export class ViewportRenderer {
 
   /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
 
-  isWallDecorationHit(x: number, y: number): boolean {
-    return isWallDecorationHit(this.ui, x, y);
-  }
-
-  isDoorSwitchHit(x: number, y: number): boolean {
-    return isDoorSwitchHit(this.ui, x, y);
+  resolveEmptyHandedViewportClick(x: number, y: number): 'doorSwitch' | 'wall' | 'object' | null {
+    return resolveEmptyHandedViewportClick(this.ui, x, y);
   }
 
   tryPickViewportObject(x: number, y: number): boolean {
@@ -639,7 +634,6 @@ export class ViewportRenderer {
     const wb = this.getBitmapsSet(wallGraphicSet);
     this.ui.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
     this.ui.context.doorBitmaps = wb.doors;
-    this.ui.context.wallDecorationRects = [];
     this.ui.context.doorSwitchRects = [];
     this.ui.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
     this.ui.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);

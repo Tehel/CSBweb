@@ -23,17 +23,6 @@ export type ViewportCursorAction =
   | { kind: 'drop'; pos: number; viAltar?: boolean }
   | { kind: 'wall' };
 
-export function isWallDecorationHit(ui: UIState, x: number, y: number): boolean {
-  const rects = ui.context?.wallDecorationRects;
-  if (!rects || rects.length === 0) return false;
-  const vx = x - VIEWPORT_X;
-  const vy = y - VIEWPORT_Y;
-  for (const rect of rects) {
-    if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
-  }
-  return false;
-}
-
 export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
   const rects = ui.context?.doorSwitchRects;
   if (!rects || rects.length === 0) return false;
@@ -43,6 +32,26 @@ export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
     if (vx >= rect.x1 && vx <= rect.x2 && vy >= rect.y1 && vy <= rect.y2) return true;
   }
   return false;
+}
+
+/**
+ * What an empty-handed click in the viewport touches, in `HandleClickInViewport`'s order
+ * (`doc/CSBwin-src/Mouse.cpp:1053-1135`): the door switch first, then the six viewport
+ * buttons 0..5, the first hit winning. 0-4 are the objects drawn in the cells ahead and 5
+ * is the front wall's decoration (`CSBCode.cpp:3299`), so an object lying in an alcove is
+ * picked up rather than the alcove touched. Button 5 of an alcove touches nothing at all
+ * — `TouchWallF1` only runs `if (d.FacingAlcove == 0)` (`Mouse.cpp:1123-1128`).
+ *
+ * Returns `null` for a click that hit no button, and for an alcove's own wall.
+ */
+export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: number): 'doorSwitch' | 'wall' | 'object' | null {
+  if (isDoorSwitchHit(ui, x, y)) return 'doorSwitch';
+  for (let button = 0; button < 6; button++) {
+    if (!isViewportButtonHit(ui, button, x, y)) continue;
+    if (button < 5) return 'object';
+    return ui.context?.facingAlcove ? null : 'wall';
+  }
+  return null;
 }
 
 export function tryPickViewportObject(ui: UIState, x: number, y: number): boolean {

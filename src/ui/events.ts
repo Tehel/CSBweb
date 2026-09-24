@@ -99,13 +99,10 @@ function handleClickInViewport(ctx: UIContext, x: number, y: number): void {
             }
         }
     } else if (!ctx.renderer.hasCursorObject()) {
-        if (ctx.renderer.isDoorSwitchHit(x, y)) {
-            ctx.game.handleDoorSwitchClick();
-        } else if (ctx.renderer.isWallDecorationHit(x, y)) {
-            ctx.game.handleWallClick();
-        } else {
-            ctx.renderer.tryPickViewportObject(x, y);
-        }
+        const target = ctx.renderer.resolveEmptyHandedViewportClick(x, y);
+        if (target === 'doorSwitch') ctx.game.handleDoorSwitchClick();
+        else if (target === 'wall') ctx.game.handleWallClick();
+        else if (target === 'object') ctx.renderer.tryPickViewportObject(x, y);
     }
 }
 

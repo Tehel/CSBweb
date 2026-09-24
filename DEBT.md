@@ -97,6 +97,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C30 | `removeCharacterPossession` is a bare slot clear | M | ⏳ |
 | C31 | A dead champion's bones are not set down by `MoveObject` | S | ⏳ |
 | C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
+| C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -779,6 +780,10 @@ mouse queue, a ring of `MOUSEQLEN` entries, and it holds keys and clicks alike.
   whatever is behind it.
 - **The viewport.** Button 80, `HandleClickInViewport`, is now `src/ui/events.ts`'s
   `handleClickInViewport`, reached through the queue instead of from the DOM event.
+  *Regression:* the move dropped the old `isWallDecorationHit(…) && handleWallClick()`
+  fall-through. An alcove's wall decoration then swallowed every pickup from the alcove.
+  Fixed by porting CSBWin's button order, objects before the wall
+  (`resolveEmptyHandedViewportClick`, `tools/dump-viewport-click.ts`).
 - **The on-screen arrows (buttons 1-6).** They were queued but dropped; they now work.
 - **Removed.** `ui.mouseQueue` and the renderer's `processMouseQueue` are gone.
 
@@ -1075,6 +1080,16 @@ Moonstone 3 max mana. Maximum, current and minimum all move. CSBWin calls it fro
 anything worn. Needs the whole table read before porting (`:1600-1760`), a check per
 kind of bonus, and a thought about saves: CSBWin stores the adjusted attributes, so a
 save loaded from CSBWin already carries the bonuses. Size M.
+
+### C33 ⏳ An empty-handed click on bare stone plays no sound
+
+Found fixing the alcove pickup. When `HandleClickInViewport`'s empty-handed button loop
+hits nothing, it plays sound 4 at the party if all of these hold: the party is not
+facing an alcove, `d.CellTypeJustAhead` is 0, the cell ahead is stone or a visible false
+wall, and the click is within x 33-189, y 44-150
+(`doc/CSBwin-src/Mouse.cpp:1139-1157`). `resolveEmptyHandedViewportClick` returns `null`
+there, and nothing plays. Add the sound, and a row to `tools/dump-viewport-click.ts` that
+asserts it is queued.
 
 ## D — State representation
 

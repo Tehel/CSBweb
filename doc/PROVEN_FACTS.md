@@ -3169,3 +3169,25 @@ and weapon-ready areas), `d.PartySleeping = 1`, `DisplaySleepScreen()`, `d.Speed
   (`:215-240`).
 
 Evidence: `tools/dump-sleep.ts`.
+
+## An empty-handed viewport click tests the objects before the front wall
+
+`HandleClickInViewport`, empty-handed (`doc/CSBwin-src/Mouse.cpp:1097-1158`), after the
+door-switch test at `:1053-1095`, loops `D5W` over `ViewportObjectButtons[0..5]` and acts
+on the **first** rectangle hit, then returns (`:1099-1136`):
+
+- `D5W` 0-4 are the objects drawn in the cell under the party and the cell ahead.
+  `TAG01a148(D5W)` picks the object up (`:1132`).
+- `D5W` 5 is the front wall's F1 decoration. Only two places set it: the decoration
+  drawer (`CSBCode.cpp:3299`) and the door button (`:4081`). A side wall's decoration
+  never sets it, and neither does wall text, which returns before `:3299`. On button 5,
+  `TouchWallF1()` runs only `if (d.FacingAlcove == 0)` (`Mouse.cpp:1123-1128`). So a
+  click on an alcove's wall touches nothing.
+- An alcove's objects are drawn inside its decoration, so button 4 lies within
+  button 5. Testing the objects first is what lets the player take an object out of an
+  alcove.
+- If no button is hit, and the party is not facing an alcove, the cell type just ahead
+  is 0, and the cell ahead is stone or a visible false wall, then a click with
+  33 ≤ x ≤ 189 and 44 ≤ y ≤ 150 plays sound 4 (`:1139-1157`).
+
+Evidence: `tools/dump-viewport-click.ts`.

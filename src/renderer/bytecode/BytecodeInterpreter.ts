@@ -101,8 +101,6 @@ export interface InterpreterContext {
   // Room data for all 21 cells
   roomData: SummarizeRoomData[];
 
-  // Per-frame wall decoration hit rects (viewport coordinates)
-  wallDecorationRects?: RectPos[];
   doorSwitchRects?: RectPos[];
   viewportObjectButtons?: RectPos[];
   viewportObjectRNs?: ObjectID[];
@@ -1411,9 +1409,6 @@ export class BytecodeInterpreter {
     if (relativePosition >= 10) {
       const bitmap = mirror ? this.getMirroredBitmap(src) : src;
       bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2 });
-      if (this.context.wallDecorationRects && distanceBand === 2) {
-        this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
-      }
       return isAlcove;
     }
 
@@ -1467,10 +1462,6 @@ export class BytecodeInterpreter {
     // already flush at 0 and the same offset would shift it wrongly.
 
     bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2, srcX: srcOffsetX });
-
-    if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
-      this.context.wallDecorationRects.push({ x1, y1, x2, y2 });
-    }
     return isAlcove;
   }
 
@@ -1604,10 +1595,6 @@ export class BytecodeInterpreter {
       srcY: 0,
     };
     bltShapeToViewportIndex(derived, viewport, rect);
-
-    if (this.context.wallDecorationRects && Math.floor(relativePosition / 5) === 2) {
-      this.context.wallDecorationRects.push({ x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 });
-    }
   }
 
   private drawWallText(textRN: ObjectID, relativePosition: number, removeMortarJoint: boolean): void {
