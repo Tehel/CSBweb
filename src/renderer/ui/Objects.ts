@@ -54,9 +54,8 @@ export function descIndexForObject(ui: UIState, rn: ObjectID): number | null {
   return descIndex === -1 ? null : descIndex;
 }
 
-export function isChestRecord(value: number | null): value is ObjectID {
-  if (value === null) return false;
-  return decodeObjectID(value as ObjectID).category === DBType.CHEST;
+export function isChestRecord(value: ObjectID): boolean {
+  return decodeObjectID(value).category === DBType.CHEST;
 }
 
 export function isBaseObjectNameIndex(ui: UIState, objectId: number, min: number, max: number): boolean {

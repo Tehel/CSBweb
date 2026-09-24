@@ -1661,7 +1661,7 @@ export class Game {
             // `for (D6W=2; (D6W--) != 0;)` — hand 1, then hand 0.
             for (let hand = 1; hand >= 0; hand--) {
                 const obj = this.getChampionPossession(champion, hand);
-                if (obj === null) continue;
+                if (obj === OBJECT_ID_NULL) continue;
                 const nameIndex = this.nameIndex(obj);
                 if (nameIndex < OBJNI_TORCH_A || nameIndex > OBJNI_TORCH_D) continue;
                 const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
@@ -1793,7 +1793,7 @@ export class Game {
                         let local4Hp = ((attrs.maxHealth | 0) >> 7) + 1;
                         if (sleeping) local4Hp *= 2;
                         const necklace = this.getChampionPossession(champ, 10);
-                        if (necklace !== null && this.getBaseObjectNameIndex(necklace) === OBJNI_EKKHARD_CROSS) {
+                        if (necklace !== OBJECT_ID_NULL && this.getBaseObjectNameIndex(necklace) === OBJNI_EKKHARD_CROSS) {
                             local4Hp = local4Hp + Math.trunc(local4Hp / 2) + 1;
                         }
                         attrs.health += Math.min(local4Hp, (attrs.maxHealth | 0) - (attrs.health | 0));
@@ -1825,9 +1825,9 @@ export class Game {
         }
     }
 
-    private getChampionPossession(champion: Champion, slot: number): ObjectID | null {
-        const value = champion.possessions[slot] ?? OBJECT_ID_NULL;
-        return value === OBJECT_ID_NULL ? null : value;
+    /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
+    private getChampionPossession(champion: Champion, slot: number): ObjectID {
+        return champion.possessions[slot] ?? OBJECT_ID_NULL;
     }
 
     private castMagic(casterIdx: number): number {
@@ -2117,7 +2117,7 @@ export class Game {
     private getFlaskInHand(champion: Champion): ObjectID | null {
         for (let slot = 0; slot < 2; slot += 1) {
             const obj = this.getChampionPossession(champion, slot);
-            if (obj === null) continue;
+            if (obj === OBJECT_ID_NULL) continue;
             if (this.getBaseObjectNameIndex(obj) === OBJNI_EMPTY_FLASK) return obj;
         }
         return null;
@@ -2355,11 +2355,11 @@ export class Game {
     }
 
     /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1093`). */
-    private removeCharacterPossession(chIdx: number, slot: number): ObjectID | null {
+    private removeCharacterPossession(chIdx: number, slot: number): ObjectID {
         const champion = this.party.state.champions[chIdx];
-        if (!champion) return null;
+        if (!champion) return OBJECT_ID_NULL;
         const obj = this.getChampionPossession(champion, slot);
-        if (obj === null) return null;
+        if (obj === OBJECT_ID_NULL) return OBJECT_ID_NULL;
         this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
         return obj;
     }
@@ -2384,7 +2384,7 @@ export class Game {
             champion, 1, this.party.state.sleeping ?? false,
         );
         const obj = this.removeCharacterPossession(options.chIdx, 1);
-        if (obj === null) return 0;
+        if (obj === OBJECT_ID_NULL) return 0;
         return this.throwByCharacter(
             options.chIdx, champion, obj, options.side, throwingDistance, options,
         ) ? 1 : 0;
@@ -2413,11 +2413,11 @@ export class Game {
             // A bow that has just been fired reloads itself from slot 12, then from
             // slots 7-9, taking the first object of the matching ammunition class
             // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
-            if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === null) {
+            if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === OBJECT_ID_NULL) {
                 for (const slot of [12, 7, 8, 9]) {
                     if (this.matchingAmmunition(champion, slot)) {
                         const ammo = this.removeCharacterPossession(chIdx, slot);
-                        if (ammo !== null) this.setChampionHand(champion, 0, ammo);
+                        if (ammo !== OBJECT_ID_NULL) this.setChampionHand(champion, 0, ammo);
                         break;
                     }
                 }
@@ -2433,7 +2433,7 @@ export class Game {
      */
     private matchingAmmunition(champion: Champion, slot: number): boolean {
         const launcher = this.getChampionPossession(champion, 1);
-        if (launcher === null || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
+        if (launcher === OBJECT_ID_NULL || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
         const launcherDesc = this.characterStats.weaponDescFor(launcher);
         if (!launcherDesc) return false;
         let wanted: number;
@@ -2442,7 +2442,7 @@ export class Game {
         else return false;
 
         const candidate = this.getChampionPossession(champion, slot);
-        if (candidate === null || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
+        if (candidate === OBJECT_ID_NULL || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
         const desc = this.characterStats.weaponDescFor(candidate);
         return !!desc && desc.uByte1 === wanted;
     }
@@ -2455,13 +2455,13 @@ export class Game {
     private refillPossessionSlot(chIdx: number, slot: number): void {
         const champion = this.party.state.champions[chIdx];
         if (!champion) return;
-        if (this.getChampionPossession(champion, slot) !== null) return;
+        if (this.getChampionPossession(champion, slot) !== OBJECT_ID_NULL) return;
         for (const source of [12, 7, 8, 9]) {
             const obj = this.getChampionPossession(champion, source);
-            if (obj === null) continue;
+            if (obj === OBJECT_ID_NULL) continue;
             if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
             const moved = this.removeCharacterPossession(chIdx, source);
-            if (moved !== null) this.setChampionHand(champion, slot, moved);
+            if (moved !== OBJECT_ID_NULL) this.setChampionHand(champion, slot, moved);
             return;
         }
     }

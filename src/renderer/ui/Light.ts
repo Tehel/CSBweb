@@ -7,7 +7,7 @@
  * `palette552` sets extracted from graphics.dat item `0x232`.
  */
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../../core/objectNameIndex';
-import { ObjectID } from '../../core/types';
+import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { getChampionPossession } from './Character';
 import { getBaseObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
@@ -85,7 +85,7 @@ export function collectTorchCharges(ui: UIState): number[] {
         continue;
       }
       const objectId = getChampionPossession(champ, hand);
-      if (objectId === null) {
+      if (objectId === OBJECT_ID_NULL) {
         charges[outIndex++] = 0;
         continue;
       }

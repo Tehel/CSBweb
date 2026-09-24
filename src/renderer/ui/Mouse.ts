@@ -255,7 +255,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = OBJECT_ID_NULL;
     } else {
-      setChampionPossession(ui, champ, slot, null);
+      setChampionPossession(ui, champ, slot, OBJECT_ID_NULL);
     }
     ui.partyState.objectInHand = slotObject;
   }

@@ -260,8 +260,8 @@ export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSo
   if (ui.pressingEye) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
   const handObject = getChampionPossession(champion, handSlot);
-  if (isChestRecord(handObject)) {
-    return { id: handObject as ObjectID, source: 'hand', slot: handSlot };
+  if (handObject !== OBJECT_ID_NULL && isChestRecord(handObject)) {
+    return { id: handObject, source: 'hand', slot: handSlot };
   }
   return null;
 }

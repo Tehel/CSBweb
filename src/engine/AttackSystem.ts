@@ -298,7 +298,7 @@ export interface AttackSystemHooks {
   /** `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — a real object, not a spell. */
   launchObject?: (chIdx: number, object: ObjectID, range: number, damage: number, decayRate: number) => number;
   /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1093`). */
-  removeCharacterPossession?: (chIdx: number, slot: number) => ObjectID | null;
+  removeCharacterPossession?: (chIdx: number, slot: number) => ObjectID;
   /** `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`) — returns its `D6W`. */
   magicShield?: (chIdx: number, spellShield: boolean, strength: number, mustHaveMana: number) => number;
   /** `d.Brightness += delta` then `SetBrightnessTimer(decayRate, time)`. */
@@ -330,8 +330,8 @@ export interface AttackSystemHooks {
   adjustSkills?: (chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy) => void;
   /** `RN::NameIndex()`. */
   nameIndex?: (rn: ObjectID) => number;
-  /** `CHARDESC::Possession(slot)`. */
-  possession?: (champ: Champion, slot: number) => ObjectID | null;
+  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
+  possession?: (champ: Champion, slot: number) => ObjectID;
   /** Trace, mirroring CSBWin's `AttackTraceActive` output. */
   trace?: (line: string) => void;
 }
@@ -386,13 +386,13 @@ export class AttackSystem {
     return this.deps.getPartyState().champions;
   }
 
-  private possession(champ: Champion | null, slot: number): ObjectID | null {
-    if (!champ) return null;
-    return this.hooks.possession?.(champ, slot) ?? null;
+  private possession(champ: Champion | null, slot: number): ObjectID {
+    if (!champ) return OBJECT_ID_NULL;
+    return this.hooks.possession?.(champ, slot) ?? OBJECT_ID_NULL;
   }
 
-  private nameIndexOf(rn: ObjectID | null): number {
-    if (rn === null) return -1;
+  private nameIndexOf(rn: ObjectID): number {
+    if (rn === OBJECT_ID_NULL) return -1;
     return this.hooks.nameIndex?.(rn) ?? -1;
   }
 
@@ -850,7 +850,7 @@ export class AttackSystem {
    */
   decrementChargesRemaining(chIdx: number): void {
     const obj = this.possession(getPartyChampion(this.deps.getPartyState(), chIdx), 1);
-    if (obj === null) return;
+    if (obj === OBJECT_ID_NULL) return;
     const dungeon = this.deps.dungeon;
     switch (decodeObjectID(obj).category) {
       case DBType.WEAPON: {
@@ -1223,14 +1223,14 @@ export class AttackSystem {
         // charge-spending path; the two boxes differ tenfold.
         let delta = 0;
         const held = this.possession(pChar, 1);
-        const misc = held !== null && decodeObjectID(held).category === DBType.MISC
+        const misc = held !== OBJECT_ID_NULL && decodeObjectID(held).category === DBType.MISC
           ? this.deps.dungeon.getMiscRecord(held)
           : null;
         if (misc) {
           if (misc.miscType === MISC_MAGICAL_BOX_A) delta = 30;
           if (misc.miscType === MISC_MAGICAL_BOX_B) delta = 125;
         }
-        if (delta !== 0 && held !== null) {
+        if (delta !== 0 && held !== OBJECT_ID_NULL) {
           this.hooks.removeCharacterPossession?.(params.charIdx, 1);
           this.hooks.deleteDBEntry?.(held);
         } else {
@@ -1363,10 +1363,10 @@ export class AttackSystem {
     };
 
     const ammo = this.possession(pChar, 0);
-    if (ammo === null || decodeObjectID(ammo).category !== DBType.WEAPON) return needAmmo();
+    if (ammo === OBJECT_ID_NULL || decodeObjectID(ammo).category !== DBType.WEAPON) return needAmmo();
 
     const weapon = this.possession(pChar, 1);
-    const launcherDesc = weapon !== null ? this.deps.characterStats?.weaponDescFor(weapon) ?? null : null;
+    const launcherDesc = weapon !== OBJECT_ID_NULL ? this.deps.characterStats?.weaponDescFor(weapon) ?? null : null;
     const ammoDesc = this.deps.characterStats?.weaponDescFor(ammo) ?? null;
     if (!launcherDesc || !ammoDesc) return needAmmo();
 
@@ -1380,7 +1380,7 @@ export class AttackSystem {
     }
 
     this.setCharToPartyFacing(pChar);
-    const projectile = this.hooks.removeCharacterPossession?.(params.charIdx, 0) ?? null;
+    const projectile = this.hooks.removeCharacterPossession?.(params.charIdx, 0) ?? OBJECT_ID_NULL;
     this.hooks.queueSound?.(16, party.position.x, party.position.y, 1);
     const mastery = sw(this.masteryOf(pChar, 11));
     params.attdep.shoot.range = launcherDesc.uByte3 + ammoDesc.uByte3;
@@ -1388,7 +1388,7 @@ export class AttackSystem {
     params.attdep.shoot.damage = weaponClass; // See the ⚠️ above.
     params.attdep.shoot.success = 1;
     this.callAttackFilter(filter, params, 1);
-    if (projectile === null) return 1;
+    if (projectile === OBJECT_ID_NULL) return 1;
     this.hooks.launchObject?.(
       params.charIdx,
       projectile,

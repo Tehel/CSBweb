@@ -156,7 +156,7 @@ export class CharacterStats {
     }
 
     const feet = this.possession(champ, 5);
-    if (feet !== null && this.deps.nameIndex(feet) === OBJNI_ELVEN_BOOTS) {
+    if (feet !== OBJECT_ID_NULL && this.deps.nameIndex(feet) === OBJNI_ELVEN_BOOTS) {
       maxLoad = sw(maxLoad + (maxLoad >> 4));
     }
 
@@ -187,7 +187,7 @@ export class CharacterStats {
     }
     if (((champ.wounds ?? 0) & 32) !== 0) time = sw(time + footPenalty);
     const feet = this.possession(champ, 5);
-    if (feet !== null && this.deps.nameIndex(feet) === OBJNI_BOOTS_OF_SPEED) time--;
+    if (feet !== OBJECT_ID_NULL && this.deps.nameIndex(feet) === OBJNI_BOOTS_OF_SPEED) time--;
     return time;
   }
 
@@ -206,7 +206,7 @@ export class CharacterStats {
     let d7 = sw((this.deps.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
     const obj = this.possession(champ, hand);
-    const weight = sw(typeof obj === 'number' ? this.getObjectWeight(obj as ObjectID) : 0);
+    const weight = sw(obj !== OBJECT_ID_NULL ? this.getObjectWeight(obj) : 0);
     const sixteenth = sw(div(this.maxLoad(champ), 16));
 
     if (weight <= sixteenth) {
@@ -262,10 +262,9 @@ export class CharacterStats {
     return applyLimits(loLimit, quickness, hiLimit);
   }
 
-  /** `CHARDESC::Possession(slot)`. */
-  private possession(champ: Champion, slot: number): ObjectID | null {
-    const value = champ.possessions[slot] ?? OBJECT_ID_NULL;
-    return value === OBJECT_ID_NULL ? null : value;
+  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
+  private possession(champ: Champion, slot: number): ObjectID {
+    return champ.possessions[slot] ?? OBJECT_ID_NULL;
   }
 
   /** `TAG0099d2` (`doc/CSBwin-src/Code51a4.cpp:2875`). */

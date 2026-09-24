@@ -37,7 +37,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { MISC_BONES_OF_HERO } from '../src/core/constants';
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -198,7 +198,7 @@ function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean
     bones: bones.length === 1,
     bonesValue2: (record?.specialState ?? 0) === 2,
     expoolRecord: rn !== undefined && game.dungeonState.copyChampionBonesRecord(rn) !== null,
-    dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === null),
+    dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === OBJECT_ID_NULL),
     // Only meaningful when the victim was the last one standing.
     gameIsLost: lastAlive ? game.party.state.gameIsLost === true : true,
   };

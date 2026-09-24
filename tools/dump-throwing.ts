@@ -420,10 +420,10 @@ async function main(): Promise<void> {
   const missilesAfterThrow = data2.databases.missiles.records.length;
   const handAfterThrow = getChampionPossession(thrower2, 1);
   console.log(`THROW: result ${threw}, missiles ${missilesBeforeThrow} -> ${missilesAfterThrow}, ` +
-    `fighting hand reads ${handAfterThrow === null ? 'empty' : handAfterThrow}`);
+    `fighting hand reads ${handAfterThrow === OBJECT_ID_NULL ? 'empty' : handAfterThrow}`);
   check(threw === 1, 'atk_THROW reports a successful attack');
   check(missilesAfterThrow === missilesBeforeThrow + 1, 'atk_THROW launched exactly one missile');
-  check(handAfterThrow === null,
+  check(handAfterThrow === OBJECT_ID_NULL,
     `the thrown club left the fighting hand (read back ${handAfterThrow}, thrown ${club})`);
 
   // SHOOT: the arrow goes from the shield hand, the bow stays in the fighting hand.
@@ -441,10 +441,10 @@ async function main(): Promise<void> {
   const ammoAfterShot = getChampionPossession(archer, 0);
   const bowAfterShot = getChampionPossession(archer, 1);
   console.log(`SHOOT: result ${shot}, missiles ${missilesBeforeShot} -> ${missilesAfterShot}, ` +
-    `shield hand reads ${ammoAfterShot === null ? 'empty' : ammoAfterShot}`);
+    `shield hand reads ${ammoAfterShot === OBJECT_ID_NULL ? 'empty' : ammoAfterShot}`);
   check(shot === 1, 'atk_SHOOT reports a successful attack');
   check(missilesAfterShot === missilesBeforeShot + 1, 'atk_SHOOT launched exactly one missile');
-  check(ammoAfterShot === null,
+  check(ammoAfterShot === OBJECT_ID_NULL,
     `the arrow left the shield hand (read back ${ammoAfterShot}, shot ${arrow})`);
   check(bowAfterShot === bow, 'the bow itself stays in the fighting hand');
 

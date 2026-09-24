@@ -17,7 +17,7 @@
  * exists as a struct in CSBWin, so it is kept as one here.
  */
 import { applyLimits, sw } from '../core/intCast';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
@@ -682,8 +682,11 @@ export class MonsterAttack {
   armourStrength(champ: Champion, bodyPart: number, scale: boolean): number {
     let handTotal = 0;
     for (let hand = 0; hand < 2; hand++) {
-      const worn = this.clothingTypeIn(champ, hand);
-      if (worn === null) continue;
+      const obj = this.possession(champ, hand);
+      if (obj === OBJECT_ID_NULL || decodeObjectID(obj).category !== DBType.CLOTHING) continue;
+      const rec = this.dungeon.getClothingRecord(obj);
+      if (!rec) continue;
+      const worn = rec.clothingType;
       if (((this.tables?.clothingFlags?.[worn] ?? 0) & 0x80) === 0) continue; // not a shield
       const throwingDistance = this.characterStats?.determineThrowingDistance(
         champ, hand, this.getPartyState().sleeping ?? false,
@@ -708,8 +711,11 @@ export class MonsterAttack {
 
     // The garment worn on this part — hands (0 and 1) are the shields handled above.
     if (bodyPart > 1) {
-      const worn = this.clothingTypeIn(champ, bodyPart);
-      if (worn !== null) total += this.clothingArmourValue(worn, scale);
+      const obj = this.possession(champ, bodyPart);
+      const rec = obj !== OBJECT_ID_NULL && decodeObjectID(obj).category === DBType.CLOTHING
+        ? this.dungeon.getClothingRecord(obj)
+        : null;
+      if (rec) total += this.clothingArmourValue(rec.clothingType, scale);
     }
 
     return Math.min(100, Math.max(0, total >> 1));
@@ -726,12 +732,9 @@ export class MonsterAttack {
     return scaledMultiply(strength, 3, (flags & 7) + 4);
   }
 
-  /** The clothing type in a possession slot, or null if it holds something else. */
-  private clothingTypeIn(champ: Champion, slot: number): number | null {
-    const value = champ.possessions[slot] ?? OBJECT_ID_NULL;
-    if (value === OBJECT_ID_NULL) return null;
-    const rec = this.dungeon.getClothingRecord(value);
-    return rec ? rec.clothingType : null;
+  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
+  private possession(champ: Champion, slot: number): ObjectID {
+    return champ.possessions[slot] ?? OBJECT_ID_NULL;
   }
 
   /* ------------------------------------------------------------ champion ---- */

@@ -142,7 +142,7 @@ async function main(): Promise<void> {
   for (let box = 0; box < 4; box++) {
     let slot = -1;
     for (let s = 0; s < 30; s++) {
-      if (getChampionPossession(party.state.champions[box], s) !== null) { slot = s; break; }
+      if (getChampionPossession(party.state.champions[box], s) !== OBJECT_ID_NULL) { slot = s; break; }
     }
     if (slot < 0) throw new Error(`champion ${box} (${party.state.champions[box].name}) carries nothing`);
     testSlot.push(slot);
@@ -225,14 +225,14 @@ async function main(): Promise<void> {
     const acted = whoChanged(party.state, before);
     row(`east: put into backpack of box ${box}`, box, acted);
     check(acted === box, `after the turn, a drop into box ${box}'s backpack must reach champion ${box}`);
-    check(getChampionPossession(party.state.champions[box], 20) !== null,
+    check(getChampionPossession(party.state.champions[box], 20) !== OBJECT_ID_NULL,
       `champion ${box} should now hold the object in slot 20`);
     handleClothingClick(ui, 20 + 8);
     handleClothingClick(ui, testSlot[box] + 8);
   }
   for (let box = 0; box < 4; box++) {
-    const hand = getChampionPossession(party.state.champions[box], 1) !== null ? 1
-      : getChampionPossession(party.state.champions[box], 0) !== null ? 0 : -1;
+    const hand = getChampionPossession(party.state.champions[box], 1) !== OBJECT_ID_NULL ? 1
+      : getChampionPossession(party.state.champions[box], 0) !== OBJECT_ID_NULL ? 0 : -1;
     if (hand < 0) continue;
     // `if (D7W+1 == d.SelectedCharacterOrdinal) return;` — the open champion's own
     // hands are inert in the top bar, so keep someone else's inventory open.

@@ -413,12 +413,14 @@ function clampMax(value: number, max: number): number {
   return value | 0;
 }
 
+/**
+ * `pChar->Possession(slot).NameIndex()`. An empty slot holds `RNnul`, whose `NameIndex`
+ * is `objNI_NotAnObject` (`doc/CSBwin-src/CSBCode.cpp:1249`), so no guard is needed.
+ */
 function getPossessionNameIndex(
   champion: Champion,
   slot: number,
   getObjectNameIndex: (objectId: number) => number | null,
 ): number | null {
-  const possession = champion.possessions[slot] ?? OBJECT_ID_NULL;
-  if (possession === OBJECT_ID_NULL) return null;
-  return getObjectNameIndex(possession | 0);
+  return getObjectNameIndex(champion.possessions[slot] ?? OBJECT_ID_NULL);
 }

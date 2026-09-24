@@ -18,7 +18,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DBType, Direction, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
-import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
@@ -175,12 +174,12 @@ async function main(): Promise<void> {
   const first = party.state.champions[0];
   let slot = -1;
   for (let s = 0; s < 30; s++) {
-    if (getChampionPossession(first, s) !== null) { slot = s; break; }
+    if (getChampionPossession(first, s) !== OBJECT_ID_NULL) { slot = s; break; }
   }
   check(slot >= 0, 'the preset hero should be carrying something');
   if (slot >= 0) {
     const object = getChampionPossession(first, slot);
-    const { category, index } = decodeObjectID(object as ObjectID);
+    const { category, index } = decodeObjectID(object);
     console.log(`\nchampion 0 (${first.name}) slot ${slot} holds ${object}`
       + ` = ${DBType[category] ?? category}#${index}`);
     // Canary: this is a real record out of dungeon.dat, not a bare object type. HALK's
@@ -195,7 +194,7 @@ async function main(): Promise<void> {
     handleClothingClick(ui, slot + 8);
     row('clicked the slot', party.state);
     check(party.state.objectInHand === object, 'the slot object should be in the hand');
-    check(getChampionPossession(first, slot) === null, 'the slot should now be empty');
+    check(getChampionPossession(first, slot) === OBJECT_ID_NULL, 'the slot should now be empty');
 
     handleClothingClick(ui, slot + 8);
     row('clicked it again', party.state);

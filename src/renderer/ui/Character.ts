@@ -527,8 +527,8 @@ export function drawTopBarHandIcons(ui: UIState): void {
           12
         );
       }
-      const held = champion ? getChampionPossession(champion, hand) : null;
-      const objectId = held === null ? -1 : (held | 0);
+      const held = champion ? getChampionPossession(champion, hand) : OBJECT_ID_NULL;
+      const objectId = held === OBJECT_ID_NULL ? -1 : (held | 0);
       const objectNameIndex = objectId >= 0 ? resolveObjectNameIndex(ui, objectId) : -1;
 
       if (objectNameIndex >= 0) {
@@ -599,14 +599,14 @@ export function drawHeldObjectName(ui: UIState): void {
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xe9, 0x25, 4, 0, padded);
 }
 
-export function getChampionPossession(champion: Champion, slot: number): number | null {
-  const value = champion.possessions[slot] ?? OBJECT_ID_NULL;
-  return value === OBJECT_ID_NULL ? null : value;
+/** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
+export function getChampionPossession(champion: Champion, slot: number): ObjectID {
+  return champion.possessions[slot] ?? OBJECT_ID_NULL;
 }
 
-export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: number | null): void {
+export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: ObjectID): void {
   const previous = getChampionPossession(champion, slot);
-  champion.possessions[slot] = value ?? OBJECT_ID_NULL;
+  champion.possessions[slot] = value;
   updateLightForPossessionChange(ui, slot, previous, value);
 }
 
@@ -621,10 +621,10 @@ export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boo
 
 export function getInventoryItemIndex(ui: UIState, champion: Champion, slot: number): number {
   const value = getChampionPossession(champion, slot);
-  return value === null ? -1 : resolveObjectNameIndex(ui, value | 0);
+  return value === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, value | 0);
 }
 
-export function updateLightForPossessionChange(ui: UIState, slot: number, previous: number | null, next: number | null): void {
+export function updateLightForPossessionChange(ui: UIState, slot: number, previous: ObjectID, next: ObjectID): void {
   if (!ui.partyState || !ui.uiTables) return;
   if (slot !== 0 && slot !== 1 && slot !== 10) return;
 
@@ -632,9 +632,9 @@ export function updateLightForPossessionChange(ui: UIState, slot: number, previo
     const word1074 = ui.uiTables.graphic232.word1074;
     const stepValue = word1074[2] ?? 0;
     if (stepValue !== 0) {
-      const prevIsIllumulet = previous !== null
+      const prevIsIllumulet = previous !== OBJECT_ID_NULL
         && isBaseObjectNameIndex(ui, previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-      const nextIsIllumulet = next !== null
+      const nextIsIllumulet = next !== OBJECT_ID_NULL
         && isBaseObjectNameIndex(ui, next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
       const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
       if (delta !== 0) {
@@ -650,8 +650,8 @@ export function updateLightForPossessionChange(ui: UIState, slot: number, previo
   }
 }
 
-export function setTorchLitState(ui: UIState, objectId: number | null, lit: boolean): void {
-  if (objectId === null) return;
+export function setTorchLitState(ui: UIState, objectId: ObjectID, lit: boolean): void {
+  if (objectId === OBJECT_ID_NULL) return;
   if (!isBaseObjectNameIndex(ui, objectId, OBJNI_TORCH_A, OBJNI_TORCH_A)) return;
   const weapon = ui.dungeonState.getWeaponRecord(objectId as ObjectID);
   if (!weapon) return;

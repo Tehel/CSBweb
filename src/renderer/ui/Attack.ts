@@ -27,7 +27,7 @@
  * simply keeps running underneath, as it already does for the feeding animation.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
-import { DBType, decodeObjectID, type ObjectID } from '../../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_NULL } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
@@ -61,9 +61,8 @@ export function attackButtonRect(chIdx: number): Rect {
 export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return true;
-  const obj = getChampionPossession(champ, SLOT_WEAPON_HAND);
-  if (obj === null) return true;
-  const rn = obj as ObjectID;
+  const rn = getChampionPossession(champ, SLOT_WEAPON_HAND);
+  if (rn === OBJECT_ID_NULL) return true;
   switch (decodeObjectID(rn).category) {
     case DBType.WEAPON:
       return (ui.dungeonState.getWeaponRecord(rn)?.charges ?? 0) !== 0;
@@ -134,7 +133,7 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
 
   const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let attackClass: number;
-  if (weapon === null) {
+  if (weapon === OBJECT_ID_NULL) {
     attackClass = ATTACK_CLASS_EMPTY_HAND;
   } else {
     attackClass = getAttackClass(ui, weapon) & 0xff;
@@ -284,7 +283,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
   fillRectIndex(ui.screenIndexBuffer, rect, 4);
   const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let iconIndex = -1;
-  if (weapon === null) {
+  if (weapon === OBJECT_ID_NULL) {
     iconIndex = OBJNI_SPECIAL_C; // the empty fist
   } else if (getAttackClass(ui, weapon) !== 0) {
     iconIndex = getBaseObjectNameIndex(ui, weapon);
