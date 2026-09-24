@@ -109,6 +109,7 @@ import {
   getChampionPortrait,
 } from './ui/Character';
 import {
+  displaySleepScreen,
   drawMessageLines,
   shadeRectIndex,
 } from './ui/Draw';
@@ -478,6 +479,12 @@ export class ViewportRenderer {
     attackPanelTick(this.ui);
   }
 
+  /** Buttons 145 and 146 — the sleep icon and the viewport click that wakes. */
+  setSleepHandlers(onSleep: () => void, onWakeUp: () => void): void {
+    this.ui.onSleep = onSleep;
+    this.ui.onWakeUp = onWakeUp;
+  }
+
   setUIMode(mode: UIMode): void {
     this.ui.uiMode = mode;
     updateButtonLists(this.ui);
@@ -560,7 +567,10 @@ export class ViewportRenderer {
       this.applyMonsterPaletteOverrides(map);
       this.lastPaletteLevel = z;
     }
-    this.drawViewportFrame(this.ui.dungeonState, position, facing, map);
+    // `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the party
+    // sleeps (doc/CSBwin-src/CSBCode.cpp:637); `DisplaySleepScreen` holds the viewport.
+    if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
+    else this.drawViewportFrame(this.ui.dungeonState, position, facing, map);
     this.presentViewport();
   }
 
@@ -847,6 +857,15 @@ export class ViewportRenderer {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui);
+    if (this.ui.partyState?.sleeping && this.ui.uiTables) {
+      // `TAG02076e` ran on the way to sleep (`doc/CSBwin-src/Mouse.cpp:1691`): the
+      // movement arrows, the magic area and the weapon-ready area stay shaded until
+      // `WakeUp`'s `TAG0207cc` redraws them (`CSBCode.cpp:9934`). The inventory is
+      // always closed by then, so the arrows are always there to shade.
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
+    }
     if (isSaveMenuOpen(this.ui)) {
       // `TAG02076e` shades the movement-arrow, magic and weapon-ready areas before any
       // menu goes up (`doc/CSBwin-src/Character.cpp:5118-5131`). The screen itself then

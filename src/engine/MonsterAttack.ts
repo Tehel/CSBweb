@@ -352,8 +352,9 @@ export class MonsterAttack {
    * `MonsterDamagesCharacter` (`doc/CSBwin-src/Monster.cpp:4518`).
    *
    * Two chances to avoid the blow entirely before any damage is rolled: being quicker
-   * than the monster (and winning a 3-in-4 roll), and being lucky. A sleeping party
-   * gets neither — it is woken instead.
+   * than the monster (and winning a 3-in-4 roll), and being lucky. A sleeping party is
+   * woken first (`Monster.cpp:4531`), so it gets both like anyone else: the
+   * `d.PartySleeping == 0` guard around them (`:4536`) is read after `WakeUp`.
    *
    * The damage itself is deliberately convoluted: a base from the monster's `attack10`
    * reduced by twice the champion's Fighter mastery, then halved, then grown by three

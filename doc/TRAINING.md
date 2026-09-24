@@ -96,7 +96,9 @@ it again. Mana goes in; priest experience and fighter or ninja experience come o
 ### Sleep to get mana back
 
 `TenSecondUpdate`, which regenerates mana, runs every 64 ticks awake and every 16 asleep
-(`doc/CSBwin-src/CSBCode.cpp:686-688`): **four times** as fast.
+(`doc/CSBwin-src/CSBCode.cpp:686-688`): **four times** as fast. Asleep, skill levels do
+not count: every mastery reads 1 (`doc/CSBwin-src/Code17818.cpp:29-36`), so whether mana
+comes back depends on Wisdom alone. Each point costs 14 stamina, even for a master.
 
 ### Keep a harmless monster busy on you
 

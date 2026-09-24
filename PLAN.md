@@ -81,6 +81,15 @@ C28: a dying champion's possessions drop in `d.DropOrder` order (now read from g
 (`removeCharacterPossession` is a bare slot clear — no Illumulet light, no torch), C31
 (the bones are not set down by `MoveObject`) and C32 (`AdjustStatsForItemCarried` is not
 ported: no worn object changes a stat).
+Sleep (G5's first half, asked for out of order as the most-missed gameplay feature): the
+sleep icon, 145, puts the party to sleep. A tick then runs every VBL (`d.Speed = 0`),
+the viewport shows `DisplaySleepScreen` and only a viewport click (146) or Return wakes it.
+A monster's blow or an armour-branch `DamageCharacter` wakes it too. `WakeUp`'s
+`d.clockTick = 1` runs a tick at once. Fixed on the way: `PROVEN_FACTS` claimed a sleeping
+party gets no dodge or luck check, but `WakeUp` runs before that guard. Also,
+`TenSecondUpdate` used the real Wizard and Priest masteries asleep, where CSBWin's
+`DetermineMastery` reports 1. The freeze
+(147/148) stays in G5.
 Next: C31, C30, then C32; D3 after them. Tier C is otherwise done except C25 (⚠️, waits
 for D4).
 

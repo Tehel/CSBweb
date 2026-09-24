@@ -7,6 +7,7 @@
 import { Rect } from '../csbwin/UITables';
 import { drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { scrollingText } from '../csbwin/ScrollingText';
+import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import type { UIState } from './UIState';
 
@@ -38,6 +39,19 @@ export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rec
     },
     transparentColor
   );
+}
+
+/**
+ * `DisplaySleepScreen` (`doc/CSBwin-src/CSBCode.cpp:8542`): the viewport flooded with
+ * colour 0 and `TextOut_OneLine(d.pViewportBMP, 112, 93, 65, 4, 0, "WAKE UP", …)` —
+ * viewport coordinates, colour 4 on 0. It stands in for `DrawViewport`, which the main
+ * loop skips while the party sleeps (`:637`).
+ */
+export function displaySleepScreen(ui: UIState): void {
+  const viewport = ui.context?.viewportIndexBuffer;
+  if (!viewport) return;
+  viewport.pixels.fill(0);
+  if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 93, 65, 4, 0, 'WAKE UP');
 }
 
 export function offsetViewportRect(rect: Rect): Rect {

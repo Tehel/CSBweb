@@ -241,6 +241,16 @@ export function bindUIEvents(): void {
             // A browser or OS shortcut keeps its key: nothing below is bound with a
             // modifier, so Ctrl-R still reloads rather than opening a rune keypad.
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+            // Asleep, `d.pKeyXlate1` is NULL and `d.pKeyXlate2` is `Byte18440`
+            // (doc/CSBwin-src/Mouse.cpp:1700-1701), which graphics.dat fills with two
+            // keys: Return (0x0d) is button 146, the wake-up, and Esc (0x1b) is 147, the
+            // freeze — unported with the rest of the freeze (DEBT G5). Every other key is
+            // dead, the movement keys and the panel bindings included.
+            if (ctx.game.isPartySleeping()) {
+                if (e.key === 'Enter') ctx.game.enqueueKeyButton(146);
+                e.preventDefault();
+                return;
+            }
             // The panel bindings come first. They are the larger half of the table and
             // they claim their keys whatever the game state, so the movement switch
             // below never sees one.

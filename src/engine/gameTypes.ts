@@ -224,10 +224,10 @@ export interface PartyState {
     numFootprintEnt?: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
     /**
-     * `d.PartySleeping`. A sleeping party neither dodges nor gets lucky, and is woken
-     * by any blow that lands (`doc/CSBwin-src/Monster.cpp:4529`).
-     *
-     * ⏳ Nothing sets this yet — the sleep UI is unported — so it is always false.
+     * `d.PartySleeping` — set by the sleep icon, button 145, and cleared by `WakeUp`
+     * (`Game.sleep` / `Game.wakeUp`, doc/CSBwin-src/Mouse.cpp:1683-1714). While it is
+     * set a tick runs every VBL, masteries read 1, quickness halves and the regeneration
+     * doubles; a monster's blow wakes the party (`Monster.cpp:4531`). Never saved.
      */
     sleeping?: boolean;
     /**

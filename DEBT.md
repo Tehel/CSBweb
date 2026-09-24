@@ -1475,22 +1475,29 @@ holds the raw bits, and `monster.drawAsSize4` is read ungated in
 no creature in `dm-atari/dungeon.dat` sets any of bits 11-14. Modelling it means reading
 `extendedFlags & 0x02` / `& 0x04` in `SaveGameLoader` and gating every accessor.
 
-### G5 ⏳ Messages and sleep
+### G5 ⏳ Messages and freeze
 
 From Phase 11:
 
 - The pixel-level scroll animation (`d.PushTextUp` / `d.TextScanlineScrollCount`) is not
   implemented. Rows scroll instantly, and CSBWin's wait-for-animation guards are absent.
+  With it goes `scrollingText.SetNewSpeed`, which sleep and `WakeUp` call to re-pace that
+  animation (`doc/CSBwin-src/Mouse.cpp:1696`, `CSBCode.cpp:7053`).
 - `SCROLLING_TEXT::Serialize` — message state in save games
   (`doc/CSBwin-src/Data.h:1666`). Quick-load calls `discardText()` instead.
-- `d.PartySleeping` is plumbed (`setPartySleeping`) but never set: there is no sleep
-  system yet. Its buttons are queued but have no handler (found paying C21):
-  - 145 sleeps, 146 wakes (`doc/CSBwin-src/Mouse.cpp:1683-1730`);
-  - 147 freezes, 148 thaws (`:1731-1773`);
+- Sleep is ported (`Game.sleep` / `Game.wakeUp`, `tools/dump-sleep.ts`, 2026-09-24).
+  The freeze is not (found paying C21):
+  - 147 freezes, 148 thaws (`doc/CSBwin-src/Mouse.cpp:1731-1773`);
   - nor has the frozen game's filter on the queue, which throws away every entry but 148
-    (`:1433-1444`).
+    (`:1433-1444`);
+  - nor the keys that reach them: Esc is 147 in the sleep-mode table `Byte18440` and 148
+    in the frozen one `Byte18448` (graphics.dat `0x231`). Asleep, the port swallows Esc.
 
-  `UIMode.Sleeping` and `UIMode.Frozen` are never entered.
+  `UIMode.Frozen` is never entered.
+
+Also found porting sleep: `tools/probe-ui.mjs --boot` still presses F8 for a random dev
+party, a key that no longer exists, so it boots with an empty party.
+`tools/probe-frames.mjs` builds its party at the Hall of Champions instead; `--boot` should too.
 
 ### G6 ⏳ UI effects
 

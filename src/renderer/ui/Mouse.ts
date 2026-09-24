@@ -99,6 +99,23 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   // until the button-up lets go. The port has no pressed mouth — `handleMouthPress`
   // feeds on the press — so only the eye is tested.
   if (ui.pressingEye) return;
+  if (id === 145) {
+    // The sleep icon, `buttons17760` beside the disk (`doc/CSBWIN_MENU_REFERENCE.md`), so
+    // it is only ever clicked with an inventory open. `ShowHideInventory(4)` closes it
+    // before anything else (`doc/CSBwin-src/Mouse.cpp:1683-1691`); the rest is the
+    // engine's. Refused, like the disk, while a champion is only provisionally joined.
+    if (!potential) {
+      if ((ui.partyState?.selectedCharacterIndex ?? -1) >= 0) handleInventoryToggle(ui, 4);
+      ui.onSleep?.();
+    }
+    return;
+  }
+  if (id === 146) {
+    // `WakeUp()` (`doc/CSBwin-src/Mouse.cpp:1709-1714`): `Buttons17796`, a click anywhere
+    // in the viewport while the party sleeps.
+    ui.onWakeUp?.();
+    return;
+  }
   if (id === 140) {
     // The disk icon, `buttons17760[1]` (`doc/CSBWIN_MENU_REFERENCE.md`). Both guards are
     // CSBWin's (`doc/CSBwin-src/Mouse.cpp:1708-1727`): an empty party, or a champion

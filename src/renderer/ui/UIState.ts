@@ -168,6 +168,10 @@ export interface UIState {
    * explicit.
    */
   onSetPaused?: (paused: boolean) => void;
+  /** Button 145 — `Game.sleep`, after the inventory has been hidden. */
+  onSleep?: () => void;
+  /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
+  onWakeUp?: () => void;
   /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) — shade the panels, repack a chest. */
   onEnterMenu?: () => void;
   /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) — the mirror, on the way out. */

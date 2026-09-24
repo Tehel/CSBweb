@@ -935,7 +935,10 @@ if (IsCharacterLucky(chA2, 60)) return 0;
 ```
 
 Being quicker than the monster is not enough on its own — it still needs a 3-in-4 roll. A
-**sleeping** party gets neither check; it is woken by the blow instead.
+**sleeping** party is woken by the blow *first* — `if (d.PartySleeping != 0) WakeUp();`
+(`doc/CSBwin-src/Monster.cpp:4531`) — so by the `if (d.PartySleeping == 0)` guarding both
+checks (`:4536`) it is awake (`WakeUp` clears it, `CSBCode.cpp:7051`), and it gets them
+like anyone else.
 
 `IsCharacterLucky` (`doc/CSBwin-src/Character.cpp:2165`) then moves Luck by 2 in the
 *opposite* direction to the outcome: down when it saved you. Luck is spent by using it.
@@ -3127,3 +3130,42 @@ When the dying champion's inventory is the one open, `KillCharacter` hides it
 
 Evidence: `tools/dump-champion-death.ts` section 7 (2 of 45 checks fail before the fix;
 the `DropOrder` permutation check is its canary).
+
+## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
+
+The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,
+left button), so it is only clickable with an inventory open. Its handler
+(`doc/CSBwin-src/Mouse.cpp:1683-1708`), unless `d.PotentialCharacterOrdinal` is set:
+`ShowHideInventory(4)` if one is open, `TAG02076e()` (shade the movement arrows, magic
+and weapon-ready areas), `d.PartySleeping = 1`, `DisplaySleepScreen()`, `d.Speed = 0`,
+`PrimaryButtonList = Buttons17796`, `SecondaryButtonList = NULL`,
+`pKeyXlate2 = Byte18440`, `pKeyXlate1 = NULL`, `DiscardAllInput()`.
+
+- `d.Speed = 0` makes `vblCount >= d.Speed` true on every VBL (`CSBCode.cpp:1066-1077`):
+  one game tick per VBL, instead of one per `speedTable[gameSpeed].vblPerTick` (15 at
+  normal speed, `CSBwin.cpp:180`). The top of the tick restores `d.Speed` only while
+  awake (`CSBCode.cpp:612-616`).
+- `Buttons17796` (graphics.dat `0x231`) is two entries, both button 146 over the viewport
+  x 0-223, y 33-168, mouse masks 2 and 1. `Byte18440` is two `KeyXlate`s: `{146, 0x0d}`
+  (Return) and `{147, 0x1b}` (Esc, the freeze). `Byte18448`, the frozen game's table, is
+  `{148, 0x1b}`.
+- `DisplaySleepScreen` (`CSBCode.cpp:8542`) floods the viewport with 0 and writes
+  "WAKE UP" in colour 4 at viewport (93, 65). `TextOut_OneLine` starts at row `y - 4`
+  (`Graphics.cpp:320`), so the glyphs occupy rows 61-65. The main loop skips
+  `DrawViewport` while asleep (`CSBCode.cpp:637`).
+- `WakeUp` (`CSBCode.cpp:7047`): `d.clockTick = 1`, `d.PartySleeping = 0`, the speed back,
+  `FloorAndCeilingOnly()`, the adventure lists `Buttons17196` / `Buttons17304` and key
+  tables back, `DiscardAllInput()`, `TAG0207cc()`. It is called by button 146, by
+  `MonsterDamagesCharacter` before its dodge test (`Monster.cpp:4531`), and by
+  `DamageCharacter` after the wound roll on the `P4 != 0` branch only
+  (`Character.cpp:2809-2812`). `d.clockTick = 1` makes the tick run in the same pass.
+  When the wake-up comes from inside a tick, the tick's own `d.clockTick = 0`
+  (`CSBCode.cpp:704`) cancels it.
+- `d.PartySleeping` is not saved. `d.PartySleeping = 0` is set at game start
+  (`CSBCode.cpp:10479`).
+- Asleep, `DetermineMastery` returns 1 for every skill (`Code17818.cpp:29-36`). So
+  `TenSecondUpdate`'s mana roll is `random112 < Wisdom + 2`, and each point of mana costs
+  `max(7, 16 - 2)` = 14 stamina, whatever the champion's Wizard and Priest levels
+  (`:215-240`).
+
+Evidence: `tools/dump-sleep.ts`.

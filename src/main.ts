@@ -19,6 +19,7 @@ import { extractUITables } from './renderer/csbwin/UITables';
 import { extractViewportTables } from './renderer/csbwin/ViewportTables';
 import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
+import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
 import { runBootSequence } from './renderer/intro/BootSequence';
 import { loadUISettings } from './ui/settings';
@@ -429,6 +430,16 @@ async function init() {
                 (chIdx, attackType) => game?.championAttack(chIdx, attackType) ?? 0,
                 () => game?.consumeAttackDamageToDisplay() ?? 0,
             );
+
+            // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow wakes it.
+            // The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`) or the
+            // adventure lists back (`CSBCode.cpp:7056-7057`), and the message area with
+            // its tenfold timeout (`CSBCode.cpp:1546-1553`).
+            renderer.setSleepHandlers(() => game?.sleep(), () => game?.wakeUp());
+            game.onSleepChanged((sleeping) => {
+                renderer?.setUIMode(sleeping ? UIMode.Sleeping : UIMode.Adventure);
+                scrollingText.setPartySleeping(sleeping);
+            });
 
             game.onTick(() => {
                  if (!renderer || !game) return;

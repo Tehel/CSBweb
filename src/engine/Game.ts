@@ -356,6 +356,14 @@ export class Game {
      * a tick that was due waits one frame.
      */
     private clockTickCleared = false;
+    /**
+     * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050): a tick is due at
+     * once, whatever the VBL count. The tick itself clears it again (`:704`), so a party
+     * woken by a blow during `ProcessTimers` gets no extra tick.
+     */
+    private clockTickSet = false;
+    /** Told whenever `d.PartySleeping` changes: the UI swaps its button lists. */
+    private sleepListeners: ((sleeping: boolean) => void)[] = [];
     private animationFrameId: number | null = null;
 
     // Event callbacks
@@ -575,6 +583,7 @@ export class Game {
                 dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
                 onChampionDied: (chIdx) => this.onChampionDied(chIdx),
                 isGameWon: () => this.gameWon,
+                wakeUp: () => this.wakeUp(),
                 schedulePoison: (chIdx, remaining) =>
                     this.timerSystem.schedulePoison(chIdx, remaining, this.party.state.position.z),
                 cancelPoisonTimers: (chIdx) => this.timerSystem.cancelPoisonTimers(chIdx),
@@ -815,10 +824,13 @@ export class Game {
 
         // Calculate time since last tick
         const timeSinceLastTick = currentTime - this.lastTickTime;
-        const tickInterval = 1000 / GAME_TIMING.TICKS_PER_SECOND;
+        // `d.Speed = 0` while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697), and the
+        // VBL raises `clockTick` once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`) —
+        // so asleep, a tick is due on every VBL.
+        const tickInterval = this.party.state.sleeping ? 0 : 1000 / GAME_TIMING.TICKS_PER_SECOND;
 
         // Process game ticks
-        if (timeSinceLastTick >= tickInterval && !this.clockTickCleared) {
+        if (this.clockTickSet || (timeSinceLastTick >= tickInterval && !this.clockTickCleared)) {
             if (!this.state.paused) {
                 this.gameTick();
             }
@@ -857,6 +869,8 @@ export class Game {
         // `d.Word11712` (doc/CSBwin-src/CSBCode.cpp:689-695).
         if (this.party.state.partyMoveDisableTimer !== 0) this.party.state.partyMoveDisableTimer--;
         if (this.party.state.word11712 !== 0) this.party.state.word11712--;
+        // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
+        this.clockTickSet = false;
 
         // Update party state in game state
         this.state.party = this.party.state;
@@ -870,11 +884,19 @@ export class Game {
      * what refuses a key.
      */
     enqueueMovement(action: MovementAction): boolean {
+        return this.enqueueKeyButton(MOVEMENT_BUTTON[action]);
+    }
+
+    /**
+     * Any other key `TAG0196da` found in a `pKeyXlate` table, queued the same way — the
+     * Return key of the sleep-mode table `Byte18440`, which is button 146.
+     */
+    enqueueKeyButton(num: number): boolean {
         let end = this.mouseQEnd + 2;
         if (end > MOUSEQLEN - 1) end -= MOUSEQLEN;
         if (end === this.mouseQStart) return false;
         this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
-        this.mouseQueue[this.mouseQEnd] = { num: MOVEMENT_BUTTON[action], x: 0, y: 0 };
+        this.mouseQueue[this.mouseQEnd] = { num, x: 0, y: 0 };
         return true;
     }
 
@@ -962,6 +984,7 @@ export class Game {
                 // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
                 this.discardAllInput();
                 this.clockTickCleared = true;
+                this.clockTickSet = false;
             }
             // Notify callbacks of failure
             for (const callback of this.onMoveCallbacks) {
@@ -1043,6 +1066,54 @@ export class Game {
     discardAllInput(): void {
         this.mouseQStart = 0;
         this.mouseQEnd = MOUSEQLEN - 1;
+    }
+
+    /**
+     * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
+     * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
+     * `TAG02076e`); this is `d.PartySleeping = 1`, `d.Speed = 0` — which `runFrame` reads
+     * as a tick on every frame — and `DiscardAllInput()`. The sleep-mode button list,
+     * `Buttons17796`, and `DisplaySleepScreen` are the listeners' business.
+     *
+     * Refused while a champion is only provisionally in the party (`:1685`).
+     */
+    sleep(): boolean {
+        const party = this.party.state;
+        if ((party.potentialChampionIndex ?? -1) >= 0) return false;
+        party.sleeping = true;
+        this.notifySleep(true);
+        this.discardAllInput();
+        return true;
+    }
+
+    /**
+     * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7047) — button 146, or any blow that lands on a
+     * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
+     * `d.PartySleeping = 0`, the game speed back, the adventure button lists back (the
+     * listeners), `DiscardAllInput()`.
+     *
+     * Not ported: `scrollingText.SetNewSpeed`, which paces the scroll animation the port
+     * does not have (DEBT G5).
+     */
+    wakeUp(): void {
+        this.clockTickSet = true;
+        this.clockTickCleared = false;
+        this.party.state.sleeping = false;
+        this.notifySleep(false);
+        this.discardAllInput();
+    }
+
+    isPartySleeping(): boolean {
+        return this.party.state.sleeping === true;
+    }
+
+    /** Register for `d.PartySleeping` changes (see `sleep` / `wakeUp`). */
+    onSleepChanged(listener: (sleeping: boolean) => void): void {
+        this.sleepListeners.push(listener);
+    }
+
+    private notifySleep(sleeping: boolean): void {
+        for (const listener of this.sleepListeners) listener(sleeping);
     }
 
     /**
@@ -1726,9 +1797,12 @@ export class Game {
             const maxMana = attrs.maxMana | 0;
             const mana = attrs.mana | 0;
             if (mana < maxMana) {
+                // Asleep, `DetermineMastery` reports 1 for every skill
+                // (doc/CSBwin-src/Code17818.cpp:29-36): the roll is Wisdom + 2, and each
+                // point costs 14 stamina, whatever the champion's levels.
                 const magicMastery =
-                    determineMastery(champ, 3, { getObjectNameIndex })
-                    + determineMastery(champ, 2, { getObjectNameIndex });
+                    determineMastery(champ, 3, { getObjectNameIndex, partySleeping: sleeping })
+                    + determineMastery(champ, 2, { getObjectNameIndex, partySleeping: sleeping });
                 const wisdom = championAttribute(champ, AttributeIndex.Wisdom);
                 if (random112 >= magicMastery + wisdom) {
                     if (mana > maxMana) {
@@ -2975,7 +3049,13 @@ export class Game {
 
     // Restore runtime state from quick-save.
     applyRuntimeSaveState(save: RuntimeSaveState): void {
+        // `d.PartySleeping = 0` wherever a game starts (doc/CSBwin-src/CSBCode.cpp:10479):
+        // CSBWin never saves it. Loading over a sleeping party must hand the UI its
+        // adventure button lists back, whatever the restored state says.
+        const wasSleeping = this.isPartySleeping();
         this.party.setState(save.party);
+        this.party.state.sleeping = false;
+        if (wasSleeping) this.notifySleep(false);
         // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1636): the cursor
         // owner is part of the saved state. `setState` carries it, and this repairs the
         // states written before it was ever set.
