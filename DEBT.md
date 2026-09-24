@@ -93,6 +93,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ✅ |
 | C27 | A dead champion keeps a ghost of slot 8 | S | ✅ |
 | C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
+| C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-c) | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -991,6 +992,18 @@ though it now lay on the floor. CSBWin's `DropAllPossessions` empties all thirty
 (`doc/CSBwin-src/Character.cpp:2497-2518`). The fix clears the mirror; D1 then deletes
 it. Evidence: `tools/dump-champion-death.ts` arms slot 8 too and reads every slot back
 through the UI's reader (3 of 41 checks fail before).
+
+### C29 ✅ The save writer writes an empty cursor as `RNempty`
+
+**Paid in (this commit).** Found splitting D2b. `SaveGamePayload` wrote
+`(party.objectInHand ?? 0)`, so an empty cursor went into the index pre-pass and out
+through `encode` as 0, `RNempty`. CSBWin writes `d.objectInHand.ConvertToInteger()`
+(`doc/CSBwin-src/SaveGame.cpp:1033`), `RNnul` for an empty hand, and its loader converts
+anything that is not `RNnul` (`:2753-2760`), so a file this port wrote with an empty
+cursor would have loaded in CSBWin with `RNempty` in hand. Every committed save with an
+empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is why no
+round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
+back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
 
 ### C28 ⏳ `DropAllPossessions` is not CSBWin's
 

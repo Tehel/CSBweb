@@ -1613,7 +1613,12 @@ later, the cursor is empty (`0xffff`) and the one live MISSILE record carries
 `timerIndex = 2` against `NumTimer = 3`.
 
 `0xffff` in `gb2.ObjectInHand` is the empty hand, and **`timerIndex == 0xffff` marks a
-free slot** in the MISSILE pool. The pool is allocated at full size regardless of what
+free slot** in the MISSILE pool. The writer is `gb2.ObjectInHand =
+d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`), and the loader
+takes the word back with `NonExtendedInteger` (`:1649`) and converts it unless it is
+`RNnul` (`:2753-2760`) — so an empty hand must be written as `RNnul`, never `RNempty`
+(0, `CSBTypes.h:249`), which would come back as an object in hand. All thirteen
+committed saves with an empty hand hold `0xffff`. The pool is allocated at full size regardless of what
 is happening: all twelve sample saves carry 60 missile and 50 cloud records, so a
 record count says nothing about how many missiles are in flight — only a live
 `timerIndex` does.

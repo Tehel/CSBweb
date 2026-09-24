@@ -360,6 +360,14 @@ function writeAndReload(label: string, game: Game): Game | null {
     `${label}: NumWordsInTextArray is the index length the conversion wrote`);
   check((parsed.save.objectIndex?.countAliases() ?? -1) === 0,
     `${label}: no two slots of the object indirect index name the same record`);
+  // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1033`): an
+  // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
+  // would load in CSBWin as an object in hand (`:1649`, `:2753`).
+  const inHand = game.party.state.objectInHand;
+  if (inHand === null || inHand === undefined || inHand === 0xffff) {
+    const word = parsed.save.block2?.objectInHand;
+    check(word === 0xffff, `${label}: the empty cursor is written as RNnul (0x${(word ?? 0).toString(16)})`);
+  }
 
   const next = makeGame();
   try {
