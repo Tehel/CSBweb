@@ -29,8 +29,8 @@ how to work an item. **One item per commit, a few per session**, then `/clear`.
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, and C1–C24
-and C26, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
+Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
+C26, C27 and C29, and D1 with D2a–c, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -67,8 +67,16 @@ viewport click (button 80) goes through the queue, and the on-screen arrows (but
 which the queue used to drop, work. C26: the disk icon waits for the eye to be let go.
 Recorded with them: G9 (the marching-order buttons 125-128). G5 gained the sleep and
 freeze buttons (145-148). G6 gained `FlashButton`.
-Next: tier C is done except C25 (⚠️, waits for D4). Tier D starts with D1+D2 (bundled,
-size L together, so split it first and record the split in `DEBT.md`).
+D1: a champion's hands live only in `possessions` (the `shieldHand` / `weaponHand` /
+`quiver` mirrors are gone). D2 was split into D2a–d. D2a: an empty possession slot is
+`RNnul` and the array is a required thirty. D2b: so is the cursor, `objectInHand`, and the
+chest view; the four normalizers are gone. D2c: `isLikelyObjectRecord` is gone, with the
+object-*type* overloads it chose between. `RUNTIME_SAVE_VERSION` is 10. Fixed on the way:
+C27 (a dead champion kept a ghost of slot 8) and C29 (the save writer wrote an empty cursor
+as `RNempty`, 0, where CSBWin writes `RNnul`). Recorded: C28 (`DropAllPossessions` has
+neither `DropOrder` nor `MoveObject`) and D2d.
+Next: D2d (the possession readers return `RNnul` rather than `null`), then D3. Tier C is
+done except C25 (⚠️, waits for D4) and C28 (⏳).
 
 ## Ground rules
 
@@ -244,7 +252,7 @@ writes a whole file**. Against the sixteen-block write order in
 | --- | --- | --- |
 | 0 | Extended Features, `dataTypeMap`/`dataIndexMap`, DSA blocks | ✅ written and byte-identical to all fourteen saves — header, both maps, the game info and the DSA level index with its 0xff terminator. `buildObjectIndirectIndex` builds the maps for a world this port holds, which is what blocks 10-13 will encode their RNs through |
 | 1 | GAMEBLOCK1 | ✅ |
-| 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44) are `PartyState`'s since DEBT.md C13. `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image |
+| 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44) are `PartyState`'s since DEBT.md C13. `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image; an empty hand is written as `RNnul` since DEBT.md C29 |
 | 3 | ITEM16 | ✅ |
 | 4 | characters + party tail | ✅ byte-identical to all fourteen committed saves, the thirty possession slots included — they go out through `encodeRN` as slot numbers |
 | 5 | timers | ✅ the whole 16-byte `TIMER`, in all three sizes, byte-identical bar `unused13` in a freed slot |
@@ -395,8 +403,8 @@ above 1023 cannot be expressed. All three are detailed under step 12.
 
 - ✅ **A quick-save carries the converted image** (September 14th).
   `src/engine/DungeonSnapshot.ts` captures `textWords`, `indirectTextIndex`,
-  `compressedText` and `expool`; `RUNTIME_SAVE_VERSION` is 7 and an older payload is
-  refused rather than half-restored. `expool` is the one of the four that can be
+  `compressedText` and `expool`; `RUNTIME_SAVE_VERSION` went to 7 for it (it is 10 since
+  `DEBT.md` D2b) and an older payload is refused rather than half-restored. `expool` is the one of the four that can be
   canaried — `dungeon.dat` has none and every save carries blocks of it — and the three
   text fields cannot, because this port's conversion of `dungeon.dat` reproduces the
   saves' arrays exactly; `tools/dump-save-roundtrip.ts` says so where it makes the claim.

@@ -95,7 +95,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
-| D2 | One "no object" value (split: D2a-d) | L | ⏳ |
+| D2 | One "no object" value (split: D2a-c ✅, D2d ⏳) | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
@@ -1089,7 +1089,7 @@ five picked-object RNs are filled with `RNeof` by `ViewportRenderer`, and
 way: C29, fixed first. Evidence: `npm test -- --frames`; a grep finds none of the four
 normalizers.
 
-**D2c, paid in (this commit).** `isLikelyObjectRecord` is gone, with all fourteen calls.
+**D2c, paid in `f0297c2`.** `isLikelyObjectRecord` is gone, with all fourteen calls.
 Thirteen guarded a value already known to be an object — a slot or the cursor, tested
 against `RNnul` just before — and simply went. The fourteenth, `drawScrollPanel`'s check
 of a Viewing Filter DSA's answer, is CSBWin's own `obj.checkIndirectIndex(...)` then

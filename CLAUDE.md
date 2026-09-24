@@ -120,7 +120,10 @@ main.ts     Bootstrap and wiring
 
 - **Big-endian everywhere** (Atari ST heritage).
 - **Object IDs / RN system**: 16-bit `[position:2][category:4][index:10]`. Objects live in
-  per-cell linked chains; all references are indirect through these IDs.
+  per-cell linked chains; all references are indirect through these IDs. "No object" is
+  `RNnul` (`OBJECT_ID_NULL`, 0xFFFF) in every stored slot and the cursor, as in CSBWin;
+  `RNeof` (0xFFFE) only ends a chain. `tsc` cannot catch a stale `=== null` against a
+  `number`, so a change to an empty value is audited by grep, reader by reader.
 - **Cell flags**: 8-bit `[roomType:3][hasObjects:1][attributes:4]`.
 - **Text**: 5-bit chars, 3 per 16-bit word. **Colours**: Atari 12-bit `0RGB`, ×36 → 8-bit.
 - **Rendering is NOT ray-casting.** 21 fixed relative cells; each (cell × roomType) pair

@@ -60,7 +60,8 @@ or a wrong order of operations** — not a miscomputed number. Recent ones, all 
 
 - *A thrown object stayed in the hand.* `setPossessionDirect` wrote `possessions[slot]`
   and returned, never clearing the `weaponHand` / `shieldHand` / `quiver` mirrors that
-  every reader falls back to. The removal removed nothing.
+  every reader fell back to. The removal removed nothing. (The mirrors are gone since
+  `DEBT.md` D1; the lesson is not.)
 - *The eye panel printed no mastery ranks.* The rank-name table was an empty placeholder,
   read through a `continue`-on-falsy guard — so it produced no warning and no marker.
 - *Inventory clicks acted on the wrong champion.* `partyPosition` was being used where a
