@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26, C27 and C29, and D1 with D2a–c, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C29, and D1 with D2, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -75,8 +75,14 @@ object-*type* overloads it chose between. `RUNTIME_SAVE_VERSION` is 10. Fixed on
 C27 (a dead champion kept a ghost of slot 8) and C29 (the save writer wrote an empty cursor
 as `RNempty`, 0, where CSBWin writes `RNnul`). Recorded: C28 (`DropAllPossessions` has
 neither `DropOrder` nor `MoveObject`) and D2d.
-Next: D2d (the possession readers return `RNnul` rather than `null`), then D3. Tier C is
-done except C25 (⚠️, waits for D4) and C28 (⏳).
+D2d: every possession reader returns `RNnul`, like CSBWin's `Possession()`, so D2 is paid.
+C28: a dying champion's possessions drop in `d.DropOrder` order (now read from graphic
+`0x232`), through `MoveObject`, so they fall down a pit. Recorded on the way: C30
+(`removeCharacterPossession` is a bare slot clear — no Illumulet light, no torch), C31
+(the bones are not set down by `MoveObject`) and C32 (`AdjustStatsForItemCarried` is not
+ported: no worn object changes a stat).
+Next: C31, C30, then C32; D3 after them. Tier C is otherwise done except C25 (⚠️, waits
+for D4).
 
 ## Ground rules
 

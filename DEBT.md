@@ -98,7 +98,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C31 | A dead champion's bones are not set down by `MoveObject` | S | ⏳ |
 | C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
-| D2 | One "no object" value (split: D2a-c ✅, D2d ⏳) | L | ⏳ |
+| D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
@@ -998,7 +998,7 @@ through the UI's reader (3 of 41 checks fail before).
 
 ### C28 ✅ `DropAllPossessions` is not CSBWin's
 
-**Paid.** `Game.dropAllPossessions` walks `d.DropOrder`, now read from graphic `0x232`
+**Paid in `7abaf1a`.** `Game.dropAllPossessions` walks `d.DropOrder`, now read from graphic `0x232`
 (byte 244, `UITables.graphic232.dropOrder`, passed in `TimerTables`), takes each slot
 out through `removeCharacterPossession`, turns the object to the champion's corner and
 sets it down with `timerSystem.moveObject(obj, -1, 0, partyX, partyY)`. `Game` throws if
@@ -1108,7 +1108,7 @@ Delete the three fields, read and write the array through named slot constants, 
 
 </details>
 
-### D2 ⏳ One "no object" value
+### D2 ✅ One "no object" value
 
 **Split** (size L, recorded while paying D1). One commit each, in this order:
 
@@ -1117,7 +1117,7 @@ Delete the three fields, read and write the array through named slot constants, 
 | D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ✅ |
 | D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ✅ |
 | D2c | Retire `isLikelyObjectRecord` (`Game.ts`, `ui/Objects.ts`): a plain `!== OBJECT_ID_NULL` where a guard is still needed, nothing where it is not. | ✅ |
-| D2d | The possession readers (`getChampionPossession` in `Game`, `CharacterStats.possession`, `ui/Character`, `skills.getPossessionNameIndex`, `MonsterAttack.clothingTypeIn`, and `AttackSystem`'s hook) return `RNnul` like CSBWin's `Possession()` instead of `null`, and `ui/Character.setChampionPossession` takes it. Every caller is converted by hand — `tsc` cannot see a stale `=== null` — so list them first with a grep and convert them all in one commit. Found paying D2a. | ⏳ |
+| D2d | The possession readers (`getChampionPossession` in `Game`, `CharacterStats.possession`, `ui/Character`, `skills.getPossessionNameIndex`, `MonsterAttack.clothingTypeIn`, and `AttackSystem`'s hook) return `RNnul` like CSBWin's `Possession()` instead of `null`, and `ui/Character.setChampionPossession` takes it. Every caller is converted by hand — `tsc` cannot see a stale `=== null` — so list them first with a grep and convert them all in one commit. Found paying D2a. | ✅ |
 
 **D2a, paid in `865d704`.** `Champion.possessions` is a required `ObjectID[]`, built
 by `emptyPossessions()` (`src/engine/gameTypes.ts`), and an empty slot holds `RNnul`
@@ -1159,6 +1159,23 @@ type: `ui/Objects.getObjectWeight`, `getObjectWeightForObjectType` and
 `getDescIndexForObjectType`. `canPlaceInSlot` and `computeFeedParameters` take the RN
 path only. Evidence: `npm test -- --frames`; a grep finds none of the four names outside
 `doc/PLAN_ARCHIVE.md`.
+
+**D2d, paid in `d1b3f8f`.** Every possession reader is CSBWin's `Possession()` and returns
+`RNnul` for an empty slot: `Game.getChampionPossession`, `CharacterStats.possession`,
+`ui/Character.getChampionPossession`, `AttackSystem`'s `possession` hook, and
+`removeCharacterPossession` (`Game` and `AttackSystem`'s hook), which returns `RNnul` as
+CSBWin's does. `MonsterAttack.clothingTypeIn` became a `possession()` reader and
+`armourStrength` makes `TAG01680a`'s own test, `== RNnul || dbType() != dbCLOTHING`
+(`doc/CSBwin-src/Character.cpp:2405-2407`, `:2465-2466`). `skills.getPossessionNameIndex`
+hands the `RNnul` to `NameIndex`, which answers `objNI_NotAnObject` as CSBWin's does
+(`CSBCode.cpp:1249`). `ui/Character.setChampionPossession`, `updateLightForPossessionChange`
+and `setTorchLitState` take an `ObjectID`, and `ui/Objects.isChestRecord` no longer takes
+`null`. The audit was the grep of every reader's callers, about forty sites in eleven
+modules and four tools, all converted in the one commit. The four tools with a stale
+`=== null` failed until converted (72/76), which shows they read the readers.
+`RuntimeSaveState` did not change, so `RUNTIME_SAVE_VERSION` stays 10. Five one-line
+readers remain, one per module; E1 is where they become one. Evidence: `npm test --
+--frames`; a grep of the readers' callers finds no `null` test.
 
 Each is a refactor: `npm test` before and after, `-- --frames` since each touches
 `src/renderer/ui/`, and `RUNTIME_SAVE_VERSION` bumped for D2a and D2b (both change
@@ -1269,6 +1286,11 @@ without setters — since E2 and E3 build on it.
 
 **Evidence.** Behaviour-neutral: `npm test -- --frames`. The `tools/` construct `Game` too;
 they keep working unchanged or are updated in the same commit.
+
+*Also (found paying D2d):* `CHARDESC::Possession(slot)` is written out once per module —
+`Game.getChampionPossession`, `CharacterStats.possession`, `MonsterAttack.possession`,
+`AttackSystem`'s hook, `ui/Character.getChampionPossession` — each a one-line
+`possessions[slot] ?? OBJECT_ID_NULL`. The context should carry the one reader.
 
 ### E2 ⏳ Split `Game.ts` by CSBWin source file
 
