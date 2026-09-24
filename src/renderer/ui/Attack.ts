@@ -30,7 +30,7 @@ import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, decodeObjectID, type ObjectID } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
-import type { Champion } from '../../engine/gameTypes';
+import { SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { determineMastery } from '../../engine/skills';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -61,7 +61,7 @@ export function attackButtonRect(chIdx: number): Rect {
 export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return true;
-  const obj = getChampionPossession(champ, 1);
+  const obj = getChampionPossession(champ, SLOT_WEAPON_HAND);
   if (obj === null) return true;
   const rn = obj as ObjectID;
   switch (decodeObjectID(rn).category) {
@@ -132,7 +132,7 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   if (!champ) return;
   if (champ.alive === false || (champ.attributes.health | 0) === 0) return;
 
-  const weapon = getChampionPossession(champ, 1);
+  const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let attackClass: number;
   if (weapon === null) {
     attackClass = ATTACK_CLASS_EMPTY_HAND;
@@ -282,7 +282,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
   }
 
   fillRectIndex(ui.screenIndexBuffer, rect, 4);
-  const weapon = getChampionPossession(champ, 1);
+  const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let iconIndex = -1;
   if (weapon === null) {
     iconIndex = OBJNI_SPECIAL_C; // the empty fist

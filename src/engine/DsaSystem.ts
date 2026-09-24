@@ -2363,9 +2363,6 @@ export class DsaSystem {
       champion.possessions = slots;
     }
     champion.possessions[slot] = next;
-    if (slot === 0) champion.shieldHand = next;
-    if (slot === 1) champion.weaponHand = next;
-    if (slot === 8) champion.quiver = next;
     this.updateLightForPossessionChange(slot, previous, next);
   }
 

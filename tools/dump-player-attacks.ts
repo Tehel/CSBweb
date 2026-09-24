@@ -60,7 +60,6 @@ function champion(i: number, name: string, fighterExp: number): Champion {
     // Skill 4 is the fighter base; 5-11 are its subskills. `determineMastery` reads the
     // base for anything above index 3, so this is what a champion's competence is.
     skills: Array.from({ length: 20 }, () => ({ tempAdjust: 0, experience: fighterExp })),
-    weaponHand: null, shieldHand: null, quiver: null,
     possessions: new Array(30).fill(null),
     partyPosition: i,
   };
@@ -535,7 +534,6 @@ function giveSword(game: Game, chIdx: number): ObjectID {
   const rn = encodeObjectID(0, DBType.WEAPON, data.databases.weapons.records.length - 1);
   const champ = game.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
-  champ.weaponHand = rn;
   return rn as ObjectID;
 }
 

@@ -141,7 +141,7 @@ interface DropCursorOptions {
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 7;
+export const RUNTIME_SAVE_VERSION = 8;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -1173,7 +1173,7 @@ export class Game {
             setHandOwner(party, 0);
         }
 
-        this.collectMirrorPossessions(champion, possessions);
+        this.collectMirrorPossessions(possessions);
 
         // `ShowHideInventory(LOCAL_2)` (`:792`) — the inventory opens on the new
         // champion, and `potentialChampionIndex` turns its eye panel into the
@@ -1357,7 +1357,7 @@ export class Game {
      * cell until Resurrect or Reincarnate is pressed, which is what makes Cancel a
      * clean undo.
      */
-    private collectMirrorPossessions(champion: Champion, possessions: Array<ObjectID | null>): void {
+    private collectMirrorPossessions(possessions: Array<ObjectID | null>): void {
         if (!this.addCharacterTables) return;
         const party = this.party.state;
         const mirror = this.getMirrorCell();
@@ -1380,9 +1380,6 @@ export class Game {
         }
 
         assignAddCharacterPossessions(items, this.addCharacterTables, possessions);
-        champion.weaponHand = possessions[1] ?? null;
-        champion.shieldHand = possessions[0] ?? null;
-        champion.quiver = possessions[8] ?? null;
     }
 
     /**
@@ -1563,9 +1560,6 @@ export class Game {
             if (!isLikelyObjectRecord(this.dungeonState, rn)) continue;
             this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
         }
-        champ.weaponHand = null;
-        champ.shieldHand = null;
-        champ.quiver = null;
     }
 
     /**
@@ -1832,8 +1826,6 @@ export class Game {
             const value = champion.possessions[slot];
             if (typeof value === 'number') return value as ObjectID;
         }
-        if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand as ObjectID;
-        if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand as ObjectID;
         return null;
     }
 
@@ -2231,8 +2223,6 @@ export class Game {
         if (typeof current === 'number' && current !== OBJECT_ID_NULL && current !== OBJECT_ID_EOF) return false;
         slots[slot] = obj;
         champion.possessions = slots;
-        if (slot === 0) champion.shieldHand = obj;
-        if (slot === 1) champion.weaponHand = obj;
         return true;
     }
 
@@ -2422,9 +2412,9 @@ export class Game {
         if (!champion) return;
         if ((champion.attackType ?? -1) !== -1) champion.attackStatModifier = 0;
         if ((champion.attributes.health | 0) !== 0) {
-            // A bow that has just been fired reloads itself from the quiver, then from
-            // the three pouch slots, taking the first object of the matching ammunition
-            // class (`TAG0153c2`).
+            // A bow that has just been fired reloads itself from slot 12, then from
+            // slots 7-9, taking the first object of the matching ammunition class
+            // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
             if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === null) {
                 for (const slot of [12, 7, 8, 9]) {
                     if (this.matchingAmmunition(champion, slot)) {
@@ -2461,7 +2451,7 @@ export class Game {
 
     /**
      * `TAG0115ee` (`doc/CSBwin-src/CSBCode.cpp:6251`) — put a weapon back into the hand
-     * a throw emptied, from the quiver first and then the three pouch slots. Only a
+     * a throw emptied, from slot 12 first and then slots 7-9 (`:6263-6270`). Only a
      * weapon: a thrown apple does not come back.
      */
     private refillPossessionSlot(chIdx: number, slot: number): void {
@@ -2884,20 +2874,11 @@ export class Game {
      * Write a possession slot without the UI's placement rules — used for CSBWin's
      * temporary hand swap, where the object is put back immediately, and by
      * `RemoveCharacterPossession`.
-     *
-     * `shieldHand`, `weaponHand` and `quiver` mirror slots 0, 1 and 8, and
-     * `getChampionPossession` falls back to them when `possessions` reads null. Writing
-     * only the array therefore does not empty a hand: a thrown weapon flew as a missile
-     * *and* stayed in the fighting hand, so it could be picked up again where it landed
-     * and the party gained a second one.
      */
     private setPossessionDirect(champion: Champion, slot: number, value: ObjectID | null): void {
         if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
             champion.possessions[slot] = value;
         }
-        if (slot === 0) champion.shieldHand = value;
-        else if (slot === 1) champion.weaponHand = value;
-        else if (slot === 8) champion.quiver = value;
     }
 
 

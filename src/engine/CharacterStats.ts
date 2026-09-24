@@ -131,9 +131,7 @@ export class CharacterStats {
    * Re-summed rather than cached; see the module comment.
    */
   characterLoad(champ: Champion): number {
-    const items: Array<number | null | undefined> = champ.possessions?.length
-      ? champ.possessions
-      : [champ.shieldHand, champ.weaponHand, champ.quiver];
+    const items = champ.possessions ?? [];
     const visited = new Set<number>();
     let total = 0;
     for (const item of items) {
@@ -265,19 +263,10 @@ export class CharacterStats {
     return applyLimits(loLimit, quickness, hiLimit);
   }
 
-  /**
-   * `CHARDESC::Possession(slot)`, with the same fallback the rest of the engine uses
-   * for champions that carry only the two hand slots rather than the full 30.
-   */
+  /** `CHARDESC::Possession(slot)`. */
   private possession(champ: Champion, slot: number): ObjectID | null {
-    if (champ.possessions && slot >= 0 && slot < champ.possessions.length) {
-      const value = champ.possessions[slot];
-      if (typeof value === 'number') return value as ObjectID;
-      return null;
-    }
-    if (slot === 0 && typeof champ.shieldHand === 'number') return champ.shieldHand as ObjectID;
-    if (slot === 1 && typeof champ.weaponHand === 'number') return champ.weaponHand as ObjectID;
-    return null;
+    const value = champ.possessions?.[slot];
+    return typeof value === 'number' ? value as ObjectID : null;
   }
 
   /** `TAG0099d2` (`doc/CSBwin-src/Code51a4.cpp:2875`). */

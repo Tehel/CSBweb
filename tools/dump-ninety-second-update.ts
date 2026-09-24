@@ -37,7 +37,7 @@ function champion(i: number): Champion {
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
-    skills: [], weaponHand: null, shieldHand: null, quiver: null,
+    skills: [],
     possessions: new Array(30).fill(null),
     partyPosition: i,
   };
@@ -111,7 +111,6 @@ function giveTorch(game: Game, chIdx: number, charges: number): WeaponRecord {
   const rn = encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
   const champ = game.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
-  champ.weaponHand = rn;
   return torch;
 }
 

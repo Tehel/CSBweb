@@ -421,9 +421,6 @@ function getPossessionNameIndex(
   if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
     possession = champion.possessions[slot];
   }
-  if (possession == null && slot === 1 && typeof champion.weaponHand === 'number') {
-    possession = champion.weaponHand;
-  }
   if (possession == null || typeof possession !== 'number') return null;
   return getObjectNameIndex(possession | 0);
 }

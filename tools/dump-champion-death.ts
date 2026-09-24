@@ -71,7 +71,7 @@ function champion(i: number, name: string): Champion {
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
-    skills: [], weaponHand: null, shieldHand: null, quiver: null,
+    skills: [],
     possessions,
     partyPosition: i,
   };
@@ -157,12 +157,10 @@ function armChampion(game: Game, chIdx: number): void {
   const champ = game.party.state.champions[chIdx]!;
   const rn = dagger();
   champ.possessions![1] = rn;
-  champ.weaponHand = rn;
-  // Slot 8 as well: the port used to mirror it in `quiver`, and the drop forgot the
-  // mirror, so the inventory still showed the dropped object there.
+  // Slot 8 as well: the port used to mirror it in a `quiver` field, and the drop forgot
+  // the mirror, so the inventory still showed the dropped object there (DEBT.md C27).
   const spare = dagger();
   champ.possessions![8] = spare;
-  champ.quiver = spare;
 }
 
 function bonesAt(game: Game, cell: Position): ObjectID[] {

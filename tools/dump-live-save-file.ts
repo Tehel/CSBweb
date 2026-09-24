@@ -411,8 +411,6 @@ function playFromDungeonDat(): Game {
   if (toThrow !== null) {
     const slot = (thrower.possessions ?? []).indexOf(toThrow);
     thrower.possessions![slot] = null;
-    if (thrower.weaponHand === toThrow) thrower.weaponHand = null;
-    if (thrower.shieldHand === toThrow) thrower.shieldHand = null;
     party.objectInHand = toThrow as ObjectID;
     party.cursorOwner = 0;
     const thrown = game.throwObjectFromCursor(0);
@@ -435,8 +433,6 @@ function playFromDungeonDat(): Game {
   if (held !== null && other) {
     const slot = other.possessions!.indexOf(held);
     other.possessions![slot] = null;
-    if (other.weaponHand === held) other.weaponHand = null;
-    if (other.shieldHand === held) other.shieldHand = null;
     party.objectInHand = held as ObjectID;
     party.cursorOwner = 1;
   }

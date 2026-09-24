@@ -225,11 +225,6 @@ export function readCsbwinCharacter(
     water: readI16BE(block, base + 68),
     skills: readSkills(block, base),
     actionDisabledUntil: 0,
-    // The three named hand fields mirror `possessions`; every writer has to maintain
-    // both (PLAN.md carries the debt), so build them from the array here.
-    weaponHand: slots[1] ?? null,
-    shieldHand: slots[0] ?? null,
-    quiver: slots[8] ?? null,
     possessions: slots,
     shieldStrength: readU16BE(block, base + 274),
     fingerprint: readU16BE(block, base + 280) as ui16,

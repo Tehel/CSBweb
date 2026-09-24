@@ -235,8 +235,6 @@ function main(): void {
     `all ${halk.inventory.length} objects at the mirror's wall became possessions`);
   check(taken.every(({ rn }) => decodeObjectID(rn).position === wall),
     "every possession came from the mirror's own wall position");
-  check(champ.weaponHand === (champ.possessions?.[1] ?? null),
-    'the weapon hand mirrors possession slot 1');
 
   const mirrorDuring = cellObjects(game, mirror);
   check(mirrorDuring.length === mirrorBefore.length,

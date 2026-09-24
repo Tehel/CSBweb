@@ -8,40 +8,16 @@
 import type { ui8, ui16, ui32, i16, i32, Direction, Position, ObjectID } from '../core/types';
 import type { Attribute } from './attributes';
 
-// Slots 0-12 are the paper-doll equipment positions; 13-29 are backpack slots.
-// CSBWin maps these via inventory button ids 8..20 and 21..37 (HandleClothingClick).
-export enum PossessionSlot {
-    ShieldHand = 0,
-    WeaponHand = 1,
-    Head = 2,
-    Body = 3,
-    Legs = 4,
-    Feet = 5,
-    Pouch1 = 6,
-    Pouch2 = 7,
-    Quiver = 8,
-    Quiver2 = 9,
-    Neck = 10,
-    Quiver3 = 11,
-    Quiver4 = 12,
-    Backpack1 = 13,
-    Backpack2 = 14,
-    Backpack3 = 15,
-    Backpack4 = 16,
-    Backpack5 = 17,
-    Backpack6 = 18,
-    Backpack7 = 19,
-    Backpack8 = 20,
-    Backpack9 = 21,
-    Backpack10 = 22,
-    Backpack11 = 23,
-    Backpack12 = 24,
-    Backpack13 = 25,
-    Backpack14 = 26,
-    Backpack15 = 27,
-    Backpack16 = 28,
-    Backpack17 = 29,
-}
+/**
+ * `CHARDESC.possessions[30]` (`doc/CSBwin-src/CSB.h:2579`). CSBWin indexes it with bare
+ * numbers, and so does ported code; these name only the slots CSBWin's own comments
+ * name, for the port's code that is not a transcription.
+ */
+export const POSSESSION_COUNT = 30;
+/** The hand CSBWin calls the "non-weapon hand" (`doc/CSBwin-src/Character.cpp:3074`). */
+export const SLOT_SHIELD_HAND = 0;
+/** "Weapon hand = 1" (`doc/CSBwin-src/Attack.cpp:1669`). */
+export const SLOT_WEAPON_HAND = 1;
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -187,12 +163,9 @@ export interface Champion {
     actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
     busyTimerIndex?: i32;      // Timer index for action disable
 
-    // Inventory slots (simplified for MVP)
-    weaponHand: any | null;     // Right hand weapon
-    shieldHand: any | null;     // Left hand shield/weapon
-    quiver: any | null;         // Quiver slot
     shieldStrength?: ui16;      // Optional shield strength for UI dots
-    possessions?: Array<number | null>; // Optional 30-slot possessions (CSBWin CHARDESC possessions[30])
+    /** `CHARDESC.possessions[30]`, the hands included — see `SLOT_WEAPON_HAND`. */
+    possessions?: Array<number | null>;
 
     /**
      * `CHARDESC.charPosition` — which **corner of the cell** the champion stands in,

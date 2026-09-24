@@ -10,7 +10,7 @@ import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/
 import { ObjectID } from '../../core/types';
 import { sw } from '../../core/intCast';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
-import { Champion } from '../../engine/gameTypes';
+import { SLOT_SHIELD_HAND, SLOT_WEAPON_HAND, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
@@ -528,14 +528,8 @@ export function drawTopBarHandIcons(ui: UIState): void {
           12
         );
       }
-      const objectId =
-        hand === 1
-          ? typeof champion?.weaponHand === 'number'
-            ? (champion.weaponHand | 0)
-            : -1
-          : typeof champion?.shieldHand === 'number'
-            ? (champion.shieldHand | 0)
-            : -1;
+      const held = champion ? getChampionPossession(champion, hand) : null;
+      const objectId = held === null ? -1 : (held | 0);
       const objectNameIndex = objectId >= 0 ? resolveObjectNameIndex(ui, objectId) : -1;
 
       if (objectNameIndex >= 0) {
@@ -611,9 +605,6 @@ export function getChampionPossession(champion: Champion, slot: number): number 
     const value = champion.possessions[slot];
     if (typeof value === 'number') return value;
   }
-  if (slot === 0 && typeof champion.shieldHand === 'number') return champion.shieldHand;
-  if (slot === 1 && typeof champion.weaponHand === 'number') return champion.weaponHand;
-  if (slot === 8 && typeof champion.quiver === 'number') return champion.quiver;
   return null;
 }
 
@@ -630,9 +621,6 @@ export function setChampionPossession(ui: UIState, champion: Champion, slot: num
     champion.possessions = slots;
   }
   champion.possessions[slot] = next;
-  if (slot === 0) champion.shieldHand = next;
-  if (slot === 1) champion.weaponHand = next;
-  if (slot === 8) champion.quiver = next;
   updateLightForPossessionChange(ui, slot, previous, next);
 }
 
@@ -652,12 +640,6 @@ export function getInventoryItemIndex(ui: UIState, champion: Champion, slot: num
   if (possessions && slot >= 0 && slot < possessions.length) {
     const value = possessions[slot];
     if (typeof value === 'number') return resolveObjectNameIndex(ui, value | 0);
-  }
-  if (slot === 0 && typeof champion.shieldHand === 'number') {
-    return resolveObjectNameIndex(ui, champion.shieldHand | 0);
-  }
-  if (slot === 1 && typeof champion.weaponHand === 'number') {
-    return resolveObjectNameIndex(ui, champion.weaponHand | 0);
   }
   return -1;
 }
@@ -682,7 +664,7 @@ export function updateLightForPossessionChange(ui: UIState, slot: number, previo
     }
   }
 
-  if (slot === 0 || slot === 1) {
+  if (slot === SLOT_SHIELD_HAND || slot === SLOT_WEAPON_HAND) {
     setTorchLitState(ui, previous, false);
     setTorchLitState(ui, next, true);
   }

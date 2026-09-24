@@ -93,8 +93,8 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ✅ |
 | C27 | A dead champion keeps a ghost of slot 8 | S | ✅ |
 | C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
-| D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
-| D2 | One "no object" value | L | ⏳ |
+| D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
+| D2 | One "no object" value (split: D2a-c) | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
@@ -983,7 +983,7 @@ an ID whose corner is not part of its identity belongs.
 
 ### C27 ✅ A dead champion keeps a ghost of slot 8
 
-**Paid in (this commit).** Found splitting D1. `Game.dropAllPossessions` emptied the
+**Paid in `3eeca47`.** Found splitting D1. `Game.dropAllPossessions` emptied the
 array and the `weaponHand` / `shieldHand` mirrors but not `quiver`, and
 `ui/Character.getChampionPossession` falls back to `quiver` for slot 8 when the array
 reads null — so after death the inventory still showed whatever had been in slot 8,
@@ -1006,7 +1006,21 @@ Extend `tools/dump-champion-death.ts`. Size S-M.
 
 ## D — State representation
 
-### D1 ⏳ Hands stored twice *(bundle with D2)*
+### D1 ✅ Hands stored twice *(bundle with D2)*
+
+**Paid in (this commit).** `Champion.shieldHand`, `weaponHand` and `quiver` are gone;
+every reader and writer uses `possessions` only, and a tool builds a champion with it.
+The unused `PossessionSlot` enum went too: its names for slots 6-12 were a guess, and
+CSBWin's own reload order says otherwise (the search starts at slot 12, then 7-9,
+`doc/CSBwin-src/Timer.cpp:2656-2672`, `CSBCode.cpp:6263-6270`, where the port's comments
+had said "the quiver, then the three pouch slots"). In its place, `POSSESSION_COUNT`,
+`SLOT_SHIELD_HAND` and `SLOT_WEAPON_HAND` (`src/engine/gameTypes.ts`), used by the UI's own
+code; ported code keeps CSBWin's bare `Possession(1)` numbers, to stay greppable. The one
+case where a mirror had disagreed with the array was C27, fixed first. `RuntimeSaveState`
+carries `PartyState`, so its shape changed: `RUNTIME_SAVE_VERSION` is 8. Evidence: a grep
+finds no mirror; `npm test -- --frames` passes unchanged, the save round-trips included.
+
+<details><summary>original entry</summary>
 
 `Champion` keeps its hands in both `possessions[0]`, `[1]` and `[8]` and three named
 fields, `shieldHand`, `weaponHand` and `quiver` (`src/engine/gameTypes.ts:191-193`), and
@@ -1020,7 +1034,24 @@ Delete the three fields, read and write the array through named slot constants, 
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “A thrown or shot object no longer stays in the hand as well”.</sub>
 
+</details>
+
 ### D2 ⏳ One "no object" value
+
+**Split** (size L, recorded while paying D1). One commit each, in this order:
+
+| Step | What | Status |
+| --- | --- | --- |
+| D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ⏳ |
+| D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ⏳ |
+| D2c | Retire `isLikelyObjectRecord` (`Game.ts`, `ui/Objects.ts`): a plain `!== OBJECT_ID_NULL` where a guard is still needed, nothing where it is not. | ⏳ |
+
+Each is a refactor: `npm test` before and after, `-- --frames` since each touches
+`src/renderer/ui/`, and `RUNTIME_SAVE_VERSION` bumped for D2a and D2b (both change
+`PartyState`). The port has one `getChampionPossession` per module (`Game`,
+`CharacterStats`, `ui/Character`, `DsaSystem`, `skills`); D2a may leave them as one-line
+reads, and merging them is B-tier work to record, not to smuggle in.
+
 
 **What.** An empty possession slot or the cursor can hold `null`, `undefined`,
 `OBJECT_ID_NULL` (0xFFFF) or `OBJECT_ID_EOF` (0xFFFE) (`src/core/types.ts:112-113`).

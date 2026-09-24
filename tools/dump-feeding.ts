@@ -58,7 +58,7 @@ function champion(name: string): Champion {
       experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1000, water: 1000,
-    skills: [], weaponHand: null, shieldHand: null, quiver: null,
+    skills: [],
     possessions: new Array(30).fill(null),
     partyPosition: 0,
   };

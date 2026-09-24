@@ -55,7 +55,7 @@ function champion(over: Partial<Champion['attributes']> & { strength?: number } 
       ...attrOver,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
-    skills: [], weaponHand: null, shieldHand: null, quiver: null,
+    skills: [],
     possessions: new Array(30).fill(null),
     partyPosition: 0,
   };
@@ -381,12 +381,11 @@ async function main(): Promise<void> {
   // not", because the missile is drawn either way — so the bug this section pins down
   // was invisible until the thrown club was picked up again and the party owned two.
   //
-  // The trap is that a champion's hands are stored **twice**: in `possessions[0..1]`
-  // and in the `shieldHand`/`weaponHand`/`quiver` mirrors, and every reader falls back
-  // to the mirror when the array reads null (`src/renderer/ui/Character.ts:538`). A
-  // removal that writes only the array therefore removes nothing at all. The check is
-  // deliberately made through the UI's own reader rather than through `possessions`
-  // directly — reading the array would have passed while the club was still in hand.
+  // The trap was that a champion's hands were stored **twice**: in `possessions[0..1]`
+  // and in `shieldHand`/`weaponHand`/`quiver` mirrors that every reader fell back to
+  // when the array read null, so a removal that wrote only the array removed nothing.
+  // The mirrors are gone (DEBT.md D1), but the check is still made through the UI's own
+  // reader rather than through `possessions` directly.
   console.log('');
   console.log('=== 7. the thrown object leaves the champion (atk_THROW, atk_SHOOT) ===');
 
@@ -400,12 +399,8 @@ async function main(): Promise<void> {
     return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
   };
 
-  /** Put an object in a slot the way `AddCharacter` does — array *and* mirror. */
   const equip = (ch: Champion, slot: number, obj: ObjectID | null): void => {
     ch.possessions![slot] = obj;
-    if (slot === 0) ch.shieldHand = obj;
-    if (slot === 1) ch.weaponHand = obj;
-    if (slot === 8) ch.quiver = obj;
   };
 
   const WEAPON_CLUB = 23;
@@ -429,7 +424,6 @@ async function main(): Promise<void> {
   check(missilesAfterThrow === missilesBeforeThrow + 1, 'atk_THROW launched exactly one missile');
   check(handAfterThrow === null,
     `the thrown club left the fighting hand (read back ${handAfterThrow}, thrown ${club})`);
-  check(thrower2.weaponHand === null, 'and left the weaponHand mirror too');
 
   // SHOOT: the arrow goes from the shield hand, the bow stays in the fighting hand.
   const archer = champion();
@@ -451,7 +445,6 @@ async function main(): Promise<void> {
   check(missilesAfterShot === missilesBeforeShot + 1, 'atk_SHOOT launched exactly one missile');
   check(ammoAfterShot === null,
     `the arrow left the shield hand (read back ${ammoAfterShot}, shot ${arrow})`);
-  check(archer.shieldHand === null, 'and left the shieldHand mirror too');
   check(bowAfterShot === bow, 'the bow itself stays in the fighting hand');
 
   console.log('');
