@@ -79,6 +79,58 @@
             overflow-y: scroll;
         }
 
+        /* Fixed width, for the reason #hover has a fixed height: the table is always four
+           champion columns, and a panel that changed width would reflow the canvas. */
+        #champions {
+            --bar: #7a9a6a;
+            background-color: #bbb;
+            color: #000;
+            width: 360px;
+            font-size: 10px;
+            padding: 2px;
+        }
+        #champions table {
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: collapse;
+        }
+        #champions col.label-col {
+            width: 76px;
+        }
+        #champions th,
+        #champions td {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            padding: 0 2px;
+            text-align: right;
+        }
+        #champions td:first-child {
+            text-align: left;
+        }
+        #champions tr.group-start td {
+            border-top: 1px solid #888;
+        }
+        #champions tr.base td {
+            font-weight: bold;
+        }
+        #champions .lvl {
+            float: left;
+            font-weight: bold;
+        }
+        #champions .changed {
+            color: #a00000;
+        }
+        #champions .dead {
+            color: #666;
+            text-decoration: line-through;
+        }
+        #champions .training-context {
+            white-space: pre-wrap;
+            padding-top: 2px;
+            border-top: 1px solid #888;
+        }
+
         #map-canvas {
             background-color: black;
         }
@@ -138,6 +190,7 @@
                 <button id="btn-map" class="toggle-button is-pressed">Map</button>
                 <button id="btn-log" class="toggle-button">Log</button>
                 <button id="btn-hover" class="toggle-button">Hover</button>
+                <button id="btn-champions" class="toggle-button">Champions</button>
                 <button id="btn-debug" class="toggle-button">Debug</button>
             </div>
             <div id="map">
@@ -145,6 +198,7 @@
             </div>
             <div id="log"></div>
             <div id="hover">...hover...</div>
+            <div id="champions" style="display: none"></div>
         </div>
     </div>
 
