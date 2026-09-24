@@ -1565,6 +1565,7 @@ export class Game {
         }
         champ.weaponHand = null;
         champ.shieldHand = null;
+        champ.quiver = null;
     }
 
     /**

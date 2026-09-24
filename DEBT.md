@@ -91,6 +91,8 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C24 | `moveMonster`'s return value, and what the AI does with it | M | ✅ |
 | C25 | The stairs do not turn a monster's corner | S | ⚠️ |
 | C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ✅ |
+| C27 | A dead champion keeps a ghost of slot 8 | S | ✅ |
+| C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ⏳ |
 | D2 | One "no object" value | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -978,6 +980,29 @@ compare it whole, where CSBWin's `RN ==` compares only the indirect index (`:349
 Believed invisible — a group's members are placed by `ITEM16`/`uByte5`, not by the RN's
 corner — but not verified. Revisit with D4 (`ObjectID` as a distinct type), which is where
 an ID whose corner is not part of its identity belongs.
+
+### C27 ✅ A dead champion keeps a ghost of slot 8
+
+**Paid in (this commit).** Found splitting D1. `Game.dropAllPossessions` emptied the
+array and the `weaponHand` / `shieldHand` mirrors but not `quiver`, and
+`ui/Character.getChampionPossession` falls back to `quiver` for slot 8 when the array
+reads null — so after death the inventory still showed whatever had been in slot 8,
+though it now lay on the floor. CSBWin's `DropAllPossessions` empties all thirty
+(`doc/CSBwin-src/Character.cpp:2497-2518`). The fix clears the mirror; D1 then deletes
+it. Evidence: `tools/dump-champion-death.ts` arms slot 8 too and reads every slot back
+through the UI's reader (3 of 41 checks fail before).
+
+### C28 ⏳ `DropAllPossessions` is not CSBWin's
+
+Found paying C27. CSBWin's `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497-2518`)
+takes the slots in `d.DropOrder[30]` order, through `RemoveCharacterPossession` (so the
+load, the light and the portrait hands are updated), turns each object to the champion's
+`charPosition` and sets it down with `MoveObject(obj, -1, 0, partyX, partyY)` — so the
+drop presses pads and falls through pits like any cursor drop. `Game.dropAllPossessions`
+walks slots 0-29 in array order, writes the array directly, and splices each object in
+with `addObjectToCell`. Visible as the stacking order of a dead champion's belongings, and
+on a pad or a pit. `DropOrder` must come from the game data or CSBWin, not be guessed.
+Extend `tools/dump-champion-death.ts`. Size S-M.
 
 ## D — State representation
 

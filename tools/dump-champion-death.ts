@@ -44,6 +44,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
+import { getChampionPossession } from '../src/renderer/ui/Character';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
@@ -144,16 +145,24 @@ function findCellWithWestNeighbour(game: Game): Position | null {
 function armChampion(game: Game, chIdx: number): void {
   const data = game.dungeonState.getData();
   const db = data.databases.weapons;
-  db.records.push({
-    nextObject: OBJECT_ID_EOF,
-    broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
-    important: false, weaponType: 8, // a dagger
-  });
-  db.count++;
-  const rn = encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+  const dagger = (): ObjectID => {
+    db.records.push({
+      nextObject: OBJECT_ID_EOF,
+      broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
+      important: false, weaponType: 8, // a dagger
+    });
+    db.count++;
+    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+  };
   const champ = game.party.state.champions[chIdx]!;
+  const rn = dagger();
   champ.possessions![1] = rn;
   champ.weaponHand = rn;
+  // Slot 8 as well: the port used to mirror it in `quiver`, and the drop forgot the
+  // mirror, so the inventory still showed the dropped object there.
+  const spare = dagger();
+  champ.possessions![8] = spare;
+  champ.quiver = spare;
 }
 
 function bonesAt(game: Game, cell: Position): ObjectID[] {
@@ -190,7 +199,7 @@ function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean
     bones: bones.length === 1,
     bonesValue2: (record?.specialState ?? 0) === 2,
     expoolRecord: rn !== undefined && game.dungeonState.copyChampionBonesRecord(rn) !== null,
-    dropped: (champ.possessions ?? []).every((v) => v === null || v === undefined),
+    dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === null),
     // Only meaningful when the victim was the last one standing.
     gameIsLost: lastAlive ? game.party.state.gameIsLost === true : true,
   };
