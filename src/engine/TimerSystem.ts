@@ -97,6 +97,8 @@ interface MonsterMove {
 export interface TimerTables {
   monsterDesc?: ArrayLike<MonsterDesc>;
   word1074?: number[];
+  /** `d.DropOrder[30]` — graphic `0x232`'s order for `DropAllPossessions`. */
+  dropOrder?: ArrayLike<number>;
   /** `d.sound1772` — graphic `0x232`'s sound table, for `QueueSound`. */
   soundTable?: ArrayLike<SoundTableEntry>;
   /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC`. */

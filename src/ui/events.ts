@@ -3,6 +3,7 @@ import type { UIContext } from './context';
 import { getUIContext, isDebugFeaturesEnabled, setDebugFeaturesEnabled } from './context';
 import { updateDebug } from './messages';
 import { handleMapCanvasClick } from './mapPreview';
+import { updateChampionPanel } from './championPanel';
 import { applyUISettings, loadUISettings, readUISettings, saveUISettings } from './settings';
 import { getEventPosition } from './utils';
 
@@ -13,6 +14,7 @@ const debugButton = document.getElementById('btn-debug') as HTMLButtonElement | 
 const mapButton = document.getElementById('btn-map') as HTMLButtonElement | null;
 const logButton = document.getElementById('btn-log') as HTMLButtonElement | null;
 const hoverButton = document.getElementById('btn-hover') as HTMLButtonElement | null;
+const championsButton = document.getElementById('btn-champions') as HTMLButtonElement | null;
 const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement | null;
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
 const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
@@ -198,6 +200,20 @@ export function bindUIEvents(): void {
             hoverButton.classList.toggle('is-pressed', !visible);
             saveUISettings(readUISettings());
         });
+
+        championsButton?.addEventListener('click', () => {
+            const championsEl = document.getElementById('champions');
+            if (!championsEl) return;
+            const visible = championsEl.style.display !== 'none';
+            championsEl.style.display = visible ? 'none' : 'block';
+            championsButton.classList.toggle('is-pressed', !visible);
+            updateChampionPanel();
+            saveUISettings(readUISettings());
+        });
+
+        // Once per game tick, which is when skills and attributes can change. The panel
+        // does nothing while it is hidden.
+        ctx.game.onTick(() => updateChampionPanel());
 
         document.addEventListener('keydown', (e) => {
             // The Reincarnate name-entry screen is modal on the keyboard as well as

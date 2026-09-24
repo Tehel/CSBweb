@@ -78,6 +78,9 @@ function champion(i: number, name: string): Champion {
   };
 }
 
+/** `d.DropOrder[30]` as the last `makeGame` extracted it. */
+let dropOrder: number[] = [];
+
 function makeGame(championCount: number): Game {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
@@ -89,6 +92,7 @@ function makeGame(championCount: number): Game {
   const viewportTables = extractViewportTables(graphics);
   const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
   const uiTables = extractUITables(graphics);
+  dropOrder = uiTables.graphic232.dropOrder;
 
   const game = new Game(
     data,
@@ -104,6 +108,7 @@ function makeGame(championCount: number): Game {
     {
       monsterDesc: objectTables.monsterDesc,
       word1074: uiTables.graphic232.word1074,
+      dropOrder: uiTables.graphic232.dropOrder,
       soundTable: uiTables.graphic232.soundTable,
       doorCharacteristics: objectTables.doorCharacteristics,
       monsterDroppings: objectTables.monsterDroppings,
@@ -162,6 +167,65 @@ function armChampion(game: Game, chIdx: number): void {
   // the mirror, so the inventory still showed the dropped object there (DEBT.md C27).
   const spare = dagger();
   champ.possessions![8] = spare;
+}
+
+/** A fresh dagger record, as `armChampion` makes them. */
+function newDagger(game: Game): ObjectID {
+  const db = game.dungeonState.getData().databases.weapons;
+  db.records.push({
+    nextObject: OBJECT_ID_EOF,
+    broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
+    important: false, weaponType: 8,
+  });
+  db.count++;
+  return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+}
+
+/** The cell's chain, in order. */
+function chainAt(game: Game, cell: Position): ObjectID[] {
+  const out: ObjectID[] = [];
+  for (
+    let rn = game.dungeonState.findFirstObject(cell);
+    rn !== OBJECT_ID_EOF && out.length < 64;
+    rn = game.dungeonState.getDBRecordLink(rn)
+  ) out.push(rn);
+  return out;
+}
+
+/** Every cell holding `rn` (any corner), across the whole dungeon. */
+function whereIs(game: Game, rn: ObjectID): Position[] {
+  const found: Position[] = [];
+  const dungeon = game.dungeonState;
+  for (let z = 0; z < dungeon.getMapCount(); z++) {
+    const map = dungeon.getMap(z);
+    if (!map) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if ((map.cellFlags[x]![y]! & 0x10) === 0) continue;
+        const cell = new Position(x, y, z);
+        if (chainAt(game, cell).some((o) => (o & 0x3fff) === (rn & 0x3fff))) found.push(cell);
+      }
+    }
+  }
+  return found;
+}
+
+/** An open pit (`0x08` set, not imaginary) — the test `TimerSystem.isActivePitAt` makes. */
+function findOpenPit(game: Game): Position | null {
+  const dungeon = game.dungeonState;
+  for (let z = 0; z < dungeon.getMapCount() - 1; z++) {
+    const map = dungeon.getMap(z);
+    if (!map) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const f = map.cellFlags[x]![y]!;
+        if (((f >> 5) & 7) === RoomType.PIT && (f & 0x08) !== 0 && (f & 0x01) === 0 && (f & 0x10) === 0) {
+          return new Position(x, y, z);
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function bonesAt(game: Game, cell: Position): ObjectID[] {
@@ -388,6 +452,62 @@ function main(): void {
     const big = g.monsterAttack.damageCharacter(0, 0x10000 + 5, 0, 0);
     console.log(`damage 0x10005: returned ${big}, health ${hero.attributes.health}`);
     check(big === 5 && hero.attributes.health === 15, 'the blow is cut to 16 bits first: 0x10005 is 5');
+  }
+
+  /* ------------------------------------ 7. DropAllPossessions -------------------- */
+  //
+  // `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) empties the slots in
+  // `d.DropOrder` order, through `RemoveCharacterPossession`, and sets each object down
+  // with `MoveObject(obj, -1, 0, partyX, partyY)`. `AddObjectToRoom` appends
+  // (`doc/CSBwin-src/Code11f52.cpp:392`), so the cell's chain must list the dropped
+  // objects in `DropOrder` order, not slot order — and on an open pit they fall.
+  console.log('');
+  console.log('=== DropAllPossessions ===');
+  {
+    const g = makeGame(1);
+    // Canary: `DropOrder` sits at byte 244 of graphic 0x232 (`Byte1832+2` is offset 0,
+    // `DropOrder` is 1586), and a misplaced read would not be a permutation of 0-29.
+    console.log(`DropOrder ${dropOrder.join(',')}`);
+    const sorted = [...dropOrder].sort((a, b) => a - b);
+    check(dropOrder.length === 30 && sorted.every((v, i) => v === i),
+      'DropOrder is a permutation of the thirty slots');
+
+    const cell = findCellWithWestNeighbour(g)!;
+    g.party.state.position = cell;
+    g.monsterSystem.loadPartyLevel(cell.z);
+    const champ = g.party.state.champions[0]!;
+    champ.partyPosition = 2;
+    const armed = [0, 1, 5, 10, 13];
+    const slotOf = new Map<number, number>();
+    for (const slot of armed) {
+      const rn = newDagger(g);
+      champ.possessions[slot] = rn;
+      slotOf.set(rn & 0x3fff, slot);
+    }
+    g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    const dropped = chainAt(g, cell).filter((rn) => slotOf.has(rn & 0x3fff));
+    const got = dropped.map((rn) => slotOf.get(rn & 0x3fff)!);
+    const want = dropOrder.filter((slot) => armed.includes(slot));
+    console.log(`slots ${armed.join(',')} land in the order ${got.join(',')} (DropOrder says ${want.join(',')})`);
+    check(got.join(',') === want.join(','), 'the dropped objects are chained in DropOrder order');
+    check(dropped.every((rn) => decodeObjectID(rn).position === 2),
+      'each is turned to the dying champion\'s corner');
+
+    const g2 = makeGame(1);
+    const pit = findOpenPit(g2);
+    if (!pit) {
+      fail('no open pit in the dungeon');
+    } else {
+      g2.party.state.position = pit;
+      g2.monsterSystem.loadPartyLevel(pit.z);
+      const rn = newDagger(g2);
+      g2.party.state.champions[0]!.possessions[1] = rn;
+      g2.monsterAttack.damageCharacter(0, 999, 0, 0);
+      const at = whereIs(g2, rn);
+      console.log(`dying over the open pit at (${pit.x},${pit.y}) level ${pit.z}: the dagger is at `
+        + (at.map((p) => `(${p.x},${p.y}) level ${p.z}`).join(' ') || 'nowhere'));
+      check(at.length === 1 && at[0]!.z > pit.z, 'a possession dropped over an open pit falls through it');
+    }
   }
 
   finish();

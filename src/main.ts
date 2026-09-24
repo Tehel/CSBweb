@@ -245,6 +245,7 @@ async function init() {
             timerTables = {
                 monsterDesc: objectTables.monsterDesc,
                 word1074: uiTables.graphic232.word1074,
+                dropOrder: uiTables.graphic232.dropOrder,
                 soundTable: uiTables.graphic232.soundTable,
                 doorCharacteristics: objectTables.doorCharacteristics,
                 monsterDroppings: objectTables.monsterDroppings,

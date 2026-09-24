@@ -297,7 +297,7 @@ export interface AttackSystemHooks {
   characterThrowsSpell?: (chIdx: number, projectile: number, range: number, neededMana: number) => number;
   /** `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — a real object, not a spell. */
   launchObject?: (chIdx: number, object: ObjectID, range: number, damage: number, decayRate: number) => number;
-  /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1093`). */
+  /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822`). */
   removeCharacterPossession?: (chIdx: number, slot: number) => ObjectID;
   /** `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`) — returns its `D6W`. */
   magicShield?: (chIdx: number, spellShield: boolean, strength: number, mustHaveMana: number) => number;

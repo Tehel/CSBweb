@@ -3102,3 +3102,28 @@ generator, ignores the value and queues the sound itself when it is audible
 
 Evidence: `tools/dump-monster-move-code.ts` (13 of 17 checks fail before the fix),
 `tools/dump-monster-move.ts` case 1.
+
+## A dying champion's possessions drop in `d.DropOrder` order, through `MoveObject`
+
+`DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) walks `D4W` 0-29 and takes
+slot `d.DropOrder[D4W]` out with `RemoveCharacterPossession`, skips an `RNnul`, turns the
+object to the champion's `charPosition` and sets it down with `MoveObject(obj, -1, 0,
+d.partyX, d.partyY)` — so a dropped possession presses a pad, falls down an open pit or
+goes through a teleporter, as any cursor drop does. `AddObjectToRoom` appends to the end
+of the cell's chain (`doc/CSBwin-src/Code11f52.cpp:392`), so the chain lists the objects in
+`DropOrder` order.
+
+`d.DropOrder[30]` is an `i16` table in graphic `0x232` (`doc/CSBwin-src/Data.h:1405`,
+byte-swapped at `CSBCode.cpp:10206`). The item is read to `d.Byte1832+2` (`:10197`), so
+the name `1586` puts it at byte 1830 − 1586 = 244 of the item, straight after `Word1588`.
+In the Atari DM `graphics.dat` it reads
+
+    5, 4, 9, 8, 7, 12, 6, 11, 3, 13, 14, 15, … 29, 10, 2, 0, 1
+
+a permutation of the thirty slots: the hands go last, the neck just before them.
+When the dying champion's inventory is the one open, `KillCharacter` hides it
+(`ShowHideInventory(4)`, `Character.cpp:2622`) before it calls `DropAllPossessions`
+(`:2624`).
+
+Evidence: `tools/dump-champion-death.ts` section 7 (2 of 45 checks fail before the fix;
+the `DropOrder` permutation check is its canary).

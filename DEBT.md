@@ -92,8 +92,11 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C25 | The stairs do not turn a monster's corner | S | ⚠️ |
 | C26 | The disk icon ignores `HandleMouseEvents`' eye and mouth gate | S | ✅ |
 | C27 | A dead champion keeps a ghost of slot 8 | S | ✅ |
-| C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
+| C28 | `DropAllPossessions` is not CSBWin's | S | ✅ |
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
+| C30 | `removeCharacterPossession` is a bare slot clear | M | ⏳ |
+| C31 | A dead champion's bones are not set down by `MoveObject` | S | ⏳ |
+| C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-c ✅, D2d ⏳) | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -993,7 +996,20 @@ though it now lay on the floor. CSBWin's `DropAllPossessions` empties all thirty
 it. Evidence: `tools/dump-champion-death.ts` arms slot 8 too and reads every slot back
 through the UI's reader (3 of 41 checks fail before).
 
-### C28 ⏳ `DropAllPossessions` is not CSBWin's
+### C28 ✅ `DropAllPossessions` is not CSBWin's
+
+**Paid.** `Game.dropAllPossessions` walks `d.DropOrder`, now read from graphic `0x232`
+(byte 244, `UITables.graphic232.dropOrder`, passed in `TimerTables`), takes each slot
+out through `removeCharacterPossession`, turns the object to the champion's corner and
+sets it down with `timerSystem.moveObject(obj, -1, 0, partyX, partyY)`. `Game` throws if
+the table was not handed in, rather than dropping nothing; eight tools that kill a
+champion now pass it. The drop is only as faithful as `removeCharacterPossession`, which
+is a bare slot clear — C30. The table and the order are in `doc/PROVEN_FACTS.md`.
+Evidence: `tools/dump-champion-death.ts` section 7 — `DropOrder` is a permutation of
+0-29 (the canary), the chain lists the objects in `DropOrder` order, and a possession
+dropped over an open pit falls through it (2 of 45 checks fail before).
+
+<details><summary>original entry</summary>
 
 Found paying C27. CSBWin's `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497-2518`)
 takes the slots in `d.DropOrder[30]` order, through `RemoveCharacterPossession` (so the
@@ -1004,6 +1020,8 @@ walks slots 0-29 in array order, writes the array directly, and splices each obj
 with `addObjectToCell`. Visible as the stacking order of a dead champion's belongings, and
 on a pad or a pit. `DropOrder` must come from the game data or CSBWin, not be guessed.
 Extend `tools/dump-champion-death.ts`. Size S-M.
+
+</details>
 
 ### C29 ✅ The save writer writes an empty cursor as `RNempty`
 
@@ -1016,6 +1034,47 @@ cursor would have loaded in CSBWin with `RNempty` in hand. Every committed save 
 empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is why no
 round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
 back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
+
+### C30 ⏳ `removeCharacterPossession` is a bare slot clear
+
+Found paying C28. `Game.removeCharacterPossession` only writes `RNnul` into the slot.
+CSBWin's `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) also:
+for slot 10, an Illumulet gets `value(0)` and takes `d.Word1074[2]` off `d.Brightness`, a
+Jewel Symal gets `value(0)`; for slot 1, sets `CHARFLAG_weaponAttack`, calls `TAG01b1c0`
+when this champion's attack menu is open, and closes a scroll (`open(false)`); for either
+hand, a torch goes out (`litTorch(0)`); when the champion's inventory is open, a chest in
+slot 1 is repacked; and `AdjustStatsForItemCarried(…, -1, …)` (C32). The load needs
+nothing — `CharacterStats.characterLoad` re-sums. Its callers are the throw, the shot,
+the two hand refills and, since C28, `DropAllPossessions`, so a champion who dies
+wearing an Illumulet leaves the party's light raised, and a thrown or dropped torch stays
+lit. The UI's `setChampionPossession` does the Illumulet's brightness and the torch, but
+not the rest, so the two paths disagree. Port it once, for the engine, with a check that
+kills a champion wearing an Illumulet and holding a lit torch.
+
+### C31 ⏳ A dead champion's bones are not set down by `MoveObject`
+
+Found paying C28. `KillCharacter` sets the bones down with `MoveObject(objD4, -1, 0,
+d.partyX, d.partyY)` (`doc/CSBwin-src/Character.cpp:2636-2645`), like the possessions,
+so over an open pit they fall. `MonsterAttack.killCharacter` splices them in with
+`addObjectToCell`. `tools/dump-champion-death.ts` section 7 already stands the party on
+an open pit; assert where the bones end up, and check the expool record still pairs
+them.
+
+### C32 ⏳ `AdjustStatsForItemCarried` is not ported
+
+Found paying C28. `AdjustStatsForItemCarried` (`doc/CSBwin-src/Character.cpp:1569-1770`)
+is what makes a carried object change its bearer: a cursed weapon or garment in slots
+0-12 costs 3 Luck, a Rabbit's Foot anywhere gives 10; in the weapon hand the Mace of
+Order gives 5 Strength and the staffs, wands, Vorpal Blade and their kin give max mana;
+Powertowers on the legs 10 Strength; the Crown of Nerra 10 Wisdom and the Dexhelm 10
+Dexterity on the head; Flamebain 12 anti-fire and the Cloak of Night 8 Dexterity on the
+body; round the neck a Jewel Symal 15 anti-magic, the Cloak of Night 8 Dexterity, the
+Moonstone 3 max mana. Maximum, current and minimum all move. CSBWin calls it from
+`AddCharacterPossession` (`:1970`), `RemoveCharacterPossession` (`:1858`) and `SetCursed`
+(`:1801`, `:1815`). No module of the port has any of it, so none of these objects does
+anything worn. Needs the whole table read before porting (`:1600-1760`), a check per
+kind of bonus, and a thought about saves: CSBWin stores the adjusted attributes, so a
+save loaded from CSBWin already carries the bonuses. Size M.
 
 ## D — State representation
 

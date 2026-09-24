@@ -324,6 +324,8 @@ export class Game {
     private objDescObjectType: ArrayLike<number> = [];
     /** `d.Byte640`, which `NameIndex` reads for a lit torch. */
     private byte640: ArrayLike<number> = [];
+    /** `d.DropOrder[30]`, graphic `0x232` — see `dropAllPossessions`. */
+    private dropOrder: ArrayLike<number> = [];
     /**
      * `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two tables `AddCharacter` needs
      * to pick a possession slot. Taken from the actuator tables, which already carry
@@ -610,6 +612,7 @@ export class Game {
         });
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? [];
         this.byte640 = actuatorTables?.byte640 ?? [];
+        this.dropOrder = timerTables?.dropOrder ?? [];
         this.addCharacterTables =
             actuatorTables?.objDescCarryMask && actuatorTables.carryLocation
                 ? {
@@ -1551,19 +1554,26 @@ export class Game {
     }
 
     /**
-     * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497`) — everything a dying
-     * champion carried falls into the party's cell.
+     * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) — everything a
+     * dying champion carried falls into the party's cell, slot by slot in
+     * `d.DropOrder` order, each taken out through `RemoveCharacterPossession`, turned
+     * to the champion's corner and set down with `MoveObject(obj, -1, 0, partyX,
+     * partyY)` — so it presses a pad or falls down a pit like any other drop.
      */
     private dropAllPossessions(chIdx: number): void {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
-        const slots = champ.possessions;
-        const here = this.party.state.position;
-        for (let i = 0; i < slots.length; i++) {
-            const rn = slots[i]!;
-            if (rn === OBJECT_ID_NULL) continue;
-            slots[i] = OBJECT_ID_NULL;
-            this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
+        if (this.dropOrder.length < 30) {
+            throw new Error('DropAllPossessions needs d.DropOrder (graphic 0x232)');
+        }
+        const D6W = champ.partyPosition & 0x3;
+        const party = this.party.state;
+        for (let D4W = 0; D4W < 30; D4W++) {
+            const objD5 = this.removeCharacterPossession(chIdx, this.dropOrder[D4W]!);
+            if (objD5 === OBJECT_ID_NULL) continue;
+            this.timerSystem.moveObject(
+                withObjectPosition(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
+            );
         }
     }
 
@@ -2354,7 +2364,7 @@ export class Game {
         return launched ? 1 : 0;
     }
 
-    /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1093`). */
+    /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822`). */
     private removeCharacterPossession(chIdx: number, slot: number): ObjectID {
         const champion = this.party.state.champions[chIdx];
         if (!champion) return OBJECT_ID_NULL;

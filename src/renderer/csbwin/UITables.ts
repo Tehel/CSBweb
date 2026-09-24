@@ -102,6 +102,12 @@ export interface UITables {
     uByte590: number[];
     /** `d.Byte586[8][4]` — the order an attack from a given side reaches the party. */
     byte586: number[][];
+    /**
+     * `d.DropOrder[30]` (`doc/CSBwin-src/Data.h:1405`) — the order in which
+     * `DropAllPossessions` empties a dying champion's slots
+     * (`doc/CSBwin-src/Character.cpp:2506-2508`).
+     */
+    dropOrder: number[];
     word1526: number[][];
     word1502: number[][];
     wRectPos1454: WordRect[];
@@ -560,7 +566,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   off += 2;
 
   // DropOrder[30], Word1526[4][3], Word1502[4][6]
-  off += 30 * 2;
+  const dropOrder = readI16Array(view, off, 30); off += 30 * 2;
   const word1526: number[][] = [];
   for (let i = 0; i < 4; i++) {
     word1526.push(readI16Array(view, off + i * 3 * 2, 3));
@@ -692,6 +698,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos1780,
     soundTable,
     byte1596,
+    dropOrder,
     word1526,
     word1502,
     wRectPos1454,
