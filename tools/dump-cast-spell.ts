@@ -30,6 +30,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** Rune 0x69 alone: class 3, missile type 5, skill 1, `byte5` 16 in the Atari table. */
 const SPELL_RUNE = 0x69;
@@ -50,7 +51,7 @@ function champion(i: number): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills,
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
   } as unknown as Champion;
 }

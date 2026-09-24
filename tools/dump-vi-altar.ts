@@ -52,6 +52,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
 import { check, fail, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** `if (decorationIndex == 2) d.OrnateAlcoveGraphicIndex = D5W` (`Code390e.cpp:218`). */
 const ORNATE_ALCOVE_DECORATION = 2;
@@ -67,7 +68,7 @@ function champion(i: number, name: string): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
     fingerprint: 0x1000 + i,
   };

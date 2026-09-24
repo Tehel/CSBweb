@@ -47,11 +47,11 @@ const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
 const CARRYABLE = new Set([5, 6, 7, 8, 9, 10]);
 
 /** A compact, readable line: which slots are full, and with what. */
-function describePossessions(slots: Array<number | null>): string {
+function describePossessions(slots: number[]): string {
   const parts: string[] = [];
   for (let i = 0; i < slots.length; i++) {
-    const rn = slots[i];
-    if (rn === null) continue;
+    const rn = slots[i]!;
+    if (rn === OBJECT_ID_NULL) continue;
     const { category, index } = decodeObjectID(rn);
     const key = DB_OF_CATEGORY[category];
     parts.push(`${i}:${key ?? `db${category}`}[${index}]`);
@@ -105,10 +105,10 @@ function main(): void {
       console.log(`    hp ${a.health}/${a.maxHealth}  sta ${a.stamina}/${a.maxStamina}  ` +
         `mana ${a.mana}/${a.maxMana}  food ${c.food} water ${c.water}`);
       console.log(`    stats ${a.stats.map((s) => `${s.current}/${s.maximum}`).join(' ')}`);
-      const carried = (c.possessions ?? []).filter((p) => p !== null).length;
+      const carried = c.possessions.filter((p) => p !== OBJECT_ID_NULL).length;
       const topSkills = c.skills.slice(0, 4).map((s) => s.experience).join(',');
       console.log(`    carrying ${carried} objects, class experience ${topSkills}`);
-      console.log(`    slots ${describePossessions(c.possessions ?? [])}`);
+      console.log(`    slots ${describePossessions(c.possessions)}`);
 
       // Self-consistency. A misread record fails these long before it looks plausible.
       check(a.maxHealth > 0, `${name}/${c.name}: has a maximum health`);
@@ -147,8 +147,8 @@ function main(): void {
       // reference lands in them immediately, because they are the low-numbered
       // databases a slot number's low bits fall into.
       const bad: string[] = [];
-      for (const rn of c.possessions ?? []) {
-        if (rn === null) continue;
+      for (const rn of c.possessions) {
+        if (rn === OBJECT_ID_NULL) continue;
         const { category, index } = decodeObjectID(rn);
         const key = DB_OF_CATEGORY[category];
         if (!key || !CARRYABLE.has(category)) { bad.push(`cat ${category}`); continue; }

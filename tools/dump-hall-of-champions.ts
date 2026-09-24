@@ -137,9 +137,9 @@ function possessionList(game: Game, chIdx: number): Array<{ slot: number; rn: Ob
   const champ = game.party.state.champions[chIdx];
   const out: Array<{ slot: number; rn: ObjectID }> = [];
   for (let slot = 0; slot < (champ?.possessions?.length ?? 0); slot++) {
-    const value = champ!.possessions![slot];
-    if (value === null || value === undefined) continue;
-    out.push({ slot, rn: value as ObjectID });
+    const value = champ!.possessions[slot]!;
+    if (value === OBJECT_ID_NULL) continue;
+    out.push({ slot, rn: value });
   }
   return out;
 }

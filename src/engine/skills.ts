@@ -1,5 +1,6 @@
 import type { Champion, Skill } from './gameTypes';
 import { CsbRandom } from '../core/random';
+import { OBJECT_ID_NULL } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
 import {
@@ -417,10 +418,7 @@ function getPossessionNameIndex(
   slot: number,
   getObjectNameIndex: (objectId: number) => number | null,
 ): number | null {
-  let possession: number | null | undefined = null;
-  if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
-    possession = champion.possessions[slot];
-  }
-  if (possession == null || typeof possession !== 'number') return null;
+  const possession = champion.possessions[slot] ?? OBJECT_ID_NULL;
+  if (possession === OBJECT_ID_NULL) return null;
   return getObjectNameIndex(possession | 0);
 }

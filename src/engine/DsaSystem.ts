@@ -2278,11 +2278,11 @@ export class DsaSystem {
     if (!loc) return null;
     const champ = this.getChampion(party, loc.chIdx);
     if (!champ) return null;
-    const possessions = champ.possessions ?? [];
+    const possessions = champ.possessions;
     if (loc.posIdx < 0 || loc.posIdx >= possessions.length) return null;
-    if (this.isEmptyObject(possessions[loc.posIdx])) return null;
-    const removed = possessions[loc.posIdx] ?? null;
-    this.setChampionPossession(champ, loc.posIdx, null);
+    const removed = possessions[loc.posIdx]!;
+    if (removed === OBJECT_ID_NULL) return null;
+    this.setChampionPossession(champ, loc.posIdx, OBJECT_ID_NULL);
     return removed;
   }
 
@@ -2317,9 +2317,8 @@ export class DsaSystem {
       if (!loc) return false;
       const champ = this.getChampion(party, loc.chIdx);
       if (!champ) return false;
-      const possessions = champ.possessions ?? [];
       if (loc.posIdx < 0 || loc.posIdx >= 30) return false;
-      return this.isEmptyObject(possessions[loc.posIdx]);
+      return champ.possessions[loc.posIdx] === OBJECT_ID_NULL;
     }
     const monsterId = this.decodeMonsterLocation(location);
     if (monsterId === null) return false;
@@ -2349,19 +2348,9 @@ export class DsaSystem {
     return party.champions[index] ?? null;
   }
 
-  private setChampionPossession(champion: Champion, slot: number, objectId: number | null): void {
+  private setChampionPossession(champion: Champion, slot: number, next: ObjectID): void {
     if (slot < 0 || slot >= 30) return;
-    const next = this.normalizePossessionValue(objectId);
-    const previous = this.normalizePossessionValue(champion.possessions?.[slot] ?? null);
-    if (!champion.possessions || champion.possessions.length < 30) {
-      const slots = new Array(30).fill(null) as Array<number | null>;
-      if (champion.possessions) {
-        for (let i = 0; i < champion.possessions.length && i < slots.length; i++) {
-          slots[i] = this.normalizePossessionValue(champion.possessions[i]);
-        }
-      }
-      champion.possessions = slots;
-    }
+    const previous = champion.possessions[slot]!;
     champion.possessions[slot] = next;
     this.updateLightForPossessionChange(slot, previous, next);
   }
@@ -2372,7 +2361,7 @@ export class DsaSystem {
     return value;
   }
 
-  private updateLightForPossessionChange(slot: number, previous: number | null, next: number | null): void {
+  private updateLightForPossessionChange(slot: number, previous: ObjectID, next: ObjectID): void {
     if (slot !== 10) return;
     const word1074 = this.word1074;
     const party = this.getPartyState?.();
@@ -2380,9 +2369,9 @@ export class DsaSystem {
     const stepValue = word1074[2] ?? 0;
     if (stepValue === 0) return;
 
-    const prevIsIllumulet = previous !== null
+    const prevIsIllumulet = previous !== OBJECT_ID_NULL
       && this.isBaseObjectNameIndex(previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-    const nextIsIllumulet = next !== null
+    const nextIsIllumulet = next !== OBJECT_ID_NULL
       && this.isBaseObjectNameIndex(next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
     const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
     if (delta === 0) return;
@@ -2562,13 +2551,12 @@ export class DsaSystem {
     }
     const champ = this.getChampion(party, chIdx);
     if (!champ) return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
-    const possessions = champ.possessions ?? [];
-    const obj = this.normalizePossessionValue(possessions[carryLoc]);
-    if (obj === null) return { error: DsaMoveError.SER_NoObjectAtCarryLocation, object: OBJECT_ID_EOF };
+    const obj = champ.possessions[carryLoc]!;
+    if (obj === OBJECT_ID_NULL) return { error: DsaMoveError.SER_NoObjectAtCarryLocation, object: OBJECT_ID_EOF };
     if (decodeObjectID(obj).category === DBType.CLOUD) {
       return { error: DsaMoveError.SER_NoCloudsPlease, object: OBJECT_ID_EOF };
     }
-    if (doit) this.setChampionPossession(champ, carryLoc, null);
+    if (doit) this.setChampionPossession(champ, carryLoc, OBJECT_ID_NULL);
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
@@ -2728,8 +2716,7 @@ export class DsaSystem {
     if (carryLoc < 0 || carryLoc > 29) return DsaMoveError.DER_IllegalPossessionIndex;
     const champ = this.getChampion(party, chIdx);
     if (!champ) return DsaMoveError.DER_IllegalCharacterIndex;
-    const possessions = champ.possessions ?? [];
-    if (!this.isEmptyObject(possessions[carryLoc])) return DsaMoveError.DER_PossessionSlotNotEmpty;
+    if (champ.possessions[carryLoc] !== OBJECT_ID_NULL) return DsaMoveError.DER_PossessionSlotNotEmpty;
     const carryMask = this.getObjectCarryMask(object);
     const slotMask = this.getCarryLocationMask(carryLoc);
     if (carryMask === null || (carryMask & slotMask) === 0) {
@@ -2919,11 +2906,9 @@ export class DsaSystem {
     if (!party) return false;
     const visited = new Set<number>();
     for (const champion of party.champions) {
-      const possessions = champion.possessions ?? [];
-      for (const item of possessions) {
-        const normalized = this.normalizePossessionValue(item);
-        if (normalized === null) continue;
-        if (this.searchListForObject(objectId, normalized, visited)) return true;
+      for (const item of champion.possessions) {
+        if (item === OBJECT_ID_NULL) continue;
+        if (this.searchListForObject(objectId, item, visited)) return true;
       }
     }
     const cursorObj = this.normalizePossessionValue(party.objectInHand);

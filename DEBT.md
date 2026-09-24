@@ -1008,7 +1008,7 @@ Extend `tools/dump-champion-death.ts`. Size S-M.
 
 ### D1 ✅ Hands stored twice *(bundle with D2)*
 
-**Paid in (this commit).** `Champion.shieldHand`, `weaponHand` and `quiver` are gone;
+**Paid in `114dbbe`.** `Champion.shieldHand`, `weaponHand` and `quiver` are gone;
 every reader and writer uses `possessions` only, and a tool builds a champion with it.
 The unused `PossessionSlot` enum went too: its names for slots 6-12 were a guess, and
 CSBWin's own reload order says otherwise (the search starts at slot 12, then 7-9,
@@ -1017,7 +1017,7 @@ had said "the quiver, then the three pouch slots"). In its place, `POSSESSION_CO
 `SLOT_SHIELD_HAND` and `SLOT_WEAPON_HAND` (`src/engine/gameTypes.ts`), used by the UI's own
 code; ported code keeps CSBWin's bare `Possession(1)` numbers, to stay greppable. The one
 case where a mirror had disagreed with the array was C27, fixed first. `RuntimeSaveState`
-carries `PartyState`, so its shape changed: `RUNTIME_SAVE_VERSION` is 8. Evidence: a grep
+carries `PartyState`, so its shape changed: `RUNTIME_SAVE_VERSION` went to 8. Evidence: a grep
 finds no mirror; `npm test -- --frames` passes unchanged, the save round-trips included.
 
 <details><summary>original entry</summary>
@@ -1042,9 +1042,23 @@ Delete the three fields, read and write the array through named slot constants, 
 
 | Step | What | Status |
 | --- | --- | --- |
-| D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ⏳ |
+| D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ✅ |
 | D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ⏳ |
 | D2c | Retire `isLikelyObjectRecord` (`Game.ts`, `ui/Objects.ts`): a plain `!== OBJECT_ID_NULL` where a guard is still needed, nothing where it is not. | ⏳ |
+
+**D2a, paid in (this commit).** `Champion.possessions` is a required `ObjectID[]`, built
+by `emptyPossessions()` (`src/engine/gameTypes.ts`), and an empty slot holds `RNnul`
+everywhere — the loader stores it as read (an `RNeof` in a file slot still becomes
+`RNnul`, as it did before), the writer writes it back unchanged, and no module grows
+or re-normalises the array. Every reader that skipped `null` now skips `OBJECT_ID_NULL`;
+`tsc` finds only the writers, so each reader was converted by hand, and the element-read
+grep in the commit is the audit. `Game.setChampionHand` no longer treats `RNeof` as
+empty. The per-module `getChampionPossession` readers still return `ObjectID | null` to
+their callers: changing that to CSBWin's `RNnul` return would be invisible to `tsc`
+(`number === null` compiles), so it waits for D4's branded type, which would catch it.
+`DsaSystem.normalizePossessionValue` / `isEmptyObject` survive only for `objectInHand`,
+and go with D2b. `RUNTIME_SAVE_VERSION` is 9. Evidence: `npm test -- --frames`, the save
+round-trips included.
 
 Each is a refactor: `npm test` before and after, `-- --frames` since each touches
 `src/renderer/ui/`, and `RUNTIME_SAVE_VERSION` bumped for D2a and D2b (both change

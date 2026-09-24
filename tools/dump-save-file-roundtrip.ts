@@ -40,6 +40,7 @@ import {
 import type { DungeonData, Databases, TimerRecord } from '../src/data/dungeonTypes';
 import type { CsbwinObjectIndex } from '../src/data/CsbwinObjectIndex';
 import { check, finish } from './lib/check';
+import { OBJECT_ID_NULL } from '../src/core/types';
 
 const DEFAULT_DIR = 'static/gamefiles/saves';
 
@@ -89,7 +90,7 @@ function rewrite(bytes: Uint8Array): {
   const timerObjects = objectCarryingTimers(save.timers ?? [], save.timerQueue ?? []);
   for (const { rn } of timerObjects) held.push(resolveOf(save.objectIndex, rn));
   for (const champion of champions) {
-    for (const slot of champion.possessions ?? []) if (typeof slot === 'number') held.push(slot);
+    for (const slot of champion.possessions) if (slot !== OBJECT_ID_NULL) held.push(slot);
   }
   if (save.block2) held.push(resolveOf(save.objectIndex, save.block2.objectInHand & 0xffff));
 

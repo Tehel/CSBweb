@@ -40,6 +40,7 @@ import {
   mouthBoxGraphic,
 } from '../src/renderer/ui/Inventory';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** A champion with nothing wrong: fed, watered, unpoisoned, no attribute drained. */
 function healthyChampion(): Champion {
@@ -52,7 +53,7 @@ function healthyChampion(): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: 0,
   };
 }

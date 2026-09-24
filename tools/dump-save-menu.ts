@@ -62,6 +62,7 @@ import { SAVE_MENU_GEOMETRY, extendListPanel } from '../src/renderer/ui/SaveMenu
 import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -433,7 +434,7 @@ function healthyChampion(name: string): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: 0,
   };
 }

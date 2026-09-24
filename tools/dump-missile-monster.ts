@@ -45,6 +45,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 const WEAPON_FALCHION = 9;
 const EAST = 1;
@@ -59,7 +60,7 @@ function champion(i: number): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
   };
 }

@@ -29,6 +29,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
+import { OBJECT_ID_NULL } from '../src/core/types';
 
 const OBJNI_CHEST = 0x90;
 
@@ -66,7 +67,7 @@ async function main(): Promise<void> {
 
   // A floor object the party does not already carry, and a chest to carry it in.
   const carried = new Set<number>();
-  for (const champ of party.state.champions) for (const p of champ.possessions ?? []) if (typeof p === 'number') carried.add(basic(p));
+  for (const champ of party.state.champions) for (const p of champ.possessions) if (p !== OBJECT_ID_NULL) carried.add(basic(p));
   let item: ObjectID | null = null;
   let itemAt: Position | null = null;
   for (let z = 0; z < dungeon.getMapCount() && item === null; z++) {
@@ -106,7 +107,7 @@ async function main(): Promise<void> {
   check(has(value), 'an object in a carried chest counts');
 
   // The chest on the cursor instead.
-  pack[13] = null;
+  pack[13] = OBJECT_ID_NULL;
   party.state.objectInHand = chest;
   check(has(value), 'an object in a chest on the cursor counts');
 

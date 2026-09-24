@@ -21,6 +21,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 function champion(i: number, name: string): Champion {
   return {
@@ -32,7 +33,7 @@ function champion(i: number, name: string): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
   };
 }

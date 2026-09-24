@@ -44,6 +44,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { sw } from '../src/core/intCast';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** A plain champion — the party only has to exist for `d.NumCharacter != 0`. */
 function champion(i: number): Champion {
@@ -56,7 +57,7 @@ function champion(i: number): Champion {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
   };
 }

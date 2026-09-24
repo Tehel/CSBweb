@@ -28,6 +28,7 @@ import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './Game';
 import type { Champion } from './gameTypes';
+import { OBJECT_ID_NULL } from '../core/types';
 
 /** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
 export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
@@ -187,8 +188,8 @@ function buildFileBlocks(
     const carried = objectCarryingTimers(timers, runtime.dungeon.timerQueue ?? []);
     for (const { rn } of carried) held.push(rn);
     for (const champion of champions) {
-        for (const slot of champion.possessions ?? []) {
-            if (typeof slot === 'number') held.push(slot);
+        for (const slot of champion.possessions) {
+            if (slot !== OBJECT_ID_NULL) held.push(slot);
         }
     }
     held.push(objectInHand);

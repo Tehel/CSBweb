@@ -17,7 +17,7 @@
  * exists as a struct in CSBWin, so it is kept as one here.
  */
 import { applyLimits, sw } from '../core/intCast';
-import { OBJECT_ID_EOF, Position, withObjectPosition, type ObjectID } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
@@ -728,9 +728,9 @@ export class MonsterAttack {
 
   /** The clothing type in a possession slot, or null if it holds something else. */
   private clothingTypeIn(champ: Champion, slot: number): number | null {
-    const value = champ.possessions?.[slot];
-    if (value === null || value === undefined) return null;
-    const rec = this.dungeon.getClothingRecord(value as ObjectID);
+    const value = champ.possessions[slot] ?? OBJECT_ID_NULL;
+    if (value === OBJECT_ID_NULL) return null;
+    const rec = this.dungeon.getClothingRecord(value);
     return rec ? rec.clothingType : null;
   }
 

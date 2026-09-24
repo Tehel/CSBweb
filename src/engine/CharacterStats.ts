@@ -131,12 +131,11 @@ export class CharacterStats {
    * Re-summed rather than cached; see the module comment.
    */
   characterLoad(champ: Champion): number {
-    const items = champ.possessions ?? [];
     const visited = new Set<number>();
     let total = 0;
-    for (const item of items) {
-      if (typeof item !== 'number') continue;
-      total += this.getObjectWeight(item as ObjectID, visited);
+    for (const item of champ.possessions) {
+      if (item === OBJECT_ID_NULL) continue;
+      total += this.getObjectWeight(item, visited);
     }
     return total;
   }
@@ -265,8 +264,8 @@ export class CharacterStats {
 
   /** `CHARDESC::Possession(slot)`. */
   private possession(champ: Champion, slot: number): ObjectID | null {
-    const value = champ.possessions?.[slot];
-    return typeof value === 'number' ? value as ObjectID : null;
+    const value = champ.possessions[slot] ?? OBJECT_ID_NULL;
+    return value === OBJECT_ID_NULL ? null : value;
   }
 
   /** `TAG0099d2` (`doc/CSBwin-src/Code51a4.cpp:2875`). */

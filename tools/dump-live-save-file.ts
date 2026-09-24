@@ -407,10 +407,10 @@ function playFromDungeonDat(): Game {
   // An object onto the cursor and thrown. `throwObjectFromCursor` is the UI's own path;
   // what it leaves behind is a MISSILE record and a timer carrying the object's RN.
   const thrower = party.champions[0];
-  const toThrow = (thrower.possessions ?? []).find((p) => p !== null && p !== undefined) ?? null;
+  const toThrow = thrower.possessions.find((p) => p !== OBJECT_ID_NULL) ?? null;
   if (toThrow !== null) {
-    const slot = (thrower.possessions ?? []).indexOf(toThrow);
-    thrower.possessions![slot] = null;
+    const slot = thrower.possessions.indexOf(toThrow);
+    thrower.possessions[slot] = OBJECT_ID_NULL;
     party.objectInHand = toThrow as ObjectID;
     party.cursorOwner = 0;
     const thrown = game.throwObjectFromCursor(0);
@@ -429,10 +429,10 @@ function playFromDungeonDat(): Game {
 
   // And a second object left on the cursor, which is `GAMEBLOCK2.ObjectInHand`.
   const other = party.champions[1];
-  const held = (other?.possessions ?? []).find((p) => p !== null && p !== undefined) ?? null;
+  const held = other?.possessions.find((p) => p !== OBJECT_ID_NULL) ?? null;
   if (held !== null && other) {
     const slot = other.possessions!.indexOf(held);
-    other.possessions![slot] = null;
+    other.possessions[slot] = OBJECT_ID_NULL;
     party.objectInHand = held as ObjectID;
     party.cursorOwner = 1;
   }

@@ -704,7 +704,7 @@ export class ActuatorSystem {
    */
   private doesPartyHave(actuatorValue: number): boolean {
     const matches = (obj: number | null | undefined): boolean => {
-      if (obj === null || obj === undefined) return false;
+      if (obj === null || obj === undefined || obj === OBJECT_ID_NULL) return false;
       const objNI = this.getBasicObjectType(obj);
       if (objNI === actuatorValue) return true;
       if (objNI !== OBJNI_CHEST) return false;
@@ -717,9 +717,8 @@ export class ActuatorSystem {
     const party = this.getPartyState();
     for (const champ of party.champions) {
       if ((champ.attributes.health | 0) === 0) continue;
-      const possessions = champ.possessions ?? [];
       for (let slot = 0; slot < 30; slot++) {
-        if (matches(possessions[slot])) return true;
+        if (matches(champ.possessions[slot])) return true;
       }
     }
     return matches(party.objectInHand);

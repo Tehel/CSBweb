@@ -40,6 +40,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { determineMastery } from '../src/engine/skills';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** `weapon_Sword` (`doc/CSBwin-src/Objects.h:51`). */
 const WEAPON_SWORD = 10;
@@ -60,7 +61,7 @@ function champion(i: number, name: string, fighterExp: number): Champion {
     // Skill 4 is the fighter base; 5-11 are its subskills. `determineMastery` reads the
     // base for anything above index 3, so this is what a champion's competence is.
     skills: Array.from({ length: 20 }, () => ({ tempAdjust: 0, experience: fighterExp })),
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: i,
   };
 }

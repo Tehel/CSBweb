@@ -49,6 +49,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** `RNFireball` and friends (`doc/CSBwin-src/CSBTypes.h:239-247`). */
 const RN_FIREBALL = 0xff80;
@@ -62,7 +63,7 @@ const RN_POISON_BOLT = 0xff86;
  * visible. Stamina is small for the same reason on the exhaustion path.
  */
 function champion(i: number, name: string): Champion {
-  const possessions: Array<ObjectID | null> = new Array(30).fill(null);
+  const possessions = emptyPossessions();
   return {
     name,
     attributes: {

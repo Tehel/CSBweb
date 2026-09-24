@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import type { ui8, ui16, ui32, i16, i32, Direction, Position, ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type ui8, type ui16, type ui32, type i16, type i32, type Direction, type Position, type ObjectID } from '../core/types';
 import type { Attribute } from './attributes';
 
 /**
@@ -18,6 +18,14 @@ export const POSSESSION_COUNT = 30;
 export const SLOT_SHIELD_HAND = 0;
 /** "Weapon hand = 1" (`doc/CSBwin-src/Attack.cpp:1669`). */
 export const SLOT_WEAPON_HAND = 1;
+
+/**
+ * Thirty empty slots. An empty slot holds `RNnul`, as in CSBWin
+ * (`doc/CSBwin-src/Character.cpp:2912`) and in the save file — never `null`.
+ */
+export function emptyPossessions(): ObjectID[] {
+    return new Array<ObjectID>(POSSESSION_COUNT).fill(OBJECT_ID_NULL);
+}
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -164,8 +172,11 @@ export interface Champion {
     busyTimerIndex?: i32;      // Timer index for action disable
 
     shieldStrength?: ui16;      // Optional shield strength for UI dots
-    /** `CHARDESC.possessions[30]`, the hands included — see `SLOT_WEAPON_HAND`. */
-    possessions?: Array<number | null>;
+    /**
+     * `CHARDESC.possessions[30]`, the hands included — see `SLOT_WEAPON_HAND`. Always
+     * thirty entries; an empty slot is `RNnul` (`emptyPossessions`).
+     */
+    possessions: ObjectID[];
 
     /**
      * `CHARDESC.charPosition` — which **corner of the cell** the champion stands in,

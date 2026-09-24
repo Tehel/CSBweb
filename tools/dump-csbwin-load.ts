@@ -253,8 +253,8 @@ function main(): void {
     const live = game.state.dungeon;
     let carried = 0;
     for (const champion of party.champions) {
-      for (const rn of champion.possessions ?? []) {
-        if (rn === null || rn === undefined) continue;
+      for (const rn of champion.possessions) {
+        if (rn === OBJECT_ID_NULL) continue;
         carried++;
         const { category, index } = decodeObjectID(rn);
         const key = DB_OF_CATEGORY[category];

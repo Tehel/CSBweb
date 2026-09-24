@@ -16,7 +16,7 @@ import type {
     TimerRecord,
 } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
-import { GAME_TIMING, MovementAction } from './gameTypes';
+import { GAME_TIMING, MovementAction, emptyPossessions } from './gameTypes';
 import { Party, ensureHandOwner, findChampionByFingerprint, selectMagicCaster, setHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
@@ -138,10 +138,16 @@ interface DropCursorOptions {
  * `collapseTimerBytes`). A v6 payload kept the RN only on the live `TimerEntry.object`,
  * which has no byte in the file, so a restored missile came back without its object.
  *
+ * Version 8 drops `Champion`'s `shieldHand` / `weaponHand` / `quiver`, which mirrored
+ * possession slots 0, 1 and 8 (`DEBT.md` D1).
+ *
+ * Version 9 stores an empty possession slot as `RNnul` (0xffff), as CSBWin and the
+ * save file do, where it had been `null` (`DEBT.md` D2a).
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 8;
+export const RUNTIME_SAVE_VERSION = 9;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -1143,7 +1149,7 @@ export class Game {
         if (!hero) return false;
 
         const index = party.champions.length; // LOCAL_2
-        const possessions: Array<ObjectID | null> = new Array(30).fill(null);
+        const possessions = emptyPossessions();
         const champion = createChampionFromPreset(
             hero,
             findFreeCharPosition(party.champions, party.facing),
@@ -1213,9 +1219,9 @@ export class Game {
         // `RemoveObjectFromRoom` for each possession (`:6668-6677`). `AddCharacter` left
         // them linked in the mirror's cell *as well as* on the champion; this is where
         // the room finally lets go of them.
-        for (const value of champion.possessions ?? []) {
-            if (value === null || value === undefined) continue;
-            this.dungeonState.removeObjectFromCell(mirror, value as ObjectID);
+        for (const value of champion.possessions) {
+            if (value === OBJECT_ID_NULL) continue;
+            this.dungeonState.removeObjectFromCell(mirror, value);
         }
 
         this.disableMirrorActuators(mirror);
@@ -1357,7 +1363,7 @@ export class Game {
      * cell until Resurrect or Reincarnate is pressed, which is what makes Cancel a
      * clean undo.
      */
-    private collectMirrorPossessions(possessions: Array<ObjectID | null>): void {
+    private collectMirrorPossessions(possessions: ObjectID[]): void {
         if (!this.addCharacterTables) return;
         const party = this.party.state;
         const mirror = this.getMirrorCell();
@@ -1550,13 +1556,11 @@ export class Game {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
         const slots = champ.possessions;
-        if (!slots) return;
         const here = this.party.state.position;
         for (let i = 0; i < slots.length; i++) {
-            const value = slots[i];
-            if (value === null || value === undefined) continue;
-            slots[i] = null;
-            const rn = value as ObjectID;
+            const rn = slots[i]!;
+            if (rn === OBJECT_ID_NULL) continue;
+            slots[i] = OBJECT_ID_NULL;
             if (!isLikelyObjectRecord(this.dungeonState, rn)) continue;
             this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
         }
@@ -1822,11 +1826,8 @@ export class Game {
     }
 
     private getChampionPossession(champion: Champion, slot: number): ObjectID | null {
-        if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
-            const value = champion.possessions[slot];
-            if (typeof value === 'number') return value as ObjectID;
-        }
-        return null;
+        const value = champion.possessions[slot] ?? OBJECT_ID_NULL;
+        return value === OBJECT_ID_NULL ? null : value;
     }
 
     private castMagic(casterIdx: number): number {
@@ -2217,12 +2218,10 @@ export class Game {
     }
 
     private setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
-        const slots = champion.possessions ?? new Array(30).fill(null);
+        const slots = champion.possessions;
         if (slot < 0 || slot >= slots.length) return false;
-        const current = slots[slot];
-        if (typeof current === 'number' && current !== OBJECT_ID_NULL && current !== OBJECT_ID_EOF) return false;
+        if (slots[slot] !== OBJECT_ID_NULL) return false;
         slots[slot] = obj;
-        champion.possessions = slots;
         return true;
     }
 
@@ -2362,7 +2361,7 @@ export class Game {
         if (!champion) return null;
         const obj = this.getChampionPossession(champion, slot);
         if (obj === null) return null;
-        this.setPossessionDirect(champion, slot, null);
+        this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
         return obj;
     }
 
@@ -2772,7 +2771,7 @@ export class Game {
         // CSBWin's `hand < 0` path: the object goes into the fighting hand for exactly
         // as long as it takes to measure the throw, because `DetermineThrowingDistance`
         // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:698-705`).
-        const saved = this.getChampionPossession(champion, 1);
+        const saved = champion.possessions[1]!;
         this.setPossessionDirect(champion, 1, obj);
         const throwingDistance = this.characterStats.determineThrowingDistance(
             champion, 1, party.sleeping ?? false,
@@ -2875,10 +2874,8 @@ export class Game {
      * temporary hand swap, where the object is put back immediately, and by
      * `RemoveCharacterPossession`.
      */
-    private setPossessionDirect(champion: Champion, slot: number, value: ObjectID | null): void {
-        if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
-            champion.possessions[slot] = value;
-        }
+    private setPossessionDirect(champion: Champion, slot: number, value: ObjectID): void {
+        if (slot >= 0 && slot < champion.possessions.length) champion.possessions[slot] = value;
     }
 
 

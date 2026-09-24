@@ -7,7 +7,7 @@
  */
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
-import { ObjectID } from '../../core/types';
+import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { sw } from '../../core/intCast';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { SLOT_SHIELD_HAND, SLOT_WEAPON_HAND, Champion } from '../../engine/gameTypes';
@@ -601,26 +601,14 @@ export function drawHeldObjectName(ui: UIState): void {
 }
 
 export function getChampionPossession(champion: Champion, slot: number): number | null {
-  if (champion.possessions && slot >= 0 && slot < champion.possessions.length) {
-    const value = champion.possessions[slot];
-    if (typeof value === 'number') return value;
-  }
-  return null;
+  const value = champion.possessions[slot] ?? OBJECT_ID_NULL;
+  return value === OBJECT_ID_NULL ? null : value;
 }
 
 export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: number | null): void {
-  const previous = normalizeObjectValue(getChampionPossession(champion, slot));
+  const previous = getChampionPossession(champion, slot);
   const next = normalizeObjectValue(value);
-  if (!champion.possessions || champion.possessions.length < 30) {
-    const slots = new Array(30).fill(null) as Array<number | null>;
-    if (champion.possessions) {
-      for (let i = 0; i < champion.possessions.length && i < slots.length; i++) {
-        slots[i] = normalizeObjectValue(champion.possessions[i]);
-      }
-    }
-    champion.possessions = slots;
-  }
-  champion.possessions[slot] = next;
+  champion.possessions[slot] = next ?? OBJECT_ID_NULL;
   updateLightForPossessionChange(ui, slot, previous, next);
 }
 
@@ -636,12 +624,8 @@ export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boo
 }
 
 export function getInventoryItemIndex(ui: UIState, champion: Champion, slot: number): number {
-  const possessions = champion.possessions;
-  if (possessions && slot >= 0 && slot < possessions.length) {
-    const value = possessions[slot];
-    if (typeof value === 'number') return resolveObjectNameIndex(ui, value | 0);
-  }
-  return -1;
+  const value = getChampionPossession(champion, slot);
+  return value === null ? -1 : resolveObjectNameIndex(ui, value | 0);
 }
 
 export function updateLightForPossessionChange(ui: UIState, slot: number, previous: number | null, next: number | null): void {

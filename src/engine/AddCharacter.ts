@@ -8,10 +8,10 @@
  */
 
 import { DescIndexOfRecord } from './objectIndex';
-import { DBType, type Direction, type ObjectID } from '../core/types';
+import { DBType, OBJECT_ID_NULL, type Direction, type ObjectID } from '../core/types';
 import type { DatabaseRecord, HeroInventoryItem, PresetHero } from '../data/dungeonTypes';
 import { CHARFLAG_MALE } from '../data/CsbwinCharacters';
-import type { Champion } from './gameTypes';
+import { emptyPossessions, type Champion } from './gameTypes';
 import { makeAddCharacterAttributes } from './attributes';
 import { createSkillsFromSubskillLevels } from './skills';
 
@@ -107,7 +107,7 @@ export function characterAtPosition(champions: Champion[], position: number): nu
 export function assignAddCharacterPossessions(
   items: Iterable<AddCharacterItem>,
   tables: AddCharacterTables,
-  possessions: Array<ObjectID | null>,
+  possessions: ObjectID[],
 ): void {
   let nextBackpackSlot = 13;
 
@@ -133,7 +133,7 @@ export function assignAddCharacterPossessions(
           }
         }
         if (matched) break;
-        if (neckLegal && possessions[10] === null) {
+        if (neckLegal && possessions[10] === OBJECT_ID_NULL) {
           slot = 10;
           break;
         }
@@ -141,7 +141,7 @@ export function assignAddCharacterPossessions(
         break;
       }
       case DBType.WEAPON:
-        if (possessions[1] !== null) {
+        if (possessions[1] !== OBJECT_ID_NULL) {
           toCase9 = true;
           break;
         }
@@ -149,11 +149,11 @@ export function assignAddCharacterPossessions(
         break;
       case DBType.SCROLL:
       case DBType.POTION:
-        if (possessions[11] === null) {
+        if (possessions[11] === OBJECT_ID_NULL) {
           slot = 11;
           break;
         }
-        if (possessions[6] === null) slot = 6;
+        if (possessions[6] === OBJECT_ID_NULL) slot = 6;
         toCase9 = true;
         break;
       default:
@@ -166,14 +166,14 @@ export function assignAddCharacterPossessions(
     // Reached again from `switchbreak:` when the chosen slot turns out to be full.
     for (;;) {
       if (toCase9) {
-        if (neckLegal && possessions[10] === null) {
+        if (neckLegal && possessions[10] === OBJECT_ID_NULL) {
           slot = 10;
         } else {
           slot = nextBackpackSlot++;
         }
       }
       // `switchbreak:`
-      if (slot >= 0 && slot < possessions.length && possessions[slot] !== null) {
+      if (slot >= 0 && slot < possessions.length && possessions[slot] !== OBJECT_ID_NULL) {
         toCase9 = true;
         continue;
       }
@@ -194,8 +194,8 @@ export function assignAddCharacterPossessions(
 export function assignPresetHeroPossessions(
   items: HeroInventoryItem[],
   tables: AddCharacterTables,
-): Array<ObjectID | null> {
-  const possessions: Array<ObjectID | null> = new Array(30).fill(null);
+): ObjectID[] {
+  const possessions = emptyPossessions();
   assignAddCharacterPossessions(items, tables, possessions);
   return possessions;
 }
@@ -203,7 +203,7 @@ export function assignPresetHeroPossessions(
 export function createChampionFromPreset(
   hero: PresetHero,
   partyPosition: number,
-  possessions?: Array<ObjectID | null>,
+  possessions?: ObjectID[],
 ): Champion {
   const maxHealth = hero.health;
   const maxStamina = hero.stamina;
@@ -212,7 +212,7 @@ export function createChampionFromPreset(
   const ninja = maxSkill(hero.ninja);
   const priest = maxSkill(hero.priest);
   const wizard = maxSkill(hero.wizard);
-  const slots = possessions ?? new Array(30).fill(null);
+  const slots = possessions ?? emptyPossessions();
   const skills = createSkillsFromSubskillLevels(getPresetSubskillLevels(hero));
 
   return {

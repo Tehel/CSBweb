@@ -39,6 +39,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 const RN_FIREBALL = 0xff80;
 const RN_POISON_CLOUD = 0xff87;
@@ -202,7 +203,7 @@ async function main(): Promise<void> {
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: 0,
   }];
   const here = new Position(party.position.x, party.position.y, party.position.z);

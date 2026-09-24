@@ -23,7 +23,7 @@
  */
 import type { Champion, PartyState, Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
-import type { i16, ui8, ui16, ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
@@ -94,13 +94,14 @@ function readPossessions(
   block: Uint8Array,
   base: number,
   objectIndex?: CsbwinObjectIndex,
-): Array<ObjectID | null> {
-  const slots: Array<ObjectID | null> = [];
+): ObjectID[] {
+  const slots: ObjectID[] = [];
   for (let i = 0; i < 30; i++) {
     const rn = readU16BE(block, base + POSSESSIONS_OFFSET + i * 2);
-    // `RNeof` (0xfffe) and `RNnul` (0xffff) both mean "empty slot" here.
+    // `RNeof` (0xfffe) and `RNnul` (0xffff) both mean "empty slot" here; the port keeps
+    // only `RNnul`, which is what the writer puts back.
     if (rn === 0xffff || rn === 0xfffe) {
-      slots.push(null);
+      slots.push(OBJECT_ID_NULL);
       continue;
     }
     slots.push((objectIndex ? objectIndex.resolve(rn) : rn) as ObjectID);
@@ -472,9 +473,9 @@ export function writeCsbwinCharacter(
   }
 
   for (let i = 0; i < 30; i++) {
-    const slot = champion.possessions?.[i];
-    // `RNnul`, which is what every empty slot holds in all twelve committed saves.
-    const rn = typeof slot === 'number' ? slot : 0xffff;
+    // An empty slot is `RNnul`, which is what every empty slot holds in all twelve
+    // committed saves.
+    const rn = champion.possessions[i] ?? OBJECT_ID_NULL;
     setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
   }
 

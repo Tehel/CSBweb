@@ -40,6 +40,7 @@ import { Game } from '../src/engine/Game';
 import { AttackType } from '../src/engine/monsterTypes';
 import { getChampionPossession } from '../src/renderer/ui/Character';
 import { check, finish } from './lib/check';
+import { emptyPossessions } from '../src/engine/gameTypes';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */
 const SAMPLES = 400;
@@ -56,7 +57,7 @@ function champion(over: Partial<Champion['attributes']> & { strength?: number } 
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
-    possessions: new Array(30).fill(null),
+    possessions: emptyPossessions(),
     partyPosition: 0,
   };
 }
@@ -399,8 +400,8 @@ async function main(): Promise<void> {
     return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
   };
 
-  const equip = (ch: Champion, slot: number, obj: ObjectID | null): void => {
-    ch.possessions![slot] = obj;
+  const equip = (ch: Champion, slot: number, obj: ObjectID): void => {
+    ch.possessions[slot] = obj;
   };
 
   const WEAPON_CLUB = 23;
