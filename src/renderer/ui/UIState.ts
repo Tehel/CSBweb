@@ -18,9 +18,14 @@ import type { ObjectTables } from '../csbwin/ObjectTables';
 import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
-import type { ObjectID, Position } from '../../core/types';
+import { OBJECT_ID_NULL, type ObjectID, type Position } from '../../core/types';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
+
+/** Eight empty chest slots, each `RNnul`. */
+export function emptyChestContents(): ObjectID[] {
+  return new Array<ObjectID>(8).fill(OBJECT_ID_NULL);
+}
 
 export enum UIMode {
   Adventure = 'adventure',
@@ -105,7 +110,8 @@ export interface UIState {
    */
   displayResurrectChestOrScroll: number;
   openChestId: ObjectID | null;
-  openChestContents: Array<ObjectID | null>;
+  /** `d.rnChestContents[8]` — the open chest's objects, `RNnul` in an empty slot. */
+  openChestContents: ObjectID[];
   openChestIconIndex: number | null;
   mouthChewStartMs: number | null;
   mouthChewEndMs: number;
@@ -216,7 +222,7 @@ export function createUIState(
     attackFlashUntilMs: 0,
     displayResurrectChestOrScroll: 0,
     openChestId: null,
-    openChestContents: Array(8).fill(null),
+    openChestContents: emptyChestContents(),
     openChestIconIndex: null,
     mouthChewStartMs: null,
     mouthChewEndMs: 0,

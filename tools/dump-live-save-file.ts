@@ -194,9 +194,9 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
   check(b.facing === a.facing, `${label}: facing ${b.facing}`);
   check(b.cursorOwner === a.cursorOwner, `${label}: d.HandChar`);
   check(b.magicCasterIndex === a.magicCasterIndex, `${label}: d.MagicCaster`);
-  check((b.objectInHand ?? null) === (a.objectInHand ?? null),
+  check(b.objectInHand === a.objectInHand,
     `${label}: the object on the cursor is the same record ` +
-    `(${b.objectInHand ?? 'none'} vs ${a.objectInHand ?? 'none'})`);
+    `(${b.objectInHand} vs ${a.objectInHand})`);
   check(before.getTickCount() === after.getTickCount(), `${label}: the clock`);
   // `gb2.partyMoveDisableTimer`, `Word11712`, `Word11714` (SaveGame.cpp:1029-1031, :1645-1647).
   check(b.partyMoveDisableTimer === a.partyMoveDisableTimer && b.word11712 === a.word11712 &&
@@ -364,7 +364,7 @@ function writeAndReload(label: string, game: Game): Game | null {
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
   // would load in CSBWin as an object in hand (`:1649`, `:2753`).
   const inHand = game.party.state.objectInHand;
-  if (inHand === null || inHand === undefined || inHand === 0xffff) {
+  if (inHand === OBJECT_ID_NULL) {
     const word = parsed.save.block2?.objectInHand;
     check(word === 0xffff, `${label}: the empty cursor is written as RNnul (0x${(word ?? 0).toString(16)})`);
   }
@@ -444,7 +444,7 @@ function playFromDungeonDat(): Game {
     party.objectInHand = held as ObjectID;
     party.cursorOwner = 1;
   }
-  check(party.objectInHand !== null && party.objectInHand !== undefined,
+  check(party.objectInHand !== OBJECT_ID_NULL,
     'an object is on the cursor at the moment of the save');
   return game;
 }

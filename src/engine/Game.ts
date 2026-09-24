@@ -144,10 +144,12 @@ interface DropCursorOptions {
  * Version 9 stores an empty possession slot as `RNnul` (0xffff), as CSBWin and the
  * save file do, where it had been `null` (`DEBT.md` D2a).
  *
+ * Version 10 does the same for `PartyState.objectInHand`, now required (`DEBT.md` D2b).
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 9;
+export const RUNTIME_SAVE_VERSION = 10;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -1139,7 +1141,7 @@ export class Game {
     addCharacter(charID: number, mirrorCell: Position, wall: number): boolean {
         const party = this.party.state;
         // `if (d.EmptyHanded == 0) return; if (d.NumCharacter == 4) return;` (`:477-479`)
-        if (party.objectInHand !== null && party.objectInHand !== undefined) return false;
+        if (party.objectInHand !== OBJECT_ID_NULL) return false;
         if (party.champions.length >= 4) return false;
         // One mirror at a time: a second click while the menu is up would push a
         // champion that `_ResurrectReincarnateCancel` can no longer reach.
@@ -2631,8 +2633,7 @@ export class Game {
      */
     handleDoorSwitchClick(): boolean {
         const party = this.party.state;
-        const hand = party.objectInHand;
-        if (hand !== null && hand !== undefined && hand !== OBJECT_ID_NULL && hand !== OBJECT_ID_EOF) return false;
+        if (party.objectInHand !== OBJECT_ID_NULL) return false;
 
         const facing = party.facing & 0x3;
         const pos = party.position;
@@ -2674,8 +2675,8 @@ export class Game {
         const owner = party.cursorOwner ?? -1;
         if (owner < 0) return false;
 
-        const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
-        if (!obj) return false;
+        const obj = party.objectInHand;
+        if (obj === OBJECT_ID_NULL) return false;
         if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         let dropPos = relativePos | 0;
@@ -2702,7 +2703,7 @@ export class Game {
         // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
         // through an active teleporter or open pit on the cell it lands on.
         const dropped = encodeObjectID(newPos, decoded.category, decoded.index) as ObjectID;
-        party.objectInHand = null;
+        party.objectInHand = OBJECT_ID_NULL;
         this.timerSystem.moveObject(dropped, -1, 0, target.x, target.y, target.z);
         this.loadPartyLevelIfChanged();
         this.timerSystem.processTimers(this.state.tickCount);
@@ -2761,8 +2762,8 @@ export class Game {
         const owner = party.cursorOwner ?? -1;
         if (owner < 0) return false;
 
-        const obj = this.normalizeObjectInHand(party.objectInHand ?? null);
-        if (!obj) return false;
+        const obj = party.objectInHand;
+        if (obj === OBJECT_ID_NULL) return false;
         if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         const champion = party.champions[owner] ?? null;
@@ -2778,7 +2779,7 @@ export class Game {
         );
         this.setPossessionDirect(champion, 1, saved);
 
-        party.objectInHand = null;
+        party.objectInHand = OBJECT_ID_NULL;
         const launched = this.throwByCharacter(owner, champion, obj, leftOrRight, throwingDistance);
         if (!launched) party.objectInHand = obj;
         return launched;
@@ -2892,12 +2893,6 @@ export class Game {
         const result = this.castMagic(chIdx);
         if (result !== 3) champion.incantation = [];
         return result;
-    }
-
-    private normalizeObjectInHand(value: ObjectID | null): ObjectID | null {
-        if (value === null || value === undefined) return null;
-        if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return null;
-        return value;
     }
 
     /** `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. */

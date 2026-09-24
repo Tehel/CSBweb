@@ -8,11 +8,11 @@
  * rather than projecting the click back into the dungeon.
  */
 import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
-import { OBJECT_ID_EOF, ObjectID, RoomType } from '../../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, RoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { GraphicRoomType } from '../bytecode/Types';
-import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { resolveObjectNameIndex } from './Objects';
 import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 import { Position } from '@/core';
@@ -48,7 +48,7 @@ export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
 
 export function tryPickViewportObject(ui: UIState, x: number, y: number): boolean {
   if (!ui.partyState || !ui.context?.viewportObjectButtons || !ui.context.viewportObjectRNs) return false;
-  if (normalizeObjectValue(ui.partyState.objectInHand) !== null) return false;
+  if (ui.partyState.objectInHand !== OBJECT_ID_NULL) return false;
   if ((ui.partyState.cursorOwner ?? -1) < 0) return false;
 
   const hit = findViewportObjectHit(ui, x, y);
@@ -66,13 +66,13 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
 
 export function hasCursorObject(ui: UIState): boolean {
   if (!ui.partyState) return false;
-  return normalizeObjectValue(ui.partyState.objectInHand) !== null;
+  return ui.partyState.objectInHand !== OBJECT_ID_NULL;
 }
 
 export function resolveViewportCursorAction(ui: UIState, x: number, y: number): ViewportCursorAction | null {
   if (!ui.partyState || !ui.uiTables) return null;
-  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
-  if (objectId === null) return null;
+  const objectId = ui.partyState.objectInHand;
+  if (objectId === OBJECT_ID_NULL) return null;
   if ((ui.partyState.cursorOwner ?? -1) < 0) return null;
 
   const stoneAhead = isFrontCellStoneOrVisibleFalseWall(ui);
@@ -111,8 +111,8 @@ export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean 
   if (ui.context.facingAlcove) return false;
   if (!ui.context.facingWaterFountain) return false;
 
-  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
-  if (objectId === null) return false;
+  const objectId = ui.partyState.objectInHand;
+  if (objectId === OBJECT_ID_NULL) return false;
   if (!isLikelyObjectRecord(ui.dungeonState, objectId)) return false;
 
   const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
@@ -209,7 +209,9 @@ export function findViewportObjectHit(ui: UIState, x: number, y: number): { rela
     if (!rect || rect.x1 === 255) continue;
     if (vx < rect.x1 || vx > rect.x2 || vy < rect.y1 || vy > rect.y2) continue;
     const rn = rns[i];
-    if (normalizeObjectValue(rn) === null) continue;
+    // `ViewportRenderer` fills the five with `RNeof` before the interpreter writes the
+    // objects it drew.
+    if (rn === undefined || rn === OBJECT_ID_EOF) continue;
     return { relativeLocation: i, rn };
   }
   return null;

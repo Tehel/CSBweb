@@ -95,7 +95,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C28 | `DropAllPossessions` is not CSBWin's | S | ⏳ |
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
-| D2 | One "no object" value (split: D2a-c) | L | ⏳ |
+| D2 | One "no object" value (split: D2a-d) | L | ⏳ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
@@ -993,18 +993,6 @@ though it now lay on the floor. CSBWin's `DropAllPossessions` empties all thirty
 it. Evidence: `tools/dump-champion-death.ts` arms slot 8 too and reads every slot back
 through the UI's reader (3 of 41 checks fail before).
 
-### C29 ✅ The save writer writes an empty cursor as `RNempty`
-
-**Paid in (this commit).** Found splitting D2b. `SaveGamePayload` wrote
-`(party.objectInHand ?? 0)`, so an empty cursor went into the index pre-pass and out
-through `encode` as 0, `RNempty`. CSBWin writes `d.objectInHand.ConvertToInteger()`
-(`doc/CSBwin-src/SaveGame.cpp:1033`), `RNnul` for an empty hand, and its loader converts
-anything that is not `RNnul` (`:2753-2760`), so a file this port wrote with an empty
-cursor would have loaded in CSBWin with `RNempty` in hand. Every committed save with an
-empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is why no
-round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
-back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
-
 ### C28 ⏳ `DropAllPossessions` is not CSBWin's
 
 Found paying C27. CSBWin's `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497-2518`)
@@ -1056,10 +1044,11 @@ Delete the three fields, read and write the array through named slot constants, 
 | Step | What | Status |
 | --- | --- | --- |
 | D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ✅ |
-| D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ⏳ |
+| D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ✅ |
 | D2c | Retire `isLikelyObjectRecord` (`Game.ts`, `ui/Objects.ts`): a plain `!== OBJECT_ID_NULL` where a guard is still needed, nothing where it is not. | ⏳ |
+| D2d | The possession readers (`getChampionPossession` in `Game`, `CharacterStats.possession`, `ui/Character`, `skills.getPossessionNameIndex`, `MonsterAttack.clothingTypeIn`, and `AttackSystem`'s hook) return `RNnul` like CSBWin's `Possession()` instead of `null`, and `ui/Character.setChampionPossession` takes it. Every caller is converted by hand — `tsc` cannot see a stale `=== null` — so list them first with a grep and convert them all in one commit. Found paying D2a. | ⏳ |
 
-**D2a, paid in (this commit).** `Champion.possessions` is a required `ObjectID[]`, built
+**D2a, paid in `865d704`.** `Champion.possessions` is a required `ObjectID[]`, built
 by `emptyPossessions()` (`src/engine/gameTypes.ts`), and an empty slot holds `RNnul`
 everywhere — the loader stores it as read (an `RNeof` in a file slot still becomes
 `RNnul`, as it did before), the writer writes it back unchanged, and no module grows
@@ -1067,11 +1056,26 @@ or re-normalises the array. Every reader that skipped `null` now skips `OBJECT_I
 `tsc` finds only the writers, so each reader was converted by hand, and the element-read
 grep in the commit is the audit. `Game.setChampionHand` no longer treats `RNeof` as
 empty. The per-module `getChampionPossession` readers still return `ObjectID | null` to
-their callers: changing that to CSBWin's `RNnul` return would be invisible to `tsc`
-(`number === null` compiles), so it waits for D4's branded type, which would catch it.
+their callers: changing that to CSBWin's `RNnul` return is invisible to `tsc`
+(`number === null` compiles, branded or not), so it is a step of its own, D2d.
 `DsaSystem.normalizePossessionValue` / `isEmptyObject` survive only for `objectInHand`,
 and go with D2b. `RUNTIME_SAVE_VERSION` is 9. Evidence: `npm test -- --frames`, the save
 round-trips included.
+
+**D2b, paid in (this commit).** `PartyState.objectInHand` is a required `ObjectID`,
+`RNnul` when the cursor is empty, and so is every slot of the chest view
+(`UIState.openChestContents`, CSBWin's `d.rnChestContents[8]`, built by
+`emptyChestContents()`). The four normalizers are gone: `Game.normalizeObjectInHand`,
+`ActuatorSystem.normalizeObjectInHand`, `DsaSystem.normalizePossessionValue` with its
+`isEmptyObject`, and `ui/Objects.normalizeObjectValue`. The CSBWin loader maps a file's
+`RNempty`, `RNnul` or `RNeof` cursor to `RNnul`. `Game.handleDoorSwitchClick` no longer
+treats `RNeof` as an empty hand, and `ActuatorSystem`'s wall-object switch hands
+`GetBasicObjectType` the `RNnul` itself, which returns `OBJNI_NOT_AN_OBJECT` as the old
+`?? OBJNI_NOT_AN_OBJECT` fallback did (`src/engine/objectIndex.ts`). The viewport's
+five picked-object RNs are filled with `RNeof` by `ViewportRenderer`, and
+`ViewportPicking` now tests for that directly. `RUNTIME_SAVE_VERSION` is 10. Found on the
+way: C29, fixed first. Evidence: `npm test -- --frames`; a grep finds none of the four
+normalizers.
 
 Each is a refactor: `npm test` before and after, `-- --frames` since each touches
 `src/renderer/ui/`, and `RUNTIME_SAVE_VERSION` bumped for D2a and D2b (both change
@@ -1146,6 +1150,18 @@ step, and `tiles` has readers in `DungeonSnapshot`, `TimerSystem`, `DsaSystem` a
 the other stale — C13's type-7 scenario had to write both. Keep `cellFlags`, derive the
 rest where it is read.
 
+
+### C29 ✅ The save writer writes an empty cursor as `RNempty`
+
+**Paid in `3b76c49`.** Found splitting D2b. `SaveGamePayload` wrote
+`(party.objectInHand ?? 0)`, so an empty cursor went into the index pre-pass and out
+through `encode` as 0, `RNempty`. CSBWin writes `d.objectInHand.ConvertToInteger()`
+(`doc/CSBwin-src/SaveGame.cpp:1033`), `RNnul` for an empty hand, and its loader converts
+anything that is not `RNnul` (`:2753-2760`), so a file this port wrote with an empty
+cursor would have loaded in CSBWin with `RNempty` in hand. Every committed save with an
+empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is why no
+round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
+back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
 ---
 
 ## E — Architecture

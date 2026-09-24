@@ -68,12 +68,6 @@ export function getDescIndexForObjectType(ui: UIState, objectType: number): numb
   return null;
 }
 
-export function normalizeObjectValue(value: number | null | undefined): number | null {
-  if (value === undefined || value === null) return null;
-  if (value === OBJECT_ID_NULL || value === OBJECT_ID_EOF) return null;
-  return value;
-}
-
 export function isChestRecord(ui: UIState, value: number | null): value is ObjectID {
   if (value === null || value === undefined) return false;
   if (!isLikelyObjectRecord(ui.dungeonState, value)) return false;

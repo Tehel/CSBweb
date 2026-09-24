@@ -16,7 +16,7 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getBonesChampion, getDescIndexForObjectType, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
 import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
@@ -587,9 +587,9 @@ export function drawHeldObjectName(ui: UIState): void {
   const objectNames = ui.objectTables?.objectNames;
   if (!objectNames || objectNames.length === 0) return;
 
-  const objectId = normalizeObjectValue(ui.partyState?.objectInHand);
+  const objectId = ui.partyState?.objectInHand ?? OBJECT_ID_NULL;
   let label = '';
-  if (objectId !== null) {
+  if (objectId !== OBJECT_ID_NULL) {
     const nameIndex = resolveObjectNameIndex(ui, objectId);
     label = objectNames[nameIndex] ?? '';
     const owner = getBonesChampion(ui, objectId as ObjectID, nameIndex);
@@ -607,9 +607,8 @@ export function getChampionPossession(champion: Champion, slot: number): number 
 
 export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: number | null): void {
   const previous = getChampionPossession(champion, slot);
-  const next = normalizeObjectValue(value);
-  champion.possessions[slot] = next ?? OBJECT_ID_NULL;
-  updateLightForPossessionChange(ui, slot, previous, next);
+  champion.possessions[slot] = value ?? OBJECT_ID_NULL;
+  updateLightForPossessionChange(ui, slot, previous, value);
 }
 
 export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boolean {

@@ -43,7 +43,7 @@ import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
 import { RUNTIME_SAVE_VERSION, type Game, type RuntimeSaveState } from '../engine/Game';
 import type { DungeonData, TimerRecord } from './dungeonTypes';
-import { Position } from '../core/types';
+import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { PartyState } from '../engine/gameTypes';
 
@@ -74,11 +74,12 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
     const tail = readCsbwinPartyTail(block);
 
     // `d.objectInHand.NonExtendedInteger(b.gb2.ObjectInHand)` (`:1642`) — the cursor's
-    // object is an indirect slot number like every other RN in the file. `RNempty` is 0.
+    // object is an indirect slot number like every other RN in the file. `RNempty` is 0;
+    // the port keeps `RNnul` as its one empty value.
     const rawInHand = gb2.objectInHand & 0xffff;
     const objectInHand =
         rawInHand === 0 || rawInHand === 0xffff || rawInHand === 0xfffe
-            ? null
+            ? OBJECT_ID_NULL
             : ((world.save.objectIndex ? world.save.objectIndex.resolve(rawInHand) : rawInHand) as ObjectID);
 
     const position = new Position(gb2.partyX, gb2.partyY, gb2.partyLevel);

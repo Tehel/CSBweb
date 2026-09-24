@@ -9,7 +9,7 @@
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../../core/objectNameIndex';
 import { ObjectID } from '../../core/types';
 import { getChampionPossession } from './Character';
-import { getBaseObjectNameIndex, normalizeObjectValue } from './Objects';
+import { getBaseObjectNameIndex } from './Objects';
 import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 
@@ -85,7 +85,7 @@ export function collectTorchCharges(ui: UIState): number[] {
         charges[outIndex++] = 0;
         continue;
       }
-      const objectId = normalizeObjectValue(getChampionPossession(champ, hand));
+      const objectId = getChampionPossession(champ, hand);
       if (objectId === null) {
         charges[outIndex++] = 0;
         continue;

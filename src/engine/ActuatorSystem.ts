@@ -259,8 +259,8 @@ export class ActuatorSystem {
     let result = false;
     let characterAdded = false;
     const party = this.getPartyState();
-    let objectInHand = this.normalizeObjectInHand(party.objectInHand ?? null);
-    let emptyHanded = objectInHand === null;
+    let objectInHand = party.objectInHand;
+    let emptyHanded = objectInHand === OBJECT_ID_NULL;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; ) {
       const next = this.dungeon.getDBRecordLink(rn);
       const decoded = decodeObjectID(rn);
@@ -304,7 +304,7 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+            const objType = this.getBasicObjectType(objectInHand);
             switchOpen = isActuatorNormallyClosed(rec) === (getActuatorValue(rec) === objType);
             if (!switchOpen && actuatorType === 11) {
               this.performLocalAction(2, position.x, position.y, position.z, actuatorPos);
@@ -341,7 +341,7 @@ export class ActuatorSystem {
               party.objectInHand = found;
               emptyHanded = false;
             } else {
-              const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+              const objType = this.getBasicObjectType(objectInHand);
               if (objType !== actuatorValue) {
                 skip = true;
                 break;
@@ -351,14 +351,14 @@ export class ActuatorSystem {
                 skip = true;
                 break;
               }
-              if (!this.applyCursorFilter(CursorFilterType.PlaceInTorchHolder, objectInHand ?? OBJECT_ID_NULL, position, actuatorPos)) {
+              if (!this.applyCursorFilter(CursorFilterType.PlaceInTorchHolder, objectInHand, position, actuatorPos)) {
                 skip = true;
                 break;
               }
-              const placed = withObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
+              const placed = withObjectPosition(objectInHand, actuatorPos);
               this.dungeon.addObjectToCell(position, placed);
-              party.objectInHand = null;
-              objectInHand = null;
+              party.objectInHand = OBJECT_ID_NULL;
+              objectInHand = OBJECT_ID_NULL;
               emptyHanded = true;
             }
             this.performLocalAction(2, position.x, position.y, position.z, actuatorPos);
@@ -377,7 +377,7 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            const objType = this.getBasicObjectType(objectInHand ?? OBJNI_NOT_AN_OBJECT);
+            const objType = this.getBasicObjectType(objectInHand);
             if (objType !== getActuatorValue(rec)) {
               skip = true;
               break;
@@ -387,12 +387,12 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            if (!this.applyCursorFilter(CursorFilterType.SwapRemove, objectInHand ?? OBJECT_ID_NULL, position, actuatorPos)) {
+            if (!this.applyCursorFilter(CursorFilterType.SwapRemove, objectInHand, position, actuatorPos)) {
               skip = true;
               break;
             }
             this.dungeon.removeObjectFromCell(position, firstObject);
-            const placed = withObjectPosition(objectInHand ?? OBJECT_ID_NULL, actuatorPos);
+            const placed = withObjectPosition(objectInHand, actuatorPos);
             this.dungeon.addObjectToCell(position, placed);
             this.applyCursorFilter(CursorFilterType.SwapReplace, firstObject, position, actuatorPos);
             party.objectInHand = firstObject;
@@ -433,13 +433,13 @@ export class ActuatorSystem {
               this.playSound?.(SoundIndex.SWITCH);
             }
             if (!emptyHanded && (actuatorType === 4 || actuatorType === 11 || actuatorType === 17)) {
-              const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand ?? OBJECT_ID_NULL, position, actuatorPos);
+              const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand, position, actuatorPos);
               if (allow) {
                 const deleted = objectInHand;
-                party.objectInHand = null;
-                objectInHand = null;
+                party.objectInHand = OBJECT_ID_NULL;
+                objectInHand = OBJECT_ID_NULL;
                 emptyHanded = true;
-                if (deleted !== null && deleted !== undefined) {
+                if (deleted !== OBJECT_ID_NULL) {
                   this.dungeon.deleteDBEntry(deleted);
                 }
               }
@@ -869,12 +869,6 @@ export class ActuatorSystem {
       : (dir === 1) ? position.east
       : (dir === 2) ? position.south
       : position.west;
-  }
-
-  private normalizeObjectInHand(value: ObjectID | null | undefined): ObjectID | null {
-    if (value === null || value === undefined) return null;
-    if (value === OBJECT_ID_NULL || value === OBJECT_ID_EOF) return null;
-    return value;
   }
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */

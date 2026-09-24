@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { CsbRandom } from '../src/core/random';
-import { DBType, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_NULL, encodeObjectID, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { CharacterStats } from '../src/engine/CharacterStats';
@@ -364,7 +364,7 @@ async function main(): Promise<void> {
     check(first.damage >= 40 && first.damage <= 200,
       `damage is inside ApplyLimits(40, …, 200) (got ${first.damage})`);
   }
-  check(party.objectInHand === null, 'the thrown object left the cursor');
+  check(party.objectInHand === OBJECT_ID_NULL, 'the thrown object left the cursor');
   console.log(`stamina ${staminaBefore} -> ${staminaAfter} (TAG016382 charged for a 1.0 kg rock)`);
   check(staminaAfter < staminaBefore, 'the throw cost stamina');
   check((party.champions[0]!.actionDisabledUntil ?? 0) > 0, 'the champion is busy afterwards');

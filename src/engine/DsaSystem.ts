@@ -2269,9 +2269,9 @@ export class DsaSystem {
     const party = this.getPartyState?.();
     if (!party) return null;
     if (location === -1) {
-      if (this.isEmptyObject(party.objectInHand ?? null)) return null;
-      const removed = party.objectInHand ?? null;
-      party.objectInHand = null;
+      const removed = party.objectInHand;
+      if (removed === OBJECT_ID_NULL) return null;
+      party.objectInHand = OBJECT_ID_NULL;
       return removed;
     }
     const loc = this.decodeCharacterLocation(location);
@@ -2310,7 +2310,7 @@ export class DsaSystem {
     const party = this.getPartyState?.();
     if (!party) return false;
     if (location === -1) {
-      return this.isEmptyObject(party.objectInHand ?? null);
+      return party.objectInHand === OBJECT_ID_NULL;
     }
     if (location > -1000) {
       const loc = this.decodeCharacterLocation(location);
@@ -2355,12 +2355,6 @@ export class DsaSystem {
     this.updateLightForPossessionChange(slot, previous, next);
   }
 
-  private normalizePossessionValue(value: number | null | undefined): number | null {
-    if (value === undefined || value === null) return null;
-    if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return null;
-    return value;
-  }
-
   private updateLightForPossessionChange(slot: number, previous: ObjectID, next: ObjectID): void {
     if (slot !== 10) return;
     const word1074 = this.word1074;
@@ -2390,9 +2384,6 @@ export class DsaSystem {
     return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], objectId);
   }
 
-  private isEmptyObject(value: number | null | undefined): boolean {
-    return this.normalizePossessionValue(value) === null;
-  }
 
   private addObjectToMonster(monsterId: number, objectId: number): void {
     const monster = this.dungeon.getCreatureRecord(monsterId);
@@ -2534,9 +2525,9 @@ export class DsaSystem {
   private findCursorSource(doit: boolean): { error: number; object: number } {
     const party = this.getPartyState?.();
     if (!party) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
-    const obj = this.normalizePossessionValue(party.objectInHand);
-    if (obj === null) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
-    if (doit) party.objectInHand = null;
+    const obj = party.objectInHand;
+    if (obj === OBJECT_ID_NULL) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
+    if (doit) party.objectInHand = OBJECT_ID_NULL;
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
@@ -2730,7 +2721,7 @@ export class DsaSystem {
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const party = this.getPartyState?.();
     if (!party) return DsaMoveError.DER_CursorNotEmpty;
-    if (!this.isEmptyObject(party.objectInHand ?? null)) return DsaMoveError.DER_CursorNotEmpty;
+    if (party.objectInHand !== OBJECT_ID_NULL) return DsaMoveError.DER_CursorNotEmpty;
     if (doit) party.objectInHand = object;
     return DsaMoveError.DER_OK;
   }
@@ -2911,8 +2902,8 @@ export class DsaSystem {
         if (this.searchListForObject(objectId, item, visited)) return true;
       }
     }
-    const cursorObj = this.normalizePossessionValue(party.objectInHand);
-    if (cursorObj !== null) {
+    const cursorObj = party.objectInHand;
+    if (cursorObj !== OBJECT_ID_NULL) {
       if (this.searchListForObject(objectId, cursorObj, visited)) return true;
     }
     return false;

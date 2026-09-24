@@ -5,7 +5,7 @@
  * Based on CSBWin's party management system
  */
 
-import { ui8, Direction, Position } from '../core/types';
+import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { Direction as Dir } from '../core/types';
@@ -26,7 +26,7 @@ export class Party {
             gameIsLost: false,
             cursorOwner: -1,
             selectedCharacterIndex: -1,
-            objectInHand: null,
+            objectInHand: OBJECT_ID_NULL,
             brightness: 0,
             invisible: 0,
             seeThruWalls: 0,
@@ -205,7 +205,7 @@ export class Party {
             gameIsLost: state.gameIsLost ?? false,
             cursorOwner: state.cursorOwner ?? -1,
             selectedCharacterIndex: state.selectedCharacterIndex ?? -1,
-            objectInHand: state.objectInHand ?? null,
+            objectInHand: state.objectInHand ?? OBJECT_ID_NULL,
             brightness: state.brightness ?? 0,
             invisible: state.invisible ?? 0,
             seeThruWalls: state.seeThruWalls ?? 0,

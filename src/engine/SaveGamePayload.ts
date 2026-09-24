@@ -184,7 +184,7 @@ function buildFileBlocks(
     const champions = party.champions ?? [];
     // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`doc/CSBwin-src/SaveGame.cpp:1033`):
     // an empty cursor is `RNnul`, never `RNempty` (0), which CSBWin would load as an object.
-    const objectInHand = (party.objectInHand ?? OBJECT_ID_NULL) & 0xffff;
+    const objectInHand = party.objectInHand & 0xffff;
 
     const held: number[] = [];
     const carried = objectCarryingTimers(timers, runtime.dungeon.timerQueue ?? []);
@@ -289,7 +289,7 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
     return {
         time: runtime.game.tickCount >>> 0,
         ranseed: runtime.game.randomSeed >>> 0,
-        objectInHand: (party.objectInHand ?? OBJECT_ID_NULL) & 0xffff,
+        objectInHand: party.objectInHand & 0xffff,
         numCharacter: champions.length,
         partyX: party.position?.x ?? 0,
         partyY: party.position?.y ?? 0,

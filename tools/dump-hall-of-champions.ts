@@ -399,7 +399,7 @@ function main(): void {
   party.objectInHand = party.champions[0]!.possessions![1] as ObjectID;
   check(game.handleWallClick() === false && party.champions.length === 2,
     'a full cursor refuses the mirror (d.EmptyHanded)');
-  party.objectInHand = null;
+  party.objectInHand = OBJECT_ID_NULL;
 
   check(game.handleWallClick() === false && party.champions.length === 3,
     'and an empty one accepts it');

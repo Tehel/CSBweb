@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Direction, Position } from '../src/core/types';
+import { Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
@@ -245,7 +245,7 @@ async function main(): Promise<void> {
   // ---- 5. The magic tabs, the same defect one module over: `drawSpellControls` lays
   //         them out by box index, so the hit test must read the same index.
   party.state.selectedCharacterIndex = -1;
-  party.state.objectInHand = null;
+  party.state.objectInHand = OBJECT_ID_NULL;
   const tabRect = uiTables.graphic230.word20242;
   for (let box = 0; box < 4; box++) {
     party.state.magicCasterIndex = 0;

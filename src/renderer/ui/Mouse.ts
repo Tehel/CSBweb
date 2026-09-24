@@ -9,14 +9,15 @@
  */
 import { IndexedBitmap } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../csbwin/UITables';
-import { canPlaceInSlot, getChampionPossession, setChampionPossession } from './Character';
+import { canPlaceInSlot, setChampionPossession } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { handleAttackAreaClick } from './Attack';
-import { normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { resolveObjectNameIndex } from './Objects';
+import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, setHandOwner } from '../../engine/Party';
 import { updateHover } from '@/ui';
@@ -172,8 +173,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
 
   if (ui.displayResurrectChestOrScroll === 5) {
     // The Hall of Champions menu, and only with an empty cursor (`d.EmptyHanded`).
-    const inHand = ui.partyState.objectInHand;
-    if (inHand !== null && inHand !== undefined) return;
+    if (ui.partyState.objectInHand !== OBJECT_ID_NULL) return;
     const button = searchButtonList(buttons.buttons18372, clickX, clickY, 2);
     if (button !== 0) ui.onResurrectReincarnateCancel?.(button);
   }
@@ -240,26 +240,26 @@ export function handleClothingClick(ui: UIState, button: number): void {
     syncOpenChest(ui, chestView);
   }
 
-  const objectInHand = normalizeObjectValue(ui.partyState.objectInHand);
+  const objectInHand = ui.partyState.objectInHand;
   const slotObject = isChestSlot
-    ? normalizeObjectValue(ui.openChestContents[slot - 30] ?? null)
-    : normalizeObjectValue(getChampionPossession(champ, slot));
-  if (!objectInHand && !slotObject) return;
+    ? ui.openChestContents[slot - 30] ?? OBJECT_ID_NULL
+    : champ.possessions[slot] ?? OBJECT_ID_NULL;
+  if (objectInHand === OBJECT_ID_NULL && slotObject === OBJECT_ID_NULL) return;
 
-  if (objectInHand && !canPlaceInSlot(ui, objectInHand, slot)) return;
+  if (objectInHand !== OBJECT_ID_NULL && !canPlaceInSlot(ui, objectInHand, slot)) return;
 
-  if (objectInHand) {
-    ui.partyState.objectInHand = null;
+  if (objectInHand !== OBJECT_ID_NULL) {
+    ui.partyState.objectInHand = OBJECT_ID_NULL;
   }
-  if (slotObject) {
+  if (slotObject !== OBJECT_ID_NULL) {
     if (isChestSlot) {
-      ui.openChestContents[slot - 30] = null;
+      ui.openChestContents[slot - 30] = OBJECT_ID_NULL;
     } else {
       setChampionPossession(ui, champ, slot, null);
     }
     ui.partyState.objectInHand = slotObject;
   }
-  if (objectInHand) {
+  if (objectInHand !== OBJECT_ID_NULL) {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = objectInHand;
     } else {
@@ -290,8 +290,8 @@ export function updateButtonLists(ui: UIState): void {
 
 export function drawCursorItem(ui: UIState): void {
   if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
-  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
-  if (objectId === null) {
+  const objectId = ui.partyState.objectInHand;
+  if (objectId === OBJECT_ID_NULL) {
     drawEmptyCursor(ui);
     return;
   }

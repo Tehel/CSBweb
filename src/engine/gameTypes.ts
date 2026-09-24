@@ -210,7 +210,8 @@ export interface PartyState {
      * finds no living champion left.
      */
     gameIsLost?: boolean;
-    objectInHand?: ObjectID | null; // Object on cursor (CSBWin d.objectInHand)
+    /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */
+    objectInHand: ObjectID;
     partyShield?: ui16;         // Optional party shield strength
     fireShield?: ui16;          // Optional fire shield strength
     spellShield?: ui16;         // Optional spell shield strength

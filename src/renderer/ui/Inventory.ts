@@ -18,9 +18,9 @@ import { Rect } from '../csbwin/UITables';
 import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getChampionPossession, getInventoryItemIndex } from './Character';
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
-import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';
 import { isLikelyObjectRecord } from '../../engine/objectIndex';
-import { UIState } from './UIState';
+import { UIState, emptyChestContents } from './UIState';
 
 const MAX_LINES_IN_SCROLL = 9;
 const MAX_SCROLL_LINE_LENGTH = 16;
@@ -104,8 +104,8 @@ export function drawInventoryScreen(ui: UIState): void {
     drawChestPanel(ui, chestView);
   } else if (ui.pressingEye) {
     ui.displayResurrectChestOrScroll = 0;
-    const cursorObject = normalizeObjectValue(ui.partyState?.objectInHand);
-    if (cursorObject !== null) {
+    const cursorObject = ui.partyState?.objectInHand ?? OBJECT_ID_NULL;
+    if (cursorObject !== OBJECT_ID_NULL) {
       drawObjectInfoPanel(ui, cursorObject);
     } else {
       drawAttributePanel(ui, champion);
@@ -253,14 +253,14 @@ export function getOpenChestIconIndex(ui: UIState): number {
 export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSource | null {
   if (!ui.partyState) return null;
 
-  const cursorObject = normalizeObjectValue(ui.partyState.objectInHand);
-  if (ui.pressingEye && isChestRecord(ui, cursorObject)) {
-    return { id: cursorObject as ObjectID, source: 'cursor' };
+  const cursorObject = ui.partyState.objectInHand;
+  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(ui, cursorObject)) {
+    return { id: cursorObject, source: 'cursor' };
   }
 
   if (ui.pressingEye) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
-  const handObject = normalizeObjectValue(getChampionPossession(champion, handSlot));
+  const handObject = getChampionPossession(champion, handSlot);
   if (isChestRecord(ui, handObject)) {
     return { id: handObject as ObjectID, source: 'hand', slot: handSlot };
   }
@@ -284,12 +284,12 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
   const chest = ui.dungeonState.getContainerRecord(chestId);
   if (!chest) {
     ui.openChestId = null;
-    ui.openChestContents = Array(8).fill(null);
+    ui.openChestContents = emptyChestContents();
     return;
   }
 
   ui.openChestId = chestId;
-  const contents: Array<ObjectID | null> = Array(8).fill(null);
+  const contents = emptyChestContents();
   let cursor = chest.containedObject;
   let index = 0;
   while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
@@ -299,7 +299,7 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
   ui.openChestContents = contents;
 
   for (const item of contents) {
-    if (item !== null) {
+    if (item !== OBJECT_ID_NULL) {
       ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
     }
   }
@@ -311,14 +311,14 @@ export function repackOpenChest(ui: UIState): void {
   const chest = ui.dungeonState.getContainerRecord(ui.openChestId);
   if (!chest) {
     ui.openChestId = null;
-    ui.openChestContents = Array(8).fill(null);
+    ui.openChestContents = emptyChestContents();
     return;
   }
 
   chest.containedObject = OBJECT_ID_EOF;
   let previous: ObjectID | null = null;
   for (const item of ui.openChestContents) {
-    if (item === null) continue;
+    if (item === OBJECT_ID_NULL) continue;
     ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
     if (previous === null) {
       chest.containedObject = item;
@@ -329,7 +329,7 @@ export function repackOpenChest(ui: UIState): void {
   }
 
   ui.openChestId = null;
-  ui.openChestContents = Array(8).fill(null);
+  ui.openChestContents = emptyChestContents();
 }
 
 export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
@@ -343,8 +343,8 @@ export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
   for (let slot = 0; slot < 8; slot++) {
     const rect = getChestSlotRect(iconSlots, slot);
     if (!rect) continue;
-    const item = normalizeObjectValue(ui.openChestContents[slot] ?? null);
-    if (item === null) continue;
+    const item = ui.openChestContents[slot] ?? OBJECT_ID_NULL;
+    if (item === OBJECT_ID_NULL) continue;
     const objectIndex = resolveObjectNameIndex(ui, item | 0);
     if (objectIndex >= 0) drawObjectIcon(ui, rect, objectIndex, word612);
   }

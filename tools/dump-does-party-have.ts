@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_EOF, Position, decodeObjectID, encodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -29,7 +29,6 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
-import { OBJECT_ID_NULL } from '../src/core/types';
 
 const OBJNI_CHEST = 0x90;
 
@@ -117,7 +116,7 @@ async function main(): Promise<void> {
   check(has(value), 'an object on the cursor counts');
 
   // A champion with no hit points does not, whatever the alive flag says.
-  party.state.objectInHand = null;
+  party.state.objectInHand = OBJECT_ID_NULL;
   pack[13] = item;
   champ0.attributes.health = 0;
   check(!has(value), 'an object carried by a champion with 0 HP does not count');

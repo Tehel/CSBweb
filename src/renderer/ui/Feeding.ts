@@ -8,10 +8,10 @@
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
 import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
-import { DBType, ObjectID, decodeObjectID } from '../../core/types';
+import { DBType, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
-import { descIndexForObject, getDescIndexForObjectType, normalizeObjectValue, resolveObjectNameIndex } from './Objects';
+import { descIndexForObject, getDescIndexForObjectType, resolveObjectNameIndex } from './Objects';
 import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState, nowMs } from './UIState';
 import { SoundIndex } from '@/core';
@@ -105,8 +105,8 @@ export function handleMouthPress(ui: UIState): void {
   const champ = ui.partyState.champions[selected] ?? null;
   if (!champ || champ.alive === false) return;
 
-  const objectId = normalizeObjectValue(ui.partyState.objectInHand);
-  if (objectId === null) return;
+  const objectId = ui.partyState.objectInHand;
+  if (objectId === OBJECT_ID_NULL) return;
 
   const fp = computeFeedParameters(ui, selected, objectId);
   if (!fp) return;
@@ -133,7 +133,7 @@ export function handleMouthPress(ui: UIState): void {
   }
 
   if (fp.emptyHand) {
-    ui.partyState.objectInHand = null;
+    ui.partyState.objectInHand = OBJECT_ID_NULL;
     if (isRecord) ui.dungeonState.deleteDBEntry(objectId as ObjectID);
   }
 

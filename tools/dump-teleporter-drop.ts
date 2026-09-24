@@ -20,7 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -173,7 +173,7 @@ function main(): void {
 
   const dropped = game.dropObjectFromCursor(2); // "in front" of the party
   check(dropped, 'the drop is accepted');
-  check(party.objectInHand === null, 'the cursor is empty afterwards');
+  check(party.objectInHand === OBJECT_ID_NULL, 'the cursor is empty afterwards');
 
   let atTeleporter = false;
   for (let rn = game.dungeonState.findFirstObject(teleporter.at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {

@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, Direction, OBJECT_ID_EOF, Position, decodeObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -54,7 +54,7 @@ function owner(party: PartyState): number {
 }
 
 function row(what: string, party: PartyState): void {
-  const hand = party.objectInHand === null || party.objectInHand === undefined ? '-' : String(party.objectInHand);
+  const hand = party.objectInHand === OBJECT_ID_NULL ? '-' : String(party.objectInHand);
   console.log([what, party.champions.length, owner(party), hand].join('\t'));
 }
 
@@ -199,7 +199,7 @@ async function main(): Promise<void> {
 
     handleClothingClick(ui, slot + 8);
     row('clicked it again', party.state);
-    check(party.state.objectInHand === null || party.state.objectInHand === OBJECT_ID_EOF,
+    check(party.state.objectInHand === OBJECT_ID_NULL,
       'the hand should be empty again');
     check(getChampionPossession(first, slot) === object, 'the object should be back in its slot');
   }
