@@ -13,7 +13,6 @@ import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { GraphicRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
-import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState } from './UIState';
 import { Position } from '@/core';
 
@@ -113,7 +112,6 @@ export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean 
 
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) return false;
-  if (!isLikelyObjectRecord(ui.dungeonState, objectId)) return false;
 
   const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
   if (objectNameIndex < 0) return false;

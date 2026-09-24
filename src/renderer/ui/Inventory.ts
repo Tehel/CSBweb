@@ -19,7 +19,6 @@ import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getChampionP
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
 import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';
-import { isLikelyObjectRecord } from '../../engine/objectIndex';
 import { UIState, emptyChestContents } from './UIState';
 
 const MAX_LINES_IN_SCROLL = 9;
@@ -254,14 +253,14 @@ export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSo
   if (!ui.partyState) return null;
 
   const cursorObject = ui.partyState.objectInHand;
-  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(ui, cursorObject)) {
+  if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(cursorObject)) {
     return { id: cursorObject, source: 'cursor' };
   }
 
   if (ui.pressingEye) return null;
   const handSlot = 1; // CSBWin uses weapon hand for chest display.
   const handObject = getChampionPossession(champion, handSlot);
-  if (isChestRecord(ui, handObject)) {
+  if (isChestRecord(handObject)) {
     return { id: handObject as ObjectID, source: 'hand', slot: handSlot };
   }
   return null;
@@ -423,10 +422,12 @@ export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
   let scrollId = objectId;
   const filter = applyViewingFilter(ui, objectId, 0);
   if (filter) {
+    // `obj.checkIndirectIndex(pDSAparameters[2])`, then `dbType() == dbSCROLL`
+    // (`doc/CSBwin-src/Character.cpp:3510-3514`): the DSA's answer counts only if it
+    // names a scroll that exists.
     const candidate = filter.objectId | 0;
-    if (candidate >= 0 && isLikelyObjectRecord(ui.dungeonState, candidate)) {
-      const decoded = decodeObjectID(candidate as ObjectID);
-      if (decoded.category === DBType.SCROLL) scrollId = candidate as ObjectID;
+    if (candidate >= 0 && ui.dungeonState.getScrollRecord(candidate as ObjectID)) {
+      scrollId = candidate as ObjectID;
     }
   }
 

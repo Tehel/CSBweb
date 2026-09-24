@@ -11,8 +11,7 @@ import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '.
 import { DBType, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
-import { descIndexForObject, getDescIndexForObjectType, resolveObjectNameIndex } from './Objects';
-import { isLikelyObjectRecord } from '../../engine/objectIndex';
+import { descIndexForObject, resolveObjectNameIndex } from './Objects';
 import { UIState, nowMs } from './UIState';
 import { SoundIndex } from '@/core';
 
@@ -33,23 +32,20 @@ export function computeFeedParameters(
   const champ = ui.partyState.champions[chIdx];
   if (!champ) return null;
 
-  const isRecord = isLikelyObjectRecord(ui.dungeonState, objectId);
-  const nameIndex = isRecord ? resolveObjectNameIndex(ui, objectId) : objectId | 0;
+  const nameIndex = resolveObjectNameIndex(ui, objectId);
   if (nameIndex < 0) return null;
-  const category = isRecord ? decodeObjectID(objectId as ObjectID).category : null;
+  const category = decodeObjectID(objectId as ObjectID).category;
 
   const fp = clearFeedParameters();
   fp.characterIndex = chIdx;
   fp.objectID = objectId;
   fp.objectType = nameIndex;
-  fp.objectDB = category ?? -1;
+  fp.objectDB = category;
 
   // `d.ObjDesc[objDI].word4 & 1` — the mouth bit of the carry-location mask. Anything
   // without it is inedible, and a chest or a scroll is refused outright; other objects
   // fall through so a waterskin or a bones can still reach the branches below.
-  const descIndex = isRecord
-    ? descIndexForObject(ui, objectId as ObjectID)
-    : getDescIndexForObjectType(ui, objectId | 0);
+  const descIndex = descIndexForObject(ui, objectId as ObjectID);
   const carryMask = descIndex !== null ? ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
   if ((carryMask & 1) === 0) {
     if (category === DBType.CHEST || category === DBType.SCROLL) return null;
@@ -59,7 +55,7 @@ export function computeFeedParameters(
 
   if (nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER) {
     // A waterskin holds gulps in the misc record's `value`, and each drink spends one.
-    const rec = isRecord ? ui.dungeonState.getMiscRecord(objectId as ObjectID) : null;
+    const rec = ui.dungeonState.getMiscRecord(objectId as ObjectID);
     if ((rec?.specialState ?? 0) === 0) {
       fp.waterValue = 0;
       fp.emptyFlask = false;
@@ -117,7 +113,6 @@ export function handleMouthPress(ui: UIState): void {
   const applied = ui.applyFeeding?.(selected, fp) ?? false;
   if (!applied) return;
 
-  const isRecord = isLikelyObjectRecord(ui.dungeonState, objectId);
   if (fp.chew) {
     startMouthChewAnimation(ui);
   } else if (fp.emptyFlask) {
@@ -134,7 +129,7 @@ export function handleMouthPress(ui: UIState): void {
 
   if (fp.emptyHand) {
     ui.partyState.objectInHand = OBJECT_ID_NULL;
-    if (isRecord) ui.dungeonState.deleteDBEntry(objectId as ObjectID);
+    ui.dungeonState.deleteDBEntry(objectId as ObjectID);
   }
 
   if (fp.gulp >= 0) ui.playSound?.(fp.gulp);

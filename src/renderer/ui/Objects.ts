@@ -5,9 +5,9 @@
  * `doc/CSBwin-src/Code17818.cpp`): resolving an object reference to its `OBJNI_*` name
  * index, the phrase/attribute lines the eye shows, carried weight, and `DetermineMastery`.
  */
-import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_FIRST_FULL_FLASK, OBJNI_LAST_FULL_FLASK, OBJNI_OPEN_SCROLL, OBJNI_SCROLL, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
-import { DescIndex, GetBasicObjectType, isLikelyObjectRecord, NameIndex } from '../../engine/objectIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
+import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJNI_SPECIAL_F, OBJNI_SPECIAL_J, OBJNI_SPECIAL_N, OBJNI_TORCH_A, OBJNI_TORCH_D, OBJNI_WATER, OBJNI_WATERSKIN, OBJNI_WATER_FLASK } from '../../core/objectNameIndex';
+import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
+import { DBType, ObjectID, decodeObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
 import { TextDecodeTables } from '../../engine/DungeonState';
 import { Champion } from '../../engine/gameTypes';
@@ -16,7 +16,6 @@ import { determineMastery as determineMasteryEngine } from '../../engine/skills'
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { UIMode, UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
-const DEFAULT_CHEST_WEIGHT = 50;
 
 /**
  * `RN::NameIndex` (`src/engine/objectIndex.ts`) with the UI's tables and the party's
@@ -55,24 +54,9 @@ export function descIndexForObject(ui: UIState, rn: ObjectID): number | null {
   return descIndex === -1 ? null : descIndex;
 }
 
-/**
- * The first `d.ObjDesc` row whose `objectType` is `objectType` — for the icon and eye
- * paths that hold an object *type* rather than an object.
- */
-export function getDescIndexForObjectType(ui: UIState, objectType: number): number | null {
-  if (!ui.objectTables) return null;
-  const table = ui.objectTables.objDescObjectType;
-  for (let i = 0; i < table.length; i++) {
-    if (table[i] === objectType) return i;
-  }
-  return null;
-}
-
-export function isChestRecord(ui: UIState, value: number | null): value is ObjectID {
-  if (value === null || value === undefined) return false;
-  if (!isLikelyObjectRecord(ui.dungeonState, value)) return false;
-  const { category } = decodeObjectID(value as ObjectID);
-  return category === DBType.CHEST;
+export function isChestRecord(value: number | null): value is ObjectID {
+  if (value === null) return false;
+  return decodeObjectID(value as ObjectID).category === DBType.CHEST;
 }
 
 export function isBaseObjectNameIndex(ui: UIState, objectId: number, min: number, max: number): boolean {
@@ -149,57 +133,11 @@ export function formatWeightText(weight: number): string {
   return `WEIGHS ${kg}.${tenths} KG.`;
 }
 
-export function getObjectWeight(ui: UIState, value: number, visited: Set<number>): number {
-  if (!ui.objectTables) return 0;
-  if (value === OBJECT_ID_EOF || value === OBJECT_ID_NULL) return 0;
-  if (isLikelyObjectRecord(ui.dungeonState, value)) {
-    return getObjectWeightForRecord(ui, value as ObjectID, visited);
-  }
-  return getObjectWeightForObjectType(ui, value | 0);
-}
-
 /**
- * `GetObjectWeight` / `TAG0091e6` for an object *record*, in the engine
- * (`src/engine/CharacterStats.ts`). The name-index form below stays here: it exists for
- * the icons and the eye panel, which deal in object types rather than records.
+ * `GetObjectWeight` / `TAG0091e6`, in the engine (`src/engine/CharacterStats.ts`).
  */
 export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
   return ui.characterStats?.getObjectWeight(rn, visited) ?? 0;
-}
-
-export function getObjectWeightForObjectType(ui: UIState, objectType: number): number {
-  if (!ui.objectTables) return 0;
-  let descIndex = getDescIndexForObjectType(ui, objectType);
-  if (descIndex === null) {
-    if (objectType === OBJNI_SCROLL || objectType === OBJNI_OPEN_SCROLL) return 1;
-    if (objectType === OBJNI_WATERSKIN || objectType === OBJNI_WATER) {
-      descIndex = 127 + 1;
-    }
-    if (descIndex === null) {
-      if (objectType === OBJNI_EMPTY_FLASK) return 1;
-      if (objectType >= OBJNI_FIRST_FULL_FLASK && objectType <= OBJNI_LAST_FULL_FLASK) return 3;
-      return 0;
-    }
-  }
-
-  if (descIndex === 0) return 1;
-  if (descIndex === 1) return DEFAULT_CHEST_WEIGHT;
-  if (descIndex >= 2 && descIndex <= 22) {
-    if (objectType === OBJNI_EMPTY_FLASK) return 1;
-    return 3;
-  }
-  if (descIndex >= 23 && descIndex <= 68) {
-    return ui.objectTables.weaponWeights[descIndex - 23] ?? 0;
-  }
-  if (descIndex >= 69 && descIndex <= 126) {
-    return ui.objectTables.clothingWeights[descIndex - 69] ?? 0;
-  }
-  if (descIndex >= 127 && descIndex <= 179) {
-    let weight = ui.objectTables.miscWeights[descIndex - 127] ?? 0;
-    if (objectType === OBJNI_WATER) weight += 6;
-    return weight;
-  }
-  return 0;
 }
 
 export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
@@ -270,7 +208,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
   let phraseMask = descriptionMask & flags & 0x0f;
   phraseMask |= 0x40;
 
-  const weight = getObjectWeight(ui, objectId | 0, new Set<number>());
+  const weight = getObjectWeightForRecord(ui, objectId, new Set<number>());
   phrases[6] = formatWeightText(weight);
 
   const filter = applyViewingFilter(ui, objectId, phraseMask);

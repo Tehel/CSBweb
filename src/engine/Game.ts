@@ -42,7 +42,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { DescIndex, GetBasicObjectType, IsAKey, isLikelyObjectRecord, NameIndex } from './objectIndex';
+import { DescIndex, GetBasicObjectType, IsAKey, NameIndex } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -1563,7 +1563,6 @@ export class Game {
             const rn = slots[i]!;
             if (rn === OBJECT_ID_NULL) continue;
             slots[i] = OBJECT_ID_NULL;
-            if (!isLikelyObjectRecord(this.dungeonState, rn)) continue;
             this.dungeonState.addObjectToCell(here, withObjectPosition(rn, champ.partyPosition & 0x3));
         }
     }
@@ -1662,8 +1661,7 @@ export class Game {
             // `for (D6W=2; (D6W--) != 0;)` — hand 1, then hand 0.
             for (let hand = 1; hand >= 0; hand--) {
                 const obj = this.getChampionPossession(champion, hand);
-                if (!obj) continue;
-                if (!isLikelyObjectRecord(this.dungeonState, obj)) continue;
+                if (obj === null) continue;
                 const nameIndex = this.nameIndex(obj);
                 if (nameIndex < OBJNI_TORCH_A || nameIndex > OBJNI_TORCH_D) continue;
                 const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
@@ -2119,8 +2117,7 @@ export class Game {
     private getFlaskInHand(champion: Champion): ObjectID | null {
         for (let slot = 0; slot < 2; slot += 1) {
             const obj = this.getChampionPossession(champion, slot);
-            if (!obj) continue;
-            if (!isLikelyObjectRecord(this.dungeonState, obj)) continue;
+            if (obj === null) continue;
             if (this.getBaseObjectNameIndex(obj) === OBJNI_EMPTY_FLASK) return obj;
         }
         return null;
@@ -2677,7 +2674,6 @@ export class Game {
 
         const obj = party.objectInHand;
         if (obj === OBJECT_ID_NULL) return false;
-        if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         let dropPos = relativePos | 0;
         if (dropPos < 0 || dropPos > 4) return false;
@@ -2764,7 +2760,6 @@ export class Game {
 
         const obj = party.objectInHand;
         if (obj === OBJECT_ID_NULL) return false;
-        if (!isLikelyObjectRecord(this.dungeonState, obj)) return false;
 
         const champion = party.champions[owner] ?? null;
         if (!champion) return false;
