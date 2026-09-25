@@ -49,8 +49,6 @@ export type GameMethods = Pick<Game,
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
   | 'notePartyMoved'
-  | 'onChampionDied'
-  | 'registerChampionBones'
   | 'setBusyTimerRefill'
   | 'throwFromWeaponHand'
   | 'wakeUp'

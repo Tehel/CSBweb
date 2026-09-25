@@ -549,7 +549,8 @@ export class MonsterAttack {
     if (bones !== null) {
       const objD4 = withObjectPosition(bones, champ.partyPosition & 0x3);
       this.ctx.systems.timer.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
-      this.ctx.systems.game.registerChampionBones(objD4, chIdx);
+      // `AddChampionBonesRecord`, whatever the fingerprint (`:2646`): 0 pairs the bones too.
+      this.dungeon.addChampionBonesRecord(objD4, champ.fingerprint);
     }
 
     // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the
@@ -586,7 +587,10 @@ export class MonsterAttack {
       if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
 
-    this.ctx.systems.game.onChampionDied(chIdx);
+    // `ShowHideInventory(4)` (`doc/CSBwin-src/Character.cpp:2619`): the inventory closes
+    // on a dead champion. The magic tab is not cleared: `SelectMagicCaster` above handed
+    // it to a living champion, and blanking it would undo that.
+    if (party.selectedCharacterIndex === chIdx) party.selectedCharacterIndex = -1;
   }
 
   private createBonesRecord(): ObjectID | null {

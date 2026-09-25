@@ -1195,14 +1195,6 @@ export class Game {
         }
     }
 
-    registerChampionBones(bones: ObjectID, champIndex: number): void {
-        const champ = this.party.state.champions[champIndex];
-        if (!champ) return;
-        // `expool.AddChampionBonesRecord(objD4, pcA3->fingerPrint)`, whatever the
-        // fingerprint (doc/CSBwin-src/Character.cpp:2646): 0 pairs the bones too.
-        this.dungeonState.addChampionBonesRecord(bones, champ.fingerprint);
-    }
-
     /**
      * The tail of `ProcessMissileEncounter`'s party arm
      * (`doc/CSBwin-src/Code11f52.cpp:2044-2056`):
@@ -1284,22 +1276,6 @@ export class Game {
                 ),
             random: () => this.random.next() & 0xffff,
         });
-    }
-
-    /**
-     * A champion died. Keeps the derived party state honest.
-     *
-     * Closing the inventory on a dead champion is CSBWin's `ShowHideInventory(4)`
-     * (`doc/CSBwin-src/Character.cpp:2619`). The magic tab is *not* cleared here:
-     * `killCharacter` hands it to a living champion through `SelectMagicCaster`, and
-     * blanking it afterwards would undo that.
-     */
-    onChampionDied(chIdx: number): void {
-        const champ = this.party.state.champions[chIdx];
-        if (!champ) return;
-        if (this.party.state.selectedCharacterIndex === chIdx) {
-            this.party.state.selectedCharacterIndex = -1;
-        }
     }
 
     /**
