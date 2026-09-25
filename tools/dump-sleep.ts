@@ -31,6 +31,7 @@ import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
+import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
@@ -281,21 +282,20 @@ async function main(): Promise<void> {
       const wisdom = syra.attributes.stats[AttributeIndex.Wisdom]!.current;
       console.log(`SYRA: Wisdom ${wisdom}, Wizard + Priest mastery ${awake} awake`);
       check(awake + wisdom > 48 && 2 + wisdom <= 48, 'the canary: r = 48 separates the two thresholds');
-      const tenSecond = game as unknown as { processTenSecondUpdate(): void };
       game.sleep();
       syra.attributes.mana = 0;
       internals.state.tickCount = 0x180; // random112 = 48
-      tenSecond.processTenSecondUpdate();
+      tenSecondUpdate(game.ctx);
       console.log(`r=48 asleep: mana ${syra.attributes.mana}`);
       check(syra.attributes.mana === 0, 'asleep, r = 48 is not below Wisdom + 2: no mana');
       internals.state.tickCount = 0x200; // random112 = 0
       syra.attributes.stamina = 200;
-      tenSecond.processTenSecondUpdate();
+      tenSecondUpdate(game.ctx);
       check(syra.attributes.mana === 1, 'r = 0 is: MaxMana 15 / 40 * 2 + 1 = one point');
       game.wakeUp();
       syra.attributes.mana = 0;
       internals.state.tickCount = 0x380; // random112 = 48 again (bit 9 is not read), awake
-      tenSecond.processTenSecondUpdate();
+      tenSecondUpdate(game.ctx);
       check(syra.attributes.mana === 1, 'awake, her levels count: r = 48 < 50 gives mana');
     }
   }

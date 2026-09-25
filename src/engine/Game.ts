@@ -17,7 +17,7 @@ import { TimerQueue, TimerFunction } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
 import { MonsterSystem } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
-import { createGameContext, nameIndexOf, type GameContext, type GameSystems } from './GameContext';
+import { createGameContext, type GameContext, type GameSystems } from './GameContext';
 import { createGameHost, type GameHost } from './GameHost';
 import { PartyFootprints } from './PartyFootprints';
 import { applyRuntimeSaveState, getRuntimeSaveState, type RuntimeSaveState } from './RuntimeSave';
@@ -32,29 +32,16 @@ import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
 import { wakeUp } from './LoopState';
+import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
-import { determineMastery, ensureSkills } from './skills';
 import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { GetBasicObjectType } from './objectIndex';
 
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { CharacterStats } from './CharacterStats';
 import type { GameTables } from './GameTables';
-import {
-    OBJNI_EKKHARD_CROSS,
-    OBJNI_TORCH_A,
-    OBJNI_TORCH_D,
-} from '../core/objectNameIndex';
-import {
-    AttributeIndex,
-    attributeCurrent,
-    attributeMaximum,
-    championAttribute,
-    incrAttributeCurrent,
-} from './attributes';
 import { computeChampionFingerprint } from './AddCharacter';
 
 /**
@@ -368,8 +355,10 @@ export class Game {
         do {
             this.timerSystem.processTimers(this.state.tickCount);
         } while (this.loadNewPartyLevel());
-        this.processNinetySecondUpdate();
-        this.processTenSecondUpdate();
+        // `if ((d.Time&511)==0) NinetySecondUpdate();` and `if ((d.Time & (d.PartySleeping ?
+        // 15 : 63)) == 0) TenSecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-688).
+        if (isNinetySecondTick(this.state.tickCount)) ninetySecondUpdate(this.ctx);
+        if (isTenSecondTick(this.state.tickCount, this.party.state.sleeping)) tenSecondUpdate(this.ctx);
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
         // (doc/CSBwin-src/CSBCode.cpp:684).
         if (this.party.state.freezeLifeTimer !== 0) this.party.state.freezeLifeTimer--;
@@ -677,203 +666,6 @@ export class Game {
         ensureHandOwner(this.party.state);
     }
 
-    /**
-     * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`), called from the
-     * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`) —
-     * every 512 ticks, about 85 seconds, despite the name.
-     *
-     * Each torch in a champion's hands loses one charge, and one that burns out loses its
-     * `important` flag. The loop runs over `d.NumCharacter`, less one while
-     * `d.PotentialCharacterOrdinal != 0`: a Hall of Champions recruit is always the last
-     * champion, and their torch does not burn. The dead are not skipped (their hands are
-     * empty anyway).
-     *
-     * CSBWin then calls `SelectPaletteForLightLevel` and `DrawEightHands` whether or not
-     * a torch changed. Both have no counterpart here: the light palette and the hands
-     * are derived from live state every frame (`src/renderer/ui/Light.ts`).
-     */
-    private processNinetySecondUpdate(): void {
-        if ((this.state.tickCount & 511) !== 0) return;
-        const party = this.party.state;
-        let count = party.champions.length;
-        if (party.potentialChampionIndex >= 0) count--;
-        for (let chIdx = 0; chIdx < count; chIdx++) {
-            const champion = party.champions[chIdx];
-            if (!champion) continue;
-            // `for (D6W=2; (D6W--) != 0;)` — hand 1, then hand 0.
-            for (let hand = 1; hand >= 0; hand--) {
-                const obj = this.getChampionPossession(champion, hand);
-                if (obj === OBJECT_ID_NULL) continue;
-                const nameIndex = this.nameIndex(obj);
-                if (nameIndex < OBJNI_TORCH_A || nameIndex > OBJNI_TORCH_D) continue;
-                const weapon = this.dungeonState.getWeaponRecord(obj as ObjectID);
-                if (!weapon) continue;
-                const charges = weapon.charges & 0x0f;
-                if (charges === 0) continue;
-                const next = (charges - 1) & 0x0f;
-                weapon.charges = next;
-                if (next === 0) weapon.important = false;
-            }
-        }
-    }
-
-    /**
-     * `TenSecondUpdate` (`doc/CSBwin-src/Code17818.cpp:160-436`), called from the game
-     * tick whenever `(d.Time & (d.PartySleeping ? 15 : 63)) == 0`
-     * (`doc/CSBwin-src/CSBCode.cpp:686-688`) — every 16 s awake, 4 s asleep, despite
-     * the name.
-     *
-     * Per living champion: mana regeneration, `tempAdjust` decay, food and water
-     * consumption paid for in stamina, HP regeneration, and — every 256 ticks (64
-     * asleep) — one point of each attribute's Current drawn back toward its Maximum.
-     * That last step is what clears the red a level gain paints on the stats panel:
-     * `LevelUp` raises only Maximum (`doc/CSBwin-src/Magic.cpp:98-148`).
-     *
-     * Not ported: the `d.Word11750` countdown (`:375-383`). It is a cursor-redraw
-     * counter armed only by `CSBCode.cpp:959-965`, which this port has no equivalent
-     * of, so it is always zero and the branch is dead. The trailing
-     * `charFlags |= CHARFLAG_statsChanged` has no counterpart either: the panels are
-     * redrawn from live state every frame.
-     */
-    private processTenSecondUpdate(): void {
-        const party = this.party.state;
-        const time = this.state.tickCount;
-        const sleeping = party.sleeping;
-        if ((time & (sleeping ? 15 : 63)) !== 0) return;
-        if (party.champions.length === 0) return;
-
-        this.footprints.ageFootprints();
-
-        const random112 = (time & 0x40)
-            | ((time & 0x80) >> 2)
-            | ((time & 0x100) >> 4);
-        const getObjectNameIndex = (objectId: ObjectID): number => this.nameIndex(objectId);
-
-        for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
-            const champ = party.champions[chIdx];
-            if (!champ) continue;
-            const attrs = champ.attributes;
-            if ((attrs.health | 0) === 0) continue;
-            if (party.potentialChampionIndex === chIdx) continue;
-            const maxMana = attrs.maxMana | 0;
-            const mana = attrs.mana | 0;
-            if (mana < maxMana) {
-                // Asleep, `DetermineMastery` reports 1 for every skill
-                // (doc/CSBwin-src/Code17818.cpp:29-36): the roll is Wisdom + 2, and each
-                // point costs 14 stamina, whatever the champion's levels.
-                const magicMastery =
-                    determineMastery(champ, 3, { getObjectNameIndex, partySleeping: sleeping })
-                    + determineMastery(champ, 2, { getObjectNameIndex, partySleeping: sleeping });
-                const wisdom = championAttribute(champ, AttributeIndex.Wisdom);
-                if (random112 >= magicMastery + wisdom) {
-                    if (mana > maxMana) {
-                        attrs.mana = Math.max(maxMana, mana - 1);
-                    }
-                } else {
-                    let manaAdjust = Math.trunc(maxMana / 40);
-                    if (sleeping) manaAdjust *= 2;
-                    manaAdjust += 1;
-                    const staminaAdjust = manaAdjust * Math.max(7, 16 - magicMastery);
-                    this.monsterAttack.adjustStamina(chIdx, staminaAdjust);
-                    const deltaMana = Math.min(manaAdjust, maxMana - mana);
-                    attrs.mana = mana + deltaMana;
-                }
-            } else if (mana > maxMana) {
-                attrs.mana = Math.max(maxMana, mana - 1);
-            }
-
-            const skills = ensureSkills(champ.skills ?? []);
-            for (const entry of skills) {
-                if (entry.tempAdjust > 0) entry.tempAdjust -= 1;
-            }
-            champ.skills = skills;
-
-            // Food and water (`:291-344`). D6 grows by 2 for each halving of
-            // MaxStamina that Stamina is still below — a tired champion eats more.
-            let d6 = 4;
-            for (let d4 = attrs.maxStamina | 0; (d4 >>= 1), (attrs.stamina | 0) < d4; d6 += 2) {
-                // empty
-            }
-            let d4 = 0;
-            // `ApplyLimits(1, (MaxStamina>>8)-1, 6)`
-            let local4 = Math.min(6, Math.max(1, ((attrs.maxStamina | 0) >> 8) - 1));
-            if (sleeping) local4 <<= 1;
-            const sinceMove = sw(time - this.footprints.getLastPartyMoveTime());
-            if (sinceMove > 80) {
-                local4++;
-                if (sinceMove > 250) local4++;
-            }
-            do {
-                const d5 = d6 <= 4;
-                if (champ.food < -512) {
-                    if (d5) {
-                        d4 += local4;
-                        champ.food -= 2;
-                    }
-                } else {
-                    if (champ.food >= 0) d4 -= local4;
-                    champ.food -= d5 ? 2 : Math.trunc(d6 / 2);
-                }
-                if (champ.water < -512) {
-                    if (d5) {
-                        d4 += local4;
-                        champ.water -= 1;
-                    }
-                } else {
-                    if (champ.water >= 0) d4 -= local4;
-                    champ.water -= d5 ? 1 : Math.trunc(d6 / 2);
-                }
-                d6--;
-                if (d6 === 0) break;
-            } while ((attrs.stamina | 0) < (attrs.maxStamina | 0) + d4);
-
-            this.monsterAttack.adjustStamina(chIdx, d4);
-            if (champ.food < -1024) champ.food = -1024;
-            if (champ.water < -1024) champ.water = -1024;
-
-            // HP regeneration (`:350-372`).
-            if ((attrs.health | 0) < (attrs.maxHealth | 0)) {
-                if ((attrs.stamina | 0) >= Math.trunc((attrs.maxStamina | 0) / 4)) {
-                    if (random112 < championAttribute(champ, AttributeIndex.Vitality) + 12) {
-                        let local4Hp = ((attrs.maxHealth | 0) >> 7) + 1;
-                        if (sleeping) local4Hp *= 2;
-                        const necklace = this.getChampionPossession(champ, 10);
-                        if (necklace !== OBJECT_ID_NULL && this.getBaseObjectNameIndex(necklace) === OBJNI_EKKHARD_CROSS) {
-                            local4Hp = local4Hp + Math.trunc(local4Hp / 2) + 1;
-                        }
-                        attrs.health += Math.min(local4Hp, (attrs.maxHealth | 0) - (attrs.health | 0));
-                    }
-                }
-            }
-
-            // Attributes drift back to Maximum, one point at a time (`:384-414`).
-            if ((time & (sleeping ? 63 : 255)) === 0) {
-                for (const attr of attrs.stats) {
-                    const maximum = attributeMaximum(attr);
-                    const current = attributeCurrent(attr);
-                    if (current < maximum) {
-                        incrAttributeCurrent(attr, 1);
-                    } else if (current > maximum) {
-                        incrAttributeCurrent(attr, -Math.trunc(current / (maximum === 0 ? 1 : maximum)));
-                    }
-                }
-            }
-
-            // A champion left facing elsewhere turns back with the party once no
-            // monster has struck for 60 ticks (`:416-430`).
-            if (!sleeping && champ.facing !== party.facing) {
-                if (party.lastMonsterAttackTime < time - 60) {
-                    champ.facing = party.facing;
-                    champ.maxRecentDamage = 0;
-                }
-            }
-        }
-    }
-
-    /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-    private getChampionPossession(champion: Champion, slot: number): ObjectID {
-        return champion.possessions[slot] ?? OBJECT_ID_NULL;
-    }
 
 
 
@@ -909,16 +701,6 @@ export class Game {
     }
 
 
-
-    /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
-    private getBaseObjectNameIndex(rn: ObjectID): number {
-        return GetBasicObjectType(this.dungeonState, this.tables.objDescObjectType, rn);
-    }
-
-    /** `RN::NameIndex` (`src/engine/objectIndex.ts`). */
-    private nameIndex(rn: ObjectID): number {
-        return nameIndexOf(this.ctx, rn);
-    }
 
     /**
      * Register callback for game tick

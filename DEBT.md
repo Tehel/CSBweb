@@ -1597,8 +1597,9 @@ before moving, and decide the two open questions first:
   the update should not be folded into. Neither update has state of its own, so no class.
   The cadence tests (`(d.Time & 511) == 0`, `d.Time & (d.PartySleeping ? 15 : 63)`)
   are the loop's (`CSBCode.cpp:680-688`) and move out of the bodies into `gameTick`,
-  where CSBWin has them; `d.NumCharacter == 0` stays in `TenSecondUpdate`
-  (`Code17818.cpp:174`).
+  where CSBWin has them — as two predicates the module exports, `isNinetySecondTick` /
+  `isTenSecondTick`, so that the cadence tools test the tick's own test;
+  `d.NumCharacter == 0` stays in `TenSecondUpdate` (`Code17818.cpp:174`).
 - **`_ExecuteAttack`'s engine half** (`championAttack`, `attackStatModifier`) goes to
   `CharacterSystem` as `executeAttack`, by the file rule: it is `Character.cpp:4944`, it
   writes two `CHARDESC` fields (`word64`, `attackType`) and makes one call into

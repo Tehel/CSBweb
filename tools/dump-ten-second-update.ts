@@ -20,6 +20,7 @@ import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { isTenSecondTick, tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { AttributeIndex, incrAttributeMaximum, makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
@@ -59,14 +60,11 @@ function makeGame(): Game {
   return game;
 }
 
-type Internals = { state: { tickCount: number }; processTenSecondUpdate(): void };
-
 /** Run `TenSecondUpdate`'s gate at every tick in `[from, to]`, as the game tick does. */
 function runTicks(game: Game, from: number, to: number): void {
-  const g = game as unknown as Internals;
   for (let t = from; t <= to; t++) {
-    g.state.tickCount = t;
-    g.processTenSecondUpdate();
+    game.state.tickCount = t;
+    if (isTenSecondTick(t, game.party.state.sleeping)) tenSecondUpdate(game.ctx);
   }
 }
 

@@ -18,6 +18,7 @@ import type { WeaponRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { isNinetySecondTick, ninetySecondUpdate } from '../src/engine/PeriodicUpdates';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
@@ -59,14 +60,11 @@ function makeGame(): Game {
   return game;
 }
 
-type Internals = { state: { tickCount: number }; processNinetySecondUpdate(): void };
-
 /** Run `NinetySecondUpdate`'s gate at every tick in `[from, to]`, as the game tick does. */
 function runTicks(game: Game, from: number, to: number, onTick?: (t: number) => void): void {
-  const g = game as unknown as Internals;
   for (let t = from; t <= to; t++) {
-    g.state.tickCount = t;
-    g.processNinetySecondUpdate();
+    game.state.tickCount = t;
+    if (isNinetySecondTick(t)) ninetySecondUpdate(game.ctx);
     onTick?.(t);
   }
 }
