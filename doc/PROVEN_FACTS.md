@@ -279,6 +279,38 @@ The door sound specifically was verified correct in DMweb: the divergence toward
 pitch has already been applied and matches the real game. (`NOTES.md` still carries an
 older entry saying doors sound wrong — that entry is stale.)
 
+## Crack Switch (In) placement (deliberate divergence from CSBWin)
+
+Each wall ornament is drawn through one of eight coordinate sets
+(`d.wallDecorationPosition[8][13]`), chosen per global ornament number by `d.Byte4100[60]`
+(`doc/CSBwin-src/Code390e.cpp:232-234`, used at `doc/CSBwin-src/CSBCode.cpp:3218-3220`).
+Both tables come from `graphics.dat` item `0x22e`. The stock DM Atari `graphics.dat`
+(md5 `0b5e042f2c7f2752bac78292cc6bb07e`) and the Conflux 3.5 one both hold:
+
+| Ornament | `Byte4100` | Front view (relative position 12) | Bitmaps (side, front) |
+| --- | --- | --- | --- |
+| 50 Crack Switch (Out) | 2 | y 92–119, low on the wall | 16×19, 32×28 |
+| 55 Crack Switch (In) | 0 | y 36–63, eye level | 16×19, 32×28 |
+
+Names from `doc/CSBwin-src/AsciiDump.cpp:957` (50) and by the Out/In pairing of 49/54
+(`:951`, `:960`). The two bitmaps are the same crack, with the button out and pushed in.
+
+Where it shows: level 4, the east face of (13,29), seen from (14,29) facing west. Two
+once-only type-1 switches: #601 (ornament 55, local action 1) first, #163 (ornament 50,
+opens the grid at (13,28)) second. A wall shows its last actuator's ornament
+(`doc/CSBwin-src/Codea59a.cpp:136-139`), so 50 is shown until the click; local action 1
+is `RotateActuatorList` (`doc/CSBwin-src/Mouse.cpp:249-252`,
+`doc/CSBwin-src/Code11f52.cpp:3465`), which moves #601 last, so 55 is shown after it.
+CSBWin, reading the table as is, draws the pressed crack at eye level.
+
+The author, who played the Atari ST original on the same `graphics.dat`, is confident the
+original draws it where the Out crack was. How the original manages this was not
+established. So the port sets `Byte4100[55]` to 2 at load
+(`correctCrackSwitchInPlacement` in `src/renderer/csbwin/ObjectTables.ts`), only when
+entry 50 is 2 and entry 55 is 0. No other entry, and no other code path, changes.
+`tools/dump-crack-switch.ts` asserts all of this, and golden frame `09-crack-switch` shows
+the pressed switch. Do not "fix" it back to CSBWin.
+
 ## The Timer-A values in `StartSound` are the sample rates
 
 `StartSound`'s second argument is the Atari ST Timer-A data value the original loaded to clock

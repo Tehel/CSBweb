@@ -218,7 +218,7 @@ export interface ObjectTables {
 
   // Wall decorations
   wallDecorationRectSets: DecorationDesc[][]; // d.wallDecorationPosition[8][13]
-  wallDecorationRectSetIndex: Uint8Array; // d.Byte4100[60]
+  wallDecorationRectSetIndex: Uint8Array; // d.Byte4100[60], entry 55 corrected (correctCrackSwitchInPlacement)
 
   // Wall text helpers (DrawWallDecoration, CSBCode.cpp:3258+)
   wallTextRect: RectPos; // d.Byte4192 rect for mortar joint removal
@@ -685,6 +685,35 @@ function computeOffsetFromWall(wallRectanglesOffset: number, absField: number): 
   return wallRectanglesOffset - (absField - ABS_WALL_RECTANGLES);
 }
 
+/** `d.Byte4100[60]` exactly as `graphics.dat` item 0x22e holds it — before `correctCrackSwitchInPlacement`. */
+export function readWallDecorationRectSetIndex(raw22e: Uint8Array, wallRectanglesOffset: number): Uint8Array {
+  const off = computeOffsetFromWall(wallRectanglesOffset, ABS_WALL_DECORATION_RECT_SET_INDEX);
+  return raw22e.slice(off, off + 60);
+}
+
+/** Wall ornaments 50 and 55: one crack switch, button out and button pushed in. */
+export const WALL_ORNAMENT_CRACK_SWITCH_OUT = 50;
+export const WALL_ORNAMENT_CRACK_SWITCH_IN = 55;
+
+/**
+ * **A deliberate divergence from CSBWin** — see "Crack Switch (In) placement" in
+ * `doc/PROVEN_FACTS.md`.
+ *
+ * `graphics.dat` puts Crack Switch (Out) in coordinate set 2, low on the wall, and its
+ * pushed-in twin in set 0, at eye level, though the two bitmaps are the same size. CSBWin
+ * reads the table as it stands (`doc/CSBwin-src/Code390e.cpp:232-234`), so once a crack
+ * switch is pressed — `RotateActuatorList` bringing the "In" actuator last on the face —
+ * the crack jumps up the wall. The Atari ST original does not do this. Set 55 to 50's
+ * set, only when the table carries exactly this defect, so any other `graphics.dat` is
+ * read untouched. Returns whether it changed anything.
+ */
+export function correctCrackSwitchInPlacement(rectSetIndex: Uint8Array): boolean {
+  if (rectSetIndex[WALL_ORNAMENT_CRACK_SWITCH_OUT] !== 2) return false;
+  if (rectSetIndex[WALL_ORNAMENT_CRACK_SWITCH_IN] !== 0) return false;
+  rectSetIndex[WALL_ORNAMENT_CRACK_SWITCH_IN] = rectSetIndex[WALL_ORNAMENT_CRACK_SWITCH_OUT];
+  return true;
+}
+
 function readDecorationDescTable22e(raw: Uint8Array, off: number): DecorationDesc[][] {
   const sets = 8;
   const entries = 13;
@@ -880,7 +909,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const miscWeights = readMiscWeights22f(raw22f);
   const weaponDesc = readWeaponDesc22f(raw22f);
   const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
-  const wallDecorationRectSetIndex = raw22e.slice(wallDecorationRectSetIndexOffset, wallDecorationRectSetIndexOffset + 60);
+  const wallDecorationRectSetIndex = readWallDecorationRectSetIndex(raw22e, wallRectanglesOffset);
+  correctCrackSwitchInPlacement(wallDecorationRectSetIndex);
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
   const wallTextLineY2 = raw22e.slice(wallTextLineY2Offset, wallTextLineY2Offset + 4);
   const alcoveDecorationIndices = raw22e.slice(alcoveDecorationIndicesOffset, alcoveDecorationIndicesOffset + 4);

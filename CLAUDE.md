@@ -19,8 +19,9 @@ Corollaries:
   each other. Even CSBWin's own typos are preserved where they are identifiers
   (e.g. `TT_DESSAGE`).
 - Tables must be extracted at runtime from `graphics.dat` / `dungeon.dat`, never hardcoded.
-- Documented exceptions exist and are rare — see "Audio sample rates" in
-  `doc/PROVEN_FACTS.md`, the one place we knowingly diverge. Don't create new ones silently.
+- Documented exceptions exist and are rare — see "Audio sample rates" and "Crack Switch
+  (In) placement" in `doc/PROVEN_FACTS.md`, the two places we knowingly diverge (listed
+  under `DEBT.md` H). Don't create new ones silently.
 
 ## Where things are written down
 
@@ -67,7 +68,7 @@ was hiding among the type errors.
 There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is a runner
 (`tools/run-checks.mjs`) over two standing forms of evidence, and both must pass:
 
-- `tools/check-frames.sh` compares eight live screen states against `tools/frames/` — the
+- `tools/check-frames.sh` compares nine live screen states against `tools/frames/` — the
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is

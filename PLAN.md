@@ -788,9 +788,11 @@ never carried out, because the project has **no test framework**.
    `tools/` is inside the type gate. Shared helpers in `tools/lib/check.ts`.
    <sub>How it went, and the two real bugs it surfaced: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
 2. ⚠️ **Golden-frame rendering tests.** `tools/check-frames.sh` starts its own dev server
-   and headless Chrome and takes `--update`. Eight frames since Phase 16: the first six load
+   and headless Chrome and takes `--update`. Nine frames: the first six load
    the app with `?intro=0`, and `07-entrance` / `08-credits` load it again without, which is
    the only standing evidence that the corridor behind the prison doors actually renders.
+   `09-crack-switch` boots with `?intro=0` once more and places the party on level 4, in
+   front of a pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement").
    Still owed to make it a real test: a fixed set of *party positions* rather than whatever
    the boot dungeon gives, and rendering straight from the index buffer instead of a browser
    screenshot.

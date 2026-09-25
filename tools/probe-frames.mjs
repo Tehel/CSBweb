@@ -124,7 +124,7 @@ await wait(200);
 // used to press F8, a dev-only random-party key that no longer exists; driving the real
 // Hall of Champions needs no scaffolding in the app, only the public game API that
 // `tools/dump-hall-of-champions.ts` drives headlessly.
-await evaluate(`(()=>{
+const BUILD_PARTY = `(()=>{
   const { game, renderView } = window.__probe;
   const DELTA_X = [0, 1, 0, -1], DELTA_Y = [-1, 0, 1, 0];
   // HALK first: champion 0 is the one the frames below open an inventory and an attack
@@ -146,7 +146,8 @@ await evaluate(`(()=>{
   }
   renderView();
   return game.party.state.champions.map(c => c.name).join(',');
-})()`).then(names => console.log('  party:', names));
+})()`;
+await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
 await wait(600);
 console.log('state: party built');       await shot('02-party');
 // Right-click a party block (DM mask 1, button id 7) opens that champion's inventory.
@@ -194,6 +195,27 @@ console.log('state: entrance');          await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
 await canvasClick(270, 192, 0); await wait(1500);
 console.log('state: credits');           await shot('08-credits');
+
+// A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,
+// (14,29) facing west, after the click. The pushed-in crack must sit low on the wall where
+// the Out crack was, not at eye level where `graphics.dat`'s coordinate set would put it.
+// Built from a fresh `?intro=0` boot with the same party, since TouchWall needs a leader.
+// The click also opens the grid at (13,28), off to the right; the wait covers its opening.
+await send('Page.navigate', { url: `${APP}?intro=0` });
+await wait(3500);
+await evaluate(BUILD_PARTY);
+await evaluate(`(()=>{
+  const { game, renderView } = window.__probe;
+  const party = game.party.state;
+  party.position.x = 14; party.position.y = 29; party.position.z = 4;
+  party.facing = 3;
+  party.brightness = 1000;   // level 4 is dark, and no one holds a torch: full magic light
+  const touched = game.handleWallClick();
+  renderView();
+  return touched;
+})()`).then(t => console.log('  touched:', t));
+await wait(3000);
+console.log('state: crack switch');      await shot('09-crack-switch');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

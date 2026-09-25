@@ -1857,15 +1857,18 @@ Recorded so that nobody "fixes" them.
   nothing to drift against. If a boot-time animation ever has to agree with `d.Time`, this
   is the place that would have to change.
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** A developer
-  affordance with no CSBWin counterpart, kept deliberately: five of the eight golden frames
+  affordance with no CSBWin counterpart, kept deliberately: six of the nine golden frames
   boot through it.
 - 🚫 **Custom skins / `BACKGROUND_LIB`** (Phase 6). The shipped DM dungeon uses no custom
   backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here,
   so the branch is dead.
-- 🚫 **Audio sample rates** — the one documented exception to faithfulness;
+- 🚫 **Audio sample rates** — a documented exception to faithfulness;
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
+- 🚫 **Crack Switch (In) placement** — `Byte4100[55]` is read as 2, not `graphics.dat`'s
+  0, so a pressed crack switch stays low on the wall as in the Atari ST original;
+  `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
 - **Not debt, per the 2026-09-23 review** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
