@@ -12,8 +12,8 @@ const SOUND_DOOR_STRUGGLE = 4;
 const SOUND_TELEPORT = 17;
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { DungeonState } from './DungeonState';
+import type { GameContext } from './GameContext';
 import type { Champion, PartyState } from './gameTypes';
 import { characterAtPosition } from './AddCharacter';
 import {
@@ -55,7 +55,6 @@ import {
   setActuatorValue,
 } from '../data/actuatorHelpers';
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterFireResistance } from '../renderer/csbwin/ObjectTables';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
@@ -94,41 +93,6 @@ interface MonsterMove {
   noItem16: boolean;
 }
 
-export interface TimerTables {
-  monsterDesc?: ArrayLike<MonsterDesc>;
-  word1074?: number[];
-  /** `d.DropOrder[30]` — graphic `0x232`'s order for `DropAllPossessions`. */
-  dropOrder?: ArrayLike<number>;
-  /** `d.sound1772` — graphic `0x232`'s sound table, for `QueueSound`. */
-  soundTable?: ArrayLike<SoundTableEntry>;
-  /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC`. */
-  doorCharacteristics?: ArrayLike<number>;
-  /** `d.MonsterDroppings[40]` — what a dying monster leaves behind. */
-  monsterDroppings?: ArrayLike<number>;
-  /** `d.Byte10340[4]` — group facing byte when no `ITEM16` is attached. */
-  facingReplication?: ArrayLike<number>;
-  /** `d.uByte9672[8]` — monster attack sound ordinals. */
-  monsterAttackSounds?: ArrayLike<number>;
-  /** `d.uByte590[4]` — wound-location bitmasks. */
-  uByte590?: ArrayLike<number>;
-  /** `d.Byte586[8][4]` — attack order by side. */
-  byte586?: ArrayLike<ArrayLike<number>>;
-  /** `d.ClothingDesc[58].uByte1` / `.uByte2` — armour strength and flags. */
-  clothingArmour?: ArrayLike<number>;
-  clothingFlags?: ArrayLike<number>;
-  /** `d.Byte1412[6]` — per-body-part shield weighting. */
-  byte1412?: ArrayLike<number>;
-  /** Graphic `0x230`'s 44-entry `ATTACKTYPE` tables, for `AttackSystem`. */
-  experienceForAttacking?: ArrayLike<number>;
-  skillNumber?: ArrayLike<number>;
-  byte20046?: ArrayLike<number>;
-  byte20002?: ArrayLike<number>;
-  byte19958?: ArrayLike<number>;
-  byte19914?: ArrayLike<number>;
-  byte20090?: ArrayLike<number>;
-  attackNames?: ArrayLike<string>;
-}
-
 type MissileDropTarget = { monster: ObjectID } | null;
 
 export interface TimerHooks {
@@ -142,8 +106,6 @@ export interface TimerHooks {
    * and the weapon descriptors, both of which live in `Game`.
    */
   onEnableCharacterAction?: (chIdx: number, refillSlot: number) => void;
-  /** `d.Word11694` — non-zero once the game is won, which freezes `TT_24`. */
-  isGameWon?: () => boolean;
   onDsaTimer5?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer6?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
   onDsaTimer7?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
@@ -238,8 +200,6 @@ export interface TimerHooks {
   objDescWord4?: (rn: ObjectID) => number;
   /** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686`). */
   isAKey?: (rn: ObjectID) => boolean;
-  /** `QueueSound` — a sound named by ordinal, attenuated by distance from the party. */
-  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
   damageAllCharacters?: (damage: number, woundMask: number, kind: number) => number;
   /** `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`). */
@@ -289,15 +249,18 @@ export class TimerSystem {
    */
   private now = 0;
   private missileFilterTimer: TimerEntry | null = null;
+  private readonly dungeon: DungeonState;
+  private readonly timers: TimerQueue;
+  private readonly random: CsbRandom;
+
   constructor(
-    private dungeon: DungeonState,
-    private getPartyState: () => PartyState,
-    private timers: TimerQueue,
+    private readonly ctx: GameContext,
     private actuators: ActuatorSystem,
-    private random: CsbRandom,
-    private tables?: TimerTables,
     private hooks?: TimerHooks,
   ) {
+    this.dungeon = ctx.dungeon;
+    this.timers = ctx.timers;
+    this.random = ctx.random;
     this.dungeon.setTimerWord8Lookup((index) => this.timers.getTimerWord8(index));
   }
 
@@ -434,7 +397,7 @@ export class TimerSystem {
   }
 
   private processActionDisableTimer(timer: TimerEntry): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const chIdx = timer.uByte5 & 0xff;
     const champ = party.champions[chIdx];
     if (!champ) return;
@@ -446,7 +409,7 @@ export class TimerSystem {
   }
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     this.timers.createTimer(
       TimerFunction.TT_LIGHT,
       0,
@@ -462,18 +425,18 @@ export class TimerSystem {
   }
 
   applyBrightnessSteps(steps: number, sign: number): void {
-    const word1074 = this.tables?.word1074;
+    const word1074 = this.ctx.tables.word1074;
     if (!word1074 || word1074.length === 0) return;
     let idx = steps | 0;
     if (idx < 0) idx = -idx;
     if (idx >= word1074.length) idx = word1074.length - 1;
     const delta = (word1074[idx] ?? 0) * (sign >= 0 ? 1 : -1);
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     party.brightness = sw((party.brightness ?? 0) + delta);
   }
 
   private processLightLevelTimer(timer: TimerEntry): void {
-    const word1074 = this.tables?.word1074;
+    const word1074 = this.ctx.tables.word1074;
     if (!word1074 || word1074.length < 2) return;
 
     let steps = sw(timer.timerWord6);
@@ -489,7 +452,7 @@ export class TimerSystem {
       change = -change;
     }
 
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const current = party.brightness ?? 0;
     party.brightness = sw(current + change);
 
@@ -511,19 +474,19 @@ export class TimerSystem {
   }
 
   private processInvisibleTimer(): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const value = party.invisible - 1;
     party.invisible = value < 0 ? 0 : value;
   }
 
   private processSeeThruWallsTimer(): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const value = party.seeThruWalls - 1;
     party.seeThruWalls = value < 0 ? 0 : value;
   }
 
   private processPartyShieldTimer(timer: TimerEntry): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const current = party.partyShield;
     const next = current - sw(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
@@ -534,7 +497,7 @@ export class TimerSystem {
    * the Ya potion's contribution comes back off.
    */
   private processChampionShieldTimer(timer: TimerEntry): void {
-    const champ = this.getPartyState().champions[timer.uByte5 & 0xff];
+    const champ = this.ctx.party.state.champions[timer.uByte5 & 0xff];
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
     champ.shieldStrength = (champ.shieldStrength - sw(timer.timerWord6)) & 0xffff;
@@ -569,7 +532,7 @@ export class TimerSystem {
    */
   private processPoisonTimer(timer: TimerEntry): void {
     const chIdx = timer.uByte5 & 0xff;
-    const champ = this.getPartyState().champions[chIdx];
+    const champ = this.ctx.party.state.champions[chIdx];
     if (!champ) return;
     champ.poisonCount = Math.max(0, champ.poisonCount - 1);
     this.hooks?.onPoisonTick?.(chIdx, sw(timer.timerWord6));
@@ -613,21 +576,21 @@ export class TimerSystem {
   }
 
   private processSpellShieldTimer(timer: TimerEntry): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const current = party.spellShield;
     const next = current - sw(timer.timerWord6);
     party.spellShield = next < 0 ? 0 : next;
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const current = party.fireShield;
     const next = current - sw(timer.timerWord6);
     party.fireShield = next < 0 ? 0 : next;
   }
 
   private processMagicFootprintsTimer(): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const value = party.magicFootprintsActive - 1;
     party.magicFootprintsActive = value < 0 ? 0 : value;
   }
@@ -874,10 +837,10 @@ export class TimerSystem {
       //
       // Gated on `d.NumCharacter > 0` — an empty party is not squashed.
       if (this.isPartyAt(target) && doorState !== 0) {
-        if (this.getPartyState().champions.length > 0) {
+        if (this.ctx.party.state.champions.length > 0) {
           this.setDoorState(map, x, y, 0);
           const hurt = this.hooks?.damageAllCharacters?.(5, 4, 2) ?? 0;
-          if (hurt !== 0) this.hooks?.queueSound?.(SOUND_DOOR_OPENING, x, y, 1);
+          if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1);
         }
         this.timers.addTimer(timer);
         return;
@@ -896,7 +859,7 @@ export class TimerSystem {
       const monsterRn = this.dungeon.findFirstMonster(target);
       if (monsterRn !== OBJECT_ID_EOF) {
         const creature = this.dungeon.getCreatureRecord(monsterRn);
-        const desc = creature ? this.tables?.monsterDesc?.[creature.creatureType] : undefined;
+        const desc = creature ? this.ctx.tables.monsterDesc[creature.creatureType] : undefined;
         if (creature && desc && !monsterNonMaterial(desc)) {
           const needed = upDown ? monsterVerticalSize(desc) : 1;
           if (doorState >= needed) {
@@ -913,7 +876,7 @@ export class TimerSystem {
             }
             // The rebound: one step back up, floored at 0, then re-queue.
             this.setDoorState(map, x, y, doorState === 0 ? 0 : doorState - 1);
-            this.hooks?.queueSound?.(SOUND_DOOR_STRUGGLE, x, y, 1);
+            this.ctx.sounds.queueSound(SOUND_DOOR_STRUGGLE, x, y, 1);
             this.timers.addTimer(timer);
             return;
           }
@@ -955,7 +918,7 @@ export class TimerSystem {
   }
 
   private getPartyDistance(x: number, y: number, level: number): number | null {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (party.position.z !== level) return null;
     const dx = Math.abs((party.position.x ?? 0) - x);
     const dy = Math.abs((party.position.y ?? 0) - y);
@@ -1282,7 +1245,7 @@ export class TimerSystem {
       let consumeBonesRecord = false;
       const fingerprint = this.dungeon.copyChampionBonesRecord(target);
       if (fingerprint !== null) {
-        const found = findChampionByFingerprint(this.getPartyState(), fingerprint);
+        const found = findChampionByFingerprint(this.ctx.party.state, fingerprint);
         chIdx = found === -1 ? null : found;
         // ⏳ CSBWin's other arm here is the wings: a champion whose fingerprint
         // matches nobody in the party is fetched with `CHARDESC::GetFromWings`,
@@ -1292,7 +1255,7 @@ export class TimerSystem {
         // nothing to look in, and the bones are left on the floor rather than
         // silently destroyed.
         if (chIdx === null) return;
-        if (!this.isChampionDead(this.getPartyState().champions[chIdx])) return;
+        if (!this.isChampionDead(this.ctx.party.state.champions[chIdx])) return;
         consumeBonesRecord = true;
       } else {
         // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2789`). Bones with no
@@ -1304,7 +1267,7 @@ export class TimerSystem {
         const record = this.dungeon.getMiscRecord(target);
         if (!record) return;
         chIdx = (record.specialState ?? 0) & 0x3;
-        const champ = this.getPartyState().champions[chIdx];
+        const champ = this.ctx.party.state.champions[chIdx];
         // `if (chIndex < d.NumCharacter)`, then `if (HP() != 0) break`.
         if (!champ) return;
         if (!this.isChampionDead(champ)) return;
@@ -1385,7 +1348,7 @@ export class TimerSystem {
    * a 64th of their maximum health for good, floored at 25.
    */
   private bringCharacterToLife(chIdx: number): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const champ = party.champions[chIdx];
     if (!champ) return;
 
@@ -1435,7 +1398,7 @@ export class TimerSystem {
   }
 
   private isPartyAt(position: Position): boolean {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const pos = party.position;
     return pos.x === position.x && pos.y === position.y && pos.z === position.z;
   }
@@ -1447,7 +1410,7 @@ export class TimerSystem {
    * false-wall timer does (doc/CSBwin-src/Timer.cpp:1466-1472).
    */
   private isNonMaterialMonsterAt(position: Position): boolean {
-    const table = this.tables?.monsterDesc;
+    const table = this.ctx.tables.monsterDesc;
     if (!table) return false;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category !== DBType.CREATURE) continue;
@@ -1520,7 +1483,7 @@ export class TimerSystem {
     }
     // `CreateMonster` makes its own sound only off the party's level; an audible
     // generator always queues one (`doc/CSBwin-src/Timer.cpp:1797-1800`).
-    if (audible) this.hooks?.queueSound?.(SOUND_TELEPORT, target.x, target.y, 1);
+    if (audible) this.ctx.sounds.queueSound(SOUND_TELEPORT, target.x, target.y, 1);
 
     if (isActuatorOnceOnly(actuator)) {
       setActuatorType(actuator, 0);
@@ -1861,7 +1824,7 @@ export class TimerSystem {
   checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
     if (this.missileFilterObject !== OBJECT_ID_EOF) return;
 
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const movedObjectType = movedObject === null ? -2 : -1;
     const whoLeavesCell = [0, 0, 0, 0];
     const whoLeavesNewCell = [0, 0, 0, 0];
@@ -1881,7 +1844,7 @@ export class TimerSystem {
       const hasHp = (monster.hp ?? []).some((hp) => (hp ?? 0) > 0);
       if (!hasHp) return;
       for (let pos = 0; pos < 4; pos++) {
-        if (ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, pos) !== 0) {
+        if (ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, pos) !== 0) {
           whoLeavesCell[pos] = (pos + 1) & 0xff;
         }
       }
@@ -2068,7 +2031,7 @@ export class TimerSystem {
         // marks a door missiles can pass: a non-physical spell always does, a thrown
         // object if it still has range to beat `STRandom(128)`, fits in a pouch and is
         // not a key.
-        const tocHigh = (this.dungeon.doorTOC(position.z, door.doorType, this.tables?.doorCharacteristics) >> 8) & 0xff;
+        const tocHigh = (this.dungeon.doorTOC(position.z, door.doorType, this.ctx.tables.doorCharacteristics) >> 8) & 0xff;
         if (tocHigh & 2) {
           let passes: boolean;
           if (projectileDbType === DBType.CLOUD) {
@@ -2095,7 +2058,7 @@ export class TimerSystem {
         // names the champion, and an empty one — or one holding only a corpse, since
         // `CharacterAtPosition` skips the dead — lets the missile fly on. From here on
         // `objectPos` *is* a champion index, including in the filter call below.
-        const chIdx = characterAtPosition(this.getPartyState().champions, objectPos & 0x3);
+        const chIdx = characterAtPosition(this.ctx.party.state.champions, objectPos & 0x3);
         if (chIdx < 0) return false;
         if (this.missileEncounterFilter(7, position, objectPos, missileRn, filterProjectile, chIdx) === 1) {
           return false;
@@ -2130,7 +2093,7 @@ export class TimerSystem {
         if (!monster) return false;
         // The member in the corner the missile reached. Nobody there lets it fly on —
         // unless the group is drawn as one full-cell figure, when member 1 takes it.
-        let monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.tables?.monsterDesc, monster, objectPos);
+        let monsterOrdinal = ordinalOfMonsterAtPosition(this.dungeon, this.ctx.tables.monsterDesc, monster, objectPos);
         if (monsterOrdinal === 0) {
           if (!monster.drawAsSize4) return false;
           monsterOrdinal = 1;
@@ -2139,7 +2102,7 @@ export class TimerSystem {
           return false;
         }
         const monsterType = monster.creatureType;
-        const desc = this.tables?.monsterDesc?.[monsterType];
+        const desc = this.ctx.tables.monsterDesc[monsterType];
         if (!desc) return false;
 
         // A fireball feeds a Black Flame: `hitPoints6 = Smaller(1000, hp + magic)`, and
@@ -2366,7 +2329,7 @@ export class TimerSystem {
    * Fluxcages around Lord Chaos standing through the endgame.
    */
   private processExpireObject(timer: TimerEntry): void {
-    if (this.hooks?.isGameWon?.()) return;
+    if (this.ctx.state.gameWon) return;
     // `timeEnt.timerObj8()`: the object, which this port keeps on `object`, as every
     // creator of a `TT_24` / `TT_25` puts it there (`CreateFluxcage`, Code11f52.cpp:1535).
     const rn = timer.object ?? OBJECT_ID_EOF;
@@ -2425,7 +2388,7 @@ export class TimerSystem {
       if (damage === 0) return;
     }
 
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (position.z === party.position.z && objX === party.position.x && objY === party.position.y) {
       this.hooks?.damageAllCharacters?.(damage, 63, 1);
       return;
@@ -2435,7 +2398,7 @@ export class TimerSystem {
     if (monsterRn === OBJECT_ID_EOF) return;
     const monster = this.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return;
-    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return;
     const fireResistance = monsterFireResistance(desc);
     if (fireResistance === 15) return;
@@ -2474,14 +2437,14 @@ export class TimerSystem {
     if (!cloud) return;
 
     const roomType = (this.dungeon.getCellFlag(position) >> 5) & 7;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const partyHere =
       timer.level === party.position.z && x === party.position.x && y === party.position.y;
 
     const monsterRn = this.dungeon.findFirstMonster(position);
     const monster = monsterRn !== OBJECT_ID_EOF ? this.dungeon.getCreatureRecord(monsterRn) : null;
     const monsterType = monster ? monster.creatureType : -1;
-    const desc = monster ? this.tables?.monsterDesc?.[monsterType] : null;
+    const desc = monster ? this.ctx.tables.monsterDesc[monsterType] : null;
 
     const kind = (0xff80 + (cloud.cloudType & 0x7f)) & 0xffff;
 
@@ -2518,7 +2481,7 @@ export class TimerSystem {
 
       case RN_FFE4:
         cloud.cloudType = (cloud.cloudType + 1) & 0x7f;
-        this.hooks?.queueSound?.(5, x, y, 1);
+        this.ctx.sounds.queueSound(5, x, y, 1);
         reschedule = true;
         break;
 
@@ -2592,7 +2555,7 @@ export class TimerSystem {
     if (!door) return false;
 
     if (explosion ? !door.destructibleByFireball : !door.destructibleByChop) return false;
-    const toc = this.dungeon.doorTOC(position.z, door.doorType, this.tables?.doorCharacteristics) & 0xff;
+    const toc = this.dungeon.doorTOC(position.z, door.doorType, this.ctx.tables.doorCharacteristics) & 0xff;
     if (force < toc) return false;
 
     const map = this.dungeon.getMap(position.z);
@@ -2640,7 +2603,6 @@ export class TimerSystem {
    * so a dropped scroll or piece of food played an explosion.
    */
   private playMissileImpactSound(projectile: ObjectID, position: Position): void {
-    if (!this.hooks?.queueSound) return;
     let soundNum: number;
     if (!this.isMagicSpell(projectile) && decodeObjectID(projectile).category === DBType.WEAPON) {
       soundNum = 0;
@@ -2649,7 +2611,7 @@ export class TimerSystem {
     } else {
       soundNum = 4;
     }
-    this.hooks.queueSound(soundNum, position.x, position.y, 1);
+    this.ctx.sounds.queueSound(soundNum, position.x, position.y, 1);
   }
 
   /**
@@ -2663,13 +2625,12 @@ export class TimerSystem {
    * whatever ordinal 13 sounds like instead of a quieter version of its own blast.
    */
   private playCloudSound(projectile: ObjectID, size: number, position: Position): void {
-    if (!this.hooks?.queueSound) return;
     if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
-      this.hooks.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1);
+      this.ctx.sounds.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1);
       return;
     }
     if (projectile !== RN_MONSTER_DEATH) {
-      this.hooks.queueSound(13, position.x, position.y, 1);
+      this.ctx.sounds.queueSound(13, position.x, position.y, 1);
     }
   }
 
@@ -2871,7 +2832,7 @@ export class TimerSystem {
   }
 
   private wiggleParty(position: Position): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const result = this.resolveCellEffects(position, -1, 0, party.facing, undefined, true);
     if (!result.moved) return;
 
@@ -2939,7 +2900,7 @@ export class TimerSystem {
     if (type === DBType.CREATURE && newX >= 0) {
       throw new Error('moveObject: placing a monster is MonsterSystem.moveMonster');
     }
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const levitated = type === DBType.MISSILE
       || (type === DBType.CREATURE && this.isMonsterLevitating(this.dungeon.getCreatureRecord(object)));
     const partyOn = (x: number, y: number, z: number): boolean =>
@@ -3020,7 +2981,7 @@ export class TimerSystem {
     const decoded = decodeObjectID(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
     const facing = rec?.facing ?? 0;
-    const partyLevel = this.getPartyState().position.z;
+    const partyLevel = this.ctx.party.state.position.z;
     const item16Attached = destination.z === partyLevel && oldX >= 0;
     const result = this.resolveCellEffects(
       destination,
@@ -3216,7 +3177,7 @@ export class TimerSystem {
           if (!below) break;
           position = below;
         }
-        const exit = this.dungeon.getExitStairsDirection(position, this.getPartyState().facing as Direction);
+        const exit = this.dungeon.getExitStairsDirection(position, this.ctx.party.state.facing as Direction);
         position = new Position(position.x + DELTA_X[exit]!, position.y + DELTA_Y[exit]!, position.z);
         const back = (exit + 2) & 0x3;
         curPos = ((((curPos - back + 1) & 2) >> 1) + back) & 0x3;
@@ -3303,7 +3264,7 @@ export class TimerSystem {
    * through a whole chain of pits and only the first drop is free.
    */
   private partyFallsIntoPit(): void {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (party.champions.length === 0) return;
 
     if (this.supressPitDamage) {
@@ -3321,7 +3282,7 @@ export class TimerSystem {
     } else {
       const hurt = this.hooks?.damageAllCharacters?.(20, 48, 2) ?? 0;
       if (hurt !== 0) {
-        this.hooks?.queueSound?.(6, party.position.x, party.position.y, 0);
+        this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0);
       }
     }
     this.supressPitDamage = false;
@@ -3354,7 +3315,7 @@ export class TimerSystem {
 
   private isMonsterLevitating(rec: CreatureRecord | null): boolean {
     if (!rec) return false;
-    const desc = this.tables?.monsterDesc?.[rec.creatureType];
+    const desc = this.ctx.tables.monsterDesc[rec.creatureType];
     if (!desc) return false;
     return monsterLevitating(desc);
   }
@@ -3391,7 +3352,7 @@ export class TimerSystem {
     let newPositions = positions;
 
     if (positions !== 0xff) {
-      const desc = this.tables?.monsterDesc?.[monster.creatureType];
+      const desc = this.ctx.tables.monsterDesc[monster.creatureType];
       const horizontalSize = desc ? monsterHorizontalSize(desc) : 0;
       const numMonM1 = monster.numMonM1 & 0x3;
       let facingShift = facings & 0xff;
@@ -3426,7 +3387,7 @@ export class TimerSystem {
       if (positions !== 0xff) monster.groupIndex = newPositions & 0xff;
     }
 
-    const partyLevel = this.getPartyState().position.z;
+    const partyLevel = this.ctx.party.state.position.z;
     const code = move.attachedLevel === partyLevel && monster.fear === StateOfFear.StateOfFear6
       ? monster.groupIndex + 2
       : 1;
@@ -3434,7 +3395,7 @@ export class TimerSystem {
   }
 
   private getMonsterItem16(monster: CreatureRecord, level: number): Item16Record | null {
-    const partyLevel = this.getPartyState().position.z;
+    const partyLevel = this.ctx.party.state.position.z;
     if (level !== partyLevel) return null;
     return this.dungeon.getAttachedItem16(monster);
   }

@@ -24,7 +24,7 @@ import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { ActuatorSystem, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
-import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
+import { TimerSystem, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
 import { createGameContext, nameIndexOf, type GameContext } from './GameContext';
@@ -383,30 +383,6 @@ export class Game {
         const { playSound, timerHooks, monsterHooks } = options;
         this.tables = tables;
         this.addCharacterTables = { objDescCarryMask: tables.objDescWord4, carryLocation: tables.carryLocation };
-        // The subsystems still take the slices they always did (`DEBT.md` E1b retires them).
-        const timerTables: TimerTables = {
-            monsterDesc: tables.monsterDesc,
-            word1074: tables.word1074,
-            dropOrder: tables.dropOrder,
-            soundTable: tables.sound1772,
-            doorCharacteristics: tables.doorCharacteristics,
-            monsterDroppings: tables.monsterDroppings,
-            facingReplication: tables.byte10340,
-            monsterAttackSounds: tables.uByte9672,
-            uByte590: tables.uByte590,
-            byte586: tables.byte586,
-            clothingArmour: tables.clothingArmour,
-            clothingFlags: tables.clothingFlags,
-            byte1412: tables.byte1412,
-            experienceForAttacking: tables.experienceForAttacking,
-            skillNumber: tables.skillNumber,
-            byte20046: tables.byte20046,
-            byte20002: tables.byte20002,
-            byte19958: tables.byte19958,
-            byte19914: tables.byte19914,
-            byte20090: tables.byte20090,
-            attackNames: tables.attackNames,
-        };
 
         const ctx = createGameContext(dungeonData, tables, playSound);
         this.ctx = ctx;
@@ -429,12 +405,8 @@ export class Game {
         });
         this.dsaSystem = new DsaSystem(ctx, this.actuators);
         this.timerSystem = new TimerSystem(
-            this.dungeonState,
-            () => this.party.state,
-            this.timerQueue,
+            ctx,
             this.actuators,
-            this.random,
-            timerTables,
             {
                 onDsaTimer5: (rn, timer, loc) => this.dsaSystem.processTimer5(rn, timer, loc),
                 onDsaTimer6: (rn, timer, loc) => this.dsaSystem.processTimer6(rn, timer, loc),
@@ -461,8 +433,6 @@ export class Game {
                 onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
                 // The cloud machinery: `ProcessTT_25` needs to hurt whatever is standing
                 // in the cloud, and those live in MonsterAttack and MonsterDamage.
-                queueSound: (ordinal, mapX, mapY, deltaTime) =>
-                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 damageAllCharacters: (damage, woundMask, kind) =>
                     this.monsterAttack.damageAllCharacters(damage, woundMask, kind),
                 damageMonsterGroup: (monster, level, mapX, mapY, damage, noItem16, apply) =>
@@ -496,7 +466,6 @@ export class Game {
                 onPartyMoved: () => this.notePartyMoved(),
                 onPoisonTick: (chIdx, remaining) => this.monsterAttack.poisonCharacter(chIdx, remaining),
                 onEnableCharacterAction: (chIdx, refillSlot) => this.enableCharacterAction(chIdx, refillSlot),
-                isGameWon: () => this.gameWon,
                 onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
                 playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
                 ...timerHooks,
@@ -573,30 +542,13 @@ export class Game {
         this.characterStats = new CharacterStats(ctx);
         this.monsterAttack.setCharacterStats(this.characterStats);
 
-        this.attackSystem = new AttackSystem({
-            dungeon: this.dungeonState,
-            random: this.random,
-            getPartyState: () => this.party.state,
-            getTime: () => this.state.tickCount,
-            tables: {
-                monsterDesc: tables.monsterDesc,
-                experienceForAttacking: tables.experienceForAttacking,
-                skillNumber: tables.skillNumber,
-                byte20046: tables.byte20046,
-                byte20002: tables.byte20002,
-                byte19958: tables.byte19958,
-                byte19914: tables.byte19914,
-                attackNames: tables.attackNames,
-                word1074: tables.word1074,
-            },
+        this.attackSystem = new AttackSystem(ctx, {
             monsterDamage: this.monsterDamage,
             monsterAttack: this.monsterAttack,
             monsters: this.monsterSystem,
             dsa: this.dsaSystem,
             characterStats: this.characterStats,
             hooks: {
-                queueSound: (ordinal, mapX, mapY, deltaTime) =>
-                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
                 disableCharacterAction: (chIdx, timeDelay) => this.disableCharacterAction(chIdx, timeDelay),
                 hitDoor: (position, force, explosion, delay) =>
@@ -634,7 +586,6 @@ export class Game {
                 },
                 adjustSkills: (chIdx, skillNumber, experience, why) =>
                     this.applySpellSkillGain(chIdx, skillNumber, experience, why),
-                nameIndex: (rn) => this.nameIndex(rn),
                 possession: (champ, slot) => this.getChampionPossession(champ, slot),
                 trace: monsterHooks?.trace,
             },

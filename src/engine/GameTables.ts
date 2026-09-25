@@ -70,7 +70,7 @@ export interface GameTables {
   readonly doorCharacteristics: ArrayLike<number>;
   /** `d.Byte1596[8]` — the room-type timer functions (the port's `roomTimerFunctions`). */
   readonly byte1596: ArrayLike<number>;
-  /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness (`Data.h:1424`). */
+  /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
   readonly word1074: number[];
 
   // --- The party: where a blow lands, how a shield covers it, the message colours ---
@@ -84,7 +84,9 @@ export interface GameTables {
   /** `d.Byte1386[4]` — each champion's message colour (the port's `championMessageColors`). */
   readonly byte1386: ArrayLike<number>;
 
-  // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:638-651`) ---
+  // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:638-651`).
+  //     CSBWin names most of them after their addresses, and so do we: nothing in the C++
+  //     says what four of them mean. ---
 
   /** `d.experienceForAttacking[44]` (`Byte20178`). */
   readonly experienceForAttacking: ArrayLike<number>;
@@ -92,15 +94,15 @@ export interface GameTables {
   readonly skillNumber: ArrayLike<number>;
   /** `d.Byte20046[44]` — base stamina cost. */
   readonly byte20046: ArrayLike<number>;
-  /** `d.Byte20002[44]`. */
+  /** `d.Byte20002[44]` — only ever read as `75 - this`, the second-chance luck threshold. */
   readonly byte20002: ArrayLike<number>;
-  /** `d.Byte19958[44]`. */
+  /** `d.Byte19958[44]` — scales the throwing distance into damage, over 32. */
   readonly byte19958: ArrayLike<number>;
   /** `d.Byte19914[44]` — how long the attack keeps the champion busy. */
   readonly byte19914: ArrayLike<number>;
   /** `d.Byte20090[44]` — the defence penalty an attack type carries while busy. */
   readonly byte20090: ArrayLike<number>;
-  /** `d.AttackNames` — "KICK", "PUNCH", … in `ATTACKTYPE` order. */
+  /** `d.AttackNames` — "KICK", "PUNCH", … in `ATTACKTYPE` order. Trace only. */
   readonly attackNames: ArrayLike<string>;
   /** The spell table graphic `0x230` carries, for `CastSpell`. */
   readonly spells: readonly SpellDefinition[];

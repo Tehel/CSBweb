@@ -31,7 +31,7 @@ import { DescIndex } from '../src/engine/objectIndex';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { newGame } from './lib/game';
+import { gameTablesOf } from './lib/game';
 import { check, finish } from './lib/check';
 
 const graphics = new GraphicsLoader();
@@ -39,12 +39,13 @@ graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-
 const viewportTables = extractViewportTables(graphics);
 const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
 
-function makeGame(): Game {
+/** A game whose `d.DoorCharacteristics` are all `doorToc`, so any door has that `DoorTOC`. */
+function makeGame(doorToc: number): Game {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const game = newGame(data, graphics);
+  const game = new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [doorToc, doorToc, doorToc, doorToc] });
   game.setRandomSeed(0x12345678);
   return game;
 }
@@ -113,7 +114,7 @@ function encounter(
   range = 255,
   pick?: (game: Game) => ObjectID,
 ): Outcome {
-  const game = makeGame();
+  const game = makeGame(door.toc);
   const ts = game.timerSystem as any;
   const at = findClosedDoor(game);
   const map = game.dungeonState.getMap(at.z)!;
@@ -122,7 +123,6 @@ function encounter(
   const record = game.dungeonState.getDoorRecordByIndex(decodeObjectID(rn).index)!;
   record.hasButton = door.button ?? false;
   record.destructibleByChop = door.chop ?? true;
-  ts.tables.doorCharacteristics = [door.toc, door.toc, door.toc, door.toc];
 
   const thrown = pick ? pick(game) : projectile;
   ts.now = 100;
