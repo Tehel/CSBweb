@@ -1,14 +1,15 @@
 /**
- * Main game class
- *
- * Ties together all game systems and implements game loop
- * Based on CSBWin's VBL-driven game loop
+ * `Game` — CSBWin's main loop (the VBL-driven tick of `CSBCode.cpp`: `runFrame`,
+ * `gameTick`, `tag0006a4`, `HandleMouseEvents` and the mouse queue's front door), the
+ * construction of every system over one `GameContext`, and one-line facades for
+ * `main.ts`, the UI and `tools/`. Everything else lives in the system that ports its
+ * CSBWin file (`DEBT.md` E2).
  */
 
 import type { DungeonData } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
-import { Party, ensureHandOwner, setHandOwner } from './Party';
+import { Party, ensureHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
@@ -39,7 +40,6 @@ import { CsbRandom } from '../core/random';
 
 import { CharacterStats } from './CharacterStats';
 import type { GameTables } from './GameTables';
-import { computeChampionFingerprint } from './AddCharacter';
 
 /**
  * Game event callback types
@@ -506,23 +506,9 @@ export class Game {
         return result;
     }
 
-    /**
-     * Add a champion to the party
-     */
+    /** A pre-built champion joins, as the tools' do (`HallOfChampions.addChampion`). */
     addChampion(champion: Champion): boolean {
-        // `AddCharacter`'s fingerprint (doc/CSBwin-src/Character.cpp:513-516), given
-        // once, on joining, as `addCharacter` gives it: this is how the tools'
-        // champions join.
-        const pos = this.party.state.position;
-        champion.fingerprint = computeChampionFingerprint(this.party.state.champions, pos.z, pos.x, pos.y);
-        if (!this.party.addChampion(champion)) return false;
-        // `if (d.NumCharacter == 1) SetHandOwner(0)` — the first champion to join the
-        // party gets the cursor (doc/CSBwin-src/Character.cpp:706-710). Every inventory
-        // click is gated on someone owning it.
-        if (this.party.state.champions.length === 1) {
-            setHandOwner(this.party.state, 0);
-        }
-        return true;
+        return this.hallOfChampions.addChampion(champion);
     }
 
     /** Button 160-162 on the potential champion's eye panel (`HallOfChampions`). */

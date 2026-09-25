@@ -55,6 +55,24 @@ export class HallOfChampions {
   }
 
   /**
+   * A champion built outside a mirror joins the party — how the tools' champions join.
+   * `AddCharacter`'s two steps such a champion still needs: the fingerprint, given once,
+   * on joining (doc/CSBwin-src/Character.cpp:513-516), and `if (d.NumCharacter == 1)
+   * SetHandOwner(0)` — the first champion to join gets the cursor (`:706-710`). Every
+   * inventory click is gated on someone owning it.
+   */
+  addChampion(champion: Champion): boolean {
+    const party = this.ctx.party;
+    const pos = party.state.position;
+    champion.fingerprint = computeChampionFingerprint(party.state.champions, pos.z, pos.x, pos.y);
+    if (!party.addChampion(champion)) return false;
+    if (party.state.champions.length === 1) {
+      setHandOwner(party.state, 0);
+    }
+    return true;
+  }
+
+  /**
    * `AddCharacter` (`doc/CSBwin-src/Character.cpp:456`) — a click on a Hall of
    * Champions mirror.
    *
