@@ -39,12 +39,10 @@ async function main(): Promise<void> {
   let turnsStarted = 0;
   let turnsPassedGate = 0;
   const game = newGame(data, graphics, {
-    monsterHooks: {
-      trace: (l) => {
-        if (l.startsWith('MonsterAI ')) turnsStarted++;
-        if (l.includes('MAI Passed.')) turnsPassedGate++;
-        if (traceLines.length < 200) traceLines.push(l);
-      },
+    trace: (l) => {
+      if (l.startsWith('MonsterAI ')) turnsStarted++;
+      if (l.includes('MAI Passed.')) turnsPassedGate++;
+      if (traceLines.length < 200) traceLines.push(l);
     },
   });
   game.setRandomSeed(0x12345678);

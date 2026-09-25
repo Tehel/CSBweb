@@ -59,12 +59,6 @@ const SOUND_ORDINAL_TELEPORT = 17;
 export const GROUP_INDEX_DETACHED = 0xd8;
 export const GROUP_INDEX_DETACHED_SIZE4 = 0xff;
 
-/** What `MonsterSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
-export interface MonsterSystemHooks {
-  /** Dev-only AI trace sink; mirrors CSBWin's `AITraceActive` output. */
-  trace?: (line: string) => void;
-}
-
 /**
  * `DB4::Unique()` (doc/CSBwin-src/CSB.h:1129) — `drawAsSize4Monsters && BITS13_13(word14)`.
  * `drawAsSize4Monsters` is a design option from a save's extended-features block
@@ -96,7 +90,7 @@ export class MonsterSystem {
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
 
-  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterSystemHooks = {}) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -858,7 +852,7 @@ export class MonsterSystem {
   }
 
   private trace(line: string): void {
-    this.hooks.trace?.(line);
+    this.ctx.host.trace(line);
   }
 }
 

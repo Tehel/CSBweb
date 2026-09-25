@@ -224,10 +224,24 @@ async function init() {
             const playSound = soundManager
                 ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
+            // The `GameHost`: what the engine asks of the page. The renderer does not exist
+            // yet, so the engine→UI notices reach it through the variable.
             game = new Game(dungeon, gameTables, {
                 cursorFilter: handleCursorFilter,
                 messages: scrollingText,
                 playSound,
+                // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow
+                // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`)
+                // or the adventure lists back (`CSBCode.cpp:7056-7057`), and the message
+                // area with its tenfold timeout (`CSBCode.cpp:1546-1553`).
+                sleepChanged: (sleeping) => {
+                    renderer?.setUIMode(sleeping ? UIMode.Sleeping : UIMode.Adventure);
+                    scrollingText.setPartySleeping(sleeping);
+                },
+                // The first half of Reincarnate: the engine raises the name-entry screen
+                // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`); the
+                // screen's answer comes back through `setReincarnateNamedHandler` below.
+                openReincarnateScreen: (chIdx) => renderer?.openReincarnateScreen(chIdx),
             });
 
             // Initialize viewport renderer
@@ -251,10 +265,8 @@ async function init() {
             renderer.setResurrectReincarnateCancelHandler((button) => {
                 game?.resurrectReincarnateCancel(button);
             });
-            // The two halves of Reincarnate: the engine raises the name-entry screen,
-            // and the screen hands the typed name back so the engine can finish
-            // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`).
-            game.openReincarnateScreen = (chIdx) => renderer?.openReincarnateScreen(chIdx);
+            // The second half of Reincarnate: the screen hands the typed name back so the
+            // engine can finish (the first half is the host's `openReincarnateScreen`).
             renderer.setReincarnateNamedHandler((chIdx, name, title) => {
                 game?.reincarnateNamed(chIdx, name, title);
                 renderView();
@@ -381,15 +393,8 @@ async function init() {
                 () => game?.consumeAttackDamageToDisplay() ?? 0,
             );
 
-            // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow wakes it.
-            // The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`) or the
-            // adventure lists back (`CSBCode.cpp:7056-7057`), and the message area with
-            // its tenfold timeout (`CSBCode.cpp:1546-1553`).
+            // Buttons 145 and 146 (the host's `sleepChanged` is the engine's answer).
             renderer.setSleepHandlers(() => game?.sleep(), () => game?.wakeUp());
-            game.onSleepChanged((sleeping) => {
-                renderer?.setUIMode(sleeping ? UIMode.Sleeping : UIMode.Adventure);
-                scrollingText.setPartySleeping(sleeping);
-            });
 
             game.onTick(() => {
                  if (!renderer || !game) return;

@@ -82,13 +82,6 @@ export interface MessageSink {
 export const MSG_COLOR_SPELL = 4;
 export const MSG_COLOR_ROOM_TEXT = 15;
 
-/** What `ActuatorSystem` calls that is not in the context (`DEBT.md` E1c/E1d retire these). */
-export interface ActuatorHooks {
-  cursorFilter?: CursorFilterHook;
-  messages?: MessageSink;
-  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-}
-
 export class ActuatorSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
@@ -98,30 +91,19 @@ export class ActuatorSystem {
   private readonly objDescObjectType: ArrayLike<number>;
   /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
   private readonly championMessageColors: ArrayLike<number>;
-  private readonly cursorFilter?: CursorFilterHook;
-  private readonly messages?: MessageSink;
-  private readonly playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
   private delayedActionY = 0;
   private delayedActionZ = 0;
   private delayedActionPos = -1;
 
-  constructor(private readonly ctx: GameContext, hooks: ActuatorHooks = {}) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
     this.roomTimerFunctions = ctx.tables.byte1596;
     this.objDescObjectType = ctx.tables.objDescObjectType;
     this.championMessageColors = ctx.tables.byte1386;
-    this.cursorFilter = hooks.cursorFilter;
-    this.messages = hooks.messages;
-    this.playSound = hooks.playSound;
-  }
-
-  /** Expose the message sink so sibling systems (Game) can compose fragments. */
-  getMessages(): MessageSink | undefined {
-    return this.messages;
   }
 
   /** CSBWin per-champion message colour `d.Byte1386[chIdx]`; 13 is the historical default. */
@@ -389,7 +371,7 @@ export class ActuatorSystem {
           if (!switchOpen) {
             result = true;
             if (isActuatorAudible(rec)) {
-              this.playSound?.(SoundIndex.SWITCH);
+              this.ctx.host.playSound(SoundIndex.SWITCH);
             }
             if (!emptyHanded && (actuatorType === 4 || actuatorType === 11 || actuatorType === 17)) {
               const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand, position, actuatorPos);
@@ -524,7 +506,7 @@ export class ActuatorSystem {
     }
 
     if (isActuatorAudible(rec)) {
-      this.playSound?.(SoundIndex.SWITCH);
+      this.ctx.host.playSound(SoundIndex.SWITCH);
     }
 
     // Always -1, an alcove's wall position included (doc/CSBwin-src/Code11f52.cpp:3875).
@@ -623,8 +605,8 @@ export class ActuatorSystem {
           // CSBWin: `QuePrintLines(15, text)` with no preceding PrintLinefeed() — the
           // decoder prepends the linefeed itself for typeOfText 1
           // (doc/CSBwin-src/Code11f52.cpp:3962, doc/CSBwin-src/CSBCode.cpp:5510).
-          if (text && this.messages) {
-            this.messages.quePrintLines(MSG_COLOR_ROOM_TEXT, text);
+          if (text) {
+            this.ctx.host.messages.quePrintLines(MSG_COLOR_ROOM_TEXT, text);
           }
           continue;
         }
@@ -735,7 +717,6 @@ export class ActuatorSystem {
   }
 
   private queueLevelUpMessage(chIdx: number, basicSkill: number): void {
-    if (!this.messages) return;
     const party = this.ctx.party.state;
     const champ = party.champions[chIdx];
     if (!champ) return;
@@ -744,11 +725,12 @@ export class ActuatorSystem {
     // CSBWin LevelUp (doc/CSBwin-src/Magic.cpp:173-177): linefeed, then four fragments in
     // the champion's own colour, flowing onto one wrapped line.
     const color = this.getChampionMessageColor(chIdx);
-    this.messages.printLinefeed();
-    this.messages.quePrintLines(color, champ.name);
-    this.messages.quePrintLines(color, ' JUST GAINED A ');
-    this.messages.quePrintLines(color, label);
-    this.messages.quePrintLines(color, ' LEVEL');
+    const messages = this.ctx.host.messages;
+    messages.printLinefeed();
+    messages.quePrintLines(color, champ.name);
+    messages.quePrintLines(color, ' JUST GAINED A ');
+    messages.quePrintLines(color, label);
+    messages.quePrintLines(color, ' LEVEL');
   }
 
   notifyLevelUp(chIdx: number, basicSkill: number): void {
@@ -841,8 +823,7 @@ export class ActuatorSystem {
     position: Position,
     pos: number,
   ): boolean {
-    if (!this.cursorFilter) return true;
-    return this.cursorFilter({
+    return this.ctx.host.cursorFilter({
       type,
       object,
       level: position.z,

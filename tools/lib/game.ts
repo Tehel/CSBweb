@@ -10,8 +10,9 @@ import { resolve } from 'node:path';
 
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
-import { Game, type GameOptions } from '../../src/engine/Game';
+import { Game } from '../../src/engine/Game';
 import { createGameContext, type GameContext } from '../../src/engine/GameContext';
+import type { GameHost } from '../../src/engine/GameHost';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
 
 const built = new WeakMap<GraphicsLoader, GameTables>();
@@ -36,9 +37,9 @@ export function gameTablesOf(graphics: GraphicsLoader): GameTables {
   return tables;
 }
 
-/** A `Game` over `data` with every table from `graphics`. */
-export function newGame(data: DungeonData, graphics: GraphicsLoader, options?: GameOptions): Game {
-  return new Game(data, gameTablesOf(graphics), options);
+/** A `Game` over `data` with every table from `graphics`, and the parts of `host` the tool listens to. */
+export function newGame(data: DungeonData, graphics: GraphicsLoader, host?: Partial<GameHost>): Game {
+  return new Game(data, gameTablesOf(graphics), host);
 }
 
 /**

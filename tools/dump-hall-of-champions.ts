@@ -46,6 +46,8 @@ const CANCEL = 162;
 
 /** The graphics loader, kept aside so the portrait section can re-read its tables. */
 let sharedGraphics: GraphicsLoader | null = null;
+/** Where the games' `GameHost.openReincarnateScreen` goes; a scenario points it at its screen. */
+let reincarnateScreen: (chIdx: number) => void = () => {};
 
 function makeGame(): Game {
   const loader = new DungeonLoader();
@@ -63,6 +65,7 @@ function makeGame(): Game {
       printLinefeed: () => { messages.push({ color: -1, text: '\n' }); },
       quePrintLines: (color, text) => { messages.push({ color, text }); },
     },
+    openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
   });
   game.setRandomSeed(0x12345678);
   (game as unknown as { probeMessages: typeof messages }).probeMessages = messages;
@@ -305,7 +308,7 @@ function main(): void {
   // penalties are charged. With no UI attached the engine stops at exactly that point,
   // so this stands in for the screen — which is what `main.ts` wires the real one as.
   let screenOpenedFor = -1;
-  game.openReincarnateScreen = (chIdx) => { screenOpenedFor = chIdx; };
+  reincarnateScreen = (chIdx) => { screenOpenedFor = chIdx; };
   game.resurrectReincarnateCancel(REINCARNATE);
   check(screenOpenedFor === 1, 'Reincarnate raises the name-entry screen for the new champion');
   check(

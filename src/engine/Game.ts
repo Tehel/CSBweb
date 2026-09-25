@@ -22,12 +22,13 @@ import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
-import { ActuatorSystem, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
+import { ActuatorSystem } from './ActuatorSystem';
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
-import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
+import { MonsterSystem } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
 import { createGameContext, nameIndexOf, type GameContext, type GameSystems } from './GameContext';
+import { createGameHost, type GameHost } from './GameHost';
 import { PartyFootprints, type FootprintsSnapshot } from './PartyFootprints';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { MonsterPerception } from './MonsterPerception';
@@ -230,22 +231,6 @@ const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
 );
 
 /**
- * What the host hands `Game` besides the dungeon and the tables: the calls that leave the
- * engine, and the tools' interception points. All optional — headless, nobody listens.
- * (`DEBT.md` E1d gathers these into one `GameHost`.)
- */
-export interface GameOptions {
-    /** `CursorFilter`, the host's view of the object on the cursor. */
-    cursorFilter?: CursorFilterHook;
-    /** The message area. */
-    messages?: MessageSink;
-    /** Play a sample. */
-    playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-    /** The monster trace. */
-    monsterHooks?: MonsterSystemHooks;
-}
-
-/**
  * Game class - main game controller
  */
 export class Game {
@@ -334,7 +319,6 @@ export class Game {
 
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
-    private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
     /** Every table from `graphics.dat` (`GameTables`), CSBWin's `d.` tables. */
     private readonly tables: GameTables;
@@ -369,20 +353,21 @@ export class Game {
      * woken by a blow during `ProcessTimers` gets no extra tick.
      */
     private clockTickSet = false;
-    /** Told whenever `d.PartySleeping` changes: the UI swaps its button lists. */
-    private sleepListeners: ((sleeping: boolean) => void)[] = [];
     private animationFrameId: number | null = null;
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
     private onMoveCallbacks: MovementCallback[] = [];
 
-    constructor(dungeonData: DungeonData, tables: GameTables, options: GameOptions = {}) {
-        const { playSound, monsterHooks } = options;
+    /**
+     * `host` is what the engine asks of whoever runs it (`GameHost`); what it leaves out
+     * does nothing.
+     */
+    constructor(dungeonData: DungeonData, tables: GameTables, host: Partial<GameHost> = {}) {
         this.tables = tables;
         this.addCharacterTables = { objDescCarryMask: tables.objDescWord4, carryLocation: tables.carryLocation };
 
-        const ctx = createGameContext(dungeonData, tables, playSound);
+        const ctx = createGameContext(dungeonData, tables, createGameHost(host));
         this.ctx = ctx;
         this.dungeonState = ctx.dungeon;
         this.party = ctx.party;
@@ -391,24 +376,17 @@ export class Game {
         this.footprints = ctx.footprints;
         this.timerQueue = ctx.timers;
         this.sounds = ctx.sounds;
-        this.playSound = playSound;
-        this.actuators = new ActuatorSystem(ctx, {
-            cursorFilter: options.cursorFilter,
-            messages: options.messages,
-            playSound,
-        });
+        this.actuators = new ActuatorSystem(ctx);
         this.dsaSystem = new DsaSystem(ctx);
-        this.timerSystem = new TimerSystem(ctx, {
-            playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
-        });
-        this.monsterSystem = new MonsterSystem(ctx, monsterHooks);
-        this.monsterDamage = new MonsterDamage(ctx, { trace: monsterHooks?.trace });
+        this.timerSystem = new TimerSystem(ctx);
+        this.monsterSystem = new MonsterSystem(ctx);
+        this.monsterDamage = new MonsterDamage(ctx);
         this.monsterPerception = new MonsterPerception(ctx);
         this.monsterAttack = new MonsterAttack(ctx);
-        this.monsterAI = new MonsterAI(ctx, { trace: monsterHooks?.trace });
+        this.monsterAI = new MonsterAI(ctx);
         this.characterStats = new CharacterStats(ctx);
 
-        this.attackSystem = new AttackSystem(ctx, { trace: monsterHooks?.trace });
+        this.attackSystem = new AttackSystem(ctx);
         this.movementSystem = new MovementSystem(ctx);
 
         Object.assign(ctx.systems, {
@@ -790,13 +768,9 @@ export class Game {
         return this.party.state.sleeping;
     }
 
-    /** Register for `d.PartySleeping` changes (see `sleep` / `wakeUp`). */
-    onSleepChanged(listener: (sleeping: boolean) => void): void {
-        this.sleepListeners.push(listener);
-    }
-
+    /** Tell the host `d.PartySleeping` changed (see `sleep` / `wakeUp`). */
     private notifySleep(sleeping: boolean): void {
-        for (const listener of this.sleepListeners) listener(sleeping);
+        this.ctx.host.sleepChanged(sleeping);
     }
 
     /**
@@ -995,7 +969,7 @@ export class Game {
             // penalties, the tail below — is deferred to `finishReincarnate`, which the
             // screen calls when it is answered. The champion stays potential-free but
             // still last in the party throughout, which is all the deferred half needs.
-            this.openReincarnateScreen?.(party.champions.length - 1);
+            this.ctx.host.openReincarnateScreen(party.champions.length - 1);
             return true;
         }
 
@@ -1019,13 +993,11 @@ export class Game {
             selectMagicCaster(party, 0);
         }
 
-        const messages = this.actuators.getMessages();
-        if (messages) {
-            const color = this.actuators.getChampionMessageColor(party.champions.length - 1);
-            messages.printLinefeed();
-            messages.quePrintLines(color, champion.name);
-            messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
-        }
+        const messages = this.ctx.host.messages;
+        const color = this.actuators.getChampionMessageColor(party.champions.length - 1);
+        messages.printLinefeed();
+        messages.quePrintLines(color, champion.name);
+        messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
 
         party.selectedCharacterIndex = -1;
     }
@@ -1042,14 +1014,6 @@ export class Game {
         champion.title = title;
         this.finishResurrectReincarnate(champion, 161);
     }
-
-    /**
-     * Set by the host once the renderer exists: the Reincarnate branch has to raise a
-     * screen the engine does not own. Left optional so `tools/` can drive
-     * `resurrectReincarnateCancel` with no UI at all — there, Reincarnate stops at the
-     * point CSBWin would be waiting for a name, which is exactly where it stops here.
-     */
-    openReincarnateScreen?: (chIdx: number) => void;
 
     /**
      * The Reincarnate half of `_ResurrectReincarnateCancel` (`:6739-6784`), everything
@@ -2330,8 +2294,8 @@ export class Game {
      * message area word-wraps it.
      */
     emitSpellMessage(text: string): void {
-        const messages = this.actuators.getMessages();
-        if (!messages || !text) return;
+        const messages = this.ctx.host.messages;
+        if (!text) return;
         messages.printLinefeed();
         messages.quePrintLines(MSG_COLOR_SPELL, text);
     }
@@ -2344,8 +2308,7 @@ export class Game {
      * puts a hard newline between the champion name and the message body.
      */
     private spellErrorMsg(champion: Champion, code: number, skillNumber: number): void {
-        const messages = this.actuators.getMessages();
-        if (!messages) return;
+        const messages = this.ctx.host.messages;
 
         let base = skillNumber | 0;
         if (base > 3) base = Math.floor((base - 4) / 4);
@@ -2438,7 +2401,7 @@ export class Game {
         const door = this.dungeonState.getDoorRecordByIndex(index);
         if (!door || !door.hasButton) return false;
 
-        this.playSound?.(SoundIndex.SWITCH);
+        this.ctx.host.playSound(SoundIndex.SWITCH);
         this.timerQueue.createTimer(
             TimerFunction.TT_DOOR,
             target.x,

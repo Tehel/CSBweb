@@ -95,11 +95,6 @@ interface MonsterMove {
 
 type MissileDropTarget = { monster: ObjectID } | null;
 
-/** What `TimerSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
-export interface TimerHooks {
-  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-}
-
 export class TimerSystem {
   private missileFilterObject = OBJECT_ID_EOF;
   /**
@@ -113,10 +108,7 @@ export class TimerSystem {
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
 
-  constructor(
-    private readonly ctx: GameContext,
-    private readonly hooks: TimerHooks = {},
-  ) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -751,7 +743,7 @@ export class TimerSystem {
     this.setDoorState(map, x, y, doorState);
     if (prevState !== doorState) {
       const distance = this.getPartyDistance(x, y, timer.level);
-      if (distance !== null) this.hooks.playSound?.(SoundIndex.DOOR, 0, distance);
+      if (distance !== null) this.ctx.host.playSound(SoundIndex.DOOR, 0, distance);
     }
 
     if ((action === ActuatorAction.SET && doorState !== 0) || (action === ActuatorAction.CLEAR && doorState !== 4)) {
@@ -2944,7 +2936,7 @@ export class TimerSystem {
           teleportAudible = teleporter.sound;
           if (teleporter.sound) {
             const distance = this.getPartyDistance(position.x, position.y, position.z);
-            if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 0, distance);
+            if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 0, distance);
           }
         } else if (objectType === DBType.MISSILE) {
           if (teleporter.absoluteRotation) {
@@ -2961,14 +2953,14 @@ export class TimerSystem {
             teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
-              if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 1, distance);
+              if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 1, distance);
             }
           } else {
             curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
             teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
-              if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 1, distance);
+              if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 1, distance);
             }
           }
         } else {

@@ -255,14 +255,8 @@ function unmarshalParameters(params: PartyAttackParameters, words: ArrayLike<num
   }
 }
 
-/** What `AttackSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
-export interface AttackSystemHooks {
-  /** Trace, mirroring CSBWin's `AttackTraceActive` output. */
-  trace?: (line: string) => void;
-}
-
 export class AttackSystem {
-  constructor(private readonly ctx: GameContext, private readonly hooks: AttackSystemHooks = {}) {}
+  constructor(private readonly ctx: GameContext) {}
 
   /**
    * `d.MonsterUnderAttack`. A global in CSBWin, read directly by
@@ -278,7 +272,7 @@ export class AttackSystem {
   // ---------------------------------------------------------------- helpers
 
   private trace(line: string): void {
-    this.hooks.trace?.(line);
+    this.ctx.host.trace(line);
   }
 
   private champions(): Champion[] {

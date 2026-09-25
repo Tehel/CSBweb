@@ -81,17 +81,12 @@ const DROPPING_MISC_BASE = 127;
 const DROPPING_CLOTHING_BASE = 69;
 const DROPPING_WEAPON_BASE = 23;
 
-/** What `MonsterDamage` calls that leaves the engine (`DEBT.md` E1d retires it). */
-export interface MonsterDamageHooks {
-  trace?: (line: string) => void;
-}
-
 export class MonsterDamage {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
 
-  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterDamageHooks = {}) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -650,6 +645,6 @@ export class MonsterDamage {
   }
 
   private trace(line: string): void {
-    this.hooks.trace?.(line);
+    this.ctx.host.trace(line);
   }
 }

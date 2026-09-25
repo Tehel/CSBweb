@@ -83,7 +83,16 @@ async function main(): Promise<void> {
   'asleep, the viewport and only the viewport is button 146');
   check((sleepList[0]!.button | sleepList[1]!.button) === 3, 'either mouse button wakes');
 
-  const game = newGame(data, graphics);
+  // The host's `sleepChanged`, wired as `main.ts` wires it (the UI half is built below).
+  const notified: boolean[] = [];
+  const game = newGame(data, graphics, {
+    sleepChanged: (sleeping) => {
+      notified.push(sleeping);
+      ui.uiMode = sleeping ? UIMode.Sleeping : UIMode.Adventure;
+      Mouse.updateButtonLists(ui);
+      Mouse.syncInventoryButtons(ui);
+    },
+  });
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
   game.addChampion(champion(1));
@@ -102,13 +111,6 @@ async function main(): Promise<void> {
   Mouse.updateButtonLists(ui);
   ui.onSleep = () => game.sleep();
   ui.onWakeUp = () => game.wakeUp();
-  const notified: boolean[] = [];
-  game.onSleepChanged((sleeping) => {
-    notified.push(sleeping);
-    ui.uiMode = sleeping ? UIMode.Sleeping : UIMode.Adventure;
-    Mouse.updateButtonLists(ui);
-    Mouse.syncInventoryButtons(ui);
-  });
   const handled: number[] = [];
   game.setMouseEventHandlers({
     button: (num, x, y) => { handled.push(num); Mouse.handleMouseButton(ui, num, x, y); },

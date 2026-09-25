@@ -153,11 +153,6 @@ export interface InitialChecksResult {
   timerFunction: number;
 }
 
-/** What `MonsterAI` calls that leaves the engine (`DEBT.md` E1d retires it). */
-export interface MonsterAiHooks {
-  trace?: (line: string) => void;
-}
-
 export class MonsterAI {
   private scratch = makeAiScratch();
 
@@ -165,7 +160,7 @@ export class MonsterAI {
   private readonly random: CsbRandom;
   private readonly timers: TimerQueue;
 
-  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterAiHooks = {}) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
     this.timers = ctx.timers;
@@ -1589,7 +1584,7 @@ export class MonsterAI {
   }
 
   private trace(line: string): void {
-    this.hooks.trace?.(line);
+    this.ctx.host.trace(line);
   }
 }
 

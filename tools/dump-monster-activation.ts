@@ -49,7 +49,7 @@ async function main(): Promise<void> {
   // A fixed seed: the point is a repeatable listing, not a realistic game.
   const ctx = newContext(data, graphics, { dungeon, timers, random: new CsbRandom(0x12345678) });
   ctx.party.state = party;
-  const monsters = new MonsterSystem(ctx, { trace: () => {} });
+  const monsters = new MonsterSystem(ctx);
 
   monsters.loadPartyLevel(level);
 

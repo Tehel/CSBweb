@@ -7,14 +7,14 @@
  * `Party.setState` replaces) and `ctx.state.tickCount` (`d.Time`).
  *
  * `systems` holds the subsystems themselves, so that they call each other directly, as
- * CSBWin's functions do. E1d adds `host`, the calls that leave the engine (see the design
- * note in `DEBT.md` E1).
+ * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
 import type { DungeonData } from '../data/dungeonTypes';
 import type { ObjectID } from '../core/types';
 import { CsbRandom } from '../core/random';
 import { DungeonState } from './DungeonState';
 import type { GameState } from './gameTypes';
+import { createGameHost, type GameHost } from './GameHost';
 import type { GameTables } from './GameTables';
 import { NameIndex } from './objectIndex';
 import { Party } from './Party';
@@ -104,18 +104,20 @@ export interface GameContext {
   readonly sounds: SoundQueue;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
+  /** What only the host can do: play a sample, trace, tell the UI something. */
+  readonly host: GameHost;
   /** The subsystems, filled by `Game` as it builds them. */
   readonly systems: GameSystems;
 }
 
 /**
  * The context for a new game over `dungeonData`: the party at the dungeon's start, the
- * clock at 0, an empty timer queue. `playSound` is where `QueueSound` sends a sample.
+ * clock at 0, an empty timer queue, and `host` (a null host by default).
  */
 export function createGameContext(
   dungeonData: DungeonData,
   tables: GameTables,
-  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void,
+  host: GameHost = createGameHost(),
 ): GameContext {
   const dungeon = new DungeonState(dungeonData);
   const party = new Party(dungeon.getStartPosition(), dungeon.getStartFacing());
@@ -136,8 +138,9 @@ export function createGameContext(
     random: new CsbRandom(),
     footprints: new PartyFootprints(),
     timers: new TimerQueue(),
-    sounds: new SoundQueue(party, tables.sound1772, playSound),
+    sounds: new SoundQueue(party, tables.sound1772, host),
     tables,
+    host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
     systems: {} as GameSystems,
   };

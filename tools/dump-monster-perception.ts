@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   const footprints = new PartyFootprints();
   const ctx = newContext(data, graphics, { dungeon, timers, random, footprints });
   ctx.party.state = party;
-  const monsters = new MonsterSystem(ctx, { trace: () => {} });
+  const monsters = new MonsterSystem(ctx);
   monsters.loadPartyLevel(level);
 
   const perception = new MonsterPerception(ctx);

@@ -63,7 +63,7 @@ async function main(): Promise<void> {
   ctx.party.state = party;
   ctx.state.tickCount = time;
 
-  const monsters = new MonsterSystem(ctx, {});
+  const monsters = new MonsterSystem(ctx);
   monsters.loadPartyLevel(level);
 
   let clouds = 0;

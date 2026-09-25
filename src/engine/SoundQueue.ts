@@ -21,17 +21,18 @@
  * Both are recorded in PLAN.md Phase 12.
  */
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
+import type { GameHost } from './GameHost';
 import type { Party } from './Party';
 
 export class SoundQueue {
   /**
    * @param soundTable `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
-   * @param play where a sample goes; headless, nowhere.
+   * @param host where a sample goes (`GameHost.playSound`).
    */
   constructor(
     private readonly party: Party,
     private readonly soundTable: ArrayLike<SoundTableEntry>,
-    private readonly play?: (soundId: number, rateIdx?: number, distance?: number) => void,
+    private readonly host: Pick<GameHost, 'playSound'>,
   ) {}
 
   /**
@@ -51,8 +52,6 @@ export class SoundQueue {
    * (fully loud at or below) and `byte7` (silent at or above).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number): void {
-    const play = this.play;
-    if (!play) return;
     const entry = this.soundTable[ordinal];
     if (!entry) return;
 
@@ -67,6 +66,6 @@ export class SoundQueue {
     // `rateIdx` selects among the decoded variants a SND item may have; it is not
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio
     // layer (doc/CSBwin-src/Sound.cpp:647). Everything else in the port passes 0.
-    play(soundId, 0, distance);
+    this.host.playSound(soundId, 0, distance);
   }
 }
