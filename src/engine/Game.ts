@@ -39,7 +39,6 @@ import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
 import { MOUSE_UNCLICK } from './MouseQueue';
 import { wakeUp } from './LoopState';
-import { AttackType } from './monsterTypes';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
@@ -1374,82 +1373,6 @@ export class Game {
         return this.throwByCharacter(
             options.chIdx, champion, obj, options.side, throwingDistance, options,
         ) ? 1 : 0;
-    }
-
-    /** The busy timer's `uByte6`, which decides which slot refills the hand. */
-    setBusyTimerRefill(chIdx: number, value: number): void {
-        const champion = this.party.state.champions[chIdx];
-        const index = champion?.busyTimerIndex ?? -1;
-        if (index < 0) return;
-        const timer = this.timerQueue.getTimer(index);
-        if (timer) timer.uByte6 = value & 0xff;
-    }
-
-    /**
-     * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion is free
-     * again. Two pieces of tidying beyond clearing the flag: the attack's defence
-     * penalty goes, and a hand is refilled — the quiver after a shot, or the slot named
-     * by the timer's `uByte6` after a throw.
-     */
-    enableCharacterAction(chIdx: number, refillSlot: number): void {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return;
-        if (champion.attackType !== -1) champion.attackStatModifier = 0;
-        if ((champion.attributes.health | 0) !== 0) {
-            // A bow that has just been fired reloads itself from slot 12, then from
-            // slots 7-9, taking the first object of the matching ammunition class
-            // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
-            if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === OBJECT_ID_NULL) {
-                for (const slot of [12, 7, 8, 9]) {
-                    if (this.matchingAmmunition(champion, slot)) {
-                        const ammo = this.character.removeCharacterPossession(chIdx, slot);
-                        if (ammo !== OBJECT_ID_NULL) this.character.setChampionHand(champion, 0, ammo);
-                        break;
-                    }
-                }
-            }
-        }
-        if (refillSlot !== 0) this.refillPossessionSlot(chIdx, refillSlot - 1);
-    }
-
-    /**
-     * `TAG0153c2` (`doc/CSBwin-src/CSBCode.cpp`) — is what is in `slot` the right
-     * ammunition for the launcher in the fighting hand? Weapon classes 16-31 fire
-     * class-10 objects (arrows), 32-47 fire class-11 (slingstones).
-     */
-    private matchingAmmunition(champion: Champion, slot: number): boolean {
-        const launcher = this.getChampionPossession(champion, 1);
-        if (launcher === OBJECT_ID_NULL || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
-        const launcherDesc = this.characterStats.weaponDescFor(launcher);
-        if (!launcherDesc) return false;
-        let wanted: number;
-        if (launcherDesc.uByte1 >= 16 && launcherDesc.uByte1 <= 31) wanted = 10;
-        else if (launcherDesc.uByte1 >= 32 && launcherDesc.uByte1 <= 47) wanted = 11;
-        else return false;
-
-        const candidate = this.getChampionPossession(champion, slot);
-        if (candidate === OBJECT_ID_NULL || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
-        const desc = this.characterStats.weaponDescFor(candidate);
-        return !!desc && desc.uByte1 === wanted;
-    }
-
-    /**
-     * `TAG0115ee` (`doc/CSBwin-src/CSBCode.cpp:6251`) — put a weapon back into the hand
-     * a throw emptied, from slot 12 first and then slots 7-9 (`:6263-6270`). Only a
-     * weapon: a thrown apple does not come back.
-     */
-    private refillPossessionSlot(chIdx: number, slot: number): void {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return;
-        if (this.getChampionPossession(champion, slot) !== OBJECT_ID_NULL) return;
-        for (const source of [12, 7, 8, 9]) {
-            const obj = this.getChampionPossession(champion, source);
-            if (obj === OBJECT_ID_NULL) continue;
-            if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
-            const moved = this.character.removeCharacterPossession(chIdx, source);
-            if (moved !== OBJECT_ID_NULL) this.character.setChampionHand(champion, slot, moved);
-            return;
-        }
     }
 
 

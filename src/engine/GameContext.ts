@@ -46,8 +46,6 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
-  | 'enableCharacterAction'
-  | 'setBusyTimerRefill'
   | 'throwFromWeaponHand'
 >;
 

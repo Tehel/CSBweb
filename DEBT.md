@@ -113,6 +113,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
+| C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ archived |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ archived |
 | D3 | Most state fields are optional (split: D3a-g) | L | ✅ archived |
@@ -1203,6 +1204,21 @@ not in `THROWABLE`, so no missile flies), but the parameters are what CSBWin cop
 Monster Attack Filter (`:1129-1165`), which the port has not wired: once it is, a DSA
 filter would see 0 where CSBWin shows `RNnul`. Return `OBJECT_ID_NULL`, with a check that
 reads the parameters of a monster that throws nothing.
+
+### C36 ⏳ `EnableCharacterAction` keeps the attack type, and frees only its own timer
+
+Found paying E2 (moving it into `TimerSystem`). CSBWin's `EnableCharacterAction`
+(`doc/CSBwin-src/Timer.cpp:2638`) ends with `pChar->attackType = -1` (`:2680`); the port's
+never resets it, so `champion.attackType` keeps the last attack for good. The next
+`EnableCharacterAction` — say after a spell's `DisableCharacterAction` — then zeroes
+`attackStatModifier` again (harmless: it is already 0) and, if that last attack was a
+shot and hand 0 (the one the arrow is nocked from) is empty, reloads the bow from the quiver, where CSBWin would
+not. CSBWin also sets `busyTimer = -1` and clears `CHARFLAG_attackDisable`
+unconditionally (`:2645-2646`); `TimerSystem.processActionDisableTimer` does both only when
+the expiring timer is the champion's own `busyTimerIndex`. Reset `attackType` at the end,
+and check whether a stale `TT_11` can reach the handler at all (CSBWin's `SetTimer`
+de-duplication may make the guard dead) before deciding the second; a check that shoots,
+casts, and reads the quiver after the cast.
 
 ---
 

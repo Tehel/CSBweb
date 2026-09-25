@@ -56,7 +56,7 @@ import {
 } from '../data/actuatorHelpers';
 import { TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import { monsterFireResistance } from '../renderer/csbwin/ObjectTables';
-import { MonsterType, StateOfFear } from './monsterTypes';
+import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import {
@@ -265,7 +265,39 @@ export class TimerSystem {
       champ.busyTimerIndex = -1;
       champ.actionDisabledUntil = 0;
     }
-    this.ctx.systems.game.enableCharacterAction(chIdx, timer.uByte6 & 0xff);
+    // The `TT_11` case (doc/CSBwin-src/CSBCode.cpp:6466-6475): `EnableCharacterAction`,
+    // then `TAG0115ee(chIdx, uByte6 - 1)` when `uByte6 != 0` — the slot a throw emptied.
+    this.enableCharacterAction(chIdx);
+    const refillSlot = timer.uByte6 & 0xff;
+    if (refillSlot !== 0) this.ctx.systems.character.refillPossessionSlot(chIdx, refillSlot - 1);
+  }
+
+  /**
+   * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion is free
+   * again: the attack's defence penalty goes, and a bow that has just been fired reloads
+   * from the quiver. Not ported (`DEBT.md` C36): the closing `attackType = -1`
+   * (`:2680`), and the unconditional `busyTimer = -1` (`:2645`), which the caller does
+   * only for the champion's own timer.
+   */
+  private enableCharacterAction(chIdx: number): void {
+    const champion = this.ctx.party.state.champions[chIdx];
+    if (!champion) return;
+    if (champion.attackType !== -1) champion.attackStatModifier = 0;
+    if ((champion.attributes.health | 0) !== 0) {
+      // A bow that has just been fired reloads itself from slot 12, then from
+      // slots 7-9, taking the first object of the matching ammunition class
+      // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
+      const character = this.ctx.systems.character;
+      if (champion.attackType === AttackType.atk_SHOOT && (champion.possessions[0] ?? OBJECT_ID_NULL) === OBJECT_ID_NULL) {
+        for (const slot of [12, 7, 8, 9]) {
+          if (character.matchingAmmunition(champion, slot)) {
+            const ammo = character.removeCharacterPossession(chIdx, slot);
+            if (ammo !== OBJECT_ID_NULL) character.setChampionHand(champion, 0, ammo);
+            break;
+          }
+        }
+      }
+    }
   }
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {

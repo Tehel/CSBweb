@@ -1224,7 +1224,7 @@ export class AttackSystem {
           // `disableTime` is zeroed — a second `DisableCharacterAction` below would
           // clear that byte and the champion's hand would never be refilled.
           if (params.disableTime > 255) params.disableTime = 255;
-          this.ctx.systems.game.setBusyTimerRefill(params.charIdx, params.disableTime < 0 ? 2 : params.disableTime);
+          this.setBusyTimerRefill(params.charIdx, params.disableTime < 0 ? 2 : params.disableTime);
           params.disableTime = 0;
         }
         break;
@@ -1363,5 +1363,14 @@ export class AttackSystem {
     this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
     this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
     this.ctx.systems.monsters.loadPartyLevelOnArrival();
+  }
+
+  /** The busy timer's `uByte6`, which decides which slot refills the hand (`TT_11`). */
+  private setBusyTimerRefill(chIdx: number, value: number): void {
+    const champion = this.ctx.party.state.champions[chIdx];
+    const index = champion?.busyTimerIndex ?? -1;
+    if (index < 0) return;
+    const timer = this.ctx.timers.getTimer(index);
+    if (timer) timer.uByte6 = value & 0xff;
   }
 }
