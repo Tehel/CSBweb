@@ -248,7 +248,7 @@ export class MagicSystem {
           case 7: {
             const zokathra = this.createMiscObject(51);
             if (zokathra) {
-              if (this.ctx.systems.game.setChampionHand(champion, 0, zokathra) || this.ctx.systems.game.setChampionHand(champion, 1, zokathra)) {
+              if (this.ctx.systems.character.setChampionHand(champion, 0, zokathra) || this.ctx.systems.character.setChampionHand(champion, 1, zokathra)) {
                 // placed in hand
               } else {
                 const placed = this.dungeon.addObjectToCell(

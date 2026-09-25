@@ -540,7 +540,7 @@ export class MonsterAttack {
     champ.attributes.health = 0;
     champ.incantation = [];
 
-    this.ctx.systems.game.dropAllPossessions(chIdx);
+    this.ctx.systems.character.dropAllPossessions(chIdx);
 
     // `objD4.pos(charPosition)`, then `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`
     // and `expool.AddChampionBonesRecord(objD4, …)` (`doc/CSBwin-src/Character.cpp:2626-2646`):

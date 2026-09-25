@@ -1165,7 +1165,7 @@ export class AttackSystem {
           if (misc.miscType === MISC_MAGICAL_BOX_B) delta = 125;
         }
         if (delta !== 0 && held !== OBJECT_ID_NULL) {
-          this.ctx.systems.game.removeCharacterPossession(params.charIdx, 1);
+          this.ctx.systems.character.removeCharacterPossession(params.charIdx, 1);
           this.ctx.dungeon.deleteDBEntry(held);
         } else {
           delta = 70;
@@ -1319,7 +1319,7 @@ export class AttackSystem {
     }
 
     this.setCharToPartyFacing(pChar);
-    const projectile = this.ctx.systems.game.removeCharacterPossession(params.charIdx, 0);
+    const projectile = this.ctx.systems.character.removeCharacterPossession(params.charIdx, 0);
     this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
     const mastery = sw(this.masteryOf(pChar, 11));
     params.attdep.shoot.range = launcherDesc.uByte3 + ammoDesc.uByte3;

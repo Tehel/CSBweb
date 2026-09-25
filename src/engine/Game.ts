@@ -37,10 +37,11 @@ import { MonsterAI } from './MonsterAI';
 import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
 import { MagicSystem } from './MagicSystem';
+import { CharacterSystem } from './CharacterSystem';
 import { AttackType } from './monsterTypes';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type LocationRel, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -55,16 +56,9 @@ import {
     setActuatorType,
 } from '../data/actuatorHelpers';
 import { CharacterStats } from './CharacterStats';
-import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import type { GameTables } from './GameTables';
 import {
     OBJNI_EKKHARD_CROSS,
-    OBJNI_ILLUMULET_A,
-    OBJNI_ILLUMULET_B,
-    OBJNI_JEWEL_SYMAL_A,
-    OBJNI_JEWEL_SYMAL_B,
-    OBJNI_OPEN_SCROLL,
-    OBJNI_SCROLL,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
@@ -307,6 +301,8 @@ export class Game {
     readonly attackSystem: AttackSystem;
     /** `Magic.cpp`'s engine half: casting, `LaunchObject`, `DisableCharacterAction`. */
     readonly magic: MagicSystem;
+    /** `Character.cpp`'s possession writers: `RemoveCharacterPossession`, `DropAllPossessions`. */
+    readonly character: CharacterSystem;
     /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
     get gameWon(): boolean { return this.state.gameWon; }
     set gameWon(won: boolean) { this.state.gameWon = won; }
@@ -387,6 +383,7 @@ export class Game {
         this.attackSystem = new AttackSystem(ctx);
         this.movementSystem = new MovementSystem(ctx);
         this.magic = new MagicSystem(ctx);
+        this.character = new CharacterSystem(ctx);
 
         Object.assign(ctx.systems, {
             actuators: this.actuators,
@@ -401,6 +398,7 @@ export class Game {
             attack: this.attackSystem,
             movement: this.movementSystem,
             magic: this.magic,
+            character: this.character,
             game: this,
         } satisfies GameSystems);
     }
@@ -1115,7 +1113,7 @@ export class Game {
         // what they carry. Only the stat half is here; the rest is `DEBT.md` C34.
         for (let slot = 0; slot < 30; slot++) {
             const obj = possessions[slot]!;
-            if (obj !== OBJECT_ID_NULL) this.adjustStatsForItemCarried(champion, slot, 1, obj);
+            if (obj !== OBJECT_ID_NULL) this.character.adjustStatsForItemCarried(champion, slot, 1, obj);
         }
     }
 
@@ -1265,27 +1263,6 @@ export class Game {
             position.y,
             this.party.state.magicFootprintsActive !== 0,
         );
-    }
-
-    /**
-     * `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2499-2520`) — everything a
-     * dying champion carried falls into the party's cell, slot by slot in
-     * `d.DropOrder` order, each taken out through `RemoveCharacterPossession`, turned
-     * to the champion's corner and set down with `MoveObject(obj, -1, 0, partyX,
-     * partyY)` — so it presses a pad or falls down a pit like any other drop.
-     */
-    dropAllPossessions(chIdx: number): void {
-        const champ = this.party.state.champions[chIdx];
-        if (!champ) return;
-        const D6W = champ.partyPosition & 0x3;
-        const party = this.party.state;
-        for (let D4W = 0; D4W < 30; D4W++) {
-            const objD5 = this.removeCharacterPossession(chIdx, this.tables.dropOrder[D4W]!);
-            if (objD5 === OBJECT_ID_NULL) continue;
-            this.timerSystem.moveObject(
-                withObjectPosition(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
-            );
-        }
     }
 
     /**
@@ -1537,22 +1514,6 @@ export class Game {
         return value | 0;
     }
 
-    setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
-        const slots = champion.possessions;
-        if (slot < 0 || slot >= slots.length) return false;
-        if (slots[slot] !== OBJECT_ID_NULL) return false;
-        slots[slot] = obj;
-        // The stat half of `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1970`);
-        // the rest is `DEBT.md` C34.
-        this.adjustStatsForItemCarried(champion, slot, 1, obj);
-        return true;
-    }
-
-    /** `AdjustStatsForItemCarried` (`src/engine/AdjustStatsForItemCarried.ts`). */
-    private adjustStatsForItemCarried(champion: Champion, slot: number, addOrRemove: number, obj: ObjectID): void {
-        AdjustStatsForItemCarried(champion, slot, addOrRemove, obj, this.dungeonState, (rn) => this.nameIndex(rn));
-    }
-
 
     // ------------------------------------------------------------ attacks
 
@@ -1586,50 +1547,6 @@ export class Game {
     }
 
     /**
-     * `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) — empty a
-     * slot and undo what wearing or holding the object did.
-     *
-     * Ported: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
-     * `d.Brightness`, a Jewel Symal gets `value(0)`; in the weapon hand a scroll closes;
-     * in either hand a torch goes out. All of these test `RN::NameIndex`, the modified
-     * name, so a lit torch is any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`.
-     *
-     * No counterpart here: `SelectPaletteForLightLevel`, `DrawEightHands`,
-     * `DisplayBackpackItem` and the `charFlags` redraw bits (the light and the panels are
-     * derived from live state every frame); `load` (`CharacterStats.characterLoad`
-     * re-sums it). Not ported (`DEBT.md` C34), because they read UI state: `TAG01b1c0`
-     * when this champion's attack menu is open and `RepackChest` when their inventory is. The chest slots (30 and up)
-     * belong to the open inventory; no engine caller passes one.
-     */
-    removeCharacterPossession(chIdx: number, slot: number): ObjectID {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return OBJECT_ID_NULL;
-        const objRemoved = this.getChampionPossession(champion, slot);
-        this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
-        if (objRemoved === OBJECT_ID_NULL) return OBJECT_ID_NULL;
-        const objNID5 = this.nameIndex(objRemoved);
-        this.adjustStatsForItemCarried(champion, slot, -1, objRemoved);
-        if (slot === 10) {
-            if (objNID5 >= OBJNI_ILLUMULET_A && objNID5 <= OBJNI_ILLUMULET_B) {
-                this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
-                const party = this.party.state;
-                party.brightness = sw(party.brightness - this.tables.word1074[2]!);
-            } else if (objNID5 >= OBJNI_JEWEL_SYMAL_A && objNID5 <= OBJNI_JEWEL_SYMAL_B) {
-                this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
-            }
-        }
-        if (slot < 2) {
-            if (slot === 1 && objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
-                this.dungeonState.getScrollRecord(objRemoved)!.open = false;
-            }
-            if (objNID5 >= OBJNI_TORCH_A && objNID5 <= OBJNI_TORCH_D) {
-                this.dungeonState.getWeaponRecord(objRemoved)!.litTorch = false;
-            }
-        }
-        return objRemoved;
-    }
-
-    /**
      * `ThrowByCharacter` with an explicit hand (`doc/CSBwin-src/Mouse.cpp:672`) — the
      * THROW attack, which throws what is in the fighting hand rather than what the
      * cursor is holding. `range`/`damage`/`decayRate` of -1 mean "compute them", which
@@ -1648,7 +1565,7 @@ export class Game {
         const throwingDistance = this.characterStats.determineThrowingDistance(
             champion, 1, this.party.state.sleeping,
         );
-        const obj = this.removeCharacterPossession(options.chIdx, 1);
+        const obj = this.character.removeCharacterPossession(options.chIdx, 1);
         if (obj === OBJECT_ID_NULL) return 0;
         return this.throwByCharacter(
             options.chIdx, champion, obj, options.side, throwingDistance, options,
@@ -1681,8 +1598,8 @@ export class Game {
             if (champion.attackType === AttackType.atk_SHOOT && this.getChampionPossession(champion, 0) === OBJECT_ID_NULL) {
                 for (const slot of [12, 7, 8, 9]) {
                     if (this.matchingAmmunition(champion, slot)) {
-                        const ammo = this.removeCharacterPossession(chIdx, slot);
-                        if (ammo !== OBJECT_ID_NULL) this.setChampionHand(champion, 0, ammo);
+                        const ammo = this.character.removeCharacterPossession(chIdx, slot);
+                        if (ammo !== OBJECT_ID_NULL) this.character.setChampionHand(champion, 0, ammo);
                         break;
                     }
                 }
@@ -1725,8 +1642,8 @@ export class Game {
             const obj = this.getChampionPossession(champion, source);
             if (obj === OBJECT_ID_NULL) continue;
             if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
-            const moved = this.removeCharacterPossession(chIdx, source);
-            if (moved !== OBJECT_ID_NULL) this.setChampionHand(champion, slot, moved);
+            const moved = this.character.removeCharacterPossession(chIdx, source);
+            if (moved !== OBJECT_ID_NULL) this.character.setChampionHand(champion, slot, moved);
             return;
         }
     }
@@ -1935,11 +1852,11 @@ export class Game {
         // as long as it takes to measure the throw, because `DetermineThrowingDistance`
         // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:698-705`).
         const saved = champion.possessions[1]!;
-        this.setPossessionDirect(champion, 1, obj);
+        this.character.setPossessionDirect(champion, 1, obj);
         const throwingDistance = this.characterStats.determineThrowingDistance(
             champion, 1, party.sleeping,
         );
-        this.setPossessionDirect(champion, 1, saved);
+        this.character.setPossessionDirect(champion, 1, saved);
 
         party.objectInHand = OBJECT_ID_NULL;
         const launched = this.throwByCharacter(owner, champion, obj, leftOrRight, throwingDistance);
@@ -2030,15 +1947,6 @@ export class Game {
             cost = cost + Math.trunc(remaining / 2);
         }
         return cost;
-    }
-
-    /**
-     * Write a possession slot without the UI's placement rules — used for CSBWin's
-     * temporary hand swap, where the object is put back immediately, and by
-     * `RemoveCharacterPossession`.
-     */
-    private setPossessionDirect(champion: Champion, slot: number, value: ObjectID): void {
-        if (slot >= 0 && slot < champion.possessions.length) champion.possessions[slot] = value;
     }
 
 

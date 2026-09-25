@@ -25,6 +25,7 @@ import type { ActuatorSystem } from './ActuatorSystem';
 import type { AttackSystem } from './AttackSystem';
 import type { CharacterStats } from './CharacterStats';
 import type { DsaSystem } from './DsaSystem';
+import type { CharacterSystem } from './CharacterSystem';
 import type { Game } from './Game';
 import type { MagicSystem } from './MagicSystem';
 import type { MonsterAI } from './MonsterAI';
@@ -45,15 +46,12 @@ export type GameMethods = Pick<Game,
   | 'addCharacter'
   | 'applyMissileDamageToParty'
   | 'climbDownIntoPit'
-  | 'dropAllPossessions'
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
   | 'notePartyMoved'
   | 'onChampionDied'
   | 'registerChampionBones'
-  | 'removeCharacterPossession'
   | 'setBusyTimerRefill'
-  | 'setChampionHand'
   | 'throwFromWeaponHand'
   | 'wakeUp'
 >;
@@ -78,6 +76,7 @@ export interface GameSystems {
   attack: AttackSystem;
   movement: MovementSystem;
   magic: MagicSystem;
+  character: CharacterSystem;
   game: GameMethods;
 }
 
