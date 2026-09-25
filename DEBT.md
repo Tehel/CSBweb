@@ -110,7 +110,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
-| D3 | Most state fields are optional | L | ⏳ |
+| D3 | Most state fields are optional (split: D3a-f) | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
@@ -1321,6 +1321,43 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 
 ### D3 ⏳ Most state fields are optional
 
+**Split** (size L, recorded 2026-09-25 before any code; re-counted then: `Champion` has
+23 optional fields, `PartyState` 12). One commit per group, in this order:
+
+| Step | Fields | Initializer, checked against CSBWin | Status |
+| --- | --- | --- | --- |
+| D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0: `d.` is static storage | ⏳ |
+| D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ⏳ |
+| D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:517-518`), the rest cleared by `ClearMemory(pcA3, 800)` (`:482`) | ⏳ |
+| D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ⏳ |
+| D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:511`), `fingerPrint` (`:512-515`), `timerIndex = -1` (`:519`), `charFlags` (`:529`, `:596`) | ⏳ |
+| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:520`) | ⏳ |
+
+The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
+`ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
+and the tools' champion builders spread. `Party.setState` fills a field an older
+runtime save lacks from the same defaults, so `RuntimeSaveState` keeps its JSON shape and
+the saves in `static/gamefiles/saves/` keep loading (they were checked: they lack
+`sleeping`, the shields, `wounds` and more).
+
+Found while splitting, and paid as separate fixes:
+
+- **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
+  the port leaves `damageFromDirection` unset, so the save writer writes 0 and
+  `ui/Attack.ts` falls back to `champ.facing`. A fix with D3d.
+
+Not debt, so staying optional:
+
+- `portrait` / `portraitGraphic`: a champion has one or the other (a save's pixels, or a
+  graphic-26 cell for one this engine made). Absence is the information.
+- `titleField` / `incantationField`: kept only when the file holds bytes past the
+  terminator. Absence is the information again.
+- `charFlags`' graphic bits (0xff80): `AddCharacter` sets `CHARFLAG_positionChanged`
+  (`:529`), a redraw flag, and the port models none of those (see C32's
+  `CHARFLAG_statsChanged` note). Only `CHARFLAG_male` is carried.
+
+<details><summary>original entry</summary>
+
 `Champion` has 24 optional fields out of 35, and `PartyState` 13 out of 25
 (`src/engine/gameTypes.ts`). That is where `src/engine/` gets its 277 `?? 0` and 62 `?.[`.
 CSBWin's `CHARDESC` has no optional fields; the optionality is a relic of porting one field
@@ -1332,6 +1369,8 @@ Make them required, initialised in one place per type (`createChampionFromPreset
 the initializer's, and check the initializer against CSBWin. Split across sessions by field
 group, and record the split here. If `RuntimeSaveState`'s shape changes, bump
 `RUNTIME_SAVE_VERSION`.
+
+</details>
 
 ### D4 ⏳ `ObjectID` is not a distinct type
 
