@@ -110,7 +110,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
-| D3 | Most state fields are optional (split: D3a-f) | L | ⏳ |
+| D3 | Most state fields are optional (split: D3a-g; a-f ✅, D3g ⏳) | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
@@ -1341,7 +1341,7 @@ runtime save lacks from the same defaults, so `RuntimeSaveState` keeps its JSON 
 the saves in `static/gamefiles/saves/` keep loading (they were checked: they lack
 `sleeping`, the shields, `wounds` and more).
 
-**D3a, paid.** The nine counters are required. `initialPartyState` (`src/engine/Party.ts`)
+**D3a, paid in `b988d0b`.** The nine counters are required. `initialPartyState` (`src/engine/Party.ts`)
 is `PartyState`'s one initializer: the constructor returns it, and `setState` spreads it
 under the restored state, so a field an older save lacks takes the same value (the three
 shields were missing from every save in `static/gamefiles/saves/`; all three still load and
@@ -1349,7 +1349,7 @@ run). 34 fallbacks went, every one `?? 0`, the initializer's own value, so no hi
 default. `ViewportRenderer`'s `partyState?.seeThruWalls ?? 0` stays: it guards a missing
 `partyState`. `RUNTIME_SAVE_VERSION` stays 10. Evidence: `npm test -- --frames`.
 
-**D3b, paid.** `potentialChampionIndex`, `gameIsLost` and `sleeping` are required, all three
+**D3b, paid in `50408fe`.** `potentialChampionIndex`, `gameIsLost` and `sleeping` are required, all three
 in `initialPartyState` (`sleeping` had been missing from it). The CSBWin loader sets them
 too: none is in the file's party blocks, and `LoadGame` clears `d.GameIsLost`
 (`doc/CSBwin-src/SaveGame.cpp:1891`). 29 fallbacks and `=== true` tests went; each
@@ -1357,7 +1357,7 @@ matched the initializer. Four `ui.partyState?.… ?? x` stay in `ui/` (`Keyboard
 `Attack`), because they guard a missing `partyState`. Evidence: `npm test -- --frames`, and
 the three saves in `static/gamefiles/saves/` still load and run.
 
-**D3c, paid.** `actionDisabledUntil`, `busyTimerIndex`, `attackType` and
+**D3c, paid in `a5a27db`.** `actionDisabledUntil`, `busyTimerIndex`, `attackType` and
 `attackStatModifier` are required. Their initializer is `addCharacterDefaults()`
 (`src/engine/AddCharacter.ts`), `ClearMemory` plus `AddCharacter`'s constant stores. It
 grows one group at a time. `createChampionFromPreset` spreads it, and so do the 25
@@ -1366,21 +1366,21 @@ champion, replacing its two hand-written `??`. Ten fallbacks went, each the init
 value. `Game.setBusyTimerRefill`'s `champion?.busyTimerIndex ?? -1` stays: it guards a
 missing champion. Evidence: `npm test -- --frames`; the three saves still load.
 
-**D3d, paid.** `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection` and
+**D3d, paid in `b4332d5`.** `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection` and
 `shieldStrength` are required, all cleared in `addCharacterDefaults`. 36 `?? 0` went.
 The 37th fallback was `ui/Attack.ts`'s `damageFromDirection ?? champ.facing ?? 0`, a
 different default. It was unreachable, because its guard, `maxRecentDamage`, turns non-zero
 only at `MonsterAttack.ts:240`, which sets `damageFromDirection` in the same statement group. So it
 went too. What it hid is the `facing3` fix below. Evidence: `npm test -- --frames`.
 
-**D3e, paid.** `charFlags`, `timerIndex`, `talents`, `causeOfDamage`,
+**D3e, paid in `a050ea8`.** `charFlags`, `timerIndex`, `talents`, `causeOfDamage`,
 `monsterCausingDamage` and `load` are required, in `addCharacterDefaults`. Eight
 fallbacks went, all in the save writer, each the initializer's value. Two of the planned
 eight fields came out of the group: `fingerprint` (D3g) and `incantationCursor`, whose
 fallback hid a different default. That one is the second fix below. Evidence:
 `npm test -- --frames`; the three saves still load.
 
-**D3f, paid.** `title` and `facing` are required: `''` and 0 in `addCharacterDefaults`,
+**D3f, paid in `5297dd6`.** `title` and `facing` are required: `''` and 0 in `addCharacterDefaults`,
 `ClearMemory`'s values. `createChampionFromPreset` sets the title, and `Game.addCharacter`
 sets the facing to `d.partyFacing`, as `AddCharacter` does (`Character.cpp:522`). Nine
 fallbacks went. One hid a different default: `setPartyFacing` rotated
@@ -1397,7 +1397,7 @@ Found while splitting, and paid as separate fixes:
 - ✅ **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
   the port left `damageFromDirection` unset, so the save writer wrote 0 and
   `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
-  it with `facing`. `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
+  it with `facing` (`2def79c`). `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
   party faces west, and failed before the fix (facing3 0, not 3).
 - ✅ **`byte33`.** The save writer wrote `incantationCursor ?? incantation.length`, and the
   engine never updates `incantationCursor`. So a champion loaded from a save keeps the
@@ -1406,7 +1406,8 @@ Found while splitting, and paid as separate fixes:
   writer of `byte33` keeps it equal to `strlen(incantation) & 3`: the add
   (`CSBCode.cpp:8984-8988`), the backspace (`Magic.cpp:814-817`), the cast (`:951-952`),
   and the two resets with `incantation[0] = 0` (`Character.cpp:2648-2649`,
-  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`. **Paid:**
+  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`. **Paid in
+  `76e0ee3`:**
   `incantationCursor` is gone, and the writer derives `incantation.length & 3`. The
   fourteen committed saves still pack byte-identical. `tools/dump-character-block.ts`
   types two runes into a loaded champion and failed before the fix (byte33 0, not 2).
@@ -1447,7 +1448,7 @@ Measure the churn on a branch first.
 
 ### D5 ✅ Cell flags stored twice (`cellFlags` and `tiles`)
 
-**Paid.** `MapData.tiles` and `TileData` are gone; `cellFlags` is the one copy of the byte,
+**Paid in `468ebc6`.** `MapData.tiles` and `TileData` are gone; `cellFlags` is the one copy of the byte,
 as in CSBWin, and readers unpack it with `getRoomType` / `cellHasObjects`
 (`src/core/types.ts`). The six writers that kept `tiles` in step (`DungeonState`'s
 has-objects and door writers, `TimerSystem.setDoorState` / `setCellFlag`,

@@ -183,3 +183,5 @@ Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase
 12). What is left is the other half of **Phase 10**, *writing* a CSBWin-compatible save;
 the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT.md` —
 **paying that off is the current priority**, one item per commit, in the order it gives.
+Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
+before the rest of tier C, which is frozen: new divergences are recorded, not fixed.

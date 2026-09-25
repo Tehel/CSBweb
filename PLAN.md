@@ -98,10 +98,20 @@ staffs, the Rabbit's Foot, curses, Powertowers and the rest change their bearer'
 (`tools/dump-item-bonuses.ts`). Recorded: C34 (five possession writers, none of them
 CSBWin's whole — the UI and DSA paths lack the scroll, `value()`, the attack menu and the
 chest repack) and, in G1, `STKOP_SetCurse` with `SetCursed`.
-Next (order changed 2026-09-25: tiers D and E before the rest of tier C, which is frozen —
-new divergences are recorded, not fixed, unless they block the D/E item or corrupt saves):
-D5, then D3 (split by field group first), D4, E1 (design note first), E2–E5. C33 and C34
-wait until after E1/E2; C25 (⚠️) still waits for D4.
+On 2026-09-25 the order changed: tiers D and E now come before the rest of tier C, which is
+frozen. A new divergence is recorded, not fixed, unless it blocks the D/E item at hand or
+corrupts saves. D5: the cell flag byte is stored once (`MapData.tiles` is gone). D3 was
+split into D3a–g, and D3a–f are paid: `PartyState` has no optional field left, and
+`Champion` keeps only `fingerprint` (D3g) and four fields whose absence carries meaning
+(`portrait` / `portraitGraphic`, `titleField` / `incantationField`). `initialPartyState`
+and `addCharacterDefaults` are the two initializers. `Party.setState` fills an older runtime
+save's gaps from them, so `RUNTIME_SAVE_VERSION` stays 10 and the author's saves still load.
+Fixed on the way, each in its own commit: a recruit's `facing3` starts as the party's facing
+(`Character.cpp:531`), and `byte33` is derived from the incantation instead of carried
+stale from the save it was read from.
+Next: D3g (`fingerprint`, which needs a design decision first; see its row), then D4
+(measure a branded `ObjectID` on a branch before deciding), E1 (design note in `DEBT.md`
+first), then E2–E5. C33 and C34 wait until after E1/E2. C25 (⚠️) still waits for D4.
 
 ## Ground rules
 
