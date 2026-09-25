@@ -35,6 +35,7 @@ import type { MonsterAttack } from './MonsterAttack';
 import type { MonsterDamage } from './MonsterDamage';
 import type { MonsterPerception } from './MonsterPerception';
 import type { MonsterSystem } from './MonsterSystem';
+import type { MouseSystem } from './MouseSystem';
 import type { MovementSystem } from './MovementSystem';
 import type { TimerSystem } from './TimerSystem';
 
@@ -46,7 +47,6 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
-  | 'throwFromWeaponHand'
 >;
 
 /**
@@ -70,6 +70,7 @@ export interface GameSystems {
   movement: MovementSystem;
   magic: MagicSystem;
   character: CharacterSystem;
+  mouse: MouseSystem;
   game: GameMethods;
 }
 

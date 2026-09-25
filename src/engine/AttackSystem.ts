@@ -1207,7 +1207,7 @@ export class AttackSystem {
         params.attdep.thro.decayRate = -1;
         this.callAttackFilter(filter, params, 1);
         if (params.attdep.thro.abort === 0) {
-          successfulAttack = this.ctx.systems.game.throwFromWeaponHand({
+          successfulAttack = this.ctx.systems.mouse.throwFromWeaponHand({
             chIdx: params.charIdx,
             side: params.attdep.thro.side,
             disableTime: params.disableTime,

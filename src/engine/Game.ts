@@ -16,7 +16,7 @@ import type {
 } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction, emptyPossessions } from './gameTypes';
-import { Party, ensureHandOwner, findChampionByFingerprint, selectMagicCaster, setHandOwner } from './Party';
+import { Party, ensureHandOwner, selectMagicCaster, setHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
@@ -37,12 +37,13 @@ import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
 import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
+import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { MOUSE_UNCLICK } from './MouseQueue';
 import { wakeUp } from './LoopState';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
-import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
+import { determineMastery, ensureSkills } from './skills';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
+import { SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import { GetBasicObjectType } from './objectIndex';
@@ -87,10 +88,6 @@ import { DELTA_X, DELTA_Y } from './MonsterPerception';
  */
 export type GameEventCallback = (game: Game) => void;
 export type MovementCallback = (success: boolean, result?: MovementResult) => void;
-
-interface DropCursorOptions {
-    viAltar?: boolean;
-}
 
 /**
  * The quick-save payload.
@@ -269,6 +266,8 @@ export class Game {
     readonly magic: MagicSystem;
     /** `Character.cpp`'s possession writers: `RemoveCharacterPossession`, `DropAllPossessions`. */
     readonly character: CharacterSystem;
+    /** `Mouse.cpp`'s engine half: the cursor's drop and throw, `ThrowByCharacter`. */
+    readonly mouse: MouseSystem;
     /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
     get gameWon(): boolean { return this.state.gameWon; }
     set gameWon(won: boolean) { this.state.gameWon = won; }
@@ -338,6 +337,7 @@ export class Game {
         this.movementSystem = new MovementSystem(ctx);
         this.magic = new MagicSystem(ctx);
         this.character = new CharacterSystem(ctx);
+        this.mouse = new MouseSystem(ctx);
 
         Object.assign(ctx.systems, {
             actuators: this.actuators,
@@ -353,6 +353,7 @@ export class Game {
             movement: this.movementSystem,
             magic: this.magic,
             character: this.character,
+            mouse: this.mouse,
             game: this,
         } satisfies GameSystems);
     }
@@ -1311,11 +1312,6 @@ export class Game {
         return champion.possessions[slot] ?? OBJECT_ID_NULL;
     }
 
-    private applyLimits(min: number, value: number, max: number): number {
-        if (value < min) return min;
-        if (value > max) return max;
-        return value | 0;
-    }
 
 
     // ------------------------------------------------------------ attacks
@@ -1349,31 +1345,6 @@ export class Game {
         return value;
     }
 
-    /**
-     * `ThrowByCharacter` with an explicit hand (`doc/CSBwin-src/Mouse.cpp:672`) — the
-     * THROW attack, which throws what is in the fighting hand rather than what the
-     * cursor is holding. `range`/`damage`/`decayRate` of -1 mean "compute them", which
-     * is how the Party Attack Filter can override any of the three.
-     */
-    throwFromWeaponHand(options: {
-        chIdx: number;
-        side: number;
-        disableTime: number;
-        range: number;
-        damage: number;
-        decayRate: number;
-    }): number {
-        const champion = this.party.state.champions[options.chIdx];
-        if (!champion) return 0;
-        const throwingDistance = this.characterStats.determineThrowingDistance(
-            champion, 1, this.party.state.sleeping,
-        );
-        const obj = this.character.removeCharacterPossession(options.chIdx, 1);
-        if (obj === OBJECT_ID_NULL) return 0;
-        return this.throwByCharacter(
-            options.chIdx, champion, obj, options.side, throwingDistance, options,
-        ) ? 1 : 0;
-    }
 
 
     /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
@@ -1448,205 +1419,14 @@ export class Game {
         return true;
     }
 
-    /**
-     * Drop the cursor object into the current/front cell, following CSBWin's DropObject positioning rules.
-     */
+    /** `DropObject` (`MouseSystem.dropObjectFromCursor`), for the UI and `tools/`. */
     dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
-        const party = this.party.state;
-        const owner = party.cursorOwner ?? -1;
-        if (owner < 0) return false;
-
-        const obj = party.objectInHand;
-        if (obj === OBJECT_ID_NULL) return false;
-
-        let dropPos = relativePos | 0;
-        if (dropPos < 0 || dropPos > 4) return false;
-        if (dropPos === 4) dropPos = 2;
-
-        const facing = party.facing & 0x3;
-        const target =
-            dropPos > 1
-                ? facing === 0 ? party.position.north
-                    : facing === 1 ? party.position.east
-                        : facing === 2 ? party.position.south
-                            : party.position.west
-                : party.position;
-
-        const map = this.dungeonState.getMap(target.z);
-        if (!map) return false;
-        if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return false;
-
-        const decoded = decodeObjectID(obj);
-        const newPos = (facing + dropPos) & 0x3;
-
-        // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
-        // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
-        // through an active teleporter or open pit on the cell it lands on.
-        const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
-        party.objectInHand = OBJECT_ID_NULL;
-        this.timerSystem.moveObject(dropped, -1, 0, target.x, target.y, target.z);
-        this.monsterSystem.loadPartyLevelOnArrival();
-        this.timerSystem.processTimers(this.state.tickCount);
-        if (options?.viAltar) {
-            this.maybeScheduleViAltar(dropped, target, newPos);
-        }
-        return true;
+        return this.mouse.dropObjectFromCursor(relativePos, options);
     }
 
-    /**
-     * Dropping bones into the Vi altar's alcove (`doc/CSBwin-src/Mouse.cpp:894-960`).
-     *
-     * The two arms are the same pair `ProcessTT_ViAltar` runs on, and the difference
-     * between them is the whole point. Bones made by a **death** carry an expool
-     * record holding the champion's fingerprint; there `value` is the kind of bones
-     * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1264`), and the
-     * champion is found by fingerprint. Bones placed by the **dungeon** carry no
-     * record; there `value` is itself the champion index and there is no `== 2` test
-     * at all — which is why this used to demand `value == 2` unconditionally and so
-     * ignored every dungeon-authored bones object except one aimed at champion 2.
-     *
-     * Both arms refuse a champion who is not dead, so the altar cannot be used to
-     * resurrect the living.
-     */
-    private maybeScheduleViAltar(obj: ObjectID, location: Position, posInCell: number): void {
-        const misc = this.dungeonState.getMiscRecord(obj);
-        if (!misc) return;
-        // `objNI_2 == objNI_Bones_a`.
-        if ((misc.miscType | 0) !== MISC_BONES_OF_HERO) return;
-
-        const party = this.party.state;
-        const fingerprint = this.dungeonState.copyChampionBonesRecord(obj);
-        let chIdx: number;
-        if (fingerprint !== null) {
-            chIdx = findChampionByFingerprint(party, fingerprint);
-            if (chIdx === -1) return;
-            if ((misc.specialState | 0) !== 2) return;
-        } else {
-            chIdx = (misc.specialState | 0) & 0x3;
-            // `if (chIdx < d.NumCharacter)`.
-            if (chIdx >= party.champions.length) return;
-        }
-        const champion = party.champions[chIdx];
-        if (!champion) return;
-        if (champion.alive !== false && (champion.attributes?.health ?? 0) !== 0) return;
-
-        this.timerSystem.scheduleViAltar(obj, location, posInCell, this.state.tickCount);
-    }
-
-    /**
-     * `ThrowObjectInHand` / `TAG01772e` (`doc/CSBwin-src/Mouse.cpp:764`) — throw what
-     * the cursor is holding, on behalf of the champion who owns the cursor.
-     */
+    /** `ThrowObjectInHand` (`MouseSystem.throwObjectFromCursor`), for the UI and `tools/`. */
     throwObjectFromCursor(leftOrRight: number): boolean {
-        const party = this.party.state;
-        const owner = party.cursorOwner ?? -1;
-        if (owner < 0) return false;
-
-        const obj = party.objectInHand;
-        if (obj === OBJECT_ID_NULL) return false;
-
-        const champion = party.champions[owner] ?? null;
-        if (!champion) return false;
-
-        // CSBWin's `hand < 0` path: the object goes into the fighting hand for exactly
-        // as long as it takes to measure the throw, because `DetermineThrowingDistance`
-        // reads a *possession*, not a loose object (`doc/CSBwin-src/Mouse.cpp:698-705`).
-        const saved = champion.possessions[1]!;
-        this.character.setPossessionDirect(champion, 1, obj);
-        const throwingDistance = this.characterStats.determineThrowingDistance(
-            champion, 1, party.sleeping,
-        );
-        this.character.setPossessionDirect(champion, 1, saved);
-
-        party.objectInHand = OBJECT_ID_NULL;
-        const launched = this.throwByCharacter(owner, champion, obj, leftOrRight, throwingDistance);
-        if (!launched) party.objectInHand = obj;
-        return launched;
-    }
-
-    /**
-     * The tail of `ThrowByCharacter` / `TAG017570` (`doc/CSBwin-src/Mouse.cpp:722-756`),
-     * from the sound to `LaunchMissile`.
-     *
-     * The order matters and is not the obvious one: the throw **raises skill 10 before**
-     * the mastery that sets its range is read, so a throw that levels the skill flies
-     * that little bit further. All three missile statistics come out of one mastery
-     * value — range from it plus the throwing distance, damage as `8 * mastery` plus
-     * noise, and the decay rate as `11 - mastery` — so a master thrower throws further,
-     * harder, and with a projectile that keeps its damage longer.
-     *
-     * This replaces `estimateThrowRange/Damage/Decay`, three invented formulas built on
-     * strength and dexterity that touched neither the object's weight nor the skill.
-     */
-    private throwByCharacter(
-        chIdx: number,
-        champion: Champion,
-        obj: ObjectID,
-        leftOrRight: number,
-        throwingDistance: number,
-        overrides?: { disableTime: number; range: number; damage: number; decayRate: number },
-    ): boolean {
-        const party = this.party.state;
-
-        this.sounds.queueSound(16, party.position.x, party.position.y, 1);
-        this.monsterAttack.adjustStamina(chIdx, this.throwStaminaCost(obj));
-        // A negative disable time means "use the default", which is 4 ticks.
-        const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
-        this.magic.disableCharacterAction(chIdx, disableTime);
-
-        // The experience the throw earns, and `weaponBonus` — the weapon's own
-        // contribution to the distance, which doubles as the damage scale below.
-        let experience = 8;
-        let weaponBonus = 1;
-        if (decodeObjectID(obj).category === DBType.WEAPON) {
-            experience += 4;
-            const desc = this.characterStats.weaponDescFor(obj);
-            // Above class 12 are the staves and wands, which gain nothing from a throw.
-            if (desc && desc.uByte1 <= 12) {
-                weaponBonus = desc.uByte3;
-                experience += Math.trunc(weaponBonus / 4);
-            }
-        }
-        this.awardThrowSkill(chIdx, experience);
-
-        const base = throwingDistance + weaponBonus;
-        const mastery = determineMastery(champion, 10, {
-            partySleeping: party.sleeping,
-            getObjectNameIndex: (objectId: ObjectID) => this.nameIndex(objectId),
-        });
-        const range = base + this.random.below(16) + Math.trunc(base / 2) + mastery;
-        const damage = this.applyLimits(40, 8 * mastery + (this.random.next() & 31), 200);
-        const decayRate = Math.max(5, 11 - mastery);
-
-        const launched = this.timerSystem.throwObjectFromHand(
-            obj,
-            party.position,
-            leftOrRight,
-            party.facing,
-            overrides && overrides.range >= 0 ? overrides.range : range,
-            overrides && overrides.damage >= 0 ? overrides.damage : damage,
-            overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,
-            this.state.tickCount,
-        );
-        // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (doc/CSBwin-src/Mouse.cpp:753-754):
-        // for 4 ticks the party cannot step after what it threw.
-        party.word11712 = 4;
-        party.word11714 = party.facing;
-        return launched;
-    }
-
-    /**
-     * `TAG016382` (`doc/CSBwin-src/Mouse.cpp:653`) — the stamina a throw costs, which
-     * grows faster than linearly with weight: half the weight, clamped to 1-10, and then
-     * half of every remaining 10 units piled on top.
-     */
-    private throwStaminaCost(obj: ObjectID): number {
-        let remaining = Math.trunc(this.characterStats.getObjectWeight(obj) / 2);
-        let cost = this.applyLimits(1, remaining, 10);
-        while ((remaining -= 10) > 0) {
-            cost = cost + Math.trunc(remaining / 2);
-        }
-        return cost;
+        return this.mouse.throwObjectFromCursor(leftOrRight);
     }
 
 
@@ -1655,20 +1435,6 @@ export class Game {
         return this.magic.castSpellFromUi(chIdx, incantation);
     }
 
-    /** `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. */
-    private awardThrowSkill(chIdx: number, experience: number): void {
-        if (experience <= 0) return;
-        const map = this.dungeonState.getMap(this.party.state.position.z);
-        const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-        adjustSkills(this.party.state.champions, chIdx, 10, experience, AdjustSkillsWhy.ThrowByCharacter, {
-            time: this.state.tickCount,
-            lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
-            random: this.random,
-            experienceMultiplier,
-            applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
-            onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
-        });
-    }
 
     // Get position info for debugging
     getPositionInfo = () => this.movementSystem.getPositionInfo();
