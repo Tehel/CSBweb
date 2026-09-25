@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, all of tier D (D1–D6), all of E1 (E1a–d) and F4, paid by 2026-09-25, and E2 under way. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, all of tier D (D1–D6), all of E1 (E1a–d) and F4, paid by 2026-09-25, and E2 on 2026-09-26 (`Game` is the loop, the construction and facades); E3 next. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had

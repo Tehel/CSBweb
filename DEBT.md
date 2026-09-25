@@ -42,9 +42,10 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    can reach the UI without new setters. C25 (re-sized to M after D4) and C35 wait in the
    frozen queue with the rest of tier C. D6 and F4 were paid before E1c (2026-09-25), so
    tier D is closed and every suite tool is seeded. E1 was paid on 2026-09-25 (E1d:
-   `GameHost`). E2 is under way — `GameMethods` is gone (2026-09-25); what is left is the
-   code in `Game` that is not the loop (see E2, "What is left") — then E3, E4. C36 (found
-   paying E2) waits with the rest of tier C.
+   `GameHost`). E2 was paid on 2026-09-26: `Game` is the loop, the construction and facades.
+   Next E3 (split `TimerSystem.ts`), then E4 and E5. C36 and C37 (found paying E2) wait
+   with the rest of tier C; C33 and C34 were waiting for E2 and are now unblocked; by the D/E-first
+   order they follow tier E unless the author pulls them forward.
 
 ## Why this order
 
@@ -123,7 +124,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ archived |
 | D6 | `GameState.party` is a second copy of `Party.state` | S | ✅ archived |
 | E1 | A shared game context, and one set of tables (split E1a-d) | L | ✅ |
-| E2 | Split `Game.ts` by CSBWin source file (under way: `GameMethods` gone; the non-loop rest left) | L | ⚠️ |
+| E2 | Split `Game.ts` by CSBWin source file | L | ✅ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
 | E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
@@ -1467,9 +1468,9 @@ them to `GameHost` when it needs them. Still unchanged: `Game.addCharacterTables
 per-module `possession` readers (`MagicSystem` and `CharacterSystem` read
 `champion.possessions[slot] ?? OBJECT_ID_NULL` inline rather than add a sixth).
 
-### E2 ⚠️ Split `Game.ts` by CSBWin source file
+### E2 ✅ Split `Game.ts` by CSBWin source file
 
-`Game.ts` is 3018 lines (2172 after the first six commits below, 1364 after the next five). Split it by CSBWin source file, as `src/renderer/ui/` already is
+`Game.ts` is 3018 lines (2172 after the first six commits below, 1364 after the next five, 623 at the end). Split it by CSBWin source file, as `src/renderer/ui/` already is
 (`doc/UI_MODULE_MAP.md`). Method groups (lines as of 2026-09-23):
 
 | Group | Methods | CSBWin |
@@ -1623,6 +1624,27 @@ before moving, and decide the two open questions first:
   owes one thing to the loop: `HandleMouseEvents`' `lastTime = 0` (`SaveGame.cpp:1661`),
   which is `Game`'s own static. `setPartyState` and `setRandomSeed` stay as facades (the
   map preview and the tools).
+
+**Done (2026-09-26): `Game` less the loop.** Seven commits, each byte-identical on every
+tool's full output (but for `dump-save-menu`'s one-byte wobble), frames identical, and
+the author's five runtime saves hash the same after load and after 600 ticks as on
+`b143003`. `RUNTIME_SAVE_VERSION` stays 10: the payload's shape did not change.
+
+| Commit | Moved |
+| --- | --- |
+| `fd2f69a` | The quick-save into `src/engine/RuntimeSave.ts`: `RUNTIME_SAVE_VERSION`, `RuntimeSaveState`, `getRuntimeSaveState(ctx)` / `applyRuntimeSaveState(ctx, save)`, the timer (de)serialisers. `Game` keeps the two facades, the second also resetting `HandleMouseEvents`' `lastTime`. |
+| `e968d68` | `NinetySecondUpdate` / `TenSecondUpdate` into `src/engine/PeriodicUpdates.ts`; the cadence tests out of the bodies into `gameTick`, as `isNinetySecondTick` / `isTenSecondTick`, which the three cadence tools now call too. |
+| `214e6b5` | `_ExecuteAttack`'s engine half into `CharacterSystem.executeAttack`; `consumeAttackDamageToDisplay` into `AttackSystem`. `Game.tables` went with the last reader. |
+| `ff0899a` | `HandleClickInViewport`'s engine arms — `handleDoorSwitchClick`, `handleWallClick`, `triggerObjectMove` (the floor pick-up's `MoveObject`) — and `sleep` into `MouseSystem`. C37 recorded on the way. |
+| `5b1607c` | `applyFeeding`'s bindings into `Feeding.applyFeedParameters(ctx, …)`; `FeedingHooks` is gone. |
+| `2606967` | `MoveParty`'s tail into `MovementSystem.moveParty`, with `setPartyMoveDelay`. `Game.move` keeps the `onMove` listeners. |
+| `7749f9d` | `addChampion` (the tools' join) into `HallOfChampions`. |
+
+What `Game` is now: the loop (`start`/`stop`/`gameLoop`, `runFrame`, `gameTick`,
+`loadNewPartyLevel` = `tag0006a4`, `handleMouseEvents` with `lastInputTime`, the mouse
+queue's front door), the construction, the `onTick` / `onMove` listeners, and one-line
+facades. Not moved, knowingly: `setPartyState` (two lines, the map preview's) and the
+`getPositionInfo` / `getTickCount` / `getElapsedTime` debug getters.
 
 ### E3 ⏳ Split `TimerSystem.ts`
 

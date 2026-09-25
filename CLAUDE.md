@@ -105,8 +105,9 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
-            `ctx.loop`), skills, AddCharacter, objectIndex (the one DescIndex /
-            GetBasicObjectType / NameIndex)
+            `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates),
+            RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
+            (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
@@ -197,6 +198,6 @@ the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT
 Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
 before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
 is paid; so is E1 (one `GameTables`, one `GameContext` every subsystem takes, subsystems
-calling each other through `ctx.systems`, one `GameHost` at `ctx.host`). E2 (split
-`Game.ts` by CSBWin file) is under way: `GameMethods` is gone, so no system calls `Game`;
-what is left is the code in `Game` that is not the loop (`DEBT.md` E2, "What is left").
+calling each other through `ctx.systems`, one `GameHost` at `ctx.host`), and so is E2:
+`Game` is only the loop, the construction and one-line facades, and every other method
+lives in the system that ports its CSBWin file. Next is E3, splitting `TimerSystem.ts`.
