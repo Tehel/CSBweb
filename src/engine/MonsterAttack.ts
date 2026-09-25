@@ -31,7 +31,6 @@ import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurren
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
-import type { CharacterStats } from './CharacterStats';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 
 /**
@@ -86,49 +85,11 @@ export interface AttackParameters {
   supressPoison: number;
 }
 
-export interface MonsterAttackHooks {
-  /** `LaunchMissile` (`doc/CSBwin-src/Magic.cpp:40`). */
-  launchMissile?: (options: {
-    projectile: ObjectID;
-    mapX: number;
-    mapY: number;
-    posInCell: number;
-    direction: number;
-    range: number;
-    damage: number;
-    decayRate: number;
-    level: number;
-    startTime: number;
-  }) => void;
-  /** `StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`) — the giggler. */
-  stealFromCharacter?: (monster: CreatureRecord, chIdx: number) => void;
-  /** `MonsterAttackFilter` — a DSA may rewrite the whole parameter block. */
-  attackFilter?: (params: AttackParameters) => AttackParameters | null;
-  /** Called when a champion dies, after bones and possessions are dealt with. */
-  onChampionDied?: (chIdx: number) => void;
-  /** Register the bones↔champion mapping (`expool.AddChampionBonesRecord`). */
-  registerBones?: (bones: ObjectID, chIdx: number) => void;
-  /**
-   * `MoveObject(obj, -1, 0, x, y)` — sets an object down in a cell as a drop does, so it
-   * presses a pad or falls down a pit (`doc/CSBwin-src/Code11f52.cpp`).
-   */
-  moveObject: (object: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number) => void;
-  /** `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497`). */
-  dropAllPossessions?: (chIdx: number) => void;
-  /** `WakeUp` (`doc/CSBwin-src/CSBCode.cpp`). */
-  wakeUp?: () => void;
-  /** Arm the `TT_75` poison timer (`doc/CSBwin-src/CSBCode.cpp:7228`). */
-  schedulePoison?: (chIdx: number, remaining: number) => void;
-  /** Delete this champion's `TT_75` timers (`doc/CSBwin-src/Character.cpp:3016`). */
-  cancelPoisonTimers?: (chIdx: number) => void;
-  trace?: (line: string) => void;
-}
-
 export class MonsterAttack {
   private readonly dungeon: DungeonState;
   private readonly random: CsbRandom;
 
-  constructor(private readonly ctx: GameContext, private hooks?: MonsterAttackHooks) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
   }
@@ -173,11 +134,13 @@ export class MonsterAttack {
       monsterRn, monster, slot, desc, mapX, mapY, monsterIndex, context,
     );
 
-    const amended = this.hooks?.attackFilter?.(p) ?? p;
+    // `MonsterAttackFilter`, the DSA that may rewrite the whole block, is not ported
+    // (DEBT.md G2).
+    const amended = p;
 
     if (amended.monsterShouldLaunchMissile) {
       if (THROWABLE.has(amended.missileType)) {
-        this.hooks?.launchMissile?.({
+        this.ctx.systems.timer.launchMonsterMissile({
           projectile: amended.missileType,
           mapX: amended.monsterX,
           mapY: amended.monsterY,
@@ -213,7 +176,8 @@ export class MonsterAttack {
       }
 
       if (amended.monsterShouldSteal) {
-        this.hooks?.stealFromCharacter?.(monster, chIdx);
+        // `StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`), the giggler, is not
+        // ported (DEBT.md G10): the blow is spent and nothing is taken.
       } else {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
         const champ = getPartyChampion(this.ctx.party.state, chIdx);
@@ -355,7 +319,7 @@ export class MonsterAttack {
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
-    if (party.sleeping) this.hooks?.wakeUp?.();
+    if (party.sleeping) this.ctx.systems.game.wakeUp();
 
     const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return 0;
@@ -543,7 +507,7 @@ export class MonsterAttack {
           if (dealt <= threshold) break;
         } while (threshold !== 0);
       }
-      if (party.sleeping) this.hooks?.wakeUp?.();
+      if (party.sleeping) this.ctx.systems.game.wakeUp();
     }
 
     if (dealt <= 0) return 0;
@@ -576,7 +540,7 @@ export class MonsterAttack {
     champ.attributes.health = 0;
     champ.incantation = [];
 
-    this.hooks?.dropAllPossessions?.(chIdx);
+    this.ctx.systems.game.dropAllPossessions(chIdx);
 
     // `objD4.pos(charPosition)`, then `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`
     // and `expool.AddChampionBonesRecord(objD4, …)` (`doc/CSBwin-src/Character.cpp:2626-2646`):
@@ -584,9 +548,8 @@ export class MonsterAttack {
     const bones = this.createBonesRecord();
     if (bones !== null) {
       const objD4 = withObjectPosition(bones, champ.partyPosition & 0x3);
-      if (!this.hooks) throw new Error('KillCharacter needs MoveObject to set the bones down');
-      this.hooks.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
-      this.hooks.registerBones?.(objD4, chIdx);
+      this.ctx.systems.timer.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
+      this.ctx.systems.game.registerChampionBones(objD4, chIdx);
     }
 
     // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the
@@ -623,7 +586,7 @@ export class MonsterAttack {
       if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
 
-    this.hooks?.onChampionDied?.(chIdx);
+    this.ctx.systems.game.onChampionDied(chIdx);
   }
 
   private createBonesRecord(): ObjectID | null {
@@ -635,17 +598,6 @@ export class MonsterAttack {
       miscType: MISC_BONES_OF_HERO,
     });
     return index === null ? null : withObjectPosition(encodeMisc(index), 0);
-  }
-
-  /**
-   * `CharacterStats`, for the `DetermineThrowingDistance` term in `TAG01680a` and the
-   * load term in `Quickness`. Injected after construction because `Game` builds it
-   * from tables that arrive with the graphics.
-   */
-  private characterStats: CharacterStats | null = null;
-
-  setCharacterStats(stats: CharacterStats): void {
-    this.characterStats = stats;
   }
 
   /**
@@ -679,9 +631,9 @@ export class MonsterAttack {
       if (!rec) continue;
       const worn = rec.clothingType;
       if (((this.ctx.tables.clothingFlags[worn] ?? 0) & 0x80) === 0) continue; // not a shield
-      const throwingDistance = this.characterStats?.determineThrowingDistance(
+      const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
         champ, hand, this.ctx.party.state.sleeping,
-      ) ?? 0;
+      );
       const strength = this.clothingArmourValue(worn, scale) + throwingDistance;
       const weight = this.ctx.tables.byte1412[bodyPart] ?? 0;
       const product = (strength * weight) & 0xffff;
@@ -735,8 +687,7 @@ export class MonsterAttack {
    * owns the `MaxLoad` chain; this supplies `d.PartySleeping`.
    */
   quickness(champ: Champion): number {
-    if (!this.characterStats) throw new Error('MonsterAttack.quickness before setCharacterStats');
-    return this.characterStats.quickness(champ, this.ctx.party.state.sleeping);
+    return this.ctx.systems.characterStats.quickness(champ, this.ctx.party.state.sleeping);
   }
 
   /**
@@ -851,7 +802,7 @@ export class MonsterAttack {
     const remaining = strength - 1;
     if (remaining !== 0) {
       champ.poisonCount = Math.min(255, champ.poisonCount + 1);
-      this.hooks?.schedulePoison?.(chIdx, remaining);
+      this.ctx.systems.timer.schedulePoison(chIdx, remaining, this.ctx.party.state.position.z);
     }
   }
 
@@ -861,7 +812,7 @@ export class MonsterAttack {
    */
   curePoison(chIdx: number): void {
     if (chIdx === -1) return;
-    this.hooks?.cancelPoisonTimers?.(chIdx);
+    this.ctx.systems.timer.cancelPoisonTimers(chIdx);
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (champ) champ.poisonCount = 0;
   }

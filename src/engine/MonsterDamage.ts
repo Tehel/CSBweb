@@ -81,35 +81,17 @@ const DROPPING_MISC_BASE = 127;
 const DROPPING_CLOTHING_BASE = 69;
 const DROPPING_WEAPON_BASE = 23;
 
+/** What `MonsterDamage` calls that leaves the engine (`DEBT.md` E1d retires it). */
 export interface MonsterDamageHooks {
-  /** `CreateCloud(RNMonsterDeath, …)`. */
-  createCloud?: (projectile: ObjectID, size: number, position: Position, posInCell: number) => void;
-  /** `MoveObject` for a group, `MonsterSystem.moveMonster`. */
-  moveMonster?: (monsterRn: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number) => void;
-  /**
-   * `ProcessMonsterDeleteFilter` (`doc/CSBwin-src/Code11f52.cpp:926`) — a DSA may
-   * suppress the death cloud (`deathCloud == 2`) or the dropped remains
-   * (`dropResidue == 2`).
-   */
-  monsterDeleteFilter?: (options: {
-    mapX: number;
-    mapY: number;
-    level: number;
-    why: number;
-    index: number;
-  }) => { deathCloud: number; dropResidue: number } | null;
   trace?: (line: string) => void;
 }
-
-/** `DELETEMONSTERWHY` — only the damage case is reachable from here. */
-const DMW_DAMAGE = 0;
 
 export class MonsterDamage {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
 
-  constructor(private readonly ctx: GameContext, private hooks?: MonsterDamageHooks) {
+  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterDamageHooks = {}) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -371,8 +353,7 @@ export class MonsterDamage {
 
     this.trace(`Deleting monster ${rn.toString(16)} ${level}(${mapX},${mapY})`);
     monster.hp = [0, 0, 0, 0];
-    if (this.hooks?.moveMonster) this.hooks.moveMonster(rn, mapX, mapY, -1, 0, level);
-    else this.dungeon.removeObjectFromCell(position, rn);
+    this.ctx.systems.monsters.moveMonster(rn, mapX, mapY, -1, 0, level);
     const groupIndex = monster.groupIndex;
     this.dungeon.deleteDBEntry(rn);
 
@@ -380,14 +361,11 @@ export class MonsterDamage {
       const slot = this.dungeon.getItem16Record(groupIndex);
       if (slot) {
         slot.word0 = ITEM16_FREE;
-        this.onItem16Freed?.();
+        this.ctx.systems.monsters.noteItem16Freed();
       }
     }
     this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
   }
-
-  /** Set by `MonsterSystem` so `d.ITEM16QueLen` stays in step. */
-  onItem16Freed?: () => void;
 
   /* ---------------------------------------------------------------- damage ---- */
 
@@ -487,15 +465,15 @@ export class MonsterDamage {
     const deadPosition = positions === 255 ? 255 : (positions >> (2 * indexInGroup)) & 0x3;
     const numMonM1 = monster.numMonM1 & 0x3;
 
-    const filter = this.hooks?.monsterDeleteFilter?.({
-      mapX: attackX,
-      mapY: attackY,
-      level,
-      why: DMW_DAMAGE,
-      index: numMonM1 === 0 ? -1 : indexInGroup,
-    });
-    const showDeathCloud = (filter?.deathCloud ?? 0) !== 2;
-    const dropResidue = (filter?.dropResidue ?? 0) < 2;
+    // `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`) is not ported (DEBT.md G2): no DSA
+
+    // may suppress the death cloud (`deathCloud == 2`) or the remains (`dropResidue == 2`),
+
+    // so both are their defaults.
+
+    const showDeathCloud = true;
+
+    const dropResidue = true;
 
     let result: MonsterDamageResult;
 
@@ -530,10 +508,10 @@ export class MonsterDamage {
       const size = [110, 190, 255][monsterHorizontalSize(desc)] ?? 255;
       if (monster.drawAsSize4) {
         if (numMonM1 === 0) {
-          this.hooks?.createCloud?.(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255);
+          this.ctx.systems.timer.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255);
         }
       } else {
-        this.hooks?.createCloud?.(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition);
+        this.ctx.systems.timer.createDeathCloud(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition);
       }
     }
 
@@ -672,6 +650,6 @@ export class MonsterDamage {
   }
 
   private trace(line: string): void {
-    this.hooks?.trace?.(line);
+    this.hooks.trace?.(line);
   }
 }

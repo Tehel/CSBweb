@@ -27,13 +27,10 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { StateOfFear } from './monsterTypes';
-import type { MonsterSystem } from './MonsterSystem';
-import type { MonsterDamage } from './MonsterDamage';
 import { MonsterDamageResult } from './MonsterDamage';
 import {
   DELTA_X,
   DELTA_Y,
-  MonsterPerception,
   distanceBetweenPoints,
   getPrimaryAndSecondaryDirection,
   type MoveProbeState,
@@ -156,30 +153,8 @@ export interface InitialChecksResult {
   timerFunction: number;
 }
 
-/** The other systems `MonsterAI` calls (`DEBT.md` E1c turns them into `ctx.systems`). */
-export interface MonsterAiDeps {
-  monsters: MonsterSystem;
-  damage: MonsterDamage;
-  perception: MonsterPerception;
-  /**
-   * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — returns true
-   * when resolving the missiles at that cell position destroyed the whole group.
-   */
-  checkMonsterVersusMissiles?: (mapX: number, mapY: number, position: number, level: number) => boolean;
-  /**
-   * `MonsterAttacks` (`doc/CSBwin-src/Monster.cpp:944`) — resolve one member's attack
-   * on the party, returning whether it is now in its attacking pose.
-   *
-   * ⏳ Not supplied yet; without it a monster reaches the point of attacking and then
-   * simply doesn't. Tracked in PLAN.md Phase 12 step 5.
-   */
-  monsterAttacks?: (
-    monsterRn: ObjectID,
-    monster: CreatureRecord,
-    mapX: number,
-    mapY: number,
-    member: number,
-  ) => boolean;
+/** What `MonsterAI` calls that leaves the engine (`DEBT.md` E1d retires it). */
+export interface MonsterAiHooks {
   trace?: (line: string) => void;
 }
 
@@ -190,7 +165,7 @@ export class MonsterAI {
   private readonly random: CsbRandom;
   private readonly timers: TimerQueue;
 
-  constructor(private readonly ctx: GameContext, private readonly deps: MonsterAiDeps) {
+  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterAiHooks = {}) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
     this.timers = ctx.timers;
@@ -456,7 +431,7 @@ export class MonsterAI {
     if (fearFactor === StateOfFear.StateOfFear6) {
       this.trace('      MAI fearFactor==6');
       const member = c.timerFunction - TimerFunction.TT_MONSTER_A0;
-      frame.i60 = this.deps.monsters.nextMonsterUpdateTime(
+      frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(
         c.slot,
         member,
         ((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0,
@@ -494,7 +469,7 @@ export class MonsterAI {
   private processIndividualBTimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
     if (fearFactor === StateOfFear.StateOfFear5) {
       if (c.indexOfLastMonster !== 0) {
-        this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+        this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
       }
       this.tryToMove(frame, c);
       return;
@@ -503,7 +478,7 @@ export class MonsterAI {
     const member = c.timerFunction - TimerFunction.TT_MONSTER_B0;
     if (((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0) {
       // Mid-attack: schedule the follow-through.
-      frame.i60 = this.deps.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY);
+      frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY);
       const roll = this.random.zeroTo3();
       const attackTicks = c.desc.attackTicks07 & 0xff;
       frame.timer.time = (frame.timer.time + ((attackTicks + roll - 1) & 0xffff)) >>> 0;
@@ -558,10 +533,14 @@ export class MonsterAI {
         if (reach === 1 && this.sidestepBeforeMeleeing(frame, c, member, preferredDirection)) return;
 
         // Attack.
-        frame.i60 = this.deps.monsters.nextMonsterUpdateTime(
+        frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(
           c.slot,
           member,
-          this.deps.monsterAttacks?.(c.monsterRn, c.monster, c.mapX, c.mapY, member) ?? false,
+          this.ctx.systems.monsterAttack.monsterAttacks(c.monsterRn, c.monster, c.mapX, c.mapY, member, {
+            level: this.ctx.party.state.position.z,
+            primaryDirectionToParty: this.primaryDirectionToParty,
+            orthogonalDistanceToParty: this.orthogonalDistanceToParty,
+          }),
           c.mapX,
           c.mapY,
         );
@@ -570,7 +549,7 @@ export class MonsterAI {
       } else {
         c.monster.fear = StateOfFear.StateOfFear7;
         if (c.indexOfLastMonster !== 0) {
-          this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+          this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
         }
         this.d4d0Finish(frame, c);
         return;
@@ -580,7 +559,7 @@ export class MonsterAI {
       if (seen !== 0) {
         this.rememberPartyPosition(c.slot);
         const ref = { facings: c.slot.facings };
-        this.deps.perception.turnMonster(
+        this.ctx.systems.monsterPerception.turnMonster(
           this.scratch, c.slotIndex, ref, preferredDirection, member,
           c.indexOfLastMonster !== 0 && c.horizSize === 1, this.ctx.state.tickCount,
         );
@@ -590,7 +569,7 @@ export class MonsterAI {
       } else {
         c.monster.fear = StateOfFear.StateOfFear7;
         if (c.indexOfLastMonster !== 0) {
-          this.deps.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
+          this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(c.slotIndex, c.mapX, c.mapY, c.level);
         }
         this.tryUByte67(frame, c, preferredDirection);
         return;
@@ -735,7 +714,7 @@ export class MonsterAI {
     }
 
     // Fear state 0 and the party is out of sight: hunt by smell.
-    const smelled = this.deps.perception.getBestMonsterFacing(c.desc, c.level, c.mapX, c.mapY, {
+    const smelled = this.ctx.systems.monsterPerception.getBestMonsterFacing(c.desc, c.level, c.mapX, c.mapY, {
       partyX: this.scratch.partyX,
       partyY: this.scratch.partyY,
       orthogonalDistanceToParty: this.scratch.orthogonalDistanceToParty,
@@ -784,7 +763,7 @@ export class MonsterAI {
       }
 
       if (!skip) {
-        const probe = this.deps.perception.possibleMove(
+        const probe = this.ctx.systems.monsterPerception.possibleMove(
           c.monsterRn, c.desc, c.level, c.mapX, c.mapY, direction, false, this.scratch,
         );
         if (probe.possible) {
@@ -798,7 +777,7 @@ export class MonsterAI {
           // how often a group re-forms (doc/CSBwin-src/Monster.cpp:2497-2513).
           if (
             (c.timeUntilAlternateUpdate & 15) !== 5 ||
-            this.deps.perception.findPossibleMove(
+            this.ctx.systems.monsterPerception.findPossibleMove(
               c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
             ) === 0 ||
             this.random.bool() !== 0
@@ -837,7 +816,7 @@ export class MonsterAI {
   ): void {
     const rfpaw = recognizesFalsePitsAndWalls;
     const probe = (dir: number, rec: boolean): boolean =>
-      this.deps.perception.possibleMove(
+      this.ctx.systems.monsterPerception.possibleMove(
         c.monsterRn, c.desc, c.level, c.mapX, c.mapY, dir, rec, this.scratch,
       ).possible;
 
@@ -903,7 +882,7 @@ export class MonsterAI {
     c.slot.uByte5 = (c.slot.uByte5 - 1) & 0xff;
     if (c.slot.uByte5 !== 0) {
       if (this.random.bool() !== 0) {
-        const anyMove = this.deps.perception.findPossibleMove(
+        const anyMove = this.ctx.systems.monsterPerception.findPossibleMove(
           c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
         );
         if (anyMove === 0 && c.xDistance + c.yDistance <= 1) {
@@ -998,12 +977,12 @@ export class MonsterAI {
    */
   private processInvincible(frame: AiFrame, c: AiConst, preferredDirection: number): boolean {
     this.trace('      MAI Entering Process_Invincible');
-    this.deps.perception.findPossibleMove(
+    this.ctx.systems.monsterPerception.findPossibleMove(
       c.monsterRn, c.desc, c.level, c.mapX, c.mapY, false, this.scratch,
     );
 
     const doubleMove = (dir: number): boolean =>
-      this.deps.perception.possibleDoubleMove(
+      this.ctx.systems.monsterPerception.possibleDoubleMove(
         c.monsterRn, c.desc, c.level, c.mapX, c.mapY, dir, this.scratch,
       );
 
@@ -1035,14 +1014,14 @@ export class MonsterAI {
     frame.d5 = dir;
     const newX = c.mapX + 2 * (DELTA_X[dir] ?? 0);
     const newY = c.mapY + 2 * (DELTA_Y[dir] ?? 0);
-    this.deps.monsters.playTeleportSound(newX, newY);
+    this.ctx.systems.monsters.playTeleportSound(newX, newY);
 
     const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
     frame.bool36 = remaining <= 0;
     if (frame.bool36) {
       // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
       // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:1711-1720`).
-      const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+      const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
       if (moved.code !== 0) return true;
       frame.timer.uByte6 = moved.position.x & 0xff;
       frame.timer.uByte7 = moved.position.y & 0xff;
@@ -1135,7 +1114,7 @@ export class MonsterAI {
     }
     // Any non-zero `MoveObject` ends the turn; otherwise the timer follows the group to
     // `d.NewX, d.NewY` (`doc/CSBwin-src/Monster.cpp:2105-2112`, `:2440-2449`).
-    const moved = this.deps.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
+    const moved = this.ctx.systems.monsters.moveMonster(c.monsterRn, c.mapX, c.mapY, newX, newY, c.level);
     if (moved.code !== 0) return false;
     frame.timer.uByte6 = moved.position.x & 0xff;
     frame.timer.uByte7 = moved.position.y & 0xff;
@@ -1163,7 +1142,7 @@ export class MonsterAI {
   }
 
   private blocked(c: AiConst, member: number): number {
-    return this.deps.perception.blocked(c.monster, member, c.level, c.mapX, c.mapY, {
+    return this.ctx.systems.monsterPerception.blocked(c.monster, member, c.level, c.mapX, c.mapY, {
       partyX: this.scratch.partyX,
       partyY: this.scratch.partyY,
       partyInvisible: this.ctx.party.state.invisible !== 0,
@@ -1180,7 +1159,7 @@ export class MonsterAI {
    */
   private checkMonsterVersusMissiles(c: AiConst): boolean {
     const wiped =
-      this.deps.checkMonsterVersusMissiles?.(c.mapX, c.mapY, c.slot.positions, c.level) ?? false;
+      this.ctx.systems.timer.checkMonsterVersusMissiles(c.mapX, c.mapY, c.slot.positions, c.level);
     this.lastDamageResult = wiped
       ? MonsterDamageResult.ALL_MONSTERS_DIED
       : MonsterDamageResult.NO_MONSTER_DIED;
@@ -1263,7 +1242,7 @@ export class MonsterAI {
       const numMon = (monster.numMonM1 & 0x3) + 1;
       for (let i = 0; i < numMon; i++) {
         if ((monster.hp[i] ?? 0) !== 0) continue;
-        const result = this.deps.damage.damageMonster(
+        const result = this.ctx.systems.monsterDamage.damageMonster(
           monster, i, level, mapX, mapY, 0, true, !onPartyLevel,
         );
         if (result !== MonsterDamageResult.NO_MONSTER_DIED) {
@@ -1290,7 +1269,7 @@ export class MonsterAI {
     // (4) Off the party's level: one random step, then a long sleep.
     if (!onPartyLevel) {
       const direction = this.random.zeroTo3();
-      const probe = this.deps.perception.possibleMove(
+      const probe = this.ctx.systems.monsterPerception.possibleMove(
         monsterRn, desc, level, mapX, mapY, direction, false, this.scratch,
       );
       this.trace(
@@ -1299,7 +1278,7 @@ export class MonsterAI {
       if (probe.possible) {
         const newX = mapX + (DELTA_X[direction] ?? 0);
         const newY = mapY + (DELTA_Y[direction] ?? 0);
-        const moved = this.deps.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level);
+        const moved = this.ctx.systems.monsters.moveMonster(monsterRn, mapX, mapY, newX, newY, level);
         this.trace(`      MAI MoveObject to (${newX},${newY}) returned ${moved.code}`);
         if (moved.code !== 0) {
           this.trace('      MAI Skip monster AI because MoveObject non-zero');
@@ -1429,7 +1408,7 @@ export class MonsterAI {
   /** `EnsureI60NonZero` (`doc/CSBwin-src/Monster.cpp:1381`). */
   ensureI60NonZero(i60: number, slot: Item16Record, monsterX: number, monsterY: number): number {
     if (i60 !== 0) return i60;
-    return this.deps.monsters.nextMonsterUpdateTime(slot, -1, false, monsterX, monsterY);
+    return this.ctx.systems.monsters.nextMonsterUpdateTime(slot, -1, false, monsterX, monsterY);
   }
 
   /**
@@ -1468,7 +1447,7 @@ export class MonsterAI {
     fearFactorIs6: boolean,
   ): void {
     if (fearFactorIs6) monster.fear = StateOfFear.StateOfFear7;
-    this.deps.monsters.clearAttackingAndDeleteMovementTimers(slotIndex, mapX, mapY, level);
+    this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(slotIndex, mapX, mapY, level);
   }
 
   /**
@@ -1489,7 +1468,7 @@ export class MonsterAI {
     let direction = preferredDirection;
     if (!hasPreference && sinceLastUpdate >= 0) direction = this.random.zeroTo3();
     const ref = { facings: slot.facings };
-    this.deps.perception.turnMonsterGroup(
+    this.ctx.systems.monsterPerception.turnMonsterGroup(
       this.scratch, slotIndex, ref, direction, indexOfLastMonster, horizSize === 1, this.ctx.state.tickCount,
     );
     slot.facings = ref.facings;
@@ -1536,7 +1515,7 @@ export class MonsterAI {
       const turns = preferred !== monsterDirection && (monIdx === 0 || this.random.bool() === 0);
       if (turns) {
         const ref = { facings: slot.facings };
-        this.deps.perception.turnMonster(
+        this.ctx.systems.monsterPerception.turnMonster(
           this.scratch,
           slotIndex,
           ref,
@@ -1572,7 +1551,7 @@ export class MonsterAI {
       // mutating it, which left the queue unsorted and stalled every timer behind it.
       this.setMonsterTimerB(
         timer,
-        this.deps.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY),
+        this.ctx.systems.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY),
       );
     }
   }
@@ -1610,7 +1589,7 @@ export class MonsterAI {
   }
 
   private trace(line: string): void {
-    this.deps.trace?.(line);
+    this.hooks.trace?.(line);
   }
 }
 

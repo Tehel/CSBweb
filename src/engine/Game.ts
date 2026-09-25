@@ -241,7 +241,7 @@ export interface GameOptions {
     messages?: MessageSink;
     /** Play a sample. */
     playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-    /** Overrides for `MonsterSystem`'s hooks, and the monster trace. */
+    /** The monster trace. */
     monsterHooks?: MonsterSystemHooks;
 }
 
@@ -401,69 +401,12 @@ export class Game {
         this.timerSystem = new TimerSystem(ctx, {
             playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
         });
-        this.monsterSystem = new MonsterSystem(
-            ctx,
-            {
-                checkMoveFromMissile: (from, to, monsterRn) =>
-                    this.timerSystem.checkMonsterMoveFromMissile(from, to, monsterRn),
-                resolveMonsterDestination: (destination, monsterRn, oldX, oldY) =>
-                    this.timerSystem.resolveMonsterDestination(destination, monsterRn, oldX, oldY),
-                flushPendingDroppings: (monsterType, level, mapX, mapY) =>
-                    this.monsterDamage.flushPendingDroppings(monsterType, level, mapX, mapY),
-                dropMonsterRemains: (level, mapX, mapY, monsterRn, delay, attachedLevel, dropResidue) =>
-                    this.monsterDamage.dropMonsterRemains(level, mapX, mapY, monsterRn, delay, attachedLevel, dropResidue),
-                deleteMonster: (level, mapX, mapY) => this.monsterDamage.deleteMonster(level, mapX, mapY),
-                triggerObjectMove: (position, object, place, unchangedRoom) =>
-                    this.actuators.triggerObjectMove(position, object, place, unchangedRoom, this.party.state.facing),
-                ...monsterHooks,
-            },
-        );
-        this.monsterDamage = new MonsterDamage(
-            ctx,
-            {
-                createCloud: (projectile, size, position, posInCell) =>
-                    this.timerSystem.createDeathCloud(projectile, size, position, posInCell),
-                moveMonster: (monsterRn, oldX, oldY, newX, newY, level) => {
-                    this.monsterSystem.moveMonster(monsterRn, oldX, oldY, newX, newY, level);
-                },
-                trace: monsterHooks?.trace,
-            },
-        );
-        this.monsterDamage.onItem16Freed = () => this.monsterSystem.noteItem16Freed();
+        this.monsterSystem = new MonsterSystem(ctx, monsterHooks);
+        this.monsterDamage = new MonsterDamage(ctx, { trace: monsterHooks?.trace });
         this.monsterPerception = new MonsterPerception(ctx);
-        this.monsterAttack = new MonsterAttack(
-            ctx,
-            {
-                launchMissile: (o) => this.timerSystem.launchMonsterMissile(o),
-                moveObject: (object, oldX, oldY, newX, newY, level) => {
-                    this.timerSystem.moveObject(object, oldX, oldY, newX, newY, level);
-                },
-                registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
-                dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
-                onChampionDied: (chIdx) => this.onChampionDied(chIdx),
-                wakeUp: () => this.wakeUp(),
-                schedulePoison: (chIdx, remaining) =>
-                    this.timerSystem.schedulePoison(chIdx, remaining, this.party.state.position.z),
-                cancelPoisonTimers: (chIdx) => this.timerSystem.cancelPoisonTimers(chIdx),
-                trace: monsterHooks?.trace,
-            },
-        );
-        this.monsterAI = new MonsterAI(ctx, {
-            monsters: this.monsterSystem,
-            damage: this.monsterDamage,
-            perception: this.monsterPerception,
-            checkMonsterVersusMissiles: (mapX, mapY, position, level) =>
-                this.timerSystem.checkMonsterVersusMissiles(mapX, mapY, position, level),
-            monsterAttacks: (monsterRn, monster, mapX, mapY, member) =>
-                this.monsterAttack.monsterAttacks(monsterRn, monster, mapX, mapY, member, {
-                    level: this.party.state.position.z,
-                    primaryDirectionToParty: this.monsterAI.primaryDirectionToParty,
-                    orthogonalDistanceToParty: this.monsterAI.orthogonalDistanceToParty,
-                }),
-            trace: monsterHooks?.trace,
-        });
+        this.monsterAttack = new MonsterAttack(ctx);
+        this.monsterAI = new MonsterAI(ctx, { trace: monsterHooks?.trace });
         this.characterStats = new CharacterStats(ctx);
-        this.monsterAttack.setCharacterStats(this.characterStats);
 
         this.attackSystem = new AttackSystem(ctx, {
             monsterDamage: this.monsterDamage,
@@ -1433,7 +1376,7 @@ export class Game {
      * to the champion's corner and set down with `MoveObject(obj, -1, 0, partyX,
      * partyY)` — so it presses a pad or falls down a pit like any other drop.
      */
-    private dropAllPossessions(chIdx: number): void {
+    dropAllPossessions(chIdx: number): void {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
         const D6W = champ.partyPosition & 0x3;
@@ -1476,7 +1419,7 @@ export class Game {
      * `killCharacter` hands it to a living champion through `SelectMagicCaster`, and
      * blanking it afterwards would undo that.
      */
-    private onChampionDied(chIdx: number): void {
+    onChampionDied(chIdx: number): void {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
         if (this.party.state.selectedCharacterIndex === chIdx) {

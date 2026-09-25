@@ -43,9 +43,13 @@ import type { TimerSystem } from './TimerSystem';
 export type GameMethods = Pick<Game,
   | 'addCharacter'
   | 'applyMissileDamageToParty'
+  | 'dropAllPossessions'
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
   | 'notePartyMoved'
+  | 'onChampionDied'
+  | 'registerChampionBones'
+  | 'wakeUp'
 >;
 
 /**

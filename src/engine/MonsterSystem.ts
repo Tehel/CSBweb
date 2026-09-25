@@ -59,39 +59,8 @@ const SOUND_ORDINAL_TELEPORT = 17;
 export const GROUP_INDEX_DETACHED = 0xd8;
 export const GROUP_INDEX_DETACHED_SIZE4 = 0xff;
 
+/** What `MonsterSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
 export interface MonsterSystemHooks {
-  /**
-   * `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp`) — a monster leaving a
-   * square may be struck by a missile sitting in it. Returns true if that removed
-   * the monster from the dungeon.
-   */
-  checkMoveFromMissile?: (from: Position, to: Position | null, monsterRn: ObjectID) => boolean;
-  /**
-   * `MoveObject`'s loop for a monster (`TimerSystem.resolveMonsterDestination`):
-   * teleporter chains, pit falls and stairs. `code` is `LOCAL_14` as `TeleportMonster` left it,
-   * `audible` is `LOCAL_26`, and `groupDied` is `LOCAL_18`, a fall that killed them all.
-   */
-  resolveMonsterDestination?: (
-    destination: Position,
-    monsterRn: ObjectID,
-    oldX: number,
-    oldY: number,
-  ) => { position: Position; code: number; audible: boolean; groupDied: boolean };
-  /** `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:806`), `MonsterDamage.flushPendingDroppings`. */
-  flushPendingDroppings?: (monsterType: number, level: number, mapX: number, mapY: number) => void;
-  /** `DropMonsterRemains` (`doc/CSBwin-src/Code11f52.cpp:830`), `MonsterDamage.dropMonsterRemains`. */
-  dropMonsterRemains?: (
-    level: number, mapX: number, mapY: number, monsterRn: ObjectID,
-    bodyPartSoundDelay: number, monsterAttachedToLevel: number, dropResidue: boolean,
-  ) => void;
-  /** `DeleteMonster` (`doc/CSBwin-src/Code11f52.cpp:1026`), `MonsterDamage.deleteMonster`. */
-  deleteMonster?: (level: number, mapX: number, mapY: number) => void;
-  /**
-   * The actuator half of `PlaceOrRemoveObjectInRoom` (`doc/CSBwin-src/Code11f52.cpp:3882`),
-   * `ActuatorSystem.triggerObjectMove`: the pads of `position` see the group arrive
-   * (`place`) or leave. The chain itself is spliced here, before the call.
-   */
-  triggerObjectMove?: (position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean) => void;
   /** Dev-only AI trace sink; mirrors CSBWin's `AITraceActive` output. */
   trace?: (line: string) => void;
 }
@@ -127,7 +96,7 @@ export class MonsterSystem {
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
 
-  constructor(private readonly ctx: GameContext, private hooks?: MonsterSystemHooks) {
+  constructor(private readonly ctx: GameContext, private readonly hooks: MonsterSystemHooks = {}) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -532,7 +501,7 @@ export class MonsterSystem {
 
     // A monster leaving a square may run into a missile sitting in it (`:2843-2849`).
     if (fromDungeon && level === partyLevel) {
-      const hit = this.hooks?.checkMoveFromMissile?.(
+      const hit = this.ctx.systems.timer.checkMonsterMoveFromMissile(
         new Position(oldX, oldY, level),
         newX >= 0 ? requested : null,
         monsterRn,
@@ -547,8 +516,7 @@ export class MonsterSystem {
     }
 
     // Follow teleporters and fall down pits, exactly as the party does.
-    const resolved = this.hooks?.resolveMonsterDestination?.(requested, monsterRn, oldX, oldY)
-      ?? { position: requested, code: 0, audible: false, groupDied: false };
+    const resolved = this.ctx.systems.timer.resolveMonsterDestination(requested, monsterRn, oldX, oldY);
 
     const destination = resolved.position;
     const destLevel = destination.z | 0;
@@ -558,11 +526,11 @@ export class MonsterSystem {
     // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
     // default, `0 < 2`.
     if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
-      this.hooks?.flushPendingDroppings?.(monster.creatureType, destLevel, destination.x, destination.y);
-      this.hooks?.dropMonsterRemains?.(
+      this.ctx.systems.monsterDamage.flushPendingDroppings(monster.creatureType, destLevel, destination.x, destination.y);
+      this.ctx.systems.monsterDamage.dropMonsterRemains(
         destLevel, destination.x, destination.y, monsterRn, 2, fromDungeon ? level : -1, true,
       );
-      if (fromDungeon) this.hooks?.deleteMonster?.(level, oldX, oldY);
+      if (fromDungeon) this.ctx.systems.monsterDamage.deleteMonster(level, oldX, oldY);
       return { code: 1, position: destination };
     }
 
@@ -601,7 +569,7 @@ export class MonsterSystem {
 
     // Set it down (`:3384-3399`): "Not current room. Room changed."
     this.dungeon.addObjectToCell(destination, monsterRn);
-    if (!levitated) this.hooks?.triggerObjectMove?.(destination, monsterRn, true, false);
+    if (!levitated) this.ctx.systems.actuators.triggerObjectMove(destination, monsterRn, true, false, this.ctx.party.state.facing);
 
     // A freshly attached group, or one placed from nowhere, needs its first timer.
     if (code !== 0 || !fromDungeon) {
@@ -630,7 +598,7 @@ export class MonsterSystem {
     if (levitated) return;
     const party = this.ctx.party.state.position;
     const partyThere = level === (party.z | 0) && oldX === (party.x | 0) && oldY === (party.y | 0);
-    this.hooks?.triggerObjectMove?.(old, monsterRn, false, partyThere);
+    this.ctx.systems.actuators.triggerObjectMove(old, monsterRn, false, partyThere, this.ctx.party.state.facing);
   }
 
   /**
@@ -890,7 +858,7 @@ export class MonsterSystem {
   }
 
   private trace(line: string): void {
-    this.hooks?.trace?.(line);
+    this.hooks.trace?.(line);
   }
 }
 
