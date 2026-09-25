@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, and D1 with D2, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, D1 with D2, D3, D4 and D5, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -109,9 +109,21 @@ save's gaps from them, so `RUNTIME_SAVE_VERSION` stays 10 and the author's saves
 Fixed on the way, each in its own commit: a recruit's `facing3` starts as the party's facing
 (`Character.cpp:531`), and `byte33` is derived from the incantation instead of carried
 stale from the save it was read from.
-Next: D3g (`fingerprint`, which needs a design decision first; see its row), then D4
-(measure a branded `ObjectID` on a branch before deciding), E1 (design note in `DEBT.md`
-first), then E2–E5. C33 and C34 wait until after E1/E2. C25 (⚠️) still waits for D4.
+D3g closed D3: a champion gets its `fingerprint` once, on joining (`addCharacter`, and
+`addChampion` for the tools), and the field is required. Fixed first, in its own commit:
+a fingerprint of 0 pairs a dead champion's bones too (`Character.cpp:2646`). D4: `ObjectID`
+is a branded type, as CSBWin's `RN` is a class. A plain number becomes one only through
+`as ObjectID` where CSBWin converts (file words, timer words, a checked DSA word, the
+`RNVAL`s). Measured first: 140 `tsc` errors, no live bug, one latent confusion (a cloud
+type passed as an RN). Found and recorded: C35 (a monster that throws nothing reports 0,
+not `RNnul`). C25 turned out to need an `RN ==` that ignores the corner, which the brand
+cannot give, so it is re-sized to M and stays in the frozen tier C. E1's design note is in
+`DEBT.md`: one `GameContext` (dungeon, party, state, random, timers, sounds, tables, host,
+systems), direct calls through `ctx.systems` instead of setters and hooks, one
+`GameTables`. Split into E1a–d.
+Next: E1a (`GameTables` and its one builder, used by `main.ts` and the 44 tools that build a
+`Game`), then E1b–d, then E2–E5. C33 and C34 wait until after E1/E2; C25 and C35 wait with
+the rest of tier C.
 
 ## Ground rules
 

@@ -125,6 +125,10 @@ main.ts     Bootstrap and wiring
   possession reader returns for an empty slot, as in CSBWin;
   `RNeof` (0xFFFE) only ends a chain. `tsc` cannot catch a stale `=== null` against a
   `number`, so a change to an empty value is audited by grep, reader by reader.
+  `ObjectID` is a branded type, as CSBWin's `RN` is a class: a plain number becomes one
+  only through `as ObjectID`, and only where CSBWin converts (a file's word, a timer word,
+  a DSA word after `isValidObjectId`, the `RNVAL` constants in `core/spellRn.ts`). Retype
+  the variable before adding a cast anywhere else.
 - **Cell flags**: 8-bit `[roomType:3][hasObjects:1][attributes:4]`.
 - **Text**: 5-bit chars, 3 per 16-bit word. **Colours**: Atari 12-bit `0RGB`, ×36 → 8-bit.
 - **Rendering is NOT ray-casting.** 21 fixed relative cells; each (cell × roomType) pair
@@ -184,4 +188,5 @@ Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase
 the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT.md` —
 **paying that off is the current priority**, one item per commit, in the order it gives.
 Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
-before the rest of tier C, which is frozen: new divergences are recorded, not fixed.
+before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
+is paid (2026-09-25); E1 (a shared `GameContext`, design note in `DEBT.md`) is next.

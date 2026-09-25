@@ -2051,3 +2051,357 @@ Found in B2. CSBWin has one `LOCATIONREL` (`doc/CSBwin-src/DSA.cpp:300-317`: `l`
 (`DsaSystem`'s `intToLocation`). Size S.
 
 </details>
+
+#### `DEBT.md` tier D — State representation (paid 2026-09-25)
+
+
+##### D1 ✅ Hands stored twice *(bundle with D2)*
+
+**Paid in `114dbbe`.** `Champion.shieldHand`, `weaponHand` and `quiver` are gone;
+every reader and writer uses `possessions` only, and a tool builds a champion with it.
+The unused `PossessionSlot` enum went too: its names for slots 6-12 were a guess, and
+CSBWin's own reload order says otherwise (the search starts at slot 12, then 7-9,
+`doc/CSBwin-src/Timer.cpp:2656-2672`, `CSBCode.cpp:6263-6270`, where the port's comments
+had said "the quiver, then the three pouch slots"). In its place, `POSSESSION_COUNT`,
+`SLOT_SHIELD_HAND` and `SLOT_WEAPON_HAND` (`src/engine/gameTypes.ts`), used by the UI's own
+code; ported code keeps CSBWin's bare `Possession(1)` numbers, to stay greppable. The one
+case where a mirror had disagreed with the array was C27, fixed first. `RuntimeSaveState`
+carries `PartyState`, so its shape changed: `RUNTIME_SAVE_VERSION` went to 8. Evidence: a grep
+finds no mirror; `npm test -- --frames` passes unchanged, the save round-trips included.
+
+<details><summary>original entry</summary>
+
+`Champion` keeps its hands in both `possessions[0]`, `[1]` and `[8]` and three named
+fields, `shieldHand`, `weaponHand` and `quiver` (`src/engine/gameTypes.ts:191-193`), and
+every writer has to remember both — `Game.setPossessionDirect` (`src/engine/Game.ts:2700`)
+is the pattern. The named fields are typed `any`, so the compiler cannot help. CSBWin has
+only `possessions[30]`.
+
+Delete the three fields, read and write the array through named slot constants, and let
+`tsc` find every site. Check that the save paths (`SaveGameLoader`, `CsbwinCharacters`,
+`RuntimeSaveState`) serialise the array only.
+
+<sub>Context: `doc/PLAN_ARCHIVE.md` → “A thrown or shot object no longer stays in the hand as well”.</sub>
+
+</details>
+
+##### D2 ✅ One "no object" value
+
+**Split** (size L, recorded while paying D1). One commit each, in this order:
+
+| Step | What | Status |
+| --- | --- | --- |
+| D2a | `possessions` becomes a required 30-entry `ObjectID[]`, `RNnul` its only empty value. `DsaSystem.normalizePossessionValue` / `isEmptyObject` and the array-growing code in the three `setChampionPossession` copies go. The save loaders store `RNnul` as read. | ✅ |
+| D2b | `objectInHand` becomes a required `ObjectID`, `RNnul` when empty. `Game.normalizeObjectInHand`, `ActuatorSystem.normalizeObjectInHand` and `ui/Objects.normalizeObjectValue` go. | ✅ |
+| D2c | Retire `isLikelyObjectRecord` (`Game.ts`, `ui/Objects.ts`): a plain `!== OBJECT_ID_NULL` where a guard is still needed, nothing where it is not. | ✅ |
+| D2d | The possession readers (`getChampionPossession` in `Game`, `CharacterStats.possession`, `ui/Character`, `skills.getPossessionNameIndex`, `MonsterAttack.clothingTypeIn`, and `AttackSystem`'s hook) return `RNnul` like CSBWin's `Possession()` instead of `null`, and `ui/Character.setChampionPossession` takes it. Every caller is converted by hand — `tsc` cannot see a stale `=== null` — so list them first with a grep and convert them all in one commit. Found paying D2a. | ✅ |
+
+**D2a, paid in `865d704`.** `Champion.possessions` is a required `ObjectID[]`, built
+by `emptyPossessions()` (`src/engine/gameTypes.ts`), and an empty slot holds `RNnul`
+everywhere — the loader stores it as read (an `RNeof` in a file slot still becomes
+`RNnul`, as it did before), the writer writes it back unchanged, and no module grows
+or re-normalises the array. Every reader that skipped `null` now skips `OBJECT_ID_NULL`;
+`tsc` finds only the writers, so each reader was converted by hand, and the element-read
+grep in the commit is the audit. `Game.setChampionHand` no longer treats `RNeof` as
+empty. The per-module `getChampionPossession` readers still return `ObjectID | null` to
+their callers: changing that to CSBWin's `RNnul` return is invisible to `tsc`
+(`number === null` compiles, branded or not), so it is a step of its own, D2d.
+`DsaSystem.normalizePossessionValue` / `isEmptyObject` survive only for `objectInHand`,
+and go with D2b. `RUNTIME_SAVE_VERSION` is 9. Evidence: `npm test -- --frames`, the save
+round-trips included.
+
+**D2b, paid in `bbd902d`.** `PartyState.objectInHand` is a required `ObjectID`,
+`RNnul` when the cursor is empty, and so is every slot of the chest view
+(`UIState.openChestContents`, CSBWin's `d.rnChestContents[8]`, built by
+`emptyChestContents()`). The four normalizers are gone: `Game.normalizeObjectInHand`,
+`ActuatorSystem.normalizeObjectInHand`, `DsaSystem.normalizePossessionValue` with its
+`isEmptyObject`, and `ui/Objects.normalizeObjectValue`. The CSBWin loader maps a file's
+`RNempty`, `RNnul` or `RNeof` cursor to `RNnul`. `Game.handleDoorSwitchClick` no longer
+treats `RNeof` as an empty hand, and `ActuatorSystem`'s wall-object switch hands
+`GetBasicObjectType` the `RNnul` itself, which returns `OBJNI_NOT_AN_OBJECT` as the old
+`?? OBJNI_NOT_AN_OBJECT` fallback did (`src/engine/objectIndex.ts`). The viewport's
+five picked-object RNs are filled with `RNeof` by `ViewportRenderer`, and
+`ViewportPicking` now tests for that directly. `RUNTIME_SAVE_VERSION` is 10. Found on the
+way: C29, fixed first. Evidence: `npm test -- --frames`; a grep finds none of the four
+normalizers.
+
+**D2c, paid in `f0297c2`.** `isLikelyObjectRecord` is gone, with all fourteen calls.
+Thirteen guarded a value already known to be an object — a slot or the cursor, tested
+against `RNnul` just before — and simply went. The fourteenth, `drawScrollPanel`'s check
+of a Viewing Filter DSA's answer, is CSBWin's own `obj.checkIndirectIndex(...)` then
+`dbType() == dbSCROLL` (`doc/CSBwin-src/Character.cpp:3510-3514`) and is now
+`getScrollRecord(candidate)`. Three functions existed only for the "an object *type*,
+not an object" overload the guard chose between, and had no caller left that passed a
+type: `ui/Objects.getObjectWeight`, `getObjectWeightForObjectType` and
+`getDescIndexForObjectType`. `canPlaceInSlot` and `computeFeedParameters` take the RN
+path only. Evidence: `npm test -- --frames`; a grep finds none of the four names outside
+`doc/PLAN_ARCHIVE.md`.
+
+**D2d, paid in `d1b3f8f`.** Every possession reader is CSBWin's `Possession()` and returns
+`RNnul` for an empty slot: `Game.getChampionPossession`, `CharacterStats.possession`,
+`ui/Character.getChampionPossession`, `AttackSystem`'s `possession` hook, and
+`removeCharacterPossession` (`Game` and `AttackSystem`'s hook), which returns `RNnul` as
+CSBWin's does. `MonsterAttack.clothingTypeIn` became a `possession()` reader and
+`armourStrength` makes `TAG01680a`'s own test, `== RNnul || dbType() != dbCLOTHING`
+(`doc/CSBwin-src/Character.cpp:2405-2407`, `:2465-2466`). `skills.getPossessionNameIndex`
+hands the `RNnul` to `NameIndex`, which answers `objNI_NotAnObject` as CSBWin's does
+(`CSBCode.cpp:1249`). `ui/Character.setChampionPossession`, `updateLightForPossessionChange`
+and `setTorchLitState` take an `ObjectID`, and `ui/Objects.isChestRecord` no longer takes
+`null`. The audit was the grep of every reader's callers, about forty sites in eleven
+modules and four tools, all converted in the one commit. The four tools with a stale
+`=== null` failed until converted (72/76), which shows they read the readers.
+`RuntimeSaveState` did not change, so `RUNTIME_SAVE_VERSION` stays 10. Five one-line
+readers remain, one per module; E1 is where they become one. Evidence: `npm test --
+--frames`; a grep of the readers' callers finds no `null` test.
+
+Each is a refactor: `npm test` before and after, `-- --frames` since each touches
+`src/renderer/ui/`, and `RUNTIME_SAVE_VERSION` bumped for D2a and D2b (both change
+`PartyState`). The port has one `getChampionPossession` per module (`Game`,
+`CharacterStats`, `ui/Character`, `DsaSystem`, `skills`); D2a may leave them as one-line
+reads, and merging them is B-tier work to record, not to smuggle in.
+
+
+**What.** An empty possession slot or the cursor can hold `null`, `undefined`,
+`OBJECT_ID_NULL` (0xFFFF) or `OBJECT_ID_EOF` (0xFFFE) (`src/core/types.ts:112-113`).
+`possessions` is an *optional* `Array<number | null>` and `objectInHand` is
+`ObjectID | null` (`src/engine/gameTypes.ts:195`, `:229`). So every module normalises for
+itself, with four identical functions:
+
+- `Game.normalizeObjectInHand` (`src/engine/Game.ts:2722`)
+- `ActuatorSystem.normalizeObjectInHand` (`src/engine/ActuatorSystem.ts:870`)
+- `DsaSystem.normalizePossessionValue` (`src/engine/DsaSystem.ts:2338`), plus
+  `isEmptyObject` (`:2379`)
+- `normalizeObjectValue` (`src/renderer/ui/Objects.ts:170`)
+
+It also guards with `isLikelyObjectRecord` (`Game.ts:2357`, `ui/Objects.ts:150`), called
+about twenty times. That function only checks that a record index is in range — a
+defensive guess at whether a number is an object at all.
+
+CSBWin has one empty value, `RNnul`; `RNeof` only ever terminates a chain.
+
+**Fix (recommended).** Make `RNnul` (`OBJECT_ID_NULL`) the only empty value everywhere a
+slot or the cursor is stored. CSBWin does that, and the save file already stores it, so the
+load/save boundary stops converting. Make `possessions` a required 30-entry `ObjectID[]`.
+Delete the normalizers. Wherever `isLikelyObjectRecord` still guards something after B1 has
+split the RN/type overload, replace it with a plain `!== OBJECT_ID_NULL` or delete it. If
+an `OBJECT_ID_EOF` ever turns up in a slot, that is a bug upstream to find, not a value to
+normalise.
+
+The alternative — `null` as the one empty value, converted at the file boundary — is less
+churn but departs from CSBWin; "port, don't reinvent" argues for `RNnul`.
+
+**Evidence.** `npm test -- --frames`; `tools/dump-save-roundtrip.ts` and
+`tools/dump-live-save-file.ts` prove the boundary. A grep proves the normalizers are gone.
+If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
+
+##### D3 ✅ Most state fields are optional
+
+**Split** (size L, recorded 2026-09-25 before any code; re-counted then: `Champion` has
+23 optional fields, `PartyState` 12). One commit per group, in this order:
+
+| Step | Fields | Initializer, checked against CSBWin | Status |
+| --- | --- | --- | --- |
+| D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0 (`Data.h:767-783`) | ✅ |
+| D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ✅ |
+| D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:519-520`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
+| D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
+| D3e | `Champion`: `charFlags`, `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~8). `fingerprint` moved to D3g, `incantationCursor` to the fix below | cleared, except `talents = 0` (`:512`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ✅ |
+| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ✅ |
+| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. **Decided 2026-09-25:** a champion gets its fingerprint once, when it joins, as `AddCharacter` does (`:513-516`). `Game.addCharacter` already does; `Game.addChampion` (the dev/tool path) computes it unconditionally. The lazy assignments in `setPartyState`, the runtime-save restore and `registerChampionBones` go (a save always carries the field), and so does `registerChampionBones`' `if (!fingerprint) return`, which CSBWin does not have (`Character.cpp:2646`). A tool that puts champions into the party without `addChampion` sets their fingerprints itself: divergences stay in the tools, never the engine. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`); 0 in `addCharacterDefaults` (`ClearMemory`) | ✅ |
+
+The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
+`ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
+and the tools' champion builders spread. `Party.setState` fills a field an older
+runtime save lacks from the same defaults, so `RuntimeSaveState` keeps its JSON shape and
+the saves in `static/gamefiles/saves/` keep loading (they were checked: they lack
+`sleeping`, the shields, `wounds` and more).
+
+**D3a, paid in `b988d0b`.** The nine counters are required. `initialPartyState` (`src/engine/Party.ts`)
+is `PartyState`'s one initializer: the constructor returns it, and `setState` spreads it
+under the restored state, so a field an older save lacks takes the same value (the three
+shields were missing from every save in `static/gamefiles/saves/`; all three still load and
+run). 34 fallbacks went, every one `?? 0`, the initializer's own value, so no hidden
+default. `ViewportRenderer`'s `partyState?.seeThruWalls ?? 0` stays: it guards a missing
+`partyState`. `RUNTIME_SAVE_VERSION` stays 10. Evidence: `npm test -- --frames`.
+
+**D3b, paid in `50408fe`.** `potentialChampionIndex`, `gameIsLost` and `sleeping` are required, all three
+in `initialPartyState` (`sleeping` had been missing from it). The CSBWin loader sets them
+too: none is in the file's party blocks, and `LoadGame` clears `d.GameIsLost`
+(`doc/CSBwin-src/SaveGame.cpp:1891`). 29 fallbacks and `=== true` tests went; each
+matched the initializer. Four `ui.partyState?.… ?? x` stay in `ui/` (`Keyboard`, `Mouse`,
+`Attack`), because they guard a missing `partyState`. Evidence: `npm test -- --frames`, and
+the three saves in `static/gamefiles/saves/` still load and run.
+
+**D3c, paid in `a5a27db`.** `actionDisabledUntil`, `busyTimerIndex`, `attackType` and
+`attackStatModifier` are required. Their initializer is `addCharacterDefaults()`
+(`src/engine/AddCharacter.ts`), `ClearMemory` plus `AddCharacter`'s constant stores. It
+grows one group at a time. `createChampionFromPreset` spreads it, and so do the 25
+champion literals in `tools/` (tsc found each one). `Party.setState` spreads it under each restored
+champion, replacing its two hand-written `??`. Ten fallbacks went, each the initializer's
+value. `Game.setBusyTimerRefill`'s `champion?.busyTimerIndex ?? -1` stays: it guards a
+missing champion. Evidence: `npm test -- --frames`; the three saves still load.
+
+**D3d, paid in `b4332d5`.** `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection` and
+`shieldStrength` are required, all cleared in `addCharacterDefaults`. 36 `?? 0` went.
+The 37th fallback was `ui/Attack.ts`'s `damageFromDirection ?? champ.facing ?? 0`, a
+different default. It was unreachable, because its guard, `maxRecentDamage`, turns non-zero
+only at `MonsterAttack.ts:240`, which sets `damageFromDirection` in the same statement group. So it
+went too. What it hid is the `facing3` fix below. Evidence: `npm test -- --frames`.
+
+**D3e, paid in `a050ea8`.** `charFlags`, `timerIndex`, `talents`, `causeOfDamage`,
+`monsterCausingDamage` and `load` are required, in `addCharacterDefaults`. Eight
+fallbacks went, all in the save writer, each the initializer's value. Two of the planned
+eight fields came out of the group: `fingerprint` (D3g) and `incantationCursor`, whose
+fallback hid a different default. That one is the second fix below. Evidence:
+`npm test -- --frames`; the three saves still load.
+
+**D3f, paid in `5297dd6`.** `title` and `facing` are required: `''` and 0 in `addCharacterDefaults`,
+`ClearMemory`'s values. `createChampionFromPreset` sets the title, and `Game.addCharacter`
+sets the facing to `d.partyFacing`, as `AddCharacter` does (`Character.cpp:522`). Nine
+fallbacks went. One hid a different default: `setPartyFacing` rotated
+`champion.facing ?? facing`, so a champion without one started from the party's facing.
+No engine champion lacks one (`addCharacter`, the CSBWin loader and every runtime save set
+it), so only tools' hand-built champions could reach it. None depends on it: `npm test --
+--frames` passes unchanged. `ui/Character.ts`'s `champion?.facing ?? facing` stays; it
+guards a missing champion. Left as found: `createChampionFromPreset`'s own
+`facing: partyPosition & 3`. It is not CSBWin's, but only `dev.ts` and the tools keep it,
+because `addCharacter` overwrites it.
+
+**D3g, paid in `fe3ae24`.** `fingerprint` is required, 0 in `addCharacterDefaults`.
+`Game.addChampion` computes it unconditionally, as `addCharacter` does, so a champion gets
+its fingerprint once, on joining. `assignChampionFingerprint` went with its four lazy
+callers (`addChampion`, `setPartyState`, the runtime-save restore,
+`registerChampionBones`); `registerChampionBones`' `if (!fingerprint) return` had gone
+first, as a fix (below). Five `?? 0` / `?? -1` went. No tool needed to set fingerprints
+itself: the ones that put champions in the party without `addChampion` never kill them,
+and `dump-vi-altar`'s preset `0x1000 + i` went, since `addChampion` now overwrites it.
+`RUNTIME_SAVE_VERSION` stays 10: every runtime save already carries the field (the three in
+`static/gamefiles/saves/` load with their fingerprints and run). Evidence: `npm test`.
+
+Found while splitting, and paid as separate fixes:
+
+- ✅ **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
+  the port left `damageFromDirection` unset, so the save writer wrote 0 and
+  `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
+  it with `facing` (`2def79c`). `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
+  party faces west, and failed before the fix (facing3 0, not 3).
+- ✅ **`byte33`.** The save writer wrote `incantationCursor ?? incantation.length`, and the
+  engine never updates `incantationCursor`. So a champion loaded from a save keeps the
+  file's `byte33` while runes are added or cast in the port, and the next save writes it
+  back stale. CSBWin's add would then write the next rune at the wrong index. Every CSBWin
+  writer of `byte33` keeps it equal to `strlen(incantation) & 3`: the add
+  (`CSBCode.cpp:8984-8988`), the backspace (`Magic.cpp:814-817`), the cast (`:951-952`),
+  and the two resets with `incantation[0] = 0` (`Character.cpp:2648-2649`,
+  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`. **Paid in
+  `76e0ee3`:**
+  `incantationCursor` is gone, and the writer derives `incantation.length & 3`. The
+  fourteen committed saves still pack byte-identical. `tools/dump-character-block.ts`
+  types two runes into a loaded champion and failed before the fix (byte33 0, not 2).
+- ✅ **A fingerprint of 0.** `registerChampionBones` returned early when a champion's
+  fingerprint was 0, so their bones got no expool record and the Altar of Vi read the
+  bones' `value` (2) as a champion index instead. CSBWin's `AddChampionBonesRecord` call is
+  unconditional (`Character.cpp:2646`, `data.cpp:1636-1643`), and 0 is `AddCharacter`'s
+  fingerprint for a champion recruited at level 0, (0, 0). **Paid** before D3g's refactor:
+  the guard is gone. `tools/dump-vi-altar.ts` section 1b kills a champion whose
+  fingerprint is 0 and failed before the fix (no record, nobody raised).
+
+Not debt, so staying optional:
+
+- `portrait` / `portraitGraphic`: a champion has one or the other (a save's pixels, or a
+  graphic-26 cell for one this engine made). Absence is the information.
+- `titleField` / `incantationField`: kept only when the file holds bytes past the
+  terminator. Absence is the information again.
+- `charFlags`' graphic bits (0xff80): `AddCharacter` sets `CHARFLAG_positionChanged`
+  (`:530`), a redraw flag, and the port models none of those (see C32's
+  `CHARFLAG_statsChanged` note). Only `CHARFLAG_male` is carried.
+
+<details><summary>original entry</summary>
+
+`Champion` has 24 optional fields out of 35, and `PartyState` 13 out of 25
+(`src/engine/gameTypes.ts`). That is where `src/engine/` gets its 277 `?? 0` and 62 `?.[`.
+CSBWin's `CHARDESC` has no optional fields; the optionality is a relic of porting one field
+at a time.
+
+Make them required, initialised in one place per type (`createChampionFromPreset` in
+`src/engine/AddCharacter.ts`, `Party`'s constructor, the save loaders), then remove the
+`?? 0` fallbacks field by field. Watch for a fallback that hides a *different* default from
+the initializer's, and check the initializer against CSBWin. Split across sessions by field
+group, and record the split here. If `RuntimeSaveState`'s shape changes, bump
+`RUNTIME_SAVE_VERSION`.
+
+</details>
+
+##### D4 ✅ `ObjectID` is not a distinct type
+
+**Measured 2026-09-25**, on a throwaway worktree. With the brand alone
+(`ui16 & { readonly [rnBrand]: true }`), `tsc` reported 140 errors in 14 files, 111 of them
+in `DsaSystem` and `TimerSystem`, every one a plain `number` flowing into an `ObjectID`
+parameter or field. A script that cast every error site until `tsc` was clean needed 146
+new `as ObjectID` casts. With three boundary types instead (`decodeObjectID` takes any
+number, `DsaSystem.isValidObjectId` a type guard, `TimerEntry.object` an `ObjectID`), 93
+errors were left. The errors found no live bug, but they showed where the port holds RNs
+in plain numbers (the DSA's words, the timer's object, the missile paths) and one real
+confusion: `createFluxcage` passed a *cloud type* where `createCloudRecord` wanted an RN,
+correct only because `CT_FLUXCAGE & 0x7f` is itself.
+
+**Decided: brand it.** CSBWin's `RN` is a class (`doc/CSBwin-src/CSBTypes.h:269`); an
+integer becomes one only through `RN(RNVAL)` or `ConstructFromInteger`, so a distinct type
+with explicit conversions is the faithful shape, not an embellishment. Dropping the casts
+would have kept a type that checks nothing.
+
+**Paid in `8606715`.** `ObjectID` is branded (`src/core/types.ts`), and a plain number
+becomes one only through `as ObjectID`, at the places CSBWin converts: a file's words
+(`DungeonLoader.readRN`, `SaveGameLoader.resolveRN`, `CsbwinObjectIndex.resolve`), the
+timer words a restore reads back, a DSA word once `isValidObjectId` has checked it (a type
+guard), the `RNVAL` constants in `src/core/spellRn.ts` and `OBJECT_ID_NULL` / `_EOF`.
+`encodeObjectID` and `withObjectPosition` return one. Everything else was retyped rather
+than cast: the DSA's move sources and destinations, the timer's missile, projectile, cloud
+and Vi-altar paths, `TimerEntry.object`, `DescIndex` / `GetBasicObjectType` / `NameIndex` /
+`IsAKey` and the UI's `resolveObjectNameIndex` family (whose callers' `| 0` went), and the
+hooks that carry an RN. `createCloudRecord` takes the cloud type, and its callers pass
+`GetSpellType()` (`projectile & 0x7f`, `Code11f52.cpp:1428`) or `CT_FLUXCAGE`, as CSBWin's
+two creators do. Casts went from 101 to 96: 31 that re-cast an `encodeObjectID` result
+went, 26 boundary casts came. Two duplicates went with them: `MonsterDamage`'s own
+`RN_MONSTER_DEATH`, and the `RN_*` constants seven tools re-declared, which now import
+`spellRn`. Found and recorded, not fixed: C35. Evidence: `npm test -- --frames` passes
+unchanged. `RuntimeSaveState`'s JSON shape is untouched.
+
+C25 was waiting for D4, but the brand does not settle it: C25 needs an RN *comparison*
+that ignores the corner, and a brand cannot forbid `===`. See C25.
+
+<details><summary>original entry</summary>
+
+`type ObjectID = ui16` (`src/core/types.ts:110`) is a plain `number`. So the 82
+`as ObjectID` casts check nothing, and a name index or a slot number passes for an object
+ID silently. After D2, decide: brand it (`number & { readonly __rn: unique symbol }`),
+which would make `tsc` catch RN/type confusion like B1's overload, or drop the casts.
+Measure the churn on a branch first.
+
+</details>
+
+##### D5 ✅ Cell flags stored twice (`cellFlags` and `tiles`)
+
+**Paid in `468ebc6`.** `MapData.tiles` and `TileData` are gone; `cellFlags` is the one copy of the byte,
+as in CSBWin, and readers unpack it with `getRoomType` / `cellHasObjects`
+(`src/core/types.ts`). The six writers that kept `tiles` in step (`DungeonState`'s
+has-objects and door writers, `TimerSystem.setDoorState` / `setCellFlag`,
+`DsaSystem.updateCellFlag`, `applyDungeonSnapshot`) write the byte only.
+`DungeonState.getTile` went, with its five `isWall` / `isDoor` / `isPit` /
+`isTeleporter` / `isStairs` helpers, which had no caller; `hasObjects` reads the flag.
+`tiles` was never serialised, so `RUNTIME_SAVE_VERSION` stays 10. Three tools that wrote
+both copies write one; `dump-savegame`'s "the tiles agree with the flags" check went
+with the thing it checked. Evidence: `npm test -- --frames` passes unchanged before and
+after; a grep finds no `.tiles` or `TileData`.
+
+<details><summary>original entry</summary>
+
+Found paying C13. `MapData` keeps each cell's flag byte in `cellFlags[x][y]` and again,
+unpacked, in `tiles[x][y]` (`TileData`: `cellFlag`, `roomType`, `hasObjects`,
+`attributes`, `src/data/dungeonTypes.ts:87`). `getCellFlag` reads the first,
+`getTile` the second; `DungeonState.setCellHasObjects` and the door writers keep them in
+step, and `tiles` has readers in `DungeonSnapshot`, `TimerSystem`, `DsaSystem` and
+`ui/mapPreview`. CSBWin has one byte per cell. A writer that updates one copy leaves
+the other stale — C13's type-7 scenario had to write both. Keep `cellFlags`, derive the
+rest where it is read.
+
+</details>
