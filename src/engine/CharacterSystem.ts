@@ -4,6 +4,7 @@
  * `AddCharacterPossession` (`setChampionHand`) and `AdjustStatsForItemCarried` bound to
  * the context, and the two hand refills the busy timer runs (`matchingAmmunition`,
  * `refillPossessionSlot`). `DEBT.md` C34 makes this the one home of the possession writers.
+ * Also `_ExecuteAttack`'s engine half (`executeAttack`), by the same file.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
  * `ctx.systems.character`.
@@ -155,5 +156,29 @@ export class CharacterSystem {
       if (moved !== OBJECT_ID_NULL) this.setChampionHand(champion, slot, moved);
       return;
     }
+  }
+
+  /**
+   * `_ExecuteAttack`'s engine half (`doc/CSBwin-src/Character.cpp:4944`): run the
+   * attack, and record the type on the champion so `EnableCharacterAction` can undo
+   * its defence penalty and refill a bow's quiver when the busy timer expires.
+   * The attack menu's half — `d.AttackingCharacterOrdinal`, `d.PossibleAttackTypes`,
+   * `TAG01b1c0` — is the UI's (`src/renderer/ui/Attack.ts`).
+   */
+  executeAttack(chIdx: number, attackType: number): number {
+    const champion = this.ctx.party.state.champions[chIdx];
+    if (!champion) return 0;
+    // `CHARDESC.word64` — the attack's own defence modifier, live until the
+    // champion is free again. Mostly negative: swinging leaves you open.
+    champion.attackStatModifier = this.attackStatModifier(attackType);
+    const result = this.ctx.systems.attack.attack(chIdx, attackType);
+    champion.attackType = attackType;
+    return result;
+  }
+
+  /** `d.Byte20090[attackType]`, as a signed byte. */
+  private attackStatModifier(attackType: number): number {
+    const raw = this.ctx.tables.byte20090[attackType] ?? 0;
+    return (raw << 24) >> 24;
   }
 }

@@ -269,6 +269,13 @@ export class AttackSystem {
   /** `d.attackDamageToDisplay` — what `FlashAttackDamage` shows next. */
   attackDamageToDisplay = 0;
 
+  /** `d.attackDamageToDisplay` — read and cleared by the UI's damage flash. */
+  consumeAttackDamageToDisplay(): number {
+    const value = this.attackDamageToDisplay;
+    this.attackDamageToDisplay = 0;
+    return value;
+  }
+
   // ---------------------------------------------------------------- helpers
 
   private trace(line: string): void {

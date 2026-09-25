@@ -162,8 +162,6 @@ export class Game {
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
     private dsaSystem: DsaSystem;
-    /** Every table from `graphics.dat` (`GameTables`), CSBWin's `d.` tables. */
-    private readonly tables: GameTables;
     /**
      * `GetObjectWeight` / `MaxLoad` / `DetermineThrowingDistance` / `Quickness`
      * (`src/engine/CharacterStats.ts`). Public because the throw path, the armour
@@ -185,8 +183,6 @@ export class Game {
      * does nothing.
      */
     constructor(dungeonData: DungeonData, tables: GameTables, host: Partial<GameHost> = {}) {
-        this.tables = tables;
-
         const ctx = createGameContext(dungeonData, tables, createGameHost(host));
         this.ctx = ctx;
         this.dungeonState = ctx.dungeon;
@@ -669,38 +665,15 @@ export class Game {
 
 
 
-    // ------------------------------------------------------------ attacks
-
-    /**
-     * `_ExecuteAttack`'s engine half (`doc/CSBwin-src/Character.cpp:4944`): run the
-     * attack, and record the type on the champion so `EnableCharacterAction` can undo
-     * its defence penalty and refill a bow's quiver when the busy timer expires.
-     */
+    /** `_ExecuteAttack`'s engine half (`CharacterSystem.executeAttack`), for the UI and `tools/`. */
     championAttack(chIdx: number, attackType: number): number {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return 0;
-        // `CHARDESC.word64` — the attack's own defence modifier, live until the
-        // champion is free again. Mostly negative: swinging leaves you open.
-        champion.attackStatModifier = this.attackStatModifier(attackType);
-        const result = this.attackSystem.attack(chIdx, attackType);
-        champion.attackType = attackType;
-        return result;
+        return this.character.executeAttack(chIdx, attackType);
     }
 
-    /** `d.Byte20090[attackType]`, as a signed byte. */
-    private attackStatModifier(attackType: number): number {
-        const raw = this.tables.byte20090[attackType] ?? 0;
-        return (raw << 24) >> 24;
-    }
-
-    /** `d.attackDamageToDisplay` — read and cleared by the UI's damage flash. */
+    /** `d.attackDamageToDisplay`, read and cleared (`AttackSystem.consumeAttackDamageToDisplay`). */
     consumeAttackDamageToDisplay(): number {
-        const value = this.attackSystem.attackDamageToDisplay;
-        this.attackSystem.attackDamageToDisplay = 0;
-        return value;
+        return this.attackSystem.consumeAttackDamageToDisplay();
     }
-
-
 
     /**
      * Register callback for game tick
