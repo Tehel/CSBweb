@@ -37,7 +37,8 @@ import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
 import { roomTimerFunction } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
-import type { ActuatorSystem } from './ActuatorSystem';
+import type { MonsterSystem } from './MonsterSystem';
+import type { TimerSystem } from './TimerSystem';
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -46,20 +47,6 @@ import {
     OBJNI_ILLUMULET_A,
     OBJNI_ILLUMULET_B,
 } from '../core/objectNameIndex';
-
-/**
- * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`)
- * a DSA cell move needs: `TimerSystem.moveObject`, and its monster branch,
- * `MonsterSystem.moveMonster`.
- */
-export interface DsaObjectMover {
-  moveObject(
-    object: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
-  ): { removed: boolean; placed: ObjectID | null; position: Position | null };
-  moveMonster(
-    monster: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
-  ): { code: number; position: Position };
-}
 
 export interface ViewingFilterOptions {
   phraseMask: number;
@@ -414,10 +401,8 @@ export class DsaSystem {
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
   private readonly monsterDesc: ArrayLike<MonsterDesc>;
-  private teleportPartyHandler?: (location: LocationRel) => void;
-  private objectMover?: DsaObjectMover;
 
-  constructor(private readonly ctx: GameContext, private actuators?: ActuatorSystem) {
+  constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
@@ -445,19 +430,6 @@ export class DsaSystem {
 
   getAdjustSkillsParameters(): Int32Array {
     return this.adjustSkillsParameters;
-  }
-
-  /**
-   * CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`), which a DSA
-   * cell move goes through. `Game` wires it: the DSA is built before the systems that
-   * own it.
-   */
-  setObjectMover(mover: DsaObjectMover): void {
-    this.objectMover = mover;
-  }
-
-  setTeleportPartyHandler(handler: (location: LocationRel) => void): void {
-    this.teleportPartyHandler = handler;
   }
 
   processMissileEncounterFilter(options: {
@@ -1365,7 +1337,7 @@ export class DsaSystem {
           const { category } = decodeObjectID(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
-          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, false, this.ctx.party.state.facing);
+          this.ctx.systems.actuators.triggerObjectMove(pos, rn as ObjectID, false, false, this.ctx.party.state.facing);
           this.deleteLinkedScrollText(rn, bank);
           this.deleteObject(bank, rn);
           break;
@@ -1387,7 +1359,7 @@ export class DsaSystem {
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
-          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.ctx.party.state.facing);
+          this.ctx.systems.actuators.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.ctx.party.state.facing);
           this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
         } else if (location === -1) {
           const party = this.ctx.party.state;
@@ -1478,12 +1450,7 @@ export class DsaSystem {
         const location = bank.stack.pop();
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
-        if (this.teleportPartyHandler) {
-          this.teleportPartyHandler(locr);
-        } else if (!this.warnedOps.has(subcode)) {
-          this.warnedOps.add(subcode);
-          console.warn('DSA TeleportParty handler not set');
-        }
+        this.ctx.systems.game.handleDsaTeleportParty(locr);
         break;
       }
       case StkOp.DESCRIBE: {
@@ -2585,7 +2552,7 @@ export class DsaSystem {
         && dstType === 1
         && locationRelFromInteger(dstLoc).l === partyLevel
         && locr.l === partyLevel;
-      if (!sameLevelMonsterMove) this.requireObjectMover().moveObject(object as ObjectID, locr.x, locr.y, -1, 0, locr.l);
+      if (!sameLevelMonsterMove) this.objectMover().moveObject(object as ObjectID, locr.x, locr.y, -1, 0, locr.l);
     } else if (decodeObjectID(object).category === DBType.CLOUD) {
       // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
       for (const entry of this.timers.searchOrder()) {
@@ -2767,7 +2734,7 @@ export class DsaSystem {
           timer.level = locr.l & 0xff;
         }
       }
-      const mover = this.requireObjectMover();
+      const mover = this.objectMover();
       if (!sameLevelMonsterMove) {
         this.dungeon.setDBRecordLink(object, OBJECT_ID_EOF);
         if (decoded.category === DBType.CREATURE) {
@@ -2820,9 +2787,17 @@ export class DsaSystem {
     return DsaMoveError.DER_OK;
   }
 
-  private requireObjectMover(): DsaObjectMover {
-    if (!this.objectMover) throw new Error('DsaSystem: a cell move needs setObjectMover');
-    return this.objectMover;
+  /**
+   * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`)
+   * a DSA cell move goes through: `TimerSystem.moveObject`, and its monster branch,
+   * `MonsterSystem.moveMonster`.
+   */
+  private objectMover(): { moveObject: TimerSystem['moveObject']; moveMonster: MonsterSystem['moveMonster'] } {
+    const { timer, monsters } = this.ctx.systems;
+    return {
+      moveObject: (object, oldX, oldY, newX, newY, level) => timer.moveObject(object, oldX, oldY, newX, newY, level),
+      moveMonster: (monster, oldX, oldY, newX, newY, level) => monsters.moveMonster(monster, oldX, oldY, newX, newY, level),
+    };
   }
 
   /** `groupIndex(0xd8)`, or `0xff` for a monster that fills the cell (`MoveObject.cpp:511-518`). */

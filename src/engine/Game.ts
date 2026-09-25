@@ -27,7 +27,7 @@ import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
-import { createGameContext, nameIndexOf, type GameContext } from './GameContext';
+import { createGameContext, nameIndexOf, type GameContext, type GameSystems } from './GameContext';
 import { PartyFootprints, type FootprintsSnapshot } from './PartyFootprints';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { MonsterPerception } from './MonsterPerception';
@@ -398,12 +398,8 @@ export class Game {
             cursorFilter: options.cursorFilter,
             messages: options.messages,
             playSound,
-            adjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
-            // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
-            // Wired here rather than by the host so the tools get it too.
-            onAddCharacter: (charID, mirrorCell, wall) => this.addCharacter(charID, mirrorCell, wall),
         });
-        this.dsaSystem = new DsaSystem(ctx, this.actuators);
+        this.dsaSystem = new DsaSystem(ctx);
         this.timerSystem = new TimerSystem(
             ctx,
             this.actuators,
@@ -532,13 +528,6 @@ export class Game {
                 }),
             trace: monsterHooks?.trace,
         });
-        this.dsaSystem.setTeleportPartyHandler((locr) => this.handleDsaTeleportParty(locr));
-        this.dsaSystem.setObjectMover({
-            moveObject: (object, oldX, oldY, newX, newY, level) =>
-                this.timerSystem.moveObject(object, oldX, oldY, newX, newY, level),
-            moveMonster: (monster, oldX, oldY, newX, newY, level) =>
-                this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
-        });
         this.characterStats = new CharacterStats(ctx);
         this.monsterAttack.setCharacterStats(this.characterStats);
 
@@ -611,6 +600,20 @@ export class Game {
             adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
         });
 
+        Object.assign(ctx.systems, {
+            actuators: this.actuators,
+            dsa: this.dsaSystem,
+            timer: this.timerSystem,
+            monsters: this.monsterSystem,
+            monsterDamage: this.monsterDamage,
+            monsterPerception: this.monsterPerception,
+            monsterAttack: this.monsterAttack,
+            monsterAI: this.monsterAI,
+            characterStats: this.characterStats,
+            attack: this.attackSystem,
+            movement: this.movementSystem,
+            game: this,
+        } satisfies GameSystems);
     }
 
     processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
@@ -865,7 +868,7 @@ export class Game {
         }
     }
 
-    private handleDsaTeleportParty(locr: LocationRel): void {
+    handleDsaTeleportParty(locr: LocationRel): void {
         const party = this.party.state;
         const oldPos = new Position(party.position.x, party.position.y, party.position.z);
         const oldFacing = party.facing & 0x3;

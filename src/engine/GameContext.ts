@@ -6,8 +6,9 @@
  * a field of it; what changes is read through it at call time: `ctx.party.state` (which
  * `Party.setState` replaces) and `ctx.state.tickCount` (`d.Time`).
  *
- * E1c adds `systems`, the subsystems themselves, and E1d `host`, the calls that leave the
- * engine (see the design note in `DEBT.md` E1).
+ * `systems` holds the subsystems themselves, so that they call each other directly, as
+ * CSBWin's functions do. E1d adds `host`, the calls that leave the engine (see the design
+ * note in `DEBT.md` E1).
  */
 import type { DungeonData } from '../data/dungeonTypes';
 import type { ObjectID } from '../core/types';
@@ -20,6 +21,51 @@ import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
+import type { ActuatorSystem } from './ActuatorSystem';
+import type { AttackSystem } from './AttackSystem';
+import type { CharacterStats } from './CharacterStats';
+import type { DsaSystem } from './DsaSystem';
+import type { Game } from './Game';
+import type { MonsterAI } from './MonsterAI';
+import type { MonsterAttack } from './MonsterAttack';
+import type { MonsterDamage } from './MonsterDamage';
+import type { MonsterPerception } from './MonsterPerception';
+import type { MonsterSystem } from './MonsterSystem';
+import type { MovementSystem } from './MovementSystem';
+import type { TimerSystem } from './TimerSystem';
+
+/**
+ * The `Game` methods a subsystem still calls, reached through `ctx.systems.game`. They
+ * have no system of their own until `DEBT.md` E2 splits `Game.ts`: each group E2 moves
+ * out leaves this list, and its callers then name the new system. E2 is done when this
+ * type is gone.
+ */
+export type GameMethods = Pick<Game,
+  | 'addCharacter'
+  | 'handleDsaTeleportParty'
+>;
+
+/**
+ * The subsystems, so that one calls another directly (`DEBT.md` E1c). `Game` fills it
+ * as it constructs them. No constructor may call through it — only a method may, and
+ * methods run after construction, so the construction order does not matter. A call
+ * goes through the instance at call time, so a tool that replaces a method on an
+ * instance still intercepts it.
+ */
+export interface GameSystems {
+  actuators: ActuatorSystem;
+  dsa: DsaSystem;
+  timer: TimerSystem;
+  monsters: MonsterSystem;
+  monsterDamage: MonsterDamage;
+  monsterPerception: MonsterPerception;
+  monsterAttack: MonsterAttack;
+  monsterAI: MonsterAI;
+  characterStats: CharacterStats;
+  attack: AttackSystem;
+  movement: MovementSystem;
+  game: GameMethods;
+}
 
 export interface GameContext {
   /** The level data: the dungeon half of `d.`. */
@@ -38,6 +84,8 @@ export interface GameContext {
   readonly sounds: SoundQueue;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
+  /** The subsystems, filled by `Game` as it builds them. */
+  readonly systems: GameSystems;
 }
 
 /**
@@ -70,6 +118,8 @@ export function createGameContext(
     timers: new TimerQueue(),
     sounds: new SoundQueue(party, tables.sound1772, playSound),
     tables,
+    // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
+    systems: {} as GameSystems,
   };
 }
 

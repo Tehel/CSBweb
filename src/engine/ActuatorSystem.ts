@@ -63,14 +63,6 @@ export interface CursorFilterPacket {
 
 export type CursorFilterHook = (packet: CursorFilterPacket) => boolean;
 
-export type AddCharacterHook = (portraitIndex: number, position: Position, pos: number) => boolean;
-export type AdjustSkillsFilterHook = (params: {
-  chIdx: number;
-  skillNumber: number;
-  experience: number;
-  why: number;
-}) => { chIdx: number; skillNumber: number; experience: number } | null;
-
 /**
  * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
  * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1654`, `:1744`).
@@ -93,9 +85,7 @@ export const MSG_COLOR_ROOM_TEXT = 15;
 /** What `ActuatorSystem` calls that is not in the context (`DEBT.md` E1c/E1d retire these). */
 export interface ActuatorHooks {
   cursorFilter?: CursorFilterHook;
-  onAddCharacter?: AddCharacterHook;
   messages?: MessageSink;
-  adjustSkillsFilter?: AdjustSkillsFilterHook;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
 }
 
@@ -109,9 +99,7 @@ export class ActuatorSystem {
   /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
   private readonly championMessageColors: ArrayLike<number>;
   private readonly cursorFilter?: CursorFilterHook;
-  private readonly onAddCharacter?: AddCharacterHook;
   private readonly messages?: MessageSink;
-  private readonly adjustSkillsFilter?: AdjustSkillsFilterHook;
   private readonly playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
@@ -127,9 +115,7 @@ export class ActuatorSystem {
     this.objDescObjectType = ctx.tables.objDescObjectType;
     this.championMessageColors = ctx.tables.byte1386;
     this.cursorFilter = hooks.cursorFilter;
-    this.onAddCharacter = hooks.onAddCharacter;
     this.messages = hooks.messages;
-    this.adjustSkillsFilter = hooks.adjustSkillsFilter;
     this.playSound = hooks.playSound;
   }
 
@@ -382,8 +368,9 @@ export class ActuatorSystem {
               skip = true;
               break;
             }
-            if (emptyHanded && this.onAddCharacter) {
-              const added = this.onAddCharacter(getActuatorValue(rec), position, actuatorPos);
+            // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
+            if (emptyHanded) {
+              const added = this.ctx.systems.game.addCharacter(getActuatorValue(rec), position, actuatorPos);
               if (added) characterAdded = true;
             }
             skip = true;
@@ -742,7 +729,7 @@ export class ActuatorSystem {
       lastMonsterAttackTime: party.lastMonsterAttackTime,
       experienceMultiplier,
       random: this.random,
-      applyAdjustSkillsFilter: this.adjustSkillsFilter,
+      applyAdjustSkillsFilter: (params) => this.ctx.systems.dsa.processAdjustSkillsFilter(params),
       onLevelUp: (levelIdx, basicSkill) => this.queueLevelUpMessage(levelIdx, basicSkill),
     });
   }

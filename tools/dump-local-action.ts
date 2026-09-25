@@ -25,6 +25,7 @@ import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ActuatorSystem } from '../src/engine/ActuatorSystem';
+import { DsaSystem } from '../src/engine/DsaSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { Party } from '../src/engine/Party';
@@ -64,6 +65,8 @@ async function main(): Promise<void> {
     const ctx = newContext(data, graphics, { party, random: new CsbRandom(0x1234) });
     ctx.state.tickCount = 1000;
     const actuators = new ActuatorSystem(ctx);
+    // `AdjustSkills` asks the DSA's skill filter, which this dungeon does not define.
+    ctx.systems.dsa = new DsaSystem(ctx);
     return { party, actuators };
   };
   const exp = (party: Party): number[] => party.state.champions.map((c) => c.skills[SKILL].experience);
