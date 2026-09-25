@@ -420,13 +420,13 @@ export function writeCsbwinCharacter(
   // reincarnate screen does exactly that) must be written from the *string*, or the
   // rename would be silently dropped. Same rule for the incantation below.
   const title = champion.titleField;
-  if (title && title.length === 20 && decodeCharField(Uint8Array.from(title)) === (champion.title ?? '')) {
+  if (title && title.length === 20 && decodeCharField(Uint8Array.from(title)) === champion.title) {
     block.set(Uint8Array.from(title), base + 8);
   } else {
-    block.set(encodeCharField(champion.title ?? '', 20), base + 8);
+    block.set(encodeCharField(champion.title, 20), base + 8);
   }
 
-  block[base + 28] = (champion.facing ?? 0) & 0xff;
+  block[base + 28] = champion.facing & 0xff;
   block[base + 29] = champion.partyPosition & 0xff;
   block[base + 30] = 1;
   block[base + 31] = 2;

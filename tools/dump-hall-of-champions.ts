@@ -191,7 +191,7 @@ function main(): void {
   console.log(['field', 'value', 'expected'].join('\t'));
   const expectedFingerprint = (party.position.z << 10) | (party.position.x << 5) | party.position.y;
   console.log(['name', champ.name, 'HALK'].join('\t'));
-  console.log(['title', champ.title ?? '', 'THE BARBARIAN'].join('\t'));
+  console.log(['title', champ.title, 'THE BARBARIAN'].join('\t'));
   console.log(['fingerprint', String(champ.fingerprint), String(expectedFingerprint)].join('\t'));
   console.log(['charPosition', String(champ.partyPosition), String(facing)].join('\t'));
   console.log(['facing', String(champ.facing), String(facing)].join('\t'));

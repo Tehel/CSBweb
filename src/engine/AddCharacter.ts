@@ -206,6 +206,7 @@ export type ChampionDefaults = Pick<
   | 'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
   | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'
   | 'charFlags' | 'timerIndex' | 'talents' | 'causeOfDamage' | 'monsterCausingDamage' | 'load'
+  | 'title' | 'facing'
 >;
 
 /**
@@ -236,6 +237,10 @@ export function addCharacterDefaults(): ChampionDefaults {
     causeOfDamage: 0,
     monsterCausingDamage: 0,
     load: 0,
+    title: '', // read off the hero text (`:585-590`); `createChampionFromPreset` sets it
+    // Cleared here. `AddCharacter` then sets `d.partyFacing` (`:522`), and so does
+    // `Game.addCharacter`.
+    facing: 0,
   };
 }
 

@@ -69,7 +69,7 @@ export interface Skill {
  */
 export interface Champion {
     name: string;
-    title?: string;
+    title: string;
     attributes: ChampionAttributes;
     alive: boolean;
     portraitGraphic?: ui16;     // Optional portrait index in graphic 26
@@ -86,7 +86,7 @@ export interface Champion {
      * holds no graphics to blit from; the renderer resolves it there.
      */
     portrait?: ui8[];
-    facing?: Direction;         // Optional facing for UI indicator
+    facing: Direction;          // CHARDESC.facing
     fingerprint?: ui16;         // CSBWin CHARDESC.fingerPrint (used for bones mapping)
     /**
      * `CHARDESC.title` as its 20 raw bytes, kept only when they hold more than `title`

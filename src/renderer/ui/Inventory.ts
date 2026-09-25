@@ -53,7 +53,7 @@ export function drawInventoryScreen(ui: UIState): void {
       12,
       champion.name
     );
-    const title = champion.title ?? '';
+    const title = champion.title;
     if (title.length > 0) {
       let titleX = nameBaseX + champion.name.length * 6;
       const firstChar = title.charCodeAt(0);

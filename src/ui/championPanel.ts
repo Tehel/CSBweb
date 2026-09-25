@@ -81,7 +81,7 @@ export function updateChampionPanel(): void {
         const champion = champions[chIdx];
         const header = headerCells[chIdx];
         header.textContent = champion ? champion.name || `#${chIdx}` : '—';
-        header.title = champion ? `chIdx ${chIdx}: ${champion.name} ${champion.title ?? ''}`.trim() : 'empty slot';
+        header.title = champion ? `chIdx ${chIdx}: ${champion.name} ${champion.title}`.trim() : 'empty slot';
         header.classList.toggle('dead', !!champion && !champion.alive);
 
         for (const row of rows) {

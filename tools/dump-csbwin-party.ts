@@ -134,7 +134,7 @@ function main(): void {
       // lose its first character"). CSBWin prints nothing for those, and reading on past
       // the NUL — which this reader used to do — would show a title the real game hides.
       check(!c.name.includes('\u0000'), `${name}/${c.name}: the name stops at its terminator`);
-      check(!(c.title ?? '').includes('\u0000'), `${name}/${c.name}: the title stops at its terminator`);
+      check(!c.title.includes('\u0000'), `${name}/${c.name}: the title stops at its terminator`);
 
       // The cross-check the whole tool exists for, and the one that used to be
       // reported-but-not-asserted because the encoding was not understood.

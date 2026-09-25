@@ -1331,7 +1331,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:519-520`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
 | D3e | `Champion`: `charFlags`, `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~8). `fingerprint` moved to D3g, `incantationCursor` to the fix below | cleared, except `talents = 0` (`:512`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ✅ |
-| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ⏳ |
+| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ✅ |
 | D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. Decide first where those champions get theirs, once, as `AddCharacter` does (`:513-516`), and whether `registerChampionBones`' `if (!fingerprint) return` — not in CSBWin (`Character.cpp:2646`) — can then go. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`) | ⏳ |
 
 The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
@@ -1379,6 +1379,18 @@ fallbacks went, all in the save writer, each the initializer's value. Two of the
 eight fields came out of the group: `fingerprint` (D3g) and `incantationCursor`, whose
 fallback hid a different default. That one is the second fix below. Evidence:
 `npm test -- --frames`; the three saves still load.
+
+**D3f, paid.** `title` and `facing` are required: `''` and 0 in `addCharacterDefaults`,
+`ClearMemory`'s values. `createChampionFromPreset` sets the title, and `Game.addCharacter`
+sets the facing to `d.partyFacing`, as `AddCharacter` does (`Character.cpp:522`). Nine
+fallbacks went. One hid a different default: `setPartyFacing` rotated
+`champion.facing ?? facing`, so a champion without one started from the party's facing.
+No engine champion lacks one (`addCharacter`, the CSBWin loader and every runtime save set
+it), so only tools' hand-built champions could reach it. None depends on it: `npm test --
+--frames` passes unchanged. `ui/Character.ts`'s `champion?.facing ?? facing` stays; it
+guards a missing champion. Left as found: `createChampionFromPreset`'s own
+`facing: partyPosition & 3`. It is not CSBWin's, but only `dev.ts` and the tools keep it,
+because `addCharacter` overwrites it.
 
 Found while splitting, and paid as separate fixes:
 

@@ -211,7 +211,7 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     const was = b.champions[i];
     const now = a.champions[i];
     const who = `${label}/${was.name}`;
-    check(was.name === now.name && (was.title ?? '') === (now.title ?? ''), `${who}: name and title`);
+    check(was.name === now.name && was.title === now.title, `${who}: name and title`);
     check(was.attributes.health === now.attributes.health &&
       was.attributes.maxHealth === now.attributes.maxHealth, `${who}: hit points`);
     check(was.attributes.stamina === now.attributes.stamina &&

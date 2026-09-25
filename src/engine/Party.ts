@@ -373,6 +373,6 @@ export function setPartyFacing(party: PartyState, newFacing: number): void {
     for (const champion of party.champions) {
         if (!champion) continue;
         champion.partyPosition = (champion.partyPosition + delta) & 3;
-        champion.facing = (((champion.facing ?? facing) + delta) & 3) as Direction;
+        champion.facing = ((champion.facing + delta) & 3) as Direction;
     }
 }
