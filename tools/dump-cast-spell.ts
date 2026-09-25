@@ -22,13 +22,10 @@ import { resolve } from 'node:path';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import type { SpellParameters } from '../src/engine/magicTypes';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 
@@ -63,39 +60,14 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const printed: string[] = [];
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      messages: {
-        printLinefeed: () => {},
-        quePrintLines: (_color, text) => { printed.push(text); },
-      },
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
+  const game = newGame(data, graphics, {
+    messages: {
+      printLinefeed: () => {},
+      quePrintLines: (_color, text) => { printed.push(text); },
     },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-    },
-  );
-  game.setSpellDefinitions(uiTables.graphic230.spells);
+  });
   game.party.state.position = new Position(2, 2, 0);
 
   type Internals = {

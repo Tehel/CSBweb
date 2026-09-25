@@ -35,9 +35,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -47,50 +45,13 @@ import { RN_FIREBALL, RN_POISON_CLOUD, RN_MONSTER_DEATH } from '../src/core/spel
 async function main(): Promise<void> {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const makeGame = async (): Promise<Game> => {
     const loader = new DungeonLoader();
     await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
     const data = loader.getData();
     if (!data) throw new Error('dungeon.dat did not load');
-    const game = new Game(
-      data,
-      {
-        roomTimerFunctions: uiTables.graphic232.byte1596,
-        monsterDesc: objectTables.monsterDesc,
-        objDescObjectType: objectTables.objDescObjectType,
-        weaponDesc: objectTables.weaponDesc,
-        weaponWeights: objectTables.weaponWeights,
-        clothingWeights: objectTables.clothingWeights,
-        miscWeights: objectTables.miscWeights,
-      },
-      {
-        monsterDesc: objectTables.monsterDesc,
-        word1074: uiTables.graphic232.word1074,
-        dropOrder: uiTables.graphic232.dropOrder,
-        soundTable: uiTables.graphic232.soundTable,
-        doorCharacteristics: objectTables.doorCharacteristics,
-        monsterDroppings: objectTables.monsterDroppings,
-        facingReplication: objectTables.facingReplication,
-        monsterAttackSounds: objectTables.monsterAttackSounds,
-        uByte590: uiTables.graphic232.uByte590,
-        byte586: uiTables.graphic232.byte586,
-        clothingArmour: objectTables.clothingArmour,
-        clothingFlags: objectTables.clothingFlags,
-        byte1412: uiTables.graphic232.byte1412,
-      experienceForAttacking: uiTables.graphic230.experienceForAttacking,
-      skillNumber: uiTables.graphic230.skillNumber,
-      byte20046: uiTables.graphic230.byte20046,
-      byte20002: uiTables.graphic230.byte20002,
-      byte19958: uiTables.graphic230.byte19958,
-      byte19914: uiTables.graphic230.byte19914,
-      byte20090: uiTables.graphic230.byte20090,
-      attackNames: uiTables.graphic230.attackNames,
-      },
-    );
+    const game = newGame(data, graphics);
     // Fixed seed, so the numbers below repeat run to run. This used to sit *after* a
     // `return new Game(...)` — dead code, so every run of this tool was unseeded
     // despite the comment. `tsc` never saw it because `tools/` was outside the

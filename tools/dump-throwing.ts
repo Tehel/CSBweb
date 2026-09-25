@@ -34,11 +34,10 @@ import { DungeonState } from '../src/engine/DungeonState';
 import type { Champion } from '../src/engine/gameTypes';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { Game } from '../src/engine/Game';
 import { AttackType } from '../src/engine/monsterTypes';
 import { getChampionPossession } from '../src/renderer/ui/Character';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -309,29 +308,8 @@ async function main(): Promise<void> {
   await loader2.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data2 = loader2.getData();
   if (!data2) throw new Error('dungeon.dat did not load');
-  const uiTables = extractUITables(graphics);
 
-  const game = new Game(
-    data2,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      // Section 7 goes through `championAttack`, which reads the attack tables.
-      experienceForAttacking: uiTables.graphic230.experienceForAttacking,
-      skillNumber: uiTables.graphic230.skillNumber,
-      byte20090: uiTables.graphic230.byte20090,
-      attackNames: uiTables.graphic230.attackNames,
-    },
-  );
+  const game = newGame(data2, graphics);
 
   const party = game.party.state;
   party.champions = [champion()];

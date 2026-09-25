@@ -27,9 +27,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -37,9 +35,6 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-const uiTables = extractUITables(graphics);
 
 function champion(i: number): Champion {
   return {
@@ -62,26 +57,7 @@ function makeGame(): Game {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-    },
-  );
+  const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i));
   return game;

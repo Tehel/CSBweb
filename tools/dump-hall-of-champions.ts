@@ -31,10 +31,10 @@ import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { ImageFormat } from '../src/core/imageDecoder';
+import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
 const DELTA_X = [0, 1, 0, -1];
@@ -56,45 +56,14 @@ function makeGame(): Game {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
   sharedGraphics = graphics;
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const messages: Array<{ color: number; text: string }> = [];
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      // The two tables `AddCharacter`'s possession loop reads.
-      objDescCarryMask: objectTables.objDescCarryMask,
-      carryLocation: uiTables.graphic232.carryLocation,
-      championMessageColors: uiTables.graphic232.byte1386,
-      messages: {
-        printLinefeed: () => { messages.push({ color: -1, text: '\n' }); },
-        quePrintLines: (color, text) => { messages.push({ color, text }); },
-      },
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
+  const game = newGame(data, graphics, {
+    messages: {
+      printLinefeed: () => { messages.push({ color: -1, text: '\n' }); },
+      quePrintLines: (color, text) => { messages.push({ color, text }); },
     },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      monsterAttackSounds: objectTables.monsterAttackSounds,
-      uByte590: uiTables.graphic232.uByte590,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-      byte1412: uiTables.graphic232.byte1412,
-    },
-  );
+  });
   game.setRandomSeed(0x12345678);
   (game as unknown as { probeMessages: typeof messages }).probeMessages = messages;
   return game;

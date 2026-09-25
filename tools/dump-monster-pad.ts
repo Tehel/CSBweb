@@ -39,8 +39,8 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables, monsterLevitating } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 
@@ -51,33 +51,13 @@ async function main(): Promise<void> {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
   const viewportTables = extractViewportTables(graphics);
   const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const makeGame = async (): Promise<Game> => {
     const loader = new DungeonLoader();
     await loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
     const data = loader.getData();
     if (!data) throw new Error('dungeon.dat did not load');
-    const game = new Game(
-      data,
-      {
-        roomTimerFunctions: uiTables.graphic232.byte1596,
-        monsterDesc: objectTables.monsterDesc,
-        objDescObjectType: objectTables.objDescObjectType,
-        weaponDesc: objectTables.weaponDesc,
-        weaponWeights: objectTables.weaponWeights,
-        clothingWeights: objectTables.clothingWeights,
-        miscWeights: objectTables.miscWeights,
-      },
-      {
-        monsterDesc: objectTables.monsterDesc,
-        word1074: uiTables.graphic232.word1074,
-        soundTable: uiTables.graphic232.soundTable,
-        doorCharacteristics: objectTables.doorCharacteristics,
-        monsterDroppings: objectTables.monsterDroppings,
-        facingReplication: objectTables.facingReplication,
-      },
-    );
+    const game = newGame(data, graphics);
     game.setRandomSeed(0x12345678);
     return game;
   };

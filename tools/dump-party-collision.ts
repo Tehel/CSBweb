@@ -32,17 +32,14 @@ import { resolve } from 'node:path';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion, MovementResult } from '../src/engine/gameTypes';
 import { SoundIndex } from '../src/core/constants';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { sw } from '../src/core/intCast';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -72,36 +69,9 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const level = Number(process.argv[2] ?? 2);
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      // `GetCharacterToDamage` picks the wall-bump victims through `Byte586`; without it
-      // `determineAttackOrder` falls back to a placeholder order.
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-    },
-  );
+  const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
   game.monsterSystem.loadPartyLevel(level);

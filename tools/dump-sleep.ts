@@ -25,7 +25,6 @@ import { resolve } from 'node:path';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -33,10 +32,9 @@ import { addCharacterDefaults, createChampionFromPreset } from '../src/engine/Ad
 import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
@@ -71,8 +69,6 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
   const uiTables = extractUITables(graphics);
   const lists = uiTables.graphic231.buttons;
 
@@ -87,32 +83,7 @@ async function main(): Promise<void> {
   'asleep, the viewport and only the viewport is button 146');
   check((sleepList[0]!.button | sleepList[1]!.button) === 3, 'either mouse button wakes');
 
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      monsterAttackSounds: objectTables.monsterAttackSounds,
-      uByte590: uiTables.graphic232.uByte590,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-      byte1412: uiTables.graphic232.byte1412,
-    },
-  );
+  const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
   game.addChampion(champion(1));

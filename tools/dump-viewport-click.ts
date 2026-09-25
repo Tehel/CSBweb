@@ -28,6 +28,7 @@ import { Game } from '../src/engine/Game';
 import { resolveEmptyHandedViewportClick, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { newGame, stockGraphics } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 
@@ -45,7 +46,7 @@ function makeGame(): Game {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  return new Game(data);
+  return newGame(data, stockGraphics());
 }
 
 /** The items (not actuators, not text) in a cell, first to last. */

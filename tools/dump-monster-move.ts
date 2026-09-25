@@ -17,12 +17,9 @@ import { resolve } from 'node:path';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
@@ -33,31 +30,9 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
   const level = Number(process.argv[2] ?? 2);
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-    },
-  );
+  const game = newGame(data, graphics);
   // Stand the party somewhere on the target level so it becomes the loaded level.
   game.party.state.position = new Position(0, 0, level);
   game.monsterSystem.loadPartyLevel(level);

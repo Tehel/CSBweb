@@ -22,3 +22,4 @@ export * from './DsaSystem';
 export * from './Game';
 export * from './AddCharacter';
 export * from './skills';
+export * from './GameTables';

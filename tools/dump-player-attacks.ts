@@ -39,6 +39,7 @@ import { extractObjectTables, monsterInvincible, monsterNonMaterial } from '../s
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { determineMastery } from '../src/engine/skills';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -86,41 +87,7 @@ async function main(): Promise<void> {
     await loader.loadFromArray(dungeonBytes.slice());
     const data = loader.getData();
     if (!data) throw new Error('dungeon.dat did not load');
-    const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      dropOrder: uiTables.graphic232.dropOrder,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      monsterAttackSounds: objectTables.monsterAttackSounds,
-      uByte590: uiTables.graphic232.uByte590,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-      byte1412: uiTables.graphic232.byte1412,
-      experienceForAttacking: g230.experienceForAttacking,
-      skillNumber: g230.skillNumber,
-      byte20046: g230.byte20046,
-      byte20002: g230.byte20002,
-      byte19958: g230.byte19958,
-      byte19914: g230.byte19914,
-      byte20090: g230.byte20090,
-      attackNames: g230.attackNames,
-    },
-    );
+    const game = newGame(data, graphics);
     // Fixed seed: without it every rate in the tables below drifts run to run and the
     // novice-versus-veteran comparison can flip on noise alone.
     game.setRandomSeed(0x12345678);

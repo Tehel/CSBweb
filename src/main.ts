@@ -5,7 +5,7 @@
 import { Direction } from './core';
 import { SoundManager } from './audio';
 import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader } from './data';
-import { Game, type ActuatorTables, type TimerTables, type TimerHooks } from './engine';
+import { Game, buildGameTables } from './engine';
 import {
     applySaveBytes,
     buildSavePayload,
@@ -14,9 +14,6 @@ import {
 } from './engine/SaveGamePayload';
 import { loadGlfx } from './lib/glfx-loader';
 import { ViewportRenderer } from './renderer/ViewportRenderer';
-import { extractObjectTables } from './renderer/csbwin/ObjectTables';
-import { extractUITables } from './renderer/csbwin/UITables';
-import { extractViewportTables } from './renderer/csbwin/ViewportTables';
 import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
@@ -33,8 +30,6 @@ let graphicsLoader: GraphicsLoader | null = null;
 let dungeonLoader: DungeonLoader | null = null;
 let csbGraphicsLoader: CSBGraphicsLoader | null = null;
 let soundManager: SoundManager | null = null;
-let actuatorTables: ActuatorTables | null = null;
-let timerTables: TimerTables | null = null;
 let crtController: CrtController | null = null;
 /** Set by `onRestoreSave`, read and cleared by the boot sequence. */
 let restoredFromSave = false;
@@ -219,66 +214,21 @@ async function init() {
                 csbGraphicsLoader = null;
             }
 
-            const uiTables = extractUITables(graphicsLoader);
-            const viewportTables = extractViewportTables(graphicsLoader);
-            const objectTables = extractObjectTables(graphicsLoader, viewportTables.wallRectanglesOffset);
-            soundManager?.setSoundTable(uiTables.graphic232.soundTable);
+            const gameTables = buildGameTables(graphicsLoader);
+            soundManager?.setSoundTable(gameTables.sound1772);
             if (soundManager?.isAvailable()) {
                 soundManager.preloadAll();
             }
-            actuatorTables = {
-                roomTimerFunctions: uiTables.graphic232.byte1596,
-                objDescObjectType: objectTables.objDescObjectType,
-                objDescCarryMask: objectTables.objDescCarryMask,
-                carryLocation: uiTables.graphic232.carryLocation,
-                byte640: uiTables.graphic232.byte640,
-                word1074: uiTables.graphic232.word1074,
-                monsterDesc: objectTables.monsterDesc,
-                cursorFilter: handleCursorFilter,
-                messages: scrollingText,
-                championMessageColors: uiTables.graphic232.byte1386,
-                playSound: (soundId, rateIdx, distance) => soundManager?.playSound(soundId, rateIdx, distance),
-                weaponDesc: objectTables.weaponDesc,
-                weaponWeights: objectTables.weaponWeights,
-                clothingWeights: objectTables.clothingWeights,
-                miscWeights: objectTables.miscWeights,
-            };
-            timerTables = {
-                monsterDesc: objectTables.monsterDesc,
-                word1074: uiTables.graphic232.word1074,
-                dropOrder: uiTables.graphic232.dropOrder,
-                soundTable: uiTables.graphic232.soundTable,
-                doorCharacteristics: objectTables.doorCharacteristics,
-                monsterDroppings: objectTables.monsterDroppings,
-                facingReplication: objectTables.facingReplication,
-                monsterAttackSounds: objectTables.monsterAttackSounds,
-                uByte590: uiTables.graphic232.uByte590,
-                byte586: uiTables.graphic232.byte586,
-                clothingArmour: objectTables.clothingArmour,
-                clothingFlags: objectTables.clothingFlags,
-                byte1412: uiTables.graphic232.byte1412,
-                experienceForAttacking: uiTables.graphic230.experienceForAttacking,
-                skillNumber: uiTables.graphic230.skillNumber,
-                byte20046: uiTables.graphic230.byte20046,
-                byte20002: uiTables.graphic230.byte20002,
-                byte19958: uiTables.graphic230.byte19958,
-                byte19914: uiTables.graphic230.byte19914,
-                byte20090: uiTables.graphic230.byte20090,
-                attackNames: uiTables.graphic230.attackNames,
-            };
-
             // Initialize game engine
             console.log('Initializing game engine...');
-            const timerHooks: TimerHooks = {};
-            if (soundManager) {
-                timerHooks.playSound = (soundId: number, rateIdx?: number, distance?: number) =>
-                    soundManager?.playSound(soundId, rateIdx, distance);
-            }
             const playSound = soundManager
                 ? (soundId: number, rateIdx?: number, distance?: number) => soundManager?.playSound(soundId, rateIdx, distance)
                 : undefined;
-            game = new Game(dungeon, actuatorTables, timerTables ?? undefined, undefined, timerHooks, playSound);
-            game.setSpellDefinitions(uiTables.graphic230.spells);
+            game = new Game(dungeon, gameTables, {
+                cursorFilter: handleCursorFilter,
+                messages: scrollingText,
+                playSound,
+            });
 
             // Initialize viewport renderer
             console.log('Initializing viewport renderer (CSBWin bytecode system)...');

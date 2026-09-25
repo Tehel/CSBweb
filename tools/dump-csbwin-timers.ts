@@ -47,9 +47,7 @@ import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -63,29 +61,7 @@ function loadWorld(): Game {
   const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
-  return new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-    },
-  );
+  return newGame(data, graphics);
 }
 
 /**

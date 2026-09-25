@@ -51,6 +51,7 @@ import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
+import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -87,33 +88,7 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
   const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
   const uiTables = extractUITables(graphics);
 
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      dropOrder: uiTables.graphic232.dropOrder,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      monsterAttackSounds: objectTables.monsterAttackSounds,
-      uByte590: uiTables.graphic232.uByte590,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-      byte1412: uiTables.graphic232.byte1412,
-    },
-  );
+  const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
   return { game, objectTables, uiTables };

@@ -31,49 +31,20 @@ import { DescIndex } from '../src/engine/objectIndex';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
 const viewportTables = extractViewportTables(graphics);
 const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-const uiTables = extractUITables(graphics);
 
 function makeGame(): Game {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const game = new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      objDescCarryMask: objectTables.objDescCarryMask,
-      carryLocation: uiTables.graphic232.carryLocation,
-      byte640: uiTables.graphic232.byte640,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-      monsterAttackSounds: objectTables.monsterAttackSounds,
-      uByte590: uiTables.graphic232.uByte590,
-      byte586: uiTables.graphic232.byte586,
-      clothingArmour: objectTables.clothingArmour,
-      clothingFlags: objectTables.clothingFlags,
-      byte1412: uiTables.graphic232.byte1412,
-    },
-  );
+  const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   return game;
 }

@@ -54,13 +54,12 @@ import {
 } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { MENU_HEIGHT, MENU_PANEL_COLOR, MENU_WIDTH, drawMenuBitmap, splitLongLine } from '../src/renderer/ui/Menu';
 import { SAVE_MENU_GEOMETRY, extendListPanel } from '../src/renderer/ui/SaveMenu';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
+import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -448,30 +447,8 @@ async function loadGame(): Promise<Game> {
   if (!data) throw new Error('dungeon.dat did not load');
 
   const graphics = loadGraphics();
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
 
-  return new Game(
-    data,
-    {
-      roomTimerFunctions: uiTables.graphic232.byte1596,
-      monsterDesc: objectTables.monsterDesc,
-      objDescObjectType: objectTables.objDescObjectType,
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    {
-      monsterDesc: objectTables.monsterDesc,
-      word1074: uiTables.graphic232.word1074,
-      soundTable: uiTables.graphic232.soundTable,
-      doorCharacteristics: objectTables.doorCharacteristics,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-    },
-  );
+  return newGame(data, graphics);
 }
 
 /**

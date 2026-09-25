@@ -22,7 +22,7 @@ import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
-import { ActuatorSystem, type ActuatorTables } from './ActuatorSystem';
+import { ActuatorSystem, type ActuatorTables, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
@@ -36,7 +36,7 @@ import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
 import { AttackType } from './monsterTypes';
 import { constructPredefinedMissile } from './missileHelpers';
-import { DsaSystem, type DsaTables, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
+import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
@@ -55,6 +55,7 @@ import {
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { CharacterStats } from './CharacterStats';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
+import type { GameTables } from './GameTables';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -228,6 +229,24 @@ const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
 );
 
 /**
+ * What the host hands `Game` besides the dungeon and the tables: the calls that leave the
+ * engine, and the tools' interception points. All optional — headless, nobody listens.
+ * (`DEBT.md` E1d gathers these into one `GameHost`.)
+ */
+export interface GameOptions {
+    /** `CursorFilter`, the host's view of the object on the cursor. */
+    cursorFilter?: CursorFilterHook;
+    /** The message area. */
+    messages?: MessageSink;
+    /** Play a sample. */
+    playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+    /** Overrides for `TimerSystem`'s hooks. */
+    timerHooks?: TimerHooks;
+    /** Overrides for `MonsterSystem`'s hooks, and the monster trace. */
+    monsterHooks?: MonsterSystemHooks;
+}
+
+/**
  * Game class - main game controller
  */
 export class Game {
@@ -304,8 +323,6 @@ export class Game {
     readonly monsterAttack: MonsterAttack;
     /** The champions' own attacks (`doc/CSBwin-src/Attack.cpp`). */
     readonly attackSystem: AttackSystem;
-    /** `d.Byte20090[44]` — the defence penalty each attack type carries while busy. */
-    private readonly byte20090: ArrayLike<number> | null;
     /**
      * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While
      * set, invincible monsters stop taking their turns entirely
@@ -328,19 +345,10 @@ export class Game {
     readonly sounds: SoundQueue;
     private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
     private dsaSystem: DsaSystem;
-    private objDescObjectType: ArrayLike<number> = [];
-    /** `d.Byte640`, which `NameIndex` reads for a lit torch. */
-    private byte640: ArrayLike<number> = [];
-    /** `d.DropOrder[30]`, graphic `0x232` — see `dropAllPossessions`. */
-    private dropOrder: ArrayLike<number> = [];
-    /** `d.Word1074`, graphic `0x232`; entry 2 is what an Illumulet adds to `d.Brightness`. */
-    private word1074: ArrayLike<number> = [];
-    /**
-     * `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two tables `AddCharacter` needs
-     * to pick a possession slot. Taken from the actuator tables, which already carry
-     * both, so there is one copy in the engine.
-     */
-    private addCharacterTables: AddCharacterTables | null = null;
+    /** Every table from `graphics.dat` (`GameTables`), CSBWin's `d.` tables. */
+    private readonly tables: GameTables;
+    /** `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two `AddCharacter` reads. */
+    private readonly addCharacterTables: AddCharacterTables;
     /**
      * `reincarnateAttributePenalty` / `reincarnateStatPenalty`
      * (`doc/CSBwin-src/Character.cpp:14`) — CSBWin holds them in file-scope globals that
@@ -354,7 +362,6 @@ export class Game {
      * calculation and `tools/` all reach it.
      */
     readonly characterStats: CharacterStats;
-    private spellDefinitions: SpellDefinition[] = [];
 
     // Game loop
     private running: boolean = false;
@@ -379,15 +386,52 @@ export class Game {
     private onTickCallbacks: GameEventCallback[] = [];
     private onMoveCallbacks: MovementCallback[] = [];
 
-    constructor(
-        dungeonData: DungeonData,
-        actuatorTables?: ActuatorTables,
-        timerTables?: TimerTables,
-        dsaTables?: DsaTables,
-        timerHooks?: TimerHooks,
-        playSound?: (soundId: number, rateIdx?: number, distance?: number) => void,
-        monsterHooks?: MonsterSystemHooks,
-    ) {
+    constructor(dungeonData: DungeonData, tables: GameTables, options: GameOptions = {}) {
+        const { playSound, timerHooks, monsterHooks } = options;
+        this.tables = tables;
+        this.addCharacterTables = { objDescCarryMask: tables.objDescWord4, carryLocation: tables.carryLocation };
+        // The subsystems still take the slices they always did (`DEBT.md` E1b retires them).
+        const actuatorTables: ActuatorTables = {
+            roomTimerFunctions: tables.byte1596,
+            objDescObjectType: tables.objDescObjectType,
+            objDescCarryMask: tables.objDescWord4,
+            carryLocation: tables.carryLocation,
+            byte640: tables.byte640,
+            word1074: tables.word1074,
+            monsterDesc: tables.monsterDesc,
+            cursorFilter: options.cursorFilter,
+            messages: options.messages,
+            championMessageColors: tables.byte1386,
+            playSound,
+            weaponDesc: tables.weaponDesc,
+            weaponWeights: tables.weaponWeights,
+            clothingWeights: tables.clothingWeights,
+            miscWeights: tables.byte8946,
+        };
+        const timerTables: TimerTables = {
+            monsterDesc: tables.monsterDesc,
+            word1074: tables.word1074,
+            dropOrder: tables.dropOrder,
+            soundTable: tables.sound1772,
+            doorCharacteristics: tables.doorCharacteristics,
+            monsterDroppings: tables.monsterDroppings,
+            facingReplication: tables.byte10340,
+            monsterAttackSounds: tables.uByte9672,
+            uByte590: tables.uByte590,
+            byte586: tables.byte586,
+            clothingArmour: tables.clothingArmour,
+            clothingFlags: tables.clothingFlags,
+            byte1412: tables.byte1412,
+            experienceForAttacking: tables.experienceForAttacking,
+            skillNumber: tables.skillNumber,
+            byte20046: tables.byte20046,
+            byte20002: tables.byte20002,
+            byte19958: tables.byte19958,
+            byte19914: tables.byte19914,
+            byte20090: tables.byte20090,
+            attackNames: tables.attackNames,
+        };
+
         // Initialize dungeon state
         this.dungeonState = new DungeonState(dungeonData);
 
@@ -424,7 +468,7 @@ export class Game {
             this.timerQueue,
             this.random,
             () => this.party.state,
-            dsaTables ?? actuatorTables,
+            actuatorTables,
             this.actuators,
         );
         this.actuators.setTables({
@@ -450,11 +494,11 @@ export class Game {
                     this.characterStats.weaponDescFor(rn)?.uByte3 ?? 0,
                 objDescWord4: (rn) => {
                     const descIndex = DescIndex(this.dungeonState, rn);
-                    return descIndex === -1 ? 0 : this.addCharacterTables?.objDescCarryMask[descIndex] ?? 0;
+                    return descIndex === -1 ? 0 : this.tables.objDescWord4[descIndex] ?? 0;
                 },
                 isAKey: (rn) => IsAKey(
                     this.dungeonState,
-                    { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
+                    this.tables,
                     this.party.state.facing,
                     rn,
                 ),
@@ -508,7 +552,7 @@ export class Game {
             },
         );
         this.sounds = new SoundQueue({
-            soundTable: timerTables?.soundTable,
+            soundTable: tables.sound1772,
             getPartyPosition: () => this.party.state.position,
             // Only the party's level is ever loaded in this port; CSBWin's
             // `d.LoadedLevel` can differ transiently while it walks another level.
@@ -521,7 +565,7 @@ export class Game {
             this.timerQueue,
             () => this.state.tickCount,
             this.random,
-            { monsterDesc: timerTables?.monsterDesc },
+            { monsterDesc: tables.monsterDesc },
             {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
@@ -545,9 +589,9 @@ export class Game {
             this.timerQueue,
             this.random,
             {
-                monsterDesc: timerTables?.monsterDesc,
-                monsterDroppings: timerTables?.monsterDroppings,
-                facingReplication: timerTables?.facingReplication,
+                monsterDesc: tables.monsterDesc,
+                monsterDroppings: tables.monsterDroppings,
+                facingReplication: tables.byte10340,
             },
             {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
@@ -566,8 +610,8 @@ export class Game {
             () => this.party.state.position.z,
             this.random,
             this.footprints,
-            () => timerTables?.monsterDesc ?? null,
-            () => timerTables?.doorCharacteristics ?? null,
+            () => tables.monsterDesc,
+            () => tables.doorCharacteristics,
         );
         this.monsterAttack = new MonsterAttack(
             this.dungeonState,
@@ -576,13 +620,13 @@ export class Game {
             this.random,
             () => this.dungeonState.getMap(this.party.state.position.z)?.descriptor.difficulty ?? 0,
             {
-                monsterDesc: timerTables?.monsterDesc,
-                monsterAttackSounds: timerTables?.monsterAttackSounds,
-                uByte590: timerTables?.uByte590,
-                byte586: timerTables?.byte586,
-                clothingArmour: timerTables?.clothingArmour,
-                clothingFlags: timerTables?.clothingFlags,
-                byte1412: timerTables?.byte1412,
+                monsterDesc: tables.monsterDesc,
+                monsterAttackSounds: tables.uByte9672,
+                uByte590: tables.uByte590,
+                byte586: tables.byte586,
+                clothingArmour: tables.clothingArmour,
+                clothingFlags: tables.clothingFlags,
+                byte1412: tables.byte1412,
             },
             {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
@@ -611,7 +655,7 @@ export class Game {
             monsters: this.monsterSystem,
             damage: this.monsterDamage,
             perception: this.monsterPerception,
-            monsterDesc: () => timerTables?.monsterDesc ?? null,
+            monsterDesc: () => tables.monsterDesc,
             isGameWon: () => this.gameWon,
             getCurrentPalette: () => this.currentPalette,
             checkMonsterVersusMissiles: (mapX, mapY, position, level) =>
@@ -631,27 +675,14 @@ export class Game {
             moveMonster: (monster, oldX, oldY, newX, newY, level) =>
                 this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
         });
-        this.objDescObjectType = actuatorTables?.objDescObjectType ?? [];
-        this.byte640 = actuatorTables?.byte640 ?? [];
-        this.dropOrder = timerTables?.dropOrder ?? [];
-        this.word1074 = timerTables?.word1074 ?? [];
-        this.addCharacterTables =
-            actuatorTables?.objDescCarryMask && actuatorTables.carryLocation
-                ? {
-                    objDescCarryMask: actuatorTables.objDescCarryMask,
-                    carryLocation: actuatorTables.carryLocation,
-                }
-                : null;
-        this.byte20090 = timerTables?.byte20090 ?? null;
-
         this.characterStats = new CharacterStats({
             dungeon: this.dungeonState,
             random: this.random,
             tables: {
-                weaponDesc: actuatorTables?.weaponDesc,
-                weaponWeights: actuatorTables?.weaponWeights,
-                clothingWeights: actuatorTables?.clothingWeights,
-                miscWeights: actuatorTables?.miscWeights,
+                weaponDesc: tables.weaponDesc,
+                weaponWeights: tables.weaponWeights,
+                clothingWeights: tables.clothingWeights,
+                miscWeights: tables.byte8946,
             },
             nameIndex: (rn) => this.nameIndex(rn),
         });
@@ -663,15 +694,15 @@ export class Game {
             getPartyState: () => this.party.state,
             getTime: () => this.state.tickCount,
             tables: {
-                monsterDesc: timerTables?.monsterDesc,
-                experienceForAttacking: timerTables?.experienceForAttacking,
-                skillNumber: timerTables?.skillNumber,
-                byte20046: timerTables?.byte20046,
-                byte20002: timerTables?.byte20002,
-                byte19958: timerTables?.byte19958,
-                byte19914: timerTables?.byte19914,
-                attackNames: timerTables?.attackNames,
-                word1074: timerTables?.word1074,
+                monsterDesc: tables.monsterDesc,
+                experienceForAttacking: tables.experienceForAttacking,
+                skillNumber: tables.skillNumber,
+                byte20046: tables.byte20046,
+                byte20002: tables.byte20002,
+                byte19958: tables.byte19958,
+                byte19914: tables.byte19914,
+                attackNames: tables.attackNames,
+                word1074: tables.word1074,
             },
             monsterDamage: this.monsterDamage,
             monsterAttack: this.monsterAttack,
@@ -753,10 +784,6 @@ export class Game {
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
     setRandomSeed(seed: number): void {
         this.random.setSeed(seed);
-    }
-
-    setSpellDefinitions(spells: SpellDefinition[]): void {
-        this.spellDefinitions = spells.slice();
     }
 
     /**
@@ -1458,7 +1485,6 @@ export class Game {
      * clean undo.
      */
     private collectMirrorPossessions(champion: Champion, possessions: ObjectID[]): void {
-        if (!this.addCharacterTables) return;
         const party = this.party.state;
         const mirror = this.getMirrorCell();
         const wall = (party.facing + 2) & 3;
@@ -1647,13 +1673,10 @@ export class Game {
     private dropAllPossessions(chIdx: number): void {
         const champ = this.party.state.champions[chIdx];
         if (!champ) return;
-        if (this.dropOrder.length < 30) {
-            throw new Error('DropAllPossessions needs d.DropOrder (graphic 0x232)');
-        }
         const D6W = champ.partyPosition & 0x3;
         const party = this.party.state;
         for (let D4W = 0; D4W < 30; D4W++) {
-            const objD5 = this.removeCharacterPossession(chIdx, this.dropOrder[D4W]!);
+            const objD5 = this.removeCharacterPossession(chIdx, this.tables.dropOrder[D4W]!);
             if (objD5 === OBJECT_ID_NULL) continue;
             this.timerSystem.moveObject(
                 withObjectPosition(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
@@ -2179,7 +2202,7 @@ export class Game {
             shift -= 8;
             if (shift < 0) break;
         }
-        for (const spell of this.spellDefinitions) {
+        for (const spell of this.tables.spells) {
             if ((spell.spellId & 0xff000000) !== 0) {
                 if ((packed >>> 0) === (spell.spellId >>> 0)) return spell;
             } else if (((packed >>> 0) & 0xffffff) === (spell.spellId >>> 0)) {
@@ -2390,7 +2413,7 @@ export class Game {
 
     /** `d.Byte20090[attackType]`, as a signed byte. */
     private attackStatModifier(attackType: number): number {
-        const raw = this.byte20090?.[attackType] ?? 0;
+        const raw = this.tables.byte20090[attackType] ?? 0;
         return (raw << 24) >> 24;
     }
 
@@ -2483,11 +2506,8 @@ export class Game {
         if (slot === 10) {
             if (objNID5 >= OBJNI_ILLUMULET_A && objNID5 <= OBJNI_ILLUMULET_B) {
                 this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
-                if (this.word1074.length < 3) {
-                    throw new Error('RemoveCharacterPossession needs d.Word1074 (graphic 0x232)');
-                }
                 const party = this.party.state;
-                party.brightness = sw(party.brightness - this.word1074[2]!);
+                party.brightness = sw(party.brightness - this.tables.word1074[2]!);
             } else if (objNID5 >= OBJNI_JEWEL_SYMAL_A && objNID5 <= OBJNI_JEWEL_SYMAL_B) {
                 this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
             }
@@ -2728,14 +2748,14 @@ export class Game {
 
     /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
     private getBaseObjectNameIndex(rn: ObjectID): number {
-        return GetBasicObjectType(this.dungeonState, this.objDescObjectType, rn);
+        return GetBasicObjectType(this.dungeonState, this.tables.objDescObjectType, rn);
     }
 
     /** `RN::NameIndex` (`src/engine/objectIndex.ts`). */
     private nameIndex(rn: ObjectID): number {
         return NameIndex(
             this.dungeonState,
-            { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
+            this.tables,
             this.party.state.facing,
             rn,
         );
