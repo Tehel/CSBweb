@@ -608,25 +608,9 @@ export class Game {
         this.hallOfChampions.reincarnateNamed(chIdx, name, title);
     }
 
-    /**
-     * The apply half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4348`), with
-     * the engine pieces the UI cannot reach bound in. Returns CSBWin's
-     * `fp.performFeeding`, which is what tells the caller the object was consumed.
-     */
+    /** The apply half of `_FeedCharacter` (`Feeding.applyFeedParameters`), for the UI and `tools/`. */
     applyFeeding(chIdx: number, fp: FeedParameters): boolean {
-        return applyFeedParameters(this.party.state, chIdx, fp, {
-            curePoison: (idx) => this.monsterAttack.curePoison(idx),
-            adjustStamina: (idx, decrement) => this.monsterAttack.adjustStamina(idx, decrement),
-            killCharacter: (idx) => this.monsterAttack.killCharacter(idx),
-            scheduleShieldExpiry: (idx, amount, duration) =>
-                this.timerSystem.scheduleChampionShieldExpiry(
-                    idx,
-                    amount,
-                    duration,
-                    this.party.state.position.z,
-                ),
-            random: () => this.random.next() & 0xffff,
-        });
+        return applyFeedParameters(this.ctx, chIdx, fp);
     }
 
     /**

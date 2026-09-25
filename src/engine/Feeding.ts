@@ -6,7 +6,9 @@
  * fills in a `FEEDPARAMETERS` block, hands the whole block to the Feeding Filter DSA
  * so a dungeon can rewrite any field of it, and only then applies the result. That
  * indirection is the reason the struct exists, so it is kept as one here: the UI half
- * in `src/renderer/ui/Feeding.ts` derives the block, this file applies it.
+ * in `src/renderer/ui/Feeding.ts` derives the block, this file applies it, reaching
+ * the engine (`CurePoison`, `AdjustStamina`, `KillCharacter`, the shield timer) through
+ * the context.
  *
  * The order below is CSBWin's own (`:4348-4423`) and matters: attributes, poison,
  * stamina, shield, mana, hit points, wounds, then water and food, then the
@@ -18,7 +20,8 @@ import {
   AttributeIndex,
   adjustCurrentAttribute,
 } from './attributes';
-import type { Champion, PartyState } from './gameTypes';
+import type { GameContext } from './GameContext';
+import type { Champion } from './gameTypes';
 
 /** `MAXMANA` (`doc/CSBwin-src/Character.cpp:4396`). */
 const MAX_MANA = 900;
@@ -197,20 +200,6 @@ export function derivePotionFeeding(
   fp.emptyFlask = true;
 }
 
-/** What `applyFeedParameters` needs from the engine around it. */
-export interface FeedingHooks {
-  /** `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`). */
-  curePoison: (chIdx: number) => void;
-  /** `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`). */
-  adjustStamina: (chIdx: number, decrement: number) => void;
-  /** `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`). */
-  killCharacter: (chIdx: number) => void;
-  /** The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4386-4391`). */
-  scheduleShieldExpiry: (chIdx: number, amount: number, duration: number) => void;
-  /** `STRandom()` — the whole 16-bit word, which the wound heal masks with. */
-  random: () => number;
-}
-
 /**
  * The "Now we do the actual changes to the character's stats" block
  * (`doc/CSBwin-src/Character.cpp:4348-4430`).
@@ -223,12 +212,12 @@ export interface FeedingHooks {
  * Returns whether anything was applied, which is CSBWin's `fp.performFeeding`.
  */
 export function applyFeedParameters(
-  party: PartyState,
+  ctx: GameContext,
   chIdx: number,
   fp: FeedParameters,
-  hooks: FeedingHooks,
 ): boolean {
   if (!fp.performFeeding) return false;
+  const party = ctx.party.state;
   const champ = party.champions[chIdx];
   if (!champ) return false;
 
@@ -240,14 +229,22 @@ export function applyFeedParameters(
   adjustCurrentAttribute(stats[AttributeIndex.AntiMagic], fp.antiMagicAdjust);
   adjustCurrentAttribute(stats[AttributeIndex.AntiFire], fp.antiFireAdjust);
 
-  if (fp.antiVenin) hooks.curePoison(chIdx);
-  // Negated: `staminaAdjust` is a gain, `AdjustStamina` takes a cost.
-  hooks.adjustStamina(chIdx, -fp.staminaAdjust);
+  // `CurePoison` (`doc/CSBwin-src/Character.cpp:3007`).
+  if (fp.antiVenin) ctx.systems.monsterAttack.curePoison(chIdx);
+  // `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`), negated: `staminaAdjust` is a
+  // gain, `AdjustStamina` takes a cost.
+  ctx.systems.monsterAttack.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
     const next = champ.shieldStrength + fp.shieldStrengthAdjust;
     champ.shieldStrength = next < 0 ? 0 : next & 0xffff;
-    hooks.scheduleShieldExpiry(chIdx, fp.shieldStrengthAdjust, fp.shieldDuration);
+    // The `TT_72` shield-expiry timer (`doc/CSBwin-src/Character.cpp:4386-4391`).
+    ctx.systems.timer.scheduleChampionShieldExpiry(
+      chIdx,
+      fp.shieldStrengthAdjust,
+      fp.shieldDuration,
+      party.position.z,
+    );
   }
 
   // The unconfirmed champion in a Hall of Champions mirror takes no mana, no healing
@@ -255,10 +252,12 @@ export function applyFeedParameters(
   if (party.potentialChampionIndex !== chIdx) {
     champ.attributes.mana = limit(0, (champ.attributes.mana | 0) + fp.manaAdjust, MAX_MANA);
     if ((champ.attributes.health | 0) + fp.hitpointAdjust <= 0) {
-      hooks.killCharacter(chIdx);
+      // `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).
+      ctx.systems.monsterAttack.killCharacter(chIdx);
     } else {
       champ.attributes.health = (champ.attributes.health | 0) + fp.hitpointAdjust;
-      healWounds(champ, fp.healCount, hooks.random);
+      // `STRandom()` — the whole 16-bit word, which the wound heal masks with.
+      healWounds(champ, fp.healCount, () => ctx.random.next() & 0xffff);
     }
   }
 
