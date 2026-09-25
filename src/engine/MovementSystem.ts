@@ -9,7 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
@@ -45,6 +45,79 @@ export class MovementSystem {
 
         // Handle movement (requires collision detection)
         return this.handleMovement(action);
+    }
+
+    /**
+     * `MoveParty` (doc/CSBwin-src/CSBCode.cpp:7944) whole: `move` is its head (the turn,
+     * the stairs, the collision, the stamina); this is the tail (`:8310-8349`) — on a
+     * step, the missiles in the way, the pits and teleporters, `MoveObject`'s pads and
+     * the move delay; on an inhibited step, `DiscardAllInput(); d.clockTick = 0;`.
+     * `HandleMouseEvents` (`Game.move`) calls it.
+     */
+    moveParty(action: MovementAction): MovementResult {
+        const result = this.move(action);
+
+        if (result.success) {
+            const oldPos = this.party.state.position;
+            const oldFacing = this.party.state.facing;
+            let resolvedPosition = result.newPosition;
+            let resolvedFacing = result.newFacing ?? oldFacing;
+            const timer = this.ctx.systems.timer;
+
+            if (resolvedPosition) {
+                timer.checkMoveFromMissile(oldPos, resolvedPosition, null);
+                const teleported = timer.resolvePartyMove(resolvedPosition, resolvedFacing);
+                resolvedPosition = teleported.position;
+                resolvedFacing = teleported.facing;
+                result.newPosition = resolvedPosition;
+                if (resolvedFacing !== (result.newFacing ?? oldFacing)) {
+                    result.newFacing = resolvedFacing;
+                }
+            }
+            this.party.applyMovement(result);
+            if (result.stepped) this.setPartyMoveDelay();
+            if (resolvedPosition) {
+                const unchanged = oldPos.x === resolvedPosition.x
+                    && oldPos.y === resolvedPosition.y
+                    && oldPos.z === resolvedPosition.z;
+                const actuators = this.ctx.systems.actuators;
+                actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
+                actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
+            }
+            timer.notePartyMoved();
+            this.ctx.systems.monsters.loadPartyLevelOnArrival();
+            timer.processTimers(this.ctx.state.tickCount);
+        } else if (result.inhibited) {
+            // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
+            this.ctx.mouseQueue.discardAllInput();
+            this.ctx.loop.clockTickCleared = true;
+            this.ctx.loop.clockTickSet = false;
+        }
+        return result;
+    }
+
+    /**
+     * The tail of `MoveParty`'s step (doc/CSBwin-src/CSBCode.cpp:8326-8349), after
+     * `MoveObject` — so a champion a pit just killed no longer counts:
+     *
+     *   time2move = 1;
+     *   for (i = 0; i < d.NumCharacter; i++)
+     *     if (pCharacter->HP() != 0) time2move = sw(Larger(time2move, TimeToMove(pCharacter)));
+     *   ...d.partyMoveDisableTimer = time2move;   // unless a party-move filter set a delay
+     *   d.Word11712 = 0;
+     *
+     * A stairway is not a step: taking one sets neither.
+     */
+    private setPartyMoveDelay(): void {
+        const party = this.party.state;
+        let time2move = 1;
+        for (const champ of party.champions) {
+            if (champ.attributes.health !== 0) {
+                time2move = sw(Math.max(time2move, this.ctx.systems.characterStats.timeToMove(champ)));
+            }
+        }
+        party.partyMoveDisableTimer = time2move;
+        party.word11712 = 0;
     }
 
     /**

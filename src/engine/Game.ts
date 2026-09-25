@@ -34,9 +34,8 @@ import { MOUSE_UNCLICK } from './MouseQueue';
 import { wakeUp } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
-import { OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
+import { Position, type ObjectID } from '../core/types';
 import { CsbRandom } from '../core/random';
-import { sw } from '../core/intCast';
 
 import { CharacterStats } from './CharacterStats';
 import type { GameTables } from './GameTables';
@@ -412,90 +411,18 @@ export class Game {
         this.mouseEventHandlers = handlers;
     }
 
-    /**
-     * Attempt to move the party
-     */
+    /** `MoveParty` (`MovementSystem.moveParty`), then the move listeners (`onMove`). */
     move(action: MovementAction): boolean {
-        const result = this.movementSystem.move(action);
-
-        if (result.success) {
-            const oldPos = this.party.state.position;
-            const oldFacing = this.party.state.facing;
-            let resolvedPosition = result.newPosition;
-            let resolvedFacing = result.newFacing ?? oldFacing;
-
-            if (resolvedPosition) {
-                this.timerSystem.checkMoveFromMissile(oldPos, resolvedPosition, null);
-                const teleported = this.timerSystem.resolvePartyMove(resolvedPosition, resolvedFacing);
-                resolvedPosition = teleported.position;
-                resolvedFacing = teleported.facing;
-                result.newPosition = resolvedPosition;
-                if (resolvedFacing !== (result.newFacing ?? oldFacing)) {
-                    result.newFacing = resolvedFacing;
-                }
-            }
-            this.party.applyMovement(result);
-            if (result.stepped) this.setPartyMoveDelay();
-            if (resolvedPosition) {
-                const unchanged = oldPos.x === resolvedPosition.x
-                    && oldPos.y === resolvedPosition.y
-                    && oldPos.z === resolvedPosition.z;
-                this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
-                this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
-            }
-            this.timerSystem.notePartyMoved();
-            this.monsterSystem.loadPartyLevelOnArrival();
-            this.timerSystem.processTimers(this.state.tickCount);
-
-            // Notify callbacks
-            for (const callback of this.onMoveCallbacks) {
-                callback(true, result);
-            }
-
-            return true;
-        } else {
-            if (result.inhibited) {
-                // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
-                this.discardAllInput();
-                this.ctx.loop.clockTickCleared = true;
-                this.ctx.loop.clockTickSet = false;
-            }
-            // Notify callbacks of failure
-            for (const callback of this.onMoveCallbacks) {
-                callback(false, result);
-            }
-
-            return false;
+        const result = this.movementSystem.moveParty(action);
+        for (const callback of this.onMoveCallbacks) {
+            callback(result.success, result);
         }
+        return result.success;
     }
 
     /** The UI's object move, the floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`). */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
-    }
-
-    /**
-     * The tail of `MoveParty`'s step (doc/CSBwin-src/CSBCode.cpp:8326-8349), after
-     * `MoveObject` — so a champion a pit just killed no longer counts:
-     *
-     *   time2move = 1;
-     *   for (i = 0; i < d.NumCharacter; i++)
-     *     if (pCharacter->HP() != 0) time2move = sw(Larger(time2move, TimeToMove(pCharacter)));
-     *   ...d.partyMoveDisableTimer = time2move;   // unless a party-move filter set a delay
-     *   d.Word11712 = 0;
-     *
-     * A stairway is not a step: taking one sets neither.
-     */
-    private setPartyMoveDelay(): void {
-        const party = this.party.state;
-        let time2move = 1;
-        for (const champ of party.champions) {
-            if (champ.attributes.health !== 0) {
-                time2move = sw(Math.max(time2move, this.characterStats.timeToMove(champ)));
-            }
-        }
-        party.partyMoveDisableTimer = time2move;
-        party.word11712 = 0;
     }
 
     /** `DiscardAllInput` (`MouseQueue.discardAllInput`). */
