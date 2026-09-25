@@ -58,16 +58,12 @@ async function main(): Promise<void> {
   const party = { position: { x: 0, y: 0, z: level } } as PartyState;
   const random = new CsbRandom(0x12345678);
   const timers = new TimerQueue();
-  let time = 0;
-  const monsters = new MonsterSystem(
-    dungeon, () => party, timers, () => time, random,
-    { monsterDesc: objectTables.monsterDesc }, { trace: () => {} },
-  );
-  monsters.loadPartyLevel(level);
-
   const footprints = new PartyFootprints();
   const ctx = newContext(data, graphics, { dungeon, timers, random, footprints });
   ctx.party.state = party;
+  const monsters = new MonsterSystem(ctx, { trace: () => {} });
+  monsters.loadPartyLevel(level);
+
   const perception = new MonsterPerception(ctx);
 
   const pool = dungeon.getItem16Pool();

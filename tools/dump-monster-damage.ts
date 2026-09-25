@@ -56,17 +56,15 @@ async function main(): Promise<void> {
   const party = { position: { x: 0, y: 0, z: level } } as PartyState;
   const timers = new TimerQueue();
   const random = new CsbRandom(0xc0ffee);
-  let time = 100;
+  const time = 100;
+  const ctx = newContext(data, graphics, { dungeon, timers, random });
+  ctx.party.state = party;
+  ctx.state.tickCount = time;
 
-  const monsters = new MonsterSystem(
-    dungeon, () => party, timers, () => time, random,
-    { monsterDesc: objectTables.monsterDesc }, {},
-  );
+  const monsters = new MonsterSystem(ctx, {});
   monsters.loadPartyLevel(level);
 
   let clouds = 0;
-  const ctx = newContext(data, graphics, { dungeon, timers, random });
-  ctx.party.state = party;
   const damage = new MonsterDamage(ctx, { createCloud: () => { clouds++; } });
   damage.onItem16Freed = () => monsters.noteItem16Freed();
 

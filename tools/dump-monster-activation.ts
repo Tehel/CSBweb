@@ -21,6 +21,7 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
+import { newContext } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -45,17 +46,10 @@ async function main(): Promise<void> {
 
   const party = { position: { x: start.x, y: start.y, z: level } } as PartyState;
   const timers = new TimerQueue();
-  let time = 0;
   // A fixed seed: the point is a repeatable listing, not a realistic game.
-  const monsters = new MonsterSystem(
-    dungeon,
-    () => party,
-    timers,
-    () => time,
-    new CsbRandom(0x12345678),
-    { monsterDesc: objectTables.monsterDesc },
-    { trace: () => {} },
-  );
+  const ctx = newContext(data, graphics, { dungeon, timers, random: new CsbRandom(0x12345678) });
+  ctx.party.state = party;
+  const monsters = new MonsterSystem(ctx, { trace: () => {} });
 
   monsters.loadPartyLevel(level);
 

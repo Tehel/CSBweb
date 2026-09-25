@@ -503,15 +503,8 @@ export class Game {
             },
         );
         this.monsterSystem = new MonsterSystem(
-            this.dungeonState,
-            () => this.party.state,
-            this.timerQueue,
-            () => this.state.tickCount,
-            this.random,
-            { monsterDesc: tables.monsterDesc },
+            ctx,
             {
-                queueSound: (ordinal, mapX, mapY, deltaTime) =>
-                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 checkMoveFromMissile: (from, to, monsterRn) =>
                     this.timerSystem.checkMonsterMoveFromMissile(from, to, monsterRn),
                 resolveMonsterDestination: (destination, monsterRn, oldX, oldY) =>
@@ -540,23 +533,8 @@ export class Game {
         this.monsterDamage.onItem16Freed = () => this.monsterSystem.noteItem16Freed();
         this.monsterPerception = new MonsterPerception(ctx);
         this.monsterAttack = new MonsterAttack(
-            this.dungeonState,
-            () => this.party.state,
-            () => this.state.tickCount,
-            this.random,
-            () => this.dungeonState.getMap(this.party.state.position.z)?.descriptor.difficulty ?? 0,
+            ctx,
             {
-                monsterDesc: tables.monsterDesc,
-                monsterAttackSounds: tables.uByte9672,
-                uByte590: tables.uByte590,
-                byte586: tables.byte586,
-                clothingArmour: tables.clothingArmour,
-                clothingFlags: tables.clothingFlags,
-                byte1412: tables.byte1412,
-            },
-            {
-                queueSound: (ordinal, mapX, mapY, deltaTime) =>
-                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 launchMissile: (o) => this.timerSystem.launchMonsterMissile(o),
                 moveObject: (object, oldX, oldY, newX, newY, level) => {
                     this.timerSystem.moveObject(object, oldX, oldY, newX, newY, level);
@@ -564,7 +542,6 @@ export class Game {
                 registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
                 dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
                 onChampionDied: (chIdx) => this.onChampionDied(chIdx),
-                isGameWon: () => this.gameWon,
                 wakeUp: () => this.wakeUp(),
                 schedulePoison: (chIdx, remaining) =>
                     this.timerSystem.schedulePoison(chIdx, remaining, this.party.state.position.z),
@@ -572,18 +549,10 @@ export class Game {
                 trace: monsterHooks?.trace,
             },
         );
-        this.monsterAI = new MonsterAI({
-            dungeon: this.dungeonState,
-            getPartyState: () => this.party.state,
-            getTime: () => this.state.tickCount,
-            random: this.random,
-            timers: this.timerQueue,
+        this.monsterAI = new MonsterAI(ctx, {
             monsters: this.monsterSystem,
             damage: this.monsterDamage,
             perception: this.monsterPerception,
-            monsterDesc: () => tables.monsterDesc,
-            isGameWon: () => this.gameWon,
-            getCurrentPalette: () => this.currentPalette,
             checkMonsterVersusMissiles: (mapX, mapY, position, level) =>
                 this.timerSystem.checkMonsterVersusMissiles(mapX, mapY, position, level),
             monsterAttacks: (monsterRn, monster, mapX, mapY, member) =>

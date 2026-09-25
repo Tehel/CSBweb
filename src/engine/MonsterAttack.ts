@@ -22,7 +22,8 @@ import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
-import type { Champion, PartyState } from './gameTypes';
+import type { GameContext } from './GameContext';
+import type { Champion } from './gameTypes';
 import { getPartyChampion } from './Party';
 import { MonsterType } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
@@ -85,23 +86,7 @@ export interface AttackParameters {
   supressPoison: number;
 }
 
-export interface MonsterAttackTables {
-  monsterDesc?: ArrayLike<MonsterDesc>;
-  monsterAttackSounds?: ArrayLike<number>;
-  /** `d.uByte590[4]` — wound-location bitmasks. */
-  uByte590?: ArrayLike<number>;
-  /** `d.Byte586[8][4]` — attack order by side. */
-  byte586?: ArrayLike<ArrayLike<number>>;
-  /** `d.ClothingDesc[58].uByte1` — armour strength per garment. */
-  clothingArmour?: ArrayLike<number>;
-  /** `d.ClothingDesc[58].uByte2` — flags; bit 7 marks a shield. */
-  clothingFlags?: ArrayLike<number>;
-  /** `d.Byte1412[6]` — per-body-part shield weighting. */
-  byte1412?: ArrayLike<number>;
-}
-
 export interface MonsterAttackHooks {
-  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `LaunchMissile` (`doc/CSBwin-src/Magic.cpp:40`). */
   launchMissile?: (options: {
     projectile: ObjectID;
@@ -132,8 +117,6 @@ export interface MonsterAttackHooks {
   dropAllPossessions?: (chIdx: number) => void;
   /** `WakeUp` (`doc/CSBwin-src/CSBCode.cpp`). */
   wakeUp?: () => void;
-  /** `d.Word11694` — set when the game is won; `DamageCharacter` then hurts nobody. */
-  isGameWon?: () => boolean;
   /** Arm the `TT_75` poison timer (`doc/CSBwin-src/CSBCode.cpp:7228`). */
   schedulePoison?: (chIdx: number, remaining: number) => void;
   /** Delete this champion's `TT_75` timers (`doc/CSBwin-src/Character.cpp:3016`). */
@@ -142,18 +125,17 @@ export interface MonsterAttackHooks {
 }
 
 export class MonsterAttack {
-  constructor(
-    private dungeon: DungeonState,
-    private getPartyState: () => PartyState,
-    private getTime: () => number,
-    private random: CsbRandom,
-    private getExperienceMultiplier: () => number,
-    private tables?: MonsterAttackTables,
-    private hooks?: MonsterAttackHooks,
-  ) {}
+  private readonly dungeon: DungeonState;
+  private readonly random: CsbRandom;
 
-  setTables(tables: MonsterAttackTables): void {
-    this.tables = { ...this.tables, ...tables };
+  constructor(private readonly ctx: GameContext, private hooks?: MonsterAttackHooks) {
+    this.dungeon = ctx.dungeon;
+    this.random = ctx.random;
+  }
+
+  /** The party's level's difficulty, the experience multiplier. */
+  private getExperienceMultiplier(): number {
+    return this.dungeon.getMap(this.ctx.party.state.position.z)?.descriptor.difficulty ?? 0;
   }
 
   /**
@@ -174,17 +156,17 @@ export class MonsterAttack {
       orthogonalDistanceToParty: number;
     },
   ): boolean {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (party.champions.length === 0) return false;
 
     // `d.LastMonsterAttackTime = d.Time` — this is the real feed for the value that
     // `AdjustSkills` scales experience against; it used to be set from the missile
     // path as a stand-in (PLAN.md Phase 12).
-    party.lastMonsterAttackTime = this.getTime() | 0;
+    party.lastMonsterAttackTime = this.ctx.state.tickCount | 0;
 
     const slot = this.dungeon.getAttachedItem16(monster);
     if (!slot) return false;
-    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return false;
 
     const p = this.buildAttackParameters(
@@ -206,7 +188,7 @@ export class MonsterAttack {
           damage: amended.missileDamage,
           decayRate: amended.missileDecayRate,
           level: context.level,
-          startTime: this.getTime(),
+          startTime: this.ctx.state.tickCount,
         });
       }
     } else {
@@ -234,7 +216,7 @@ export class MonsterAttack {
         this.hooks?.stealFromCharacter?.(monster, chIdx);
       } else {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
-        const champ = getPartyChampion(this.getPartyState(), chIdx);
+        const champ = getPartyChampion(this.ctx.party.state, chIdx);
         // `maxRecentDamage` drives which way the portrait's damage flash points.
         if (champ && dealt > champ.maxRecentDamage) {
           champ.maxRecentDamage = dealt & 0xff;
@@ -244,8 +226,8 @@ export class MonsterAttack {
     }
 
     if (amended.attackSoundOrdinal !== 0) {
-      const ordinal = this.tables?.monsterAttackSounds?.[amended.attackSoundOrdinal - 1] ?? 0;
-      if (ordinal) this.hooks?.queueSound?.(ordinal, amended.monsterX, amended.monsterY, 1);
+      const ordinal = this.ctx.tables.uByte9672[amended.attackSoundOrdinal - 1] ?? 0;
+      if (ordinal) this.ctx.sounds.queueSound(ordinal, amended.monsterX, amended.monsterY, 1);
     }
     return true;
   }
@@ -307,7 +289,7 @@ export class MonsterAttack {
     if (monsterWord2Bit4(desc)) {
       let target = this.random.zeroTo3();
       let tries = 0;
-      while (tries < 4 && (getPartyChampion(this.getPartyState(), target)?.attributes.health ?? 0) === 0) {
+      while (tries < 4 && (getPartyChampion(this.ctx.party.state, target)?.attributes.health ?? 0) === 0) {
         target = (target + 1) & 0x3;
         tries++;
       }
@@ -369,19 +351,19 @@ export class MonsterAttack {
    * step-for-step because no simpler form would give the same distribution.
    */
   monsterDamagesCharacter(monster: CreatureRecord, chIdx: number, supressPoison: boolean): number {
-    const party = this.getPartyState();
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    const party = this.ctx.party.state;
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
     if (party.sleeping) this.hooks?.wakeUp?.();
 
-    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return 0;
     const experienceTerm = 2 * this.getExperienceMultiplier();
 
     // Being attacked trains the Fighter defence skill regardless of the outcome.
     adjustSkills(party.champions, chIdx, 7, monsterWord16_8_11(desc), AdjustSkillsWhy.MonsterDamagesCharacter, {
-      time: this.getTime(),
+      time: this.ctx.state.tickCount,
       lastMonsterAttackTime: party.lastMonsterAttackTime,
       experienceMultiplier: this.getExperienceMultiplier(),
       random: this.random,
@@ -404,7 +386,7 @@ export class MonsterAttack {
       let word22 = ((desc.uByte22[0] ?? 0) << 8) | (desc.uByte22[1] ?? 0);
       let index = 0;
       while (low > (word22 & 15)) { word22 >>= 4; index++; }
-      woundMask = this.tables?.uByte590?.[index] ?? 0;
+      woundMask = this.ctx.tables.uByte590[index] ?? 0;
     } else {
       woundMask = roll & 1;
     }
@@ -428,7 +410,7 @@ export class MonsterAttack {
     if (dealt === 0) return 0;
 
     // Sound ordinal `chIdx + 9` names *which* champion was hurt.
-    this.hooks?.queueSound?.(chIdx + 9, party.position.x, party.position.y, 2);
+    this.ctx.sounds.queueSound(chIdx + 9, party.position.x, party.position.y, 2);
 
     const poison = desc.poisonAttack11;
     if (poison !== 0 && this.random.bool() !== 0) {
@@ -454,7 +436,7 @@ export class MonsterAttack {
     const range = 2 * spread;
 
     let hurt = 0;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
       const roll = (this.random.next() & 0xffff) % range;
       if (this.damageCharacter(chIdx, Math.max(1, base + roll), woundMask, kind) !== 0) hurt++;
@@ -473,7 +455,7 @@ export class MonsterAttack {
    */
   adjustStamina(chIdx: number, decrement: number): void {
     if (chIdx === -1) return;
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
 
     const newStamina = (champ.attributes.stamina | 0) - (decrement | 0);
@@ -498,7 +480,7 @@ export class MonsterAttack {
    * land on, which then scales the damage by `130 - armour`.
    */
   damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     // The early guards, in CSBWin's order (`doc/CSBwin-src/Character.cpp:2712-2717`).
     // The recruit standing in a Hall of Champions mirror and a won game both return
     // non-zero, so a caller reading the result sees "damage was dealt".
@@ -506,7 +488,7 @@ export class MonsterAttack {
     if (chIdx === -1) return 0;
     if (party.potentialChampionIndex === chIdx) return chIdx + 1;
     // `d.Word11694`, only ever set to 1 (`Attack.cpp:2268`, `Timer.cpp:2371`).
-    if (this.hooks?.isGameWon?.()) return 1;
+    if (this.ctx.state.gameWon) return 1;
     if (dealt <= 0) return 0;
     const champ = getPartyChampion(party, chIdx);
     if (!champ) return 0;
@@ -586,8 +568,8 @@ export class MonsterAttack {
    * (`doc/CSBwin-src/Character.cpp:2626-2645`).
    */
   killCharacter(chIdx: number): void {
-    const party = this.getPartyState();
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    const party = this.ctx.party.state;
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
 
     champ.alive = false;
@@ -696,12 +678,12 @@ export class MonsterAttack {
       const rec = this.dungeon.getClothingRecord(obj);
       if (!rec) continue;
       const worn = rec.clothingType;
-      if (((this.tables?.clothingFlags?.[worn] ?? 0) & 0x80) === 0) continue; // not a shield
+      if (((this.ctx.tables.clothingFlags[worn] ?? 0) & 0x80) === 0) continue; // not a shield
       const throwingDistance = this.characterStats?.determineThrowingDistance(
-        champ, hand, this.getPartyState().sleeping,
+        champ, hand, this.ctx.party.state.sleeping,
       ) ?? 0;
       const strength = this.clothingArmourValue(worn, scale) + throwingDistance;
-      const weight = this.tables?.byte1412?.[bodyPart] ?? 0;
+      const weight = this.ctx.tables.byte1412[bodyPart] ?? 0;
       const product = (strength * weight) & 0xffff;
       handTotal += product >> (hand === bodyPart ? 4 : 5);
     }
@@ -711,7 +693,7 @@ export class MonsterAttack {
     let total = (this.random.next() & 0xffff) % spread;
     if (scale) total = Math.trunc(total / 2);
 
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     total +=
       champ.attackStatModifier +
       champ.shieldStrength +
@@ -735,9 +717,9 @@ export class MonsterAttack {
    * optionally scaled by its own flags rather than taken raw.
    */
   private clothingArmourValue(clothingType: number, scale: boolean): number {
-    const strength = this.tables?.clothingArmour?.[clothingType] ?? 0;
+    const strength = this.ctx.tables.clothingArmour[clothingType] ?? 0;
     if (!scale) return strength;
-    const flags = this.tables?.clothingFlags?.[clothingType] ?? 0;
+    const flags = this.ctx.tables.clothingFlags[clothingType] ?? 0;
     return scaledMultiply(strength, 3, (flags & 7) + 4);
   }
 
@@ -754,7 +736,7 @@ export class MonsterAttack {
    */
   quickness(champ: Champion): number {
     if (!this.characterStats) throw new Error('MonsterAttack.quickness before setCharacterStats');
-    return this.characterStats.quickness(champ, this.getPartyState().sleeping);
+    return this.characterStats.quickness(champ, this.ctx.party.state.sleeping);
   }
 
   /**
@@ -801,7 +783,7 @@ export class MonsterAttack {
    * Only adjacent attackers can reach anyone: `xDist + yDist > 1` returns -1.
    */
   getCharacterToDamage(attackerX: number, attackerY: number, attackerAbsPos: number): number {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (party.champions.length === 0) return -1;
     const xDist = Math.abs(attackerX - (party.position.x | 0));
     const yDist = Math.abs(attackerY - (party.position.y | 0));
@@ -839,7 +821,7 @@ export class MonsterAttack {
     let pos = attackerPos;
     if ((attackFromDirection & 1) === 0) pos++;
     const index = 2 * attackFromDirection + (Math.trunc(pos / 2) & 1);
-    const row = this.tables?.byte586?.[index & 0x7];
+    const row = this.ctx.tables.byte586[index & 0x7];
     if (!row) return [0, 1, 2, 3];
     return [row[0] ?? 0, row[1] ?? 0, row[2] ?? 0, row[3] ?? 0];
   }
@@ -859,9 +841,9 @@ export class MonsterAttack {
    */
   poisonCharacter(chIdx: number, strength: number): void {
     if (chIdx === -1) return;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     if (party.potentialChampionIndex === chIdx) return;
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
 
     this.damageCharacter(chIdx, Math.max(1, Math.trunc(strength / 64)), 0, 0);
@@ -880,13 +862,13 @@ export class MonsterAttack {
   curePoison(chIdx: number): void {
     if (chIdx === -1) return;
     this.hooks?.cancelPoisonTimers?.(chIdx);
-    const champ = getPartyChampion(this.getPartyState(), chIdx);
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (champ) champ.poisonCount = 0;
   }
 
   /** `RanLiveChar` (`doc/CSBwin-src/Monster.cpp:905`). */
   private randomLiveChampion(): number {
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const live: number[] = [];
     party.champions.forEach((ch, i) => {
       if (ch.attributes.health > 0) live.push(i);

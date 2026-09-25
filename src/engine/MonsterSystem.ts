@@ -19,7 +19,7 @@ import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
-import type { PartyState } from './gameTypes';
+import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -59,10 +59,6 @@ const SOUND_ORDINAL_TELEPORT = 17;
 export const GROUP_INDEX_DETACHED = 0xd8;
 export const GROUP_INDEX_DETACHED_SIZE4 = 0xff;
 
-export interface MonsterSystemTables {
-  monsterDesc?: ArrayLike<MonsterDesc>;
-}
-
 export interface MonsterSystemHooks {
   /**
    * `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp`) — a monster leaving a
@@ -96,8 +92,6 @@ export interface MonsterSystemHooks {
    * (`place`) or leave. The chain itself is spliced here, before the call.
    */
   triggerObjectMove?: (position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean) => void;
-  /** `QueueSound(ordinal, mapX, mapY, deltaTime)` (`doc/CSBwin-src/CSBCode.cpp:1819`). */
-  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** Dev-only AI trace sink; mirrors CSBWin's `AITraceActive` output. */
   trace?: (line: string) => void;
 }
@@ -129,20 +123,15 @@ export class MonsterSystem {
    */
   private loadedLevel: number | null = null;
 
-  constructor(
-    private dungeon: DungeonState,
-    private getPartyState: () => PartyState,
-    private timers: TimerQueue,
-    private getTime: () => number,
-    private random: CsbRandom,
-    private tables?: MonsterSystemTables,
-    private hooks?: MonsterSystemHooks,
-  ) {
-    this.initializeItem16();
-  }
+  private readonly dungeon: DungeonState;
+  private readonly timers: TimerQueue;
+  private readonly random: CsbRandom;
 
-  setTables(tables: MonsterSystemTables): void {
-    if (tables.monsterDesc) this.tables = { ...this.tables, monsterDesc: tables.monsterDesc };
+  constructor(private readonly ctx: GameContext, private hooks?: MonsterSystemHooks) {
+    this.dungeon = ctx.dungeon;
+    this.timers = ctx.timers;
+    this.random = ctx.random;
+    this.initializeItem16();
   }
 
   /* ------------------------------------------------------------------ pool ---- */
@@ -186,7 +175,7 @@ export class MonsterSystem {
   }
 
   private isPartyLevelLoaded(): boolean {
-    return this.loadedLevel !== null && this.loadedLevel === (this.getPartyState().position.z | 0);
+    return this.loadedLevel !== null && this.loadedLevel === (this.ctx.party.state.position.z | 0);
   }
 
   /**
@@ -223,7 +212,7 @@ export class MonsterSystem {
     slot.ubPrevX = mapX & 0xff;
     slot.uByte11 = mapY & 0xff;
     slot.ubPrevY = mapY & 0xff;
-    slot.uByte4 = (this.getTime() - 127) & 0xff; // about 20 seconds
+    slot.uByte4 = (this.ctx.state.tickCount - 127) & 0xff; // about 20 seconds
 
     // Every member of the group faces whichever way the DB4 says, and starts with a
     // cleared status byte.
@@ -304,17 +293,17 @@ export class MonsterSystem {
     const pool = this.pool;
     this.item16QueLen = pool.reduce((n, r) => n + (r.word0 >= 0 ? 1 : 0), 0);
     this.loadedLevel = null;
-    this.loadPartyLevel(this.getPartyState().position.z | 0);
+    this.loadPartyLevel(this.ctx.party.state.position.z | 0);
   }
 
   /** True if the party has changed level since the last `loadPartyLevel`. */
   needsLevelReload(): boolean {
-    return this.loadedLevel !== (this.getPartyState().position.z | 0);
+    return this.loadedLevel !== (this.ctx.party.state.position.z | 0);
   }
 
   /** Run `loadPartyLevel` if, and only if, the party's level has changed; say whether it ran. */
   loadPartyLevelIfChanged(): boolean {
-    const level = this.getPartyState().position.z | 0;
+    const level = this.ctx.party.state.position.z | 0;
     if (this.loadedLevel === level) return false;
     this.loadPartyLevel(level);
     return true;
@@ -379,7 +368,7 @@ export class MonsterSystem {
       mapY,
       0, // timerUByte8
       0, // timerUByte9
-      (this.getTime() + 1) >>> 0,
+      (this.ctx.state.tickCount + 1) >>> 0,
       level,
       uByte5,
     );
@@ -406,9 +395,9 @@ export class MonsterSystem {
     monsterY: number,
   ): number {
     const monster = this.dungeon.getCreatureRecordByIndex(slot.word0);
-    if (!monster) return this.getTime();
+    if (!monster) return this.ctx.state.tickCount;
     const desc = this.getDesc(monster);
-    if (!desc) return this.getTime();
+    if (!desc) return this.ctx.state.tickCount;
 
     const allMembers = monsterIndex < 0;
     let index = allMembers ? monster.numMonM1 & 0x3 : monsterIndex;
@@ -439,7 +428,7 @@ export class MonsterSystem {
             // makes a noise doing it (doc/CSBwin-src/CSBCode.cpp:5900-5908).
             if (this.random.bool()) {
               sms ^= SMS_MIRROR;
-              this.hooks?.queueSound?.(SOUND_ORDINAL_DETH_KNIGHT_FLIP, monsterX, monsterY, 1);
+              this.ctx.sounds.queueSound(SOUND_ORDINAL_DETH_KNIGHT_FLIP, monsterX, monsterY, 1);
             }
           } else if (!wasAttacking || !monsterWord4Bit10(desc)) {
             sms = this.random.bool() ? sms | SMS_MIRROR : sms & ~SMS_MIRROR;
@@ -466,7 +455,7 @@ export class MonsterSystem {
     const minDelay = attacking
       ? monsterDelayFromAttackToMove(desc)
       : monsterDelayFromMoveToAttack(desc);
-    return (this.getTime() + minDelay + this.random.bool()) >>> 0;
+    return (this.ctx.state.tickCount + minDelay + this.random.bool()) >>> 0;
   }
 
   /* ------------------------------------------------------------ moving ------- */
@@ -531,14 +520,14 @@ export class MonsterSystem {
     const monster = this.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return { code: 0, position: requested };
 
-    const party = this.getPartyState().position;
+    const party = this.ctx.party.state.position;
     const partyLevel = party.z | 0;
     const fromDungeon = oldX >= 0;
     // "Proper level && oldX >= 0 means an ITEM16 exists"
     // (doc/CSBwin-src/Code11f52.cpp:2864).
     const item16Attached = level === partyLevel && fromDungeon;
     // `Levitating(objD7)` (`:2841`, `:2417-2437`): a flying monster.
-    const desc = this.tables?.monsterDesc?.[monster.creatureType];
+    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     const levitated = desc !== undefined && monsterLevitating(desc);
 
     // A monster leaving a square may run into a missile sitting in it (`:2843-2849`).
@@ -639,7 +628,7 @@ export class MonsterSystem {
     const old = new Position(oldX, oldY, level);
     this.dungeon.removeObjectFromCell(old, monsterRn);
     if (levitated) return;
-    const party = this.getPartyState().position;
+    const party = this.ctx.party.state.position;
     const partyThere = level === (party.z | 0) && oldX === (party.x | 0) && oldY === (party.y | 0);
     this.hooks?.triggerObjectMove?.(old, monsterRn, false, partyThere);
   }
@@ -694,7 +683,7 @@ export class MonsterSystem {
       destination.y,
       0,
       0,
-      (this.getTime() + 5) >>> 0,
+      (this.ctx.state.tickCount + 5) >>> 0,
       destination.z,
       monsterRn,
     );
@@ -713,8 +702,8 @@ export class MonsterSystem {
     const level = timer.level & 0xff;
     let mapX = timer.uByte6;
     let mapY = timer.uByte7;
-    const partyLevel = this.getPartyState().position.z | 0;
-    const party = this.getPartyState().position;
+    const partyLevel = this.ctx.party.state.position.z | 0;
+    const party = this.ctx.party.state.position;
 
     let triedWander = false;
     for (;;) {
@@ -723,7 +712,7 @@ export class MonsterSystem {
         this.dungeon.findFirstMonster(new Position(mapX, mapY, level)) === OBJECT_ID_EOF;
       if (free) {
         if (timer.function === TimerFunction.TT_61) {
-          this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
+          this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
         }
         this.moveMonster(monsterRn as ObjectID, -1, 0, mapX, mapY, level);
         return;
@@ -799,7 +788,7 @@ export class MonsterSystem {
     this.ensureItem16Available();
     if (this.isItem16PoolFull()) return null;
 
-    const desc = this.tables?.monsterDesc?.[monsterType];
+    const desc = this.ctx.tables.monsterDesc[monsterType];
     if (!desc) return null;
 
     const rn = this.findEmptyCreatureEntry();
@@ -855,7 +844,7 @@ export class MonsterSystem {
     // generator queues its own when it is audible (`Timer.cpp:1797-1800`).
     const placed = this.moveMonster(rn, -1, 0, options.mapX, options.mapY, options.level);
     if (placed.code !== 0) return null;
-    this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
+    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
     return rn;
   }
 
@@ -893,11 +882,11 @@ export class MonsterSystem {
   }
 
   playTeleportSound(mapX: number, mapY: number): void {
-    this.hooks?.queueSound?.(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
+    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
   }
 
   private getDesc(monster: CreatureRecord): MonsterDesc | null {
-    return this.tables?.monsterDesc?.[monster.creatureType] ?? null;
+    return this.ctx.tables.monsterDesc[monster.creatureType] ?? null;
   }
 
   private trace(line: string): void {
