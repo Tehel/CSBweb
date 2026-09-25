@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, D1 with D2, D3, D4 and D5, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, D1 with D2, D3, D4 and D5, E1a and E1b, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -121,9 +121,17 @@ cannot give, so it is re-sized to M and stays in the frozen tier C. E1's design 
 `DEBT.md`: one `GameContext` (dungeon, party, state, random, timers, sounds, tables, host,
 systems), direct calls through `ctx.systems` instead of setters and hooks, one
 `GameTables`. Split into E1a–d.
-Next: E1a (`GameTables` and its one builder, used by `main.ts` and the 44 tools that build a
-`Game`), then E1b–d, then E2–E5. C33 and C34 wait until after E1/E2; C25 and C35 wait with
-the rest of tier C.
+E1a: one `GameTables` (`src/engine/GameTables.ts`), every field required and named as
+CSBWin names it, built once by `buildGameTables` for `main.ts` and — through
+`tools/lib/game.ts` — for the 44 tools, none of which turned out to depend on a table it had
+left out. E1b: one `GameContext` (`src/engine/GameContext.ts`; dungeon, party, state,
+random, footprints, timers, sounds, tables), the first argument of every subsystem; the
+getter lambdas, the seven table slices and their `setTables`, the `queueSound` /
+`isGameWon` / `nameIndex` hooks are gone. `d.Word11694` and `d.CurrentPalette` live in
+`GameState`. No `RUNTIME_SAVE_VERSION` change. Found and recorded: D6 (`GameState.party`
+is a second copy of `Party.state`, resynced by hand) and F4 (four suite tools unseeded).
+Next: D6 and F4 (both S), then E1c (`ctx.systems`), E1d (`GameHost`), then E2–E5. C33 and
+C34 wait until after E1/E2; C25 and C35 wait with the rest of tier C.
 
 ## Ground rules
 

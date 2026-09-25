@@ -133,14 +133,29 @@ behaviour with an extra case explaining why it looks like an omission.
 
 ## Gotchas
 
-**Tools build their own tables.** Each tool constructs its own `timerTables` /
-`actuatorTables`. Adding a field in `main.ts` does **not** reach them — the armour test
-silently measured nothing until the tool got the same tables. When you add a table,
-grep `tools/` and update every constructor. A missing `byte586` does the same to `GetCharacterToDamage`:
-`determineAttackOrder` falls back to `[0, 1, 2, 3]`, and a wall bump hurt the back row.
-Copy the tables the code under test reads, not only the ones the tool's model needed.
+**Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
+gives the game every table `buildGameTables` extracts — the same `GameTables` `main.ts`
+uses — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that
+stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `timers` or
+seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Before E1a each
+tool hand-built the subset of tables it thought it needed, and two tests silently
+measured nothing because of it (the armour test without the clothing tables;
+`GetCharacterToDamage` without `byte586`, where a wall bump hurt the back row). A new
+table goes into `GameTables` and `buildGameTables`, and every tool has it. A tool that
+needs a *different* table builds its game over a copy:
+`new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [...] })`
+(`dump-missile-door.ts`). Never mutate the shared set.
 
-**Seed fixed, always.** `new CsbRandom(0x12345678)`. An unseeded run is not a test.
+**Seed fixed, always.** `new CsbRandom(0x12345678)` (or `game.setRandomSeed(…)`). An
+unseeded run is not a test, and it spoils the refactor check below (`DEBT.md` F4).
+
+**A refactor is proven by diffing every tool's whole output, not only the verdicts.**
+Before a behaviour-neutral change, capture `npx tsx tools/<t>.ts` for every tool in
+`run-checks.mjs` into a scratch directory; after it, capture again and `cmp` file by file.
+A passing check can hide a changed number the check does not look at. Run a differing
+tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
+`node_modules` and `static/gamefiles` symlinked in) to tell a real change from a tool that
+varies on its own.
 
 **Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
 overrides `Math.random` to make the golden frames reproducible; anything that draws

@@ -79,7 +79,8 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   everything the frames cannot see** — tables, AI, damage, timers, movement. `npm test`
   runs every tool **listed** in `tools/run-checks.mjs` — there is no discovery, so a new
   tool is not evidence until it is added there. Run one on its own with
-  `npx tsx tools/<name>.ts`.
+  `npx tsx tools/<name>.ts`. A tool builds its `Game` (or a bare `GameContext`) through
+  `tools/lib/game.ts`, so it gets every table `main.ts` does.
 
 When porting behaviour that is invisible on screen, write the tool in the same commit.
 The `verification-tools` skill in `.claude/skills/` has the pattern, the gotchas, and
@@ -97,9 +98,10 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
-engine/     Game, DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
-            ActuatorSystem, DsaSystem, skills, AddCharacter, objectIndex (the one
-            DescIndex / GetBasicObjectType / NameIndex)
+engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameTables
+            (every graphics.dat table, one builder), DungeonState, Party, MovementSystem,
+            TimerSystem, TimerQueue, ActuatorSystem, DsaSystem, skills, AddCharacter,
+            objectIndex (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
@@ -189,4 +191,5 @@ the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT
 **paying that off is the current priority**, one item per commit, in the order it gives.
 Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
 before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
-is paid (2026-09-25); E1 (a shared `GameContext`, design note in `DEBT.md`) is next.
+is paid but for D6, found on the way (2026-09-25); E1a–b (one `GameTables`, one
+`GameContext` every subsystem takes) are paid, and D6, F4 and E1c (`ctx.systems`) are next.

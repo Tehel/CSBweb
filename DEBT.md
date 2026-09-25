@@ -40,7 +40,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    not fixed — unless it blocks the D/E item at hand or corrupts saves. C33 and C34 wait;
    C34 lands after E1/E2, once the possession code has one `Character` home and the engine
    can reach the UI without new setters. C25 (re-sized to M after D4) and C35 wait in the
-   frozen queue with the rest of tier C.
+   frozen queue with the rest of tier C. D6 (found paying E1b) is tier D, so it goes
+   before E1c; F4 (unseeded tools) is cheap and makes every later refactor's before/after
+   diff exact, so pay it alongside.
 
 ## Why this order
 
@@ -115,13 +117,15 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D3 | Most state fields are optional (split: D3a-g) | L | ✅ archived |
 | D4 | `ObjectID` is not a distinct type | M | ✅ archived |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ archived |
-| E1 | A shared game context, and one set of tables (design note written; split E1a-d) | L | ⏳ |
+| D6 | `GameState.party` is a second copy of `Party.state` | S | ⏳ |
+| E1 | A shared game context, and one set of tables (split E1a-d: E1a-b ✅, E1c-d ⏳) | L | ⏳ |
 | E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
 | E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
 | F1 | Sweep for empty placeholder tables | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
+| F4 | Four suite tools draw from an unseeded stream | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1–G9 | Unported CSBWin features | — | ⏳ |
 | H | Deliberate divergences | — | 🚫 |
@@ -1208,6 +1212,20 @@ reads the parameters of a monster that throws nothing.
 outcomes and the fixes found on the way, are in `doc/PLAN_ARCHIVE.md` → "Resolved debt" →
 "`DEBT.md` tier D".
 
+### D6 ⏳ `GameState.party` is a second copy of `Party.state`
+
+*(Found paying E1b, 2026-09-25.)* `GameState` (`src/engine/gameTypes.ts`) carries
+`party: PartyState`, set once in `createGameContext`, while `Party.setState` replaces
+`Party.state` with a new object. `Game` keeps the two in step by hand:
+`this.state.party = this.party.state` appears ten times in `Game.ts` (after `setState`,
+`addChampion`, the Hall of Champions, `setBrightness`, the runtime-save restore…). A path
+that replaces the party and misses the resync leaves `game.state.party` naming the old
+object — and `applySavePayload` (`src/engine/SaveGamePayload.ts`) writes a loaded save's
+blocks *into* `game.state.party`. Not seen to go wrong; it is the D-tier shape of bug
+(stored twice, kept in step by hand). Fix: drop `GameState.party` and read
+`ctx.party.state`, as every subsystem now does. Re-audit the ten sites first: some may be
+resyncing after a `setState` that no longer exists.
+
 ---
 
 ## E — Architecture
@@ -1316,6 +1334,57 @@ member, since it needs nothing but the champion.
 `AttackSystem`'s hook, `ui/Character.getChampionPossession` — each a one-line
 `possessions[slot] ?? OBJECT_ID_NULL`. The context should carry the one reader.
 
+**E1a ✅ (`5afe970`).** `src/engine/GameTables.ts`: one read-only `GameTables`, every
+field required, grouped by content (objects, object descriptors, monsters, the dungeon,
+the party, attacks and spells, sound). The tables the port had renamed carry CSBWin's
+name (`byte1596`, not `roomTimerFunctions`; `byte1386`, `byte10340`, `uByte9672`,
+`byte8946`, `sound1772`, `objDescWord4`); a struct array's fields keep the port's names.
+`spells` joined it, so `setSpellDefinitions` is gone. `buildGameTables(graphics)` is the
+one builder; `main.ts` uses it, and so do the 44 tools, through `tools/lib/game.ts`
+(`newGame`, `gameTablesOf`, `stockGraphics`). `Game`'s constructor became
+`(dungeonData, tables, options)`, `GameOptions` holding what leaves the engine
+(`cursorFilter`, `messages`, `playSound`) and the tools' `timerHooks` / `monsterHooks`.
+**No tool depended on a table it had left out**: every tool's full output was diffed
+before and after, and the only differences were the five tools that vary from run to run
+anyway (recorded as F4), plus the graphics loader's log lines in `dump-viewport-click`,
+which now loads graphics. Evidence: `npm test -- --frames`.
+
+**E1b ✅ (`a32d3d6`, `3c9d48f`, `9a49f22`, `eb10975`).** `src/engine/GameContext.ts`:
+`GameContext` = `dungeon`, `party`, `state`, `random`, `footprints` (`d.PartyFootprints`,
+not in the design note, but shared state that `MonsterPerception` took positionally),
+`timers`, `sounds`, `tables`. `createGameContext(dungeonData, tables, playSound)` builds
+it, and `Game` takes its members from it. Every subsystem's first argument is `ctx`. The
+getter lambdas are gone (`() => this.party.state`, `() => this.state.tickCount`, the party
+level, the experience multiplier, `monsterDesc()`), and so are the seven table slices
+(`ActuatorTables`, `TimerTables`, `DsaTables`, `MonsterSystemTables`, `MonsterDamageTables`,
+`MonsterAttackTables`, `AttackSystemTables`, `CharacterStatsTables`) and their `setTables`.
+`d.Word11694` and `d.CurrentPalette` moved into `GameState` (`gameWon`,
+`currentPalette`), with `Game` accessors, so the `isGameWon` / `getCurrentPalette` hooks
+became reads of `ctx.state`. The `queueSound` hooks became `ctx.sounds.queueSound`, and
+`nameIndex` became `nameIndexOf(ctx, rn)`. `ActuatorSystem`'s callbacks left its tables
+for an `ActuatorHooks` given at construction, which retired its post-construction
+`setTables` call. `SoundQueue` takes `(party, soundTable, play)`. Tools that stand a
+subsystem up alone use `newContext(data, graphics, parts)`. Behaviour-neutral: every
+deterministic tool's output byte-identical, frames identical, the author's three runtime
+saves load and play (no `RUNTIME_SAVE_VERSION` change: `GameState` is not saved as such,
+and `RuntimeSaveState`'s `gameWon` goes through the accessor). One tool had to change how
+it worked: `dump-missile-door` rewrote `TimerSystem`'s private table bag through a cast,
+and now builds its game over a copy of the tables with its own `doorCharacteristics`.
+
+*What E1c inherits.* Still second constructor arguments, for `ctx.systems` to retire:
+`DsaSystem(ctx, actuators)`, `TimerSystem(ctx, actuators, hooks)`,
+`MonsterAI(ctx, { monsters, damage, perception, … })`,
+`AttackSystem(ctx, { monsterDamage, monsterAttack, monsters, dsa, characterStats, hooks })`,
+and the hook objects of `TimerSystem`, `MonsterSystem`, `MonsterDamage`, `MonsterAttack`,
+`AttackSystem`, `MovementSystem`, `ActuatorSystem`. The setters too: `setCharacterStats`
+(`MonsterAttack`, `AttackSystem`), `setTeleportPartyHandler`, `setObjectMover`,
+`onItem16Freed`. Many hooks call `Game` methods (`enableCharacterAction`,
+`registerChampionBones`, `applyMagicShield`, `addCharacter`…), which have no system of
+their own until E2: decide in E1c whether they go through a `ctx.systems.game` for now or
+stay hooks until E2 gives them a home. `Game.addCharacterTables` is a two-field slice
+still cut from `GameTables` for `assignAddCharacterPossessions`. The `possession` hooks
+(the one-line `CHARDESC::Possession`) are still written out per module.
+
 ### E2 ⏳ Split `Game.ts` by CSBWin source file
 
 `Game.ts` is 3018 lines. Split it by CSBWin source file, as `src/renderer/ui/` already is
@@ -1416,6 +1485,17 @@ party, which the probe does not have. That is the same missing affordance as Pha
 2's "fixed set of party positions" (`PLAN.md`), so build it once for both.
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “A wall decoration one cell ahead and to the left is no longer…”.</sub>
+
+### F4 ⏳ Four suite tools draw from an unseeded stream
+
+*(Found paying E1a, 2026-09-25, by diffing every tool's output before and after.)*
+`dump-attributes`, `dump-monster-ai`, `dump-throwing` (its `Game`; its `CharacterStats`
+is seeded) and `watch-monsters` build a `Game` without `setRandomSeed`, so their output
+changes from run to run: `dump-attributes` even runs 47, 49 or 51 checks. They pass
+because their assertions hold for any seed, but a run cannot be compared with the last one,
+which is what a refactor needs. (`dump-save-menu` varies too, by a byte of payload size;
+that is the save date, not the random stream.) Fix: seed each, as the skill says
+(`game.setRandomSeed(0x12345678)`), then check the assertions still bite.
 
 ### F3 — Phase 15 steps 3–5 stay in `PLAN.md`
 
