@@ -119,7 +119,7 @@ async function main(): Promise<void> {
     return {
       result,
       experience: skills[16].experience - 2000,
-      seeThruWalls: game.party.state.seeThruWalls ?? 0,
+      seeThruWalls: game.party.state.seeThruWalls,
       printed: printed.join(' '),
     };
   };

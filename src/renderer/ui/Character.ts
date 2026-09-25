@@ -383,9 +383,9 @@ export function drawPartyStatus(ui: UIState): void {
 export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {
   if (!ui.screenIndexBuffer || !ui.partyState) return;
   const shields: number[] = [];
-  const fireShield = ui.partyState.fireShield ?? 0;
-  const spellShield = ui.partyState.spellShield ?? 0;
-  const partyShield = ui.partyState.partyShield ?? 0;
+  const fireShield = ui.partyState.fireShield;
+  const spellShield = ui.partyState.spellShield;
+  const partyShield = ui.partyState.partyShield;
   const personalShield = champion.shieldStrength ?? 0;
 
   if (fireShield > 0) shields.push(38);

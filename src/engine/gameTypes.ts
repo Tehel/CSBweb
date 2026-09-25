@@ -212,16 +212,16 @@ export interface PartyState {
     gameIsLost?: boolean;
     /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */
     objectInHand: ObjectID;
-    partyShield?: ui16;         // Optional party shield strength
-    fireShield?: ui16;          // Optional fire shield strength
-    spellShield?: ui16;         // Optional spell shield strength
+    partyShield: ui16;          // d.PartyShield
+    fireShield: ui16;           // d.FireShield
+    spellShield: ui16;          // d.SpellShield
     brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
-    invisible?: i16;            // Active invisibility counter
-    seeThruWalls?: i16;         // Active see-thru-walls counter
-    magicFootprintsActive?: i16; // Active magic footprint counter
-    indexOfFirstMagicFootprint?: i16;
-    indexOfLastMagicFootprint?: i16;
-    numFootprintEnt?: i16;
+    invisible: i16;             // Active invisibility counter
+    seeThruWalls: i16;          // Active see-thru-walls counter
+    magicFootprintsActive: i16; // Active magic footprint counter
+    indexOfFirstMagicFootprint: i16;
+    indexOfLastMagicFootprint: i16;
+    numFootprintEnt: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
     /**
      * `d.PartySleeping` — set by the sleep icon, button 145, and cleared by `WakeUp`

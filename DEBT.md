@@ -1326,7 +1326,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 
 | Step | Fields | Initializer, checked against CSBWin | Status |
 | --- | --- | --- | --- |
-| D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0: `d.` is static storage | ⏳ |
+| D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0 (`Data.h:767-783`) | ✅ |
 | D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ⏳ |
 | D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:517-518`), the rest cleared by `ClearMemory(pcA3, 800)` (`:482`) | ⏳ |
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ⏳ |
@@ -1339,6 +1339,14 @@ and the tools' champion builders spread. `Party.setState` fills a field an older
 runtime save lacks from the same defaults, so `RuntimeSaveState` keeps its JSON shape and
 the saves in `static/gamefiles/saves/` keep loading (they were checked: they lack
 `sleeping`, the shields, `wounds` and more).
+
+**D3a, paid.** The nine counters are required. `initialPartyState` (`src/engine/Party.ts`)
+is `PartyState`'s one initializer: the constructor returns it, and `setState` spreads it
+under the restored state, so a field an older save lacks takes the same value (the three
+shields were missing from every save in `static/gamefiles/saves/`; all three still load and
+run). 34 fallbacks went, every one `?? 0`, the initializer's own value, so no hidden
+default. `ViewportRenderer`'s `partyState?.seeThruWalls ?? 0` stays: it guards a missing
+`partyState`. `RUNTIME_SAVE_VERSION` stays 10. Evidence: `npm test -- --frames`.
 
 Found while splitting, and paid as separate fixes:
 

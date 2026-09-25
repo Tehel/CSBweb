@@ -512,19 +512,19 @@ export class TimerSystem {
 
   private processInvisibleTimer(): void {
     const party = this.getPartyState();
-    const value = (party.invisible ?? 0) - 1;
+    const value = party.invisible - 1;
     party.invisible = value < 0 ? 0 : value;
   }
 
   private processSeeThruWallsTimer(): void {
     const party = this.getPartyState();
-    const value = (party.seeThruWalls ?? 0) - 1;
+    const value = party.seeThruWalls - 1;
     party.seeThruWalls = value < 0 ? 0 : value;
   }
 
   private processPartyShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
-    const current = party.partyShield ?? 0;
+    const current = party.partyShield;
     const next = current - sw(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
   }
@@ -614,21 +614,21 @@ export class TimerSystem {
 
   private processSpellShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
-    const current = party.spellShield ?? 0;
+    const current = party.spellShield;
     const next = current - sw(timer.timerWord6);
     party.spellShield = next < 0 ? 0 : next;
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
     const party = this.getPartyState();
-    const current = party.fireShield ?? 0;
+    const current = party.fireShield;
     const next = current - sw(timer.timerWord6);
     party.fireShield = next < 0 ? 0 : next;
   }
 
   private processMagicFootprintsTimer(): void {
     const party = this.getPartyState();
-    const value = (party.magicFootprintsActive ?? 0) - 1;
+    const value = party.magicFootprintsActive - 1;
     party.magicFootprintsActive = value < 0 ? 0 : value;
   }
 

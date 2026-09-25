@@ -11,37 +11,49 @@ import { MovementAction } from './gameTypes';
 import { Direction as Dir } from '../core/types';
 
 /**
+ * The one initializer of `PartyState`. `Party.setState` fills from it any field an older
+ * runtime save does not carry.
+ */
+export function initialPartyState(position: Position, facing: Direction): PartyState {
+    return {
+        champions: [],
+        position,
+        facing,
+        magicCasterIndex: -1,
+        potentialChampionIndex: -1,
+        gameIsLost: false,
+        cursorOwner: -1,
+        selectedCharacterIndex: -1,
+        objectInHand: OBJECT_ID_NULL,
+        // `d.PartyShield`, `d.FireShield`, `d.SpellShield` (doc/CSBwin-src/Data.h:770-772).
+        partyShield: 0,
+        fireShield: 0,
+        spellShield: 0,
+        brightness: 0,
+        invisible: 0,
+        seeThruWalls: 0,
+        magicFootprintsActive: 0,
+        indexOfFirstMagicFootprint: 0,
+        indexOfLastMagicFootprint: 0,
+        numFootprintEnt: 0,
+        lastMonsterAttackTime: -200,
+        freezeLifeTimer: 0,
+        partyMoveDisableTimer: 0,
+        word11712: 0,
+        word11714: 0,
+        moving: false,
+        turning: false,
+    };
+}
+
+/**
  * Party class - manages party state and movement
  */
 export class Party {
     state: PartyState;
 
     constructor(initialPosition: Position, initialFacing: Direction) {
-        this.state = {
-            champions: [],
-            position: initialPosition,
-            facing: initialFacing,
-            magicCasterIndex: -1,
-            potentialChampionIndex: -1,
-            gameIsLost: false,
-            cursorOwner: -1,
-            selectedCharacterIndex: -1,
-            objectInHand: OBJECT_ID_NULL,
-            brightness: 0,
-            invisible: 0,
-            seeThruWalls: 0,
-            magicFootprintsActive: 0,
-            indexOfFirstMagicFootprint: 0,
-            indexOfLastMagicFootprint: 0,
-            numFootprintEnt: 0,
-            lastMonsterAttackTime: -200,
-            freezeLifeTimer: 0,
-            partyMoveDisableTimer: 0,
-            word11712: 0,
-            word11714: 0,
-            moving: false,
-            turning: false,
-        };
+        this.state = initialPartyState(initialPosition, initialFacing);
     }
 
     /**
@@ -187,10 +199,13 @@ export class Party {
     }
 
     /**
-     * Replace full party state (used for save/load).
+     * Replace full party state (used for save/load). A field an older runtime save does
+     * not carry takes `initialPartyState`'s value, so no reader needs a fallback.
      */
     setState(state: PartyState): void {
         this.state = {
+            ...initialPartyState(state.position, state.facing),
+            ...state,
             champions: state.champions.map((c) => ({
                 ...c,
                 attributes: c.attributes,
@@ -200,26 +215,6 @@ export class Party {
             })),
             position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,
-            magicCasterIndex: state.magicCasterIndex ?? -1,
-            potentialChampionIndex: state.potentialChampionIndex ?? -1,
-            gameIsLost: state.gameIsLost ?? false,
-            cursorOwner: state.cursorOwner ?? -1,
-            selectedCharacterIndex: state.selectedCharacterIndex ?? -1,
-            objectInHand: state.objectInHand ?? OBJECT_ID_NULL,
-            brightness: state.brightness ?? 0,
-            invisible: state.invisible ?? 0,
-            seeThruWalls: state.seeThruWalls ?? 0,
-            magicFootprintsActive: state.magicFootprintsActive ?? 0,
-            indexOfFirstMagicFootprint: state.indexOfFirstMagicFootprint ?? 0,
-            indexOfLastMagicFootprint: state.indexOfLastMagicFootprint ?? 0,
-            numFootprintEnt: state.numFootprintEnt ?? 0,
-            lastMonsterAttackTime: state.lastMonsterAttackTime ?? -200,
-            freezeLifeTimer: state.freezeLifeTimer ?? 0,
-            partyMoveDisableTimer: state.partyMoveDisableTimer ?? 0,
-            word11712: state.word11712 ?? 0,
-            word11714: state.word11714 ?? 0,
-            moving: state.moving,
-            turning: state.turning,
         };
     }
 

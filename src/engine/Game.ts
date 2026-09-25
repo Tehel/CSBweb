@@ -700,7 +700,7 @@ export class Game {
                     this.setBrightnessTimer(decayRate, time);
                 },
                 openWindow: (duration) => {
-                    this.party.state.seeThruWalls = (this.party.state.seeThruWalls ?? 0) + 1;
+                    this.party.state.seeThruWalls = this.party.state.seeThruWalls + 1;
                     this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
                 },
                 createFluxcage: (position) => this.timerSystem.createFluxcage(position, this.state.tickCount),
@@ -1640,7 +1640,7 @@ export class Game {
             position.z,
             position.x,
             position.y,
-            (this.party.state.magicFootprintsActive ?? 0) !== 0,
+            this.party.state.magicFootprintsActive !== 0,
         );
     }
 
@@ -2112,30 +2112,30 @@ export class Game {
                         break;
                     }
                     case 2: {
-                        this.party.state.seeThruWalls = (this.party.state.seeThruWalls ?? 0) + 1;
+                        this.party.state.seeThruWalls = this.party.state.seeThruWalls + 1;
                         d6 = Math.trunc(d6 / 2);
                         const duration = d6 * d6;
                         this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
                         break;
                     }
                     case 3: {
-                        this.party.state.invisible = (this.party.state.invisible ?? 0) + 1;
+                        this.party.state.invisible = this.party.state.invisible + 1;
                         this.queueUtilityTimer(TimerFunction.TT_71, d6, 0);
                         break;
                     }
                     case 4: {
                         let shieldAdd = d6;
-                        if ((this.party.state.partyShield ?? 0) > 50) {
+                        if (this.party.state.partyShield > 50) {
                             shieldAdd = Math.trunc(shieldAdd / 4);
                         }
-                        this.party.state.partyShield = (this.party.state.partyShield ?? 0) + shieldAdd;
+                        this.party.state.partyShield = this.party.state.partyShield + shieldAdd;
                         const duration = d6 * d6;
                         this.queueUtilityTimer(TimerFunction.TT_74, duration, shieldAdd);
                         break;
                     }
                     case 6: {
-                        this.party.state.magicFootprintsActive = (this.party.state.magicFootprintsActive ?? 0) + 1;
-                        const first = this.party.state.numFootprintEnt ?? 0;
+                        this.party.state.magicFootprintsActive = this.party.state.magicFootprintsActive + 1;
+                        const first = this.party.state.numFootprintEnt;
                         this.party.state.indexOfFirstMagicFootprint = first;
                         this.party.state.indexOfLastMagicFootprint = spellPower < 3 ? first : 0;
                         const duration = d6 * d6;
@@ -2309,12 +2309,12 @@ export class Game {
         }
         let add = Math.trunc(fullStrength / 32);
         if (isSpellShield) {
-            if ((party.spellShield ?? 0) > 50) add = Math.trunc(add / 4);
-            party.spellShield = (party.spellShield ?? 0) + add;
+            if (party.spellShield > 50) add = Math.trunc(add / 4);
+            party.spellShield = party.spellShield + add;
             this.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
         } else {
-            if ((party.fireShield ?? 0) > 50) add = Math.trunc(add / 4);
-            party.fireShield = (party.fireShield ?? 0) + add;
+            if (party.fireShield > 50) add = Math.trunc(add / 4);
+            party.fireShield = party.fireShield + add;
             this.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
         }
         return raised;

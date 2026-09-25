@@ -1166,7 +1166,7 @@ export class MonsterAI {
     return this.deps.perception.blocked(c.monster, member, c.level, c.mapX, c.mapY, {
       partyX: this.scratch.partyX,
       partyY: this.scratch.partyY,
-      partyInvisible: (this.deps.getPartyState().invisible ?? 0) !== 0,
+      partyInvisible: this.deps.getPartyState().invisible !== 0,
       currentPalette: this.deps.getCurrentPalette?.() ?? 0,
       orthogonalDistanceToParty: this.scratch.orthogonalDistanceToParty,
     });
