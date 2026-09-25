@@ -46,10 +46,7 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
-  | 'climbDownIntoPit'
   | 'enableCharacterAction'
-  | 'handleDsaTeleportParty'
-  | 'notePartyMoved'
   | 'setBusyTimerRefill'
   | 'throwFromWeaponHand'
 >;

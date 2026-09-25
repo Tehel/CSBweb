@@ -15,7 +15,7 @@ import {
 } from '../core/types';
 import { DescIndex, GetBasicObjectType, NameIndex } from './objectIndex';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
-import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
+import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
   getActuatorDsaSelector,
@@ -1450,7 +1450,7 @@ export class DsaSystem {
         const location = bank.stack.pop();
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) break;
-        this.ctx.systems.game.handleDsaTeleportParty(locr);
+        this.teleportParty(locr);
         break;
       }
       case StkOp.DESCRIBE: {
@@ -3077,5 +3077,38 @@ export class DsaSystem {
       last = copied;
     }
     return result;
+  }
+
+  /**
+   * `STKOP_TeleportParty` (doc/CSBwin-src/DSA.cpp:4583): the party moved by a pretend
+   * teleporter — `what(2)`, party and objects — through the world `MoveObject`, which
+   * resolves whatever the destination does to them.
+   */
+  private teleportParty(locr: LocationRel): void {
+    const party = this.ctx.party.state;
+    const oldPos = new Position(party.position.x, party.position.y, party.position.z);
+    const oldFacing = party.facing & 0x3;
+    const pretendTeleporter: TeleporterRecord = {
+      nextObject: OBJECT_ID_EOF,
+      sound: false,
+      scope: 2,
+      absoluteRotation: false,
+      rotation: locr.p & 0x3,
+      destX: locr.x & 0x1f,
+      destY: locr.y & 0x1f,
+      destMap: locr.l & 0xff,
+    };
+
+    this.ctx.systems.timer.checkMoveFromMissile(oldPos, oldPos, null);
+    const resolved = this.ctx.systems.timer.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
+    party.position = resolved.position;
+    this.ctx.party.setFacing(resolved.facing);
+
+    const unchanged = oldPos.x === resolved.position.x
+      && oldPos.y === resolved.position.y
+      && oldPos.z === resolved.position.z;
+    if (!unchanged) this.ctx.systems.timer.notePartyMoved();
+    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
+    this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }
 }

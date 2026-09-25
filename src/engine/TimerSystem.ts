@@ -2716,6 +2716,25 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * Append the party's new square to the footprint trail.
+   *
+   * CSBWin does this inside `MoveObject` whenever the party is the thing being
+   * moved and the party is non-empty (doc/CSBwin-src/Code11f52.cpp:3222-3247), so
+   * it fires for every kind of relocation — walking, teleporters, pits, DSAs.
+   */
+  notePartyMoved(): void {
+    if (this.ctx.party.state.champions.length === 0) return;
+    const position = this.ctx.party.state.position;
+    this.ctx.footprints.recordPartyMove(
+      this.ctx.state.tickCount,
+      position.z,
+      position.x,
+      position.y,
+      this.ctx.party.state.magicFootprintsActive !== 0,
+    );
+  }
+
   private wiggleParty(position: Position): void {
     const party = this.ctx.party.state;
     const result = this.resolveCellEffects(position, -1, 0, party.facing, undefined, true);
@@ -2727,7 +2746,7 @@ export class TimerSystem {
     setPartyFacing(party, result.facing);
 
     const unchanged = this.isSamePosition(oldPos, result.position);
-    if (!unchanged) this.ctx.systems.game.notePartyMoved();
+    if (!unchanged) this.notePartyMoved();
     this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
     this.ctx.systems.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }

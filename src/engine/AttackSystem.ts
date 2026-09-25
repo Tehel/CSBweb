@@ -1143,7 +1143,7 @@ export class AttackSystem {
         // Climbing down is only possible into an empty pit; anything in it and the
         // party stays put, and does not even lose a turn.
         if (roomType === RoomType.PIT && this.findFirstMonsterAt(params.attackX, params.attackY) === OBJECT_ID_EOF) {
-          this.ctx.systems.game.climbDownIntoPit(target);
+          this.climbDownIntoPit(target);
         } else {
           params.disableTime = 0;
         }
@@ -1336,5 +1336,32 @@ export class AttackSystem {
       params.attdep.shoot.damage,
     );
     return 1;
+  }
+
+  /**
+   * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2033`) — into the pit deliberately,
+   * which means falling all the way down whatever chain of pits is below.
+   *
+   * CSBWin sets `d.SupressPitDamage` around the move (`Attack.cpp:2031`), so the
+   * *first* drop of a controlled descent costs stamina instead of blood. Only the
+   * first: the flag is cleared by the fall itself, so a rope onto a stack of pits
+   * still hurts for every pit after the one climbed into.
+   */
+  private climbDownIntoPit(target: Position): void {
+    const party = this.ctx.party.state;
+    const oldPos = new Position(party.position.x, party.position.y, party.position.z);
+    const resolved = this.ctx.systems.timer.withSupressedPitDamage(() =>
+      this.ctx.systems.timer.resolvePartyMove(target, party.facing & 0x3),
+    );
+    this.ctx.systems.timer.checkMoveFromMissile(oldPos, resolved.position, null);
+    party.position = resolved.position;
+    this.ctx.party.setFacing(resolved.facing);
+    const unchanged = oldPos.x === resolved.position.x
+      && oldPos.y === resolved.position.y
+      && oldPos.z === resolved.position.z;
+    if (!unchanged) this.ctx.systems.timer.notePartyMoved();
+    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
+    this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+    this.ctx.systems.monsters.loadPartyLevelOnArrival();
   }
 }

@@ -12,7 +12,6 @@ import type {
     Item16Record,
     MissileRecord,
     PresetHero,
-    TeleporterRecord,
     TimerRecord,
 } from '../data/dungeonTypes';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
@@ -43,7 +42,7 @@ import { wakeUp } from './LoopState';
 import { AttackType } from './monsterTypes';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type LocationRel, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
@@ -574,7 +573,7 @@ export class Game {
                 this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
                 this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
-            this.notePartyMoved();
+            this.timerSystem.notePartyMoved();
             this.monsterSystem.loadPartyLevelOnArrival();
             this.timerSystem.processTimers(this.state.tickCount);
 
@@ -598,34 +597,6 @@ export class Game {
 
             return false;
         }
-    }
-
-    handleDsaTeleportParty(locr: LocationRel): void {
-        const party = this.party.state;
-        const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-        const oldFacing = party.facing & 0x3;
-        const pretendTeleporter: TeleporterRecord = {
-            nextObject: OBJECT_ID_EOF,
-            sound: false,
-            scope: 2,
-            absoluteRotation: false,
-            rotation: locr.p & 0x3,
-            destX: locr.x & 0x1f,
-            destY: locr.y & 0x1f,
-            destMap: locr.l & 0xff,
-        };
-
-        this.timerSystem.checkMoveFromMissile(oldPos, oldPos, null);
-        const resolved = this.timerSystem.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
-        party.position = resolved.position;
-        this.party.setFacing(resolved.facing);
-
-        const unchanged = oldPos.x === resolved.position.x
-            && oldPos.y === resolved.position.y
-            && oldPos.z === resolved.position.z;
-        if (!unchanged) this.notePartyMoved();
-        this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-        this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
     }
 
     /**
@@ -1115,25 +1086,6 @@ export class Game {
     }
 
     /**
-     * Append the party's new square to the footprint trail.
-     *
-     * CSBWin does this inside `MoveObject` whenever the party is the thing being
-     * moved and the party is non-empty (doc/CSBwin-src/Code11f52.cpp:3222-3247), so
-     * it fires for every kind of relocation — walking, teleporters, pits, DSAs.
-     */
-    notePartyMoved(): void {
-        if (this.party.state.champions.length === 0) return;
-        const position = this.party.state.position;
-        this.footprints.recordPartyMove(
-            this.state.tickCount,
-            position.z,
-            position.x,
-            position.y,
-            this.party.state.magicFootprintsActive !== 0,
-        );
-    }
-
-    /**
      * The apply half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4348`), with
      * the engine pieces the UI cannot reach bound in. Returns CSBWin's
      * `fp.performFeeding`, which is what tells the caller the object was consumed.
@@ -1498,33 +1450,6 @@ export class Game {
             if (moved !== OBJECT_ID_NULL) this.character.setChampionHand(champion, slot, moved);
             return;
         }
-    }
-
-    /**
-     * `atk_CLIMBDOWN` (`doc/CSBwin-src/Attack.cpp:2033`) — into the pit deliberately,
-     * which means falling all the way down whatever chain of pits is below.
-     *
-     * CSBWin sets `d.SupressPitDamage` around the move (`Attack.cpp:2031`), so the
-     * *first* drop of a controlled descent costs stamina instead of blood. Only the
-     * first: the flag is cleared by the fall itself, so a rope onto a stack of pits
-     * still hurts for every pit after the one climbed into.
-     */
-    climbDownIntoPit(target: Position): void {
-        const party = this.party.state;
-        const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-        const resolved = this.timerSystem.withSupressedPitDamage(() =>
-            this.timerSystem.resolvePartyMove(target, party.facing & 0x3),
-        );
-        this.timerSystem.checkMoveFromMissile(oldPos, resolved.position, null);
-        party.position = resolved.position;
-        this.party.setFacing(resolved.facing);
-        const unchanged = oldPos.x === resolved.position.x
-            && oldPos.y === resolved.position.y
-            && oldPos.z === resolved.position.z;
-        if (!unchanged) this.notePartyMoved();
-        this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-        this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
-        this.monsterSystem.loadPartyLevelOnArrival();
     }
 
 
