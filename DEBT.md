@@ -1665,6 +1665,22 @@ dispatch and the small per-type handlers (doors, pits, light, shields, poison…
 (`resolveMonsterDestination`, `checkMonsterMoveFromMissile`); after the split those point
 at the new modules. Do E1 first, and C2 before moving the missile code.
 
+*Re-audited 2026-09-26 (after E2).* 3368 lines. The groups now start at: missiles
+`launchMissile` 942 … `throwObjectFromHand` 1085, `createMissileRecord` 1262,
+`triggerMissileLauncher` 1428, `processMissileTimer` 1524, `checkMoveFromMissile` 1707,
+`processMissileEncounter` 1829 … `finishMissileEncounter` 2168, the `word8` codec
+2670-2683; Vi altar 1111-1241; generators 1346-1403; clouds 2213-2348, 2499, 2544; door
+and magic damage `hitDoor` 2468, `determineMagicDamage` 2583; wiggle 2687-2770 (with
+`notePartyMoved` 2758, from E2); world moves `resolvePartyMove` 2786, `moveObject` 2826 …
+`teleportMonster` 3274. E2 also left `enableCharacterAction` 282 here (`Timer.cpp:2638`,
+where it belongs). *To settle first, as E2 did:* the file rule keeps every `Timer.cpp`
+handler (the Vi altar, `ProcessTT_25`, the missile timer, `WiggleEverything`) in
+`TimerSystem`; what leaves is `Code11f52.cpp`'s — the world `MoveObject`,
+`ProcessMissileEncounter`, `CreateCloud`, `HitDoor`, `DetermineMagicDamage` — and
+whether that is one system (`Code11f52.cpp` is one file) or two (world moves; missiles
+and clouds) is the first decision. Confirm each method's CSBWin home in
+`doc/CSBWIN_SYMBOL_INDEX.tsv` before grouping it.
+
 ### E4 ⏳ `ViewportRenderer` has become the UI host; `main.ts`'s `init()`
 
 Phase 14 cut `ViewportRenderer.ts` from 3809 lines to 723. It is back to 999, and changed in
