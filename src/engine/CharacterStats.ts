@@ -282,7 +282,7 @@ export class CharacterStats {
   private mastery(champ: Champion, skill: number, partySleeping: boolean): number {
     return determineMastery(champ, skill, {
       partySleeping,
-      getObjectNameIndex: (objectId: number) => this.deps.nameIndex(objectId as ObjectID),
+      getObjectNameIndex: (objectId: ObjectID) => this.deps.nameIndex(objectId),
     });
   }
 }

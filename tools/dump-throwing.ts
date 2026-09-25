@@ -101,7 +101,7 @@ async function main(): Promise<void> {
       important: false, cursed: false, poisoned: false, broken: false,
     } as unknown as (typeof db.records)[number]);
     db.count++;
-    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
   };
 
   /** Make a misc record of the given type — no `WEAPONDESC` term, so a pure weight test. */
@@ -111,7 +111,7 @@ async function main(): Promise<void> {
       nextObject: 0xfffe, miscType, specialState: 0, important: false,
     } as unknown as (typeof db.records)[number]);
     db.count++;
-    return encodeObjectID(0, DBType.MISC, db.records.length - 1) as ObjectID;
+    return encodeObjectID(0, DBType.MISC, db.records.length - 1);
   };
 
   /* ------------------------------------------------- 1. WEAPONDESC and weights ---- */
@@ -344,7 +344,7 @@ async function main(): Promise<void> {
       important: false, cursed: false, poisoned: false, broken: false,
     } as unknown as (typeof db.records)[number]);
     db.count++;
-    party.objectInHand = encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+    party.objectInHand = encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
 
     const before = data2.databases.missiles.records.length;
     const ok = game.throwObjectFromCursor(0);
@@ -399,7 +399,7 @@ async function main(): Promise<void> {
       important: false, cursed: false, poisoned: false, broken: false,
     } as unknown as (typeof db.records)[number]);
     db.count++;
-    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
   };
 
   const equip = (ch: Champion, slot: number, obj: ObjectID): void => {

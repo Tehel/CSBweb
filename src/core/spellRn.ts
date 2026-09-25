@@ -1,3 +1,5 @@
+import type { ObjectID } from './types';
+
 /**
  * The predefined spell/projectile RNs (`doc/CSBwin-src/CSBTypes.h:236-249`).
  *
@@ -29,17 +31,17 @@
  *
  * Note the gap at `0xff85`: it is deliberate, and `RNPoisonBolt` is 0xff86.
  */
-export const RN_FIREBALL = 0xff80;
-export const RN_POISON = 0xff81;
-export const RN_LIGHTNING = 0xff82;
-export const RN_DISPELL_MISSILE = 0xff83;
-export const RN_ZO_SPELL = 0xff84;
-export const RN_POISON_BOLT = 0xff86;
-export const RN_POISON_CLOUD = 0xff87;
-export const RN_MONSTER_DEATH = 0xffa8;
-export const RN_FLUX_CAGE = 0xffb2;
+export const RN_FIREBALL = 0xff80 as ObjectID;
+export const RN_POISON = 0xff81 as ObjectID;
+export const RN_LIGHTNING = 0xff82 as ObjectID;
+export const RN_DISPELL_MISSILE = 0xff83 as ObjectID;
+export const RN_ZO_SPELL = 0xff84 as ObjectID;
+export const RN_POISON_BOLT = 0xff86 as ObjectID;
+export const RN_POISON_CLOUD = 0xff87 as ObjectID;
+export const RN_MONSTER_DEATH = 0xffa8 as ObjectID;
+export const RN_FLUX_CAGE = 0xffb2 as ObjectID;
 /** The Altar of Vi's resurrection cloud. CSBWin never named this one. */
-export const RN_FFE4 = 0xffe4;
+export const RN_FFE4 = 0xffe4 as ObjectID;
 
 /** `RN::IsMagicSpell()` (`doc/CSBwin-src/CSBTypes.h:372`). */
 export function isMagicSpellRn(rn: number): boolean {

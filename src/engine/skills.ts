@@ -1,6 +1,6 @@
 import type { Champion, Skill } from './gameTypes';
 import { CsbRandom } from '../core/random';
-import { OBJECT_ID_NULL } from '../core/types';
+import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
 import {
@@ -36,7 +36,7 @@ export enum AdjustSkillsWhy {
 
 export interface DetermineMasteryOptions {
   partySleeping?: boolean;
-  getObjectNameIndex?: (objectId: number) => number | null;
+  getObjectNameIndex?: (objectId: ObjectID) => number | null;
 }
 
 export interface AdjustSkillsFilterParams {
@@ -62,7 +62,7 @@ export interface AdjustSkillsContext {
   onLevelUp?: (chIdx: number, basicSkill: number) => void;
   /** CSBWin's `d.RandomNumber` stream. See `src/core/random.ts`. */
   random?: CsbRandom;
-  getObjectNameIndex?: (objectId: number) => number | null;
+  getObjectNameIndex?: (objectId: ObjectID) => number | null;
 }
 
 export interface AdjustSkillsResult {
@@ -420,7 +420,7 @@ function clampMax(value: number, max: number): number {
 function getPossessionNameIndex(
   champion: Champion,
   slot: number,
-  getObjectNameIndex: (objectId: number) => number | null,
+  getObjectNameIndex: (objectId: ObjectID) => number | null,
 ): number | null {
   return getObjectNameIndex(champion.possessions[slot] ?? OBJECT_ID_NULL);
 }

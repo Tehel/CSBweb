@@ -73,9 +73,9 @@ export interface ObjectIndexTables {
  * Divergence: CSBWin reads the record without checking it exists. An RN whose index
  * runs past its database also answers -1 here, since there is nothing to read.
  */
-export function DescIndex(dungeon: DungeonState, rn: number): number {
+export function DescIndex(dungeon: DungeonState, rn: ObjectID): number {
   if (rn === 0) return -1; // RNempty
-  const { category, index } = decodeObjectID(rn as ObjectID);
+  const { category, index } = decodeObjectID(rn);
   const { databases } = dungeon.getData();
   const records: ArrayLike<DatabaseRecord> | undefined =
     category === DBType.SCROLL ? databases.scrolls.records :
@@ -120,7 +120,7 @@ export function DescIndexOfRecord(category: DBType, record: DatabaseRecord | nul
 export function GetBasicObjectType(
   dungeon: DungeonState,
   objDescObjectType: ArrayLike<number>,
-  rn: number,
+  rn: ObjectID,
 ): number {
   if (rn === OBJECT_ID_NULL) return OBJNI_NOT_AN_OBJECT;
   const objDI = DescIndex(dungeon, rn);
@@ -133,7 +133,7 @@ export function NameIndex(
   dungeon: DungeonState,
   tables: ObjectIndexTables,
   partyFacing: number,
-  rn: number,
+  rn: ObjectID,
 ): number {
   let objNID7 = GetBasicObjectType(dungeon, tables.objDescObjectType, rn);
   if (objNID7 === OBJNI_NOT_AN_OBJECT) return objNID7;
@@ -186,9 +186,9 @@ export function IsAKey(
   dungeon: DungeonState,
   tables: ObjectIndexTables,
   partyFacing: number,
-  rn: number,
+  rn: ObjectID,
 ): boolean {
-  if (decodeObjectID(rn as ObjectID).category !== DBType.MISC) return false;
+  if (decodeObjectID(rn).category !== DBType.MISC) return false;
   const objNI = NameIndex(dungeon, tables, partyFacing, rn);
   if (objNI < OBJNI_FIRST_KEY) return false;
   if (objNI > OBJNI_LAST_KEY) return false;

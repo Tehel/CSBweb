@@ -142,7 +142,7 @@ function newObject(game: Game, objNI: number, extra: { cursed?: boolean; charges
     db.records.push({ ...common, specialState: 0, miscType: found.type });
   }
   db.count++;
-  return encodeObjectID(0, found.category, db.records.length - 1) as ObjectID;
+  return encodeObjectID(0, found.category, db.records.length - 1);
 }
 
 /** Everything the function may move, as one comparable string. */

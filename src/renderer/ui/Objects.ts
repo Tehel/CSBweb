@@ -21,7 +21,7 @@ export type ItemDescriptionLine = { text: string; color: number };
  * `RN::NameIndex` (`src/engine/objectIndex.ts`) with the UI's tables and the party's
  * facing. -1 for a negative value, which some callers pass for "no object".
  */
-export function resolveObjectNameIndex(ui: UIState, value: number): number {
+export function resolveObjectNameIndex(ui: UIState, value: ObjectID): number {
   if (value < 0 || !ui.objectTables) return -1;
   return NameIndex(
     ui.dungeonState,
@@ -35,13 +35,13 @@ export function resolveObjectNameIndex(ui: UIState, value: number): number {
 }
 
 /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). -1 as `resolveObjectNameIndex`. */
-export function getBaseObjectNameIndex(ui: UIState, rn: number): number {
+export function getBaseObjectNameIndex(ui: UIState, rn: ObjectID): number {
   if (rn < 0 || !ui.objectTables) return -1;
   return GetBasicObjectType(ui.dungeonState, ui.objectTables.objDescObjectType, rn);
 }
 
 /** `d.ObjDesc[rn.DescIndex()].attackClass`; 0, "no attacks", when there is no row. */
-export function getAttackClass(ui: UIState, rn: number): number {
+export function getAttackClass(ui: UIState, rn: ObjectID): number {
   if (!ui.objectTables || rn < 0) return 0;
   const descIndex = DescIndex(ui.dungeonState, rn);
   if (descIndex === -1) return 0;
@@ -58,7 +58,7 @@ export function isChestRecord(value: ObjectID): boolean {
   return decodeObjectID(value).category === DBType.CHEST;
 }
 
-export function isBaseObjectNameIndex(ui: UIState, objectId: number, min: number, max: number): boolean {
+export function isBaseObjectNameIndex(ui: UIState, objectId: ObjectID, min: number, max: number): boolean {
   const base = getBaseObjectNameIndex(ui, objectId);
   return base >= min && base <= max;
 }

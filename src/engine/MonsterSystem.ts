@@ -877,7 +877,7 @@ export class MonsterSystem {
       unique: false,
       poisoned: false,
     });
-    return index === null ? null : encodeObjectID(0, DBType.CREATURE, index) as ObjectID;
+    return index === null ? null : encodeObjectID(0, DBType.CREATURE, index);
   }
 
   /* ----------------------------------------------------------------- misc ---- */

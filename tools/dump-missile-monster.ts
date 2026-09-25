@@ -219,7 +219,7 @@ function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
   return log;
 }
 
-function fly(game: Game, projectile: number, launch: Position): void {
+function fly(game: Game, projectile: ObjectID, launch: Position): void {
   game.timerSystem.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
   for (let i = 0; i < 4; i++) {
     game.state.tickCount++;
@@ -236,7 +236,7 @@ function newRecord<T>(game: Game, db: 'weapons' | 'potions', category: number, r
   const database = game.dungeonState.getData().databases[db] as unknown as { records: T[]; count: number };
   database.records.push(record);
   database.count++;
-  return encodeObjectID(0, category, database.records.length - 1) as ObjectID;
+  return encodeObjectID(0, category, database.records.length - 1);
 }
 
 function cloudsIn(game: Game, cell: Position): number {

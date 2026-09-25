@@ -203,7 +203,7 @@ async function main(): Promise<void> {
   // tool had built a state the game cannot reach.
   playedData.databases.misc.count++;
   playedData.header.objectCounts[DBType.MISC] = playedData.databases.misc.records.length;
-  const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore) as ObjectID;
+  const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore);
   played.dungeonState.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
 
   // The column-index mutation. A second appended record, dropped into a cell that had
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
     miscType: 34,
   });
   playedData.databases.misc.count++;
-  const loneRn = encodeObjectID(0, DBType.MISC, loneCountBefore) as ObjectID;
+  const loneRn = encodeObjectID(0, DBType.MISC, loneCountBefore);
   const columnIndexBefore = [...playedData.columnIndex];
   played.dungeonState.addObjectToCell(new Position(emptyCell.x, emptyCell.y, level), loneRn);
   const columnIndexAfter = [...playedData.columnIndex];
@@ -391,7 +391,7 @@ async function main(): Promise<void> {
     reloadedData.header.objectCounts[DBType.MISC] = (reloadedData.header.objectCounts[DBType.MISC] + 1) & 0xffff;
     reloaded.dungeonState.addObjectToCell(
       new Position(secondEmpty.x, secondEmpty.y, level),
-      encodeObjectID(0, DBType.MISC, idx) as ObjectID,
+      encodeObjectID(0, DBType.MISC, idx),
     );
     check(
       fingerprint(reloadedData) !== afterFirstLoad,

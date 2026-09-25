@@ -11,7 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, decodeObjectID, OBJECT_ID_EOF, Position } from '../src/core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -203,14 +203,14 @@ async function main(): Promise<void> {
     nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: 30,
   });
   data.databases.clothing.count++;
-  const encode = (i: number) => ((6 << 10) | i);
+  const encode = (i: number) => ((6 << 10) | i) as ObjectID;
   armoured.possessions![3] = encode(plate);  // body
   armoured.possessions![0] = encode(shield); // shield hand
   const partial = measure();
 
   // Now a full suit. Only the body part actually struck is consulted, so covering
   // one slot out of six can only help a sixth of the time.
-  const addClothing = (type: number): number => {
+  const addClothing = (type: number): ObjectID => {
     const i = data.databases.clothing.records.length;
     data.databases.clothing.records.push({
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, cursed: false, important: false, clothingType: type,

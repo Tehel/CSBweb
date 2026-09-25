@@ -108,10 +108,11 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C32 | `AdjustStatsForItemCarried` is not ported | M | ✅ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
+| C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional (split: D3a-g) | L | ✅ |
-| D4 | `ObjectID` is not a distinct type | M | ⏳ |
+| D4 | `ObjectID` is not a distinct type | M | ✅ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
 | E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
@@ -1178,6 +1179,19 @@ engine a way to ask the UI to close the attack menu and repack the chest. Needs 
 frames (the inventory click is UI). `tools/dump-item-bonuses.ts` section 4 already
 drives four of the writers.
 
+### C35 ⏳ A monster that throws nothing reports missile 0, not `RNnul`
+
+Found paying D4. CSBWin's monster attack starts from `missile = RNnul` and stores
+`attackParameters.missileType = missile.ConvertToInteger()`
+(`doc/CSBwin-src/Monster.cpp:1041`, `:1076`), so a monster with no missile reports
+0xffff. `MonsterAttack.chooseMissile`'s default returns 0. Nothing reads it today (0 is
+not in `THROWABLE`, so no missile flies), but the parameters are what CSBWin copies to the
+Monster Attack Filter (`:1129-1165`), which the port has not wired: once it is, a DSA
+filter would see 0 where CSBWin shows `RNnul`. Return `OBJECT_ID_NULL`, with a check that
+reads the parameters of a monster that throws nothing.
+
+---
+
 ## D — State representation
 
 ### D1 ✅ Hands stored twice *(bundle with D2)*
@@ -1392,7 +1406,7 @@ guards a missing champion. Left as found: `createChampionFromPreset`'s own
 `facing: partyPosition & 3`. It is not CSBWin's, but only `dev.ts` and the tools keep it,
 because `addCharacter` overwrites it.
 
-**D3g, paid in `COMMIT_D3G`.** `fingerprint` is required, 0 in `addCharacterDefaults`.
+**D3g, paid in `fe3ae24`.** `fingerprint` is required, 0 in `addCharacterDefaults`.
 `Game.addChampion` computes it unconditionally, as `addCharacter` does, so a champion gets
 its fingerprint once, on joining. `assignChampionFingerprint` went with its four lazy
 callers (`addChampion`, `setPartyState`, the runtime-save restore,
@@ -1456,13 +1470,53 @@ group, and record the split here. If `RuntimeSaveState`'s shape changes, bump
 
 </details>
 
-### D4 ⏳ `ObjectID` is not a distinct type
+### D4 ✅ `ObjectID` is not a distinct type
+
+**Measured 2026-09-25**, on a throwaway worktree. With the brand alone
+(`ui16 & { readonly [rnBrand]: true }`), `tsc` reported 140 errors in 14 files, 111 of them
+in `DsaSystem` and `TimerSystem`, every one a plain `number` flowing into an `ObjectID`
+parameter or field. A script that cast every error site until `tsc` was clean needed 146
+new `as ObjectID` casts. With three boundary types instead (`decodeObjectID` takes any
+number, `DsaSystem.isValidObjectId` a type guard, `TimerEntry.object` an `ObjectID`), 93
+errors were left. The errors found no live bug, but they showed where the port holds RNs
+in plain numbers (the DSA's words, the timer's object, the missile paths) and one real
+confusion: `createFluxcage` passed a *cloud type* where `createCloudRecord` wanted an RN,
+correct only because `CT_FLUXCAGE & 0x7f` is itself.
+
+**Decided: brand it.** CSBWin's `RN` is a class (`doc/CSBwin-src/CSBTypes.h:269`); an
+integer becomes one only through `RN(RNVAL)` or `ConstructFromInteger`, so a distinct type
+with explicit conversions is the faithful shape, not an embellishment. Dropping the casts
+would have kept a type that checks nothing.
+
+**Paid in `COMMIT_D4`.** `ObjectID` is branded (`src/core/types.ts`), and a plain number
+becomes one only through `as ObjectID`, at the places CSBWin converts: a file's words
+(`DungeonLoader.readRN`, `SaveGameLoader.resolveRN`, `CsbwinObjectIndex.resolve`), the
+timer words a restore reads back, a DSA word once `isValidObjectId` has checked it (a type
+guard), the `RNVAL` constants in `src/core/spellRn.ts` and `OBJECT_ID_NULL` / `_EOF`.
+`encodeObjectID` and `withObjectPosition` return one. Everything else was retyped rather
+than cast: the DSA's move sources and destinations, the timer's missile, projectile, cloud
+and Vi-altar paths, `TimerEntry.object`, `DescIndex` / `GetBasicObjectType` / `NameIndex` /
+`IsAKey` and the UI's `resolveObjectNameIndex` family (whose callers' `| 0` went), and the
+hooks that carry an RN. `createCloudRecord` takes the cloud type, and its callers pass
+`GetSpellType()` (`projectile & 0x7f`, `Code11f52.cpp:1428`) or `CT_FLUXCAGE`, as CSBWin's
+two creators do. Casts went from 101 to 96: 31 that re-cast an `encodeObjectID` result
+went, 26 boundary casts came. Two duplicates went with them: `MonsterDamage`'s own
+`RN_MONSTER_DEATH`, and the `RN_*` constants seven tools re-declared, which now import
+`spellRn`. Found and recorded, not fixed: C35. Evidence: `npm test -- --frames` passes
+unchanged. `RuntimeSaveState`'s JSON shape is untouched.
+
+C25 was waiting for D4, but the brand does not settle it: C25 needs an RN *comparison*
+that ignores the corner, and a brand cannot forbid `===`. See C25.
+
+<details><summary>original entry</summary>
 
 `type ObjectID = ui16` (`src/core/types.ts:110`) is a plain `number`. So the 82
 `as ObjectID` casts check nothing, and a name index or a slot number passes for an object
 ID silently. After D2, decide: brand it (`number & { readonly __rn: unique symbol }`),
 which would make `tsc` catch RN/type confusion like B1's overload, or drop the casts.
 Measure the churn on a branch first.
+
+</details>
 
 ### D5 ✅ Cell flags stored twice (`cellFlags` and `tiles`)
 

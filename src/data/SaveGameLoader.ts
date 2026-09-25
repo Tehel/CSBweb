@@ -6,7 +6,7 @@
  */
 
 import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
-import { DBType, OBJECT_ID_NULL } from '../core/types';
+import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { MakeBigActuators } from './CsbwinDungeonConversions';
 import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
@@ -677,8 +677,8 @@ function computeDungeonImageLayout(
 }
 
 /** Translate one stored RN, or leave it alone when the file carries no indirect index. */
-function resolveRN(objectIndex: CsbwinObjectIndex | undefined, raw: number): number {
-  return objectIndex ? objectIndex.resolve(raw) : raw;
+function resolveRN(objectIndex: CsbwinObjectIndex | undefined, raw: number): ObjectID {
+  return objectIndex ? objectIndex.resolve(raw) : raw as ObjectID;
 }
 
 function parseSpecialLocationsFromSaveData(

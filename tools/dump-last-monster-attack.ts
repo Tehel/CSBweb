@@ -27,6 +27,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { RN_FIREBALL } from '../src/core/spellRn';
 
 function champion(i: number, name: string): Champion {
   return {
@@ -88,7 +89,6 @@ function makeGame(): Game {
   return game;
 }
 
-const RN_FIREBALL = 0xff80;
 
 function main(): void {
   const game = makeGame();

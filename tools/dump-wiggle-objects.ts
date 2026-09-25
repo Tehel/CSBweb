@@ -38,10 +38,9 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
+import { RN_POISON_CLOUD, RN_FIREBALL } from '../src/core/spellRn';
 
 // `RN(0xff87)`, the poison cloud, and `RN(0xff80)`, the fireball.
-const RN_POISON_CLOUD = 0xff87;
-const RN_FIREBALL = 0xff80;
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
@@ -218,7 +217,7 @@ function main(): void {
     const calls = spy(game);
     // Any weapon record, lifted from wherever it lies.
     const weapons = dungeon.getData().databases.weapons.records.length;
-    const rn = encodeObjectID(0, DBType.WEAPON, weapons - 1) as ObjectID;
+    const rn = encodeObjectID(0, DBType.WEAPON, weapons - 1);
     const lying = findSquare(game, (p) => inCell(game, p, DBType.WEAPON, weapons - 1) !== null);
     if (lying) dungeon.removeObjectFromCell(lying, inCell(game, lying, DBType.WEAPON, weapons - 1)!);
     switchOn(game, at, TimerFunction.TT_TELEPORTER, () => {

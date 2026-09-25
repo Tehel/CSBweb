@@ -57,7 +57,7 @@
  *   here. `countAliases` reports it; nothing in the shipped dungeon triggers it.
  */
 import { DBType as DBTypeEnum, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../core/types';
-import type { DBType, TilePosition, ui16 } from '../core/types';
+import type { DBType, ObjectID, TilePosition, ui16 } from '../core/types';
 import type { Databases, DungeonData } from './dungeonTypes';
 
 /**
@@ -84,7 +84,7 @@ export interface CsbwinObjectIndex {
      * Throws on a reference to slot 0, to a slot past the end of the map, to a free
      * slot, or to a record index this port's 10-bit field cannot hold.
      */
-    resolve(raw: number): ui16;
+    resolve(raw: number): ObjectID;
     /** How many slots share a `(db, idx)` pair with an earlier slot. Normally 0. */
     countAliases(): number;
 }
@@ -154,10 +154,10 @@ function makeObjectIndirectIndex(
         length: dataMapLength,
         typeMap,
         indexMap,
-        resolve(raw: number): ui16 {
+        resolve(raw: number): ObjectID {
             const value = raw & 0xffff;
-            if (value === RN_EMPTY) return RN_EMPTY;
-            if (value >= RN_LITERAL_FLOOR) return value;
+            if (value === RN_EMPTY) return RN_EMPTY as ObjectID;
+            if (value >= RN_LITERAL_FLOOR) return value as ObjectID;
             if (value >= dataMapLength) {
                 throw new Error(`object reference ${value} past the indirect index (${dataMapLength})`);
             }

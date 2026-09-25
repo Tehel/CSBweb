@@ -949,7 +949,7 @@ export class AttackSystem {
   private masteryOf(champ: Champion, skill: number): number {
     return determineMastery(champ, skill, {
       partySleeping: this.deps.getPartyState().sleeping,
-      getObjectNameIndex: (objectId: number) => {
+      getObjectNameIndex: (objectId: ObjectID) => {
         const value = this.nameIndexOf(objectId as ObjectID);
         return value >= 0 ? value : null;
       },

@@ -14,7 +14,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, Position, encodeObjectID } from '../src/core/types';
-import type { ObjectID } from '../src/core/types';
 import type { WeaponRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -111,7 +110,7 @@ function giveTorch(game: Game, chIdx: number, charges: number): WeaponRecord {
   };
   db.records.push(torch);
   db.count++;
-  const rn = encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+  const rn = encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
   const champ = game.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
   return torch;

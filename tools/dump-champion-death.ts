@@ -54,13 +54,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
-
-/** `RNFireball` and friends (`doc/CSBwin-src/CSBTypes.h:239-247`). */
-const RN_FIREBALL = 0xff80;
-const RN_POISON = 0xff81;
-const RN_LIGHTNING = 0xff82;
-const RN_DISPELL_MISSILE = 0xff83;
-const RN_POISON_BOLT = 0xff86;
+import { RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_POISON_BOLT } from '../src/core/spellRn';
 
 /**
  * Low hit points so a single blow is fatal, and one real possession so the drop is
@@ -168,7 +162,7 @@ function armChampion(game: Game, chIdx: number): void {
       important: false, weaponType: 8, // a dagger
     });
     db.count++;
-    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+    return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
   };
   const champ = game.party.state.champions[chIdx]!;
   const rn = dagger();
@@ -188,7 +182,7 @@ function newDagger(game: Game): ObjectID {
     important: false, weaponType: 8,
   });
   db.count++;
-  return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+  return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
 }
 
 /** The first weapon or misc type whose `ObjDesc` row names `objNI`. */
@@ -207,7 +201,7 @@ function newRecord(game: Game, category: DBType.WEAPON | DBType.MISC | DBType.SC
     : category === DBType.MISC ? databases.misc : databases.scrolls;
   (db.records as object[]).push({ nextObject: OBJECT_ID_EOF, ...record });
   db.count++;
-  return encodeObjectID(0, category, db.records.length - 1) as ObjectID;
+  return encodeObjectID(0, category, db.records.length - 1);
 }
 
 /** The cell's chain, in order. */
@@ -432,7 +426,7 @@ function main(): void {
     const g = makeGame(1);
     const missile = { nextObject: OBJECT_ID_EOF, projectileObject: 0 as ObjectID, rangeRemaining: 200, damageRemaining: 200, timerIndex: 0 };
     console.log(['projectile', 'damage', 'kind', 'poison'].join('\t'));
-    const of = (name: string, rn: number): { damage: number; kind: number; poisonStrength: number } => {
+    const of = (name: string, rn: ObjectID): { damage: number; kind: number; poisonStrength: number } => {
       const r = g.timerSystem.determineMagicDamage({ ...missile }, rn);
       console.log([name, r.damage, r.kind, r.poisonStrength].join('\t'));
       return r;

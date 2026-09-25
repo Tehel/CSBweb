@@ -94,7 +94,7 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
       if (ui.context?.facingAlcove) {
         let viAltar = false;
         if (ui.context?.facingViAltar) {
-          const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+          const objectNameIndex = resolveObjectNameIndex(ui, objectId);
           viAltar = objectNameIndex === OBJNI_BONES_A;
         }
         return { kind: 'drop', pos: 4, viAltar };
@@ -122,7 +122,7 @@ export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean 
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) return false;
 
-  const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+  const objectNameIndex = resolveObjectNameIndex(ui, objectId);
   if (objectNameIndex < 0) return false;
 
   if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {

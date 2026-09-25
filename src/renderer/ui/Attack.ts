@@ -27,7 +27,7 @@
  * simply keeps running underneath, as it already does for the feeding animation.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
-import { DBType, decodeObjectID, OBJECT_ID_NULL } from '../../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
@@ -112,7 +112,7 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
 function masteryOf(ui: UIState, champ: Champion, skill: number): number {
   return determineMastery(champ, skill, {
     partySleeping: ui.partyState?.sleeping ?? false,
-    getObjectNameIndex: (objectId: number) => {
+    getObjectNameIndex: (objectId: ObjectID) => {
       const value = resolveObjectNameIndex(ui, objectId);
       return value >= 0 ? value : null;
     },

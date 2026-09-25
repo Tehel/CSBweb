@@ -27,11 +27,11 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
+import { RN_POISON_BOLT } from '../src/core/spellRn';
 
 const MISSILE_TYPE_ARROW = 51;
 const MISSILE_TYPE_BOULDER = 128;
 const WEAPON_ARROW = 27;
-const RN_POISON_BOLT = 0xff86;
 
 async function main(): Promise<void> {
   const graphics = new GraphicsLoader();

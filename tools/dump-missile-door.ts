@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
 import { OBJNI_FIRST_KEY, OBJNI_LAST_KEY } from '../src/core/objectNameIndex';
 import { RN_DISPELL_MISSILE, RN_FIREBALL, RN_ZO_SPELL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -137,10 +137,10 @@ interface Outcome {
  * given, and run the door arm on it once.
  */
 function encounter(
-  projectile: number,
+  projectile: ObjectID,
   door: { toc: number; state: number; button?: boolean; chop?: boolean },
   range = 255,
-  pick?: (game: Game) => number,
+  pick?: (game: Game) => ObjectID,
 ): Outcome {
   const game = makeGame();
   const ts = game.timerSystem as any;
@@ -219,31 +219,31 @@ const STRONG = 0x00ff;      // no thrown blow is
   show('2c. dispell at a solid door', solid);
   check(solid.spent, 'without the bit nothing passes');
 
-  const pouch = (game: Game): number =>
+  const pouch = (game: Game): ObjectID =>
     liftFloorObject(game, (rn) => decodeObjectID(rn).category === DBType.MISC && fitsPouch(game, rn) && !isKey(game, rn));
-  const coin = encounter(0, { toc: GRATE, state: 4 }, 255, pouch);
+  const coin = encounter(OBJECT_ID_NULL, { toc: GRATE, state: 4 }, 255, pouch);
   show('2d. a pouch-sized object at a grate, range 255', coin);
   check(!coin.spent, 'a thrown object with range, that fits a pouch and is no key, passes');
-  const short = encounter(0, { toc: GRATE, state: 4 }, 0, pouch);
+  const short = encounter(OBJECT_ID_NULL, { toc: GRATE, state: 4 }, 0, pouch);
   show('2e. the same with range 0', short);
   check(short.spent, 'with no range left it does not');
-  const key = encounter(0, { toc: GRATE, state: 4 }, 255, (game) => liftFloorObject(game, (rn) => isKey(game, rn) && fitsPouch(game, rn)));
+  const key = encounter(OBJECT_ID_NULL, { toc: GRATE, state: 4 }, 255, (game) => liftFloorObject(game, (rn) => isKey(game, rn) && fitsPouch(game, rn)));
   show('2f. a key at a grate', key);
   check(key.spent, 'a key never passes');
 }
 
 /* --------------------------------------------------------- 3. HitDoor --------- */
 {
-  const weapon = (game: Game): number => liftFloorObject(game, (rn) => decodeObjectID(rn).category === DBType.WEAPON);
-  const bash = encounter(0, { toc: WEAK, state: 4, chop: true }, 255, weapon);
+  const weapon = (game: Game): ObjectID => liftFloorObject(game, (rn) => decodeObjectID(rn).category === DBType.WEAPON);
+  const bash = encounter(OBJECT_ID_NULL, { toc: WEAK, state: 4, chop: true }, 255, weapon);
   show('3a. a thrown weapon at a solid, choppable door', bash);
   check(bash.hits.length === 1 && !bash.hits[0].explosion && bash.hits[0].delay === 0 && bash.hits[0].force >= 1,
     'HitDoor(x, y, D5W + STRandom() % D5W, false, 0)');
   check(bash.doorState === 5, 'a blow over the door\'s strength breaks it at once');
-  const sturdy = encounter(0, { toc: WEAK, state: 4, chop: false }, 255, weapon);
+  const sturdy = encounter(OBJECT_ID_NULL, { toc: WEAK, state: 4, chop: false }, 255, weapon);
   show('3b. the same door, not choppable', sturdy);
   check(sturdy.hits.length === 1 && sturdy.doorState === 4, 'HitDoor is still called, and the door holds');
-  const strong = encounter(0, { toc: STRONG, state: 4, chop: true }, 255, weapon);
+  const strong = encounter(OBJECT_ID_NULL, { toc: STRONG, state: 4, chop: true }, 255, weapon);
   show('3c. a choppable door of strength 255', strong);
   check(strong.hits.length === 1 && strong.hits[0].force < 255 && strong.doorState === 4, 'a blow under DoorTOC & 0xff leaves it shut');
 }

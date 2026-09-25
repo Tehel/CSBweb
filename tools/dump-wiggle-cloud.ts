@@ -32,6 +32,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { RN_POISON_CLOUD } from '../src/core/spellRn';
 
 function champion(i: number, name: string): Champion {
   return {
@@ -126,7 +127,6 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
 
 
 // `RN(0xff87)`, the poison cloud: it lives long enough to follow (dump-clouds.ts).
-const RN_POISON_CLOUD = 0xff87;
 
 /** The cloud in a cell with this record index, or null. */
 function cloudIn(game: Game, at: Position, index: number): ObjectID | null {

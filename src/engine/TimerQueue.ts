@@ -1,3 +1,4 @@
+import type { ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 
 /**
@@ -98,7 +99,7 @@ export interface TimerEntry {
   sequence: number;
   timerWord8: number;
   timerWord6: number;
-  object?: number;
+  object?: ObjectID;
 }
 
 export class TimerQueue {
@@ -156,7 +157,7 @@ export class TimerQueue {
     action: number,
     time: number,
     level: number,
-    object?: number,
+    object?: ObjectID,
     timerWord8 = 0,
     timerWord6 = 0,
   ): TimerEntry {
@@ -187,7 +188,7 @@ export class TimerQueue {
     time: number,
     level: number,
     uByte5: number,
-    object?: number,
+    object?: ObjectID,
     timerWord8 = 0,
     timerWord6 = 0,
   ): TimerEntry {

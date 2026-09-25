@@ -41,9 +41,8 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
+import { RN_POISON_CLOUD, RN_POISON_BOLT } from '../src/core/spellRn';
 
-const RN_POISON_CLOUD = 0xff87;
-const RN_POISON_BOLT = 0xff86;
 const SER_BadCloudTimer = 16;
 const CELL = 1;
 

@@ -41,10 +41,8 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { RN_FIREBALL, RN_POISON_CLOUD, RN_MONSTER_DEATH } from '../src/core/spellRn';
 
-const RN_FIREBALL = 0xff80;
-const RN_POISON_CLOUD = 0xff87;
-const RN_MONSTER_DEATH = 0xffa8;
 
 async function main(): Promise<void> {
   const graphics = new GraphicsLoader();
@@ -115,7 +113,7 @@ async function main(): Promise<void> {
    * it leaves the cell. Returns the values it passed through and how long it lived.
    */
   const watchCloud = async (
-    projectile: number,
+    projectile: ObjectID,
     size: number,
     at: Position,
   ): Promise<{ values: number[]; ticks: number }> => {

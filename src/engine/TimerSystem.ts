@@ -129,7 +129,7 @@ export interface TimerTables {
   attackNames?: ArrayLike<string>;
 }
 
-type MissileDropTarget = { monster: number } | null;
+type MissileDropTarget = { monster: ObjectID } | null;
 
 export interface TimerHooks {
   /**
@@ -144,9 +144,9 @@ export interface TimerHooks {
   onEnableCharacterAction?: (chIdx: number, refillSlot: number) => void;
   /** `d.Word11694` — non-zero once the game is won, which freezes `TT_24`. */
   isGameWon?: () => boolean;
-  onDsaTimer5?: (rn: number, timer: TimerEntry, location: Position) => boolean;
-  onDsaTimer6?: (rn: number, timer: TimerEntry, location: Position) => boolean;
-  onDsaTimer7?: (rn: number, timer: TimerEntry, location: Position) => boolean;
+  onDsaTimer5?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
+  onDsaTimer6?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
+  onDsaTimer7?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
   /**
    * A missile reached the party. `chIdx` is already `CharacterAtPosition(objectPos)`,
    * and `damage`/`kind`/`poisonStrength` are already `DetermineMagicDamage`'s three
@@ -156,7 +156,7 @@ export interface TimerHooks {
    */
   onMissileHitParty?: (options: {
     missile: number;
-    projectile: number;
+    projectile: ObjectID;
     position: Position;
     posInCell: number;
     direction: number;
@@ -183,7 +183,7 @@ export interface TimerHooks {
     position: Position;
     posInCell: number;
     missile: number;
-    projectile: number;
+    projectile: ObjectID;
     direction: number;
     index: number;
   }) => number;
@@ -231,13 +231,13 @@ export interface TimerHooks {
   }) => void;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   /** `GetObjectWeight(object)`, for `DetermineMagicDamage`'s thrown-object arm. */
-  objectWeight?: (rn: number) => number;
+  objectWeight?: (rn: ObjectID) => number;
   /** `TAG0099d2(object)->uByte3` — a thrown weapon's own damage contribution. */
-  weaponThrowDamage?: (rn: number) => number;
+  weaponThrowDamage?: (rn: ObjectID) => number;
   /** `d.ObjDesc[object.DescIndex()].word4` — where the object may be carried. */
-  objDescWord4?: (rn: number) => number;
+  objDescWord4?: (rn: ObjectID) => number;
   /** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686`). */
-  isAKey?: (rn: number) => boolean;
+  isAKey?: (rn: ObjectID) => boolean;
   /** `QueueSound` — a sound named by ordinal, attenuated by distance from the party. */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
@@ -1086,7 +1086,7 @@ export class TimerSystem {
   }
 
   private launchMissile(
-    projectileObject: number,
+    projectileObject: ObjectID,
     launchX: number,
     launchY: number,
     level: number,
@@ -1117,7 +1117,7 @@ export class TimerSystem {
    * path a cast spell takes.
    */
   launchMonsterMissile(options: {
-    projectile: number;
+    projectile: ObjectID;
     mapX: number;
     mapY: number;
     posInCell: number;
@@ -1146,7 +1146,7 @@ export class TimerSystem {
   }
 
   launchThrownMissile(
-    projectileObject: number,
+    projectileObject: ObjectID,
     position: Position,
     posInCell: number,
     direction: number,
@@ -1207,7 +1207,8 @@ export class TimerSystem {
         break;
       }
     } else {
-      projectileObject = missileTypeWord >= 0xff80 ? missileTypeWord : spellObjectId(missileTypeWord);
+      // `>= 0xff80` is a spell `RNVAL` already, which the word carries as is.
+      projectileObject = missileTypeWord >= 0xff80 ? missileTypeWord as ObjectID : spellObjectId(missileTypeWord);
     }
 
     if (projectileObject === OBJECT_ID_EOF) return false;
@@ -1228,7 +1229,7 @@ export class TimerSystem {
   }
 
   throwObjectFromHand(
-    projectileObject: number,
+    projectileObject: ObjectID,
     partyPosition: Position,
     leftOrRight: number,
     facing: number,
@@ -1253,7 +1254,7 @@ export class TimerSystem {
     );
   }
 
-  scheduleViAltar(bones: number, location: Position, posInCell: number, startTime: number): void {
+  scheduleViAltar(bones: ObjectID, location: Position, posInCell: number, startTime: number): void {
     this.queueViAltarTimer(bones, location, posInCell, 2, startTime);
   }
 
@@ -1261,7 +1262,7 @@ export class TimerSystem {
     const state = this.unpackViAltarState(timer.uByte5);
     const pos = this.unpackViAltarPos(timer.uByte5);
     const location = new Position(timer.uByte6, timer.uByte7, timer.level);
-    const bones = (timer.object ?? OBJECT_ID_EOF) as number;
+    const bones = timer.object ?? OBJECT_ID_EOF;
     if (bones === OBJECT_ID_EOF) return;
 
     // `CreateCloud(RN(RNffe4), 0, bonesX, bonesY, bonesX, bonesY, D5W, NULL)`
@@ -1300,7 +1301,7 @@ export class TimerSystem {
         // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index. This used to guess
         // instead, resurrecting the one dead champion if there was exactly one and
         // refusing outright if there were two.
-        const record = this.dungeon.getMiscRecord(target as ObjectID);
+        const record = this.dungeon.getMiscRecord(target);
         if (!record) return;
         chIdx = (record.specialState ?? 0) & 0x3;
         const champ = this.getPartyState().champions[chIdx];
@@ -1322,7 +1323,7 @@ export class TimerSystem {
   }
 
   private queueViAltarTimer(
-    bones: number,
+    bones: ObjectID,
     location: Position,
     posInCell: number,
     state: number,
@@ -1355,7 +1356,7 @@ export class TimerSystem {
     return (value >> 2) & 0x3;
   }
 
-  private findViAltarBones(bones: number, location: Position, posInCell: number): number | null {
+  private findViAltarBones(bones: ObjectID, location: Position, posInCell: number): ObjectID | null {
     const target = bones as number;
     for (let rn = this.dungeon.findFirstObject(location); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (rn !== target) continue;
@@ -1405,16 +1406,16 @@ export class TimerSystem {
   }
 
   private createMissileRecord(
-    projectileObject: number,
+    projectileObject: ObjectID,
     rangeRemaining: number,
     damageRemaining: number,
     timerIndex: number,
     position: number,
-  ): number | null {
+  ): ObjectID | null {
     // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
     const index = this.dungeon.findEmptyDBEntry('missiles', {
       nextObject: OBJECT_ID_EOF,
-      projectileObject: projectileObject & 0xffff,
+      projectileObject: (projectileObject & 0xffff) as ObjectID,
       rangeRemaining: rangeRemaining & 0xff,
       damageRemaining: damageRemaining & 0xff,
       timerIndex: timerIndex & 0xffff,
@@ -1488,7 +1489,7 @@ export class TimerSystem {
     }
   }
 
-  private spawnMonsterGenerator(timer: TimerEntry, actuator: ActuatorRecord, rn: number, target: Position): void {
+  private spawnMonsterGenerator(timer: TimerEntry, actuator: ActuatorRecord, rn: ObjectID, target: Position): void {
     let countMinus1 = getActuatorDelay(actuator);
     if ((countMinus1 & 0x8) !== 0) {
       // `STRandom(n)` yields 0..n-1 (doc/CSBwin-src/Timer.cpp:1776). This used to be
@@ -1547,8 +1548,8 @@ export class TimerSystem {
 
   private processReactivateGenerator(timer: TimerEntry): void {
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
-    let firstTypeZero: number | null = null;
-    let match: number | null = null;
+    let firstTypeZero: ObjectID | null = null;
+    let match: ObjectID | null = null;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
@@ -1584,7 +1585,7 @@ export class TimerSystem {
 
     const source = new Position(timer.uByte6, timer.uByte7, timer.level);
     const altPos = (timerPos + 1) & 0x3;
-    const takeObject = (): number => {
+    const takeObject = (): ObjectID => {
       for (let rn = this.dungeon.findFirstObject(source); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
         const decoded = decodeObjectID(rn);
         if (decoded.category <= DBType.ACTUATOR) continue;
@@ -1675,7 +1676,7 @@ export class TimerSystem {
   }
 
   private processMissileTimer(timer: TimerEntry): void {
-    const missileRn = (timer.object ?? OBJECT_ID_EOF) as number;
+    const missileRn = timer.object ?? OBJECT_ID_EOF;
     if (missileRn === OBJECT_ID_EOF) return;
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
@@ -1714,7 +1715,7 @@ export class TimerSystem {
       }
 
       if ((missile.rangeRemaining & 0xff) <= deltaEnergy) {
-        const filterProjectile = missile.projectileObject & 0xffff;
+        const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
         this.missileEncounterFilter(5, current, curPos, missileRn, filterProjectile, -1);
         this.processObjectFromMissile(missileRn, null, current);
         this.clearMissileFilterState();
@@ -1857,7 +1858,7 @@ export class TimerSystem {
     return (this.monsterDamageResult as number) === MonsterDamageResult.ALL_MONSTERS_DIED;
   }
 
-  checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: number | null): void {
+  checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
     if (this.missileFilterObject !== OBJECT_ID_EOF) return;
 
     const party = this.getPartyState();
@@ -1986,19 +1987,19 @@ export class TimerSystem {
     missileX: number,
     missileY: number,
     objectPos: number,
-    missileRn: number,
+    missileRn: ObjectID,
   ): boolean {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return false;
     const position = new Position(missileX, missileY, this.missileFilterTimer?.level ?? 0);
     const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
-    const filterProjectile = missile.projectileObject & 0xffff;
+    const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
     // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1770`).
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
     // `RNprojectile` stays the potion all through the switch below: a Ven or Ful potion
     // becomes its cloud (`obj_26`) only in the shared tail (`:2060-2063`), so the blow it
     // lands first — on a champion, a monster or a door — is a thrown object's.
-    const projectile = missile.projectileObject & 0xffff;
+    const projectile = (missile.projectileObject & 0xffff) as ObjectID;
     const projectileDbType = this.isMagicSpell(projectile)
       ? DBType.CLOUD
       : decodeObjectID(projectile).category;
@@ -2008,7 +2009,7 @@ export class TimerSystem {
     let convertedProjectile = projectile;
 
     if (projectileDbType === DBType.POTION) {
-      const potion = this.dungeon.getPotionRecord(projectile as number);
+      const potion = this.dungeon.getPotionRecord(projectile);
       if (potion) {
         if ((potion.potionType | 0) === PotionType.VEN_POTION) {
           convertedProjectile = RN_POISON_CLOUD;
@@ -2022,14 +2023,14 @@ export class TimerSystem {
       }
     }
 
-    const tailProjectile = convertedPotion ? convertedProjectile & 0xffff : projectile;
+    const tailProjectile = convertedPotion ? (convertedProjectile & 0xffff) as ObjectID : projectile;
 
     const nonPoisonSpell =
       projectileDbType === DBType.CLOUD &&
       projectile !== RN_POISON &&
       projectile !== RN_POISON_BOLT;
 
-    let absorbedMonster: number | null = null;
+    let absorbedMonster: ObjectID | null = null;
     switch (cellType) {
       case RoomType.FALSEWALL:
         if (this.missileEncounterFilter(3, position, objectPos, missileRn, filterProjectile, -1) === 1) {
@@ -2186,7 +2187,7 @@ export class TimerSystem {
             projectileDbType === DBType.WEAPON &&
             monsterAbsorbsDaggersEtc(desc)
           ) {
-            const wt = (this.dungeon.getWeaponRecord(projectile as number)?.weaponType ?? -1) | 0;
+            const wt = (this.dungeon.getWeaponRecord(projectile)?.weaponType ?? -1) | 0;
             if (
               wt === WEAPON_DAGGER ||
               wt === WEAPON_ARROW ||
@@ -2221,14 +2222,14 @@ export class TimerSystem {
    * of trusting the caller's `posInCell`, reproduces that split without threading a
    * second parameter through every encounter path.
    */
-  private processObjectFromMissile(missileRn: number, dest: MissileDropTarget, position: Position): void {
+  private processObjectFromMissile(missileRn: ObjectID, dest: MissileDropTarget, position: Position): void {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
-    const projectile = missile.projectileObject & 0xffff;
+    const projectile = (missile.projectileObject & 0xffff) as ObjectID;
     const projectileIsMagic = this.isMagicSpell(projectile);
     const projectileDbType = projectileIsMagic ? DBType.CLOUD : decodeObjectID(projectile).category;
 
-    this.dungeon.removeObjectFromCell(position, missileRn as number);
+    this.dungeon.removeObjectFromCell(position, missileRn);
 
     if (!projectileIsMagic && projectileDbType !== DBType.CLOUD) {
       if (dest && dest.monster !== OBJECT_ID_EOF) {
@@ -2238,7 +2239,7 @@ export class TimerSystem {
       }
     }
 
-    this.dungeon.deleteDBEntry(missileRn as number);
+    this.dungeon.deleteDBEntry(missileRn);
   }
 
   private missileEncounterFilter(
@@ -2246,7 +2247,7 @@ export class TimerSystem {
     position: Position,
     posInCell: number,
     missile: number,
-    projectile: number,
+    projectile: ObjectID,
     index: number,
   ): number {
     const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
@@ -2267,8 +2268,8 @@ export class TimerSystem {
     this.missileFilterTimer = null;
   }
 
-  private findMissilesAt(position: Position): number[] {
-    const missiles: number[] = [];
+  private findMissilesAt(position: Position): ObjectID[] {
+    const missiles: ObjectID[] = [];
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
       if (decoded.category === DBType.MISSILE) missiles.push(rn);
@@ -2284,11 +2285,11 @@ export class TimerSystem {
   }
 
   private finishMissileEncounter(
-    missileRn: number,
-    destMonster: number | null,
+    missileRn: ObjectID,
+    destMonster: ObjectID | null,
     position: Position,
     objectPos: number,
-    projectile: number,
+    projectile: ObjectID,
     convertedPotion: boolean,
     convertedPower: number,
     nonPoisonSpell: boolean,
@@ -2316,7 +2317,7 @@ export class TimerSystem {
 
     if (convertedPotion) {
       this.dungeon.deleteDBEntry(missile.projectileObject);
-      missile.projectileObject = projectile & 0xffff;
+      missile.projectileObject = (projectile & 0xffff) as ObjectID;
     }
 
     this.processObjectFromMissile(missileRn, dest, position);
@@ -2328,7 +2329,7 @@ export class TimerSystem {
    * (`doc/CSBwin-src/Code11f52.cpp:1376`, called from `DamageMonster`). The cloud
    * machinery lives here because that is where every other cloud is made.
    */
-  createDeathCloud(projectile: number, size: number, position: Position, posInCell: number): void {
+  createDeathCloud(projectile: ObjectID, size: number, position: Position, posInCell: number): void {
     this.createCloud(projectile, size, position.x, position.y, position, posInCell);
   }
 
@@ -2387,7 +2388,7 @@ export class TimerSystem {
    * cloud appears, not on the timer.
    */
   private createCloud(
-    projectile: number,
+    projectile: ObjectID,
     size: number,
     objX: number,
     objY: number,
@@ -2395,7 +2396,8 @@ export class TimerSystem {
     posInCell: number,
   ): void {
     if (objX < 0 || objY < 0) return;
-    const rn = this.createCloudRecord(projectile, size, posInCell);
+    // `P1.GetSpellType()` (doc/CSBwin-src/Code11f52.cpp:1428).
+    const rn = this.createCloudRecord(projectile & 0x7f, size, posInCell);
     if (rn === null) return;
     this.playCloudSound(projectile, size, position);
     this.dungeon.addObjectToCell(position, rn);
@@ -2614,8 +2616,7 @@ export class TimerSystem {
     this.setDoorState(map, timer.uByte6, timer.uByte7, 5);
   }
 
-  private createCloudRecord(projectile: number, size: number, posInCell: number): number | null {
-    const cloudType = projectile & 0x7f;
+  private createCloudRecord(cloudType: number, size: number, posInCell: number): ObjectID | null {
     const bit7 = (posInCell & 0xff) === 255;
     // `FindEmptyDB15Entry` (`doc/CSBwin-src/CSBCode.cpp:5073`).
     const index = this.dungeon.findEmptyDBEntry('clouds', {
@@ -2638,7 +2639,7 @@ export class TimerSystem {
    * case (`SoundIndex.FIREBALL_EXPLODE`, ordinal 5's sound, instead of ordinal 4's) —
    * so a dropped scroll or piece of food played an explosion.
    */
-  private playMissileImpactSound(projectile: number, position: Position): void {
+  private playMissileImpactSound(projectile: ObjectID, position: Position): void {
     if (!this.hooks?.queueSound) return;
     let soundNum: number;
     if (!this.isMagicSpell(projectile) && decodeObjectID(projectile).category === DBType.WEAPON) {
@@ -2661,7 +2662,7 @@ export class TimerSystem {
    * (ordinal 13's sample) for the small case, turning a modest fireball into
    * whatever ordinal 13 sounds like instead of a quieter version of its own blast.
    */
-  private playCloudSound(projectile: number, size: number, position: Position): void {
+  private playCloudSound(projectile: ObjectID, size: number, position: Position): void {
     if (!this.hooks?.queueSound) return;
     if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
       this.hooks.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1);
@@ -2703,7 +2704,7 @@ export class TimerSystem {
    */
   determineMagicDamage(
     missile: MissileRecord,
-    projectile: number,
+    projectile: ObjectID,
   ): { damage: number; kind: number; poisonStrength: number } {
     let poisonStrength = 0;
     let kind = 3;
@@ -2753,23 +2754,23 @@ export class TimerSystem {
     return isMagicSpellRn(objectId);
   }
 
-  private addObjectToMonsterPossession(monsterRn: number, objectRn: number): void {
-    const monster = this.dungeon.getCreatureRecord(monsterRn as number);
+  private addObjectToMonsterPossession(monsterRn: ObjectID, objectRn: ObjectID): void {
+    const monster = this.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return;
     const head = monster.possession ?? OBJECT_ID_EOF;
     if (head === OBJECT_ID_EOF || head === OBJECT_ID_NULL) {
-      monster.possession = objectRn as number;
-      this.dungeon.setDBRecordLink(objectRn as number, OBJECT_ID_EOF);
+      monster.possession = objectRn;
+      this.dungeon.setDBRecordLink(objectRn, OBJECT_ID_EOF);
       return;
     }
     let current = head;
     for (;;) {
-      const next = this.dungeon.getDBRecordLink(current as number);
+      const next = this.dungeon.getDBRecordLink(current);
       if (next === OBJECT_ID_EOF) break;
       current = next;
     }
-    this.dungeon.setDBRecordLink(current as number, objectRn as number);
-    this.dungeon.setDBRecordLink(objectRn as number, OBJECT_ID_EOF);
+    this.dungeon.setDBRecordLink(current, objectRn);
+    this.dungeon.setDBRecordLink(objectRn, OBJECT_ID_EOF);
   }
 
   /**
@@ -2780,11 +2781,11 @@ export class TimerSystem {
    * teleporter and presses a pad. `oldX` is -2, not -1, so a relative teleporter turns
    * its corner (`Code11f52.cpp:3000-3006`). A spell or a cloud is not dropped (`:138`).
    */
-  private dropMissileObject(projectileObject: number, position: Position, posInCell: number): void {
+  private dropMissileObject(projectileObject: ObjectID, position: Position, posInCell: number): void {
     if (projectileObject >= 0xff80) return;
-    const decoded = decodeObjectID(projectileObject as number);
+    const decoded = decodeObjectID(projectileObject);
     if (decoded.category === DBType.CLOUD) return;
-    const dropped = encodeObjectID(posInCell, decoded.category, decoded.index) as ObjectID;
+    const dropped = encodeObjectID(posInCell, decoded.category, decoded.index);
     this.moveObject(dropped, -2, 0, position.x, position.y, position.z);
   }
 
@@ -2967,7 +2968,7 @@ export class TimerSystem {
       destination = result.position;
       newDir = result.missileDir;
       const corner = result.objectPos & 0x3;
-      moved = encodeObjectID(corner, type, decoded.index) as ObjectID;
+      moved = encodeObjectID(corner, type, decoded.index);
       const unchangedRoom = destination.z === level && destination.x === oldX && destination.y === oldY;
       if (unchangedRoom && corner === decoded.position && type !== DBType.MISSILE) {
         return { removed: false, placed: null, position: null };
@@ -3011,7 +3012,7 @@ export class TimerSystem {
    */
   resolveMonsterDestination(
     destination: Position,
-    monsterRn: number,
+    monsterRn: ObjectID,
     oldX: number,
     oldY: number,
   ): { position: Position; code: number; audible: boolean; groupDied: boolean } {
@@ -3084,7 +3085,7 @@ export class TimerSystem {
   }
 
   /** `CheckMoveFromMissile` for a monster leaving a square. */
-  checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: number): boolean {
+  checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: ObjectID): boolean {
     this.movedObjectWasDestroyed = false;
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
     this.checkMoveFromMissile(from, to, monsterRn);

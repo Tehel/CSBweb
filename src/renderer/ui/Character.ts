@@ -529,8 +529,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
         );
       }
       const held = champion ? getChampionPossession(champion, hand) : OBJECT_ID_NULL;
-      const objectId = held === OBJECT_ID_NULL ? -1 : (held | 0);
-      const objectNameIndex = objectId >= 0 ? resolveObjectNameIndex(ui, objectId) : -1;
+      const objectNameIndex = held === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, held);
 
       if (objectNameIndex >= 0) {
         drawObjectIcon(ui, rect, objectNameIndex, word612);
@@ -631,7 +630,7 @@ export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boo
 
 export function getInventoryItemIndex(ui: UIState, champion: Champion, slot: number): number {
   const value = getChampionPossession(champion, slot);
-  return value === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, value | 0);
+  return value === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, value);
 }
 
 export function updateLightForPossessionChange(ui: UIState, slot: number, previous: ObjectID, next: ObjectID): void {

@@ -149,7 +149,7 @@ function takeWeapon(game: Game, corner: number): ObjectID {
       }
     }
   }
-  return encodeObjectID(corner, DBType.WEAPON, index) as ObjectID;
+  return encodeObjectID(corner, DBType.WEAPON, index);
 }
 
 function findWeapon(game: Game, at: Position, index: number): ObjectID | null {

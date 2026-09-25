@@ -703,7 +703,7 @@ export class ActuatorSystem {
    * contents too.
    */
   private doesPartyHave(actuatorValue: number): boolean {
-    const matches = (obj: number | null | undefined): boolean => {
+    const matches = (obj: ObjectID | null | undefined): boolean => {
       if (obj === null || obj === undefined || obj === OBJECT_ID_NULL) return false;
       const objNI = this.getBasicObjectType(obj);
       if (objNI === actuatorValue) return true;
@@ -872,7 +872,7 @@ export class ActuatorSystem {
   }
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
-  private getBasicObjectType(rn: number): number {
+  private getBasicObjectType(rn: ObjectID): number {
     return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], rn);
   }
 

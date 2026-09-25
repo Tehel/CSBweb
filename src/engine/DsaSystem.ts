@@ -335,7 +335,7 @@ class DsaBank {
    * `m_objectDeleteList` (`doc/CSBwin-src/DSA.cpp:132`) — what `&DEL` has condemned,
    * chained through the records' own links, freed only once the run is over.
    */
-  objectDeleteList: number = OBJECT_ID_EOF;
+  objectDeleteList: ObjectID = OBJECT_ID_EOF;
 
   constructor(public vars: DsaVars) {}
 
@@ -381,8 +381,8 @@ interface ExecutionPacket {
   transferCol: number;
   locrMaster: LocationRel;
   locrSlave: LocationRel;
-  rnMaster: number;
-  rnSlave: number;
+  rnMaster: ObjectID;
+  rnSlave: ObjectID;
   master: DsaDefinition;
   slave: DsaDefinition;
   subroutineLevel: number;
@@ -775,17 +775,17 @@ export class DsaSystem {
     return updated;
   }
 
-  processTimer5(rn: number, timer: TimerEntry, location: Position): boolean {
+  processTimer5(rn: ObjectID, timer: TimerEntry, location: Position): boolean {
     const vars = new DsaVars();
     return this.processTimer6Internal(rn, timer, location, false, vars);
   }
 
-  processTimer6(rn: number, timer: TimerEntry, location: Position): boolean {
+  processTimer6(rn: ObjectID, timer: TimerEntry, location: Position): boolean {
     const vars = new DsaVars();
     return this.processTimer6Internal(rn, timer, location, false, vars);
   }
 
-  processTimer7(rn: number, timer: TimerEntry, location: Position): boolean {
+  processTimer7(rn: ObjectID, timer: TimerEntry, location: Position): boolean {
     const vars = new DsaVars();
     return this.processTimer6Internal(rn, timer, location, false, vars);
   }
@@ -802,7 +802,7 @@ export class DsaSystem {
   }
 
   private processTimer6Internal(
-    rn: number,
+    rn: ObjectID,
     timer: TimerEntry,
     location: Position,
     filter: boolean,
@@ -872,7 +872,7 @@ export class DsaSystem {
    * `DSADBANK::DeleteObject` (`doc/CSBwin-src/DSA.cpp:157-163`) — condemn a record by
    * pushing it on the run's delete list through its own link. Nothing is freed yet.
    */
-  private deleteObject(bank: DsaBank, rn: number): void {
+  private deleteObject(bank: DsaBank, rn: ObjectID): void {
     this.dungeon.setDBRecordLink(rn, bank.objectDeleteList);
     bank.objectDeleteList = rn;
   }
@@ -882,7 +882,7 @@ export class DsaSystem {
    * `&DEL` condemned during the run, and say whether the DSA's own actuator was among
    * it. `==` on an `RN` compares the indirect index alone (`CSBTypes.h:349`).
    */
-  private consumateDeletes(bank: DsaBank, rnSlave: number): boolean {
+  private consumateDeletes(bank: DsaBank, rnSlave: ObjectID): boolean {
     let result = false;
     while (bank.objectDeleteList !== OBJECT_ID_EOF) {
       const obj = bank.objectDeleteList;
@@ -1407,7 +1407,7 @@ export class DsaSystem {
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
-          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed as ObjectID, true, false, this.getPartyState?.().facing ?? 0);
+          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.getPartyState?.().facing ?? 0);
           this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
         } else if (location === -1) {
           const party = this.getPartyState?.();
@@ -1471,7 +1471,7 @@ export class DsaSystem {
         if (!map) break;
         const cellFlag = map.cellFlags[locr.x][locr.y];
         if (((cellFlag >> 5) & 0x7) === RoomType.STONE) break;
-        let firstDisabled: number | null = null;
+        let firstDisabled: ObjectID | null = null;
         const pos = new Position(locr.x, locr.y, locr.l);
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
           const decoded = decodeObjectID(rn);
@@ -1679,7 +1679,7 @@ export class DsaSystem {
           break;
         }
         const pos = new Position(locr.x, locr.y, locr.l);
-        let found: number | null = null;
+        let found: ObjectID | null = null;
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
           const decoded = decodeObjectID(rn);
           if (decoded.category !== DBType.ACTUATOR) continue;
@@ -1959,8 +1959,8 @@ export class DsaSystem {
     return idx;
   }
 
-  private findMaster(slave: DsaDefinition, rnSlave: number, x: number, y: number, locrSlave: LocationRel): {
-    rn: number;
+  private findMaster(slave: DsaDefinition, rnSlave: ObjectID, x: number, y: number, locrSlave: LocationRel): {
+    rn: ObjectID;
     locr: LocationRel;
   } {
     if (slave.localState !== 3) {
@@ -2006,7 +2006,7 @@ export class DsaSystem {
     thirtyTwo: boolean,
     readWord: () => number,
     bank: DsaBank,
-    rnMaster: number,
+    rnMaster: ObjectID,
   ): LocationRel | null {
     let target = 0;
     switch (targetType) {
@@ -2068,7 +2068,7 @@ export class DsaSystem {
     this.timers.createTimer(functionType, locr.x, locr.y, locr.p, action, actionTime, locr.l);
   }
 
-  private loadParameter(where: number, rnMaster: number): number {
+  private loadParameter(where: number, rnMaster: ObjectID): number {
     let rn = rnMaster;
     let slot = where;
     while (slot > 1) {
@@ -2086,7 +2086,7 @@ export class DsaSystem {
     return slot === 0 ? getActuatorParameterA(rec) : getActuatorParameterB(rec);
   }
 
-  private storeParameter(where: number, rnMaster: number, value: number): void {
+  private storeParameter(where: number, rnMaster: ObjectID, value: number): void {
     let rn = rnMaster;
     let slot = where;
     while (slot > 1) {
@@ -2126,14 +2126,14 @@ export class DsaSystem {
     this.updateCellFlag(dst, srcMap.cellFlags[src.x][src.y]);
   }
 
-  private findFirstTeleporter(position: Position): number {
+  private findFirstTeleporter(position: Position): ObjectID {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category === DBType.TELEPORTER) return rn;
     }
     return OBJECT_ID_EOF;
   }
 
-  private findFirstDsaActuator(position: Position): number {
+  private findFirstDsaActuator(position: Position): ObjectID {
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
@@ -2217,7 +2217,7 @@ export class DsaSystem {
     return null;
   }
 
-  private isValidObjectId(objectId: number): boolean {
+  private isValidObjectId(objectId: number): objectId is ObjectID {
     if (objectId < 0) return false;
     if (objectId === OBJECT_ID_EOF || objectId === OBJECT_ID_NULL) return false;
     const { category, index } = decodeObjectID(objectId);
@@ -2264,7 +2264,7 @@ export class DsaSystem {
     );
   }
 
-  private deleteFromNegativeLocation(location: number): number | null {
+  private deleteFromNegativeLocation(location: number): ObjectID | null {
     const party = this.getPartyState?.();
     if (!party) return null;
     if (location === -1) {
@@ -2286,7 +2286,7 @@ export class DsaSystem {
   }
 
   /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1715-1722`): its text goes first. */
-  private deleteLinkedScrollText(rn: number, bank: DsaBank): void {
+  private deleteLinkedScrollText(rn: ObjectID, bank: DsaBank): void {
     if (!this.isValidObjectId(rn)) return;
     const { category } = decodeObjectID(rn);
     if (category !== DBType.SCROLL) return;
@@ -2333,7 +2333,7 @@ export class DsaSystem {
     return { chIdx, posIdx };
   }
 
-  private decodeMonsterLocation(location: number): number | null {
+  private decodeMonsterLocation(location: number): ObjectID | null {
     if (location > -1000) return null;
     const monsterId = Math.trunc(-location / 1000);
     if (!this.isValidObjectId(monsterId)) return null;
@@ -2383,18 +2383,18 @@ export class DsaSystem {
     party.brightness = sw(current + delta);
   }
 
-  private isBaseObjectNameIndex(objectId: number, min: number, max: number): boolean {
+  private isBaseObjectNameIndex(objectId: ObjectID, min: number, max: number): boolean {
     const base = this.getBaseObjectNameIndex(objectId);
     return base >= min && base <= max;
   }
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
-  private getBaseObjectNameIndex(objectId: number): number {
+  private getBaseObjectNameIndex(objectId: ObjectID): number {
     return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], objectId);
   }
 
 
-  private addObjectToMonster(monsterId: number, objectId: number): void {
+  private addObjectToMonster(monsterId: ObjectID, objectId: ObjectID): void {
     const monster = this.dungeon.getCreatureRecord(monsterId);
     if (!monster) return;
     let head = monster.possession;
@@ -2486,7 +2486,7 @@ export class DsaSystem {
     dstType: number,
     dstLoc: number,
     doit: boolean,
-  ): { error: number; object: number; timer?: number } {
+  ): { error: number; object: ObjectID; timer?: number } {
     switch (srcType) {
       case 2:
         return this.findCursorSource(doit);
@@ -2509,7 +2509,7 @@ export class DsaSystem {
     dstPosMsk: number,
     dstLoc: number,
     dstDepth: number,
-    object: number,
+    object: ObjectID,
     srcType: number,
     srcLoc: number,
     hTimer: number,
@@ -2531,7 +2531,7 @@ export class DsaSystem {
     }
   }
 
-  private findCursorSource(doit: boolean): { error: number; object: number } {
+  private findCursorSource(doit: boolean): { error: number; object: ObjectID } {
     const party = this.getPartyState?.();
     if (!party) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
     const obj = party.objectInHand;
@@ -2540,7 +2540,7 @@ export class DsaSystem {
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
-  private findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: number } {
+  private findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID } {
     const party = this.getPartyState?.();
     if (!party) return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
     if (chIdx < 0 || chIdx >= party.champions.length) {
@@ -2576,7 +2576,7 @@ export class DsaSystem {
     dstType: number,
     dstLoc: number,
     doit: boolean,
-  ): { error: number; object: number; timer?: number } {
+  ): { error: number; object: ObjectID; timer?: number } {
     const locr = locationRelFromInteger(srcLoc);
     if (!this.dungeon.isValidLocation(locr)) {
       return { error: DsaMoveError.SER_InvalidCellLocation, object: OBJECT_ID_EOF };
@@ -2623,7 +2623,7 @@ export class DsaSystem {
     srcLoc: number,
     srcDepth: number,
     doit: boolean,
-  ): { error: number; object: number } {
+  ): { error: number; object: ObjectID } {
     if (!this.isValidObjectId(srcLoc)) {
       return { error: DsaMoveError.SER_IllegalMonsterID, object: OBJECT_ID_EOF };
     }
@@ -2664,7 +2664,7 @@ export class DsaSystem {
     srcLoc: number,
     srcDepth: number,
     doit: boolean,
-  ): { error: number; object: number } {
+  ): { error: number; object: ObjectID } {
     if (!this.isValidObjectId(srcLoc)) {
       return { error: DsaMoveError.SER_IllegalChestID, object: OBJECT_ID_EOF };
     }
@@ -2706,7 +2706,7 @@ export class DsaSystem {
   private findCharacterDestination(
     chIdx: number,
     carryLoc: number,
-    object: number,
+    object: ObjectID,
     doit: boolean,
   ): number {
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
@@ -2726,7 +2726,7 @@ export class DsaSystem {
     return DsaMoveError.DER_OK;
   }
 
-  private checkObjectToCursor(object: number, doit: boolean): number {
+  private checkObjectToCursor(object: ObjectID, doit: boolean): number {
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const party = this.getPartyState?.();
     if (!party) return DsaMoveError.DER_CursorNotEmpty;
@@ -2752,7 +2752,7 @@ export class DsaSystem {
     dstPosMsk: number,
     dstLoc: number,
     dstDepth: number,
-    object: number,
+    object: ObjectID,
     srcType: number,
     srcLoc: number,
     hTimer: number,
@@ -2793,7 +2793,7 @@ export class DsaSystem {
         if (decoded.category === DBType.CREATURE) {
           // `object.pos(p)` rewrites the indirect index, so the monster's corner is `p`
           // wherever it ends up; nothing in the monster branch reads it before.
-          mover.moveMonster(placed as ObjectID, -1, 0, locr.x, locr.y, locr.l);
+          mover.moveMonster(placed, -1, 0, locr.x, locr.y, locr.l);
         } else {
           // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
           // pads see the corner the object came with, and it lies in corner `p`.
@@ -2823,7 +2823,7 @@ export class DsaSystem {
         }
       }
       if (decoded.category === DBType.MISSILE) {
-        const missile = this.dungeon.getMissileRecord(placed as ObjectID);
+        const missile = this.dungeon.getMissileRecord(placed);
         const timer = missile ? this.timers.getTimer(missile.timerIndex) : null;
         if (timer) {
           timer.timerWord8 = (timer.timerWord8 & 0xffe0) | (locr.x & 31);
@@ -2851,7 +2851,7 @@ export class DsaSystem {
     return desc && monsterHorizontalSize(desc) === 2 ? 0xff : 0xd8;
   }
 
-  private findChestDestination(dstLoc: number, dstDepth: number, object: number, doit: boolean): number {
+  private findChestDestination(dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {
     if (!this.isValidObjectId(dstLoc)) return DsaMoveError.DER_IllegalChestID;
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const decodedChest = decodeObjectID(dstLoc);
@@ -2872,7 +2872,7 @@ export class DsaSystem {
     return DsaMoveError.DER_OK;
   }
 
-  private findMonsterDestination(dstLoc: number, dstDepth: number, object: number, doit: boolean): number {
+  private findMonsterDestination(dstLoc: number, dstDepth: number, object: ObjectID, doit: boolean): number {
     if (!this.isValidObjectId(dstLoc)) return DsaMoveError.DER_IllegalMonsterID;
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
     const decoded = decodeObjectID(dstLoc);
@@ -2918,7 +2918,7 @@ export class DsaSystem {
     return false;
   }
 
-  private searchListForObject(target: number, head: number, visited: Set<number>): boolean {
+  private searchListForObject(target: number, head: ObjectID, visited: Set<number>): boolean {
     for (let rn = head; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {
       if (rn === target) return true;
       if (visited.has(rn)) continue;
@@ -3037,7 +3037,7 @@ export class DsaSystem {
     return category * 10000 + id;
   }
 
-  private getActuator(rn: number): ActuatorRecord | null {
+  private getActuator(rn: ObjectID): ActuatorRecord | null {
     return this.dungeon.getActuatorRecord(rn);
   }
 
@@ -3053,12 +3053,12 @@ export class DsaSystem {
     return positions[idx] ?? fallback;
   }
 
-  private copyItem(objectId: number): number | null {
+  private copyItem(objectId: number): ObjectID | null {
     if (!this.isValidObjectId(objectId)) return null;
     const { category, index, position } = decodeObjectID(objectId);
     const data = this.dungeon.getData();
     // Each copy takes a record through `FindEmptyDB<n>Entry` (`DungeonState.findEmptyDBEntry`).
-    const placed = (newIndex: number | null): number | null =>
+    const placed = (newIndex: number | null): ObjectID | null =>
       newIndex === null ? null : encodeObjectID(position, category, newIndex);
 
     switch (category) {
@@ -3108,7 +3108,7 @@ export class DsaSystem {
     }
   }
 
-  private copyItemList(head: number): number {
+  private copyItemList(head: ObjectID): ObjectID {
     let result = OBJECT_ID_EOF;
     let last = OBJECT_ID_EOF;
     for (let rn = head; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {

@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   if (heroes.length < 2) throw new Error('dungeon.dat carries fewer than two preset heroes');
 
   const dungeon = new DungeonState(data);
-  const basic = (rn: number): number => GetBasicObjectType(dungeon, objectTables.objDescObjectType, rn);
+  const basic = (rn: ObjectID): number => GetBasicObjectType(dungeon, objectTables.objDescObjectType, rn);
 
   // For the record: how many type-8 sensors the shipped dungeon has.
   const type8 = data.databases.actuators.records.filter((rec) => getActuatorType(rec) === 8).length;
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     finish();
     return;
   }
-  const chest = encodeObjectID(0, DBType.CHEST, chestIndex) as ObjectID;
+  const chest = encodeObjectID(0, DBType.CHEST, chestIndex);
   check(basic(chest) === OBJNI_CHEST, `the chest record's basic type is objNI_Chest (${basic(chest)})`);
   const value = basic(item);
   console.log(`item 0x${item.toString(16)} (basic type ${value}) from level ${itemAt.z} (${itemAt.x},${itemAt.y}); chest 0x${chest.toString(16)}`);

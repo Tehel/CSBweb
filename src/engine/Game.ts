@@ -445,9 +445,9 @@ export class Game {
                 onDsaTimer6: (rn, timer, loc) => this.dsaSystem.processTimer6(rn, timer, loc),
                 onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
                 onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
-                objectWeight: (rn) => this.characterStats.getObjectWeight(rn as ObjectID),
+                objectWeight: (rn) => this.characterStats.getObjectWeight(rn),
                 weaponThrowDamage: (rn) =>
-                    this.characterStats.weaponDescFor(rn as ObjectID)?.uByte3 ?? 0,
+                    this.characterStats.weaponDescFor(rn)?.uByte3 ?? 0,
                 objDescWord4: (rn) => {
                     const descIndex = DescIndex(this.dungeonState, rn);
                     return descIndex === -1 ? 0 : this.addCharacterTables?.objDescCarryMask[descIndex] ?? 0;
@@ -1796,7 +1796,7 @@ export class Game {
         const random112 = (time & 0x40)
             | ((time & 0x80) >> 2)
             | ((time & 0x100) >> 4);
-        const getObjectNameIndex = (objectId: number): number => this.nameIndex(objectId);
+        const getObjectNameIndex = (objectId: ObjectID): number => this.nameIndex(objectId);
 
         for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
             const champ = party.champions[chIdx];
@@ -2732,7 +2732,7 @@ export class Game {
     }
 
     /** `RN::NameIndex` (`src/engine/objectIndex.ts`). */
-    private nameIndex(rn: number): number {
+    private nameIndex(rn: ObjectID): number {
         return NameIndex(
             this.dungeonState,
             { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
@@ -2837,7 +2837,7 @@ export class Game {
         // `objD4.pos(w_4); MoveObject(objD4, -1, 0, D6W, D5W, NULL, NULL)`
         // (`doc/CSBwin-src/Mouse.cpp:881-882`): a freshly-dropped object still walks
         // through an active teleporter or open pit on the cell it lands on.
-        const dropped = encodeObjectID(newPos, decoded.category, decoded.index) as ObjectID;
+        const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
         party.objectInHand = OBJECT_ID_NULL;
         this.timerSystem.moveObject(dropped, -1, 0, target.x, target.y, target.z);
         this.loadPartyLevelIfChanged();
@@ -2967,7 +2967,7 @@ export class Game {
         const base = throwingDistance + weaponBonus;
         const mastery = determineMastery(champion, 10, {
             partySleeping: party.sleeping,
-            getObjectNameIndex: (objectId: number) => this.nameIndex(objectId),
+            getObjectNameIndex: (objectId: ObjectID) => this.nameIndex(objectId),
         });
         const range = base + this.random.below(16) + Math.trunc(base / 2) + mastery;
         const damage = this.applyLimits(40, 8 * mastery + (this.random.next() & 31), 200);
@@ -3284,8 +3284,8 @@ export class Game {
             // a restored missile has no object and vanishes on its next tick.
             const at = Game.objectBytesOf(record.function & 0xff);
             const object =
-                at === 6 ? record.timerWord6 & 0xffff :
-                at === 8 ? record.timerWord8 & 0xffff : undefined;
+                at === 6 ? (record.timerWord6 & 0xffff) as ObjectID :
+                at === 8 ? (record.timerWord8 & 0xffff) as ObjectID : undefined;
             entries.push({
                 index,
                 time: record.time >>> 0,

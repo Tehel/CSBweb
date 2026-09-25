@@ -74,7 +74,7 @@ export interface AttackParameters {
   missileDecayRate: number;
   directionToParty: number;
   distanceToParty: number;
-  missileType: number;
+  missileType: ObjectID;
   monsterShouldLaunchMissile: boolean;
   monsterShouldSteal: boolean;
   /** 0-3 a specific champion, 4 the leader, 5 random, 6 closest, -1 none. */
@@ -104,7 +104,7 @@ export interface MonsterAttackHooks {
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `LaunchMissile` (`doc/CSBwin-src/Magic.cpp:40`). */
   launchMissile?: (options: {
-    projectile: number;
+    projectile: ObjectID;
     mapX: number;
     mapY: number;
     posInCell: number;
@@ -328,7 +328,7 @@ export class MonsterAttack {
   }
 
   /** Which missile a given monster type throws (`doc/CSBwin-src/Monster.cpp:1029-1058`). */
-  private chooseMissile(monsterType: number): number {
+  private chooseMissile(monsterType: number): ObjectID {
     switch (monsterType) {
       case MonsterType.mon_Vexirk:
       case MonsterType.mon_LordChaos:
@@ -349,7 +349,9 @@ export class MonsterAttack {
       case MonsterType.mon_Dragon:
         return RN_FIREBALL;
       default:
-        return 0;
+        // ⚠️ CSBWin starts from `missile = RNnul` (doc/CSBwin-src/Monster.cpp:1041), not 0
+        // — DEBT.md C35.
+        return 0 as ObjectID;
     }
   }
 

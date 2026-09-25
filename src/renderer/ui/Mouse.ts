@@ -314,7 +314,7 @@ export function drawCursorItem(ui: UIState): void {
   }
 
   const word612 = ui.uiTables.graphic232.word612;
-  const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+  const objectNameIndex = resolveObjectNameIndex(ui, objectId);
   if (objectNameIndex < 0) return;
 
   const baseX = Math.floor(ui.hoverPoint.x) - 8;

@@ -34,7 +34,7 @@
  * the stubs below are never reached. They throw rather than lie: if a future change makes
  * the viewport ask this level for an object, that should be a crash and not a blank wall.
  */
-import { Position, type CellFlag, type ObjectID } from '../../core/types';
+import { OBJECT_ID_EOF, Position, type CellFlag, type ObjectID } from '../../core/types';
 import type { DungeonState } from '../../engine/DungeonState';
 import type { MapData } from '../../data/dungeonTypes';
 
@@ -106,13 +106,13 @@ export function createPrisonDungeonState(randomSeed: number): DungeonState {
     },
     findFirstObject(_position: Position): ObjectID {
       // RN_EOF. No cell here has the `hasObjects` bit, so this is the only honest answer.
-      return 0xfffe;
+      return OBJECT_ID_EOF;
     },
     getDBRecordLink(_rn: ObjectID): ObjectID {
-      return 0xfffe;
+      return OBJECT_ID_EOF;
     },
     findFirstDoor(_position: Position): ObjectID {
-      return 0xfffe;
+      return OBJECT_ID_EOF;
     },
     getTextRecord(): never {
       return unreachable('a text record');

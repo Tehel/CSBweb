@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as OBJNI from '../src/core/objectNameIndex';
-import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, encodeObjectID, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DatabaseRecord, Databases } from '../src/data/dungeonTypes';
@@ -78,8 +78,8 @@ async function main(): Promise<void> {
     objDescObjectType: objectTables.objDescObjectType,
     byte640: uiTables.graphic232.byte640,
   };
-  const basic = (rn: number): number => GetBasicObjectType(dungeon, tables.objDescObjectType, rn);
-  const nameIndex = (rn: number, facing = 0): number => NameIndex(dungeon, tables, facing, rn);
+  const basic = (rn: ObjectID): number => GetBasicObjectType(dungeon, tables.objDescObjectType, rn);
+  const nameIndex = (rn: ObjectID, facing = 0): number => NameIndex(dungeon, tables, facing, rn);
 
   // --- every record --------------------------------------------------------------
   console.log(['database', 'records', 'rows seen', 'first name'].join('\t'));
@@ -111,14 +111,14 @@ async function main(): Promise<void> {
   }
 
   // --- the sentinels -------------------------------------------------------------
-  for (const [label, rn] of [['RNnul', OBJECT_ID_NULL], ['RNeof', OBJECT_ID_EOF], ['RNempty', 0]] as const) {
+  for (const [label, rn] of [['RNnul', OBJECT_ID_NULL], ['RNeof', OBJECT_ID_EOF], ['RNempty', 0 as ObjectID]] as const) {
     check(DescIndex(dungeon, rn) === -1, `${label}: DescIndex is -1`);
     check(basic(rn) === OBJNI.OBJNI_NOT_AN_OBJECT, `${label}: GetBasicObjectType is objNI_NotAnObject`);
     check(nameIndex(rn) === OBJNI.OBJNI_NOT_AN_OBJECT, `${label}: NameIndex is objNI_NotAnObject`);
   }
 
   // --- canaries: the name each database's first row spells ------------------------
-  const firstOf = (category: DBType, pick: (type: number) => boolean): number | null => {
+  const firstOf = (category: DBType, pick: (type: number) => boolean): ObjectID | null => {
     const [, key] = DATABASE_OF.find(([c]) => c === category)!;
     const records = data.databases[key].records;
     for (let index = 0; index < records.length; index++) {

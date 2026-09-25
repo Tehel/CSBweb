@@ -106,16 +106,21 @@ export interface PositionOriented extends Position {
  * Special values:
  * - 0xFFFE: End of linked list
  * - 0xFFFF: Null/empty
+ *
+ * A distinct type, as CSBWin's `RN` is a class (doc/CSBwin-src/CSBTypes.h:269): a plain
+ * number becomes one only through an explicit `as ObjectID`, the port's
+ * `RN(RNVAL)` / `ConstructFromInteger`. An `ObjectID` reads as a number freely.
  */
-export type ObjectID = ui16;
+declare const rnBrand: unique symbol;
+export type ObjectID = ui16 & { readonly [rnBrand]: true };
 
-export const OBJECT_ID_EOF = 0xFFFE;
-export const OBJECT_ID_NULL = 0xFFFF;
+export const OBJECT_ID_EOF = 0xFFFE as ObjectID;
+export const OBJECT_ID_NULL = 0xFFFF as ObjectID;
 
 /**
  * Decode an Object ID into its components
  */
-export function decodeObjectID(id: ObjectID): {
+export function decodeObjectID(id: number): {
     position: TilePosition;
     category: DBType;
     index: ui16;
@@ -131,16 +136,16 @@ export function decodeObjectID(id: ObjectID): {
  * Encode an Object ID from its components
  */
 export function encodeObjectID(position: TilePosition, category: DBType, index: ui16): ObjectID {
-    return ((position & 0x03) << 14) |
-           ((category & 0x0F) << 10) |
-           (index & 0x3FF);
+    return (((position & 0x03) << 14) |
+            ((category & 0x0F) << 10) |
+            (index & 0x3FF)) as ObjectID;
 }
 
 /**
  * `RN::pos(p)` (doc/CSBwin-src/CSBTypes.h:336) — the same object, moved to corner `p`.
  */
 export function withObjectPosition(rn: ObjectID, position: number): ObjectID {
-    return ((position & 0x03) << 14) | (rn & 0x3FFF);
+    return (((position & 0x03) << 14) | (rn & 0x3FFF)) as ObjectID;
 }
 
 /**

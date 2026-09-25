@@ -344,7 +344,7 @@ export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
     if (!rect) continue;
     const item = ui.openChestContents[slot] ?? OBJECT_ID_NULL;
     if (item === OBJECT_ID_NULL) continue;
-    const objectIndex = resolveObjectNameIndex(ui, item | 0);
+    const objectIndex = resolveObjectNameIndex(ui, item);
     if (objectIndex >= 0) drawObjectIcon(ui, rect, objectIndex, word612);
   }
 }
@@ -366,7 +366,7 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
   blitBasicGraphicToViewport(ui, 29, g232.wRectPos942, 32, 12);
 
-  const objectNameIndex = resolveObjectNameIndex(ui, objectId | 0);
+  const objectNameIndex = resolveObjectNameIndex(ui, objectId);
   if (objectNameIndex >= 0) {
     const iconRect = {
       x1: VIEWPORT_X + 111,

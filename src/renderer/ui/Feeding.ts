@@ -26,7 +26,7 @@ import { SoundIndex } from '@/core';
 export function computeFeedParameters(
   ui: UIState,
   chIdx: number,
-  objectId: number,
+  objectId: ObjectID,
 ): FeedParameters | null {
   if (!ui.objectTables || !ui.partyState) return null;
   const champ = ui.partyState.champions[chIdx];

@@ -22,6 +22,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import { ITEM16_FREE } from '../data/dungeonTypes';
+import { RN_MONSTER_DEATH } from '../core/spellRn';
 import type { DungeonState } from './DungeonState';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
@@ -41,9 +42,6 @@ export enum MonsterDamageResult {
   SOME_NOT_ALL_MONSTERS_DIED = 1,
   ALL_MONSTERS_DIED = 2,
 }
-
-/** `RNMonsterDeath` (`doc/CSBwin-src/CSBTypes.h:246`) — the death cloud's "projectile". */
-export const RN_MONSTER_DEATH = 0xffa8;
 
 /** HP of `0xffff` marks a member that cannot be damaged at all. */
 const HP_INVULNERABLE = 0xffff;
@@ -96,7 +94,7 @@ export interface MonsterDamageTables {
 export interface MonsterDamageHooks {
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `CreateCloud(RNMonsterDeath, …)`. */
-  createCloud?: (projectile: number, size: number, position: Position, posInCell: number) => void;
+  createCloud?: (projectile: ObjectID, size: number, position: Position, posInCell: number) => void;
   /** `MoveObject` for a group, `MonsterSystem.moveMonster`. */
   moveMonster?: (monsterRn: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number) => void;
   /**
@@ -244,7 +242,7 @@ export class MonsterDamage {
         position === 255 || this.random.zeroTo3() === 0 ? this.random.zeroTo3() : position & 0x3;
       const placed = this.dungeon.addObjectToCell(
         new Position(mapX, mapY, level),
-        encodeObjectID(posInCell, category, decodeObjectID(rn).index) as ObjectID,
+        encodeObjectID(posInCell, category, decodeObjectID(rn).index),
       );
       if (!placed) this.dungeon.deleteDBEntry(rn);
     }
@@ -274,7 +272,7 @@ export class MonsterDamage {
           important: false,
           weaponType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.WEAPON, index) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.WEAPON, index);
       }
       case DBType.CLOTHING: {
         const index = this.dungeon.findEmptyDBEntry('clothing', {
@@ -285,7 +283,7 @@ export class MonsterDamage {
           important: false,
           clothingType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.CLOTHING, index) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.CLOTHING, index);
       }
       case DBType.MISC: {
         const index = this.dungeon.findEmptyDBEntry('misc', {
@@ -294,7 +292,7 @@ export class MonsterDamage {
           important: false,
           miscType: type & 0x7f,
         });
-        return index === null ? null : encodeObjectID(0, DBType.MISC, index) as ObjectID;
+        return index === null ? null : encodeObjectID(0, DBType.MISC, index);
       }
       default:
         return null;
@@ -354,7 +352,7 @@ export class MonsterDamage {
       const next = this.dungeon.getDBRecordLink(carried);
       const { category, index } = decodeObjectID(carried);
       if (category === DBType.WEAPON) droppedWeapon = true;
-      const placed = encodeObjectID(this.random.zeroTo3(), category, index) as ObjectID;
+      const placed = encodeObjectID(this.random.zeroTo3(), category, index);
       this.dungeon.addObjectToCell(target, placed);
       carried = next;
     }

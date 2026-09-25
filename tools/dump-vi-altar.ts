@@ -164,7 +164,7 @@ function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectI
     miscType: MISC_BONES_OF_HERO,
   });
   db.count++;
-  return encodeObjectID(posInCell & 0x3, DBType.MISC, db.records.length - 1) as ObjectID;
+  return encodeObjectID(posInCell & 0x3, DBType.MISC, db.records.length - 1);
 }
 
 /**
@@ -470,7 +470,7 @@ function main(): void {
         fail('the death left no bones to carry');
       } else {
         const ui = makeUI(g, objectTables, uiTables);
-        const nameIndex = resolveObjectNameIndex(ui, bones | 0);
+        const nameIndex = resolveObjectNameIndex(ui, bones);
 
         // The gate that decides whether a click in the alcove is an altar offering at
         // all (`src/renderer/ui/ViewportPicking.ts`, `doc/CSBwin-src/Mouse.cpp:898`).

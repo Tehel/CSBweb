@@ -78,7 +78,7 @@ export interface DungeonImageOptions {
      * `src/data/CsbwinObjectIndex.ts` — and hands that index's `resolve` in here, so
      * the records this loader produces are in the port's own form either way.
      */
-    resolveRN?: (raw: ui16) => ui16;
+    resolveRN?: (raw: ui16) => ObjectID;
 }
 
 export class DungeonLoader {
@@ -377,7 +377,8 @@ export class DungeonLoader {
      */
     private readRN(): ObjectID {
         const raw = this.file.readU16();
-        return this.options.resolveRN ? this.options.resolveRN(raw) : raw;
+        // A dungeon's own words are this port's RNs already: `RN(RNVAL)`.
+        return this.options.resolveRN ? this.options.resolveRN(raw) : raw as ObjectID;
     }
 
     /**
@@ -400,7 +401,7 @@ export class DungeonLoader {
      */
     private readRNOfRecord(link: ObjectID): ObjectID {
         const raw = this.file.readU16();
-        if (!this.options.resolveRN) return raw;
+        if (!this.options.resolveRN) return raw as ObjectID;
         if (link === OBJECT_ID_NULL) return OBJECT_ID_NULL;
         return this.options.resolveRN(raw);
     }

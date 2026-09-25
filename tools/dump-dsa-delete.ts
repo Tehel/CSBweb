@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   const addDsaActuator = (game: Game, at: Position, selector: number): ObjectID => {
     const data: DungeonData = game.dungeonState.getData();
     data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (selector << 7), word4: 0, word6: 0 });
-    const rn = encodeObjectID(0, DBType.ACTUATOR, data.databases.actuators.records.length - 1) as ObjectID;
+    const rn = encodeObjectID(0, DBType.ACTUATOR, data.databases.actuators.records.length - 1);
     game.dungeonState.addObjectToCell(at, rn);
     return rn;
   };
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
   const addWeapon = (game: Game, at: Position): ObjectID => {
     const data: DungeonData = game.dungeonState.getData();
     data.databases.weapons.records.push({ ...data.databases.weapons.records[0], nextObject: OBJECT_ID_EOF });
-    const rn = encodeObjectID(1, DBType.WEAPON, data.databases.weapons.records.length - 1) as ObjectID;
+    const rn = encodeObjectID(1, DBType.WEAPON, data.databases.weapons.records.length - 1);
     game.dungeonState.addObjectToCell(at, rn);
     return rn;
   };
