@@ -80,6 +80,16 @@ const WEAPON_POISON_DART = 31;
 const WEAPON_THROWING_STAR = 32;
 
 /**
+ * The wound mask a missile carries, a literal at `DamageCharacter(objectPos, D5W, 12,
+ * …)` (`doc/CSBwin-src/Code11f52.cpp:2046`). Bits 2 and 3 are the torso and the legs.
+ *
+ * (The champion *wound sound*, ordinal `chIdx + 9`, belongs to the monster's melee
+ * attack — `doc/CSBwin-src/Monster.cpp:4584`, ported in `MonsterAttack`. A missile
+ * strike queues no sound of its own.)
+ */
+const MISSILE_WOUND_MASK = 12;
+
+/**
  * What `MoveObject`'s loop knows about a monster group it is moving
  * (`doc/CSBwin-src/Code11f52.cpp:2796-3131`): where it stands (`oldX < 0`: nowhere
  * yet), the level its `ITEM16` belongs to (`AttachedLevel_4`), and whether it has none
@@ -1908,7 +1918,7 @@ export class TimerSystem {
         // at `:2044` a party-only `DamageCharacter`.
         const magic = this.determineMagicDamage(missile, projectile);
         if (magic.damage !== 0) {
-          this.ctx.systems.game.applyMissileDamageToParty({
+          this.applyMissileDamageToParty({
             chIdx,
             damage: magic.damage,
             kind: magic.kind,
@@ -2078,6 +2088,49 @@ export class TimerSystem {
     if (newPos.x < oldPos.x) return Direction.WEST;
     if (newPos.y > oldPos.y) return Direction.SOUTH;
     return Direction.NORTH;
+  }
+
+  /**
+   * The tail of `ProcessMissileEncounter`'s party arm
+   * (`doc/CSBwin-src/Code11f52.cpp:2044-2056`):
+   *
+   * ```cpp
+   * if (D4W != 0) {
+   *   D0W = DamageCharacter(objectPos, D5W, 12, d.Word12964);
+   *   if (D0W != 0 && d.Word12962 != 0 && STRandomBool())
+   *     PoisonCharacter(objectPos, d.Word12962);
+   * }
+   * ```
+   *
+   * Everything above it — which champion, how much, which mitigation, how much
+   * poison — was decided in `TimerSystem.determineMagicDamage`; this only applies
+   * it. Going through `DamageCharacter` rather than subtracting from `health` is
+   * the whole point: it is what runs armour, wounds, the shields, the wake-up, and
+   * `KillCharacter`. Until it did, a champion killed by a missile left no bones and
+   * no possessions, and a party wiped by one did not lose the game.
+   *
+   * The **wound mask is 12**, a literal at the call site: bits 2 and 3, the torso
+   * and the legs. A missile cannot wound a hand, a head or a foot.
+   */
+  private applyMissileDamageToParty(options: {
+    chIdx: number;
+    damage: number;
+    kind: number;
+    poisonStrength: number;
+  }): void {
+    // No `d.LastMonsterAttackTime` here: only `MonsterAttacks` sets it
+    // (`doc/CSBwin-src/Monster.cpp:982`), and this port does so in `MonsterAttack`.
+    const dealt = this.ctx.systems.monsterAttack.damageCharacter(
+      options.chIdx,
+      options.damage | 0,
+      MISSILE_WOUND_MASK,
+      options.kind | 0,
+    );
+    if (dealt === 0) return;
+    // `STRandomBool()` — a poisoned missile infects only half the time.
+    if ((options.poisonStrength | 0) !== 0 && this.random.bool() !== 0) {
+      this.ctx.systems.monsterAttack.poisonCharacter(options.chIdx, options.poisonStrength | 0);
+    }
   }
 
   private finishMissileEncounter(

@@ -44,7 +44,6 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
-  | 'applyMissileDamageToParty'
   | 'climbDownIntoPit'
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
