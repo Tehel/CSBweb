@@ -502,7 +502,7 @@ export class MonsterAttack {
     // non-zero, so a caller reading the result sees "damage was dealt".
     let dealt = sw(damage);
     if (chIdx === -1) return 0;
-    if ((party.potentialChampionIndex ?? -1) === chIdx) return chIdx + 1;
+    if (party.potentialChampionIndex === chIdx) return chIdx + 1;
     // `d.Word11694`, only ever set to 1 (`Attack.cpp:2268`, `Timer.cpp:2371`).
     if (this.hooks?.isGameWon?.()) return 1;
     if (dealt <= 0) return 0;
@@ -617,7 +617,7 @@ export class MonsterAttack {
     // Champions mirror who has not been confirmed yet — because they are counted in
     // `d.NumCharacter` but are not really in the party. `potentialChampionIndex` is
     // still always -1 here; Phase 13 step 4 is what sets it.
-    const potential = party.potentialChampionIndex ?? -1;
+    const potential = party.potentialChampionIndex;
     let living = -1;
     for (let i = 0; i < party.champions.length; i++) {
       const other = party.champions[i];
@@ -696,7 +696,7 @@ export class MonsterAttack {
       const worn = rec.clothingType;
       if (((this.tables?.clothingFlags?.[worn] ?? 0) & 0x80) === 0) continue; // not a shield
       const throwingDistance = this.characterStats?.determineThrowingDistance(
-        champ, hand, this.getPartyState().sleeping ?? false,
+        champ, hand, this.getPartyState().sleeping,
       ) ?? 0;
       const strength = this.clothingArmourValue(worn, scale) + throwingDistance;
       const weight = this.tables?.byte1412?.[bodyPart] ?? 0;
@@ -752,7 +752,7 @@ export class MonsterAttack {
    */
   quickness(champ: Champion): number {
     if (!this.characterStats) throw new Error('MonsterAttack.quickness before setCharacterStats');
-    return this.characterStats.quickness(champ, this.getPartyState().sleeping ?? false);
+    return this.characterStats.quickness(champ, this.getPartyState().sleeping);
   }
 
   /**
@@ -858,7 +858,7 @@ export class MonsterAttack {
   poisonCharacter(chIdx: number, strength: number): void {
     if (chIdx === -1) return;
     const party = this.getPartyState();
-    if ((party.potentialChampionIndex ?? -1) === chIdx) return;
+    if (party.potentialChampionIndex === chIdx) return;
     const champ = getPartyChampion(this.getPartyState(), chIdx);
     if (!champ) return;
 

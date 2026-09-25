@@ -252,7 +252,7 @@ export function applyFeedParameters(
 
   // The unconfirmed champion in a Hall of Champions mirror takes no mana, no healing
   // and, above all, cannot be killed by a bad potion.
-  if ((party.potentialChampionIndex ?? -1) !== chIdx) {
+  if (party.potentialChampionIndex !== chIdx) {
     champ.attributes.mana = limit(0, (champ.attributes.mana | 0) + fp.manaAdjust, MAX_MANA);
     if ((champ.attributes.health | 0) + fp.hitpointAdjust <= 0) {
       hooks.killCharacter(chIdx);

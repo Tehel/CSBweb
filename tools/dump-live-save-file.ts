@@ -167,7 +167,7 @@ function recruit(game: Game, name: string): boolean {
   );
   party.facing = facing as Direction;
   game.handleWallClick();
-  if ((party.potentialChampionIndex ?? -1) < 0) return false;
+  if (party.potentialChampionIndex < 0) return false;
   game.resurrectReincarnateCancel(RESURRECT);
   return party.champions.some((c) => c.name === name);
 }

@@ -1327,7 +1327,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | Step | Fields | Initializer, checked against CSBWin | Status |
 | --- | --- | --- | --- |
 | D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0 (`Data.h:767-783`) | ✅ |
-| D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ⏳ |
+| D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ✅ |
 | D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:517-518`), the rest cleared by `ClearMemory(pcA3, 800)` (`:482`) | ⏳ |
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ⏳ |
 | D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:511`), `fingerPrint` (`:512-515`), `timerIndex = -1` (`:519`), `charFlags` (`:529`, `:596`) | ⏳ |
@@ -1347,6 +1347,14 @@ shields were missing from every save in `static/gamefiles/saves/`; all three sti
 run). 34 fallbacks went, every one `?? 0`, the initializer's own value, so no hidden
 default. `ViewportRenderer`'s `partyState?.seeThruWalls ?? 0` stays: it guards a missing
 `partyState`. `RUNTIME_SAVE_VERSION` stays 10. Evidence: `npm test -- --frames`.
+
+**D3b, paid.** `potentialChampionIndex`, `gameIsLost` and `sleeping` are required, all three
+in `initialPartyState` (`sleeping` had been missing from it). The CSBWin loader sets them
+too: none is in the file's party blocks, and `LoadGame` clears `d.GameIsLost`
+(`doc/CSBwin-src/SaveGame.cpp:1891`). 29 fallbacks and `=== true` tests went; each
+matched the initializer. Four `ui.partyState?.… ?? x` stay in `ui/` (`Keyboard`, `Mouse`,
+`Attack`), because they guard a missing `partyState`. Evidence: `npm test -- --frames`, and
+the three saves in `static/gamefiles/saves/` still load and run.
 
 Found while splitting, and paid as separate fixes:
 

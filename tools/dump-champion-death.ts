@@ -309,7 +309,7 @@ function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean
     expoolRecord: rn !== undefined && game.dungeonState.copyChampionBonesRecord(rn) !== null,
     dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === OBJECT_ID_NULL),
     // Only meaningful when the victim was the last one standing.
-    gameIsLost: lastAlive ? game.party.state.gameIsLost === true : true,
+    gameIsLost: lastAlive ? game.party.state.gameIsLost : true,
   };
 }
 
@@ -412,7 +412,7 @@ function main(): void {
     console.log(['', 'value'].join('\t'));
     console.log(['cursorOwner', party.cursorOwner].join('\t'));
     console.log(['magicCasterIndex', party.magicCasterIndex].join('\t'));
-    console.log(['gameIsLost', String(party.gameIsLost === true)].join('\t'));
+    console.log(['gameIsLost', String(party.gameIsLost)].join('\t'));
     check(party.champions[0]!.alive !== true, 'the exhausted champion still dies');
     check(party.cursorOwner === 1, 'and hands the cursor to the survivor');
     check(party.magicCasterIndex === 1, 'and the magic tab with it');

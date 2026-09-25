@@ -237,7 +237,7 @@ function main(): void {
     check(party.cursorOwner === 1 && party.magicCasterIndex === 1, 'champion 1 holds both');
 
     g.monsterAttack.killCharacter(1);
-    console.log(['champion 1 of 3 dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost ?? false)].join('\t'));
+    console.log(['champion 1 of 3 dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.cursorOwner === 0, `the cursor moved to the first living champion (got ${party.cursorOwner})`);
     check(party.magicCasterIndex === 0, `the magic tab moved with it (got ${party.magicCasterIndex})`);
     check(party.gameIsLost !== true, 'the game is not lost while two champions live');
@@ -250,7 +250,7 @@ function main(): void {
     setHandOwner(party, 2);
     selectMagicCaster(party, 2);
     g.monsterAttack.killCharacter(0);
-    console.log(['a bystander dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost ?? false)].join('\t'));
+    console.log(['a bystander dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.cursorOwner === 2, 'a death elsewhere leaves the cursor alone');
     check(party.magicCasterIndex === 2, 'and leaves the magic tab alone');
   }
@@ -261,8 +261,8 @@ function main(): void {
     setHandOwner(party, 0);
     selectMagicCaster(party, 0);
     g.monsterAttack.killCharacter(0);
-    console.log(['the last champion dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost ?? false)].join('\t'));
-    check(party.gameIsLost === true, 'the last death sets gameIsLost');
+    console.log(['the last champion dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
+    check(party.gameIsLost, 'the last death sets gameIsLost');
     check(party.cursorOwner === -1, 'and drops the cursor');
   }
 
@@ -273,8 +273,8 @@ function main(): void {
     party.potentialChampionIndex = 1;
     setHandOwner(party, 0);
     g.monsterAttack.killCharacter(0);
-    console.log(['only a mirror champion left', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost ?? false)].join('\t'));
-    check(party.gameIsLost === true, 'a champion still in a mirror does not keep the game alive');
+    console.log(['only a mirror champion left', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
+    check(party.gameIsLost, 'a champion still in a mirror does not keep the game alive');
   }
 
   {

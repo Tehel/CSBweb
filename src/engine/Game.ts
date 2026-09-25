@@ -1092,7 +1092,7 @@ export class Game {
      */
     sleep(): boolean {
         const party = this.party.state;
-        if ((party.potentialChampionIndex ?? -1) >= 0) return false;
+        if (party.potentialChampionIndex >= 0) return false;
         party.sleeping = true;
         this.notifySleep(true);
         this.discardAllInput();
@@ -1117,7 +1117,7 @@ export class Game {
     }
 
     isPartySleeping(): boolean {
-        return this.party.state.sleeping === true;
+        return this.party.state.sleeping;
     }
 
     /** Register for `d.PartySleeping` changes (see `sleep` / `wakeUp`). */
@@ -1232,7 +1232,7 @@ export class Game {
         if (party.champions.length >= 4) return false;
         // One mirror at a time: a second click while the menu is up would push a
         // champion that `_ResurrectReincarnateCancel` can no longer reach.
-        if ((party.potentialChampionIndex ?? -1) >= 0) return false;
+        if (party.potentialChampionIndex >= 0) return false;
 
         const hero = this.findHeroForMirror(charID, mirrorCell, wall);
         if (!hero) return false;
@@ -1284,7 +1284,7 @@ export class Game {
      */
     resurrectReincarnateCancel(button: number): boolean {
         const party = this.party.state;
-        const index = party.potentialChampionIndex ?? -1;
+        const index = party.potentialChampionIndex;
         if (index < 0) return false;
         // `pcA3 = &d.CH16482[d.NumCharacter-1]` — the potential champion is always last.
         const champion = party.champions[party.champions.length - 1];
@@ -1755,7 +1755,7 @@ export class Game {
         if ((this.state.tickCount & 511) !== 0) return;
         const party = this.party.state;
         let count = party.champions.length;
-        if ((party.potentialChampionIndex ?? -1) >= 0) count--;
+        if (party.potentialChampionIndex >= 0) count--;
         for (let chIdx = 0; chIdx < count; chIdx++) {
             const champion = party.champions[chIdx];
             if (!champion) continue;
@@ -1797,7 +1797,7 @@ export class Game {
     private processTenSecondUpdate(): void {
         const party = this.party.state;
         const time = this.state.tickCount;
-        const sleeping = party.sleeping === true;
+        const sleeping = party.sleeping;
         if ((time & (sleeping ? 15 : 63)) !== 0) return;
         if (party.champions.length === 0) return;
 
@@ -2530,7 +2530,7 @@ export class Game {
         const champion = this.party.state.champions[options.chIdx];
         if (!champion) return 0;
         const throwingDistance = this.characterStats.determineThrowingDistance(
-            champion, 1, this.party.state.sleeping ?? false,
+            champion, 1, this.party.state.sleeping,
         );
         const obj = this.removeCharacterPossession(options.chIdx, 1);
         if (obj === OBJECT_ID_NULL) return 0;
@@ -2919,7 +2919,7 @@ export class Game {
         const saved = champion.possessions[1]!;
         this.setPossessionDirect(champion, 1, obj);
         const throwingDistance = this.characterStats.determineThrowingDistance(
-            champion, 1, party.sleeping ?? false,
+            champion, 1, party.sleeping,
         );
         this.setPossessionDirect(champion, 1, saved);
 
@@ -2976,7 +2976,7 @@ export class Game {
 
         const base = throwingDistance + weaponBonus;
         const mastery = determineMastery(champion, 10, {
-            partySleeping: party.sleeping ?? false,
+            partySleeping: party.sleeping,
             getObjectNameIndex: (objectId: number) => this.nameIndex(objectId),
         });
         const range = base + this.random.below(16) + Math.trunc(base / 2) + mastery;

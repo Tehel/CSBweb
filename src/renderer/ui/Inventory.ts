@@ -96,7 +96,7 @@ export function drawInventoryScreen(ui: UIState): void {
   // `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3847`). The branch also decides what a
   // click in this area means, which is why it leaves `displayResurrectChestOrScroll`
   // behind for `tag01a6ea` exactly as CSBWin does.
-  if ((ui.partyState.potentialChampionIndex ?? -1) >= 0) {
+  if (ui.partyState.potentialChampionIndex >= 0) {
     drawResurrectMenu(ui);
   } else if (chestView) {
     ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;

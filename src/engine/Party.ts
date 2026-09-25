@@ -20,6 +20,7 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         position,
         facing,
         magicCasterIndex: -1,
+        // `d.PotentialCharacterOrdinal` 0 — none (doc/CSBwin-src/Data.h:933).
         potentialChampionIndex: -1,
         gameIsLost: false,
         cursorOwner: -1,
@@ -41,6 +42,7 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         partyMoveDisableTimer: 0,
         word11712: 0,
         word11714: 0,
+        sleeping: false,
         moving: false,
         turning: false,
     };

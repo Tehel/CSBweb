@@ -586,7 +586,7 @@ export class AttackSystem {
 
     // --- The damage roll proper.
     const throwingDistance = this.deps.characterStats
-      ? this.deps.characterStats.determineThrowingDistance(champ, 1, this.deps.getPartyState().sleeping ?? false)
+      ? this.deps.characterStats.determineThrowingDistance(champ, 1, this.deps.getPartyState().sleeping)
       : 0;
     let d7 = sw(throwingDistance);
     let d6 = 0;
@@ -948,7 +948,7 @@ export class AttackSystem {
 
   private masteryOf(champ: Champion, skill: number): number {
     return determineMastery(champ, skill, {
-      partySleeping: this.deps.getPartyState().sleeping ?? false,
+      partySleeping: this.deps.getPartyState().sleeping,
       getObjectNameIndex: (objectId: number) => {
         const value = this.nameIndexOf(objectId as ObjectID);
         return value >= 0 ? value : null;
@@ -1057,7 +1057,7 @@ export class AttackSystem {
           params.dataType = AttackDataType.ADT_HitDoor;
           params.disableTime = 6;
           params.attdep.hitDoor.strength = this.deps.characterStats
-            ? this.deps.characterStats.determineThrowingDistance(pChar, 1, party.sleeping ?? false)
+            ? this.deps.characterStats.determineThrowingDistance(pChar, 1, party.sleeping)
             : 0;
           this.callAttackFilter(filter, params, 1);
           this.hooks.hitDoor?.(

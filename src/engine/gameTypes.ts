@@ -202,14 +202,14 @@ export interface PartyState {
      * `d.PotentialCharacterOrdinal - 1` (`doc/CSBwin-src/Data.h:933`) — the champion
      * standing in a Hall of Champions mirror who has been provisionally added but not
      * confirmed, or -1. They are counted in the party yet skipped by every "find a
-     * living champion" search. Nothing sets this yet; Phase 13 step 4 will.
+     * living champion" search.
      */
-    potentialChampionIndex?: number;
+    potentialChampionIndex: number;
     /**
      * `d.GameIsLost` (`doc/CSBwin-src/Character.cpp:2683`) — set when `KillCharacter`
      * finds no living champion left.
      */
-    gameIsLost?: boolean;
+    gameIsLost: boolean;
     /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */
     objectInHand: ObjectID;
     partyShield: ui16;          // d.PartyShield
@@ -229,7 +229,7 @@ export interface PartyState {
      * set a tick runs every VBL, masteries read 1, quickness halves and the regeneration
      * doubles; a monster's blow wakes the party (`Monster.cpp:4531`). Never saved.
      */
-    sleeping?: boolean;
+    sleeping: boolean;
     /**
      * `d.freezeLifeTimer` (`doc/CSBwin-src/Data.h:774`). While non-zero every monster
      * that is not `invincible()` is held motionless

@@ -91,6 +91,12 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         magicCasterIndex: gb2.magicCaster,
         cursorOwner: gb2.handChar,
         selectedCharacterIndex: -1,
+        // None of the three is in the file's party blocks. `LoadGame` clears
+        // `d.GameIsLost` (doc/CSBwin-src/SaveGame.cpp:1891); the other two take
+        // `initialPartyState`'s values, as they did before they were required.
+        potentialChampionIndex: -1,
+        gameIsLost: false,
+        sleeping: false,
         objectInHand,
         partyShield: tail.partyShield,
         fireShield: tail.fireShield,
