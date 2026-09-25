@@ -45,7 +45,7 @@ export function newGame(data: DungeonData, graphics: GraphicsLoader, options?: G
  * A `GameContext` over `data` with every table from `graphics`, for a tool that stands a
  * subsystem up without a whole `Game`. `parts` replaces members, so the tool can keep its
  * own party, dungeon or seeded random. (The replaced members are not rewired: the sound
- * queue keeps following the context's own party, and `state.party` names it too.)
+ * queue keeps following the context's own party.)
  */
 export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
   return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };

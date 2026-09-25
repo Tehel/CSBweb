@@ -53,7 +53,6 @@ export function createGameContext(
   const party = new Party(dungeon.getStartPosition(), dungeon.getStartFacing());
   const state: GameState = {
     dungeon: dungeonData,
-    party: party.state,
     running: false,
     paused: false,
     startTime: Date.now(),

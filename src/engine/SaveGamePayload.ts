@@ -400,7 +400,7 @@ export function encodeSavePayload(payload: SavePayload): Uint8Array {
  */
 export function applySavePayload(game: Game, payload: SavePayload): void {
     const saveState = loadSaveGameState(decodeBase64ToBytes(payload.raw));
-    applySaveGameState(game.state.dungeon, saveState, game.state.party);
+    applySaveGameState(game.state.dungeon, saveState, game.party.state);
     game.applyRuntimeSaveState(payload.runtime);
 }
 

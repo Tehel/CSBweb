@@ -299,7 +299,6 @@ export interface MovementResult {
  */
 export interface GameState {
     dungeon: DungeonData;       // Dungeon data (maps, objects, etc.)
-    party: PartyState;          // Party state
 
     // Game status
     running: boolean;           // Is game running?

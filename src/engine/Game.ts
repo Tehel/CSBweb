@@ -747,9 +747,6 @@ export class Game {
         if (this.party.state.word11712 !== 0) this.party.state.word11712--;
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
         this.clockTickSet = false;
-
-        // Update party state in game state
-        this.state.party = this.party.state;
     }
 
     /**
@@ -846,9 +843,6 @@ export class Game {
             this.loadPartyLevelIfChanged();
             this.timerSystem.processTimers(this.state.tickCount);
 
-            // Update party state in game state
-            this.state.party = this.party.state;
-
             // Notify callbacks
             for (const callback of this.onMoveCallbacks) {
                 callback(true, result);
@@ -897,7 +891,6 @@ export class Game {
         if (!unchanged) this.notePartyMoved();
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
-        this.state.party = this.party.state;
     }
 
     /**
@@ -1142,7 +1135,6 @@ export class Game {
         // champion, and `potentialChampionIndex` turns its eye panel into the
         // Resurrect/Reincarnate/Cancel menu.
         party.selectedCharacterIndex = index;
-        this.state.party = party;
         return true;
     }
 
@@ -1168,7 +1160,6 @@ export class Game {
                 setHandOwner(party, -1);
             }
             party.champions.pop();
-            this.state.party = party;
             return true;
         }
 
@@ -1223,7 +1214,6 @@ export class Game {
         }
 
         party.selectedCharacterIndex = -1;
-        this.state.party = party;
     }
 
     /**
@@ -1526,7 +1516,7 @@ export class Game {
      * `fp.performFeeding`, which is what tells the caller the object was consumed.
      */
     applyFeeding(chIdx: number, fp: FeedParameters): boolean {
-        const applied = applyFeedParameters(this.party.state, chIdx, fp, {
+        return applyFeedParameters(this.party.state, chIdx, fp, {
             curePoison: (idx) => this.monsterAttack.curePoison(idx),
             adjustStamina: (idx, decrement) => this.monsterAttack.adjustStamina(idx, decrement),
             killCharacter: (idx) => this.monsterAttack.killCharacter(idx),
@@ -1539,8 +1529,6 @@ export class Game {
                 ),
             random: () => this.random.next() & 0xffff,
         });
-        if (applied) this.state.party = this.party.state;
-        return applied;
     }
 
     /**
@@ -1557,7 +1545,6 @@ export class Game {
         if (this.party.state.selectedCharacterIndex === chIdx) {
             this.party.state.selectedCharacterIndex = -1;
         }
-        this.state.party = this.party.state;
     }
 
     /**
@@ -1566,18 +1553,15 @@ export class Game {
     setPartyState(state: PartyState): void {
         this.party.setState(state);
         ensureHandOwner(this.party.state);
-        this.state.party = this.party.state;
     }
 
     setBrightness(value: number): void {
         this.party.state.brightness = sw(value);
-        this.state.party = this.party.state;
     }
 
     adjustBrightness(delta: number): void {
         const current = this.party.state.brightness ?? 0;
         this.party.state.brightness = sw(current + delta);
-        this.state.party = this.party.state;
     }
 
     setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
@@ -2486,7 +2470,6 @@ export class Game {
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
         this.loadPartyLevelIfChanged();
-        this.state.party = this.party.state;
     }
 
     /** `CastSpell`'s `spellParameters.action` switch (`doc/CSBwin-src/Magic.cpp:1110-1136`): '' aborts silently, null casts. */
@@ -2966,7 +2949,6 @@ export class Game {
         // owner is part of the saved state. `setState` carries it, and this repairs the
         // states written before it was ever set.
         ensureHandOwner(this.party.state);
-        this.state.party = this.party.state;
 
         this.state.paused = save.game.paused;
         this.state.tickCount = save.game.tickCount;
