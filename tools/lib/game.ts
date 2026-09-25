@@ -11,6 +11,7 @@ import { resolve } from 'node:path';
 import type { DungeonData } from '../../src/data/dungeonTypes';
 import { GraphicsLoader } from '../../src/data/GraphicsLoader';
 import { Game, type GameOptions } from '../../src/engine/Game';
+import { createGameContext, type GameContext } from '../../src/engine/GameContext';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
 
 const built = new WeakMap<GraphicsLoader, GameTables>();
@@ -38,4 +39,14 @@ export function gameTablesOf(graphics: GraphicsLoader): GameTables {
 /** A `Game` over `data` with every table from `graphics`. */
 export function newGame(data: DungeonData, graphics: GraphicsLoader, options?: GameOptions): Game {
   return new Game(data, gameTablesOf(graphics), options);
+}
+
+/**
+ * A `GameContext` over `data` with every table from `graphics`, for a tool that stands a
+ * subsystem up without a whole `Game`. `parts` replaces members, so the tool can keep its
+ * own party, dungeon or seeded random. (The replaced members are not rewired: the sound
+ * queue keeps following the context's own party, and `state.party` names it too.)
+ */
+export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
+  return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };
 }

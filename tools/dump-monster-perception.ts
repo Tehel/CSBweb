@@ -32,6 +32,7 @@ import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { TimerQueue } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { extractObjectTables, monsterSightDistance } from '../src/renderer/csbwin/ObjectTables';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
@@ -65,14 +66,9 @@ async function main(): Promise<void> {
   monsters.loadPartyLevel(level);
 
   const footprints = new PartyFootprints();
-  const perception = new MonsterPerception(
-    dungeon,
-    () => party.position.z,
-    random,
-    footprints,
-    () => objectTables.monsterDesc,
-    () => objectTables.doorCharacteristics,
-  );
+  const ctx = newContext(data, graphics, { dungeon, timers, random, footprints });
+  ctx.party.state = party;
+  const perception = new MonsterPerception(ctx);
 
   const pool = dungeon.getItem16Pool();
   const active = pool.map((slot, index) => ({ slot, index })).filter((e) => e.slot.word0 >= 0);

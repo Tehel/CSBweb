@@ -21,22 +21,25 @@
  * Both are recorded in PLAN.md Phase 12.
  */
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
-
-export interface SoundQueueContext {
-  /** `d.sound1772` — the sound table from `graphics.dat` item `0x232`. */
-  soundTable?: ArrayLike<SoundTableEntry>;
-  /** The party's map position, for the distance calculation. */
-  getPartyPosition: () => { x: number; y: number; z: number };
-  /** The level whose sounds are audible — CSBWin's `d.LoadedLevel`. */
-  getLoadedLevel: () => number;
-  play?: (soundId: number, rateIdx?: number, distance?: number) => void;
-}
+import type { Party } from './Party';
 
 export class SoundQueue {
-  constructor(private ctx: SoundQueueContext) {}
+  /**
+   * @param soundTable `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
+   * @param play where a sample goes; headless, nowhere.
+   */
+  constructor(
+    private readonly party: Party,
+    private readonly soundTable: ArrayLike<SoundTableEntry>,
+    private readonly play?: (soundId: number, rateIdx?: number, distance?: number) => void,
+  ) {}
 
-  setSoundTable(soundTable: ArrayLike<SoundTableEntry>): void {
-    this.ctx.soundTable = soundTable;
+  /**
+   * The level whose sounds are audible — CSBWin's `d.LoadedLevel`. Only the party's level
+   * is ever loaded in this port; CSBWin's can differ transiently while it walks another.
+   */
+  private loadedLevel(): number {
+    return this.party.state.position.z;
   }
 
   /**
@@ -48,14 +51,14 @@ export class SoundQueue {
    * (fully loud at or below) and `byte7` (silent at or above).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number): void {
-    const play = this.ctx.play;
+    const play = this.play;
     if (!play) return;
-    const entry = this.ctx.soundTable?.[ordinal];
+    const entry = this.soundTable[ordinal];
     if (!entry) return;
 
-    if (deltaTime !== 0 && this.ctx.getLoadedLevel() !== this.ctx.getPartyPosition().z) return;
+    if (deltaTime !== 0 && this.loadedLevel() !== this.party.state.position.z) return;
 
-    const party = this.ctx.getPartyPosition();
+    const party = this.party.state.position;
     const distance = Math.abs(mapX - party.x) + Math.abs(mapY - party.y);
     if (distance >= (entry.byte7 & 0xff)) return; // CSBWin's LOCAL_12 = -1: inaudible
 

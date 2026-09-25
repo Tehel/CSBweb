@@ -309,4 +309,19 @@ export interface GameState {
     startTime: number;          // Game start timestamp
     currentTime: number;        // Current timestamp
     tickCount: ui16;            // Number of game ticks elapsed
+
+    /**
+     * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While set,
+     * invincible monsters stop taking their turns entirely
+     * (`doc/CSBwin-src/Monster.cpp:2966-2971`), which is what freezes Lord Chaos after
+     * the fusion.
+     */
+    gameWon: boolean;
+    /**
+     * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
+     * The renderer computes it and writes it each frame; the monster AI reads it to
+     * shorten sight distance in the dark (`doc/CSBwin-src/Monster.cpp:577-581`), the same
+     * direction of flow as CSBWin, where the renderer sets the global and `Blocked` reads it.
+     */
+    currentPalette: number;
 }

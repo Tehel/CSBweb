@@ -26,7 +26,8 @@ import { ActuatorSystem, type ActuatorTables, type CursorFilterHook, type Messag
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
-import { SoundQueue } from './SoundQueue';
+import type { SoundQueue } from './SoundQueue';
+import { createGameContext, nameIndexOf, type GameContext } from './GameContext';
 import { PartyFootprints, type FootprintsSnapshot } from './PartyFootprints';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { MonsterPerception } from './MonsterPerception';
@@ -42,7 +43,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { DescIndex, GetBasicObjectType, IsAKey, NameIndex } from './objectIndex';
+import { DescIndex, GetBasicObjectType, IsAKey } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -291,7 +292,9 @@ export class Game {
      * Seeded from the host on first draw; `setRandomSeed` exists so a verification tool
      * can pin the stream, which is what makes a run repeatable.
      */
-    private random = new CsbRandom();
+    private readonly random: CsbRandom;
+    /** What every subsystem shares (`GameContext`), created first. */
+    readonly ctx: GameContext;
     private actuators: ActuatorSystem;
     /**
      * The timer system. Public like the other subsystems — `tools/` drives
@@ -305,7 +308,7 @@ export class Game {
      * Monsters smell it when they cannot see the party, and the Magic Footprints
      * spell draws from it.
      */
-    readonly footprints = new PartyFootprints();
+    readonly footprints: PartyFootprints;
     /**
      * Monster sight, smell and step probing (`doc/CSBwin-src/Monster.cpp`).
      * Public because the AI state machine and `tools/dump-monster-perception.ts`
@@ -323,23 +326,13 @@ export class Game {
     readonly monsterAttack: MonsterAttack;
     /** The champions' own attacks (`doc/CSBwin-src/Attack.cpp`). */
     readonly attackSystem: AttackSystem;
-    /**
-     * `d.Word11694` — set when the game is won (`doc/CSBwin-src/Data.h:927`). While
-     * set, invincible monsters stop taking their turns entirely
-     * (`doc/CSBwin-src/Monster.cpp:2966-2971`), which is what freezes Lord Chaos
-     * after the fusion.
-     */
-    gameWon = false;
+    /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
+    get gameWon(): boolean { return this.state.gameWon; }
+    set gameWon(won: boolean) { this.state.gameWon = won; }
 
-    /**
-     * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
-     *
-     * The renderer computes it and writes it here each frame; the monster AI reads it
-     * to shorten sight distance in the dark (`doc/CSBwin-src/Monster.cpp:577-581`).
-     * That is the same direction of flow as CSBWin, where the renderer sets the
-     * global and `Blocked` reads it.
-     */
-    currentPalette = 0;
+    /** `d.CurrentPalette`, which lives in `state` (`GameState.currentPalette`). */
+    get currentPalette(): number { return this.state.currentPalette; }
+    set currentPalette(index: number) { this.state.currentPalette = index; }
 
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
@@ -432,27 +425,15 @@ export class Game {
             attackNames: tables.attackNames,
         };
 
-        // Initialize dungeon state
-        this.dungeonState = new DungeonState(dungeonData);
-
-        // Initialize party at starting position
-        const startPos = this.dungeonState.getStartPosition();
-        const startFacing = this.dungeonState.getStartFacing();
-
-        this.party = new Party(startPos, startFacing);
-
-        // Initialize game state
-        this.state = {
-            dungeon: dungeonData,
-            party: this.party.state,
-            running: false,
-            paused: false,
-            startTime: Date.now(),
-            currentTime: Date.now(),
-            tickCount: 0,
-        };
-
-        this.timerQueue = new TimerQueue();
+        const ctx = createGameContext(dungeonData, tables, playSound);
+        this.ctx = ctx;
+        this.dungeonState = ctx.dungeon;
+        this.party = ctx.party;
+        this.state = ctx.state;
+        this.random = ctx.random;
+        this.footprints = ctx.footprints;
+        this.timerQueue = ctx.timers;
+        this.sounds = ctx.sounds;
         this.playSound = playSound;
         this.actuators = new ActuatorSystem(
             this.dungeonState,
@@ -551,14 +532,6 @@ export class Game {
                 ...timerHooks,
             },
         );
-        this.sounds = new SoundQueue({
-            soundTable: tables.sound1772,
-            getPartyPosition: () => this.party.state.position,
-            // Only the party's level is ever loaded in this port; CSBWin's
-            // `d.LoadedLevel` can differ transiently while it walks another level.
-            getLoadedLevel: () => this.party.state.position.z,
-            play: playSound,
-        });
         this.monsterSystem = new MonsterSystem(
             this.dungeonState,
             () => this.party.state,
@@ -584,18 +557,8 @@ export class Game {
             },
         );
         this.monsterDamage = new MonsterDamage(
-            this.dungeonState,
-            () => this.party.state.position.z,
-            this.timerQueue,
-            this.random,
+            ctx,
             {
-                monsterDesc: tables.monsterDesc,
-                monsterDroppings: tables.monsterDroppings,
-                facingReplication: tables.byte10340,
-            },
-            {
-                queueSound: (ordinal, mapX, mapY, deltaTime) =>
-                    this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 createCloud: (projectile, size, position, posInCell) =>
                     this.timerSystem.createDeathCloud(projectile, size, position, posInCell),
                 moveMonster: (monsterRn, oldX, oldY, newX, newY, level) => {
@@ -605,14 +568,7 @@ export class Game {
             },
         );
         this.monsterDamage.onItem16Freed = () => this.monsterSystem.noteItem16Freed();
-        this.monsterPerception = new MonsterPerception(
-            this.dungeonState,
-            () => this.party.state.position.z,
-            this.random,
-            this.footprints,
-            () => tables.monsterDesc,
-            () => tables.doorCharacteristics,
-        );
+        this.monsterPerception = new MonsterPerception(ctx);
         this.monsterAttack = new MonsterAttack(
             this.dungeonState,
             () => this.party.state,
@@ -675,17 +631,7 @@ export class Game {
             moveMonster: (monster, oldX, oldY, newX, newY, level) =>
                 this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
         });
-        this.characterStats = new CharacterStats({
-            dungeon: this.dungeonState,
-            random: this.random,
-            tables: {
-                weaponDesc: tables.weaponDesc,
-                weaponWeights: tables.weaponWeights,
-                clothingWeights: tables.clothingWeights,
-                miscWeights: tables.byte8946,
-            },
-            nameIndex: (rn) => this.nameIndex(rn),
-        });
+        this.characterStats = new CharacterStats(ctx);
         this.monsterAttack.setCharacterStats(this.characterStats);
 
         this.attackSystem = new AttackSystem({
@@ -756,7 +702,7 @@ export class Game {
         });
 
         // Initialize movement system
-        this.movementSystem = new MovementSystem(this.party, this.dungeonState, {
+        this.movementSystem = new MovementSystem(ctx, {
             findFirstMonster: (position) => this.dungeonState.findFirstMonster(position),
             activateMonster: (position) => {
                 this.monsterAI.processTimers29to41({
@@ -2753,12 +2699,7 @@ export class Game {
 
     /** `RN::NameIndex` (`src/engine/objectIndex.ts`). */
     private nameIndex(rn: ObjectID): number {
-        return NameIndex(
-            this.dungeonState,
-            this.tables,
-            this.party.state.facing,
-            rn,
-        );
+        return nameIndexOf(this.ctx, rn);
     }
 
     /**

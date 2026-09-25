@@ -23,3 +23,4 @@ export * from './Game';
 export * from './AddCharacter';
 export * from './skills';
 export * from './GameTables';
+export * from './GameContext';

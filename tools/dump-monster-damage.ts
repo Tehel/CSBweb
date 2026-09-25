@@ -28,6 +28,7 @@ import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
@@ -64,15 +65,9 @@ async function main(): Promise<void> {
   monsters.loadPartyLevel(level);
 
   let clouds = 0;
-  const damage = new MonsterDamage(
-    dungeon, () => party.position.z, timers, random,
-    {
-      monsterDesc: objectTables.monsterDesc,
-      monsterDroppings: objectTables.monsterDroppings,
-      facingReplication: objectTables.facingReplication,
-    },
-    { createCloud: () => { clouds++; }, queueSound: () => {} },
-  );
+  const ctx = newContext(data, graphics, { dungeon, timers, random });
+  ctx.party.state = party;
+  const damage = new MonsterDamage(ctx, { createCloud: () => { clouds++; } });
   damage.onItem16Freed = () => monsters.noteItem16Freed();
 
   const pool = dungeon.getItem16Pool();

@@ -24,6 +24,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomTy
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
+import type { GameContext } from './GameContext';
 import type { PartyFootprints } from './PartyFootprints';
 import { PartyFootprints as Footprints } from './PartyFootprints';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -143,14 +144,15 @@ export function getPrimaryAndSecondaryDirection(
 export type BlockingTest = (mapX: number, mapY: number) => boolean;
 
 export class MonsterPerception {
-  constructor(
-    private dungeon: DungeonState,
-    private getPartyLevel: () => number,
-    private random: CsbRandom,
-    private footprints: PartyFootprints,
-    private monsterDesc: () => ArrayLike<MonsterDesc> | null,
-    private doorCharacteristics: () => ArrayLike<number> | null,
-  ) {}
+  private readonly dungeon: DungeonState;
+  private readonly random: CsbRandom;
+  private readonly footprints: PartyFootprints;
+
+  constructor(private readonly ctx: GameContext) {
+    this.dungeon = ctx.dungeon;
+    this.random = ctx.random;
+    this.footprints = ctx.footprints;
+  }
 
   /**
    * `BlockedTypeA` (`doc/CSBwin-src/Monster.cpp:294`) — blocked to passage, where
@@ -171,7 +173,7 @@ export class MonsterPerception {
       if (doorPosition === 3 || doorPosition === 4) {
         const doorRn = this.dungeon.findFirstDoor(position);
         const door = doorRn === OBJECT_ID_EOF ? null : this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
-        const toc = door ? this.dungeon.doorTOC(level, door.doorType, this.doorCharacteristics()) : 0;
+        const toc = door ? this.dungeon.doorTOC(level, door.doorType, this.ctx.tables.doorCharacteristics) : 0;
         return (toc & 0x100) === 0; // blocked unless special
       }
       return false;
@@ -293,7 +295,7 @@ export class MonsterPerception {
       orthogonalDistanceToParty: number;
     },
   ): number {
-    const desc = this.monsterDesc()?.[monster.creatureType];
+    const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return 0;
     if (context.partyInvisible && !monsterSeesInvisible(desc)) return 0;
 
@@ -490,7 +492,7 @@ export class MonsterPerception {
     }
 
     probe.moveOntoPartyPosition =
-      level === this.getPartyLevel() && step.x === state.partyX && step.y === state.partyY;
+      level === this.ctx.party.state.position.z && step.x === state.partyX && step.y === state.partyY;
     if (probe.moveOntoPartyPosition) return probe;
 
     if (roomType === RoomType.DOOR) {

@@ -18,10 +18,9 @@
  * and a recomputation cannot drift out of step with the inventory the way a cache
  * spread across the UI and the engine can. Recorded in PLAN.md.
  */
-import type { CsbRandom } from '../core/random';
 import { applyLimits, div, sw } from '../core/intCast';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
-import type { DungeonState } from './DungeonState';
+import { nameIndexOf, type GameContext } from './GameContext';
 import type { Champion } from './gameTypes';
 import { determineMastery } from './skills';
 import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
@@ -39,36 +38,8 @@ const MISC_WATERSKIN = 1;
  */
 const DEFAULT_CHEST_WEIGHT = 50;
 
-export interface CharacterStatsTables {
-  /** `d.weapons[46]` (`WEAPONDESC`), via `TAG0099d2`. */
-  weaponDesc?: ArrayLike<WeaponDesc>;
-  /** `d.weapons[46].weight`. */
-  weaponWeights?: ArrayLike<number>;
-  /** `d.ClothingDesc[58].weight`. */
-  clothingWeights?: ArrayLike<number>;
-  /** `d.Byte8946[54]` — misc object weights. */
-  miscWeights?: ArrayLike<number>;
-}
-
-export interface CharacterStatsDeps {
-  dungeon: DungeonState;
-  tables: CharacterStatsTables;
-  random: CsbRandom;
-  /**
-   * `RN::NameIndex()` (`engine/objectIndex`), supplied by the owner of the dungeon and
-   * the object tables it needs.
-   */
-  nameIndex(rn: ObjectID): number;
-}
-
-
 export class CharacterStats {
-  constructor(private deps: CharacterStatsDeps) {}
-
-  /** Replace the tables after a later load (the graphics may arrive after the engine). */
-  setTables(tables: CharacterStatsTables): void {
-    this.deps.tables = { ...this.deps.tables, ...tables };
-  }
+  constructor(private readonly ctx: GameContext) {}
 
   /**
    * `GetObjectWeight` / `TAG0091e6` (`doc/CSBwin-src/Mouse.cpp:29`) — in tenths of a
@@ -87,35 +58,35 @@ export class CharacterStats {
     const { category } = decodeObjectID(rn);
     switch (category) {
       case DBType.WEAPON: {
-        const rec = this.deps.dungeon.getWeaponRecord(rn);
+        const rec = this.ctx.dungeon.getWeaponRecord(rn);
         if (!rec) return 0;
-        return this.deps.tables.weaponWeights?.[rec.weaponType] ?? 0;
+        return this.ctx.tables.weaponWeights[rec.weaponType] ?? 0;
       }
       case DBType.CLOTHING: {
-        const rec = this.deps.dungeon.getClothingRecord(rn);
+        const rec = this.ctx.dungeon.getClothingRecord(rn);
         if (!rec) return 0;
-        return this.deps.tables.clothingWeights?.[rec.clothingType] ?? 0;
+        return this.ctx.tables.clothingWeights[rec.clothingType] ?? 0;
       }
       case DBType.MISC: {
-        const rec = this.deps.dungeon.getMiscRecord(rn);
+        const rec = this.ctx.dungeon.getMiscRecord(rn);
         if (!rec) return 0;
-        let weight = this.deps.tables.miscWeights?.[rec.miscType] ?? 0;
+        let weight = this.ctx.tables.byte8946[rec.miscType] ?? 0;
         // A waterskin weighs its contents.
         if (rec.miscType === MISC_WATERSKIN) weight += 2 * (rec.specialState ?? 0);
         return weight;
       }
       case DBType.CHEST: {
-        const rec = this.deps.dungeon.getContainerRecord(rn);
+        const rec = this.ctx.dungeon.getContainerRecord(rn);
         let total = DEFAULT_CHEST_WEIGHT;
         let obj = rec?.containedObject ?? OBJECT_ID_EOF;
         while (obj !== OBJECT_ID_EOF && obj !== OBJECT_ID_NULL) {
           total += this.getObjectWeight(obj, visited);
-          obj = this.deps.dungeon.getDBRecordLink(obj);
+          obj = this.ctx.dungeon.getDBRecordLink(obj);
         }
         return total;
       }
       case DBType.POTION: {
-        const rec = this.deps.dungeon.getPotionRecord(rn);
+        const rec = this.ctx.dungeon.getPotionRecord(rn);
         if (!rec) return 0;
         return rec.potionType === PotionType.EMPTY_FLASK ? 1 : 3;
       }
@@ -156,7 +127,7 @@ export class CharacterStats {
     }
 
     const feet = this.possession(champ, 5);
-    if (feet !== OBJECT_ID_NULL && this.deps.nameIndex(feet) === OBJNI_ELVEN_BOOTS) {
+    if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_ELVEN_BOOTS) {
       maxLoad = sw(maxLoad + (maxLoad >> 4));
     }
 
@@ -187,7 +158,7 @@ export class CharacterStats {
     }
     if ((champ.wounds & 32) !== 0) time = sw(time + footPenalty);
     const feet = this.possession(champ, 5);
-    if (feet !== OBJECT_ID_NULL && this.deps.nameIndex(feet) === OBJNI_BOOTS_OF_SPEED) time--;
+    if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_BOOTS_OF_SPEED) time--;
     return time;
   }
 
@@ -203,7 +174,7 @@ export class CharacterStats {
    * wound on that very hand halves it.
    */
   determineThrowingDistance(champ: Champion, hand: number, partySleeping = false): number {
-    let d7 = sw((this.deps.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
+    let d7 = sw((this.ctx.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
     const obj = this.possession(champ, hand);
     const weight = sw(obj !== OBJECT_ID_NULL ? this.getObjectWeight(obj) : 0);
@@ -247,7 +218,7 @@ export class CharacterStats {
    * `0.5 * Dexterity * (1 - load/maxLoad/2)`, with random limits near 5 and 95.
    */
   quickness(champ: Champion, partySleeping: boolean): number {
-    let quickness = championAttribute(champ, AttributeIndex.Dexterity) + this.deps.random.below(8);
+    let quickness = championAttribute(champ, AttributeIndex.Dexterity) + this.ctx.random.below(8);
 
     const max = this.maxLoad(champ);
     if (max > 0) {
@@ -257,8 +228,8 @@ export class CharacterStats {
     if (partySleeping) quickness = div(quickness, 2);
     quickness = div(quickness, 2);
 
-    const loLimit = this.deps.random.below(8) + 1;
-    const hiLimit = 100 - this.deps.random.below(8);
+    const loLimit = this.ctx.random.below(8) + 1;
+    const hiLimit = 100 - this.ctx.random.below(8);
     return applyLimits(loLimit, quickness, hiLimit);
   }
 
@@ -269,9 +240,9 @@ export class CharacterStats {
 
   /** `TAG0099d2` (`doc/CSBwin-src/Code51a4.cpp:2875`). */
   weaponDescFor(rn: ObjectID): WeaponDesc | null {
-    const rec = this.deps.dungeon.getWeaponRecord(rn);
+    const rec = this.ctx.dungeon.getWeaponRecord(rn);
     if (!rec) return null;
-    return this.deps.tables.weaponDesc?.[rec.weaponType] ?? null;
+    return this.ctx.tables.weaponDesc[rec.weaponType] ?? null;
   }
 
   /**
@@ -282,7 +253,7 @@ export class CharacterStats {
   private mastery(champ: Champion, skill: number, partySleeping: boolean): number {
     return determineMastery(champ, skill, {
       partySleeping,
-      getObjectNameIndex: (objectId: ObjectID) => this.deps.nameIndex(objectId),
+      getObjectNameIndex: (objectId: ObjectID) => nameIndexOf(this.ctx, objectId),
     });
   }
 }

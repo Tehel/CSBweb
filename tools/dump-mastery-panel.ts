@@ -59,7 +59,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
-import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
@@ -180,17 +180,7 @@ async function main(): Promise<void> {
   ui.objectTables = objectTables;
   ui.fontData = font;
   ui.partyState = party.state;
-  ui.characterStats = new CharacterStats({
-    dungeon,
-    random: new CsbRandom(0x12345678),
-    tables: {
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    nameIndex: (rn) => resolveObjectNameIndex(ui, rn),
-  });
+  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
 
   /** Draw the panel for the champion as it stands and hand back the screen buffer. */
   function renderPanel(): Uint8Array {

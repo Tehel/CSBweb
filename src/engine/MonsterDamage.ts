@@ -24,6 +24,7 @@ import type { CreatureRecord } from '../data/dungeonTypes';
 import { ITEM16_FREE } from '../data/dungeonTypes';
 import { RN_MONSTER_DEATH } from '../core/spellRn';
 import type { DungeonState } from './DungeonState';
+import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { setPackedBits } from './MonsterSystem';
@@ -80,19 +81,7 @@ const DROPPING_MISC_BASE = 127;
 const DROPPING_CLOTHING_BASE = 69;
 const DROPPING_WEAPON_BASE = 23;
 
-export interface MonsterDamageTables {
-  monsterDesc?: ArrayLike<MonsterDesc>;
-  /** `d.MonsterDroppings[40]`, from `graphics.dat` item `0x22f`. */
-  monsterDroppings?: ArrayLike<number>;
-  /**
-   * `d.Byte10340[4]` — `0x00 0x55 0xaa 0xff`, the facing byte for a whole group all
-   * looking the same way (`doc/CSBwin-src/Code11f52.cpp:229`).
-   */
-  facingReplication?: ArrayLike<number>;
-}
-
 export interface MonsterDamageHooks {
-  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   /** `CreateCloud(RNMonsterDeath, …)`. */
   createCloud?: (projectile: ObjectID, size: number, position: Position, posInCell: number) => void;
   /** `MoveObject` for a group, `MonsterSystem.moveMonster`. */
@@ -116,17 +105,14 @@ export interface MonsterDamageHooks {
 const DMW_DAMAGE = 0;
 
 export class MonsterDamage {
-  constructor(
-    private dungeon: DungeonState,
-    private getPartyLevel: () => number,
-    private timers: TimerQueue,
-    private random: CsbRandom,
-    private tables?: MonsterDamageTables,
-    private hooks?: MonsterDamageHooks,
-  ) {}
+  private readonly dungeon: DungeonState;
+  private readonly timers: TimerQueue;
+  private readonly random: CsbRandom;
 
-  setTables(tables: MonsterDamageTables): void {
-    this.tables = { ...this.tables, ...tables };
+  constructor(private readonly ctx: GameContext, private hooks?: MonsterDamageHooks) {
+    this.dungeon = ctx.dungeon;
+    this.timers = ctx.timers;
+    this.random = ctx.random;
   }
 
   /* ------------------------------------------------- packed byte accessors ---- */
@@ -140,7 +126,7 @@ export class MonsterDamage {
    */
   monsterPositionByte(monster: CreatureRecord, level: number, noItem16: boolean): number {
     if (noItem16) return monster.groupIndex & 0xff;
-    if (level === this.getPartyLevel()) {
+    if (level === this.ctx.party.state.position.z) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (!item16) return 0; // CSBWin asserts then returns 0
       return item16.positions & 0xff;
@@ -150,7 +136,7 @@ export class MonsterDamage {
 
   /** `SetMonsterPositionByte` (`doc/CSBwin-src/Code11f52.cpp:203`). */
   setMonsterPositionByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
-    if (level === this.getPartyLevel() && !noItem16) {
+    if (level === this.ctx.party.state.position.z && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (item16) item16.positions = value & 0xff;
       return;
@@ -165,17 +151,17 @@ export class MonsterDamage {
    * 4-entry replication table rather than being packed per member.
    */
   monsterFacingByte(monster: CreatureRecord, level: number, noItem16: boolean): number {
-    if (level === this.getPartyLevel() && !noItem16) {
+    if (level === this.ctx.party.state.position.z && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (!item16) return 0;
       return item16.facings & 0xff;
     }
-    return (this.tables?.facingReplication?.[monster.facing & 0x3] ?? 0) & 0xff;
+    return (this.ctx.tables.byte10340[monster.facing & 0x3] ?? 0) & 0xff;
   }
 
   /** `SetMonsterFacingByte` (`doc/CSBwin-src/Code11f52.cpp:237`). */
   setMonsterFacingByte(monster: CreatureRecord, value: number, level: number, noItem16: boolean): void {
-    if (level === this.getPartyLevel() && !noItem16) {
+    if (level === this.ctx.party.state.position.z && !noItem16) {
       const item16 = this.dungeon.getAttachedItem16(monster);
       if (item16) item16.facings = value & 0xff;
       return;
@@ -207,8 +193,7 @@ export class MonsterDamage {
   ): void {
     const start = MONSTER_DROPPINGS_INDEX[monsterType as MonsterType];
     if (start === undefined) return; // CSBWin's `default: return`
-    const table = this.tables?.monsterDroppings;
-    if (!table) return;
+    const table = this.ctx.tables.monsterDroppings;
 
     const cursed = CURSED_DROPPINGS.has(monsterType);
     let droppedWeapon = false;
@@ -247,7 +232,7 @@ export class MonsterDamage {
       if (!placed) this.dungeon.deleteDBEntry(rn);
     }
 
-    this.hooks?.queueSound?.(
+    this.ctx.sounds.queueSound(
       droppedWeapon ? SOUND_ORDINAL_DROPPED_ITEM : SOUND_ORDINAL_MONSTER_DEATH,
       mapX,
       mapY,
@@ -359,7 +344,7 @@ export class MonsterDamage {
     monster.possession = OBJECT_ID_EOF;
 
     if (bodyPartSoundDelay >= 0) {
-      this.hooks?.queueSound?.(
+      this.ctx.sounds.queueSound(
         droppedWeapon ? SOUND_ORDINAL_DROPPED_ITEM : SOUND_ORDINAL_MONSTER_DEATH,
         mapX,
         mapY,
@@ -391,7 +376,7 @@ export class MonsterDamage {
     const groupIndex = monster.groupIndex;
     this.dungeon.deleteDBEntry(rn);
 
-    if (this.getPartyLevel() === level) {
+    if (this.ctx.party.state.position.z === level) {
       const slot = this.dungeon.getItem16Record(groupIndex);
       if (slot) {
         slot.word0 = ITEM16_FREE;
@@ -466,7 +451,7 @@ export class MonsterDamage {
    */
   determinePoisonDamage(monsterType: number, damage: number): number {
     if (damage === 0) return 0;
-    const desc = this.tables?.monsterDesc?.[monsterType];
+    const desc = this.ctx.tables.monsterDesc[monsterType];
     if (!desc) return 0;
     const resistance = monsterPoisonResistance(desc);
     if (resistance === 15) return 0;
@@ -591,7 +576,7 @@ export class MonsterDamage {
       }
     }
 
-    const onPartyLevel = level === this.getPartyLevel();
+    const onPartyLevel = level === this.ctx.party.state.position.z;
     const item16 = onPartyLevel ? this.dungeon.getAttachedItem16(monster) : null;
 
     if (monster.fear === StateOfFear.StateOfFear6) {
@@ -683,7 +668,7 @@ export class MonsterDamage {
   }
 
   private getDesc(monster: CreatureRecord): MonsterDesc | null {
-    return this.tables?.monsterDesc?.[monster.creatureType] ?? null;
+    return this.ctx.tables.monsterDesc[monster.creatureType] ?? null;
   }
 
   private trace(line: string): void {

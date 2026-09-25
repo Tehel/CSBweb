@@ -13,6 +13,8 @@ import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
 import type { ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
+import type { GameContext } from './GameContext';
+
 
 /**
  * What `MoveParty` needs from the monster and champion systems.
@@ -38,14 +40,12 @@ export interface MovementHooks {
  * MovementSystem - handles movement validation and collision detection
  */
 export class MovementSystem {
-    private party: Party;
-    private dungeon: DungeonState;
-    private hooks: MovementHooks;
+    private readonly party: Party;
+    private readonly dungeon: DungeonState;
 
-    constructor(party: Party, dungeon: DungeonState, hooks: MovementHooks) {
-        this.party = party;
-        this.dungeon = dungeon;
-        this.hooks = hooks;
+    constructor(ctx: GameContext, private readonly hooks: MovementHooks) {
+        this.party = ctx.party;
+        this.dungeon = ctx.dungeon;
     }
 
     /**

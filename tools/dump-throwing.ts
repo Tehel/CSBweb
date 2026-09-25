@@ -37,7 +37,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { AttackType } from '../src/engine/monsterTypes';
 import { getChampionPossession } from '../src/renderer/ui/Character';
-import { newGame } from './lib/game';
+import { newGame, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -75,22 +75,7 @@ async function main(): Promise<void> {
   const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
 
   const dungeon = new DungeonState(data);
-  const stats = new CharacterStats({
-    dungeon,
-    random: new CsbRandom(0x12345678),
-    tables: {
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    // The boots check is the only name-index lookup, and Elven Boots are not a
-    // modifiable object, so the base index is the whole answer here.
-    nameIndex: (rn) => {
-      const rec = dungeon.getClothingRecord(rn);
-      return rec ? 69 + rec.clothingType : -1;
-    },
-  });
+  const stats = new CharacterStats(newContext(data, graphics, { dungeon, random: new CsbRandom(0x12345678) }));
 
   /** Make a weapon record of the given type and return its object id. */
   const makeWeapon = (weaponType: number): ObjectID => {

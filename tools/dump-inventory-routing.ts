@@ -38,10 +38,10 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { getChampionPossession } from '../src/renderer/ui/Character';
-import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { handleMagicClick, spellControlGetRect } from '../src/renderer/ui/MagicPanel';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { CsbRandom } from '../src/core/random';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
@@ -122,17 +122,7 @@ async function main(): Promise<void> {
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  ui.characterStats = new CharacterStats({
-    dungeon,
-    random: new CsbRandom(0x12345678),
-    tables: {
-      weaponDesc: objectTables.weaponDesc,
-      weaponWeights: objectTables.weaponWeights,
-      clothingWeights: objectTables.clothingWeights,
-      miscWeights: objectTables.miscWeights,
-    },
-    nameIndex: (rn) => resolveObjectNameIndex(ui, rn),
-  });
+  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
   ui.partyState = party.state;
 
   // Not every mirror hands its hero a weapon, so pick, per box, a slot that really
