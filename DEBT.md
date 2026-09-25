@@ -1329,7 +1329,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0 (`Data.h:767-783`) | ✅ |
 | D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ✅ |
 | D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:517-518`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
-| D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ⏳ |
+| D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
 | D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:511`), `fingerPrint` (`:512-515`), `timerIndex = -1` (`:519`), `charFlags` (`:529`, `:596`) | ⏳ |
 | D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:520`) | ⏳ |
 
@@ -1364,6 +1364,13 @@ champion literals in `tools/` (tsc found each one). `Party.setState` spreads it 
 champion, replacing its two hand-written `??`. Ten fallbacks went, each the initializer's
 value. `Game.setBusyTimerRefill`'s `champion?.busyTimerIndex ?? -1` stays: it guards a
 missing champion. Evidence: `npm test -- --frames`; the three saves still load.
+
+**D3d, paid.** `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection` and
+`shieldStrength` are required, all cleared in `addCharacterDefaults`. 36 `?? 0` went.
+The 37th fallback was `ui/Attack.ts`'s `damageFromDirection ?? champ.facing ?? 0`, a
+different default. It was unreachable, because its guard, `maxRecentDamage`, turns non-zero
+only at `MonsterAttack.ts:240`, which sets `damageFromDirection` in the same statement group. So it
+went too. What it hid is the `facing3` fix below. Evidence: `npm test -- --frames`.
 
 Found while splitting, and paid as separate fixes:
 

@@ -158,7 +158,7 @@ export function derivePotionFeeding(
     case PotionType.YA_POTION: {
       // A champion already well shielded gets a quarter of the benefit.
       let amount = w12 + Math.trunc(w12 / 2);
-      if ((champ.shieldStrength ?? 0) > 50) amount = Math.trunc(amount / 4);
+      if (champ.shieldStrength > 50) amount = Math.trunc(amount / 4);
       fp.shieldStrengthAdjust = amount;
       fp.shieldDuration = amount * amount;
       fp.performFeeding = true;
@@ -245,7 +245,7 @@ export function applyFeedParameters(
   hooks.adjustStamina(chIdx, -fp.staminaAdjust);
 
   if (fp.shieldStrengthAdjust !== 0) {
-    const next = (champ.shieldStrength ?? 0) + fp.shieldStrengthAdjust;
+    const next = champ.shieldStrength + fp.shieldStrengthAdjust;
     champ.shieldStrength = next < 0 ? 0 : next & 0xffff;
     hooks.scheduleShieldExpiry(chIdx, fp.shieldStrengthAdjust, fp.shieldDuration);
   }
@@ -285,14 +285,14 @@ export function applyFeedParameters(
 function healWounds(champ: Champion, healCount: number, random: () => number): void {
   let draws = healCount | 0;
   if (draws <= 0) return;
-  const before = champ.wounds ?? 0;
+  const before = champ.wounds;
   if (before === 0) return;
   for (let pass = 10; pass !== 0; pass--) {
     for (let i = 0; i < draws; i++) {
-      champ.wounds = (champ.wounds ?? 0) & random() & 0xffff;
+      champ.wounds = champ.wounds & random() & 0xffff;
     }
     draws = 1;
-    if (before !== (champ.wounds ?? 0)) break;
+    if (before !== champ.wounds) break;
   }
 }
 

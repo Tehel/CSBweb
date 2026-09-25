@@ -139,7 +139,7 @@ function main(): void {
   for (const [what, patch, expected] of mouthCases) {
     const champ = Object.assign(healthyChampion(), patch);
     const got = mouthBoxGraphic(champ);
-    console.log([what, champ.food, champ.water, champ.poisonCount ?? 0, got].join('\t'));
+    console.log([what, champ.food, champ.water, champ.poisonCount, got].join('\t'));
     check(got === expected, `mouth box for "${what}" should be graphic ${expected}`);
   }
   console.log('');

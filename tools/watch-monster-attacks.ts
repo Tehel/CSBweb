@@ -121,7 +121,7 @@ async function main(): Promise<void> {
     totalLost += lost;
     console.log([
       c.name, c.attributes.health, lost,
-      '0x' + (c.wounds ?? 0).toString(16), c.poisonCount ?? 0,
+      '0x' + c.wounds.toString(16), c.poisonCount,
       c.alive === false ? 'DEAD' : 'yes',
     ].join('\t'));
   });
@@ -162,14 +162,14 @@ async function main(): Promise<void> {
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
     game.monsterAttack.damageCharacter(probeIdx, 300, 0x3f, 3);
-    if ((probe.wounds ?? 0) !== 0) bigWounds++;
-    bigMask |= probe.wounds ?? 0;
+    if (probe.wounds !== 0) bigWounds++;
+    bigMask |= probe.wounds;
   }
   let smallWounds = 0;
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
     game.monsterAttack.damageCharacter(probeIdx, 6, 0x3f, 3);
-    if ((probe.wounds ?? 0) !== 0) smallWounds++;
+    if (probe.wounds !== 0) smallWounds++;
   }
   console.log('');
   console.log(`wound probe: 200 hits of 300 wounded ${bigWounds} times (mask 0x${bigMask.toString(16)});`);

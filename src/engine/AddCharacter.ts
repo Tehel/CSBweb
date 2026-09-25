@@ -203,7 +203,8 @@ export function assignPresetHeroPossessions(
 /** The `Champion` fields `addCharacterDefaults` initializes. */
 export type ChampionDefaults = Pick<
   Champion,
-  'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
+  | 'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
+  | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'
 >;
 
 /**
@@ -221,6 +222,11 @@ export function addCharacterDefaults(): ChampionDefaults {
     busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:518`)
     attackType: -1, // `pcA3->attackType = -1` (`:517`)
     attackStatModifier: 0, // `word64`, cleared
+    wounds: 0, // `ouches`, cleared
+    poisonCount: 0,
+    maxRecentDamage: 0,
+    damageFromDirection: 0, // `facing3`, cleared here; `AddCharacter` sets it at `:531`
+    shieldStrength: 0,
   };
 }
 

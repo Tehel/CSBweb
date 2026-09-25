@@ -238,10 +238,10 @@ function main(): void {
     const before = champ.attributes.health;
     g.applyFeeding(0, fp);
     console.log(['VI (healing)', `${before} hp, wounds ffff`,
-      `${champ.attributes.health} hp, wounds ${(champ.wounds ?? 0).toString(16)}`].join('\t'));
+      `${champ.attributes.health} hp, wounds ${champ.wounds.toString(16)}`].join('\t'));
     check(champ.attributes.health > before, 'a Vi potion restores health');
     check(champ.attributes.health <= champ.attributes.maxHealth, 'and never past MaxHP');
-    check((champ.wounds ?? 0) !== 0xffff, 'and clears some wounds');
+    check(champ.wounds !== 0xffff, 'and clears some wounds');
   }
 
   {
@@ -273,7 +273,7 @@ function main(): void {
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.YA_POTION, 150);
     g.applyFeeding(0, fp);
-    const raised = champ.shieldStrength ?? 0;
+    const raised = champ.shieldStrength;
     const timers = g.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_72);
     console.log(`shield ${raised}, expires in ${fp.shieldDuration} ticks, ${timers.length} TT_72 queued`);
 
@@ -286,7 +286,7 @@ function main(): void {
       g.timerSystem.processTimers(t);
     }
     console.log(`after ${fp.shieldDuration + 1} ticks: shield ${champ.shieldStrength}`);
-    check((champ.shieldStrength ?? 0) === 0, `the shield expired back to 0 (got ${champ.shieldStrength})`);
+    check(champ.shieldStrength === 0, `the shield expired back to 0 (got ${champ.shieldStrength})`);
   }
 
   /* ------------------------------------------- 5. anti-venin ------------------- */
@@ -308,7 +308,7 @@ function main(): void {
     console.log(`TT_75 timers ${before} -> ${after}, poisonCount ${champ.poisonCount}`);
     check(before === 1, 'the champion was poisoned first');
     check(after === 0, 'anti-venin deleted the pending poison timer');
-    check((champ.poisonCount ?? 0) === 0, 'and cleared the count');
+    check(champ.poisonCount === 0, 'and cleared the count');
     check(champ.attributes.health === poisonedHealth, 'anti-venin heals nothing itself');
   }
 

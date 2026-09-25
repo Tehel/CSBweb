@@ -288,7 +288,7 @@ export function drawItemDescriptionLine(ui: UIState, text: string, color: number
 
 export function getInventoryPlaceholderIndex(champion: Champion, slot: number): number {
   if (slot >= 0 && slot <= 5) {
-    const wounds = champion.wounds ?? 0;
+    const wounds = champion.wounds;
     const wounded = (wounds & (1 << slot)) !== 0;
     return OBJNI_SPECIAL_N + 2 * slot + (wounded ? 1 : 0);
   }

@@ -537,7 +537,7 @@ export class TimerSystem {
     const champ = this.getPartyState().champions[timer.uByte5 & 0xff];
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
-    champ.shieldStrength = ((champ.shieldStrength ?? 0) - sw(timer.timerWord6)) & 0xffff;
+    champ.shieldStrength = (champ.shieldStrength - sw(timer.timerWord6)) & 0xffff;
   }
 
   /**
@@ -571,7 +571,7 @@ export class TimerSystem {
     const chIdx = timer.uByte5 & 0xff;
     const champ = this.getPartyState().champions[chIdx];
     if (!champ) return;
-    champ.poisonCount = Math.max(0, (champ.poisonCount ?? 0) - 1);
+    champ.poisonCount = Math.max(0, champ.poisonCount - 1);
     this.hooks?.onPoisonTick?.(chIdx, sw(timer.timerWord6));
   }
 

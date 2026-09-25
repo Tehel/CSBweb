@@ -79,7 +79,7 @@ export function drawInventoryScreen(ui: UIState): void {
     }
     const rect = getInventorySlotRect(iconSlots, slot);
     if (!rect) continue;
-    const wounds = champion.wounds ?? 0;
+    const wounds = champion.wounds;
     if (slot <= 5 && (wounds & (1 << slot)) !== 0) {
       drawWoundedOutline(ui, rect);
     }
@@ -160,7 +160,7 @@ export const BOX_GRAPHIC_MARKED = 34;
 export function mouthBoxGraphic(champion: Champion): number {
   const hungry = (champion.food ?? 0) < 0;
   const thirsty = (champion.water ?? 0) < 0;
-  const poisoned = (champion.poisonCount ?? 0) !== 0;
+  const poisoned = champion.poisonCount !== 0;
   return hungry || thirsty || poisoned ? BOX_GRAPHIC_MARKED : BOX_GRAPHIC_PLAIN;
 }
 

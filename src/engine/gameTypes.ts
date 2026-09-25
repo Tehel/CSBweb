@@ -144,16 +144,16 @@ export interface Champion {
     incantation: number[];     // Magic incantation bytes (ASCII)
     food: i16;                 // Signed food level (CSBWin uses negative for starving)
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)
-    wounds?: ui16;             // Bitmask of wounded body parts (CSBWin "ouches")
-    poisonCount?: ui8;         // Poison counter for UI and effects
+    wounds: ui16;              // Bitmask of wounded body parts (CSBWin "ouches")
+    poisonCount: ui8;          // Poison counter for UI and effects
     /**
      * `CHARDESC.maxRecentDamage` — the largest hit taken since the portrait last
      * showed it. Drives which way the damage flash points
      * (`doc/CSBwin-src/Monster.cpp:1237-1242`).
      */
-    maxRecentDamage?: ui8;
+    maxRecentDamage: ui8;
     /** `CHARDESC.facing3` — the direction the biggest recent hit came from. */
-    damageFromDirection?: ui8;
+    damageFromDirection: ui8;
     /**
      * `CHARDESC.word64` — the temporary defence modifier the champion's *own* attack
      * type imposes while it is in progress, from `Byte20090[attackType]`
@@ -171,7 +171,7 @@ export interface Champion {
     actionDisabledUntil: i32;  // Tick when actions re-enable (CSBWin busyTimer)
     busyTimerIndex: i32;       // Timer index for action disable
 
-    shieldStrength?: ui16;      // Optional shield strength for UI dots
+    shieldStrength: ui16;       // CHARDESC.shieldStrength
     /**
      * `CHARDESC.possessions[30]`, the hands included — see `SLOT_WEAPON_HAND`. Always
      * thirty entries; an empty slot is `RNnul` (`emptyPossessions`).

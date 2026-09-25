@@ -233,7 +233,7 @@ export function attackPanelTick(ui: UIState): void {
     // Not the champion holding the cursor, and not the one with the menu open: those
     // two keep facing the way the player left them.
     if (idx !== cursorOwner && idx + 1 !== ui.attackingCharacterOrdinal && champ.maxRecentDamage) {
-      const from = champ.damageFromDirection ?? champ.facing ?? 0;
+      const from = champ.damageFromDirection;
       if (champ.facing !== from) champ.facing = from;
     }
     champ.maxRecentDamage = 0;

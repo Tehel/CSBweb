@@ -55,7 +55,7 @@ export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
   blitBasicGraphicToViewport(ui, 30, g232.wRectPos950, 48, 12);
   blitBasicGraphicToViewport(ui, 31, g232.wRectPos958, 48, 12);
-  if ((champion.poisonCount ?? 0) !== 0) {
+  if (champion.poisonCount !== 0) {
     blitBasicGraphicToViewport(ui, 32, g232.wRectPos966, 96, 12);
   }
 
@@ -386,7 +386,7 @@ export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): 
   const fireShield = ui.partyState.fireShield;
   const spellShield = ui.partyState.spellShield;
   const partyShield = ui.partyState.partyShield;
-  const personalShield = champion.shieldStrength ?? 0;
+  const personalShield = champion.shieldStrength;
 
   if (fireShield > 0) shields.push(38);
   if (spellShield > 0) shields.push(39);

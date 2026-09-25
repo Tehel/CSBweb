@@ -212,7 +212,7 @@ function main(): void {
     g.monsterAttack.poisonCharacter(0, 1);
     check(ch.attributes.health === 199, 'a one-tick dose still deals the minimum 1 damage');
     check(poisonTimersFor(g, 0) === 0, 'a one-tick dose arms no timer');
-    check((ch.poisonCount ?? 0) === 0, 'and leaves the champion unpoisoned');
+    check(ch.poisonCount === 0, 'and leaves the champion unpoisoned');
   }
 
   // The potential champion — the one in a Hall of Champions mirror — is immune.

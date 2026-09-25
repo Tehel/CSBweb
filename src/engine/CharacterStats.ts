@@ -148,7 +148,7 @@ export class CharacterStats {
     let maxLoad = sw(8 * championAttribute(champ, AttributeIndex.Strength) + 100);
     maxLoad = staminaAdjustedAttribute(champ, maxLoad);
 
-    const wounds = champ.wounds ?? 0;
+    const wounds = champ.wounds;
     if (wounds !== 0) {
       // A wounded torso costs a quarter of the allowance, any other wound an eighth.
       const shift = (wounds & 16) !== 0 ? 2 : 3;
@@ -185,7 +185,7 @@ export class CharacterStats {
       time = sw(time + div((4 * (load - maxLoad)) & 0xffff, maxLoad));
       footPenalty = 2;
     }
-    if (((champ.wounds ?? 0) & 32) !== 0) time = sw(time + footPenalty);
+    if ((champ.wounds & 32) !== 0) time = sw(time + footPenalty);
     const feet = this.possession(champ, 5);
     if (feet !== OBJECT_ID_NULL && this.deps.nameIndex(feet) === OBJNI_BOOTS_OF_SPEED) time--;
     return time;
@@ -237,7 +237,7 @@ export class CharacterStats {
 
     // A wound on the hand doing the work halves it: bit 1 for hand 0, bit 2 for hand 1.
     const handWoundMask = hand === 0 ? 1 : 2;
-    if (handWoundMask & (champ.wounds ?? 0)) d7 = div(d7, 2);
+    if (handWoundMask & champ.wounds) d7 = div(d7, 2);
 
     return applyLimits(0, div(d7, 2), 100);
   }

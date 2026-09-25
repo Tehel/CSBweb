@@ -236,7 +236,7 @@ export class MonsterAttack {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
         const champ = getPartyChampion(this.getPartyState(), chIdx);
         // `maxRecentDamage` drives which way the portrait's damage flash points.
-        if (champ && dealt > (champ.maxRecentDamage ?? 0)) {
+        if (champ && dealt > champ.maxRecentDamage) {
           champ.maxRecentDamage = dealt & 0xff;
           champ.damageFromDirection = (amended.directionToParty + 2) & 0x3;
         }
@@ -554,7 +554,7 @@ export class MonsterAttack {
       if (dealt > threshold) {
         do {
           const bit = 1 << this.random.below(8);
-          champ.wounds = ((champ.wounds ?? 0) | (bit & woundMask)) & 0xffff;
+          champ.wounds = (champ.wounds | (bit & woundMask)) & 0xffff;
           threshold <<= 1;
           if (dealt <= threshold) break;
         } while (threshold !== 0);
@@ -712,7 +712,7 @@ export class MonsterAttack {
     const party = this.getPartyState();
     total +=
       champ.attackStatModifier +
-      (champ.shieldStrength ?? 0) +
+      champ.shieldStrength +
       party.partyShield +
       handTotal;
 
@@ -866,7 +866,7 @@ export class MonsterAttack {
 
     const remaining = strength - 1;
     if (remaining !== 0) {
-      champ.poisonCount = Math.min(255, (champ.poisonCount ?? 0) + 1);
+      champ.poisonCount = Math.min(255, champ.poisonCount + 1);
       this.hooks?.schedulePoison?.(chIdx, remaining);
     }
   }
