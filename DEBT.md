@@ -115,6 +115,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
+| C37 | A door button or a touched wall does not make a tick due at once | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ archived |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ archived |
 | D3 | Most state fields are optional (split: D3a-g) | L | ✅ archived |
@@ -1221,6 +1222,17 @@ and check whether a stale `TT_11` can reach the handler at all (CSBWin's `SetTim
 de-duplication may make the guard dead) before deciding the second; a check that shoots,
 casts, and reads the quiver after the cast.
 
+### C37 ⏳ A door button or a touched wall does not make a tick due at once
+
+Found paying E2 (moving `HandleClickInViewport`'s engine half into `MouseSystem`). CSBWin's
+door button sets `d.clockTick = 1` before queueing the sound and the `TT_DOOR` timer
+(`doc/CSBwin-src/Mouse.cpp:1078`), and `TouchWallF1` sets `d.clockTick = TouchWall(...)`
+(`Mouse.cpp:788`), so a wall switch that fired makes a tick due on the next VBL. The
+port's `handleDoorSwitchClick` and `handleWallClick` set neither, so the door starts
+moving, and a switch's effects land, up to a tick later. Set `ctx.loop.clockTickSet` in
+both, and prove it with a check that counts the frames from the click to the timer
+firing.
+
 ---
 
 ## D — State representation
@@ -1574,6 +1586,42 @@ before moving, and decide the two open questions first:
   not, `MovementSystem`.
 - Small change: `addChampion` (the tools' join; `HallOfChampions` or stays),
   `getChampionPossession`, `getBaseObjectNameIndex`, `nameIndex` (go with their callers).
+
+*Decisions (2026-09-26), taken before the code moved:*
+
+- **The periodic updates** go to one module of two functions over the context,
+  `src/engine/PeriodicUpdates.ts` (`ninetySecondUpdate(ctx)`, `tenSecondUpdate(ctx)`),
+  as `wakeUp(ctx)` did. `CSBCode.cpp` is the loop's file, but it is also `MoveParty`'s,
+  `WakeUp`'s and a hundred other functions'; being in it does not make a function the
+  loop. `Code17818.cpp`'s other port, `DetermineMastery`, is `skills.ts`, a table module
+  the update should not be folded into. Neither update has state of its own, so no class.
+  The cadence tests (`(d.Time & 511) == 0`, `d.Time & (d.PartySleeping ? 15 : 63)`)
+  are the loop's (`CSBCode.cpp:680-688`) and move out of the bodies into `gameTick`,
+  where CSBWin has them; `d.NumCharacter == 0` stays in `TenSecondUpdate`
+  (`Code17818.cpp:174`).
+- **`_ExecuteAttack`'s engine half** (`championAttack`, `attackStatModifier`) goes to
+  `CharacterSystem` as `executeAttack`, by the file rule: it is `Character.cpp:4944`, it
+  writes two `CHARDESC` fields (`word64`, `attackType`) and makes one call into
+  `AttackSystem`. `HallOfChampions` was the one exception to the rule, for shared tables;
+  there is no such reason here. `consumeAttackDamageToDisplay` goes to `AttackSystem`,
+  which owns `d.attackDamageToDisplay`.
+- **`MoveParty`'s tail** (`move`, `setPartyMoveDelay`) goes to `MovementSystem`, which
+  already ports `MoveParty`'s head (the collision, the stamina): one CSBWin function, one
+  home, as `MovementSystem.moveParty`. `HandleMouseEvents` calling it does not make it
+  the loop — `Mouse.cpp` calls `CSBCode.cpp` there too. `Game.move` keeps the move
+  listeners (`onMove`) and is otherwise a facade.
+- **`triggerObjectMove`** (the UI's pick-up from the floor, `ViewportPicking`), with
+  `handleDoorSwitchClick` and `handleWallClick`, is `HandleClickInViewport`
+  (`Mouse.cpp:1031`: the door switch at `:1060-1086`, `TouchWallF1` at `:1127`, the
+  pick-up `TAG01a148` at `:1132`), so all three go to `MouseSystem`. So does `sleep`
+  (button 145, `Mouse.cpp:1683`), by the same rule — `WakeUp` is `CSBCode.cpp`'s, which is
+  why it sits in `LoopState.ts` and `Sleep` does not join it.
+- **The quick-save** becomes `src/engine/RuntimeSave.ts`: `RUNTIME_SAVE_VERSION`, the
+  `RuntimeSaveState` type, and `getRuntimeSaveState(ctx)` / `applyRuntimeSaveState(ctx,
+  save)` with the timer (de)serialisers. `Game` keeps a facade for each, because loading
+  owes one thing to the loop: `HandleMouseEvents`' `lastTime = 0` (`SaveGame.cpp:1661`),
+  which is `Game`'s own static. `setPartyState` and `setRandomSeed` stay as facades (the
+  map preview and the tools).
 
 ### E3 ⏳ Split `TimerSystem.ts`
 
