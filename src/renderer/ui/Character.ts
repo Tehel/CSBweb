@@ -17,6 +17,7 @@ import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBl
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
 import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
+import { AdjustStatsForItemCarried } from '../../engine/AdjustStatsForItemCarried';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -607,6 +608,15 @@ export function getChampionPossession(champion: Champion, slot: number): ObjectI
 export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: ObjectID): void {
   const previous = getChampionPossession(champion, slot);
   champion.possessions[slot] = value;
+  // `AdjustStatsForItemCarried`, `-1` from `RemoveCharacterPossession` and `+1` from
+  // `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1858`, `:1970`).
+  const nameIndex = (rn: ObjectID): number => resolveObjectNameIndex(ui, rn);
+  if (previous !== OBJECT_ID_NULL) {
+    AdjustStatsForItemCarried(champion, slot, -1, previous, ui.dungeonState, nameIndex);
+  }
+  if (value !== OBJECT_ID_NULL) {
+    AdjustStatsForItemCarried(champion, slot, 1, value, ui.dungeonState, nameIndex);
+  }
   updateLightForPossessionChange(ui, slot, previous, value);
 }
 

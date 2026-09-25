@@ -54,6 +54,7 @@ import {
 } from '../data/actuatorHelpers';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { CharacterStats } from './CharacterStats';
+import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import type { SpellDefinition } from '../data/spellTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -1267,7 +1268,7 @@ export class Game {
             setHandOwner(party, 0);
         }
 
-        this.collectMirrorPossessions(possessions);
+        this.collectMirrorPossessions(champion, possessions);
 
         // `ShowHideInventory(LOCAL_2)` (`:792`) — the inventory opens on the new
         // champion, and `potentialChampionIndex` turns its eye panel into the
@@ -1451,7 +1452,7 @@ export class Game {
      * cell until Resurrect or Reincarnate is pressed, which is what makes Cancel a
      * clean undo.
      */
-    private collectMirrorPossessions(possessions: ObjectID[]): void {
+    private collectMirrorPossessions(champion: Champion, possessions: ObjectID[]): void {
         if (!this.addCharacterTables) return;
         const party = this.party.state;
         const mirror = this.getMirrorCell();
@@ -1474,6 +1475,13 @@ export class Game {
         }
 
         assignAddCharacterPossessions(items, this.addCharacterTables, possessions);
+        // `AddCharacter` places each object with `AddCharacterPossession`
+        // (`doc/CSBwin-src/Character.cpp:789`), so a recruit arrives with the bonuses of
+        // what they carry. Only the stat half is here; the rest is `DEBT.md` C34.
+        for (let slot = 0; slot < 30; slot++) {
+            const obj = possessions[slot]!;
+            if (obj !== OBJECT_ID_NULL) this.adjustStatsForItemCarried(champion, slot, 1, obj);
+        }
     }
 
     /**
@@ -2317,7 +2325,15 @@ export class Game {
         if (slot < 0 || slot >= slots.length) return false;
         if (slots[slot] !== OBJECT_ID_NULL) return false;
         slots[slot] = obj;
+        // The stat half of `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1970`);
+        // the rest is `DEBT.md` C34.
+        this.adjustStatsForItemCarried(champion, slot, 1, obj);
         return true;
+    }
+
+    /** `AdjustStatsForItemCarried` (`src/engine/AdjustStatsForItemCarried.ts`). */
+    private adjustStatsForItemCarried(champion: Champion, slot: number, addOrRemove: number, obj: ObjectID): void {
+        AdjustStatsForItemCarried(champion, slot, addOrRemove, obj, this.dungeonState, (rn) => this.nameIndex(rn));
     }
 
     private createMiscObject(miscType: number): ObjectID | null {
@@ -2462,9 +2478,8 @@ export class Game {
      * No counterpart here: `SelectPaletteForLightLevel`, `DrawEightHands`,
      * `DisplayBackpackItem` and the `charFlags` redraw bits (the light and the panels are
      * derived from live state every frame); `load` (`CharacterStats.characterLoad`
-     * re-sums it). Not ported (`DEBT.md` C34): `AdjustStatsForItemCarried(…, -1, …)`
-     * (C32) and, because they read UI state, `TAG01b1c0` when this champion's attack menu
-     * is open and `RepackChest` when their inventory is. The chest slots (30 and up)
+     * re-sums it). Not ported (`DEBT.md` C34), because they read UI state: `TAG01b1c0`
+     * when this champion's attack menu is open and `RepackChest` when their inventory is. The chest slots (30 and up)
      * belong to the open inventory; no engine caller passes one.
      */
     private removeCharacterPossession(chIdx: number, slot: number): ObjectID {
@@ -2474,6 +2489,7 @@ export class Game {
         this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
         if (objRemoved === OBJECT_ID_NULL) return OBJECT_ID_NULL;
         const objNID5 = this.nameIndex(objRemoved);
+        this.adjustStatsForItemCarried(champion, slot, -1, objRemoved);
         if (slot === 10) {
             if (objNID5 >= OBJNI_ILLUMULET_A && objNID5 <= OBJNI_ILLUMULET_B) {
                 this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.

@@ -3157,6 +3157,38 @@ the object's weight comes off `load` last. In the Atari DM data `d.Word1074[2]` 
 torch is weapon type 2, the Jewel Symal misc type 2 and the Illumulet misc type 3.
 Evidence: `tools/dump-champion-death.ts` section 8 (5 of 56 checks fail before C30's fix).
 
+## `AdjustStatsForItemCarried`: what a carried object does to its bearer
+
+`AdjustStatsForItemCarried(pChar, possessionIndex, addOrRemove, item)`
+(`doc/CSBwin-src/Character.cpp:1569-1780`) tests `item.NameIndex()` and the slot, first
+match wins:
+
+| Condition | Adjusts | By |
+| --- | --- | --- |
+| a *cursed* weapon or garment in slots 0-12 (misc objects are not tested) | Luck | -3 |
+| a Rabbit's Foot in any slot below 30 | Luck | +10 |
+| slot 1: the Mace of Order | Strength | +5 |
+| slot 1: Staff of Claws (`_a`-`_c`) | MaxMana | +4 |
+| slot 1: Staff, Wand, TeoWand, Yew Staff, Staff of Irra, Cross of Neta, Serpent Staff, Dragon Spit, Sceptre of Lyf | MaxMana | 2, 1, 6, 4, 10, 8, 16, 7, 5 |
+| slot 1: Side Splitter, Dragon Fang, Vorpal Blade | MaxMana | 1, 2, 4 |
+| slot 4 (legs): Powertowers | Strength | +10 |
+| slot 2 (head): Crown of Nerra / Dexhelm | Wisdom / Dexterity | +10 |
+| slot 3 (body): Flamebain / Cloak of Night | AntiFire / Dexterity | +12 / +8 |
+| slot 10 (neck): Jewel Symal (`_a`-`_b`) / Cloak of Night / Moonstone | AntiMagic / Dexterity / MaxMana | +15 / +8 / +3 |
+
+A curse is tested before everything else, so a cursed staff in the weapon hand gives -3
+Luck and no mana. An attribute bonus moves its maximum, current and minimum alike
+(`IncrMaximum` / `IncrCurrent` / `IncrMinimum`, unsigned bytes that wrap — four curses
+take the Luck minimum of 10 to 254, which the getter reads as 0); MaxMana is set to
+`MaxMana() + D4W` and the current mana is untouched. Callers: `AddCharacterPossession`
+(`:1970`, `+1`), `RemoveCharacterPossession` (`:1858`, `-1`), and `SetCursed` (`:1801`,
+`:1815`), which brackets the curse change. The bonus is baked in, so a save stores the
+adjusted attributes. In the Atari DM object names five of these objects carry DM's names,
+not the CSB identifiers': Staff of Irra is STAFF OF MANAR, Cross of Neta SNAKE STAFF,
+Serpent Staff THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR. In the Hall
+of Champions TIGGY carries a Wand, CHANI a Moonstone, BORIS a Rabbit's Foot, GOTHMOG a
+Cloak of Night and NABI a Staff. Evidence: `tools/dump-item-bonuses.ts`.
+
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
 The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,

@@ -13,7 +13,8 @@ import {
   RoomType,
   withObjectPosition,
 } from '../core/types';
-import { DescIndex, GetBasicObjectType } from './objectIndex';
+import { DescIndex, GetBasicObjectType, NameIndex } from './objectIndex';
+import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -66,6 +67,8 @@ export interface DsaTables {
   carryLocation?: ArrayLike<number>;
   word1074?: ArrayLike<number>;
   monsterDesc?: ArrayLike<MonsterDesc>;
+  /** `d.Byte640`, which `NameIndex` reads for a lit torch. */
+  byte640?: ArrayLike<number>;
 }
 
 export interface ViewingFilterOptions {
@@ -402,6 +405,7 @@ export class DsaSystem {
   private objDescObjectType: ArrayLike<number> | null;
   private carryLocation: ArrayLike<number> | null;
   private word1074: ArrayLike<number> | null;
+  private byte640: ArrayLike<number> | null;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
@@ -433,6 +437,7 @@ export class DsaSystem {
     this.carryLocation = tables?.carryLocation ?? null;
     this.word1074 = tables?.word1074 ?? null;
     this.monsterDesc = tables?.monsterDesc ?? null;
+    this.byte640 = tables?.byte640 ?? null;
   }
 
   setTables(tables: DsaTables): void {
@@ -442,6 +447,7 @@ export class DsaSystem {
     if (tables.carryLocation) this.carryLocation = tables.carryLocation;
     if (tables.word1074) this.word1074 = tables.word1074;
     if (tables.monsterDesc) this.monsterDesc = tables.monsterDesc;
+    if (tables.byte640) this.byte640 = tables.byte640;
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -2352,6 +2358,16 @@ export class DsaSystem {
     if (slot < 0 || slot >= 30) return;
     const previous = champion.possessions[slot]!;
     champion.possessions[slot] = next;
+    // `AdjustStatsForItemCarried`, `-1` from `RemoveCharacterPossession` and `+1` from
+    // `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1858`, `:1970`).
+    const nameIndex = (rn: ObjectID): number => NameIndex(
+      this.dungeon,
+      { objDescObjectType: this.objDescObjectType ?? [], byte640: this.byte640 ?? [] },
+      this.getPartyState?.().facing ?? 0,
+      rn,
+    );
+    if (previous !== OBJECT_ID_NULL) AdjustStatsForItemCarried(champion, slot, -1, previous, this.dungeon, nameIndex);
+    if (next !== OBJECT_ID_NULL) AdjustStatsForItemCarried(champion, slot, 1, next, this.dungeon, nameIndex);
     this.updateLightForPossessionChange(slot, previous, next);
   }
 

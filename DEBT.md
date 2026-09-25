@@ -96,9 +96,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
 | C30 | `removeCharacterPossession` is a bare slot clear | M | ✅ |
 | C31 | A dead champion's bones are not set down by `MoveObject` | S | ✅ |
-| C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
+| C32 | `AdjustStatsForItemCarried` is not ported | M | ✅ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
-| C34 | Four possession writers, none of them CSBWin's whole | M | ⏳ |
+| C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -1088,7 +1088,27 @@ so over an open pit they fall. `MonsterAttack.killCharacter` splices them in wit
 an open pit; assert where the bones end up, and check the expool record still pairs
 them.
 
-### C32 ⏳ `AdjustStatsForItemCarried` is not ported
+### C32 ✅ `AdjustStatsForItemCarried` is not ported
+
+**Paid.** `src/engine/AdjustStatsForItemCarried.ts` is a line-by-line port, `NameIndex`
+and the `cursed()` bit included, over the port's wrapping `ATTRIBUTE` bytes
+(`attributes.ts`) and an `sw` `maxMana`. Every writer of a champion's slots now calls it:
+`Game.removeCharacterPossession` (`-1`), `Game.setChampionHand` (`+1`, the hand refills and
+Zokathra), the Hall of Champions recruit (`+1` per object, as `AddCharacter` does through
+`AddCharacterPossession`, `Character.cpp:789`), the UI's `setChampionPossession` and
+`DsaSystem.setChampionPossession` (`-1` for what leaves, `+1` for what arrives) — so a
+bonus always comes off by the path it went on. The twenty-one new `OBJNI_*` constants
+were computed from the `Objects.h` enum. **Saves:** CSBWin stores the adjusted
+attributes, and so does the port (the attributes are saved as they are), so neither a
+CSBWin save nor the port's own needs anything on load and `RUNTIME_SAVE_VERSION` is
+unchanged. A port save written *before* this commit holds unadjusted attributes: a
+champion recruited then with NABI's Staff or BORIS's Rabbit's Foot loses the bonus when
+the object comes off, once. Not ported: `SetCursed`, whose only caller is the unported
+`STKOP_SetCurse` (G1). Evidence: `tools/dump-item-bonuses.ts` — every row of the table
+against the real objects (the names in graphic `0x22c` are the canary, five of them
+DM's names for CSB's), the places a row does not apply, curses and the wrapped Luck
+minimum, and the four writers (3 of 99 checks fail with the writers stashed, 1 of 100 for
+the DSA's).
 
 Found paying C28. `AdjustStatsForItemCarried` (`doc/CSBwin-src/Character.cpp:1569-1770`)
 is what makes a carried object change its bearer: a cursed weapon or garment in slots
@@ -1114,35 +1134,40 @@ wall, and the click is within x 33-189, y 44-150
 there, and nothing plays. Add the sound, and a row to `tools/dump-viewport-click.ts` that
 asserts it is queued.
 
-### C34 ⏳ Four possession writers, none of them CSBWin's whole
+### C34 ⏳ Five possession writers, none of them CSBWin's whole
 
 Found paying C30. CSBWin changes a champion's slots only through
 `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1936-2037`) and
-`RemoveCharacterPossession` (`:1822-1930`). The port has four writers:
+`RemoveCharacterPossession` (`:1822-1930`). The port has five writers:
 
-- `Game.removeCharacterPossession` — CSBWin's since C30, less three things:
-  `AdjustStatsForItemCarried` (C32); `TAG01b1c0` when `d.AttackingCharacterOrdinal` is
-  this champion (`:1885-1888`), which closes their attack menu; and `RepackChest` when
-  their inventory is open and a chest leaves the weapon hand (`:1906-1914`). The last two
-  read `UIState` (`attackingCharacterOrdinal`, the open inventory), which `Game` cannot
-  see.
-- `Game.setChampionHand` — a bare slot write. It is the add half of the two hand refills,
+- `Game.removeCharacterPossession` — CSBWin's since C30 and C32, less two things:
+  `TAG01b1c0` when `d.AttackingCharacterOrdinal` is this champion (`:1885-1888`), which
+  closes their attack menu; and `RepackChest` when their inventory is open and a chest
+  leaves the weapon hand (`:1906-1914`). Both read `UIState`
+  (`attackingCharacterOrdinal`, the open inventory), which `Game` cannot see.
+- `Game.setChampionHand` — a slot write plus `AdjustStatsForItemCarried` (C32), and
+  nothing else. It is the add half of the two hand refills,
   which in CSBWin are `AddCharacterPossession(chIdx, RemoveCharacterPossession(…), hand)`
   (`doc/CSBwin-src/Timer.cpp:2663`, `CSBCode.cpp:6263-6270` through `TAG011594`), so a
   torch refilled from the quiver is not lit and a scroll is not opened.
 - `ui/Character.setChampionPossession` (the inventory click, `Mouse.ts`) — adds and takes
   off the Illumulet's `Word1074[2]` and lights or puts out a torch, but sets no
   `value(1)` / `value(0)` on an Illumulet or Jewel Symal (so a worn one never shows its
-  `_b` name), opens and closes no scroll, and calls neither `TAG01b1c0` nor
-  `AdjustStatsForItemCarried`. It lights any torch by `GetBasicObjectType`; CSBWin's add
-  tests `NameIndex == Torch_a`, an unlit one (`:1988`).
-- `DsaSystem.setChampionPossession` — the Illumulet's brightness only; no torch, no
-  `value()`, no scroll.
+  `_b` name), opens and closes no scroll, and does not call `TAG01b1c0`. It lights any
+  torch by `GetBasicObjectType`; CSBWin's add tests `NameIndex == Torch_a`, an unlit one
+  (`:1988`). It does call `AdjustStatsForItemCarried` since C32.
+- `DsaSystem.setChampionPossession` — the Illumulet's brightness and, since C32,
+  `AdjustStatsForItemCarried`; no torch, no `value()`, no scroll.
+- The Hall of Champions recruit (`Game.collectMirrorPossessions`) — a fifth: CSBWin places
+  each mirror object with `AddCharacterPossession` (`Character.cpp:789`); the port writes
+  the array in `assignAddCharacterPossessions` and, since C32, adds the stat bonuses. A
+  recruit's Illumulet does not light the party and a torch is not lit.
 
-Port `AddCharacterPossession` for the engine, route all four through the engine pair,
-and give the engine a way to ask the UI to close the attack menu and repack the chest.
-Needs the frames (the inventory click is UI). Do it after C32, so the stat adjustment
-lands in one place.
+Port `AddCharacterPossession` for the engine, route all five through the engine pair
+(`AdjustStatsForItemCarried` then has one caller per direction again), and give the
+engine a way to ask the UI to close the attack menu and repack the chest. Needs the
+frames (the inventory click is UI). `tools/dump-item-bonuses.ts` section 4 already
+drives four of the writers.
 
 ## D — State representation
 
@@ -1485,6 +1510,10 @@ it.
   non-zero word (`Timer.cpp:2029-2040`), where the port takes every word `>= 0xff80` as-is
   and maps the rest through `spellObjectId`. CSBWin also `LoadLevel`s the launch level
   around the launch (`:2065-2077`). Found in B3.
+- **`STKOP_SetCurse`** (`DSA.cpp:3440-3456`) is another. It calls `SetCursed`
+  (`Character.cpp:1782-1816`), which finds the champion carrying the object and brackets
+  the curse change with `AdjustStatsForItemCarried(…, -1, …)` and `(…, +1, …)`, so a
+  curse laid on a carried weapon costs 3 Luck at once. Port both together. Found in C32.
 - **Decoration gating and footprints** *(Phase 4)*. DSA-based decoration gating and
   footprints / extended cell flags are not ported (`src/renderer/csbwin/SummarizeRoomInfo.ts:515`).
   Wall and floor decoration selection follows `TAG00a4a2` plus the actuator's

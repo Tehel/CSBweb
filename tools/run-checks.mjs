@@ -43,6 +43,7 @@ const CHECKS = [
   { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-champion-death.ts' },
+  { tool: 'dump-item-bonuses.ts' },
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-ten-second-update.ts' },
   { tool: 'dump-sleep.ts' },
