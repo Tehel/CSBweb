@@ -485,7 +485,7 @@ export function writeCsbwinCharacter(
   setU16BE(block, base + 272, options.load?.(champion) ?? champion.load);
   setU16BE(block, base + 274, champion.shieldStrength);
   setU32BE(block, base + 276, champion.talents);
-  setU16BE(block, base + 280, champion.fingerprint ?? 0);
+  setU16BE(block, base + 280, champion.fingerprint);
   setU16BE(block, base + 282, champion.causeOfDamage);
   setU16BE(block, base + 284, champion.monsterCausingDamage);
 

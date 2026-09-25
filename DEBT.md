@@ -110,7 +110,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
-| D3 | Most state fields are optional (split: D3a-g; a-f ✅, D3g ⏳) | L | ⏳ |
+| D3 | Most state fields are optional (split: D3a-g) | L | ✅ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
@@ -1319,7 +1319,7 @@ churn but departs from CSBWin; "port, don't reinvent" argues for `RNnul`.
 `tools/dump-live-save-file.ts` prove the boundary. A grep proves the normalizers are gone.
 If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 
-### D3 ⏳ Most state fields are optional
+### D3 ✅ Most state fields are optional
 
 **Split** (size L, recorded 2026-09-25 before any code; re-counted then: `Champion` has
 23 optional fields, `PartyState` 12). One commit per group, in this order:
@@ -1332,7 +1332,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
 | D3e | `Champion`: `charFlags`, `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~8). `fingerprint` moved to D3g, `incantationCursor` to the fix below | cleared, except `talents = 0` (`:512`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ✅ |
 | D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ✅ |
-| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. **Decided 2026-09-25:** a champion gets its fingerprint once, when it joins, as `AddCharacter` does (`:513-516`). `Game.addCharacter` already does; `Game.addChampion` (the dev/tool path) computes it unconditionally. The lazy assignments in `setPartyState`, the runtime-save restore and `registerChampionBones` go (a save always carries the field), and so does `registerChampionBones`' `if (!fingerprint) return`, which CSBWin does not have (`Character.cpp:2646`). A tool that puts champions into the party without `addChampion` sets their fingerprints itself: divergences stay in the tools, never the engine. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`); 0 in `addCharacterDefaults` (`ClearMemory`) | ⏳ |
+| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. **Decided 2026-09-25:** a champion gets its fingerprint once, when it joins, as `AddCharacter` does (`:513-516`). `Game.addCharacter` already does; `Game.addChampion` (the dev/tool path) computes it unconditionally. The lazy assignments in `setPartyState`, the runtime-save restore and `registerChampionBones` go (a save always carries the field), and so does `registerChampionBones`' `if (!fingerprint) return`, which CSBWin does not have (`Character.cpp:2646`). A tool that puts champions into the party without `addChampion` sets their fingerprints itself: divergences stay in the tools, never the engine. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`); 0 in `addCharacterDefaults` (`ClearMemory`) | ✅ |
 
 The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
 `ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
@@ -1391,6 +1391,17 @@ it), so only tools' hand-built champions could reach it. None depends on it: `np
 guards a missing champion. Left as found: `createChampionFromPreset`'s own
 `facing: partyPosition & 3`. It is not CSBWin's, but only `dev.ts` and the tools keep it,
 because `addCharacter` overwrites it.
+
+**D3g, paid in `COMMIT_D3G`.** `fingerprint` is required, 0 in `addCharacterDefaults`.
+`Game.addChampion` computes it unconditionally, as `addCharacter` does, so a champion gets
+its fingerprint once, on joining. `assignChampionFingerprint` went with its four lazy
+callers (`addChampion`, `setPartyState`, the runtime-save restore,
+`registerChampionBones`); `registerChampionBones`' `if (!fingerprint) return` had gone
+first, as a fix (below). Five `?? 0` / `?? -1` went. No tool needed to set fingerprints
+itself: the ones that put champions in the party without `addChampion` never kill them,
+and `dump-vi-altar`'s preset `0x1000 + i` went, since `addChampion` now overwrites it.
+`RUNTIME_SAVE_VERSION` stays 10: every runtime save already carries the field (the three in
+`static/gamefiles/saves/` load with their fingerprints and run). Evidence: `npm test`.
 
 Found while splitting, and paid as separate fixes:
 
@@ -1529,7 +1540,7 @@ they keep working unchanged or are updated in the same commit.
 
 | Group | Methods | CSBWin |
 | --- | --- | --- |
-| Hall of Champions | `addChampion`, `addCharacter`, `resurrectReincarnateCancel`, `finishResurrectReincarnate`, `reincarnateNamed`, `reincarnate`, the mirror helpers, `registerChampionBones`, `assignChampionFingerprint` (≈ `:820-1290`) | `AddCharacter` `Character.cpp:456`, `_ResurrectReincarnateCancel` `CSBCode.cpp:6616`, `_ReIncarnate` `Code13ea4.cpp` |
+| Hall of Champions | `addChampion`, `addCharacter`, `resurrectReincarnateCancel`, `finishResurrectReincarnate`, `reincarnateNamed`, `reincarnate`, the mirror helpers, `registerChampionBones` (≈ `:820-1290`) | `AddCharacter` `Character.cpp:456`, `_ResurrectReincarnateCancel` `CSBCode.cpp:6616`, `_ReIncarnate` `Code13ea4.cpp` |
 | Periodic updates | `processNinetySecondUpdate`, `processTenSecondUpdate` (≈ `:1397-1580`) | `NinetySecondUpdate` `CSBCode.cpp:7339`, `TenSecondUpdate` `Code17818.cpp:160` |
 | Magic | `castMagic`, `fillSpellParameters`, `castSpell`, `incantationToSpell`, … `applyMagicShield` (≈ `:1591-1970`), `characterThrowsSpell` (`:2078`), the spell messages (≈ `:2265-2352`), `castSpellFromUi` | `CastSpell` `Magic.cpp:1090` and its neighbours |
 | Cursor drop and throw | `dropObjectFromCursor`, `maybeScheduleViAltar`, `throwObjectFromCursor`, `throwStaminaCost`, `awardThrowSkill` (≈ `:2487-2760`) | `DropObject` `Mouse.cpp:848`, `ThrowByCharacter` `Mouse.cpp:673` |

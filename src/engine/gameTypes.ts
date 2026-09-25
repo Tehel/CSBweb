@@ -87,7 +87,7 @@ export interface Champion {
      */
     portrait?: ui8[];
     facing: Direction;          // CHARDESC.facing
-    fingerprint?: ui16;         // CSBWin CHARDESC.fingerPrint (used for bones mapping)
+    fingerprint: ui16;          // CSBWin CHARDESC.fingerPrint (used for bones mapping)
     /**
      * `CHARDESC.title` as its 20 raw bytes, kept only when they hold more than `title`
      * does.

@@ -324,7 +324,7 @@ export function findChampionByFingerprint(party: PartyState, fingerprint: number
     for (let i = 0; i < party.champions.length; i++) {
         const champion = party.champions[i];
         if (!champion) continue;
-        if (((champion.fingerprint ?? 0) & 0xffff) === wanted) return i;
+        if ((champion.fingerprint & 0xffff) === wanted) return i;
     }
     return -1;
 }

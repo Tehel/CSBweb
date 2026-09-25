@@ -39,7 +39,7 @@ export interface AddCharacterItem {
  * who have left the party. We have no wings, so only the live party is scanned.
  */
 export function fingerprintExists(champions: Champion[], fingerprint: number): boolean {
-  return champions.some((champ) => (champ.fingerprint ?? 0) === (fingerprint & 0xffff));
+  return champions.some((champ) => champ.fingerprint === (fingerprint & 0xffff));
 }
 
 /**
@@ -206,7 +206,7 @@ export type ChampionDefaults = Pick<
   | 'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
   | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'
   | 'charFlags' | 'timerIndex' | 'talents' | 'causeOfDamage' | 'monsterCausingDamage' | 'load'
-  | 'title' | 'facing'
+  | 'title' | 'facing' | 'fingerprint'
 >;
 
 /**
@@ -241,6 +241,9 @@ export function addCharacterDefaults(): ChampionDefaults {
     // Cleared here. `AddCharacter` then sets `d.partyFacing` (`:522`), and so does
     // `Game.addCharacter`.
     facing: 0,
+    // Cleared here. `AddCharacter` computes it (`:513-516`), and so do
+    // `Game.addCharacter` and `Game.addChampion`.
+    fingerprint: 0,
   };
 }
 

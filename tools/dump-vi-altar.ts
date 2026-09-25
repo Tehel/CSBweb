@@ -72,7 +72,6 @@ function champion(i: number, name: string): Champion {
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
-    fingerprint: 0x1000 + i,
   };
 }
 
@@ -275,7 +274,7 @@ function main(): void {
     const record = g.dungeonState.getMiscRecord(rn);
     check((record?.specialState ?? 0) === 2, "a death's bones carry value 2, the kind marker");
     check(
-      g.dungeonState.copyChampionBonesRecord(rn) === (g.party.state.champions[victim]!.fingerprint ?? -1),
+      g.dungeonState.copyChampionBonesRecord(rn) === g.party.state.champions[victim]!.fingerprint,
       "and an expool record holding the champion's fingerprint",
     );
 

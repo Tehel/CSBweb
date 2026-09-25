@@ -1204,7 +1204,11 @@ export class Game {
      * Add a champion to the party
      */
     addChampion(champion: Champion): boolean {
-        this.assignChampionFingerprint(champion);
+        // `AddCharacter`'s fingerprint (doc/CSBwin-src/Character.cpp:513-516), given
+        // once, on joining, as `addCharacter` gives it: this is how the tools'
+        // champions join.
+        const pos = this.party.state.position;
+        champion.fingerprint = computeChampionFingerprint(this.party.state.champions, pos.z, pos.x, pos.y);
         if (!this.party.addChampion(champion)) return false;
         // `if (d.NumCharacter == 1) SetHandOwner(0)` — the first champion to join the
         // party gets the cursor (doc/CSBwin-src/Character.cpp:706-710). Every inventory
@@ -1566,21 +1570,9 @@ export class Game {
     registerChampionBones(bones: ObjectID, champIndex: number): void {
         const champ = this.party.state.champions[champIndex];
         if (!champ) return;
-        this.assignChampionFingerprint(champ);
         // `expool.AddChampionBonesRecord(objD4, pcA3->fingerPrint)`, whatever the
         // fingerprint (doc/CSBwin-src/Character.cpp:2646): 0 pairs the bones too.
-        this.dungeonState.addChampionBonesRecord(bones, champ.fingerprint ?? 0);
-    }
-
-    private assignChampionFingerprint(champion: Champion): void {
-        if (champion.fingerprint !== undefined && champion.fingerprint !== null) return;
-        const pos = this.party.state.position;
-        champion.fingerprint = computeChampionFingerprint(
-            this.party.state.champions,
-            pos.z,
-            pos.x,
-            pos.y,
-        );
+        this.dungeonState.addChampionBonesRecord(bones, champ.fingerprint);
     }
 
     /**
@@ -1716,9 +1708,6 @@ export class Game {
         this.party.setState(state);
         ensureHandOwner(this.party.state);
         this.state.party = this.party.state;
-        for (const champ of this.party.state.champions) {
-            this.assignChampionFingerprint(champ);
-        }
     }
 
     setBrightness(value: number): void {
@@ -3127,9 +3116,6 @@ export class Game {
         // states written before it was ever set.
         ensureHandOwner(this.party.state);
         this.state.party = this.party.state;
-        for (const champ of this.party.state.champions) {
-            this.assignChampionFingerprint(champ);
-        }
 
         this.state.paused = save.game.paused;
         this.state.tickCount = save.game.tickCount;

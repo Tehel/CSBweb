@@ -419,7 +419,7 @@ function main(): void {
   check(game.handleWallClick() === false && party.champions.length === 4,
     'a fifth is refused (d.NumCharacter == 4)');
 
-  const fingerprints = party.champions.map((c) => c.fingerprint ?? 0);
+  const fingerprints = party.champions.map((c) => c.fingerprint);
   console.log(`fingerprints: [${fingerprints.map((f) => `0x${f.toString(16)}`).join(', ')}]`);
   check(new Set(fingerprints).size === fingerprints.length, 'every champion has a distinct fingerprint');
   check(fingerprints.every((f) => f !== 0), 'and none is zero');
