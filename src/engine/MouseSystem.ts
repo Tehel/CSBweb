@@ -1,18 +1,31 @@
 /**
  * `MouseSystem` — the engine half of CSBWin's `Mouse.cpp`: the cursor object dropped
  * (`DropObject`, `Mouse.cpp:848`, with its Vi-altar arm) or thrown (`ThrowObjectInHand`,
- * `:764`), and `ThrowByCharacter` (`:672`), which the THROW attack also runs. The UI half
- * — the hit tests, the inventory click — is `src/renderer/ui/Mouse.ts`.
+ * `:764`), and `ThrowByCharacter` (`:672`), which the THROW attack also runs; the engine
+ * arms of `HandleClickInViewport` (`:1031` — the door button, the wall touched, the
+ * floor pick-up's `MoveObject`); and button 145, `Sleep`. The UI half — the hit tests,
+ * the inventory click — is `src/renderer/ui/Mouse.ts`.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as `ctx.systems.mouse`.
  */
-import { MISC_BONES_OF_HERO } from '../core/constants';
+import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { applyLimits } from '../core/intCast';
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_NULL, type ObjectID, type Position } from '../core/types';
+import {
+  DBType,
+  decodeObjectID,
+  encodeObjectID,
+  OBJECT_ID_EOF,
+  OBJECT_ID_NULL,
+  RoomType,
+  type ObjectID,
+  type Position,
+} from '../core/types';
+import { ActuatorAction } from '../data/actuatorHelpers';
 import { nameIndexOf, type GameContext } from './GameContext';
 import type { Champion } from './gameTypes';
 import { findChampionByFingerprint } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
+import { TimerFunction } from './TimerQueue';
 
 export interface DropCursorOptions {
   viAltar?: boolean;
@@ -246,5 +259,89 @@ export class MouseSystem {
       cost = cost + Math.trunc(remaining / 2);
     }
     return cost;
+  }
+
+  /**
+   * The UI's object move: today only the pick-up from the floor (`ViewportPicking`),
+   * whose `TAG01a148` ends in `MoveObject(obj, x, y, -1, 0)`
+   * (doc/CSBwin-src/Mouse.cpp:836). The UI has already taken the object out of the cell;
+   * this is `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`), then
+   * whatever it set in motion — a level change, the timers it queued.
+   */
+  triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
+    this.ctx.systems.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
+    this.ctx.systems.monsters.loadPartyLevelOnArrival();
+    this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
+  }
+
+  /**
+   * `HandleClickInViewport`'s wall arm, `TouchWallF1` (doc/CSBwin-src/Mouse.cpp:776,
+   * reached at `:1127`): touch the wall ahead, on the side that faces the party.
+   * Not ported: `d.clockTick = TouchWall(...)` (`:788`, `DEBT.md` C37).
+   */
+  handleWallClick(): boolean {
+    const pos = this.ctx.party.state.position;
+    const facing = this.ctx.party.state.facing;
+    return this.ctx.systems.actuators.triggerWallSwitch(pos, facing);
+  }
+
+  /**
+   * `HandleClickInViewport`'s door-button arm (doc/CSBwin-src/Mouse.cpp:1060-1086): an
+   * empty hand on the button of the door ahead plays the switch sound and queues a
+   * `TT_DOOR` toggle for the next tick. Not ported: `d.clockTick = 1` (`:1078`,
+   * `DEBT.md` C37).
+   */
+  handleDoorSwitchClick(): boolean {
+    const party = this.ctx.party.state;
+    if (party.objectInHand !== OBJECT_ID_NULL) return false;
+
+    const facing = party.facing & 0x3;
+    const pos = party.position;
+    const target = facing === 0 ? pos.north : facing === 1 ? pos.east : facing === 2 ? pos.south : pos.west;
+    const map = this.ctx.dungeon.getMap(target.z);
+    if (!map) return false;
+    const cellFlag = map.cellFlags[target.x]?.[target.y];
+    if (cellFlag === undefined) return false;
+    if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
+
+    const nsDoor = (cellFlag & 0x8) >> 3;
+    const facingIsNS = facing & 0x1;
+    if (nsDoor === facingIsNS) return false;
+
+    const doorRN = this.ctx.dungeon.findFirstDoor(target);
+    if (doorRN === OBJECT_ID_EOF) return false;
+    const { index } = decodeObjectID(doorRN);
+    const door = this.ctx.dungeon.getDoorRecordByIndex(index);
+    if (!door || !door.hasButton) return false;
+
+    this.ctx.host.playSound(SoundIndex.SWITCH);
+    this.ctx.timers.createTimer(
+      TimerFunction.TT_DOOR,
+      target.x,
+      target.y,
+      0,
+      ActuatorAction.TOGGLE,
+      this.ctx.state.tickCount + 1,
+      target.z,
+    );
+    return true;
+  }
+
+  /**
+   * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
+   * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
+   * `TAG02076e`); this is `d.PartySleeping = 1`, `d.Speed = 0` — which `Game.runFrame`
+   * reads as a tick on every frame — and `DiscardAllInput()`. The sleep-mode button
+   * list, `Buttons17796`, and `DisplaySleepScreen` are the host's listeners' business.
+   *
+   * Refused while a champion is only provisionally in the party (`:1685`).
+   */
+  sleep(): boolean {
+    const party = this.ctx.party.state;
+    if (party.potentialChampionIndex >= 0) return false;
+    party.sleeping = true;
+    this.ctx.host.sleepChanged(true);
+    this.ctx.mouseQueue.discardAllInput();
+    return true;
   }
 }

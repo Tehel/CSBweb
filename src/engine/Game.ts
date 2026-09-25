@@ -13,7 +13,7 @@ import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { ActuatorSystem } from './ActuatorSystem';
-import { TimerQueue, TimerFunction } from './TimerQueue';
+import { TimerQueue } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
 import { MonsterSystem } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
@@ -34,12 +34,10 @@ import { MOUSE_UNCLICK } from './MouseQueue';
 import { wakeUp } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
-import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { SoundIndex } from '../core/constants';
+import { OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 
-import { ActuatorAction } from '../data/actuatorHelpers';
 import { CharacterStats } from './CharacterStats';
 import type { GameTables } from './GameTables';
 import { computeChampionFingerprint } from './AddCharacter';
@@ -471,14 +469,9 @@ export class Game {
         }
     }
 
-    /**
-     * The UI's object drop: `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`),
-     * then whatever it set in motion — a level change, the timers it queued.
-     */
+    /** The UI's object move, the floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`). */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
-        this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
-        this.monsterSystem.loadPartyLevelOnArrival();
-        this.timerSystem.processTimers(this.state.tickCount);
+        this.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
     }
 
     /**
@@ -510,22 +503,9 @@ export class Game {
         this.ctx.mouseQueue.discardAllInput();
     }
 
-    /**
-     * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
-     * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
-     * `TAG02076e`); this is `d.PartySleeping = 1`, `d.Speed = 0` — which `runFrame` reads
-     * as a tick on every frame — and `DiscardAllInput()`. The sleep-mode button list,
-     * `Buttons17796`, and `DisplaySleepScreen` are the listeners' business.
-     *
-     * Refused while a champion is only provisionally in the party (`:1685`).
-     */
+    /** Button 145, the sleep icon (`MouseSystem.sleep`). */
     sleep(): boolean {
-        const party = this.party.state;
-        if (party.potentialChampionIndex >= 0) return false;
-        party.sleeping = true;
-        this.notifySleep(true);
-        this.discardAllInput();
-        return true;
+        return this.mouse.sleep();
     }
 
     /** `WakeUp` for button 146 (`LoopState.wakeUp`). */
@@ -535,11 +515,6 @@ export class Game {
 
     isPartySleeping(): boolean {
         return this.party.state.sleeping;
-    }
-
-    /** Tell the host `d.PartySleeping` changed (see `sleep`; `wakeUp` tells it itself). */
-    private notifySleep(sleeping: boolean): void {
-        this.ctx.host.sleepChanged(sleeping);
     }
 
     /**
@@ -689,52 +664,14 @@ export class Game {
         this.onMoveCallbacks.push(callback);
     }
 
-    /**
-     * Handle a viewport wall click (lever/switch).
-     */
+    /** A click on the wall ahead, `TouchWallF1` (`MouseSystem.handleWallClick`). */
     handleWallClick(): boolean {
-        const pos = this.party.state.position;
-        const facing = this.party.state.facing;
-        return this.actuators.triggerWallSwitch(pos, facing);
+        return this.mouse.handleWallClick();
     }
 
-    /**
-     * Handle a door switch click (door button).
-     */
+    /** A click on a door's button (`MouseSystem.handleDoorSwitchClick`). */
     handleDoorSwitchClick(): boolean {
-        const party = this.party.state;
-        if (party.objectInHand !== OBJECT_ID_NULL) return false;
-
-        const facing = party.facing & 0x3;
-        const pos = party.position;
-        const target = facing === 0 ? pos.north : facing === 1 ? pos.east : facing === 2 ? pos.south : pos.west;
-        const map = this.dungeonState.getMap(target.z);
-        if (!map) return false;
-        const cellFlag = map.cellFlags[target.x]?.[target.y];
-        if (cellFlag === undefined) return false;
-        if (((cellFlag >> 5) & 0x7) !== RoomType.DOOR) return false;
-
-        const nsDoor = (cellFlag & 0x8) >> 3;
-        const facingIsNS = facing & 0x1;
-        if (nsDoor === facingIsNS) return false;
-
-        const doorRN = this.dungeonState.findFirstDoor(target);
-        if (doorRN === OBJECT_ID_EOF) return false;
-        const { index } = decodeObjectID(doorRN);
-        const door = this.dungeonState.getDoorRecordByIndex(index);
-        if (!door || !door.hasButton) return false;
-
-        this.ctx.host.playSound(SoundIndex.SWITCH);
-        this.timerQueue.createTimer(
-            TimerFunction.TT_DOOR,
-            target.x,
-            target.y,
-            0,
-            ActuatorAction.TOGGLE,
-            this.state.tickCount + 1,
-            target.z,
-        );
-        return true;
+        return this.mouse.handleDoorSwitchClick();
     }
 
     /** `DropObject` (`MouseSystem.dropObjectFromCursor`), for the UI and `tools/`. */
