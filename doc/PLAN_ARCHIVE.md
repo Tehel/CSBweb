@@ -2404,4 +2404,28 @@ step, and `tiles` has readers in `DungeonSnapshot`, `TimerSystem`, `DsaSystem` a
 the other stale — C13's type-7 scenario had to write both. Keep `cellFlags`, derive the
 rest where it is read.
 
+##### D6 ✅ `GameState.party` is a second copy of `Party.state`
+
+*(Found paying E1b, 2026-09-25.)* `GameState` (`src/engine/gameTypes.ts`) carries
+`party: PartyState`, set once in `createGameContext`, while `Party.setState` replaces
+`Party.state` with a new object. `Game` keeps the two in step by hand:
+`this.state.party = this.party.state` appears ten times in `Game.ts` (after `setState`,
+`addChampion`, the Hall of Champions, `setBrightness`, the runtime-save restore…). A path
+that replaces the party and misses the resync leaves `game.state.party` naming the old
+object — and `applySavePayload` (`src/engine/SaveGamePayload.ts`) writes a loaded save's
+blocks *into* `game.state.party`. Not seen to go wrong; it is the D-tier shape of bug
+(stored twice, kept in step by hand). Fix: drop `GameState.party` and read
+`ctx.party.state`, as every subsystem now does. Re-audit the ten sites first: some may be
+resyncing after a `setState` that no longer exists.
+
+**Paid in `27a5aae`.** The re-audit found every site resyncing after nothing: the only
+two `Party.setState` callers (`setPartyState`, `applyRuntimeSaveState`) resynced
+themselves, so `game.state.party` and `game.party.state` always named the same object and
+no path had gone wrong. `GameState.party` is gone, the thirteen `this.state.party = …`
+lines with it (`applyFeeding`'s `if (applied)` resync among them), and `applySavePayload`
+writes the loaded blocks into `game.party.state`. Behaviour-neutral: every tool's output
+byte-identical, frames identical, and the author's three runtime saves load and play 600
+ticks to the same state as before the change (`RUNTIME_SAVE_VERSION` unchanged at 10:
+`GameState` is not saved as such).
+
 </details>

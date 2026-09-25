@@ -191,5 +191,5 @@ the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT
 **paying that off is the current priority**, one item per commit, in the order it gives.
 Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
 before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
-is paid but for D6, found on the way (2026-09-25); E1a–b (one `GameTables`, one
-`GameContext` every subsystem takes) are paid, and D6, F4 and E1c (`ctx.systems`) are next.
+is paid; E1a–c (one `GameTables`, one `GameContext` every subsystem takes, subsystems
+calling each other through `ctx.systems`) are paid, and E1d (`GameHost`) then E2 are next.

@@ -40,9 +40,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    not fixed — unless it blocks the D/E item at hand or corrupts saves. C33 and C34 wait;
    C34 lands after E1/E2, once the possession code has one `Character` home and the engine
    can reach the UI without new setters. C25 (re-sized to M after D4) and C35 wait in the
-   frozen queue with the rest of tier C. D6 (found paying E1b) is tier D, so it goes
-   before E1c; F4 (unseeded tools) is cheap and makes every later refactor's before/after
-   diff exact, so pay it alongside.
+   frozen queue with the rest of tier C. D6 and F4 were paid before E1c (2026-09-25), so
+   tier D is closed and every suite tool is seeded. Next: E1d, then E2 (whose worklist is
+   `GameMethods`, see E1c), E3, E4.
 
 ## Why this order
 
@@ -117,17 +117,17 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D3 | Most state fields are optional (split: D3a-g) | L | ✅ archived |
 | D4 | `ObjectID` is not a distinct type | M | ✅ archived |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ archived |
-| D6 | `GameState.party` is a second copy of `Party.state` | S | ⏳ |
-| E1 | A shared game context, and one set of tables (split E1a-d: E1a-b ✅, E1c-d ⏳) | L | ⏳ |
+| D6 | `GameState.party` is a second copy of `Party.state` | S | ✅ archived |
+| E1 | A shared game context, and one set of tables (split E1a-d: E1a-c ✅, E1d ⏳) | L | ⏳ |
 | E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
 | E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
 | F1 | Sweep for empty placeholder tables | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
-| F4 | Four suite tools draw from an unseeded stream | S | ⏳ |
+| F4 | Four suite tools draw from an unseeded stream | S | ✅ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
-| G1–G9 | Unported CSBWin features | — | ⏳ |
+| G1–G10 | Unported CSBWin features | — | ⏳ |
 | H | Deliberate divergences | — | 🚫 |
 
 Size: **S** well under a session · **M** about one session · **L** several sessions (split
@@ -1208,23 +1208,9 @@ reads the parameters of a monster that throws nothing.
 ## D — State representation
 
 ✅ Paid on 2026-09-24/25 (D1 in `114dbbe`, D2a-d in `865d704`..`d1b3f8f`, D3a-g in
-`b988d0b`..`fe3ae24`, D4 in `8606715`, D5 in `468ebc6`). All five entries, with their
-outcomes and the fixes found on the way, are in `doc/PLAN_ARCHIVE.md` → "Resolved debt" →
-"`DEBT.md` tier D".
-
-### D6 ⏳ `GameState.party` is a second copy of `Party.state`
-
-*(Found paying E1b, 2026-09-25.)* `GameState` (`src/engine/gameTypes.ts`) carries
-`party: PartyState`, set once in `createGameContext`, while `Party.setState` replaces
-`Party.state` with a new object. `Game` keeps the two in step by hand:
-`this.state.party = this.party.state` appears ten times in `Game.ts` (after `setState`,
-`addChampion`, the Hall of Champions, `setBrightness`, the runtime-save restore…). A path
-that replaces the party and misses the resync leaves `game.state.party` naming the old
-object — and `applySavePayload` (`src/engine/SaveGamePayload.ts`) writes a loaded save's
-blocks *into* `game.state.party`. Not seen to go wrong; it is the D-tier shape of bug
-(stored twice, kept in step by hand). Fix: drop `GameState.party` and read
-`ctx.party.state`, as every subsystem now does. Re-audit the ten sites first: some may be
-resyncing after a `setState` that no longer exists.
+`b988d0b`..`fe3ae24`, D4 in `8606715`, D5 in `468ebc6`, D6 in `27a5aae`). All six
+entries, with their outcomes and the fixes found on the way, are in `doc/PLAN_ARCHIVE.md`
+→ "Resolved debt" → "`DEBT.md` tier D".
 
 ---
 
@@ -1385,6 +1371,53 @@ stay hooks until E2 gives them a home. `Game.addCharacterTables` is a two-field 
 still cut from `GameTables` for `assignAddCharacterPossessions`. The `possession` hooks
 (the one-line `CHARDESC::Possession`) are still written out per module.
 
+*E1c decision (2026-09-25, before code): the hooks that call `Game` methods.* They go
+through `ctx.systems.game`, not through hooks that wait for E2. Its type is
+`GameMethods = Pick<Game, …>` (`src/engine/GameContext.ts`): the union names exactly the
+`Game` methods a subsystem still calls, each made public for it. That list is E2's
+worklist — E2 moves a group into its own system, the subsystems' `ctx.systems.game.x`
+become `ctx.systems.<group>.x`, and the names leave the union; E2 is done when
+`GameMethods` is gone. The alternative, keeping those hooks until E2, would leave two
+mechanisms side by side and every hook written out twice more (declared, then wired in
+`Game`'s constructor). A hook whose body adapted its arguments (`magicShield`'s champion
+lookup, `applyLight`, `openWindow`, `activateMonster`, `onSpawnMonster`, `hitDoor`'s
+clock…) moves into the calling subsystem, at the call site or as a private helper named
+after the hook. What leaves the engine (`playSound`, `trace`, `cursorFilter`,
+`messages`) stays as it is for E1d.
+
+**E1c ✅ (`450fb25`, `bbbe5a4`, `e522db9`, `aa4e7d0`).** `GameContext.systems`
+(`GameSystems`: `actuators`, `dsa`, `timer`, `monsters`, `monsterDamage`,
+`monsterPerception`, `monsterAttack`, `monsterAI`, `characterStats`, `attack`, `movement`,
+`game`), created empty by `createGameContext` and filled by `Game` at the end of its
+constructor. Every subsystem takes `ctx` and nothing else but its E1d host hooks: the
+second constructor arguments (`DsaSystem`'s and `TimerSystem`'s `actuators`, `MonsterAI`'s
+and `AttackSystem`'s deps objects), the setters (`setCharacterStats` ×2,
+`setTeleportPartyHandler`, `setObjectMover`, `onItem16Freed`) and the inter-system hooks of
+`TimerSystem`, `MonsterSystem`, `MonsterDamage`, `MonsterAttack`, `MonsterAI`,
+`AttackSystem`, `MovementSystem` and `ActuatorSystem` (`onAddCharacter`,
+`adjustSkillsFilter`) are gone; `Game`'s constructor went from 233 lines to 49.
+`GameMethods` names the 22 `Game` methods a subsystem still calls. Five hooks `Game` never
+wired went with their dead branches, each now an explicit default with a pointer here:
+`onTriggerMissileLauncher`, `MonsterDamage.monsterDeleteFilter` and
+`MonsterAttack.attackFilter` (G2), `stealFromCharacter` (G10). Hook payload fields the real
+method ignored (`timer` on the AI calls, the missile's position and direction on
+`applyMissileDamageToParty`) went too, and with them `processMissileEncounter`'s unused
+`direction`. `AttackSystem` reads `CHARDESC::Possession` itself. Behaviour-neutral: every
+tool's full output byte-identical after each commit, but for `dump-save-menu`'s payload
+size, which varies by one byte from run to run on its own (3 of 16 runs on an unchanged
+tree); frames identical. Two tools that stand a subsystem up alone now fill
+`ctx.systems`: `dump-local-action` (a real `DsaSystem`), `dump-monster-damage` (stand-ins
+for the timer and actuator systems — its dead group is now lifted through
+`MonsterSystem.moveMonster`, as in a `Game`, where the missing hook used to unlink it
+bare; the output is unchanged).
+
+*What E1d inherits.* The host hooks, one per subsystem: `TimerHooks.playSound`,
+`ActuatorHooks` (`cursorFilter`, `messages`, `playSound`), and the `trace` of
+`MonsterSystemHooks`, `MonsterDamageHooks`, `MonsterAiHooks`, `AttackSystemHooks`;
+`GameOptions` (`cursorFilter`, `messages`, `playSound`, `monsterHooks`) and `Game`'s own
+engine→UI callbacks (`sleepListeners`, `openReincarnateScreen`, the notices C34 needs).
+`Game.addCharacterTables` and the per-module `possession` readers are unchanged.
+
 ### E2 ⏳ Split `Game.ts` by CSBWin source file
 
 `Game.ts` is 3018 lines. Split it by CSBWin source file, as `src/renderer/ui/` already is
@@ -1486,7 +1519,16 @@ party, which the probe does not have. That is the same missing affordance as Pha
 
 <sub>Context: `doc/PLAN_ARCHIVE.md` → “A wall decoration one cell ahead and to the left is no longer…”.</sub>
 
-### F4 ⏳ Four suite tools draw from an unseeded stream
+### F4 ✅ Four suite tools draw from an unseeded stream
+
+**Paid in `dccb6a9`.** `dump-monster-ai`, `dump-throwing` and `watch-monsters` call
+`game.setRandomSeed(0x12345678)`; `dump-attributes` built no `Game` at all — its `levelUp`
+calls fell back to a fresh unseeded `CsbRandom` each — and now shares one seeded stream.
+Each gives the same output on every run, and each still exercises what it asserts
+(`dump-attributes` sees six raises, 45 checks; `watch-monsters` 16 groups move).
+`dump-save-menu` still varies, by the save date. Found on the way, and left: `levelUp`'s
+`random` is optional and falls back to an unseeded stream, the F1 shape.
+
 
 *(Found paying E1a, 2026-09-25, by diffing every tool's output before and after.)*
 `dump-attributes`, `dump-monster-ai`, `dump-throwing` (its `Game`; its `CharacterStats`
@@ -1542,10 +1584,14 @@ shipped dungeon never carries.
 The fourth is `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`), found paying C24: it
 counts each kill in `expool`'s statistics and, when the dungeon has an
 `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA, which may set `deathCloud` and
-`dropResidue`. `MonsterDamage` has a `monsterDeleteFilter` hook that nothing wires, and
-`MoveObject`'s two deletions (`:3147-3176`, `:3298-3308`) do not call it; both use the
+`dropResidue`. Neither `MonsterDamage` (which had an unwired hook until E1c) nor
+`MoveObject`'s two deletions (`:3147-3176`, `:3298-3308`) call it; all use the
 defaults. `MonsterDamage`'s `DMW_DAMAGE` is 0 where CSBWin's `DMW_Damage` is 3
 (`CSB.h:2922`); `DMW_Movement1` is 4, `DMW_Movement2` 5.
+
+A fifth, found in E1c: `MonsterAttackFilter`, the DSA that may rewrite a monster
+attack's whole parameter block. `MonsterAttack.monsterAttacks` had an `attackFilter` hook
+for it that nothing wired; it now uses the block as built.
 
 ### G3 ⏳ The wings
 
@@ -1641,6 +1687,14 @@ The port queues these buttons, and `handleMouseButton` drops them. The marching 
 cannot be changed.
 
 ---
+
+### G10 ⏳ `StealFromCharacter` — the giggler steals nothing
+
+*(Found in E1c, 2026-09-25.)* A monster attack with `monsterShouldSteal` calls
+`StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`) in CSBWin. The port had a
+`stealFromCharacter` hook that `Game` never wired, so the blow is spent and nothing is
+taken; `MonsterAttack` now says so where the call belongs. Port it there, through
+`ctx.systems`, with a tool that has a giggler rob a champion.
 
 ## H — Deliberate divergences (not debt)
 

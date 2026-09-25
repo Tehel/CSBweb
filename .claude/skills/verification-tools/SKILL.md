@@ -137,7 +137,14 @@ behaviour with an extra case explaining why it looks like an omission.
 gives the game every table `buildGameTables` extracts — the same `GameTables` `main.ts`
 uses — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that
 stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `timers` or
-seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Before E1a each
+seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems call
+each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
+what the path under test reaches, with the real system or a cast stand-in
+(`ctx.systems.timer = { createDeathCloud: () => { clouds++; } } as unknown as TimerSystem`,
+`dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
+To intercept a call inside a whole `Game`, replace the method on the instance
+(`game.monsterDamage.damageMonster = …`, `dump-missile-monster.ts`): every caller goes
+through the instance at call time. Before E1a each
 tool hand-built the subset of tables it thought it needed, and two tests silently
 measured nothing because of it (the armour test without the clothing tables;
 `GetCharacterToDamage` without `byte586`, where a wall bump hurt the back row). A new

@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, D1 with D2, D3, D4 and D5, E1a and E1b, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, all of tier D (D1–D6), E1a–c and F4, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -130,8 +130,15 @@ getter lambdas, the seven table slices and their `setTables`, the `queueSound` /
 `isGameWon` / `nameIndex` hooks are gone. `d.Word11694` and `d.CurrentPalette` live in
 `GameState`. No `RUNTIME_SAVE_VERSION` change. Found and recorded: D6 (`GameState.party`
 is a second copy of `Party.state`, resynced by hand) and F4 (four suite tools unseeded).
-Next: D6 and F4 (both S), then E1c (`ctx.systems`), E1d (`GameHost`), then E2–E5. C33 and
-C34 wait until after E1/E2; C25 and C35 wait with the rest of tier C.
+F4: the four unseeded suite tools are seeded, so every tool's output is reproducible
+(`dump-save-menu` still varies by a byte, the save date). D6: `GameState.party` is gone;
+the thirteen resyncs were all redundant. E1c: `ctx.systems` — subsystems call each other
+directly; the second constructor arguments, the five setters and the inter-system hooks
+are gone, and `Game`'s constructor shrank from 233 lines to 49. The `Game` methods a
+subsystem still calls go through `ctx.systems.game`, typed `GameMethods` (22 names): E2's
+worklist. Found and recorded: G10 (`StealFromCharacter` is not ported) and a fifth DSA
+filter under G2 (`MonsterAttackFilter`). Next: E1d (`GameHost`), then E2–E5. C33 and C34
+wait until after E1/E2; C25 and C35 wait with the rest of tier C.
 
 ## Ground rules
 
