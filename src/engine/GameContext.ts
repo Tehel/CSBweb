@@ -26,6 +26,7 @@ import type { AttackSystem } from './AttackSystem';
 import type { CharacterStats } from './CharacterStats';
 import type { DsaSystem } from './DsaSystem';
 import type { Game } from './Game';
+import type { MagicSystem } from './MagicSystem';
 import type { MonsterAI } from './MonsterAI';
 import type { MonsterAttack } from './MonsterAttack';
 import type { MonsterDamage } from './MonsterDamage';
@@ -45,22 +46,16 @@ export type GameMethods = Pick<Game,
   | 'adjustBrightness'
   | 'applyMagicShield'
   | 'applyMissileDamageToParty'
-  | 'applySpellSkillGain'
-  | 'characterThrowsSpell'
   | 'climbDownIntoPit'
-  | 'disableCharacterAction'
   | 'dropAllPossessions'
-  | 'emitSpellMessage'
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
-  | 'launchObject'
   | 'notePartyMoved'
   | 'onChampionDied'
-  | 'queueUtilityTimer'
   | 'registerChampionBones'
   | 'removeCharacterPossession'
-  | 'setBrightnessTimer'
   | 'setBusyTimerRefill'
+  | 'setChampionHand'
   | 'throwFromWeaponHand'
   | 'wakeUp'
 >;
@@ -84,6 +79,7 @@ export interface GameSystems {
   characterStats: CharacterStats;
   attack: AttackSystem;
   movement: MovementSystem;
+  magic: MagicSystem;
   game: GameMethods;
 }
 

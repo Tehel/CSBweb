@@ -2475,7 +2475,7 @@ now, and `restoreTimerQueue` is its inverse.
 
 The other conflict is benign and is guarded rather than assumed: a magic shield or poison
 timer keeps a **count** in `timerWord6` while `uByte6`/`uByte7` are zero, because
-`Game.queueUtilityTimer` passes `x = y = 0`. The two representations can only disagree
+`MagicSystem.queueUtilityTimer` passes `x = y = 0`. The two representations can only disagree
 when one of them is zero, since no creator sets both.
 
 **And the reader has to resolve what the writer encoded.** `parseTimers` keeps bytes 6-9

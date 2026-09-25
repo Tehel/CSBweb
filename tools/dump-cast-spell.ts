@@ -3,7 +3,7 @@
  *
  * A DSA spell filter (`DsaSystem.processSpellFilter`) can rewrite the `SPELL_PARAMETERS`
  * `CastSpell` receives (`doc/CSBwin-src/Magic.cpp:1090`). No dungeon this port loads defines
- * one, so this calls `Game.castSpell` with the parameters directly:
+ * one, so this calls `MagicSystem.castSpell` with the parameters directly:
  *
  * - the difficulty is `D4W = pSpell->skillRequired + spellPower` — the spell's own skill,
  *   not the filter's — while the filter's `skillRequired` feeds only the experience's
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     castSpell(chIdx: number, p: SpellParameters): number;
     fillSpellParameters(chIdx: number, incantation: number[], party: unknown): SpellParameters;
   };
-  const internals = game as unknown as Internals;
+  const internals = game.magic as unknown as Internals;
 
   /** One cast from a fresh party with the same seed, under `overrides`. */
   const cast = (overrides: Partial<SpellParameters>, setup?: (c: Champion) => void) => {

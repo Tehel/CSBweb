@@ -36,8 +36,8 @@ import { MonsterDamage } from './MonsterDamage';
 import { MonsterAI } from './MonsterAI';
 import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
+import { MagicSystem } from './MagicSystem';
 import { AttackType } from './monsterTypes';
-import { constructPredefinedMissile } from './missileHelpers';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
 import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
@@ -54,15 +54,11 @@ import {
     getActuatorType,
     setActuatorType,
 } from '../data/actuatorHelpers';
-import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { CharacterStats } from './CharacterStats';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import type { GameTables } from './GameTables';
-import type { SpellDefinition } from '../data/spellTypes';
-import type { SpellParameters } from './magicTypes';
 import {
     OBJNI_EKKHARD_CROSS,
-    OBJNI_EMPTY_FLASK,
     OBJNI_ILLUMULET_A,
     OBJNI_ILLUMULET_B,
     OBJNI_JEWEL_SYMAL_A,
@@ -309,6 +305,8 @@ export class Game {
     readonly monsterAttack: MonsterAttack;
     /** The champions' own attacks (`doc/CSBwin-src/Attack.cpp`). */
     readonly attackSystem: AttackSystem;
+    /** `Magic.cpp`'s engine half: casting, `LaunchObject`, `DisableCharacterAction`. */
+    readonly magic: MagicSystem;
     /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
     get gameWon(): boolean { return this.state.gameWon; }
     set gameWon(won: boolean) { this.state.gameWon = won; }
@@ -388,6 +386,7 @@ export class Game {
 
         this.attackSystem = new AttackSystem(ctx);
         this.movementSystem = new MovementSystem(ctx);
+        this.magic = new MagicSystem(ctx);
 
         Object.assign(ctx.systems, {
             actuators: this.actuators,
@@ -401,6 +400,7 @@ export class Game {
             characterStats: this.characterStats,
             attack: this.attackSystem,
             movement: this.movementSystem,
+            magic: this.magic,
             game: this,
         } satisfies GameSystems);
     }
@@ -1342,11 +1342,6 @@ export class Game {
         this.party.state.brightness = sw(current + delta);
     }
 
-    setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
-        const time = (this.state.tickCount + delayTicks) >>> 0;
-        this.timerSystem.queueBrightnessTimer(deltaSteps, time);
-    }
-
     /**
      * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`), called from the
      * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`) —
@@ -1545,359 +1540,10 @@ export class Game {
         return champion.possessions[slot] ?? OBJECT_ID_NULL;
     }
 
-    private castMagic(casterIdx: number): number {
-        const party = this.party.state;
-        const champion = party.champions[casterIdx];
-        if (!champion || champion.alive === false) return 0;
-        if (champion.incantation.length === 0) return 0;
-        const params = this.fillSpellParameters(casterIdx, champion.incantation, party);
-        const filtered = this.dsaSystem.processSpellFilter(params);
-        return this.castSpell(casterIdx, filtered ?? params);
-    }
-
-    private fillSpellParameters(casterIdx: number, incantation: number[], party: PartyState): SpellParameters {
-        let value = 0;
-        let multiplier = 1000;
-        for (let i = 0; i < 4 && multiplier > 0; i += 1, multiplier = Math.floor(multiplier / 10)) {
-            const rune = incantation[i] ?? 0;
-            if (rune === 0) break;
-            value += (rune - 0x60 - 6 * i + 1) * multiplier;
-        }
-        return {
-            action: 0,
-            incantation: value,
-            chIdx: casterIdx,
-            disableTime: -1,
-            missileType: -1,
-            locationAbs: this.encodeLocationAbs(party.position),
-            facing: party.facing,
-            skillRequired: -1,
-            spellByte5: -1,
-            spellClass: -1,
-            unused1: -1,
-            unused2: -1,
-            unused3: -1,
-            unused4: -1,
-        };
-    }
-
-    /**
-     * `CastSpell` (`doc/CSBwin-src/Magic.cpp:1090`). A spell filter's `action` is handled
-     * before the caster is even looked at (`:1110-1149`), so its message prints for a
-     * dead caster too; an `action` with no message (0, or 8 and up) casts normally.
-     */
-    private castSpell(chIdx: number, spellParameters: SpellParameters): number {
-        let casterIdx = chIdx;
-        if (spellParameters.chIdx !== -1) casterIdx = spellParameters.chIdx & 0xffff;
-        const champion = this.party.state.champions[casterIdx];
-
-        const abortText = this.getSpellAbortMessage(spellParameters.action);
-        if (abortText !== null) {
-            if (abortText !== '') this.emitSpellMessage(this.substituteSpellName(abortText, champion));
-            if (spellParameters.disableTime !== -1) {
-                this.disableCharacterAction(casterIdx, spellParameters.disableTime);
-            }
-            return 0;
-        }
-        // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1150-1153`).
-        if (!champion || champion.alive === false) return 0;
-        if ((champion.attributes.health | 0) <= 0) return 0;
-
-        let facing = this.party.state.facing;
-        if (spellParameters.facing !== -1) facing = spellParameters.facing;
-        if (facing < 0 || facing > 3) return 0;
-
-        let incantation = champion.incantation;
-        if (spellParameters.incantation !== -1) {
-            incantation = this.decodeIncantationOverride(spellParameters.incantation);
-        }
-
-        const spell = this.incantationToSpell(incantation);
-        if (!spell) {
-            if (spellParameters.disableTime !== -1) {
-                this.disableCharacterAction(casterIdx, spellParameters.disableTime);
-            }
-            this.spellErrorMsg(champion, 1, 0);
-            return 0;
-        }
-
-        const spellPower = (incantation[0] ?? 0) - 95;
-        if (spellPower < 1 || spellPower > 6) return 0;
-
-        let skillRequired = spell.skillRequired;
-        if (spellParameters.skillRequired !== -1) skillRequired = spellParameters.skillRequired;
-
-        let spellByte5 = spell.byte5;
-        if (spellParameters.spellByte5 !== -1) spellByte5 = spellParameters.spellByte5;
-
-        let missileType = (spell.word6 >> 4) & 0x3f;
-        if (spellParameters.missileType !== -1) missileType = spellParameters.missileType;
-
-        // `D4W = sw(pSpell->skillRequired + spellPower)` — the spell's *own* skill sets the
-        // difficulty; a filter's `skillRequired` only enters the experience's middle term
-        // (`:1206-1211`).
-        const required = sw(spell.skillRequired + spellPower);
-        const w4 = this.computeSpellExperience(required, spellPower, skillRequired);
-        const mastery = determineMastery(champion, spellByte5, {
-            getObjectNameIndex: (objectId) => this.nameIndex(objectId),
-        });
-
-        if (mastery < required) {
-            const wisdom = championAttribute(champion, AttributeIndex.Wisdom);
-            const threshold = Math.min(wisdom + 15, 115);
-            const diff = required - mastery;
-            for (let i = 0; i < diff; i += 1) {
-                if (this.randomInt(128) > threshold) {
-                    const gained = w4 >> diff;
-                    this.applySpellSkillGain(casterIdx, spellByte5, gained, AdjustSkillsWhy.CastSpell1);
-                    this.spellErrorMsg(champion, 0, spellByte5);
-                    return 0;
-                }
-            }
-        }
-
-        let spellClass = spell.word6 & 0xf;
-        if (spellParameters.spellClass !== -1) spellClass = spellParameters.spellClass;
-
-        switch (spellClass) {
-            case 1: {
-                const flask = this.getFlaskInHand(champion);
-                if (!flask) {
-                    this.spellErrorMsg(champion, 10, 0);
-                    return 3;
-                }
-                const potion = this.dungeonState.getPotionRecord(flask);
-                if (!potion) return 3;
-                potion.potionType = (spell.word6 >> 4) & 0x3f;
-                potion.power = (40 * spellPower + this.randomInt(16)) & 0xff;
-                break;
-            }
-            case 2: {
-                champion.facing = this.party.state.facing;
-                let masteryForRange = mastery;
-                if (missileType === 4) masteryForRange *= 2;
-                const range = this.applyLimits(
-                    21,
-                    (2 * masteryForRange + 4) * (spellPower + 2),
-                    255,
-                );
-                const { range: adjustedRange, decayRate } = this.adjustSpellMissileRange(
-                    range,
-                    champion.attributes.maxMana | 0,
-                );
-                const posInCell = this.computeSpellLaunchPos(champion.partyPosition, facing);
-                this.timerSystem.launchThrownMissile(
-                    this.spellObjectId(missileType),
-                    this.party.state.position,
-                    posInCell,
-                    facing,
-                    adjustedRange,
-                    90,
-                    decayRate,
-                    this.state.tickCount,
-                );
-                break;
-            }
-            case 3: {
-                let d6 = 4 * (spellPower + 1);
-                switch (missileType) {
-                    case 0: {
-                        let delay = 10000 + (d6 - 8) * 512;
-                        d6 = Math.trunc(d6 / 2) - 1;
-                        if (d6 < 0) d6 = 0;
-                        this.timerSystem.applyBrightnessSteps(d6, 1);
-                        this.setBrightnessTimer(-d6, delay);
-                        break;
-                    }
-                    case 5: {
-                        let delay = 4000 + 128 * (d6 - 3);
-                        d6 = Math.trunc(d6 / 4) + 1;
-                        this.timerSystem.applyBrightnessSteps(d6, 1);
-                        this.setBrightnessTimer(-d6, delay);
-                        break;
-                    }
-                    case 1: {
-                        d6 = Math.trunc(d6 / 4);
-                        this.timerSystem.applyBrightnessSteps(d6, -1);
-                        this.setBrightnessTimer(d6, 98);
-                        break;
-                    }
-                    case 2: {
-                        this.party.state.seeThruWalls = this.party.state.seeThruWalls + 1;
-                        d6 = Math.trunc(d6 / 2);
-                        const duration = d6 * d6;
-                        this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
-                        break;
-                    }
-                    case 3: {
-                        this.party.state.invisible = this.party.state.invisible + 1;
-                        this.queueUtilityTimer(TimerFunction.TT_71, d6, 0);
-                        break;
-                    }
-                    case 4: {
-                        let shieldAdd = d6;
-                        if (this.party.state.partyShield > 50) {
-                            shieldAdd = Math.trunc(shieldAdd / 4);
-                        }
-                        this.party.state.partyShield = this.party.state.partyShield + shieldAdd;
-                        const duration = d6 * d6;
-                        this.queueUtilityTimer(TimerFunction.TT_74, duration, shieldAdd);
-                        break;
-                    }
-                    case 6: {
-                        this.party.state.magicFootprintsActive = this.party.state.magicFootprintsActive + 1;
-                        const first = this.party.state.numFootprintEnt;
-                        this.party.state.indexOfFirstMagicFootprint = first;
-                        this.party.state.indexOfLastMagicFootprint = spellPower < 3 ? first : 0;
-                        const duration = d6 * d6;
-                        this.queueUtilityTimer(TimerFunction.TT_79, duration, 0);
-                        break;
-                    }
-                    case 7: {
-                        const zokathra = this.createMiscObject(51);
-                        if (zokathra) {
-                            if (this.setChampionHand(champion, 0, zokathra) || this.setChampionHand(champion, 1, zokathra)) {
-                                // placed in hand
-                            } else {
-                                const placed = this.dungeonState.addObjectToCell(
-                                    this.party.state.position,
-                                    withObjectPosition(zokathra, 0),
-                                );
-                                if (!placed) this.dungeonState.deleteDBEntry(zokathra);
-                            }
-                        }
-                        break;
-                    }
-                    case 8: {
-                        this.applyMagicShield(champion, false, d6 * d6 + 100, 0);
-                        break;
-                    }
-                    default:
-                        break;
-                }
-                break;
-            }
-            default:
-                break;
-        }
-
-        this.applySpellSkillGain(casterIdx, spellByte5, w4, AdjustSkillsWhy.CastSpell2);
-        let disableTime = (spell.word6 >> 10) & 0x3f;
-        if (spellParameters.disableTime !== -1) disableTime = spellParameters.disableTime;
-        this.disableCharacterAction(casterIdx, disableTime);
-        // Spell effects are wired in subsequent magic parity steps.
-        return 1;
-    }
-
-    private incantationToSpell(incantation: number[]): SpellDefinition | null {
-        if ((incantation[1] ?? 0) === 0) return null;
-        let packed = 0;
-        let shift = 24;
-        for (let i = 0; i < 4; i++) {
-            const value = incantation[i] ?? 0;
-            packed |= (value & 0xff) << shift;
-            if ((incantation[i + 1] ?? 0) === 0) break;
-            shift -= 8;
-            if (shift < 0) break;
-        }
-        for (const spell of this.tables.spells) {
-            if ((spell.spellId & 0xff000000) !== 0) {
-                if ((packed >>> 0) === (spell.spellId >>> 0)) return spell;
-            } else if (((packed >>> 0) & 0xffffff) === (spell.spellId >>> 0)) {
-                return spell;
-            }
-        }
-        return null;
-    }
-
-    private decodeIncantationOverride(value: number): number[] {
-        const incantation = new Array<number>(4).fill(0);
-        let n = Math.max(0, value | 0);
-        for (let i = 3; i >= 0; i -= 1) {
-            const digit = n % 10;
-            n = Math.floor(n / 10);
-            if (digit <= 0) {
-                incantation[i] = 0;
-            } else {
-                incantation[i] = 0x60 + 6 * i + digit - 1;
-            }
-        }
-        return incantation;
-    }
-
-    private encodeLocationAbs(position: Position): number {
-        return ((position.z & 0x3f) << 10) | ((position.x & 0x1f) << 5) | (position.y & 0x1f);
-    }
-
-    private getFlaskInHand(champion: Champion): ObjectID | null {
-        for (let slot = 0; slot < 2; slot += 1) {
-            const obj = this.getChampionPossession(champion, slot);
-            if (obj === OBJECT_ID_NULL) continue;
-            if (this.getBaseObjectNameIndex(obj) === OBJNI_EMPTY_FLASK) return obj;
-        }
-        return null;
-    }
-
-    applySpellSkillGain(chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy): void {
-        if (experience <= 0) return;
-        const map = this.dungeonState.getMap(this.party.state.position.z);
-        const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-        adjustSkills(this.party.state.champions, chIdx, skillNumber, experience, why, {
-            time: this.state.tickCount,
-            lastMonsterAttackTime: this.party.state.lastMonsterAttackTime,
-            random: this.random,
-            experienceMultiplier,
-            applyAdjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
-            onLevelUp: (levelIdx, basicSkill) => this.actuators.notifyLevelUp(levelIdx, basicSkill),
-        });
-    }
-
-    private computeSpellExperience(required: number, spellPower: number, skillRequired: number): number {
-        const rand = this.randomInt(8);
-        const term = (spellPower - 1) * skillRequired;
-        return rand + 16 * required + 8 * term + required * required;
-    }
-
     private applyLimits(min: number, value: number, max: number): number {
         if (value < min) return min;
         if (value > max) return max;
         return value | 0;
-    }
-
-    private adjustSpellMissileRange(range: number, maxMana: number): { range: number; decayRate: number } {
-        const manaFactor = Math.min(8, Math.trunc(maxMana / 8));
-        let decayRate = 10 - manaFactor;
-        let adjusted = range | 0;
-        if (adjusted < 4 * decayRate) {
-            adjusted += 3;
-            decayRate -= 1;
-        }
-        return { range: adjusted, decayRate };
-    }
-
-    private computeSpellLaunchPos(championPos: number, facing: number): number {
-        const offset = ((championPos - facing + 1) & 2) >> 1;
-        return (offset + facing) & 0x3;
-    }
-
-    private spellObjectId(missileType: number): ObjectID {
-        return ((0xff80 + (missileType & 0x7f)) & 0xffff) as ObjectID;
-    }
-
-    queueUtilityTimer(functionType: number, duration: number, timerWord6: number): void {
-        const party = this.party.state;
-        this.timerQueue.createTimer(
-            functionType,
-            0,
-            0,
-            0,
-            0,
-            (this.state.tickCount + Math.max(0, duration | 0)) >>> 0,
-            party.position.z,
-            undefined,
-            0,
-            timerWord6,
-        );
     }
 
     applyMagicShield(champion: Champion, isSpellShield: boolean, strength: number, mustHaveMana: number): number {
@@ -1922,16 +1568,16 @@ export class Game {
         if (isSpellShield) {
             if (party.spellShield > 50) add = Math.trunc(add / 4);
             party.spellShield = party.spellShield + add;
-            this.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
+            this.magic.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
         } else {
             if (party.fireShield > 50) add = Math.trunc(add / 4);
             party.fireShield = party.fireShield + add;
-            this.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
+            this.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
         }
         return raised;
     }
 
-    private setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
+    setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
         const slots = champion.possessions;
         if (slot < 0 || slot >= slots.length) return false;
         if (slots[slot] !== OBJECT_ID_NULL) return false;
@@ -1945,49 +1591,6 @@ export class Game {
     /** `AdjustStatsForItemCarried` (`src/engine/AdjustStatsForItemCarried.ts`). */
     private adjustStatsForItemCarried(champion: Champion, slot: number, addOrRemove: number, obj: ObjectID): void {
         AdjustStatsForItemCarried(champion, slot, addOrRemove, obj, this.dungeonState, (rn) => this.nameIndex(rn));
-    }
-
-    private createMiscObject(miscType: number): ObjectID | null {
-        const newIndex = this.dungeonState.findEmptyDBEntry('misc', {
-            nextObject: OBJECT_ID_EOF,
-            specialState: 0,
-            important: false,
-            miscType: miscType & 0x7f,
-        });
-        return newIndex === null ? null : encodeObjectID(0, DBType.MISC, newIndex);
-    }
-
-    disableCharacterAction(chIdx: number, timeDelay: number): void {
-        if (timeDelay <= 0) return;
-        const party = this.party.state;
-        const champion = party.champions[chIdx];
-        if (!champion) return;
-        let targetTime = (this.state.tickCount + (timeDelay | 0)) >>> 0;
-        const existingIndex = champion.busyTimerIndex;
-        if (existingIndex >= 0) {
-            const existing = this.timerQueue.getTimer(existingIndex);
-            if (existing) {
-                const existingTime = existing.time >>> 0;
-                if (targetTime >= existingTime) {
-                    targetTime = (targetTime + ((existingTime - this.state.tickCount) >> 1)) >>> 0;
-                } else {
-                    targetTime = (existingTime + ((timeDelay | 0) >> 1)) >>> 0;
-                }
-            }
-            this.timerQueue.deleteTimer(existingIndex);
-        }
-        const entry = this.timerQueue.createTimerWithUByte5(
-            TimerFunction.TT_11,
-            0,
-            0,
-            0,
-            0,
-            targetTime,
-            party.position.z,
-            chIdx,
-        );
-        champion.busyTimerIndex = entry.index;
-        champion.actionDisabledUntil = entry.time;
     }
 
 
@@ -2020,61 +1623,6 @@ export class Game {
         const value = this.attackSystem.attackDamageToDisplay;
         this.attackSystem.attackDamageToDisplay = 0;
         return value;
-    }
-
-    /**
-     * `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:470`).
-     *
-     * The decay rate comes from the champion's *maximum* mana, not the current amount,
-     * so a naturally powerful caster's bolts keep their damage longer regardless of how
-     * drained they are. A spell whose range is short relative to its decay gets three
-     * extra cells and one less decay — a small bonus for close-range casting.
-     */
-    characterThrowsSpell(chIdx: number, projectile: number, range: number, neededMana: number): number {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return 0;
-        if ((champion.attributes.mana | 0) < neededMana) return 0;
-        champion.attributes.mana = (champion.attributes.mana | 0) - neededMana;
-
-        let decayRate = 10 - Math.min(8, Math.trunc((champion.attributes.maxMana | 0) / 8));
-        let adjustedRange = range;
-        if (adjustedRange < 4 * decayRate) {
-            adjustedRange += 3;
-            decayRate -= 1;
-        }
-        return this.launchObject(chIdx, projectile as ObjectID, adjustedRange, 90, decayRate);
-    }
-
-    /**
-     * `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — throw from the champion's own
-     * side of the cell, so a bolt cast by the front-right champion leaves on the right.
-     */
-    launchObject(
-        chIdx: number,
-        object: ObjectID,
-        range: number,
-        damage: number,
-        decayRate: number,
-    ): number {
-        const champion = this.party.state.champions[chIdx];
-        if (!champion) return 0;
-        const facing = (champion.facing ?? this.party.state.facing) & 3;
-        const posInCell = ((((champion.partyPosition - facing + 1) & 2) >> 1) + facing) & 3;
-        const projectile = (object & 0xffff) >= 0xff80
-            ? constructPredefinedMissile(this.dungeonState, object & 0xffff)
-            : object;
-        if (projectile === null) return 0;
-        const launched = this.timerSystem.launchThrownMissile(
-            projectile,
-            this.party.state.position,
-            posInCell,
-            facing,
-            range,
-            damage,
-            decayRate,
-            this.state.tickCount,
-        );
-        return launched ? 1 : 0;
     }
 
     /**
@@ -2248,97 +1796,6 @@ export class Game {
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
         this.loadPartyLevelIfChanged();
-    }
-
-    /** `CastSpell`'s `spellParameters.action` switch (`doc/CSBwin-src/Magic.cpp:1110-1136`): '' aborts silently, null casts. */
-    private getSpellAbortMessage(action: number): string | null {
-        let msg: string | null = null;
-        switch (action | 0) {
-            case 1:
-                msg = '';
-                break;
-            case 2:
-                msg = 'THAT IS A DIFFICULT SPELL.  STUDY IT.';
-                break;
-            case 3:
-                msg = 'THE SPELL FIZZLES.';
-                break;
-            case 4:
-                msg = 'THE SPELL FIZZLES AND DIES.';
-                break;
-            case 5:
-                msg = 'THIS SPELL IS TOO DIFFICULT.';
-                break;
-            case 6:
-                msg = '% NEEDS MORE PRACTICE WITH THIS SPELL.';
-                break;
-            case 7:
-                msg = 'THIS SPELL REQUIRES A COMPONENT.';
-                break;
-            default:
-                msg = null;
-                break;
-        }
-        return msg;
-    }
-
-    private substituteSpellName(text: string, champion: Champion | undefined): string {
-        const idx = text.indexOf('%');
-        if (idx < 0) return text;
-        return `${text.slice(0, idx)}${champion?.name ?? ''}${text.slice(idx + 1)}`;
-    }
-
-    /**
-     * CSBWin `StandardSpellMessage()` (`doc/CSBwin-src/Magic.cpp:1058`): a linefeed, then the
-     * text in colour 4, with '%' replaced by the caster's name. One logical line — the
-     * message area word-wraps it.
-     */
-    emitSpellMessage(text: string): void {
-        const messages = this.ctx.host.messages;
-        if (!text) return;
-        messages.printLinefeed();
-        messages.quePrintLines(MSG_COLOR_SPELL, text);
-    }
-
-    /**
-     * CSBWin `SpellErrorMsg()` (`doc/CSBwin-src/Magic.cpp:1004`).
-     *
-     * Emitted as a linefeed followed by separate fragments, all colour 4. The fragments carry
-     * their own leading/trailing spaces and flow onto a single wrapped line — CSBWin never
-     * puts a hard newline between the champion name and the message body.
-     */
-    private spellErrorMsg(champion: Champion, code: number, skillNumber: number): void {
-        const messages = this.ctx.host.messages;
-
-        let base = skillNumber | 0;
-        if (base > 3) base = Math.floor((base - 4) / 4);
-
-        messages.printLinefeed();
-        messages.quePrintLines(MSG_COLOR_SPELL, champion.name);
-
-        switch (code | 0) {
-            case 0: {
-                const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
-                const label = labels[base] ?? 'SKILL';
-                messages.quePrintLines(MSG_COLOR_SPELL, ' NEEDS MORE PRACTICE WITH THIS ');
-                messages.quePrintLines(MSG_COLOR_SPELL, label);
-                messages.quePrintLines(MSG_COLOR_SPELL, ' SPELL.');
-                break;
-            }
-            case 1:
-                messages.quePrintLines(MSG_COLOR_SPELL, ' MUMBLES A MEANINGLESS SPELL.');
-                break;
-            case 10:
-                messages.quePrintLines(MSG_COLOR_SPELL, ' NEEDS AN EMPTY FLASK IN HAND FOR POTION.');
-                break;
-            default:
-                messages.quePrintLines(MSG_COLOR_SPELL, ' UNKNOWN SPELL ERROR');
-                break;
-        }
-    }
-
-    private randomInt(maxExclusive: number): number {
-        return this.random.below(maxExclusive);
     }
 
 
@@ -2558,7 +2015,7 @@ export class Game {
         this.monsterAttack.adjustStamina(chIdx, this.throwStaminaCost(obj));
         // A negative disable time means "use the default", which is 4 ticks.
         const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
-        this.disableCharacterAction(chIdx, disableTime);
+        this.magic.disableCharacterAction(chIdx, disableTime);
 
         // The experience the throw earns, and `weaponBonus` — the weapon's own
         // contribution to the distance, which doubles as the damage scale below.
@@ -2625,19 +2082,9 @@ export class Game {
     }
 
 
-    /**
-     * The magic panel's cast button. CSBWin's caller hands `CastMagic` nothing but the
-     * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune.
-     */
+    /** The magic panel's cast button (`MagicSystem.castSpellFromUi`). */
     castSpellFromUi(chIdx: number, incantation: number[]): number {
-        if (chIdx < 0 || chIdx >= this.party.state.champions.length) return 0;
-        if (!incantation || incantation.length === 0) return 0;
-        const champion = this.party.state.champions[chIdx];
-        if (!champion || champion.alive === false) return 0;
-        champion.incantation = [...incantation];
-        const result = this.castMagic(chIdx);
-        if (result !== 3) champion.incantation = [];
-        return result;
+        return this.magic.castSpellFromUi(chIdx, incantation);
     }
 
     /** `AdjustSkills(chIdx, 10, experience, ASW_ThrowByCharacter)`. */
@@ -2821,7 +2268,7 @@ export class Game {
      *   `csbgame-flying-sword.dat`: function 49, bytes 6-7 = 0x079a (the object's slot)
      *   and bytes 8-9 = 0xa909 (the packed word).
      * - Where a **count** lives in `timerWord6` and nothing lives in the bytes — the
-     *   magic shield and poison timers, which `Game.queueUtilityTimer` creates with
+     *   magic shield and poison timers, which `MagicSystem.queueUtilityTimer` creates with
      *   x = y = 0 — the count is written into them. The two representations can only
      *   ever conflict when one is zero, because no creator sets both; the guard says
      *   exactly that rather than assuming it.

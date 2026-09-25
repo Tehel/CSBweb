@@ -371,7 +371,7 @@ export class AttackSystem {
       this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, phys.staminaAdjust);
     }
     if (phys.skillAdjust !== 0) {
-      this.ctx.systems.game.applySpellSkillGain(params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
+      this.ctx.systems.magic.applySpellSkillGain(params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
     }
 
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
@@ -689,7 +689,7 @@ export class AttackSystem {
       success = 1;
     }
 
-    this.ctx.systems.game.applySpellSkillGain(params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
+    this.ctx.systems.magic.applySpellSkillGain(params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
     return success;
   }
 
@@ -723,7 +723,7 @@ export class AttackSystem {
     params.attdep.spellAttack.decrementCharges = 1;
     this.callAttackFilter(filter, params, 1);
 
-    const success = this.ctx.systems.game.characterThrowsSpell(
+    const success = this.ctx.systems.magic.characterThrowsSpell(
       params.charIdx,
       params.attdep.spellAttack.spellType,
       params.attdep.spellAttack.spellRange,
@@ -1000,7 +1000,7 @@ export class AttackSystem {
         params.dataType = AttackDataType.ADT_Flip;
         params.attdep.flip.heads = this.ctx.random.bool();
         this.callAttackFilter(filter, params, 1);
-        this.ctx.systems.game.emitSpellMessage(params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS');
+        this.ctx.systems.magic.emitSpellMessage(params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS');
         break;
 
       case AttackType.atk_SPELLSHIELD:
@@ -1093,7 +1093,7 @@ export class AttackSystem {
         const duration = sw(this.ctx.random.below(this.masteryOf(pChar, params.skillNumber) + 8) + 5);
         // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2016`).
         this.ctx.party.state.seeThruWalls = this.ctx.party.state.seeThruWalls + 1;
-        this.ctx.systems.game.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
+        this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
         params.dataType = AttackDataType.ADT_Window;
         this.callAttackFilter(filter, params, 1);
         this.decrementChargesRemaining(params.charIdx);
@@ -1154,7 +1154,7 @@ export class AttackSystem {
         this.callAttackFilter(filter, params, 1);
         // `d.Brightness += delta`, then `SetBrightnessTimer(decayRate, time)`.
         this.ctx.systems.game.adjustBrightness(params.attdep.light.deltaLight);
-        this.ctx.systems.game.setBrightnessTimer(params.attdep.light.decayRate, params.attdep.light.time);
+        this.ctx.systems.magic.setBrightnessTimer(params.attdep.light.decayRate, params.attdep.light.time);
         this.decrementChargesRemaining(params.charIdx);
         break;
 
@@ -1203,13 +1203,13 @@ export class AttackSystem {
 
     this.callAttackFilter(filter, params, 2);
     if (params.disableTime !== 0) {
-      this.ctx.systems.game.disableCharacterAction(params.charIdx, params.disableTime);
+      this.ctx.systems.magic.disableCharacterAction(params.charIdx, params.disableTime);
     }
     if (params.staminaCost !== 0) {
       this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, params.staminaCost);
     }
     if (params.experienceGained !== 0) {
-      this.ctx.systems.game.applySpellSkillGain(params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
+      this.ctx.systems.magic.applySpellSkillGain(params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
     }
     if (params.activateMonster !== 0) {
       // `ProcessTimers29to41(x, y, TT_M1, 0)` — wake the group we just hit.
@@ -1293,7 +1293,7 @@ export class AttackSystem {
     params.attdep.shoot.success = 1;
     this.callAttackFilter(filter, params, 1);
     if (projectile === OBJECT_ID_NULL) return 1;
-    this.ctx.systems.game.launchObject(
+    this.ctx.systems.magic.launchObject(
       params.charIdx,
       projectile,
       params.attdep.shoot.range,
