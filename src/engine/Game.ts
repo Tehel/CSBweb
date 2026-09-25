@@ -579,6 +579,9 @@ export class Game {
                 queueSound: (ordinal, mapX, mapY, deltaTime) =>
                     this.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
                 launchMissile: (o) => this.timerSystem.launchMonsterMissile(o),
+                moveObject: (object, oldX, oldY, newX, newY, level) => {
+                    this.timerSystem.moveObject(object, oldX, oldY, newX, newY, level);
+                },
                 registerBones: (bones, chIdx) => this.registerChampionBones(bones, chIdx),
                 dropAllPossessions: (chIdx) => this.dropAllPossessions(chIdx),
                 onChampionDied: (chIdx) => this.onChampionDied(chIdx),

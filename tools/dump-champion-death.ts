@@ -228,6 +228,24 @@ function findOpenPit(game: Game): Position | null {
   return null;
 }
 
+/** Every bones object in the dungeon, with the cell it lies in. */
+function everyBones(game: Game): { rn: ObjectID; cell: Position }[] {
+  const dungeon = game.dungeonState;
+  const found: { rn: ObjectID; cell: Position }[] = [];
+  for (let z = 0; z < dungeon.getMapCount(); z++) {
+    const map = dungeon.getMap(z);
+    if (!map) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if ((map.cellFlags[x]![y]! & 0x10) === 0) continue;
+        const cell = new Position(x, y, z);
+        for (const rn of bonesAt(game, cell)) found.push({ rn, cell });
+      }
+    }
+  }
+  return found;
+}
+
 function bonesAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
@@ -507,6 +525,19 @@ function main(): void {
       console.log(`dying over the open pit at (${pit.x},${pit.y}) level ${pit.z}: the dagger is at `
         + (at.map((p) => `(${p.x},${p.y}) level ${p.z}`).join(' ') || 'nowhere'));
       check(at.length === 1 && at[0]!.z > pit.z, 'a possession dropped over an open pit falls through it');
+
+      // C31: `KillCharacter` sets the bones down with the same `MoveObject(objD4, -1, 0,
+      // partyX, partyY)` (`doc/CSBwin-src/Character.cpp:2636-2645`), so they fall too, and
+      // `expool.AddChampionBonesRecord(objD4, …)` still pairs them wherever they land.
+      const bones = everyBones(g2);
+      console.log('the bones are at '
+        + (bones.map(({ rn, cell }) => `(${cell.x},${cell.y}) level ${cell.z} as 0x${rn.toString(16)}`).join(' ') || 'nowhere'));
+      check(bonesAt(g2, pit).length === 0, 'no bones are left lying on the open pit');
+      check(bones.length === 1 && bones[0]!.cell.z > pit.z, 'the bones fall through the pit like the possessions');
+      check(bones.length === 1 && g2.dungeonState.copyChampionBonesRecord(bones[0]!.rn) !== null,
+        'the fallen bones are still paired in the expool');
+      check(bones.length === 1 && decodeObjectID(bones[0]!.rn).position === (g2.party.state.champions[0]!.partyPosition & 3),
+        'and lie in the dead champion\'s corner');
     }
   }
 

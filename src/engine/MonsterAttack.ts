@@ -17,7 +17,7 @@
  * exists as a struct in CSBWin, so it is kept as one here.
  */
 import { applyLimits, sw } from '../core/intCast';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
@@ -123,6 +123,11 @@ export interface MonsterAttackHooks {
   onChampionDied?: (chIdx: number) => void;
   /** Register the bones↔champion mapping (`expool.AddChampionBonesRecord`). */
   registerBones?: (bones: ObjectID, chIdx: number) => void;
+  /**
+   * `MoveObject(obj, -1, 0, x, y)` — sets an object down in a cell as a drop does, so it
+   * presses a pad or falls down a pit (`doc/CSBwin-src/Code11f52.cpp`).
+   */
+  moveObject: (object: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number) => void;
   /** `DropAllPossessions` (`doc/CSBwin-src/Character.cpp:2497`). */
   dropAllPossessions?: (chIdx: number) => void;
   /** `WakeUp` (`doc/CSBwin-src/CSBCode.cpp`). */
@@ -589,14 +594,15 @@ export class MonsterAttack {
 
     this.hooks?.dropAllPossessions?.(chIdx);
 
+    // `objD4.pos(charPosition)`, then `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`
+    // and `expool.AddChampionBonesRecord(objD4, …)` (`doc/CSBwin-src/Character.cpp:2626-2646`):
+    // the bones are set down like the possessions, so over an open pit they fall.
     const bones = this.createBonesRecord();
     if (bones !== null) {
-      const placed = this.dungeon.addObjectToCell(
-        new Position(party.position.x, party.position.y, party.position.z),
-        withObjectPosition(bones, champ.partyPosition & 0x3),
-      );
-      if (placed) this.hooks?.registerBones?.(bones, chIdx);
-      else this.dungeon.deleteDBEntry(bones);
+      const objD4 = withObjectPosition(bones, champ.partyPosition & 0x3);
+      if (!this.hooks) throw new Error('KillCharacter needs MoveObject to set the bones down');
+      this.hooks.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
+      this.hooks.registerBones?.(objD4, chIdx);
     }
 
     // `if (pcA3->poisonCount) CurePoison(chIdx)` — a corpse is not poisoned, and the

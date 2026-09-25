@@ -95,7 +95,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C28 | `DropAllPossessions` is not CSBWin's | S | ✅ |
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
 | C30 | `removeCharacterPossession` is a bare slot clear | M | ⏳ |
-| C31 | A dead champion's bones are not set down by `MoveObject` | S | ⏳ |
+| C31 | A dead champion's bones are not set down by `MoveObject` | S | ✅ |
 | C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
@@ -1056,7 +1056,15 @@ lit. The UI's `setChampionPossession` does the Illumulet's brightness and the to
 not the rest, so the two paths disagree. Port it once, for the engine, with a check that
 kills a champion wearing an Illumulet and holding a lit torch.
 
-### C31 ⏳ A dead champion's bones are not set down by `MoveObject`
+### C31 ✅ A dead champion's bones are not set down by `MoveObject`
+
+**Paid.** `MonsterAttack.killCharacter` turns the bones to the champion's corner and sets
+them down through a new required `moveObject` hook (`TimerSystem.moveObject`), then
+registers the expool record with the same RN, as CSBWin does. The old path deleted the
+record when `addObjectToCell` failed; CSBWin has no such branch. Evidence:
+`tools/dump-champion-death.ts` section 7 — dying over an open pit, no bones stay on the pit,
+they land on the level below, still paired in the expool and in the champion's corner
+(2 of 49 checks fail before).
 
 Found paying C28. `KillCharacter` sets the bones down with `MoveObject(objD4, -1, 0,
 d.partyX, d.partyY)` (`doc/CSBwin-src/Character.cpp:2636-2645`), like the possessions,

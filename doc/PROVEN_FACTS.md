@@ -996,6 +996,12 @@ dead champion's bones from an ordinary bones item. The object's position within 
 set from `pcA3->charPosition`, so the bones appear where that champion stood, and
 `expool.AddChampionBonesRecord` records the bones↔fingerprint pairing for resurrection.
 
+The bones are set down with `MoveObject(objD4, -1, 0, d.partyX, d.partyY)`, exactly as
+the possessions are, so over an open pit they fall to the level below; the expool record
+is added afterwards, unconditionally, with the same `objD4`, so it pairs the bones wherever
+they came to rest. Evidence: `tools/dump-champion-death.ts` section 7 (2 of 49 checks fail
+before C31's fix).
+
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
 Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).
