@@ -41,7 +41,8 @@
 import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
 import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
-import { RUNTIME_SAVE_VERSION, type Game, type RuntimeSaveState } from '../engine/Game';
+import type { Game } from '../engine/Game';
+import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from '../engine/RuntimeSave';
 import type { DungeonData, TimerRecord } from './dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';

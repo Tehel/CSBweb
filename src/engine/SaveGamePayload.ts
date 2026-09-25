@@ -5,7 +5,7 @@
  * save loads through `applySaveBytes` below — but *writing* one is what is left of
  * Phase 10. What this carries is the pair the quick-save has carried since format v2:
  *
- * - `runtime` — `Game.getRuntimeSaveState()`, the whole mutable world
+ * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
  *   (`src/engine/DungeonSnapshot.ts`), which is what actually restores a game;
  * - `raw` — the real, scrambled, checksummed CSBWin file *prefix* that
  *   `saveSaveGameState` can already write (blocks 0-6), base64'd. Nothing needs it to
@@ -26,7 +26,7 @@ import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImage
 import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
-import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './Game';
+import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
 import { OBJECT_ID_NULL } from '../core/types';
 
