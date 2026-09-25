@@ -210,7 +210,7 @@ export type ChampionDefaults = Pick<
 /**
  * What `AddCharacter` gives every `CHARDESC` before it reads the hero: the whole record
  * cleared, `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:481`), then its
- * constant stores (`:510-519`). The one initializer of these fields:
+ * constant stores (`:512-521`). The one initializer of these fields:
  * `createChampionFromPreset` and the tools' champion builders spread it, and
  * `Party.setState` fills an older save's gaps from it.
  */
@@ -219,8 +219,8 @@ export function addCharacterDefaults(): ChampionDefaults {
     // The port's own tick at which the busy champion is free (0: not busy); CSBWin
     // keeps only the timer, `busyTimer`.
     actionDisabledUntil: 0,
-    busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:518`)
-    attackType: -1, // `pcA3->attackType = -1` (`:517`)
+    busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:520`)
+    attackType: -1, // `pcA3->attackType = -1` (`:519`)
     attackStatModifier: 0, // `word64`, cleared
     wounds: 0, // `ouches`, cleared
     poisonCount: 0,

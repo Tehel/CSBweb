@@ -601,6 +601,23 @@ function portraitSection(): void {
     'no shipped hero needs GetExternalPortraitAddress (all portrait indices are 0..23)');
   check(new Set(heroes.map((h) => h.portraitIndex)).size === heroes.length,
     'and every one of them has a distinct portrait');
+
+  /* ------------------------------------------- facing3 at a mirror not facing 0 ---- */
+
+  // `pcA3->facing3 = (ui8)d.partyFacing` (`doc/CSBwin-src/Character.cpp:531`): the way a
+  // hit turns the portrait, and byte 40 of the saved CHARDESC. `ClearMemory` would leave
+  // it 0, so only a party facing some other way can tell the two apart.
+  const turned = heroes.find((h) => ((h.location.wall + 2) & 3) !== 0);
+  check(turned !== undefined, 'some shipped mirror is faced other than north');
+  if (turned) {
+    const g = makeGame();
+    const at = standAtMirror(g, turned);
+    g.handleWallClick();
+    const added = g.party.state.champions[0];
+    console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
+    check(added !== undefined && added.damageFromDirection === at.facing,
+      `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:531)`);
+  }
 }
 
 main();

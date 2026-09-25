@@ -2015,10 +2015,10 @@ bytes — all fourteen are byte-identical, empty slots, dead incantation tails a
 
 | Offset | Field | What to write |
 | --- | --- | --- |
-| 30 | `byte30` | **1** — `pcA3->byte30 = 1;` (`doc/CSBwin-src/Character.cpp:515`) |
-| 31 | `byte31` | **2** — `pcA3->byte31 = 2;` (`:516`) |
+| 30 | `byte30` | **1** — `pcA3->byte30 = 1;` (`doc/CSBwin-src/Character.cpp:517`) |
+| 31 | `byte31` | **2** — `pcA3->byte31 = 2;` (`:518`) |
 | 43 | `uByte43` | 0 |
-| 38-39, 91, 286-335 | the `FILL` runs | 0 — `ClearMemory((ui8 *)pcA3, 800)` (`:478`) |
+| 38-39, 91, 286-335 | the `FILL` runs | 0 — `ClearMemory((ui8 *)pcA3, 800)` (`:481`) |
 | 212-271 | an empty possession slot | **0xffff** (`RNnul`), in all 656 empty slots of the committed saves |
 | 3287-3327 | `Byte13195[41]`, the party tail's own filler | 0 |
 
@@ -2030,6 +2030,12 @@ Two more, which have readers but not in this port, so they are carried rather th
 derived: `timerIndex` at 46 (the timer that erases the damage readout over a portrait,
 `doc/CSBwin-src/CSBCode.cpp:7176-7190`, -1 in every committed save) and `charFlags` at 48,
 whose bit 4 is the champion's **gender** — the only place it is recorded.
+
+`facing3` at 40 is **not** cleared: `AddCharacter` sets it with `facing`, both to
+`d.partyFacing` (`doc/CSBwin-src/Character.cpp:522`, `:531`), so a recruit that has never
+been hit saves the party's facing there. It is the way the portrait turns on the next hit
+(`Monster.cpp:1242` sets it, `CSBCode.cpp:8826-8832` applies it). The port's recruit wrote
+0 until D3's `facing3` fix (`tools/dump-hall-of-champions.ts`, a mirror faced west).
 
 ### `CHARDESC.load` agrees with this port's own sum
 

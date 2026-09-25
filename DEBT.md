@@ -1328,10 +1328,10 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | --- | --- | --- | --- |
 | D3a | `PartyState`: `partyShield`, `fireShield`, `spellShield`, `invisible`, `seeThruWalls`, `magicFootprintsActive`, `indexOfFirstMagicFootprint`, `indexOfLastMagicFootprint`, `numFootprintEnt` — the spell-effect counters (~45 fallbacks) | the `Party` constructor, all 0 (`Data.h:767-783`) | ✅ |
 | D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ✅ |
-| D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:517-518`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
+| D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:519-520`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
-| D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:511`), `fingerPrint` (`:512-515`), `timerIndex = -1` (`:519`), `charFlags` (`:529`, `:596`) | ⏳ |
-| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:520`) | ⏳ |
+| D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:512`), `fingerPrint` (`:513-516`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ⏳ |
+| D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ⏳ |
 
 The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
 `ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
@@ -1374,9 +1374,11 @@ went too. What it hid is the `facing3` fix below. Evidence: `npm test -- --frame
 
 Found while splitting, and paid as separate fixes:
 
-- **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
-  the port leaves `damageFromDirection` unset, so the save writer writes 0 and
-  `ui/Attack.ts` falls back to `champ.facing`. A fix with D3d.
+- ✅ **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
+  the port left `damageFromDirection` unset, so the save writer wrote 0 and
+  `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
+  it with `facing`. `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
+  party faces west, and failed before the fix (facing3 0, not 3).
 
 Not debt, so staying optional:
 
@@ -1385,7 +1387,7 @@ Not debt, so staying optional:
 - `titleField` / `incantationField`: kept only when the file holds bytes past the
   terminator. Absence is the information again.
 - `charFlags`' graphic bits (0xff80): `AddCharacter` sets `CHARFLAG_positionChanged`
-  (`:529`), a redraw flag, and the port models none of those (see C32's
+  (`:530`), a redraw flag, and the port models none of those (see C32's
   `CHARFLAG_statsChanged` note). Only `CHARFLAG_male` is carried.
 
 <details><summary>original entry</summary>

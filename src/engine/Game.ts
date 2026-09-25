@@ -1244,9 +1244,10 @@ export class Game {
             findFreeCharPosition(party.champions, party.facing),
             possessions,
         );
-        // `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:520`, `:531`) — the corner
+        // `pcA3->facing = pcA3->facing3 = d.partyFacing` (`:522`, `:531`) — the corner
         // the champion stands in is chosen above, but they face the way the party does.
         champion.facing = party.facing;
+        champion.damageFromDirection = party.facing;
         champion.portraitGraphic = charID;
         champion.fingerprint = computeChampionFingerprint(
             party.champions,
