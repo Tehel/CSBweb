@@ -205,6 +205,7 @@ export type ChampionDefaults = Pick<
   Champion,
   | 'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
   | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'
+  | 'charFlags' | 'timerIndex' | 'talents' | 'causeOfDamage' | 'monsterCausingDamage' | 'load'
 >;
 
 /**
@@ -227,6 +228,14 @@ export function addCharacterDefaults(): ChampionDefaults {
     maxRecentDamage: 0,
     damageFromDirection: 0, // `facing3`, cleared here; `AddCharacter` sets it at `:531`
     shieldStrength: 0,
+    // `CHARFLAG_positionChanged` (`:530`) is a redraw flag, which the port does not model;
+    // `createChampionFromPreset` ORs in `CHARFLAG_male` (`:594`).
+    charFlags: 0,
+    timerIndex: -1, // `pcA3->timerIndex = -1` (`:521`)
+    talents: 0, // `pcA3->talents = 0` (`:512`)
+    causeOfDamage: 0,
+    monsterCausingDamage: 0,
+    load: 0,
   };
 }
 

@@ -1330,8 +1330,9 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | D3b | `PartyState`: `potentialChampionIndex`, `gameIsLost`, `sleeping` (~24) | the constructor: -1 (`d.PotentialCharacterOrdinal` 0, less one), `false`, `false` | ✅ |
 | D3c | `Champion`: `actionDisabledUntil`, `busyTimerIndex`, `attackType`, `attackStatModifier` (~12) | `AddCharacter`: `busyTimer = -1`, `attackType = -1` (`Character.cpp:519-520`), the rest cleared by `ClearMemory(pcA3, 800)` (`:481`) | ✅ |
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
-| D3e | `Champion`: `fingerprint`, `charFlags`, `timerIndex`, `incantationCursor`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~13) | cleared, except `talents = 0` (`:512`), `fingerPrint` (`:513-516`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ⏳ |
+| D3e | `Champion`: `charFlags`, `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~8). `fingerprint` moved to D3g, `incantationCursor` to the fix below | cleared, except `talents = 0` (`:512`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ✅ |
 | D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ⏳ |
+| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. Decide first where those champions get theirs, once, as `AddCharacter` does (`:513-516`), and whether `registerChampionBones`' `if (!fingerprint) return` — not in CSBWin (`Character.cpp:2646`) — can then go. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`) | ⏳ |
 
 The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
 `ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
@@ -1372,6 +1373,13 @@ different default. It was unreachable, because its guard, `maxRecentDamage`, tur
 only at `MonsterAttack.ts:240`, which sets `damageFromDirection` in the same statement group. So it
 went too. What it hid is the `facing3` fix below. Evidence: `npm test -- --frames`.
 
+**D3e, paid.** `charFlags`, `timerIndex`, `talents`, `causeOfDamage`,
+`monsterCausingDamage` and `load` are required, in `addCharacterDefaults`. Eight
+fallbacks went, all in the save writer, each the initializer's value. Two of the planned
+eight fields came out of the group: `fingerprint` (D3g) and `incantationCursor`, whose
+fallback hid a different default. That one is the second fix below. Evidence:
+`npm test -- --frames`; the three saves still load.
+
 Found while splitting, and paid as separate fixes:
 
 - ✅ **`facing3`.** `AddCharacter` sets `pcA3->facing3 = d.partyFacing` (`Character.cpp:531`);
@@ -1379,6 +1387,14 @@ Found while splitting, and paid as separate fixes:
   `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
   it with `facing`. `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
   party faces west, and failed before the fix (facing3 0, not 3).
+- ⏳ **`byte33`.** The save writer writes `incantationCursor ?? incantation.length`, and the
+  engine never updates `incantationCursor`. So a champion loaded from a save keeps the
+  file's `byte33` while runes are added or cast in the port, and the next save writes it
+  back stale. CSBWin's add would then write the next rune at the wrong index. Every CSBWin
+  writer of `byte33` keeps it equal to `strlen(incantation) & 3`: the add
+  (`CSBCode.cpp:8984-8988`), the backspace (`Magic.cpp:814-817`), the cast (`:951-952`),
+  and the two resets with `incantation[0] = 0` (`Character.cpp:2648-2649`,
+  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`.
 
 Not debt, so staying optional:
 

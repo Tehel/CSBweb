@@ -349,7 +349,7 @@ function buildCharacterBlock(
             invisible: party.invisible,
         },
         {
-            load: (champion) => game.characterStats?.characterLoad(champion) ?? champion.load ?? 0,
+            load: (champion) => game.characterStats?.characterLoad(champion) ?? champion.load,
             portraitOf: (champion) => options.portraitOf?.(champion),
             // The thirty possession slots are RNs like any other and go out as slot
             // numbers in the same index the image uses.

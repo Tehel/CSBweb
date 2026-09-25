@@ -114,13 +114,13 @@ export interface Champion {
      * as they stand. Nothing in this port reads them yet — they are carried so a save
      * can be written back with the champion's gender intact.
      */
-    charFlags?: i16;
+    charFlags: i16;
     /**
      * `CHARDESC.timerIndex` — the timer that erases the damage readout over the
      * champion's portrait (`doc/CSBwin-src/CSBCode.cpp:7176-7190`), or -1. This port
      * draws that readout without a timer; the field is carried for the save writer.
      */
-    timerIndex?: i16;
+    timerIndex: i16;
     /**
      * `CHARDESC.byte33` — how many symbols of the spell being composed have been
      * entered, 0..3, wrapping (`doc/CSBwin-src/CSBCode.cpp:8988`,
@@ -130,17 +130,17 @@ export interface Champion {
      */
     incantationCursor?: ui8;
     /** `CHARDESC.talents` — a `ui32` `AddCharacter` zeroes (`Character.cpp:510`). */
-    talents?: ui32;
+    talents: ui32;
     /** `CHARDESC.causeOfDamage` — `enum COD`, what last hurt the champion. */
-    causeOfDamage?: ui16;
+    causeOfDamage: ui16;
     /** `CHARDESC.monsterCausingDamage` — which monster it was. */
-    monsterCausingDamage?: ui16;
+    monsterCausingDamage: ui16;
     /**
      * `CHARDESC.load` — tenths of a kilogram, which CSBWin keeps incrementally at each
      * of its eight possession writers. This port re-sums it instead
      * (`CharacterStats.characterLoad`), so the field only carries what a save said.
      */
-    load?: ui16;
+    load: ui16;
     incantation: number[];     // Magic incantation bytes (ASCII)
     food: i16;                 // Signed food level (CSBWin uses negative for starving)
     water: i16;                // Signed water level (CSBWin uses negative for dehydrated)

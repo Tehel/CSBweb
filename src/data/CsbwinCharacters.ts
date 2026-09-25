@@ -445,8 +445,8 @@ export function writeCsbwinCharacter(
   block[base + 41] = champion.maxRecentDamage & 0xff;
   block[base + 42] = champion.poisonCount & 0xff;
   setU16BE(block, base + 44, champion.busyTimerIndex);
-  setU16BE(block, base + 46, champion.timerIndex ?? -1);
-  setU16BE(block, base + 48, champion.charFlags ?? 0);
+  setU16BE(block, base + 46, champion.timerIndex);
+  setU16BE(block, base + 48, champion.charFlags);
   setU16BE(block, base + 50, champion.wounds);
   setU16BE(block, base + 52, champion.attributes.health);
   setU16BE(block, base + 54, champion.attributes.maxHealth);
@@ -479,12 +479,12 @@ export function writeCsbwinCharacter(
     setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
   }
 
-  setU16BE(block, base + 272, options.load?.(champion) ?? champion.load ?? 0);
+  setU16BE(block, base + 272, options.load?.(champion) ?? champion.load);
   setU16BE(block, base + 274, champion.shieldStrength);
-  setU32BE(block, base + 276, champion.talents ?? 0);
+  setU32BE(block, base + 276, champion.talents);
   setU16BE(block, base + 280, champion.fingerprint ?? 0);
-  setU16BE(block, base + 282, champion.causeOfDamage ?? 0);
-  setU16BE(block, base + 284, champion.monsterCausingDamage ?? 0);
+  setU16BE(block, base + 282, champion.causeOfDamage);
+  setU16BE(block, base + 284, champion.monsterCausingDamage);
 
   writePortrait(block, base, champion.portrait ?? options.portraitOf?.(champion));
 }
