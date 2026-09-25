@@ -42,8 +42,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    can reach the UI without new setters. C25 (re-sized to M after D4) and C35 wait in the
    frozen queue with the rest of tier C. D6 and F4 were paid before E1c (2026-09-25), so
    tier D is closed and every suite tool is seeded. E1 was paid on 2026-09-25 (E1d:
-   `GameHost`). E2 is under way — its worklist is `GameMethods`, down from 22 names to 8
-   (see E2) — then E3, E4.
+   `GameHost`). E2 is under way — `GameMethods` is gone (2026-09-25); what is left is the
+   code in `Game` that is not the loop (see E2, "What is left") — then E3, E4. C36 (found
+   paying E2) waits with the rest of tier C.
 
 ## Why this order
 
@@ -121,7 +122,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ archived |
 | D6 | `GameState.party` is a second copy of `Party.state` | S | ✅ archived |
 | E1 | A shared game context, and one set of tables (split E1a-d) | L | ✅ |
-| E2 | Split `Game.ts` by CSBWin source file (under way: `GameMethods` at 8 of 22) | L | ⚠️ |
+| E2 | Split `Game.ts` by CSBWin source file (under way: `GameMethods` gone; the non-loop rest left) | L | ⚠️ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
 | E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
@@ -1456,7 +1457,7 @@ per-module `possession` readers (`MagicSystem` and `CharacterSystem` read
 
 ### E2 ⚠️ Split `Game.ts` by CSBWin source file
 
-`Game.ts` is 3018 lines (2172 after the first six commits, below). Split it by CSBWin source file, as `src/renderer/ui/` already is
+`Game.ts` is 3018 lines (2172 after the first six commits below, 1364 after the next five). Split it by CSBWin source file, as `src/renderer/ui/` already is
 (`doc/UI_MODULE_MAP.md`). Method groups (lines as of 2026-09-23):
 
 | Group | Methods | CSBWin |
@@ -1485,24 +1486,23 @@ caller. Each commit behaviour-neutral: every tool's full output byte-identical (
 | `1529b4b` | `CharacterSystem` (`src/engine/CharacterSystem.ts`, `ctx.systems.character`, `game.character`): `RemoveCharacterPossession`, `DropAllPossessions`, `setChampionHand` (the stat half of `AddCharacterPossession`), `AdjustStatsForItemCarried` bound to the context, `setPossessionDirect`. This is the one possession home C34 waits for. `setChampionHand` had joined `GameMethods` for one commit, for `MagicSystem`'s Zokathra. | `dropAllPossessions`, `removeCharacterPossession`, `setChampionHand` |
 | `7ee7b57` | `KillCharacter`'s tail into `MonsterAttack.killCharacter`: the bones record and the inventory close, at the call sites. | `registerChampionBones`, `onChampionDied` |
 | `3abb4b3` | `ProcessMissileEncounter`'s party arm into `TimerSystem` (private `applyMissileDamageToParty`, with `MISSILE_WOUND_MASK`). | `applyMissileDamageToParty` |
+| `9b70f20` | The loop's state onto the context (the decision below): `MouseQueue` at `ctx.mouseQueue`, `LoopFlags` at `ctx.loop`, `wakeUp(ctx)` (`LoopState.ts`), `MonsterSystem.loadPartyLevelOnArrival`. `Game.wakeUp` is a facade for `main.ts`. | `wakeUp` |
+| `a5c04bd` | `climbDownIntoPit` into `AttackSystem` (private), `handleDsaTeleportParty` into `DsaSystem` (private `teleportParty`, `STKOP_TeleportParty`), `notePartyMoved` into `TimerSystem`. | `climbDownIntoPit`, `handleDsaTeleportParty`, `notePartyMoved` |
+| `a72da7f` | `EnableCharacterAction` into `TimerSystem` (private; the `TT_11` case now calls it and `TAG0115ee` apart, as `CSBCode.cpp:6466-6475` does); `matchingAmmunition` (`TAG0153c2`, `Character.cpp:1521` — the old comment said `CSBCode.cpp`) and `refillPossessionSlot` (`TAG0115ee`) into `CharacterSystem`, beside the possession pair C34 rewrites; `setBusyTimerRefill` into its one caller, `AttackSystem`. C36 recorded. | `enableCharacterAction`, `setBusyTimerRefill` |
+| `fa6a67e` | `MouseSystem` (`src/engine/MouseSystem.ts`, `ctx.systems.mouse`, `game.mouse`): `DropObject` with its Vi-altar arm, `ThrowObjectInHand`, `throwFromWeaponHand`, `ThrowByCharacter`, `TAG016382`. `awardThrowSkill` went: it was `MagicSystem.applySpellSkillGain(chIdx, 10, …)` line for line. `Game.applyLimits` went for `core/intCast`'s (same result on these clamped ranges). `Game.dropObjectFromCursor` / `throwObjectFromCursor` are facades for `events.ts` and `tools/`. | `throwFromWeaponHand` |
+| `6883775` | `HallOfChampions` (`src/engine/HallOfChampions.ts`, `ctx.systems.hallOfChampions`, `game.hallOfChampions`): `AddCharacter`, `_ResurrectReincarnateCancel` and its finish, `ReIncarnate`'s tail, the mirror helpers, `getObjectRecord`, `reincarnationSource`, `addCharacterTables`. One system, not `CharacterSystem`: the three CSBWin files share `reincarnateAttributePenalty` / `reincarnateStatPenalty` (`Character.cpp:14`), and two of them have no other port. `Game.resurrectReincarnateCancel` / `reincarnateNamed` are facades for `main.ts`. `GameMethods` and `ctx.systems.game` are gone. | `addCharacter` — none left |
 
-*What is left: `GameMethods` has 8 names.* Proposed homes, by CSBWin file — confirm each
-against the source before moving:
+Every one byte-identical on every tool's full output, frames identical, and the author's
+three runtime saves hash the same after load and after 600 ticks as on `bf5c700`.
 
-- `addCharacter` (`Character.cpp:456`) — the Hall of Champions group, ≈ 400 lines with
-  `addChampion`, `resurrectReincarnateCancel`, `finishResurrectReincarnate`,
-  `reincarnateNamed`, `reincarnate`, the mirror helpers, `getObjectRecord`,
-  `reincarnationSource` and `addCharacterTables`. It spans `Character.cpp`,
-  `CSBCode.cpp:6616` and `Code13ea4.cpp`; the `AddCharacter` half could join
-  `CharacterSystem`, or the whole group be one `HallOfChampions` — decide first. It is the
-  largest group left, and it empties one name.
+*What was left at `GameMethods` = 8 names* (kept for the reasoning behind the moves above):
+
+- `addCharacter` (`Character.cpp:456`) — the Hall of Champions group; `AddCharacter` into
+  `CharacterSystem`, or one `HallOfChampions` — decided for the second (`6883775`).
 - `enableCharacterAction` (`Timer.cpp:2638`) with `refillPossessionSlot` and
   `matchingAmmunition`, and `setBusyTimerRefill` (the port's own helper for the throw's
-  `uByte6`) — `TimerSystem` by file, though E3 is about to split it; or `CharacterSystem`,
-  since the body is possession refilling. Empties two.
-- `throwFromWeaponHand` — the "Cursor drop and throw" group (`Mouse.cpp`: `DropObject`
-  `:848`, `ThrowByCharacter` `:673`), with `dropObjectFromCursor`, `throwObjectFromCursor`,
-  `throwByCharacter`, `throwStaminaCost`, `awardThrowSkill`, `maybeScheduleViAltar`.
+  `uByte6`).
+- `throwFromWeaponHand` — the "Cursor drop and throw" group (`Mouse.cpp`).
 - `climbDownIntoPit` (`Attack.cpp:2033`), `handleDsaTeleportParty` (the DSA's party
   teleport), `notePartyMoved` (the footprint step of the world `MoveObject`,
   `Code11f52.cpp:3222`) and `wakeUp` (`CSBCode.cpp:7047`). These four touch `Game`'s
@@ -1542,6 +1542,38 @@ Then the four go by file: `climbDownIntoPit` into `AttackSystem` (its one caller
 `atk_CLIMBDOWN`), `handleDsaTeleportParty` into `DsaSystem` (`STKOP_TeleportParty`,
 `DSA.cpp:4583`, its one caller), `notePartyMoved` into `TimerSystem` beside the world
 `MoveObject` it is a step of (E3 will carry it on with the world moves).
+
+*What is left (2026-09-25): `Game` less the loop.* No system calls `Game` any more, so
+what remains is found by reading `Game.ts`, not a type. E2 is done when `Game` is the loop
+(`runFrame`, `gameTick`, `tag0006a4`, `HandleMouseEvents` and the queue's front door), the
+construction, and one-line facades. By group, largest first — confirm each CSBWin home
+before moving, and decide the two open questions first:
+
+- **Quick-save** (≈ 340 lines with the `RuntimeSaveState` type): `getRuntimeSaveState`,
+  `applyRuntimeSaveState`, `buildTimerRecords`, `restoreTimerQueue`. No CSBWin home — the
+  port's own format. A `RuntimeSave.ts` module over the context, which is what E5 (the
+  hand-maintained snapshot) then works on. `setPartyState` and `setRandomSeed` go with it
+  if they are only its and the tools'.
+- **Periodic updates** (≈ 180 lines): `processNinetySecondUpdate` (`NinetySecondUpdate`,
+  `CSBCode.cpp:7339`) and `processTenSecondUpdate` (`TenSecondUpdate`,
+  `Code17818.cpp:160`). *Open:* `CSBCode.cpp` is the loop's own file, so
+  `NinetySecondUpdate` may rightly stay; `TenSecondUpdate` has no system. One small
+  module for both, called from `gameTick`, is the likely answer.
+- **The attack's engine half**: `championAttack` and `attackStatModifier` (`_ExecuteAttack`,
+  `Character.cpp:4944`, which records `attackType` and `word64` around `Attack`), and
+  `consumeAttackDamageToDisplay` — `AttackSystem` already owns `attackDamageToDisplay`.
+  *Open:* `Character.cpp` says `CharacterSystem`; the body is all `AttackSystem`'s state.
+- **The rest of `Mouse.cpp`**: `handleDoorSwitchClick` (the door button), `handleWallClick`,
+  `sleep` (button 145, `Mouse.cpp:1683`) — into `MouseSystem`; `sleep` could instead sit
+  beside `wakeUp` in `LoopState.ts`.
+- **Feeding**: `applyFeeding` (the apply half of `_FeedCharacter`, `Character.cpp:4004`; the code cites `:4348`),
+  which only binds `MonsterAttack` and `TimerSystem` calls into `Feeding.ts` — with a
+  context those bindings can go into `Feeding.ts` itself.
+- **`MoveParty`'s tail**: `move`, `triggerObjectMove`, `setPartyMoveDelay`
+  (`MoveParty`, `CSBCode.cpp:7944`; its tail `:8310-8349`). `HandleMouseEvents` calls `move`, so this may be loop; if
+  not, `MovementSystem`.
+- Small change: `addChampion` (the tools' join; `HallOfChampions` or stays),
+  `getChampionPossession`, `getBaseObjectNameIndex`, `nameIndex` (go with their callers).
 
 ### E3 ⏳ Split `TimerSystem.ts`
 

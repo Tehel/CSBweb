@@ -101,8 +101,10 @@ data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, He
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
-            ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem, the
-            Monster* systems, skills, AddCharacter, objectIndex (the one DescIndex /
+            ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
+            MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
+            MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
+            `ctx.loop`), skills, AddCharacter, objectIndex (the one DescIndex /
             GetBasicObjectType / NameIndex)
 renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
@@ -195,4 +197,5 @@ Since 2026-09-25 that order puts tiers D (state representation) and E (architect
 before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
 is paid; so is E1 (one `GameTables`, one `GameContext` every subsystem takes, subsystems
 calling each other through `ctx.systems`, one `GameHost` at `ctx.host`). E2 (split
-`Game.ts` by CSBWin file) is under way: its worklist is `GameMethods`, 8 names left.
+`Game.ts` by CSBWin file) is under way: `GameMethods` is gone, so no system calls `Game`;
+what is left is the code in `Game` that is not the loop (`DEBT.md` E2, "What is left").

@@ -144,9 +144,18 @@ the per-subsystem host hooks and `GameOptions` are gone, and every subsystem tak
 alone. E2, first six commits: `MagicSystem` (`Magic.cpp`'s engine half), `MagicShield`
 into `AttackSystem`, `CharacterSystem` (`Character.cpp`'s possession writers, C34's future
 home), and three one-caller methods folded into their callers; `Game.ts` 2172 lines,
-`GameMethods` down from 22 names to 8. Next: the rest of E2 (`DEBT.md` E2 lists the eight
-names and their proposed homes; four of them need a decision on the loop state first),
-then E3–E5. C33 and C34 wait until after E1/E2; C25 and C35 wait with the rest of tier C.
+`GameMethods` down from 22 names to 8. E2, next five commits: the loop's state onto the
+context (`ctx.mouseQueue`, CSBWin's one mouse queue with `DiscardAllInput`; `ctx.loop`,
+`d.clockTick` and `d.newPartyLevel` as other files write them; `wakeUp(ctx)`), not into
+`GameState`, so the quick-save's shape is unchanged; `climbDownIntoPit`, the DSA's party
+teleport and the footprint step into `AttackSystem`, `DsaSystem` and `TimerSystem`;
+`EnableCharacterAction` into `TimerSystem` and the hand refills into `CharacterSystem`;
+`MouseSystem` (`Mouse.cpp`'s engine half: drop, throw, `ThrowByCharacter`); and
+`HallOfChampions` (`AddCharacter`, `_ResurrectReincarnateCancel`, `ReIncarnate`'s tail).
+**`GameMethods` is gone** and `Game.ts` is 1364 lines. Found and recorded: C36
+(`EnableCharacterAction` keeps the attack type). Next: the rest of E2 — what is still in
+`Game` that is not the loop (`DEBT.md` E2, "What is left"), then E3–E5. C33 and C34 wait
+until after E2; C25, C35 and C36 wait with the rest of tier C.
 
 ## Ground rules
 
