@@ -10,6 +10,7 @@ import {
   type ObjectID,
 } from '../core/types';
 import type { DungeonState } from './DungeonState';
+import type { GameContext } from './GameContext';
 import type { PartyState } from './gameTypes';
 import { adjustSkills, AdjustSkillsWhy } from './skills';
 import type { ActuatorRecord } from '../data/dungeonTypes';
@@ -34,7 +35,6 @@ import {
 import { TimerQueue } from './TimerQueue';
 import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
-import type { MonsterDesc, WeaponDesc } from '../renderer/csbwin/ObjectTables';
 import type { CsbRandom } from '../core/random';
 import { roomTimerFunction } from './roomTimers';
 import {
@@ -90,75 +90,47 @@ export interface MessageSink {
 export const MSG_COLOR_SPELL = 4;
 export const MSG_COLOR_ROOM_TEXT = 15;
 
-export interface ActuatorTables {
-  roomTimerFunctions?: ArrayLike<number>;
-  objDescObjectType?: ArrayLike<number>;
-  /** `d.Byte640`, for `NameIndex` (`src/engine/objectIndex.ts`). */
-  byte640?: ArrayLike<number>;
-  objDescCarryMask?: ArrayLike<number>;
-  carryLocation?: ArrayLike<number>;
-  word1074?: ArrayLike<number>;
-  monsterDesc?: ArrayLike<MonsterDesc>;
+/** What `ActuatorSystem` calls that is not in the context (`DEBT.md` E1c/E1d retire these). */
+export interface ActuatorHooks {
   cursorFilter?: CursorFilterHook;
   onAddCharacter?: AddCharacterHook;
   messages?: MessageSink;
-  /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
-  championMessageColors?: ArrayLike<number>;
   adjustSkillsFilter?: AdjustSkillsFilterHook;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-  /**
-   * The object-weight and weapon tables `CharacterStats` needs. They ride here rather
-   * than on their own channel because this is already how `objDescObjectType` reaches
-   * the engine, and `Game` passes the whole bag straight through.
-   */
-  weaponDesc?: ArrayLike<WeaponDesc>;
-  weaponWeights?: ArrayLike<number>;
-  clothingWeights?: ArrayLike<number>;
-  miscWeights?: ArrayLike<number>;
 }
 
 export class ActuatorSystem {
-  private roomTimerFunctions: ArrayLike<number> | null;
-  private objDescObjectType: ArrayLike<number> | null;
-  private cursorFilter?: CursorFilterHook;
-  private onAddCharacter?: AddCharacterHook;
-  private messages?: MessageSink;
-  private championMessageColors?: ArrayLike<number>;
-  private adjustSkillsFilter?: AdjustSkillsFilterHook;
-  private playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+  private readonly dungeon: DungeonState;
+  private readonly timers: TimerQueue;
+  private readonly random: CsbRandom;
+  /** `d.Byte1596`, the room-type timer functions. */
+  private readonly roomTimerFunctions: ArrayLike<number>;
+  private readonly objDescObjectType: ArrayLike<number>;
+  /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
+  private readonly championMessageColors: ArrayLike<number>;
+  private readonly cursorFilter?: CursorFilterHook;
+  private readonly onAddCharacter?: AddCharacterHook;
+  private readonly messages?: MessageSink;
+  private readonly adjustSkillsFilter?: AdjustSkillsFilterHook;
+  private readonly playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
   private delayedAction = -1;
   private delayedActionX = 0;
   private delayedActionY = 0;
   private delayedActionZ = 0;
   private delayedActionPos = -1;
 
-  constructor(
-    private dungeon: DungeonState,
-    private getPartyState: () => PartyState,
-    private timers: TimerQueue,
-    private timeSource: () => number,
-    private random: CsbRandom,
-    tables?: ActuatorTables,
-  ) {
-    this.roomTimerFunctions = tables?.roomTimerFunctions ?? null;
-    this.objDescObjectType = tables?.objDescObjectType ?? null;
-    this.cursorFilter = tables?.cursorFilter;
-    this.onAddCharacter = tables?.onAddCharacter;
-    this.messages = tables?.messages;
-    this.championMessageColors = tables?.championMessageColors;
-    this.adjustSkillsFilter = tables?.adjustSkillsFilter;
-    this.playSound = tables?.playSound;
-  }
-
-  setTables(tables: ActuatorTables): void {
-    if (tables.roomTimerFunctions) this.roomTimerFunctions = tables.roomTimerFunctions;
-    if (tables.objDescObjectType) this.objDescObjectType = tables.objDescObjectType;
-    if (tables.cursorFilter) this.cursorFilter = tables.cursorFilter;
-    if (tables.onAddCharacter) this.onAddCharacter = tables.onAddCharacter;
-    if (tables.messages) this.messages = tables.messages;
-    if (tables.championMessageColors) this.championMessageColors = tables.championMessageColors;
-    if (tables.adjustSkillsFilter) this.adjustSkillsFilter = tables.adjustSkillsFilter;
-    if (tables.playSound) this.playSound = tables.playSound;
+  constructor(private readonly ctx: GameContext, hooks: ActuatorHooks = {}) {
+    this.dungeon = ctx.dungeon;
+    this.timers = ctx.timers;
+    this.random = ctx.random;
+    this.roomTimerFunctions = ctx.tables.byte1596;
+    this.objDescObjectType = ctx.tables.objDescObjectType;
+    this.championMessageColors = ctx.tables.byte1386;
+    this.cursorFilter = hooks.cursorFilter;
+    this.onAddCharacter = hooks.onAddCharacter;
+    this.messages = hooks.messages;
+    this.adjustSkillsFilter = hooks.adjustSkillsFilter;
+    this.playSound = hooks.playSound;
   }
 
   /** Expose the message sink so sibling systems (Game) can compose fragments. */
@@ -168,7 +140,7 @@ export class ActuatorSystem {
 
   /** CSBWin per-champion message colour `d.Byte1386[chIdx]`; 13 is the historical default. */
   getChampionMessageColor(chIdx: number): number {
-    return this.championMessageColors?.[chIdx] ?? 13;
+    return this.championMessageColors[chIdx] ?? 13;
   }
 
   queueSwitchActionForActuator(actuator: ActuatorRecord, action: ActuatorAction, level: number, mapPos?: number): void {
@@ -258,7 +230,7 @@ export class ActuatorSystem {
 
     let result = false;
     let characterAdded = false;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     let objectInHand = party.objectInHand;
     let emptyHanded = objectInHand === OBJECT_ID_NULL;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; ) {
@@ -501,7 +473,7 @@ export class ActuatorSystem {
           break;
         case 3:
           if (context.movedObjectDBNum !== -1) return false;
-          if (this.getPartyState().champions.length === 0) return false;
+          if (this.ctx.party.state.champions.length === 0) return false;
           if (actuatorValue === 0) {
             if (unchangedRoom) return false;
           } else {
@@ -583,7 +555,7 @@ export class ActuatorSystem {
       actuator.word2 &= ~0x7f;
     }
 
-    const actionTime = (this.timeSource() + getActuatorDelay(actuator)) >>> 0;
+    const actionTime = (this.ctx.state.tickCount + getActuatorDelay(actuator)) >>> 0;
     if (isActuatorLocalActionOnly(actuator)) {
       if (this.isDebugTimersEnabled()) {
         console.log('[Actuator] local action', {
@@ -714,7 +686,7 @@ export class ActuatorSystem {
       }
       return false;
     };
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     for (const champ of party.champions) {
       if ((champ.attributes.health | 0) === 0) continue;
       for (let slot = 0; slot < 30; slot++) {
@@ -728,7 +700,7 @@ export class ActuatorSystem {
     if (localActionType === 10) {
       // SkillIncreaser(8, 300, mapPos == -1 ? 0 : 1) (doc/CSBwin-src/Mouse.cpp:209-230).
       let adjustment = 300;
-      const party = this.getPartyState();
+      const party = this.ctx.party.state;
       const experienceMultiplier = this.dungeon.getMap(mapZ)?.descriptor.difficulty ?? 0;
 
       if (mapPos !== -1) {
@@ -764,9 +736,9 @@ export class ActuatorSystem {
     why: AdjustSkillsWhy,
   ): void {
     if (!champion || index < 0) return;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     adjustSkills(party.champions, chIdx, index, delta, why, {
-      time: this.timeSource(),
+      time: this.ctx.state.tickCount,
       lastMonsterAttackTime: party.lastMonsterAttackTime,
       experienceMultiplier,
       random: this.random,
@@ -777,7 +749,7 @@ export class ActuatorSystem {
 
   private queueLevelUpMessage(chIdx: number, basicSkill: number): void {
     if (!this.messages) return;
-    const party = this.getPartyState();
+    const party = this.ctx.party.state;
     const champ = party.champions[chIdx];
     if (!champ) return;
     const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
@@ -873,7 +845,7 @@ export class ActuatorSystem {
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
   private getBasicObjectType(rn: ObjectID): number {
-    return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], rn);
+    return GetBasicObjectType(this.dungeon, this.objDescObjectType, rn);
   }
 
   private applyCursorFilter(

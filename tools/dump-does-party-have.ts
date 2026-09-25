@@ -24,10 +24,10 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { Party } from '../src/engine/Party';
-import { TimerQueue } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 const OBJNI_CHEST = 0x90;
@@ -60,8 +60,9 @@ async function main(): Promise<void> {
   for (let i = 0; i < 2; i++) {
     party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, addTables)));
   }
-  const actuators = new ActuatorSystem(dungeon, () => party.state, new TimerQueue(), () => 1000, new CsbRandom(0x1234),
-    { objDescObjectType: objectTables.objDescObjectType });
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x1234) });
+  ctx.state.tickCount = 1000;
+  const actuators = new ActuatorSystem(ctx);
   const has = (value: number): boolean => (actuators as any).doesPartyHave(value);
 
   // A floor object the party does not already carry, and a chest to carry it in.

@@ -22,7 +22,7 @@ import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
-import { ActuatorSystem, type ActuatorTables, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
+import { ActuatorSystem, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
 import { TimerSystem, type TimerTables, type TimerHooks } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
@@ -384,23 +384,6 @@ export class Game {
         this.tables = tables;
         this.addCharacterTables = { objDescCarryMask: tables.objDescWord4, carryLocation: tables.carryLocation };
         // The subsystems still take the slices they always did (`DEBT.md` E1b retires them).
-        const actuatorTables: ActuatorTables = {
-            roomTimerFunctions: tables.byte1596,
-            objDescObjectType: tables.objDescObjectType,
-            objDescCarryMask: tables.objDescWord4,
-            carryLocation: tables.carryLocation,
-            byte640: tables.byte640,
-            word1074: tables.word1074,
-            monsterDesc: tables.monsterDesc,
-            cursorFilter: options.cursorFilter,
-            messages: options.messages,
-            championMessageColors: tables.byte1386,
-            playSound,
-            weaponDesc: tables.weaponDesc,
-            weaponWeights: tables.weaponWeights,
-            clothingWeights: tables.clothingWeights,
-            miscWeights: tables.byte8946,
-        };
         const timerTables: TimerTables = {
             monsterDesc: tables.monsterDesc,
             word1074: tables.word1074,
@@ -435,29 +418,16 @@ export class Game {
         this.timerQueue = ctx.timers;
         this.sounds = ctx.sounds;
         this.playSound = playSound;
-        this.actuators = new ActuatorSystem(
-            this.dungeonState,
-            () => this.party.state,
-            this.timerQueue,
-            () => this.state.tickCount,
-            this.random,
-            actuatorTables,
-        );
-        this.dsaSystem = new DsaSystem(
-            this.dungeonState,
-            () => this.state.tickCount,
-            this.timerQueue,
-            this.random,
-            () => this.party.state,
-            actuatorTables,
-            this.actuators,
-        );
-        this.actuators.setTables({
+        this.actuators = new ActuatorSystem(ctx, {
+            cursorFilter: options.cursorFilter,
+            messages: options.messages,
+            playSound,
             adjustSkillsFilter: (params) => this.dsaSystem.processAdjustSkillsFilter(params),
             // A click on a Hall of Champions mirror (`doc/CSBwin-src/Mouse.cpp:513`).
             // Wired here rather than by the host so the tools get it too.
             onAddCharacter: (charID, mirrorCell, wall) => this.addCharacter(charID, mirrorCell, wall),
         });
+        this.dsaSystem = new DsaSystem(ctx, this.actuators);
         this.timerSystem = new TimerSystem(
             this.dungeonState,
             () => this.party.state,

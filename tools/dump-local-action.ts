@@ -27,12 +27,11 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
-import { TimerQueue } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 const SKILL = 8;
@@ -62,7 +61,9 @@ async function main(): Promise<void> {
     CELLS.forEach((cell, i) =>
       party.addChampion(createChampionFromPreset(heroes[i], cell, assignPresetHeroPossessions(heroes[i].inventory, addTables))));
     party.state.cursorOwner = handChar;
-    const actuators = new ActuatorSystem(new DungeonState(data), () => party.state, new TimerQueue(), () => 1000, new CsbRandom(0x1234));
+    const ctx = newContext(data, graphics, { party, random: new CsbRandom(0x1234) });
+    ctx.state.tickCount = 1000;
+    const actuators = new ActuatorSystem(ctx);
     return { party, actuators };
   };
   const exp = (party: Party): number[] => party.state.champions.map((c) => c.skills[SKILL].experience);

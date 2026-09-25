@@ -32,6 +32,7 @@ import {
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
 import type { DungeonState, TextDecodeTables } from './DungeonState';
+import type { GameContext } from './GameContext';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
 import { roomTimerFunction } from './roomTimers';
@@ -58,17 +59,6 @@ export interface DsaObjectMover {
   moveMonster(
     monster: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
   ): { code: number; position: Position };
-}
-
-export interface DsaTables {
-  roomTimerFunctions?: ArrayLike<number>;
-  objDescCarryMask?: ArrayLike<number>;
-  objDescObjectType?: ArrayLike<number>;
-  carryLocation?: ArrayLike<number>;
-  word1074?: ArrayLike<number>;
-  monsterDesc?: ArrayLike<MonsterDesc>;
-  /** `d.Byte640`, which `NameIndex` reads for a lit torch. */
-  byte640?: ArrayLike<number>;
 }
 
 export interface ViewingFilterOptions {
@@ -400,12 +390,17 @@ function readSignedWord(word: number): number {
 
 
 export class DsaSystem {
-  private roomTimerFunctions: ArrayLike<number> | null;
-  private objDescCarryMask: ArrayLike<number> | null;
-  private objDescObjectType: ArrayLike<number> | null;
-  private carryLocation: ArrayLike<number> | null;
-  private word1074: ArrayLike<number> | null;
-  private byte640: ArrayLike<number> | null;
+  private readonly dungeon: DungeonState;
+  private readonly timers: TimerQueue;
+  private readonly random: CsbRandom;
+  /** `d.Byte1596`, the room-type timer functions. */
+  private readonly roomTimerFunctions: ArrayLike<number>;
+  /** `d.ObjDesc[].word4`. */
+  private readonly objDescCarryMask: ArrayLike<number>;
+  private readonly objDescObjectType: ArrayLike<number>;
+  private readonly carryLocation: ArrayLike<number>;
+  private readonly word1074: ArrayLike<number>;
+  private readonly byte640: ArrayLike<number>;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
@@ -418,36 +413,21 @@ export class DsaSystem {
   private overridePos = 0;
   private overrideP = false;
   private viewingFilterContext: ViewingFilterContext | null = null;
-  private monsterDesc: ArrayLike<MonsterDesc> | null = null;
+  private readonly monsterDesc: ArrayLike<MonsterDesc>;
   private teleportPartyHandler?: (location: LocationRel) => void;
   private objectMover?: DsaObjectMover;
 
-  constructor(
-    private dungeon: DungeonState,
-    private getTime: () => number,
-    private timers: TimerQueue,
-    private random: CsbRandom,
-    private getPartyState?: () => PartyState,
-    tables?: DsaTables,
-    private actuators?: ActuatorSystem,
-  ) {
-    this.roomTimerFunctions = tables?.roomTimerFunctions ?? null;
-    this.objDescCarryMask = tables?.objDescCarryMask ?? null;
-    this.objDescObjectType = tables?.objDescObjectType ?? null;
-    this.carryLocation = tables?.carryLocation ?? null;
-    this.word1074 = tables?.word1074 ?? null;
-    this.monsterDesc = tables?.monsterDesc ?? null;
-    this.byte640 = tables?.byte640 ?? null;
-  }
-
-  setTables(tables: DsaTables): void {
-    if (tables.roomTimerFunctions) this.roomTimerFunctions = tables.roomTimerFunctions;
-    if (tables.objDescCarryMask) this.objDescCarryMask = tables.objDescCarryMask;
-    if (tables.objDescObjectType) this.objDescObjectType = tables.objDescObjectType;
-    if (tables.carryLocation) this.carryLocation = tables.carryLocation;
-    if (tables.word1074) this.word1074 = tables.word1074;
-    if (tables.monsterDesc) this.monsterDesc = tables.monsterDesc;
-    if (tables.byte640) this.byte640 = tables.byte640;
+  constructor(private readonly ctx: GameContext, private actuators?: ActuatorSystem) {
+    this.dungeon = ctx.dungeon;
+    this.timers = ctx.timers;
+    this.random = ctx.random;
+    this.roomTimerFunctions = ctx.tables.byte1596;
+    this.objDescCarryMask = ctx.tables.objDescWord4;
+    this.objDescObjectType = ctx.tables.objDescObjectType;
+    this.carryLocation = ctx.tables.carryLocation;
+    this.word1074 = ctx.tables.word1074;
+    this.monsterDesc = ctx.tables.monsterDesc;
+    this.byte640 = ctx.tables.byte640;
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -1385,7 +1365,7 @@ export class DsaSystem {
           const { category } = decodeObjectID(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
-          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, false, this.getPartyState?.().facing ?? 0);
+          this.actuators?.triggerObjectMove(pos, rn as ObjectID, false, false, this.ctx.party.state.facing);
           this.deleteLinkedScrollText(rn, bank);
           this.deleteObject(bank, rn);
           break;
@@ -1407,14 +1387,14 @@ export class DsaSystem {
           const pos = this.choosePositionFromMask(posMask);
           const { category, index } = decodeObjectID(cloned);
           const placed = encodeObjectID(pos, category, index);
-          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.getPartyState?.().facing ?? 0);
+          this.actuators?.triggerObjectMove(new Position(locr.x, locr.y, locr.l), placed, true, false, this.ctx.party.state.facing);
           this.dungeon.addObjectToCell(new Position(locr.x, locr.y, locr.l), placed);
         } else if (location === -1) {
-          const party = this.getPartyState?.();
+          const party = this.ctx.party.state;
           if (!party) break;
           party.objectInHand = cloned;
         } else if (location > -1000) {
-          const party = this.getPartyState?.();
+          const party = this.ctx.party.state;
           if (!party) break;
           const loc = this.decodeCharacterLocation(location);
           if (!loc) break;
@@ -1660,7 +1640,7 @@ export class DsaSystem {
         break;
       }
       case StkOp.TIME_FETCH:
-        bank.stack.push(this.getTime());
+        bank.stack.push(this.ctx.state.tickCount);
         break;
       case StkOp.GENERATOR_DELAY_FETCH: {
         const loc = bank.stack.pop();
@@ -1902,8 +1882,8 @@ export class DsaSystem {
       case StkOp.GLOBAL_FETCH: {
         const which = bank.stack.pop();
         let result = 0;
-        if (which === 1 && this.getPartyState) {
-          const party = this.getPartyState();
+        if (which === 1) {
+          const party = this.ctx.party.state;
           result = locationRelToInteger({
             l: party.position.z,
             x: party.position.x,
@@ -2042,7 +2022,7 @@ export class DsaSystem {
   }
 
   private queueDsaSwitchAction(delay: number, action: number, locr: LocationRel, morD: 'M' | 'D'): void {
-    const actionTime = (this.getTime() + delay) >>> 0;
+    const actionTime = (this.ctx.state.tickCount + delay) >>> 0;
     let functionType = TimerFunction.TT_DESSAGE;
 
     if (morD === 'M') {
@@ -2265,7 +2245,7 @@ export class DsaSystem {
   }
 
   private deleteFromNegativeLocation(location: number): ObjectID | null {
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return null;
     if (location === -1) {
       const removed = party.objectInHand;
@@ -2306,7 +2286,7 @@ export class DsaSystem {
       const locr = locationRelFromInteger(location);
       return this.dungeon.isValidLocation(locr);
     }
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return false;
     if (location === -1) {
       return party.objectInHand === OBJECT_ID_NULL;
@@ -2355,8 +2335,8 @@ export class DsaSystem {
     // `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1858`, `:1970`).
     const nameIndex = (rn: ObjectID): number => NameIndex(
       this.dungeon,
-      { objDescObjectType: this.objDescObjectType ?? [], byte640: this.byte640 ?? [] },
-      this.getPartyState?.().facing ?? 0,
+      { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
+      this.ctx.party.state.facing,
       rn,
     );
     if (previous !== OBJECT_ID_NULL) AdjustStatsForItemCarried(champion, slot, -1, previous, this.dungeon, nameIndex);
@@ -2367,7 +2347,7 @@ export class DsaSystem {
   private updateLightForPossessionChange(slot: number, previous: ObjectID, next: ObjectID): void {
     if (slot !== 10) return;
     const word1074 = this.word1074;
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!word1074 || !party) return;
     const stepValue = word1074[2] ?? 0;
     if (stepValue === 0) return;
@@ -2390,7 +2370,7 @@ export class DsaSystem {
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
   private getBaseObjectNameIndex(objectId: ObjectID): number {
-    return GetBasicObjectType(this.dungeon, this.objDescObjectType ?? [], objectId);
+    return GetBasicObjectType(this.dungeon, this.objDescObjectType, objectId);
   }
 
 
@@ -2532,7 +2512,7 @@ export class DsaSystem {
   }
 
   private findCursorSource(doit: boolean): { error: number; object: ObjectID } {
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
     const obj = party.objectInHand;
     if (obj === OBJECT_ID_NULL) return { error: DsaMoveError.SER_NoObjInCursor, object: OBJECT_ID_EOF };
@@ -2541,7 +2521,7 @@ export class DsaSystem {
   }
 
   private findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID } {
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
     if (chIdx < 0 || chIdx >= party.champions.length) {
       return { error: DsaMoveError.SER_IllegalCharacterIndex, object: OBJECT_ID_EOF };
@@ -2600,7 +2580,7 @@ export class DsaSystem {
     if (doit) {
       // A monster moved within the party's level is not lifted: `FindCellDestination`
       // moves it square to square (`MoveObject.cpp:203-220`).
-      const partyLevel = this.getPartyState?.().position.z;
+      const partyLevel = this.ctx.party.state.position.z;
       const sameLevelMonsterMove = decodeObjectID(object).category === DBType.CREATURE
         && dstType === 1
         && locationRelFromInteger(dstLoc).l === partyLevel
@@ -2710,7 +2690,7 @@ export class DsaSystem {
     doit: boolean,
   ): number {
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return DsaMoveError.DER_IllegalCharacterIndex;
     if (chIdx < 0 || chIdx >= party.champions.length) return DsaMoveError.DER_IllegalCharacterIndex;
     if (carryLoc < 0 || carryLoc > 29) return DsaMoveError.DER_IllegalPossessionIndex;
@@ -2728,7 +2708,7 @@ export class DsaSystem {
 
   private checkObjectToCursor(object: ObjectID, doit: boolean): number {
     if (decodeObjectID(object).category === DBType.CLOUD) return DsaMoveError.DER_NoCloudsPlease;
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return DsaMoveError.DER_CursorNotEmpty;
     if (party.objectInHand !== OBJECT_ID_NULL) return DsaMoveError.DER_CursorNotEmpty;
     if (doit) party.objectInHand = object;
@@ -2766,7 +2746,7 @@ export class DsaSystem {
     if (doit) {
       const decoded = decodeObjectID(object);
       const placed = encodeObjectID(pos, decoded.category, decoded.index);
-      const partyLevel = this.getPartyState?.().position.z;
+      const partyLevel = this.ctx.party.state.position.z;
       const srcLocr = srcType === 1 ? locationRelFromInteger(srcLoc) : null;
       const sameLevelMonsterMove = decoded.category === DBType.CREATURE
         && locr.l === partyLevel
@@ -2847,7 +2827,7 @@ export class DsaSystem {
 
   /** `groupIndex(0xd8)`, or `0xff` for a monster that fills the cell (`MoveObject.cpp:511-518`). */
   private detachedGroupIndex(monster: CreatureRecord): number {
-    const desc = this.monsterDesc?.[monster.creatureType];
+    const desc = this.monsterDesc[monster.creatureType];
     return desc && monsterHorizontalSize(desc) === 2 ? 0xff : 0xd8;
   }
 
@@ -2891,18 +2871,18 @@ export class DsaSystem {
     if (!this.isValidObjectId(objectId)) return null;
     const descIndex = DescIndex(this.dungeon, objectId);
     if (descIndex === -1) return null;
-    const mask = this.objDescCarryMask?.[descIndex];
+    const mask = this.objDescCarryMask[descIndex];
     return typeof mask === 'number' ? mask : null;
   }
 
   private getCarryLocationMask(slot: number): number {
-    const value = this.carryLocation?.[slot];
+    const value = this.carryLocation[slot];
     return typeof value === 'number' ? value : 0;
   }
 
 
   private isObjectInCharactersOrCursor(objectId: number): boolean {
-    const party = this.getPartyState?.();
+    const party = this.ctx.party.state;
     if (!party) return false;
     const visited = new Set<number>();
     for (const champion of party.champions) {
