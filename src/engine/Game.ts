@@ -59,6 +59,12 @@ import type { SpellParameters } from './magicTypes';
 import {
     OBJNI_EKKHARD_CROSS,
     OBJNI_EMPTY_FLASK,
+    OBJNI_ILLUMULET_A,
+    OBJNI_ILLUMULET_B,
+    OBJNI_JEWEL_SYMAL_A,
+    OBJNI_JEWEL_SYMAL_B,
+    OBJNI_OPEN_SCROLL,
+    OBJNI_SCROLL,
     OBJNI_TORCH_A,
     OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
@@ -326,6 +332,8 @@ export class Game {
     private byte640: ArrayLike<number> = [];
     /** `d.DropOrder[30]`, graphic `0x232` — see `dropAllPossessions`. */
     private dropOrder: ArrayLike<number> = [];
+    /** `d.Word1074`, graphic `0x232`; entry 2 is what an Illumulet adds to `d.Brightness`. */
+    private word1074: ArrayLike<number> = [];
     /**
      * `d.ObjDesc[].word4` and `d.CarryLocation[]`, the two tables `AddCharacter` needs
      * to pick a possession slot. Taken from the actuator tables, which already carry
@@ -625,6 +633,7 @@ export class Game {
         this.objDescObjectType = actuatorTables?.objDescObjectType ?? [];
         this.byte640 = actuatorTables?.byte640 ?? [];
         this.dropOrder = timerTables?.dropOrder ?? [];
+        this.word1074 = timerTables?.word1074 ?? [];
         this.addCharacterTables =
             actuatorTables?.objDescCarryMask && actuatorTables.carryLocation
                 ? {
@@ -2441,14 +2450,51 @@ export class Game {
         return launched ? 1 : 0;
     }
 
-    /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822`). */
+    /**
+     * `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) — empty a
+     * slot and undo what wearing or holding the object did.
+     *
+     * Ported: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
+     * `d.Brightness`, a Jewel Symal gets `value(0)`; in the weapon hand a scroll closes;
+     * in either hand a torch goes out. All of these test `RN::NameIndex`, the modified
+     * name, so a lit torch is any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`.
+     *
+     * No counterpart here: `SelectPaletteForLightLevel`, `DrawEightHands`,
+     * `DisplayBackpackItem` and the `charFlags` redraw bits (the light and the panels are
+     * derived from live state every frame); `load` (`CharacterStats.characterLoad`
+     * re-sums it). Not ported (`DEBT.md` C34): `AdjustStatsForItemCarried(…, -1, …)`
+     * (C32) and, because they read UI state, `TAG01b1c0` when this champion's attack menu
+     * is open and `RepackChest` when their inventory is. The chest slots (30 and up)
+     * belong to the open inventory; no engine caller passes one.
+     */
     private removeCharacterPossession(chIdx: number, slot: number): ObjectID {
         const champion = this.party.state.champions[chIdx];
         if (!champion) return OBJECT_ID_NULL;
-        const obj = this.getChampionPossession(champion, slot);
-        if (obj === OBJECT_ID_NULL) return OBJECT_ID_NULL;
+        const objRemoved = this.getChampionPossession(champion, slot);
         this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
-        return obj;
+        if (objRemoved === OBJECT_ID_NULL) return OBJECT_ID_NULL;
+        const objNID5 = this.nameIndex(objRemoved);
+        if (slot === 10) {
+            if (objNID5 >= OBJNI_ILLUMULET_A && objNID5 <= OBJNI_ILLUMULET_B) {
+                this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
+                if (this.word1074.length < 3) {
+                    throw new Error('RemoveCharacterPossession needs d.Word1074 (graphic 0x232)');
+                }
+                const party = this.party.state;
+                party.brightness = sw(party.brightness - this.word1074[2]!);
+            } else if (objNID5 >= OBJNI_JEWEL_SYMAL_A && objNID5 <= OBJNI_JEWEL_SYMAL_B) {
+                this.dungeonState.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
+            }
+        }
+        if (slot < 2) {
+            if (slot === 1 && objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
+                this.dungeonState.getScrollRecord(objRemoved)!.open = false;
+            }
+            if (objNID5 >= OBJNI_TORCH_A && objNID5 <= OBJNI_TORCH_D) {
+                this.dungeonState.getWeaponRecord(objRemoved)!.litTorch = false;
+            }
+        }
+        return objRemoved;
     }
 
     /**

@@ -20,6 +20,7 @@ export const OBJNI_TORCH_D = 7;
 export const OBJNI_WATERSKIN = 8;
 export const OBJNI_WATER = 9;
 export const OBJNI_JEWEL_SYMAL_A = 10;
+export const OBJNI_JEWEL_SYMAL_B = 11;
 export const OBJNI_ILLUMULET_A = 12;
 export const OBJNI_ILLUMULET_B = 13;
 export const OBJNI_FLAMITT_A = 14;

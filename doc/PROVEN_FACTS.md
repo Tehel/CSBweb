@@ -3137,6 +3137,26 @@ When the dying champion's inventory is the one open, `KillCharacter` hides it
 Evidence: `tools/dump-champion-death.ts` section 7 (2 of 45 checks fail before the fix;
 the `DropOrder` permutation check is its canary).
 
+## `RemoveCharacterPossession` undoes the Illumulet, the Jewel Symal, the scroll and the torch
+
+`RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) empties the slot
+first, returns `RNnul` for an empty one, and then tests `objRemoved.NameIndex()` — the
+*modified* name, so a lit torch is any of `objNI_Torch_a`-`_d` and a worn Illumulet is
+`_b`:
+
+- slot 10, an Illumulet (`objNI_Illumulet_a`-`_b`): `value(0)`, and `d.Brightness -=
+  d.Word1074[2]` (`:1860-1867`); a Jewel Symal (`_a`-`_b`): `value(0)` (`:1869-1875`);
+- slot 1: `CHARFLAG_weaponAttack`, `TAG01b1c0()` if `d.AttackingCharacterOrdinal` is this
+  champion, and a scroll (`objNI_OpenScroll`-`objNI_Scroll`) gets `open(false)`
+  (`:1882-1895`);
+- slot 0 or 1, a torch: `litTorch(0)` — the charges stay (`:1897-1904`);
+- slot 1 with this champion's inventory open: a chest is repacked (`:1906-1914`).
+
+`AdjustStatsForItemCarried(pcA3, slot, -1, obj)` runs before all of these (`:1858`), and
+the object's weight comes off `load` last. In the Atari DM data `d.Word1074[2]` is 12, the
+torch is weapon type 2, the Jewel Symal misc type 2 and the Illumulet misc type 3.
+Evidence: `tools/dump-champion-death.ts` section 8 (5 of 56 checks fail before C30's fix).
+
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
 The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,

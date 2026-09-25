@@ -44,6 +44,9 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
+import { DescIndexOfRecord } from '../src/engine/objectIndex';
+import type { DatabaseRecord } from '../src/data/dungeonTypes';
+import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
 import { getChampionPossession } from '../src/renderer/ui/Character';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -80,6 +83,9 @@ function champion(i: number, name: string): Champion {
 
 /** `d.DropOrder[30]` as the last `makeGame` extracted it. */
 let dropOrder: number[] = [];
+/** `d.ObjDesc[].objectType` and `d.Word1074`, likewise. */
+let objDescObjectType: ArrayLike<number> = [];
+let word1074: number[] = [];
 
 function makeGame(championCount: number): Game {
   const loader = new DungeonLoader();
@@ -93,6 +99,8 @@ function makeGame(championCount: number): Game {
   const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
   const uiTables = extractUITables(graphics);
   dropOrder = uiTables.graphic232.dropOrder;
+  objDescObjectType = objectTables.objDescObjectType;
+  word1074 = uiTables.graphic232.word1074;
 
   const game = new Game(
     data,
@@ -179,6 +187,25 @@ function newDagger(game: Game): ObjectID {
   });
   db.count++;
   return encodeObjectID(0, DBType.WEAPON, db.records.length - 1) as ObjectID;
+}
+
+/** The first weapon or misc type whose `ObjDesc` row names `objNI`. */
+function typeNamed(category: DBType.WEAPON | DBType.MISC, objNI: number): number {
+  for (let t = 0; t < 128; t++) {
+    const record = category === DBType.WEAPON ? { weaponType: t } : { miscType: t };
+    const di = DescIndexOfRecord(category, record as unknown as DatabaseRecord);
+    if (objDescObjectType[di] === objNI) return t;
+  }
+  throw new Error(`no ${DBType[category]} type is named ${objNI}`);
+}
+
+function newRecord(game: Game, category: DBType.WEAPON | DBType.MISC | DBType.SCROLL, record: object): ObjectID {
+  const databases = game.dungeonState.getData().databases;
+  const db = category === DBType.WEAPON ? databases.weapons
+    : category === DBType.MISC ? databases.misc : databases.scrolls;
+  (db.records as object[]).push({ nextObject: OBJECT_ID_EOF, ...record });
+  db.count++;
+  return encodeObjectID(0, category, db.records.length - 1) as ObjectID;
 }
 
 /** The cell's chain, in order. */
@@ -539,6 +566,59 @@ function main(): void {
       check(bones.length === 1 && decodeObjectID(bones[0]!.rn).position === (g2.party.state.champions[0]!.partyPosition & 3),
         'and lie in the dead champion\'s corner');
     }
+  }
+
+  /* ------------------------------ 8. RemoveCharacterPossession ------------------ */
+  //
+  // C30. `DropAllPossessions` takes every slot out through `RemoveCharacterPossession`
+  // (`doc/CSBwin-src/Character.cpp:1822-1930`), which undoes what wearing or holding an
+  // object did: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
+  // `d.Brightness`, a Jewel Symal gets `value(0)` (`:1860-1876`); in the weapon hand a
+  // scroll closes (`:1891-1895`); in either hand a torch goes out (`:1897-1904`).
+  console.log('');
+  console.log('=== RemoveCharacterPossession ===');
+  {
+    const g = makeGame(2);
+    const cell = findCellWithWestNeighbour(g)!;
+    g.party.state.position = cell;
+    g.monsterSystem.loadPartyLevel(cell.z);
+    const torchType = typeNamed(DBType.WEAPON, OBJNI_TORCH_A);
+    const illumuletType = typeNamed(DBType.MISC, OBJNI_ILLUMULET_A);
+    const symalType = typeNamed(DBType.MISC, OBJNI_JEWEL_SYMAL_A);
+    const step = word1074[2] ?? 0;
+    console.log(`torch is weapon ${torchType}, Illumulet misc ${illumuletType}, Jewel Symal misc ${symalType}; `
+      + `Word1074[2] = ${step}`);
+    check(step !== 0, 'the Illumulet has a brightness step to take off');
+
+    const torch = newRecord(g, DBType.WEAPON, {
+      broken: false, charges: 10, litTorch: true, poisoned: false, cursed: false,
+      important: false, weaponType: torchType,
+    });
+    const scroll = newRecord(g, DBType.SCROLL, { open: true, textReference: 0 });
+    const illumulet = newRecord(g, DBType.MISC, { specialState: 1, important: false, miscType: illumuletType });
+    const symal = newRecord(g, DBType.MISC, { specialState: 1, important: false, miscType: symalType });
+    // What `AddCharacterPossession` would have left (`:2006-2022`): worn, so `value(1)`,
+    // and the Illumulet's step added to the party's light.
+    const before = g.party.state.brightness;
+    g.party.state.brightness = before + step;
+    const a = g.party.state.champions[0]!;
+    a.possessions[0] = torch;
+    a.possessions[1] = scroll;
+    a.possessions[10] = illumulet;
+    g.party.state.champions[1]!.possessions[10] = symal;
+
+    g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    g.monsterAttack.damageCharacter(1, 999, 0, 0);
+    const d = g.dungeonState;
+    console.log(`brightness ${before + step} -> ${g.party.state.brightness}; torch lit ${d.getWeaponRecord(torch)?.litTorch}; `
+      + `scroll open ${d.getScrollRecord(scroll)?.open}; Illumulet value ${d.getMiscRecord(illumulet)?.specialState}; `
+      + `Jewel Symal value ${d.getMiscRecord(symal)?.specialState}`);
+    check(g.party.state.brightness === before, 'the dead champion\'s Illumulet takes its light off the party');
+    check(d.getMiscRecord(illumulet)?.specialState === 0, 'the dropped Illumulet is of no use any more, value(0)');
+    check(d.getMiscRecord(symal)?.specialState === 0, 'the dropped Jewel Symal is of no use any more, value(0)');
+    check(d.getWeaponRecord(torch)?.litTorch === false, 'the dropped torch goes out');
+    check(d.getWeaponRecord(torch)?.charges === 10, 'without losing its charges');
+    check(d.getScrollRecord(scroll)?.open === false, 'the scroll in the weapon hand closes');
   }
 
   finish();

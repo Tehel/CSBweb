@@ -94,10 +94,11 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | C27 | A dead champion keeps a ghost of slot 8 | S | ✅ |
 | C28 | `DropAllPossessions` is not CSBWin's | S | ✅ |
 | C29 | The save writer writes an empty cursor as `RNempty` | S | ✅ |
-| C30 | `removeCharacterPossession` is a bare slot clear | M | ⏳ |
+| C30 | `removeCharacterPossession` is a bare slot clear | M | ✅ |
 | C31 | A dead champion's bones are not set down by `MoveObject` | S | ✅ |
 | C32 | `AdjustStatsForItemCarried` is not ported | M | ⏳ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
+| C34 | Four possession writers, none of them CSBWin's whole | M | ⏳ |
 | D1 | Hands stored twice (*bundle with D2*) | M | ✅ |
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional | L | ⏳ |
@@ -1040,7 +1041,21 @@ empty hand holds `0xffff`. The port's own reader accepted 0 as empty, which is w
 round trip caught it. Evidence: `tools/dump-live-save-file.ts` now reads the written word
 back (2 of 193 checks fail before). The fact is in `doc/PROVEN_FACTS.md`.
 
-### C30 ⏳ `removeCharacterPossession` is a bare slot clear
+### C30 ✅ `removeCharacterPossession` is a bare slot clear
+
+**Paid.** `Game.removeCharacterPossession` now does what CSBWin's does to the object and
+the party: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
+`d.Brightness` (the table is passed in `TimerTables`; `Game` throws if it is missing when
+an Illumulet comes off), a Jewel Symal gets `value(0)`; in the weapon hand a scroll
+closes; in either hand a torch goes out — all tested on `RN::NameIndex`, as CSBWin does.
+So a champion who dies wearing an Illumulet no longer leaves the party lit, and a thrown,
+shot or dropped torch no longer burns on the floor. The palette, hands, backpack redraw,
+`charFlags` and `load` have no counterpart (derived every frame, or re-summed). Left out
+and recorded in C34: `AdjustStatsForItemCarried` (C32), `TAG01b1c0` and `RepackChest`
+(both read UI state). Evidence: `tools/dump-champion-death.ts` section 8 kills one
+champion wearing an Illumulet with a lit torch and an open scroll in hand, and one
+wearing a Jewel Symal (5 of 56 checks fail before; the weapon and misc types are found
+through `ObjDesc`, and come out as DM's torch 2, Jewel Symal 2, Illumulet 3).
 
 Found paying C28. `Game.removeCharacterPossession` only writes `RNnul` into the slot.
 CSBWin's `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) also:
@@ -1098,6 +1113,36 @@ wall, and the click is within x 33-189, y 44-150
 (`doc/CSBwin-src/Mouse.cpp:1139-1157`). `resolveEmptyHandedViewportClick` returns `null`
 there, and nothing plays. Add the sound, and a row to `tools/dump-viewport-click.ts` that
 asserts it is queued.
+
+### C34 ⏳ Four possession writers, none of them CSBWin's whole
+
+Found paying C30. CSBWin changes a champion's slots only through
+`AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1936-2037`) and
+`RemoveCharacterPossession` (`:1822-1930`). The port has four writers:
+
+- `Game.removeCharacterPossession` — CSBWin's since C30, less three things:
+  `AdjustStatsForItemCarried` (C32); `TAG01b1c0` when `d.AttackingCharacterOrdinal` is
+  this champion (`:1885-1888`), which closes their attack menu; and `RepackChest` when
+  their inventory is open and a chest leaves the weapon hand (`:1906-1914`). The last two
+  read `UIState` (`attackingCharacterOrdinal`, the open inventory), which `Game` cannot
+  see.
+- `Game.setChampionHand` — a bare slot write. It is the add half of the two hand refills,
+  which in CSBWin are `AddCharacterPossession(chIdx, RemoveCharacterPossession(…), hand)`
+  (`doc/CSBwin-src/Timer.cpp:2663`, `CSBCode.cpp:6263-6270` through `TAG011594`), so a
+  torch refilled from the quiver is not lit and a scroll is not opened.
+- `ui/Character.setChampionPossession` (the inventory click, `Mouse.ts`) — adds and takes
+  off the Illumulet's `Word1074[2]` and lights or puts out a torch, but sets no
+  `value(1)` / `value(0)` on an Illumulet or Jewel Symal (so a worn one never shows its
+  `_b` name), opens and closes no scroll, and calls neither `TAG01b1c0` nor
+  `AdjustStatsForItemCarried`. It lights any torch by `GetBasicObjectType`; CSBWin's add
+  tests `NameIndex == Torch_a`, an unlit one (`:1988`).
+- `DsaSystem.setChampionPossession` — the Illumulet's brightness only; no torch, no
+  `value()`, no scroll.
+
+Port `AddCharacterPossession` for the engine, route all four through the engine pair,
+and give the engine a way to ask the UI to close the attack menu and repack the chest.
+Needs the frames (the inventory click is UI). Do it after C32, so the stat adjustment
+lands in one place.
 
 ## D — State representation
 
