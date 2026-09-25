@@ -42,13 +42,26 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
+  | 'adjustBrightness'
+  | 'applyMagicShield'
   | 'applyMissileDamageToParty'
+  | 'applySpellSkillGain'
+  | 'characterThrowsSpell'
+  | 'climbDownIntoPit'
+  | 'disableCharacterAction'
   | 'dropAllPossessions'
+  | 'emitSpellMessage'
   | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
+  | 'launchObject'
   | 'notePartyMoved'
   | 'onChampionDied'
+  | 'queueUtilityTimer'
   | 'registerChampionBones'
+  | 'removeCharacterPossession'
+  | 'setBrightnessTimer'
+  | 'setBusyTimerRefill'
+  | 'throwFromWeaponHand'
   | 'wakeUp'
 >;
 

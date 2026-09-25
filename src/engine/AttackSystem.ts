@@ -34,11 +34,9 @@ import { div, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import type { Champion } from './gameTypes';
 import { getPartyChampion } from './Party';
-import type { CharacterStats } from './CharacterStats';
-import type { MonsterAttack } from './MonsterAttack';
-import type { MonsterDamage } from './MonsterDamage';
 import { MonsterDamageResult } from './MonsterDamage';
-import type { DsaSystem, PartyAttackFilter } from './DsaSystem';
+import { TimerFunction } from './TimerQueue';
+import type { PartyAttackFilter } from './DsaSystem';
 import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
@@ -48,7 +46,6 @@ import {
 } from '../core/spellRn';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { AdjustSkillsWhy, determineMastery } from './skills';
-import type { MonsterSystem } from './MonsterSystem';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import {
   monsterBravery,
@@ -258,66 +255,14 @@ function unmarshalParameters(params: PartyAttackParameters, words: ArrayLike<num
   }
 }
 
+/** What `AttackSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
 export interface AttackSystemHooks {
-  /** `AdjustStamina` (`doc/CSBwin-src/Character.cpp:2249`). */
-  adjustStamina?: (chIdx: number, decrement: number) => void;
-  /** `DisableCharacterAction` (`doc/CSBwin-src/Character.cpp:2380`). */
-  disableCharacterAction?: (chIdx: number, timeDelay: number) => void;
-  /** `HitDoor` (`doc/CSBwin-src/Code11f52.cpp:2263`). */
-  hitDoor?: (position: Position, force: number, explosion: boolean, delay: number) => boolean;
-  /** `CharacterThrowsSpell` (`doc/CSBwin-src/Magic.cpp:470`). */
-  characterThrowsSpell?: (chIdx: number, projectile: number, range: number, neededMana: number) => number;
-  /** `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449`) — a real object, not a spell. */
-  launchObject?: (chIdx: number, object: ObjectID, range: number, damage: number, decayRate: number) => number;
-  /** `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822`). */
-  removeCharacterPossession?: (chIdx: number, slot: number) => ObjectID;
-  /** `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`) — returns its `D6W`. */
-  magicShield?: (chIdx: number, spellShield: boolean, strength: number, mustHaveMana: number) => number;
-  /** `d.Brightness += delta` then `SetBrightnessTimer(decayRate, time)`. */
-  applyLight?: (deltaLight: number, decayRate: number, time: number) => void;
-  /** `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2016`). */
-  openWindow?: (duration: number) => void;
-  /** `CreateFluxcage` (`doc/CSBwin-src/Code11f52.cpp:1515`). */
-  createFluxcage?: (position: Position) => ObjectID | null;
-  /** `ThrowByCharacter(chIdx, 1, side, disableTime, range, damage, decayRate)`. */
-  throwByCharacter?: (options: {
-    chIdx: number;
-    side: number;
-    disableTime: number;
-    range: number;
-    damage: number;
-    decayRate: number;
-  }) => number;
-  /** The busy timer's `uByte6`, which `atk_THROW` overwrites (`:2144`). */
-  setBusyTimerRefill?: (chIdx: number, value: number) => void;
-  /** `MoveObject(RNnul, ...)` for the party, with pit damage suppressed. */
-  climbDownIntoPit?: (target: Position) => void;
-  /** `PrintWithSubstitution(text, 4, true)` (`doc/CSBwin-src/Graphics.cpp:1540`). */
-  printMessage?: (text: string) => void;
-  /** `DeleteDBEntry` — the magic box FREEZE LIFE consumes. */
-  deleteDBEntry?: (rn: ObjectID) => void;
-  /** `ProcessTimers29to41(x, y, TT_M1, 0)` — wake the group we just hit. */
-  activateMonster?: (mapX: number, mapY: number, level: number) => void;
-  /** `AdjustSkills`'s surrounding context, which only `Game` can supply. */
-  adjustSkills?: (chIdx: number, skillNumber: number, experience: number, why: AdjustSkillsWhy) => void;
-  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-  possession?: (champ: Champion, slot: number) => ObjectID;
   /** Trace, mirroring CSBWin's `AttackTraceActive` output. */
   trace?: (line: string) => void;
 }
 
-/** The other systems `AttackSystem` calls (`DEBT.md` E1c turns them into `ctx.systems`). */
-export interface AttackSystemDeps {
-  monsterDamage: MonsterDamage;
-  monsterAttack: MonsterAttack;
-  monsters: MonsterSystem;
-  dsa?: DsaSystem | null;
-  characterStats?: CharacterStats | null;
-  hooks?: AttackSystemHooks;
-}
-
 export class AttackSystem {
-  constructor(private readonly ctx: GameContext, private deps: AttackSystemDeps) {}
+  constructor(private readonly ctx: GameContext, private readonly hooks: AttackSystemHooks = {}) {}
 
   /**
    * `d.MonsterUnderAttack`. A global in CSBWin, read directly by
@@ -330,15 +275,7 @@ export class AttackSystem {
   /** `d.attackDamageToDisplay` — what `FlashAttackDamage` shows next. */
   attackDamageToDisplay = 0;
 
-  setCharacterStats(stats: CharacterStats): void {
-    this.deps.characterStats = stats;
-  }
-
   // ---------------------------------------------------------------- helpers
-
-  private get hooks(): AttackSystemHooks {
-    return this.deps.hooks ?? {};
-  }
 
   private trace(line: string): void {
     this.hooks.trace?.(line);
@@ -350,7 +287,7 @@ export class AttackSystem {
 
   private possession(champ: Champion | null, slot: number): ObjectID {
     if (!champ) return OBJECT_ID_NULL;
-    return this.hooks.possession?.(champ, slot) ?? OBJECT_ID_NULL;
+    return champ.possessions[slot] ?? OBJECT_ID_NULL;
   }
 
   private nameIndexOf(rn: ObjectID): number {
@@ -398,7 +335,7 @@ export class AttackSystem {
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return 0;
 
-    const order = this.deps.monsterAttack.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
+    const order = this.ctx.systems.monsterAttack.determineAttackOrder(attackX, attackY, partyX, partyY, charPos);
     for (const pos of order) {
       const ordinal = ordinalOfMonsterAtPosition(this.ctx.dungeon, this.ctx.tables.monsterDesc, monster, pos);
       if (ordinal !== 0) return ordinal;
@@ -410,8 +347,8 @@ export class AttackSystem {
 
   /** `CallAttackFilter` (`doc/CSBwin-src/Attack.cpp:457`). */
   private callAttackFilter(filter: PartyAttackFilter | null, params: PartyAttackParameters, msg: number): void {
-    if (!filter || !this.deps.dsa) return;
-    const words = this.deps.dsa.callPartyAttackFilter(filter, marshalParameters(params), msg);
+    if (!filter) return;
+    const words = this.ctx.systems.dsa.callPartyAttackFilter(filter, marshalParameters(params), msg);
     unmarshalParameters(params, words);
     // "Party attack Filter error: Set illegal character index" — CSBWin puts up a
     // message box and carries on with champion 0.
@@ -437,15 +374,15 @@ export class AttackSystem {
     const phys = params.attdep.physicalAttack;
 
     if (phys.staminaAdjust !== 0) {
-      this.hooks.adjustStamina?.(params.charIdx, phys.staminaAdjust);
+      this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, phys.staminaAdjust);
     }
     if (phys.skillAdjust !== 0) {
-      this.hooks.adjustSkills?.(params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
+      this.ctx.systems.game.applySpellSkillGain(params.charIdx, params.skillNumber, phys.skillAdjust, AdjustSkillsWhy.PhysicalAttack);
     }
 
     const monster = this.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) return;
-    const result = this.deps.monsterDamage.damageMonster(
+    const result = this.ctx.systems.monsterDamage.damageMonster(
       monster,
       phys.attackedMonsterOrdinal - 1,
       this.ctx.party.state.position.z,
@@ -526,14 +463,14 @@ export class AttackSystem {
 
     // --- Did it connect? Quickness against the monster's dexterity, then two
     //     independent second chances: a flat 1-in-4, then Luck.
-    const quickness = this.deps.monsterAttack.quickness(champ);
+    const quickness = this.ctx.systems.monsterAttack.quickness(champ);
     let required = sw(random.below(32) + desc.dexterity12 + levelDifficulty - 16);
     let luckyHit = false;
     this.trace(`character's quickenss = ${quickness}`);
     this.trace(`required quickness = ${required}`);
     if (quickness <= required) {
       luckyHit = random.zeroTo3() === 0;
-      if (!luckyHit && !this.deps.monsterAttack.isCharacterLucky(champ, 75 - p7)) {
+      if (!luckyHit && !this.ctx.systems.monsterAttack.isCharacterLucky(champ, 75 - p7)) {
         this.trace('Attack failed.  Quickness too small. Luck(1/4) failed.  Return 0');
         phys.staminaAdjust = 2 + random.bool();
         this.physicalAttackFilter(filter, params);
@@ -547,9 +484,9 @@ export class AttackSystem {
     );
 
     // --- The damage roll proper.
-    const throwingDistance = this.deps.characterStats
-      ? this.deps.characterStats.determineThrowingDistance(champ, 1, this.ctx.party.state.sleeping)
-      : 0;
+    const throwingDistance = this.ctx.systems.characterStats.determineThrowingDistance(
+      champ, 1, this.ctx.party.state.sleeping,
+    );
     let d7 = sw(throwingDistance);
     let d6 = 0;
     this.trace(`D7W = Throwing distance=${d7}`);
@@ -746,8 +683,8 @@ export class AttackSystem {
       // A group already in fear state 6 has broken formation to attack; frightening it
       // has to stop the attack and restart its movement timers from scratch.
       if ((monster.fear & 0xf) === StateOfFear.StateOfFear6) {
-        this.deps.monsters.clearAttackingAndDeleteMovementTimers(slotIndex, params.attackX, params.attackY, level);
-        this.deps.monsters.startMonsterMovementTimers(params.attackX, params.attackY, level);
+        this.ctx.systems.monsters.clearAttackingAndDeleteMovementTimers(slotIndex, params.attackX, params.attackY, level);
+        this.ctx.systems.monsters.startMonsterMovementTimers(params.attackX, params.attackY, level);
       }
       monster.fear = (monster.fear & ~0xf) | StateOfFear.StateOfFear5;
       // How long the fright lasts: worse bravery means longer, and a slow monster
@@ -758,7 +695,7 @@ export class AttackSystem {
       success = 1;
     }
 
-    this.hooks.adjustSkills?.(params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
+    this.ctx.systems.game.applySpellSkillGain(params.charIdx, 14, wc.skillIncrement, AdjustSkillsWhy.WarCryEtc);
     return success;
   }
 
@@ -792,12 +729,12 @@ export class AttackSystem {
     params.attdep.spellAttack.decrementCharges = 1;
     this.callAttackFilter(filter, params, 1);
 
-    const success = this.hooks.characterThrowsSpell?.(
+    const success = this.ctx.systems.game.characterThrowsSpell(
       params.charIdx,
       params.attdep.spellAttack.spellType,
       params.attdep.spellAttack.spellRange,
       params.neededMana,
-    ) ?? 0;
+    );
     if (success === 0) params.experienceGained = div(params.experienceGained, 2);
     if (params.attdep.spellAttack.decrementCharges !== 0) {
       this.decrementChargesRemaining(params.charIdx);
@@ -886,7 +823,7 @@ export class AttackSystem {
     const position = new Position(mapX, mapY, party.position.z);
     const roomType = (this.ctx.dungeon.getCellFlag(position) >> 5) & 7;
     if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) return;
-    const cage = this.hooks.createFluxcage?.(position) ?? null;
+    const cage = this.ctx.systems.timer.createFluxcage(position, this.ctx.state.tickCount);
     if (cage === null) return;
 
     const neighbours: Array<[number, number]> = [
@@ -939,7 +876,7 @@ export class AttackSystem {
     if (!pChar) return 0;
     if ((pChar.attributes.health | 0) === 0) return 0;
 
-    const filter = this.deps.dsa?.findPartyAttackFilter() ?? null;
+    const filter = this.ctx.systems.dsa.findPartyAttackFilter();
     const params = createAttackParameters();
     params.charIdx = initialChIdx;
     params.attackType = initialAttackType;
@@ -1018,15 +955,15 @@ export class AttackSystem {
           this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
           params.dataType = AttackDataType.ADT_HitDoor;
           params.disableTime = 6;
-          params.attdep.hitDoor.strength = this.deps.characterStats
-            ? this.deps.characterStats.determineThrowingDistance(pChar, 1, party.sleeping)
-            : 0;
+          params.attdep.hitDoor.strength =
+            this.ctx.systems.characterStats.determineThrowingDistance(pChar, 1, party.sleeping);
           this.callAttackFilter(filter, params, 1);
-          this.hooks.hitDoor?.(
+          this.ctx.systems.timer.hitDoor(
             new Position(params.attackX, params.attackY, party.position.z),
             params.attdep.hitDoor.strength,
             false, // not a ZO spell
             2, // delay
+            this.ctx.state.tickCount,
           );
           this.ctx.sounds.queueSound(4, party.position.x, party.position.y, 2);
           break;
@@ -1069,7 +1006,7 @@ export class AttackSystem {
         params.dataType = AttackDataType.ADT_Flip;
         params.attdep.flip.heads = this.ctx.random.bool();
         this.callAttackFilter(filter, params, 1);
-        this.hooks.printMessage?.(params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS');
+        this.ctx.systems.game.emitSpellMessage(params.attdep.flip.heads !== 0 ? 'IT COMES UP HEADS' : 'IT COMES UP TAILS');
         break;
 
       case AttackType.atk_SPELLSHIELD:
@@ -1078,12 +1015,16 @@ export class AttackSystem {
         params.attdep.shield.strength = 0x118;
         params.dataType = AttackDataType.ADT_Shield;
         this.callAttackFilter(filter, params, 1);
-        const raised = this.hooks.magicShield?.(
-          params.charIdx,
-          params.attackType === AttackType.atk_SPELLSHIELD,
-          params.attdep.shield.strength,
-          params.attdep.shield.mustHaveMana,
-        ) ?? 0;
+        // `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`) — returns its `D6W`.
+        const shielded = this.champions()[params.charIdx];
+        const raised = shielded
+          ? this.ctx.systems.game.applyMagicShield(
+            shielded,
+            params.attackType === AttackType.atk_SPELLSHIELD,
+            params.attdep.shield.strength,
+            params.attdep.shield.mustHaveMana,
+          )
+          : 0;
         // `MagicShield` returns 0 when the champion was down to its last three mana and
         // got only half a shield for them: a botched cast, so most of the reward goes.
         if (raised === 0) {
@@ -1156,7 +1097,9 @@ export class AttackSystem {
 
       case AttackType.atk_WINDOW: {
         const duration = sw(this.ctx.random.below(this.masteryOf(pChar, params.skillNumber) + 8) + 5);
-        this.hooks.openWindow?.(duration);
+        // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2016`).
+        this.ctx.party.state.seeThruWalls = this.ctx.party.state.seeThruWalls + 1;
+        this.ctx.systems.game.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
         params.dataType = AttackDataType.ADT_Window;
         this.callAttackFilter(filter, params, 1);
         this.decrementChargesRemaining(params.charIdx);
@@ -1171,7 +1114,7 @@ export class AttackSystem {
         // Climbing down is only possible into an empty pit; anything in it and the
         // party stays put, and does not even lose a turn.
         if (roomType === RoomType.PIT && this.findFirstMonsterAt(params.attackX, params.attackY) === OBJECT_ID_EOF) {
-          this.hooks.climbDownIntoPit?.(target);
+          this.ctx.systems.game.climbDownIntoPit(target);
         } else {
           params.disableTime = 0;
         }
@@ -1193,8 +1136,8 @@ export class AttackSystem {
           if (misc.miscType === MISC_MAGICAL_BOX_B) delta = 125;
         }
         if (delta !== 0 && held !== OBJECT_ID_NULL) {
-          this.hooks.removeCharacterPossession?.(params.charIdx, 1);
-          this.hooks.deleteDBEntry?.(held);
+          this.ctx.systems.game.removeCharacterPossession(params.charIdx, 1);
+          this.ctx.dungeon.deleteDBEntry(held);
         } else {
           delta = 70;
           this.decrementChargesRemaining(params.charIdx);
@@ -1215,11 +1158,9 @@ export class AttackSystem {
         params.attdep.light.time = 2500;
         params.attdep.light.decayRate = -2;
         this.callAttackFilter(filter, params, 1);
-        this.hooks.applyLight?.(
-          params.attdep.light.deltaLight,
-          params.attdep.light.decayRate,
-          params.attdep.light.time,
-        );
+        // `d.Brightness += delta`, then `SetBrightnessTimer(decayRate, time)`.
+        this.ctx.systems.game.adjustBrightness(params.attdep.light.deltaLight);
+        this.ctx.systems.game.setBrightnessTimer(params.attdep.light.decayRate, params.attdep.light.time);
         this.decrementChargesRemaining(params.charIdx);
         break;
 
@@ -1237,14 +1178,14 @@ export class AttackSystem {
         params.attdep.thro.decayRate = -1;
         this.callAttackFilter(filter, params, 1);
         if (params.attdep.thro.abort === 0) {
-          successfulAttack = this.hooks.throwByCharacter?.({
+          successfulAttack = this.ctx.systems.game.throwFromWeaponHand({
             chIdx: params.charIdx,
             side: params.attdep.thro.side,
             disableTime: params.disableTime,
             range: params.attdep.thro.range,
             damage: params.attdep.thro.damage,
             decayRate: params.attdep.thro.decayRate,
-          }) ?? 0;
+          });
         } else {
           successfulAttack = 0;
         }
@@ -1254,7 +1195,7 @@ export class AttackSystem {
           // `disableTime` is zeroed — a second `DisableCharacterAction` below would
           // clear that byte and the champion's hand would never be refilled.
           if (params.disableTime > 255) params.disableTime = 255;
-          this.hooks.setBusyTimerRefill?.(params.charIdx, params.disableTime < 0 ? 2 : params.disableTime);
+          this.ctx.systems.game.setBusyTimerRefill(params.charIdx, params.disableTime < 0 ? 2 : params.disableTime);
           params.disableTime = 0;
         }
         break;
@@ -1268,16 +1209,23 @@ export class AttackSystem {
 
     this.callAttackFilter(filter, params, 2);
     if (params.disableTime !== 0) {
-      this.hooks.disableCharacterAction?.(params.charIdx, params.disableTime);
+      this.ctx.systems.game.disableCharacterAction(params.charIdx, params.disableTime);
     }
     if (params.staminaCost !== 0) {
-      this.hooks.adjustStamina?.(params.charIdx, params.staminaCost);
+      this.ctx.systems.monsterAttack.adjustStamina(params.charIdx, params.staminaCost);
     }
     if (params.experienceGained !== 0) {
-      this.hooks.adjustSkills?.(params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
+      this.ctx.systems.game.applySpellSkillGain(params.charIdx, params.skillNumber, params.experienceGained, AdjustSkillsWhy.Attack);
     }
     if (params.activateMonster !== 0) {
-      this.hooks.activateMonster?.(params.attackX, params.attackY, party.position.z);
+      // `ProcessTimers29to41(x, y, TT_M1, 0)` — wake the group we just hit.
+      this.ctx.systems.monsterAI.processTimers29to41({
+        mapX: params.attackX,
+        mapY: params.attackY,
+        level: party.position.z,
+        timerFunction: TimerFunction.TT_M1,
+        timeUntilAlternateUpdate: 0,
+      });
     }
     return successfulAttack;
   }
@@ -1328,8 +1276,8 @@ export class AttackSystem {
     if (ammo === OBJECT_ID_NULL || decodeObjectID(ammo).category !== DBType.WEAPON) return needAmmo();
 
     const weapon = this.possession(pChar, 1);
-    const launcherDesc = weapon !== OBJECT_ID_NULL ? this.deps.characterStats?.weaponDescFor(weapon) ?? null : null;
-    const ammoDesc = this.deps.characterStats?.weaponDescFor(ammo) ?? null;
+    const launcherDesc = weapon !== OBJECT_ID_NULL ? this.ctx.systems.characterStats.weaponDescFor(weapon) ?? null : null;
+    const ammoDesc = this.ctx.systems.characterStats.weaponDescFor(ammo) ?? null;
     if (!launcherDesc || !ammoDesc) return needAmmo();
 
     let weaponClass = launcherDesc.uByte1;
@@ -1342,7 +1290,7 @@ export class AttackSystem {
     }
 
     this.setCharToPartyFacing(pChar);
-    const projectile = this.hooks.removeCharacterPossession?.(params.charIdx, 0) ?? OBJECT_ID_NULL;
+    const projectile = this.ctx.systems.game.removeCharacterPossession(params.charIdx, 0);
     this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
     const mastery = sw(this.masteryOf(pChar, 11));
     params.attdep.shoot.range = launcherDesc.uByte3 + ammoDesc.uByte3;
@@ -1351,7 +1299,7 @@ export class AttackSystem {
     params.attdep.shoot.success = 1;
     this.callAttackFilter(filter, params, 1);
     if (projectile === OBJECT_ID_NULL) return 1;
-    this.hooks.launchObject?.(
+    this.ctx.systems.game.launchObject(
       params.charIdx,
       projectile,
       params.attdep.shoot.range,

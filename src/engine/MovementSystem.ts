@@ -7,34 +7,14 @@
 
 import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
-import type { Champion, MovementResult } from './gameTypes';
+import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
-import type { ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
+import { TimerFunction } from './TimerQueue';
 
-
-/**
- * What `MoveParty` needs from the monster and champion systems.
- */
-export interface MovementHooks {
-    /** `FindFirstMonster(newX, newY)` (doc/CSBwin-src/CSBCode.cpp:8296). */
-    findFirstMonster(position: Position): ObjectID;
-    /** `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8302). */
-    activateMonster(position: Position): void;
-    /** `GetCharacterToDamage` (doc/CSBwin-src/CSBCode.cpp:6884). */
-    getCharacterToDamage(x: number, y: number, corner: number): number;
-    /** `DamageCharacter` (doc/CSBwin-src/Character.cpp:2703). */
-    damageCharacter(chIdx: number, damage: number, woundMask: number, kind: number): number;
-    /** `MaxLoad` (doc/CSBwin-src/Code11f52.cpp:4280). */
-    maxLoad(champ: Champion): number;
-    /** `CHARDESC.load`, in tenths of a kilogram (doc/CSBwin-src/CSB.h:2584). */
-    characterLoad(champ: Champion): number;
-    /** `AdjustStamina` (doc/CSBwin-src/Code11f52.cpp:4413). */
-    adjustStamina(chIdx: number, decrement: number): void;
-}
 
 /**
  * MovementSystem - handles movement validation and collision detection
@@ -43,7 +23,7 @@ export class MovementSystem {
     private readonly party: Party;
     private readonly dungeon: DungeonState;
 
-    constructor(ctx: GameContext, private readonly hooks: MovementHooks) {
+    constructor(private readonly ctx: GameContext) {
         this.party = ctx.party;
         this.dungeon = ctx.dungeon;
     }
@@ -166,8 +146,15 @@ export class MovementSystem {
         // `GravityGame` produce those moves, and both are `false` and never assigned
         // (doc/CSBwin-src/data.cpp:239-240).
         if (this.party.state.champions.length !== 0) {
-            if (this.hooks.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
-                this.hooks.activateMonster(newPosition);
+            if (this.dungeon.findFirstMonster(newPosition) !== OBJECT_ID_EOF) {
+                // `ProcessTimers29to41(newX, newY, TT_M1, 0)` (doc/CSBwin-src/CSBCode.cpp:8302).
+                this.ctx.systems.monsterAI.processTimers29to41({
+                    mapX: newPosition.x,
+                    mapY: newPosition.y,
+                    level: newPosition.z,
+                    timerFunction: TimerFunction.TT_M1,
+                    timeUntilAlternateUpdate: 0,
+                });
                 return {
                     success: false,
                     blocked: true,
@@ -206,11 +193,11 @@ export class MovementSystem {
         const staminaAdjustment: number[] = [];
         for (let charIdx = 0; charIdx < champions.length; charIdx++) {
             const champ = champions[charIdx];
-            const maxLoad = this.hooks.maxLoad(champ);
-            staminaAdjustment[charIdx] = sw(div(3 * this.hooks.characterLoad(champ), maxLoad) + 1);
+            const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
+            staminaAdjustment[charIdx] = sw(div(3 * this.ctx.systems.characterStats.characterLoad(champ), maxLoad) + 1);
         }
         for (let charIdx = 0; charIdx < champions.length; charIdx++) {
-            this.hooks.adjustStamina(charIdx, staminaAdjustment[charIdx]);
+            this.ctx.systems.monsterAttack.adjustStamina(charIdx, staminaAdjustment[charIdx]);
         }
     }
 
@@ -236,11 +223,11 @@ export class MovementSystem {
         let k = 0;
         if (this.party.state.champions.length !== 0) {
             const direction = relDirection + ((this.party.state.facing & 3) + 2);
-            const local8 = this.hooks.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
-            k = sw(this.hooks.damageCharacter(local8, 1, 24, 2));
-            const local10 = this.hooks.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
+            const local8 = this.ctx.systems.monsterAttack.getCharacterToDamage(newPosition.x, newPosition.y, direction & 3);
+            k = sw(this.ctx.systems.monsterAttack.damageCharacter(local8, 1, 24, 2));
+            const local10 = this.ctx.systems.monsterAttack.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
             const local30 = local10 & 0xffff;
-            if (local8 !== local30) k |= this.hooks.damageCharacter(local10, 1, 24, 2);
+            if (local8 !== local30) k |= this.ctx.systems.monsterAttack.damageCharacter(local10, 1, 24, 2);
         }
         return {
             success: false,
