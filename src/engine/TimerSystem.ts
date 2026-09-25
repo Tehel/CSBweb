@@ -14,7 +14,7 @@ import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import type { Champion, PartyState } from './gameTypes';
+import type { PartyState } from './gameTypes';
 import { characterAtPosition } from './AddCharacter';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON,
@@ -66,7 +66,7 @@ import {
   monsterNonMaterial,
   monsterVerticalSize,
 } from '../renderer/csbwin/ObjectTables';
-import type { ActuatorSystem } from './ActuatorSystem';
+import { DescIndex, IsAKey } from './objectIndex';
 import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { CloudType } from './cloudTypes';
@@ -95,149 +95,9 @@ interface MonsterMove {
 
 type MissileDropTarget = { monster: ObjectID } | null;
 
+/** What `TimerSystem` calls that leaves the engine (`DEBT.md` E1d retires it). */
 export interface TimerHooks {
-  /**
-   * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion's action
-   * timer has expired. `refillSlot` is the timer's `uByte6`: zero for an ordinary
-   * attack, otherwise one more than the possession slot to refill from the backpack,
-   * which is how a thrown weapon comes back to the hand.
-   *
-   * A hook rather than code here because refilling a hand needs the possession rules
-   * and the weapon descriptors, both of which live in `Game`.
-   */
-  onEnableCharacterAction?: (chIdx: number, refillSlot: number) => void;
-  onDsaTimer5?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
-  onDsaTimer6?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
-  onDsaTimer7?: (rn: ObjectID, timer: TimerEntry, location: Position) => boolean;
-  /**
-   * A missile reached the party. `chIdx` is already `CharacterAtPosition(objectPos)`,
-   * and `damage`/`kind`/`poisonStrength` are already `DetermineMagicDamage`'s three
-   * outputs, because CSBWin computes all four inside `ProcessMissileEncounter`
-   * (`doc/CSBwin-src/Code11f52.cpp:1947-1958`, `:2044-2056`). The hook only applies
-   * them: `DamageCharacter` and, on a hit that drew blood, `PoisonCharacter`.
-   */
-  onMissileHitParty?: (options: {
-    missile: number;
-    projectile: ObjectID;
-    position: Position;
-    posInCell: number;
-    direction: number;
-    chIdx: number;
-    damage: number;
-    kind: number;
-    poisonStrength: number;
-    range: number;
-  }) => void;
-  /**
-   * `DamageMonster(pMonster, indexInGroup, x, y, damage, 1, false, pmmr)` — the missile
-   * arm's call (`doc/CSBwin-src/Code11f52.cpp:2016-2024`).
-   */
-  damageMonster?: (
-    monster: CreatureRecord,
-    indexInGroup: number,
-    level: number,
-    mapX: number,
-    mapY: number,
-    damage: number,
-  ) => MonsterDamageResult;
-  onMissileEncounterFilter?: (options: {
-    type: number;
-    position: Position;
-    posInCell: number;
-    missile: number;
-    projectile: ObjectID;
-    direction: number;
-    index: number;
-  }) => number;
-  /**
-   * `TT_75` fired: apply another tick of poison to this champion, with `remaining`
-   * ticks left after it. `PoisonCharacter` lives with the rest of the champion damage
-   * chain, so the timer only wakes it.
-   */
-  onPoisonTick?: (chIdx: number, remaining: number) => void;
-  /** The party was relocated by a timer (a pit, a teleporter, a wiggle). */
-  onPartyMoved?: () => void;
-  /**
-   * `ProcessTimer60and61` (doc/CSBwin-src/Timer.cpp:2566) — a monster waiting for its
-   * destination square to clear.
-   */
-  onMonsterAbeyance?: (timer: TimerEntry) => void;
-  /**
-   * `ProcessTimers29to41` (doc/CSBwin-src/Monster.cpp:3239). Every timer type from
-   * 29 to 41 lands here rather than in the ordinary dispatch.
-   */
-  onMonsterAI?: (options: {
-    mapX: number;
-    mapY: number;
-    level: number;
-    timerFunction: number;
-    timeUntilAlternateUpdate: number;
-    timer?: TimerEntry;
-  }) => void;
-  onSpawnMonster?: (options: {
-    type: number;
-    hitPointMultiplier: number;
-    countMinus1: number;
-    facing: number;
-    x: number;
-    y: number;
-    normallyClosed: boolean;
-    drawAsSize4: boolean;
-    audible: boolean;
-  }) => void;
-  onTriggerMissileLauncher?: (options: {
-    actuator: ActuatorRecord;
-    timer: TimerEntry;
-    mapX: number;
-    mapY: number;
-  }) => void;
   playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-  /** `GetObjectWeight(object)`, for `DetermineMagicDamage`'s thrown-object arm. */
-  objectWeight?: (rn: ObjectID) => number;
-  /** `TAG0099d2(object)->uByte3` — a thrown weapon's own damage contribution. */
-  weaponThrowDamage?: (rn: ObjectID) => number;
-  /** `d.ObjDesc[object.DescIndex()].word4` — where the object may be carried. */
-  objDescWord4?: (rn: ObjectID) => number;
-  /** `RN::IsAKey` (`doc/CSBwin-src/data.cpp:686`). */
-  isAKey?: (rn: ObjectID) => boolean;
-  /** `DamageAllCharacters` (doc/CSBwin-src/Code11f52.cpp:4378). */
-  damageAllCharacters?: (damage: number, woundMask: number, kind: number) => number;
-  /** `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`). */
-  adjustStamina?: (chIdx: number, decrement: number) => void;
-  /** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`). */
-  maxLoad?: (champ: Champion) => number;
-  /** `CHARDESC.load` — what the champion is actually carrying. */
-  characterLoad?: (champ: Champion) => number;
-  /** `DamageMonsterGroup` (doc/CSBwin-src/Code11f52.cpp:1317). Returns MONSTER_DAMAGE_RESULT. */
-  damageMonsterGroup?: (
-    monster: CreatureRecord,
-    level: number,
-    mapX: number,
-    mapY: number,
-    damage: number,
-    /** CSBWin's `noItem16`; only the pit fall passes it, and only when true. */
-    noItem16?: boolean,
-    /**
-     * CSBWin's `P5`, false only for the pit fall (`Code11f52.cpp:3097`): the last
-     * member's death is not applied, and droppings wait for `flushPendingDroppings`.
-     */
-    apply?: boolean,
-  ) => number;
-  /**
-   * `MoveObject`'s monster branch (`doc/CSBwin-src/Code11f52.cpp:2796-3424`),
-   * `MonsterSystem.moveMonster`: `code` is its return value, `position` is `d.NewX`,
-   * `d.NewY`, `d.NewLevel`.
-   */
-  moveMonster?: (
-    monsterRn: ObjectID, oldX: number, oldY: number, newX: number, newY: number, level: number,
-  ) => { code: number; position: Position };
-  /**
-   * `TAG00b522` (`doc/CSBwin-src/Code11f52.cpp:806`) — drop the remains a
-   * `damageMonsterGroup(apply = false)` deferred, at the square the group fell to.
-   */
-  flushPendingDroppings?: (monsterType: number, level: number, mapX: number, mapY: number) => void;
-  /** `DeterminePoisonDamage` (doc/CSBwin-src/Code11f52.cpp:1358). */
-  determinePoisonDamage?: (monsterType: number, damage: number) => number;
 }
 
 export class TimerSystem {
@@ -255,8 +115,7 @@ export class TimerSystem {
 
   constructor(
     private readonly ctx: GameContext,
-    private actuators: ActuatorSystem,
-    private hooks?: TimerHooks,
+    private readonly hooks: TimerHooks = {},
   ) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
@@ -299,13 +158,12 @@ export class TimerSystem {
       timer.function >= TimerFunction.TT_FIRST_MONSTER_AI &&
       timer.function <= TimerFunction.TT_LAST_MONSTER_AI
     ) {
-      this.hooks?.onMonsterAI?.({
+      this.ctx.systems.monsterAI.processTimers29to41({
         mapX: timer.uByte6,
         mapY: timer.uByte7,
         level: timer.level,
         timerFunction: timer.function,
         timeUntilAlternateUpdate: timer.uByte8,
-        timer,
       });
       return;
     }
@@ -359,7 +217,7 @@ export class TimerSystem {
         break;
       case TimerFunction.TT_60:
       case TimerFunction.TT_61:
-        this.hooks?.onMonsterAbeyance?.(timer);
+        this.ctx.systems.monsters.processAbeyanceTimer(timer);
         break;
       case TimerFunction.TT_OPENROOM:
         this.processOpenRoom(timer);
@@ -405,7 +263,7 @@ export class TimerSystem {
       champ.busyTimerIndex = -1;
       champ.actionDisabledUntil = 0;
     }
-    this.hooks?.onEnableCharacterAction?.(chIdx, timer.uByte6 & 0xff);
+    this.ctx.systems.game.enableCharacterAction(chIdx, timer.uByte6 & 0xff);
   }
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {
@@ -535,7 +393,7 @@ export class TimerSystem {
     const champ = this.ctx.party.state.champions[chIdx];
     if (!champ) return;
     champ.poisonCount = Math.max(0, champ.poisonCount - 1);
-    this.hooks?.onPoisonTick?.(chIdx, sw(timer.timerWord6));
+    this.ctx.systems.monsterAttack.poisonCharacter(chIdx, sw(timer.timerWord6));
   }
 
   /**
@@ -616,7 +474,7 @@ export class TimerSystem {
         const type = getActuatorType(rec);
         if (type === 47) {
           const loc = new Position(target.x, target.y, target.z);
-          if (this.hooks?.onDsaTimer5?.(rn, timer, loc)) break;
+          if (this.ctx.systems.dsa.processTimer5(rn, timer, loc)) break;
           continue;
         }
         if (type === 48) {
@@ -649,7 +507,7 @@ export class TimerSystem {
       const type = getActuatorType(rec);
       if (type === 47) {
         const loc = new Position(target.x, target.y, target.z);
-        if (this.hooks?.onDsaTimer6?.(rn, timer, loc)) break;
+        if (this.ctx.systems.dsa.processTimer6(rn, timer, loc)) break;
         continue;
       }
       if (type === 127 && decoded.position === targetPos) {
@@ -693,7 +551,7 @@ export class TimerSystem {
       }
       if (type === 47) {
         const loc = new Position(target.x, target.y, target.z);
-        if (this.hooks?.onDsaTimer7?.(rn, timer, loc)) break;
+        if (this.ctx.systems.dsa.processTimer7(rn, timer, loc)) break;
         continue;
       }
     }
@@ -839,7 +697,7 @@ export class TimerSystem {
       if (this.isPartyAt(target) && doorState !== 0) {
         if (this.ctx.party.state.champions.length > 0) {
           this.setDoorState(map, x, y, 0);
-          const hurt = this.hooks?.damageAllCharacters?.(5, 4, 2) ?? 0;
+          const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(5, 4, 2);
           if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1);
         }
         this.timers.addTimer(timer);
@@ -863,15 +721,14 @@ export class TimerSystem {
         if (creature && desc && !monsterNonMaterial(desc)) {
           const needed = upDown ? monsterVerticalSize(desc) : 1;
           if (doorState >= needed) {
-            const result = this.hooks?.damageMonsterGroup?.(creature, timer.level, x, y, 5);
+            const result = this.ctx.systems.monsterDamage.damageMonsterGroup(creature, timer.level, x, y, 5, true, false);
             if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
-              this.hooks?.onMonsterAI?.({
+              this.ctx.systems.monsterAI.processTimers29to41({
                 mapX: x,
                 mapY: y,
                 level: timer.level,
                 timerFunction: TimerFunction.TT_M3,
                 timeUntilAlternateUpdate: 0,
-                timer,
               });
             }
             // The rebound: one step back up, floored at 0, then re-queue.
@@ -894,7 +751,7 @@ export class TimerSystem {
     this.setDoorState(map, x, y, doorState);
     if (prevState !== doorState) {
       const distance = this.getPartyDistance(x, y, timer.level);
-      if (distance !== null) this.hooks?.playSound?.(SoundIndex.DOOR, 0, distance);
+      if (distance !== null) this.hooks.playSound?.(SoundIndex.DOOR, 0, distance);
     }
 
     if ((action === ActuatorAction.SET && doorState !== 0) || (action === ActuatorAction.CLEAR && doorState !== 4)) {
@@ -942,14 +799,14 @@ export class TimerSystem {
     if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
       const pressed = counter === 0;
       const closed = pressed !== isActuatorNormallyClosed(actuator);
-      this.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchActionForActuator(
         actuator,
         closed ? ActuatorAction.SET : ActuatorAction.CLEAR,
         target.z,
         getActuatorTargetPos(actuator),
       );
     } else if (counter === 0) {
-      this.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchActionForActuator(
         actuator,
         getActuatorAction(actuator),
         target.z,
@@ -1020,14 +877,14 @@ export class TimerSystem {
     const pressed = newState === newTarget;
     const closed = pressed !== isActuatorNormallyClosed(actuator);
     if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
-      this.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchActionForActuator(
         actuator,
         closed ? ActuatorAction.SET : ActuatorAction.CLEAR,
         target.z,
         actuatorPos & 3,
       );
     } else if (closed) {
-      this.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchActionForActuator(
         actuator,
         getActuatorAction(actuator),
         target.z,
@@ -1468,19 +1325,19 @@ export class TimerSystem {
     const normallyClosed = isActuatorNormallyClosed(actuator);
     const audible = isActuatorAudible(actuator);
 
-    if (this.hooks?.onSpawnMonster) {
-      this.hooks.onSpawnMonster({
-        type: getActuatorValue(actuator),
-        hitPointMultiplier,
-        countMinus1,
-        facing,
-        x: target.x,
-        y: target.y,
-        normallyClosed,
-        drawAsSize4,
-        audible,
-      });
-    }
+    this.ctx.systems.monsters.createMonster({
+      value: getActuatorValue(actuator),
+      hitPointMultiplier,
+      numMonM1: countMinus1,
+      facing,
+      mapX: target.x,
+      mapY: target.y,
+      level: this.ctx.party.state.position.z,
+      // CSBWin passes `normallyClosed()` as `invisible` and `drawAsSize4()` as itself
+      // (doc/CSBwin-src/Timer.cpp:1785-1793).
+      invisible: normallyClosed,
+      drawAsSize4,
+    });
     // `CreateMonster` makes its own sound only off the party's level; an audible
     // generator always queues one (`doc/CSBwin-src/Timer.cpp:1797-1800`).
     if (audible) this.ctx.sounds.queueSound(SOUND_TELEPORT, target.x, target.y, 1);
@@ -1628,14 +1485,6 @@ export class TimerSystem {
       );
     }
 
-    if (this.hooks?.onTriggerMissileLauncher) {
-      this.hooks.onTriggerMissileLauncher({
-        actuator,
-        timer,
-        mapX: timer.uByte6,
-        mapY: timer.uByte7,
-      });
-    }
   }
 
   private processMissileTimer(timer: TimerEntry): void {
@@ -1955,7 +1804,6 @@ export class TimerSystem {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return false;
     const position = new Position(missileX, missileY, this.missileFilterTimer?.level ?? 0);
-    const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
     const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
     // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1770`).
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
@@ -2040,8 +1888,8 @@ export class TimerSystem {
             const w72 = this.random.below(128);
             passes =
               (missile.rangeRemaining & 0xff) > w72 &&
-              ((this.hooks?.objDescWord4?.(projectile) ?? 0) & 0x100) !== 0 &&
-              !(this.hooks?.isAKey?.(projectile) ?? false);
+              (this.objDescWord4(projectile) & 0x100) !== 0 &&
+              !IsAKey(this.dungeon, this.ctx.tables, this.ctx.party.state.facing, projectile);
           }
           if (passes) return false;
         }
@@ -2068,17 +1916,11 @@ export class TimerSystem {
         // at `:2044` a party-only `DamageCharacter`.
         const magic = this.determineMagicDamage(missile, projectile);
         if (magic.damage !== 0) {
-          this.hooks?.onMissileHitParty?.({
-            missile: missileRn,
-            projectile,
-            position,
-            posInCell: objectPos,
-            direction,
+          this.ctx.systems.game.applyMissileDamageToParty({
             chIdx,
             damage: magic.damage,
             kind: magic.kind,
             poisonStrength: magic.poisonStrength,
-            range: missile.rangeRemaining & 0xff,
           });
         }
         // The missile is spent either way: a dispel missile does a champion no damage
@@ -2124,16 +1966,16 @@ export class TimerSystem {
         const magic = this.determineMagicDamage(missile, projectile);
         const defense = desc.defense08 === 0 ? 1 : desc.defense08;
         const blow = sw(Math.trunc(((64 * (magic.damage & 0xffff)) & 0xffff) / defense));
-        if (blow !== 0 && this.hooks?.damageMonster) {
+        if (blow !== 0) {
           // `DeterminePoisonDamage(mt_60, d.Word12962)` — the poison strength the
           // `DetermineMagicDamage` call above just set.
-          const poison = sw(this.hooks.determinePoisonDamage?.(monsterType, magic.poisonStrength) ?? 0);
-          const result = this.hooks.damageMonster(
-            monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison,
+          const poison = sw(this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, magic.poisonStrength));
+          const result = this.ctx.systems.monsterDamage.damageMonster(
+            monster, monsterOrdinal - 1, position.z, objX, objY, blow + poison, true, false,
           );
           // "At least one monster in group remains": the survivors react.
           if (result !== MonsterDamageResult.ALL_MONSTERS_DIED) {
-            this.hooks.onMonsterAI?.({
+            this.ctx.systems.monsterAI.processTimers29to41({
               mapX: objX,
               mapY: objY,
               level: position.z,
@@ -2214,8 +2056,7 @@ export class TimerSystem {
     index: number,
   ): number {
     const direction = ((this.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
-    if (!this.hooks?.onMissileEncounterFilter) return 0;
-    return this.hooks.onMissileEncounterFilter({
+    return this.ctx.systems.dsa.processMissileEncounterFilter({
       type,
       position,
       posInCell: posInCell & 0x3,
@@ -2390,7 +2231,7 @@ export class TimerSystem {
 
     const party = this.ctx.party.state;
     if (position.z === party.position.z && objX === party.position.x && objY === party.position.y) {
-      this.hooks?.damageAllCharacters?.(damage, 63, 1);
+      this.ctx.systems.monsterAttack.damageAllCharacters(damage, 63, 1);
       return;
     }
 
@@ -2406,7 +2247,7 @@ export class TimerSystem {
     damage -= this.random.below(2 * fireResistance + 1);
     if (damage <= 0) return;
     this.monsterDamageResult =
-      this.hooks?.damageMonsterGroup?.(monster, position.z, objX, objY, damage) ?? 0;
+      this.ctx.systems.monsterDamage.damageMonsterGroup(monster, position.z, objX, objY, damage, true, false);
   }
 
   /**
@@ -2475,7 +2316,7 @@ export class TimerSystem {
       case RN_DISPELL_MISSILE:
         // Dispell only touches what is not really there.
         if (monster && desc && monsterNonMaterial(desc)) {
-          this.hooks?.damageMonsterGroup?.(monster, timer.level, x, y, damage);
+          this.ctx.systems.monsterDamage.damageMonsterGroup(monster, timer.level, x, y, damage, true, false);
         }
         break;
 
@@ -2494,20 +2335,19 @@ export class TimerSystem {
 
       case RN_POISON_CLOUD: {
         if (partyHere) {
-          this.hooks?.damageAllCharacters?.(damage, 0, 0);
+          this.ctx.systems.monsterAttack.damageAllCharacters(damage, 0, 0);
         } else if (monster) {
-          const poison = this.hooks?.determinePoisonDamage?.(monsterType, damage) ?? 0;
+          const poison = this.ctx.systems.monsterDamage.determinePoisonDamage(monsterType, damage);
           if (poison !== 0) {
-            const result = this.hooks?.damageMonsterGroup?.(monster, timer.level, x, y, poison) ?? 0;
+            const result = this.ctx.systems.monsterDamage.damageMonsterGroup(monster, timer.level, x, y, poison, true, false);
             // Survivors notice: TT_M3 is CSBWin's "damaged by a cloud or a door".
             if (result !== 2 && poison > 2) {
-              this.hooks?.onMonsterAI?.({
+              this.ctx.systems.monsterAI.processTimers29to41({
                 mapX: x,
                 mapY: y,
                 level: timer.level,
                 timerFunction: TimerFunction.TT_M3,
                 timeUntilAlternateUpdate: 0,
-                timer,
               });
             }
           }
@@ -2678,12 +2518,12 @@ export class TimerSystem {
     let d6: number;
     if (dbType !== DBType.CLOUD) {
       if (dbType === DBType.WEAPON) {
-        d6 = this.hooks?.weaponThrowDamage?.(projectile) ?? 0;
+        d6 = this.ctx.systems.characterStats.weaponDescFor(projectile)?.uByte3 ?? 0;
         kind = 3;
       } else {
         d6 = this.random.zeroTo3();
       }
-      d6 = sw(d6 + Math.trunc((this.hooks?.objectWeight?.(projectile) ?? 0) / 2));
+      d6 = sw(d6 + Math.trunc(this.ctx.systems.characterStats.getObjectWeight(projectile) / 2));
     } else if (projectile === RN_POISON) {
       d6 = this.random.next() & 15;
       poisonStrength = sw(d6 + 10);
@@ -2777,7 +2617,7 @@ export class TimerSystem {
     // `MoveObject(objD4, mapX, mapY, mapX, mapY)` (`Timer.cpp:2446-2450`).
     const monster = this.dungeon.findFirstMonster(position);
     if (monster !== OBJECT_ID_EOF) {
-      this.hooks?.moveMonster?.(monster, mapX, mapY, mapX, mapY, level);
+      this.ctx.systems.monsters.moveMonster(monster, mapX, mapY, mapX, mapY, level);
     }
 
     // `FindFirstDrawableObject` (`doc/CSBwin-src/CSBCode.cpp:5140`), then count what
@@ -2842,9 +2682,9 @@ export class TimerSystem {
     setPartyFacing(party, result.facing);
 
     const unchanged = this.isSamePosition(oldPos, result.position);
-    if (!unchanged) this.hooks?.onPartyMoved?.();
-    this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-    this.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+    if (!unchanged) this.ctx.systems.game.notePartyMoved();
+    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
+    this.ctx.systems.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }
 
   resolvePartyMove(position: Position, facing: number): { position: Position; facing: number; moved: boolean } {
@@ -2939,13 +2779,13 @@ export class TimerSystem {
     if (oldX >= 0) {
       const old = new Position(oldX, oldY, level);
       this.dungeon.removeObjectFromCell(old, object);
-      if (!levitated) this.actuators.triggerObjectMove(old, moved, false, partyOn(oldX, oldY, level), party.facing);
+      if (!levitated) this.ctx.systems.actuators.triggerObjectMove(old, moved, false, partyOn(oldX, oldY, level), party.facing);
     }
     if (!destination) return { removed: false, placed: null, position: null };
 
     this.dungeon.addObjectToCell(destination, moved);
     if (type !== DBType.MISSILE) {
-      this.actuators.triggerObjectMove(
+      this.ctx.systems.actuators.triggerObjectMove(
         destination, moved, true, partyOn(destination.x, destination.y, destination.z), party.facing,
       );
     }
@@ -3104,7 +2944,7 @@ export class TimerSystem {
           teleportAudible = teleporter.sound;
           if (teleporter.sound) {
             const distance = this.getPartyDistance(position.x, position.y, position.z);
-            if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 0, distance);
+            if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 0, distance);
           }
         } else if (objectType === DBType.MISSILE) {
           if (teleporter.absoluteRotation) {
@@ -3121,14 +2961,14 @@ export class TimerSystem {
             teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
-              if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
+              if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 1, distance);
             }
           } else {
             curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
             teleportAudible = teleporter.sound;
             if (teleporter.sound) {
               const distance = this.getPartyDistance(position.x, position.y, position.z);
-              if (distance !== null) this.hooks?.playSound?.(SoundIndex.TELEPORT, 1, distance);
+              if (distance !== null) this.hooks.playSound?.(SoundIndex.TELEPORT, 1, distance);
             }
           }
         } else {
@@ -3158,7 +2998,7 @@ export class TimerSystem {
           groupDied = hurt === MonsterDamageResult.ALL_MONSTERS_DIED;
           if (groupDied) break;
           if (hurt === MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
-            this.hooks?.flushPendingDroppings?.(monster.record.creatureType, position.z, position.x, position.y);
+            this.ctx.systems.monsterDamage.flushPendingDroppings(monster.record.creatureType, position.z, position.x, position.y);
           }
         }
         continue;
@@ -3272,15 +3112,15 @@ export class TimerSystem {
         const champ = party.champions[chIdx];
         if (!champ) continue;
         if ((champ.attributes?.health ?? 0) === 0) continue;
-        const maxLoad = this.hooks?.maxLoad?.(champ) ?? 0;
+        const maxLoad = this.ctx.systems.characterStats.maxLoad(champ);
         if (maxLoad <= 0) continue;
-        const load = this.hooks?.characterLoad?.(champ) ?? 0;
+        const load = this.ctx.systems.characterStats.characterLoad(champ);
         // `(25 * load) & 0xffff` first — CSBWin does the multiply in a word.
         const cost = Math.trunc(((25 * load) & 0xffff) / maxLoad) + 1;
-        this.hooks?.adjustStamina?.(chIdx, cost);
+        this.ctx.systems.monsterAttack.adjustStamina(chIdx, cost);
       }
     } else {
-      const hurt = this.hooks?.damageAllCharacters?.(20, 48, 2) ?? 0;
+      const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(20, 48, 2);
       if (hurt !== 0) {
         this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0);
       }
@@ -3297,9 +3137,9 @@ export class TimerSystem {
    * is hurt at `(-1, 0)`, so its death clouds are not made (`CreateCloud`, `:1400`).
    */
   private monsterFallsIntoPit(monster: MonsterMove): number {
-    return this.hooks?.damageMonsterGroup?.(
-      monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, monster.noItem16, false,
-    ) ?? MonsterDamageResult.NO_MONSTER_DIED;
+    return this.ctx.systems.monsterDamage.damageMonsterGroup(
+      monster.record, monster.attachedLevel, monster.oldX, monster.oldY, 20, false, monster.noItem16,
+    );
   }
 
   private isActivePitAt(position: Position): boolean {
@@ -3411,15 +3251,20 @@ export class TimerSystem {
     return (value & ~mask) | ((bits & 0x3) << shift);
   }
 
+  /** `d.ObjDesc[object.DescIndex()].word4` — where the object may be carried. */
+  private objDescWord4(rn: ObjectID): number {
+    const descIndex = DescIndex(this.dungeon, rn);
+    return descIndex === -1 ? 0 : this.ctx.tables.objDescWord4[descIndex] ?? 0;
+  }
+
   private activateDsa(timer: TimerEntry): void {
-    if (!this.hooks?.onDsaTimer5) return;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
       if (decoded.category !== DBType.ACTUATOR) continue;
       const rec = this.dungeon.getActuatorRecord(rn);
       if (!rec || getActuatorType(rec) !== 47) continue;
-      this.hooks.onDsaTimer5(rn, timer, target);
+      this.ctx.systems.dsa.processTimer5(rn, timer, target);
     }
   }
 

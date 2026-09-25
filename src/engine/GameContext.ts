@@ -42,7 +42,10 @@ import type { TimerSystem } from './TimerSystem';
  */
 export type GameMethods = Pick<Game,
   | 'addCharacter'
+  | 'applyMissileDamageToParty'
+  | 'enableCharacterAction'
   | 'handleDsaTeleportParty'
+  | 'notePartyMoved'
 >;
 
 /**

@@ -24,7 +24,7 @@ import { MovementSystem } from './MovementSystem';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';
 import { ActuatorSystem, type CursorFilterHook, type MessageSink } from './ActuatorSystem';
 import { TimerQueue, TimerFunction, type TimerEntry } from './TimerQueue';
-import { TimerSystem, type TimerHooks } from './TimerSystem';
+import { TimerSystem } from './TimerSystem';
 import { MonsterSystem, type MonsterSystemHooks } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
 import { createGameContext, nameIndexOf, type GameContext, type GameSystems } from './GameContext';
@@ -43,7 +43,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, 
 import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
 import { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
-import { DescIndex, GetBasicObjectType, IsAKey } from './objectIndex';
+import { GetBasicObjectType } from './objectIndex';
 
 import {
     ActuatorAction,
@@ -241,8 +241,6 @@ export interface GameOptions {
     messages?: MessageSink;
     /** Play a sample. */
     playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
-    /** Overrides for `TimerSystem`'s hooks. */
-    timerHooks?: TimerHooks;
     /** Overrides for `MonsterSystem`'s hooks, and the monster trace. */
     monsterHooks?: MonsterSystemHooks;
 }
@@ -380,7 +378,7 @@ export class Game {
     private onMoveCallbacks: MovementCallback[] = [];
 
     constructor(dungeonData: DungeonData, tables: GameTables, options: GameOptions = {}) {
-        const { playSound, timerHooks, monsterHooks } = options;
+        const { playSound, monsterHooks } = options;
         this.tables = tables;
         this.addCharacterTables = { objDescCarryMask: tables.objDescWord4, carryLocation: tables.carryLocation };
 
@@ -400,73 +398,9 @@ export class Game {
             playSound,
         });
         this.dsaSystem = new DsaSystem(ctx);
-        this.timerSystem = new TimerSystem(
-            ctx,
-            this.actuators,
-            {
-                onDsaTimer5: (rn, timer, loc) => this.dsaSystem.processTimer5(rn, timer, loc),
-                onDsaTimer6: (rn, timer, loc) => this.dsaSystem.processTimer6(rn, timer, loc),
-                onDsaTimer7: (rn, timer, loc) => this.dsaSystem.processTimer7(rn, timer, loc),
-                onMissileHitParty: (options) => this.applyMissileDamageToParty(options),
-                objectWeight: (rn) => this.characterStats.getObjectWeight(rn),
-                weaponThrowDamage: (rn) =>
-                    this.characterStats.weaponDescFor(rn)?.uByte3 ?? 0,
-                objDescWord4: (rn) => {
-                    const descIndex = DescIndex(this.dungeonState, rn);
-                    return descIndex === -1 ? 0 : this.tables.objDescWord4[descIndex] ?? 0;
-                },
-                isAKey: (rn) => IsAKey(
-                    this.dungeonState,
-                    this.tables,
-                    this.party.state.facing,
-                    rn,
-                ),
-                damageMonster: (monster, indexInGroup, level, mapX, mapY, damage) =>
-                    this.monsterDamage.damageMonster(
-                        monster, indexInGroup, level, mapX, mapY, damage, true, false,
-                    ),
-                onMonsterAI: (options) => this.monsterAI.processTimers29to41(options),
-                onMonsterAbeyance: (timer) => this.monsterSystem.processAbeyanceTimer(timer),
-                // The cloud machinery: `ProcessTT_25` needs to hurt whatever is standing
-                // in the cloud, and those live in MonsterAttack and MonsterDamage.
-                damageAllCharacters: (damage, woundMask, kind) =>
-                    this.monsterAttack.damageAllCharacters(damage, woundMask, kind),
-                damageMonsterGroup: (monster, level, mapX, mapY, damage, noItem16, apply) =>
-                    this.monsterDamage.damageMonsterGroup(
-                        monster, level, mapX, mapY, damage, apply ?? true, noItem16 ?? false,
-                    ),
-                flushPendingDroppings: (monsterType, level, mapX, mapY) =>
-                    this.monsterDamage.flushPendingDroppings(monsterType, level, mapX, mapY),
-                moveMonster: (monster, oldX, oldY, newX, newY, level) =>
-                    this.monsterSystem.moveMonster(monster, oldX, oldY, newX, newY, level),
-                adjustStamina: (chIdx, decrement) => this.monsterAttack.adjustStamina(chIdx, decrement),
-                maxLoad: (champ) => this.characterStats.maxLoad(champ),
-                characterLoad: (champ) => this.characterStats.characterLoad(champ),
-                determinePoisonDamage: (monsterType, damage) =>
-                    this.monsterDamage.determinePoisonDamage(monsterType, damage),
-                onSpawnMonster: (o) => {
-                    this.monsterSystem.createMonster({
-                        value: o.type,
-                        hitPointMultiplier: o.hitPointMultiplier,
-                        numMonM1: o.countMinus1,
-                        facing: o.facing,
-                        mapX: o.x,
-                        mapY: o.y,
-                        level: this.party.state.position.z,
-                        // CSBWin passes `normallyClosed()` as `invisible` and
-                        // `drawAsSize4()` as itself (doc/CSBwin-src/Timer.cpp:1785-1793).
-                        invisible: o.normallyClosed,
-                        drawAsSize4: o.drawAsSize4,
-                    });
-                },
-                onPartyMoved: () => this.notePartyMoved(),
-                onPoisonTick: (chIdx, remaining) => this.monsterAttack.poisonCharacter(chIdx, remaining),
-                onEnableCharacterAction: (chIdx, refillSlot) => this.enableCharacterAction(chIdx, refillSlot),
-                onMissileEncounterFilter: (options) => this.dsaSystem.processMissileEncounterFilter(options),
-                playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
-                ...timerHooks,
-            },
-        );
+        this.timerSystem = new TimerSystem(ctx, {
+            playSound: (soundId, rateIdx, distance) => this.playSound?.(soundId, rateIdx, distance),
+        });
         this.monsterSystem = new MonsterSystem(
             ctx,
             {
@@ -1452,7 +1386,7 @@ export class Game {
      * The **wound mask is 12**, a literal at the call site: bits 2 and 3, the torso
      * and the legs. A missile cannot wound a hand, a head or a foot.
      */
-    private applyMissileDamageToParty(options: {
+    applyMissileDamageToParty(options: {
         chIdx: number;
         damage: number;
         kind: number;
@@ -2387,7 +2321,7 @@ export class Game {
      * penalty goes, and a hand is refilled — the quiver after a shot, or the slot named
      * by the timer's `uByte6` after a throw.
      */
-    private enableCharacterAction(chIdx: number, refillSlot: number): void {
+    enableCharacterAction(chIdx: number, refillSlot: number): void {
         const champion = this.party.state.champions[chIdx];
         if (!champion) return;
         if (champion.attackType !== -1) champion.attackStatModifier = 0;
