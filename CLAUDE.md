@@ -175,7 +175,7 @@ were three lines each is not.
 See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
 renderer, movement (stamina, the move delay in ticks, and CSBWin's one mouse queue that
 keys and clicks share), timers, actuators, DSA scripting, missiles,
-skills/experience, magic casting, light levels, sound, the pre-game screens (Phase 16 —
+skills/experience, magic casting, light levels, worn-object bonuses, sound, the pre-game screens (Phase 16 —
 title, dungeon entrance, doors, credits) and most of the DM UI all work. The message area (Phase 11),
 the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
 combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of

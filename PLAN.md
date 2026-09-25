@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C29, and D1 with D2, paid by 2026-09-24. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, and D1 with D2, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -90,8 +90,16 @@ party gets no dodge or luck check, but `WakeUp` runs before that guard. Also,
 `TenSecondUpdate` used the real Wizard and Priest masteries asleep, where CSBWin's
 `DetermineMastery` reports 1. The freeze
 (147/148) stays in G5.
-Next: C31, C30, then C32; D3 after them. Tier C is otherwise done except C25 (⚠️, waits
-for D4).
+C31: a dead champion's bones are set down by `MoveObject`, so over a pit they fall, still
+paired in the expool. C30: `RemoveCharacterPossession` puts out a torch, closes a scroll,
+and un-wears an Illumulet (its light comes off the party) or a Jewel Symal. C32:
+`AdjustStatsForItemCarried` is ported, and all five possession writers call it, so the
+staffs, the Rabbit's Foot, curses, Powertowers and the rest change their bearer's stats
+(`tools/dump-item-bonuses.ts`). Recorded: C34 (five possession writers, none of them
+CSBWin's whole — the UI and DSA paths lack the scroll, `value()`, the attack menu and the
+chest repack) and, in G1, `STKOP_SetCurse` with `SetCursed`.
+Next: C33 and C34, then D3 (split by field group first). Tier C is otherwise done except
+C25 (⚠️, waits for D4).
 
 ## Ground rules
 

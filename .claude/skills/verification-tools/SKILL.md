@@ -173,6 +173,14 @@ wrap the instance method (`game.timerSystem.determineMagicDamage = …`) to reco
 inputs and outputs, then check the arithmetic the engine did with them. Recomputing the
 draws in the tool would need the RNG state and proves less.
 
+**Find objects by name index, and canary the name.** To stand up "a Staff" or "an
+Illumulet", search the `ObjDesc` rows of the right category for the `OBJNI_*` CSBWin
+tests (`typeNamed` in `dump-item-bonuses.ts` / `dump-champion-death.ts`) — bound the
+search to the category's own rows, or a weapon type runs into the clothing rows — and
+check `objectTables.objectNames[objNI]` spells what you meant. The Atari DM names are not
+always CSB's: Staff of Irra is STAFF OF MANAR, Cross of Neta SNAKE STAFF, Serpent Staff
+THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR.
+
 **Make output diffable.** Tab-separated columns, stable ordering, no timestamps.
 
 ## Existing tools worth copying from
