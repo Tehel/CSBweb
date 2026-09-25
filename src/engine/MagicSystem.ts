@@ -261,7 +261,7 @@ export class MagicSystem {
             break;
           }
           case 8: {
-            this.ctx.systems.game.applyMagicShield(champion, false, d6 * d6 + 100, 0);
+            this.ctx.systems.attack.applyMagicShield(champion, false, d6 * d6 + 100, 0);
             break;
           }
           default:

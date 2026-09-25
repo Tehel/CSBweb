@@ -1333,15 +1333,6 @@ export class Game {
         ensureHandOwner(this.party.state);
     }
 
-    setBrightness(value: number): void {
-        this.party.state.brightness = sw(value);
-    }
-
-    adjustBrightness(delta: number): void {
-        const current = this.party.state.brightness ?? 0;
-        this.party.state.brightness = sw(current + delta);
-    }
-
     /**
      * `NinetySecondUpdate` (`doc/CSBwin-src/CSBCode.cpp:7339-7387`), called from the
      * game tick whenever `(d.Time & 511) == 0` (`doc/CSBwin-src/CSBCode.cpp:680-683`) —
@@ -1544,37 +1535,6 @@ export class Game {
         if (value < min) return min;
         if (value > max) return max;
         return value | 0;
-    }
-
-    applyMagicShield(champion: Champion, isSpellShield: boolean, strength: number, mustHaveMana: number): number {
-        const party = this.party.state;
-        let fullStrength = strength | 0;
-        // CSBWin's `D6W`: 1 normally, 0 when the champion could not pay the full four
-        // mana and got half a shield for whatever was left. `_Attack` reads it to decide
-        // whether the cast counts.
-        let raised = 1;
-        if (mustHaveMana !== 0) {
-            const mana = champion.attributes.mana | 0;
-            if (mana === 0) return 0;
-            if (mana < 4) {
-                fullStrength = Math.trunc(fullStrength / 2);
-                champion.attributes.mana = 0;
-                raised = 0;
-            } else {
-                champion.attributes.mana = mana - 4;
-            }
-        }
-        let add = Math.trunc(fullStrength / 32);
-        if (isSpellShield) {
-            if (party.spellShield > 50) add = Math.trunc(add / 4);
-            party.spellShield = party.spellShield + add;
-            this.magic.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
-        } else {
-            if (party.fireShield > 50) add = Math.trunc(add / 4);
-            party.fireShield = party.fireShield + add;
-            this.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
-        }
-        return raised;
     }
 
     setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {

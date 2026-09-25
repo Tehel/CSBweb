@@ -772,6 +772,41 @@ export class AttackSystem {
     if (champ.facing !== party.facing) champ.facing = party.facing;
   }
 
+  /**
+   * `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`): the spell or fire shield, from the
+   * shield attacks and from `CastSpell`'s fire shield. Returns CSBWin's `D6W`.
+   */
+  applyMagicShield(champion: Champion, isSpellShield: boolean, strength: number, mustHaveMana: number): number {
+    const party = this.ctx.party.state;
+    let fullStrength = strength | 0;
+    // CSBWin's `D6W`: 1 normally, 0 when the champion could not pay the full four
+    // mana and got half a shield for whatever was left. `_Attack` reads it to decide
+    // whether the cast counts.
+    let raised = 1;
+    if (mustHaveMana !== 0) {
+      const mana = champion.attributes.mana | 0;
+      if (mana === 0) return 0;
+      if (mana < 4) {
+        fullStrength = Math.trunc(fullStrength / 2);
+        champion.attributes.mana = 0;
+        raised = 0;
+      } else {
+        champion.attributes.mana = mana - 4;
+      }
+    }
+    let add = Math.trunc(fullStrength / 32);
+    if (isSpellShield) {
+      if (party.spellShield > 50) add = Math.trunc(add / 4);
+      party.spellShield = party.spellShield + add;
+      this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
+    } else {
+      if (party.fireShield > 50) add = Math.trunc(add / 4);
+      party.fireShield = party.fireShield + add;
+      this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
+    }
+    return raised;
+  }
+
   // -------------------------------------------------------------- fluxcage
 
   /** `IsCellFluxcage` (`doc/CSBwin-src/Attack.cpp:57`). */
@@ -1012,7 +1047,7 @@ export class AttackSystem {
         // `MagicShield` (`doc/CSBwin-src/Attack.cpp:1190`) — returns its `D6W`.
         const shielded = this.champions()[params.charIdx];
         const raised = shielded
-          ? this.ctx.systems.game.applyMagicShield(
+          ? this.applyMagicShield(
             shielded,
             params.attackType === AttackType.atk_SPELLSHIELD,
             params.attdep.shield.strength,
@@ -1153,7 +1188,7 @@ export class AttackSystem {
         params.attdep.light.decayRate = -2;
         this.callAttackFilter(filter, params, 1);
         // `d.Brightness += delta`, then `SetBrightnessTimer(decayRate, time)`.
-        this.ctx.systems.game.adjustBrightness(params.attdep.light.deltaLight);
+        party.brightness = sw(party.brightness + params.attdep.light.deltaLight);
         this.ctx.systems.magic.setBrightnessTimer(params.attdep.light.decayRate, params.attdep.light.time);
         this.decrementChargesRemaining(params.charIdx);
         break;
