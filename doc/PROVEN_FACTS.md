@@ -2002,6 +2002,16 @@ Fixed by reading the terminated prefix, as CSBWin does. The dead tail is kept se
 byte; it is used only while it still agrees with the live prefix, so a rune typed after
 the load is never overwritten by it.
 
+**`byte33` is always `StrLen(incantation) & 3`**, so it is derived, not stored. It has
+five writers, and each keeps it there: the add stores `(D7W + 1) & 3` after writing rune
+`D7W` and a terminator after it (`doc/CSBwin-src/CSBCode.cpp:8984-8988`); the backspace
+stores `(byte33 + 3) & 3` and zeroes that byte (`Magic.cpp:814-817`); the cast
+(`:951-952`, above) and the two champion resets (`Character.cpp:2648-2649`, `:5293-5294`)
+store 0 with `incantation[0] = 0`. After four runes it wraps to 0 while `StrLen` is 4.
+`tools/dump-character-block.ts` packs all fourteen committed saves with the derived value
+byte for byte. This port used to carry the file's `byte33` instead, which went stale as
+soon as a rune was typed after the load.
+
 <sub>Note the terminator write at `incantation[D7W + 1]` with `D7W == 3`: `incantation`
 is `i8[4]`, so that is a write to `FILL38[0]`. It is zero in every committed save, and
 this port writes zero there.</sub>

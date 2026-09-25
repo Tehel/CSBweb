@@ -233,7 +233,6 @@ export function readCsbwinCharacter(
     // reader in the engine yet. `charFlags` is where the champion's gender lives.
     charFlags,
     timerIndex: readI16BE(block, base + 46),
-    incantationCursor: readU8(block, base + 33),
     talents: readU32BE(block, base + 276),
     load: readU16BE(block, base + 272),
     causeOfDamage: readU16BE(block, base + 282),
@@ -432,7 +431,11 @@ export function writeCsbwinCharacter(
   block[base + 30] = 1;
   block[base + 31] = 2;
   block[base + 32] = champion.attackType & 0xff;
-  block[base + 33] = (champion.incantationCursor ?? (champion.incantation?.length ?? 0)) & 3;
+  // `byte33`, the index of the next rune. Every CSBWin writer of it keeps it at
+  // `strlen(incantation) & 3` — the add (`doc/CSBwin-src/CSBCode.cpp:8984-8988`), the
+  // backspace (`Magic.cpp:814-817`), the cast (`:951-952`) and the two resets
+  // (`Character.cpp:2648-2649`, `:5293-5294`) — so it is derived, never carried.
+  block[base + 33] = champion.incantation.length & 3;
   const incantation = champion.incantationField;
   const live = champion.incantation ?? [];
   const keepRaw = incantation?.length === 4

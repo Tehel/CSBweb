@@ -167,14 +167,13 @@ function compareChampions(label: string, before: Champion[], after: Champion[]):
     check(was.charFlags === now?.charFlags, `${label}/${name}: charFlags — the gender — round-trips`);
     check(same(was.attributes, now?.attributes), `${label}/${name}: the attributes round-trip`);
     check(same(was.skills, now?.skills), `${label}/${name}: the skills round-trip`);
-    // The runes a cast leaves behind, and the two fields that qualify them: a C string
+    // The runes a cast leaves behind, and the field that qualifies them: a C string
     // (`doc/PROVEN_FACTS.md` → "`CHARDESC.incantation` is a C string"), so the live
-    // prefix, the raw four bytes and the cursor are three separate pieces of state.
+    // prefix and the raw four bytes are separate pieces of state. `byte33` is not: it
+    // is derived from the prefix (`tools/dump-character-block.ts`).
     check(same(was.incantation, now?.incantation), `${label}/${name}: the incantation round-trips`);
     check(same(was.incantationField, now?.incantationField),
       `${label}/${name}: the raw incantation bytes round-trip`);
-    check(was.incantationCursor === now?.incantationCursor,
-      `${label}/${name}: the incantation cursor round-trips`);
   });
 }
 

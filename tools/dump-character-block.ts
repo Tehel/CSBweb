@@ -178,6 +178,14 @@ function main(): void {
     readCsbwinCharacter(afterCast, 0).champion.incantation.join(',') === '96,111',
     'and a champion who has typed a rune since, from the incantation',
   );
+  // `byte33` is CSBWin's index for the next rune. Each of its five writers keeps it at
+  // `strlen(incantation) & 3` (`CSBCode.cpp:8984-8988`, `Magic.cpp:814-817`, `:951-952`,
+  // `Character.cpp:2648-2649`, `:5293-5294`), so after two runes it is 2, whatever the
+  // save said. A stale one would have CSBWin write the third rune over the first.
+  check(
+    afterCast[33] === 2,
+    `and its byte33 is 2, the length of those runes (got ${afterCast[33]}, the save had ${original[33]})`,
+  );
 
   // 4. And through the file: block 4 packed, scrambled, checksummed, written, read back.
   //    `saveSaveGameState` used to put 3328 zeros here whatever it was given.

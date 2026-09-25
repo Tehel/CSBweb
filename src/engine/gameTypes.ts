@@ -121,14 +121,6 @@ export interface Champion {
      * draws that readout without a timer; the field is carried for the save writer.
      */
     timerIndex: i16;
-    /**
-     * `CHARDESC.byte33` — how many symbols of the spell being composed have been
-     * entered, 0..3, wrapping (`doc/CSBwin-src/CSBCode.cpp:8988`,
-     * `doc/CSBwin-src/Magic.cpp:814-816`). It indexes `incantation`, so this port keeps
-     * the array's length instead; the field is carried for the save writer, which
-     * cannot derive the wrap at four symbols.
-     */
-    incantationCursor?: ui8;
     /** `CHARDESC.talents` — a `ui32` `AddCharacter` zeroes (`Character.cpp:510`). */
     talents: ui32;
     /** `CHARDESC.causeOfDamage` — `enum COD`, what last hurt the champion. */

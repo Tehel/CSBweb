@@ -1387,14 +1387,17 @@ Found while splitting, and paid as separate fixes:
   `ui/Attack.ts` fell back to `champ.facing`. **Paid** after D3d: `Game.addCharacter` sets
   it with `facing`. `tools/dump-hall-of-champions.ts` recruits DAROOU, whose mirror the
   party faces west, and failed before the fix (facing3 0, not 3).
-- ⏳ **`byte33`.** The save writer writes `incantationCursor ?? incantation.length`, and the
+- ✅ **`byte33`.** The save writer wrote `incantationCursor ?? incantation.length`, and the
   engine never updates `incantationCursor`. So a champion loaded from a save keeps the
   file's `byte33` while runes are added or cast in the port, and the next save writes it
   back stale. CSBWin's add would then write the next rune at the wrong index. Every CSBWin
   writer of `byte33` keeps it equal to `strlen(incantation) & 3`: the add
   (`CSBCode.cpp:8984-8988`), the backspace (`Magic.cpp:814-817`), the cast (`:951-952`),
   and the two resets with `incantation[0] = 0` (`Character.cpp:2648-2649`,
-  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`.
+  `:5293-5294`). So the field is derivable and should go, like D5's `tiles`. **Paid:**
+  `incantationCursor` is gone, and the writer derives `incantation.length & 3`. The
+  fourteen committed saves still pack byte-identical. `tools/dump-character-block.ts`
+  types two runes into a loaded champion and failed before the fix (byte33 0, not 2).
 
 Not debt, so staying optional:
 
