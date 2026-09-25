@@ -98,8 +98,10 @@ staffs, the Rabbit's Foot, curses, Powertowers and the rest change their bearer'
 (`tools/dump-item-bonuses.ts`). Recorded: C34 (five possession writers, none of them
 CSBWin's whole — the UI and DSA paths lack the scroll, `value()`, the attack menu and the
 chest repack) and, in G1, `STKOP_SetCurse` with `SetCursed`.
-Next: C33 and C34, then D3 (split by field group first). Tier C is otherwise done except
-C25 (⚠️, waits for D4).
+Next (order changed 2026-09-25: tiers D and E before the rest of tier C, which is frozen —
+new divergences are recorded, not fixed, unless they block the D/E item or corrupt saves):
+D5, then D3 (split by field group first), D4, E1 (design note first), E2–E5. C33 and C34
+wait until after E1/E2; C25 (⚠️) still waits for D4.
 
 ## Ground rules
 

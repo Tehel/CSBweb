@@ -35,6 +35,11 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    whole tier is ✅, move it to `doc/PLAN_ARCHIVE.md` → "Resolved debt".
 6. **New debt goes here**, in the tier it belongs to — not only in a code comment, and not
    in `PLAN.md` once its phase is closed.
+7. **Since 2026-09-25, tiers D and E go before the rest of tier C** (see "Why this order").
+   Tier C is **frozen**: a divergence found along the way is recorded here, in tier C, and
+   not fixed — unless it blocks the D/E item at hand or corrupts saves. C33 and C34 wait;
+   C34 lands after E1/E2, once the possession code has one `Character` home and the engine
+   can reach the UI without new setters. C25 still waits for D4.
 
 ## Why this order
 
@@ -44,7 +49,11 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
   fix lands once and misses the others, and one of them (`DescIndex`) has already drifted.
   Tier C also needs the single copies (`OrdinalOfMonsterAtPosition`, `NameIndex`).
 - **C — Known divergences from CSBWin.** The project's first rule is faithfulness, so known
-  wrong behaviour outranks tidiness. Each item is local and small.
+  wrong behaviour outranks tidiness. Each item is local and small. C1–C32 were paid in
+  this order; **the rest of tier C now comes after D and E** (from 2026-09-25). Every C
+  fix had begun to cost a new hook in `Game`'s constructor and a fresh round of `?? 0`
+  guesses, which is exactly the debt D and E remove, so paying them first makes each
+  remaining C item cheaper. New C items are still recorded as they are found.
 - **D — State representation.** The most pervasive debt: four spellings of "no object" and
   mostly-optional state types. It comes before the splits in E because it *deletes* code —
   moving code that is about to be rewritten would double the diff to review.
