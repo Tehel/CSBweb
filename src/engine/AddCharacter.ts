@@ -200,6 +200,30 @@ export function assignPresetHeroPossessions(
   return possessions;
 }
 
+/** The `Champion` fields `addCharacterDefaults` initializes. */
+export type ChampionDefaults = Pick<
+  Champion,
+  'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
+>;
+
+/**
+ * What `AddCharacter` gives every `CHARDESC` before it reads the hero: the whole record
+ * cleared, `ClearMemory((ui8 *)pcA3, 800)` (`doc/CSBwin-src/Character.cpp:481`), then its
+ * constant stores (`:510-519`). The one initializer of these fields:
+ * `createChampionFromPreset` and the tools' champion builders spread it, and
+ * `Party.setState` fills an older save's gaps from it.
+ */
+export function addCharacterDefaults(): ChampionDefaults {
+  return {
+    // The port's own tick at which the busy champion is free (0: not busy); CSBWin
+    // keeps only the timer, `busyTimer`.
+    actionDisabledUntil: 0,
+    busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:518`)
+    attackType: -1, // `pcA3->attackType = -1` (`:517`)
+    attackStatModifier: 0, // `word64`, cleared
+  };
+}
+
 export function createChampionFromPreset(
   hero: PresetHero,
   partyPosition: number,
@@ -216,6 +240,7 @@ export function createChampionFromPreset(
   const skills = createSkillsFromSubskillLevels(getPresetSubskillLevels(hero));
 
   return {
+    ...addCharacterDefaults(),
     name: hero.name,
     title: hero.title,
     attributes: {
@@ -252,8 +277,6 @@ export function createChampionFromPreset(
     food: 1500,
     water: 1500,
     skills,
-    actionDisabledUntil: 0,
-    busyTimerIndex: -1,
     possessions: slots,
     partyPosition,
     facing: (partyPosition & 3) as Direction,

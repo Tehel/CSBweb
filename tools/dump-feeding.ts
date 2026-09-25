@@ -36,6 +36,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const POTION_NAMES: Record<number, string> = {
   [PotionType.ROS_POTION]: 'ROS (dexterity)',
@@ -52,6 +53,7 @@ const POTION_NAMES: Record<number, string> = {
 
 function champion(name: string): Champion {
   return {
+    ...addCharacterDefaults(),
     name,
     attributes: {
       health: 100, maxHealth: 200, stamina: 40, maxStamina: 100, mana: 20, maxMana: 60,

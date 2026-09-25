@@ -53,6 +53,7 @@ import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 /** `if (decorationIndex == 2) d.OrnateAlcoveGraphicIndex = D5W` (`Code390e.cpp:218`). */
 const ORNATE_ALCOVE_DECORATION = 2;
@@ -60,6 +61,7 @@ const ORNATE_ALCOVE_DECORATION = 2;
 /** Every champion starts at 200/200, so a `MaxHP/64` cut is visible without rounding. */
 function champion(i: number, name: string): Champion {
   return {
+    ...addCharacterDefaults(),
     name,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,

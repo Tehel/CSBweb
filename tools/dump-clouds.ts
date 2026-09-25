@@ -40,6 +40,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const RN_FIREBALL = 0xff80;
 const RN_POISON_CLOUD = 0xff87;
@@ -196,6 +197,7 @@ async function main(): Promise<void> {
   const gameP = await makeGame();
   const party = gameP.party.state;
   party.champions = [{
+    ...addCharacterDefaults(),
     name: 'VICTIM',
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,

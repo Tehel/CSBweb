@@ -33,6 +33,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
@@ -42,6 +43,7 @@ const uiTables = extractUITables(graphics);
 
 function champion(i: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name: `HERO${i}`,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,

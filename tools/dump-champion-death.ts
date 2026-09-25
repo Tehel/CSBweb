@@ -53,6 +53,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 /** `RNFireball` and friends (`doc/CSBwin-src/CSBTypes.h:239-247`). */
 const RN_FIREBALL = 0xff80;
@@ -68,6 +69,7 @@ const RN_POISON_BOLT = 0xff86;
 function champion(i: number, name: string): Champion {
   const possessions = emptyPossessions();
   return {
+    ...addCharacterDefaults(),
     name,
     attributes: {
       health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 0, maxMana: 0,

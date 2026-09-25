@@ -26,11 +26,13 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const WEAPON_TORCH = 2;
 
 function champion(i: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name: `HERO${i}`,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,

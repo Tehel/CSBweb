@@ -8,6 +8,7 @@
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
 import type { PartyState, Champion, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
+import { addCharacterDefaults } from './AddCharacter';
 import { Direction as Dir } from '../core/types';
 
 /**
@@ -208,13 +209,7 @@ export class Party {
         this.state = {
             ...initialPartyState(state.position, state.facing),
             ...state,
-            champions: state.champions.map((c) => ({
-                ...c,
-                attributes: c.attributes,
-                incantation: c.incantation,
-                actionDisabledUntil: c.actionDisabledUntil ?? 0,
-                busyTimerIndex: c.busyTimerIndex ?? -1,
-            })),
+            champions: state.champions.map((c) => ({ ...addCharacterDefaults(), ...c })),
             position: new Position(state.position.x, state.position.y, state.position.z),
             facing: state.facing,
         };

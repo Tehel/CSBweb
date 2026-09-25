@@ -298,7 +298,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
     );
   }
 
-  const busy = (champ.actionDisabledUntil ?? 0) !== 0 || (champ.busyTimerIndex ?? -1) >= 0;
+  const busy = champ.actionDisabledUntil !== 0 || champ.busyTimerIndex >= 0;
   if (busy || (ui.partyState?.sleeping ?? false)) {
     shadeRectIndex(ui, rect, 0);
   }

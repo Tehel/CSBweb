@@ -438,7 +438,7 @@ export class TimerSystem {
     const chIdx = timer.uByte5 & 0xff;
     const champ = party.champions[chIdx];
     if (!champ) return;
-    if ((champ.busyTimerIndex ?? -1) === timer.index) {
+    if (champ.busyTimerIndex === timer.index) {
       champ.busyTimerIndex = -1;
       champ.actionDisabledUntil = 0;
     }

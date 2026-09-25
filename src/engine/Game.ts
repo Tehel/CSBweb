@@ -2352,7 +2352,7 @@ export class Game {
         const champion = party.champions[chIdx];
         if (!champion) return;
         let targetTime = (this.state.tickCount + (timeDelay | 0)) >>> 0;
-        const existingIndex = champion.busyTimerIndex ?? -1;
+        const existingIndex = champion.busyTimerIndex;
         if (existingIndex >= 0) {
             const existing = this.timerQueue.getTimer(existingIndex);
             if (existing) {
@@ -2557,7 +2557,7 @@ export class Game {
     private enableCharacterAction(chIdx: number, refillSlot: number): void {
         const champion = this.party.state.champions[chIdx];
         if (!champion) return;
-        if ((champion.attackType ?? -1) !== -1) champion.attackStatModifier = 0;
+        if (champion.attackType !== -1) champion.attackStatModifier = 0;
         if ((champion.attributes.health | 0) !== 0) {
             // A bow that has just been fired reloads itself from slot 12, then from
             // slots 7-9, taking the first object of the matching ammunition class

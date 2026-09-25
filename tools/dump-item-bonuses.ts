@@ -39,6 +39,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { setChampionPossession } from '../src/renderer/ui/Character';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
@@ -88,6 +89,7 @@ function makeGame(): Game {
 
 function champion(i: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name: `HERO${i}`,
     attributes: {
       health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 7, maxMana: 20,

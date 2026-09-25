@@ -41,10 +41,12 @@ import {
 } from '../src/renderer/ui/Inventory';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 /** A champion with nothing wrong: fed, watered, unpoisoned, no attribute drained. */
 function healthyChampion(): Champion {
   return {
+    ...addCharacterDefaults(),
     name: 'HERO',
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,

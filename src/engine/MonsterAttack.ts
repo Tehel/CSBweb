@@ -711,7 +711,7 @@ export class MonsterAttack {
 
     const party = this.getPartyState();
     total +=
-      (champ.attackStatModifier ?? 0) +
+      champ.attackStatModifier +
       (champ.shieldStrength ?? 0) +
       party.partyShield +
       handTotal;

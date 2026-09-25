@@ -41,6 +41,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { determineMastery } from '../src/engine/skills';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 /** `weapon_Sword` (`doc/CSBwin-src/Objects.h:51`). */
 const WEAPON_SWORD = 10;
@@ -51,6 +52,7 @@ const ATTACK_CLASS_EMPTY_HAND = 2;
 
 function champion(i: number, name: string, fighterExp: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name,
     attributes: {
       health: 200, maxHealth: 200, stamina: 200, maxStamina: 200, mana: 60, maxMana: 60,

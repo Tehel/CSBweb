@@ -46,12 +46,14 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { check, fail, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const WEAPON_FALCHION = 9;
 const EAST = 1;
 
 function champion(i: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name: `HERO${i}`,
     attributes: {
       health: 500, maxHealth: 500, stamina: 500, maxStamina: 500, mana: 0, maxMana: 0,

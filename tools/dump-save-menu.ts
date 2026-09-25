@@ -63,6 +63,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -426,6 +427,7 @@ function checkListLogic(): void {
 
 function healthyChampion(name: string): Champion {
   return {
+    ...addCharacterDefaults(),
     name,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,

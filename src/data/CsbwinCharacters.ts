@@ -431,7 +431,7 @@ export function writeCsbwinCharacter(
   block[base + 29] = champion.partyPosition & 0xff;
   block[base + 30] = 1;
   block[base + 31] = 2;
-  block[base + 32] = (champion.attackType ?? -1) & 0xff;
+  block[base + 32] = champion.attackType & 0xff;
   block[base + 33] = (champion.incantationCursor ?? (champion.incantation?.length ?? 0)) & 3;
   const incantation = champion.incantationField;
   const live = champion.incantation ?? [];
@@ -444,7 +444,7 @@ export function writeCsbwinCharacter(
   block[base + 40] = (champion.damageFromDirection ?? 0) & 0xff;
   block[base + 41] = (champion.maxRecentDamage ?? 0) & 0xff;
   block[base + 42] = (champion.poisonCount ?? 0) & 0xff;
-  setU16BE(block, base + 44, champion.busyTimerIndex ?? -1);
+  setU16BE(block, base + 44, champion.busyTimerIndex);
   setU16BE(block, base + 46, champion.timerIndex ?? -1);
   setU16BE(block, base + 48, champion.charFlags ?? 0);
   setU16BE(block, base + 50, champion.wounds ?? 0);
@@ -454,7 +454,7 @@ export function writeCsbwinCharacter(
   setU16BE(block, base + 58, champion.attributes.maxStamina);
   setU16BE(block, base + 60, champion.attributes.mana);
   setU16BE(block, base + 62, champion.attributes.maxMana);
-  setU16BE(block, base + 64, champion.attackStatModifier ?? 0);
+  setU16BE(block, base + 64, champion.attackStatModifier);
   setU16BE(block, base + 66, champion.food);
   setU16BE(block, base + 68, champion.water);
 

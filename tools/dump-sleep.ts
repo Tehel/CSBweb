@@ -29,7 +29,7 @@ import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { emptyPossessions } from '../src/engine/gameTypes';
-import { createChampionFromPreset } from '../src/engine/AddCharacter';
+import { addCharacterDefaults, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
@@ -49,6 +49,7 @@ async function importUI(): Promise<[typeof import('../src/renderer/ui/Mouse'), t
 
 function champion(i: number): Champion {
   return {
+    ...addCharacterDefaults(),
     name: `HERO${i}`,
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,

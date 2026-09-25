@@ -160,16 +160,16 @@ export interface Champion {
      * (`doc/CSBwin-src/Character.cpp:4970`). Mostly negative: swinging leaves you
      * open. Cleared by `EnableCharacterAction`.
      */
-    attackStatModifier?: i16;
+    attackStatModifier: i16;
     /**
      * `CHARDESC.attackType` — the attack currently in progress, or -1
      * (`doc/CSBwin-src/Character.cpp:4973`). `EnableCharacterAction` reads it to know
      * whether to clear the defence penalty and whether to reload a bow.
      */
-    attackType?: i16;
+    attackType: i16;
     skills: Skill[];           // CSBWin skills92[20]
-    actionDisabledUntil?: i32; // Tick when actions re-enable (CSBWin busyTimer)
-    busyTimerIndex?: i32;      // Timer index for action disable
+    actionDisabledUntil: i32;  // Tick when actions re-enable (CSBWin busyTimer)
+    busyTimerIndex: i32;       // Timer index for action disable
 
     shieldStrength?: ui16;      // Optional shield strength for UI dots
     /**
