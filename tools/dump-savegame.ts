@@ -348,12 +348,6 @@ async function main(): Promise<void> {
   const countsTrackLength = (Object.keys(reloadedData.databases) as Array<keyof typeof reloadedData.databases>)
     .every((key) => reloadedData.databases[key].count === reloadedData.databases[key].records.length);
   check(countsTrackLength, 'every restored database count should equal its record count');
-  // `tiles` is derived from the cell flags, and the engine reads both; a restore that
-  // wrote one and not the other would leave the two disagreeing.
-  const tilesAgree = reloadedData.maps.every((m) =>
-    m.tiles.every((col, x) => col.every((tile, y) => tile.cellFlag === m.cellFlags[x][y])),
-  );
-  check(tilesAgree, 'the derived tiles should agree with the restored cell flags');
 
   // ---- Loading twice, with play in between --------------------------------
   //

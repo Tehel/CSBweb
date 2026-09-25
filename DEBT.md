@@ -112,7 +112,7 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D2 | One "no object" value (split: D2a-d ✅) | L | ✅ |
 | D3 | Most state fields are optional | L | ⏳ |
 | D4 | `ObjectID` is not a distinct type | M | ⏳ |
-| D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ⏳ |
+| D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ |
 | E1 | A shared game context, and one set of tables | L | ⏳ |
 | E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
@@ -1341,7 +1341,21 @@ ID silently. After D2, decide: brand it (`number & { readonly __rn: unique symbo
 which would make `tsc` catch RN/type confusion like B1's overload, or drop the casts.
 Measure the churn on a branch first.
 
-### D5 ⏳ Cell flags stored twice (`cellFlags` and `tiles`)
+### D5 ✅ Cell flags stored twice (`cellFlags` and `tiles`)
+
+**Paid.** `MapData.tiles` and `TileData` are gone; `cellFlags` is the one copy of the byte,
+as in CSBWin, and readers unpack it with `getRoomType` / `cellHasObjects`
+(`src/core/types.ts`). The six writers that kept `tiles` in step (`DungeonState`'s
+has-objects and door writers, `TimerSystem.setDoorState` / `setCellFlag`,
+`DsaSystem.updateCellFlag`, `applyDungeonSnapshot`) write the byte only.
+`DungeonState.getTile` went, with its five `isWall` / `isDoor` / `isPit` /
+`isTeleporter` / `isStairs` helpers, which had no caller; `hasObjects` reads the flag.
+`tiles` was never serialised, so `RUNTIME_SAVE_VERSION` stays 10. Three tools that wrote
+both copies write one; `dump-savegame`'s "the tiles agree with the flags" check went
+with the thing it checked. Evidence: `npm test -- --frames` passes unchanged before and
+after; a grep finds no `.tiles` or `TileData`.
+
+<details><summary>original entry</summary>
 
 Found paying C13. `MapData` keeps each cell's flag byte in `cellFlags[x][y]` and again,
 unpacked, in `tiles[x][y]` (`TileData`: `cellFlag`, `roomType`, `hasObjects`,
@@ -1351,6 +1365,8 @@ step, and `tiles` has readers in `DungeonSnapshot`, `TimerSystem`, `DsaSystem` a
 `ui/mapPreview`. CSBWin has one byte per cell. A writer that updates one copy leaves
 the other stale — C13's type-7 scenario had to write both. Keep `cellFlags`, derive the
 rest where it is read.
+
+</details>
 
 ---
 

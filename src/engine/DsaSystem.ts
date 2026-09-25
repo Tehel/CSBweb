@@ -2176,14 +2176,7 @@ export class DsaSystem {
     if (!map) return;
     if (locr.x < 0 || locr.y < 0) return;
     if (locr.x >= map.descriptor.width || locr.y >= map.descriptor.height) return;
-    const next = cellFlag & 0xff;
-    map.cellFlags[locr.x][locr.y] = next;
-    const tile = map.tiles[locr.x]?.[locr.y];
-    if (!tile) return;
-    tile.cellFlag = next;
-    tile.attributes = next & 0xf;
-    tile.roomType = (next >> 5) & 0x7;
-    tile.hasObjects = (next & 0x10) !== 0;
+    map.cellFlags[locr.x][locr.y] = cellFlag & 0xff;
   }
 
   private modifyDescription(locrInt: number, index: number, color: number): void {

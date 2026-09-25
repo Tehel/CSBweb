@@ -649,19 +649,15 @@ async function main(): Promise<void> {
     check(spot !== null, 'the level should have two open cells side by side');
     if (spot) {
       const [ddx, ddy] = DIRS[spot.dir];
-      // The cell is stored twice — `cellFlags` and `tiles` (DEBT.md D5) — so both change.
       const [tx, ty] = [spot.px + ddx, spot.py + ddy];
       const cells = map.cellFlags;
       const saved = cells[tx][ty];
-      const savedTile = map.tiles[tx][ty];
       cells[tx][ty] = (RoomType.EMPTY << 5) | (saved & 0x1f);
-      map.tiles[tx][ty] = { ...savedTile, cellFlag: cells[tx][ty], roomType: RoomType.EMPTY };
       game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
       game.party.state.position = new Position(spot.px, spot.py, level);
       game.party.setFacing(spot.dir);
       const entered = game.move(MovementAction.MOVE_FORWARD);
       cells[tx][ty] = saved;
-      map.tiles[tx][ty] = savedTile;
       console.log(`room type 7: ${entered ? 'entered' : 'refused'}`);
       console.log('');
       check(entered, 'a room-type-7 cell should be walked into, as CSBWin does');
@@ -686,10 +682,8 @@ async function main(): Promise<void> {
     if (pit) {
       const cells = map.cellFlags;
       const saved = cells[pit.x][pit.y];
-      const savedTile = map.tiles[pit.x][pit.y];
       const setCell = (v: number): void => {
         cells[pit.x][pit.y] = v;
-        map.tiles[pit.x][pit.y] = { ...savedTile, cellFlag: v };
       };
       setCell(saved & 0xf7); // closed: the party stands on it
       const party = game.party.state;
@@ -734,7 +728,6 @@ async function main(): Promise<void> {
       check(queuedAfterTick === 0, 'the queued turn should be discarded in that same tick');
       check(!turned, 'the queued turn should never run on the new level');
       setCell(saved);
-      map.tiles[pit.x][pit.y] = savedTile;
       game.party.state.position = new Position(scene.px, scene.py, level);
       game.monsterSystem.loadPartyLevel(level);
     }

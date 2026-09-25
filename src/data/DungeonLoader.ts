@@ -14,7 +14,6 @@ import type {
     DungeonHeader,
     MapDescriptor,
     MapData,
-    TileData,
     Databases,
     DoorRecord,
     TeleporterRecord,
@@ -840,24 +839,14 @@ export class DungeonLoader {
         for (const descriptor of descriptors) {
             this.file.seek(offset + descriptor.dataOffset);
 
-            const tiles: TileData[][] = [];
             const cellFlags: CellFlag[][] = [];
 
-            // Read tiles row by row
+            // Read the cell flags column by column
             for (let x = 0; x < descriptor.width; x++) {
-                tiles[x] = [];
                 cellFlags[x] = [];
 
                 for (let y = 0; y < descriptor.height; y++) {
-                    const cellFlag = this.file.readU8();
-                    cellFlags[x][y] = cellFlag;
-
-                    tiles[x][y] = {
-                        cellFlag,
-                        roomType: (cellFlag >> 5) & 0x7,
-                        hasObjects: (cellFlag & 0x10) !== 0,
-                        attributes: cellFlag & 0xF
-                    };
+                    cellFlags[x][y] = this.file.readU8();
                 }
             }
 
@@ -882,7 +871,6 @@ export class DungeonLoader {
 
             maps.push({
                 descriptor,
-                tiles,
                 cellFlags,
                 monsterTypes,
                 wallDecorationTOC,

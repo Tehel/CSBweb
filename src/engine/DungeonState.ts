@@ -5,7 +5,7 @@
  * Based on CSBWin's dungeon data access
  */
 
-import { ui8, ui16, Position, CellFlag, ObjectID, Direction, type LocationRel } from '../core/types';
+import { ui8, ui16, Position, CellFlag, ObjectID, Direction, cellHasObjects, type LocationRel } from '../core/types';
 import type {
     ClothingRecord,
     ContainerRecord,
@@ -20,7 +20,6 @@ import type {
     PotionRecord,
     ScrollRecord,
     TeleporterRecord,
-    TileData,
     WeaponRecord,
     ActuatorRecord,
     Database,
@@ -229,21 +228,6 @@ export class DungeonState {
     }
 
     /**
-     * Get tile data at position
-     * @returns Tile data or null if out of bounds
-     */
-    getTile(position: Position): TileData | null {
-        const { x, y, z } = position;
-        const map = this.getMap(z);
-        if (!map) return null;
-
-        // Check bounds
-        if (x < 0 || x >= map.descriptor.width || y < 0 || y >= map.descriptor.height) return null;
-
-        return map.tiles[x][y];
-    }
-
-    /**
      * Get cell flag at position
      * @returns Cell flag or 0 if out of bounds
      */
@@ -402,10 +386,6 @@ export class DungeonState {
         if (hasObjects) cellFlag |= 0x10;
         else cellFlag &= 0xef;
         map.cellFlags[x][y] = cellFlag;
-        const tile = map.tiles[x]?.[y];
-        if (!tile) return;
-        tile.cellFlag = cellFlag;
-        tile.hasObjects = hasObjects;
     }
 
     /**
@@ -917,58 +897,7 @@ export class DungeonState {
         const newAttr = (cellFlag & 0x8) | (nextState & 0x7);
         const newCellFlag = (cellFlag & 0xf0) | newAttr;
         map.cellFlags[x][y] = newCellFlag;
-        const tile = map.tiles[x][y];
-        tile.cellFlag = newCellFlag;
-        tile.attributes = newAttr;
         return true;
-    }
-
-    /**
-     * Check if a position is a wall
-     * @returns True if position is a wall
-     */
-    isWall(position: Position): boolean {
-        const tile = this.getTile(position);
-        if (!tile) return true; // Out of bounds = wall
-        if (tile.roomType === RoomType.STONE) return true;
-        if (tile.roomType === RoomType.FALSEWALL) return (tile.cellFlag & 0x05) === 0;
-        return false;
-    }
-
-    /**
-     * Check if a position is a door
-     * @returns True if position is a door
-     */
-    isDoor(position: Position): boolean {
-        const tile = this.getTile(position);
-        return tile?.roomType === RoomType.DOOR;
-    }
-
-    /**
-     * Check if a position is a pit
-     * @returns True if position is a pit
-     */
-    isPit(position: Position): boolean {
-        const tile = this.getTile(position);
-        return tile?.roomType === RoomType.PIT;
-    }
-
-    /**
-     * Check if a position is a teleporter
-     * @returns True if position is a teleporter
-     */
-    isTeleporter(position: Position): boolean {
-        const tile = this.getTile(position);
-        return tile?.roomType === RoomType.TELEPORTER;
-    }
-
-    /**
-     * Check if a position is stairs
-     * @returns True if position is stairs
-     */
-    isStairs(position: Position): boolean {
-        const tile = this.getTile(position);
-        return tile?.roomType === RoomType.STAIRS;
     }
 
     /**
@@ -976,8 +905,7 @@ export class DungeonState {
      * @returns True if position has objects
      */
     hasObjects(position: Position): boolean {
-        const tile = this.getTile(position);
-        return tile?.hasObjects || false;
+        return cellHasObjects(this.getCellFlag(position));
     }
 
     // Get start position from dungeon header

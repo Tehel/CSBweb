@@ -9,7 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { Champion, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { OBJECT_ID_EOF, Position, RoomType } from '../core/types';
+import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
 import type { ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
@@ -304,8 +304,10 @@ export class MovementSystem {
         const facing = this.party.state.facing;
 
         const dirNames = ['North', 'East', 'South', 'West'];
-        const tile = this.dungeon.getTile(position);
-        const tileType = tile ? `Type: ${tile.roomType}` : 'Unknown';
+        const map = this.dungeon.getMap(position.z);
+        const inBounds = !!map && position.x >= 0 && position.x < map.descriptor.width &&
+            position.y >= 0 && position.y < map.descriptor.height;
+        const tileType = inBounds ? `Type: ${getRoomType(this.dungeon.getCellFlag(position))}` : 'Unknown';
 
         return `Position: (${position.x}, ${position.y}) Map: ${position.z} Facing: ${dirNames[facing]} ${tileType}`;
     }

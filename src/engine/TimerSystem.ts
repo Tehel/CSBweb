@@ -1427,19 +1427,10 @@ export class TimerSystem {
     const cellFlag = map.cellFlags[x][y];
     const newCellFlag = (cellFlag & 0xf8) | (doorState & 0x7);
     map.cellFlags[x][y] = newCellFlag;
-    const tile = map.tiles[x][y];
-    tile.cellFlag = newCellFlag;
-    tile.attributes = newCellFlag & 0x0f;
   }
 
   private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {
     map.cellFlags[x][y] = cellFlag;
-    const tile = map.tiles[x]?.[y];
-    if (!tile) return;
-    tile.cellFlag = cellFlag;
-    tile.attributes = cellFlag & 0x0f;
-    tile.roomType = (cellFlag >> 5) & 0x7;
-    tile.hasObjects = (cellFlag & 0x10) !== 0;
   }
 
   private isPartyAt(position: Position): boolean {

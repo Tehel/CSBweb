@@ -1,4 +1,4 @@
-import { Position, RoomType } from '../core';
+import { Position, RoomType, getRoomType } from '../core';
 import { getUIContext, isDebugFeaturesEnabled } from './context';
 import { updateDebug } from './messages';
 import { getEventPosition, getMapPreviewLayout } from './utils';
@@ -30,10 +30,10 @@ export function drawMapPreview(levelIndex: number): void {
     const current = ctx.game.party.state.position;
     for (let x = 0; x < map.descriptor.width; x++) {
         for (let y = 0; y < map.descriptor.height; y++) {
-            const tile = map.tiles[x][y];
+            const roomType = getRoomType(map.cellFlags[x][y]);
             const px = offsetX + x * cellSize;
             const py = offsetY + y * cellSize;
-            canvasCtx.fillStyle = colors.get(tile.roomType) ?? '#f0f';
+            canvasCtx.fillStyle = colors.get(roomType) ?? '#f0f';
             canvasCtx.fillRect(px, py, cellSize - 1, cellSize - 1);
 
             if (current.x === x && current.y === y && current.z === levelIndex) {

@@ -39,6 +39,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ratesDefault } from '../src/audio/soundsIndex';
 import { buildSoundCatalog } from '../src/audio/soundsIndex';
 import { SoundIndex } from '../src/core/constants';
+import { cellHasObjects, getRoomType } from '../src/core/types';
 import {
   createPaletteIndexViewportBuffer,
   type IndexedBitmap,
@@ -245,11 +246,11 @@ function checkPrisonLevel(): void {
   check(map!.descriptor.mapGraphicsStyle === 0 && map!.descriptor.floorCeilingStyle === 0,
     'the zeroed LEVELDESC selects wall set 0 and floor/ceiling set 0, which `_GameSetup` loaded');
   check(map!.descriptor.wallGraphicsCount === 0, 'and no wall decorations');
-  check(map!.tiles[2][0].roomType === 1 && map!.tiles[0][0].roomType === 0,
-    'the derived tiles agree with the flags: OPEN at (2,0), STONE at (0,0)');
+  check(getRoomType(map!.cellFlags[2][0]) === 1 && getRoomType(map!.cellFlags[0][0]) === 0,
+    'the cell flags say OPEN at (2,0), STONE at (0,0)');
   let objectAsked = false;
   for (let x = 0; x < PRISON_LEVEL_SIZE; x++) {
-    for (let y = 0; y < PRISON_LEVEL_SIZE; y++) if (map!.tiles[x][y].hasObjects) objectAsked = true;
+    for (let y = 0; y < PRISON_LEVEL_SIZE; y++) if (cellHasObjects(map!.cellFlags[x][y])) objectAsked = true;
   }
   check(!objectAsked, 'no cell claims objects, so the viewport never walks a chain here');
 }

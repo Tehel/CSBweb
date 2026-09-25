@@ -81,23 +81,16 @@ export interface MapDescriptor {
 }
 
 /**
- * Tile definition (1 byte)
- * Encoded as: [RoomType:3][HasObjects:1][Attributes:4]
- */
-export interface TileData {
-    cellFlag: CellFlag;         // Raw cell flag byte
-    roomType: ui8;              // Room type (bits 5-7)
-    hasObjects: boolean;        // Has objects flag (bit 4)
-    attributes: ui8;            // Type-specific attributes (bits 0-3)
-}
-
-/**
- * Map data (tiles + optional graphics indices)
+ * Map data (cell flags + optional graphics indices)
  */
 export interface MapData {
     descriptor: MapDescriptor;
-    tiles: TileData[][];        // [x][y] 2D array
-    cellFlags: CellFlag[][];    // [x][y] raw cell flags for fast access
+    /**
+     * [x][y] the cell flag byte, `[RoomType:3][HasObjects:1][Attributes:4]` — the one copy,
+     * as CSBWin keeps one byte per cell. Unpack it where it is read (`getRoomType`,
+     * `cellHasObjects` in `src/core/types.ts`).
+     */
+    cellFlags: CellFlag[][];
 
     // Extra per-level tables stored after CELLFLAGs in dungeon.dat (CSBWin `SetPartyLevel`, CSBCode.cpp:5778+).
     monsterTypes?: ui8[];           // LEVELDESC.numMonsterType() entries

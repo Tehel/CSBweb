@@ -14,8 +14,7 @@
  * What mutates, and so what is here:
  *
  * - `cellFlags` — door state, pit open/closed, false walls, teleporters, and the
- *   has-objects bit. `MapData.tiles` is a pure derivation of the cell flag byte
- *   (`DungeonLoader.parseMapData`), so it is rebuilt on restore rather than stored.
+ *   has-objects bit. It is the only copy of the cell byte.
  * - `objectList` — the per-cell object chains. Every pick-up, drop and throw edits
  *   it.
  * - `columnIndex` — the per-column offset into `objectList`. It looks structural and
@@ -216,17 +215,7 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
         const cellFlags = decodeCellFlags(snapshot.cellFlags[index], width, height);
         for (let x = 0; x < width; x++) {
             for (let y = 0; y < height; y++) {
-                const cellFlag = cellFlags[x][y];
-                map.cellFlags[x][y] = cellFlag;
-                // `tiles` is derived from the cell flag byte, exactly as the loader
-                // derives it (`DungeonLoader.parseMapData`), and the engine keeps the
-                // two in step (`DungeonState.setCellHasObjects`, `setDoorState`).
-                const tile = map.tiles[x]?.[y];
-                if (!tile) continue;
-                tile.cellFlag = cellFlag;
-                tile.roomType = (cellFlag >> 5) & 0x7;
-                tile.hasObjects = (cellFlag & 0x10) !== 0;
-                tile.attributes = cellFlag & 0xf;
+                map.cellFlags[x][y] = cellFlags[x][y];
             }
         }
     });

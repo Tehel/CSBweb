@@ -117,8 +117,6 @@ async function main(): Promise<void> {
     const flag = map.cellFlags[x][y];
     const next = (flag & 0xf8) | (state & 0x7);
     map.cellFlags[x][y] = next;
-    map.tiles[x][y].cellFlag = next;
-    map.tiles[x][y].attributes = next & 0x0f;
   };
 
   // A real door on this level, with an open neighbour to walk the party in from.

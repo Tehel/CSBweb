@@ -36,7 +36,7 @@
  */
 import { Position, type CellFlag, type ObjectID } from '../../core/types';
 import type { DungeonState } from '../../engine/DungeonState';
-import type { MapData, TileData } from '../../data/dungeonTypes';
+import type { MapData } from '../../data/dungeonTypes';
 
 /** `d.width` / `d.height`. */
 export const PRISON_LEVEL_SIZE = 5;
@@ -46,15 +46,6 @@ export const PRISON_LEVEL_INDEX = 255;
 export const PRISON_PARTY_POSITION = { x: 2, y: 0, facing: 2 } as const;
 /** `roomOPEN << 5` (`doc/CSBwin-src/CSB.h:558-566`). */
 const CELL_OPEN = 32;
-
-function tileOf(cellFlag: CellFlag): TileData {
-  return {
-    cellFlag,
-    roomType: (cellFlag >> 5) & 7,
-    hasObjects: (cellFlag & 0x10) !== 0,
-    attributes: cellFlag & 0x0f,
-  };
-}
 
 /** The `LOCAL_154` array, `[x][y]`. */
 export function prisonCellFlags(): CellFlag[][] {
@@ -91,7 +82,6 @@ export function prisonMap(): MapData {
       mapGraphicsStyle: 0,
       floorCeilingStyle: 0,
     },
-    tiles: cellFlags.map((column) => column.map(tileOf)),
     cellFlags,
   };
 }
