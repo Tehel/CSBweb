@@ -47,6 +47,7 @@ async function main(): Promise<void> {
       },
     },
   });
+  game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(10, 10, level);
   game.monsterSystem.loadPartyLevel(level);
 

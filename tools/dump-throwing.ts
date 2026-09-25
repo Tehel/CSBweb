@@ -295,6 +295,7 @@ async function main(): Promise<void> {
   if (!data2) throw new Error('dungeon.dat did not load');
 
   const game = newGame(data2, graphics);
+  game.setRandomSeed(0x12345678);
 
   const party = game.party.state;
   party.champions = [champion()];

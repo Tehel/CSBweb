@@ -38,6 +38,7 @@ import {
   makeAttribute,
   setAttributeCurrentWithinLimits,
 } from '../src/engine/attributes';
+import { CsbRandom } from '../src/core/random';
 import { levelUp } from '../src/engine/skills';
 import type { Champion } from '../src/engine/gameTypes';
 import { check, finish } from './lib/check';
@@ -123,12 +124,13 @@ function main(): void {
   console.log(['skill', 'attribute', 'before cur/max', 'after cur/max'].join('\t'));
 
   let sawARaise = false;
+  const random = new CsbRandom(0x12345678);
   for (const basicSkill of [0, 1, 2, 3]) {
     const champ: Champion = createChampionFromPreset(heroes[0], 0, []);
     // A champion with real skill experience, so DetermineMastery returns a live level.
     champ.skills = champ.skills.map((s) => ({ ...s, experience: 125 << 6 }));
     const before = champ.attributes.stats.map((a) => ({ ...a }));
-    levelUp(champ, basicSkill);
+    levelUp(champ, basicSkill, random);
     for (let i = 0; i < ATTRIBUTE_COUNT; i++) {
       const was = before[i];
       const now = champ.attributes.stats[i];

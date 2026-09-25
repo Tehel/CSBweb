@@ -36,6 +36,7 @@ async function main(): Promise<void> {
   const ticks = Number(process.argv[5] ?? 600);
 
   const game = newGame(data, graphics);
+  game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(px, py, level);
   game.monsterSystem.loadPartyLevel(level);
 
