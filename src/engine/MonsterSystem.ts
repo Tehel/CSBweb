@@ -264,6 +264,17 @@ export class MonsterSystem {
     return this.loadedLevel !== (this.ctx.party.state.position.z | 0);
   }
 
+  /**
+   * The port loads a new party level as soon as the party arrives on it; CSBWin only
+   * sets `d.newPartyLevel` there and loads it at the top of the next tick, where
+   * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623). So the discard is
+   * left for the tick (`ctx.loop.newPartyLevel`): input queued between the arrival and
+   * that tick is lost too.
+   */
+  loadPartyLevelOnArrival(): void {
+    if (this.loadPartyLevelIfChanged()) this.ctx.loop.newPartyLevel = true;
+  }
+
   /** Run `loadPartyLevel` if, and only if, the party's level has changed; say whether it ran. */
   loadPartyLevelIfChanged(): boolean {
     const level = this.ctx.party.state.position.z | 0;

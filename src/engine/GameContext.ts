@@ -19,6 +19,8 @@ import type { GameTables } from './GameTables';
 import { NameIndex } from './objectIndex';
 import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
+import { MouseQueue } from './MouseQueue';
+import { createLoopFlags, type LoopFlags } from './LoopState';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
@@ -50,7 +52,6 @@ export type GameMethods = Pick<Game,
   | 'notePartyMoved'
   | 'setBusyTimerRefill'
   | 'throwFromWeaponHand'
-  | 'wakeUp'
 >;
 
 /**
@@ -90,6 +91,10 @@ export interface GameContext {
   readonly footprints: PartyFootprints;
   /** `GameTimers`. */
   readonly timers: TimerQueue;
+  /** `pMouseQueue`, which `DiscardAllInput` empties from anywhere. */
+  readonly mouseQueue: MouseQueue;
+  /** `d.clockTick` and `d.newPartyLevel` as other files write them (`LoopFlags`). */
+  readonly loop: LoopFlags;
   /** `QueueSound`. */
   readonly sounds: SoundQueue;
   /** Every table from `graphics.dat`. */
@@ -128,6 +133,8 @@ export function createGameContext(
     random: new CsbRandom(),
     footprints: new PartyFootprints(),
     timers: new TimerQueue(),
+    mouseQueue: new MouseQueue(),
+    loop: createLoopFlags(),
     sounds: new SoundQueue(party, tables.sound1772, host),
     tables,
     host,

@@ -1491,10 +1491,41 @@ against the source before moving:
   teleport), `notePartyMoved` (the footprint step of the world `MoveObject`,
   `Code11f52.cpp:3222`) and `wakeUp` (`CSBCode.cpp:7047`). These four touch `Game`'s
   loop state — `loadPartyLevelIfChanged`, `clockTickSet`, the mouse queue
-  (`discardAllInput`) — which `Game` keeps as "the loop". **Decide before moving them**
-  how a system reaches that state: likely the loop's `d.` fields (`clockTick`,
-  `newPartyLevel`, the mouse queue) move into `GameState` or a small `ctx` member, so
-  `wakeUp` and the level load become plain systems' code and `Game` only reads the flags.
+  (`discardAllInput`) — which `Game` keeps as "the loop".
+
+*Decision: how a system reaches the loop's state (2026-09-25).* In CSBWin all three are
+`d.` globals that files other than the main loop write: `WakeUp` sets `d.clockTick = 1`
+(`CSBCode.cpp:7050`), an inhibited `MoveParty` clears it (`:8313`), the world `MoveObject`
+sets `d.newPartyLevel` (`Code11f52.cpp:3323`), and `DiscardAllInput` (`CSBCode.cpp:7532`)
+resets `d.MouseQStart` / `d.MouseQEnd` for whoever calls it. So they move out of `Game`
+into the context, as every other `d.` field did in E1 — and **not into `GameState`**:
+`SaveGame.cpp` names neither `d.clockTick` nor `d.newPartyLevel`, the port's quick-save
+carries none of the three today, and `GameState` is what the quick-save writes, so
+putting them there would change the save's shape for state the next tick settles anyway.
+
+- `ctx.mouseQueue` — a `MouseQueue` (`src/engine/MouseQueue.ts`): the ring
+  (`pMouseQueue`, `MouseQStart`, `MouseQEnd`, `MOUSEQLEN`), its three writers (a key, a
+  click, the button-up), `numEnt`, `DiscardAllInput`, and the head `HandleMouseEvents`
+  takes. `HandleMouseEvents` itself stays in `Game`: it is the loop's consumer, and it
+  calls `Game.move`.
+- `ctx.loop` — a `LoopFlags` (`src/engine/LoopState.ts`): `clockTickSet` /
+  `clockTickCleared` (the two ways a caller overrides the VBL's `d.clockTick`) and
+  `newPartyLevel` (a level change whose `DiscardAllInput` the next tick owes). `Game`
+  reads and clears them in `runFrame` / `gameTick`, as it does now.
+- `WakeUp` becomes `wakeUp(ctx)` in the same module: with the flags and the queue on
+  the context it needs nothing of `Game`, and its callers are `Monster.cpp:4531`'s and
+  `DamageCharacter`'s blow (`MonsterAttack`) and button 146 (`Game.wakeUp`, a facade for
+  `main.ts`). `Sleep` (button 145, `Mouse.cpp:1683`) has only the UI calling it and stays.
+- The port's early level load (`loadPartyLevelIfChanged`: `LoadPartyLevel` at once, the
+  discard owed to the next tick) becomes `MonsterSystem.loadPartyLevelOnArrival()`, beside
+  `loadPartyLevel`, setting `ctx.loop.newPartyLevel`. The bare
+  `MonsterSystem.loadPartyLevelIfChanged` keeps its other callers, which owe no discard.
+  `tag0006a4` (`loadNewPartyLevel`) stays in `Game`: it is the tick.
+
+Then the four go by file: `climbDownIntoPit` into `AttackSystem` (its one caller,
+`atk_CLIMBDOWN`), `handleDsaTeleportParty` into `DsaSystem` (`STKOP_TeleportParty`,
+`DSA.cpp:4583`, its one caller), `notePartyMoved` into `TimerSystem` beside the world
+`MoveObject` it is a step of (E3 will carry it on with the world moves).
 
 ### E3 ⏳ Split `TimerSystem.ts`
 

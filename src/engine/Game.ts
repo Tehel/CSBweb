@@ -38,6 +38,8 @@ import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
 import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
+import { MOUSE_UNCLICK } from './MouseQueue';
+import { wakeUp } from './LoopState';
 import { AttackType } from './monsterTypes';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { adjustSkills, determineMastery, ensureSkills, AdjustSkillsWhy } from './skills';
@@ -172,18 +174,6 @@ export interface RuntimeSaveState {
     };
 }
 
-/**
- * `MOUSEQLEN` — 8, because `Data.h:1513` leaves `#define NoKeyQue` commented out; the 3 on
- * `:1515` is the dead branch (doc/CSBwin-src/Data.h:1513-1518).
- */
-const MOUSEQLEN = 8;
-
-/** The button-up `OnMouseUnClick` queues (doc/CSBwin-src/CSBCode.cpp:7594). */
-const MOUSE_UNCLICK = 0x0add;
-
-/** One `pMouseQueue` entry: a button number and the point clicked (0,0 for a key). */
-export interface MouseQueueEntry { num: number; x: number; y: number }
-
 /** Where `HandleMouseEvents` sends the buttons it does not handle itself. */
 export interface MouseEventHandlers {
     /** Any button but a turn, a step or the button-up, with the point clicked. */
@@ -219,16 +209,6 @@ export class Game {
     dungeonState: DungeonState;
     private movementSystem: MovementSystem;
     /**
-     * CSBWin's one mouse queue, `pMouseQueue` (doc/CSBwin-src/Mouse.cpp): clicks, their
-     * button-ups and keys alike, as button numbers. A ring of `MOUSEQLEN` entries that
-     * keeps one slot empty — `MouseQStart` is the next entry to handle, `MouseQEnd` the
-     * last one queued, and `MouseQEnd + 1 == MouseQStart` means empty.
-     */
-    private readonly mouseQueue: MouseQueueEntry[] =
-        Array.from({ length: MOUSEQLEN }, () => ({ num: 0, x: 0, y: 0 }));
-    private mouseQStart = 0;
-    private mouseQEnd = MOUSEQLEN - 1;
-    /**
      * Where `HandleMouseEvents` sends every button that is not its own (the turns and the
      * steps): the UI's dispatcher, and the button-up. Headless, nobody is listening and
      * the entry is still consumed and still takes its tick.
@@ -240,8 +220,6 @@ export class Game {
      * initialise call, which a game load makes (`SaveGame.cpp:1661`).
      */
     private lastInputTime = 0;
-    /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */
-    private newPartyLevel = false;
     /** The timer queue. Public like the other subsystems; `tools/` drives it. */
     readonly timerQueue: TimerQueue;
     /**
@@ -325,18 +303,6 @@ export class Game {
     // Game loop
     private running: boolean = false;
     private lastTickTime: number = 0;
-    /**
-     * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313). The VBL
-     * sets `clockTick` again on every VBL once `vblCount >= d.Speed` (`:1066-1077`), so
-     * a tick that was due waits one frame.
-     */
-    private clockTickCleared = false;
-    /**
-     * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050): a tick is due at
-     * once, whatever the VBL count. The tick itself clears it again (`:704`), so a party
-     * woken by a blow during `ProcessTimers` gets no extra tick.
-     */
-    private clockTickSet = false;
     private animationFrameId: number | null = null;
 
     // Event callbacks
@@ -473,7 +439,7 @@ export class Game {
      */
     runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
-        this.clockTickCleared = false;
+        this.ctx.loop.clockTickCleared = false;
         // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
         // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
         while (this.handleMouseEvents(1) & 1) { /* the next entry, in the same pass */ }
@@ -486,7 +452,7 @@ export class Game {
         const tickInterval = this.party.state.sleeping ? 0 : 1000 / GAME_TIMING.TICKS_PER_SECOND;
 
         // Process game ticks
-        if (this.clockTickSet || (timeSinceLastTick >= tickInterval && !this.clockTickCleared)) {
+        if (this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared)) {
             if (!this.state.paused) {
                 this.gameTick();
             }
@@ -526,7 +492,7 @@ export class Game {
         if (this.party.state.partyMoveDisableTimer !== 0) this.party.state.partyMoveDisableTimer--;
         if (this.party.state.word11712 !== 0) this.party.state.word11712--;
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
-        this.clockTickSet = false;
+        this.ctx.loop.clockTickSet = false;
     }
 
     /**
@@ -545,12 +511,7 @@ export class Game {
      * Return key of the sleep-mode table `Byte18440`, which is button 146.
      */
     enqueueKeyButton(num: number): boolean {
-        let end = this.mouseQEnd + 2;
-        if (end > MOUSEQLEN - 1) end -= MOUSEQLEN;
-        if (end === this.mouseQStart) return false;
-        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
-        this.mouseQueue[this.mouseQEnd] = { num, x: 0, y: 0 };
-        return true;
+        return this.ctx.mouseQueue.enqueueKey(num);
     }
 
     /**
@@ -561,11 +522,7 @@ export class Game {
      * it was queued.
      */
     onMouseClick(num: number, x: number, y: number): boolean {
-        if (num === 0) return false;
-        if (this.queuedInputCount() >= MOUSEQLEN - 2) return false;
-        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
-        this.mouseQueue[this.mouseQEnd] = { num, x, y };
-        return true;
+        return this.ctx.mouseQueue.enqueueClick(num, x, y);
     }
 
     /**
@@ -573,14 +530,12 @@ export class Game {
      * while fewer than `MOUSEQLEN-1` entries wait — whether or not its click was.
      */
     onMouseUnClick(): void {
-        if (this.queuedInputCount() >= MOUSEQLEN - 1) return;
-        this.mouseQEnd = (this.mouseQEnd + 1) % MOUSEQLEN;
-        this.mouseQueue[this.mouseQEnd] = { num: MOUSE_UNCLICK, x: 0, y: 0 };
+        this.ctx.mouseQueue.enqueueUnClick();
     }
 
     /** `numEnt`: how many entries wait in the mouse queue (doc/CSBwin-src/CSBCode.cpp:7589-7590). */
     queuedInputCount(): number {
-        return (this.mouseQEnd - this.mouseQStart + 1 + MOUSEQLEN) % MOUSEQLEN;
+        return this.ctx.mouseQueue.count();
     }
 
     /** Who handles the buttons that are not movement (see `MouseEventHandlers`). */
@@ -620,7 +575,7 @@ export class Game {
                 this.actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
             this.notePartyMoved();
-            this.loadPartyLevelIfChanged();
+            this.monsterSystem.loadPartyLevelOnArrival();
             this.timerSystem.processTimers(this.state.tickCount);
 
             // Notify callbacks
@@ -633,8 +588,8 @@ export class Game {
             if (result.inhibited) {
                 // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
                 this.discardAllInput();
-                this.clockTickCleared = true;
-                this.clockTickSet = false;
+                this.ctx.loop.clockTickCleared = true;
+                this.ctx.loop.clockTickSet = false;
             }
             // Notify callbacks of failure
             for (const callback of this.onMoveCallbacks) {
@@ -679,7 +634,7 @@ export class Game {
      */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
-        this.loadPartyLevelIfChanged();
+        this.monsterSystem.loadPartyLevelOnArrival();
         this.timerSystem.processTimers(this.state.tickCount);
     }
 
@@ -707,14 +662,9 @@ export class Game {
         party.word11712 = 0;
     }
 
-    /**
-     * `DiscardAllInput` (doc/CSBwin-src/CSBCode.cpp:7532-7544): the mouse queue is reset
-     * to empty, `MouseQStart = 0`, `MouseQEnd = MOUSEQLEN-1` — every key and click that
-     * was waiting is lost.
-     */
+    /** `DiscardAllInput` (`MouseQueue.discardAllInput`). */
     discardAllInput(): void {
-        this.mouseQStart = 0;
-        this.mouseQEnd = MOUSEQLEN - 1;
+        this.ctx.mouseQueue.discardAllInput();
     }
 
     /**
@@ -735,28 +685,16 @@ export class Game {
         return true;
     }
 
-    /**
-     * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7047) — button 146, or any blow that lands on a
-     * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
-     * `d.PartySleeping = 0`, the game speed back, the adventure button lists back (the
-     * listeners), `DiscardAllInput()`.
-     *
-     * Not ported: `scrollingText.SetNewSpeed`, which paces the scroll animation the port
-     * does not have (DEBT G5).
-     */
+    /** `WakeUp` for button 146 (`LoopState.wakeUp`). */
     wakeUp(): void {
-        this.clockTickSet = true;
-        this.clockTickCleared = false;
-        this.party.state.sleeping = false;
-        this.notifySleep(false);
-        this.discardAllInput();
+        wakeUp(this.ctx);
     }
 
     isPartySleeping(): boolean {
         return this.party.state.sleeping;
     }
 
-    /** Tell the host `d.PartySleeping` changed (see `sleep` / `wakeUp`). */
+    /** Tell the host `d.PartySleeping` changed (see `sleep`; `wakeUp` tells it itself). */
     private notifySleep(sleeping: boolean): void {
         this.ctx.host.sleepChanged(sleeping);
     }
@@ -770,20 +708,10 @@ export class Game {
      * whether it ran.
      */
     private loadNewPartyLevel(): boolean {
-        if (!this.monsterSystem.loadPartyLevelIfChanged() && !this.newPartyLevel) return false;
-        this.newPartyLevel = false;
+        if (!this.monsterSystem.loadPartyLevelIfChanged() && !this.ctx.loop.newPartyLevel) return false;
+        this.ctx.loop.newPartyLevel = false;
         this.discardAllInput();
         return true;
-    }
-
-    /**
-     * The port loads a new party level as soon as the party arrives on it; CSBWin only
-     * sets `d.newPartyLevel` there and loads it at the top of the next tick, where
-     * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623). So the discard is
-     * left for `gameTick`: input queued between the arrival and that tick is lost too.
-     */
-    private loadPartyLevelIfChanged(): void {
-        if (this.monsterSystem.loadPartyLevelIfChanged()) this.newPartyLevel = true;
     }
 
     /**
@@ -807,17 +735,18 @@ export class Game {
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;
-        if (this.queuedInputCount() === 0) return result;
+        const queue = this.ctx.mouseQueue;
+        if (queue.count() === 0) return result;
         const time = this.state.tickCount;
         if (this.lastInputTime !== 0 && time < this.lastInputTime + delta) return result;
-        const entry = this.mouseQueue[this.mouseQStart];
+        const entry = queue.head();
         const num = entry.num;
         const party = this.party.state;
         if (num >= 3 && num <= 6 && (
             party.partyMoveDisableTimer !== 0 ||
             (party.word11712 !== 0 && ((party.facing + num - 3) & 3) === party.word11714)
         )) return result;
-        this.mouseQStart = (this.mouseQStart + 1) % MOUSEQLEN;
+        queue.take();
         if (num === MOUSE_UNCLICK) {
             this.mouseEventHandlers?.unclick();
             return result | 1;
@@ -1595,7 +1524,7 @@ export class Game {
         if (!unchanged) this.notePartyMoved();
         this.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
         this.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
-        this.loadPartyLevelIfChanged();
+        this.monsterSystem.loadPartyLevelOnArrival();
     }
 
 
@@ -1708,7 +1637,7 @@ export class Game {
         const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
         party.objectInHand = OBJECT_ID_NULL;
         this.timerSystem.moveObject(dropped, -1, 0, target.x, target.y, target.z);
-        this.loadPartyLevelIfChanged();
+        this.monsterSystem.loadPartyLevelOnArrival();
         this.timerSystem.processTimers(this.state.tickCount);
         if (options?.viAltar) {
             this.maybeScheduleViAltar(dropped, target, newPos);

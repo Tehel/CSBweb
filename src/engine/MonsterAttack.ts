@@ -32,6 +32,7 @@ import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
+import { wakeUp } from './LoopState';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -319,7 +320,7 @@ export class MonsterAttack {
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return 0;
     if (champ.attributes.health === 0) return 0;
-    if (party.sleeping) this.ctx.systems.game.wakeUp();
+    if (party.sleeping) wakeUp(this.ctx);
 
     const desc = this.ctx.tables.monsterDesc[monster.creatureType];
     if (!desc) return 0;
@@ -507,7 +508,7 @@ export class MonsterAttack {
           if (dealt <= threshold) break;
         } while (threshold !== 0);
       }
-      if (party.sleeping) this.ctx.systems.game.wakeUp();
+      if (party.sleeping) wakeUp(this.ctx);
     }
 
     if (dealt <= 0) return 0;

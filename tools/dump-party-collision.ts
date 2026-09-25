@@ -290,7 +290,7 @@ async function main(): Promise<void> {
   // one input queue is `Game`'s mouse queue. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1066-1077`), so the tick runs one frame later.
-  type Internals = { lastTickTime: number; lastInputTime: number; newPartyLevel: boolean };
+  type Internals = { lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
   const T0 = Date.now() + 60_000;
   let discard: {
@@ -665,7 +665,7 @@ async function main(): Promise<void> {
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
-      internals.newPartyLevel = false;
+      game.ctx.loop.newPartyLevel = false;
       // An event was handled this tick, so the turn waits for the next one
       // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
       internals.lastInputTime = game.state.tickCount;
@@ -687,7 +687,7 @@ async function main(): Promise<void> {
       const newLevel = party.position.z;
       const queuedAfterTick = game.queuedInputCount();
       const loadedAfterTick = game.monsterSystem.needsLevelReload() ? 'not yet' : 'loaded';
-      const owedAfterTick = internals.newPartyLevel;
+      const owedAfterTick = game.ctx.loop.newPartyLevel;
       frame(false);
       const turned = party.facing !== facingBefore;
       console.log(
