@@ -1002,6 +1002,12 @@ is added afterwards, unconditionally, with the same `objD4`, so it pairs the bon
 they came to rest. Evidence: `tools/dump-champion-death.ts` section 7 (2 of 49 checks fail
 before C31's fix).
 
+Unconditionally also means whatever the fingerprint: `AddChampionBonesRecord` stores
+`fingerprint & 0xffff` with no test (`doc/CSBwin-src/data.cpp:1636-1643`), so a fingerprint
+of 0 — `AddCharacter`'s for a champion recruited at level 0, (0, 0)
+(`Character.cpp:513-516`) — pairs the bones like any other. Evidence:
+`tools/dump-vi-altar.ts` section 1b (2 checks fail before the fix).
+
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
 Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).

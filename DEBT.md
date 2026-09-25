@@ -1332,7 +1332,7 @@ If `RuntimeSaveState`'s shape changes, bump `RUNTIME_SAVE_VERSION`.
 | D3d | `Champion`: `wounds`, `poisonCount`, `maxRecentDamage`, `damageFromDirection`, `shieldStrength` (~25) | cleared, except `facing3 = d.partyFacing` (`:531`) | ✅ |
 | D3e | `Champion`: `charFlags`, `timerIndex`, `talents`, `causeOfDamage`, `monsterCausingDamage`, `load` (~8). `fingerprint` moved to D3g, `incantationCursor` to the fix below | cleared, except `talents = 0` (`:512`), `timerIndex = -1` (`:521`), `charFlags` (`:530`, `:594`) | ✅ |
 | D3f | `Champion`: `title`, `facing` (~18) | `AddCharacter`'s text parse, `facing = d.partyFacing` (`:522`) | ✅ |
-| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. Decide first where those champions get theirs, once, as `AddCharacter` does (`:513-516`), and whether `registerChampionBones`' `if (!fingerprint) return` — not in CSBWin (`Character.cpp:2646`) — can then go. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`) | ⏳ |
+| D3g | `Champion.fingerprint` (~6). Its absence means "not assigned yet" to `Game.assignChampionFingerprint`, which gives one to a champion that did not come through `AddCharacter` (the tools' and `dev.ts`'s, on `addChampion`, `setPartyState`, a restore, and lazily at death in `registerChampionBones`). A required 0 would stop that. **Decided 2026-09-25:** a champion gets its fingerprint once, when it joins, as `AddCharacter` does (`:513-516`). `Game.addCharacter` already does; `Game.addChampion` (the dev/tool path) computes it unconditionally. The lazy assignments in `setPartyState`, the runtime-save restore and `registerChampionBones` go (a save always carries the field), and so does `registerChampionBones`' `if (!fingerprint) return`, which CSBWin does not have (`Character.cpp:2646`). A tool that puts champions into the party without `addChampion` sets their fingerprints itself: divergences stay in the tools, never the engine. | `AddCharacter`'s `FingerprintExists` loop (`:513-516`); 0 in `addCharacterDefaults` (`ClearMemory`) | ⏳ |
 
 The `Champion` defaults live in one function in `src/engine/AddCharacter.ts`, CSBWin's
 `ClearMemory` plus `AddCharacter`'s constant stores, which `createChampionFromPreset`
@@ -1411,6 +1411,13 @@ Found while splitting, and paid as separate fixes:
   `incantationCursor` is gone, and the writer derives `incantation.length & 3`. The
   fourteen committed saves still pack byte-identical. `tools/dump-character-block.ts`
   types two runes into a loaded champion and failed before the fix (byte33 0, not 2).
+- ✅ **A fingerprint of 0.** `registerChampionBones` returned early when a champion's
+  fingerprint was 0, so their bones got no expool record and the Altar of Vi read the
+  bones' `value` (2) as a champion index instead. CSBWin's `AddChampionBonesRecord` call is
+  unconditional (`Character.cpp:2646`, `data.cpp:1636-1643`), and 0 is `AddCharacter`'s
+  fingerprint for a champion recruited at level 0, (0, 0). **Paid** before D3g's refactor:
+  the guard is gone. `tools/dump-vi-altar.ts` section 1b kills a champion whose
+  fingerprint is 0 and failed before the fix (no record, nobody raised).
 
 Not debt, so staying optional:
 

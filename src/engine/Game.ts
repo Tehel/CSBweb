@@ -1567,9 +1567,9 @@ export class Game {
         const champ = this.party.state.champions[champIndex];
         if (!champ) return;
         this.assignChampionFingerprint(champ);
-        const fingerprint = champ.fingerprint ?? 0;
-        if (!fingerprint) return;
-        this.dungeonState.addChampionBonesRecord(bones, fingerprint);
+        // `expool.AddChampionBonesRecord(objD4, pcA3->fingerPrint)`, whatever the
+        // fingerprint (doc/CSBwin-src/Character.cpp:2646): 0 pairs the bones too.
+        this.dungeonState.addChampionBonesRecord(bones, champ.fingerprint ?? 0);
     }
 
     private assignChampionFingerprint(champion: Champion): void {

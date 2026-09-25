@@ -326,6 +326,36 @@ function main(): void {
     );
   }
 
+  /* ---------------------------------------- 1b. a fingerprint of 0 --------------- */
+
+  // `expool.AddChampionBonesRecord(objD4, pcA3->fingerPrint)` is unconditional
+  // (doc/CSBwin-src/Character.cpp:2646): 0 is a fingerprint like any other — the one
+  // `AddCharacter` gives a champion recruited at level 0, (0, 0).
+  console.log('');
+  console.log('=== a fingerprint of 0 still pairs the bones with the champion ===');
+  {
+    const { game: g } = makeGame();
+    const cell = findOpenCell(g);
+    g.party.state.position = cell;
+    g.monsterSystem.loadPartyLevel(cell.z);
+
+    // Not champion 2: a death's bones carry value 2, which unpaired bones would read
+    // as a champion index.
+    const victim = 1;
+    g.party.state.champions[victim]!.fingerprint = 0;
+    g.monsterAttack.killCharacter(victim);
+    const bones = bonesAt(g, cell);
+    const rn = bones[0];
+    const record = rn === undefined ? null : g.dungeonState.copyChampionBonesRecord(rn);
+    console.log(`bones: ${bones.length}, expool record: ${record}`);
+    check(bones.length === 1 && record === 0, 'the death records fingerprint 0 in the expool');
+    if (rn !== undefined) {
+      g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+      runTicks(g, 6);
+      check(g.party.state.champions[victim]!.alive !== false, 'and the altar raises the champion');
+    }
+  }
+
   /* ---------------------------------------- 2. bones authored by the dungeon ----- */
 
   console.log('');
