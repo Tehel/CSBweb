@@ -41,8 +41,9 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
    C34 lands after E1/E2, once the possession code has one `Character` home and the engine
    can reach the UI without new setters. C25 (re-sized to M after D4) and C35 wait in the
    frozen queue with the rest of tier C. D6 and F4 were paid before E1c (2026-09-25), so
-   tier D is closed and every suite tool is seeded. Next: E1d, then E2 (whose worklist is
-   `GameMethods`, see E1c), E3, E4.
+   tier D is closed and every suite tool is seeded. E1 was paid on 2026-09-25 (E1d:
+   `GameHost`). E2 is under way — its worklist is `GameMethods`, down from 22 names to 8
+   (see E2) — then E3, E4.
 
 ## Why this order
 
@@ -118,8 +119,8 @@ Markers are `PLAN.md`'s: ✅ done · ⚠️ knowingly divergent or incomplete ·
 | D4 | `ObjectID` is not a distinct type | M | ✅ archived |
 | D5 | Cell flags stored twice (`cellFlags` and `tiles`) | S | ✅ archived |
 | D6 | `GameState.party` is a second copy of `Party.state` | S | ✅ archived |
-| E1 | A shared game context, and one set of tables (split E1a-d: E1a-c ✅, E1d ⏳) | L | ⏳ |
-| E2 | Split `Game.ts` by CSBWin source file | L | ⏳ |
+| E1 | A shared game context, and one set of tables (split E1a-d) | L | ✅ |
+| E2 | Split `Game.ts` by CSBWin source file (under way: `GameMethods` at 8 of 22) | L | ⚠️ |
 | E3 | Split `TimerSystem.ts` | L | ⏳ |
 | E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
@@ -1216,7 +1217,7 @@ entries, with their outcomes and the fixes found on the way, are in `doc/PLAN_AR
 
 ## E — Architecture
 
-### E1 ⏳ A shared game context, and one set of tables
+### E1 ✅ A shared game context, and one set of tables
 
 **What.** `Game`'s constructor (`src/engine/Game.ts:273-590`, about 320 lines) hands the
 same five things — the dungeon, a party-state getter, a tick getter, `random`, the timer
@@ -1418,9 +1419,28 @@ bare; the output is unchanged).
 engine→UI callbacks (`sleepListeners`, `openReincarnateScreen`, the notices C34 needs).
 `Game.addCharacterTables` and the per-module `possession` readers are unchanged.
 
-### E2 ⏳ Split `Game.ts` by CSBWin source file
+**E1d ✅ (`e2513c2`).** `src/engine/GameHost.ts`: `GameHost` = `playSound`, `trace`,
+`cursorFilter`, `messages`, `sleepChanged`, `openReincarnateScreen`, every member
+required. `createGameHost(partial)` fills what the host leaves out (or leaves `undefined`,
+as `main.ts` does with no audio) with a null object — a cursor filter that lets everything
+through, a message sink that drops everything — so no caller asks whether anyone is
+listening. It sits at `ctx.host`; `Game`'s constructor is `(dungeonData, tables, host)`,
+and `newGame(data, graphics, host)` in `tools/lib/game.ts`. Gone: `GameOptions`,
+`ActuatorHooks`, `TimerHooks`, the four `trace` hook types (`MonsterSystemHooks`,
+`MonsterDamageHooks`, `MonsterAiHooks`, `AttackSystemHooks`), `ActuatorSystem.getMessages`,
+`Game.onSleepChanged` and its listener list, the assignable `Game.openReincarnateScreen`.
+`SoundQueue` takes the host. Every subsystem now takes `ctx` and nothing else.
+`dump-monster-ai` passes its trace as the host's; `dump-sleep` and `dump-hall-of-champions`
+pass `sleepChanged` / `openReincarnateScreen` at construction instead of registering them
+after it. Behaviour-neutral: every tool's full output byte-identical, frames identical. The
+"notices C34 needs" (close the attack menu, repack the open chest) are not added: C34 adds
+them to `GameHost` when it needs them. Still unchanged: `Game.addCharacterTables`, and the
+per-module `possession` readers (`MagicSystem` and `CharacterSystem` read
+`champion.possessions[slot] ?? OBJECT_ID_NULL` inline rather than add a sixth).
 
-`Game.ts` is 3018 lines. Split it by CSBWin source file, as `src/renderer/ui/` already is
+### E2 ⚠️ Split `Game.ts` by CSBWin source file
+
+`Game.ts` is 3018 lines (2172 after the first six commits, below). Split it by CSBWin source file, as `src/renderer/ui/` already is
 (`doc/UI_MODULE_MAP.md`). Method groups (lines as of 2026-09-23):
 
 | Group | Methods | CSBWin |
@@ -1434,6 +1454,47 @@ engine→UI callbacks (`sleepListeners`, `openReincarnateScreen`, the notices C3
 
 Leave `Game` as the loop, the construction, and a thin public facade. One group per commit.
 Do E1 first.
+
+**Progress (2026-09-25).** The rule applied is the one in the title: a method goes to the
+system that ports its CSBWin file, even where the table above grouped it by topic
+(`MagicShield` is `Attack.cpp`'s, `DisableCharacterAction` and `AdjustSkills` are
+`Magic.cpp`'s). A `Game` method that only adapted a call for one caller moves into that
+caller. Each commit behaviour-neutral: every tool's full output byte-identical (but for
+`dump-save-menu`'s known one-byte wobble), frames identical.
+
+| Commit | Group | Left `GameMethods` |
+| --- | --- | --- |
+| `659fcb6` | `MagicSystem` (`src/engine/MagicSystem.ts`, `ctx.systems.magic`, `game.magic`): `CastMagic`, `CastSpell` and its helpers, `SpellErrorMsg`, `StandardSpellMessage`, `CharacterThrowsSpell`, `LaunchObject`, `DisableCharacterAction`, `SetBrightnessTimer`, `AdjustSkills` bound to the context (`applySpellSkillGain`), `queueUtilityTimer`. `Game.castSpellFromUi` is a one-line facade for `main.ts`. | `applySpellSkillGain`, `characterThrowsSpell`, `disableCharacterAction`, `emitSpellMessage`, `launchObject`, `queueUtilityTimer`, `setBrightnessTimer` |
+| `1e2fa18` | `Attack.cpp` into `AttackSystem`: `MagicShield` (`applyMagicShield`), and `d.Brightness += delta` inline. `Game.setBrightness`, which nothing called, is gone. | `applyMagicShield`, `adjustBrightness` |
+| `1529b4b` | `CharacterSystem` (`src/engine/CharacterSystem.ts`, `ctx.systems.character`, `game.character`): `RemoveCharacterPossession`, `DropAllPossessions`, `setChampionHand` (the stat half of `AddCharacterPossession`), `AdjustStatsForItemCarried` bound to the context, `setPossessionDirect`. This is the one possession home C34 waits for. `setChampionHand` had joined `GameMethods` for one commit, for `MagicSystem`'s Zokathra. | `dropAllPossessions`, `removeCharacterPossession`, `setChampionHand` |
+| `7ee7b57` | `KillCharacter`'s tail into `MonsterAttack.killCharacter`: the bones record and the inventory close, at the call sites. | `registerChampionBones`, `onChampionDied` |
+| `3abb4b3` | `ProcessMissileEncounter`'s party arm into `TimerSystem` (private `applyMissileDamageToParty`, with `MISSILE_WOUND_MASK`). | `applyMissileDamageToParty` |
+
+*What is left: `GameMethods` has 8 names.* Proposed homes, by CSBWin file — confirm each
+against the source before moving:
+
+- `addCharacter` (`Character.cpp:456`) — the Hall of Champions group, ≈ 400 lines with
+  `addChampion`, `resurrectReincarnateCancel`, `finishResurrectReincarnate`,
+  `reincarnateNamed`, `reincarnate`, the mirror helpers, `getObjectRecord`,
+  `reincarnationSource` and `addCharacterTables`. It spans `Character.cpp`,
+  `CSBCode.cpp:6616` and `Code13ea4.cpp`; the `AddCharacter` half could join
+  `CharacterSystem`, or the whole group be one `HallOfChampions` — decide first. It is the
+  largest group left, and it empties one name.
+- `enableCharacterAction` (`Timer.cpp:2638`) with `refillPossessionSlot` and
+  `matchingAmmunition`, and `setBusyTimerRefill` (the port's own helper for the throw's
+  `uByte6`) — `TimerSystem` by file, though E3 is about to split it; or `CharacterSystem`,
+  since the body is possession refilling. Empties two.
+- `throwFromWeaponHand` — the "Cursor drop and throw" group (`Mouse.cpp`: `DropObject`
+  `:848`, `ThrowByCharacter` `:673`), with `dropObjectFromCursor`, `throwObjectFromCursor`,
+  `throwByCharacter`, `throwStaminaCost`, `awardThrowSkill`, `maybeScheduleViAltar`.
+- `climbDownIntoPit` (`Attack.cpp:2033`), `handleDsaTeleportParty` (the DSA's party
+  teleport), `notePartyMoved` (the footprint step of the world `MoveObject`,
+  `Code11f52.cpp:3222`) and `wakeUp` (`CSBCode.cpp:7047`). These four touch `Game`'s
+  loop state — `loadPartyLevelIfChanged`, `clockTickSet`, the mouse queue
+  (`discardAllInput`) — which `Game` keeps as "the loop". **Decide before moving them**
+  how a system reaches that state: likely the loop's `d.` fields (`clockTick`,
+  `newPartyLevel`, the mouse queue) move into `GameState` or a small `ctx` member, so
+  `wakeUp` and the level load become plain systems' code and `Game` only reads the flags.
 
 ### E3 ⏳ Split `TimerSystem.ts`
 

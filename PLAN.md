@@ -30,7 +30,7 @@ Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, 
 steps 3–5 — comes after the debt, unless a debt item needs it.
 
 Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, all of tier D (D1–D6), E1a–c and F4, paid by 2026-09-25. C13 closed `MoveParty`: stamina per step, the move delay as
+C26–C32, all of tier D (D1–D6), all of E1 (E1a–d) and F4, paid by 2026-09-25, and E2 under way. C13 closed `MoveParty`: stamina per step, the move delay as
 `d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
 words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
 `DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
@@ -137,8 +137,16 @@ directly; the second constructor arguments, the five setters and the inter-syste
 are gone, and `Game`'s constructor shrank from 233 lines to 49. The `Game` methods a
 subsystem still calls go through `ctx.systems.game`, typed `GameMethods` (22 names): E2's
 worklist. Found and recorded: G10 (`StealFromCharacter` is not ported) and a fifth DSA
-filter under G2 (`MonsterAttackFilter`). Next: E1d (`GameHost`), then E2–E5. C33 and C34
-wait until after E1/E2; C25 and C35 wait with the rest of tier C.
+filter under G2 (`MonsterAttackFilter`). E1d: one `GameHost` at `ctx.host` (`playSound`,
+`trace`, `cursorFilter`, `messages`, `sleepChanged`, `openReincarnateScreen`, a null object
+for whatever the host leaves out), passed to `Game` by `main.ts` and `tools/lib/game.ts`;
+the per-subsystem host hooks and `GameOptions` are gone, and every subsystem takes `ctx`
+alone. E2, first six commits: `MagicSystem` (`Magic.cpp`'s engine half), `MagicShield`
+into `AttackSystem`, `CharacterSystem` (`Character.cpp`'s possession writers, C34's future
+home), and three one-caller methods folded into their callers; `Game.ts` 2172 lines,
+`GameMethods` down from 22 names to 8. Next: the rest of E2 (`DEBT.md` E2 lists the eight
+names and their proposed homes; four of them need a decision on the loop state first),
+then E3–E5. C33 and C34 wait until after E1/E2; C25 and C35 wait with the rest of tier C.
 
 ## Ground rules
 

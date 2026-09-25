@@ -98,10 +98,12 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
-engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameTables
-            (every graphics.dat table, one builder), DungeonState, Party, MovementSystem,
-            TimerSystem, TimerQueue, ActuatorSystem, DsaSystem, skills, AddCharacter,
-            objectIndex (the one DescIndex / GetBasicObjectType / NameIndex)
+engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
+            the engine asks of the page), GameTables (every graphics.dat table, one
+            builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
+            ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem, the
+            Monster* systems, skills, AddCharacter, objectIndex (the one DescIndex /
+            GetBasicObjectType / NameIndex)
 renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
@@ -191,5 +193,6 @@ the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT
 **paying that off is the current priority**, one item per commit, in the order it gives.
 Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
 before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
-is paid; E1a–c (one `GameTables`, one `GameContext` every subsystem takes, subsystems
-calling each other through `ctx.systems`) are paid, and E1d (`GameHost`) then E2 are next.
+is paid; so is E1 (one `GameTables`, one `GameContext` every subsystem takes, subsystems
+calling each other through `ctx.systems`, one `GameHost` at `ctx.host`). E2 (split
+`Game.ts` by CSBWin file) is under way: its worklist is `GameMethods`, 8 names left.
