@@ -96,7 +96,7 @@ await send('Emulation.setDeviceMetricsOverride', {
   width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false,
 });
 // Deterministic run: no persisted UI settings / quick-save, and a seeded Math.random —
-// `AddCharacter` rolls food and water from it (`Game.addCharacter`), so without the seed
+// `AddCharacter` rolls food and water from it (`HallOfChampions.addCharacter`), so without the seed
 // the status bars would differ run to run.
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   try { localStorage.clear(); } catch (e) {}

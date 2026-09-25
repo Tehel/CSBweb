@@ -3,8 +3,9 @@
  *
  * The engine half: the fingerprint, the champion's corner of the cell, the possession
  * slot chosen for each object lying in the mirror, and the champion record built out of
- * a hero text. `Game.addCharacter` drives it; `Game.resurrectReincarnateCancel` is the
- * other end (`doc/CSBwin-src/CSBCode.cpp:6615`).
+ * a hero text. `HallOfChampions.addCharacter` drives it;
+ * `HallOfChampions.resurrectReincarnateCancel` is the other end
+ * (`doc/CSBwin-src/CSBCode.cpp:6615`).
  */
 
 import { DescIndexOfRecord } from './objectIndex';
@@ -239,10 +240,10 @@ export function addCharacterDefaults(): ChampionDefaults {
     load: 0,
     title: '', // read off the hero text (`:585-590`); `createChampionFromPreset` sets it
     // Cleared here. `AddCharacter` then sets `d.partyFacing` (`:522`), and so does
-    // `Game.addCharacter`.
+    // `HallOfChampions.addCharacter`.
     facing: 0,
     // Cleared here. `AddCharacter` computes it (`:513-516`), and so do
-    // `Game.addCharacter` and `Game.addChampion`.
+    // `HallOfChampions.addCharacter` and `Game.addChampion`.
     fingerprint: 0,
   };
 }

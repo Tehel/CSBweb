@@ -28,7 +28,7 @@ import type { AttackSystem } from './AttackSystem';
 import type { CharacterStats } from './CharacterStats';
 import type { DsaSystem } from './DsaSystem';
 import type { CharacterSystem } from './CharacterSystem';
-import type { Game } from './Game';
+import type { HallOfChampions } from './HallOfChampions';
 import type { MagicSystem } from './MagicSystem';
 import type { MonsterAI } from './MonsterAI';
 import type { MonsterAttack } from './MonsterAttack';
@@ -38,16 +38,6 @@ import type { MonsterSystem } from './MonsterSystem';
 import type { MouseSystem } from './MouseSystem';
 import type { MovementSystem } from './MovementSystem';
 import type { TimerSystem } from './TimerSystem';
-
-/**
- * The `Game` methods a subsystem still calls, reached through `ctx.systems.game`. They
- * have no system of their own until `DEBT.md` E2 splits `Game.ts`: each group E2 moves
- * out leaves this list, and its callers then name the new system (22 names at first;
- * `DEBT.md` E2 proposes a home for each one left). E2 is done when this type is gone.
- */
-export type GameMethods = Pick<Game,
-  | 'addCharacter'
->;
 
 /**
  * The subsystems, so that one calls another directly (`DEBT.md` E1c). `Game` fills it
@@ -71,7 +61,7 @@ export interface GameSystems {
   magic: MagicSystem;
   character: CharacterSystem;
   mouse: MouseSystem;
-  game: GameMethods;
+  hallOfChampions: HallOfChampions;
 }
 
 export interface GameContext {
