@@ -205,4 +205,5 @@ port writes all sixteen blocks, block 1 still a stub (Phase 10). What is left: t
 the validation debt (Phase 15, steps 3–5), and the technical debt in `DEBT.md`. **Paying
 the debt off is the current priority**, one item per commit, in `DEBT.md`'s order:
 structure first (tiers D and E), then the known divergences (tier C, frozen until then),
-then the unported features. The first row of its index is the next item.
+then the unported features. The first row of its index is the next item, and `/pay-debt`
+starts a session on it.

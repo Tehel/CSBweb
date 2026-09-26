@@ -44,7 +44,8 @@ The order, then:
 ## How to work this list
 
 1. **One item per commit, a few per session**, in the order above, then `/clear`
-   (`CLAUDE.md` → "Working economically"). Stop before a size-M item would overrun the
+   (`CLAUDE.md` → "Working economically"). `/pay-debt` (`.claude/commands/pay-debt.md`)
+   starts such a session and ends it with the command for the next one. Stop before a size-M item would overrun the
    session. Split an L item into steps and record the split in its entry.
 2. **Re-verify first.** Every pointer below was checked against the code on 2026-09-26, but
    line numbers drift. If an item turns out to be already paid, delete it and say how you
