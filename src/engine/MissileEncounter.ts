@@ -8,8 +8,9 @@
  *
  * The flight is `TimerSystem`'s, as `Timer.cpp` is: `MissileTimer` calls the encounter,
  * and the encounter spends a missile through `ProcessObjectFromMissile` (`Timer.cpp:129`).
- * `missileFilterObject` / `missileFilterTimer` (`Timer.cpp:176-177`) and the port's copy of
- * `d.Time` stay there too, reached through `ctx.systems.timer`. `d.MonsterDamageResult`
+ * The port's copy of `d.Time` stays there too, reached through `ctx.systems.timer`, and
+ * `missileFilterObject` / `missileFilterTimer` (`Timer.cpp:176-177`) are the timer queue's,
+ * whose `getTimer` answers the copy as `GameTimers::pTimer` does. `d.MonsterDamageResult`
  * (`Data.h:851`) is here, where three of its four writers are; the fourth,
  * `CheckMonsterVersusMissiles`, is `MonsterAI`'s.
  */
@@ -454,7 +455,7 @@ export class MissileEncounter {
     // `BITS10_11(missileFilterTimer.timerWord8())` (`doc/CSBwin-src/Code11f52.cpp:1681`): the
     // direction of the last missile `MissileTimer` ran, also for an encounter it did not
     // cause, a party or a monster walking away from a missile.
-    const direction = ((this.ctx.systems.timer.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
+    const direction = ((this.timers.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
     return this.ctx.systems.dsa.processMissileEncounterFilter({
       type,
       position,

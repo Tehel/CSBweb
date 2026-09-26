@@ -1,4 +1,4 @@
-import type { ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 
 /**
@@ -102,7 +102,25 @@ export interface TimerEntry {
   object?: ObjectID;
 }
 
+/**
+ * The timer index a missile's record holds while `MissileTimer` moves it
+ * (`pDBMissile->timerIndex(0xffff)`, `doc/CSBwin-src/Timer.cpp:224-226`), which
+ * `getTimer` answers with `missileFilterTimer`.
+ */
+export const MISSILE_FILTER_TIMER_INDEX = 0xffff;
+
 export class TimerQueue {
+  /**
+   * `missileFilterObject` and `missileFilterTimer` (`doc/CSBwin-src/Timer.cpp:176-177`):
+   * the missile `MissileTimer` is moving, and its copy of the timer. Only
+   * `TimerSystem.processMissileTimer` writes them. Every exit puts the object back to
+   * `RNnul` and leaves the copy, so `missileFilterTimer` is the last missile timer run,
+   * and `MissileEncounterFilter` reads its direction (`Code11f52.cpp:1681`) for every
+   * encounter, whatever caused it. `null` is the zeroed global, before any missile has
+   * flown.
+   */
+  missileFilterObject = OBJECT_ID_NULL;
+  missileFilterTimer: TimerEntry | null = null;
   private queue: TimerEntry[] = [];
   /** `m_timerSequence` (`Data.h:1542`), a `ui16`: the stamp the next queued timer takes. */
   private nextSequence = 0;
@@ -316,12 +334,21 @@ export class TimerQueue {
     return this.firstAvailTimer;
   }
 
+  /**
+   * `GameTimers::pTimer` (`doc/CSBwin-src/Timer.cpp:700-714`): the timer in slot `index`,
+   * or, for `MISSILE_FILTER_TIMER_INDEX`, the copy of the missile timer that is running.
+   * CSBWin dies on that index outside `MissileTimer`; the port answers `null`, as for any
+   * slot that holds no timer.
+   */
   getTimer(index: number): TimerEntry | null {
+    if (index === MISSILE_FILTER_TIMER_INDEX) {
+      return this.missileFilterObject !== OBJECT_ID_NULL ? this.missileFilterTimer : null;
+    }
     return this.indexMap.get(index) ?? null;
   }
 
   getTimerWord8(index: number): number | null {
-    const entry = this.indexMap.get(index);
+    const entry = this.getTimer(index);
     return entry ? entry.timerWord8 & 0xffff : null;
   }
 

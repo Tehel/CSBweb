@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 | C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
 | C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
-| C56 | The missile `MissileTimer` runs keeps its freed timer index | S | ⏳ |
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
@@ -136,7 +135,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 (`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1423-1433`). `moveObject` has a missile arm of its own,
+missile itself (`TimerSystem.ts:1417-1427`). `moveObject` has a missile arm of its own,
 which reads the direction from the timer the missile record names (`WorldMove.ts:207-211`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
@@ -212,7 +211,7 @@ attenuates it by the distance to the party. Seven calls play a `SoundIndex` item
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
 `src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:374`, `:509`), three
 teleporters in `WorldMove.resolveCellEffects` (`:342`, `:359`, `:366`) and a door's step
-in `TimerSystem` (`:753`). For the door button CSBWin queues
+in `TimerSystem` (`:743`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
 not yet read. All seven escape whatever `QueueSound` does that the host does not: the
@@ -265,8 +264,8 @@ CSBWin's `m_timerQueue` is a binary min-heap over `TIMER::operator<`
 sifts it (`:959-984`). `LoadGame` reads the array back as it was written
 (`SaveGame.cpp:1693-1699`). The port's `TimerQueue` is a sorted array instead: `addTimer`
 and `reprioritizeTimer` insert in order, `shiftNext` and `deleteTimer` shift and splice,
-`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:297`), and
-`processTimers` stops at the first entry not yet due (`src/engine/TimerSystem.ts:97-121`).
+`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:315`), and
+`processTimers` stops at the first entry not yet due (`src/engine/TimerSystem.ts:87-111`).
 `searchOrder`, `TIMER_SEARCH`'s walk from the end of the array, which decides which
 duplicate `SetTimer` keeps, then visits the timers in another order than CSBWin's.
 
@@ -323,28 +322,6 @@ only for the playback of a recording (`CSBUI.cpp:964`, `:2160`, `:2201`) or by a
 `clockTickSet` at the top of both. Evidence: a row in `tools/dump-mouse-queue.ts` counting
 the frames from an arrow click to the next tick.
 
-### C56 ⏳ The missile `MissileTimer` runs keeps its freed timer index
-
-While `MissileTimer` runs, the missile's record names no queued timer: it sets the record's
-`timerIndex` to 0xffff (`doc/CSBwin-src/Timer.cpp:224-226`) until `SetTimer` queues the copy
-again (`:428`), and `GameTimers::pTimer(0xffff)` is `&missileFilterTimer` while
-`missileFilterObject` is set (`:700-714`). So a `CheckMoveFromMissile` run from inside the
-timer reads the flying missile's function off the copy (`Code11f52.cpp:2720`), which is
-`TT_Missile` even on the first tick (`Timer.cpp:231-234`), and meets the flying missile in
-a corner someone leaves. The port's `processMissileTimer` leaves the record's `timerIndex`
-on the slot `TimerQueue.shiftNext` has freed (`src/engine/TimerQueue.ts:139-144`), so
-`checkMoveFromMissile`'s `getTimer` (`src/engine/MissileEncounter.ts:153`) answers `null`
-and skips the missile. If a handler has queued a timer in that slot since, it answers that
-timer instead, and a hit deletes it (`:172`).
-
-Only a move made from inside a missile timer sees this, and no shipped path makes one: a
-missile encounter filter's DSA can (`tools/dump-move-from-missile.ts` stands one in).
-CSBWin's own hit here is undefined: `DeleteTimer(0xffff)` (`Code11f52.cpp:2742`) writes
-`m_timers[0xffff]`, outside the array (`Timer.cpp:965`). What can be ported is the
-lookup: set the index to 0xffff for the length of the timer, answer the copy for it, and
-keep the hit from deleting any queued timer. Evidence: a row in
-`tools/dump-move-from-missile.ts` whose move leaves the flying missile's own corner.
-
 ### C57 ⏳ The party's arrival on another level runs at once, not at the top of the next tick
 
 When a `MoveObject` of the party ends on another level, CSBWin sets `d.newPartyLevel` and
@@ -396,7 +373,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:284`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:274`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy
@@ -517,7 +494,7 @@ No shipped DM hero touches any of these.
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:370`) and in `MonsterDamage`
+`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:371`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in

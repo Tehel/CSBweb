@@ -869,6 +869,23 @@ or `CheckMonsterVersusMissiles`. It is 0, the zeroed global's, before any missil
 flown. A move made from inside a missile timer, by a filter's DSA, still checks the
 missiles it leaves. `tools/dump-move-from-missile.ts` checks both.
 
+## While `MissileTimer` runs, its missile names timer 0xffff, which is the copy
+
+`MissileTimer` sets the missile record's `timerIndex(0xffff)` before anything else
+(`doc/CSBwin-src/Timer.cpp:224-226`; the index it saves there is never read again), and
+only its last line gives the record a real index again, the one `SetTimer` returns for
+the copy (`:428`). `GameTimers::pTimer(0xffff)` returns `&missileFilterTimer`, and dies
+if `missileFilterObject` is `RNnul` (`:700-714`). The copy's function is already
+`TT_Missile` on the first tick (`:231-234`).
+
+So everything that looks the missile's timer up from inside `MissileTimer` reads the copy:
+`MoveObject`'s `d.NewDir` for the missile's own move (`Code11f52.cpp:2891-2898`), and
+`CheckMoveFromMissile`'s function test (`:2720`), which therefore meets a missile in its
+first tick in a corner someone leaves. A hit there calls `DeleteTimer(0xffff)` (`:2742`),
+which writes `m_timers[0xffff]`, outside the array (`Timer.cpp:965`): undefined. The port
+answers the index with the copy the same way (`TimerQueue.getTimer`) and its
+`deleteTimer(0xffff)` deletes nothing. `tools/dump-move-from-missile.ts` case 3.
+
 ## `item16Attached` is a conjunction, not a lookup
 
 `doc/CSBwin-src/Code11f52.cpp:3122`:

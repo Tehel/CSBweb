@@ -134,7 +134,7 @@ function encounter(
   }
   if (missileRn === null) throw new Error('missile not placed');
   const missile = game.dungeonState.getMissileRecord(missileRn)!;
-  ts.missileFilterTimer = game.timerQueue.getTimer(missile.timerIndex);
+  game.timerQueue.missileFilterTimer = game.timerQueue.getTimer(missile.timerIndex);
 
   const hits: Outcome['hits'] = [];
   const hitDoor = me.hitDoor.bind(me);
