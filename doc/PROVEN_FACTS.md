@@ -3302,8 +3302,14 @@ on the **first** rectangle hit, then returns (`:1099-1136`):
 - An alcove's objects are drawn inside its decoration, so button 4 lies within
   button 5. Testing the objects first is what lets the player take an object out of an
   alcove.
-- If no button is hit, and the party is not facing an alcove, the cell type just ahead
-  is 0, and the cell ahead is stone or a visible false wall, then a click with
-  33 ≤ x ≤ 189 and 44 ≤ y ≤ 150 plays sound 4 (`:1139-1157`).
+- If no button is hit, and the party is not facing an alcove, `d.CellTypeJustAhead` is
+  0, and the cell ahead is stone or a false wall with `(cf & 5) == 0`, then a click with
+  33 ≤ x ≤ 189 and 44 ≤ y ≤ 150 plays sound 4 at the party, with no delay
+  (`QueueSound(4, d.partyX, d.partyY, 0)`, `:1138-1157`). Ordinal 4 is SND item 536.
+- The two stone tests differ. `d.CellTypeJustAhead` is `roomData[17].roomType`
+  (`Viewport.cpp:6782-6785`), and `SummarizeRoomInfo` makes a false wall stone whenever
+  it is not open, `(cf & 4) == 0` (`Codea59a.cpp:278-279`). `(cf & 5) == 0` also wants it
+  not imaginary. So a closed imaginary false wall (level 2, (7,9), `cf` 0xc1, in the
+  shipped dungeon) has `d.CellTypeJustAhead == 0` and is silent.
 
 Evidence: `tools/dump-viewport-click.ts`.

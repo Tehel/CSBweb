@@ -84,8 +84,9 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
 
 /**
  * Button 80, `HandleClickInViewport` (doc/CSBwin-src/Mouse.cpp:1031), reached through
- * `HandleMouseEvents` (`:1665-1670`): a drop, a throw, a wall, a door switch or an object
- * picked up. The eye, when the inventory hides the viewport, is `handleMouseButton`'s.
+ * `HandleMouseEvents` (`:1665-1670`): a drop, a throw, a wall, a door switch, an object
+ * picked up, or the sound of a hand on bare stone. The eye, when the inventory hides the
+ * viewport, is `handleMouseButton`'s.
  */
 function handleClickInViewport(ctx: UIContext, x: number, y: number): void {
     if (ctx.screen.isInventoryOpen()) return;
@@ -103,6 +104,7 @@ function handleClickInViewport(ctx: UIContext, x: number, y: number): void {
         if (target === 'doorSwitch') ctx.game.handleDoorSwitchClick();
         else if (target === 'wall') ctx.game.handleWallClick();
         else if (target === 'object') ctx.screen.tryPickViewportObject(x, y);
+        else if (target === 'stone') ctx.game.handleStoneClick();
     }
 }
 

@@ -21,4 +21,5 @@ This document captures verified input handling from the CSBWin C++ source under 
 
 ## False wall click gating
 
-- `Mouse.cpp` treats false walls as solid/visible when `(cellFlag & 0x05) == 0` (used for clicks into the viewport when `CellTypeJustAhead == 0`), matching the same solid-false-wall test used by `MissileTimer` (`doc/CSBwin-src/Mouse.cpp`, `doc/CSBwin-src/Timer.cpp`).
+- `d.CellTypeJustAhead` is `roomData[17].roomType` as `SummarizeRoomInfo` leaves it (`doc/CSBwin-src/Viewport.cpp:6782-6785`), and a false wall summarises as stone while it is not open, `(cellFlag & 0x04) == 0` (`doc/CSBwin-src/Codea59a.cpp:278-279`). `CellTypeJustAhead == 0` picks the cursor's stone arm (`doc/CSBwin-src/Mouse.cpp:1165`), so a closed imaginary false wall takes it too.
+- The stricter `(cellFlag & 0x05) == 0`, a false wall neither open nor imaginary, gates only the empty-handed bare-stone sound, inside a `CellTypeJustAhead == 0` test (`doc/CSBwin-src/Mouse.cpp:1139-1147`). `MissileTimer` uses the same test for a solid false wall (`doc/CSBwin-src/Timer.cpp:344`).

@@ -286,6 +286,16 @@ export class MouseSystem {
   }
 
   /**
+   * `HandleClickInViewport`'s last empty-handed arm (doc/CSBwin-src/Mouse.cpp:1138-1157):
+   * a click that touched no button, on the bare stone ahead, is heard at the party.
+   * `ViewportPicking.resolveEmptyHandedViewportClick` decides that the click is one.
+   */
+  handleStoneClick(): void {
+    const pos = this.ctx.party.state.position;
+    this.ctx.sounds.queueSound(4, pos.x, pos.y, 0);
+  }
+
+  /**
    * `HandleClickInViewport`'s door-button arm (doc/CSBwin-src/Mouse.cpp:1060-1086): an
    * empty hand on the button of the door ahead plays the switch sound and queues a
    * `TT_DOOR` toggle for the next tick. Not ported: `d.clockTick = 1` (`:1078`,

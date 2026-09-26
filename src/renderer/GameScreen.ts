@@ -40,6 +40,7 @@ import { createUIState, UIMode, type ScreenIndexBuffer, type UIState } from './u
 import { drawStaticUIFrame } from './ui/Draw';
 import { selectPaletteIndexForLightLevel } from './ui/Light';
 import {
+  EmptyHandedViewportTarget,
   ViewportCursorAction,
   hasCursorObject,
   resolveEmptyHandedViewportClick,
@@ -300,7 +301,7 @@ export class GameScreen {
 
   /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
 
-  resolveEmptyHandedViewportClick(x: number, y: number): 'doorSwitch' | 'wall' | 'object' | null {
+  resolveEmptyHandedViewportClick(x: number, y: number): EmptyHandedViewportTarget | null {
     return resolveEmptyHandedViewportClick(this.ui, x, y);
   }
 

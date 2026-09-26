@@ -30,8 +30,7 @@ The order, then:
 1. **D and E.** New structural debt goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
    found along the way is recorded here and not fixed, unless it blocks the D/E item at
-   hand or corrupts saves. C33 and C34 come first, unless the author pulls another
-   forward.
+   hand or corrupts saves. C34 comes first, unless the author pulls another forward.
 3. **G — Unported CSBWin features.** Last. A missing feature is started only once D and E
    are empty, even when a dungeon, a save or a playtest needs it — note the need under the
    item instead. The author can always ask for one out of order.
@@ -73,7 +72,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
@@ -87,6 +85,8 @@ In payoff order: the first row is the next item.
 | C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
 | C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
 | C45 | Saving does not re-attach the monsters | S | ⏳ |
+| C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
+| C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -121,7 +121,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Next, now that tiers D and E are empty: C33 and C34 first (see "Priority").
+Next, now that tiers D and E are empty: C34 first (see "Priority").
 
 ### C25 ⚠️ The stairs do not turn a monster's corner
 
@@ -140,16 +140,6 @@ A type cannot fix this: the `ObjectID` brand cannot forbid `===`. The fix is an
 by `removeObjectFromCell` and every chain walker that CSBWin writes as `RN ==`. Only then
 can `moveMonster` set the group down under the turned ID without the next lift missing it
 (the lift still holds the old ID). That touches every chain operation, hence M.
-
-### C33 ⏳ An empty-handed click on bare stone plays no sound
-
-When `HandleClickInViewport`'s empty-handed button loop hits nothing, CSBWin plays sound 4
-at the party if all of these hold: the party is not facing an alcove, `d.CellTypeJustAhead`
-is 0, the cell ahead is stone or a visible false wall (`(cf & 5) == 0`), and the click is
-within x 33-189, y 44-150 (`doc/CSBwin-src/Mouse.cpp:1138-1157`). The port's
-`resolveEmptyHandedViewportClick` (`src/renderer/ui/ViewportPicking.ts:47`) returns `null`
-there, and `src/ui/events.ts` does nothing with it. Add the sound, and a row to
-`tools/dump-viewport-click.ts` that asserts it is queued.
 
 ### C34 ⏳ Five possession writers, none of them CSBWin's whole
 
@@ -232,7 +222,7 @@ returns 0 (`:315`) unless it worked a wall switch (`:537-539`). So a switch that
 a tick due at once, and a touch that fired nothing clears a due tick, the way an inhibited
 move does (the port's `ctx.loop.clockTickCleared`). Only a cell ahead that is off the map
 leaves `d.clockTick` alone (`:784-787`). The port's `MouseSystem.handleDoorSwitchClick`
-and `handleWallClick` (`src/engine/MouseSystem.ts:282-300`) set neither flag, so a door
+and `handleWallClick` (`src/engine/MouseSystem.ts:304-338`, `:282-286`) set neither flag, so a door
 starts moving, and a switch's effects land, up to a tick late.
 
 Set `ctx.loop.clockTickSet` for the door button and a switch that fired, and
@@ -374,6 +364,37 @@ re-creates the timers and re-rolls the bits, drawing from the stream as it does.
 after the save, in the save paths rather than in `getRuntimeSaveState`, which tools call
 just to read the state. Evidence: a check that plays on after a save beside a load of that
 save, frame for frame, and compares the monsters' timers and `singleMonsterStatus`.
+
+### C46 ⏳ The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags
+
+With an object in hand, `HandleClickInViewport` takes its stone arm (the two near drop
+areas, then button 5 for the wall, an alcove or a fountain) when `d.CellTypeJustAhead == 0`
+(`doc/CSBwin-src/Mouse.cpp:1165`). That is `roomData[17].roomType` as `SummarizeRoomInfo`
+leaves it (`Viewport.cpp:6782-6785`), and a false wall summarises as stone while it is not
+open, `(cf & 4) == 0` (`Codea59a.cpp:278-279`). The port's `resolveViewportCursorAction`
+(`src/renderer/ui/ViewportPicking.ts:94`) tests `isFrontCellStoneOrVisibleFalseWall`
+instead, which also wants a false wall not to be imaginary, `(cf & 5) == 0`: the
+bare-stone sound's test (`Mouse.cpp:1146-1147`), not this one. So before a closed imaginary
+false wall (level 2, (7,9), `cf` 0xc1, in the shipped dungeon) CSBWin takes the stone arm
+and the port the open one, with its throw and four drop areas. Test
+`ui.context.roomData[17].roomType`, as `resolveEmptyHandedViewportClick` does. Evidence: a
+row in `tools/dump-viewport-click.ts` with an object in hand before (7,9).
+
+### C47 ⏳ Seven engine sounds bypass `QueueSound`
+
+The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
+(`doc/CSBwin-src/CSBCode.cpp:1819`), which looks the ordinal up in `d.sound1772` and
+attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
+`ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
+`src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:374`, `:509`), three
+teleporters in `WorldMove.resolveCellEffects` (`:294`, `:311`, `:318`) and a door's step
+in `TimerSystem` (`:754`). For the door button CSBWin queues
+`QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
+`SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
+not yet read. All seven escape whatever `QueueSound` does that the host does not: the
+sound table's distances today, and its delayed sounds and `SoundFilter` once they are
+ported (`SoundQueue`'s module comment). Read each site's CSBWin call and queue its ordinal.
+Evidence: a check per site that records the ordinal queued.
 
 ---
 

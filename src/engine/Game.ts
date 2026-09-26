@@ -582,6 +582,11 @@ export class Game {
         return this.mouse.handleWallClick();
     }
 
+    /** An empty-handed click on the bare stone ahead (`MouseSystem.handleStoneClick`). */
+    handleStoneClick(): void {
+        this.mouse.handleStoneClick();
+    }
+
     /** A click on a door's button (`MouseSystem.handleDoorSwitchClick`). */
     handleDoorSwitchClick(): boolean {
         return this.mouse.handleDoorSwitchClick();

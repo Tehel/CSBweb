@@ -11,7 +11,7 @@ import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, RoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
-import { GraphicRoomType } from '../bytecode/Types';
+import { GraphicRoomType, RoomType as SummaryRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { Position } from '@/core';
@@ -34,24 +34,38 @@ export function isDoorSwitchHit(ui: UIState, x: number, y: number): boolean {
   return false;
 }
 
+/** What an empty-handed click in the viewport touches (`resolveEmptyHandedViewportClick`). */
+export type EmptyHandedViewportTarget = 'doorSwitch' | 'wall' | 'object' | 'stone';
+
 /**
  * What an empty-handed click in the viewport touches, in `HandleClickInViewport`'s order
- * (`doc/CSBwin-src/Mouse.cpp:1053-1135`): the door switch first, then the six viewport
+ * (`doc/CSBwin-src/Mouse.cpp:1053-1157`): the door switch first, then the six viewport
  * buttons 0..5, the first hit winning. 0-4 are the objects drawn in the cells ahead and 5
  * is the front wall's decoration (`CSBCode.cpp:3299`), so an object lying in an alcove is
  * picked up rather than the alcove touched. Button 5 of an alcove touches nothing at all
  * — `TouchWallF1` only runs `if (d.FacingAlcove == 0)` (`Mouse.cpp:1123-1128`).
  *
- * Returns `null` for a click that hit no button, and for an alcove's own wall.
+ * A click that hit no button is `'stone'`, which makes a sound, when it lands on the bare
+ * stone ahead (`:1138-1157`): the party is not facing an alcove, `d.CellTypeJustAhead`
+ * (`roomData[17].roomType`, `Viewport.cpp:6782-6785`) is stone, the cell's own flags are
+ * stone or a false wall neither open nor imaginary (`(cf & 5) == 0`), and the click is
+ * within x 33-189, y 44-150. A closed imaginary false wall passes the first test and fails
+ * the second.
+ *
+ * Returns `null` for any other click that hit no button, and for an alcove's own wall.
  */
-export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: number): 'doorSwitch' | 'wall' | 'object' | null {
+export function resolveEmptyHandedViewportClick(ui: UIState, x: number, y: number): EmptyHandedViewportTarget | null {
   if (isDoorSwitchHit(ui, x, y)) return 'doorSwitch';
   for (let button = 0; button < 6; button++) {
     if (!isViewportButtonHit(ui, button, x, y)) continue;
     if (button < 5) return 'object';
     return ui.context?.facingAlcove ? null : 'wall';
   }
-  return null;
+  if (ui.context?.facingAlcove) return null;
+  if (ui.context?.roomData?.[17]?.roomType !== SummaryRoomType.STONE) return null;
+  if (!isFrontCellStoneOrVisibleFalseWall(ui)) return null;
+  if (x < 33 || x > 189 || y < 44 || y > 150) return null;
+  return 'stone';
 }
 
 export function tryPickViewportObject(ui: UIState, x: number, y: number): boolean {
