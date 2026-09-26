@@ -73,7 +73,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
+| D8 | `CHARFLAG_attackDisable` is a port-only `actionDisabledUntil` | M | ⏳ |
+| C36 | `EnableCharacterAction` keeps the attack type | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
 | C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
 | C39 | `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1 | S | ⏳ |
@@ -86,6 +87,8 @@ In payoff order: the first row is the next item.
 | C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
+| C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
+| C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -108,7 +111,32 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 
 ## D — State representation
 
-Empty. New state-representation debt goes here, and jumps the queue.
+New state-representation debt goes here, and jumps the queue.
+
+### D8 ⏳ `CHARFLAG_attackDisable` is a port-only `actionDisabledUntil`
+
+CSBWin keeps a champion's busy state as bit 0x0008 of `charFlags`, `CHARFLAG_attackDisable`
+(`doc/CSBwin-src/CSB.h:2461`). `DisableCharacterAction` sets it when the champion has no
+busy timer yet (`Magic.cpp:528-531`), `EnableCharacterAction` clears it (`Timer.cpp:2646`),
+`DrawAttackButton` shades the hand by it (`Character.cpp:4875`), `PrepareAttack` refuses by
+it (`:4916`), and a save carries it with the rest of `charFlags`. The port never sets or
+clears the bit: `champion.charFlags` keeps what the file or `AddCharacter` gave it. Its busy
+state is `actionDisabledUntil`, a field of its own holding the busy timer's due tick, set by
+`MagicSystem.disableCharacterAction` (`src/engine/MagicSystem.ts:508`), cleared by
+`TimerSystem.processActionDisableTimer` (`src/engine/TimerSystem.ts:232`), and read, with
+`busyTimerIndex >= 0`, by `drawAttackButton` (`src/renderer/ui/Attack.ts:302`) and
+`tools/dump-throwing.ts:335`.
+
+So a CSBWin save the port writes (`src/data/CsbwinCharacters.ts:452`) has the bit clear for
+a busy champion it recruited. And a bit set in a loaded CSBWin save is never cleared, so a save written
+after that champion's timer fired carries the bit with `busyTimer` -1, and CSBWin, loading
+it, refuses the champion's attack menu until a spell or a throw busies and frees them.
+
+Set and clear the bit where CSBWin does, read it where CSBWin does, and delete
+`actionDisabledUntil`. The quick-save carries the field inside the champion
+(`RUNTIME_SAVE_VERSION`, `src/engine/RuntimeSave.ts:66`), so its loader has to cope with
+it. The saved bit changes, so this is a fix and owes the five things: a check that busies a
+champion, writes a CSBWin save, and reads bit 3 back, then again after the timer fires.
 
 ---
 
@@ -120,27 +148,30 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Next, now that tiers D and E are empty, in the index's order (see "Priority").
+Frozen while tier D has an item, then taken in the index's order (see "Priority").
 
-### C36 ⏳ `EnableCharacterAction` keeps the attack type, and frees only its own timer
+### C36 ⏳ `EnableCharacterAction` keeps the attack type
 
-CSBWin's `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638-2681`) opens with
-`busyTimer = -1` and clears `CHARFLAG_attackDisable` unconditionally (`:2645-2646`), and it
-ends with `pChar->attackType = -1` (`:2680`).
+CSBWin's `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638-2681`) ends with
+`pChar->attackType = -1` (`:2680`). The port's `TimerSystem.enableCharacterAction`
+(`src/engine/TimerSystem.ts:248`) never resets it, so `champion.attackType` keeps the last
+attack for good. The next `EnableCharacterAction`, say after a spell's
+`DisableCharacterAction`, then zeroes `attackStatModifier` again (harmless, because it is
+already 0). And if that last attack was a shot and hand 0 (the one the arrow is nocked
+from) is empty, it reloads the bow from the quiver, which CSBWin would not do.
 
-- **The attack type.** The port's `TimerSystem.enableCharacterAction` (`TimerSystem.ts:248`)
-  never resets it, so `champion.attackType` keeps the last attack for good. The next
-  `EnableCharacterAction`, say after a spell's `DisableCharacterAction`, then zeroes
-  `attackStatModifier` again (harmless, because it is already 0). And if that last attack was
-  a shot and hand 0 (the one the arrow is nocked from) is empty, it reloads the bow from
-  the quiver, which CSBWin would not do.
-- **The timer.** `TimerSystem.processActionDisableTimer` (`:225`) clears `busyTimerIndex`
-  and `actionDisabledUntil` only when the expiring timer is the champion's own
-  `busyTimerIndex`.
+The function also opens with `busyTimer = -1` and clears `CHARFLAG_attackDisable`
+unconditionally (`:2645-2646`), where `TimerSystem.processActionDisableTimer` (`:225`) frees
+the champion only when the expiring timer is their own `busyTimerIndex`. That guard is
+dead, in CSBWin and in the port: `SetTimer` de-duplicates only `TT_1`, `TT_BASH_DOOR` and
+the map timers 5-10 (`Timer.cpp:1011-1126`), and the only `TT_11` is
+`DisableCharacterAction`'s, which deletes the champion's busy timer before it queues the
+next (`Magic.cpp:513-536`; the port's `MagicSystem.ts:484-507`). So free the champion
+unconditionally inside `enableCharacterAction`, as CSBWin does, clearing the bit once D8
+has given the port one.
 
-Reset `attackType` at the end. For the second, check first whether a stale `TT_11` can
-reach the handler at all, since `SetTimer`'s de-duplication may make the guard dead.
-Evidence: a check that shoots, casts, and reads the quiver after the cast.
+Reset `attackType` at the end. Evidence: a check that shoots, casts, and reads the quiver
+after the cast.
 
 ### C37 ⏳ A door button or a touched wall does not set `d.clockTick`
 
@@ -335,6 +366,30 @@ drop does. The port's `MagicSystem` links it in with `DungeonState.addObjectToCe
 that fails, a case CSBWin does not have. Drop it with `WorldMove.moveObject(obj, -1, 0, …)`,
 as `CharacterSystem.dropAllPossessions` does. Evidence: a check that casts Zokathra with
 both hands full on a pressure pad.
+
+### C49 ⏳ `PrepareAttack` does not refuse a busy champion
+
+CSBWin's `PrepareAttack` returns at once when the champion has `CHARFLAG_attackDisable` set
+(`doc/CSBwin-src/Character.cpp:4916`), so a click on a shaded hand, or its attack key,
+opens no menu. The port's `prepareAttack` (`src/renderer/ui/Attack.ts:128-133`) tests only
+health, and neither caller (`Attack.ts:211`, `src/renderer/ui/Keyboard.ts:120`) nor
+`executeAttack` tests more, so a busy champion's menu opens, and an option picked from it
+attacks again before the busy timer has fired. Waits on D8, which gives the port the bit
+to test. Evidence: a check that attacks, then clicks the same hand at once.
+
+### C50 ⏳ `DisableCharacterAction` refuses a delay of 0
+
+CSBWin's `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502-537`) has no guard on
+`timeDelay`. A delay of 0 queues a `TT_11` due at `d.Time`, and for a champion who is
+already busy it replaces the busy timer with one due at the same time (`:517-525`), whose
+`timerUByte6`, the slot a throw refills, is 0 (`:512`). The port's
+`MagicSystem.disableCharacterAction` returns on `timeDelay <= 0`
+(`src/engine/MagicSystem.ts:479`). No shipped path passes 0 or less: every spell in
+`dm-atari/graphics.dat` has a disable time of 12 to 63 (`BITS10_15(word6)`,
+`Magic.cpp:1399`), an attack disables only when its time is non-zero (`Attack.cpp:2149`),
+and a throw turns a negative time into 4 (`Mouse.cpp:723`). Such a time comes only from a
+filter (G2) or another game's spell table. Remove the guard. Evidence: a check that
+disables a champion for 0 ticks, once idle and once busy.
 
 ---
 

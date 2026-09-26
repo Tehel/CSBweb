@@ -476,7 +476,7 @@ export class MagicSystem {
   }
 
   disableCharacterAction(chIdx: number, timeDelay: number): void {
-    if (timeDelay <= 0) return;
+    if (timeDelay <= 0) return; // ⚠️ CSBWin has no such guard (DEBT.md C50)
     const party = this.ctx.party.state;
     const champion = party.champions[chIdx];
     if (!champion) return;

@@ -169,7 +169,7 @@ export interface Champion {
      */
     attackType: i16;
     skills: Skill[];           // CSBWin skills92[20]
-    actionDisabledUntil: i32;  // Tick when actions re-enable (CSBWin busyTimer)
+    actionDisabledUntil: i32;  // Port-only: stands in for CHARFLAG_attackDisable (DEBT.md D8)
     busyTimerIndex: i32;       // Timer index for action disable
 
     shieldStrength: ui16;       // CHARDESC.shieldStrength
