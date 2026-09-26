@@ -81,6 +81,12 @@ export interface MessageSink {
   setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void;
   /** `scrollingText.ResetTime(newTime)`, with `d.Time`. */
   resetTime(newTime: number, time: number): void;
+  /** `scrollingText.ClockTick()`, the tick's own, with `d.Time`. */
+  clockTick(time: number): void;
+  /** `tag0007c8`: the main loop's one `printQueue` entry a pass, with `d.Time`. */
+  printNextQueued(time: number): void;
+  /** The message strip's share of `vblInterrupt`: a scroll under way moves on a scanline. */
+  vblInterrupt(): void;
 }
 
 /** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */

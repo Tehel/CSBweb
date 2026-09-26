@@ -66,6 +66,9 @@ function makeGame(): Game {
       quePrintLines: (color, text) => { messages.push({ color, text }); },
       setNewSpeed: () => {},
       resetTime: () => {},
+      clockTick: () => {},
+      printNextQueued: () => {},
+      vblInterrupt: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
   });

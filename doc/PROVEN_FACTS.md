@@ -3412,6 +3412,28 @@ screen and rebases their timeouts onto the loaded clock with
 in-game load; CSBWin loads only when a game starts) also shrinks the rows back, as the next
 tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:612-616`). Evidence: `tools/dump-sleep.ts`.
 
+## The message area: one entry a pass, a scanline a VBL
+
+- **The order in a VBL.** `checkVBL` runs `vblInterrupt` and then hands the main loop its
+  `UIM_VBL` (`doc/CSBwin-src/system.cpp:624-630`, dispatched at `CSBUI.cpp:1253-1272`).
+  The loop's pass runs `HandleMouseEvents`, the tick when `d.clockTick` is set, and then
+  takes one `printQueue` entry at `tag0007c8` (`CSBCode.cpp:714-721`). Frozen, the pass
+  skips the tick and still takes the entry (`:765`). The disk menu holds the loop in
+  `DisplayDiskMenu` (`:762`), so no entry is taken while it is open.
+- **The scroll.** `ScrollUp` sets `d.PushTextUp = 1` and `d.TextScanlineScrollCount = 0`
+  (`:1583-1596`); the count starts the game at -1 (`:352`). Each VBL moves the strip up a
+  scanline and blanks the bottom `count` scanlines, until the count reaches 7 and turns
+  to -1; the next VBL clears `d.PushTextUp` (`:971-1004`). Until then `ClockTick` places
+  nothing (`:1526-1527`) and `RemoveTimedOutText` removes nothing (`:1505-1508`).
+- **Who places a piece a scroll held back.** `ClockTick`'s only callers are the tick
+  (`:677`), the end of `PrintLines` (`:1736`) and `_ProcessTimersViewportAndSound`
+  (`Attack.cpp:2211`). With the print queue empty, the piece waits for the next tick.
+- **`DiscardText`** stops the scroll, drops the pieces waiting and blanks the strip, and
+  leaves the print queue, `d.TextTimeout` and `d.PrintColumn` alone (`CSBCode.cpp:1441-1464`).
+
+The port: `Game.runFrame` and `ScrollingText` (`doc/CSBWIN_MESSAGES_REFERENCE.md` → "The
+port"). Evidence: `tools/dump-messages.ts`.
+
 ## The freeze: button 147 in, button 148 out, no tick in between
 
 - **The keys and buttons.** `TAG0196da` turns a key into a button through `d.pKeyXlate2`,

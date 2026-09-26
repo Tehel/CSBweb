@@ -1,0 +1,193 @@
+/**
+ * The message area's pace: one print-queue entry a pass of the main loop, and the scroll.
+ *
+ * - The main loop takes one `printQueue` entry a pass, at `tag0007c8`, whether or not a
+ *   tick ran, frozen or not (doc/CSBwin-src/CSBCode.cpp:714-721, `:765`), and `PrintLines`
+ *   ends in `ClockTick` (`:1736`). So a message reaches the screen without a tick, stamped
+ *   with the `d.Time` it is printed at. The save menu holds the loop in `DisplayDiskMenu`
+ *   (`:762`), so it takes none.
+ * - A new row at the bottom is `ScrollUp` (`:1583-1596`): `d.PushTextUp = 1`,
+ *   `d.TextScanlineScrollCount = 0`. `vblInterrupt`, which runs before the pass its VBL
+ *   wakes (`system.cpp:624-630`, `CSBUI.cpp:1253-1272`), moves the strip, scanlines
+ *   172-199, up one scanline a VBL and blanks the bottom `count`, until the count reaches 7
+ *   and turns to -1; the next VBL clears `d.PushTextUp` (`CSBCode.cpp:971-1004`).
+ * - Until then `ClockTick` places nothing (`:1526-1527`) and `RemoveTimedOutText` removes
+ *   nothing (`:1505-1508`). A piece printed during the scroll waits for the next
+ *   `ClockTick`: the tick's own, after the timers (`:677`), or the next `PrintLines`.
+ * - `DiscardText` stops the scroll (`:1441-1464`).
+ *
+ * Run: `npx tsx tools/dump-messages.ts`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { Position } from '../src/core/types';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
+import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import { newGame } from './lib/game';
+import { check, finish } from './lib/check';
+
+const STRIP_TOP = 172;
+const STRIP_HEIGHT = 28;
+const WIDTH = 320;
+
+function main(): void {
+  const loader = new DungeonLoader();
+  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = loader.getData();
+  if (!data) throw new Error('dungeon.dat did not load');
+  const graphics = new GraphicsLoader();
+  graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
+  const font = loadFontData(graphics);
+
+  const messages = new ScrollingText();
+  const game = newGame(data, graphics, { messages });
+  game.setRandomSeed(0x12345678);
+  game.party.state.position = new Position(6, 14, 2);
+  game.monsterSystem.loadPartyLevel(2);
+
+  type Internals = { lastTickTime: number; state: { tickCount: number } };
+  const internals = game as unknown as Internals;
+  let t = Date.now() + 60_000;
+  let vbl = 0;
+
+  /** The strip's pixels as `draw` leaves them in a cleared screen. */
+  const strip = (): Uint8Array => {
+    const screen = createPaletteIndexViewportBuffer(WIDTH, 200, 0);
+    messages.draw(screen, font);
+    return screen.pixels.slice(STRIP_TOP * WIDTH, (STRIP_TOP + STRIP_HEIGHT) * WIDTH);
+  };
+  /** A scanline with ink is `#`, a blank one `.`, from 172 down to 199. */
+  const ink = (pixels: Uint8Array): string => {
+    let line = '';
+    for (let y = 0; y < STRIP_HEIGHT; y++) {
+      line += pixels.subarray(y * WIDTH, (y + 1) * WIDTH).some((p) => p !== 0) ? '#' : '.';
+    }
+    return line;
+  };
+  const state = (): string => {
+    const { pushTextUp, textScanlineScrollCount } = messages.scrollState();
+    const { printQueue, futureLines } = messages.backlog();
+    return `t=${internals.state.tickCount} push=${pushTextUp} count=${String(textScanlineScrollCount).padStart(2)} ` +
+      `queue=${printQueue} future=${futureLines} ${ink(strip())} ${JSON.stringify(messages.snapshot())}`;
+  };
+  /** One VBL, 17 ms on, with a tick due or not. */
+  const frame = (tick = false): void => {
+    t += 17;
+    internals.lastTickTime = tick ? t - 1000 : t;
+    game.runFrame(t);
+    vbl++;
+    console.log(`vbl ${String(vbl).padStart(2)}${tick ? ' tick' : '     '} ${state()}`);
+  };
+  const say = (text: string): void => {
+    messages.printLinefeed();
+    messages.quePrintLines(15, text);
+  };
+  const rows = (): string[] => messages.snapshot().map((line) => line.trim());
+
+  console.log('=== one entry a pass, no tick (CSBCode.cpp:714-721) ===');
+  const t0 = internals.state.tickCount;
+  for (const text of ['ONE', 'TWO', 'THREE', 'FOUR']) say(text);
+  const placedAt: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    frame();
+    const row = rows().findIndex((line, r) => line !== '' && placedAt[r] === undefined);
+    if (row >= 0) placedAt[row] = vbl;
+  }
+  check(internals.state.tickCount === t0, 'no tick ran');
+  check(placedAt.join() === '2,4,6,8', 'a row lands every second VBL: its linefeed, then its text');
+  check(messages.timeouts().every((timeout) => timeout === t0 + 70),
+    'each row is stamped with the d.Time it was printed at, + 70');
+
+  console.log('');
+  console.log('=== a fifth row scrolls the strip, a scanline a VBL (CSBCode.cpp:971-1004) ===');
+  const before = strip();
+  say('FIVE');
+  frame();
+  const started = messages.scrollState();
+  check(started.pushTextUp === 1 && started.textScanlineScrollCount === 0, 'its linefeed starts the scroll: PushTextUp 1, count 0');
+  check(rows().join() === 'TWO,THREE,FOUR,', 'the rows and their timeouts move up at once');
+  check(strip().every((p, i) => p === before[i]), 'and no pixel moves before the first VBL');
+  let shifted = true;
+  for (let k = 1; k <= 7; k++) {
+    frame();
+    const now = strip();
+    for (let y = 0; y < STRIP_HEIGHT && shifted; y++) {
+      for (let x = 0; x < WIDTH; x++) {
+        const expected = y < STRIP_HEIGHT - k ? before[(y + k) * WIDTH + x]! : 0;
+        if (now[y * WIDTH + x] !== expected) { shifted = false; break; }
+      }
+    }
+    if (k === 1) {
+      check(messages.backlog().printQueue === 0 && messages.backlog().futureLines === 1,
+        'FIVE is printed in the next pass, and waits');
+    }
+  }
+  check(shifted, 'after k VBLs the strip is the old one moved up k scanlines, the bottom k blank');
+  check(messages.scrollState().textScanlineScrollCount === -1 && messages.scrollState().pushTextUp === 1,
+    'after seven the count turns to -1');
+  frame();
+  check(messages.scrollState().pushTextUp === 0, 'the next VBL clears PushTextUp');
+  for (let i = 0; i < 3; i++) frame();
+  check(rows()[3] === '' && messages.backlog().futureLines === 1,
+    'with the print queue empty, nothing calls ClockTick: FIVE still waits');
+  frame(true);
+  check(rows()[3] === 'FIVE' && messages.timeouts()[3] === internals.state.tickCount + 70,
+    'the tick\'s own ClockTick places it, stamped with the new d.Time');
+
+  console.log('');
+  console.log('=== RemoveTimedOutText waits for the scroll (CSBCode.cpp:1505-1508) ===');
+  say('SIX');
+  frame();
+  const late = internals.state.tickCount + 500;
+  messages.clockTick(late);
+  check(rows().join() === 'THREE,FOUR,FIVE,', 'every row is due, and the scroll keeps them all');
+  for (let i = 0; i < 9; i++) frame();
+  messages.clockTick(late);
+  check(rows().join() === ',,,SIX', 'after it, they go, and SIX is placed');
+
+  console.log('');
+  console.log('=== frozen, the loop still prints; under the save menu it does not ===');
+  game.freeze();
+  say('FROZEN');
+  const frozenAt = internals.state.tickCount;
+  frame(true);
+  frame(true);
+  check(internals.state.tickCount === frozenAt && messages.backlog().printQueue === 0,
+    'frozen, no tick runs, and the loop still takes both entries (CSBCode.cpp:765)');
+  game.thaw();
+  for (let i = 0; i < 7; i++) frame();
+  frame(true);
+  check(rows()[3] === 'FROZEN', 'thawed, once the scroll its linefeed started is over, a tick places it');
+  say('SAVED');
+  frame();
+  check(messages.scrollState().textScanlineScrollCount === 0, 'a linefeed starts a scroll');
+  game.setPaused(true);
+  for (let i = 0; i < 3; i++) frame();
+  check(messages.scrollState().textScanlineScrollCount === 3 && messages.backlog().printQueue === 1,
+    'paused, the scroll goes on and the entry waits (CSBCode.cpp:762)');
+  game.setPaused(false);
+  frame();
+  check(messages.backlog().printQueue === 0, 'unpaused, the next pass takes it');
+
+  console.log('');
+  console.log('=== DiscardText stops the scroll (CSBCode.cpp:1441-1464) ===');
+  say('GONE');
+  frame();
+  check(messages.scrollState().textScanlineScrollCount >= 0, 'a scroll is under way');
+  const timeoutsBefore = messages.timeouts().join();
+  messages.discardText();
+  console.log(`after discard: ${state()}`);
+  const stopped = messages.scrollState();
+  check(stopped.pushTextUp === 0 && stopped.textScanlineScrollCount === -1, 'the scroll stops');
+  check(rows().every((line) => line === '') && ink(strip()) === '.'.repeat(STRIP_HEIGHT), 'and the strip is blank');
+  check(messages.backlog().printQueue === 1 && messages.timeouts().join() === timeoutsBefore,
+    'the print queue and the timeouts are left as they are');
+
+  finish();
+}
+
+main();

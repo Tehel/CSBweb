@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 4 next |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -88,6 +87,7 @@ In payoff order: the first row is the next item.
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
+| C63 | The main loop makes one pass a VBL, not one a message | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -107,7 +107,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C63 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C64 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -134,7 +134,7 @@ The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
 (`doc/CSBwin-src/CSBCode.cpp:1819`), which looks the ordinal up in `d.sound1772` and
 attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
-`src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:374`, `:509`), three
+`src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:384`, `:519`), three
 teleporters in `WorldMove.resolveCellEffects` (`:324`, `:341`, `:348`) and a door's step
 in `TimerSystem` (`:743`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
@@ -357,6 +357,19 @@ port's own bindings, and keep those bindings only where they claim no key a tabl
 `translateKey` returns the first. Evidence: a row per table entry in
 `tools/dump-key-bindings.ts`.
 
+### C63 ⏳ The main loop makes one pass a VBL, not one a message
+
+CSBWin's main loop makes a pass for every message the UI hands it
+(`doc/CSBwin-src/CSBUI.cpp:1253-1272`): each VBL's `UIM_VBL` (`system.cpp:624-630`), and a
+mouse button going down, which `EnqueMouseClick`s and then pushes its own message
+(`CSBUI.cpp:1185-1201`, `:1207-1222`). Every pass runs `HandleMouseEvents`, the tick if
+`d.clockTick` is set, and takes one print-queue entry (`CSBCode.cpp:714-765`), so a click
+is handled in the pass its message makes. The port makes one pass a VBL, `Game.runFrame`:
+`onMouseClick` only queues, so the click waits for the next VBL, and the pass it would have
+made takes no print-queue entry. A handler that sets `d.clockTick` (C53) runs its tick in
+the click's pass in CSBWin. Evidence: a check that clicks between two VBLs and records the
+pass that handles it and the entries taken.
+
 ---
 
 ## F — Verification debt
@@ -509,45 +522,6 @@ holds the raw bits, and `monster.drawAsSize4` is read ungated in
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 `SaveGameLoader` and gating every accessor.
-
-### G5 ⏳ The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze
-
-The author has pulled G5 ahead of tier C. It is size L, in four steps taken in order, each
-one commit. Step 4 is next.
-
-1. ✅ **`SetNewSpeed`**: falling asleep and `WakeUp` rescale the message timeouts
-   (`ScrollingText.setNewSpeed`, `speed` in `src/engine/LoopState.ts`,
-   `tools/dump-sleep.ts`).
-2. ✅ **A load keeps the message area**: CSBWin saves no message state, and
-   `applyRuntimeSaveState` rebases the rows on screen onto the loaded clock (`ResetTime`,
-   `tools/dump-sleep.ts`).
-3. ✅ **The freeze**: buttons 147 and 148, by Esc or a click, over the adventure and sleep
-   screens (`doc/PROVEN_FACTS.md` → "The freeze", `tools/dump-freeze.ts`). Esc no longer
-   pauses the game; `Game.setPaused` is only the save menu's clock stop.
-4. ⏳ **The scroll animation, and the pace of the print queue** (M).
-   - `ScrollUp` (`doc/CSBwin-src/CSBCode.cpp:1584-1596`) starts a pixel scroll,
-     `d.PushTextUp = 1` and `d.TextScanlineScrollCount = 0`. The VBL handler then moves the
-     strip up one scanline per VBL and blanks the bottom `count` scanlines, until the count
-     reaches 7 and turns to -1; the next VBL clears `d.PushTextUp` (`:971-1004`). Until then
-     `ClockTick` places nothing (`:1526-1527`) and `RemoveTimedOutText` removes nothing
-     (`:1505-1508`). `DiscardText` stops the scroll (`:1447-1448`). The port moves the rows
-     at once and has none of these guards (`src/renderer/csbwin/ScrollingText.ts`, module
-     comment).
-   - The pace: CSBWin's main loop takes one print-queue entry per pass, whether or not a
-     tick ran (`CSBCode.cpp:714-721`), so a message reaches `PrintLines` in the VBL it was
-     queued in, and the tick's own `ClockTick` comes after `ProcessTimers` and `d.Time++`
-     (`:660`, `:677`). The port pumps the whole queue at the top of a tick, before the
-     timers (`game.onTick`, `src/main.ts:388`), so a message queued by a click or a timer
-     waits for the next tick, and its row is stamped a tick late. Once the animation makes
-     pieces wait, when the queue is drained decides what waits behind a scroll, so both go
-     together: a per-VBL step from `Game.runFrame` that advances the scroll and drains the
-     queue, and `clockTick` where CSBWin's tick calls it.
-   - The port redraws the rows every frame, so the draw offsets them by the scroll count and
-     keeps the row that is scrolling out until it has gone.
-
-   Evidence: a new `tools/dump-messages.ts` that fills the four rows, queues a fifth, and
-   prints per VBL the scroll count, the rows, and the VBL the next piece lands in; and
-   `npm test -- --frames`.
 
 ### G6 ⏳ UI effects
 

@@ -380,14 +380,18 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
         }
     });
 
-    // The message queue is pumped here, mirroring CSBWin's main loop
-    // (doc/CSBwin-src/CSBCode.cpp:716) — see doc/CSBWIN_MESSAGES_REFERENCE.md.
     game.onTick(() => {
-        scrollingText.pump(game.getTickCount());
         // `TAG01b29a` — the champion flinch and the attack panel's redraw
         // state, before the frame is drawn (doc/CSBwin-src/CSBCode.cpp:685).
         screen.attackPanelTick();
         renderView();
+    });
+
+    // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
+    // a VBL; CSBWin's `vblInterrupt` invalidates the window after each
+    // (doc/CSBwin-src/CSBCode.cpp:1003).
+    game.onFrame(() => {
+        if (scrollingText.takeChanged()) renderView();
     });
 }
 

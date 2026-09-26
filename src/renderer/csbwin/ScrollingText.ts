@@ -6,16 +6,16 @@
  * Full spec and citations: `doc/CSBWIN_MESSAGES_REFERENCE.md`.
  *
  * Architecture, as in CSBWin: callers never draw. They enqueue fragments with
- * `quePrintLines()`; the game loop drains the queue through `printLines()`, which tokenizes
- * and word-wraps into `futureLines`; `clockTick()` then places pieces onto the four rows and
- * stamps their expiry.
+ * `quePrintLines()`; the main loop takes one entry a pass through `printNextQueued()`, whose
+ * `printLines()` tokenizes and word-wraps into `futureLines`; `clockTick()` then places
+ * pieces onto the four rows and stamps their expiry. A new row at the bottom scrolls the
+ * strip up a scanline a VBL (`vblInterrupt()`), and nothing is placed or removed until the
+ * scroll is over.
  *
- * Two documented deviations:
- *  - The pixel-level scroll animation (`d.PushTextUp` / `d.TextScanlineScrollCount`) is not
- *    implemented; rows scroll instantly. All the guards CSBWin uses to wait for that
- *    animation are therefore absent. See DEBT.md G5 step 4.
- *  - CSBWin draws each piece once and lets the screen hold it; we re-render from the row
- *    model every frame because our screen buffer is cleared each frame. Same pixels.
+ * CSBWin draws each piece once and lets the screen hold it, and its VBL handler moves those
+ * pixels up. We re-render from the row model every frame, because our screen buffer is
+ * cleared each frame: `draw` offsets the rows by the scroll count, and keeps the row that is
+ * scrolling out until it has gone. Same pixels.
  */
 
 import { div } from '../../core/intCast';
@@ -28,8 +28,10 @@ const NUM_ROWS = 4;
 const ROW_HEIGHT = 7;
 /** Character cell width. */
 const CHAR_WIDTH = 6;
-/** Top scanline of row 0's clear rectangle (`172 + i*7`). */
+/** Top scanline of row 0's clear rectangle (`172 + i*7`), the top of the strip. */
 const ROW_CLEAR_TOP_Y = 172;
+/** The strip is scanlines 172-199. */
+const STRIP_HEIGHT = NUM_ROWS * ROW_HEIGHT;
 /** Text draw baseline for row 0 (`row*7 + 177`). */
 const TEXT_BASE_Y = 177;
 const SCREEN_LAST_X = 319;
@@ -90,6 +92,18 @@ export class ScrollingText {
   private printQueue: QueuedFragment[] = [];
   /** `d.PartySleeping`. */
   private partySleeping = false;
+  /** `d.PushTextUp`: a scroll has started, and the VBL after its last scanline has not run. */
+  private pushTextUp = 0;
+  /**
+   * `d.TextScanlineScrollCount`: the scanlines the strip has moved up in the scroll under
+   * way, 0-6, or -1 once it has moved all seven, and before any scroll
+   * (`doc/CSBwin-src/CSBCode.cpp:352`).
+   */
+  private textScanlineScrollCount = -1;
+  /** The pieces of the row a scroll pushes off the top, until they have gone. */
+  private scrollingOut: PlacedPiece[] = [];
+  /** Set by whatever changes what the strip shows; `takeChanged()` clears it. */
+  private changed = false;
 
   // ---------------------------------------------------------------- enqueueing
 
@@ -110,20 +124,33 @@ export class ScrollingText {
   // ------------------------------------------------------------------ pumping
 
   /**
-   * Drain the print queue and place any pending text. CSBWin's main loop takes exactly one
-   * entry per iteration (`doc/CSBwin-src/CSBCode.cpp:716`) at a rate far above the game
-   * clock; our render pump runs at the 4 Hz tick, so we drain the whole queue at once.
-   * Equivalent because `printLines()` ends with a `clockTick()` regardless.
+   * `tag0007c8` (`doc/CSBwin-src/CSBCode.cpp:714-721`): the main loop takes one `printQueue`
+   * entry a pass, whether or not a tick ran in it, and prints it.
    */
-  pump(time: number): void {
-    let guard = 0;
-    while (this.printQueue.length > 0) {
-      const entry = this.printQueue.shift();
-      if (!entry) break;
-      this.printLines(entry.color, entry.text, time);
-      if (++guard > 1000) break;
+  printNextQueued(time: number): void {
+    const entry = this.printQueue.shift();
+    if (entry) this.printLines(entry.color, entry.text, time);
+  }
+
+  /**
+   * The message strip's share of `vblInterrupt` (`doc/CSBwin-src/CSBCode.cpp:971-1004`).
+   * While a scroll runs, the strip moves up a scanline and the count goes up; once it has
+   * moved seven the count turns to -1, and the next VBL clears `d.PushTextUp`. CSBWin moves
+   * the pixels and copies the blank `d.newTextLine` in at the bottom; `draw` offsets the rows
+   * by the count instead. The bottom row is empty until the scroll is over, so that VBL's
+   * copy changes nothing.
+   */
+  vblInterrupt(): void {
+    if (this.textScanlineScrollCount < 0) {
+      this.pushTextUp = 0;
+      return;
     }
-    this.clockTick(time);
+    this.textScanlineScrollCount++;
+    if (this.textScanlineScrollCount === ROW_HEIGHT) {
+      this.textScanlineScrollCount = -1;
+      this.scrollingOut = [];
+    }
+    this.changed = true;
   }
 
   /**
@@ -215,6 +242,8 @@ export class ScrollingText {
     this.removeTimedOutText(time);
 
     for (;;) {
+      if (this.textScanlineScrollCount >= 0) return; // wait for scrolling to cease
+      if (this.pushTextUp !== 0) return; // wait for line to scroll
       const piece = this.futureLines[0];
       if (!piece) return;
 
@@ -236,6 +265,7 @@ export class ScrollingText {
       }
 
       this.rows[row].push({ col: piece.col, color: piece.color, text: piece.text });
+      this.changed = true;
 
       this.textTimeout[row] = time + (this.partySleeping ? TEXT_TIMEOUT_TICKS_SLEEPING : TEXT_TIMEOUT_TICKS);
       // A row must never expire before the row above it.
@@ -251,13 +281,19 @@ export class ScrollingText {
     for (let row = 0; row < NUM_ROWS; row++) {
       if (this.textTimeout[row] === -1) continue;
       if (this.textTimeout[row] > time) continue;
+      // "We'll get it next time."
+      if (this.textScanlineScrollCount >= 0 || this.pushTextUp !== 0) return;
       this.rows[row] = [];
       this.textTimeout[row] = -1;
+      this.changed = true;
     }
   }
 
   /** CSBWin `SCROLLING_TEXT::ScrollUp()` (`doc/CSBwin-src/CSBCode.cpp:1583`). */
   private scrollUp(): void {
+    this.pushTextUp = 1;
+    this.textScanlineScrollCount = 0; // Start the scrolling process
+    this.scrollingOut = this.rows[0];
     for (let row = 0; row < NUM_ROWS - 1; row++) {
       this.rows[row] = this.rows[row + 1];
       this.textTimeout[row] = this.textTimeout[row + 1];
@@ -267,17 +303,20 @@ export class ScrollingText {
     this.textTimeout[NUM_ROWS - 1] = -1;
   }
 
-  /** CSBWin `SCROLLING_TEXT::DiscardText()` (`doc/CSBwin-src/CSBCode.cpp:1441`). */
+  /**
+   * CSBWin `SCROLLING_TEXT::DiscardText()` (`doc/CSBwin-src/CSBCode.cpp:1441-1464`): the
+   * pieces waiting and the pixels go, and the scroll stops. The print queue, the timeouts
+   * and `d.PrintColumn` are left as they are.
+   */
   discardText(): void {
     this.futureLines = [];
-    this.printQueue = [];
     this.rows = [[], [], [], []];
-    for (let row = 0; row < NUM_ROWS; row++) {
-      this.textTimeout[row] = -1;
-      this.rowPrintLinesCount[row] = -1;
-    }
+    this.scrollingOut = [];
+    for (let row = 0; row < NUM_ROWS; row++) this.rowPrintLinesCount[row] = -1;
     this.printRow = -1;
-    this.printColumn = 0;
+    this.textScanlineScrollCount = -1;
+    this.pushTextUp = 0;
+    this.changed = true;
   }
 
   /** CSBWin `SCROLLING_TEXT::ResetTime()` (`doc/CSBwin-src/CSBCode.cpp:1564`). */
@@ -311,15 +350,23 @@ export class ScrollingText {
 
   /**
    * Render the four rows into the screen index buffer at CSBWin's geometry.
-   * Text at `x = col*6`, `y = row*7 + 177` (`doc/CSBwin-src/CSBCode.cpp:1537`).
+   * Text at `x = col*6`, `y = row*7 + 177` (`doc/CSBwin-src/CSBCode.cpp:1537`). While a scroll
+   * runs, every row sits `7 - count` scanlines below its place, and the row scrolling out
+   * sits above row 0, cut off at the top of the strip.
    */
   draw(buffer: PaletteIndexViewportBuffer, font: FontData): void {
-    for (let row = 0; row < NUM_ROWS; row++) {
-      const pieces = this.rows[row];
+    const strip: PaletteIndexViewportBuffer = {
+      width: buffer.width,
+      height: STRIP_HEIGHT,
+      pixels: buffer.pixels.subarray(ROW_CLEAR_TOP_Y * buffer.width, (ROW_CLEAR_TOP_Y + STRIP_HEIGHT) * buffer.width),
+    };
+    const offset = this.textScanlineScrollCount >= 0 ? ROW_HEIGHT - this.textScanlineScrollCount : 0;
+    for (let row = -1; row < NUM_ROWS; row++) {
+      const pieces = row < 0 ? this.scrollingOut : this.rows[row];
       if (pieces.length === 0) continue;
-      const y = row * ROW_HEIGHT + TEXT_BASE_Y;
+      const y = row * ROW_HEIGHT + TEXT_BASE_Y - ROW_CLEAR_TOP_Y + offset;
       for (const piece of pieces) {
-        drawTextLineIndex(buffer, font, piece.col * CHAR_WIDTH, y, piece.color, null, piece.text);
+        drawTextLineIndex(strip, font, piece.col * CHAR_WIDTH, y, piece.color, null, piece.text);
       }
     }
   }
@@ -334,6 +381,23 @@ export class ScrollingText {
       const top = ROW_CLEAR_TOP_Y + row * ROW_HEIGHT;
       fillRectIndex(buffer, { x1: 0, y1: top, x2: SCREEN_LAST_X, y2: top + ROW_HEIGHT - 1 }, 0);
     }
+  }
+
+  /** Whether the strip has changed since the last call; the host redraws the screen when it has. */
+  takeChanged(): boolean {
+    const changed = this.changed;
+    this.changed = false;
+    return changed;
+  }
+
+  /** `d.PushTextUp` and `d.TextScanlineScrollCount`, for tests and debugging. */
+  scrollState(): { pushTextUp: number; textScanlineScrollCount: number } {
+    return { pushTextUp: this.pushTextUp, textScanlineScrollCount: this.textScanlineScrollCount };
+  }
+
+  /** The entries in `printQueue` and the pieces in `m_futureLines`, for tests and debugging. */
+  backlog(): { printQueue: number; futureLines: number } {
+    return { printQueue: this.printQueue.length, futureLines: this.futureLines.length };
   }
 
   /** `d.TextTimeout[4]`, for tests and debugging. */

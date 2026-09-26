@@ -48,6 +48,7 @@ const CHECKS = [
   { tool: 'dump-ten-second-update.ts' },
   { tool: 'dump-sleep.ts' },
   { tool: 'dump-freeze.ts' },
+  { tool: 'dump-messages.ts' },
   { tool: 'dump-ninety-second-update.ts' },
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-vi-altar.ts' },

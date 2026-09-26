@@ -71,7 +71,10 @@ sets `TextTimeout[3] = -1`, and starts a pixel-level scroll animation via
 ### The scroll animation
 
 The VBL handler runs it (`vblInterrupt`, `doc/CSBwin-src/CSBCode.cpp:971-1004`), one
-scanline per VBL:
+scanline per VBL. `checkVBL` calls `vblInterrupt` before it hands the main loop the VBL's
+`UIM_VBL` (`system.cpp:624-630`, dispatched at `CSBUI.cpp:1253-1272`), so each VBL's
+scanline moves before that VBL's pass of the loop. The count starts at -1
+(`CSBCode.cpp:352`).
 
 - While `TextScanlineScrollCount >= 0`: move scanlines 173 .. `199 - count` up one (the
   strip is 28 scanlines, 172-199), then `count++`, and copy `count` scanlines of
@@ -85,14 +88,23 @@ drawing (its old body is commented out, `:1616-1642`), so what comes in at the b
 blank. After seven VBLs every row sits 7 scanlines higher and the bottom row is empty; the
 eighth clears `PushTextUp`. `RemoveTimedOutText` also waits for both (`:1505-1508`), and
 `DiscardText` stops the scroll (`TextScanlineScrollCount = -1`, `PushTextUp = 0`,
-`:1447-1448`).
+`:1447-1448`). `DiscardText` also drops the pieces waiting and blanks the strip, but leaves
+the print queue, the timeouts and `d.PrintColumn` alone (`:1441-1464`). Its only caller is
+the DSA opcode `STKOP_DiscardText` (`DSA.cpp:3161-3166`).
 
 ### When the queue is drained
 
 The main loop takes one `printQueue` entry per pass, at `tag0007c8`, whether or not a tick
 ran in that pass (`CSBCode.cpp:714-721`), so a message queued by a click reaches
-`PrintLines` without waiting for a tick. The tick's own `scrollingText.ClockTick()` comes
-after `ProcessTimers` and `d.Time++` (`:660`, `:677`).
+`PrintLines` without waiting for a tick. A frozen loop still takes them
+(`if (d.ClockRunning == 0) goto tag0007b4;`, `:765`); the disk menu holds the loop in
+`DisplayDiskMenu` (`:762`), so none is taken while it is open. The tick's own
+`scrollingText.ClockTick()` comes after `ProcessTimers` and `d.Time++` (`:660`, `:677`).
+
+`ClockTick` has three callers: the tick (`:677`), the end of `PrintLines` (`:1736`), and
+`_ProcessTimersViewportAndSound` (`Attack.cpp:2211`), the fusion's loop. A piece that a
+scroll holds back is placed by the first of them after the scroll: with the print queue
+empty, that is the next tick.
 
 ## Timeouts
 
@@ -110,7 +122,7 @@ comment in the C++ source guesses "about 10 seconds"; the authoritative fact is 
 not a wall-clock duration.)
 
 `RemoveTimedOutText()` clears the row's rectangle to colour 0 and sets `TextTimeout = -1`.
-If a scroll is in progress it returns early and retries on the next tick.
+If a scroll is in progress it returns early, and the row goes at a later `ClockTick`.
 
 `ResetTime(newTime)` rebases all live timeouts by `newTime - d.Time` (`CSBCode.cpp:1564`).
 `LoadGame` calls it with the saved time just before it sets `d.Time`
@@ -143,9 +155,18 @@ keeps whatever is on screen and rebases its timeouts (`ResetTime`, above).
 ## The port
 
 `src/renderer/csbwin/ScrollingText.ts` ports the queue, the tokenizer, the four rows and
-their timeouts with `SetNewSpeed`, and draws into the 320×200 index buffer at the geometry
-above. The engine reaches it through `GameHost.messages`: sleep and `WakeUp` call
-`setNewSpeed` with `d.Speed` (`speed` in `src/engine/LoopState.ts`), and every load calls
-`resetTime` just before it replaces the tick count (`applyRuntimeSaveState`). Not yet
-ported, both in `DEBT.md` G5: the scroll animation and its guards, and draining the queue
-once per VBL rather than at the top of a tick.
+their timeouts with `SetNewSpeed`, the scroll and its guards, and draws into the 320×200
+index buffer at the geometry above. The engine reaches it through `GameHost.messages`:
+
+- `Game.runFrame` is one VBL: `vblInterrupt()` first, then the loop's pass, which ends
+  with `printNextQueued()`, one entry, unless the save menu has the clock stopped.
+- The tick calls `clockTick()` after the timers.
+- Sleep and `WakeUp` call `setNewSpeed` with `d.Speed` (`speed` in
+  `src/engine/LoopState.ts`), and every load calls `resetTime` just before it replaces the
+  tick count (`applyRuntimeSaveState`).
+
+The port redraws the strip every frame from its row model: `draw` offsets the rows by the
+scroll count and keeps the row scrolling out until it has gone, and `main.ts` redraws the
+screen after any frame in which the strip changed. CSBWin's loop also makes a pass for a
+mouse button going down, and the port's does not (`DEBT.md` C63). Evidence:
+`tools/dump-messages.ts`.

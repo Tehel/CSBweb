@@ -185,6 +185,7 @@ export class Game {
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
+    private onFrameCallbacks: GameEventCallback[] = [];
     private onMoveCallbacks: MovementCallback[] = [];
 
     /**
@@ -317,11 +318,16 @@ export class Game {
     };
 
     /**
-     * One VBL of the loop: the mouse queue, then a game tick if one is due.
+     * One VBL of the loop: `vblInterrupt`, then the main loop's pass it wakes — the mouse
+     * queue, a game tick if one is due, and a message off the print queue.
      * Public so that `tools/` can step frames at chosen times.
      */
     runFrame(currentTime: number): void {
         this.state.currentTime = currentTime;
+        // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
+        // (doc/CSBwin-src/system.cpp:624-630, CSBUI.cpp:1253-1272): the message strip's
+        // scroll moves on first. It runs frozen or not, and under the save menu.
+        this.ctx.host.messages.vblInterrupt();
         this.ctx.loop.clockTickCleared = false;
         // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
         // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
@@ -335,14 +341,21 @@ export class Game {
         const tickInterval = this.party.state.sleeping ? 0 : 1000 / GAME_TIMING.TICKS_PER_SECOND;
 
         // Process game ticks
-        if (this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared)) {
-            // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
-            // frozen, the due tick waits, and runs in the frame that thaws.
-            if (!this.ctx.loop.clockRunning) return;
+        // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
+        // frozen, the due tick waits, and runs in the frame that thaws.
+        const tickDue = this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared);
+        if (tickDue && this.ctx.loop.clockRunning) {
             if (!this.state.paused) {
                 this.gameTick();
             }
             this.lastTickTime = currentTime;
+        }
+        // `tag0007c8` (doc/CSBwin-src/CSBCode.cpp:714-721): one print-queue entry a pass,
+        // ticked or not, frozen or not. The save menu holds the loop in `DisplayDiskMenu`
+        // (`:762`), so it takes none.
+        if (!this.state.paused) this.ctx.host.messages.printNextQueued(this.state.tickCount);
+        for (const callback of this.onFrameCallbacks) {
+            callback(this);
         }
     }
 
@@ -368,6 +381,9 @@ export class Game {
         do {
             this.timerSystem.processTimers(this.state.tickCount);
         } while (this.loadNewPartyLevel());
+        // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:660-677):
+        // after the timers, so what they print is placed in this tick.
+        this.ctx.host.messages.clockTick(this.state.tickCount);
         // `if ((d.Time&511)==0) NinetySecondUpdate();` and `if ((d.Time & (d.PartySleeping ?
         // 15 : 63)) == 0) TenSecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-688).
         if (isNinetySecondTick(this.state.tickCount)) ninetySecondUpdate(this.ctx);
@@ -608,6 +624,11 @@ export class Game {
      */
     onTick(callback: GameEventCallback): void {
         this.onTickCallbacks.push(callback);
+    }
+
+    /** Called at the end of every frame, whether or not a tick ran in it. */
+    onFrame(callback: GameEventCallback): void {
+        this.onFrameCallbacks.push(callback);
     }
 
     /**

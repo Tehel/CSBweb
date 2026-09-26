@@ -68,6 +68,9 @@ async function main(): Promise<void> {
       quePrintLines: (_color, text) => { printed.push(text); },
       setNewSpeed: () => {},
       resetTime: () => {},
+      clockTick: () => {},
+      printNextQueued: () => {},
+      vblInterrupt: () => {},
     },
   });
   game.party.state.position = new Position(2, 2, 0);

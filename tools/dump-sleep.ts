@@ -219,7 +219,7 @@ async function main(): Promise<void> {
   {
     const t0 = internals.state.tickCount;
     messages.quePrintLines(15, 'HELLO');
-    messages.pump(t0);
+    messages.printNextQueued(t0);
     const placed = messages.timeouts()[0]!;
     game.sleep();
     const asleep = messages.timeouts()[0]!;
@@ -353,7 +353,8 @@ async function main(): Promise<void> {
     internals.state.tickCount = saved + 500;
     messages.printLinefeed();
     messages.quePrintLines(15, 'LOADED');
-    messages.pump(internals.state.tickCount);
+    messages.printNextQueued(internals.state.tickCount);
+    messages.printNextQueued(internals.state.tickCount);
     const row = messages.snapshot().findIndex((line) => line.includes('LOADED'));
     const before = messages.timeouts()[row]!;
     game.applyRuntimeSaveState(save);
