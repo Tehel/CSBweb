@@ -289,6 +289,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
                 bytes: encodeSavePayload(payload),
             };
         },
+        onSaveWritten: () => game.saveWritten(),
         onRestoreSave: (bytes) => {
             applySaveBytes(game, bytes);
             // The entrance screen's "Resume" needs to know whether a save actually

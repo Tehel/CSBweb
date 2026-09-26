@@ -558,6 +558,9 @@ async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   const taken = new Set(state.entries.map((e) => e.name));
   const meta: SaveEntryMeta = { ...built.meta, name: uniqueName(built.meta.name, taken) };
   await currentStore(state).write(meta, built.bytes);
+  // The clock has been stopped since the menu opened, so this still runs on the world
+  // the bytes hold, and before the menu's `tag0207cc`, as in CSBWin.
+  ui.onSaveWritten?.();
   await refreshSaveMenu(ui);
   const at = state.entries.findIndex((e) => e.name === meta.name);
   if (at >= 0) state.selected = at;

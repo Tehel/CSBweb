@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C45 | Saving does not re-attach the monsters | S | ⏳ |
 | C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
@@ -102,11 +101,12 @@ In payoff order: the first row is the next item.
 | G9 | Changing the marching order | — | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
+| G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | H | Deliberate divergences | — | 🚫 |
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C62 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
+Next free IDs: C62 · D9 · E7 · F11 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -126,22 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C45 ⏳ Saving does not re-attach the monsters
-
-Once the file is closed, CSBWin's save detaches every active group and runs
-`ProcessMonstersOnLevel` (`doc/CSBwin-src/SaveGame.cpp:1237-1245`), so that the game
-played on after a save is the one a restore of it gives back. A restore re-attaches the
-same way, through the game start's `LoadPartyLevel(d.partyLevel)`
-(`doc/CSBwin-src/CSBCode.cpp:10491`). The port re-attaches on a load
-(`MonsterSystem.reloadAfterSaveGame`, from `applyRuntimeSaveState`) but not on a save:
-`getRuntimeSaveState`, which the quick-save and `buildSavePayload` both call, leaves the
-monsters alone. So a game played on after a save keeps its monsters' movement timers and
-`singleMonsterStatus` mirror bits, and its place in the random stream, where CSBWin's
-re-creates the timers and re-rolls the bits, drawing from the stream as it does. Re-attach
-after the save, in the save paths rather than in `getRuntimeSaveState`, which tools call
-just to read the state. Evidence: a check that plays on after a save beside a load of that
-save, frame for frame, and compares the monsters' timers and `singleMonsterStatus`.
 
 ### C46 ⏳ The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags
 
@@ -576,6 +560,17 @@ giggler rob a champion.
 database holds 1024 records (`:535`). At that point CSBWin calls `MakeMoreRoomInDB`
 (`doc/CSBwin-src/Character.cpp:182`) to make room. This cannot happen in the shipped
 dungeons.
+
+### G12 ⏳ `SmartDiscard`: a filling database is not thinned
+
+CSBWin's main loop calls `SmartDiscard(false)` on every tick
+(`doc/CSBwin-src/CSBCode.cpp:678`), and the game start (`:10636`) and the tail of a save
+(`SaveGame.cpp:1245`) call `SmartDiscard(true)`, which starts it over on a new database
+(`SmartDiscard.cpp:747-757`). Each call does one step of a cycle through the misc, weapon
+and clothing databases (`:764-793`): count the records in use, fifty a step, and once the
+count reaches three quarters of the database's maximum (`:805-821`), scan the dungeon for
+objects and discard them in priority order. None of it is ported. `Game.saveWritten`, the
+save's tail, leaves out its `SmartDiscard(true)`.
 
 ---
 

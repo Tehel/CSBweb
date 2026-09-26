@@ -186,6 +186,8 @@ export interface UIState {
    * engine's business, not the UI's.
    */
   onCreateSave?: () => { meta: { name: string; savedAt: number; level: number; champions: string[] }; bytes: Uint8Array };
+  /** The save `onCreateSave` built is written: `Game.saveWritten`. */
+  onSaveWritten?: () => void;
   /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
   onRestoreSave?: (bytes: Uint8Array) => void;
 

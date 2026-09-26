@@ -100,6 +100,7 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onSleep'
   | 'onWakeUp'
   | 'onCreateSave'
+  | 'onSaveWritten'
   | 'onRestoreSave'
   | 'onSetPaused'
 >> {
@@ -160,6 +161,7 @@ export class GameScreen {
     ui.onSleep = hooks.onSleep;
     ui.onWakeUp = hooks.onWakeUp;
     ui.onCreateSave = hooks.onCreateSave;
+    ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;
     ui.onSetPaused = hooks.onSetPaused;
     this.onPaletteSelected = hooks.onPaletteSelected;

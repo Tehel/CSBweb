@@ -42,6 +42,10 @@
  * left after a load. Those are the three fields excluded below, one at a time and by
  * name, rather than by comparing less.
  *
+ * The save does the same to the game it leaves, once the file is closed
+ * (`doc/CSBwin-src/SaveGame.cpp:1237-1245`, `Game.saveWritten`), so section 6 plays on
+ * after a save beside a load of it and asserts that the two never part.
+ *
  * Run: `npx tsx tools/dump-save-roundtrip.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -390,6 +394,53 @@ function main(): void {
     check(!busy(champion(saved)) && champion(saved).busyTimerIndex === -1,
       'csbgame6.dat: his TT_11 clears the bit the file set, and the busy timer');
     check(!busy(written(saved)), 'csbgame6.dat: a save written after carries no bit 3');
+  }
+
+  /* ---- 6. playing on after a save, beside a load of it ---- */
+
+  // Once the file is closed, CSBWin's save detaches every group and runs
+  // `ProcessMonstersOnLevel` (`doc/CSBwin-src/SaveGame.cpp:1237-1245`), as a restore does,
+  // so the game played on after a save is the one a load of it gives back. csbgame7.dat's
+  // party level has live groups; 30 ticks of play first make their timers the game's own.
+  // Stepped side by side, the monsters' ITEM16 slots (their `singleMonsterStatus` among
+  // them), the whole timer table and queue, the world and the random seed must agree on
+  // every tick. Run without the tail too, which must tell the two apart: the check's teeth.
+  console.log('\n=== playing on after a save, beside a load of it ===');
+  console.log(['tail', 'tick', 'groups', 'AI timers here', 'seed', 'same'].join('\t'));
+  /** The monster AI timers (29-41) of the party's level, the ones the tail re-creates. */
+  const monsterTimers = (g: Game): number => (g.getRuntimeSaveState().dungeon.timerQueue ?? [])
+    .map((i) => g.ctx.timers.getTimer(i))
+    .filter((t) => t && t.function >= 29 && t.function <= 41 && t.level === g.party.state.position.z).length;
+  const monstersOf = (g: Game): string => {
+    const { dungeon, game } = g.getRuntimeSaveState();
+    return JSON.stringify([dungeon.item16, dungeon.timers, dungeon.timerQueue, dungeon.timerSequence,
+      dungeon.missiles, dungeon.snapshot, game.randomSeed, game.tickCount]);
+  };
+  for (const withTail of [true, false]) {
+    const live = fromCsbwinSave('csbgame7.dat');
+    advance(live, 30);
+    const bytes = encodeSavePayload(buildSavePayload(live));
+    if (withTail) live.saveWritten();
+    const loaded = loadWorld();
+    applySaveBytes(loaded, bytes);
+    let firstDiff = -1;
+    for (let tick = 0; tick <= 300; tick++) {
+      if (tick > 0) { advance(live, 1); advance(loaded, 1); }
+      const same = monstersOf(live) === monstersOf(loaded);
+      if (!same && firstDiff < 0) firstDiff = tick;
+      if (tick % 100 === 0 || (!same && firstDiff === tick)) {
+        console.log([withTail ? 'yes' : 'no', live.state.tickCount, live.monsterSystem.getItem16QueLen(),
+          monsterTimers(live), live.ctx.random.getSeed() >>> 0, same].join('\t'));
+      }
+    }
+    if (withTail) {
+      check(live.monsterSystem.getItem16QueLen() > 0 && monsterTimers(live) > 0,
+        'csbgame7.dat: the party level still has attached groups with movement timers');
+      check(firstDiff < 0, 'with the save\'s tail, the game played on and a load of its save agree ' +
+        `on every tick for 300 ticks${firstDiff < 0 ? '' : `, not from tick ${firstDiff}`}`);
+    } else {
+      check(firstDiff === 0, 'without it, they differ from the moment of the save');
+    }
   }
 
   finish();

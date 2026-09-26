@@ -643,6 +643,16 @@ export class Game {
     }
 
     /**
+     * The tail of CSBWin's `SaveGame`, once the file is written
+     * (`MonsterSystem.reattachAfterSave`). A save that fails skips it: CSBWin's
+     * `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1264`). The same tail's
+     * `SmartDiscard(true)` is not ported (DEBT.md G12).
+     */
+    saveWritten(): void {
+        this.monsterSystem.reattachAfterSave();
+    }
+
+    /**
      * Restore a quick-save (`RuntimeSave.applyRuntimeSaveState`), then the loop's own
      * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
      * (doc/CSBwin-src/SaveGame.cpp:1661, `Mouse.cpp:1372-1376`).

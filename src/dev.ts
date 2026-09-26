@@ -101,6 +101,10 @@ export function createDevTools(host: DevHost): DevTools {
         await migrateLegacyQuickSave();
         try {
             const payload = buildSavePayload(host.game, { portraitOf: host.portraitOf });
+            // The quick-save does not stop the clock, so the save's tail runs now, on
+            // the world the payload holds, not once the write below comes back: a
+            // failed write keeps the re-attached monsters, where CSBWin's skips it.
+            host.game.saveWritten();
             // `writableSaveStore` falls back to the browser when the file source is
             // chosen but not connected: F5 must never raise a folder picker over the game.
             const store = writableSaveStore();

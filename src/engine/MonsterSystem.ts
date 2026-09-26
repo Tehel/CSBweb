@@ -259,6 +259,19 @@ export class MonsterSystem {
     this.loadPartyLevel(this.ctx.party.state.position.z | 0);
   }
 
+  /**
+   * Re-attach everything once a save is written: `TAG00bd40()` then
+   * `ProcessMonstersOnLevel()`, after the file is closed
+   * (`doc/CSBwin-src/SaveGame.cpp:1237-1245`). A restore re-attaches the same way
+   * (`reloadAfterSaveGame`), so the game played on after a save is the one a load of it
+   * gives back: the movement timers re-created and the `singleMonsterStatus` bits
+   * re-rolled, drawing from the random stream as the load does.
+   */
+  reattachAfterSave(): void {
+    this.detachAllItem16();
+    this.processMonstersOnLevel();
+  }
+
   /** True if the party has changed level since the last `loadPartyLevel`. */
   needsLevelReload(): boolean {
     return this.loadedLevel !== (this.ctx.party.state.position.z | 0);
