@@ -267,9 +267,9 @@ export class MonsterSystem {
   /**
    * The port loads a new party level as soon as the party arrives on it; CSBWin only
    * sets `d.newPartyLevel` there and loads it at the top of the next tick, where
-   * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623). So the discard is
-   * left for the tick (`ctx.loop.newPartyLevel`): input queued between the arrival and
-   * that tick is lost too.
+   * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623) (DEBT.md C57). So
+   * the discard is left for the tick (`ctx.loop.newPartyLevel`): input queued between the
+   * arrival and that tick is lost too.
    */
   loadPartyLevelOnArrival(): void {
     if (this.loadPartyLevelIfChanged()) this.ctx.loop.newPartyLevel = true;

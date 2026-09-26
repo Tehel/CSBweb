@@ -9,7 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType } from '../core/types';
+import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
@@ -48,45 +48,16 @@ export class MovementSystem {
     }
 
     /**
-     * `MoveParty` (doc/CSBwin-src/CSBCode.cpp:7944) whole: `move` is its head (the turn,
-     * the stairs, the collision, the stamina); this is the tail (`:8310-8349`) — on a
-     * step, the missiles in the way, the pits and teleporters, `MoveObject`'s pads and
-     * the move delay; on an inhibited step, `DiscardAllInput(); d.clockTick = 0;`.
-     * `HandleMouseEvents` (`Game.move`) calls it.
+     * `MoveParty` (doc/CSBwin-src/CSBCode.cpp:7944) and `_TurnParty` (`:7854`) whole:
+     * `move` makes the turn, the stairs or the step, each through the party's world
+     * `MoveObject` (`WorldMove.moveParty`); this adds, on an inhibited step,
+     * `DiscardAllInput(); d.clockTick = 0;`. `HandleMouseEvents` (`Game.move`) calls it.
      */
     moveParty(action: MovementAction): MovementResult {
         const result = this.move(action);
 
         if (result.success) {
-            const oldPos = this.party.state.position;
-            const oldFacing = this.party.state.facing;
-            let resolvedPosition = result.newPosition;
-            let resolvedFacing = result.newFacing ?? oldFacing;
-            const { timer, missileEncounter, worldMove } = this.ctx.systems;
-
-            if (resolvedPosition) {
-                missileEncounter.checkMoveFromMissile(oldPos, resolvedPosition, null);
-                const teleported = worldMove.resolvePartyMove(resolvedPosition, resolvedFacing);
-                resolvedPosition = teleported.position;
-                resolvedFacing = teleported.facing;
-                result.newPosition = resolvedPosition;
-                if (resolvedFacing !== (result.newFacing ?? oldFacing)) {
-                    result.newFacing = resolvedFacing;
-                }
-            }
-            this.party.applyMovement(result);
-            if (result.stepped) this.setPartyMoveDelay();
-            if (resolvedPosition) {
-                const unchanged = oldPos.x === resolvedPosition.x
-                    && oldPos.y === resolvedPosition.y
-                    && oldPos.z === resolvedPosition.z;
-                const actuators = this.ctx.systems.actuators;
-                actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
-                actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
-            }
-            worldMove.notePartyMoved();
-            this.ctx.systems.monsters.loadPartyLevelOnArrival();
-            timer.processTimers(this.ctx.state.tickCount);
+            this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
         } else if (result.inhibited) {
             // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
             this.ctx.mouseQueue.discardAllInput();
@@ -129,10 +100,13 @@ export class MovementSystem {
         const roomType = (cellFlags >> 5) & 0x7;
 
         if (roomType === RoomType.STAIRS) {
-            return this.traverseStairway(position, (cellFlags & 0x04) !== 0);
+            return this.traverseStairway(position, (cellFlags & 0x04) !== 0, null);
         }
 
+        // `SetPartyFacing((d.partyFacing + deltaFacing) & 3)` (doc/CSBwin-src/CSBCode.cpp:7927).
+        // The pads around it are not pressed (DEBT.md C58).
         const newFacing = this.party.calculateNewFacing(action);
+        this.party.setFacing(newFacing);
 
         return {
             success: true,
@@ -152,8 +126,9 @@ export class MovementSystem {
 
         this.chargeStamina();
 
-        if (roomTypeFrom === RoomType.STAIRS && relDirection === 2) {
-            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0);
+        const startingInStairwell = roomTypeFrom === RoomType.STAIRS;
+        if (startingInStairwell && relDirection === 2) {
+            return this.traverseStairway(position, (cellFlagsFrom & 0x04) !== 0, null);
         }
 
         const newPosition = this.party.calculateNewPosition(action);
@@ -171,7 +146,7 @@ export class MovementSystem {
         const cellFlagsTo = this.dungeon.getCellFlag(newPosition);
         const roomTypeTo = (cellFlagsTo >> 5) & 0x7;
         if (roomTypeTo === RoomType.STAIRS) {
-            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0);
+            return this.traverseStairway(newPosition, (cellFlagsTo & 0x04) !== 0, position);
         }
 
         // `D5W` — terrain inhibits the move for stone, a door whose state is not 0, 1 or 5,
@@ -236,10 +211,15 @@ export class MovementSystem {
             }
         }
 
-        // Movement is valid
+        // `MoveObject(RN(RNnul), -1, 0, newX, newY)` out of a stairwell, else from the
+        // party's square (doc/CSBwin-src/CSBCode.cpp:8316-8325), then the move delay.
+        this.ctx.systems.worldMove.moveParty(
+            startingInStairwell ? -1 : position.x, position.y, newPosition.x, newPosition.y,
+        );
+        this.setPartyMoveDelay();
         return {
             success: true,
-            newPosition,
+            newPosition: this.party.state.position,
             stepped: true,
         };
     }
@@ -320,40 +300,42 @@ export class MovementSystem {
         }
     }
 
-    private traverseStairway(position: Position, isUp: boolean): MovementResult {
-        const delta = isUp ? -1 : 1;
-        const next = this.dungeon.incrementLevel(position, delta);
-
+    /**
+     * `TraverseStairway(UpOrDown, true)` (doc/CSBwin-src/CSBCode.cpp:7733-7782) from the
+     * stairs at `stairs`. For a step into them, `MoveParty` first lifts the party off the
+     * square it leaves, `enteredFrom`, and stands it on the stairs (`:8209-8214`). Then
+     * the party is lifted off the stairs, put on the square below or above facing
+     * `ExitStairsDirection`, and placed there when it arrives on that level
+     * (`WorldMove.arriveOnPartyLevel`). `CallPartyMoveFilter` is not ported (DEBT.md G2).
+     *
+     * A stairway to no level is a malformed dungeon, where CSBWin would `LoadLevel(-1)`;
+     * the party stays where it is.
+     */
+    private traverseStairway(stairs: Position, isUp: boolean, enteredFrom: Position | null): MovementResult {
+        const next = this.dungeon.incrementLevel(stairs, isUp ? -1 : 1);
         if (!next) {
             return {
                 success: false,
                 blocked: true,
             };
         }
+        const newFacing = this.dungeon.getExitStairsDirection(next, this.party.state.facing);
 
-        const fallbackFacing = this.party.state.facing;
-        const newFacing = this.dungeon.getExitStairsDirection(next, fallbackFacing);
+        const worldMove = this.ctx.systems.worldMove;
+        if (enteredFrom) {
+            worldMove.moveParty(enteredFrom.x, enteredFrom.y, -1, 0);
+            this.party.state.position = stairs;
+        }
+        worldMove.moveParty(stairs.x, stairs.y, -1, 0);
+        this.party.state.position = next;
+        this.party.setFacing(newFacing);
+        worldMove.arriveOnPartyLevel();
 
         return {
             success: true,
-            newPosition: next,
+            newPosition: this.party.state.position,
             newFacing,
         };
-    }
-
-    /**
-     * Execute a validated movement
-     *
-     * @param action - Movement action
-     * @returns True if movement was executed
-     */
-    executeMovement(action: MovementAction): boolean {
-        const result = this.move(action);
-
-        if (!result.success) return false;
-
-        this.party.applyMovement(result);
-        return true;
     }
 
     /**

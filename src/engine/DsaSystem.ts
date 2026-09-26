@@ -3027,8 +3027,6 @@ export class DsaSystem {
    */
   private teleportParty(locr: LocationRel): void {
     const party = this.ctx.party.state;
-    const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-    const oldFacing = party.facing & 0x3;
     const pretendTeleporter: TeleporterRecord = {
       nextObject: OBJECT_ID_EOF,
       sound: false,
@@ -3040,16 +3038,8 @@ export class DsaSystem {
       destMap: locr.l & 0xff,
     };
 
-    this.ctx.systems.missileEncounter.checkMoveFromMissile(oldPos, oldPos, null);
-    const resolved = this.ctx.systems.worldMove.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
-    party.position = resolved.position;
-    this.ctx.party.setFacing(resolved.facing);
-
-    const unchanged = oldPos.x === resolved.position.x
-      && oldPos.y === resolved.position.y
-      && oldPos.z === resolved.position.z;
-    if (!unchanged) this.ctx.systems.worldMove.notePartyMoved();
-    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-    this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+    this.ctx.systems.worldMove.moveParty(
+      party.position.x, party.position.y, party.position.x, party.position.y, pretendTeleporter,
+    );
   }
 }

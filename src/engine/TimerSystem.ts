@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 
 /**
@@ -54,7 +54,7 @@ import { AttackType } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import { monsterNonMaterial, monsterVerticalSize } from '../renderer/csbwin/ObjectTables';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
-import { getPartyDistance, setPartyFacing } from './Party';
+import { getPartyDistance } from './Party';
 
 
 export type MissileDropTarget = { monster: ObjectID } | null;
@@ -1752,21 +1752,9 @@ export class TimerSystem {
     }
   }
 
+  /** `MoveObject(RN(RNnul), mapX, mapY, mapX, mapY, NULL, NULL)` (`Timer.cpp:2443`). */
   private wiggleParty(position: Position): void {
-    const party = this.ctx.party.state;
-    const worldMove = this.ctx.systems.worldMove;
-    const result = worldMove.resolvePartyMove(position, party.facing);
-    if (!result.moved) return;
-
-    const oldPos = new Position(position.x, position.y, position.z);
-    this.ctx.systems.missileEncounter.checkMoveFromMissile(oldPos, result.position, null);
-    party.position = result.position;
-    setPartyFacing(party, result.facing);
-
-    const unchanged = isSamePosition(oldPos, result.position);
-    if (!unchanged) worldMove.notePartyMoved();
-    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-    this.ctx.systems.actuators.triggerObjectMove(result.position, OBJECT_ID_NULL, true, unchanged, party.facing);
+    this.ctx.systems.worldMove.moveParty(position.x, position.y, position.x, position.y);
   }
 
   private activateDsa(timer: TimerEntry): void {

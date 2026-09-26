@@ -144,11 +144,8 @@ async function main(): Promise<void> {
     return { moved, soundId };
   };
 
-  // ---- Case 1: no champions — CSBWin's `d.NumCharacter != 0` gate is off ----
-  game.party.state.champions = [];
-  const empty = attempt('no champions (gate off)');
-
   // ---- Case 2: a real party walks into the monster ------------------------
+  // (Case 1, the empty party, is last: it deletes the monster.)
   game.party.state.champions = [champion(0)];
   const blocked = attempt('party vs monster');
 
@@ -705,6 +702,16 @@ async function main(): Promise<void> {
     }
   }
 
+  // ---- Case 1: no champions — CSBWin's `d.NumCharacter != 0` gate is off ----
+  // The empty party walks onto the monster, and `MoveObject` deletes a monster where the
+  // party lands (`doc/CSBwin-src/Code11f52.cpp:3298-3308`).
+  const champions = game.party.state.champions;
+  game.party.state.champions = [];
+  const empty = attempt('no champions (gate off)');
+  game.party.state.champions = champions;
+  const crushed = !monsterAt(scene.mx, scene.my);
+  console.log(`\n${rows[rows.length - 1]!.join('\t')}; the monster is ${crushed ? 'gone' : 'still there'}`);
+
   // ---- Assertions ---------------------------------------------------------
 
   check(decodeObjectID(monsterRn).category === DBType.CREATURE, 'the scene should have found a real creature');
@@ -713,6 +720,7 @@ async function main(): Promise<void> {
   // The vacuity guard: without the `d.NumCharacter != 0` gate the block would fire
   // for everyone, and case 2 would pass for the wrong reason.
   check(empty.moved, 'a party with no champions should walk into the monster (CSBWin gates on d.NumCharacter)');
+  check(crushed, 'and the monster it lands on is deleted');
 
   check(!blocked.moved, 'a real party should be blocked by the monster');
   check(blocked.soundId === undefined, 'the monster bump should be silent — CSBWin queues no sound for it');

@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C41 | The party's `MoveObject` is put together at four call sites | M | ⏳ |
 | C42 | The missile timer puts its own `MoveObject` together | S | ⏳ |
 | C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
 | C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
@@ -88,6 +87,8 @@ In payoff order: the first row is the next item.
 | C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | C56 | The missile `MissileTimer` runs keeps its freed timer index | S | ⏳ |
+| C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
+| C58 | A turn does not lift and place the party | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -106,7 +107,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C57 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
+Next free IDs: C59 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -127,32 +128,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
 
-### C41 ⏳ The party's `MoveObject` is put together at four call sites
-
-CSBWin moves the party with one function, the world `MoveObject(RNnul, …)`
-(`doc/CSBwin-src/Code11f52.cpp:2796`), from nine call sites (`Timer.cpp:2443`,
-`DSA.cpp:4604`, `Attack.cpp:2032`, `CSBCode.cpp:8320`, …). The port has no such function.
-Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove` (or
-`resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
-(`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
-`AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3028`) and
-`TimerSystem.wiggleParty` (`:1755`). They do not agree:
-
-- `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
-  its caller passed, before any teleporter or pit (`Code11f52.cpp:2847-2853`). The step and
-  the DSA teleport do the same. The climb-down resolves the fall first and passes the cell
-  it lands in, where CSBWin passes the pit (`Attack.cpp:2032`). That cell is on the level
-  below, so the check's same-level second half-step never runs. The wiggle passes the
-  resolved cell, where CSBWin passes the party's own cell twice (`Timer.cpp:2443`), and it
-  skips the check altogether when nothing moved the party.
-- The footprint step runs only when the room changed (`unchangedRoom`,
-  `Code11f52.cpp:3183-3247`). Three of the sites test that. The step calls `notePartyMoved`
-  after every successful move (`MovementSystem.ts:87`).
-
-Port the party path of `MoveObject` once, in `WorldMove`, in CSBWin's order, and
-route the four through it. Evidence: a check per call site that moves the party past a
-missile and onto a pit, compared with the order above.
-
 ### C42 ⏳ The missile timer puts its own `MoveObject` together
 
 CSBWin's `MissileTimer` moves its missile into the next cell with the world
@@ -162,7 +137,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
 missile itself (`TimerSystem.ts:1423-1433`). `moveObject` has a missile arm of its own,
-which reads the direction from the timer the missile record names (`WorldMove.ts:161-165`).
+which reads the direction from the timer the missile record names (`WorldMove.ts:207-211`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
 a missile through a rotating teleporter and compares its cell, corner and direction.
@@ -236,7 +211,7 @@ The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
 attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
 `src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:374`, `:509`), three
-teleporters in `WorldMove.resolveCellEffects` (`:296`, `:313`, `:320`) and a door's step
+teleporters in `WorldMove.resolveCellEffects` (`:342`, `:359`, `:366`) and a door's step
 in `TimerSystem` (`:753`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
@@ -370,6 +345,37 @@ lookup: set the index to 0xffff for the length of the timer, answer the copy for
 keep the hit from deleting any queued timer. Evidence: a row in
 `tools/dump-move-from-missile.ts` whose move leaves the flying missile's own corner.
 
+### C57 ⏳ The party's arrival on another level runs at once, not at the top of the next tick
+
+When a `MoveObject` of the party ends on another level, CSBWin sets `d.newPartyLevel` and
+presses no pads (`doc/CSBwin-src/Code11f52.cpp:3319-3324`), and `TraverseStairway` sets it
+too (`CSBCode.cpp:7775`). The main loop acts on it at the top of the next tick, or at once
+after `ProcessTimers` when a timer moved the party (`CSBCode.cpp:618-623`, `:635`):
+`LoadPartyLevel`, then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the
+party through its square again, leaves a second footprint and presses the pads, then
+`DiscardAllInput`. Until then `d.partyLevel` is the old level while `d.partyX` and
+`d.partyY` are already the new square's. The port runs the load and the second
+`MoveObject` from inside the move, in `WorldMove.arriveOnPartyLevel`
+(`src/engine/WorldMove.ts:125`), and leaves only the discard to the tick
+(`MonsterSystem.loadPartyLevelOnArrival`, `Game.loadNewPartyLevel`). So whatever runs
+between the move and that tick sees the new level loaded, its groups attached and its pads
+pressed, where CSBWin's sees the old party level: the rest of the timers in the pass that
+moved the party, for one, since `ProcessTimers` does not test `d.newPartyLevel`. Porting
+it means a pending level that `Game.loadNewPartyLevel` acts on, and a `party.position` that
+can hold CSBWin's half-moved state without the renderer drawing it (CSBWin draws only after
+the check, `CSBCode.cpp:635-639`). Evidence: a check that drops the party down a pit from a
+timer with a second timer due in the same pass, and records the level the second one sees.
+
+### C58 ⏳ A turn does not lift and place the party
+
+Off the stairs, `_TurnParty` brackets its `SetPartyFacing` with
+`PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)` before and
+`(…, true, 1)` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`), so the pads under the party
+see it leave and come back, with `unchangedRoom` true, facing the new way. The port's turn,
+`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:109`), only sets the facing.
+Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
+calls.
+
 ---
 
 ## F — Verification debt
@@ -467,7 +473,7 @@ uses CSBWin's defaults.
   The port builds a fresh block each attack, with `disableTime` 0.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
-  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:260`).
+  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:240`).
 - `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
   attack option. The names come straight from `AttackNames`.
 - `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is
@@ -511,7 +517,7 @@ No shipped DM hero touches any of these.
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:359`) and in `MonsterDamage`
+`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:370`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in

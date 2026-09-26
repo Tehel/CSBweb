@@ -1352,20 +1352,10 @@ export class AttackSystem {
    */
   private climbDownIntoPit(target: Position): void {
     const party = this.ctx.party.state;
-    const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-    const resolved = this.ctx.systems.worldMove.withSupressedPitDamage(() =>
-      this.ctx.systems.worldMove.resolvePartyMove(target, party.facing & 0x3),
+    const worldMove = this.ctx.systems.worldMove;
+    worldMove.withSupressedPitDamage(() =>
+      worldMove.moveParty(party.position.x, party.position.y, target.x, target.y),
     );
-    this.ctx.systems.missileEncounter.checkMoveFromMissile(oldPos, resolved.position, null);
-    party.position = resolved.position;
-    this.ctx.party.setFacing(resolved.facing);
-    const unchanged = oldPos.x === resolved.position.x
-      && oldPos.y === resolved.position.y
-      && oldPos.z === resolved.position.z;
-    if (!unchanged) this.ctx.systems.worldMove.notePartyMoved();
-    this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
-    this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
-    this.ctx.systems.monsters.loadPartyLevelOnArrival();
   }
 
   /** The busy timer's `uByte6`, which decides which slot refills the hand (`TT_11`). */

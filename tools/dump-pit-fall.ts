@@ -62,6 +62,16 @@ function makeGame(): Game {
   return game;
 }
 
+/**
+ * Stand the party on the pit's level and drop it in, `MoveObject(RNnul, -1, 0, x, y)`,
+ * and say where it landed.
+ */
+function fall(g: Game, pit: Position): Position {
+  g.party.state.position = new Position(pit.x, pit.y, pit.z);
+  g.worldMove.moveParty(-1, 0, pit.x, pit.y);
+  return g.party.state.position;
+}
+
 /** An open, active pit in the shipped dungeon that actually leads somewhere. */
 function findOpenPit(game: Game): Position | null {
   const dungeon = game.dungeonState;
@@ -113,15 +123,15 @@ function main(): void {
     const g = makeGame();
     const before = healths(g);
     const staminaBefore = staminas(g);
-    const resolved = g.worldMove.resolvePartyMove(pit, 0);
+    const resolved = fall(g, pit);
     const after = healths(g);
     for (let i = 0; i < after.length; i++) {
       console.log([`HERO${i}`, before[i], after[i]].join('\t'));
     }
-    console.log(`landed at level ${resolved.position.z} (${resolved.position.x},${resolved.position.y})`);
+    console.log(`landed at level ${resolved.z} (${resolved.x},${resolved.y})`);
 
-    check(resolved.moved, 'the party fell');
-    check(resolved.position.z === below.z, 'and landed one level down');
+    check(resolved.z !== pit.z, 'the party fell');
+    check(resolved.z === below.z, 'and landed one level down');
     const hurt = after.filter((h, i) => h < before[i]!).length;
     check(hurt > 0, `the fall hurt someone (${hurt} of ${after.length})`);
     // The spread is `damage/8 + 1` either side of `damage - spread`, so nobody takes
@@ -140,14 +150,14 @@ function main(): void {
     const g = makeGame();
     const healthBefore = healths(g);
     const staminaBefore = staminas(g);
-    const resolved = g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
+    const resolved = g.worldMove.withSupressedPitDamage(() => fall(g, pit));
     const staminaAfter = staminas(g);
     const healthAfter = healths(g);
     for (let i = 0; i < staminaAfter.length; i++) {
       console.log([`HERO${i}`, staminaBefore[i], staminaAfter[i], healthAfter[i]].join('\t'));
     }
 
-    check(resolved.moved, 'the party still fell');
+    check(resolved.z !== pit.z, 'the party still fell');
     check(healthAfter.every((h, i) => h === healthBefore[i]), 'a climb down costs no health');
     check(staminaAfter.every((s, i) => s < staminaBefore[i]!), 'but every champion paid stamina');
     // Empty-handed champions pay the floor of 1.
@@ -175,10 +185,10 @@ function main(): void {
 
   {
     const g = makeGame();
-    g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
+    g.worldMove.withSupressedPitDamage(() => fall(g, pit));
     const healthBefore = healths(g);
     // Put the party back at the pit and fall again, this time without a rope.
-    g.worldMove.resolvePartyMove(pit, 0);
+    fall(g, pit);
     const healthAfter = healths(g);
     check(healthAfter.some((h, i) => h < healthBefore[i]!), 'the next fall hurts again');
   }
@@ -194,7 +204,7 @@ function main(): void {
     dead.alive = false;
     dead.attributes.health = 0;
     const staminaBefore = dead.attributes.stamina;
-    g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
+    g.worldMove.withSupressedPitDamage(() => fall(g, pit));
     check(dead.attributes.stamina === staminaBefore, 'a dead champion is skipped by the climb cost');
   }
 

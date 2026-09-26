@@ -6,7 +6,7 @@
  */
 
 import { OBJECT_ID_NULL, ui8, Direction, Position } from '../core/types';
-import type { PartyState, Champion, MovementResult } from './gameTypes';
+import type { PartyState, Champion } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { addCharacterDefaults } from './AddCharacter';
 import { Direction as Dir } from '../core/types';
@@ -148,31 +148,6 @@ export class Party {
         }
 
         return facing;
-    }
-
-    /**
-     * Apply validated movement
-     *
-     * This should only be called after collision detection has validated the move
-     *
-     * @param result - Movement result from collision detection
-     */
-    applyMovement(result: MovementResult): void {
-        if (!result.success) {
-            return;
-        }
-
-        // Update position if moved
-        if (result.newPosition) {
-            this.state.position = result.newPosition;
-            this.state.moving = true;
-        }
-
-        // Update facing if turned
-        if (result.newFacing !== undefined) {
-            this.setFacing(result.newFacing);
-            this.state.turning = true;
-        }
     }
 
     /**

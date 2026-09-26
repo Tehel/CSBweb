@@ -2803,6 +2803,38 @@ fails before the eye gate),
 
 Evidence: `tools/dump-mouse-queue.ts`, case 9.
 
+## The party moves through one `MoveObject`, in one order
+
+Every move of the party is `MoveObject(RN(RNnul), oldX, oldY, newX, newY, …)`
+(`doc/CSBwin-src/Code11f52.cpp:2796`) on the party's level, each caller passing its own
+cells: the step `(partyX, partyY, newX, newY)`, or `(-1, 0, newX, newY)` out of a stairwell
+(`CSBCode.cpp:8318-8325`); the climb down `(partyX, partyY, pitX, pitY)` with
+`d.SupressPitDamage` set (`Attack.cpp:2031-2033`); the DSA teleport and the wiggle the
+party's own square twice (`DSA.cpp:4604-4608`, `Timer.cpp:2443`); the stairs a lift,
+`(partyX, partyY, -1, 0)`, twice for a step into them, first off the square left and then
+off the stairs (`CSBCode.cpp:8212`, `:7774`). A turn off the stairs is not a `MoveObject`
+(`:7910-7934`). Inside, in this order:
+
+1. With `oldX >= 0`, `CheckMoveFromMissile(oldX, oldY, newX, newY)` (`:2847-2853`). Its
+   `return 1`, which ends the move, reads the global `d.MonsterDamageResult == 2`
+   (`:2743`), for the party too.
+2. With `newX >= 0`, `d.partyX`/`d.partyY` are set to the new square (`:2868-2869`) and
+   follow every teleporter jump (`:2960-2961`, with `SetPartyFacing`, `:2967-2977`) and
+   every pit fall (`:3055-3056`), so a fall hurts, and a champion it kills drops what
+   they carry, on the square the party fell into.
+3. Back on its square facing as it did, nothing more happens (`:3194-3201`). Otherwise a
+   footprint is left when it left its square (`:3224-3247`).
+4. With `oldX >= 0`, the old square's pads (`:3258-3268`). With `newX < 0`, that is all
+   (`:3297`).
+5. A monster on the square the party landed on is deleted: `DropMonsterRemains(…, 1, …)`
+   and `DeleteMonster` (`:3298-3308`). The step refuses a square with a monster only for a
+   party with champions (`CSBCode.cpp:8286-8304`), so an empty party walks onto one and
+   deletes it.
+6. On its level, the new square's pads (`:3309-3317`); on another, `d.newPartyLevel`
+   (`:3319-3324`), and the next section.
+
+Evidence: `tools/dump-party-move.ts`, and `tools/dump-party-collision.ts` case 1.
+
 ## A level change discards all input, at the top of the next tick
 
 Taking a stairway, falling or being teleported to another level only sets

@@ -85,7 +85,7 @@ export class MissileEncounter {
     return (this.monsterDamageResult as number) === MonsterDamageResult.ALL_MONSTERS_DIED;
   }
 
-  checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
+  private checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
     const party = this.ctx.party.state;
     const movedObjectType = movedObject === null ? -2 : -1;
     const whoLeavesCell = [0, 0, 0, 0];
@@ -195,6 +195,17 @@ export class MissileEncounter {
    * being moved — CSBWin's `return 1` from `CheckMoveFromMissile`.
    */
   private movedObjectWasDestroyed = false;
+
+  /**
+   * `CheckMoveFromMissile` for the party leaving a square. Its `return 1` reads the
+   * global `d.MonsterDamageResult` for the party too (`Code11f52.cpp:2743`), so it
+   * answers true when a missile the party met wiped out a group on the way.
+   */
+  checkPartyMoveFromMissile(from: Position, to: Position | null): boolean {
+    this.movedObjectWasDestroyed = false;
+    this.checkMoveFromMissile(from, to, null);
+    return this.movedObjectWasDestroyed;
+  }
 
   /** `CheckMoveFromMissile` for a monster leaving a square. */
   checkMonsterMoveFromMissile(from: Position, to: Position | null, monsterRn: ObjectID): boolean {

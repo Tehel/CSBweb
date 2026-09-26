@@ -233,9 +233,11 @@ function main(): void {
   {
     const game = makeGame();
     const stairs = findStairs(game, true);
-    const result = game.worldMove.resolvePartyMove(stairs.at, 0);
-    console.log(`5. the party resolved on the stairs: moved ${result.moved}`);
-    check(!result.moved && same(result.position, stairs.at), 'the stairs arm breaks for the party');
+    game.party.state.position = stairs.at;
+    game.worldMove.moveParty(-1, 0, stairs.at.x, stairs.at.y);
+    const landed = game.party.state.position;
+    console.log(`5. the party set down on the stairs: at level ${landed.z} (${landed.x},${landed.y})`);
+    check(same(landed, stairs.at), 'the stairs arm breaks for the party');
   }
 
   finish();

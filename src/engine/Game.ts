@@ -463,10 +463,10 @@ export class Game {
     /**
      * `tag0006a4` (doc/CSBwin-src/CSBCode.cpp:615-623): `if (d.newPartyLevel != -1)`,
      * `LoadPartyLevel(...); MoveObject(RN(RNnul), -1, 0, ...); d.newPartyLevel = -1;
-     * DiscardAllInput();`. The port has already placed the party — it resolves a whole
-     * pit and teleporter chain at once — and may already have loaded the level (see
-     * `loadPartyLevelIfChanged`), in which case only the discard is still owed. Says
-     * whether it ran.
+     * DiscardAllInput();`. The port has already loaded the level and placed the party
+     * there, as soon as it arrived (`WorldMove.arriveOnPartyLevel`, DEBT.md C57), so only
+     * the discard is still owed, unless something else changed the party's level (see
+     * `loadPartyLevelIfChanged`). Says whether it ran.
      */
     private loadNewPartyLevel(): boolean {
         if (!this.monsterSystem.loadPartyLevelIfChanged() && !this.ctx.loop.newPartyLevel) return false;

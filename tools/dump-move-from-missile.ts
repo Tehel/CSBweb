@@ -132,7 +132,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   const struck = launch(game, party, 2, Direction.WEST, 10);
   // The fireball whose timer runs: eastbound, in corner 1, so it leaves the cell into stone.
   const flying = launch(game, wallSide, 1, Direction.EAST, 1);
-  onWall = () => game.missileEncounter.checkMoveFromMissile(party, north, null);
+  onWall = () => game.missileEncounter.checkPartyMoveFromMissile(party, north);
 
   ts.processTimers(ts.now + 1);
 
@@ -151,7 +151,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
 {
   const struck = launch(game, party, 2, Direction.WEST, 10);
   calls.length = 0;
-  game.missileEncounter.checkMoveFromMissile(party, north, null);
+  game.missileEncounter.checkPartyMoveFromMissile(party, north);
   const met = calls.find((c) => c.type === 7 && c.missile === struck);
   show('2. a move after the timer, from a westbound fireball', met);
   check(met !== undefined && !met.filterObjectSet, 'the move meets it, outside any missile timer');

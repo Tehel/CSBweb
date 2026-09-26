@@ -1,7 +1,7 @@
 /**
  * `WorldMove` — the world `MoveObject(object, oldX, oldY, newX, newY, …)`
  * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`), as the port cuts it up: `moveObject` for
- * anything but the party and a monster set down, `resolvePartyMove` for the party,
+ * anything but the party and a monster set down, `moveParty` for the party,
  * `resolveMissileMove` for the missile timer, `resolveMonsterDestination` for
  * `MonsterSystem.moveMonster`, all four through the one teleporter / pit / stairs loop,
  * `resolveCellEffects`. With it are what only that loop
@@ -12,7 +12,7 @@
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
-import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, monsterLevitating } from '../renderer/csbwin/ObjectTables';
@@ -50,36 +50,82 @@ export class WorldMove {
   }
 
   /**
-   * Append the party's new square to the footprint trail.
+   * `MoveObject(RNnul, oldX, oldY, newX, newY, pPretendTeleporter, NULL)`
+   * (`doc/CSBwin-src/Code11f52.cpp:2796-3325`): the party moved on its own level, which
+   * every caller has loaded (`d.LoadedLevel == d.partyLevel`). `oldX < 0` places the
+   * party from nowhere (a step out of a stairwell, the arrival on a level), `newX < 0`
+   * lifts it (the stairs). In CSBWin's order:
    *
-   * CSBWin does this inside `MoveObject` whenever the party is the thing being
-   * moved and the party is non-empty (doc/CSBwin-src/Code11f52.cpp:3222-3247), so
-   * it fires for every kind of relocation — walking, teleporters, pits, DSAs.
+   * - the missiles in the corners it leaves, `CheckMoveFromMissile(oldX, oldY, newX,
+   *   newY)` with the cells as passed (`:2847-2853`), which end the move when one of
+   *   them wiped out a group;
+   * - the party set on the new square and taken through the teleporter and pit loop,
+   *   its square and facing following every jump and fall (`:2854-3135`);
+   * - nothing more when it is back on its square facing the same way (`:3194-3201`);
+   * - a footprint when it left its square (`:3224-3247`);
+   * - the old square's pads (`:3258-3268`), a monster where it landed deleted
+   *   (`:3298-3308`), then the new square's pads (`:3309-3317`).
+   *
+   * On another level, CSBWin sets `d.newPartyLevel` instead of pressing the pads
+   * (`:3319-3324`), and the top of the next tick places the party there. The port does
+   * that at once, in `arriveOnPartyLevel` (DEBT.md C57).
    */
-  notePartyMoved(): void {
-    if (this.ctx.party.state.champions.length === 0) return;
-    const position = this.ctx.party.state.position;
-    this.ctx.footprints.recordPartyMove(
-      this.ctx.state.tickCount,
-      position.z,
-      position.x,
-      position.y,
-      this.ctx.party.state.magicFootprintsActive !== 0,
-    );
+  moveParty(oldX: number, oldY: number, newX: number, newY: number, pretendTeleporter?: TeleporterRecord): void {
+    const party = this.ctx.party.state;
+    const level = party.position.z | 0;
+    if (oldX >= 0) {
+      const to = newX >= 0 ? new Position(newX, newY, level) : null;
+      if (this.ctx.systems.missileEncounter.checkPartyMoveFromMissile(new Position(oldX, oldY, level), to)) return;
+    }
+    let unchangedRoom = false;
+    if (newX >= 0) {
+      const oldFacing = party.facing; // `LOCAL_8`
+      party.position = new Position(newX, newY, level);
+      const landed = this.resolveCellEffects(
+        party.position, -1, 0, party.facing, undefined, true, undefined, pretendTeleporter,
+      ).position;
+      unchangedRoom = landed.z === level && landed.x === oldX && landed.y === oldY;
+      if (unchangedRoom) {
+        if (party.facing === oldFacing) return;
+      } else if (party.champions.length !== 0) {
+        this.ctx.footprints.recordPartyMove(
+          this.ctx.state.tickCount, landed.z, landed.x, landed.y, party.magicFootprintsActive !== 0,
+        );
+      }
+    }
+    const actuators = this.ctx.systems.actuators;
+    if (oldX >= 0) {
+      actuators.triggerObjectMove(new Position(oldX, oldY, level), OBJECT_ID_NULL, false, unchangedRoom, party.facing);
+    }
+    if (newX < 0) return;
+    const at = party.position;
+    const monster = this.dungeon.findFirstMonster(at);
+    if (monster !== OBJECT_ID_EOF) {
+      // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
+      // default, `0 < 2`.
+      const monsterDamage = this.ctx.systems.monsterDamage;
+      monsterDamage.dropMonsterRemains(at.z, at.x, at.y, monster, 1, at.z, true);
+      monsterDamage.deleteMonster(at.z, at.x, at.y);
+    }
+    if (at.z === level) {
+      actuators.triggerObjectMove(at, OBJECT_ID_NULL, true, unchangedRoom, party.facing);
+    } else {
+      this.arriveOnPartyLevel();
+    }
   }
 
-  resolvePartyMove(position: Position, facing: number): { position: Position; facing: number; moved: boolean } {
-    const result = this.resolveCellEffects(position, -1, 0, facing, undefined, true);
-    return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
-  }
-
-  resolvePartyMoveWithTeleporter(
-    position: Position,
-    facing: number,
-    teleporter: TeleporterRecord,
-  ): { position: Position; facing: number; moved: boolean } {
-    const result = this.resolveCellEffects(position, -1, 0, facing, undefined, true, undefined, teleporter);
-    return { position: result.position, facing: result.facing & 0x3, moved: result.moved };
+  /**
+   * `tag0006a4` (`doc/CSBwin-src/CSBCode.cpp:618-623`), which CSBWin runs at the top of
+   * the tick after the party reached another level: `LoadPartyLevel(d.newPartyLevel)`,
+   * then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the party
+   * through the square it stands on again, leaves a second footprint and presses its
+   * pads. The port runs both as soon as the party is on the level, and leaves the
+   * `DiscardAllInput` to the tick (`loadPartyLevelOnArrival`, DEBT.md C57).
+   */
+  arriveOnPartyLevel(): void {
+    this.ctx.systems.monsters.loadPartyLevelOnArrival();
+    const at = this.ctx.party.state.position;
+    this.moveParty(-1, 0, at.x, at.y);
   }
 
   /**
@@ -328,6 +374,11 @@ export class WorldMove {
 
         position = destination;
         moved = true;
+        // `d.partyX = newX; d.partyY = newY;` and `SetPartyFacing` at every jump (`:2958-2977`).
+        if (objectType === -1) {
+          this.ctx.party.state.position = position;
+          this.ctx.party.setFacing(curFacing);
+        }
         if (isSamePosition(prev, position)) break;
         continue;
       }
@@ -339,6 +390,9 @@ export class WorldMove {
         if (!next) break;
         position = next;
         moved = true;
+        // `d.partyX = newX; d.partyY = newY;` (`:3053-3056`), so a champion the fall kills
+        // drops what they carry where the party landed.
+        if (objectType === -1) this.ctx.party.state.position = position;
         // The fall hurts (`doc/CSBwin-src/Code11f52.cpp:3053-3106`). A group is hurt
         // at `oldX, oldY`, where it is still linked: nothing has moved in the database yet.
         if (objectType === -1) this.partyFallsIntoPit();
