@@ -249,8 +249,8 @@ export class MonsterSystem {
    *
    * Restoring replaces the whole `ITEM16` pool, so the in-use count here is stale
    * and the slots the save recorded may not match the level the party is now on.
-   * CSBWin has the same problem and solves it the same way — `TAG00bd40()` then
-   * `ProcessMonstersOnLevel()` (`doc/CSBwin-src/SaveGame.cpp:1240-1244`).
+   * CSBWin's game start does the same, `TAG00bd40()` then `ProcessMonstersOnLevel()`
+   * through `LoadPartyLevel(d.partyLevel)` (`doc/CSBwin-src/CSBCode.cpp:10491`, `:795`, `:818`).
    */
   reloadAfterSaveGame(): void {
     const pool = this.pool;

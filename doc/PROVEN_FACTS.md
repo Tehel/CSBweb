@@ -2144,9 +2144,13 @@ The invariant that falls out of the first two is that the cursor is always the *
 free slot, which is why this port derives it from the holes in the restored table on load
 rather than adding a field to the save format.
 
-Why it is not merely tidy numbering: `LoadGame` is followed by `ProcessMonstersOnLevel`
-(`doc/CSBwin-src/SaveGame.cpp:1240-1244`), which deletes and re-creates the movement
-timers of every monster group on the party's level. Without slot reuse every load
+Why it is not merely tidy numbering: a restore is followed by `ProcessMonstersOnLevel`,
+which deletes and re-creates the movement timers of every monster group on the party's
+level. The game start calls `LoadPartyLevel(d.partyLevel)`
+(`doc/CSBwin-src/CSBCode.cpp:10491`), which runs `TAG00bd40` to detach every group and then
+`ProcessMonstersOnLevel` (`:795`, `:818`). A save does the same once the file is closed
+(`doc/CSBwin-src/SaveGame.cpp:1237-1245`), so that the game played on after a save is the
+one a restore of it gives back (the port does not, `DEBT.md` C45). Without slot reuse every load
 abandons one slot per re-created timer — two per save/load cycle on `csbgame7.dat`,
 without bound, in an array CSBWin lets reach 5000 entries before `die(45, "No empty Timer
 entries")` (`doc/CSBwin-src/Timer.cpp:1003-1009`). `tools/dump-save-roundtrip.ts` runs

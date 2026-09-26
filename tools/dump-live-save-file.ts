@@ -479,7 +479,7 @@ function main(): void {
   // **A load is not a no-op, and CSBWin's is not either.** `reloadAfterSaveGame` deletes
   // and re-creates the movement timers of every monster group on the party's level, and
   // `NextMonsterUpdateTime` re-rolls each member's walk offsets
-  // (`doc/CSBwin-src/SaveGame.cpp:1240-1244`, `doc/CSBwin-src/CSBCode.cpp:5842`), so a
+  // (`doc/CSBwin-src/CSBCode.cpp:10491`, `doc/CSBwin-src/CSBCode.cpp:5842`), so a
   // world with live monsters comes back with different timer slots, a different queue
   // order, different `ITEM16` walk bytes and the odd creature facing. That is play, not
   // loss, and it is why `tools/dump-save-roundtrip.ts` says the same thing.

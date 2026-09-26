@@ -189,8 +189,8 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     };
     applySaveGameState(ctx.state.dungeon, saveGameState);
     // The restore replaced the ITEM16 pool wholesale; re-derive which groups are
-    // active, as CSBWin does after its own restore
-    // (doc/CSBwin-src/SaveGame.cpp:1240-1244).
+    // active, as CSBWin's game start does after its own restore
+    // (`LoadPartyLevel(d.partyLevel)`, doc/CSBwin-src/CSBCode.cpp:10491).
     ctx.footprints.restore(save.game.footprints);
     ctx.systems.monsters.reloadAfterSaveGame();
 }

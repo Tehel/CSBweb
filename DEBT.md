@@ -88,6 +88,7 @@ In payoff order: the first row is the next item.
 | C42 | The missile timer puts its own `MoveObject` together | S | ⏳ |
 | C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
 | C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
+| C45 | Saving does not re-attach the monsters | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -387,6 +388,22 @@ nothing assigns either hook (`src/renderer/ui/UIState.ts:176-178`), so neither r
 
 Port both into the UI, call them from the save menu, and delete the two hooks. Evidence: a
 check that opens the menu over an open chest.
+
+### C45 ⏳ Saving does not re-attach the monsters
+
+Once the file is closed, CSBWin's save detaches every active group and runs
+`ProcessMonstersOnLevel` (`doc/CSBwin-src/SaveGame.cpp:1237-1245`), so that the game
+played on after a save is the one a restore of it gives back. A restore re-attaches the
+same way, through the game start's `LoadPartyLevel(d.partyLevel)`
+(`doc/CSBwin-src/CSBCode.cpp:10491`). The port re-attaches on a load
+(`MonsterSystem.reloadAfterSaveGame`, from `applyRuntimeSaveState`) but not on a save:
+`getRuntimeSaveState`, which the quick-save and `buildSavePayload` both call, leaves the
+monsters alone. So a game played on after a save keeps its monsters' movement timers and
+`singleMonsterStatus` mirror bits, and its place in the random stream, where CSBWin's
+re-creates the timers and re-rolls the bits, drawing from the stream as it does. Re-attach
+after the save, in the save paths rather than in `getRuntimeSaveState`, which tools call
+just to read the state. Evidence: a check that plays on after a save beside a load of that
+save, frame for frame, and compares the monsters' timers and `singleMonsterStatus`.
 
 ---
 

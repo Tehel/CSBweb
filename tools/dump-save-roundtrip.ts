@@ -30,7 +30,7 @@
  *     above the highest restored one, and `LoadGame` is followed by
  *     `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
  *     movement timers of every monster group on the party's level
- *     (`doc/CSBwin-src/SaveGame.cpp:1240-1244`). Each load therefore abandoned one slot
+ *     (`LoadPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:10491`). Each load abandoned one slot
  *     per re-created timer — two per cycle on `csbgame7.dat`, for ever, in a fixed-size
  *     array CSBWin gives 5000 entries before it calls `die`.
  *
