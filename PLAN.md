@@ -22,9 +22,9 @@ phase, move its body to the archive and lift anything still open into `DEBT.md`.
 
 The next work is the technical debt, not new phases. `DEBT.md` gathers it — the findings of
 a whole-codebase review plus everything that used to be listed here as carried-over debt —
-in payoff order: housekeeping, duplicated implementations, known divergences from CSBWin,
-state representation, then architecture. That file gives the reasoning for the order and
-how to work an item. **One item per commit, a few per session**, then `/clear`.
+in payoff order: data-structure and architecture debt first, then the known divergences
+from CSBWin, and the unported CSBWin features last. That file gives the reasoning for the
+order and how to work an item. **One item per commit, a few per session**, then `/clear`.
 
 Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
 steps 3–5 — comes after the debt, unless a debt item needs it.
@@ -153,9 +153,11 @@ teleport and the footprint step into `AttackSystem`, `DsaSystem` and `TimerSyste
 `MouseSystem` (`Mouse.cpp`'s engine half: drop, throw, `ThrowByCharacter`); and
 `HallOfChampions` (`AddCharacter`, `_ResurrectReincarnateCancel`, `ReIncarnate`'s tail).
 **`GameMethods` is gone** and `Game.ts` is 1364 lines. Found and recorded: C36
-(`EnableCharacterAction` keeps the attack type). Next: the rest of E2 — what is still in
-`Game` that is not the loop (`DEBT.md` E2, "What is left"), then E3–E5. C33 and C34 wait
-until after E2; C25, C35 and C36 wait with the rest of tier C.
+(`EnableCharacterAction` keeps the attack type). The rest of E2 left `Game` the loop, the
+construction and one-line facades; found on the way: C37. On 2026-09-26 `DEBT.md` was
+cut down to its open items (the paid ones are in `doc/PLAN_ARCHIVE.md` → "Resolved
+debt"), and three residuals of paid items got IDs of their own: E6, C38, G11. Next: E3,
+then E4–E6; after tier E, C33 and C34, then the rest of tier C.
 
 ## Ground rules
 
