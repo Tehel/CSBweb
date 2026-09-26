@@ -86,8 +86,6 @@ export class MissileEncounter {
   }
 
   checkMoveFromMissile(oldPos: Position, newPos: Position | null, movedObject: ObjectID | null): void {
-    if (this.ctx.systems.timer.missileFilterObject !== OBJECT_ID_EOF) return;
-
     const party = this.ctx.party.state;
     const movedObjectType = movedObject === null ? -2 : -1;
     const whoLeavesCell = [0, 0, 0, 0];
@@ -159,8 +157,6 @@ export class MissileEncounter {
           const leaving = whoLeavesCell[missilePos];
           if (leaving === 0) continue;
 
-          this.ctx.systems.timer.missileFilterObject = missileRn;
-          this.ctx.systems.timer.missileFilterTimer = timer;
           const hit = this.processMissileEncounter(
             movedObjectType,
             oldPos.x,
@@ -171,7 +167,6 @@ export class MissileEncounter {
             (leaving - 1) & 0xff,
             missileRn,
           );
-          this.ctx.systems.timer.clearMissileFilterState();
 
           if (hit) {
             this.timers.deleteTimer(missile.timerIndex);
@@ -445,6 +440,9 @@ export class MissileEncounter {
     projectile: ObjectID,
     index: number,
   ): number {
+    // `BITS10_11(missileFilterTimer.timerWord8())` (`doc/CSBwin-src/Code11f52.cpp:1681`): the
+    // direction of the last missile `MissileTimer` ran, also for an encounter it did not
+    // cause, a party or a monster walking away from a missile.
     const direction = ((this.ctx.systems.timer.missileFilterTimer?.timerWord8 ?? 0) >> 10) & 0x3;
     return this.ctx.systems.dsa.processMissileEncounterFilter({
       type,

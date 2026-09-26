@@ -70,6 +70,7 @@ const CHECKS = [
   { tool: 'dump-db-reuse.ts' },
   { tool: 'dump-missile-monster.ts' },
   { tool: 'dump-missile-door.ts' },
+  { tool: 'dump-move-from-missile.ts' },
   { tool: 'dump-last-monster-attack.ts' },
   { tool: 'dump-monster-missile-type.ts' },
   { tool: 'dump-cast-spell.ts' },

@@ -69,11 +69,13 @@ export function setDoorState(map: MapData, x: number, y: number, doorState: numb
 export class TimerSystem {
   /**
    * `missileFilterObject` and `missileFilterTimer` (`doc/CSBwin-src/Timer.cpp:176-177`):
-   * the missile `MissileTimer` is moving, and its timer. `MissileEncounter` reads them
-   * (`Code11f52.cpp:1681`), and its `checkMoveFromMissile` also writes them, which
-   * CSBWin's does not (`DEBT.md` C40).
+   * the missile `MissileTimer` is moving, and its copy of the timer. Only `MissileTimer`
+   * writes them. Every exit puts the object back to `RNnul` and leaves the copy, so
+   * `missileFilterTimer` is the last missile timer run, and `MissileEncounterFilter`
+   * reads its direction (`Code11f52.cpp:1681`) for every encounter, whatever caused it.
+   * `null` is the zeroed global, before any missile has flown.
    */
-  missileFilterObject = OBJECT_ID_EOF;
+  missileFilterObject = OBJECT_ID_NULL;
   missileFilterTimer: TimerEntry | null = null;
   /**
    * `d.Time` as `processTimers` last set it. `MissileEncounter`'s `CreateCloud`,
@@ -1313,7 +1315,7 @@ export class TimerSystem {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return;
 
-    if (this.missileFilterObject !== OBJECT_ID_EOF) {
+    if (this.missileFilterObject !== OBJECT_ID_NULL) {
       throw new Error('MissileFilter already active');
     }
 
@@ -1333,7 +1335,7 @@ export class TimerSystem {
       const current = new Position(curMapX, curMapY, timer.level);
       if (this.isPartyAt(current)) {
         if (this.ctx.systems.missileEncounter.processMissileEncounter(-2, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
-          this.clearMissileFilterState();
+          this.missileFilterObject = OBJECT_ID_NULL;
           return;
         }
       }
@@ -1341,7 +1343,7 @@ export class TimerSystem {
       const monster = this.dungeon.findFirstMonster(current);
       if (monster !== OBJECT_ID_EOF) {
         if (this.ctx.systems.missileEncounter.processMissileEncounter(-1, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
-          this.clearMissileFilterState();
+          this.missileFilterObject = OBJECT_ID_NULL;
           return;
         }
       }
@@ -1350,7 +1352,7 @@ export class TimerSystem {
         const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
         this.ctx.systems.missileEncounter.missileEncounterFilter(5, current, curPos, missileRn, filterProjectile, -1);
         this.processObjectFromMissile(missileRn, null, current);
-        this.clearMissileFilterState();
+        this.missileFilterObject = OBJECT_ID_NULL;
         return;
       }
 
@@ -1395,7 +1397,7 @@ export class TimerSystem {
           const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
           if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
             if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, timer.level, curPos, missileRn)) {
-              this.clearMissileFilterState();
+              this.missileFilterObject = OBJECT_ID_NULL;
               return;
             }
           }
@@ -1413,7 +1415,7 @@ export class TimerSystem {
       if (outOfBounds) {
         const dropPos = new Position(origMapX, origMapY, timer.level);
         this.processObjectFromMissile(missileRn, null, dropPos);
-        this.clearMissileFilterState();
+        this.missileFilterObject = OBJECT_ID_NULL;
         return;
       }
 
@@ -1426,7 +1428,7 @@ export class TimerSystem {
 
       this.dungeon.removeObjectFromCell(oldPos, missileRn);
       if (!this.dungeon.addObjectToCell(newPos, newRn)) {
-        this.clearMissileFilterState();
+        this.missileFilterObject = OBJECT_ID_NULL;
         return;
       }
 
@@ -1442,7 +1444,7 @@ export class TimerSystem {
         const cellFlag = map.cellFlags[curMapX][curMapY];
         if (((cellFlag >> 5) & 0x7) === RoomType.DOOR) {
           if (this.ctx.systems.missileEncounter.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
-            this.clearMissileFilterState();
+            this.missileFilterObject = OBJECT_ID_NULL;
             return;
           }
         }
@@ -1452,7 +1454,7 @@ export class TimerSystem {
       const newRn = encodeObjectID(curPos & 0x3, DBType.MISSILE, decoded.index);
       this.dungeon.removeObjectFromCell(oldPos, missileRn);
       if (!this.dungeon.addObjectToCell(oldPos, newRn)) {
-        this.clearMissileFilterState();
+        this.missileFilterObject = OBJECT_ID_NULL;
         return;
       }
       timer.object = newRn;
@@ -1465,7 +1467,7 @@ export class TimerSystem {
     // doc/CSBwin-src/Timer.cpp:429), and so must we: the queue keeps a copy.
     const queued = this.timers.addTimer(timer);
     missile.timerIndex = queued.index & 0xffff;
-    this.clearMissileFilterState();
+    this.missileFilterObject = OBJECT_ID_NULL;
   }
 
   /**
@@ -1500,11 +1502,6 @@ export class TimerSystem {
     }
 
     this.dungeon.deleteDBEntry(missileRn);
-  }
-
-  clearMissileFilterState(): void {
-    this.missileFilterObject = OBJECT_ID_EOF;
-    this.missileFilterTimer = null;
   }
 
   /**

@@ -852,6 +852,23 @@ A missile that kills *some* of the group does not stop the move. `d.MonsterDamag
 global precisely because the call chain between `DamageMonster` and here carries no return
 value.
 
+## Only `MissileTimer` writes the missile filter's globals, and the timer copy outlives it
+
+`doc/CSBwin-src/Timer.cpp:176-177` declares `RN missileFilterObject = RNnul;` and
+`TIMER missileFilterTimer;`. `MissileTimer` copies the timer it runs into the second
+(`:220`) and points the first at its missile (`:221`). Each of its six exits sets
+`missileFilterObject = RNnul` (`:254`, `:272`, `:287`, `:362`, `:416`, `:427`), and none
+touches the copy. Nothing else in the tree writes either: outside `Timer.cpp` they appear
+only in `MissileEncounterFilter`, which reads the copy's direction as the DSA's parameter 6,
+`BITS10_11(missileFilterTimer.timerWord8())` (`doc/CSBwin-src/Code11f52.cpp:1681`).
+`CheckMoveFromMissile` (`:2530-2776`) uses neither.
+
+So the filter's parameter 6 is the direction of the last missile `MissileTimer` ran, also
+for an encounter no missile timer caused: a party or a monster walking away from a missile,
+or `CheckMonsterVersusMissiles`. It is 0, the zeroed global's, before any missile has
+flown. A move made from inside a missile timer, by a filter's DSA, still checks the
+missiles it leaves. `tools/dump-move-from-missile.ts` checks both.
+
 ## `item16Attached` is a conjunction, not a lookup
 
 `doc/CSBwin-src/Code11f52.cpp:3122`:
