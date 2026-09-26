@@ -28,7 +28,7 @@ export interface DevHost {
     renderView(): void;
     /**
      * The portrait pixels of a champion carrying only `portraitGraphic`, for the save
-     * writer — the renderer's, since only it holds graphic 26. See
+     * writer — the screen's, since only it holds graphic 26. See
      * `SavePayloadOptions`.
      */
     portraitOf?: (champion: Champion) => number[] | undefined;

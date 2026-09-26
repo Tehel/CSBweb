@@ -12,12 +12,12 @@ Protocol instead, through the `window.__probe` handle `src/main.ts` exposes.
 ```bash
 node tools/probe-ui.mjs 'game.party.state.champions.map(c => c && c.name)'
 node tools/probe-ui.mjs --boot --shot /tmp/boot.png
-node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'renderer.ui.uiMode'
+node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
 node tools/probe-ui.mjs --stop
 ```
 
 Actions run in the order given; the bare argument is evaluated last, with `game`,
-`renderer` and `renderView` in scope, and printed as JSON. `--help` lists them all.
+`screen` and `renderView` in scope, and printed as JSON. `--help` lists them all.
 
 ## It is fast only if you let it be
 

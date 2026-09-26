@@ -464,7 +464,7 @@ icon. It calls `SelectSaveGame(_9_, 1, 1, 1)` (`:1563`), against the disk icon's
 
 This port reaches the same place through `openSaveMenu(ui, 'loadOnly')` — the same unbounded
 list as the disk icon, with no SAVE button — drawn on a cleared screen by
-`ViewportRenderer.presentSaveMenuOnly`. Cancelling puts the entrance back up, as the retry
+`GameScreen.presentSaveMenuOnly`. Cancelling puts the entrance back up, as the retry
 loop does. The four fixed slots, the recency letters and this port's other divergences from
 them are in `doc/CSBWIN_MENU_REFERENCE.md`.
 

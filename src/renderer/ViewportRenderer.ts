@@ -1,17 +1,13 @@
 /**
- * Viewport Renderer - Integration module
+ * The dungeon view: `DrawViewport` and everything set up around it for one frame.
  *
- * This module connects all the pieces together:
- * - Graphics loading
- * - Bytecode interpreter
- * - DrawViewport main loop
- * - Canvas rendering
+ * It owns the interpreter context, the level's wall, door and floor/ceiling bitmaps, and
+ * the viewport's palettes with the level's monster colours applied. It draws into
+ * `buffer`, the 224x136 viewport; putting that on the screen, with the interface around
+ * it, is `GameScreen`'s.
  */
 
-import { GraphicsLoader } from '../data/GraphicsLoader';
-import type { Champion, PartyState } from '../engine/gameTypes';
-import type { FeedParameters } from '../engine/Feeding';
-import type { CharacterStats } from '../engine/CharacterStats';
+import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { MapData } from '../data/dungeonTypes';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import { DrawViewport } from './DrawViewport';
@@ -21,102 +17,23 @@ import {
   createPrisonDungeonState,
   prisonPartyPosition,
 } from './intro/PrisonLevel';
-import { DungeonState } from '../engine/DungeonState';
-import type { IndexedBitmap } from './csbwin/CanvasBlitter';
-import {
-  clearIndex,
-  createPaletteIndexViewportBuffer,
-  tag0088b2Index,
-  updateImageDataFromIndex,
-  updateImageDataFromIndexWithViewportPalette,
-} from './csbwin/CanvasBlitter';
+import type { DungeonState } from '../engine/DungeonState';
+import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
+import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, tag0088b2Index } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
-import { extractObjectTables } from './csbwin/ObjectTables';
-import { extractUITables, type UITables } from './csbwin/UITables';
-import { loadFontData } from './csbwin/TextRenderer';
-import { ImageFormat } from '../core/imageDecoder';
+import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
 import {
   initializeFloorCeilingIndexed,
   initializeDoorBitmapsIndexed,
   initializeWallBitmapsIndexed,
   VIEWPORT_WIDTH,
   VIEWPORT_HEIGHT,
-  SCREEN_WIDTH,
-  SCREEN_HEIGHT,
-  VIEWPORT_X,
-  VIEWPORT_Y,
 } from './ViewportGraphics';
 import { getOrSet, Position } from '@/core';
 import { OBJECT_ID_EOF } from '../core/types';
-import { createUIState, UIMode, type ObjectMoveHandler, type ScreenIndexBuffer, type UIState } from './ui/UIState';
-import {
-  drawStaticUIFrame,
-} from './ui/Draw';
-import {
-  selectPaletteIndexForLightLevel,
-} from './ui/Light';
-import {
-  ViewportCursorAction,
-  hasCursorObject,
-  resolveEmptyHandedViewportClick,
-  resolveViewportCursorAction,
-  tryPickViewportObject,
-  tryUseFrontWallItem,
-} from './ui/ViewportPicking';
-import {
-  drawCursorItem,
-  drawHoverHighlights,
-  handleMouseButton,
-  handleMouseUnclick,
-  searchMouseButtons,
-  syncInventoryButtons,
-  updateButtonLists,
-} from './ui/Mouse';
-import {
-  drawSpellControls,
-  drawSpellPanel,
-} from './ui/MagicPanel';
-import { attackPanelTick, drawAttackPanel } from './ui/Attack';
-import { handleUIKey } from './ui/Keyboard';
-import {
-  drawReincarnateScreen,
-  isReincarnateScreenOpen,
-  openReincarnateScreen,
-  reincarnateClick,
-  reincarnateKey,
-} from './ui/ReIncarnate';
-import {
-  closeSaveMenu,
-  drawSaveMenu,
-  isSaveMenuOpen,
-  openSaveMenu,
-  saveMenuClick,
-  saveMenuKey,
-  saveMenuWheel,
-  type SaveMenuMode,
-} from './ui/SaveMenu';
-import {
-  drawInventoryBackground,
-  drawInventoryScreen,
-  syncOpenChest,
-} from './ui/Inventory';
-import {
-} from './ui/Feeding';
-import {
-  drawHeldObjectName,
-  drawPartyStatus,
-  getChampionPortrait,
-} from './ui/Character';
-import {
-  displaySleepScreen,
-  drawMessageLines,
-  shadeRectIndex,
-} from './ui/Draw';
-import type { ViewingFilterOptions, ViewingFilterResult } from '../engine/DsaSystem';
 
 type IndexedBitmapSet = IndexedBitmap[]
-
-export { UIMode } from './ui/UIState';
 
 export interface WallBitmapSet {
   wall: IndexedBitmapSet;
@@ -132,85 +49,59 @@ export interface FloorCeiling {
   mirrored: Uint8Array;
 }
 
+export interface ViewportRendererDeps {
+  graphicsLoader: GraphicsLoader;
+  dungeonState: DungeonState;
+  csbGraphicsLoader?: CSBGraphicsLoader;
+  /** `graphic232.palette552`: the viewport's palettes, one per light level. */
+  palette552: number[][];
+  /** The screen's graphics cache, which the interpreter shares with the interface. */
+  graphicCache: Map<string, IndexedBitmap>;
+  getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
+  viewportContext: CanvasRenderingContext2D;
+}
 
-/**
- * Main ViewportRenderer class
- * Manages viewport rendering state and provides API for rendering
- */
 export class ViewportRenderer {
-  private csbGraphicsLoader?: CSBGraphicsLoader;
-  private canvas: HTMLCanvasElement | null = null;
-  private screenCtx: CanvasRenderingContext2D | null = null;
-  private screenImageData: ImageData | null = null; // RGBA staging for present
-  private palette: number[] | null = null;
-  private uiPalette: number[] | null = null;
-  private baseViewportPalettes: number[][] | null = null;
-  private viewportPalettes: number[][] | null = null;
-  private lastPaletteLevel: number | null = null;
-  private initialized: boolean = false;
+  /** What `DrawViewport` and the bytecode interpreter read and write, CSBWin's `d.` for them. */
+  readonly context: InterpreterContext;
+  /** The viewport, 224x136 palette indices: `d.pViewportBMP`. */
+  readonly buffer: PaletteIndexViewportBuffer;
+  readonly objectTables: ObjectTables;
+  /**
+   * The viewport's palettes, one per light level, with the current level's monster colours
+   * applied; `null` when `graphics.dat` has none.
+   */
+  readonly viewportPalettes: number[][] | null;
 
+  private readonly graphicsLoader: GraphicsLoader;
+  private readonly dungeonState: DungeonState;
+  private readonly baseViewportPalettes: number[][] | null;
+  private readonly mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
+  private readonly mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
+  private lastPaletteLevel: number | null = null;
   private wallBitmapSets: Map<number, WallBitmapSet> = new Map();
-  private mirrorWallRectF2?: { x1: number; x2: number; y1: number; y2: number };
-  private mirrorWallRectF3?: { x1: number; x2: number; y1: number; y2: number };
-  private lastRenderPosition: Position | null = null;
-  private lastRenderFacing: number = 0;
   private floorCeilingCache: Map<number, FloorCeiling> = new Map();
 
-  /** Everything the UI modules share. See `ui/UIState.ts`. */
-  private readonly ui: UIState;
-
-  constructor(graphicsLoader: GraphicsLoader, dungeonState: DungeonState, csbGraphicsLoader?: CSBGraphicsLoader) {
-    this.csbGraphicsLoader = csbGraphicsLoader;
-    this.ui = createUIState(graphicsLoader, dungeonState, {
-      getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
-      renderLastFrame: () => this.renderLastFrame(),
-    });
-  }
-
-  /**
-   * Initialize the viewport renderer
-   * Loads all necessary graphics and sets up the rendering context
-   */
-  async initialize(canvas: HTMLCanvasElement): Promise<void> {
-    if (this.initialized) return;
-
-    console.log('Initializing viewport renderer...');
-
-    // Create full screen canvas (320×200)
-    this.canvas = canvas;
-    this.screenCtx = this.canvas.getContext('2d');
-    if (!this.screenCtx) throw new Error('Failed to create screen 2D context');
-    this.screenImageData = this.screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
-
-    // Get palette
-    const palette = this.ui.graphicsLoader.getPalette(0);
-    this.palette = palette;
-    console.log('Got palette from graphics loader');
+  constructor(deps: ViewportRendererDeps) {
+    this.graphicsLoader = deps.graphicsLoader;
+    this.dungeonState = deps.dungeonState;
 
     // Extract CSBWin viewport tables from graphics.dat item 0x22e
-    const viewportTables = extractViewportTables(this.ui.graphicsLoader);
+    const viewportTables = extractViewportTables(this.graphicsLoader);
     console.log(`Extracted wallRectangles[14] from 0x22e at offset 0x${viewportTables.wallRectanglesOffset.toString(16)}`);
-    const objectTables = extractObjectTables(this.ui.graphicsLoader, viewportTables.wallRectanglesOffset);
-    this.ui.objectTables = objectTables;
+    this.objectTables = extractObjectTables(this.graphicsLoader, viewportTables.wallRectanglesOffset);
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
-    this.ui.uiTables = extractUITables(this.ui.graphicsLoader);
-    const palette552 = this.ui.uiTables.graphic232.palette552;
-    if (palette552 && palette552.length > 0) {
-      this.baseViewportPalettes = palette552.map((pal) => pal.slice());
-      this.viewportPalettes = palette552.map((pal) => pal.slice());
-      this.uiPalette = this.baseViewportPalettes[0] ?? this.palette;
+    if (deps.palette552.length > 0) {
+      this.baseViewportPalettes = deps.palette552.map((pal) => pal.slice());
+      this.viewportPalettes = deps.palette552.map((pal) => pal.slice());
     } else {
-      this.uiPalette = this.palette;
+      this.baseViewportPalettes = null;
+      this.viewportPalettes = null;
     }
-    this.ui.fontData = loadFontData(this.ui.graphicsLoader);
 
-    const viewportIndexBuffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
-    this.ui.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-    updateButtonLists(this.ui);
-
-    // Create interpreter context
-    this.ui.context = {
+    this.buffer = createPaletteIndexViewportBuffer(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 0);
+    this.context = {
       wallBitmaps: [],
       doorBitmaps: [],
       wallRectangles: viewportTables.wallRectangles,
@@ -229,265 +120,37 @@ export class ViewportRenderer {
       championPortraitRect: viewportTables.championPortraitRect,
       wallGraphicSet: 0,
       backgroundGraphicSet: 0,
-      getGraphicBitmap: (n: number) => this.getGraphicBitmap(n),
-      graphicCache: this.ui.graphicCache,
-      objectTables,
-      csbGraphics: this.csbGraphicsLoader,
-      dungeonState: this.ui.dungeonState,
-      viewportContext: this.screenCtx,
-      viewportIndexBuffer,
+      getGraphicBitmap: deps.getGraphicBitmap,
+      graphicCache: deps.graphicCache,
+      objectTables: this.objectTables,
+      csbGraphics: deps.csbGraphicsLoader,
+      dungeonState: this.dungeonState,
+      viewportContext: deps.viewportContext,
+      viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],
     };
-
-    this.initialized = true;
-    console.log('Viewport renderer initialized successfully');
-  }
-
-  getUITables(): UITables | null {
-    return this.ui.uiTables;
-  }
-
-  /* Mouse entry points for the host page; the work is in `ui/Mouse.ts`. */
-
-  /** The button a click hits, 0 for none; the host queues it with `Game.onMouseClick`. */
-  searchMouseButtons(x: number, y: number, buttons: number): number {
-    return searchMouseButtons(this.ui, x, y, buttons);
   }
 
   /**
-   * A click on the Reincarnate name-entry screen. That screen reads the mouse itself and
-   * does its own geometry (`doc/CSBwin-src/Code13ea4.cpp:114-212`) — it never consults a
-   * button list, and while it is up nothing else may act on a click.
+   * The level the party is on, for the monster colours: re-applied only when it changes,
+   * whether or not the view is drawn (it is not while the party sleeps).
    */
-  handleReincarnateClick(x: number, y: number): void {
-    reincarnateClick(this.ui, x, y);
+  selectLevel(z: number): void {
+    if (this.lastPaletteLevel === z) return;
+    this.applyMonsterPaletteOverrides(this.dungeonState.getMap(z));
+    this.lastPaletteLevel = z;
   }
 
   /**
-   * Offer a key to the Reincarnate name-entry screen. Returns whether it took it —
-   * while that screen is up it takes everything, which is what makes it modal
-   * (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`).
+   * One frame of the dungeon seen from `position`. `seeThroughWalls` is CSBWin's
+   * `d.SeeThruWalls`, read as a boolean each frame:
+   * `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).
+   * The engine maintains the counter (`Magic.cpp:1314` increments it, TT_73 decrements
+   * it — see `TimerSystem.processSeeThruWallsTimer`).
    */
-  handleReincarnateKey(key: string): boolean {
-    return reincarnateKey(this.ui, key);
-  }
-
-  isReincarnateScreenOpen(): boolean {
-    return isReincarnateScreenOpen(this.ui);
-  }
-
-  /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6738`) — open the screen. */
-  openReincarnateScreen(chIdx: number): void {
-    openReincarnateScreen(this.ui, chIdx);
-  }
-
-  setReincarnateNamedHandler(handler: (chIdx: number, name: string, title: string) => void): void {
-    this.ui.onReincarnateNamed = handler;
-  }
-
-  /**
-   * Offer a key to the interface's own bindings (`src/renderer/ui/Keyboard.ts`).
-   * Returns whether it was claimed. The modal screens must be offered the key first.
-   */
-  handleUIKey(key: string): boolean {
-    return handleUIKey(this.ui, key);
-  }
-
-  /**
-   * A button `Game.handleMouseEvents` took off the mouse queue and does not handle itself.
-   * `DiskMenuNeeded` is raised by the disk icon's handler and acted on by whoever called
-   * `HandleMouseEvents` — the main loop in CSBWin (`doc/CSBwin-src/CSBCode.cpp:762`), this
-   * method here. The deferral is the whole reason the flag exists.
-   */
-  handleMouseButton(num: number, x: number, y: number): void {
-    handleMouseButton(this.ui, num, x, y);
-    if (this.ui.diskMenuNeeded) {
-      this.ui.diskMenuNeeded = false;
-      openSaveMenu(this.ui);
-    }
-  }
-
-  /** The button-up, `0x0add` (`doc/CSBwin-src/Mouse.cpp:1523-1549`). */
-  handleMouseUnclick(): void {
-    handleMouseUnclick(this.ui);
-  }
-
-  /* The save/load screen; the work is in `ui/SaveMenu.ts`. */
-
-  isSaveMenuOpen(): boolean {
-    return isSaveMenuOpen(this.ui);
-  }
-
-  /** `loadOnly` is what a title screen wants: the same list with no SAVE button. */
-  openSaveMenu(mode: SaveMenuMode = 'full'): void {
-    openSaveMenu(this.ui, mode);
-  }
-
-  closeSaveMenu(): void {
-    closeSaveMenu(this.ui);
-  }
-
-  /**
-   * A click while the save screen is up, taken **straight from the DOM event** rather
-   * than through the mouse queue. That is CSBWin's modality — `_WaitForMenuSelect`
-   * replaces every button list while it runs — and it is also what preserves the
-   * transient user activation `showDirectoryPicker` demands.
-   */
-  handleSaveMenuClick(x: number, y: number, buttons: number): void {
-    saveMenuClick(this.ui, x, y, buttons);
-  }
-
-  handleSaveMenuKey(key: string): boolean {
-    return saveMenuKey(this.ui, key);
-  }
-
-  handleSaveMenuWheel(delta: number): boolean {
-    return saveMenuWheel(this.ui, delta);
-  }
-
-  /**
-   * `AddCharacter`'s portrait blit, deferred to save time.
-   *
-   * CSBWin copies a cell of basic graphic 26 into the character record the moment a
-   * champion joins (`doc/CSBwin-src/Character.cpp:486-495`), so `CHARDESC` always holds
-   * pixels. This engine holds no graphics, so a champion it created carries the cell
-   * *index* instead and the pixels are resolved here — the save writer asks for them
-   * when it packs block 4.
-   */
-  portraitPixelsFor(champion: Champion): number[] | undefined {
-    const bitmap = getChampionPortrait(this.ui, champion);
-    return bitmap ? Array.from(bitmap.pixels) : undefined;
-  }
-
-  setSaveHandlers(handlers: {
-    onCreateSave: NonNullable<UIState['onCreateSave']>;
-    onRestoreSave: NonNullable<UIState['onRestoreSave']>;
-    onSetPaused: NonNullable<UIState['onSetPaused']>;
-  }): void {
-    this.ui.onCreateSave = handlers.onCreateSave;
-    this.ui.onRestoreSave = handlers.onRestoreSave;
-    this.ui.onSetPaused = handlers.onSetPaused;
-  }
-
-  /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
-
-  resolveEmptyHandedViewportClick(x: number, y: number): 'doorSwitch' | 'wall' | 'object' | null {
-    return resolveEmptyHandedViewportClick(this.ui, x, y);
-  }
-
-  tryPickViewportObject(x: number, y: number): boolean {
-    return tryPickViewportObject(this.ui, x, y);
-  }
-
-  hasCursorObject(): boolean {
-    return hasCursorObject(this.ui);
-  }
-
-  resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
-    return resolveViewportCursorAction(this.ui, x, y);
-  }
-
-  tryUseFrontWallItem(x: number, y: number): boolean {
-    return tryUseFrontWallItem(this.ui, x, y);
-  }
-
-  /**
-   * Hand the UI the engine's `CharacterStats`, so the load and weight figures the eye
-   * panel prints come out of the same code the engine acts on.
-   */
-  setCharacterStats(stats: CharacterStats): void {
-    this.ui.characterStats = stats;
-  }
-
-  setPlaySound(playSound?: (soundId: number, rateIdx?: number, distance?: number) => void): void {
-    this.ui.playSound = playSound;
-  }
-
-  setViewingFilter(handler?: (options: ViewingFilterOptions) => ViewingFilterResult | null): void {
-    this.ui.viewingFilter = handler;
-  }
-
-  setObjectMoveHandler(handler?: ObjectMoveHandler): void {
-    this.ui.onObjectMove = handler;
-  }
-
-  setSpellCastHandler(handler?: (chIdx: number, incantation: number[]) => number | void): void {
-    this.ui.onSpellCast = handler;
-  }
-
-  /** Mouth → engine: the apply half of `_FeedCharacter`. */
-  setFeedingHandler(handler?: (chIdx: number, fp: FeedParameters) => boolean): void {
-    this.ui.applyFeeding = handler;
-  }
-
-  /** Hall of Champions menu → engine: `_ResurrectReincarnateCancel(button)`. */
-  setResurrectReincarnateCancelHandler(handler?: (button: number) => void): void {
-    this.ui.onResurrectReincarnateCancel = handler;
-  }
-
-  setPartyState(state: PartyState | null): void {
-    this.ui.partyState = state;
-    syncInventoryButtons(this.ui);
-  }
-
-  setHoverPoint(point: { x: number; y: number } | null): void {
-    this.ui.hoverPoint = point;
-  }
-
-  /**
-   * Recomposite the screen — cursor, hover highlights, every UI panel — over
-   * whatever `viewportIndexBuffer` already holds, without calling `DrawViewport`
-   * again.
-   *
-   * `render()` always redraws the dungeon view itself, which in CSBWin happens once
-   * per game tick (`doc/CSBwin-src/CSBCode.cpp:638`) — never in response to the
-   * mouse. Nothing in CSBWin's own mouse handling calls `DrawViewport`; the cursor
-   * is a hardware/software sprite tracked independently of it. This is the
-   * equivalent for mousemove: it exists so the custom-drawn cursor can follow the
-   * pointer at input rate without also re-running the bytecode interpreter — and
-   * with it `BytecodeInterpreter.graphicRandom`/`viewportRandom` — on every pixel of
-   * mouse travel, which turned a teleporter's or a lightning door's shimmer into
-   * something that changed only when the mouse moved and far too fast otherwise.
-   */
-  refreshOverlay(): void {
-    if (!this.initialized || !this.ui.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
-      return;
-    }
-    this.presentViewport();
-  }
-
-  /** Attack menu → engine: `Attack()` and `d.attackDamageToDisplay`. */
-  setChampionAttackHandler(
-    attack: (chIdx: number, attackType: number) => number,
-    consumeDamage: () => number,
-  ): void {
-    this.ui.onChampionAttack = attack;
-    this.ui.onConsumeAttackDamage = consumeDamage;
-  }
-
-  /**
-   * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), which CSBWin's main loop calls
-   * once per game tick just before drawing (`:685`).
-   */
-  attackPanelTick(): void {
-    attackPanelTick(this.ui);
-  }
-
-  /** Buttons 145 and 146 — the sleep icon and the viewport click that wakes. */
-  setSleepHandlers(onSleep: () => void, onWakeUp: () => void): void {
-    this.ui.onSleep = onSleep;
-    this.ui.onWakeUp = onWakeUp;
-  }
-
-  setUIMode(mode: UIMode): void {
-    this.ui.uiMode = mode;
-    updateButtonLists(this.ui);
-    syncInventoryButtons(this.ui);
-  }
-
-  isInventoryOpen(): boolean {
-    return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+  draw(position: Position, facing: number, seeThroughWalls: boolean): void {
+    this.drawViewportFrame(this.dungeonState, position, facing, this.dungeonState.getMap(position.z), seeThroughWalls);
   }
 
   private resetViewportPalettes(): void {
@@ -506,8 +169,8 @@ export class ViewportRenderer {
   }
 
   private applySpecialColorScheme(whichColor: number, schemeIndex: number): void {
-    const tables = this.ui.objectTables;
-    if (!tables || !this.viewportPalettes) return;
+    const tables = this.objectTables;
+    if (!this.viewportPalettes) return;
     const scheme = tables.specialColors[schemeIndex];
     if (!scheme) return;
     for (let i = 0; i < this.viewportPalettes.length; i++) {
@@ -525,8 +188,8 @@ export class ViewportRenderer {
   }
 
   private applyMonsterPaletteOverrides(map?: MapData | null): void {
-    if (!this.ui.objectTables || !this.viewportPalettes) return;
-    if (!this.ui.objectTables.specialColors || this.ui.objectTables.specialColors.length === 0) return;
+    if (!this.viewportPalettes) return;
+    if (!this.objectTables.specialColors || this.objectTables.specialColors.length === 0) return;
 
     this.resetViewportPalettes();
     this.applySpecialColorScheme(9, 8);
@@ -534,8 +197,8 @@ export class ViewportRenderer {
 
     const monsterTypes = map?.monsterTypes ?? [];
     for (const monsterType of monsterTypes) {
-      if (monsterType < 0 || monsterType >= this.ui.objectTables.monsterGraphics.length) continue;
-      const graphic = this.ui.objectTables.monsterGraphics[monsterType];
+      if (monsterType < 0 || monsterType >= this.objectTables.monsterGraphics.length) continue;
+      const graphic = this.objectTables.monsterGraphics[monsterType];
       if (!graphic) continue;
       const lowNibble = graphic.uByte11 & 0x0f;
       if (lowNibble !== 0) this.applySpecialColorScheme(9, lowNibble - 1);
@@ -545,55 +208,30 @@ export class ViewportRenderer {
   }
 
   /**
-   * Render the viewport for a given party position and facing
-   */
-  render(position: Position, facing: number): void {
-    const { x, y, z } = position;
-    if (!this.initialized || !this.ui.context || !this.canvas || !this.screenCtx || !this.screenImageData || !this.palette) {
-      throw new Error('Renderer not initialized. Call initialize() first.');
-    }
-
-    if (!this.ui.context.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
-    this.lastRenderPosition = new Position(x, y, z);
-    this.lastRenderFacing = facing;
-
-    const map = this.ui.dungeonState.getMap(z);
-    if (this.lastPaletteLevel !== z) {
-      this.applyMonsterPaletteOverrides(map);
-      this.lastPaletteLevel = z;
-    }
-    // `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the party
-    // sleeps (doc/CSBwin-src/CSBCode.cpp:637); `DisplaySleepScreen` holds the viewport.
-    if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
-    else this.drawViewportFrame(this.ui.dungeonState, position, facing, map);
-    this.presentViewport();
-  }
-
-  /**
    * Everything `DrawViewport` needs set up around it, for one frame.
    *
-   * Split out of `render` so the prison-door screen can run the same renderer over its
+   * Separate from `draw` so the prison-door screen can run the same renderer over its
    * synthetic 5x5 level (`renderPrisonInterior`, `intro/PrisonLevel.ts`) — which is what
    * CSBWin does when it swaps `d.LevelCellFlags` and `d.pCurLevelDesc` and calls
    * `DrawViewport(2, 2, 0)` (`doc/CSBwin-src/CSBCode.cpp:9556-9583`). The palette
-   * bookkeeping stays with `render`: it belongs to the level the party is on.
+   * bookkeeping stays with `selectLevel`: it belongs to the level the party is on.
    */
   private drawViewportFrame(
     dungeonState: DungeonState,
     position: Position,
     facing: number,
     map: MapData | null,
+    seeThroughWalls: boolean,
   ): void {
     const { x, y, z } = position;
-    if (!this.ui.context?.viewportIndexBuffer) throw new Error('Missing viewportIndexBuffer');
 
     // Select current wall + floor/ceiling style based on map descriptor (CSBWin LEVELDESC.word14 bits).
     const wallGraphicSet = map?.descriptor.mapGraphicsStyle ?? 0;
     const backgroundGraphicSet = map?.descriptor.floorCeilingStyle ?? 0;
-    this.ui.context.wallGraphicSet = wallGraphicSet;
-    this.ui.context.backgroundGraphicSet = backgroundGraphicSet;
-    this.ui.context.frameMapIndex = z;
-    this.ui.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
+    this.context.wallGraphicSet = wallGraphicSet;
+    this.context.backgroundGraphicSet = backgroundGraphicSet;
+    this.context.frameMapIndex = z;
+    this.context.numWallDecoration = map?.descriptor.wallGraphicsCount ?? 0;
 
     // CSBWin `ReadGraphicsForLevel()` (Code390e.cpp:180-199): DoorGraphic[3][2] is derived from Door1Type/Door2Type.
     const doorType0 = map?.descriptor.doorType0Index ?? 0;
@@ -601,7 +239,7 @@ export class ViewportRenderer {
     const base0 = 108 + 3 * doorType0;
     const base1 = 108 + 3 * doorType1;
     // DoorGraphic[0]=F1 (nearness=2) = base+2; DoorGraphic[1]=F2 = base+1; DoorGraphic[2]=F3 = base+0
-    this.ui.context.doorGraphics = [
+    this.context.doorGraphics = [
       [base0 + 2, base1 + 2],
       [base0 + 1, base1 + 1],
       [base0 + 0, base1 + 0],
@@ -611,76 +249,55 @@ export class ViewportRenderer {
     // (`doc/CSBwin-src/CSBCode.cpp:5780-5783`) — the level's two door "types" resolved
     // to their characteristics word, bit 10 of which flags a "lightning door" and
     // drives `DrawDoor`'s per-frame random mirror/flip (`CSBCode.cpp:4156-4166`).
-    const doorCharacteristics = this.ui.objectTables?.doorCharacteristics;
-    this.ui.context.doorTOC = doorCharacteristics
+    const doorCharacteristics = this.objectTables.doorCharacteristics;
+    this.context.doorTOC = doorCharacteristics
       ? [doorCharacteristics[doorType0] ?? 0, doorCharacteristics[doorType1] ?? 0]
       : [0, 0];
 
-    // CSBWin reads the See-Thru-Walls counter as a boolean each frame:
-    // `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).
-    // The engine already maintains the counter (`Magic.cpp:1314` increments it, TT_73
-    // decrements it — see `TimerSystem.processSeeThruWallsTimer`).
-    this.ui.context.seeThroughWalls = (this.ui.partyState?.seeThruWalls ?? 0) !== 0;
+    this.context.seeThroughWalls = seeThroughWalls;
 
     // CSBWin: `d.UseMirrorImages = (x + y + facing) & 1` (Viewport.cpp:6740)
     const useMirrorImages = ((x + y + facing) & 1) !== 0;
-    this.ui.context.useMirrorImages = useMirrorImages;
+    this.context.useMirrorImages = useMirrorImages;
 
     // Compose floor/ceiling background (CSBWin: FloorAndCeilingOnly + conditional Mirror).
     const fc = this.getFloorCeiling(backgroundGraphicSet);
-    this.ui.context.viewportIndexBuffer.pixels.set(useMirrorImages ? fc.mirrored : fc.normal);
+    this.buffer.pixels.set(useMirrorImages ? fc.mirrored : fc.normal);
 
     // Select bitmaps set for this frame (CSBWin: mirrors swap some pointers when `UseMirrorImages != 0`).
     const wb = this.getBitmapsSet(wallGraphicSet);
-    this.ui.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
-    this.ui.context.doorBitmaps = wb.doors;
-    this.ui.context.doorSwitchRects = [];
-    this.ui.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
-    this.ui.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
-    this.ui.context.facingAlcove = false;
-    this.ui.context.facingViAltar = false;
-    this.ui.context.facingWaterFountain = false;
+    this.context.wallBitmaps = useMirrorImages ? wb.wallMirrored : wb.wall;
+    this.context.doorBitmaps = wb.doors;
+    this.context.doorSwitchRects = [];
+    this.context.viewportObjectButtons = Array.from({ length: 6 }, () => ({ x1: 255, x2: 0, y1: 0, y2: 0 }));
+    this.context.viewportObjectRNs = new Array(5).fill(OBJECT_ID_EOF);
+    this.context.facingAlcove = false;
+    this.context.facingViAltar = false;
+    this.context.facingWaterFountain = false;
 
     // Per-frame context for opcodes that need global state (CSBWin Interpret() params).
-    this.ui.context.frameFacing = facing;
+    this.context.frameFacing = facing;
 
     // Execute the main viewport drawing function (writes to index buffer via interpreter)
-    DrawViewport(this.ui.context, dungeonState, position, facing);
+    DrawViewport(this.context, dungeonState, position, facing);
   }
-
 
   private getBitmapsSet(wallGraphicSet: number): WallBitmapSet {
     return getOrSet(this.wallBitmapSets, wallGraphicSet, () => {
-      const wall = initializeWallBitmapsIndexed(this.ui.graphicsLoader, wallGraphicSet);
+      const wall = initializeWallBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
       const wallMirrored = this.createMirrorModeWallBitmaps(wall);
-      const doors = initializeDoorBitmapsIndexed(this.ui.graphicsLoader, wallGraphicSet);
+      const doors = initializeDoorBitmapsIndexed(this.graphicsLoader, wallGraphicSet);
       return { wall, wallMirrored, doors }
     });
   }
 
   private getFloorCeiling(backgroundGraphicSet: number): FloorCeiling {
     return getOrSet(this.floorCeilingCache, backgroundGraphicSet, () => {
-      const { floor, ceiling } = initializeFloorCeilingIndexed(this.ui.graphicsLoader, backgroundGraphicSet);
+      const { floor, ceiling } = initializeFloorCeilingIndexed(this.graphicsLoader, backgroundGraphicSet);
       const normal = this.buildFloorCeilingTemplate(ceiling, floor, true, false);
       const mirrored = this.buildFloorCeilingTemplate(ceiling, floor, false, true);
       return { normal, mirrored }
     });
-  }
-
-  private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
-    if (graphicNum < 0) return null;
-    const key = `${graphicNum}-${format}`;
-    const cached = this.ui.graphicCache.get(key);
-    if (cached) return cached;
-    try {
-      const decoded = this.ui.graphicsLoader.getImage(graphicNum, format);
-      const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
-      const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
-      this.ui.graphicCache.set(key, bmp);
-      return bmp;
-    } catch {
-      return null;
-    }
   }
 
   private createMirrorModeWallBitmaps(normal: IndexedBitmapSet): IndexedBitmapSet {
@@ -699,7 +316,7 @@ export class ViewportRenderer {
     out[1] = mirror(normal[0]); // F0L1 becomes mirror of original F0R1
     out[2] = mirror(normal[2]); // F1
 
-    const wallRects = this.ui.context?.wallRectangles;
+    const wallRects = this.context.wallRectangles;
     if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
       const derivedF3 = this.buildMirrorWallBitmap(normal[4], wallRects[0], this.mirrorWallRectF3, 11);
       const derivedF2 = this.buildMirrorWallBitmap(normal[3], wallRects[3], this.mirrorWallRectF2, 8);
@@ -822,145 +439,6 @@ export class ViewportRenderer {
     }
   }
 
-  private presentViewport(): void {
-    if (!this.ui.context?.viewportIndexBuffer || !this.screenCtx || !this.screenImageData || !this.palette || !this.ui.screenIndexBuffer) return;
-
-    clearIndex(this.ui.screenIndexBuffer, 0);
-    drawStaticUIFrame(this.ui);
-    const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
-    if (!inventoryOpen) {
-      syncOpenChest(this.ui, null);
-      this.ui.displayResurrectChestOrScroll = 0;
-    }
-    if (inventoryOpen) {
-      drawInventoryBackground(this.ui);
-    } else {
-      this.blitViewportToScreen();
-    }
-    drawPartyStatus(this.ui);
-    if (inventoryOpen) {
-      drawInventoryScreen(this.ui);
-      if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
-      // `_ReIncarnate` draws over the open inventory rather than replacing it: it
-      // blanks the name strip and puts its keyboard where the eye panel was
-      // (`doc/CSBwin-src/Code13ea4.cpp:39-50`). So it goes last, and only here.
-      drawReincarnateScreen(this.ui);
-    }
-    drawAttackPanel(this.ui);
-    drawSpellPanel(this.ui);
-    drawSpellControls(this.ui);
-    drawHeldObjectName(this.ui);
-    drawMessageLines(this.ui);
-    if (this.ui.partyState?.sleeping && this.ui.uiTables) {
-      // `TAG02076e` ran on the way to sleep (`doc/CSBwin-src/Mouse.cpp:1691`): the
-      // movement arrows, the magic area and the weapon-ready area stay shaded until
-      // `WakeUp`'s `TAG0207cc` redraws them (`CSBCode.cpp:9934`). The inventory is
-      // always closed by then, so the arrows are always there to shade.
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
-    }
-    if (isSaveMenuOpen(this.ui)) {
-      // `TAG02076e` shades the movement-arrow, magic and weapon-ready areas before any
-      // menu goes up (`doc/CSBwin-src/Character.cpp:5118-5131`). The screen itself then
-      // goes over the viewport, which is where `_DoMenu` leaves it when `I1 == 0`.
-      if (this.ui.uiTables) {
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
-      }
-      drawSaveMenu(this.ui);
-    }
-    drawHoverHighlights(this.ui);
-    drawCursorItem(this.ui);
-
-    const uiPalette = this.uiPalette ?? this.palette;
-    if (!uiPalette) return;
-    const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);
-    if (!inventoryOpen && viewportPalette !== uiPalette) {
-      updateImageDataFromIndexWithViewportPalette(
-        this.screenImageData,
-        this.ui.screenIndexBuffer,
-        {
-          x1: VIEWPORT_X,
-          y1: VIEWPORT_Y,
-          x2: VIEWPORT_X + VIEWPORT_WIDTH - 1,
-          y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1,
-        },
-        viewportPalette,
-        uiPalette,
-      );
-    } else {
-      updateImageDataFromIndex(this.screenImageData, this.ui.screenIndexBuffer, uiPalette);
-    }
-    this.screenCtx.putImageData(this.screenImageData, 0, 0);
-  }
-
-  private getViewportPalette(): number[] | null {
-    if (!this.viewportPalettes || this.viewportPalettes.length === 0) return null;
-    const index = Math.min(selectPaletteIndexForLightLevel(this.ui), this.viewportPalettes.length - 1);
-    // Publish it as CSBWin's `d.CurrentPalette`: the monster AI reads the light level
-    // to shorten how far a monster can see (`doc/CSBwin-src/Monster.cpp:577-581`).
-    this.onPaletteSelected?.(index);
-    return this.viewportPalettes[index] ?? this.viewportPalettes[0] ?? null;
-  }
-
-  /** Set by the host so the engine learns the current light level. */
-  setPaletteSelectedHandler(handler: (index: number) => void): void {
-    this.onPaletteSelected = handler;
-  }
-
-  private onPaletteSelected?: (index: number) => void;
-
-  private renderLastFrame(): void {
-    if (this.bootFrameRenderer) {
-      this.bootFrameRenderer();
-      return;
-    }
-    if (!this.lastRenderPosition) return;
-    this.render(this.lastRenderPosition, this.lastRenderFacing);
-  }
-
-  private blitViewportToScreen(): void {
-    if (!this.ui.context?.viewportIndexBuffer || !this.ui.screenIndexBuffer) return;
-
-    const src = this.ui.context.viewportIndexBuffer;
-    const dst = this.ui.screenIndexBuffer;
-    const dstX = VIEWPORT_X;
-    const dstY = VIEWPORT_Y;
-
-    const maxWidth = Math.min(src.width, dst.width - dstX);
-    const maxHeight = Math.min(src.height, dst.height - dstY);
-
-    for (let y = 0; y < maxHeight; y++) {
-      const srcRow = y * src.width;
-      const dstRow = (dstY + y) * dst.width + dstX;
-      dst.pixels.set(src.pixels.subarray(srcRow, srcRow + maxWidth), dstRow);
-    }
-  }
-
-  /* ------------------------------------------------ the pre-game screens ---- */
-
-  /** The 320x200 screen the intro modules draw into (`d.LogicalScreenBase`). */
-  getScreenBuffer(): ScreenIndexBuffer {
-    if (!this.ui.screenIndexBuffer) throw new Error('Renderer not initialized');
-    return this.ui.screenIndexBuffer;
-  }
-
-  /** `ReadAndExpandGraphic(n, …)`. Throws rather than return a blank screen. */
-  getBitmap(graphicNum: number): IndexedBitmap {
-    const bitmap = this.getGraphicBitmap(graphicNum);
-    if (!bitmap) throw new Error(`graphics.dat item ${graphicNum} did not decode`);
-    return bitmap;
-  }
-
-  /** Push the screen buffer to the canvas through an explicit palette. */
-  presentScreen(palette: number[]): void {
-    if (!this.screenCtx || !this.screenImageData || !this.ui.screenIndexBuffer) return;
-    updateImageDataFromIndex(this.screenImageData, this.ui.screenIndexBuffer, palette);
-    this.screenCtx.putImageData(this.screenImageData, 0, 0);
-  }
-
   /**
    * `DrawViewport(2, 2, 0)` over the synthetic prison level — the corridor seen through the
    * doorway on the entrance screen (`doc/CSBwin-src/CSBCode.cpp:9583`). Returns a copy of
@@ -970,54 +448,18 @@ export class ViewportRenderer {
    * monster palette overrides; this level has none and must not be allowed to stand in for
    * one.
    */
-  renderPrisonInterior(): IndexedBitmap {
-    if (!this.initialized || !this.ui.context?.viewportIndexBuffer) {
-      throw new Error('Renderer not initialized. Call initialize() first.');
-    }
-    const seed = this.ui.dungeonState.getData().header.randomSeed ?? 0;
+  renderPrisonInterior(seeThroughWalls: boolean): IndexedBitmap {
+    const seed = this.dungeonState.getData().header.randomSeed ?? 0;
     const dungeonState = createPrisonDungeonState(seed);
     this.drawViewportFrame(
       dungeonState,
       prisonPartyPosition(),
       PRISON_PARTY_POSITION.facing,
       dungeonState.getMap(PRISON_LEVEL_INDEX),
+      seeThroughWalls,
     );
     this.lastPaletteLevel = null;
-    const src = this.ui.context.viewportIndexBuffer;
+    const src = this.buffer;
     return { width: src.width, height: src.height, pixels: Uint8Array.from(src.pixels) };
-  }
-
-  /**
-   * The save/load screen alone on a cleared screen, for the entrance's "Resume".
-   *
-   * `_ReadEntireGame` reaches the chooser through `SelectSaveGame(_9_, 1, 1, 1)`
-   * (`doc/CSBwin-src/SaveGame.cpp:1563`), whose leading 1 is `_DoMenu`'s `FadeOldScreen` /
-   * `ClearOldScreen` pair (`doc/CSBwin-src/Menu.cpp:285-291`) — so unlike the in-game disk
-   * icon, this one does not sit over the picture behind it.
-   */
-  presentSaveMenuOnly(palette: number[]): void {
-    if (!this.ui.screenIndexBuffer) return;
-    clearIndex(this.ui.screenIndexBuffer, 0);
-    drawSaveMenu(this.ui);
-    this.presentScreen(palette);
-  }
-
-  /**
-   * Redraw hook for while a pre-game screen is up.
-   *
-   * `ui.renderLastFrame()` normally re-runs the last adventure frame; the save/load screen
-   * calls it whenever its list changes (`ui/SaveMenu.ts`). During the entrance screen there
-   * is no adventure frame to re-run, so the boot sequence installs its own.
-   */
-  setBootFrameRenderer(render: (() => void) | null): void {
-    this.bootFrameRenderer = render;
-  }
-
-  private bootFrameRenderer: (() => void) | null = null;
-
-  // Get the viewport canvas element styling element
-  getCanvasStyle(): CSSStyleDeclaration {
-    if (!this.canvas) throw new Error('Renderer not initialized');
-    return this.canvas.style;
   }
 }

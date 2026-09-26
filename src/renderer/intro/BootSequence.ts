@@ -23,7 +23,7 @@
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
 import { updateDebug } from '../../ui';
-import type { ViewportRenderer } from '../ViewportRenderer';
+import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap } from '../csbwin/UITables';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
@@ -34,7 +34,7 @@ const VBL_MS = 1000 / 60;
 
 export interface BootSequenceDeps {
   canvas: HTMLCanvasElement;
-  renderer: ViewportRenderer;
+  gameScreen: GameScreen;
   /** `StartSound` — see `timerDataToRateIndex` for where the rate index comes from. */
   playSound?: (soundId: number, rateIdx?: number) => void;
   /**
@@ -54,10 +54,10 @@ interface AttachedHost {
 }
 
 function createIntroHost(deps: BootSequenceDeps): AttachedHost {
-  const { canvas, renderer } = deps;
-  const screen = renderer.getScreenBuffer();
-  const uiTables = renderer.getUITables();
-  if (!uiTables) throw new Error('Renderer not initialized');
+  const { canvas, gameScreen } = deps;
+  const screen = gameScreen.getScreenBuffer();
+  const uiTables = gameScreen.getUITables();
+  if (!uiTables) throw new Error('Screen not initialized');
   // The ST's colour registers as the boot ROM leaves them: black. Every screen here opens
   // with a fade, so the first thing the player sees is a fade up from this.
   const globalPalette = [...PALETTE_11914];
@@ -126,9 +126,9 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
     screen,
     uiTables,
     globalPalette,
-    getGraphic: (graphicNum) => renderer.getBitmap(graphicNum),
+    getGraphic: (graphicNum) => gameScreen.getBitmap(graphicNum),
     present: () => {
-      const paint = (): void => renderer.presentScreen(globalPalette);
+      const paint = (): void => gameScreen.presentScreen(globalPalette);
       if (!cursorVisible) paint();
       else withCursor(screen, arrow, pointerX, pointerY, paint);
     },
@@ -144,7 +144,7 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
         requestAnimationFrame(tick);
       }),
     startSound: (graphicNum, rateIdx) => deps.playSound?.(graphicNum, rateIdx),
-    drawPrisonInterior: () => renderer.renderPrisonInterior(),
+    drawPrisonInterior: () => gameScreen.renderPrisonInterior(),
     nextEvent: () =>
       new Promise<IntroEvent>((resolve) => {
         const queued = queue.shift();
@@ -191,7 +191,7 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
  * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
  */
 async function openLoadMenu(host: IntroHost, deps: BootSequenceDeps): Promise<boolean> {
-  const { renderer } = deps;
+  const { gameScreen } = deps;
   const menuPalette = host.uiTables.graphic232.palette552[0] ?? host.globalPalette;
 
   await fadeToPalette(host, PALETTE_11914);
@@ -199,20 +199,20 @@ async function openLoadMenu(host: IntroHost, deps: BootSequenceDeps): Promise<bo
 
   // `STShowCursor(HC33)` right before `SelectSaveGame` (`doc/CSBwin-src/SaveGame.cpp:1562`).
   host.setCursorVisible(true);
-  const draw = (): void => renderer.presentSaveMenuOnly(host.globalPalette);
-  renderer.setBootFrameRenderer(draw);
-  renderer.openSaveMenu('loadOnly');
+  const draw = (): void => gameScreen.presentSaveMenuOnly(host.globalPalette);
+  gameScreen.setBootFrameRenderer(draw);
+  gameScreen.openSaveMenu('loadOnly');
   draw();
   await fadeToPalette(host, menuPalette);
 
-  while (renderer.isSaveMenuOpen()) {
+  while (gameScreen.isSaveMenuOpen()) {
     const event = await host.nextEvent();
-    if (event.kind === 'click') renderer.handleSaveMenuClick(event.x, event.y, event.buttons);
-    else renderer.handleSaveMenuKey('Escape');
+    if (event.kind === 'click') gameScreen.handleSaveMenuClick(event.x, event.y, event.buttons);
+    else gameScreen.handleSaveMenuKey('Escape');
     draw();
   }
 
-  renderer.setBootFrameRenderer(null);
+  gameScreen.setBootFrameRenderer(null);
   return deps.consumeRestored();
 }
 

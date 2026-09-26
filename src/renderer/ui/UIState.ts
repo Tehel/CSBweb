@@ -2,7 +2,7 @@
  * Shared state for the DM user interface.
  *
  * CSBWin keeps this in globals that `Mouse.cpp`, `CSBUI.cpp`, `Character.cpp` and
- * `Magic.cpp` all reach into. `ViewportRenderer` owns the single instance and the UI
+ * `Magic.cpp` all reach into. `GameScreen` owns the single instance and the UI
  * modules take it as their first argument, which keeps each of them a thin, greppable
  * translation of its C++ counterpart instead of another method on a god object.
  */

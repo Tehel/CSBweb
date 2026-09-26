@@ -121,7 +121,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates),
             RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
-renderer/   ViewportRenderer (viewport composition only), DrawViewport, ViewportGraphics
+renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
+            ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
             SummarizeRoomInfo, CanvasBlitter, TextRenderer

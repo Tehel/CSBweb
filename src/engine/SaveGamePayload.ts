@@ -92,7 +92,7 @@ export interface SavePayloadOptions {
     /**
      * The portrait pixels of a champion who carries only `portraitGraphic` — every
      * champion this engine created, since the engine holds no graphics to blit from.
-     * `ViewportRenderer.portraitPixelsFor` is the one the app passes; without it such a
+     * `GameScreen.portraitPixelsFor` is the one the app passes; without it such a
      * champion's `CHARDESC.portrait` is written blank.
      */
     portraitOf?: (champion: Champion) => number[] | undefined;

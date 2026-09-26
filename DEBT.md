@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E4 | `ViewportRenderer` has become the UI host; `main.ts`'s `init()` | M | ⏳ |
 | E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
 | E6 | `CHARDESC::Possession` is written out once per module | S | ⏳ |
 | C25 | The stairs do not turn a monster's corner | M | ⚠️ |
@@ -89,6 +88,7 @@ In payoff order: the first row is the next item.
 | C41 | The party's `MoveObject` is put together at four call sites | M | ⏳ |
 | C42 | The missile timer puts its own `MoveObject` together | S | ⏳ |
 | C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
+| C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -110,25 +110,6 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 ---
 
 ## E — Architecture
-
-### E4 ⏳ `ViewportRenderer` has become the UI host; `main.ts`'s `init()`
-
-`src/renderer/ViewportRenderer.ts` is 1023 lines and no longer renders only the viewport.
-It hosts the save menu and the Reincarnate
-screen (`saveMenuClick` / `saveMenuKey` / `saveMenuWheel`, `reincarnateClick` /
-`reincarnateKey`) and the UI state, and it has thirteen handler setters that `main.ts`
-calls one by one: `setCharacterStats`, `setPlaySound`, `setViewingFilter`,
-`setObjectMoveHandler`, `setSpellCastHandler`, `setFeedingHandler`,
-`setResurrectReincarnateCancelHandler`, `setChampionAttackHandler`, `setSleepHandlers`,
-`setSaveHandlers`, `setPaletteSelectedHandler`, `setReincarnateNamedHandler` and
-`setBootFrameRenderer`.
-
-Keep the viewport composition (`drawViewportFrame` and its helpers) in a class that
-deserves the name. Move the screen and UI hosting into a class named for what it is, and
-have it take the handlers as one object at construction, the way `GameHost` gathers the
-engine's callbacks. `main.ts`'s `init()` (`src/main.ts:168-429`, about 260 lines)
-needs the same treatment: load, construct, wire and start as separate functions.
-Evidence: `npm test -- --frames`.
 
 ### E5 ⚠️ The quick-save snapshot is hand-maintained
 
@@ -378,6 +359,26 @@ monster (255). The port's `MonsterAI.checkMonsterVersusMissiles` compares the co
 `positions & 3` (`src/engine/MonsterAI.ts:1174`), so wherever those bits are set it meets
 the missiles in that corner, which CSBWin lets through. Compare the whole byte. Evidence: a
 check that parks a missile in corner 3 of a centred lone monster's cell and runs its turn.
+
+### C44 ⏳ The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody
+
+`openSaveMenu` and `closeSaveMenu` call `ui.onEnterMenu` and `ui.onLeaveMenu`
+(`src/renderer/ui/SaveMenu.ts:161`, `:184`), CSBWin's `TAG02076e` and `TAG0207cc`, but
+nothing assigns either hook (`src/renderer/ui/UIState.ts:176-178`), so neither runs.
+`GameScreen.presentViewport` shades the three panels while the menu is up, which is
+`TAG02076e`'s drawing half. The rest is not ported:
+
+- `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108-5135`) repacks the open chest when the
+  inventory shows one (`d.DisplayResurrectChestOrScroll == 4`, `:5124`), through
+  `RepackChest` (`:3108`), which is unported (C34 needs it too). It also sets the cursor
+  shape to 0 (`:5133`), and does nothing at all while the party sleeps (`:5111`).
+- `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) re-selects the magic caster
+  (`:9945-9947`), sets `d.Word20252 = 1` when no attack menu is open (`:9950`), and redraws
+  the attack options and the inventory. The port redraws every frame, so only the state
+  changes can matter.
+
+Port both into the UI, call them from the save menu, and delete the two hooks. Evidence: a
+check that opens the menu over an open chest.
 
 ---
 

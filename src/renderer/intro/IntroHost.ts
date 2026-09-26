@@ -7,7 +7,7 @@
  * -> `_TAG01f746`. They talk to the Atari hardware directly — the logical screen base, the
  * shifter's sixteen colour registers, the VBL counter, the sound chip — and nothing else.
  *
- * This interface is that hardware. `ViewportRenderer` implements it (`introHost()`), the
+ * This interface is that hardware. `BootSequence` builds it over `GameScreen`, the
  * three modules in this directory are the ports, and neither knows about the other's
  * internals. Full spec and citations: `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
  *

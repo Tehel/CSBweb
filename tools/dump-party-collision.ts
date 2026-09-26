@@ -119,7 +119,7 @@ async function main(): Promise<void> {
   );
 
   // `Game.move` does not play the bump sound — it puts a `soundId` on the
-  // `MovementResult` and `main.ts` plays it (`src/main.ts:385`). So the sound has to
+  // `MovementResult` and `main.ts` plays it (its `wire`, `game.onMove`). So the sound has to
   // be read off the result, not off a sound hook; the first draft of this tool
   // counted hook calls and saw silence for the wall too.
   let lastResult: MovementResult | undefined;

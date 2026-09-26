@@ -26,14 +26,14 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     canvas.dataset.uiBound = 'true';
 
     canvas.addEventListener('mousemove', (e) => {
-        if (!ctx.renderer) return;
+        if (!ctx.screen) return;
         const { x, y } = getEventPosition(canvas, e);
-        ctx.renderer.setHoverPoint({ x, y });
+        ctx.screen.setHoverPoint({ x, y });
         // Cursor tracking only — never a full `renderView()`. That would re-run
         // `DrawViewport` (and its animated-texture randomness) on every pixel of
         // mouse travel; CSBWin's own cursor moves independently of the dungeon
         // redraw, which happens once per game tick, never on a mouse event.
-        ctx.renderer.refreshOverlay();
+        ctx.screen.refreshOverlay();
     });
 
     canvas.addEventListener('mousedown', (e) => {
@@ -45,31 +45,31 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
         // game's mouse queue is also what keeps the browser's transient user
         // activation alive — `showDirectoryPicker` refuses without it, and the queue is
         // drained a frame later.
-        if (buttonMask !== 0 && ctx.renderer?.isSaveMenuOpen()) {
-            ctx.renderer.handleSaveMenuClick(x, y, buttonMask);
+        if (buttonMask !== 0 && ctx.screen?.isSaveMenuOpen()) {
+            ctx.screen.handleSaveMenuClick(x, y, buttonMask);
             ctx.renderView();
             return;
         }
         if (buttonMask === 0) return;
-        if (ctx.renderer.isReincarnateScreenOpen()) {
-            ctx.renderer.handleReincarnateClick(x, y);
+        if (ctx.screen.isReincarnateScreenOpen()) {
+            ctx.screen.handleReincarnateClick(x, y);
             ctx.renderView();
             return;
         }
         // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
         // behind any key or click already waiting, and hands it to `handleMouseButton`.
-        ctx.game.onMouseClick(ctx.renderer.searchMouseButtons(x, y, buttonMask), x, y);
+        ctx.game.onMouseClick(ctx.screen.searchMouseButtons(x, y, buttonMask), x, y);
     });
 
     canvas.addEventListener('mouseup', () => {
-        if (ctx.renderer?.isSaveMenuOpen()) return;
+        if (ctx.screen?.isSaveMenuOpen()) return;
         ctx.game.onMouseUnClick();
     });
 
     canvas.addEventListener('wheel', (e) => {
-        if (!ctx.renderer?.isSaveMenuOpen()) return;
+        if (!ctx.screen?.isSaveMenuOpen()) return;
         e.preventDefault();
-        ctx.renderer.handleSaveMenuWheel(e.deltaY);
+        ctx.screen.handleSaveMenuWheel(e.deltaY);
     }, { passive: false });
 
     canvas.addEventListener('contextmenu', (e) => {
@@ -77,7 +77,7 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 
     canvas.addEventListener('mouseleave', () => {
-        ctx.renderer.setHoverPoint(null);
+        ctx.screen.setHoverPoint(null);
         ctx.renderView();
     });
 }
@@ -88,21 +88,21 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
  * picked up. The eye, when the inventory hides the viewport, is `handleMouseButton`'s.
  */
 function handleClickInViewport(ctx: UIContext, x: number, y: number): void {
-    if (ctx.renderer.isInventoryOpen()) return;
-    const cursorAction = ctx.renderer.resolveViewportCursorAction(x, y);
+    if (ctx.screen.isInventoryOpen()) return;
+    const cursorAction = ctx.screen.resolveViewportCursorAction(x, y);
     if (cursorAction) {
         if (cursorAction.kind === 'drop') ctx.game.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
         else if (cursorAction.kind === 'throw') ctx.game.throwObjectFromCursor(cursorAction.side);
         else if (cursorAction.kind === 'wall') {
-            if (!ctx.renderer.tryUseFrontWallItem(x, y)) {
+            if (!ctx.screen.tryUseFrontWallItem(x, y)) {
                 ctx.game.handleWallClick();
             }
         }
-    } else if (!ctx.renderer.hasCursorObject()) {
-        const target = ctx.renderer.resolveEmptyHandedViewportClick(x, y);
+    } else if (!ctx.screen.hasCursorObject()) {
+        const target = ctx.screen.resolveEmptyHandedViewportClick(x, y);
         if (target === 'doorSwitch') ctx.game.handleDoorSwitchClick();
         else if (target === 'wall') ctx.game.handleWallClick();
-        else if (target === 'object') ctx.renderer.tryPickViewportObject(x, y);
+        else if (target === 'object') ctx.screen.tryPickViewportObject(x, y);
     }
 }
 
@@ -121,11 +121,11 @@ export function bindUIEvents(): void {
         ctx.game.setMouseEventHandlers({
             button: (num, x, y) => {
                 if (num === 80) handleClickInViewport(ctx, x, y);
-                ctx.renderer.handleMouseButton(num, x, y);
+                ctx.screen.handleMouseButton(num, x, y);
                 ctx.renderView();
             },
             unclick: () => {
-                ctx.renderer.handleMouseUnclick();
+                ctx.screen.handleMouseUnclick();
                 ctx.renderView();
             },
         });
@@ -134,7 +134,7 @@ export function bindUIEvents(): void {
         document.getElementById('btn-qload')?.addEventListener('click', () => ctx.onQuickLoad());
 
         smoothButton?.addEventListener('click', () => {
-            const style = ctx.renderer.getCanvasStyle();
+            const style = ctx.screen.getCanvasStyle();
             style.imageRendering = style.imageRendering === 'smooth' ? 'pixelated' : 'smooth';
             smoothButton.classList.toggle('is-pressed', style.imageRendering === 'smooth');
             saveUISettings(readUISettings());
@@ -221,16 +221,16 @@ export function bindUIEvents(): void {
             // The save/load screen takes the keyboard whole, for the reason the
             // Reincarnate screen does: 'S' would otherwise walk the party backwards
             // while the player scrolled a list of saves.
-            if (ctx.renderer?.isSaveMenuOpen()) {
+            if (ctx.screen?.isSaveMenuOpen()) {
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
-                ctx.renderer.handleSaveMenuKey(e.key);
+                ctx.screen.handleSaveMenuKey(e.key);
                 ctx.renderView();
                 e.preventDefault();
                 return;
             }
-            if (ctx.renderer?.isReincarnateScreenOpen()) {
+            if (ctx.screen?.isReincarnateScreenOpen()) {
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
-                ctx.renderer.handleReincarnateKey(e.key);
+                ctx.screen.handleReincarnateKey(e.key);
                 ctx.renderView();
                 e.preventDefault();
                 return;
@@ -251,7 +251,7 @@ export function bindUIEvents(): void {
             // The panel bindings come first. They are the larger half of the table and
             // they claim their keys whatever the game state, so the movement switch
             // below never sees one.
-            if (ctx.renderer?.handleUIKey(e.key)) {
+            if (ctx.screen?.handleUIKey(e.key)) {
                 ctx.renderView();
                 e.preventDefault();
                 return;

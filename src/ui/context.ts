@@ -1,9 +1,9 @@
 import type { DungeonData } from '../data';
 import type { Game } from '../engine';
-import type { ViewportRenderer } from '../renderer/ViewportRenderer';
+import type { GameScreen } from '../renderer/GameScreen';
 
 export interface UIContext {
-    renderer: ViewportRenderer;
+    screen: GameScreen;
     game: Game;
     dungeonData: DungeonData;
     renderView: () => void;

@@ -82,7 +82,7 @@ export function DrawViewport(
   facing: number,
 ): void {
   // The floor/ceiling background is composed by the caller before this runs, so the cell
-  // programs below blit on top of it — see `ViewportRenderer.render`, which mirrors
+  // programs below blit on top of it — see `ViewportRenderer.drawViewportFrame`, which mirrors
   // CSBWin's `FloorAndCeilingOnly()` + conditional `Mirror()`
   // (doc/CSBwin-src/Viewport.cpp:3327, doc/CSBwin-src/Viewport.cpp:6740).
 
@@ -132,7 +132,7 @@ export function DrawViewport(
   // Wall champion portraits, see-thru walls and custom backgrounds are all handled inside
   // the cell programs: `SummarizeRoomInfo` fills `championPortraitOrdinal`, and the
   // `SeeThroughWalls` opcode reads `context.seeThroughWalls`
-  // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.render`.
+  // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.drawViewportFrame`.
   //
   // Still unported: CSBWin also recolours a near door when See-Thru-Walls is active
   // (`TAG004b26(17, 2)` at doc/CSBwin-src/CSBCode.cpp:4171-4174).

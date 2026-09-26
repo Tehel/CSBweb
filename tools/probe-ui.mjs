@@ -11,11 +11,11 @@
 //
 //   node tools/probe-ui.mjs 'game.party.champions[0].name'
 //   node tools/probe-ui.mjs --boot --shot /tmp/panel.png
-//   node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'renderer.ui.uiMode'
+//   node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
 //   node tools/probe-ui.mjs --stop
 //
 // Actions run in the order given; the bare argument is the expression, evaluated last with
-// `game`, `renderer` and `renderView` in scope and printed as JSON.
+// `game`, `screen` and `renderView` in scope and printed as JSON.
 //
 // Deliberately NOT a test: nothing here asserts. Reproduce the bug in a `tools/dump-*.ts`
 // once you know what it is — see the `playtest-bug` and `verification-tools` skills.
@@ -59,7 +59,7 @@ Actions, applied in the order given:
   --shot <file.png>   screenshot to file
   --stop              kill the dev server and chrome, then exit
 
-The bare argument is evaluated last with game, renderer and renderView in scope, and
+The bare argument is evaluated last with game, screen and renderView in scope, and
 printed as JSON:  node tools/probe-ui.mjs 'game.party.champions.map(c => c.name)'
 
 Ports: DEV_PORT (9000), CDP_PORT (9222). Both daemons are started if absent and left up.`);
@@ -121,7 +121,7 @@ await send('Page.enable');
 
 const probed = (expr) => `(() => { const p = window.__probe;
   if (!p) throw new Error('window.__probe missing — is Debug enabled? try --boot');
-  const { game, renderer, renderView } = p;
+  const { game, screen, renderView } = p;
   return JSON.parse(JSON.stringify((${expr}) ?? null, (k, v) =>
     typeof v === 'bigint' ? String(v) : v instanceof Map ? Object.fromEntries(v) : v));
 })()`;

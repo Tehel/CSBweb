@@ -45,7 +45,7 @@ export function readUISettings(): UISettings {
     const logVisible = (document.getElementById('log')?.style.display ?? '') !== 'none';
     const hoverVisible = (document.getElementById('hover')?.style.display ?? '') !== 'none';
     const championsVisible = isChampionPanelVisible();
-    const smooth = getUIContext()?.renderer.getCanvasStyle().imageRendering === 'smooth';
+    const smooth = getUIContext()?.screen.getCanvasStyle().imageRendering === 'smooth';
     return {
         mapVisible,
         logVisible,
@@ -89,7 +89,7 @@ export function applyUISettings(settings: UISettings): void {
     updateChampionPanel();
 
     if (ctx) {
-        const style = ctx.renderer.getCanvasStyle();
+        const style = ctx.screen.getCanvasStyle();
         style.imageRendering = settings.smooth ? 'smooth' : 'pixelated';
     }
     smoothButton?.classList.toggle('is-pressed', settings.smooth);
