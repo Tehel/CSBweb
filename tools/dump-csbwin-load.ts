@@ -279,11 +279,10 @@ function main(): void {
     }
 
     // And the round trip that a player actually performs: load a CSBWin save, then
-    // quick-save and reload. The quick-save carries the world through
-    // `DungeonSnapshot`, which is a hand-maintained list of what play can change
-    // (`PLAN.md` carries that debt) — so a CSBWin load that put something into the
-    // world the snapshot does not capture would be lost at the next F5/F9 and nothing
-    // else here would notice.
+    // quick-save and reload. The quick-save carries only the fields `DungeonSnapshot`'s
+    // `DUNGEON_DATA_SOURCES` marks `snapshot` — so a CSBWin load that put something into
+    // a field it does not carry would be lost at the next F5/F9 and nothing else here
+    // would notice. (Five such fields are known, `DEBT.md` D7.)
     const second = loadWorld();
     second.applyRuntimeSaveState(game.getRuntimeSaveState());
     check(

@@ -2,8 +2,8 @@
  * The port's own quick-save: the whole mutable world as one JSON-able snapshot, and its
  * restore. It has no CSBWin home — CSBWin's save is `SaveGame.cpp`'s binary file, which
  * `SaveGamePayload` writes beside this — so it is a module over the context rather than
- * a system. Moved out of `Game` by `DEBT.md` E2; `DEBT.md` E5 (the hand-maintained
- * `DungeonSnapshot`) works on it next.
+ * a system. Which fields of the dungeon it carries, and which it leaves to the file the
+ * world was built from, is `DUNGEON_DATA_SOURCES` (`DungeonSnapshot.ts`).
  */
 import type { Item16Record, MissileRecord, TimerRecord } from '../data/dungeonTypes';
 import { applySaveGameState, type SaveGameState } from '../data/SaveGameLoader';

@@ -27,8 +27,7 @@ tier C, and the unported features of tier G come last. Two reasons:
 
 The order, then:
 
-1. **D and E.** Tier D is empty today. New structural debt goes into D or E and jumps the
-   queue.
+1. **D and E.** New structural debt goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
    found along the way is recorded here and not fixed, unless it blocks the D/E item at
    hand or corrupts saves. C33 and C34 come first once E is empty, unless the author
@@ -74,7 +73,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E5 | The quick-save snapshot is hand-maintained | M | ⚠️ |
+| D7 | The snapshot drops five fields a CSBWin load writes | S | ⚠️ |
 | E6 | `CHARDESC::Possession` is written out once per module | S | ⏳ |
 | C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
@@ -109,24 +108,33 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 
 ---
 
+## D — State representation
+
+### D7 ⚠️ The snapshot drops five fields a CSBWin load writes
+
+A CSBWin load writes `dsaLevelIndex`, `dsaIndex`, `specialLocations`,
+`extendedWallDecorations` and `spellFilterLocation` into the live world
+(`applyStructuralExtras`, `src/data/CsbwinSaveGame.ts:227`). `DungeonSnapshot` carries
+none of them: `DUNGEON_DATA_SOURCES` marks them `loaded`, and of `dsaIndex` only each
+entry's `state` goes in. So after a CSBWin load, a quick-save and a quick-load in a fresh
+page, the world has `dungeon.dat`'s values for all five. On the fourteen committed saves
+three are lost: `dsaLevelIndex` (a table of 0xffff becomes none), `extendedWallDecorations`
+(true becomes unset) and `spellFilterLocation` (0 becomes unset). Play reads the first
+and third the same either way: `getDsaLevelIndex`'s callers act only on 255, and
+`getSpellFilterLocation` defaults to 0. The flag drops out of the Extended Features header
+that the save writer builds (`src/data/CsbwinExtendedFeatures.ts:341`, from
+`SaveGamePayload.ts:216`).
+
+The text arrays and `expool` are already carried for this reason (the module comment of
+`DungeonSnapshot.ts`). Carry these five the same way: optional snapshot fields, which an
+older snapshot lacks and a restore then leaves alone, marked `snapshot` in the table.
+Evidence: the quick-save round trip in `tools/dump-csbwin-load.ts` compares only the cell
+flags, the party and one chain. Make it walk `DUNGEON_DATA_SOURCES`, as
+`tools/dump-savegame.ts` does, so it fails before the fix.
+
+---
+
 ## E — Architecture
-
-### E5 ⚠️ The quick-save snapshot is hand-maintained
-
-`src/engine/DungeonSnapshot.ts` lists what play can change in `DungeonData`, and both the
-quick-save (`src/engine/RuntimeSave.ts`) and the CSBWin save (`src/data/CsbwinSaveGame.ts`)
-restore the world through `captureDungeonSnapshot`. A hand list fails silently: a field
-that play changes and the list misses is simply not restored. Such fields are not always
-obvious. `data.columnIndex` looks structural, but `DungeonState.addObjectToCell` /
-`removeObjectFromCell` rewrite it whenever a cell gains or loses its last object, as CSBWin
-does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`). It is on the list, with
-`header.objectListSize` and `header.objectCounts`, and `tools/dump-savegame.ts` compares
-the whole mutable `DungeonData` and asserts that loading twice with play in between gives
-the same world. But a field added to `DungeonData` later still has to be added by hand. Derive the list from the type, or snapshot the
-whole structure and subtract what is immutable. This pairs naturally with Phase 10's
-remaining save work.
-
-<sub>Context: `doc/PROVEN_FACTS.md` → “The column index is saved state, not dungeon structure”.</sub>
 
 ### E6 ⏳ `CHARDESC::Possession` is written out once per module
 

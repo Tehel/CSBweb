@@ -1,76 +1,141 @@
 /**
- * A snapshot of everything in the dungeon that play can change.
+ * A snapshot of everything in the dungeon that play can change. The quick-save
+ * (`RuntimeSave.ts`) carries it, and a CSBWin load restores its world through it
+ * (`src/data/CsbwinSaveGame.ts`). It only has to round-trip through itself: writing a
+ * byte-compatible CSBWin file is Phase 10.
  *
- * The quick-save used to carry the party, the tick count, the `ITEM16` pool, the
- * timers and the missile records — and nothing else. Every *world* mutation was
- * therefore lost on load while the party kept its inventory: doors closed again,
- * objects the party had moved snapped back to where `dungeon.dat` put them, fired
- * actuators re-armed. A door opened with a key that the load did not give back is
- * unopenable, which makes the save unrecoverable rather than merely wrong.
+ * `DUNGEON_DATA_SOURCES` is the list of what it holds: every field of `DungeonData`, and
+ * where a restore takes it from. It is typed over every key, so a field added to
+ * `DungeonData` does not compile until it is placed there, and `tools/dump-savegame.ts`
+ * walks it to check that play wrote no `loaded` field and that every `snapshot` field
+ * comes back.
  *
- * This is *not* Phase 10. Phase 10 writes a byte-compatible CSBWin save file; this
- * is the runtime JSON snapshot, and it only has to round-trip through itself.
+ * Two placements need their reason:
  *
- * What mutates, and so what is here:
- *
- * - `cellFlags` — door state, pit open/closed, false walls, teleporters, and the
- *   has-objects bit. It is the only copy of the cell byte.
- * - `objectList` — the per-cell object chains. Every pick-up, drop and throw edits
- *   it.
- * - `columnIndex` — the per-column offset into `objectList`. It looks structural and
- *   was left out of the first version of this file on that assumption, which was
- *   simply wrong: `DungeonState.addObjectToCell` and `removeObjectFromCell` rewrite
- *   every later entry whenever a cell gains or loses its *last* object, exactly as
- *   CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin writes the array
- *   into the save file beside the object list itself
- *   (`doc/CSBwin-src/SaveGame.cpp:1178`). Restoring `objectList` without it makes
- *   `GetObjectListIndex` read every cell's chain at the wrong offset, so objects
- *   vanish from the cells that hold them and surface in cells that do not — missing
- *   pressure plates, items on the wrong floor tile, monsters apparently out of bounds.
- *   `levelIndex` really is structural: it is derived from the map descriptors by
- *   `DungeonLoader.buildLevelIndex` and nothing writes it.
- * - `header.objectListSize` and `header.objectCounts` — the same mutations maintain
- *   both (`DungeonState:310`, `Game.createMiscObject`, `DsaSystem`, `TimerSystem`),
- *   and CSBWin saves the 44-byte header too (`doc/CSBwin-src/SaveGame.cpp:1168`).
- * - every database's records — links, charges, container contents, creature hit
- *   points, actuator counters. The arrays also *grow*: `CreateAndDropObject`,
- *   `Game.createMiscObject` and `MonsterSystem.createMonster` all append.
- * - `dsaIndex` state machine positions (`DsaSystem` writes `dsa.state`) and the DSA
- *   global variables, which is where a dungeon keeps its puzzle progress.
- * - the champion-bones map, which is pure runtime state.
- *
- * And four things that do **not** mutate, but are here anyway, which needs its own
- * reason: `textWords`, `indirectTextIndex`, `compressedText` and `expool`. They are not
- * structural in the way `levelIndex` is — they are the *converted* form of an image, and
- * which form a world is in depends on the file it came from
- * (`src/data/CsbwinDungeonConversions.ts`). Leaving them out made a restored world a
- * hybrid: the TEXT records came from the snapshot, carrying entry numbers into an index
- * that was still the one `dungeon.dat` was converted into, and `expool` — which a save
- * carries whole and this port cannot regenerate — stayed whatever the dungeon the engine
- * was built on held. Carrying them makes a quick-load self-consistent, and lets the
- * binary writer take blocks 11-13 from a world whatever its provenance.
+ * - `columnIndex` looks structural and is not. `DungeonState.addObjectToCell` and
+ *   `removeObjectFromCell` rewrite every later entry whenever a cell gains or loses its
+ *   last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin
+ *   saves the array beside the object list (`doc/CSBwin-src/SaveGame.cpp:1178`).
+ *   Restoring `objectList` without it makes `GetObjectListIndex` read every cell's chain
+ *   at the wrong offset, so objects vanish from the cells that hold them and surface in
+ *   cells that do not. `levelIndex` really is structural: `DungeonLoader.buildLevelIndex`
+ *   derives it from the map descriptors and nothing writes it.
+ * - `textWords`, `indirectTextIndex`, `compressedText` and `expool` are carried although
+ *   play never writes them. They are the *converted* form of an image, and which form a
+ *   world holds depends on the file it came from (`src/data/CsbwinDungeonConversions.ts`).
+ *   Without them a restored world is a hybrid: TEXT records from the snapshot, carrying
+ *   entry numbers into the index `dungeon.dat` was converted into, and the `expool` of
+ *   whatever dungeon the engine was built on, which this port cannot regenerate.
+ *   Carrying them makes a quick-load self-consistent, and lets the binary writer take
+ *   blocks 11-13 from a world whatever its provenance.
  */
 import type { ui8, ui16, ui32, ObjectID } from '../core/types';
 import type { DungeonData, DatabaseRecord, Databases } from '../data/dungeonTypes';
 
-/** The database keys, fixed here so capture and restore cannot drift apart. */
-const DATABASE_KEYS = [
-    'doors',
-    'teleporters',
-    'texts',
-    'actuators',
-    'creatures',
-    'weapons',
-    'clothing',
-    'scrolls',
-    'potions',
-    'containers',
-    'misc',
-    'missiles',
-    'clouds',
-] as const satisfies ReadonlyArray<keyof Databases>;
+/**
+ * Where a restored world takes a field from:
+ *
+ * - `snapshot`: this snapshot, captured and applied below;
+ * - `runtimeSave`: `RuntimeSave`, which carries it beside the snapshot and puts it back
+ *   through `applySaveGameState`;
+ * - `loaded`: the file the world was built from. Play never writes it.
+ */
+export type FieldSource = 'snapshot' | 'runtimeSave' | 'loaded';
 
-type DatabaseKey = (typeof DATABASE_KEYS)[number];
+type Each<T> = T extends ReadonlyArray<infer E> ? NonNullable<E> : T;
+
+/**
+ * A source for every field of `T`, or, for an object field, a table of its own fields
+ * (of each element, for an array). Every key is required.
+ */
+export type SourceTable<T> = {
+    readonly [K in keyof T]-?:
+        | FieldSource
+        | (Each<NonNullable<T[K]>> extends object ? SourceTable<Each<NonNullable<T[K]>>> : never);
+};
+
+export const DUNGEON_DATA_SOURCES = {
+    header: {
+        randomSeed: 'loaded',
+        mapDataSize: 'loaded',
+        numMaps: 'loaded',
+        word4Low: 'loaded',
+        // Set by the load-time text conversion, beside `indirectTextIndex`.
+        textDataSize: 'loaded',
+        startPosition: 'loaded',
+        facing: 'loaded',
+        // The mutations that edit `objectList` and the databases maintain both
+        // (`DungeonState.addObjectToCell`, `findEmptyDBEntry`), and CSBWin saves the
+        // 44-byte header (`doc/CSBwin-src/SaveGame.cpp:1168`).
+        objectListSize: 'snapshot',
+        objectCounts: 'snapshot',
+    },
+    maps: {
+        descriptor: 'loaded',
+        // Door state, pits, false walls, teleporters and the has-objects bit: the one
+        // copy of the cell byte.
+        cellFlags: 'snapshot',
+        monsterTypes: 'loaded',
+        wallDecorationTOC: 'loaded',
+        floorDecorationTOC: 'loaded',
+        doorDecorationTOC: 'loaded',
+    },
+    // Links, charges, container contents, creature hit points, actuator counters. The
+    // arrays grow too: `CreateAndDropObject`, `Game.createMiscObject` and
+    // `MonsterSystem.createMonster` append.
+    databases: {
+        doors: 'snapshot',
+        teleporters: 'snapshot',
+        texts: 'snapshot',
+        actuators: 'snapshot',
+        creatures: 'snapshot',
+        weapons: 'snapshot',
+        clothing: 'snapshot',
+        scrolls: 'snapshot',
+        potions: 'snapshot',
+        containers: 'snapshot',
+        misc: 'snapshot',
+        missiles: 'snapshot',
+        clouds: 'snapshot',
+    },
+    textWords: 'snapshot',
+    indirectTextIndex: 'snapshot',
+    compressedText: 'snapshot',
+    objectList: 'snapshot',
+    columnIndex: 'snapshot',
+    levelIndex: 'loaded',
+    // Derived by `applySaveGameState` from the timers `RuntimeSave` carries.
+    timerWord8Table: 'runtimeSave',
+    item16: 'runtimeSave',
+    expool: 'snapshot',
+    // A CSBWin load writes this and the next four (`applyStructuralExtras`), and the
+    // snapshot does not carry them (`DEBT.md` D7).
+    dsaLevelIndex: 'loaded',
+    dsaIndex: {
+        entries: {
+            description: 'loaded',
+            // The state machine's position, which `DsaSystem` writes.
+            state: 'snapshot',
+            localState: 'loaded',
+            groupId: 'loaded',
+            numStates: 'loaded',
+            firstDisplayedState: 'loaded',
+            states: 'loaded',
+        },
+    },
+    specialLocations: 'loaded',
+    extendedWallDecorations: 'loaded',
+    spellFilterLocation: 'loaded',
+    bigActuators: 'loaded',
+    indirectText: 'loaded',
+    newScrolls: 'loaded',
+    presetHeroes: 'loaded',
+} as const satisfies SourceTable<DungeonData>;
+
+type DatabaseKey = keyof Databases;
+
+/** The database keys, taken from the table so capture and restore cannot drift apart. */
+const DATABASE_KEYS = Object.keys(DUNGEON_DATA_SOURCES.databases) as DatabaseKey[];
 
 export interface DungeonSnapshot {
     /** One base64 string per map: the cell flags in `[x][y]` order, row-major over x. */

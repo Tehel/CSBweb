@@ -29,6 +29,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
+import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';
 import { getActuatorValue, setActuatorValue } from '../src/data/actuatorHelpers';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -67,6 +68,65 @@ function objectsAt(game: Game, x: number, y: number, level: number): ObjectID[] 
   for (let rn = game.dungeonState.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
     out.push(rn);
     if (out.length > 64) break; // a corrupted chain must not hang the tool
+  }
+  return out;
+}
+
+/** `DUNGEON_DATA_SOURCES`, as the walk below reads it. */
+type SourceTable = { readonly [field: string]: FieldSource | SourceTable };
+const SOURCES = DUNGEON_DATA_SOURCES as SourceTable;
+
+/** JSON with `expool`'s bytes spelled out, so two worlds compare whole. */
+function json(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => (v instanceof Uint8Array ? Array.from(v) : v));
+}
+
+interface SourceWalk {
+  /** Leaf values compared, by source. */
+  compared: Record<FieldSource, number>;
+  /** A field of the world that the table does not place. */
+  unplaced: string[];
+  /** A `loaded` field that play wrote, or that the restore did not leave as loaded. */
+  written: string[];
+  /** A `snapshot` field that did not come back. */
+  lost: string[];
+}
+
+/**
+ * Walk the source table over three worlds at once: the one that was played and saved,
+ * a fresh one, and the fresh one after the save was restored into it. A `snapshot` field
+ * has to come back as played; a `loaded` one has to be the same in all three.
+ * `runtimeSave` fields are `tools/dump-save-roundtrip.ts`'s: a load re-derives the
+ * `ITEM16` pool, so they are not expected to come back unchanged.
+ */
+function walkSources(table: SourceTable, played: any, fresh: any, restored: any, path: string, walk: SourceWalk): void {
+  for (const field of Object.keys(played ?? {})) {
+    if (!(field in table)) walk.unplaced.push(`${path}${field}`);
+  }
+  for (const [field, source] of Object.entries(table)) {
+    const at = `${path}${field}`;
+    const [p, f, r] = [played?.[field], fresh?.[field], restored?.[field]];
+    if (typeof source === 'string') {
+      walk.compared[source]++;
+      if (source === 'snapshot' && json(r) !== json(p)) walk.lost.push(at);
+      if (source === 'loaded' && (json(p) !== json(f) || json(r) !== json(f))) walk.written.push(at);
+    } else if (Array.isArray(p)) {
+      const n = Math.max(p.length, f?.length ?? 0, r?.length ?? 0);
+      for (let i = 0; i < n; i++) walkSources(source, p[i], f?.[i], r?.[i], `${at}[${i}].`, walk);
+    } else {
+      walkSources(source, p, f, r, `${at}.`, walk);
+    }
+  }
+}
+
+/** The world without its `runtimeSave` fields: what one load of a save has to reproduce. */
+function withoutRuntimeSave(table: SourceTable, value: any): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map((each) => withoutRuntimeSave(table, each));
+  const out: Record<string, unknown> = {};
+  for (const [field, source] of Object.entries(table)) {
+    if (source === 'runtimeSave') continue;
+    out[field] = typeof source === 'string' ? value[field] : withoutRuntimeSave(source, value[field]);
   }
   return out;
 }
@@ -220,6 +280,7 @@ async function main(): Promise<void> {
   const freshCreatureHp = reloadedData.databases.creatures.records.find((r) => r.hp.length > 0)!.hp[0];
   const freshColumnIndex = [...reloadedData.columnIndex];
   const freshLone = objectsAt(reloaded, emptyCell.x, emptyCell.y, level).length > 0;
+  const freshData = JSON.parse(json(reloadedData));
 
   reloaded.applyRuntimeSaveState(JSON.parse(serialized));
 
@@ -291,33 +352,17 @@ async function main(): Promise<void> {
   check(restoredDroppedType === 33, 'the appended record should come back as misc type 33, at its own index');
   check(restoredLone, 'the object dropped into an empty cell should be there after the load');
 
-  // The whole-world check. Anything mutable that the snapshot forgot shows up here
-  // even though no case above names it.
-  const cellFlagsOf = (data: DungeonData): string =>
-    data.maps.map((m) => m.cellFlags.map((col) => col.join(',')).join(';')).join('|');
-  check(cellFlagsOf(reloadedData) === cellFlagsOf(playedData), 'every cell flag on every level should round-trip');
-  check(
-    JSON.stringify(reloadedData.objectList) === JSON.stringify(playedData.objectList),
-    'the whole object list should round-trip',
-  );
-  check(
-    JSON.stringify(reloadedData.databases) === JSON.stringify(playedData.databases),
-    'every database record should round-trip',
-  );
-  // `columnIndex` is *not* structural: `addObjectToCell` and `removeObjectFromCell`
-  // rewrite every later entry whenever a cell gains or loses its last object, exactly
-  // as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`), and CSBWin saves the array
-  // beside the object list (`doc/CSBwin-src/SaveGame.cpp:1178`). A restore that puts
-  // `objectList` back without it reads every cell's chain at the wrong offset, so
-  // objects vanish from their cells and appear in unrelated ones.
-  check(
-    JSON.stringify(reloadedData.columnIndex) === JSON.stringify(playedData.columnIndex),
-    'the column index should round-trip',
-  );
-  check(
-    JSON.stringify(reloadedData.header) === JSON.stringify(playedData.header),
-    'the dungeon header (object list size, per-database counts) should round-trip',
-  );
+  // The whole-world check, over every field `DUNGEON_DATA_SOURCES` places. A field that
+  // play changes and the table calls `loaded` shows up here even though no case above
+  // names it, and so does a `snapshot` field the capture forgot.
+  const walk: SourceWalk = { compared: { snapshot: 0, runtimeSave: 0, loaded: 0 }, unplaced: [], written: [], lost: [] };
+  walkSources(SOURCES, playedData, freshData, reloadedData, '', walk);
+  console.log(`fields compared: ${walk.compared.snapshot} snapshot, ${walk.compared.loaded} loaded ` +
+    `(${walk.compared.runtimeSave} runtimeSave left to dump-save-roundtrip)\n`);
+  const some = (paths: string[]): string => paths.slice(0, 6).join(', ') + (paths.length > 6 ? ', ...' : '');
+  check(walk.unplaced.length === 0, `every field of the world should be placed in DUNGEON_DATA_SOURCES (${some(walk.unplaced)})`);
+  check(walk.written.length === 0, `no loaded field should differ between the played, fresh and restored worlds (${some(walk.written)})`);
+  check(walk.lost.length === 0, `every snapshot field should round-trip (${some(walk.lost)})`);
   // Pinned because it is what the first draft of this tool got wrong: `Database.count`
   // tracks `records.length` because every engine append maintains it, so the restore
   // recomputing it is equivalent — not a divergence.
@@ -333,14 +378,7 @@ async function main(): Promise<void> {
   // `columnIndex` as play left it makes the result depend on what happened *between*
   // the two loads, so a load is not idempotent. Reproduce it exactly — load, play,
   // load again — and require the two loads to agree.
-  const fingerprint = (data: DungeonData): string =>
-    JSON.stringify([
-      data.maps.map((m) => m.cellFlags),
-      data.objectList,
-      data.columnIndex,
-      data.header,
-      data.databases,
-    ]);
+  const fingerprint = (data: DungeonData): string => json(withoutRuntimeSave(SOURCES, data));
 
   const afterFirstLoad = fingerprint(reloadedData);
 
