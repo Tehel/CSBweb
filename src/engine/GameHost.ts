@@ -54,7 +54,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     playSound: host.playSound ?? (() => {}),
     trace: host.trace ?? (() => {}),
     cursorFilter: host.cursorFilter ?? (() => true),
-    messages: host.messages ?? { printLinefeed: () => {}, quePrintLines: () => {} },
+    messages: host.messages ?? { printLinefeed: () => {}, quePrintLines: () => {}, setNewSpeed: () => {} },
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),

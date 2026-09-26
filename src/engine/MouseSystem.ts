@@ -22,6 +22,7 @@ import {
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { nameIndexOf, type GameContext } from './GameContext';
+import { speed } from './LoopState';
 import type { Champion } from './gameTypes';
 import { findChampionByFingerprint } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
@@ -353,17 +354,20 @@ export class MouseSystem {
   /**
    * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
    * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
-   * `TAG02076e`); this is `d.PartySleeping = 1`, `d.Speed = 0` — which `Game.runFrame`
-   * reads as a tick on every frame — and `DiscardAllInput()`. The sleep-mode button
-   * list, `Buttons17796`, and `DisplaySleepScreen` are the host's listeners' business.
+   * `TAG02076e`); this is `d.PartySleeping = 1`, `scrollingText.SetNewSpeed(d.Speed, 0)`
+   * and `d.Speed = 0` — which `Game.runFrame` reads as a tick on every frame — and
+   * `DiscardAllInput()`. The sleep-mode button list, `Buttons17796`, and
+   * `DisplaySleepScreen` are the host's listeners' business.
    *
    * Refused while a champion is only provisionally in the party (`:1685`).
    */
   sleep(): boolean {
     const party = this.ctx.party.state;
     if (party.potentialChampionIndex >= 0) return false;
+    const oldSpeed = speed(this.ctx);
     party.sleeping = true;
     this.ctx.host.sleepChanged(true);
+    this.ctx.host.messages.setNewSpeed(oldSpeed, 0, this.ctx.state.tickCount);
     this.ctx.mouseQueue.discardAllInput();
     return true;
   }

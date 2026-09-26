@@ -73,7 +73,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 1 next |
+| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 2 next |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -509,23 +509,11 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 ### G5 ⏳ The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze
 
 The author has pulled G5 ahead of tier C. It is size L, in four steps taken in order, each
-one commit:
+one commit. Step 2 is next.
 
-1. ⏳ **`SetNewSpeed`** (S). `SCROLLING_TEXT::SetNewSpeed(oldSpeed, newSpeed)`
-   (`doc/CSBwin-src/CSBCode.cpp:1598-1609`) rescales every live `d.TextTimeout` to a new
-   `d.Speed`, the VBLs per tick: `delta = (delta*(oldSpeed+1) + newSpeed)/(newSpeed+1)`,
-   with `delta` counted from `d.Time`. Sleep calls it with `(d.Speed, 0)`
-   (`Mouse.cpp:1696`) and `WakeUp` with `(d.Speed, speedTable[gameSpeed].vblPerTick)`
-   (`CSBCode.cpp:7053`), 15 at the default `SPEED_NORMAL` (`data.cpp:275`,
-   `CSBwin.cpp:180`). The top of every tick calls it too while awake (`CSBCode.cpp:612-616`),
-   which does nothing at a constant speed. So falling asleep makes the rows on screen last
-   sixteen times as many ticks, and waking divides what is left by sixteen, rounding up. It
-   rescales timeouts and has nothing to do with the scroll animation. The port has no
-   `d.Speed` (`Game.runFrame` reads `sleeping`), and `MouseSystem.sleep` and `wakeUp`
-   (`src/engine/LoopState.ts`) leave the timeouts alone. Port it into `ScrollingText`, reach
-   it through the host's `MessageSink`, and call it from both. Evidence: a check in
-   `tools/dump-sleep.ts` that places a row, sleeps, wakes, and prints its timeout at each
-   step.
+1. ✅ **`SetNewSpeed`**: falling asleep and `WakeUp` rescale the message timeouts
+   (`ScrollingText.setNewSpeed`, `speed` in `src/engine/LoopState.ts`,
+   `tools/dump-sleep.ts`).
 2. ⏳ **A load keeps the message area** (S). CSBWin saves no message state:
    `SCROLLING_TEXT::Serialize` is declared (`doc/CSBwin-src/Data.h:1665`) and has no body
    and no caller. `LoadGame` keeps the rows on screen and rebases their timeouts onto the

@@ -3433,6 +3433,11 @@ and weapon-ready areas), `d.PartySleeping = 1`, `DisplaySleepScreen()`, `d.Speed
   (`CSBCode.cpp:704`) cancels it.
 - `d.PartySleeping` is not saved. `d.PartySleeping = 0` is set at game start
   (`CSBCode.cpp:10479`).
+- Falling asleep calls `scrollingText.SetNewSpeed(d.Speed, 0)` (`Mouse.cpp:1696`) and
+  `WakeUp` calls `SetNewSpeed(d.Speed, 15)` (`CSBCode.cpp:7053`), so the message rows on
+  screen last sixteen times as many ticks asleep, and waking divides what is left by 16,
+  rounding up. The formula is in `doc/CSBWIN_MESSAGES_REFERENCE.md` → "Timeouts". Evidence:
+  `tools/dump-sleep.ts`.
 - Asleep, `DetermineMastery` returns 1 for every skill (`Code17818.cpp:29-36`). So
   `TenSecondUpdate`'s mana roll is `random112 < Wisdom + 2`, and each point of mana costs
   `max(7, 16 - 2)` = 14 stamina, whatever the champion's Wizard and Priest levels

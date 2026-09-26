@@ -13,11 +13,12 @@
  * Two documented deviations:
  *  - The pixel-level scroll animation (`d.PushTextUp` / `d.TextScanlineScrollCount`) is not
  *    implemented; rows scroll instantly. All the guards CSBWin uses to wait for that
- *    animation are therefore absent. See PLAN.md Phase 11 step 7.
+ *    animation are therefore absent. See DEBT.md G5 step 4.
  *  - CSBWin draws each piece once and lets the screen hold it; we re-render from the row
  *    model every frame because our screen buffer is cleared each frame. Same pixels.
  */
 
+import { div } from '../../core/intCast';
 import { fillRectIndex, type PaletteIndexViewportBuffer } from './CanvasBlitter';
 import { drawTextLineIndex, type FontData } from './TextRenderer';
 
@@ -287,6 +288,20 @@ export class ScrollingText {
     }
   }
 
+  /**
+   * CSBWin `SCROLLING_TEXT::SetNewSpeed()` (`doc/CSBwin-src/CSBCode.cpp:1598`): what is left
+   * of each live timeout, counted from `time`, rescaled from `oldSpeed` to `newSpeed` VBLs
+   * per tick.
+   */
+  setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void {
+    if (oldSpeed === newSpeed) return;
+    for (let row = 0; row < NUM_ROWS; row++) {
+      if (this.textTimeout[row] < 0) continue;
+      const delta = div((this.textTimeout[row] - time) * (oldSpeed + 1) + newSpeed, newSpeed + 1);
+      this.textTimeout[row] = time + delta;
+    }
+  }
+
   /** `d.PartySleeping` — stretches message lifetime tenfold. */
   setPartySleeping(sleeping: boolean): void {
     this.partySleeping = sleeping;
@@ -319,6 +334,11 @@ export class ScrollingText {
       const top = ROW_CLEAR_TOP_Y + row * ROW_HEIGHT;
       fillRectIndex(buffer, { x1: 0, y1: top, x2: SCREEN_LAST_X, y2: top + ROW_HEIGHT - 1 }, 0);
     }
+  }
+
+  /** `d.TextTimeout[4]`, for tests and debugging. */
+  timeouts(): readonly number[] {
+    return this.textTimeout;
   }
 
   /** True when any row currently holds text (useful for tests/debug). */

@@ -16,6 +16,9 @@
  * - `DisplaySleepScreen` (`CSBCode.cpp:8542`): colour 0 and "WAKE UP" in colour 4 at
  *   viewport (93, 65), 65 being the bottom row (`Graphics.cpp:320`).
  * - A game never starts asleep (`CSBCode.cpp:10479`), a quick-save included.
+ * - `SetNewSpeed` (`CSBCode.cpp:1598`): falling asleep multiplies what is left of each
+ *   message row's timeout by 16 (`d.Speed` 15 -> 0, `Mouse.cpp:1696`), and `WakeUp` divides
+ *   it by 16, rounding up (0 -> 15, `CSBCode.cpp:7053`).
  *
  * Run: `npx tsx tools/dump-sleep.ts`
  */
@@ -35,6 +38,7 @@ import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -86,7 +90,9 @@ async function main(): Promise<void> {
 
   // The host's `sleepChanged`, wired as `main.ts` wires it (the UI half is built below).
   const notified: boolean[] = [];
+  const messages = new ScrollingText();
   const game = newGame(data, graphics, {
+    messages,
     sleepChanged: (sleeping) => {
       notified.push(sleeping);
       ui.uiMode = sleeping ? UIMode.Sleeping : UIMode.Adventure;
@@ -204,6 +210,30 @@ async function main(): Promise<void> {
     check(game.enqueueKeyButton(146), 'Return is queued as 146');
     frame();
     check(!game.isPartySleeping(), 'and wakes the party');
+  }
+
+  console.log('');
+  console.log('=== SetNewSpeed (CSBCode.cpp:1598): a message row across a sleep ===');
+  {
+    const t0 = internals.state.tickCount;
+    messages.quePrintLines(15, 'HELLO');
+    messages.pump(t0);
+    const placed = messages.timeouts()[0]!;
+    game.sleep();
+    const asleep = messages.timeouts()[0]!;
+    for (let i = 0; i < 100; i++) frame(17);
+    const t1 = internals.state.tickCount;
+    game.wakeUp();
+    const awake = messages.timeouts()[0]!;
+    game.wakeUp();
+    const again = messages.timeouts()[0]!;
+    console.log(`placed at ${t0}: ${placed}; asleep: ${asleep}; woken at ${t1}: ${awake}; again: ${again}; row 1: ${messages.timeouts()[1]}`);
+    check(placed === t0 + 70, 'awake, a row lasts 70 ticks (CSBCode.cpp:1552)');
+    check(asleep === t0 + 70 * 16, 'SetNewSpeed(15, 0): the 70 ticks left become 70 * 16');
+    check(t1 === t0 + 100 && awake === t1 + Math.ceil((asleep - t1) / 16),
+      'SetNewSpeed(0, 15): the 1020 left become ceil(1020 / 16) = 64');
+    check(again === awake, 'WakeUp awake is SetNewSpeed(15, 15), which changes nothing');
+    check(messages.timeouts()[1] === -1, 'an empty row stays empty');
   }
 
   console.log('');

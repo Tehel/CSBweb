@@ -30,18 +30,33 @@ export function createLoopFlags(): LoopFlags {
 }
 
 /**
+ * `speedTable[gameSpeed].vblPerTick` at CSBWin's default `SPEED_NORMAL`
+ * (doc/CSBwin-src/data.cpp:275, `CSBwin.cpp:180`), the port's only game speed.
+ */
+export const VBL_PER_TICK = 15;
+
+/**
+ * `d.Speed`, the VBLs per tick: 0 while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697),
+ * `VBL_PER_TICK` awake (`CSBCode.cpp:7054`). The top of every tick sets it again while
+ * awake, with a `SetNewSpeed` (`:612-616`) that the port's one speed makes a no-op.
+ */
+export function speed(ctx: GameContext): number {
+  return ctx.party.state.sleeping ? 0 : VBL_PER_TICK;
+}
+
+/**
  * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7047) — button 146, or any blow that lands on a
  * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
- * `d.PartySleeping = 0`, the game speed back, the adventure button lists back (the
+ * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
+ * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7053`), the adventure button lists back (the
  * host's listeners), `DiscardAllInput()`.
- *
- * Not ported: `scrollingText.SetNewSpeed`, which paces the scroll animation the port
- * does not have (DEBT G5).
  */
 export function wakeUp(ctx: GameContext): void {
+  const oldSpeed = speed(ctx);
   ctx.loop.clockTickSet = true;
   ctx.loop.clockTickCleared = false;
   ctx.party.state.sleeping = false;
+  ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
   ctx.host.sleepChanged(false);
   ctx.mouseQueue.discardAllInput();
 }

@@ -64,6 +64,7 @@ function makeGame(): Game {
     messages: {
       printLinefeed: () => { messages.push({ color: -1, text: '\n' }); },
       quePrintLines: (color, text) => { messages.push({ color, text }); },
+      setNewSpeed: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
   });

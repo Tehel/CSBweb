@@ -66,6 +66,7 @@ async function main(): Promise<void> {
     messages: {
       printLinefeed: () => {},
       quePrintLines: (_color, text) => { printed.push(text); },
+      setNewSpeed: () => {},
     },
   });
   game.party.state.position = new Position(2, 2, 0);
