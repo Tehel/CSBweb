@@ -113,6 +113,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
             WorldMove (the world `MoveObject`: teleporters, pits, stairs),
+            MissileEncounter (a missile meeting something, and the clouds and door
+            blows it sets off),
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /

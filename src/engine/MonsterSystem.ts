@@ -506,7 +506,7 @@ export class MonsterSystem {
 
     // A monster leaving a square may run into a missile sitting in it (`:2843-2849`).
     if (fromDungeon && level === partyLevel) {
-      const hit = this.ctx.systems.timer.checkMonsterMoveFromMissile(
+      const hit = this.ctx.systems.missileEncounter.checkMonsterMoveFromMissile(
         new Position(oldX, oldY, level),
         newX >= 0 ? requested : null,
         monsterRn,

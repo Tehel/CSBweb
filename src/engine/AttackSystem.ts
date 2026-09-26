@@ -859,7 +859,7 @@ export class AttackSystem {
     const position = new Position(mapX, mapY, party.position.z);
     const roomType = (this.ctx.dungeon.getCellFlag(position) >> 5) & 7;
     if (roomType === RoomType.STONE || roomType === RoomType.STAIRS) return;
-    const cage = this.ctx.systems.timer.createFluxcage(position, this.ctx.state.tickCount);
+    const cage = this.ctx.systems.missileEncounter.createFluxcage(position, this.ctx.state.tickCount);
     if (cage === null) return;
 
     const neighbours: Array<[number, number]> = [
@@ -994,7 +994,7 @@ export class AttackSystem {
           params.attdep.hitDoor.strength =
             this.ctx.systems.characterStats.determineThrowingDistance(pChar, 1, party.sleeping);
           this.callAttackFilter(filter, params, 1);
-          this.ctx.systems.timer.hitDoor(
+          this.ctx.systems.missileEncounter.hitDoor(
             new Position(params.attackX, params.attackY, party.position.z),
             params.attdep.hitDoor.strength,
             false, // not a ZO spell
@@ -1360,7 +1360,7 @@ export class AttackSystem {
     const resolved = this.ctx.systems.worldMove.withSupressedPitDamage(() =>
       this.ctx.systems.worldMove.resolvePartyMove(target, party.facing & 0x3),
     );
-    this.ctx.systems.timer.checkMoveFromMissile(oldPos, resolved.position, null);
+    this.ctx.systems.missileEncounter.checkMoveFromMissile(oldPos, resolved.position, null);
     party.position = resolved.position;
     this.ctx.party.setFacing(resolved.facing);
     const unchanged = oldPos.x === resolved.position.x

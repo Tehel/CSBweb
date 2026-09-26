@@ -38,7 +38,7 @@
  * `ProcessMissileEncounter`'s shared ending (`doc/CSBwin-src/Code11f52.cpp:2101-2121`)
  * calls `QueueSound` with an *ordinal* into the sound table — 0 for a weapon, 4 for
  * anything else physical (food, a scroll, …) — not a raw SND item number.
- * `TimerSystem.playMissileImpactSound` used to skip that table and call `playSound`
+ * `playMissileImpactSound` used to skip that table and call `playSound`
  * with a hand-picked `SoundIndex` constant instead, and got the non-weapon case wrong:
  * `SoundIndex.FIREBALL_EXPLODE` is ordinal 5's sample, not ordinal 4's, so a dropped
  * scroll or piece of food played an explosion. This throws a weapon and a misc item at

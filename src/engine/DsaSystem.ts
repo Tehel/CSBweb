@@ -3099,7 +3099,7 @@ export class DsaSystem {
       destMap: locr.l & 0xff,
     };
 
-    this.ctx.systems.timer.checkMoveFromMissile(oldPos, oldPos, null);
+    this.ctx.systems.missileEncounter.checkMoveFromMissile(oldPos, oldPos, null);
     const resolved = this.ctx.systems.worldMove.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
     party.position = resolved.position;
     this.ctx.party.setFacing(resolved.facing);

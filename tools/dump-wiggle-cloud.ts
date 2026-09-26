@@ -125,7 +125,7 @@ function main(): void {
   // Switch it off, stand a poison cloud on it, and queue the timer that switches it on.
   const map = dungeon.getMap(at.z)!;
   map.cellFlags[at.x]![at.y]! &= ~0x08;
-  game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 255, at, 0);
+  game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, at, 0);
   let born: ObjectID | null = null;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category === DBType.CLOUD) born = rn;

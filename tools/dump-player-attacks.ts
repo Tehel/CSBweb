@@ -468,10 +468,10 @@ async function main(): Promise<void> {
     const characteristics = objectTables.doorCharacteristics;
     console.log(`DoorCharacteristics force: ${Array.from(characteristics, (v) => v & 0xff).join(', ')}; level 1 maps type 1 to entry ${map.descriptor.doorType1Index}`);
     map.descriptor.doorType1Index = 3;
-    const held = !game.timerSystem.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 4;
+    const held = !game.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 4;
     check(held, 'force 100 does not break a door the level maps to entry 3 (force 255)');
     map.descriptor.doorType1Index = 1;
-    const broke = game.timerSystem.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
+    const broke = game.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
     check(broke, 'and does break it through entry 1 (force 42)');
   }
 

@@ -10,7 +10,7 @@
  *
  * Not the DSA's ten-argument `MoveObject` (`MoveObject.cpp:721`), which is
  * `DsaSystem.moveObjectDsa`. A monster lifted on the party's level first meets the
- * missiles in its way through `CheckMoveFromMissile`, which is `TimerSystem`'s.
+ * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
 import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
@@ -148,7 +148,7 @@ export class WorldMove {
 
     if (oldX >= 0 && type === DBType.CREATURE && level === (party.position.z | 0)) {
       const to = newX >= 0 ? new Position(newX, newY, level) : null;
-      if (this.ctx.systems.timer.checkMonsterMoveFromMissile(new Position(oldX, oldY, level), to, object)) {
+      if (this.ctx.systems.missileEncounter.checkMonsterMoveFromMissile(new Position(oldX, oldY, level), to, object)) {
         return { removed: true, placed: null, position: null };
       }
     }

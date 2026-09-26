@@ -24,7 +24,7 @@ import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterSystem } from '../src/engine/MonsterSystem';
 import { MonsterDamage, MonsterDamageResult } from '../src/engine/MonsterDamage';
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
-import type { TimerSystem } from '../src/engine/TimerSystem';
+import type { MissileEncounter } from '../src/engine/MissileEncounter';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
@@ -72,10 +72,10 @@ async function main(): Promise<void> {
   // counted, no missile waits in the cell a dead group is lifted from, and no pad is there.
   ctx.systems.monsters = monsters;
   ctx.systems.monsterDamage = damage;
-  ctx.systems.timer = {
+  ctx.systems.missileEncounter = {
     createDeathCloud: () => { clouds++; },
     checkMonsterMoveFromMissile: () => false,
-  } as unknown as TimerSystem;
+  } as unknown as MissileEncounter;
   ctx.systems.actuators = { triggerObjectMove: () => {} } as unknown as ActuatorSystem;
 
   const pool = dungeon.getItem16Pool();

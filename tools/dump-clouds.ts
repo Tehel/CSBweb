@@ -80,7 +80,7 @@ async function main(): Promise<void> {
   ): Promise<{ values: number[]; ticks: number }> => {
     const game = await makeGame();
     const dungeon = game.dungeonState;
-    game.timerSystem.createDeathCloud(projectile, size, at, 255);
+    game.missileEncounter.createDeathCloud(projectile, size, at, 255);
 
     const values: number[] = [];
     let ticks = 0;
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
   // The record must leave the cell *and* be freed, or the DB fills up with dead clouds.
   const gameD = await makeGame();
   const cloudsBefore = gameD.dungeonState.getData().databases.clouds.records.length;
-  gameD.timerSystem.createDeathCloud(RN_MONSTER_DEATH, 255, at, 255);
+  gameD.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, at, 255);
   const born = cloudIn(gameD, at);
   check(born !== null, 'the cloud is in the cell to begin with');
   for (let t = 1; t <= 20; t++) gameD.timerSystem.processTimers(t);
@@ -170,7 +170,7 @@ async function main(): Promise<void> {
   }];
   const here = new Position(party.position.x, party.position.y, party.position.z);
   const healthBefore = party.champions[0]!.attributes.health;
-  gameP.timerSystem.createDeathCloud(RN_POISON_CLOUD, 255, here, 255);
+  gameP.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, here, 255);
   for (let t = 1; t <= 120; t++) gameP.timerSystem.processTimers(t);
   const healthAfter = party.champions[0]!.attributes.health;
   console.log(`champion standing in a poison cloud: ${healthBefore} -> ${healthAfter} health`);
@@ -211,7 +211,7 @@ async function main(): Promise<void> {
     const map = dungeonF.getMap(doorAt.z)!;
     const before = map.cellFlags[doorAt.x]![doorAt.y]! & 7;
     // A big fireball, so the force clears the door type's DoorTOC threshold.
-    gameF.timerSystem.createDeathCloud(RN_FIREBALL, 255, doorAt, 255);
+    gameF.missileEncounter.createDeathCloud(RN_FIREBALL, 255, doorAt, 255);
     for (let t = 1; t <= 10; t++) gameF.timerSystem.processTimers(t);
     const after = map.cellFlags[doorAt.x]![doorAt.y]! & 7;
     console.log(`=== a fireball at the door on level ${doorAt.z} (${doorAt.x},${doorAt.y}) ===`);
@@ -233,7 +233,7 @@ async function main(): Promise<void> {
       ordinal = o;
       return original.call(this, o, mapX, mapY, deltaTime);
     };
-    game.timerSystem.createDeathCloud(RN_FIREBALL, size, at, 255);
+    game.missileEncounter.createDeathCloud(RN_FIREBALL, size, at, 255);
     SoundQueue.prototype.queueSound = original;
     return ordinal;
   };
@@ -295,7 +295,7 @@ async function main(): Promise<void> {
   const dungeonX = gameX.dungeonState;
   const door0 = dungeonX.getDoorRecordByIndex(0);
   const door0Link = door0?.nextObject;
-  const cage = gameX.timerSystem.createFluxcage(at, 0);
+  const cage = gameX.missileEncounter.createFluxcage(at, 0);
   check(cage !== null && cloudIn(gameX, at) === cage, 'the cage stands in the cell');
   for (let t = 1; t <= 99; t++) gameX.timerSystem.processTimers(t);
   check(cloudIn(gameX, at) === cage, 'it is still there at tick 99');

@@ -30,6 +30,7 @@ import type { DsaSystem } from './DsaSystem';
 import type { CharacterSystem } from './CharacterSystem';
 import type { HallOfChampions } from './HallOfChampions';
 import type { MagicSystem } from './MagicSystem';
+import type { MissileEncounter } from './MissileEncounter';
 import type { MonsterAI } from './MonsterAI';
 import type { MonsterAttack } from './MonsterAttack';
 import type { MonsterDamage } from './MonsterDamage';
@@ -52,6 +53,7 @@ export interface GameSystems {
   dsa: DsaSystem;
   timer: TimerSystem;
   worldMove: WorldMove;
+  missileEncounter: MissileEncounter;
   monsters: MonsterSystem;
   monsterDamage: MonsterDamage;
   monsterPerception: MonsterPerception;

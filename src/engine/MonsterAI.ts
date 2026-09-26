@@ -19,7 +19,7 @@
  * `monsterMoveInhibit[]` — and passing them explicitly is the only way to keep the
  * port readable without inventing a global of our own.
  */
-import { OBJECT_ID_EOF, Position, type ObjectID } from '../core/types';
+import { decodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { SMS_ATTACKING } from '../data/dungeonTypes';
@@ -1148,13 +1148,42 @@ export class MonsterAI {
 
   /**
    * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — shifting
-   * position inside a cell can walk the monster into a missile already there.
+   * position inside a cell can walk the monster into a missile already there. Resolves
+   * every missile in that corner, stopping early if the group is wiped out.
    *
    * Returns true when that wiped out the group, in which case the turn ends.
    */
   private checkMonsterVersusMissiles(c: AiConst): boolean {
-    const wiped =
-      this.ctx.systems.timer.checkMonsterVersusMissiles(c.mapX, c.mapY, c.slot.positions, c.level);
+    const encounter = this.ctx.systems.missileEncounter;
+    const { mapX, mapY, level } = c;
+    const position = c.slot.positions;
+    encounter.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
+    const cell = new Position(mapX, mapY, level);
+
+    // Restart the scan after each hit: resolving one missile mutates the cell chain.
+    for (let guard = 0; guard < 64; guard++) {
+      let hitSomething = false;
+      for (
+        let rn = this.dungeon.findFirstObject(cell);
+        rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
+        rn = this.dungeon.getDBRecordLink(rn)
+      ) {
+        const decoded = decodeObjectID(rn);
+        if (decoded.category !== DBType.MISSILE) continue;
+        // CSBWin compares the corner with the whole positions byte (`DEBT.md` C43).
+        if ((decoded.position & 0x3) !== (position & 0x3)) continue;
+        const missile = this.dungeon.getMissileRecord(rn);
+        const timerIndex = missile?.timerIndex;
+        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, position & 0x3, rn)) {
+          if (timerIndex !== undefined) this.timers.deleteTimer(timerIndex);
+          hitSomething = true;
+          break;
+        }
+      }
+      if (!hitSomething) break;
+      if (encounter.groupWasWipedOut()) break;
+    }
+    const wiped = encounter.groupWasWipedOut();
     this.lastDamageResult = wiped
       ? MonsterDamageResult.ALL_MONSTERS_DIED
       : MonsterDamageResult.NO_MONSTER_DIED;

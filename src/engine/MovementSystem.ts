@@ -62,10 +62,10 @@ export class MovementSystem {
             const oldFacing = this.party.state.facing;
             let resolvedPosition = result.newPosition;
             let resolvedFacing = result.newFacing ?? oldFacing;
-            const { timer, worldMove } = this.ctx.systems;
+            const { timer, missileEncounter, worldMove } = this.ctx.systems;
 
             if (resolvedPosition) {
-                timer.checkMoveFromMissile(oldPos, resolvedPosition, null);
+                missileEncounter.checkMoveFromMissile(oldPos, resolvedPosition, null);
                 const teleported = worldMove.resolvePartyMove(resolvedPosition, resolvedFacing);
                 resolvedPosition = teleported.position;
                 resolvedFacing = teleported.facing;

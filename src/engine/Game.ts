@@ -17,6 +17,7 @@ import { ActuatorSystem } from './ActuatorSystem';
 import { TimerQueue } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
 import { WorldMove } from './WorldMove';
+import { MissileEncounter } from './MissileEncounter';
 import { MonsterSystem } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
 import { createGameContext, type GameContext, type GameSystems } from './GameContext';
@@ -121,6 +122,11 @@ export class Game {
      * any object. Public because `tools/` moves things through it directly.
      */
     readonly worldMove: WorldMove;
+    /**
+     * A missile meeting the party, a monster, a wall or a door, and the clouds and door
+     * blows it sets off. Public because `tools/` spies on and calls it directly.
+     */
+    readonly missileEncounter: MissileEncounter;
     /** Monster group lifecycle and movement. Public for the same reason. */
     readonly monsterSystem: MonsterSystem;
     /**
@@ -199,6 +205,7 @@ export class Game {
         this.dsaSystem = new DsaSystem(ctx);
         this.timerSystem = new TimerSystem(ctx);
         this.worldMove = new WorldMove(ctx);
+        this.missileEncounter = new MissileEncounter(ctx);
         this.monsterSystem = new MonsterSystem(ctx);
         this.monsterDamage = new MonsterDamage(ctx);
         this.monsterPerception = new MonsterPerception(ctx);
@@ -218,6 +225,7 @@ export class Game {
             dsa: this.dsaSystem,
             timer: this.timerSystem,
             worldMove: this.worldMove,
+            missileEncounter: this.missileEncounter,
             monsters: this.monsterSystem,
             monsterDamage: this.monsterDamage,
             monsterPerception: this.monsterPerception,

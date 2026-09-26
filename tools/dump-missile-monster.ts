@@ -171,9 +171,9 @@ type Hit = { index: number; damage: number };
 /** Record what the encounter asks for, as the real engine asks it. */
 function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
   const log = { magic: [] as Magic[], poison: [] as number[], hits: [] as Hit[] };
-  const ts = game.timerSystem;
-  const magic = ts.determineMagicDamage.bind(ts);
-  ts.determineMagicDamage = (missile, projectile) => {
+  const me = game.missileEncounter;
+  const magic = me.determineMagicDamage.bind(me);
+  me.determineMagicDamage = (missile, projectile) => {
     const r = magic(missile, projectile);
     log.magic.push({ projectile, damage: r.damage, poisonStrength: r.poisonStrength });
     return r;

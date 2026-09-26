@@ -101,7 +101,7 @@ async function main(): Promise<void> {
     const start = game.dungeonState.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
-    game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
+    game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
     const result = move(game, DBType.CLOUD, from, to, 2);
     const moved = inCell(game, to, DBType.CLOUD);
     const timer = game.timerQueue.getTimers().find((t) => t.function === TimerFunction.TT_25);
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     const start = game.dungeonState.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
-    game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
+    game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
     const tt25 = game.timerQueue.getTimers().find((t) => t.function === TimerFunction.TT_25);
     if (tt25) game.timerQueue.deleteTimer(tt25.index);
     const result = move(game, DBType.CLOUD, from, to, 2);
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
 
     const start = dungeon.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
-    game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
+    game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
     const cloud = inCell(game, from, DBType.CLOUD)[0]!;
     const cloudResult = move(game, DBType.CLOUD, from, pit, 0);
     console.log(`5b. cloud -> the same pit: result ${cloudResult}, on the pit ${holding(game, pit, cloud)}, below ${holding(game, below, cloud)}`);

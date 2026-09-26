@@ -503,10 +503,10 @@ export class MonsterDamage {
       const size = [110, 190, 255][monsterHorizontalSize(desc)] ?? 255;
       if (monster.drawAsSize4) {
         if (numMonM1 === 0) {
-          this.ctx.systems.timer.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255);
+          this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, new Position(attackX, attackY, level), 255);
         }
       } else {
-        this.ctx.systems.timer.createDeathCloud(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition);
+        this.ctx.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, size, new Position(attackX, attackY, level), deadPosition);
       }
     }
 

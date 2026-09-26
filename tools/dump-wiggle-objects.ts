@@ -141,7 +141,7 @@ function main(): void {
     const below = dungeon.incrementLevel(pit, 1)!;
     let index = -1;
     switchOn(game, pit, TimerFunction.TT_PIT, () => {
-      game.timerSystem.createDeathCloud(RN_POISON_CLOUD, 255, pit, 0);
+      game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, pit, 0);
       for (let rn = dungeon.findFirstObject(pit); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category === DBType.CLOUD) index = decodeObjectID(rn).index;
       }

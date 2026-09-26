@@ -140,7 +140,7 @@ stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `tim
 seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems call
 each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
 what the path under test reaches, with the real system or a cast stand-in
-(`ctx.systems.timer = { createDeathCloud: () => { clouds++; } } as unknown as TimerSystem`,
+(`ctx.systems.missileEncounter = { createDeathCloud: () => { clouds++; } } as unknown as MissileEncounter`,
 `dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
 To intercept a call inside a whole `Game`, replace the method on the instance
 (`game.monsterDamage.damageMonster = …`, `dump-missile-monster.ts`): every caller goes
@@ -196,7 +196,7 @@ tick runs the monsters too, so do anything that needs a monster where you found 
 before the frames that tick, or set `lastTickTime = t` so none is due.
 
 **Spy on the real call, don't re-derive it.** When a formula consumes random numbers,
-wrap the instance method (`game.timerSystem.determineMagicDamage = …`) to record its
+wrap the instance method (`game.missileEncounter.determineMagicDamage = …`) to record its
 inputs and outputs, then check the arithmetic the engine did with them. Recomputing the
 draws in the tool would need the RNG state and proves less.
 

@@ -116,6 +116,7 @@ function encounter(
 ): Outcome {
   const game = makeGame(door.toc);
   const ts = game.timerSystem as any;
+  const me = game.missileEncounter as any;
   const at = findClosedDoor(game);
   const map = game.dungeonState.getMap(at.z)!;
   map.cellFlags[at.x][at.y] = (map.cellFlags[at.x][at.y] & 0xf8) | door.state;
@@ -136,13 +137,13 @@ function encounter(
   ts.missileFilterTimer = game.timerQueue.getTimer(missile.timerIndex);
 
   const hits: Outcome['hits'] = [];
-  const hitDoor = ts.hitDoor.bind(ts);
-  ts.hitDoor = (p: Position, force: number, explosion: boolean, delay = 0, time?: number): boolean => {
+  const hitDoor = me.hitDoor.bind(me);
+  me.hitDoor = (p: Position, force: number, explosion: boolean, delay = 0, time?: number): boolean => {
     hits.push({ force, explosion, delay });
     return hitDoor(p, force, explosion, delay, time);
   };
   const before = new Set(game.timerQueue.getTimers().map((t) => t.index));
-  const spent = ts.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, 0, missileRn);
+  const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, 0, missileRn);
   const doorTimers = game.timerQueue.getTimers()
     .filter((t) => !before.has(t.index) && t.function === TimerFunction.TT_DOOR)
     .map((t) => ({ time: t.time, action: t.uByte9 }));

@@ -402,7 +402,7 @@ function main(): void {
     const missile = { nextObject: OBJECT_ID_EOF, projectileObject: 0 as ObjectID, rangeRemaining: 200, damageRemaining: 200, timerIndex: 0 };
     console.log(['projectile', 'damage', 'kind', 'poison'].join('\t'));
     const of = (name: string, rn: ObjectID): { damage: number; kind: number; poisonStrength: number } => {
-      const r = g.timerSystem.determineMagicDamage({ ...missile }, rn);
+      const r = g.missileEncounter.determineMagicDamage({ ...missile }, rn);
       console.log([name, r.damage, r.kind, r.poisonStrength].join('\t'));
       return r;
     };
