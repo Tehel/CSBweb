@@ -66,7 +66,33 @@ sets `TextTimeout[3] = -1`, and starts a pixel-level scroll animation via
 `d.PushTextUp = 1` / `d.TextScanlineScrollCount = 0`.
 
 `ClockTick` refuses to place new text while `TextScanlineScrollCount >= 0` or
-`PushTextUp != 0` — it waits for the scroll animation to finish.
+`PushTextUp != 0` — it waits for the scroll animation to finish (`CSBCode.cpp:1526-1527`).
+
+### The scroll animation
+
+The VBL handler runs it (`vblInterrupt`, `doc/CSBwin-src/CSBCode.cpp:971-1004`), one
+scanline per VBL:
+
+- While `TextScanlineScrollCount >= 0`: move scanlines 173 .. `199 - count` up one (the
+  strip is 28 scanlines, 172-199), then `count++`, and copy `count` scanlines of
+  `d.newTextLine` to the bottom of the screen, from scanline `200 - count`. When the count
+  reaches 7 it becomes -1.
+- Otherwise, if `PushTextUp != 0`: clear it and copy 7 scanlines of `d.newTextLine` to
+  scanlines 193-199.
+
+`ScrollUp` clears `d.newTextLine` (`:1587`), and nothing writes it since `Printf` stopped
+drawing (its old body is commented out, `:1616-1642`), so what comes in at the bottom is
+blank. After seven VBLs every row sits 7 scanlines higher and the bottom row is empty; the
+eighth clears `PushTextUp`. `RemoveTimedOutText` also waits for both (`:1505-1508`), and
+`DiscardText` stops the scroll (`TextScanlineScrollCount = -1`, `PushTextUp = 0`,
+`:1447-1448`).
+
+### When the queue is drained
+
+The main loop takes one `printQueue` entry per pass, at `tag0007c8`, whether or not a tick
+ran in that pass (`CSBCode.cpp:714-721`), so a message queued by a click reaches
+`PrintLines` without waiting for a tick. The tick's own `scrollingText.ClockTick()` comes
+after `ProcessTimers` and `d.Time++` (`:660`, `:677`).
 
 ## Timeouts
 
@@ -86,8 +112,18 @@ not a wall-clock duration.)
 `RemoveTimedOutText()` clears the row's rectangle to colour 0 and sets `TextTimeout = -1`.
 If a scroll is in progress it returns early and retries on the next tick.
 
-`ResetTime(newTime)` rebases all live timeouts by `newTime - d.Time` (used when game time
-is reloaded), and `SetNewSpeed` rescales them.
+`ResetTime(newTime)` rebases all live timeouts by `newTime - d.Time` (`CSBCode.cpp:1564`).
+`LoadGame` calls it with the saved time just before it sets `d.Time`
+(`SaveGame.cpp:1623-1624`).
+
+`SetNewSpeed(oldSpeed, newSpeed)` rescales every live timeout to a new `d.Speed`, the VBLs
+per tick: `delta = TextTimeout - d.Time`, then
+`delta = (delta*(oldSpeed+1) + newSpeed)/(newSpeed+1)` (`CSBCode.cpp:1598-1609`). Sleep calls
+it with `(d.Speed, 0)` (`Mouse.cpp:1696`), `WakeUp` with
+`(d.Speed, speedTable[gameSpeed].vblPerTick)` (`CSBCode.cpp:7053`), and the top of every tick
+while awake with the same arguments (`:612-616`). At the default `SPEED_NORMAL`, 15 VBLs per
+tick (`data.cpp:275`, `CSBwin.cpp:180`), falling asleep multiplies what is left of each
+timeout by 16, and waking divides it by 16, rounding up.
 
 ## Colours
 
@@ -100,18 +136,14 @@ Colour is per-fragment, passed to `QuePrintLines`. Known uses:
 
 ## Persistence
 
-`SCROLLING_TEXT::Serialize` saves/loads the text area, so message state is part of a save
-game (`Data.h:1666`).
+CSBWin saves no message state. `SCROLLING_TEXT::Serialize` is declared
+(`doc/CSBwin-src/Data.h:1665`) but has no body and no caller anywhere in the tree. A load
+keeps whatever is on screen and rebases its timeouts (`ResetTime`, above).
 
-## Implications for DMweb
+## The port
 
-Our current implementation routes gameplay text through the debug helper `updateDebug()`,
-which sets whole pre-split lines and never expires them. To match CSBWin we need:
-
-1. A two-stage queue (`quePrintLines` → drained in the game loop → `printLines`).
-2. A fragment-based API, not whole-string messages, with word wrap at 53 columns and
-   2-column continuation indent.
-3. Four rows with per-row tick timeouts (70 / 700) plus the monotonic clamp.
-4. Fill-downward-then-scroll-up row management.
-5. Per-fragment colour, with 4 for spell messages.
-6. Drawing into the 320×200 index buffer at the geometry above — not into DOM elements.
+`src/renderer/csbwin/ScrollingText.ts` ports the queue, the tokenizer, the four rows and
+their timeouts, and draws into the 320×200 index buffer at the geometry above. Not yet
+ported, all in `DEBT.md` G5: `SetNewSpeed`, the load's `ResetTime` (the port discards the
+text on a load), the scroll animation and its guards, and draining the queue once per VBL
+rather than at the top of a tick.

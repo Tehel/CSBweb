@@ -73,6 +73,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 1 next |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -86,14 +87,15 @@ In payoff order: the first row is the next item.
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
+| C62 | The key tables of graphics.dat are not read | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
+| F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
 | G2 | Nine DSA filters | — | ⏳ |
 | G3 | The wings | — | ⏳ |
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
-| G5 | The message scroll, message state in saves, the freeze | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
 | G8 | Lord Chaos's fusion endgame | — | ⏳ |
@@ -105,7 +107,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C62 · D9 · E7 · F11 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C63 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -313,9 +315,9 @@ neither half:
 What each misses is the halves' state: `SetCursorShape(0)`, the arrow cursor until
 `TAG0207cc`'s `TAG002572` puts it back (while asleep, for one); the caster selected again;
 `d.Word20252 = 1` when no attack menu is open; the inventory shown again. The freeze's
-pair (`Mouse.cpp:1736`, `:1765`) goes with the freeze (G5). Call the pair at each site, and
-move `drawCursorItem`'s arrow, which tests the save menu, onto a cursor-shape state the pair
-sets and clears. Evidence: a check per site, in `tools/dump-sleep.ts` and
+pair (`Mouse.cpp:1736`, `:1765`) goes with the freeze, G5 step 3, which also moves
+`drawCursorItem`'s arrow, now a test of the save menu, onto a cursor-shape state the pair
+sets and clears. Call the pair at each site. Evidence: a check per site, in `tools/dump-sleep.ts` and
 `tools/dump-hall-of-champions.ts`.
 
 ### C61 ⏳ The dev quick-save writes an open chest empty
@@ -327,6 +329,29 @@ straight from the game, so a quick-save made with a chest open restores the ches
 and its objects nowhere. CSBWin has no quick-save; its only save repacks. Repack before
 the payload is built and open the chest again after, as the disk menu does. Evidence: a
 check that quick-saves over an open chest and restores it.
+
+### C62 ⏳ The key tables of graphics.dat are not read
+
+`TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428`) turns a key into a button through the two
+`KeyXlate` tables that `d.pKeyXlate2` and `d.pKeyXlate1` point at, `{mouse, keyscan}`
+pairs ending at `mouse == 0` (`CSB.h:1379-1383`), all four read from graphics.dat `0x231`.
+Awake they are `Byte18400` and `Byte18428` (`CSBCode.cpp:7058-7059`, `:10489-10490`):
+
+- `Byte18400`: F1-F4 (`0x3b00`-`0x3e00`) are buttons 7-10, Ctrl-S (`0x13`) is 140, the disk
+  menu, and Esc (`0x1b`) is 147, the freeze.
+- `Byte18428`: Insert (`0x5200`) and Clr/Home (`0x4700`) turn left and right (buttons 1
+  and 2), and the four arrows are buttons 3-6: up steps forward, down back, left and
+  right strafe.
+
+Asleep the tables are `Byte18440` (Return 146, Esc 147) and nothing (`Mouse.cpp:1700-1701`),
+and frozen `Byte18448` (Esc 148) and nothing (`:1754-1755`). The port skips all four
+(`src/renderer/csbwin/UITables.ts:456-470`) and hardcodes its keys in `src/ui/events.ts` and
+`src/renderer/ui/Keyboard.ts`: F1-F4 select the caster, Ctrl-S is left to the browser, Esc
+toggles a dev pause, and the left and right arrows turn. Keyboard.ts's module comment says
+CSBWin has no keys of its own beyond `config.txt`, which these tables contradict. Read the
+tables, queue what they bind as `TAG0196da` does, and keep the port's extra bindings only
+where they claim no key a table binds. G5 step 3 reads the Esc entries it needs. Evidence:
+a row per table entry in `tools/dump-key-bindings.ts`.
 
 ---
 
@@ -363,6 +388,12 @@ flush with its right edge, and the front-right one starts flush with its left ed
 pixels themselves are still verified only by screenshot. A new frame needs a way to place
 the party, which the probe does not have. That is the same missing affordance as the
 "fixed set of party positions" in `PLAN.md` → Phase 15 step 2, so build it once for both.
+
+### F11 ⏳ `probe-ui.mjs --boot` boots with an empty party
+
+`tools/probe-ui.mjs --boot` still presses F8 for a random dev party (`:146`), a key that no
+longer exists, so it boots with an empty party. `tools/probe-frames.mjs` builds its party
+at the Hall of Champions instead, and `--boot` should do the same.
 
 ### F3 — Phase 15 steps 3–5 stay in `PLAN.md`
 
@@ -475,28 +506,85 @@ constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 `SaveGameLoader` and gating every accessor.
 
-### G5 ⏳ The message scroll, message state in saves, the freeze
+### G5 ⏳ The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze
 
-- **The scroll animation.** The pixel-level scroll (`d.PushTextUp` /
-  `d.TextScanlineScrollCount`) is not implemented. Rows scroll instantly, and CSBWin's
-  wait-for-animation guards are absent. `scrollingText.SetNewSpeed` goes with it: sleep and
-  `WakeUp` call it to re-pace that animation (`doc/CSBwin-src/Mouse.cpp:1696`,
-  `CSBCode.cpp:7053`).
-- **`SCROLLING_TEXT::Serialize`**, the message state in save games
-  (`doc/CSBwin-src/Data.h:1666`). Quick-load calls `discardText()` instead.
-- **The freeze.** Sleep is ported (`MouseSystem.sleep`, `wakeUp(ctx)` in
-  `src/engine/LoopState.ts`, `tools/dump-sleep.ts`); the freeze is not:
-  - button 147 freezes and 148 thaws (`doc/CSBwin-src/Mouse.cpp:1731-1773`);
-  - the frozen game's queue filter throws away every entry but 148 (`:1433-1444`);
-  - the keys that reach them are missing too: Esc is 147 in the sleep-mode table
-    `Byte18440` and 148 in the frozen one `Byte18448` (graphics.dat `0x231`). Asleep, the
-    port swallows Esc.
+The author has pulled G5 ahead of tier C. It is size L, in four steps taken in order, each
+one commit:
 
-  `UIMode.Frozen` is never entered.
+1. ⏳ **`SetNewSpeed`** (S). `SCROLLING_TEXT::SetNewSpeed(oldSpeed, newSpeed)`
+   (`doc/CSBwin-src/CSBCode.cpp:1598-1609`) rescales every live `d.TextTimeout` to a new
+   `d.Speed`, the VBLs per tick: `delta = (delta*(oldSpeed+1) + newSpeed)/(newSpeed+1)`,
+   with `delta` counted from `d.Time`. Sleep calls it with `(d.Speed, 0)`
+   (`Mouse.cpp:1696`) and `WakeUp` with `(d.Speed, speedTable[gameSpeed].vblPerTick)`
+   (`CSBCode.cpp:7053`), 15 at the default `SPEED_NORMAL` (`data.cpp:275`,
+   `CSBwin.cpp:180`). The top of every tick calls it too while awake (`CSBCode.cpp:612-616`),
+   which does nothing at a constant speed. So falling asleep makes the rows on screen last
+   sixteen times as many ticks, and waking divides what is left by sixteen, rounding up. It
+   rescales timeouts and has nothing to do with the scroll animation. The port has no
+   `d.Speed` (`Game.runFrame` reads `sleeping`), and `MouseSystem.sleep` and `wakeUp`
+   (`src/engine/LoopState.ts`) leave the timeouts alone. Port it into `ScrollingText`, reach
+   it through the host's `MessageSink`, and call it from both. Evidence: a check in
+   `tools/dump-sleep.ts` that places a row, sleeps, wakes, and prints its timeout at each
+   step.
+2. ⏳ **A load keeps the message area** (S). CSBWin saves no message state:
+   `SCROLLING_TEXT::Serialize` is declared (`doc/CSBwin-src/Data.h:1665`) and has no body
+   and no caller. `LoadGame` keeps the rows on screen and rebases their timeouts onto the
+   loaded clock, `scrollingText.ResetTime(b.gb2.Time)` just before
+   `d.Time = b.gb2.Time` (`SaveGame.cpp:1623-1624`, `ResetTime` at `CSBCode.cpp:1564`). The
+   port discards the message area instead, after the menus' restore (`onRestoreSave`,
+   `src/main.ts:303`) and the dev quick-load (`src/dev.ts:146`), both citing the missing
+   `Serialize`. `ScrollingText.resetTime` is ported and has no caller. Call it in
+   `applySaveBytes` (`src/engine/SaveGamePayload.ts:432`), which the two menus and the
+   quick-load share, before the tick count is replaced, and drop both `discardText` calls.
+   Evidence: a check that restores a save with another clock over a row on screen and
+   prints the row's timeout before and after.
+3. ⏳ **The freeze** (M).
+   - Button 147 (`doc/CSBwin-src/Mouse.cpp:1731-1759`): `d.ClockRunning = 0`,
+     `gameFrozen = true`, `TAG02076e()`, the viewport flooded with 0 and "GAME FROZEN" in
+     colour 4 at viewport (81, 69), the button lists and key tables saved and replaced by
+     `Buttons17832` (the whole screen, either mouse button, is 148) and `Byte18448`,
+     `DiscardAllInput()`. Button 148 (`:1760-1773`) puts it all back, with `TAG0207cc()`.
+   - While `d.ClockRunning == 0` the main loop runs no tick (`CSBCode.cpp:765`) and a
+     viewport click does nothing (`Mouse.cpp:1667`). While `gameFrozen`,
+     `HandleMouseEvents` throws away every entry but 148 (`:1433-1444`).
+   - The keys: Esc is 147 in the adventure table `Byte18400` and in the sleep table
+     `Byte18440`, and 148 in the frozen table `Byte18448` (graphics.dat `0x231`, C62). In the
+     port Esc toggles a dev pause in adventure (`src/ui/events.ts:291`) and is swallowed
+     asleep (`:243-251`). This step reads the tables it needs from graphics.dat; C62 is the
+     rest of them.
+   - The pair's arrow cursor needs the cursor-shape state C60 plans. Build it here, and C60
+     then only adds its call sites.
+   - `UIMode.Frozen` and its button list (`updateButtonLists`,
+     `src/renderer/ui/Mouse.ts:341`) exist and are never entered.
 
-Also: `tools/probe-ui.mjs --boot` still presses F8 for a random dev party, a key that no
-longer exists, so it boots with an empty party. `tools/probe-frames.mjs` builds its party
-at the Hall of Champions instead, and `--boot` should do the same.
+   Evidence: a new `tools/dump-freeze.ts`, listed in `tools/run-checks.mjs`, that freezes
+   by click and by Esc, awake and asleep, shows that no tick runs and that every entry but
+   148 is dropped, then thaws; and the frozen screen as a golden frame if the frame probe
+   can reach it.
+4. ⏳ **The scroll animation, and the pace of the print queue** (M).
+   - `ScrollUp` (`doc/CSBwin-src/CSBCode.cpp:1584-1596`) starts a pixel scroll,
+     `d.PushTextUp = 1` and `d.TextScanlineScrollCount = 0`. The VBL handler then moves the
+     strip up one scanline per VBL and blanks the bottom `count` scanlines, until the count
+     reaches 7 and turns to -1; the next VBL clears `d.PushTextUp` (`:971-1004`). Until then
+     `ClockTick` places nothing (`:1526-1527`) and `RemoveTimedOutText` removes nothing
+     (`:1505-1508`). `DiscardText` stops the scroll (`:1447-1448`). The port moves the rows
+     at once and has none of these guards (`src/renderer/csbwin/ScrollingText.ts`, module
+     comment).
+   - The pace: CSBWin's main loop takes one print-queue entry per pass, whether or not a
+     tick ran (`CSBCode.cpp:714-721`), so a message reaches `PrintLines` in the VBL it was
+     queued in, and the tick's own `ClockTick` comes after `ProcessTimers` and `d.Time++`
+     (`:660`, `:677`). The port pumps the whole queue at the top of a tick, before the
+     timers (`game.onTick`, `src/main.ts:388`), so a message queued by a click or a timer
+     waits for the next tick, and its row is stamped a tick late. Once the animation makes
+     pieces wait, when the queue is drained decides what waits behind a scroll, so both go
+     together: a per-VBL step from `Game.runFrame` that advances the scroll and drains the
+     queue, and `clockTick` where CSBWin's tick calls it.
+   - The port redraws the rows every frame, so the draw offsets them by the scroll count and
+     keeps the row that is scrolling out until it has gone.
+
+   Evidence: a new `tools/dump-messages.ts` that fills the four rows, queues a fifth, and
+   prints per VBL the scroll count, the rows, and the VBL the next piece lands in; and
+   `npm test -- --frames`.
 
 ### G6 ⏳ UI effects
 
