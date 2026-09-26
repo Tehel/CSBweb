@@ -40,6 +40,7 @@ import { newGame, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */
 const SAMPLES = 400;
@@ -332,7 +333,8 @@ async function main(): Promise<void> {
   check(party.objectInHand === OBJECT_ID_NULL, 'the thrown object left the cursor');
   console.log(`stamina ${staminaBefore} -> ${staminaAfter} (TAG016382 charged for a 1.0 kg rock)`);
   check(staminaAfter < staminaBefore, 'the throw cost stamina');
-  check(party.champions[0]!.actionDisabledUntil > 0, 'the champion is busy afterwards');
+  check((party.champions[0]!.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0 && party.champions[0]!.busyTimerIndex >= 0,
+    'the champion is busy afterwards: CHARFLAG_attackDisable and a busy timer');
 
   // Skill 10 must have gained: 8 for any object, +4 for a weapon, +uByte3/4 for a
   // throwable — a rock is uByte3 18, so 8 + 4 + 4 = 16 before the difficulty scaling.

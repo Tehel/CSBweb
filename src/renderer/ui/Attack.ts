@@ -31,6 +31,7 @@ import { DBType, decodeObjectID, OBJECT_ID_NULL, type ObjectID } from '../../cor
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
 import { getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
+import { CHARFLAG_ATTACK_DISABLE } from '../../data/CsbwinCharacters';
 import { determineMastery } from '../../engine/skills';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -299,7 +300,9 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
     );
   }
 
-  const busy = champ.actionDisabledUntil !== 0 || champ.busyTimerIndex >= 0;
+  // ⚠️ CSBWin also shades while `d.PotentialCharacterOrdinal` is set
+  // (`Character.cpp:4876`): DEBT.md C52.
+  const busy = (champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
   if (busy || (ui.partyState?.sleeping ?? false)) {
     shadeRectIndex(ui, rect, 0);
   }

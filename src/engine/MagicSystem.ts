@@ -18,6 +18,7 @@ import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
+import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import type { SpellParameters } from './magicTypes';
 import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
@@ -475,6 +476,10 @@ export class MagicSystem {
     return newIndex === null ? null : encodeObjectID(0, DBType.MISC, newIndex);
   }
 
+  /**
+   * `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502`) — busy the champion for
+   * `timeDelay` ticks, or stretch the busy timer they already have.
+   */
   disableCharacterAction(chIdx: number, timeDelay: number): void {
     if (timeDelay <= 0) return; // ⚠️ CSBWin has no such guard (DEBT.md C50)
     const party = this.ctx.party.state;
@@ -493,6 +498,10 @@ export class MagicSystem {
         }
       }
       this.timers.deleteTimer(existingIndex);
+    } else {
+      // `CHARFLAG_weaponAttack` and `DrawCharacterState` are the redraw, which this port
+      // does every frame.
+      champion.charFlags |= CHARFLAG_ATTACK_DISABLE;
     }
     const entry = this.timers.createTimerWithUByte5(
       TimerFunction.TT_11,
@@ -505,7 +514,6 @@ export class MagicSystem {
       chIdx,
     );
     champion.busyTimerIndex = entry.index;
-    champion.actionDisabledUntil = entry.time;
   }
 
   /**

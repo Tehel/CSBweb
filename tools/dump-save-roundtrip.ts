@@ -55,6 +55,7 @@ import { Game } from '../src/engine/Game';
 import type { RuntimeSaveState } from '../src/engine/RuntimeSave';
 import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes } from '../src/engine/SaveGamePayload';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
+import { CHARFLAG_ATTACK_DISABLE, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -311,6 +312,84 @@ function main(): void {
     // block would have been indistinguishable from a valid one only at the very start.
     check(block2.partyLevel > 0 || block2.partyX > 0 || block2.partyY > 0,
       `${file}: the position written is not the all-zero one a stub block would give`);
+  }
+
+  /* ---- 5. the busy bit, out of a live game and back ---- */
+
+  // A busy champion is `CHARFLAG_attackDisable` in `charFlags`. `DisableCharacterAction`
+  // sets it when the champion has no busy timer yet (`doc/CSBwin-src/Magic.cpp:528-531`)
+  // and `EnableCharacterAction` clears it (`Timer.cpp:2646`), so a save written while
+  // the champion is busy carries bit 3, and one written after the timer fired does not.
+  console.log('\n=== CHARFLAG_attackDisable, busy and freed ===');
+  {
+    const game = fromCsbwinSave('csbgame7.dat');
+    const champion = (g: Game): Champion => g.party.state.champions[0]!;
+    /** Champion 0 as the block 4 of a save written now has them. */
+    const written = (g: Game): Champion => readCsbwinCharacter(
+      loadSaveGameState(decodeBase64ToBytes(buildSavePayload(g).raw)).characterBlock!, 0).champion;
+    const busy = (c: Champion): boolean => (c.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
+    const hex = (n: number): string => `0x${(n & 0xffff).toString(16).padStart(4, '0')}`;
+    const report = (label: string, g: Game): void => {
+      const w = written(g);
+      console.log(`${label}: tick ${g.state.tickCount} charFlags ${hex(champion(g).charFlags)} ` +
+        `busyTimer ${champion(g).busyTimerIndex}, written ${hex(w.charFlags)} / ${w.busyTimerIndex}`);
+    };
+    const others = champion(game).charFlags & ~CHARFLAG_ATTACK_DISABLE;
+
+    report('loaded', game);
+    check(!busy(champion(game)) && champion(game).busyTimerIndex === -1,
+      'csbgame7.dat: champion 0 starts idle, bit 3 clear and no busy timer');
+
+    game.ctx.systems.magic.disableCharacterAction(0, 8);
+    const timer = champion(game).busyTimerIndex;
+    report('busied', game);
+    check(busy(champion(game)) && timer >= 0,
+      'DisableCharacterAction sets CHARFLAG_attackDisable and queues the busy timer');
+    check(busy(written(game)) && written(game).busyTimerIndex === timer,
+      'a save written while the champion is busy carries bit 3 and that busy timer');
+
+    const { next } = roundTrip(game);
+    check(busy(champion(next)) && champion(next).busyTimerIndex === timer,
+      'and so does our own payload, read back into a fresh game');
+
+    // Busied again while busy, the timer is replaced by a later one (`Magic.cpp:517-525`):
+    // due at d.Time + 8 + 8/2. The bit is already set and stays.
+    game.ctx.systems.magic.disableCharacterAction(0, 8);
+    report('busied again', game);
+    check(busy(champion(game)) && champion(game).busyTimerIndex >= 0,
+      'busied again while busy, the champion keeps the bit and a busy timer');
+
+    for (const [label, g, ticks] of [['live', game, 12], ['restored', next, 8]] as const) {
+      advance(g, ticks - 1);
+      check(busy(champion(g)), `${label}: still busy ${ticks - 1} ticks on, one before the timer`);
+      advance(g, 1);
+      report(`${label}, freed`, g);
+      check(!busy(champion(g)) && champion(g).busyTimerIndex === -1,
+        `${label}: the TT_11 at ${ticks} ticks clears the bit and the busy timer`);
+      check(!busy(written(g)) && written(g).busyTimerIndex === -1,
+        `${label}: a save written after the timer fired carries neither`);
+      check((champion(g).charFlags & ~CHARFLAG_ATTACK_DISABLE) === others,
+        `${label}: the other flags, the gender among them, are untouched`);
+    }
+
+    // A genuine CSBWin save of a busy champion: IAIDO, champion 0 of `csbgame6.dat`, has
+    // bit 3 and a busy timer. The bit is the file's, and only his TT_11 clears it. The
+    // timer is due at the saved d.Time, but the port fires it 17 ticks after the load
+    // (DEBT.md C51), so this steps until it has fired rather than to its due time.
+    const saved = fromCsbwinSave('csbgame6.dat');
+    report('csbgame6.dat', saved);
+    check(busy(champion(saved)) && saved.ctx.timers.getTimer(champion(saved).busyTimerIndex)?.function === 11,
+      'csbgame6.dat: champion 0 is saved busy, with bit 3 and a TT_11');
+    let heldUntilTimer = true;
+    for (let i = 0; i < 100 && champion(saved).busyTimerIndex >= 0; i++) {
+      heldUntilTimer &&= busy(champion(saved));
+      advance(saved, 1);
+    }
+    report('csbgame6.dat, freed', saved);
+    check(heldUntilTimer, 'csbgame6.dat: the bit holds for as long as his TT_11 is queued');
+    check(!busy(champion(saved)) && champion(saved).busyTimerIndex === -1,
+      'csbgame6.dat: his TT_11 clears the bit the file set, and the busy timer');
+    check(!busy(written(saved)), 'csbgame6.dat: a save written after carries no bit 3');
   }
 
   finish();

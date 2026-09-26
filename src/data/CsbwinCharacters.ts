@@ -28,6 +28,14 @@ import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInf
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
 
+/**
+ * `CHARFLAG_attackDisable` (`doc/CSBwin-src/CSB.h:2460`) — the champion is busy.
+ * `DisableCharacterAction` sets it when the champion has no busy timer yet
+ * (`Magic.cpp:528-531`), `EnableCharacterAction` clears it (`Timer.cpp:2646`), and it
+ * shades the attack hand (`Character.cpp:4875`).
+ */
+export const CHARFLAG_ATTACK_DISABLE = 0x0008;
+
 /** `CHARFLAG_male` — `AddCharacter` ORs it in for an 'M' hero (`Character.cpp:596`). */
 export const CHARFLAG_MALE = 0x10;
 
@@ -225,12 +233,12 @@ export function readCsbwinCharacter(
     food: readI16BE(block, base + 66),
     water: readI16BE(block, base + 68),
     skills: readSkills(block, base),
-    actionDisabledUntil: 0,
     possessions: slots,
     shieldStrength: readU16BE(block, base + 274),
     fingerprint: readU16BE(block, base + 280) as ui16,
-    // Carried, not used: the save writer needs every field back, and these have no
-    // reader in the engine yet. `charFlags` is where the champion's gender lives.
+    // `charFlags` holds the champion's gender and their busy bit. The rest below are
+    // carried, not used: the save writer needs every field back, and these have no
+    // reader in the engine yet.
     charFlags,
     timerIndex: readI16BE(block, base + 46),
     talents: readU32BE(block, base + 276),

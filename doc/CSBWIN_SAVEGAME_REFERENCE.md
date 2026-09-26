@@ -188,8 +188,10 @@ writes one. Of what it emits:
 - block 5 — **complete**. The whole 16-byte `TIMER`, in whichever of the three sizes the
   Extended Features flags select. It used to write `timerWord8` (offset 8) and nothing
   else, so a file this project wrote said when nothing was due.
-- block 6 — **complete**: the queue order, which is the firing order CSBWin never
-  re-sorts on load.
+- block 6 — **complete**: the queue array, which CSBWin keeps as a binary heap and never
+  reorders on load (`doc/PROVEN_FACTS.md` → "CSBWin's timer queue is a binary heap"). The
+  port writes its own sorted array there, which is not the heap CSBWin would have
+  (`DEBT.md` C51).
 - block 0 — **complete**, and byte-identical to all fourteen committed saves. The
   512-byte header, `dataTypeMap`, `dataIndexMap`, the game info and the DSA level index
   with its three-byte 0xff terminator; `src/data/CsbwinExtendedFeatures.ts` has the whole

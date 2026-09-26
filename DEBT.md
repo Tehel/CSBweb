@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D8 | `CHARFLAG_attackDisable` is a port-only `actionDisabledUntil` | M | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
 | C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
@@ -89,6 +88,8 @@ In payoff order: the first row is the next item.
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
 | C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
+| C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
+| C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -111,32 +112,7 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 
 ## D — State representation
 
-New state-representation debt goes here, and jumps the queue.
-
-### D8 ⏳ `CHARFLAG_attackDisable` is a port-only `actionDisabledUntil`
-
-CSBWin keeps a champion's busy state as bit 0x0008 of `charFlags`, `CHARFLAG_attackDisable`
-(`doc/CSBwin-src/CSB.h:2461`). `DisableCharacterAction` sets it when the champion has no
-busy timer yet (`Magic.cpp:528-531`), `EnableCharacterAction` clears it (`Timer.cpp:2646`),
-`DrawAttackButton` shades the hand by it (`Character.cpp:4875`), `PrepareAttack` refuses by
-it (`:4916`), and a save carries it with the rest of `charFlags`. The port never sets or
-clears the bit: `champion.charFlags` keeps what the file or `AddCharacter` gave it. Its busy
-state is `actionDisabledUntil`, a field of its own holding the busy timer's due tick, set by
-`MagicSystem.disableCharacterAction` (`src/engine/MagicSystem.ts:508`), cleared by
-`TimerSystem.processActionDisableTimer` (`src/engine/TimerSystem.ts:232`), and read, with
-`busyTimerIndex >= 0`, by `drawAttackButton` (`src/renderer/ui/Attack.ts:302`) and
-`tools/dump-throwing.ts:335`.
-
-So a CSBWin save the port writes (`src/data/CsbwinCharacters.ts:452`) has the bit clear for
-a busy champion it recruited. And a bit set in a loaded CSBWin save is never cleared, so a save written
-after that champion's timer fired carries the bit with `busyTimer` -1, and CSBWin, loading
-it, refuses the champion's attack menu until a spell or a throw busies and frees them.
-
-Set and clear the bit where CSBWin does, read it where CSBWin does, and delete
-`actionDisabledUntil`. The quick-save carries the field inside the champion
-(`RUNTIME_SAVE_VERSION`, `src/engine/RuntimeSave.ts:66`), so its loader has to cope with
-it. The saved bit changes, so this is a fix and owes the five things: a check that busies a
-champion, writes a CSBWin save, and reads bit 3 back, then again after the timer fires.
+Empty. New state-representation debt goes here, and jumps the queue.
 
 ---
 
@@ -148,27 +124,27 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Frozen while tier D has an item, then taken in the index's order (see "Priority").
+Tiers D and E are empty, so these are taken in the index's order (see "Priority").
 
 ### C36 ⏳ `EnableCharacterAction` keeps the attack type
 
 CSBWin's `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638-2681`) ends with
 `pChar->attackType = -1` (`:2680`). The port's `TimerSystem.enableCharacterAction`
-(`src/engine/TimerSystem.ts:248`) never resets it, so `champion.attackType` keeps the last
+(`src/engine/TimerSystem.ts:246`) never resets it, so `champion.attackType` keeps the last
 attack for good. The next `EnableCharacterAction`, say after a spell's
 `DisableCharacterAction`, then zeroes `attackStatModifier` again (harmless, because it is
 already 0). And if that last attack was a shot and hand 0 (the one the arrow is nocked
 from) is empty, it reloads the bow from the quiver, which CSBWin would not do.
 
 The function also opens with `busyTimer = -1` and clears `CHARFLAG_attackDisable`
-unconditionally (`:2645-2646`), where `TimerSystem.processActionDisableTimer` (`:225`) frees
-the champion only when the expiring timer is their own `busyTimerIndex`. That guard is
-dead, in CSBWin and in the port: `SetTimer` de-duplicates only `TT_1`, `TT_BASH_DOOR` and
-the map timers 5-10 (`Timer.cpp:1011-1126`), and the only `TT_11` is
-`DisableCharacterAction`'s, which deletes the champion's busy timer before it queues the
-next (`Magic.cpp:513-536`; the port's `MagicSystem.ts:484-507`). So free the champion
-unconditionally inside `enableCharacterAction`, as CSBWin does, clearing the bit once D8
-has given the port one.
+unconditionally (`:2645-2646`). The port's clears the bit there too, but
+`TimerSystem.processActionDisableTimer` (`:226`) sets `busyTimerIndex` to -1 only when the
+expiring timer is the champion's own. That guard is dead, in CSBWin and in the port:
+`SetTimer` de-duplicates only `TT_1`, `TT_BASH_DOOR` and the map timers 5-10
+(`Timer.cpp:1011-1126`), and the only `TT_11` is `DisableCharacterAction`'s, which deletes
+the champion's busy timer before it queues the next (`Magic.cpp:513-536`; the port's
+`MagicSystem.ts:489-516`). So set `busyTimerIndex` to -1 unconditionally inside
+`enableCharacterAction`, as CSBWin does.
 
 Reset `attackType` at the end. Evidence: a check that shoots, casts, and reads the quiver
 after the cast.
@@ -198,7 +174,7 @@ stamps in use down to the lowest numbers, in their order (`:1136-1188`). The sta
 ties between timers due on the same tick, and it is saved (`gb2.TimerSequence`). The port's
 `TimerQueue` stamps the same way (`nextSequence`, `src/engine/TimerQueue.ts:233`) but has
 no repack. Its counter grows past 16 bits, and the quick-save keeps only the low 16 bits of
-each stamp (`src/engine/RuntimeSave.ts:294`, `:333`). After 65535 queued timers the port's
+each stamp (`src/engine/RuntimeSave.ts:298`, `:337`). After 65535 queued timers the port's
 stamps no longer match CSBWin's, and two timers on either side of the wrap swap their tie
 order across a save and a load. Port the repack. Evidence: a `tools/` check that queues
 past 0xffff and compares the stamps, and the queue order, before and after a save.
@@ -230,7 +206,7 @@ writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` 
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
-  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1507`,
+  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1506`,
   then `?? 0` at `MissileEncounter.ts:440`). Only a dungeon with a missile encounter
   filter can see this half.
 
@@ -247,7 +223,7 @@ Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove`
 `resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
 (`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
 `AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3028`) and
-`TimerSystem.wiggleParty` (`:1760`). They do not agree:
+`TimerSystem.wiggleParty` (`:1759`). They do not agree:
 
 - `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
   its caller passed, before any teleporter or pit (`Code11f52.cpp:2847-2853`). The step and
@@ -272,7 +248,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 (`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1423-1433`). `moveObject` has a missile arm of its own,
+missile itself (`TimerSystem.ts:1422-1432`). `moveObject` has a missile arm of its own,
 which reads the direction from the timer the missile record names (`WorldMove.ts:161-165`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
@@ -348,7 +324,7 @@ attenuates it by the distance to the party. Seven calls play a `SoundIndex` item
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
 `src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:375`, `:510`), three
 teleporters in `WorldMove.resolveCellEffects` (`:296`, `:313`, `:320`) and a door's step
-in `TimerSystem` (`:753`). For the door button CSBWin queues
+in `TimerSystem` (`:752`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
 not yet read. All seven escape whatever `QueueSound` does that the host does not: the
@@ -362,7 +338,7 @@ When neither of the caster's hands is empty, CSBWin's Zokathra drops the new obj
 the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY, NULL, NULL)`, on the
 party's level (`doc/CSBwin-src/Magic.cpp:1380-1387`), so it presses a pad there as any
 drop does. The port's `MagicSystem` links it in with `DungeonState.addObjectToCell`
-(`src/engine/MagicSystem.ts:333-337`), which triggers nothing, and deletes the record if
+(`src/engine/MagicSystem.ts:334-338`), which triggers nothing, and deletes the record if
 that fails, a case CSBWin does not have. Drop it with `WorldMove.moveObject(obj, -1, 0, …)`,
 as `CharacterSystem.dropAllPossessions` does. Evidence: a check that casts Zokathra with
 both hands full on a pressure pad.
@@ -371,11 +347,12 @@ both hands full on a pressure pad.
 
 CSBWin's `PrepareAttack` returns at once when the champion has `CHARFLAG_attackDisable` set
 (`doc/CSBwin-src/Character.cpp:4916`), so a click on a shaded hand, or its attack key,
-opens no menu. The port's `prepareAttack` (`src/renderer/ui/Attack.ts:128-133`) tests only
-health, and neither caller (`Attack.ts:211`, `src/renderer/ui/Keyboard.ts:120`) nor
+opens no menu. The port's `prepareAttack` (`src/renderer/ui/Attack.ts:129-134`) tests only
+health, and neither caller (`Attack.ts:212`, `src/renderer/ui/Keyboard.ts:120`) nor
 `executeAttack` tests more, so a busy champion's menu opens, and an option picked from it
-attacks again before the busy timer has fired. Waits on D8, which gives the port the bit
-to test. Evidence: a check that attacks, then clicks the same hand at once.
+attacks again before the busy timer has fired. Test `CHARFLAG_ATTACK_DISABLE` in
+`charFlags`, as `drawAttackButton` does. Evidence: a check that attacks, then clicks the
+same hand at once.
 
 ### C50 ⏳ `DisableCharacterAction` refuses a delay of 0
 
@@ -384,12 +361,46 @@ CSBWin's `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502-537`) has no gu
 already busy it replaces the busy timer with one due at the same time (`:517-525`), whose
 `timerUByte6`, the slot a throw refills, is 0 (`:512`). The port's
 `MagicSystem.disableCharacterAction` returns on `timeDelay <= 0`
-(`src/engine/MagicSystem.ts:479`). No shipped path passes 0 or less: every spell in
+(`src/engine/MagicSystem.ts:484`). No shipped path passes 0 or less: every spell in
 `dm-atari/graphics.dat` has a disable time of 12 to 63 (`BITS10_15(word6)`,
 `Magic.cpp:1399`), an attack disables only when its time is non-zero (`Attack.cpp:2149`),
 and a throw turns a negative time into 4 (`Mouse.cpp:723`). Such a time comes only from a
 filter (G2) or another game's spell table. Remove the guard. Evidence: a check that
 disables a champion for 0 ticks, once idle and once busy.
+
+### C51 ⏳ A restored timer queue is read as a sorted list, but CSBWin's is a heap
+
+CSBWin's `m_timerQueue` is a binary min-heap over `TIMER::operator<`
+(`doc/CSBwin-src/Timer.cpp:765-810`). `SetTimer` appends the new timer and sifts it
+(`:1200-1202`, `AdjustTimerQueue` at `:831-896`), `GetNextTimerEntry` takes
+`m_timerQueue[0]` (`:1222-1235`), and `DeleteTimer` moves the last entry into the hole and
+sifts it (`:959-984`). `LoadGame` reads the array back as it was written
+(`SaveGame.cpp:1693-1699`). The port's `TimerQueue` is a sorted array instead: `addTimer`
+and `reprioritizeTimer` insert in order, `shiftNext` and `deleteTimer` shift and splice,
+`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:273`), and
+`processTimers` stops at the first entry not yet due (`src/engine/TimerSystem.ts:95-119`).
+`searchOrder`, `TIMER_SEARCH`'s walk from the end of the array, which decides which
+duplicate `SetTimer` keeps, then visits the timers in another order than CSBWin's.
+
+Every committed save's queue is heap-ordered by time, and none with more than two timers is
+sorted (33 of `csbgame7.dat`'s 76 entries follow a later one). So a loaded game fires its timers
+out of order, and a due timer waits behind later ones: IAIDO's `TT_11` in `csbgame6.dat`,
+due at the saved `d.Time`, fires 17 ticks after the load. The port's own insertions and
+deletions then work on an array that is neither sorted nor a heap, and the save writer
+carries that array as the queue (`src/engine/SaveGamePayload.ts:241`), which CSBWin would
+read as a heap. Port the heap, so the port writes back the array CSBWin would. Evidence: a
+check that loads `csbgame7.dat` and compares the order the timers fire in with the heap's
+`operator<` order.
+
+### C52 ⏳ The attack hands are not shaded while a candidate is in the party
+
+CSBWin's `DrawAttackButton` shades the hand while `d.PotentialCharacterOrdinal` is set,
+as it does for a busy champion and a sleeping party (`doc/CSBwin-src/Character.cpp:4875-4880`),
+so a champion being considered at a Hall of Champions mirror, once `DrawCharacterState`
+draws them (`:1500-1503`), shows a shaded hand. The port's `drawAttackButton`
+(`src/renderer/ui/Attack.ts:305`) tests only the busy bit and sleep. Add
+`potentialChampionIndex >= 0`. Evidence: a check or a golden frame of a candidate's
+attack hand.
 
 ---
 
@@ -411,7 +422,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:284`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:283`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy

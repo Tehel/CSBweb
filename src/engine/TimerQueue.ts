@@ -246,11 +246,12 @@ export class TimerQueue {
    * Replace the whole queue with a saved one.
    *
    * `LoadGame` restores CSBWin's timer array and its queue verbatim and then **does not
-   * re-sort**: the queue read out of the file already is the firing order, kept sorted
-   * by every insertion that built it (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). So this
-   * takes the order as given rather than re-inserting through `addTimer`, which would
-   * also run the duplicate-timer rules over a set of timers that legitimately coexist —
-   * two door steps on the same cell at different times, say — and quietly drop some.
+   * re-sort** (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). ⚠️ That queue is CSBWin's binary
+   * heap, not the sorted list this class keeps, so the order taken here is not the firing
+   * order (`DEBT.md` C51). This takes the order as given rather than re-inserting through
+   * `addTimer`, which would also run the duplicate-timer rules over a set of timers that
+   * legitimately coexist — two door steps on the same cell at different times, say — and
+   * quietly drop some.
    *
    * `nextSequence` is `gb2.TimerSequence`, the counter CSBWin hands to the next timer it
    * queues. Indices are kept as the file numbered them, because other saved state points
@@ -359,8 +360,9 @@ export class TimerQueue {
   /**
    * `TIMER_SEARCH`'s order: a snapshot of the queue (`CreateSearchList`,
    * `doc/CSBwin-src/Timer.cpp:1209-1215`) walked from its **end** (`FindNextTimer`,
-   * `:2924-2933`) — the timer due last comes first. It is a snapshot, so deleting the
-   * current entry does not disturb the walk.
+   * `:2924-2933`). It is a snapshot, so deleting the current entry does not disturb the
+   * walk. ⚠️ CSBWin's queue is a heap, so its walk starts at the heap's last array entry;
+   * this sorted array starts it at the timer due last (`DEBT.md` C51).
    */
   searchOrder(): TimerEntry[] {
     return this.queue.slice().reverse();

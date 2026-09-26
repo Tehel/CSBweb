@@ -60,10 +60,14 @@ import type { TimerEntry } from './TimerQueue';
  *
  * Version 10 does the same for `PartyState.objectInHand`, now required (`DEBT.md` D2b).
  *
+ * Version 11 drops `Champion.actionDisabledUntil`, the port's own busy tick: a busy
+ * champion is `CHARFLAG_attackDisable` in `charFlags`, as CSBWin keeps it, which a v10
+ * payload never set.
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 10;
+export const RUNTIME_SAVE_VERSION = 11;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;

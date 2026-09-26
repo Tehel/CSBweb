@@ -3017,10 +3017,11 @@ from the party's facing turns back once 60 ticks pass without one). Evidence:
 
 ## `TIMER_SEARCH` walks the queue backwards, and `SetTimer` mostly keeps the old timer
 
-`TIMER_SEARCH`'s constructor copies the **queue** (`m_timerQueue`, in firing order) into
-`m_searchList` (`CreateSearchList`, `doc/CSBwin-src/Timer.cpp:1209-1215`), and `FindNextTimer`
-(`:2924-2933`) starts at its end and counts down: the timer due last is visited first, and
-slot numbers play no part. Because it walks a copy, `DeleteTimer` on the current entry is safe.
+`TIMER_SEARCH`'s constructor copies the **queue** (`m_timerQueue`, the heap array: see "CSBWin's
+timer queue is a binary heap") into `m_searchList` (`CreateSearchList`,
+`doc/CSBwin-src/Timer.cpp:1209-1215`), and `FindNextTimer` (`:2924-2933`) starts at its end and
+counts down: the heap's last array entry is visited first, which is not in general the timer
+due last, and slot numbers play no part. Because it walks a copy, `DeleteTimer` on the current entry is safe.
 Every "first match" in CSBWin's timer searches — `SetTimer`'s duplicate rules, the DSA's
 cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
 
@@ -3349,3 +3350,43 @@ on the **first** rectangle hit, then returns (`:1099-1136`):
   shipped dungeon) has `d.CellTypeJustAhead == 0` and is silent.
 
 Evidence: `tools/dump-viewport-click.ts`.
+
+## A busy champion is `CHARFLAG_attackDisable`, and one function each sets and clears it
+
+- `CHARFLAG_attackDisable` is bit 0x0008 of `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2460`),
+  inside `CHARFLAG_nonGraphicFlags` (0x007f, `:2459`). `DrawCharacterState` ends with
+  `charFlags &= CHARFLAG_nonGraphicFlags` (`Character.cpp:1514`), which keeps it, and a save
+  carries it with the rest of `charFlags`.
+- Four places in the tree touch it. `DisableCharacterAction` sets it, with
+  `CHARFLAG_weaponAttack`, only when the champion has no busy timer, `busyTimer < 0`
+  (`Magic.cpp:528-531`). `EnableCharacterAction`, the `TT_11`, clears it unconditionally,
+  after `busyTimer = -1` (`Timer.cpp:2645-2646`). `DrawAttackButton` shades the hand while it,
+  `d.PotentialCharacterOrdinal` or `d.PartySleeping` is set (`Character.cpp:4875-4880`), and
+  `PrepareAttack` opens no menu while it is set (`:4916`).
+- A champion busied again while busy keeps the bit, and the busy timer is replaced: with
+  `D7 = d.Time + delay` and the old timer due at `D6`, the new one is due at
+  `D7 + ((D6 - d.Time) >> 1)` if `D7 >= D6`, else at `D6 + delay / 2` (`Magic.cpp:514-527`).
+- IAIDO is saved busy in `csbgame6.dat` and `csbgame-flying-sword.dat`: `charFlags` 0x0018,
+  with a `TT_11` as his `busyTimer`.
+
+Evidence: `tools/dump-save-roundtrip.ts`, section 5.
+
+## CSBWin's timer queue is a binary heap
+
+- `m_timerQueue` holds `m_numTimer` indices into `m_timers`, as a min-heap over
+  `TIMER::operator<` (`doc/CSBwin-src/Timer.cpp:765-810`): the earlier time, then a
+  parameter message before anything else, then the higher function code, then the higher
+  `timerUByte5` (the lower, between two parameter messages), then the lower sequence stamp.
+- `SetTimer` appends the new index and calls `AdjustTimerQueue` on it (`:1200-1202`).
+  `AdjustTimerQueue(i)` (`:831-896`) moves the entry up while it is less than its parent,
+  `(i - 1) >> 1`, and only if it did not move, down toward the lesser of its children
+  `2i + 1` and `2i + 2`.
+- `GetNextTimerEntry` takes `m_timerQueue[0]` and deletes it (`:1222-1235`). `DeleteTimer`
+  moves the last entry into the vacated position and calls `AdjustTimerQueue` there
+  (`:959-984`).
+- `LoadGame` unscrambles the array into place and never reorders it (`SaveGame.cpp:1693-1699`),
+  so a save's block 6 is the heap as it stood. Every committed save's queue is heap-ordered
+  by time, and none with more than two timers is sorted: 33 of `csbgame7.dat`'s 76 entries
+  follow a later one.
+
+The port keeps a sorted array instead (`DEBT.md` C51).

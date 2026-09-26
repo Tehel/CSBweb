@@ -15,6 +15,7 @@ import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { getChampionPossession, type PartyState } from './gameTypes';
+import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
   isMagicSpellRn,
@@ -227,10 +228,7 @@ export class TimerSystem {
     const chIdx = timer.uByte5 & 0xff;
     const champ = party.champions[chIdx];
     if (!champ) return;
-    if (champ.busyTimerIndex === timer.index) {
-      champ.busyTimerIndex = -1;
-      champ.actionDisabledUntil = 0;
-    }
+    if (champ.busyTimerIndex === timer.index) champ.busyTimerIndex = -1;
     // The `TT_11` case (doc/CSBwin-src/CSBCode.cpp:6466-6475): `EnableCharacterAction`,
     // then `TAG0115ee(chIdx, uByte6 - 1)` when `uByte6 != 0` — the slot a throw emptied.
     this.enableCharacterAction(chIdx);
@@ -240,14 +238,15 @@ export class TimerSystem {
 
   /**
    * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion is free
-   * again: the attack's defence penalty goes, and a bow that has just been fired reloads
-   * from the quiver. Not ported (`DEBT.md` C36): the closing `attackType = -1`
-   * (`:2680`), and the unconditional `busyTimer = -1` (`:2645`), which the caller does
-   * only for the champion's own timer.
+   * again: the busy bit goes, so does the attack's defence penalty, and a bow that has
+   * just been fired reloads from the quiver. Not ported (`DEBT.md` C36): the closing
+   * `attackType = -1` (`:2680`), and the unconditional `busyTimer = -1` (`:2645`), which
+   * the caller does only for the champion's own timer.
    */
   private enableCharacterAction(chIdx: number): void {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
+    champion.charFlags &= ~CHARFLAG_ATTACK_DISABLE;
     if (champion.attackType !== -1) champion.attackStatModifier = 0;
     if ((champion.attributes.health | 0) !== 0) {
       // A bow that has just been fired reloads itself from slot 12, then from

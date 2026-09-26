@@ -12,7 +12,7 @@ This document captures verified timer behavior from the CSBWin C++ source under 
 - `deleteDuplicateTimers` is defined as `-1` (enabled) by default (`doc/CSBwin-src/data.cpp`).
 - `GameTimers::SetTimer` deduplicates map timers (`TT_MAP_FIRST..TT_MAP_LAST`, including `TT_DOOR`) when `deleteDuplicateTimers != 0`: if an existing map timer — of **any** map function — has the same `Time()`, `Level()`, and `timerWord6` (x/y), it takes the new `timerUByte9` and is returned instead of inserting another; for `TT_STONEROOM` it also matches `timerUByte8` (pos). A matching `TT_1` is instead deleted and the new timer queued (`doc/CSBwin-src/Timer.cpp:1011-1053`).
 - When inserting a `TT_1` (door step) timer, `GameTimers::SetTimer` keeps an existing `TT_DOOR` or `TT_1` at the same `Time()/Level()/timerWord6` and drops the new one: a `TT_DOOR` with `timerUByte9 == 2` (toggle) becomes `1 - newAction`, any other `TT_DOOR` is left alone, and a `TT_1` takes the new action (`doc/CSBwin-src/Timer.cpp:1055-1096`).
-- "First match" means first in `TIMER_SEARCH` order: the queue, walked from the timer due **last** (`doc/CSBwin-src/Timer.cpp:1209-1215`, `:2924-2933`). See `doc/PROVEN_FACTS.md` → "`TIMER_SEARCH` walks the queue backwards".
+- "First match" means first in `TIMER_SEARCH` order: the queue's heap array, walked from its last entry (`doc/CSBwin-src/Timer.cpp:1209-1215`, `:2924-2933`). See `doc/PROVEN_FACTS.md` → "`TIMER_SEARCH` walks the queue backwards".
 
 ## Door timers
 

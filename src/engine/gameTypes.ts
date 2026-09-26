@@ -118,10 +118,11 @@ export interface Champion {
      */
     incantationField?: ui8[];
     /**
-     * `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2461-2481`). Bit 4 is
-     * `CHARFLAG_male`; 0xff80 are redraw flags CSBWin sets as the game runs and saves
-     * as they stand. Nothing in this port reads them yet — they are carried so a save
-     * can be written back with the champion's gender intact.
+     * `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2457-2481`). Bit 3 is
+     * `CHARFLAG_attackDisable`, the champion's busy state (`CHARFLAG_ATTACK_DISABLE`),
+     * and bit 4 `CHARFLAG_male`. 0xff80 are redraw flags CSBWin sets as the game runs
+     * and saves as they stand; this port redraws every frame and does not model them,
+     * so it carries whatever the file or `AddCharacter` gave it.
      */
     charFlags: i16;
     /**
@@ -169,8 +170,11 @@ export interface Champion {
      */
     attackType: i16;
     skills: Skill[];           // CSBWin skills92[20]
-    actionDisabledUntil: i32;  // Port-only: stands in for CHARFLAG_attackDisable (DEBT.md D8)
-    busyTimerIndex: i32;       // Timer index for action disable
+    /**
+     * `CHARDESC.busyTimer` — the `TT_11` that frees the busy champion, or -1. The busy
+     * state itself is `CHARFLAG_attackDisable` in `charFlags`.
+     */
+    busyTimerIndex: i32;
 
     shieldStrength: ui16;       // CHARDESC.shieldStrength
     /**

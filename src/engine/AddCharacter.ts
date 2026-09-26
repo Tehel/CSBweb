@@ -207,7 +207,7 @@ export function assignPresetHeroPossessions(
 /** The `Champion` fields `addCharacterDefaults` initializes. */
 export type ChampionDefaults = Pick<
   Champion,
-  | 'actionDisabledUntil' | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
+  | 'busyTimerIndex' | 'attackType' | 'attackStatModifier'
   | 'wounds' | 'poisonCount' | 'maxRecentDamage' | 'damageFromDirection' | 'shieldStrength'
   | 'charFlags' | 'timerIndex' | 'talents' | 'causeOfDamage' | 'monsterCausingDamage' | 'load'
   | 'title' | 'facing' | 'fingerprint'
@@ -222,9 +222,6 @@ export type ChampionDefaults = Pick<
  */
 export function addCharacterDefaults(): ChampionDefaults {
   return {
-    // The port's own tick at which the busy champion is free (0: not busy); CSBWin
-    // keeps only the timer, `busyTimer`.
-    actionDisabledUntil: 0,
     busyTimerIndex: -1, // `pcA3->busyTimer = -1` (`:520`)
     attackType: -1, // `pcA3->attackType = -1` (`:519`)
     attackStatModifier: 0, // `word64`, cleared
