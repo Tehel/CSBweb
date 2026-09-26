@@ -24,7 +24,9 @@
  * before it melees, and `CheckMonsterVersusMissiles` finds a missile in the group's
  * corner that kills that member. The encounter looks the group up on `d.LoadedLevel`
  * (`Code11f52.cpp:1765`), which during a monster's turn is the monster's own level
- * (`LoadLevel(timeEnt.Level())`, `CSBCode.cpp:6416-6417`).
+ * (`LoadLevel(timeEnt.Level())`, `CSBCode.cpp:6416-6417`). `d.MonsterDamageResult` is
+ * then 1, some but not all died, and the sidestep leaves the corners as the encounter
+ * left them (`Monster.cpp:3959-3970`).
  *
  * Run: `npx tsx tools/dump-missile-monster.ts`
  */
@@ -386,6 +388,8 @@ function main(): void {
     check(target.z !== 0, `the group is on level ${target.z}, where an encounter on level 0 would find nobody`);
     check(encounter.monsterDamageResult === MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED && (group.numMonM1 & 3) === 0,
       `the falchion killed member 0 and not member 1: d.MonsterDamageResult is 1 (${encounter.monsterDamageResult})`);
+    check(leftByEncounter >= 0 && slot.positions === leftByEncounter,
+      `so the corners stay as the encounter left them (${leftByEncounter}), not moved to corner 1 (${slot.positions})`);
   }
 
   finish();

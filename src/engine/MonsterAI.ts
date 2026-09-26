@@ -613,7 +613,9 @@ export class MonsterAI {
       }
       if (ordinal === 0) {
         if (this.checkMonsterVersusMissiles(c)) return true;
-        if (this.lastDamageResult !== MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
+        // `d.MonsterDamageResult != 1` (`doc/CSBwin-src/Monster.cpp:3966`): a missile that
+        // killed some of the group but not all leaves its corners as they were.
+        if (this.ctx.systems.missileEncounter.monsterDamageResult !== MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED) {
           c.slot.positions = setPackedBits(c.slot.positions, member, pos);
         }
       }
@@ -1151,7 +1153,9 @@ export class MonsterAI {
    * position inside a cell can walk the monster into a missile already there. Resolves
    * every missile in that corner, stopping early if the group is wiped out.
    *
-   * Returns true when that wiped out the group, in which case the turn ends.
+   * Returns true when that wiped out the group, in which case the turn ends. The
+   * encounter leaves `d.MonsterDamageResult` in `MissileEncounter.monsterDamageResult`,
+   * where the caller reads it.
    */
   private checkMonsterVersusMissiles(c: AiConst): boolean {
     const encounter = this.ctx.systems.missileEncounter;
@@ -1183,15 +1187,8 @@ export class MonsterAI {
       if (!hitSomething) break;
       if (encounter.groupWasWipedOut()) break;
     }
-    const wiped = encounter.groupWasWipedOut();
-    this.lastDamageResult = wiped
-      ? MonsterDamageResult.ALL_MONSTERS_DIED
-      : MonsterDamageResult.NO_MONSTER_DIED;
-    return wiped;
+    return encounter.groupWasWipedOut();
   }
-
-  /** `d.MonsterDamageResult`, as the AI sees it. */
-  private lastDamageResult = MonsterDamageResult.NO_MONSTER_DIED;
 
   /**
    * `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2730`).

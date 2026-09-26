@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C39 | `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1 | S | ⏳ |
 | C40 | `CheckMoveFromMissile` uses the missile timer's filter state | S | ⏳ |
 | C41 | The party's `MoveObject` is put together at four call sites | M | ⏳ |
 | C42 | The missile timer puts its own `MoveObject` together | S | ⏳ |
@@ -127,19 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C39 ⏳ `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1
-
-CSBWin's monster shuffle calls `CheckMonsterVersusMissiles` and then moves the monster to
-its new corner only `if (d.MonsterDamageResult != 1)` (`doc/CSBwin-src/Monster.cpp:3955-3970`):
-a missile that killed some of the group but not all leaves its corners as they were. The
-port's test (`src/engine/MonsterAI.ts:616`) reads `MonsterAI.lastDamageResult`, a copy of
-`d.MonsterDamageResult` that `MonsterAI.checkMonsterVersusMissiles` sets at its end from
-whether the group was wiped out (`:1186-1189`): 2 if it was, 0 otherwise, never 1.
-So the test always passes, and the monster takes the new corner. Delete the copy and read
-`d.MonsterDamageResult` where the encounter writes it (`MissileEncounter.monsterDamageResult`).
-Evidence: a check that parks a missile in the corner a
-two-monster group shuffles to, with damage enough to kill one of them.
 
 ### C40 ⏳ `CheckMoveFromMissile` uses the missile timer's filter state
 
@@ -210,7 +196,7 @@ Both of CSBWin's calls pass the group's whole positions byte, `pI16A2->positions
 whose `objD6.pos() != position` (`:4478`). `RN::pos()` is 0-3 (`CSBTypes.h:331-335`), so a
 missile is met only while bits 2-7 of the byte are all 0, and never by a centred lone
 monster (255). The port's `MonsterAI.checkMonsterVersusMissiles` compares the corner with
-`positions & 3` (`src/engine/MonsterAI.ts:1174`), so wherever those bits are set it meets
+`positions & 3` (`src/engine/MonsterAI.ts:1178`), so wherever those bits are set it meets
 the missiles in that corner, which CSBWin lets through. Compare the whole byte. Evidence: a
 check that parks a missile in corner 3 of a centred lone monster's cell and runs its turn.
 

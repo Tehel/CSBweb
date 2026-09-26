@@ -2604,7 +2604,9 @@ shatters. Evidence: `tools/dump-player-attacks.ts` case 8.
   a timer's level before it runs it (`LoadLevel(timeEnt.Level())`,
   `doc/CSBwin-src/CSBCode.cpp:6416-6417`), so during a monster's turn that is the monster's
   own level, and `CheckMonsterVersusMissiles` (`Monster.cpp:4462`) meets missiles on every
-  level.
+  level. The member that sidesteps before a melee then takes its new corner only
+  `if (d.MonsterDamageResult != 1)` (`Monster.cpp:3966`): a missile that killed some of the
+  group but not all leaves the corners as the encounter left them.
 - The victim is `OrdinalOfMonsterAtPosition(group, objectPos)` (`:1961-1962`) — the member
   in the corner the missile reached. An ordinal of 0 returns 0, and the missile flies on,
   unless the group is `drawAsSize4()`, when member 1 is hit (`:1963-1967`).
