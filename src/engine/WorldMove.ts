@@ -2,9 +2,8 @@
  * `WorldMove` — the world `MoveObject(object, oldX, oldY, newX, newY, …)`
  * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`), as the port cuts it up: `moveObject` for
  * anything but the party and a monster set down, `moveParty` for the party,
- * `resolveMissileMove` for the missile timer, `resolveMonsterDestination` for
- * `MonsterSystem.moveMonster`, all four through the one teleporter / pit / stairs loop,
- * `resolveCellEffects`. With it are what only that loop
+ * `resolveMonsterDestination` for `MonsterSystem.moveMonster`, all three through the one
+ * teleporter / pit / stairs loop, `resolveCellEffects`. With it are what only that loop
  * calls: `TeleportMonster` (`:2308`), `Levitating` (`:2417`) and `PitGoesSomewhere`
  * (`:2777`), and `d.SupressPitDamage`.
  *
@@ -129,25 +128,6 @@ export class WorldMove {
   }
 
   /**
-   * The loop of the `MoveObject` that `MissileTimer` makes for its missile
-   * (`doc/CSBwin-src/Timer.cpp:383`): where a missile entering `position` in corner
-   * `posInCell`, flying `direction`, ends up, with its corner and direction as the
-   * teleporters left them. A missile neither falls nor takes the stairs.
-   */
-  resolveMissileMove(
-    position: Position,
-    posInCell: number,
-    direction: number,
-  ): { position: Position; posInCell: number; dir: number } {
-    const result = this.resolveCellEffects(position, DBType.MISSILE, posInCell, 0, direction, false);
-    return {
-      position: result.position,
-      posInCell: result.objectPos & 0x3,
-      dir: result.missileDir ?? direction,
-    };
-  }
-
-  /**
    * `MoveObject(object, oldX, oldY, newX, newY, NULL, NULL)`
    * (`doc/CSBwin-src/Code11f52.cpp:2796-3457`) for anything that is not the party, on
    * level `level` (`d.LoadedLevel`, CSBWin's `AttachedLevel_4`). `oldX < 0` places an
@@ -171,7 +151,9 @@ export class WorldMove {
    * Returns CSBWin's `1` as `removed` when `CheckMoveFromMissile` destroyed the group,
    * and otherwise the ID as it was placed and where, or `null` for a lift or an
    * unchanged room (`:3180-3215`). For a missile, `newDir` is `d.NewDir`: its timer's
-   * direction as `TeleportMissile` left it (`:2878-2884`, `:2392-2411`).
+   * direction as `TeleportMissile` left it (`:2891-2898`, `:2392-2411`). The timer is
+   * the one its record names, which inside `MissileTimer` is the copy
+   * (`TimerQueue.getTimer`).
    */
   moveObject(
     object: ObjectID,

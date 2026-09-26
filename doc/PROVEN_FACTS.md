@@ -884,7 +884,9 @@ So everything that looks the missile's timer up from inside `MissileTimer` reads
 first tick in a corner someone leaves. A hit there calls `DeleteTimer(0xffff)` (`:2742`),
 which writes `m_timers[0xffff]`, outside the array (`Timer.cpp:965`): undefined. The port
 answers the index with the copy the same way (`TimerQueue.getTimer`) and its
-`deleteTimer(0xffff)` deletes nothing. `tools/dump-move-from-missile.ts` case 3.
+`deleteTimer(0xffff)` deletes nothing. `tools/dump-move-from-missile.ts` case 3 checks the
+encounter, and `tools/dump-missile-teleport.ts` the direction a teleporter turns, which is
+the copy's.
 
 ## `item16Attached` is a conjunction, not a lookup
 

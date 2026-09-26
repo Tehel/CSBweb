@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C42 | The missile timer puts its own `MoveObject` together | S | ⏳ |
 | C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
 | C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
 | C45 | Saving does not re-attach the monsters | S | ⏳ |
@@ -88,6 +87,7 @@ In payoff order: the first row is the next item.
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
+| C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -106,7 +106,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C59 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
+Next free IDs: C60 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -126,20 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C42 ⏳ The missile timer puts its own `MoveObject` together
-
-CSBWin's `MissileTimer` moves its missile into the next cell with the world
-`MoveObject(missileFilterObject, origMapX, origMapY, curMapX, curMapY, NULL, NULL)` and
-reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
-(`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
-call `WorldMove.moveObject`. It runs the teleporter loop through
-`WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1417-1427`). `moveObject` has a missile arm of its own,
-which reads the direction from the timer the missile record names (`WorldMove.ts:207-211`).
-Whether the two ever give a different result is not verified. Move the missile through
-`moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
-a missile through a rotating teleporter and compares its cell, corner and direction.
 
 ### C43 ⏳ `CheckMonsterVersusMissiles` masks the positions byte
 
@@ -210,7 +196,7 @@ The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
 attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
 `src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:374`, `:509`), three
-teleporters in `WorldMove.resolveCellEffects` (`:342`, `:359`, `:366`) and a door's step
+teleporters in `WorldMove.resolveCellEffects` (`:324`, `:341`, `:348`) and a door's step
 in `TimerSystem` (`:743`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
@@ -333,7 +319,7 @@ party through its square again, leaves a second footprint and presses the pads, 
 `DiscardAllInput`. Until then `d.partyLevel` is the old level while `d.partyX` and
 `d.partyY` are already the new square's. The port runs the load and the second
 `MoveObject` from inside the move, in `WorldMove.arriveOnPartyLevel`
-(`src/engine/WorldMove.ts:125`), and leaves only the discard to the tick
+(`src/engine/WorldMove.ts:124`), and leaves only the discard to the tick
 (`MonsterSystem.loadPartyLevelOnArrival`, `Game.loadNewPartyLevel`). So whatever runs
 between the move and that tick sees the new level loaded, its groups attached and its pads
 pressed, where CSBWin's sees the old party level: the rest of the timers in the pass that
@@ -352,6 +338,20 @@ see it leave and come back, with `unchangedRoom` true, facing the new way. The p
 `MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:109`), only sets the facing.
 Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
 calls.
+
+### C59 ⏳ A missile leaving the map is dropped, not met as the exterior wall
+
+When the cell a missile flies into is off the map, CSBWin's `MissileTimer` makes it
+`roomEXTERIOR` (`doc/CSBwin-src/Timer.cpp:329`), which counts as stone (`:340`), so the
+missile meets it through `ProcessMissileEncounter(nextRoomType, …)` (`:351-364`). That
+runs filter 6 (`Code11f52.cpp:1841-1843`) and goes on into the shared tail
+(`:2044-2121`), where a spell becomes its cloud (`CreateCloud`, `:2099`). The port's
+`processMissileTimer` meets nothing off the map: it drops the missile through
+`processObjectFromMissile` (`src/engine/TimerSystem.ts:1409-1414`), so filter 6 never runs
+and a fireball ends without its explosion. `processMissileEncounter`'s arm for the
+exterior, `case 8` (`src/engine/MissileEncounter.ts:287`), is unreachable. Pass the
+exterior to the encounter as CSBWin does. Evidence: a check that flies a fireball off an
+open cell on a map's border and looks for its cloud.
 
 ---
 

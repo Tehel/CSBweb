@@ -1413,18 +1413,20 @@ export class TimerSystem {
         return;
       }
 
-      const oldPos = new Position(origMapX, origMapY, timer.level);
-      const moveResult = this.ctx.systems.worldMove.resolveMissileMove(new Position(curMapX, curMapY, timer.level), curPos, missileDir);
-      const newPosInCell = moveResult.posInCell & 0x3;
-      const newDir = moveResult.dir & 0x3;
-      const newPos = moveResult.position;
-      const newRn = encodeObjectID(newPosInCell, DBType.MISSILE, decoded.index);
-
-      this.dungeon.removeObjectFromCell(oldPos, missileRn);
-      if (!this.dungeon.addObjectToCell(newPos, newRn)) {
-        this.timers.missileFilterObject = OBJECT_ID_NULL;
-        return;
+      // `MoveObject(missileFilterObject, origMapX, origMapY, curMapX, curMapY, NULL, NULL)`
+      // (`doc/CSBwin-src/Timer.cpp:382-397`), which reads the direction off the copy, and
+      // `d.NewX`, `d.NewY`, `d.NewDir`, `d.NewPos` and `d.NewLevel` back from it. A missile
+      // it places always comes back placed: it has no unchanged-room return.
+      this.timers.missileFilterObject = encodeObjectID(curPos, DBType.MISSILE, decoded.index);
+      const moved = this.ctx.systems.worldMove.moveObject(
+        this.timers.missileFilterObject, origMapX, origMapY, curMapX, curMapY, timer.level,
+      );
+      if (!moved.placed || !moved.position || moved.newDir === undefined) {
+        throw new Error('MissileTimer: MoveObject did not place the missile');
       }
+      const newPos = moved.position;
+      const newDir = moved.newDir & 0x3;
+      const newRn = moved.placed;
 
       timer.object = newRn;
       this.timers.missileFilterObject = newRn;
