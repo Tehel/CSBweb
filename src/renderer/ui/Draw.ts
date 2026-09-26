@@ -54,6 +54,19 @@ export function displaySleepScreen(ui: UIState): void {
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 93, 65, 4, 0, 'WAKE UP');
 }
 
+/**
+ * The freeze's screen, button 147 (`doc/CSBwin-src/Mouse.cpp:1737-1746`): the viewport
+ * flooded with colour 0 and `TextOut_OneLine(d.pViewportBMP, 112, 81, 69, 4, 0,
+ * "GAME FROZEN", …)`. No tick runs while the game is frozen, so nothing draws the
+ * viewport again until the thaw.
+ */
+export function displayFrozenScreen(ui: UIState): void {
+  const viewport = ui.context?.viewportIndexBuffer;
+  if (!viewport) return;
+  viewport.pixels.fill(0);
+  if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 81, 69, 4, 0, 'GAME FROZEN');
+}
+
 export function offsetViewportRect(rect: Rect): Rect {
   return {
     x1: rect.x1 + VIEWPORT_X,

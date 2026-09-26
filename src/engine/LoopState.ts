@@ -1,8 +1,8 @@
 /**
- * The main loop's `d.` flags that other CSBWin files write, and `WakeUp`, which writes
- * them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on the context
- * (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or in the port's
- * quick-save, and the next tick settles each of them.
+ * The main loop's `d.` flags that other CSBWin files write, and `WakeUp` and the freeze,
+ * which write them (`DEBT.md` E2, "how a system reaches the loop's state"). They live on
+ * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or in the
+ * port's quick-save.
  */
 import type { GameContext } from './GameContext';
 
@@ -23,10 +23,22 @@ export interface LoopFlags {
   clockTickCleared: boolean;
   /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */
   newPartyLevel: boolean;
+  /**
+   * `d.ClockRunning`, 1 from the game start (doc/CSBwin-src/CSBCode.cpp:10549) and 0 while
+   * the game is frozen: `if (d.ClockRunning == 0) goto tag0007b4;` (`:765`), so a tick
+   * that falls due waits, still due, until the thaw.
+   */
+  clockRunning: boolean;
+  /**
+   * `gameFrozen` (a `Mouse.cpp` global): `HandleMouseEvents` throws away every entry but
+   * 148, and lets 148 through whenever it comes (doc/CSBwin-src/Mouse.cpp:1433-1444,
+   * `:1463-1476`).
+   */
+  gameFrozen: boolean;
 }
 
 export function createLoopFlags(): LoopFlags {
-  return { clockTickSet: false, clockTickCleared: false, newPartyLevel: false };
+  return { clockTickSet: false, clockTickCleared: false, newPartyLevel: false, clockRunning: true, gameFrozen: false };
 }
 
 /**
@@ -58,5 +70,23 @@ export function wakeUp(ctx: GameContext): void {
   ctx.party.state.sleeping = false;
   ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
   ctx.host.sleepChanged(false);
+  ctx.mouseQueue.discardAllInput();
+}
+
+/**
+ * The engine's half of button 147, the freeze (doc/CSBwin-src/Mouse.cpp:1731-1759):
+ * `d.ClockRunning = 0`, `gameFrozen = true`, `DiscardAllInput()`. The screen's half is
+ * `handleMouseButton`'s.
+ */
+export function freeze(ctx: GameContext): void {
+  ctx.loop.clockRunning = false;
+  ctx.loop.gameFrozen = true;
+  ctx.mouseQueue.discardAllInput();
+}
+
+/** The engine's half of button 148, the thaw (doc/CSBwin-src/Mouse.cpp:1760-1773). */
+export function thaw(ctx: GameContext): void {
+  ctx.loop.clockRunning = true;
+  ctx.loop.gameFrozen = false;
   ctx.mouseQueue.discardAllInput();
 }

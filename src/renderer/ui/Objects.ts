@@ -14,7 +14,7 @@ import { Champion } from '../../engine/gameTypes';
 import { findChampionByFingerprint } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
-import { UIMode, UIState } from './UIState';
+import { UIState } from './UIState';
 export type ItemDescriptionLine = { text: string; color: number };
 
 /**
@@ -295,7 +295,7 @@ export function getInventoryPlaceholderIndex(champion: Champion, slot: number): 
 
 export function determineMastery(ui: UIState, champion: Champion, skill: number): number {
   return determineMasteryEngine(champion, skill, {
-    partySleeping: ui.uiMode === UIMode.Sleeping,
+    partySleeping: ui.partyState?.sleeping ?? false,
     getObjectNameIndex: (objectId) => resolveObjectNameIndex(ui, objectId),
   });
 }

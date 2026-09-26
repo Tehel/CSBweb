@@ -45,6 +45,31 @@ const RUNE_BACK_KEY = '`';
 const CAST_KEY = 'Tab';
 
 /**
+ * The keyscan CSBWin's key tables hold for a `KeyboardEvent.key`: Return and Esc, the two
+ * keys `Byte18440` and `Byte18448` bind. The rest of `Byte18400` and `Byte18428`,
+ * scancodes in the high byte, is `DEBT.md` C62.
+ */
+const KEYSCAN: Readonly<Record<string, number>> = { Enter: 0x0d, Escape: 0x1b };
+
+/** `key`'s keyscan in CSBWin's key tables, or 0 for a key they cannot hold. */
+export function keyScanOf(key: string): number {
+  return KEYSCAN[key] ?? 0;
+}
+
+/**
+ * The table half of `TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428-8475`): the button
+ * `d.pKeyXlate2`, then `d.pKeyXlate1`, binds `keyscan` to, or 0. With no `pKeyXlate2`,
+ * no key is anything. CSBWin also queues every `pKeyXlate1` match after a `pKeyXlate2`
+ * one, which none of the keys `keyScanOf` knows can reach.
+ */
+export function translateKey(ui: UIState, keyscan: number): number {
+  if (!ui.keyXlate2 || keyscan === 0) return 0;
+  for (const entry of ui.keyXlate2) if (entry.keyscan === keyscan) return entry.mouse;
+  for (const entry of ui.keyXlate1 ?? []) if (entry.keyscan === keyscan) return entry.mouse;
+  return 0;
+}
+
+/**
  * Offer a `KeyboardEvent.key` to the interface. Returns whether the table claims it —
  * a bound key is claimed whatever the game state, the way a bound scancode is consumed
  * in `UIM_KEYDOWN` whether or not the click it becomes lands on anything.

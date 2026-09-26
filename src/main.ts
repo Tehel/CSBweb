@@ -269,6 +269,9 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // Buttons 145 and 146 (the host's `sleepChanged` is the engine's answer).
         onSleep: () => game.sleep(),
         onWakeUp: () => game.wakeUp(),
+        // Buttons 147 and 148 (the screen's halves are `handleMouseButton`'s).
+        onFreeze: () => game.freeze(),
+        onThaw: () => game.thaw(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
         // back through these three.

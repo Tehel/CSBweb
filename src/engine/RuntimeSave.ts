@@ -76,7 +76,6 @@ export interface RuntimeSaveState {
     party: PartyState;
     game: {
         tickCount: number;
-        paused: boolean;
         elapsedTimeMs: number;
         /** `d.RandomNumber`, so a reload continues the same stream. */
         randomSeed: number;
@@ -123,7 +122,6 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
         party: ctx.party.state,
         game: {
             tickCount: ctx.state.tickCount,
-            paused: ctx.state.paused,
             elapsedTimeMs: ctx.state.currentTime - ctx.state.startTime,
             randomSeed: ctx.random.getSeed(),
             gameWon: ctx.state.gameWon,
@@ -158,7 +156,6 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // states written before it was ever set.
     ensureHandOwner(ctx.party.state);
 
-    ctx.state.paused = save.game.paused;
     // `scrollingText.ResetTime(b.gb2.Time); d.Time = b.gb2.Time;`
     // (doc/CSBwin-src/SaveGame.cpp:1623-1624): CSBWin saves no message state, and the
     // rows on screen stay, their timeouts rebased onto the loaded clock.

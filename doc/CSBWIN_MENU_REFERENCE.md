@@ -193,8 +193,8 @@ side-effect of the loop structure.
 
 (The separate *freeze game* button, id 147, is a real clock stop: `d.ClockRunning = 0`,
 `videoMode = VM_FROZEN`, `"GAME FROZEN"` at (81,69) fg 4 / bg 0, and
-`d.PrimaryButtonList = d.Buttons17832` so only id 148 thaws it — `Mouse.cpp:1729-1758`.
-This port models it as `UIMode.Frozen`, and it is *not* what the disk menu uses.)
+`d.PrimaryButtonList = d.Buttons17832` so only id 148 thaws it — `Mouse.cpp:1731-1773`,
+`doc/PROVEN_FACTS.md` → "The freeze". It is *not* what the disk menu uses.)
 
 Since nothing in this port can block, the loop is turned inside out exactly as
 `ReIncarnate.ts` turns `_ReIncarnate` inside out: the state lives on `UIState`, the draw
@@ -258,9 +258,10 @@ back from the hand (`:2030-2050`).
 `_ReadEntireGame` (`SaveGame.cpp:1435`), the load at the entrance, calls neither.
 
 The port: `tag02076e` and `tag0207cc` in `src/renderer/ui/Mouse.ts`, which `SaveMenu.ts`
-calls around its full screen and not its load-only one. The redraws are the frame's:
-`GameScreen.presentViewport` shades the three areas and draws no inventory while the menu
-is up, and `drawCursorItem` draws the arrow over the full screen. Evidence: `tools/dump-save-menu.ts`, "the disk
+calls around its full screen and not its load-only one, and the freeze calls around its
+frozen game. The redraws are the frame's: `tag02076e` sets `UIState.shadedByTag02076e` and
+`tag0207cc` clears it, and while it is set `GameScreen.presentViewport` shades the three
+areas and `drawCursorItem` draws the arrow. No inventory is drawn while the menu is up. Evidence: `tools/dump-save-menu.ts`, "the disk
 menu over an open chest".
 
 

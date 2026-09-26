@@ -59,7 +59,7 @@ import {
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
 import { attackPanelTick, closeAttackMenu, drawAttackPanel } from './ui/Attack';
-import { handleUIKey } from './ui/Keyboard';
+import { handleUIKey, keyScanOf, translateKey } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
   isReincarnateScreenOpen,
@@ -79,7 +79,7 @@ import {
 } from './ui/SaveMenu';
 import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
-import { displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
+import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**
  * What the interface asks of the engine and the page. Each is one of `UIState`'s hooks out,
@@ -99,6 +99,8 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onReincarnateNamed'
   | 'onSleep'
   | 'onWakeUp'
+  | 'onFreeze'
+  | 'onThaw'
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
@@ -160,6 +162,8 @@ export class GameScreen {
     ui.onReincarnateNamed = hooks.onReincarnateNamed;
     ui.onSleep = hooks.onSleep;
     ui.onWakeUp = hooks.onWakeUp;
+    ui.onFreeze = hooks.onFreeze;
+    ui.onThaw = hooks.onThaw;
     ui.onCreateSave = hooks.onCreateSave;
     ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;
@@ -373,6 +377,16 @@ export class GameScreen {
     attackPanelTick(this.ui);
   }
 
+  /** Buttons 147 to 148: `gameFrozen`, the screen's side of it. */
+  isFrozen(): boolean {
+    return this.ui.uiMode === UIMode.Frozen;
+  }
+
+  /** `TAG0196da`'s table half: the button the current key tables bind `key` to, or 0. */
+  translateKey(key: string): number {
+    return translateKey(this.ui, keyScanOf(key));
+  }
+
   setUIMode(mode: UIMode): void {
     this.ui.uiMode = mode;
     updateButtonLists(this.ui);
@@ -390,9 +404,11 @@ export class GameScreen {
     this.lastRenderFacing = facing;
 
     this.viewport.selectLevel(z);
-    // `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the party
-    // sleeps (doc/CSBwin-src/CSBCode.cpp:637); `DisplaySleepScreen` holds the viewport.
-    if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
+    // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:765), so nothing draws over "GAME
+    // FROZEN". `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the
+    // party sleeps (`:637`); `DisplaySleepScreen` holds the viewport.
+    if (this.isFrozen()) displayFrozenScreen(this.ui);
+    else if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
     else this.viewport.draw(position, facing, this.seeThroughWalls());
     this.presentViewport();
   }
@@ -422,11 +438,15 @@ export class GameScreen {
     clearIndex(this.screen, 0);
     drawStaticUIFrame(this.ui);
     const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    // The inventory is drawn into the viewport bitmap (`TAG022a60(17, d.pViewportBMP)`,
+    // doc/CSBwin-src/CSBCode.cpp:7493), so the freeze's flood covers it, and nothing draws
+    // it again until the thaw's `TAG0207cc` shows it.
+    const frozen = this.isFrozen();
     if (!inventoryOpen) {
       syncOpenChest(this.ui, null);
       this.ui.displayResurrectChestOrScroll = 0;
     }
-    if (inventoryOpen) {
+    if (inventoryOpen && !frozen) {
       drawInventoryBackground(this.ui);
     } else {
       this.blitViewportToScreen();
@@ -436,12 +456,12 @@ export class GameScreen {
       // Nothing draws the inventory under the disk menu, which covers the viewport,
       // until `TAG0207cc` shows it again. Drawing it would open the chest again that
       // `TAG02076e` repacked for the save.
-      if (!isSaveMenuOpen(this.ui)) drawInventoryScreen(this.ui);
+      if (!isSaveMenuOpen(this.ui) && !frozen) drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       // `_ReIncarnate` draws over the open inventory rather than replacing it: it
       // blanks the name strip and puts its keyboard where the eye panel was
       // (`doc/CSBwin-src/Code13ea4.cpp:39-50`). So it goes last, and only here.
-      drawReincarnateScreen(this.ui);
+      if (!frozen) drawReincarnateScreen(this.ui);
     }
     drawAttackPanel(this.ui);
     drawSpellPanel(this.ui);
@@ -457,15 +477,18 @@ export class GameScreen {
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
     }
+    if ((this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) && this.ui.uiTables) {
+      // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
+      // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), before
+      // the disk menu goes up and when the game freezes. The load-only save screen, which
+      // calls no `TAG02076e`, draws over the same interface and shades it too.
+      if (!inventoryOpen) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
+    }
     if (isSaveMenuOpen(this.ui)) {
-      // `TAG02076e` shades the movement-arrow, magic and weapon-ready areas before any
-      // menu goes up (`doc/CSBwin-src/Character.cpp:5118-5131`). The screen itself then
-      // goes over the viewport, which is where `_DoMenu` leaves it when `I1 == 0`.
-      if (this.ui.uiTables) {
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
-        shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
-      }
+      // The screen goes over the viewport, which is where `_DoMenu` leaves it when
+      // `I1 == 0`.
       drawSaveMenu(this.ui);
     }
     drawHoverHighlights(this.ui);

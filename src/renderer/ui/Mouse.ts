@@ -125,6 +125,29 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     if (numChampions > 0 && !potential) ui.diskMenuNeeded = true;
     return;
   }
+  if (id === 147) {
+    // The freeze (`doc/CSBwin-src/Mouse.cpp:1731-1759`): Esc, or a left click on the
+    // pixel x 0, y 198 of the adventure list `Buttons17196`. `d.ClockRunning = 0`,
+    // `gameFrozen = true` and `DiscardAllInput()` are the engine's; `TAG02076e`, the
+    // lists and key tables saved and replaced by `Buttons17832` and `Byte18448`, and
+    // "GAME FROZEN" in the viewport (`GameScreen.render`) are the screen's.
+    ui.onFreeze?.();
+    tag02076e(ui);
+    ui.modeBeforeFreeze = ui.uiMode;
+    ui.uiMode = UIMode.Frozen;
+    updateButtonLists(ui);
+    return;
+  }
+  if (id === 148) {
+    // The thaw (`doc/CSBwin-src/Mouse.cpp:1760-1773`): a click anywhere, or Esc.
+    // `TAG0207cc`, then the saved lists and key tables back.
+    ui.onThaw?.();
+    ui.uiMode = ui.modeBeforeFreeze;
+    tag0207cc(ui);
+    updateButtonLists(ui);
+    syncInventoryButtons(ui);
+    return;
+  }
 }
 
 export function handleMouseUnclick(ui: UIState): void {
@@ -226,13 +249,14 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
  * (`SaveGame.cpp:860`). Its state half: an open inventory showing a chest
  * (`d.DisplayResurrectChestOrScroll == 4`) has it repacked (`:5116-5125`), so the save
  * finds the chest's objects in the chest. Asleep, it does nothing (`:5111`). The drawing
- * half is the menu's own, in `GameScreen.presentViewport`: the three shaded areas, and
- * the arrow cursor of `SetCursorShape(0)` (`:5133`) in `drawCursorItem`.
+ * half is `shadedByTag02076e`, which `GameScreen.presentViewport` reads for the three
+ * shaded areas and `drawCursorItem` for the arrow cursor of `SetCursorShape(0)` (`:5133`).
  */
 export function tag02076e(ui: UIState): void {
   const party = ui.partyState;
   if (!party || party.sleeping) return;
   if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
+  ui.shadedByTag02076e = true;
 }
 
 /**
@@ -242,12 +266,14 @@ export function tag02076e(ui: UIState): void {
  * attack menu is open (`d.Word20252 = 1`, `:9948-9951`); and an open inventory is shut
  * without a repack and shown again through `ShowHideInventory` (`:9953-9958`), which
  * opens the chest again on the next draw. The redraws, and `TAG002572`'s cursor, the
- * port does every frame; `d.Word11750 = 0` is the dead countdown in `DEBT.md` H. Asleep,
- * it only redraws (`:9938-9942`).
+ * port does every frame once `shadedByTag02076e` is clear; `d.Word11750 = 0` is the dead
+ * countdown in `DEBT.md` H. Asleep, it only redraws the sleep screen (`:9938-9942`),
+ * which `GameScreen.render` draws every frame.
  */
 export function tag0207cc(ui: UIState): void {
   const party = ui.partyState;
   if (!party || party.sleeping) return;
+  ui.shadedByTag02076e = false;
   const caster = party.magicCasterIndex;
   party.magicCasterIndex = -1;
   selectMagicCaster(party, caster);
@@ -330,29 +356,42 @@ export function handleClothingClick(ui: UIState, button: number): void {
   }
 }
 
+/**
+ * The button lists and key tables of the mode: asleep `Buttons17796` and `Byte18440`
+ * (`doc/CSBwin-src/Mouse.cpp:1698-1701`), frozen `Buttons17832` and `Byte18448`
+ * (`:1752-1755`), and adventuring `Buttons17196` / `Buttons17304` and `Byte18400` /
+ * `Byte18428` (`CSBCode.cpp:7056-7059`).
+ */
 export function updateButtonLists(ui: UIState): void {
   if (!ui.uiTables) return;
   const buttons = ui.uiTables.graphic231.buttons;
+  const keys = ui.uiTables.graphic231.keys;
   switch (ui.uiMode) {
     case UIMode.Sleeping:
       ui.primaryButtons = buttons.buttons17796;
       ui.secondaryButtons = null;
+      ui.keyXlate2 = keys.byte18440;
+      ui.keyXlate1 = null;
       break;
     case UIMode.Frozen:
       ui.primaryButtons = buttons.buttons17832;
       ui.secondaryButtons = null;
+      ui.keyXlate2 = keys.byte18448;
+      ui.keyXlate1 = null;
       break;
     case UIMode.Adventure:
     default:
       ui.primaryButtons = buttons.buttons17196;
       ui.secondaryButtons = buttons.buttons17304;
+      ui.keyXlate2 = keys.byte18400;
+      ui.keyXlate1 = keys.byte18428;
       break;
   }
 }
 
 export function drawCursorItem(ui: UIState): void {
   if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
-  if (ui.saveMenu?.mode === 'full') {
+  if (ui.shadedByTag02076e) {
     // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until `TAG0207cc`'s
     // `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030`) sets the cursor from the hand again.
     const arrow = getCursorArrowBitmap(ui);

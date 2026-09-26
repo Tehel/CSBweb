@@ -73,7 +73,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 3 next |
+| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 4 next |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -87,7 +87,7 @@ In payoff order: the first row is the next item.
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
-| C62 | The key tables of graphics.dat are not read | M | ⏳ |
+| C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -314,10 +314,10 @@ neither half:
 
 What each misses is the halves' state: `SetCursorShape(0)`, the arrow cursor until
 `TAG0207cc`'s `TAG002572` puts it back (while asleep, for one); the caster selected again;
-`d.Word20252 = 1` when no attack menu is open; the inventory shown again. The freeze's
-pair (`Mouse.cpp:1736`, `:1765`) goes with the freeze, G5 step 3, which also moves
-`drawCursorItem`'s arrow, now a test of the save menu, onto a cursor-shape state the pair
-sets and clears. Call the pair at each site. Evidence: a check per site, in `tools/dump-sleep.ts` and
+`d.Word20252 = 1` when no attack menu is open; the inventory shown again. The pair's
+drawing is `UIState.shadedByTag02076e`, which `tag02076e` sets and `tag0207cc` clears, and
+which `presentViewport` and `drawCursorItem` read; `presentViewport`'s separate shading
+while asleep goes once sleep calls the pair. Call the pair at each site. Evidence: a check per site, in `tools/dump-sleep.ts` and
 `tools/dump-hall-of-champions.ts`.
 
 ### C61 ⏳ The dev quick-save writes an open chest empty
@@ -330,12 +330,15 @@ and its objects nowhere. CSBWin has no quick-save; its only save repacks. Repack
 the payload is built and open the chest again after, as the disk menu does. Evidence: a
 check that quick-saves over an open chest and restores it.
 
-### C62 ⏳ The key tables of graphics.dat are not read
+### C62 ⏳ Most of the graphics.dat key tables bind nothing
 
-`TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428`) turns a key into a button through the two
-`KeyXlate` tables that `d.pKeyXlate2` and `d.pKeyXlate1` point at, `{mouse, keyscan}`
-pairs ending at `mouse == 0` (`CSB.h:1379-1383`), all four read from graphics.dat `0x231`.
-Awake they are `Byte18400` and `Byte18428` (`CSBCode.cpp:7058-7059`, `:10489-10490`):
+`TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428-8475`) turns a key into a button through the
+two `KeyXlate` tables that `d.pKeyXlate2` and `d.pKeyXlate1` point at. The port reads all
+four tables (`UITables`' `graphic231.keys`), sets them with the button lists
+(`updateButtonLists`, `src/renderer/ui/Mouse.ts`), and looks keys up in them
+(`translateKey`, `src/renderer/ui/Keyboard.ts`), but `keyScanOf` knows only Return and Esc,
+so only the sleep and frozen tables and the adventure table's Esc bind anything. Awake the
+tables are `Byte18400` and `Byte18428` (`CSBCode.cpp:7058-7059`, `:10489-10490`):
 
 - `Byte18400`: F1-F4 (`0x3b00`-`0x3e00`) are buttons 7-10, Ctrl-S (`0x13`) is 140, the disk
   menu, and Esc (`0x1b`) is 147, the freeze.
@@ -343,15 +346,16 @@ Awake they are `Byte18400` and `Byte18428` (`CSBCode.cpp:7058-7059`, `:10489-104
   and 2), and the four arrows are buttons 3-6: up steps forward, down back, left and
   right strafe.
 
-Asleep the tables are `Byte18440` (Return 146, Esc 147) and nothing (`Mouse.cpp:1700-1701`),
-and frozen `Byte18448` (Esc 148) and nothing (`:1754-1755`). The port skips all four
-(`src/renderer/csbwin/UITables.ts:456-470`) and hardcodes its keys in `src/ui/events.ts` and
-`src/renderer/ui/Keyboard.ts`: F1-F4 select the caster, Ctrl-S is left to the browser, Esc
-toggles a dev pause, and the left and right arrows turn. Keyboard.ts's module comment says
-CSBWin has no keys of its own beyond `config.txt`, which these tables contradict. Read the
-tables, queue what they bind as `TAG0196da` does, and keep the port's extra bindings only
-where they claim no key a table binds. G5 step 3 reads the Esc entries it needs. Evidence:
-a row per table entry in `tools/dump-key-bindings.ts`.
+The port binds the rest itself in `src/ui/events.ts` and `src/renderer/ui/Keyboard.ts`: F1-F4
+select the caster, Ctrl-S is left to the browser, and the left and right arrows turn.
+Keyboard.ts's module comment says CSBWin has no keys of its own beyond `config.txt`, which
+these tables contradict. **The author's decision:** the arrow keys take CSBWin's roles, so
+left and right strafe, and Insert and Home turn. Give `keyScanOf` the scancodes of F1-F4,
+Ctrl-S, the four arrows, Insert and Home, route every key through `translateKey` before the
+port's own bindings, and keep those bindings only where they claim no key a table binds.
+`TAG0196da` queues every `pKeyXlate1` match after a `pKeyXlate2` one (`:8460-8475`), where
+`translateKey` returns the first. Evidence: a row per table entry in
+`tools/dump-key-bindings.ts`.
 
 ---
 
@@ -509,7 +513,7 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 ### G5 ⏳ The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze
 
 The author has pulled G5 ahead of tier C. It is size L, in four steps taken in order, each
-one commit. Step 3 is next.
+one commit. Step 4 is next.
 
 1. ✅ **`SetNewSpeed`**: falling asleep and `WakeUp` rescale the message timeouts
    (`ScrollingText.setNewSpeed`, `speed` in `src/engine/LoopState.ts`,
@@ -517,29 +521,9 @@ one commit. Step 3 is next.
 2. ✅ **A load keeps the message area**: CSBWin saves no message state, and
    `applyRuntimeSaveState` rebases the rows on screen onto the loaded clock (`ResetTime`,
    `tools/dump-sleep.ts`).
-3. ⏳ **The freeze** (M).
-   - Button 147 (`doc/CSBwin-src/Mouse.cpp:1731-1759`): `d.ClockRunning = 0`,
-     `gameFrozen = true`, `TAG02076e()`, the viewport flooded with 0 and "GAME FROZEN" in
-     colour 4 at viewport (81, 69), the button lists and key tables saved and replaced by
-     `Buttons17832` (the whole screen, either mouse button, is 148) and `Byte18448`,
-     `DiscardAllInput()`. Button 148 (`:1760-1773`) puts it all back, with `TAG0207cc()`.
-   - While `d.ClockRunning == 0` the main loop runs no tick (`CSBCode.cpp:765`) and a
-     viewport click does nothing (`Mouse.cpp:1667`). While `gameFrozen`,
-     `HandleMouseEvents` throws away every entry but 148 (`:1433-1444`).
-   - The keys: Esc is 147 in the adventure table `Byte18400` and in the sleep table
-     `Byte18440`, and 148 in the frozen table `Byte18448` (graphics.dat `0x231`, C62). In the
-     port Esc toggles a dev pause in adventure (`src/ui/events.ts:291`) and is swallowed
-     asleep (`:243-251`). This step reads the tables it needs from graphics.dat; C62 is the
-     rest of them.
-   - The pair's arrow cursor needs the cursor-shape state C60 plans. Build it here, and C60
-     then only adds its call sites.
-   - `UIMode.Frozen` and its button list (`updateButtonLists`,
-     `src/renderer/ui/Mouse.ts:341`) exist and are never entered.
-
-   Evidence: a new `tools/dump-freeze.ts`, listed in `tools/run-checks.mjs`, that freezes
-   by click and by Esc, awake and asleep, shows that no tick runs and that every entry but
-   148 is dropped, then thaws; and the frozen screen as a golden frame if the frame probe
-   can reach it.
+3. ✅ **The freeze**: buttons 147 and 148, by Esc or a click, over the adventure and sleep
+   screens (`doc/PROVEN_FACTS.md` → "The freeze", `tools/dump-freeze.ts`). Esc no longer
+   pauses the game; `Game.setPaused` is only the save menu's clock stop.
 4. ⏳ **The scroll animation, and the pace of the print queue** (M).
    - `ScrollUp` (`doc/CSBwin-src/CSBCode.cpp:1584-1596`) starts a pixel scroll,
      `d.PushTextUp = 1` and `d.TextScanlineScrollCount = 0`. The VBL handler then moves the

@@ -240,13 +240,14 @@ export function bindUIEvents(): void {
             // A browser or OS shortcut keeps its key: nothing below is bound with a
             // modifier, so Ctrl-R still reloads rather than opening a rune keypad.
             if (e.ctrlKey || e.metaKey || e.altKey) return;
-            // Asleep, `d.pKeyXlate1` is NULL and `d.pKeyXlate2` is `Byte18440`
-            // (doc/CSBwin-src/Mouse.cpp:1700-1701), which graphics.dat fills with two
-            // keys: Return (0x0d) is button 146, the wake-up, and Esc (0x1b) is 147, the
-            // freeze — unported with the rest of the freeze (DEBT G5). Every other key is
+            // Asleep or frozen, `d.pKeyXlate1` is NULL and `d.pKeyXlate2` is `Byte18440`
+            // (doc/CSBwin-src/Mouse.cpp:1700-1701) or `Byte18448` (`:1754-1755`), which
+            // graphics.dat fills with Return 146, the wake-up, and Esc 147, the freeze, or
+            // with Esc 148, the thaw (`TAG0196da`, `CSBCode.cpp:8428`). Every other key is
             // dead, the movement keys and the panel bindings included.
-            if (ctx.game.isPartySleeping()) {
-                if (e.key === 'Enter') ctx.game.enqueueKeyButton(146);
+            if (ctx.game.isPartySleeping() || ctx.game.isFrozen()) {
+                const button = ctx.screen?.translateKey(e.key) ?? 0;
+                if (button !== 0) ctx.game.enqueueKeyButton(button);
                 e.preventDefault();
                 return;
             }
@@ -288,11 +289,14 @@ export function bindUIEvents(): void {
                     ctx.game.enqueueMovement(MovementAction.STRAFE_RIGHT);
                     handled = true;
                     break;
-                case 'Escape':
-                    ctx.game.setPaused(!ctx.game.state.paused);
-                    updateDebug(ctx.game.state.paused ? 'Game paused' : 'Game resumed');
+                case 'Escape': {
+                    // Esc is 147, the freeze, in the adventure table `Byte18400`
+                    // (`TAG0196da`, doc/CSBwin-src/CSBCode.cpp:8428).
+                    const button = ctx.screen?.translateKey(e.key) ?? 0;
+                    if (button !== 0) ctx.game.enqueueKeyButton(button);
                     handled = true;
                     break;
+                }
                 case 'F5':
                     ctx.onQuickSave();
                     handled = true;

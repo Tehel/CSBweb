@@ -13,7 +13,7 @@ import type { FeedParameters } from '../../engine/Feeding';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
-import type { UIButton, UITables } from '../csbwin/UITables';
+import type { KeyXlate, UIButton, UITables } from '../csbwin/UITables';
 import type { ObjectTables } from '../csbwin/ObjectTables';
 import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
@@ -61,6 +61,21 @@ export interface UIState {
   fontData: FontData | null;
   partyState: PartyState | null;
   uiMode: UIMode;
+  /**
+   * The mode button 147 froze, which button 148 puts back with its lists and key tables:
+   * CSBWin's `d.Pointer18982` / `Pointer18986` / `pKeyXlate18974` / `pKeyXlate18978`
+   * (`doc/CSBwin-src/Mouse.cpp:1748-1751`, `:1766-1769`).
+   */
+  modeBeforeFreeze: UIMode;
+  /**
+   * `TAG02076e` has run and `TAG0207cc` has not: the movement-arrow, magic and weapon-ready
+   * areas stay shaded, and `SetCursorShape(0)` keeps the arrow cursor
+   * (`doc/CSBwin-src/Character.cpp:5118-5133`) until `TAG0207cc` redraws the areas and
+   * its `TAG002572` sets the cursor from the hand again (`CSBCode.cpp:9934-9966`). CSBWin
+   * draws these once and the screen holds them; this port redraws every frame, so it
+   * keeps the state.
+   */
+  shadedByTag02076e: boolean;
 
   /* ---- interaction state ---- */
   /**
@@ -118,6 +133,9 @@ export interface UIState {
   mouthChewFrameHandle: number | null;
   primaryButtons: UIButton[] | null;   // graphic231 -> buttons17196
   secondaryButtons: UIButton[] | null; // graphic231 -> buttons17304
+  /** `d.pKeyXlate2` / `d.pKeyXlate1`, the key tables `TAG0196da` searches, in that order. */
+  keyXlate2: KeyXlate[] | null;        // graphic231 -> Byte18400
+  keyXlate1: KeyXlate[] | null;        // graphic231 -> Byte18428
 
   /* ---- bitmap caches ---- */
   graphicCache: Map<string, IndexedBitmap>;
@@ -180,6 +198,10 @@ export interface UIState {
   onSleep?: () => void;
   /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
   onWakeUp?: () => void;
+  /** Button 147, the engine's half of the freeze — `Game.freeze`. */
+  onFreeze?: () => void;
+  /** Button 148, the engine's half of the thaw — `Game.thaw`. */
+  onThaw?: () => void;
   /**
    * Build the bytes of a new save and the row it will be listed as
    * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the
@@ -213,6 +235,8 @@ export function createUIState(
     fontData: null,
     partyState: null,
     uiMode: UIMode.Adventure,
+    modeBeforeFreeze: UIMode.Adventure,
+    shadedByTag02076e: false,
 
     reincarnate: null,
     saveMenu: null,
@@ -239,6 +263,8 @@ export function createUIState(
     mouthChewFrameHandle: null,
     primaryButtons: null,
     secondaryButtons: null,
+    keyXlate2: null,
+    keyXlate1: null,
 
     graphicCache: new Map(),
     cursorArrowBitmap: null,

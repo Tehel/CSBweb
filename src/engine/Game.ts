@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { wakeUp } from './LoopState';
+import { freeze, thaw, wakeUp } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -285,7 +285,8 @@ export class Game {
     }
 
     /**
-     * Pause/unpause the game
+     * Stop and restart the clock around the save menu (`UIState.onSetPaused`). The game's
+     * own stop is the freeze, buttons 147 and 148.
      */
     setPaused(paused: boolean): void {
         this.state.paused = paused;
@@ -335,6 +336,9 @@ export class Game {
 
         // Process game ticks
         if (this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared)) {
+            // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
+            // frozen, the due tick waits, and runs in the frame that thaws.
+            if (!this.ctx.loop.clockRunning) return;
             if (!this.state.paused) {
                 this.gameTick();
             }
@@ -456,6 +460,21 @@ export class Game {
         wakeUp(this.ctx);
     }
 
+    /** Button 147, the engine's half (`LoopState.freeze`). */
+    freeze(): void {
+        freeze(this.ctx);
+    }
+
+    /** Button 148, the engine's half (`LoopState.thaw`). */
+    thaw(): void {
+        thaw(this.ctx);
+    }
+
+    /** `gameFrozen`: between buttons 147 and 148. */
+    isFrozen(): boolean {
+        return this.ctx.loop.gameFrozen;
+    }
+
     isPartySleeping(): boolean {
         return this.party.state.sleeping;
     }
@@ -482,7 +501,9 @@ export class Game {
      * taken, while
      *
      * - an entry was handled this tick: `lastTime != 0 && d.Time < lastTime + delta`
-     *   (`Mouse.cpp:1468-1476`);
+     *   (`Mouse.cpp:1468-1476`), unless the game is frozen and the head is 148, the thaw
+     *   (`thawCommand`, `:1463-1476`): no tick runs while frozen, so the thaw is never
+     *   made to wait for one;
      * - it is a step and `d.partyMoveDisableTimer != 0`, or `d.Word11712 != 0` and the
      *   step heads in direction `d.Word11714` (`:1485-1498`) — and everything queued
      *   behind it waits too.
@@ -491,15 +512,24 @@ export class Game {
      * button-up and every other button by `mouseEventHandlers`. Every button stamps
      * `lastTime`; the button-up does not, and lets the next entry follow (`:1523-1549`).
      *
-     * Not ported: the frozen game's filter (`:1433-1444`) and the stairs buttons
-     * `0x1124`/`0x1125`, for want of either in the port.
+     * Frozen, every entry but 148 is thrown away, one per call, and nothing else happens
+     * (`:1433-1444`). `CauseFakeMouseClick`, which follows every take, replays a click
+     * the port never defers.
+     *
+     * Not ported: the stairs buttons `0x1124`/`0x1125`, for want of them in the port.
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;
         const queue = this.ctx.mouseQueue;
         if (queue.count() === 0) return result;
+        const frozen = this.ctx.loop.gameFrozen;
+        if (frozen && queue.head().num !== 148) {
+            queue.take();
+            return result;
+        }
         const time = this.state.tickCount;
-        if (this.lastInputTime !== 0 && time < this.lastInputTime + delta) return result;
+        const thawCommand = frozen && queue.head().num === 148;
+        if (this.lastInputTime !== 0 && time < this.lastInputTime + delta && !thawCommand) return result;
         const entry = queue.head();
         const num = entry.num;
         const party = this.party.state;

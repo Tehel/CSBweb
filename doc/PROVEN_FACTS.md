@@ -3412,6 +3412,44 @@ screen and rebases their timeouts onto the loaded clock with
 in-game load; CSBWin loads only when a game starts) also shrinks the rows back, as the next
 tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:612-616`). Evidence: `tools/dump-sleep.ts`.
 
+## The freeze: button 147 in, button 148 out, no tick in between
+
+- **The keys and buttons.** `TAG0196da` turns a key into a button through `d.pKeyXlate2`,
+  then `d.pKeyXlate1` (`doc/CSBwin-src/CSBCode.cpp:8428-8475`), `KeyXlate` pairs
+  `{mouse, keyscan}` ending at `mouse == 0` (`CSB.h:1379-1383`), read from graphics.dat
+  `0x231`. Esc (`0x1b`) is 147 in the adventure table `Byte18400` and in the sleep table
+  `Byte18440`, and 148 in the frozen table `Byte18448`, which holds nothing else. Button
+  147 is also a left click on the single pixel x 0, y 198 of the adventure list
+  `Buttons17196`: its rectangle is x 0-1, y 198-199, and `SearchButtonList` excludes the
+  upper bounds (`CSBCode.cpp:7561-7564`). `Buttons17832`, the frozen list, is button 148
+  over the whole screen for either mouse button.
+- **Button 147** (`Mouse.cpp:1731-1759`), after the pressed-eye and pressed-mouth returns
+  (`:1679-1680`) and with no other guard: `d.ClockRunning = 0`, `gameFrozen = true`,
+  `TAG02076e()`, the viewport flooded with 0 and `TextOut_OneLine(d.pViewportBMP, 112, 81,
+  69, 4, 0, "GAME FROZEN", …)`, `MarkViewportUpdated(2)` (which keeps the palette mode in
+  force, `CSBCode.cpp:2906-2908`), the button lists and key tables saved (`:1748-1751`) and
+  replaced by `Buttons17832` / NULL and `Byte18448` / NULL, `DiscardAllInput()`. The
+  inventory is drawn into the viewport bitmap (`TAG022a60(17, d.pViewportBMP)`,
+  `CSBCode.cpp:7493`), so the flood covers an open inventory too.
+- **While frozen**, the main loop runs no tick: `if (d.ClockRunning == 0) goto tag0007b4;`
+  (`CSBCode.cpp:765`) leaves a due tick due. `HandleMouseEvents` throws away every entry but
+  148, one per call, without stamping `lastTime` (`Mouse.cpp:1433-1444`), and exempts 148
+  from the one-entry-per-tick limit (`thawCommand`, `:1463-1476`), since no tick can come.
+  A viewport click (button 80) also tests `d.ClockRunning` (`:1667`), which the filter
+  makes unreachable outside a recording's playback.
+- **Button 148** (`:1760-1773`): `d.ClockRunning = 1`, `gameFrozen = false`, `TAG0207cc()`,
+  the saved lists and key tables back (`:1766-1769`), `DiscardAllInput()`. The tick that
+  fell due while frozen runs in the same pass.
+- **Asleep**, `TAG02076e` returns at once (`Character.cpp:5111`) and `TAG0207cc` only
+  redraws the sleep screen (`CSBCode.cpp:9938-9942`), so a freeze from the sleep screen
+  thaws back to "WAKE UP" and the sleep lists.
+- `d.ClockRunning` and `gameFrozen` are not saved; the game start sets `d.ClockRunning = 1`
+  (`CSBCode.cpp:10549`).
+
+The port: `handleMouseButton` (`src/renderer/ui/Mouse.ts`) and `freeze` / `thaw`
+(`src/engine/LoopState.ts`), the key tables in `UITables`' `graphic231.keys`. Evidence:
+`tools/dump-freeze.ts`.
+
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
 The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,

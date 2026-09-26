@@ -26,6 +26,12 @@ export interface UIButton extends Rect {
   name?: string;
 }
 
+/** CSBWin `KeyXlate` (`doc/CSBwin-src/CSB.h:1379`): a key and the button it queues. */
+export interface KeyXlate {
+  mouse: number;
+  keyscan: number;
+}
+
 export interface SoundTableEntry {
   word0: number;
   byte2: number;
@@ -66,6 +72,13 @@ export interface UITables {
     rect18576: WordRect;
     moveButtons: WordRect[];
     dropAreas: Rect[];
+    /** The key tables `TAG0196da` reads (`KeyXlate`, `doc/CSBwin-src/CSB.h:1379`). */
+    keys: {
+      byte18448: KeyXlate[]; // frozen: Esc is 148
+      byte18440: KeyXlate[]; // asleep: Return is 146, Esc 147
+      byte18428: KeyXlate[]; // adventure, second table: the six movement keys
+      byte18400: KeyXlate[]; // adventure, first table: F1-F4, Ctrl-S, Esc
+    };
     buttons: {
       buttons18936: UIButton[];
       buttons18876: UIButton[];
@@ -254,6 +267,20 @@ function readI32Array(view: DataView, off: number, count: number): number[] {
     out.push(view.getInt32(off + i * 4, false));
   }
   return out;
+}
+
+/**
+ * `count` `KeyXlate` slots, `{ui16 mouse; ui16 keyscan;}` (`doc/CSBwin-src/CSB.h:1379-1383`),
+ * up to the terminating `mouse == 0`, which `TAG0196da` stops at (`CSBCode.cpp:8446`).
+ */
+function readKeyXlate(view: DataView, off: number, count: number): KeyXlate[] {
+  const keys: KeyXlate[] = [];
+  for (let i = 0; i < count; i++) {
+    const mouse = view.getUint16(off + i * 4, false);
+    if (mouse === 0) break;
+    keys.push({ mouse, keyscan: view.getUint16(off + i * 4 + 2, false) });
+  }
+  return keys;
 }
 
 function readButtons(view: DataView, off: number, count: number, basename: string): UIButton[] {
@@ -466,10 +493,14 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     });
   }
   off += 16;
-  off += 8;
-  off += 12;
-  off += 7 * 4;
-  off += 28;
+  requireSize(raw, off, 8 + 12 + 28 + 28, '0x231 Byte18448..Byte18400');
+  const keys = {
+    byte18448: readKeyXlate(view, off, 2), // off += 8
+    byte18440: readKeyXlate(view, off + 8, 3), // off += 12
+    byte18428: readKeyXlate(view, off + 20, 7), // off += 28
+    byte18400: readKeyXlate(view, off + 48, 7), // off += 28
+  };
+  off += 8 + 12 + 28 + 28;
 
   // 0: resurect (160)
   // 1: reincarnate (161)
@@ -507,6 +538,7 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     rect18576,
     moveButtons,
     dropAreas,
+    keys,
     buttons: {
       buttons18936,
       buttons18876,

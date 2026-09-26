@@ -315,7 +315,7 @@ export interface GameState {
 
     // Game status
     running: boolean;           // Is game running?
-    paused: boolean;            // Is game paused?
+    paused: boolean;            // The save menu holds the clock (`UIState.onSetPaused`)
 
     // Timing
     startTime: number;          // Game start timestamp
