@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C36 | `EnableCharacterAction` keeps the attack type | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
 | C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
 | C39 | `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1 | S | ⏳ |
@@ -125,29 +124,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C36 ⏳ `EnableCharacterAction` keeps the attack type
-
-CSBWin's `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638-2681`) ends with
-`pChar->attackType = -1` (`:2680`). The port's `TimerSystem.enableCharacterAction`
-(`src/engine/TimerSystem.ts:246`) never resets it, so `champion.attackType` keeps the last
-attack for good. The next `EnableCharacterAction`, say after a spell's
-`DisableCharacterAction`, then zeroes `attackStatModifier` again (harmless, because it is
-already 0). And if that last attack was a shot and hand 0 (the one the arrow is nocked
-from) is empty, it reloads the bow from the quiver, which CSBWin would not do.
-
-The function also opens with `busyTimer = -1` and clears `CHARFLAG_attackDisable`
-unconditionally (`:2645-2646`). The port's clears the bit there too, but
-`TimerSystem.processActionDisableTimer` (`:226`) sets `busyTimerIndex` to -1 only when the
-expiring timer is the champion's own. That guard is dead, in CSBWin and in the port:
-`SetTimer` de-duplicates only `TT_1`, `TT_BASH_DOOR` and the map timers 5-10
-(`Timer.cpp:1011-1126`), and the only `TT_11` is `DisableCharacterAction`'s, which deletes
-the champion's busy timer before it queues the next (`Magic.cpp:513-536`; the port's
-`MagicSystem.ts:489-516`). So set `busyTimerIndex` to -1 unconditionally inside
-`enableCharacterAction`, as CSBWin does.
-
-Reset `attackType` at the end. Evidence: a check that shoots, casts, and reads the quiver
-after the cast.
 
 ### C37 ⏳ A door button or a touched wall does not set `d.clockTick`
 
@@ -206,7 +182,7 @@ writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` 
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
-  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1506`,
+  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1505`,
   then `?? 0` at `MissileEncounter.ts:440`). Only a dungeon with a missile encounter
   filter can see this half.
 
@@ -223,7 +199,7 @@ Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove`
 `resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
 (`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
 `AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3028`) and
-`TimerSystem.wiggleParty` (`:1759`). They do not agree:
+`TimerSystem.wiggleParty` (`:1758`). They do not agree:
 
 - `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
   its caller passed, before any teleporter or pit (`Code11f52.cpp:2847-2853`). The step and
@@ -248,7 +224,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 (`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1422-1432`). `moveObject` has a missile arm of its own,
+missile itself (`TimerSystem.ts:1421-1431`). `moveObject` has a missile arm of its own,
 which reads the direction from the timer the missile record names (`WorldMove.ts:161-165`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
@@ -324,7 +300,7 @@ attenuates it by the distance to the party. Seven calls play a `SoundIndex` item
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
 `src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:375`, `:510`), three
 teleporters in `WorldMove.resolveCellEffects` (`:296`, `:313`, `:320`) and a door's step
-in `TimerSystem` (`:752`). For the door button CSBWin queues
+in `TimerSystem` (`:751`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
 not yet read. All seven escape whatever `QueueSound` does that the host does not: the
@@ -422,7 +398,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:283`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:282`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy

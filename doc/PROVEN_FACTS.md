@@ -3368,8 +3368,18 @@ Evidence: `tools/dump-viewport-click.ts`.
   `D7 + ((D6 - d.Time) >> 1)` if `D7 >= D6`, else at `D6 + delay / 2` (`Magic.cpp:514-527`).
 - IAIDO is saved busy in `csbgame6.dat` and `csbgame-flying-sword.dat`: `charFlags` 0x0018,
   with a `TT_11` as his `busyTimer`.
+- `_ExecuteAttack` records the attack in `attackType` after running it
+  (`Character.cpp:4974`), and `EnableCharacterAction` forgets it, ending with
+  `attackType = -1` (`Timer.cpp:2680`). In between, it zeroes `word64` only while an attack
+  is recorded (`:2647-2653`), and reloads the bow from slot 12, then 7-9, only while that
+  attack is `atk_SHOOT`, hand 0 is empty and the champion is alive (`:2654-2673`). So the
+  `TT_11` of a spell cast after a shot reloads nothing.
+- No champion has two `TT_11`s queued: `DisableCharacterAction`, the only place that
+  queues one, deletes the champion's busy timer first (`Magic.cpp:513-525`), and nothing
+  else deletes it. So the `TT_11` that fires is always the champion's `busyTimer`.
 
-Evidence: `tools/dump-save-roundtrip.ts`, section 5.
+Evidence: `tools/dump-save-roundtrip.ts`, section 5, and `tools/dump-throwing.ts`,
+section 8.
 
 ## CSBWin's timer queue is a binary heap
 

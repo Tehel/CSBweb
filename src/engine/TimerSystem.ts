@@ -224,11 +224,8 @@ export class TimerSystem {
   }
 
   private processActionDisableTimer(timer: TimerEntry): void {
-    const party = this.ctx.party.state;
     const chIdx = timer.uByte5 & 0xff;
-    const champ = party.champions[chIdx];
-    if (!champ) return;
-    if (champ.busyTimerIndex === timer.index) champ.busyTimerIndex = -1;
+    if (!this.ctx.party.state.champions[chIdx]) return;
     // The `TT_11` case (doc/CSBwin-src/CSBCode.cpp:6466-6475): `EnableCharacterAction`,
     // then `TAG0115ee(chIdx, uByte6 - 1)` when `uByte6 != 0` — the slot a throw emptied.
     this.enableCharacterAction(chIdx);
@@ -238,14 +235,15 @@ export class TimerSystem {
 
   /**
    * `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) — the champion is free
-   * again: the busy bit goes, so does the attack's defence penalty, and a bow that has
-   * just been fired reloads from the quiver. Not ported (`DEBT.md` C36): the closing
-   * `attackType = -1` (`:2680`), and the unconditional `busyTimer = -1` (`:2645`), which
-   * the caller does only for the champion's own timer.
+   * again: the busy timer and bit go, so does the attack's defence penalty, a bow that
+   * has just been fired reloads from the quiver, and the attack is over. The
+   * `CHARFLAG_weaponAttack` and `DrawCharacterState` of `:2675-2676` are the redraw,
+   * which this port does every frame.
    */
   private enableCharacterAction(chIdx: number): void {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
+    champion.busyTimerIndex = -1;
     champion.charFlags &= ~CHARFLAG_ATTACK_DISABLE;
     if (champion.attackType !== -1) champion.attackStatModifier = 0;
     if ((champion.attributes.health | 0) !== 0) {
@@ -262,6 +260,7 @@ export class TimerSystem {
         }
       }
     }
+    champion.attackType = -1;
   }
 
   queueBrightnessTimer(deltaSteps: number, time: number): void {

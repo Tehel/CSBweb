@@ -19,6 +19,8 @@
  *    other way round produced a failing check and a re-read of
  *    `doc/CSBwin-src/Character.cpp:2295`, where the sign is plain.
  *  - A wounded hand halves the throw made with it, and only with it.
+ *  - A shot's busy timer reloads the bow from the quiver, and a spell's busy timer after
+ *    it does not: `EnableCharacterAction` forgets the attack (section 8).
  *
  * Run: `npx tsx tools/dump-throwing.ts`
  */
@@ -414,6 +416,61 @@ async function main(): Promise<void> {
   check(ammoAfterShot === OBJECT_ID_NULL,
     `the arrow left the shield hand (read back ${ammoAfterShot}, shot ${arrow})`);
   check(bowAfterShot === bow, 'the bow itself stays in the fighting hand');
+
+  /* ------------------------- 8. EnableCharacterAction forgets the attack ---------- */
+
+  // `EnableCharacterAction` (`doc/CSBwin-src/Timer.cpp:2638`) reloads the bow from the
+  // quiver only while the attack in progress is a shot, and ends with
+  // `attackType = -1` (`:2680`). So the busy timer a spell sets later, through
+  // `DisableCharacterAction` (`Magic.cpp:502`), frees the champion without touching the
+  // quiver, even with hand 0 empty.
+  console.log('');
+  console.log('=== 8. EnableCharacterAction forgets the attack (TT_11 after a shot, then a spell) ===');
+
+  const clock = game.ctx.state;
+  const runUntilFree = (): number => {
+    let ticks = 0;
+    while (archer.busyTimerIndex >= 0 && ticks < 1000) {
+      clock.tickCount++;
+      game.timerSystem.processTimers(clock.tickCount);
+      ticks++;
+    }
+    return ticks;
+  };
+  // The rock's and the club's TT_11s are still queued for slot 0, which this tool has
+  // since given to the archer. CSBWin never queues two for one champion
+  // (`DisableCharacterAction` deletes the old one first, `Magic.cpp:513-525`), so drop
+  // them: the timer that frees the archer below is the archer's own.
+  for (const timer of [...game.ctx.timers.getTimers()]) {
+    if (timer.function === 11 && timer.index !== archer.busyTimerIndex) game.ctx.timers.deleteTimer(timer.index);
+  }
+  const quiver = makeWeapon2(WEAPON_ARROW);
+  const spare = makeWeapon2(WEAPON_ARROW);
+  equip(archer, 12, quiver);
+  equip(archer, 7, spare);
+  check(archer.attackType === AttackType.atk_SHOOT && archer.busyTimerIndex >= 0,
+    `the shot is in progress: attackType ${archer.attackType}, busy timer ${archer.busyTimerIndex}`);
+
+  const shotTicks = runUntilFree();
+  console.log(`the shot's TT_11 fired after ${shotTicks} ticks: hand 0 ${getChampionPossession(archer, 0)}, ` +
+    `slot 12 ${getChampionPossession(archer, 12)}, attackType ${archer.attackType}`);
+  check(getChampionPossession(archer, 0) === quiver && getChampionPossession(archer, 12) === OBJECT_ID_NULL,
+    "the shot's TT_11 reloads the bow from slot 12");
+  check(archer.attackType === -1, "the shot's TT_11 ends with attackType = -1 (Timer.cpp:2680)");
+  check((archer.charFlags & CHARFLAG_ATTACK_DISABLE) === 0, "the shot's TT_11 clears CHARFLAG_attackDisable");
+
+  // The arrow leaves hand 0 some other way, and a spell busies the champion.
+  game.ctx.systems.character.removeCharacterPossession(0, 0);
+  game.ctx.systems.magic.disableCharacterAction(0, 12);
+  check(archer.busyTimerIndex >= 0 && (archer.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
+    'the spell busies the champion');
+  const spellTicks = runUntilFree();
+  console.log(`the spell's TT_11 fired after ${spellTicks} ticks: hand 0 ${getChampionPossession(archer, 0)}, ` +
+    `slot 7 ${getChampionPossession(archer, 7)}`);
+  check(getChampionPossession(archer, 0) === OBJECT_ID_NULL && getChampionPossession(archer, 7) === spare,
+    "the spell's TT_11 leaves the quiver alone: no attack is in progress");
+  check(archer.busyTimerIndex === -1 && (archer.charFlags & CHARFLAG_ATTACK_DISABLE) === 0,
+    "the spell's TT_11 frees the champion");
 
   console.log('');
   finish();
