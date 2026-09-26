@@ -22,7 +22,9 @@
  * - the object chain the engine walks at the party's own cell is the one the file
  *   holds, and every possession names a live record **in the live dungeon**, which is
  *   what proves the world and the party were restored into the same place;
- * - the random stream continues from `gb2.ranseed` rather than the host clock.
+ * - the random stream continues from `gb2.ranseed` rather than the host clock;
+ * - a quick-save of the loaded world gives back every field `DUNGEON_DATA_SOURCES`
+ *   places, but the `runtimeSave` ones, which a load re-derives.
  *
  * And the vacuity guard: for a played save, the loaded world must **differ** from the
  * `dungeon.dat` the game started on. A load that quietly did nothing would otherwise
@@ -40,6 +42,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
+import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../src/data/CsbwinCharacters';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { newGame } from './lib/game';
@@ -62,6 +65,38 @@ const DB_OF_CATEGORY: Record<number, keyof DungeonData['databases']> = {
   10: 'misc', 14: 'missiles', 15: 'clouds',
 };
 const CARRYABLE = new Set([5, 6, 7, 8, 9, 10]);
+
+/** `DUNGEON_DATA_SOURCES`, as the walk below reads it. */
+type SourceTable = { readonly [field: string]: FieldSource | SourceTable };
+const SOURCES = DUNGEON_DATA_SOURCES as SourceTable;
+
+/** JSON with typed arrays spelled out, so two worlds compare whole. */
+function json(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) => (ArrayBuffer.isView(v) ? Array.from(v as Uint8Array) : v));
+}
+
+/**
+ * The fields in which two worlds differ, walked over the source table. `runtimeSave`
+ * fields are skipped: a load re-derives them, and `tools/dump-save-roundtrip.ts` checks
+ * them.
+ */
+function differingFields(table: SourceTable, a: any, b: any, path = ''): string[] {
+  const out: string[] = [];
+  for (const [field, source] of Object.entries(table)) {
+    if (source === 'runtimeSave') continue;
+    const at = `${path}${field}`;
+    const [x, y] = [a?.[field], b?.[field]];
+    if (typeof source === 'string') {
+      if (json(x) !== json(y)) out.push(at);
+    } else if (Array.isArray(x) || Array.isArray(y)) {
+      const n = Math.max(x?.length ?? 0, y?.length ?? 0);
+      for (let i = 0; i < n; i++) out.push(...differingFields(source, x?.[i], y?.[i], `${at}[${i}].`));
+    } else {
+      out.push(...differingFields(source, x, y, `${at}.`));
+    }
+  }
+  return out;
+}
 
 /** A fresh game on the real `dungeon.dat`, exactly as the app boots one. */
 function loadWorld(): Game {
@@ -281,10 +316,16 @@ function main(): void {
     // And the round trip that a player actually performs: load a CSBWin save, then
     // quick-save and reload. The quick-save carries only the fields `DungeonSnapshot`'s
     // `DUNGEON_DATA_SOURCES` marks `snapshot` — so a CSBWin load that put something into
-    // a field it does not carry would be lost at the next F5/F9 and nothing else here
-    // would notice. (Five such fields are known, `DEBT.md` D7.)
+    // a field it does not carry would be lost at the next F5/F9. The walk asks that of
+    // every field the table places, the checks after it of the party.
     const second = loadWorld();
-    second.applyRuntimeSaveState(game.getRuntimeSaveState());
+    second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));
+    const lost = differingFields(SOURCES, live, second.state.dungeon);
+    check(
+      lost.length === 0,
+      `${name}: every field of the loaded world but the runtimeSave ones survives a quick-save round trip` +
+        (lost.length ? ` (lost: ${lost.slice(0, 6).join(', ')}${lost.length > 6 ? ', ...' : ''})` : ''),
+    );
     check(
       countFlagDifferences(snapshotCellFlags(second.state.dungeon), loadedFlags) === 0,
       `${name}: the loaded world survives a quick-save round trip`,

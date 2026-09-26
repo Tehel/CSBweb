@@ -28,9 +28,14 @@
  *   whatever dungeon the engine was built on, which this port cannot regenerate.
  *   Carrying them makes a quick-load self-consistent, and lets the binary writer take
  *   blocks 11-13 from a world whatever its provenance.
+ * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations` and
+ *   `spellFilterLocation` are carried for the same reason. `dungeon.dat` has none of
+ *   them; a CSBWin save's Extended Features block and `EXPOOL` do, and a CSBWin load
+ *   writes them into the world (`buildCsbwinRuntimeState`). Only each DSA's `state`
+ *   changes in play, but `dsaIndex` goes in whole, since it is the save's.
  */
 import type { ui8, ui16, ui32, ObjectID } from '../core/types';
-import type { DungeonData, DatabaseRecord, Databases } from '../data/dungeonTypes';
+import type { DungeonData, DatabaseRecord, Databases, DsaDefinition, DsaIndex } from '../data/dungeonTypes';
 
 /**
  * Where a restored world takes a field from:
@@ -108,24 +113,11 @@ export const DUNGEON_DATA_SOURCES = {
     timerWord8Table: 'runtimeSave',
     item16: 'runtimeSave',
     expool: 'snapshot',
-    // A CSBWin load writes this and the next four (`applyStructuralExtras`), and the
-    // snapshot does not carry them (`DEBT.md` D7).
-    dsaLevelIndex: 'loaded',
-    dsaIndex: {
-        entries: {
-            description: 'loaded',
-            // The state machine's position, which `DsaSystem` writes.
-            state: 'snapshot',
-            localState: 'loaded',
-            groupId: 'loaded',
-            numStates: 'loaded',
-            firstDisplayedState: 'loaded',
-            states: 'loaded',
-        },
-    },
-    specialLocations: 'loaded',
-    extendedWallDecorations: 'loaded',
-    spellFilterLocation: 'loaded',
+    dsaLevelIndex: 'snapshot',
+    dsaIndex: 'snapshot',
+    specialLocations: 'snapshot',
+    extendedWallDecorations: 'snapshot',
+    spellFilterLocation: 'snapshot',
     bigActuators: 'loaded',
     indirectText: 'loaded',
     newScrolls: 'loaded',
@@ -136,6 +128,14 @@ type DatabaseKey = keyof Databases;
 
 /** The database keys, taken from the table so capture and restore cannot drift apart. */
 const DATABASE_KEYS = Object.keys(DUNGEON_DATA_SOURCES.databases) as DatabaseKey[];
+
+/** `DsaIndex.entries` as JSON holds it: each program as base64 of big-endian words. */
+type DsaIndexSnapshot = Array<
+    | (Omit<DsaDefinition, 'states'> & {
+          states: Array<{ actions: Array<{ column: number; program: string }> } | null>;
+      })
+    | null
+>;
 
 export interface DungeonSnapshot {
     /** One base64 string per map: the cell flags in `[x][y]` order, row-major over x. */
@@ -149,8 +149,6 @@ export interface DungeonSnapshot {
     objectCounts: ui16[];
     /** Every database's records, by key. A database absent from the map is left alone. */
     databases: Partial<Record<DatabaseKey, DatabaseRecord[]>>;
-    /** `dsaIndex.entries[i].state`, or null where the entry is empty. */
-    dsaStates?: Array<ui16 | null>;
     /** `DsaSystem`'s 100 global variables. */
     dsaGlobals?: number[];
     /** The champion-bones map, as `[key, fingerprint]` pairs. */
@@ -167,6 +165,18 @@ export interface DungeonSnapshot {
     compressedText?: string;
     /** `data.expool` — database 11, base64, carried whole because nothing parses it. */
     expool?: string;
+    /**
+     * `data.dsaLevelIndex`, one base64 string of big-endian words per level. This and the
+     * next four are what a CSBWin load writes. Each is `null` where the world has none,
+     * which a restore then removes.
+     */
+    dsaLevelIndex?: string[] | null;
+    /** `data.dsaIndex.entries`. */
+    dsaIndex?: DsaIndexSnapshot | null;
+    /** `data.specialLocations`, as `[location, value]` pairs. */
+    specialLocations?: Array<[number, number]> | null;
+    extendedWallDecorations?: boolean | null;
+    spellFilterLocation?: number | null;
 }
 
 function encodeBytes(bytes: Uint8Array): string {
@@ -183,7 +193,7 @@ function decodeBytes(encoded: string): Uint8Array {
 }
 
 /** Words as big-endian bytes, so a 1749-word text array costs 4.7 KB rather than 12. */
-function encodeWords(words: readonly ui16[]): string {
+function encodeWords(words: ArrayLike<ui16>): string {
     const bytes = new Uint8Array(words.length * 2);
     for (let i = 0; i < words.length; i++) {
         bytes[i * 2] = (words[i] >> 8) & 0xff;
@@ -197,6 +207,44 @@ function decodeWords(encoded: string): ui16[] {
     const words: ui16[] = [];
     for (let i = 0; i + 1 < bytes.length; i += 2) words.push((bytes[i] << 8) | bytes[i + 1]);
     return words;
+}
+
+function encodeDsaIndex(index: DsaIndex): DsaIndexSnapshot {
+    return index.entries.map(
+        (entry) =>
+            entry && {
+                ...entry,
+                states: entry.states.map(
+                    (state) =>
+                        state && {
+                            actions: state.actions.map(({ column, program }) => ({
+                                column,
+                                program: encodeWords(program),
+                            })),
+                        },
+                ),
+            },
+    );
+}
+
+function decodeDsaIndex(entries: DsaIndexSnapshot): DsaIndex {
+    return {
+        entries: entries.map(
+            (entry) =>
+                entry && {
+                    ...entry,
+                    states: entry.states.map(
+                        (state) =>
+                            state && {
+                                actions: state.actions.map(({ column, program }) => ({
+                                    column,
+                                    program: Uint16Array.from(decodeWords(program)),
+                                })),
+                            },
+                    ),
+                },
+        ),
+    };
 }
 
 /**
@@ -256,14 +304,18 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
         databases,
     };
 
-    if (data.dsaIndex) {
-        snapshot.dsaStates = data.dsaIndex.entries.map((entry) => (entry ? entry.state : null));
-    }
-
     if (data.textWords) snapshot.textWords = encodeWords(data.textWords);
     if (data.indirectTextIndex) snapshot.indirectTextIndex = [...data.indirectTextIndex];
     if (data.compressedText) snapshot.compressedText = encodeWords(data.compressedText);
     if (data.expool) snapshot.expool = encodeBytes(data.expool);
+
+    snapshot.dsaLevelIndex = data.dsaLevelIndex ? data.dsaLevelIndex.map(encodeWords) : null;
+    snapshot.dsaIndex = data.dsaIndex ? encodeDsaIndex(data.dsaIndex) : null;
+    snapshot.specialLocations = data.specialLocations
+        ? Object.entries(data.specialLocations).map(([location, value]) => [Number(location), value])
+        : null;
+    snapshot.extendedWallDecorations = data.extendedWallDecorations ?? null;
+    snapshot.spellFilterLocation = data.spellFilterLocation ?? null;
 
     return snapshot;
 }
@@ -323,10 +375,18 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
     }
     if (snapshot.expool !== undefined) data.expool = decodeBytes(snapshot.expool);
 
-    if (snapshot.dsaStates && data.dsaIndex) {
-        snapshot.dsaStates.forEach((state, index) => {
-            const entry = data.dsaIndex?.entries[index];
-            if (entry && state !== null) entry.state = state;
-        });
+    // The same holds for the five a CSBWin load writes, and `null` is a world that had
+    // none.
+    if (snapshot.dsaLevelIndex === null) delete data.dsaLevelIndex;
+    else if (snapshot.dsaLevelIndex) data.dsaLevelIndex = snapshot.dsaLevelIndex.map(decodeWords);
+    if (snapshot.dsaIndex === null) delete data.dsaIndex;
+    else if (snapshot.dsaIndex) data.dsaIndex = decodeDsaIndex(snapshot.dsaIndex);
+    if (snapshot.specialLocations === null) delete data.specialLocations;
+    else if (snapshot.specialLocations) data.specialLocations = Object.fromEntries(snapshot.specialLocations);
+    if (snapshot.extendedWallDecorations === null) delete data.extendedWallDecorations;
+    else if (snapshot.extendedWallDecorations !== undefined) {
+        data.extendedWallDecorations = snapshot.extendedWallDecorations;
     }
+    if (snapshot.spellFilterLocation === null) delete data.spellFilterLocation;
+    else if (snapshot.spellFilterLocation !== undefined) data.spellFilterLocation = snapshot.spellFilterLocation;
 }

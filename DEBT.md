@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D7 | The snapshot drops five fields a CSBWin load writes | S | ⚠️ |
 | E6 | `CHARDESC::Possession` is written out once per module | S | ⏳ |
 | C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
@@ -111,27 +110,7 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 
 ## D — State representation
 
-### D7 ⚠️ The snapshot drops five fields a CSBWin load writes
-
-A CSBWin load writes `dsaLevelIndex`, `dsaIndex`, `specialLocations`,
-`extendedWallDecorations` and `spellFilterLocation` into the live world
-(`applyStructuralExtras`, `src/data/CsbwinSaveGame.ts:227`). `DungeonSnapshot` carries
-none of them: `DUNGEON_DATA_SOURCES` marks them `loaded`, and of `dsaIndex` only each
-entry's `state` goes in. So after a CSBWin load, a quick-save and a quick-load in a fresh
-page, the world has `dungeon.dat`'s values for all five. On the fourteen committed saves
-three are lost: `dsaLevelIndex` (a table of 0xffff becomes none), `extendedWallDecorations`
-(true becomes unset) and `spellFilterLocation` (0 becomes unset). Play reads the first
-and third the same either way: `getDsaLevelIndex`'s callers act only on 255, and
-`getSpellFilterLocation` defaults to 0. The flag drops out of the Extended Features header
-that the save writer builds (`src/data/CsbwinExtendedFeatures.ts:341`, from
-`SaveGamePayload.ts:216`).
-
-The text arrays and `expool` are already carried for this reason (the module comment of
-`DungeonSnapshot.ts`). Carry these five the same way: optional snapshot fields, which an
-older snapshot lacks and a restore then leaves alone, marked `snapshot` in the table.
-Evidence: the quick-save round trip in `tools/dump-csbwin-load.ts` compares only the cell
-flags, the party and one chain. Make it walk `DUNGEON_DATA_SOURCES`, as
-`tools/dump-savegame.ts` does, so it fails before the fix.
+Empty. New state-representation debt goes here, and jumps the queue.
 
 ---
 

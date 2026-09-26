@@ -27,7 +27,7 @@ import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomTy
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { DungeonData } from '../src/data/dungeonTypes';
+import type { DsaDefinition, DungeonData } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { DUNGEON_DATA_SOURCES, type FieldSource } from '../src/engine/DungeonSnapshot';
 import { getActuatorValue, setActuatorValue } from '../src/data/actuatorHelpers';
@@ -261,6 +261,28 @@ async function main(): Promise<void> {
   const columnIndexMoved = columnIndexBefore.some((v, i) => v !== columnIndexAfter[i]);
   const miscCountAfter = playedData.databases.misc.records.length;
 
+  // What a CSBWin load writes and `dungeon.dat` has none of: the Extended Features
+  // block's DSA tables and flags, and the special locations. No committed save defines a
+  // DSA, so this is the one place a program goes through the snapshot's encoding.
+  const CSBWIN_FIELDS = ['dsaLevelIndex', 'dsaIndex', 'specialLocations', 'extendedWallDecorations', 'spellFilterLocation'] as const;
+  const dsaLevelIndex = Array.from({ length: 64 }, () => new Array<number>(32).fill(0xffff));
+  dsaLevelIndex[level][3] = 7;
+  const dsaEntries = new Array<DsaDefinition | null>(256).fill(null);
+  dsaEntries[7] = {
+    description: 'canary',
+    state: 1,
+    localState: 2,
+    groupId: 3,
+    numStates: 2,
+    firstDisplayedState: 0,
+    states: [null, { actions: [{ column: 0x12345, program: Uint16Array.of(0x0001, 0xabcd, 0xffff) }] }],
+  };
+  playedData.dsaLevelIndex = dsaLevelIndex;
+  playedData.dsaIndex = { entries: dsaEntries };
+  playedData.specialLocations = { 5: 0x1234 };
+  playedData.extendedWallDecorations = true;
+  playedData.spellFilterLocation = 0x80000123;
+
   // ---- Snapshot, and restore it into a world that never saw any of it ------
 
   const save = played.getRuntimeSaveState();
@@ -281,6 +303,7 @@ async function main(): Promise<void> {
   const freshColumnIndex = [...reloadedData.columnIndex];
   const freshLone = objectsAt(reloaded, emptyCell.x, emptyCell.y, level).length > 0;
   const freshData = JSON.parse(json(reloadedData));
+  const freshSerialized = JSON.stringify(reloaded.getRuntimeSaveState());
 
   reloaded.applyRuntimeSaveState(JSON.parse(serialized));
 
@@ -293,6 +316,7 @@ async function main(): Promise<void> {
   const restoredDropped = objectsAt(reloaded, carry.toX, carry.toY, level).includes(droppedRn);
   const restoredDroppedType = reloadedData.databases.misc.records[miscCountBefore]?.miscType;
   const restoredLone = objectsAt(reloaded, emptyCell.x, emptyCell.y, level).includes(loneRn);
+  const restoredProgram = reloadedData.dsaIndex?.entries[7]?.states[1]?.actions[0]?.program;
 
   // ---- Report -------------------------------------------------------------
 
@@ -320,6 +344,13 @@ async function main(): Promise<void> {
     columnIndexMoved,
     false,
     reloadedData.columnIndex.some((v, i) => v !== freshColumnIndex[i]),
+  );
+  row(
+    'CSBWin fields present',
+    CSBWIN_FIELDS.filter((k) => k in freshData).length,
+    CSBWIN_FIELDS.filter((k) => k in playedData).length,
+    CSBWIN_FIELDS.filter((k) => k in freshData).length,
+    CSBWIN_FIELDS.filter((k) => k in reloadedData).length,
   );
   console.log('');
 
@@ -351,6 +382,13 @@ async function main(): Promise<void> {
   // at its own index rather than being confused with a `dungeon.dat` record.
   check(restoredDroppedType === 33, 'the appended record should come back as misc type 33, at its own index');
   check(restoredLone, 'the object dropped into an empty cell should be there after the load');
+  check(CSBWIN_FIELDS.every((k) => !(k in freshData)), 'a fresh dungeon should have none of the fields a CSBWin load writes');
+  // The walk below compares them whole; this pins the one typed array among them, since
+  // a program that came back as a plain array would still run.
+  check(
+    restoredProgram instanceof Uint16Array && restoredProgram.join(',') === '1,43981,65535',
+    'the DSA program should come back as the same Uint16Array',
+  );
 
   // The whole-world check, over every field `DUNGEON_DATA_SOURCES` places. A field that
   // play changes and the table calls `loaded` shows up here even though no case above
@@ -417,6 +455,16 @@ async function main(): Promise<void> {
   check(
     fingerprint(reloadedData) === afterFirstLoad,
     'loading the same save twice, with play in between, should give the same world both times',
+  );
+
+  // ---- A save of a world that has none of the CSBWin fields ---------------
+  //
+  // Its snapshot says so, and the restore removes them. Otherwise quick-loading a game
+  // begun on `dungeon.dat` after a CSBWin load would keep that save's DSA tables.
+  reloaded.applyRuntimeSaveState(JSON.parse(freshSerialized));
+  check(
+    CSBWIN_FIELDS.every((k) => !(k in reloadedData)),
+    `restoring a save of a world without the CSBWin fields should remove them (${CSBWIN_FIELDS.filter((k) => k in reloadedData).join(', ')})`,
   );
 
   finish();

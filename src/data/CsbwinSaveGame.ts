@@ -21,10 +21,10 @@
  * | Party position, facing, level, clock, `d.RandomNumber`, hand owner, magic caster, object in hand | `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1617-1650`) |
  * | The four champions | block 4's `CHARDESC[4]` |
  * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:766-782`) |
- * | Cell flags, object chains, column index, every database record | the dungeon image, through `captureDungeonSnapshot` |
+ * | Cell flags, object chains, column index, every database record, the text arrays | the dungeon image, through `captureDungeonSnapshot` |
+ * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
  * | `ITEM16`, missiles | blocks 3 and the image, through `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
- * | The text arrays, `dsaLevelIndex`, `specialLocations`, the extended-feature flags | the save's own copies, which the snapshot does not carry |
  *
  * **What is not restored**, all of it recorded in `PLAN.md`:
  *
@@ -43,7 +43,7 @@ import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
 import type { Game } from '../engine/Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from '../engine/RuntimeSave';
-import type { DungeonData, TimerRecord } from './dungeonTypes';
+import type { TimerRecord } from './dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
 import type { PartyState } from '../engine/gameTypes';
@@ -202,45 +202,17 @@ export function buildCsbwinRuntimeState(
             timerQueue: world.save.timerQueue,
             timerSequence: world.save.timerSequence,
             missiles: world.save.missiles,
-            snapshot: captureDungeonSnapshot(world.dungeon),
+            // The image holds none of these five: the save carries them beside it.
+            snapshot: captureDungeonSnapshot({
+                ...world.dungeon,
+                dsaLevelIndex: world.save.dsaLevelIndex,
+                dsaIndex: world.save.dsaIndex,
+                specialLocations: world.save.specialLocations,
+                extendedWallDecorations: world.save.extendedWallDecorations,
+                spellFilterLocation: world.save.spellFilterLocation,
+            }),
         },
     };
-}
-
-/**
- * The parts of the save that `DungeonSnapshot` does not carry, because they never
- * change during play and so have no business in a runtime snapshot — but which *do*
- * differ between `dungeon.dat` and a save, because the save holds the converted forms.
- *
- * The text is the one that matters. A save's text section is already in indirect form:
- * `ConvertToIndirectText` has run, `DB2.index()` holds an index into `indirectTextIndex`
- * rather than a word offset, and the words themselves have been repacked
- * (`doc/CSBwin-src/SaveGame.cpp:2221-2274`). The live dungeon was converted by the same
- * algorithm over the same input, so the two orderings agree today — but they agree by
- * coincidence of input, not by construction, and a dungeon whose text records had been
- * edited would not. Taking the save's own arrays removes the coincidence.
- *
- * `bigActuators` is set by hand rather than through `applySaveGameState`, which would
- * call `applyBigActuators` and *re-derive* the word-8 of every type-47 actuator from
- * records that already carry it.
- */
-function applyStructuralExtras(live: DungeonData, world: CsbwinWorld): void {
-    const from = world.dungeon;
-    if (from.textWords) live.textWords = from.textWords;
-    if (from.indirectTextIndex) live.indirectTextIndex = from.indirectTextIndex;
-    if (from.compressedText) live.compressedText = from.compressedText;
-
-    if (world.save.dsaLevelIndex) live.dsaLevelIndex = world.save.dsaLevelIndex;
-    if (world.save.dsaIndex) live.dsaIndex = world.save.dsaIndex;
-    if (world.save.specialLocations) live.specialLocations = world.save.specialLocations;
-    if (world.save.extendedWallDecorations !== undefined) {
-        live.extendedWallDecorations = world.save.extendedWallDecorations;
-    }
-    if (world.save.spellFilterLocation !== undefined) {
-        live.spellFilterLocation = world.save.spellFilterLocation;
-    }
-    // The records restored by the snapshot are already big-actuator records.
-    if (world.save.bigActuators) live.bigActuators = true;
 }
 
 /** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
@@ -251,6 +223,9 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
         dsaGlobals: game.getDsaGlobalVariables(),
     });
     game.applyRuntimeSaveState(runtime);
-    applyStructuralExtras(game.state.dungeon, world);
+    // The records restored by the snapshot are already big-actuator records. Set by hand
+    // rather than through `applySaveGameState`, which would call `applyBigActuators` and
+    // re-derive the word-8 of every type-47 actuator from records that already carry it.
+    if (world.save.bigActuators) game.state.dungeon.bigActuators = true;
     return world;
 }
