@@ -296,11 +296,6 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
             // came back: CSBWin loops on `ReadEntireGame`'s result and re-shows the
             // door when it did not (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
             restoredFromSave = true;
-            // Message timeouts are game-tick based, so a load that moves the
-            // clock would leave rows that expire at the wrong time (or never).
-            // CSBWin serializes the text area (`doc/CSBwin-src/Data.h:1666`);
-            // until we do, discard it. See PLAN.md Phase 11.
-            scrollingText.discardText();
             renderView();
         },
         onSetPaused: (paused) => game.setPaused(paused),

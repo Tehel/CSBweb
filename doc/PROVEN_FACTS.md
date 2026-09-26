@@ -3401,6 +3401,17 @@ its chain: `ShowChestContents` clears their links and the chest's `contents`
 pair is in `doc/CSBWIN_MENU_REFERENCE.md` → "Entering and leaving". Evidence:
 `tools/dump-save-menu.ts`, "the disk menu over an open chest".
 
+## A load keeps the message area
+
+CSBWin saves no message state: `SCROLLING_TEXT::Serialize` is declared
+(`doc/CSBwin-src/Data.h:1665`) and has no body and no caller. `LoadGame` keeps the rows on
+screen and rebases their timeouts onto the loaded clock with
+`scrollingText.ResetTime(b.gb2.Time)`, just before `d.Time = b.gb2.Time`
+(`SaveGame.cpp:1623-1624`, `ResetTime` at `CSBCode.cpp:1564`). The port does the same in
+`applyRuntimeSaveState`, which every load reaches. A load over a sleeping party (the port's
+in-game load; CSBWin loads only when a game starts) also shrinks the rows back, as the next
+tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:612-616`). Evidence: `tools/dump-sleep.ts`.
+
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
 The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,

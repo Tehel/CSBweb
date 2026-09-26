@@ -73,7 +73,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 2 next |
+| G5 | The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze — pulled forward by the author | L | ⏳ step 3 next |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -509,23 +509,14 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 ### G5 ⏳ The message scroll, `SetNewSpeed`, the load's `ResetTime`, the freeze
 
 The author has pulled G5 ahead of tier C. It is size L, in four steps taken in order, each
-one commit. Step 2 is next.
+one commit. Step 3 is next.
 
 1. ✅ **`SetNewSpeed`**: falling asleep and `WakeUp` rescale the message timeouts
    (`ScrollingText.setNewSpeed`, `speed` in `src/engine/LoopState.ts`,
    `tools/dump-sleep.ts`).
-2. ⏳ **A load keeps the message area** (S). CSBWin saves no message state:
-   `SCROLLING_TEXT::Serialize` is declared (`doc/CSBwin-src/Data.h:1665`) and has no body
-   and no caller. `LoadGame` keeps the rows on screen and rebases their timeouts onto the
-   loaded clock, `scrollingText.ResetTime(b.gb2.Time)` just before
-   `d.Time = b.gb2.Time` (`SaveGame.cpp:1623-1624`, `ResetTime` at `CSBCode.cpp:1564`). The
-   port discards the message area instead, after the menus' restore (`onRestoreSave`,
-   `src/main.ts:303`) and the dev quick-load (`src/dev.ts:146`), both citing the missing
-   `Serialize`. `ScrollingText.resetTime` is ported and has no caller. Call it in
-   `applySaveBytes` (`src/engine/SaveGamePayload.ts:432`), which the two menus and the
-   quick-load share, before the tick count is replaced, and drop both `discardText` calls.
-   Evidence: a check that restores a save with another clock over a row on screen and
-   prints the row's timeout before and after.
+2. ✅ **A load keeps the message area**: CSBWin saves no message state, and
+   `applyRuntimeSaveState` rebases the rows on screen onto the loaded clock (`ResetTime`,
+   `tools/dump-sleep.ts`).
 3. ⏳ **The freeze** (M).
    - Button 147 (`doc/CSBwin-src/Mouse.cpp:1731-1759`): `d.ClockRunning = 0`,
      `gameFrozen = true`, `TAG02076e()`, the viewport flooded with 0 and "GAME FROZEN" in

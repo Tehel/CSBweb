@@ -79,6 +79,8 @@ export interface MessageSink {
   quePrintLines(color: number, text: string): void;
   /** `scrollingText.SetNewSpeed(oldSpeed, newSpeed)`, with `d.Time`. */
   setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void;
+  /** `scrollingText.ResetTime(newTime)`, with `d.Time`. */
+  resetTime(newTime: number, time: number): void;
 }
 
 /** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */

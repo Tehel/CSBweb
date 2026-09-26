@@ -11,6 +11,7 @@ import type { ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
+import { VBL_PER_TICK } from './LoopState';
 import type { PartyState } from './gameTypes';
 import { ensureHandOwner } from './Party';
 import type { FootprintsSnapshot } from './PartyFootprints';
@@ -158,7 +159,14 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     ensureHandOwner(ctx.party.state);
 
     ctx.state.paused = save.game.paused;
+    // `scrollingText.ResetTime(b.gb2.Time); d.Time = b.gb2.Time;`
+    // (doc/CSBwin-src/SaveGame.cpp:1623-1624): CSBWin saves no message state, and the
+    // rows on screen stay, their timeouts rebased onto the loaded clock.
+    ctx.host.messages.resetTime(save.game.tickCount, ctx.state.tickCount);
     ctx.state.tickCount = save.game.tickCount;
+    // Asleep, `d.Speed` was 0. Awake again, the top of the next tick puts it back with
+    // `SetNewSpeed(d.Speed, …)` (`CSBCode.cpp:612-616`).
+    if (wasSleeping) ctx.host.messages.setNewSpeed(0, VBL_PER_TICK, ctx.state.tickCount);
     const now = Date.now();
     ctx.state.currentTime = now;
     ctx.state.startTime = now - save.game.elapsedTimeMs;

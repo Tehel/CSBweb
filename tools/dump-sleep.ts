@@ -19,6 +19,8 @@
  * - `SetNewSpeed` (`CSBCode.cpp:1598`): falling asleep multiplies what is left of each
  *   message row's timeout by 16 (`d.Speed` 15 -> 0, `Mouse.cpp:1696`), and `WakeUp` divides
  *   it by 16, rounding up (0 -> 15, `CSBCode.cpp:7053`).
+ * - A load keeps the rows on screen and rebases their timeouts onto the loaded clock
+ *   (`ResetTime`, `SaveGame.cpp:1623-1624`); CSBWin saves no message state.
  *
  * Run: `npx tsx tools/dump-sleep.ts`
  */
@@ -341,6 +343,33 @@ async function main(): Promise<void> {
     game.applyRuntimeSaveState(save);
     check(!game.isPartySleeping(), 'a save taken asleep loads awake');
     check(notified.join() === 'false', 'and the UI is told');
+  }
+
+  console.log('');
+  console.log('=== a load keeps the message rows (SaveGame.cpp:1623-1624) ===');
+  {
+    const save = game.getRuntimeSaveState();
+    const saved = save.game.tickCount;
+    internals.state.tickCount = saved + 500;
+    messages.printLinefeed();
+    messages.quePrintLines(15, 'LOADED');
+    messages.pump(internals.state.tickCount);
+    const row = messages.snapshot().findIndex((line) => line.includes('LOADED'));
+    const before = messages.timeouts()[row]!;
+    game.applyRuntimeSaveState(save);
+    const after = messages.timeouts()[row]!;
+    console.log(`row ${row} placed at ${saved + 500}: ${before}; loaded at ${saved}: ${after} ${JSON.stringify(messages.snapshot()[row])}`);
+    check(row >= 0 && messages.snapshot()[row]!.includes('LOADED'), 'the row is still on screen');
+    check(after === saved + 70, 'ResetTime: its 70 ticks left count from the loaded clock');
+
+    // Loaded over a sleeping party, the next tick's SetNewSpeed(0, 15) (CSBCode.cpp:612-616).
+    game.sleep();
+    const stretched = messages.timeouts()[row]!;
+    game.applyRuntimeSaveState(save);
+    const loaded = messages.timeouts()[row]!;
+    console.log(`asleep: ${stretched}; loaded awake: ${loaded}`);
+    check(stretched === saved + 70 * 16 && loaded === saved + 70,
+      'loaded over a sleeping party, the rows shrink back as a WakeUp would shrink them');
   }
 
   finish();

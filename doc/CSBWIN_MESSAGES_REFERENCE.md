@@ -144,8 +144,8 @@ keeps whatever is on screen and rebases its timeouts (`ResetTime`, above).
 
 `src/renderer/csbwin/ScrollingText.ts` ports the queue, the tokenizer, the four rows and
 their timeouts with `SetNewSpeed`, and draws into the 320×200 index buffer at the geometry
-above. The engine reaches it through `GameHost.messages`, and sleep and `WakeUp` call
-`setNewSpeed` with `d.Speed` (`speed` in `src/engine/LoopState.ts`). Not yet ported, all in
-`DEBT.md` G5: the load's `ResetTime` (the port discards the text on a load), the scroll
-animation and its guards, and draining the queue once per VBL rather than at the top of a
-tick.
+above. The engine reaches it through `GameHost.messages`: sleep and `WakeUp` call
+`setNewSpeed` with `d.Speed` (`speed` in `src/engine/LoopState.ts`), and every load calls
+`resetTime` just before it replaces the tick count (`applyRuntimeSaveState`). Not yet
+ported, both in `DEBT.md` G5: the scroll animation and its guards, and draining the queue
+once per VBL rather than at the top of a tick.

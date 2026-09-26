@@ -19,7 +19,6 @@ import {
 } from './engine/SaveGamePayload';
 import type { Game } from './engine';
 import type { Champion } from './engine/gameTypes';
-import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { updateDebug } from './ui';
 
 /** Live handles into `main.ts`; read through getters so reassignment is visible here. */
@@ -139,11 +138,6 @@ export function createDevTools(host: DevHost): DevTools {
             // `dungeon.dat`; a v2 save has champions whose attributes are flat numbers
             // with no maximum or minimum to restore.
             applySaveBytes(host.game, await latest.store.read(latest.entry.id));
-            // Message timeouts are game-tick based, so a load that moves the clock would
-            // leave rows that expire at the wrong time (or never). CSBWin serializes the
-            // text area (doc/CSBwin-src/Data.h:1666); until we do, discard it. See
-            // PLAN.md Phase 11.
-            scrollingText.discardText();
             host.renderView();
             updateDebug(`Quick-loaded ${latest.entry.name}`);
         } catch (error) {
