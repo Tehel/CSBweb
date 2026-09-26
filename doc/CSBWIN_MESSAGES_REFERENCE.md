@@ -168,5 +168,5 @@ index buffer at the geometry above. The engine reaches it through `GameHost.mess
 The port redraws the strip every frame from its row model: `draw` offsets the rows by the
 scroll count and keeps the row scrolling out until it has gone, and `main.ts` redraws the
 screen after any frame in which the strip changed. CSBWin's loop also makes a pass for a
-mouse button going down, and the port's does not (`DEBT.md` C63). Evidence:
+mouse button going down, and the port's deliberately does not (`DEBT.md` → H). Evidence:
 `tools/dump-messages.ts`.

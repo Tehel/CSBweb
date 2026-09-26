@@ -87,7 +87,6 @@ In payoff order: the first row is the next item.
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
-| C63 | The main loop makes one pass a VBL, not one a message | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -357,19 +356,6 @@ port's own bindings, and keep those bindings only where they claim no key a tabl
 `translateKey` returns the first. Evidence: a row per table entry in
 `tools/dump-key-bindings.ts`.
 
-### C63 ⏳ The main loop makes one pass a VBL, not one a message
-
-CSBWin's main loop makes a pass for every message the UI hands it
-(`doc/CSBwin-src/CSBUI.cpp:1253-1272`): each VBL's `UIM_VBL` (`system.cpp:624-630`), and a
-mouse button going down, which `EnqueMouseClick`s and then pushes its own message
-(`CSBUI.cpp:1185-1201`, `:1207-1222`). Every pass runs `HandleMouseEvents`, the tick if
-`d.clockTick` is set, and takes one print-queue entry (`CSBCode.cpp:714-765`), so a click
-is handled in the pass its message makes. The port makes one pass a VBL, `Game.runFrame`:
-`onMouseClick` only queues, so the click waits for the next VBL, and the pass it would have
-made takes no print-queue entry. A handler that sets `d.clockTick` (C53) runs its tick in
-the click's pass in CSBWin. Evidence: a check that clicks between two VBLs and records the
-pass that handles it and the entries taken.
-
 ---
 
 ## F — Verification debt
@@ -607,6 +593,14 @@ Recorded so that nobody "fixes" them.
   because CSBWin cannot reach it either. Move Up / Down (`0x1124` / `0x1125`) come only from
   the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, whose flags are
   initialised `false` (`data.cpp:239-240`) and assigned nowhere in the tree.
+- 🚫 **The main loop makes one pass a VBL, not one a message.** CSBWin's loop makes a pass
+  for every message the UI hands it (`doc/CSBwin-src/CSBUI.cpp:1253-1272`): each VBL's
+  `UIM_VBL` (`system.cpp:624-630`), and a mouse button going down, which pushes a message
+  of its own (`CSBUI.cpp:1185-1201`, `:1207-1222`). Every pass runs `HandleMouseEvents`,
+  the tick if `d.clockTick` is set, and takes one print-queue entry (`CSBCode.cpp:714-765`).
+  The port's `Game.runFrame` is one pass a VBL, and `onMouseClick` only queues: a click
+  waits for the next VBL, at worst about 17 ms, and takes no print-queue entry of its own.
+  The author's decision: the delay is too small to matter.
 - 🚫 **The intro runs on wall-clock time** through `requestAnimationFrame`, not on a VBL
   counter shared with the game loop. Nothing else exists yet when it plays, so there is
   nothing for it to drift against. If a boot-time animation ever has to agree with `d.Time`,
