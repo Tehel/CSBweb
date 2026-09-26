@@ -417,7 +417,7 @@ uses CSBWin's defaults.
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
   `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:463` and `MonsterSystem.ts:540`.
+  `MonsterDamage.ts:463` and `MonsterSystem.ts:553`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
   (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its
