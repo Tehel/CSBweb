@@ -33,6 +33,7 @@ import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 import { wakeUp } from './LoopState';
+import { constructPredefinedMissile } from './missileHelpers';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -141,19 +142,27 @@ export class MonsterAttack {
 
     if (amended.monsterShouldLaunchMissile) {
       if (THROWABLE.has(amended.missileType)) {
-        this.ctx.systems.timer.launchMonsterMissile({
-          projectile: amended.missileType,
-          mapX: amended.monsterX,
-          mapY: amended.monsterY,
-          posInCell: amended.missileOriginPosition,
-          direction: amended.directionToParty,
-          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
-          range: applyLimits(20, amended.missileRange, 255),
-          damage: amended.missileDamage,
-          decayRate: amended.missileDecayRate,
-          level: context.level,
-          startTime: this.ctx.state.tickCount,
-        });
+        // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1194-1203`).
+        // The projectile is a predefined spell RN (`RNFireball` and friends) rather than
+        // a real object, so it goes through `constructPredefinedMissile` first, the
+        // same path a cast spell takes.
+        const projectileObject = constructPredefinedMissile(this.dungeon, amended.missileType);
+        if (projectileObject !== null) {
+          this.ctx.systems.magic.launchMissile(
+            projectileObject,
+            amended.monsterX,
+            amended.monsterY,
+            context.level,
+            amended.missileOriginPosition,
+            amended.directionToParty,
+            // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
+            applyLimits(20, amended.missileRange, 255),
+            amended.missileDamage,
+            amended.missileDecayRate,
+            this.ctx.state.tickCount,
+            false,
+          );
+        }
       }
     } else {
       let chIdx = amended.heroToDamage;

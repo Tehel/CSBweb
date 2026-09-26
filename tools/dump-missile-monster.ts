@@ -194,7 +194,7 @@ function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
 }
 
 function fly(game: Game, projectile: ObjectID, launch: Position): void {
-  game.timerSystem.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
+  game.magic.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
   for (let i = 0; i < 4; i++) {
     game.state.tickCount++;
     game.timerSystem.processTimers(game.state.tickCount);

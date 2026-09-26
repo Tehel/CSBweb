@@ -86,7 +86,7 @@ function main(): void {
 
   // A fireball (the spell RN itself, as `CharacterThrowsSpell` launches it), two cells
   // north, flying south at the party.
-  game.timerSystem.launchThrownMissile(RN_FIREBALL, new Position(at.x, at.y - 2, 0), 2, 2, 100, 100, 1, 0);
+  game.magic.launchThrownMissile(RN_FIREBALL, new Position(at.x, at.y - 2, 0), 2, 2, 100, 100, 1, 0);
   for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);
   console.log(`after the fireball: health ${health()}; lastMonsterAttackTime ${party.lastMonsterAttackTime}`);
 

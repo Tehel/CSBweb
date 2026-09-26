@@ -262,7 +262,7 @@ function main(): void {
         // range == decayRate == 5: the throw exhausts its range on the tick right
         // after it enters the teleporter's cell, so it lands there rather than flying
         // past it — see the deltaEnergy/rangeRemaining accounting in `processMissileTimer`.
-        const launched = game.timerSystem.throwObjectFromHand(item.rn, party.position, 0, 0, 5, 100, 5, 0);
+        const launched = game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 5, 100, 5, 0);
         check(launched, 'the throw launches');
 
         for (let t = 1; t <= 6; t++) game.timerSystem.processTimers(t);
@@ -300,7 +300,7 @@ function main(): void {
           return originalTrigger.call(this, position, object, place, unchangedRoom, facing);
         };
 
-        const launched = game.timerSystem.throwObjectFromHand(item.rn, party.position, 0, 0, 5, 100, 5, 0);
+        const launched = game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 5, 100, 5, 0);
         check(launched, 'the throw launches');
 
         for (let t = 1; t <= 6; t++) game.timerSystem.processTimers(t);
@@ -333,7 +333,7 @@ function main(): void {
         party.position = door.south;
         party.facing = 0; // north, straight at the door
 
-        const launched = game.timerSystem.throwObjectFromHand(item.rn, party.position, 0, 0, 40, 100, 5, 0);
+        const launched = game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 40, 100, 5, 0);
         check(launched, 'the throw launches');
 
         // The missile RN's own `.pos()` bits — not the `objectPos` `ProcessMissileEncounter`
@@ -383,7 +383,7 @@ function main(): void {
         if (mapX === door.at.x && mapY === door.at.y) ordinal = o;
         return original.call(this, o, mapX, mapY, deltaTime);
       };
-      game.timerSystem.throwObjectFromHand(item.rn, party.position, 0, 0, 40, 100, 5, 0);
+      game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 40, 100, 5, 0);
       for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);
       SoundQueue.prototype.queueSound = original;
       return ordinal;

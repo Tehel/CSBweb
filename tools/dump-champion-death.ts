@@ -351,7 +351,7 @@ function main(): void {
     while (alive() && shots < 12) {
       shots++;
       const before = champ.attributes.health;
-      g.timerSystem.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.state.tickCount);
+      g.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.state.tickCount);
       for (let i = 0; i < 6 && alive(); i++) {
         g.state.tickCount++;
         g.timerSystem.processTimers(g.state.tickCount);

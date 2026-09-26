@@ -2496,7 +2496,7 @@ live `TimerEntry` carries `uByte6..9`, `timerWord6`, `timerWord8` **and** an `ob
 field with no byte at all — so writing one to a file is a collapse, and it was being done
 wrong in two ways at once.
 
-`TimerSystem.launchMissile` puts the missile record's RN on `TimerEntry.object` and passes
+`MagicSystem.launchMissile` puts the missile record's RN on `TimerEntry.object` and passes
 the launch square as `x, y`, so a saved missile timer went out with its launch square in
 bytes 6-7 — where `ConvertTimers` says the object lives — and zeros in bytes 8-9, where
 the packed `[x:5][y:5][direction:2][decay:4]` word belongs, because `pos` and `action` are

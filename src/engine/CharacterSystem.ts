@@ -4,7 +4,8 @@
  * `AddCharacterPossession` (`setChampionHand`) and `AdjustStatsForItemCarried` bound to
  * the context, and the two hand refills the busy timer runs (`matchingAmmunition`,
  * `refillPossessionSlot`). `DEBT.md` C34 makes this the one home of the possession writers.
- * Also `_ExecuteAttack`'s engine half (`executeAttack`), by the same file.
+ * Also `_ExecuteAttack`'s engine half (`executeAttack`) and `BringCharacterToLife`, by the
+ * same file.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
  * `ctx.systems.character`.
@@ -21,6 +22,7 @@ import {
   OBJNI_TORCH_D,
 } from '../core/objectNameIndex';
 import { DBType, decodeObjectID, OBJECT_ID_NULL, withObjectPosition, type ObjectID } from '../core/types';
+import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
 import type { Champion } from './gameTypes';
@@ -156,6 +158,38 @@ export class CharacterSystem {
       if (moved !== OBJECT_ID_NULL) this.setChampionHand(champion, slot, moved);
       return;
     }
+  }
+
+  /**
+   * `BringCharacterToLife` (`doc/CSBwin-src/Character.cpp:804`).
+   *
+   * The order matters and is CSBWin's: the corner is settled **before** the champion
+   * is alive again, because `CharacterAtPosition` ignores the dead — so the champion
+   * never collides with themselves, and the free-corner search below always has one
+   * to find (at most three of four can be living while this runs).
+   *
+   * The `MaxHP` cut is permanent, not a temporary weakening: dying costs a champion
+   * a 64th of their maximum health for good, floored at 25.
+   */
+  bringCharacterToLife(chIdx: number): void {
+    const party = this.ctx.party.state;
+    const champ = party.champions[chIdx];
+    if (!champ) return;
+
+    if (characterAtPosition(party.champions, champ.partyPosition | 0) !== -1) {
+      let free = 0;
+      while (characterAtPosition(party.champions, free) !== -1) free++;
+      champ.partyPosition = free & 0xff;
+    }
+
+    const maxHealth = champ.attributes?.maxHealth ?? 0;
+    const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
+    champ.attributes.maxHealth = reducedMax;
+    champ.attributes.health = Math.floor(reducedMax / 2);
+    champ.alive = true;
+    // `pcA3->facing = (ui8)d.partyFacing` (`:823`) — a champion who comes back looks
+    // the way the party is looking, not the way they died.
+    champ.facing = party.facing;
   }
 
   /**

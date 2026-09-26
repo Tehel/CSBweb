@@ -126,7 +126,7 @@ function encounter(
 
   const thrown = pick ? pick(game) : projectile;
   ts.now = 100;
-  game.timerSystem.launchThrownMissile(thrown, at, 0, 0, range, 100, 1, 99);
+  game.magic.launchThrownMissile(thrown, at, 0, 0, range, 100, 1, 99);
   let missileRn: ObjectID | null = null;
   for (let r = game.dungeonState.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.dungeonState.getDBRecordLink(r)) {
     if (decodeObjectID(r).category === DBType.MISSILE) missileRn = r;

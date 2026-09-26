@@ -146,7 +146,7 @@ async function main(): Promise<void> {
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
     // A poison bolt in flight, heading west with decay 1, not due for a while.
-    game.timerSystem.launchThrownMissile(RN_POISON_BOLT, from, 1, 3, 100, 100, 1, 1000);
+    game.magic.launchThrownMissile(RN_POISON_BOLT, from, 1, 3, 100, 100, 1, 1000);
     const missile = inCell(game, from, DBType.MISSILE)[0];
     const record = missile !== undefined ? game.dungeonState.getMissileRecord(missile) : null;
     const timer = record ? game.timerQueue.getTimer(record.timerIndex) : null;

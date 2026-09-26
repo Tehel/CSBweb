@@ -67,7 +67,7 @@ import {
   monsterVerticalSize,
 } from '../renderer/csbwin/ObjectTables';
 import { DescIndex, IsAKey } from './objectIndex';
-import { constructPredefinedMissile, spellObjectId } from './missileHelpers';
+import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 import { CloudType } from './cloudTypes';
 import { setPartyFacing } from './Party';
@@ -939,91 +939,6 @@ export class TimerSystem {
     else record.visible = !record.visible;
   }
 
-  private launchMissile(
-    projectileObject: ObjectID,
-    launchX: number,
-    launchY: number,
-    level: number,
-    position: number,
-    direction: number,
-    rangeRemaining: number,
-    damageRemaining: number,
-    decayRate: number,
-    startTime: number,
-    missileDelay: boolean,
-  ): boolean {
-    const rn = this.createMissileRecord(projectileObject, rangeRemaining, damageRemaining, 0xffff, position);
-    if (rn === null) return false;
-    if (!this.dungeon.addObjectToCell(new Position(launchX, launchY, level), rn)) return false;
-    const functionType = missileDelay ? TimerFunction.TT_MISSILE : TimerFunction.TT_MISSILE0;
-    const timerWord8 = this.encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
-    const entry = this.timers.createTimer(functionType, launchX, launchY, 0, 0, (startTime + 1) >>> 0, level, rn, timerWord8);
-    const missile = this.dungeon.getMissileRecord(rn);
-    if (missile) missile.timerIndex = entry.index & 0xffff;
-    return true;
-  }
-
-  /**
-   * `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1195-1214`).
-   *
-   * The projectile is a predefined spell RN (`RNFireball` and friends) rather than a
-   * real object, so it goes through `constructPredefinedMissile` first — the same
-   * path a cast spell takes.
-   */
-  launchMonsterMissile(options: {
-    projectile: ObjectID;
-    mapX: number;
-    mapY: number;
-    posInCell: number;
-    direction: number;
-    range: number;
-    damage: number;
-    decayRate: number;
-    level: number;
-    startTime: number;
-  }): void {
-    const projectileObject = constructPredefinedMissile(this.dungeon, options.projectile);
-    if (projectileObject === null) return;
-    this.launchMissile(
-      projectileObject,
-      options.mapX,
-      options.mapY,
-      options.level,
-      options.posInCell,
-      options.direction,
-      options.range,
-      options.damage,
-      options.decayRate,
-      options.startTime,
-      false,
-    );
-  }
-
-  launchThrownMissile(
-    projectileObject: ObjectID,
-    position: Position,
-    posInCell: number,
-    direction: number,
-    rangeRemaining: number,
-    damageRemaining: number,
-    decayRate: number,
-    startTime: number,
-  ): boolean {
-    return this.launchMissile(
-      projectileObject,
-      position.x,
-      position.y,
-      position.z,
-      posInCell,
-      direction,
-      rangeRemaining,
-      damageRemaining,
-      decayRate,
-      startTime,
-      false,
-    );
-  }
-
   /**
    * `ThrowMissile` (doc/CSBwin-src/Timer.cpp:2016). Its one CSBWin caller is the DSA's
    * `STKOP_Throw` (`DSA.cpp:4558`), which `DsaSystem` does not implement yet, so nothing
@@ -1067,39 +982,13 @@ export class TimerSystem {
 
     if (projectileObject === OBJECT_ID_EOF) return false;
 
-    return this.launchMissile(
+    return this.ctx.systems.magic.launchMissile(
       projectileObject,
       launchLocation.x,
       launchLocation.y,
       launchLocation.l,
       launchLocation.p & 0x3,
       direction & 0x3,
-      range,
-      damage,
-      decayRate,
-      startTime,
-      false,
-    );
-  }
-
-  throwObjectFromHand(
-    projectileObject: ObjectID,
-    partyPosition: Position,
-    leftOrRight: number,
-    facing: number,
-    range: number,
-    damage: number,
-    decayRate: number,
-    startTime: number,
-  ): boolean {
-    const posInCell = (facing + (leftOrRight & 0x1)) & 0x3;
-    return this.launchMissile(
-      projectileObject,
-      partyPosition.x,
-      partyPosition.y,
-      partyPosition.z,
-      posInCell,
-      facing & 0x3,
       range,
       damage,
       decayRate,
@@ -1172,7 +1061,7 @@ export class TimerSystem {
 
     if (state === 0) {
       const chIdx = pos & 0x3;
-      this.bringCharacterToLife(chIdx);
+      this.ctx.systems.character.bringCharacterToLife(chIdx);
     }
   }
 
@@ -1226,57 +1115,6 @@ export class TimerSystem {
     if (health <= 0) return true;
     return champ.alive === false;
   }
-
-  /**
-   * `BringCharacterToLife` (`doc/CSBwin-src/Character.cpp:804`).
-   *
-   * The order matters and is CSBWin's: the corner is settled **before** the champion
-   * is alive again, because `CharacterAtPosition` ignores the dead — so the champion
-   * never collides with themselves, and the free-corner search below always has one
-   * to find (at most three of four can be living while this runs).
-   *
-   * The `MaxHP` cut is permanent, not a temporary weakening: dying costs a champion
-   * a 64th of their maximum health for good, floored at 25.
-   */
-  private bringCharacterToLife(chIdx: number): void {
-    const party = this.ctx.party.state;
-    const champ = party.champions[chIdx];
-    if (!champ) return;
-
-    if (characterAtPosition(party.champions, champ.partyPosition | 0) !== -1) {
-      let free = 0;
-      while (characterAtPosition(party.champions, free) !== -1) free++;
-      champ.partyPosition = free & 0xff;
-    }
-
-    const maxHealth = champ.attributes?.maxHealth ?? 0;
-    const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
-    champ.attributes.maxHealth = reducedMax;
-    champ.attributes.health = Math.floor(reducedMax / 2);
-    champ.alive = true;
-    // `pcA3->facing = (ui8)d.partyFacing` (`:823`) — a champion who comes back looks
-    // the way the party is looking, not the way they died.
-    champ.facing = party.facing;
-  }
-
-  private createMissileRecord(
-    projectileObject: ObjectID,
-    rangeRemaining: number,
-    damageRemaining: number,
-    timerIndex: number,
-    position: number,
-  ): ObjectID | null {
-    // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
-    const index = this.dungeon.findEmptyDBEntry('missiles', {
-      nextObject: OBJECT_ID_EOF,
-      projectileObject: (projectileObject & 0xffff) as ObjectID,
-      rangeRemaining: rangeRemaining & 0xff,
-      damageRemaining: damageRemaining & 0xff,
-      timerIndex: timerIndex & 0xffff,
-    });
-    return index === null ? null : encodeObjectID(position & 0x3, DBType.MISSILE, index);
-  }
-
 
   private setDoorState(map: MapData, x: number, y: number, doorState: number): void {
     const cellFlag = map.cellFlags[x][y];
@@ -1488,7 +1326,7 @@ export class TimerSystem {
     if (launchX < 0 || launchY < 0 || launchX >= map.descriptor.width || launchY >= map.descriptor.height) return;
 
     const launchLevel = timer.level;
-    const launched = this.launchMissile(
+    const launched = this.ctx.systems.magic.launchMissile(
       firstObject,
       launchX,
       launchY,
@@ -1504,7 +1342,7 @@ export class TimerSystem {
     if (!launched) return;
 
     if (!singleMissile && secondObject !== OBJECT_ID_EOF) {
-      this.launchMissile(
+      this.ctx.systems.magic.launchMissile(
         secondObject,
         launchX,
         launchY,
@@ -1536,7 +1374,7 @@ export class TimerSystem {
 
     const decoded = decodeObjectID(missileRn);
     const word8 = timer.timerWord8 & 0xffff;
-    const { x: origMapX, y: origMapY, dir: initialDir, deltaEnergy } = this.decodeMissileTimerWord8(word8);
+    const { x: origMapX, y: origMapY, dir: initialDir, deltaEnergy } = decodeMissileTimerWord8(word8);
     let curMapX = origMapX;
     let curMapY = origMapY;
 
@@ -1649,7 +1487,7 @@ export class TimerSystem {
       timer.uByte6 = newPos.x & 0xff;
       timer.uByte7 = newPos.y & 0xff;
       timer.level = newPos.z & 0xff;
-      timer.timerWord8 = this.encodeMissileTimerWord8(newPos.x, newPos.y, newDir, deltaEnergy);
+      timer.timerWord8 = encodeMissileTimerWord8(newPos.x, newPos.y, newDir, deltaEnergy);
     } else {
       const map = this.dungeon.getMap(timer.level);
       if (map) {
@@ -2667,23 +2505,6 @@ export class TimerSystem {
     this.moveObject(dropped, -2, 0, position.x, position.y, position.z);
   }
 
-  private getMissileTimerWord8(missile: { timerIndex: number }): number | null {
-    return this.timers.getTimerWord8(missile.timerIndex);
-  }
-
-  private decodeMissileTimerWord8(word8: number): { x: number; y: number; dir: number; deltaEnergy: number } {
-    return {
-      x: word8 & 0x1f,
-      y: (word8 >> 5) & 0x1f,
-      dir: (word8 >> 10) & 0x3,
-      deltaEnergy: (word8 >> 12) & 0xf,
-    };
-  }
-
-  private encodeMissileTimerWord8(x: number, y: number, dir: number, deltaEnergy: number): number {
-    return ((x & 0x1f) | ((y & 0x1f) << 5) | ((dir & 0x3) << 10) | ((deltaEnergy & 0xf) << 12)) & 0xffff;
-  }
-
   private wiggleEverything(mapX: number, mapY: number, level: number): void {
     const position = new Position(mapX, mapY, level);
 
@@ -2856,8 +2677,8 @@ export class TimerSystem {
       let missileDir: number | undefined;
       if (type === DBType.MISSILE) {
         const missile = this.dungeon.getMissileRecord(object);
-        const word8 = missile ? this.getMissileTimerWord8(missile) : null;
-        if (word8 !== null) missileDir = this.decodeMissileTimerWord8(word8).dir;
+        const word8 = missile ? this.timers.getTimerWord8(missile.timerIndex) : null;
+        if (word8 !== null) missileDir = decodeMissileTimerWord8(word8).dir;
       }
       const result = this.resolveCellEffects(
         new Position(newX, newY, level), type, decoded.position, party.facing, missileDir, !levitated, undefined, undefined, oldX,

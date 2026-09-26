@@ -113,19 +113,19 @@ Size: **S** well under a session · **M** about one session · **L** several ses
 
 ### E3 ⏳ Split `TimerSystem.ts` by CSBWin source file
 
-`src/engine/TimerSystem.ts` is 3368 lines, and it is half the world. Besides the
+`src/engine/TimerSystem.ts` is 3189 lines, and it is half the world. Besides the
 `ProcessTimers` dispatch (`CSBCode.cpp:6383`) and the small per-type handlers (doors, pits,
 light, shields, poison…) it holds these groups (start lines as of 2026-09-26):
 
 | Group | Methods | CSBWin |
 | --- | --- | --- |
-| Missiles | `launchMissile` 942, `throwMissile` 1032, `throwObjectFromHand` 1085, `createMissileRecord` 1262, `triggerMissileLauncher` 1428, `processMissileTimer` 1524, `checkMoveFromMissile` 1707, `processMissileEncounter` 1829 … `finishMissileEncounter` 2168, the `word8` codec 2670-2683 | `LaunchMissile` `Magic.cpp:17`; `MissileTimer` `Timer.cpp:184`, `TriggerMissileLauncher` `Timer.cpp:1883`, `ThrowMissile` `Timer.cpp:2016`; `ProcessMissileEncounter` `Code11f52.cpp:1711`, `CheckMoveFromMissile` `Code11f52.cpp:2530` |
-| Clouds | `createDeathCloud` 2213, `createFluxcage` 2224, `createCloud` 2271, `processTT_25` 2348, `createCloudRecord` 2499, `playCloudSound` 2544 | `CreateCloud` `Code11f52.cpp:1376`, `CreateFluxcage` `Code11f52.cpp:1515`, `ProcessTT_25` `Timer.cpp:436` |
-| Door and magic damage | `hitDoor` 2468, `determineMagicDamage` 2583 | `HitDoor` `Code11f52.cpp:2263`, `DetermineMagicDamage` `Code11f52.cpp:1557` |
-| Wiggle | `wiggleEverything` 2687 … 2770, with `notePartyMoved` 2758 | `WiggleEverything` `Timer.cpp:2428` |
-| World moves | `resolvePartyMove` 2786, `moveObject` 2826, `resolveMonsterDestination` 2910, `checkMonsterMoveFromMissile` 2985 … `teleportMonster` 3274 | the world `MoveObject`, `Code11f52.cpp:2796`, and `TeleportMonster` `Code11f52.cpp:2308` — **not** `MoveObject.cpp:721`, the DSA's ten-argument `MoveObject`, which is `DsaSystem.moveObjectDsa` |
-| Vi altar | `scheduleViAltar` 1111 … `bringCharacterToLife` 1241 | `ProcessTT_ViAltar` `Timer.cpp:2710` |
-| Generators | `spawnMonsterGenerator` 1346, `processReactivateGenerator` 1403 | `ProcessTT_ReactivateGenerator` `Timer.cpp:1835` |
+| Missiles | `throwMissile` 947, `triggerMissileLauncher` 1266, `processMissileTimer` 1362, `checkMoveFromMissile` 1545, `processMissileEncounter` 1667 … `finishMissileEncounter` 2006 | `MissileTimer` `Timer.cpp:184`, `TriggerMissileLauncher` `Timer.cpp:1883`, `ThrowMissile` `Timer.cpp:2016`; `ProcessMissileEncounter` `Code11f52.cpp:1711`, `CheckMoveFromMissile` `Code11f52.cpp:2530` |
+| Clouds | `createDeathCloud` 2051, `createFluxcage` 2062, `createCloud` 2109, `processTT_25` 2186, `createCloudRecord` 2337, `playCloudSound` 2382 | `CreateCloud` `Code11f52.cpp:1376`, `CreateFluxcage` `Code11f52.cpp:1515`, `ProcessTT_25` `Timer.cpp:436` |
+| Door and magic damage | `hitDoor` 2306, `determineMagicDamage` 2421 | `HitDoor` `Code11f52.cpp:2263`, `DetermineMagicDamage` `Code11f52.cpp:1557` |
+| Wiggle | `wiggleEverything` 2508 … 2591, with `notePartyMoved` 2579 | `WiggleEverything` `Timer.cpp:2428` |
+| World moves | `resolvePartyMove` 2607, `moveObject` 2647, `resolveMonsterDestination` 2731, `checkMonsterVersusMissiles` 2776, `checkMonsterMoveFromMissile` 2806 … `teleportMonster` 3095 | the world `MoveObject`, `Code11f52.cpp:2796`, and `TeleportMonster` `Code11f52.cpp:2308` — **not** `MoveObject.cpp:721`, the DSA's ten-argument `MoveObject`, which is `DsaSystem.moveObjectDsa` |
+| Vi altar | `scheduleViAltar` 1000 … `isChampionDead` 1113 | `ProcessTT_ViAltar` `Timer.cpp:2710` |
+| Generators | `spawnMonsterGenerator` 1184, `processReactivateGenerator` 1241 | `ProcessTT_ReactivateGenerator` `Timer.cpp:1835` |
 | Character action | `enableCharacterAction` 282 | `EnableCharacterAction` `Timer.cpp:2638` |
 
 **The grouping.** A method goes to the system that ports its CSBWin file, the rule `Game`'s
@@ -160,22 +160,9 @@ becomes **two** systems:
 `WorldMove` calls `MissileEncounter` (`checkMoveFromMissile`), never the reverse: the
 encounter reaches `MoveObject` only through `ProcessObjectFromMissile`, which stays.
 
-The rest leaves by the same rule:
-
-- `LaunchMissile` (`Magic.cpp:17`) goes to `MagicSystem`, with `createMissileRecord`. The
-  port's `launchMissile` is it: `FindEmptyDB14Entry`, `AddObjectToRoom`, and a `TT_Missile`
-  / `TT_Missile0` timer at `d.Time + 1` carrying the `word8` fields (`Magic.cpp:33-72`). It
-  takes the level as a parameter where CSBWin uses `d.LoadedLevel`, and returns a boolean
-  where CSBWin returns the timer index or -1. `launchThrownMissile` is it with a `Position`
-  and no delay, and goes with it. The other two adapters go into their one engine caller,
-  as `Game`'s did: `launchMonsterMissile` into `MonsterAttack` (`Monster.cpp:1194`),
-  `throwObjectFromHand` into `MouseSystem` (`ThrowByCharacter`, `Mouse.cpp:743`).
-- The missile timer's `word8` codec (`getMissileTimerWord8`, `decodeMissileTimerWord8`,
-  `encodeMissileTimerWord8`), which `LaunchMissile`, `MissileTimer` and `MoveObject` all
-  use, becomes exported functions of `src/engine/missileHelpers.ts`.
-- `CheckMonsterVersusMissiles` (`Monster.cpp:4462`) goes to `MonsterAI`, into the private
-  wrapper of the same name that is its one caller (`MonsterAI.ts:1155`).
-- `BringCharacterToLife` (`Character.cpp:804`) goes to `CharacterSystem`.
+`CheckMonsterVersusMissiles` (`Monster.cpp:4462`) leaves by the same rule, for
+`MonsterAI`: into the private wrapper of the same name that is its one caller
+(`MonsterAI.ts:1155`).
 
 **The state the line cuts through.**
 
@@ -205,9 +192,11 @@ and after 600 ticks. A tool that calls or spies on a moved method follows it
 `tools/dump-monster-damage.ts`'s stub of `ctx.systems.timer` becomes a stub of the new
 system.
 
-1. `LaunchMissile` into `MagicSystem`, the codec into `missileHelpers.ts`, the two
-   adapters into their callers; `BringCharacterToLife` into `CharacterSystem`. (S)
-2. `WorldMove`. (M)
+1. ✅ `LaunchMissile` is `MagicSystem.launchMissile` (with `launchThrownMissile`, its
+   `Position` form), and its adapters sit in their callers (`MonsterAttack`,
+   `MouseSystem`); the `word8` codec is `missileHelpers.ts`'s; `BringCharacterToLife` is
+   `CharacterSystem`'s.
+2. `WorldMove`. (M) Next.
 3. `MissileEncounter`, and `CheckMonsterVersusMissiles` into `MonsterAI` with it, since it
    needs `d.MonsterDamageResult`'s new home. This step pays E3. (M)
 
@@ -255,7 +244,7 @@ remaining save work.
 
 CSBWin reads a slot through `CHARDESC::Possession(slot)`. The port writes it out as a
 one-line `possessions[slot] ?? OBJECT_ID_NULL`: as a private helper in `CharacterStats.ts:238`,
-`AttackSystem.ts:291`, `PeriodicUpdates.ts:230` and `MonsterAttack.ts:685`; as the UI's
+`AttackSystem.ts:291`, `PeriodicUpdates.ts:230` and `MonsterAttack.ts:694`; as the UI's
 exported `getChampionPossession` (`src/renderer/ui/Character.ts:603`); and inline in
 `CharacterSystem`, `MagicSystem`, `skills.ts`, `ui/Mouse.ts` and `data/CsbwinCharacters.ts`.
 The array is a required thirty, so the `??` only guards an out-of-range slot. Make it one
@@ -341,7 +330,7 @@ already drives four of the writers.
 CSBWin's monster attack starts from `missile = RNnul` and stores
 `attackParameters.missileType = missile.ConvertToInteger()`
 (`doc/CSBwin-src/Monster.cpp:1041`, `:1076`), so a monster with no missile reports
-0xffff. `MonsterAttack.chooseMissile`'s default returns 0 (`MonsterAttack.ts:298-300`).
+0xffff. `MonsterAttack.chooseMissile`'s default returns 0 (`MonsterAttack.ts:307-309`).
 Nothing reads it today: 0 is not in `THROWABLE`, so no missile flies. But the parameters
 are what CSBWin copies to the Monster Attack Filter (`:1129-1165`, unported, G2), so once
 that filter exists a DSA would see 0 where CSBWin shows `RNnul`. Return `OBJECT_ID_NULL`,
@@ -415,17 +404,17 @@ two-monster group shuffles to, with damage enough to kill one of them.
 CSBWin's `CheckMoveFromMissile` (`doc/CSBwin-src/Code11f52.cpp:2530-2776`) neither reads nor
 writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` fills
 (`Timer.cpp:176-177`, `:220-221`). The port's `TimerSystem.checkMoveFromMissile`
-(`src/engine/TimerSystem.ts:1707`) does both:
+(`src/engine/TimerSystem.ts:1545`) does both:
 
-- It returns at once while `missileFilterObject` is set (`:1708`), so a move made while a
+- It returns at once while `missileFilterObject` is set (`:1546`), so a move made while a
   missile's own timer runs checks no missiles, where CSBWin's checks them.
-- It points both at each missile it resolves, and clears them after (`:1781-1792`). CSBWin
+- It points both at each missile it resolves, and clears them after (`:1619-1630`). CSBWin
   never clears `missileFilterTimer`, only `missileFilterObject` at each of `MissileTimer`'s
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
-  `checkMonsterVersusMissiles` (`clearMissileFilterState` at `:2104-2107`, then `?? 0` at
-  `:2092`). Only a dungeon with a missile encounter filter can see this half.
+  `checkMonsterVersusMissiles` (`clearMissileFilterState` at `:1942-1945`, then `?? 0` at
+  `:1930`). Only a dungeon with a missile encounter filter can see this half.
 
 Remove the guard and the writes, and keep `missileFilterTimer` as CSBWin does, a copy that
 outlives its timer. Evidence: a check that reads the filter's parameters for an encounter
@@ -440,7 +429,7 @@ Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove`
 `resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
 (`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
 `AttackSystem.climbDownIntoPit` (`:1357`), `DsaSystem.teleportParty` (`:3087`) and
-`TimerSystem.wiggleParty` (`:2770`). They do not agree:
+`TimerSystem.wiggleParty` (`:2591`). They do not agree:
 
 - `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
   its caller passed, before any teleporter or pit (`Code11f52.cpp:2847-2853`). The step and
@@ -473,7 +462,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
   (`ActuatorSystem`, `DsaSystem`) pass `ctx.tables.byte1596`, a required field, so it
   looks unreachable. Confirm that, then delete it and the `| null`.
 - `MonsterAttack.determineAttackOrder` returns `[0, 1, 2, 3]` when its `byte586` row is
-  missing, with no warning (`src/engine/MonsterAttack.ts:781`).
+  missing, with no warning (`src/engine/MonsterAttack.ts:790`).
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
@@ -548,7 +537,7 @@ uses CSBWin's defaults.
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
   `MonsterDamage.ts:463` and `MonsterSystem.ts:531`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
-  (`MonsterAttack.ts:138`). C35 is about what it would see.
+  (`MonsterAttack.ts:139`). C35 is about what it would see.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
   `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:260`).
@@ -584,7 +573,7 @@ No shipped DM hero touches any of these.
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, and `monster.drawAsSize4` is read ungated in
-`TimerSystem.processMissileEncounter` (`TimerSystem.ts:1974`) and in `MonsterDamage`
+`TimerSystem.processMissileEncounter` (`TimerSystem.ts:1812`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
@@ -650,7 +639,7 @@ marching order cannot be changed.
 
 A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
 (`doc/CSBwin-src/Monster.cpp:239`). The port spends the blow and takes nothing
-(`MonsterAttack.ts:179-181`). Port it there, through `ctx.systems`, with a tool that has a
+(`MonsterAttack.ts:188-190`). Port it there, through `ctx.systems`, with a tool that has a
 giggler rob a champion.
 
 ### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record

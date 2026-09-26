@@ -165,7 +165,7 @@ function main(): void {
     const calls = spy(game);
     let index = -1;
     switchOn(game, at, TimerFunction.TT_TELEPORTER, () => {
-      game.timerSystem.launchThrownMissile(RN_FIREBALL, at, 0, 1, 100, 100, 1, 50);
+      game.magic.launchThrownMissile(RN_FIREBALL, at, 0, 1, 100, 100, 1, 50);
       for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category === DBType.MISSILE) index = decodeObjectID(rn).index;
       }

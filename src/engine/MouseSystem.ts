@@ -230,11 +230,11 @@ export class MouseSystem {
     const damage = applyLimits(40, 8 * mastery + (this.ctx.random.next() & 31), 200);
     const decayRate = Math.max(5, 11 - mastery);
 
-    const launched = this.ctx.systems.timer.throwObjectFromHand(
+    const launched = this.ctx.systems.magic.launchThrownMissile(
       obj,
       party.position,
-      leftOrRight,
-      party.facing,
+      (party.facing + (leftOrRight & 0x1)) & 0x3,
+      party.facing & 0x3,
       overrides && overrides.range >= 0 ? overrides.range : range,
       overrides && overrides.damage >= 0 ? overrides.damage : damage,
       overrides && overrides.decayRate >= 0 ? overrides.decayRate : decayRate,

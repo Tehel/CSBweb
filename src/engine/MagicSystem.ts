@@ -1,8 +1,9 @@
 /**
  * `MagicSystem` — the engine half of CSBWin's `Magic.cpp`: `CastMagic` and `CastSpell`,
  * their messages (`SpellErrorMsg`, `StandardSpellMessage`), `CharacterThrowsSpell`,
- * `LaunchObject`, `DisableCharacterAction`, `SetBrightnessTimer`, and `AdjustSkills`
- * bound to the context. The rune panel, `Magic.cpp`'s UI half, is
+ * `LaunchObject`, `LaunchMissile` (which every launch goes through, a monster's, a
+ * throw's and a missile launcher's too), `DisableCharacterAction`, `SetBrightnessTimer`,
+ * and `AdjustSkills` bound to the context. The rune panel, `Magic.cpp`'s UI half, is
  * `src/renderer/ui/MagicPanel.ts`.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
@@ -11,14 +12,14 @@
 import type { SpellDefinition } from '../data/spellTypes';
 import { applyLimits, sw } from '../core/intCast';
 import { OBJNI_EMPTY_FLASK } from '../core/objectNameIndex';
-import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, withObjectPosition, type ObjectID, type Position } from '../core/types';
+import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import type { Champion, PartyState } from './gameTypes';
 import type { SpellParameters } from './magicTypes';
-import { constructPredefinedMissile } from './missileHelpers';
+import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
@@ -30,6 +31,81 @@ export class MagicSystem {
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
+  }
+
+  /**
+   * `LaunchMissile` (`doc/CSBwin-src/Magic.cpp:17`): a missile record for
+   * `projectileObject`, set down in the launch cell, and its `TT_Missile` timer (or
+   * `TT_Missile0` without `missileDelay`) at `startTime + 1`. CSBWin launches on
+   * `d.LoadedLevel` and returns the timer index, or -1 when the missile database is
+   * full; this takes the level and says whether the missile flew.
+   */
+  launchMissile(
+    projectileObject: ObjectID,
+    launchX: number,
+    launchY: number,
+    level: number,
+    position: number,
+    direction: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    decayRate: number,
+    startTime: number,
+    missileDelay: boolean,
+  ): boolean {
+    const rn = this.createMissileRecord(projectileObject, rangeRemaining, damageRemaining, 0xffff, position);
+    if (rn === null) return false;
+    if (!this.dungeon.addObjectToCell(new Position(launchX, launchY, level), rn)) return false;
+    const functionType = missileDelay ? TimerFunction.TT_MISSILE : TimerFunction.TT_MISSILE0;
+    const timerWord8 = encodeMissileTimerWord8(launchX, launchY, direction, decayRate);
+    const entry = this.timers.createTimer(functionType, launchX, launchY, 0, 0, (startTime + 1) >>> 0, level, rn, timerWord8);
+    const missile = this.dungeon.getMissileRecord(rn);
+    if (missile) missile.timerIndex = entry.index & 0xffff;
+    return true;
+  }
+
+  /** `LaunchMissile` from a `Position`, with no delay: what a throw and a spell launch. */
+  launchThrownMissile(
+    projectileObject: ObjectID,
+    position: Position,
+    posInCell: number,
+    direction: number,
+    rangeRemaining: number,
+    damageRemaining: number,
+    decayRate: number,
+    startTime: number,
+  ): boolean {
+    return this.launchMissile(
+      projectileObject,
+      position.x,
+      position.y,
+      position.z,
+      posInCell,
+      direction,
+      rangeRemaining,
+      damageRemaining,
+      decayRate,
+      startTime,
+      false,
+    );
+  }
+
+  private createMissileRecord(
+    projectileObject: ObjectID,
+    rangeRemaining: number,
+    damageRemaining: number,
+    timerIndex: number,
+    position: number,
+  ): ObjectID | null {
+    // `FindEmptyDB14Entry` (`doc/CSBwin-src/CSBCode.cpp:5056`).
+    const index = this.dungeon.findEmptyDBEntry('missiles', {
+      nextObject: OBJECT_ID_EOF,
+      projectileObject: (projectileObject & 0xffff) as ObjectID,
+      rangeRemaining: rangeRemaining & 0xff,
+      damageRemaining: damageRemaining & 0xff,
+      timerIndex: timerIndex & 0xffff,
+    });
+    return index === null ? null : encodeObjectID(position & 0x3, DBType.MISSILE, index);
   }
 
   setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
@@ -178,7 +254,7 @@ export class MagicSystem {
           champion.attributes.maxMana | 0,
         );
         const posInCell = this.computeSpellLaunchPos(champion.partyPosition, facing);
-        this.ctx.systems.timer.launchThrownMissile(
+        this.launchThrownMissile(
           this.spellObjectId(missileType),
           this.ctx.party.state.position,
           posInCell,
@@ -471,7 +547,7 @@ export class MagicSystem {
       ? constructPredefinedMissile(this.dungeon, object & 0xffff)
       : object;
     if (projectile === null) return 0;
-    const launched = this.ctx.systems.timer.launchThrownMissile(
+    const launched = this.launchThrownMissile(
       projectile,
       this.ctx.party.state.position,
       posInCell,
