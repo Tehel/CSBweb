@@ -3056,8 +3056,13 @@ cloud-timer lookup (`MoveObject.cpp:233-241`) — is first in that order.
 The returned handle is the kept timer's, so a caller storing the index stores the old slot.
 A timer that is queued is stamped `m_timerSequence++` as it goes into its slot (`:1189`, under
 `SEQUENCED_TIMERS`, defined in `stdafx.h:17`); a dropped duplicate consumes no number. The
-counter is repacked when it reaches 0xffff (`:1136-1188`).
-Evidence: `tools/dump-timer-dedupe.ts`.
+counter is a `ui16` (`Data.h:1542`). The timer that finds it at 0xffff first repacks the
+stamps of the queued timers (`:1136-1188`): the stamps are cut into pages of 32
+(`TimerSequencePageSize`, `:1135`), the pages in use are renumbered 0, 1, 2… in their order,
+and each stamp keeps its offset in its page, so the queue's order is unchanged. The counter is
+not reset: that timer takes 0xffff and the next one 0, which sorts before every repacked stamp
+due on the same tick. A dropped duplicate returns before the repack.
+Evidence: `tools/dump-timer-dedupe.ts`, and for the repack `tools/dump-timer-sequence.ts`.
 
 ## Actuator type 8 counts what is in a carried chest, and what is on the cursor
 

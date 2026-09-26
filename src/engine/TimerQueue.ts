@@ -104,6 +104,7 @@ export interface TimerEntry {
 
 export class TimerQueue {
   private queue: TimerEntry[] = [];
+  /** `m_timerSequence` (`Data.h:1542`), a `ui16`: the stamp the next queued timer takes. */
   private nextSequence = 0;
   /**
    * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) — the lowest slot of the timer
@@ -229,8 +230,12 @@ export class TimerQueue {
     // `D5L = m_firstAvailTimer` (`doc/CSBwin-src/Timer.cpp:1129`), stamped with
     // `m_timerSequence++` (`:1189`) — so a duplicate dropped above consumes no number, and
     // a timer queued again gets a fresh one — then walk the cursor forward to the next
-    // empty entry (`Timer.cpp:1195-1198`).
-    const stored: TimerEntry = { ...entry, index: this.firstAvailTimer, sequence: this.nextSequence++ };
+    // empty entry (`Timer.cpp:1195-1198`). The counter is a `ui16` (`Data.h:1542`): the
+    // timer that finds it at 0xffff repacks the stamps in use, takes 0xffff itself, and
+    // leaves it at 0.
+    if (this.nextSequence === 0xffff) this.repackSequences();
+    const stored: TimerEntry = { ...entry, index: this.firstAvailTimer, sequence: this.nextSequence };
+    this.nextSequence = (this.nextSequence + 1) & 0xffff;
     this.indexMap.set(stored.index, stored);
     while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
     const idx = this.queue.findIndex((existing) => compareTimers(stored, existing) < 0);
@@ -240,6 +245,25 @@ export class TimerQueue {
       this.queue.splice(idx, 0, stored);
     }
     return stored;
+  }
+
+  /**
+   * `SetTimer`'s repack (`doc/CSBwin-src/Timer.cpp:1136-1188`). The stamps are cut into
+   * pages of 32; the pages some queued timer's stamp is in are renumbered 0, 1, 2… in
+   * their order, and each stamp keeps its place in its page. The order of the stamps is
+   * kept, so the queue's order is too. The counter is not reset: the timer being queued
+   * still takes 0xffff, and the next one 0, below every repacked stamp.
+   */
+  private repackSequences(): void {
+    const PAGE = 32; // `TimerSequencePageSize` (`Timer.cpp:1135`)
+    const used = new Set<number>();
+    for (const timer of this.queue) used.add(Math.floor(timer.sequence / PAGE));
+    const pageTranslate = new Map<number, number>();
+    for (const page of [...used].sort((a, b) => a - b)) pageTranslate.set(page, pageTranslate.size);
+    for (const timer of this.queue) {
+      const page = pageTranslate.get(Math.floor(timer.sequence / PAGE))!;
+      timer.sequence = ((timer.sequence % PAGE) + page * PAGE) & 0xffff;
+    }
   }
 
   /**
@@ -276,7 +300,7 @@ export class TimerQueue {
     for (const entry of this.queue) this.indexMap.set(entry.index, entry);
     this.firstAvailTimer = 0;
     while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
-    this.nextSequence = nextSequence >>> 0;
+    this.nextSequence = nextSequence & 0xffff;
   }
 
   /** `gameTimers.TimerSequence()` — what the next queued timer will be stamped with. */

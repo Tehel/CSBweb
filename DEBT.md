@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
 | C39 | `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1 | S | ⏳ |
 | C40 | `CheckMoveFromMissile` uses the missile timer's filter state | S | ⏳ |
 | C41 | The party's `MoveObject` is put together at four call sites | M | ⏳ |
@@ -125,19 +124,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C38 ⏳ `SetTimer`'s sequence repack at 0xffff is not ported
-
-`SetTimer` stamps each timer it queues with `m_timerSequence++`
-(`doc/CSBwin-src/Timer.cpp:1189`). When the counter reaches 0xffff it first repacks the
-stamps in use down to the lowest numbers, in their order (`:1136-1188`). The stamp breaks
-ties between timers due on the same tick, and it is saved (`gb2.TimerSequence`). The port's
-`TimerQueue` stamps the same way (`nextSequence`, `src/engine/TimerQueue.ts:233`) but has
-no repack. Its counter grows past 16 bits, and the quick-save keeps only the low 16 bits of
-each stamp (`src/engine/RuntimeSave.ts:298`, `:337`). After 65535 queued timers the port's
-stamps no longer match CSBWin's, and two timers on either side of the wrap swap their tie
-order across a save and a load. Port the repack. Evidence: a `tools/` check that queues
-past 0xffff and compares the stamps, and the queue order, before and after a save.
 
 ### C39 ⏳ `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1
 
@@ -337,7 +323,7 @@ CSBWin's `m_timerQueue` is a binary min-heap over `TIMER::operator<`
 sifts it (`:959-984`). `LoadGame` reads the array back as it was written
 (`SaveGame.cpp:1693-1699`). The port's `TimerQueue` is a sorted array instead: `addTimer`
 and `reprioritizeTimer` insert in order, `shiftNext` and `deleteTimer` shift and splice,
-`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:273`), and
+`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:297`), and
 `processTimers` stops at the first entry not yet due (`src/engine/TimerSystem.ts:95-119`).
 `searchOrder`, `TIMER_SEARCH`'s walk from the end of the array, which decides which
 duplicate `SetTimer` keeps, then visits the timers in another order than CSBWin's.
