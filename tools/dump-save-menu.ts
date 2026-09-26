@@ -23,13 +23,18 @@
  * 5. **The metadata path.** A row's level and roster come either from our own header,
  *    read out of the first 8 KB of the file, or from blocks 2 and 4 of a genuine CSBWin
  *    save. Both are asserted against the real files.
+ * 6. **Entering and leaving.** The disk menu is bracketed by `TAG02076e` and `TAG0207cc`
+ *    (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`). The first repacks a chest open in the
+ *    inventory, which is what puts its objects in the save; the second shows the
+ *    inventory again and brings the attack buttons back. Run over a real chest, with a
+ *    real save restored into a fresh game.
  *
  * Run: `npx tsx tools/dump-save-menu.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Position } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
@@ -46,6 +51,7 @@ import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import {
+  applySaveBytes,
   buildSavePayload,
   decodeSavePayload,
   encodeSavePayload,
@@ -56,8 +62,7 @@ import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/ren
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { MENU_HEIGHT, MENU_PANEL_COLOR, MENU_WIDTH, drawMenuBitmap, splitLongLine } from '../src/renderer/ui/Menu';
-import { SAVE_MENU_GEOMETRY, extendListPanel } from '../src/renderer/ui/SaveMenu';
-import type { UIState } from '../src/renderer/ui/UIState';
+import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -67,6 +72,23 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const SAVES = 'static/gamefiles/saves';
+
+/**
+ * As in `tools/dump-hand-owner.ts`: `ui/SaveMenu` reaches `ui/Mouse`, and `ui/Mouse`
+ * reaches `@/ui`, which touches `document`.
+ */
+async function importUI(): Promise<[
+  typeof import('../src/renderer/ui/SaveMenu'),
+  typeof import('../src/renderer/ui/Inventory'),
+]> {
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  if (!g.window) g.window = g;
+  return Promise.all([import('../src/renderer/ui/SaveMenu'), import('../src/renderer/ui/Inventory')]);
+}
+
+let SaveMenu: Awaited<ReturnType<typeof importUI>>[0];
+let Inventory: Awaited<ReturnType<typeof importUI>>[1];
 
 /* ------------------------------------------------------------------------------- */
 
@@ -178,7 +200,7 @@ function checkButtonTables(graphics: GraphicsLoader): void {
   check(four[0].y1 === 101 && four[0].y2 === 115, 'the four-option top row is y 101..115');
   check(four[2].y1 === 138 && four[2].y2 === 152, 'the four-option bottom row is y 138..152');
   check(
-    four[2].word0 === SAVE_MENU_GEOMETRY.loadButtonId && four[3].word0 === SAVE_MENU_GEOMETRY.saveButtonId,
+    four[2].word0 === SaveMenu.SAVE_MENU_GEOMETRY.loadButtonId && four[3].word0 === SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId,
     'LOAD and SAVE take the bottom row, ids 212 and 213',
   );
 }
@@ -221,7 +243,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   const ui = makeDrawingUI(graphics);
   drawMenuBitmap(ui, false);
 
-  const g = SAVE_MENU_GEOMETRY;
+  const g = SaveMenu.SAVE_MENU_GEOMETRY;
   // Before the extension, the full-width button frame is in the way: the art is *not*
   // panel colour where the list's lower rows will go. If this ever stops being true the
   // extension has become unnecessary, and this tool should say so rather than pass.
@@ -229,7 +251,7 @@ function checkLayout(graphics: GraphicsLoader): void {
   const dirtyBefore = countNot(ui, VIEWPORT_X + g.panelInnerX1, VIEWPORT_X + g.panelInnerX2, lowerRowY - 4, lowerRowY + 1, MENU_PANEL_COLOR);
   check(dirtyBefore > 0, `the unpatched art is not clean under the last row (${dirtyBefore} pixels differ)`);
 
-  extendListPanel(ui);
+  SaveMenu.extendListPanel(ui);
 
   console.log('');
   console.log('=== the list panel, after tiling graphic 0\'s own interior band down ===');
@@ -375,7 +397,7 @@ function checkListLogic(): void {
   for (const row of rows) {
     const text = formatSaveRow(row);
     console.log([JSON.stringify(text), text.length].join('\t'));
-    check(text.length <= SAVE_MENU_GEOMETRY.textMaxChars, `"${text}" fits in ${SAVE_MENU_GEOMETRY.textMaxChars} characters`);
+    check(text.length <= SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars, `"${text}" fits in ${SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars} characters`);
   }
   check(formatSaveRow(rows[0]).startsWith('2026-09-13 L14 '), 'a row leads with the date and the level');
   check(formatSaveRow(rows[2]).startsWith('*'), 'a save that cannot be loaded is marked with a star');
@@ -550,9 +572,100 @@ function checkCsbwinListing(): void {
   check(readCsbwinSaveInfo(new Uint8Array(16)) === null, 'a file that is not a save reads back as null');
 }
 
+/* ------------------------------------------------- 6. entering and leaving ---- */
+
+/** The objects in a chest's own chain, as a save writes them. */
+function chestContents(game: Game, chest: ObjectID): number {
+  const record = game.dungeonState.getContainerRecord(chest);
+  let n = 0;
+  for (let rn = record?.containedObject ?? OBJECT_ID_EOF; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.dungeonState.getDBRecordLink(rn)) n++;
+  return n;
+}
+
+/** The first chest lying in a cell of `dungeon.dat` with at least two objects in it. */
+function findChest(game: Game): { chest: ObjectID; cell: Position } | null {
+  for (let level = 0; level < game.dungeonState.getMapCount(); level++) {
+    const map = game.dungeonState.getMap(level);
+    if (!map) continue;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        const cell = new Position(x, y, level);
+        for (let rn = game.dungeonState.findFirstObject(cell); rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.dungeonState.getDBRecordLink(rn)) {
+          if (decodeObjectID(rn).category === DBType.CHEST && chestContents(game, rn) >= 2) return { chest: rn, cell };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * A chest in the weapon hand of the champion whose inventory is open, opened by the
+ * inventory's own draw, then the disk menu over it.
+ */
+async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the disk menu over an open chest: TAG02076e in, TAG0207cc out ===');
+  const game = await loadGame();
+  game.addChampion(healthyChampion('DAROO'));
+  const party = game.party.state;
+  const found = findChest(game);
+  if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
+  const { chest, cell } = found;
+  const packed = chestContents(game, chest);
+  game.dungeonState.removeObjectFromCell(cell, chest);
+  party.champions[0]!.possessions[1] = chest;
+  party.magicCasterIndex = 0;
+  party.selectedCharacterIndex = 0;
+
+  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  ui.uiTables = extractUITables(graphics);
+  ui.partyState = party;
+  // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
+  // the buttons back has not run.
+  ui.word20252 = 0;
+  const draw = (): void => {
+    // `drawInventoryScreen`'s state half: open the chest in the weapon hand, and leave
+    // `d.DisplayResurrectChestOrScroll` at 4 behind it.
+    const view = Inventory.getActiveChestView(ui, party.champions[0]!);
+    Inventory.syncOpenChest(ui, view);
+    ui.displayResurrectChestOrScroll = view?.source === 'hand' ? 4 : 0;
+  };
+  draw();
+  console.log(`  chest ${chest} from (${cell.x},${cell.y}) level ${cell.z}: ${packed} objects; open, it holds ${chestContents(game, chest)}`);
+  check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
+
+  SaveMenu.openSaveMenu(ui);
+  console.log(`  menu up: open chest ${ui.openChestId}, the chest holds ${chestContents(game, chest)}`);
+  check(ui.openChestId === null && chestContents(game, chest) === packed,
+    'TAG02076e repacks it (Character.cpp:5116-5125): the chest holds its objects again');
+
+  const fresh = await loadGame();
+  applySaveBytes(fresh, encodeSavePayload(buildSavePayload(game)));
+  const saved = chestContents(fresh, chest);
+  console.log(`  a save taken now, restored into a fresh game: the chest holds ${saved}`);
+  check(saved === packed, 'so a save taken with the menu up keeps the chest\'s objects');
+
+  SaveMenu.closeSaveMenu(ui);
+  console.log(`  menu gone: inventory ${party.selectedCharacterIndex}, caster ${party.magicCasterIndex}, word20252 ${ui.word20252}`);
+  check(party.selectedCharacterIndex === 0 && party.magicCasterIndex === 0,
+    'TAG0207cc shows the inventory again and keeps the living caster (CSBCode.cpp:9945-9958)');
+  check(ui.word20252 === 1, 'and, with no attack menu open, brings the attack buttons back (d.Word20252 = 1)');
+  draw();
+  check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the next draw opens the chest again');
+
+  // The load-only screen is `_ReadEntireGame`, which calls neither.
+  ui.word20252 = 0;
+  SaveMenu.openSaveMenu(ui, 'loadOnly');
+  check(ui.openChestId === chest, 'the load-only screen leaves the chest open');
+  SaveMenu.closeSaveMenu(ui);
+  check(ui.word20252 === 0, 'and, closing, leaves the attack panel alone');
+}
+
 /* ------------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
+  [SaveMenu, Inventory] = await importUI();
   const graphics = loadGraphics();
   checkButtonTables(graphics);
   checkLayout(graphics);
@@ -560,6 +673,7 @@ async function main(): Promise<void> {
   checkListLogic();
   await checkPayload();
   checkCsbwinListing();
+  await checkEnterAndLeave(graphics);
   finish();
 }
 

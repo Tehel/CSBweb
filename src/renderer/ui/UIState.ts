@@ -180,10 +180,6 @@ export interface UIState {
   onSleep?: () => void;
   /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
   onWakeUp?: () => void;
-  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) — shade the panels, repack a chest. */
-  onEnterMenu?: () => void;
-  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) — the mirror, on the way out. */
-  onLeaveMenu?: () => void;
   /**
    * Build the bytes of a new save and the row it will be listed as
    * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the

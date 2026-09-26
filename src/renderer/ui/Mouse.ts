@@ -13,13 +13,13 @@ import { canPlaceInSlot } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
-import { getActiveChestView, getEyeRect, syncOpenChest } from './Inventory';
+import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
 import { handleAttackAreaClick } from './Attack';
 import { resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
-import { getPartyChampion, setHandOwner } from '../../engine/Party';
+import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { updateHover } from '@/ui';
 
@@ -221,6 +221,44 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   syncInventoryButtons(ui);
 }
 
+/**
+ * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108-5135`), before the disk menu goes up
+ * (`SaveGame.cpp:860`). Its state half: an open inventory showing a chest
+ * (`d.DisplayResurrectChestOrScroll == 4`) has it repacked (`:5116-5125`), so the save
+ * finds the chest's objects in the chest. Asleep, it does nothing (`:5111`). The drawing
+ * half is the menu's own, in `GameScreen.presentViewport`: the three shaded areas, and
+ * the arrow cursor of `SetCursorShape(0)` (`:5133`) in `drawCursorItem`.
+ */
+export function tag02076e(ui: UIState): void {
+  const party = ui.partyState;
+  if (!party || party.sleeping) return;
+  if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
+}
+
+/**
+ * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`), once the disk menu has gone
+ * (`SaveGame.cpp:1274`). Its state half: the magic caster is selected again, which a
+ * dead one does not survive (`:9945-9947`); the attack buttons come back unless an
+ * attack menu is open (`d.Word20252 = 1`, `:9948-9951`); and an open inventory is shut
+ * without a repack and shown again through `ShowHideInventory` (`:9953-9958`), which
+ * opens the chest again on the next draw. The redraws, and `TAG002572`'s cursor, the
+ * port does every frame; `d.Word11750 = 0` is the dead countdown in `DEBT.md` H. Asleep,
+ * it only redraws (`:9938-9942`).
+ */
+export function tag0207cc(ui: UIState): void {
+  const party = ui.partyState;
+  if (!party || party.sleeping) return;
+  const caster = party.magicCasterIndex;
+  party.magicCasterIndex = -1;
+  selectMagicCaster(party, caster);
+  if (ui.attackingCharacterOrdinal === 0) ui.word20252 = 1;
+  const selected = party.selectedCharacterIndex;
+  if (selected >= 0) {
+    party.selectedCharacterIndex = -1;
+    handleInventoryToggle(ui, selected);
+  }
+}
+
 export function syncInventoryButtons(ui: UIState): void {
   if (!ui.uiTables || ui.uiMode !== UIMode.Adventure) return;
   const buttons = ui.uiTables.graphic231.buttons;
@@ -314,6 +352,13 @@ export function updateButtonLists(ui: UIState): void {
 
 export function drawCursorItem(ui: UIState): void {
   if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
+  if (ui.saveMenu?.mode === 'full') {
+    // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until `TAG0207cc`'s
+    // `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030`) sets the cursor from the hand again.
+    const arrow = getCursorArrowBitmap(ui);
+    if (arrow) drawCursorBitmap(ui, arrow, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), 12);
+    return;
+  }
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) {
     drawEmptyCursor(ui);

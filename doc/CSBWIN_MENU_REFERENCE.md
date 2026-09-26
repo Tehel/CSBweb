@@ -237,10 +237,31 @@ Ten VBLs is **1/6 s at 60 Hz**, which is how long the port holds it.
 ```
 
 Note the either/or: an **open** inventory gets its chest repacked, a **closed** one gets
-the movement arrows shaded. `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) is the mirror,
-called on the way out (`SaveGame.cpp:1274`): it restores the magic caster, redraws the
-legal attack types, and either re-opens the inventory that was open
-(`ShowHideInventory(D7W-1)`) or redraws the viewport and movement buttons.
+the movement arrows shaded. The repack is what puts the chest's objects in the save: an
+open chest's objects are in `d.rnChestContents`, out of its chain: `ShowChestContents`
+clears their links and the chest's `contents` (`Character.cpp:3088-3101`), and `RepackChest` links them
+back (`:3108-3154`). `SetCursorShape(0)` clears `d.Word23146`, the object cursor,
+and sets `d.CursorShape` to 0, the arrow (`CSBCode.cpp:1963-1972`), and the cursor draw
+takes the arrow for both (`CSBCode.cpp:2254-2255`).
+
+`TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) is the mirror, called on the way out
+(`SaveGame.cpp:1274`, and at `:854` after "SAVES ARE DISABLED", which skipped
+`TAG02076e`). Asleep it only redraws the sleep screen (`:9938-9942`). Otherwise it selects
+the magic caster again through `SelectMagicCaster` with `d.MagicCaster` set to -1 first,
+which refuses a dead champion (`Magic.cpp:723-724`) and so leaves none; sets
+`d.Word20252 = 1`, the attack buttons, when no attack menu is open (`:9948-9951`); redraws
+the legal attack types; either shuts the open inventory without a repack
+(`d.SelectedCharacterOrdinal = 0`) and shows it again with `ShowHideInventory(D7W-1)`, or
+redraws the viewport and movement buttons (`:9953-9964`); then `TAG002572` puts the cursor
+back from the hand (`:2030-2050`).
+
+`_ReadEntireGame` (`SaveGame.cpp:1435`), the load at the entrance, calls neither.
+
+The port: `tag02076e` and `tag0207cc` in `src/renderer/ui/Mouse.ts`, which `SaveMenu.ts`
+calls around its full screen and not its load-only one. The redraws are the frame's:
+`GameScreen.presentViewport` shades the three areas and draws no inventory while the menu
+is up, and `drawCursorItem` draws the arrow over the full screen. Evidence: `tools/dump-save-menu.ts`, "the disk
+menu over an open chest".
 
 
 ## What the disk menu itself does

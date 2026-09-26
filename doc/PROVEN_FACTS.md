@@ -3387,6 +3387,18 @@ Serpent Staff THE CONDUIT, Side Splitter DELTA, Dragon Fang THE INQUISITOR. In t
 of Champions TIGGY carries a Wand, CHANI a Moonstone, BORIS a Rabbit's Foot, GOTHMOG a
 Cloak of Night and NABI a Staff. Evidence: `tools/dump-item-bonuses.ts`.
 
+## The disk menu saves an open chest packed
+
+While a chest is open in the inventory its objects are in `d.rnChestContents` and out of
+its chain: `ShowChestContents` clears their links and the chest's `contents`
+(`doc/CSBwin-src/Character.cpp:3088-3101`). The disk menu's `TAG02076e`
+(`SaveGame.cpp:860`) repacks it when `d.DisplayResurrectChestOrScroll == 4`
+(`Character.cpp:5116-5125`), so the save writes the objects in the chest, and
+`TAG0207cc` (`SaveGame.cpp:1274`) shows the inventory again, which opens the chest again
+(`CSBCode.cpp:9952-9958`). `_ReadEntireGame` (`SaveGame.cpp:1435`) calls neither. The whole
+pair is in `doc/CSBWIN_MENU_REFERENCE.md` → "Entering and leaving". Evidence:
+`tools/dump-save-menu.ts`, "the disk menu over an open chest".
+
 ## Sleep: button 145 in, button 146 or a blow out, a tick every VBL in between
 
 The sleep icon is button 145 in the inventory list `buttons17760` (x 188-204, y 36-44,

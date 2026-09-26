@@ -61,6 +61,7 @@ import {
   menuPressFinished,
   type MenuPress,
 } from './Menu';
+import { tag02076e, tag0207cc } from './Mouse';
 import { nowMs, type UIState } from './UIState';
 
 /* ------------------------------------------------------------------ geometry ---- */
@@ -152,13 +153,13 @@ export function isSaveMenuOpen(ui: UIState): boolean {
  * Raise the screen. `loadOnly` is what the title screen will want: the same list with
  * no SAVE button.
  *
- * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) runs first, as it does before every
- * CSBWin menu — an open inventory gets its chest repacked, a closed one gets the
- * movement arrows shaded; the magic and weapon-ready areas are shaded either way.
+ * The full screen is the disk menu, `_DisplayDiskMenu`, so `TAG02076e` runs first
+ * (`doc/CSBwin-src/SaveGame.cpp:860`) and `TAG0207cc` last (`:1274`): `tag02076e` and
+ * `tag0207cc`. The load-only one is `_ReadEntireGame` (`:1435`), which calls neither.
  */
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.saveMenu) return;
-  ui.onEnterMenu?.();
+  if (mode === 'full') tag02076e(ui);
   ui.onSetPaused?.(true);
   ui.saveMenu = {
     mode,
@@ -178,10 +179,11 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
 
 export function closeSaveMenu(ui: UIState): void {
   if (!ui.saveMenu) return;
+  const { mode } = ui.saveMenu;
   if (ui.saveMenu.frameHandle !== null) cancelFrame(ui.saveMenu.frameHandle);
   ui.saveMenu = null;
   ui.onSetPaused?.(false);
-  ui.onLeaveMenu?.();
+  if (mode === 'full') tag0207cc(ui);
 }
 
 /* ------------------------------------------------------------------ the list ---- */

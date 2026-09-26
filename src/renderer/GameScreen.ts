@@ -431,7 +431,10 @@ export class GameScreen {
     }
     drawPartyStatus(this.ui);
     if (inventoryOpen) {
-      drawInventoryScreen(this.ui);
+      // Nothing draws the inventory under the disk menu, which covers the viewport,
+      // until `TAG0207cc` shows it again. Drawing it would open the chest again that
+      // `TAG02076e` repacked for the save.
+      if (!isSaveMenuOpen(this.ui)) drawInventoryScreen(this.ui);
       if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       // `_ReIncarnate` draws over the open inventory rather than replacing it: it
       // blanks the name strip and puts its keyboard where the eye panel was

@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
 | C45 | Saving does not re-attach the monsters | S | ⏳ |
 | C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
@@ -87,6 +86,8 @@ In payoff order: the first row is the next item.
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
+| C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
+| C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -105,7 +106,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C60 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
+Next free IDs: C62 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -125,26 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C44 ⏳ The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody
-
-`openSaveMenu` and `closeSaveMenu` call `ui.onEnterMenu` and `ui.onLeaveMenu`
-(`src/renderer/ui/SaveMenu.ts:161`, `:184`), CSBWin's `TAG02076e` and `TAG0207cc`, but
-nothing assigns either hook (`src/renderer/ui/UIState.ts:184-186`), so neither runs.
-`GameScreen.presentViewport` shades the three panels while the menu is up, which is
-`TAG02076e`'s drawing half. The rest is not ported:
-
-- `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108-5135`) repacks the open chest when the
-  inventory shows one (`d.DisplayResurrectChestOrScroll == 4`, `:5124`), through
-  `RepackChest` (`:3108`, the port's `repackOpenChest`). It also sets the cursor
-  shape to 0 (`:5133`), and does nothing at all while the party sleeps (`:5111`).
-- `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) re-selects the magic caster
-  (`:9945-9947`), sets `d.Word20252 = 1` when no attack menu is open (`:9950`), and redraws
-  the attack options and the inventory. The port redraws every frame, so only the state
-  changes can matter.
-
-Port both into the UI, call them from the save menu, and delete the two hooks. Evidence: a
-check that opens the menu over an open chest.
 
 ### C45 ⏳ Saving does not re-attach the monsters
 
@@ -340,6 +321,44 @@ and a fireball ends without its explosion. `processMissileEncounter`'s arm for t
 exterior, `case 8` (`src/engine/MissileEncounter.ts:287`), is unreachable. Pass the
 exterior to the encounter as CSBWin does. Evidence: a check that flies a fireball off an
 open cell on a map's border and looks for its cloud.
+
+### C60 ⏳ Six other callers of `TAG02076e` / `TAG0207cc` do not call them
+
+The pair is ported as `tag02076e` and `tag0207cc` (`src/renderer/ui/Mouse.ts`), and only the
+save menu calls it. CSBWin calls it from six more places, and the port's counterparts do
+neither half:
+
+- Sleep, button 145: `TAG02076e` after the inventory is hidden
+  (`doc/CSBwin-src/Mouse.cpp:1691`). Port: the UI's sleep click, then `MouseSystem.sleep`
+  (`src/engine/MouseSystem.ts:362`).
+- `WakeUp`: `TAG0207cc` last (`CSBCode.cpp:7061`). Port: `wakeUp`
+  (`src/engine/LoopState.ts:41`).
+- `AddCharacter`: `TAG02076e` after `ShowHideInventory` shows the candidate
+  (`Character.cpp:796-797`). Port: `HallOfChampions.addCharacter`
+  (`src/engine/HallOfChampions.ts:85`).
+- `_ResurrectReincarnateCancel`: `TAG0207cc` after a cancel (`CSBCode.cpp:6657`) and after a
+  resurrection or reincarnation (`:6808`). Port: `HallOfChampions.resurrectReincarnateCancel`
+  (`:142`).
+- The main loop: the pair back to back, about every ten seconds, while `d.Word11722` is
+  non-zero (`CSBCode.cpp:766-774`). The port does not model `d.Word11722`.
+
+What each misses is the halves' state: `SetCursorShape(0)`, the arrow cursor until
+`TAG0207cc`'s `TAG002572` puts it back (while asleep, for one); the caster selected again;
+`d.Word20252 = 1` when no attack menu is open; the inventory shown again. The freeze's
+pair (`Mouse.cpp:1736`, `:1765`) goes with the freeze (G5). Call the pair at each site, and
+move `drawCursorItem`'s arrow, which tests the save menu, onto a cursor-shape state the pair
+sets and clears. Evidence: a check per site, in `tools/dump-sleep.ts` and
+`tools/dump-hall-of-champions.ts`.
+
+### C61 ⏳ The dev quick-save writes an open chest empty
+
+An open chest's objects are out of its chain until it is repacked (`doc/PROVEN_FACTS.md` →
+"The disk menu saves an open chest packed"). The disk menu repacks it before a save
+(`tag02076e`), but the dev quick-save (`quickSave`, `src/dev.ts:99`) builds its payload
+straight from the game, so a quick-save made with a chest open restores the chest empty
+and its objects nowhere. CSBWin has no quick-save; its only save repacks. Repack before
+the payload is built and open the chest again after, as the disk menu does. Evidence: a
+check that quick-saves over an open chest and restores it.
 
 ---
 
