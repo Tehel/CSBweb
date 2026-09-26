@@ -47,13 +47,12 @@ import type { Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord } from '../src/engine/objectIndex';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
 import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
-import { getChampionPossession } from '../src/renderer/ui/Character';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
+import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE, RN_POISON_BOLT } from '../src/core/spellRn';
 

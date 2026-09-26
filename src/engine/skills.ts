@@ -1,6 +1,6 @@
-import type { Champion, Skill } from './gameTypes';
+import { getChampionPossession, type Champion, type Skill } from './gameTypes';
 import { CsbRandom } from '../core/random';
-import { OBJECT_ID_NULL, type ObjectID } from '../core/types';
+import type { ObjectID } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
 import {
@@ -422,5 +422,5 @@ function getPossessionNameIndex(
   slot: number,
   getObjectNameIndex: (objectId: ObjectID) => number | null,
 ): number | null {
-  return getObjectNameIndex(champion.possessions[slot] ?? OBJECT_ID_NULL);
+  return getObjectNameIndex(getChampionPossession(champion, slot));
 }

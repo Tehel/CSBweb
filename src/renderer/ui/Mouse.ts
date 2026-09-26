@@ -20,6 +20,7 @@ import { resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, setHandOwner } from '../../engine/Party';
+import { getChampionPossession } from '../../engine/gameTypes';
 import { updateHover } from '@/ui';
 
 export { decodeCursorBitmap };
@@ -260,7 +261,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   const objectInHand = ui.partyState.objectInHand;
   const slotObject = isChestSlot
     ? ui.openChestContents[slot - 30] ?? OBJECT_ID_NULL
-    : champ.possessions[slot] ?? OBJECT_ID_NULL;
+    : getChampionPossession(champ, slot);
   if (objectInHand === OBJECT_ID_NULL && slotObject === OBJECT_ID_NULL) return;
 
   if (objectInHand !== OBJECT_ID_NULL && !canPlaceInSlot(ui, objectInHand, slot)) return;

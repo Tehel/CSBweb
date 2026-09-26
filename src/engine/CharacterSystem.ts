@@ -25,7 +25,7 @@ import { DBType, decodeObjectID, OBJECT_ID_NULL, withObjectPosition, type Object
 import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
-import type { Champion } from './gameTypes';
+import { getChampionPossession, type Champion } from './gameTypes';
 
 export class CharacterSystem {
   constructor(private readonly ctx: GameContext) {}
@@ -49,7 +49,7 @@ export class CharacterSystem {
   removeCharacterPossession(chIdx: number, slot: number): ObjectID {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return OBJECT_ID_NULL;
-    const objRemoved = champion.possessions[slot] ?? OBJECT_ID_NULL;
+    const objRemoved = getChampionPossession(champion, slot);
     this.setPossessionDirect(champion, slot, OBJECT_ID_NULL);
     if (objRemoved === OBJECT_ID_NULL) return OBJECT_ID_NULL;
     const objNID5 = nameIndexOf(this.ctx, objRemoved);
@@ -126,7 +126,7 @@ export class CharacterSystem {
    * class-10 objects (arrows), 32-47 fire class-11 (slingstones).
    */
   matchingAmmunition(champion: Champion, slot: number): boolean {
-    const launcher = champion.possessions[1] ?? OBJECT_ID_NULL;
+    const launcher = getChampionPossession(champion, 1);
     if (launcher === OBJECT_ID_NULL || decodeObjectID(launcher).category !== DBType.WEAPON) return false;
     const launcherDesc = this.ctx.systems.characterStats.weaponDescFor(launcher);
     if (!launcherDesc) return false;
@@ -135,7 +135,7 @@ export class CharacterSystem {
     else if (launcherDesc.uByte1 >= 32 && launcherDesc.uByte1 <= 47) wanted = 11;
     else return false;
 
-    const candidate = champion.possessions[slot] ?? OBJECT_ID_NULL;
+    const candidate = getChampionPossession(champion, slot);
     if (candidate === OBJECT_ID_NULL || decodeObjectID(candidate).category !== DBType.WEAPON) return false;
     const desc = this.ctx.systems.characterStats.weaponDescFor(candidate);
     return !!desc && desc.uByte1 === wanted;
@@ -149,9 +149,9 @@ export class CharacterSystem {
   refillPossessionSlot(chIdx: number, slot: number): void {
     const champion = this.ctx.party.state.champions[chIdx];
     if (!champion) return;
-    if ((champion.possessions[slot] ?? OBJECT_ID_NULL) !== OBJECT_ID_NULL) return;
+    if (getChampionPossession(champion, slot) !== OBJECT_ID_NULL) return;
     for (const source of [12, 7, 8, 9]) {
-      const obj = champion.possessions[source] ?? OBJECT_ID_NULL;
+      const obj = getChampionPossession(champion, source);
       if (obj === OBJECT_ID_NULL) continue;
       if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
       const moved = this.removeCharacterPossession(chIdx, source);

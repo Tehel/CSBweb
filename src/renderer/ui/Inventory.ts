@@ -9,13 +9,13 @@
 import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { TextDecodeTables } from '../../engine/DungeonState';
-import { Champion } from '../../engine/gameTypes';
+import { Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { Rect } from '../csbwin/UITables';
-import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getChampionPossession, getInventoryItemIndex } from './Character';
+import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventoryItemIndex } from './Character';
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';
 import { applyViewingFilter, drawItemDescriptionLine, getInventoryPlaceholderIndex, getObjectDescriptionLines, getObjectDisplayName, isChestRecord, resolveObjectNameIndex } from './Objects';

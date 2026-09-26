@@ -32,7 +32,7 @@
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
-import type { Champion } from './gameTypes';
+import { getChampionPossession, type Champion } from './gameTypes';
 import { getPartyChampion } from './Party';
 import { MonsterDamageResult } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
@@ -286,11 +286,6 @@ export class AttackSystem {
     return this.ctx.party.state.champions;
   }
 
-  private possession(champ: Champion | null, slot: number): ObjectID {
-    if (!champ) return OBJECT_ID_NULL;
-    return champ.possessions[slot] ?? OBJECT_ID_NULL;
-  }
-
   private nameIndexOf(rn: ObjectID): number {
     if (rn === OBJECT_ID_NULL) return -1;
     return nameIndexOf(this.ctx, rn);
@@ -448,7 +443,7 @@ export class AttackSystem {
       return 0;
     }
     const nonMaterial = monsterNonMaterial(desc);
-    const weaponNI = this.nameIndexOf(this.possession(champ, 1));
+    const weaponNI = this.nameIndexOf(getChampionPossession(champ, 1));
 
     // A non-material monster cannot be touched at all except by the Vorpal Blade or a
     // DISRUPT: the whole formula is skipped and only the stamina is spent.
@@ -623,7 +618,7 @@ export class AttackSystem {
     this.trace(`D6W=Byte20002[attackType=${params.attackType}]=${p7}`);
     this.trace(`D7W=Byte19958[attackType=${params.attackType}]=${p8}`);
 
-    const weaponNI = this.nameIndexOf(this.possession(champ, 1));
+    const weaponNI = this.nameIndexOf(champ ? getChampionPossession(champ, 1) : OBJECT_ID_NULL);
     const vorpalOrDisrupt = weaponNI === OBJNI_VORPAL_BLADE || params.attackType === AttackType.atk_DISRUPT;
     if (vorpalOrDisrupt) this.trace('VorpalBlade or DISRUPT.');
 
@@ -749,7 +744,8 @@ export class AttackSystem {
    * different fields, and a count of zero is left alone rather than wrapping.
    */
   decrementChargesRemaining(chIdx: number): void {
-    const obj = this.possession(getPartyChampion(this.ctx.party.state, chIdx), 1);
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
+    const obj = champ ? getChampionPossession(champ, 1) : OBJECT_ID_NULL;
     if (obj === OBJECT_ID_NULL) return;
     const dungeon = this.ctx.dungeon;
     switch (decodeObjectID(obj).category) {
@@ -1163,7 +1159,7 @@ export class AttackSystem {
         // A magical box is consumed outright and is worth far more than the ordinary
         // charge-spending path; the two boxes differ tenfold.
         let delta = 0;
-        const held = this.possession(pChar, 1);
+        const held = getChampionPossession(pChar, 1);
         const misc = held !== OBJECT_ID_NULL && decodeObjectID(held).category === DBType.MISC
           ? this.ctx.dungeon.getMiscRecord(held)
           : null;
@@ -1308,10 +1304,10 @@ export class AttackSystem {
       return 0;
     };
 
-    const ammo = this.possession(pChar, 0);
+    const ammo = getChampionPossession(pChar, 0);
     if (ammo === OBJECT_ID_NULL || decodeObjectID(ammo).category !== DBType.WEAPON) return needAmmo();
 
-    const weapon = this.possession(pChar, 1);
+    const weapon = getChampionPossession(pChar, 1);
     const launcherDesc = weapon !== OBJECT_ID_NULL ? this.ctx.systems.characterStats.weaponDescFor(weapon) ?? null : null;
     const ammoDesc = this.ctx.systems.characterStats.weaponDescFor(ammo) ?? null;
     if (!launcherDesc || !ammoDesc) return needAmmo();

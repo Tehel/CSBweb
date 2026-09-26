@@ -21,7 +21,7 @@
 import { applyLimits, div, sw } from '../core/intCast';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { nameIndexOf, type GameContext } from './GameContext';
-import type { Champion } from './gameTypes';
+import { getChampionPossession, type Champion } from './gameTypes';
 import { determineMastery } from './skills';
 import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
 import type { WeaponDesc } from '../renderer/csbwin/ObjectTables';
@@ -126,7 +126,7 @@ export class CharacterStats {
       maxLoad = sw(maxLoad - (maxLoad >> shift));
     }
 
-    const feet = this.possession(champ, 5);
+    const feet = getChampionPossession(champ, 5);
     if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_ELVEN_BOOTS) {
       maxLoad = sw(maxLoad + (maxLoad >> 4));
     }
@@ -157,7 +157,7 @@ export class CharacterStats {
       footPenalty = 2;
     }
     if ((champ.wounds & 32) !== 0) time = sw(time + footPenalty);
-    const feet = this.possession(champ, 5);
+    const feet = getChampionPossession(champ, 5);
     if (feet !== OBJECT_ID_NULL && nameIndexOf(this.ctx, feet) === OBJNI_BOOTS_OF_SPEED) time--;
     return time;
   }
@@ -176,7 +176,7 @@ export class CharacterStats {
   determineThrowingDistance(champ: Champion, hand: number, partySleeping = false): number {
     let d7 = sw((this.ctx.random.next() & 15) + championAttribute(champ, AttributeIndex.Strength));
 
-    const obj = this.possession(champ, hand);
+    const obj = getChampionPossession(champ, hand);
     const weight = sw(obj !== OBJECT_ID_NULL ? this.getObjectWeight(obj) : 0);
     const sixteenth = sw(div(this.maxLoad(champ), 16));
 
@@ -233,10 +233,6 @@ export class CharacterStats {
     return applyLimits(loLimit, quickness, hiLimit);
   }
 
-  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-  private possession(champ: Champion, slot: number): ObjectID {
-    return champ.possessions[slot] ?? OBJECT_ID_NULL;
-  }
 
   /** `TAG0099d2` (`doc/CSBwin-src/Code51a4.cpp:2875`). */
   weaponDescFor(rn: ObjectID): WeaponDesc | null {

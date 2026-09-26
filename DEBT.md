@@ -30,8 +30,8 @@ The order, then:
 1. **D and E.** New structural debt goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
    found along the way is recorded here and not fixed, unless it blocks the D/E item at
-   hand or corrupts saves. C33 and C34 come first once E is empty, unless the author
-   pulls them forward.
+   hand or corrupts saves. C33 and C34 come first, unless the author pulls another
+   forward.
 3. **G — Unported CSBWin features.** Last. A missing feature is started only once D and E
    are empty, even when a dungeon, a save or a playtest needs it — note the need under the
    item instead. The author can always ask for one out of order.
@@ -73,10 +73,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E6 | `CHARDESC::Possession` is written out once per module | S | ⏳ |
-| C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C33 | An empty-handed click on bare stone plays no sound | S | ⏳ |
 | C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
+| C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
@@ -116,21 +115,13 @@ Empty. New state-representation debt goes here, and jumps the queue.
 
 ## E — Architecture
 
-### E6 ⏳ `CHARDESC::Possession` is written out once per module
-
-CSBWin reads a slot through `CHARDESC::Possession(slot)`. The port writes it out as a
-one-line `possessions[slot] ?? OBJECT_ID_NULL`: as a private helper in `CharacterStats.ts:238`,
-`AttackSystem.ts:291`, `PeriodicUpdates.ts:230` and `MonsterAttack.ts:694`; as the UI's
-exported `getChampionPossession` (`src/renderer/ui/Character.ts:603`); and inline in
-`CharacterSystem`, `MagicSystem`, `skills.ts`, `ui/Mouse.ts` and `data/CsbwinCharacters.ts`.
-The array is a required thirty, so the `??` only guards an out-of-range slot. Make it one
-exported function beside `Champion` (`src/engine/gameTypes.ts`) and use it everywhere.
+Empty. New architecture debt goes here, and jumps the queue.
 
 ---
 
 ## C — Known divergences from CSBWin
 
-Frozen until tier E is paid (see "Priority").
+Next, now that tiers D and E are empty: C33 and C34 first (see "Priority").
 
 ### C25 ⚠️ The stairs do not turn a monster's corner
 
@@ -177,7 +168,7 @@ The port has five writers:
   `AddCharacterPossession(chIdx, RemoveCharacterPossession(…), hand)` (`Timer.cpp:2664`;
   `CSBCode.cpp:6263-6270` through `TAG011594`). So a torch refilled from the quiver is not
   lit and a scroll is not opened. `MagicSystem`'s Zokathra goes through it too.
-- `ui/Character.setChampionPossession` (`src/renderer/ui/Character.ts:607`), the inventory
+- `ui/Character.setChampionPossession` (`src/renderer/ui/Character.ts:602`), the inventory
   click from `ui/Mouse.ts`, adds and takes off the Illumulet's `Word1074[2]` and lights or
   puts out a torch. It sets no `value(1)` / `value(0)` on an Illumulet or Jewel Symal, so a
   worn one never shows its `_b` name. It opens and closes no scroll, and it does not call
@@ -305,7 +296,7 @@ CSBWin moves the party with one function, the world `MoveObject(RNnul, …)`
 Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove` (or
 `resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
 (`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
-`AttackSystem.climbDownIntoPit` (`:1357`), `DsaSystem.teleportParty` (`:3087`) and
+`AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3087`) and
 `TimerSystem.wiggleParty` (`:1763`). They do not agree:
 
 - `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
@@ -400,7 +391,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
   (`ActuatorSystem`, `DsaSystem`) pass `ctx.tables.byte1596`, a required field, so it
   looks unreachable. Confirm that, then delete it and the `| null`.
 - `MonsterAttack.determineAttackOrder` returns `[0, 1, 2, 3]` when its `byte586` row is
-  missing, with no warning (`src/engine/MonsterAttack.ts:790`).
+  missing, with no warning (`src/engine/MonsterAttack.ts:786`).
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.

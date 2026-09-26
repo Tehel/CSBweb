@@ -10,7 +10,7 @@ import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { sw } from '../../core/intCast';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
-import { SLOT_SHIELD_HAND, SLOT_WEAPON_HAND, Champion } from '../../engine/gameTypes';
+import { getChampionPossession, SLOT_SHIELD_HAND, SLOT_WEAPON_HAND, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
@@ -597,11 +597,6 @@ export function drawHeldObjectName(ui: UIState): void {
 
   const padded = (label || '').padEnd(14, ' ').slice(0, 14);
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xe9, 0x25, 4, 0, padded);
-}
-
-/** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-export function getChampionPossession(champion: Champion, slot: number): ObjectID {
-  return champion.possessions[slot] ?? OBJECT_ID_NULL;
 }
 
 export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: ObjectID): void {

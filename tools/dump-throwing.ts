@@ -36,10 +36,9 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { AttackType } from '../src/engine/monsterTypes';
-import { getChampionPossession } from '../src/renderer/ui/Character';
 import { newGame, newContext } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
+import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 /** Enough samples that the `random()&15` in the distance formula averages out. */

@@ -17,7 +17,7 @@ import {
     incrAttributeCurrent,
 } from './attributes';
 import { nameIndexOf, type GameContext } from './GameContext';
-import type { Champion } from './gameTypes';
+import { getChampionPossession } from './gameTypes';
 import { GetBasicObjectType } from './objectIndex';
 import { determineMastery, ensureSkills } from './skills';
 
@@ -223,9 +223,4 @@ export function tenSecondUpdate(ctx: GameContext): void {
             }
         }
     }
-}
-
-/** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-function getChampionPossession(champion: Champion, slot: number): ObjectID {
-    return champion.possessions[slot] ?? OBJECT_ID_NULL;
 }

@@ -23,7 +23,7 @@ import { MISC_BONES_OF_HERO } from '../core/constants';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import type { Champion } from './gameTypes';
+import { getChampionPossession, type Champion } from './gameTypes';
 import { getPartyChampion } from './Party';
 import { MonsterType } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
@@ -639,7 +639,7 @@ export class MonsterAttack {
   armourStrength(champ: Champion, bodyPart: number, scale: boolean): number {
     let handTotal = 0;
     for (let hand = 0; hand < 2; hand++) {
-      const obj = this.possession(champ, hand);
+      const obj = getChampionPossession(champ, hand);
       if (obj === OBJECT_ID_NULL || decodeObjectID(obj).category !== DBType.CLOTHING) continue;
       const rec = this.dungeon.getClothingRecord(obj);
       if (!rec) continue;
@@ -668,7 +668,7 @@ export class MonsterAttack {
 
     // The garment worn on this part — hands (0 and 1) are the shields handled above.
     if (bodyPart > 1) {
-      const obj = this.possession(champ, bodyPart);
+      const obj = getChampionPossession(champ, bodyPart);
       const rec = obj !== OBJECT_ID_NULL && decodeObjectID(obj).category === DBType.CLOTHING
         ? this.dungeon.getClothingRecord(obj)
         : null;
@@ -689,10 +689,6 @@ export class MonsterAttack {
     return scaledMultiply(strength, 3, (flags & 7) + 4);
   }
 
-  /** `CHARDESC::Possession(slot)` — `RNnul` when the slot is empty. */
-  private possession(champ: Champion, slot: number): ObjectID {
-    return champ.possessions[slot] ?? OBJECT_ID_NULL;
-  }
 
   /* ------------------------------------------------------------ champion ---- */
 

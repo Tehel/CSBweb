@@ -26,6 +26,15 @@ export const SLOT_WEAPON_HAND = 1;
 export function emptyPossessions(): ObjectID[] {
     return new Array<ObjectID>(POSSESSION_COUNT).fill(OBJECT_ID_NULL);
 }
+
+/**
+ * `CHARDESC::Possession(slot)` (`doc/CSBwin-src/CSB.h:2581`): what the slot holds,
+ * `RNnul` when it is empty. CSBWin reads the array unchecked; a slot outside the thirty
+ * reads `RNnul` here.
+ */
+export function getChampionPossession(champion: Champion, slot: number): ObjectID {
+    return champion.possessions[slot] ?? OBJECT_ID_NULL;
+}
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**

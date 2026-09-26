@@ -17,7 +17,7 @@ import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
-import type { Champion, PartyState } from './gameTypes';
+import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
 import type { SpellParameters } from './magicTypes';
 import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
@@ -399,7 +399,7 @@ export class MagicSystem {
 
   private getFlaskInHand(champion: Champion): ObjectID | null {
     for (let slot = 0; slot < 2; slot += 1) {
-      const obj = champion.possessions[slot] ?? OBJECT_ID_NULL;
+      const obj = getChampionPossession(champion, slot);
       if (obj === OBJECT_ID_NULL) continue;
       if (GetBasicObjectType(this.dungeon, this.ctx.tables.objDescObjectType, obj) === OBJNI_EMPTY_FLASK) return obj;
     }

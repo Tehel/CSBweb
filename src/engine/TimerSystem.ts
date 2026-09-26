@@ -14,7 +14,7 @@ import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import type { PartyState } from './gameTypes';
+import { getChampionPossession, type PartyState } from './gameTypes';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
   isMagicSpellRn,
@@ -254,7 +254,7 @@ export class TimerSystem {
       // slots 7-9, taking the first object of the matching ammunition class
       // (`TAG0153c2`, `doc/CSBwin-src/Timer.cpp:2656-2672`).
       const character = this.ctx.systems.character;
-      if (champion.attackType === AttackType.atk_SHOOT && (champion.possessions[0] ?? OBJECT_ID_NULL) === OBJECT_ID_NULL) {
+      if (champion.attackType === AttackType.atk_SHOOT && getChampionPossession(champion, 0) === OBJECT_ID_NULL) {
         for (const slot of [12, 7, 8, 9]) {
           if (character.matchingAmmunition(champion, slot)) {
             const ammo = character.removeCharacterPossession(chIdx, slot);

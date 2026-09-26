@@ -30,7 +30,7 @@ import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, decodeObjectID, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
 import { AttackType, ATTACK_TYPE_NONE, ATTACK_CLASS_EMPTY_HAND } from '../../engine/monsterTypes';
 import { getPartyChampion } from '../../engine/Party';
-import { SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
+import { getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { determineMastery } from '../../engine/skills';
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -38,7 +38,6 @@ import { Rect } from '../csbwin/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
 import { getAttackClass, getBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
-import { getChampionPossession } from './Character';
 import { nowMs, UIState } from './UIState';
 
 /** `VBLDelay(15)` at 60 Hz — a quarter of a second. */

@@ -8,7 +8,7 @@
  */
 import { OBJNI_TORCH_A, OBJNI_TORCH_D } from '../../core/objectNameIndex';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
-import { getChampionPossession } from './Character';
+import { getChampionPossession } from '../../engine/gameTypes';
 import { getBaseObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 

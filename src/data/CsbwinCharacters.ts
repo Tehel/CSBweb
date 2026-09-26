@@ -21,7 +21,7 @@
  * - `portrait[1]` at 336 is really 464 bytes — `FILL337[800-337]` is the rest of it —
  *   and holds the champion's portrait **bitmap**. See `readPortrait` below.
  */
-import type { Champion, PartyState, Skill } from '../engine/gameTypes';
+import { getChampionPossession, type Champion, type PartyState, type Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
 import { OBJECT_ID_NULL, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
@@ -478,7 +478,7 @@ export function writeCsbwinCharacter(
   for (let i = 0; i < 30; i++) {
     // An empty slot is `RNnul`, which is what every empty slot holds in all twelve
     // committed saves.
-    const rn = champion.possessions[i] ?? OBJECT_ID_NULL;
+    const rn = getChampionPossession(champion, i);
     setU16BE(block, base + POSSESSIONS_OFFSET + i * 2, options.encodeRN ? options.encodeRN(rn) : rn);
   }
 
