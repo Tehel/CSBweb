@@ -1174,7 +1174,7 @@ export class MonsterAI {
         if ((decoded.position & 0x3) !== (position & 0x3)) continue;
         const missile = this.dungeon.getMissileRecord(rn);
         const timerIndex = missile?.timerIndex;
-        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, position & 0x3, rn)) {
+        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, level, position & 0x3, rn)) {
           if (timerIndex !== undefined) this.timers.deleteTimer(timerIndex);
           hitSomething = true;
           break;

@@ -20,6 +20,12 @@
  * switch. Each scenario below records `DetermineMagicDamage`, `DeterminePoisonDamage`
  * and `DamageMonster` as the real engine calls them, and checks the arithmetic.
  *
+ * Scenario 5 is the other way round: a member of a group of two, on level 2, sidesteps
+ * before it melees, and `CheckMonsterVersusMissiles` finds a missile in the group's
+ * corner that kills that member. The encounter looks the group up on `d.LoadedLevel`
+ * (`Code11f52.cpp:1765`), which during a monster's turn is the monster's own level
+ * (`LoadLevel(timeEnt.Level())`, `CSBCode.cpp:6416-6417`).
+ *
  * Run: `npx tsx tools/dump-missile-monster.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -37,9 +43,12 @@ import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
+import { MonsterDamageResult } from '../src/engine/MonsterDamage';
+import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import {
   extractObjectTables, monsterAbsorbsDaggersEtc, monsterHorizontalSize, monsterInvincible,
-  monsterNonMaterial, type MonsterDesc,
+  monsterNonMaterial, monsterWord2Bit3, monsterWord2Bit4, type MonsterDesc,
 } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { newGame } from './lib/game';
@@ -320,6 +329,63 @@ function main(): void {
     fly(game, bomb, new Position(range.target.x - 1, range.target.y, range.target.z));
     console.log(`at the party, DetermineMagicDamage: ${JSON.stringify(log.magic)}`);
     check(log.magic[0]?.projectile === bomb, 'at a champion too, the blow is the potion\'s');
+  }
+
+  /* ----------------------- 5. a sidestep onto a missile that kills one member ------- */
+  console.log('');
+  console.log('=== 5. member 0 sidesteps before meleeing, and a missile in its corner kills it ===');
+  {
+    const arena = makeArena(2)!;
+    const { game, group, desc, target } = arena;
+    const slot = game.dungeonState.getAttachedItem16(group)!;
+    // Member 0 in corner 2, member 1 in corner 0: the whole byte is 2, which is what the
+    // scan compares a missile's corner with (C43 is about the other bits).
+    slot.positions = 2 | (0 << 2);
+    group.hp[0] = 1;
+    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+      nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
+      cursed: false, important: false, weaponType: WEAPON_FALCHION,
+    });
+    game.magic.launchThrownMissile(falchion, target, 2, EAST, 255, 255, 0, game.state.tickCount);
+    check(!monsterWord2Bit3(desc) || !monsterWord2Bit4(desc),
+      `${MonsterType[group.creatureType]} always passes the sidestep's die test, so no roll decides the scenario`);
+
+    const encounter = game.missileEncounter;
+    const process = encounter.processMissileEncounter.bind(encounter);
+    let leftByEncounter = -1;
+    encounter.processMissileEncounter = (...args) => {
+      const hit = process(...args);
+      leftByEncounter = slot.positions;
+      return hit;
+    };
+
+    // Facing north (0) from corner 2, the member turns to corner 1, which is empty
+    // (Monster.cpp:3940-3958).
+    const frame: AiFrame = {
+      timer: {
+        index: -1, time: game.state.tickCount, level: target.z, function: TimerFunction.TT_MONSTER_B0,
+        uByte5: 0, uByte6: target.x, uByte7: target.y, uByte8: 0, uByte9: 0, sequence: 0,
+        timerWord8: 0, timerWord6: 0,
+      },
+      i60: 0, sinceLastUpdate: 0, timePerMove: 0, bool36: false, d5: 0, secondaryDirection: 0,
+    };
+    const c: AiConst = {
+      monsterRn: game.dungeonState.findFirstMonster(target), monster: group, slot,
+      slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
+      timeUntilAlternateUpdate: 0, indexOfLastMonster: 1, horizSize: 0, invincible: false,
+      xDistance: 0, yDistance: 1, attackDistance: 1, timerFunction: TimerFunction.TT_MONSTER_B0,
+      fearFactorIs6: false, processingATimer: true,
+    };
+    const ai = game.ctx.systems.monsterAI as unknown as {
+      sidestepBeforeMeleeing(frame: AiFrame, c: AiConst, member: number, preferredDirection: number): boolean;
+    };
+    const turnOver = ai.sidestepBeforeMeleeing(frame, c, 0, 0);
+    console.log(`result ${encounter.monsterDamageResult}, members left ${(group.numMonM1 & 3) + 1}, ` +
+      `positions after the encounter ${leftByEncounter}, after the sidestep ${slot.positions}`);
+    check(turnOver, 'the sidestep ends the turn');
+    check(target.z !== 0, `the group is on level ${target.z}, where an encounter on level 0 would find nobody`);
+    check(encounter.monsterDamageResult === MonsterDamageResult.SOME_NOT_ALL_MONSTERS_DIED && (group.numMonM1 & 3) === 0,
+      `the falchion killed member 0 and not member 1: d.MonsterDamageResult is 1 (${encounter.monsterDamageResult})`);
   }
 
   finish();

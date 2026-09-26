@@ -167,6 +167,7 @@ export class MissileEncounter {
             oldPos.y,
             missileX,
             missileY,
+            level,
             (leaving - 1) & 0xff,
             missileRn,
           );
@@ -208,18 +209,25 @@ export class MissileEncounter {
     return this.movedObjectWasDestroyed;
   }
 
+  /**
+   * `ProcessMissileEncounter` (`doc/CSBwin-src/Code11f52.cpp:1711`). CSBWin works on
+   * `d.LoadedLevel` (`missileLocr.l = d.LoadedLevel`, `:1765`, and every map lookup after
+   * it), which this takes as `level`: the missile timer's level, the level of the move
+   * `checkMoveFromMissile` checks, or the level of the monster whose turn it is.
+   */
   processMissileEncounter(
     cellType: number,
     objX: number,
     objY: number,
     missileX: number,
     missileY: number,
+    level: number,
     objectPos: number,
     missileRn: ObjectID,
   ): boolean {
     const missile = this.dungeon.getMissileRecord(missileRn);
     if (!missile) return false;
-    const position = new Position(missileX, missileY, this.ctx.systems.timer.missileFilterTimer?.level ?? 0);
+    const position = new Position(missileX, missileY, level);
     const filterProjectile = (missile.projectileObject & 0xffff) as ObjectID;
     // `d.MonsterDamageResult = NO_MONSTER_DIED;` (`doc/CSBwin-src/Code11f52.cpp:1770`).
     this.monsterDamageResult = MonsterDamageResult.NO_MONSTER_DIED;

@@ -1332,7 +1332,7 @@ export class TimerSystem {
       const curPos = decoded.position & 0x3;
       const current = new Position(curMapX, curMapY, timer.level);
       if (this.isPartyAt(current)) {
-        if (this.ctx.systems.missileEncounter.processMissileEncounter(-2, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+        if (this.ctx.systems.missileEncounter.processMissileEncounter(-2, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
           this.clearMissileFilterState();
           return;
         }
@@ -1340,7 +1340,7 @@ export class TimerSystem {
 
       const monster = this.dungeon.findFirstMonster(current);
       if (monster !== OBJECT_ID_EOF) {
-        if (this.ctx.systems.missileEncounter.processMissileEncounter(-1, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+        if (this.ctx.systems.missileEncounter.processMissileEncounter(-1, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
           this.clearMissileFilterState();
           return;
         }
@@ -1394,7 +1394,7 @@ export class TimerSystem {
           const nextIsStairs = nextRoomType === RoomType.STAIRS;
           const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
           if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
-            if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, curPos, missileRn)) {
+            if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, timer.level, curPos, missileRn)) {
               this.clearMissileFilterState();
               return;
             }
@@ -1441,7 +1441,7 @@ export class TimerSystem {
       if (map) {
         const cellFlag = map.cellFlags[curMapX][curMapY];
         if (((cellFlag >> 5) & 0x7) === RoomType.DOOR) {
-          if (this.ctx.systems.missileEncounter.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, curPos, missileRn)) {
+          if (this.ctx.systems.missileEncounter.processMissileEncounter(RoomType.DOOR, curMapX, curMapY, curMapX, curMapY, timer.level, curPos, missileRn)) {
             this.clearMissileFilterState();
             return;
           }

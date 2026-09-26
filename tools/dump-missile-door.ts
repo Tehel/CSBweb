@@ -143,7 +143,7 @@ function encounter(
     return hitDoor(p, force, explosion, delay, time);
   };
   const before = new Set(game.timerQueue.getTimers().map((t) => t.index));
-  const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, 0, missileRn);
+  const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, at.z, 0, missileRn);
   const doorTimers = game.timerQueue.getTimers()
     .filter((t) => !before.has(t.index) && t.function === TimerFunction.TT_DOOR)
     .map((t) => ({ time: t.time, action: t.uByte9 }));

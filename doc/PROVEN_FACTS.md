@@ -2599,6 +2599,12 @@ shatters. Evidence: `tools/dump-player-attacks.ts` case 8.
 
 `ProcessMissileEncounter`'s monster arm (`doc/CSBwin-src/Code11f52.cpp:1960-2042`):
 
+- The group is `FindFirstMonster(objX, objY)` (`:1960`) on `d.LoadedLevel`, the level the
+  whole encounter works on (`missileLocr.l = d.LoadedLevel`, `:1765`). The timer loop loads
+  a timer's level before it runs it (`LoadLevel(timeEnt.Level())`,
+  `doc/CSBwin-src/CSBCode.cpp:6416-6417`), so during a monster's turn that is the monster's
+  own level, and `CheckMonsterVersusMissiles` (`Monster.cpp:4462`) meets missiles on every
+  level.
 - The victim is `OrdinalOfMonsterAtPosition(group, objectPos)` (`:1961-1962`) — the member
   in the corner the missile reached. An ordinal of 0 returns 0, and the missile flies on,
   unless the group is `drawAsSize4()`, when member 1 is hit (`:1963-1967`).

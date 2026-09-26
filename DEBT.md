@@ -107,6 +107,9 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
+Next free IDs: C56 · D9 · E7 · F11 · G12. An ID recorded and paid in one commit has no
+entry here, only its commit, so take the next ID from this line and move it on.
+
 ---
 
 ## D — State representation
@@ -147,13 +150,13 @@ writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` 
 
 - It returns at once while `missileFilterObject` is set (`:89`), so a move made while a
   missile's own timer runs checks no missiles, where CSBWin's checks them.
-- It points both at each missile it resolves, and clears them after (`:162-173`). CSBWin
+- It points both at each missile it resolves, and clears them after (`:162-174`). CSBWin
   never clears `missileFilterTimer`, only `missileFilterObject` at each of `MissileTimer`'s
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
   `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1505`,
-  then `?? 0` at `MissileEncounter.ts:440`). Only a dungeon with a missile encounter
+  then `?? 0` at `MissileEncounter.ts:448`). Only a dungeon with a missile encounter
   filter can see this half.
 
 Remove the guard and the writes, and keep `missileFilterTimer` as CSBWin does, a copy that
@@ -522,7 +525,7 @@ No shipped DM hero touches any of these.
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:356`) and in `MonsterDamage`
+`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:364`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
