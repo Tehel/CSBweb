@@ -97,7 +97,10 @@ export function resolveViewportCursorAction(ui: UIState, x: number, y: number): 
   if (objectId === OBJECT_ID_NULL) return null;
   if ((ui.partyState.cursorOwner ?? -1) < 0) return null;
 
-  const stoneAhead = isFrontCellStoneOrVisibleFalseWall(ui);
+  // `d.CellTypeJustAhead == 0` (`doc/CSBwin-src/Mouse.cpp:1165`), which is all this arm
+  // tests: a false wall that is not open summarises as stone, imaginary or not
+  // (`Codea59a.cpp:278-279`), unlike the bare-stone sound's `(cf & 5) == 0`.
+  const stoneAhead = ui.context?.roomData?.[17]?.roomType === SummaryRoomType.STONE;
   const doorFacingAhead = isFrontCellDoorFacing(ui);
 
   if (stoneAhead) {

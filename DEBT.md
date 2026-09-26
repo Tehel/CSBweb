@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
@@ -126,21 +125,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C46 ⏳ The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags
-
-With an object in hand, `HandleClickInViewport` takes its stone arm (the two near drop
-areas, then button 5 for the wall, an alcove or a fountain) when `d.CellTypeJustAhead == 0`
-(`doc/CSBwin-src/Mouse.cpp:1165`). That is `roomData[17].roomType` as `SummarizeRoomInfo`
-leaves it (`Viewport.cpp:6782-6785`), and a false wall summarises as stone while it is not
-open, `(cf & 4) == 0` (`Codea59a.cpp:278-279`). The port's `resolveViewportCursorAction`
-(`src/renderer/ui/ViewportPicking.ts:94`) tests `isFrontCellStoneOrVisibleFalseWall`
-instead, which also wants a false wall not to be imaginary, `(cf & 5) == 0`: the
-bare-stone sound's test (`Mouse.cpp:1146-1147`), not this one. So before a closed imaginary
-false wall (level 2, (7,9), `cf` 0xc1, in the shipped dungeon) CSBWin takes the stone arm
-and the port the open one, with its throw and four drop areas. Test
-`ui.context.roomData[17].roomType`, as `resolveEmptyHandedViewportClick` does. Evidence: a
-row in `tools/dump-viewport-click.ts` with an object in hand before (7,9).
 
 ### C47 ⏳ Seven engine sounds bypass `QueueSound`
 

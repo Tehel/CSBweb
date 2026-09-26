@@ -23,6 +23,10 @@
  * false wall (level 2, (7,9)) shows the two tests disagreeing. The sound is checked down
  * to the sample the host is asked to play.
  *
+ * With an object in hand, the same click tests `d.CellTypeJustAhead == 0` alone
+ * (`Mouse.cpp:1165`), so before that false wall it takes the stone arm: the two near drop
+ * areas and button 5, and no throw.
+ *
  * Run: `npx tsx tools/dump-viewport-click.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -35,7 +39,8 @@ import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInf
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Game } from '../src/engine/Game';
-import { resolveEmptyHandedViewportClick, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
+import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursorAction, testThrow, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
+import { extractUITables } from '../src/renderer/csbwin/UITables';
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { newGame, stockGraphics } from './lib/game';
@@ -207,6 +212,41 @@ function main(): void {
   game.party.state.facing = FACING_NORTH;
   check(summaryAhead(game).roomType === RoomType.STONE, 'a closed imaginary false wall summarises as stone');
   check(stone(imaginary, FACING_NORTH, false, 111, 97) === null, 'but is silent: (cf & 5) != 0');
+
+  // With an object in hand the click tests `d.CellTypeJustAhead == 0` and nothing else
+  // (`Mouse.cpp:1165`): stone ahead offers the two near drop areas and button 5, and
+  // anything else the throw and all four drop areas. The closed imaginary false wall is
+  // stone here, as it is to `SummarizeRoomInfo`. The object is the alcove's, still in hand.
+  const dropAreas = extractUITables(stockGraphics()).graphic231.dropAreas;
+  const [nearX, nearY] = [(dropAreas[0]!.x1 + dropAreas[0]!.x2) >> 1, (dropAreas[0]!.y1 + dropAreas[0]!.y2) >> 1];
+  const [farX, farY] = [(dropAreas[2]!.x1 + dropAreas[2]!.x2) >> 1, (dropAreas[2]!.y1 + dropAreas[2]!.y2) >> 1];
+  console.log('');
+  console.log(['party', 'facing', 'ahead', 'cellTypeJustAhead', 'click', 'in hand does'].join('\t'));
+  const inHand = (party: Position, facing: number, x: number, y: number): string => {
+    game.party.state.position = party;
+    game.party.state.facing = facing;
+    const ui = { ...bareUI(game, false), uiTables: { graphic231: { dropAreas } } } as unknown as UIState;
+    const ahead = ui.context!.roomData[17];
+    const got = resolveViewportCursorAction(ui, x, y);
+    const does = got === null ? 'null' : got.kind === 'drop' ? `drop ${got.pos}` : got.kind === 'throw' ? `throw ${got.side}` : got.kind;
+    console.log([`(${party.x},${party.y},${party.z})`, facing, `(${ahead.x},${ahead.y})`, ahead.roomType, `${x},${y}`, does].join('\t'));
+    return does;
+  };
+  // A point in `testThrow`'s left half (y 47-102) that is in no drop area.
+  const [throwX, throwY] = [80, 75];
+  check(game.party.state.objectInHand === rn, 'the alcove\'s object is still in hand');
+  check(testThrow(throwX, throwY, false) === 0 && findDropAreaHit({ uiTables: { graphic231: { dropAreas } } } as unknown as UIState,
+    throwX, throwY, 4) === null, `(${throwX},${throwY}) throws left and is in no drop area`);
+  check(inHand(PARTY, FACING_NORTH, throwX, throwY) === 'throw 0', 'open floor ahead: the point throws');
+  check(inHand(PARTY, FACING_NORTH, farX, farY) === 'drop 2', 'open floor ahead: the far drop area drops');
+  check(inHand(PARTY, FACING_WEST, throwX, throwY) === 'null', 'bare stone ahead: no throw');
+  check(inHand(PARTY, FACING_WEST, farX, farY) === 'null', 'bare stone ahead: no far drop area');
+  check(inHand(PARTY, FACING_WEST, nearX, nearY) === 'drop 0', 'bare stone ahead: the near drop area drops');
+  check(inHand(new Position(7, 24, 2), FACING_NORTH, throwX, throwY) === 'null', 'a closed solid false wall ahead: no throw');
+  check(inHand(imaginary, FACING_NORTH, throwX, throwY) === 'null',
+    'a closed imaginary false wall ahead: no throw either, d.CellTypeJustAhead is stone');
+  check(inHand(imaginary, FACING_NORTH, farX, farY) === 'null', 'nor its far drop area');
+  check(inHand(imaginary, FACING_NORTH, nearX, nearY) === 'drop 0', 'but its near drop area drops');
 
   // And the sound: ordinal 4, at the party, with no delay.
   game.party.state.position = PARTY;

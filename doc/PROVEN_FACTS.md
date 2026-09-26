@@ -3465,6 +3465,9 @@ on the **first** rectangle hit, then returns (`:1099-1136`):
   it is not open, `(cf & 4) == 0` (`Codea59a.cpp:278-279`). `(cf & 5) == 0` also wants it
   not imaginary. So a closed imaginary false wall (level 2, (7,9), `cf` 0xc1, in the
   shipped dungeon) has `d.CellTypeJustAhead == 0` and is silent.
+- With an object in hand, the click tests `d.CellTypeJustAhead == 0` alone (`:1165`).
+  Then only the two near drop areas and button 5 answer (`:1167-1180`), with no throw.
+  So before that closed imaginary false wall a click in the throw area does nothing.
 
 Evidence: `tools/dump-viewport-click.ts`.
 
