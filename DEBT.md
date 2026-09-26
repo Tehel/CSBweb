@@ -30,7 +30,8 @@ The order, then:
 1. **D and E.** New structural debt goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
    found along the way is recorded here and not fixed, unless it blocks the D/E item at
-   hand or corrupts saves. C34 comes first, unless the author pulls another forward.
+   hand or corrupts saves. Taken in the index's order, unless the author pulls another
+   forward.
 3. **G — Unported CSBWin features.** Last. A missing feature is started only once D and E
    are empty, even when a dungeon, a save or a playtest needs it — note the need under the
    item instead. The author can always ask for one out of order.
@@ -72,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C34 | Five possession writers, none of them CSBWin's whole | M | ⏳ |
 | C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
@@ -87,11 +87,12 @@ In payoff order: the first row is the next item.
 | C45 | Saving does not re-attach the monsters | S | ⏳ |
 | C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
 | C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
+| C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
-| G2 | Seven DSA filters | — | ⏳ |
+| G2 | Nine DSA filters | — | ⏳ |
 | G3 | The wings | — | ⏳ |
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G5 | The message scroll, message state in saves, the freeze | — | ⏳ |
@@ -121,7 +122,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Next, now that tiers D and E are empty: C34 first (see "Priority").
+Next, now that tiers D and E are empty, in the index's order (see "Priority").
 
 ### C25 ⚠️ The stairs do not turn a monster's corner
 
@@ -140,47 +141,6 @@ A type cannot fix this: the `ObjectID` brand cannot forbid `===`. The fix is an
 by `removeObjectFromCell` and every chain walker that CSBWin writes as `RN ==`. Only then
 can `moveMonster` set the group down under the turned ID without the next lift missing it
 (the lift still holds the old ID). That touches every chain operation, hence M.
-
-### C34 ⏳ Five possession writers, none of them CSBWin's whole
-
-CSBWin changes a champion's slots only through `AddCharacterPossession`
-(`doc/CSBwin-src/Character.cpp:1936-2037`) and `RemoveCharacterPossession` (`:1822-1930`).
-The port has five writers:
-
-- `CharacterSystem.removeCharacterPossession` is CSBWin's, less two things. One is
-  `TAG01b1c0` (`Character.cpp:4887`), which closes the attack menu, when
-  `d.AttackingCharacterOrdinal` is this champion (`:1885-1888`). The other is `RepackChest`
-  (`:3108`) when their inventory is open and a chest leaves the weapon hand (`:1906-1914`).
-  Both depend on UI state (`UIState.attackingCharacterOrdinal`, the open inventory), which
-  the engine cannot see.
-- `CharacterSystem.setChampionHand` is a slot write plus `AdjustStatsForItemCarried`, and
-  nothing else. It is the add half of the two hand refills, which in CSBWin are
-  `AddCharacterPossession(chIdx, RemoveCharacterPossession(…), hand)` (`Timer.cpp:2664`;
-  `CSBCode.cpp:6263-6270` through `TAG011594`). So a torch refilled from the quiver is not
-  lit and a scroll is not opened. `MagicSystem`'s Zokathra goes through it too.
-- `ui/Character.setChampionPossession` (`src/renderer/ui/Character.ts:602`), the inventory
-  click from `ui/Mouse.ts`, adds and takes off the Illumulet's `Word1074[2]` and lights or
-  puts out a torch. It sets no `value(1)` / `value(0)` on an Illumulet or Jewel Symal, so a
-  worn one never shows its `_b` name. It opens and closes no scroll, and it does not call
-  `TAG01b1c0`. It also lights any torch by `GetBasicObjectType`, where CSBWin's add tests
-  `NameIndex == Torch_a`, an unlit one (`:1988`).
-- `DsaSystem.setChampionPossession` (`DsaSystem.ts:2297`) does `AdjustStatsForItemCarried`
-  and the Illumulet's brightness. It does nothing for a torch, `value()` or a scroll.
-- The Hall of Champions recruit (`HallOfChampions.collectMirrorPossessions`) writes the
-  array through `assignAddCharacterPossessions` (`AddCharacter.ts:108`), then adds the stat
-  bonuses. CSBWin places each mirror object with `AddCharacterPossession`
-  (`Character.cpp:789`). So a recruit's Illumulet does not light the party and their
-  torch is not lit.
-
-All five call `AdjustStatsForItemCarried`, each in its own way, and the UI and the DSA each
-have their own copy of `updateLightForPossessionChange`.
-
-Port `AddCharacterPossession` into `CharacterSystem` beside `removeCharacterPossession`,
-and route all five writers through the pair, so that `AdjustStatsForItemCarried` has one
-caller per direction again. Add the two engine→UI notices (close the attack menu, repack
-the open chest) to `GameHost` (`src/engine/GameHost.ts`). Needs
-the frames, because the inventory click is UI. `tools/dump-item-bonuses.ts` section 4
-already drives four of the writers.
 
 ### C35 ⏳ A monster that throws nothing reports missile 0, not `RNnul`
 
@@ -270,7 +230,7 @@ writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` 
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
-  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1509`,
+  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1508`,
   then `?? 0` at `MissileEncounter.ts:440`). Only a dungeon with a missile encounter
   filter can see this half.
 
@@ -312,7 +272,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 (`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1425-1435`). `moveObject` has a missile arm of its own,
+missile itself (`TimerSystem.ts:1424-1434`). `moveObject` has a missile arm of its own,
 which reads the direction from the timer the missile record names (`WorldMove.ts:161-165`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
@@ -333,13 +293,13 @@ check that parks a missile in corner 3 of a centred lone monster's cell and runs
 
 `openSaveMenu` and `closeSaveMenu` call `ui.onEnterMenu` and `ui.onLeaveMenu`
 (`src/renderer/ui/SaveMenu.ts:161`, `:184`), CSBWin's `TAG02076e` and `TAG0207cc`, but
-nothing assigns either hook (`src/renderer/ui/UIState.ts:176-178`), so neither runs.
+nothing assigns either hook (`src/renderer/ui/UIState.ts:184-186`), so neither runs.
 `GameScreen.presentViewport` shades the three panels while the menu is up, which is
 `TAG02076e`'s drawing half. The rest is not ported:
 
 - `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108-5135`) repacks the open chest when the
   inventory shows one (`d.DisplayResurrectChestOrScroll == 4`, `:5124`), through
-  `RepackChest` (`:3108`), which is unported (C34 needs it too). It also sets the cursor
+  `RepackChest` (`:3108`, the port's `repackOpenChest`). It also sets the cursor
   shape to 0 (`:5133`), and does nothing at all while the party sleeps (`:5111`).
 - `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) re-selects the magic caster
   (`:9945-9947`), sets `d.Word20252 = 1` when no attack menu is open (`:9950`), and redraws
@@ -396,6 +356,17 @@ sound table's distances today, and its delayed sounds and `SoundFilter` once the
 ported (`SoundQueue`'s module comment). Read each site's CSBWin call and queue its ordinal.
 Evidence: a check per site that records the ordinal queued.
 
+### C48 ⏳ A Zokathra with both hands full is linked into the cell, not dropped
+
+When neither of the caster's hands is empty, CSBWin's Zokathra drops the new object into
+the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY, NULL, NULL)`, on the
+party's level (`doc/CSBwin-src/Magic.cpp:1380-1387`), so it presses a pad there as any
+drop does. The port's `MagicSystem` links it in with `DungeonState.addObjectToCell`
+(`src/engine/MagicSystem.ts:333-337`), which triggers nothing, and deletes the record if
+that fails, a case CSBWin does not have. Drop it with `WorldMove.moveObject(obj, -1, 0, …)`,
+as `CharacterSystem.dropAllPossessions` does. Evidence: a check that casts Zokathra with
+both hands full on a pressure pad.
+
 ---
 
 ## F — Verification debt
@@ -416,7 +387,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:285`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:284`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy
@@ -449,7 +420,7 @@ they are listed so nothing is lost. They come last (see "Priority").
 ### G1 ⏳ DSA gaps, and the footprint decoration
 
 - **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are reported once each through
-  `warnedOps` (`src/engine/DsaSystem.ts:1273`, `:1877`). Those warnings are the list.
+  `warnedOps` (`src/engine/DsaSystem.ts:1261`, `:1865`). Those warnings are the list.
   Slave DSAs are not implemented (`findMaster`, `:1909-1917`).
 - **`STKOP_Throw`** (`DSA.cpp:4558`) is one of the missing opcodes, so
   `TimerSystem.throwMissile` (`ThrowMissile`, `Timer.cpp:2016`) has no caller. When the
@@ -469,7 +440,7 @@ they are listed so nothing is lost. They come last (see "Priority").
   extended cell flag. It is omitted at `src/renderer/csbwin/SummarizeRoomInfo.ts:515`. The
   DSA decoration gating (actuator type 47) is ported.
 
-### G2 ⏳ Seven DSA filters
+### G2 ⏳ Nine DSA filters
 
 No dungeon we load defines any of them, so none could be verified if written. Each place
 uses CSBWin's defaults.
@@ -479,7 +450,7 @@ uses CSBWin's defaults.
   `src/renderer/ui/Feeding.ts:110`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:336`).
+  (`HallOfChampions.ts:333`).
 - `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
   statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
@@ -493,6 +464,17 @@ uses CSBWin's defaults.
   `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:260`).
 - `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
   attack option. The names come straight from `AttackNames`.
+- `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is
+  about to happen to the object on the cursor. CSBWin sends it a packet from 21 places.
+  The port sends six of the packet types, all from `ActuatorSystem` (the key, the torch
+  holder, the swap, the gift), to `GameHost.cursorFilter`, which `main.ts` answers with a
+  debug trace. None of the other types is sent, among them `HandleClothingClick`'s
+  `PlaceOnCharacter`, which may cancel the click, and `PickFromCharacter`
+  (`CSBCode.cpp:6966-6972`, `:6982-6991`).
+- `ESL_EQUIPFILTER`, which `CHARDESC::SetPossession(…, true)` runs before it writes the
+  slot, once with timer function 1 for the object leaving and once with 0 for the object
+  arriving (`Character.cpp:2917-2998`). Both halves of the pair write through it
+  (`:1850`, `:1962`). The port's pair writes with `CharacterSystem.setPossessionDirect`.
 
 ### G3 ⏳ The wings
 

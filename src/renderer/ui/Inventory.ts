@@ -305,6 +305,11 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
   chest.containedObject = OBJECT_ID_EOF;
 }
 
+/**
+ * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — link the open chest's objects back
+ * into it, in slot order. The engine asks for it when the chest leaves the weapon hand of
+ * the champion whose inventory is open (`GameHost.repackChest`).
+ */
 export function repackOpenChest(ui: UIState): void {
   if (ui.openChestId === null) return;
   const chest = ui.dungeonState.getContainerRecord(ui.openChestId);

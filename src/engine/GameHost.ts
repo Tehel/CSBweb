@@ -31,6 +31,18 @@ export interface GameHost {
    * waiting for a name.
    */
   openReincarnateScreen(chIdx: number): void;
+  /**
+   * A champion's weapon hand changed (`AddCharacterPossession` /
+   * `RemoveCharacterPossession`): `if (d.AttackingCharacterOrdinal == chIdx+1)
+   * TAG01b1c0();` (`doc/CSBwin-src/Character.cpp:1888-1891`, `:1977-1980`). The attack
+   * menu is the UI's.
+   */
+  closeAttackMenuOf(chIdx: number): void;
+  /**
+   * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`): a chest left the weapon hand of
+   * the champion whose inventory is open (`:1906-1914`). The open chest is the UI's.
+   */
+  repackChest(): void;
 }
 
 /**
@@ -45,5 +57,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     messages: host.messages ?? { printLinefeed: () => {}, quePrintLines: () => {} },
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
+    closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
+    repackChest: host.repackChest ?? (() => {}),
   };
 }

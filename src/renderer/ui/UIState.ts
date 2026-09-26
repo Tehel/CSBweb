@@ -148,6 +148,14 @@ export interface UIState {
    */
   applyFeeding?: (chIdx: number, fp: FeedParameters) => boolean;
   /**
+   * `RemoveCharacterPossession` / `AddCharacterPossession`
+   * (`doc/CSBwin-src/Character.cpp:1822`, `:1936`), for the inventory click. Hooks
+   * because the pair lights torches and the party, opens scrolls and moves the stats,
+   * all of it the engine's (`CharacterSystem`).
+   */
+  onRemoveCharacterPossession?: (chIdx: number, slot: number) => ObjectID;
+  onAddCharacterPossession?: (chIdx: number, object: ObjectID, slot: number) => void;
+  /**
    * `_ResurrectReincarnateCancel(button)` (`doc/CSBwin-src/CSBCode.cpp:6615`) — a
    * button on the Hall of Champions menu. A hook because confirming reaches the
    * dungeon's object chains and the mirror's actuators, none of which the UI owns.

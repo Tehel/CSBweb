@@ -96,8 +96,10 @@ export function characterAtPosition(champions: Champion[], position: number): nu
 }
 
 /**
- * `AddCharacter`'s possession loop (`doc/CSBwin-src/Character.cpp:730-790`), slot
- * choice only — the caller does the `AddCharacterPossession` half.
+ * `AddCharacter`'s possession loop (`doc/CSBwin-src/Character.cpp:730-790`). The slot
+ * choice is here; `place` is the `AddCharacterPossession` (`:789`), called for each
+ * object as it is chosen, and it must write `possessions`, which the next choice reads.
+ * By default it writes the slot and nothing else.
  *
  * The control flow is CSBWin's `switch` with two `goto case9`s and a `switchbreak`
  * label, kept shape-for-shape because the fall-throughs are the behaviour: a scroll or
@@ -109,6 +111,7 @@ export function assignAddCharacterPossessions(
   items: Iterable<AddCharacterItem>,
   tables: AddCharacterTables,
   possessions: ObjectID[],
+  place: (rn: ObjectID, slot: number) => void = (rn, slot) => { possessions[slot] = rn; },
 ): void {
   let nextBackpackSlot = 13;
 
@@ -182,7 +185,7 @@ export function assignAddCharacterPossessions(
     }
 
     if (slot >= 0 && slot < 30) {
-      possessions[slot] = item.rn;
+      place(item.rn, slot);
     }
   }
 }

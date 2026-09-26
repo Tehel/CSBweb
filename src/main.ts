@@ -232,6 +232,10 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`); the
         // screen's answer comes back through `onReincarnateNamed` below.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
+        // A weapon hand changed, or a chest left the open inventory's weapon hand:
+        // the attack menu and the open chest are the screen's.
+        closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
+        repackChest: () => screen?.repackChest(),
     });
 
     screen = new GameScreen(gameCanvasEl, {
@@ -250,6 +254,9 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
         onConsumeAttackDamage: () => game.consumeAttackDamageToDisplay(),
         applyFeeding: (chIdx, fp) => game.applyFeeding(chIdx, fp),
+        // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`.
+        onRemoveCharacterPossession: (chIdx, slot) => game.removeCharacterPossession(chIdx, slot),
+        onAddCharacterPossession: (chIdx, object, slot) => game.addCharacterPossession(chIdx, object, slot),
         onResurrectReincarnateCancel: (button) => {
             game.resurrectReincarnateCancel(button);
         },

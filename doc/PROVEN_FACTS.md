@@ -3215,6 +3215,30 @@ the object's weight comes off `load` last. In the Atari DM data `d.Word1074[2]` 
 torch is weapon type 2, the Jewel Symal misc type 2 and the Illumulet misc type 3.
 Evidence: `tools/dump-champion-death.ts` section 8 (5 of 56 checks fail before C30's fix).
 
+## `AddCharacterPossession` lights only an unlit torch, and repacks nothing
+
+`AddCharacterPossession(chIdx, object, place)` (`doc/CSBwin-src/Character.cpp:1936-2037`)
+returns at once for `RNnul` and otherwise overwrites the slot: every caller has found it
+empty first. After `AdjustStatsForItemCarried(pcA3, place, +1, object)` (`:1970`) it tests
+`object.NameIndex()`, taken before any of these changes it:
+
+- slot 1: `CHARFLAG_weaponAttack`, `TAG01b1c0()` if `d.AttackingCharacterOrdinal` is this
+  champion (`:1976-1980`), and a scroll (`objNI_OpenScroll`-`objNI_Scroll`) gets
+  `open(true)` (`:1981-1986`);
+- slot 0 or 1, a torch named `objNI_Torch_a`: `litTorch(1)` (`:1988-1994`). An unlit torch
+  always reads `_a`; a lit one reads `_a + d.Byte640[charges]` (`data.cpp:639-645`);
+- slot 10, an Illumulet: `value(1)` and `d.Brightness += d.Word1074[2]` (`:2011-2019`); a
+  Jewel Symal: `value(1)` (`:2022-2028`).
+
+Unlike the removal it repacks no chest: a chest or scroll going into the open inventory's
+weapon hand only marks `CHARFLAG_chestOrScroll` (`:1997-2004`). `AddCharacter` calls it for
+each mirror object inside the slot-choice loop, as the slot is chosen (`:789`), and the
+Hall of Champions' Cancel takes the champion back out without `RemoveCharacterPossession`
+(`CSBCode.cpp:6629-6658`): a cancelled recruit's Illumulet leaves the party lit, and their
+torch stays lit in the mirror's cell. ZED's mirror hands out a torch, which lands in his
+weapon hand. Evidence: `tools/dump-item-bonuses.ts` section 5 (7 of 109 checks fail before
+C34's fix).
+
 ## `AdjustStatsForItemCarried`: what a carried object does to its bearer
 
 `AdjustStatsForItemCarried(pChar, possessionIndex, addOrRemove, item)`

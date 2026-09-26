@@ -537,6 +537,16 @@ export class Game {
         this.hallOfChampions.reincarnateNamed(chIdx, name, title);
     }
 
+    /** `RemoveCharacterPossession` (`CharacterSystem`), for the inventory click and `tools/`. */
+    removeCharacterPossession(chIdx: number, slot: number): ObjectID {
+        return this.ctx.systems.character.removeCharacterPossession(chIdx, slot);
+    }
+
+    /** `AddCharacterPossession` (`CharacterSystem`), for the inventory click and `tools/`. */
+    addCharacterPossession(chIdx: number, object: ObjectID, slot: number): void {
+        this.ctx.systems.character.addCharacterPossession(chIdx, object, slot);
+    }
+
     /** The apply half of `_FeedCharacter` (`Feeding.applyFeedParameters`), for the UI and `tools/`. */
     applyFeeding(chIdx: number, fp: FeedParameters): boolean {
         return applyFeedParameters(this.ctx, chIdx, fp);

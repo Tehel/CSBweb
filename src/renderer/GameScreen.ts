@@ -58,7 +58,7 @@ import {
   updateButtonLists,
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
-import { attackPanelTick, drawAttackPanel } from './ui/Attack';
+import { attackPanelTick, closeAttackMenu, drawAttackPanel } from './ui/Attack';
 import { handleUIKey } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
@@ -77,7 +77,7 @@ import {
   saveMenuWheel,
   type SaveMenuMode,
 } from './ui/SaveMenu';
-import { drawInventoryBackground, drawInventoryScreen, syncOpenChest } from './ui/Inventory';
+import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
@@ -93,6 +93,8 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onChampionAttack'
   | 'onConsumeAttackDamage'
   | 'applyFeeding'
+  | 'onRemoveCharacterPossession'
+  | 'onAddCharacterPossession'
   | 'onResurrectReincarnateCancel'
   | 'onReincarnateNamed'
   | 'onSleep'
@@ -151,6 +153,8 @@ export class GameScreen {
     ui.onChampionAttack = hooks.onChampionAttack;
     ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
     ui.applyFeeding = hooks.applyFeeding;
+    ui.onRemoveCharacterPossession = hooks.onRemoveCharacterPossession;
+    ui.onAddCharacterPossession = hooks.onAddCharacterPossession;
     ui.onResurrectReincarnateCancel = hooks.onResurrectReincarnateCancel;
     ui.onReincarnateNamed = hooks.onReincarnateNamed;
     ui.onSleep = hooks.onSleep;
@@ -223,6 +227,16 @@ export class GameScreen {
   /** `ReIncarnate(pcA3)` (`doc/CSBwin-src/CSBCode.cpp:6738`) — open the screen. */
   openReincarnateScreen(chIdx: number): void {
     openReincarnateScreen(this.ui, chIdx);
+  }
+
+  /** `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` — the host's `closeAttackMenuOf`. */
+  closeAttackMenuOf(chIdx: number): void {
+    if (this.ui.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
+  }
+
+  /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — the host's `repackChest`. */
+  repackChest(): void {
+    repackOpenChest(this.ui);
   }
 
   /**

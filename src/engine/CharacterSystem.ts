@@ -1,17 +1,18 @@
 /**
  * `CharacterSystem` — the possession half of CSBWin's `Character.cpp`:
- * `RemoveCharacterPossession`, `DropAllPossessions`, the stat half of
- * `AddCharacterPossession` (`setChampionHand`) and `AdjustStatsForItemCarried` bound to
- * the context, and the two hand refills the busy timer runs (`matchingAmmunition`,
- * `refillPossessionSlot`). `DEBT.md` C34 makes this the one home of the possession writers.
- * Also `_ExecuteAttack`'s engine half (`executeAttack`) and `BringCharacterToLife`, by the
- * same file.
+ * `RemoveCharacterPossession` and `AddCharacterPossession`, the one pair every writer of a
+ * champion's slots goes through (the inventory click, the DSA, the hand refills, a spell,
+ * a recruit, a death), `DropAllPossessions`, `AdjustStatsForItemCarried` bound to the
+ * context, and the two hand refills the busy timer runs (`matchingAmmunition`,
+ * `refillPossessionSlot`). Also `_ExecuteAttack`'s engine half (`executeAttack`) and
+ * `BringCharacterToLife`, by the same file.
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as
  * `ctx.systems.character`.
  */
 import { sw } from '../core/intCast';
 import {
+  OBJNI_CHEST,
   OBJNI_ILLUMULET_A,
   OBJNI_ILLUMULET_B,
   OBJNI_JEWEL_SYMAL_A,
@@ -34,17 +35,20 @@ export class CharacterSystem {
    * `RemoveCharacterPossession` (`doc/CSBwin-src/Character.cpp:1822-1930`) — empty a
    * slot and undo what wearing or holding the object did.
    *
-   * Ported: round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
-   * `d.Brightness`, a Jewel Symal gets `value(0)`; in the weapon hand a scroll closes;
-   * in either hand a torch goes out. All of these test `RN::NameIndex`, the modified
-   * name, so a lit torch is any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`.
+   * Round the neck an Illumulet gets `value(0)` and takes `d.Word1074[2]` off
+   * `d.Brightness`, a Jewel Symal gets `value(0)`. Out of the weapon hand, the attack
+   * menu closes if it is this champion's and a scroll closes; out of either hand a torch
+   * goes out; and a chest out of the weapon hand of the champion whose inventory is open
+   * is repacked. All of these test `RN::NameIndex`, the modified name, so a lit torch is
+   * any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`. The attack menu and the open
+   * chest are the UI's, so those two go out as `GameHost` notices.
    *
    * No counterpart here: `SelectPaletteForLightLevel`, `DrawEightHands`,
    * `DisplayBackpackItem` and the `charFlags` redraw bits (the light and the panels are
    * derived from live state every frame); `load` (`CharacterStats.characterLoad`
-   * re-sums it). Not ported (`DEBT.md` C34), because they read UI state: `TAG01b1c0`
-   * when this champion's attack menu is open and `RepackChest` when their inventory is. The chest slots (30 and up)
-   * belong to the open inventory; no engine caller passes one.
+   * re-sums it). The chest slots (30 and up) are `d.rnChestContents`, the open
+   * inventory's, and nothing but the stat call reads them here, which does nothing past
+   * slot 29; so the inventory click writes them itself and no caller passes one.
    */
   removeCharacterPossession(chIdx: number, slot: number): ObjectID {
     const champion = this.ctx.party.state.champions[chIdx];
@@ -64,25 +68,61 @@ export class CharacterSystem {
       }
     }
     if (slot < 2) {
-      if (slot === 1 && objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
-        this.ctx.dungeon.getScrollRecord(objRemoved)!.open = false;
+      if (slot === 1) {
+        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1888-1891`)
+        this.ctx.host.closeAttackMenuOf(chIdx);
+        if (objNID5 >= OBJNI_OPEN_SCROLL && objNID5 <= OBJNI_SCROLL) {
+          this.ctx.dungeon.getScrollRecord(objRemoved)!.open = false;
+        }
       }
       if (objNID5 >= OBJNI_TORCH_A && objNID5 <= OBJNI_TORCH_D) {
         this.ctx.dungeon.getWeaponRecord(objRemoved)!.litTorch = false;
+      }
+      // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1856`, `:1906-1914`).
+      if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1 && objNID5 === OBJNI_CHEST) {
+        this.ctx.host.repackChest();
       }
     }
     return objRemoved;
   }
 
-  setChampionHand(champion: Champion, slot: number, obj: ObjectID): boolean {
-    const slots = champion.possessions;
-    if (slot < 0 || slot >= slots.length) return false;
-    if (slots[slot] !== OBJECT_ID_NULL) return false;
-    slots[slot] = obj;
-    // The stat half of `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1970`);
-    // the rest is `DEBT.md` C34.
-    this.adjustStatsForItemCarried(champion, slot, 1, obj);
-    return true;
+  /**
+   * `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1936-2037`) — put an object
+   * in a slot, which its caller has found empty, and do what wearing or holding it does.
+   *
+   * Into the weapon hand, the attack menu closes if it is this champion's and a scroll
+   * opens; into either hand an unlit torch (`NameIndex == Torch_a`, `:1988`) is lit.
+   * Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to
+   * `d.Brightness`, a Jewel Symal gets `value(1)`. The rest has no counterpart here, as
+   * in `removeCharacterPossession`. A chest slot (30 and up) is the inventory click's.
+   */
+  addCharacterPossession(chIdx: number, object: ObjectID, place: number): void {
+    if (object === OBJECT_ID_NULL) return;
+    const champion = this.ctx.party.state.champions[chIdx];
+    if (!champion) return;
+    this.setPossessionDirect(champion, place, object);
+    const objNID4 = nameIndexOf(this.ctx, object);
+    this.adjustStatsForItemCarried(champion, place, 1, object);
+    if (place < 2) {
+      if (place === 1) {
+        // `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` (`:1977-1980`)
+        this.ctx.host.closeAttackMenuOf(chIdx);
+        if (objNID4 >= OBJNI_OPEN_SCROLL && objNID4 <= OBJNI_SCROLL) {
+          this.ctx.dungeon.getScrollRecord(object)!.open = true;
+        }
+      }
+      if (objNID4 === OBJNI_TORCH_A) {
+        this.ctx.dungeon.getWeaponRecord(object)!.litTorch = true;
+      }
+    } else if (place === 10) {
+      if (objNID4 >= OBJNI_ILLUMULET_A && objNID4 <= OBJNI_ILLUMULET_B) {
+        this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
+        const party = this.ctx.party.state;
+        party.brightness = sw(party.brightness + this.ctx.tables.word1074[2]!);
+      } else if (objNID4 >= OBJNI_JEWEL_SYMAL_A && objNID4 <= OBJNI_JEWEL_SYMAL_B) {
+        this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
+      }
+    }
   }
 
   /**
@@ -112,9 +152,8 @@ export class CharacterSystem {
   }
 
   /**
-   * Write a possession slot without the UI's placement rules — used for CSBWin's
-   * temporary hand swap, where the object is put back immediately, and by
-   * `RemoveCharacterPossession`.
+   * `CHARDESC::SetPossession`, the bare slot write: CSBWin's temporary hand swap, where
+   * the object is put back at once, and the pair above.
    */
   setPossessionDirect(champion: Champion, slot: number, value: ObjectID): void {
     if (slot >= 0 && slot < champion.possessions.length) champion.possessions[slot] = value;
@@ -154,8 +193,7 @@ export class CharacterSystem {
       const obj = getChampionPossession(champion, source);
       if (obj === OBJECT_ID_NULL) continue;
       if (decodeObjectID(obj).category !== DBType.WEAPON) continue;
-      const moved = this.removeCharacterPossession(chIdx, source);
-      if (moved !== OBJECT_ID_NULL) this.setChampionHand(champion, slot, moved);
+      this.addCharacterPossession(chIdx, this.removeCharacterPossession(chIdx, source), slot);
       return;
     }
   }

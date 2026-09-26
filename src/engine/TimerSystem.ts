@@ -257,8 +257,7 @@ export class TimerSystem {
       if (champion.attackType === AttackType.atk_SHOOT && getChampionPossession(champion, 0) === OBJECT_ID_NULL) {
         for (const slot of [12, 7, 8, 9]) {
           if (character.matchingAmmunition(champion, slot)) {
-            const ammo = character.removeCharacterPossession(chIdx, slot);
-            if (ammo !== OBJECT_ID_NULL) character.setChampionHand(champion, 0, ammo);
+            character.addCharacterPossession(chIdx, character.removeCharacterPossession(chIdx, slot), 0);
             break;
           }
         }

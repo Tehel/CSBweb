@@ -39,6 +39,7 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { handleMagicClick, spellControlGetRect } from '../src/renderer/ui/MagicPanel';
 import { CharacterStats } from '../src/engine/CharacterStats';
+import { CharacterSystem } from '../src/engine/CharacterSystem';
 import { CsbRandom } from '../src/core/random';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
@@ -121,7 +122,12 @@ async function main(): Promise<void> {
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
+  ui.characterStats = new CharacterStats(ctx);
+  // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`, as `main.ts` wires them.
+  const character = new CharacterSystem(ctx);
+  ui.onRemoveCharacterPossession = (chIdx, slot) => character.removeCharacterPossession(chIdx, slot);
+  ui.onAddCharacterPossession = (chIdx, object, slot) => character.addCharacterPossession(chIdx, object, slot);
   ui.partyState = party.state;
 
   // Not every mirror hands its hero a weapon, so pick, per box, a slot that really

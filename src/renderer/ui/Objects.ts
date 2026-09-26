@@ -58,11 +58,6 @@ export function isChestRecord(value: ObjectID): boolean {
   return decodeObjectID(value).category === DBType.CHEST;
 }
 
-export function isBaseObjectNameIndex(ui: UIState, objectId: ObjectID, min: number, max: number): boolean {
-  const base = getBaseObjectNameIndex(ui, objectId);
-  return base >= min && base <= max;
-}
-
 export function getObjectName(ui: UIState, objectNameIndex: number): string {
   const names = ui.objectTables?.objectNames ?? [];
   if (objectNameIndex >= 0 && objectNameIndex < names.length) {

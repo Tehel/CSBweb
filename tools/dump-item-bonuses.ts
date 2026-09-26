@@ -1,6 +1,8 @@
 /**
  * What carrying an object does to its bearer — `AdjustStatsForItemCarried`
- * (`doc/CSBwin-src/Character.cpp:1569-1780`), `DEBT.md` C32.
+ * (`doc/CSBwin-src/Character.cpp:1569-1780`) — and what else `AddCharacterPossession` /
+ * `RemoveCharacterPossession` (`:1936-2037`, `:1822-1930`), the one pair every writer
+ * goes through, do.
  *
  *   npx tsx tools/dump-item-bonuses.ts
  *
@@ -13,16 +15,22 @@
  *    a Rabbit's Foot in a chest slot, a cursed dagger past slot 12, a cursed misc object.
  * 3. A curse: -3 Luck in slots 0-12, before any other bonus (a cursed staff in the
  *    weapon hand gives no mana), and four of them wrap the Luck minimum below zero.
- * 4. The writers: `RemoveCharacterPossession` through a death, the UI's inventory click
- *    (`setChampionPossession`), a DSA move, and a Hall of Champions recruit arriving with
- *    the bonuses of what the mirror hands out.
+ * 4. The writers: `RemoveCharacterPossession` through a death, the inventory click
+ *    (`HandleClothingClick`), a DSA `&MOVE` to and from a character, and a Hall of
+ *    Champions recruit arriving with the bonuses of what the mirror hands out.
+ * 5. The rest of the pair, along those same paths: a torch lit in either hand (a hand
+ *    refilled from the backpack, ZED's torch from his mirror) and put out again, a scroll
+ *    opened in the weapon hand, an Illumulet lighting the party and a Jewel Symal waking
+ *    round the neck, and the two notices to the UI: the attack menu closes on any change
+ *    to the weapon hand, and the open inventory's chest is repacked when it leaves it.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import * as NI from '../src/core/objectNameIndex';
-import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, encodeObjectID } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
+import type { GameHost } from '../src/engine/GameHost';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -36,8 +44,7 @@ import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_T
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { setChampionPossession } from '../src/renderer/ui/Character';
-import { createUIState } from '../src/renderer/ui/UIState';
+import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -48,15 +55,49 @@ const viewportTables = extractViewportTables(graphics);
 const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
 const uiTables = extractUITables(graphics);
 
-function makeGame(): Game {
+function makeGame(host?: Partial<GameHost>): Game {
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const game = newGame(data, graphics);
+  const game = newGame(data, graphics, host);
   game.setRandomSeed(0x12345678);
   return game;
 }
+
+/** `ui/Mouse.ts` reaches for the DOM when it loads; a stub is enough for a click. */
+async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  if (!g.window) g.window = g;
+  return import('../src/renderer/ui/Mouse');
+}
+
+/** The interface over `g`, with the inventory click wired to the engine's pair as `main.ts` does. */
+function uiOver(g: Game): UIState {
+  const ui = createUIState(graphics, g.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  ui.uiTables = uiTables;
+  ui.objectTables = objectTables;
+  ui.partyState = g.party.state;
+  ui.onRemoveCharacterPossession = (chIdx, slot) => g.removeCharacterPossession(chIdx, slot);
+  ui.onAddCharacterPossession = (chIdx, object, slot) => g.addCharacterPossession(chIdx, object, slot);
+  return ui;
+}
+
+/** The first record of `category` in the dungeon, as an object ID. */
+function firstRecord(g: Game, category: DBType.SCROLL | DBType.CHEST): ObjectID {
+  const databases = g.dungeonState.getData().databases;
+  const db = category === DBType.SCROLL ? databases.scrolls : databases.containers;
+  if (db.records.length === 0) throw new Error(`dungeon.dat has no ${DBType[category]} record`);
+  return encodeObjectID(0, category, 0);
+}
+
+type DsaCharacterMoves = {
+  findCharacterSource(chIdx: number, carryLoc: number, doit: boolean): { error: number; object: ObjectID };
+  findCharacterDestination(chIdx: number, carryLoc: number, object: ObjectID, doit: boolean): number;
+};
+/** The DSA's `&MOVE` arms for a character (`doc/CSBwin-src/MoveObject.cpp:146`, `:420`). */
+const dsaOf = (g: Game): DsaCharacterMoves => (g as unknown as { dsaSystem: DsaCharacterMoves }).dsaSystem;
 
 function champion(i: number): Champion {
   return {
@@ -155,7 +196,8 @@ const table: Row[] = [
   { id: 'Moonstone', objNI: NI.OBJNI_MOONSTONE, slot: 10, stat: 'maxMana', bonus: 3 },
 ];
 
-function main(): void {
+async function main(): Promise<void> {
+  const { handleClothingClick } = await importMouse();
   const game = makeGame();
   const dungeon = game.dungeonState;
   const nameIndex = (rn: ObjectID): number => NameIndex(
@@ -279,27 +321,28 @@ function main(): void {
     console.log(`dying with a Serpent Staff and the Crown of Nerra: maxMana/Wisdom ${worn} -> ${after}`);
     check(worn === '36 53' && after === '20 43', 'a death takes each bonus off as the object drops');
 
-    // The UI's inventory click.
-    const ui = createUIState(graphics, g.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-    ui.uiTables = uiTables;
-    ui.objectTables = objectTables;
-    ui.partyState = g.party.state;
+    // The inventory click: champion 1's inventory is open, so a button of 8 and up is a
+    // slot of theirs (`slot = button - 8`, `doc/CSBwin-src/CSBCode.cpp:6944`).
+    const ui = uiOver(g);
+    g.party.state.selectedCharacterIndex = 1;
     const b = g.party.state.champions[1]!;
     const dexhelm = newObject(g, NI.OBJNI_DEXHELM);
     const dex = b.attributes.stats[AttributeIndex.Dexterity]!;
-    setChampionPossession(ui, b, 2, dexhelm);
+    g.party.state.objectInHand = dexhelm;
+    handleClothingClick(ui, 8 + 2);
     const on = dex.current;
-    setChampionPossession(ui, b, 2, OBJECT_ID_NULL);
+    handleClothingClick(ui, 8 + 2);
     console.log(`the inventory click: Dexterity 42 -> ${on} with the Dexhelm on -> ${dex.current} off`);
-    check(on === 52 && dex.current === 42 && dex.minimum === 30, 'the inventory click puts the bonus on and takes it off');
+    check(on === 52 && dex.current === 42 && dex.minimum === 30 && g.party.state.objectInHand === dexhelm,
+      'the inventory click puts the bonus on and takes it off');
 
-    // The DSA's writer, behind `&MOVE` to and from a character (`MoveObject.cpp:160`, `:435`).
-    const dsa = (g as unknown as { dsaSystem: { setChampionPossession(c: Champion, slot: number, rn: ObjectID): void } }).dsaSystem;
+    // The DSA's `&MOVE` to and from a character (`MoveObject.cpp:435`, `:160`).
+    const dsa = dsaOf(g);
     const towers = newObject(g, NI.OBJNI_POWERTOWERS);
     const strength = b.attributes.stats[AttributeIndex.Strength]!;
-    dsa.setChampionPossession(b, 4, towers);
+    dsa.findCharacterDestination(1, 4, towers, true);
     const dsaOn = strength.current;
-    dsa.setChampionPossession(b, 4, OBJECT_ID_NULL);
+    dsa.findCharacterSource(1, 4, true);
     console.log(`a DSA move: Strength 41 -> ${dsaOn} with Powertowers on -> ${strength.current} off`);
     check(dsaOn === 51 && strength.current === 41, 'a DSA move puts the bonus on and takes it off');
   }
@@ -330,6 +373,131 @@ function main(): void {
       + `Rabbit's Foot in slot ${foot}`);
     check(foot >= 0 && luck?.current === Math.min(boris.luck, 224) + 10 && luck?.minimum === 20,
       'a recruit arrives with the bonus of what they carry');
+  }
+
+  /* ---------------------------------------- 5. the rest of the pair -------------- */
+  console.log('');
+  console.log('=== The rest of the pair ===');
+  {
+    const notices: string[] = [];
+    const g = makeGame({
+      closeAttackMenuOf: (chIdx) => notices.push(`closeAttackMenuOf(${chIdx})`),
+      repackChest: () => notices.push('repackChest'),
+    });
+    g.addChampion(champion(0));
+    g.addChampion(champion(1));
+    const ui = uiOver(g);
+    const party = g.party.state;
+    party.selectedCharacterIndex = 1;
+    const weapons = g.dungeonState.getData().databases.weapons.records;
+    const gNameIndex = (rn: ObjectID): number => NameIndex(
+      g.dungeonState,
+      { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 }, 0, rn,
+    );
+
+    // A torch refilled into an empty hand from the backpack (`TAG011594`,
+    // `CSBCode.cpp:6246-6247`) is lit: `NameIndex == Torch_a` (`Character.cpp:1988`).
+    const torch = newObject(g, NI.OBJNI_TORCH_A, { charges: 15 });
+    const torchIndex = torch & 0x3ff;
+    party.champions[1]!.possessions[7] = torch;
+    g.ctx.systems.character.refillPossessionSlot(1, 0);
+    const refilled = party.champions[1]!.possessions[0] === torch;
+    const litByRefill = weapons[torchIndex]!.litTorch;
+    handleClothingClick(ui, 8 + 0);
+    const outByClick = weapons[torchIndex]!.litTorch;
+    console.log(`a torch refilled into hand 0 from slot 7: lit ${litByRefill}, name ${gNameIndex(torch)} in the cursor`
+      + ` after the click took it out: lit ${outByClick}`);
+    check(refilled && litByRefill === true, 'a hand refilled with a torch lights it');
+    check(outByClick === false && party.objectInHand === torch, 'and taking it out of the hand puts it out');
+    party.objectInHand = OBJECT_ID_NULL;
+
+    // A scroll opens in the weapon hand and closes out of it (`:1981-1986`, `:1892-1896`).
+    const scroll = firstRecord(g, DBType.SCROLL);
+    const scrolls = g.dungeonState.getData().databases.scrolls.records;
+    scrolls[0]!.open = false;
+    party.objectInHand = scroll;
+    handleClothingClick(ui, 8 + 1);
+    const openInHand = scrolls[0]!.open;
+    const openName = gNameIndex(scroll);
+    handleClothingClick(ui, 8 + 1);
+    console.log(`a scroll into the weapon hand: open ${openInHand} (name ${openName}), out again: open ${scrolls[0]!.open}`);
+    check(openInHand && openName === NI.OBJNI_OPEN_SCROLL && !scrolls[0]!.open && gNameIndex(scroll) === NI.OBJNI_SCROLL,
+      'a scroll in the weapon hand is open, and closed again out of it');
+    party.objectInHand = OBJECT_ID_NULL;
+
+    // Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to the party's
+    // light (`:2011-2019`); a Jewel Symal gets `value(1)` (`:2022-2028`).
+    const misc = g.dungeonState.getData().databases.misc.records;
+    const step = uiTables.graphic232.word1074[2]!;
+    const brightness = party.brightness;
+    const illumulet = newObject(g, NI.OBJNI_ILLUMULET_A);
+    party.objectInHand = illumulet;
+    handleClothingClick(ui, 8 + 10);
+    const lit = `${party.brightness} ${misc[illumulet & 0x3ff]!.specialState} ${gNameIndex(illumulet)}`;
+    handleClothingClick(ui, 8 + 10);
+    const unlit = `${party.brightness} ${misc[illumulet & 0x3ff]!.specialState} ${gNameIndex(illumulet)}`;
+    console.log(`an Illumulet round the neck (Word1074[2] = ${step}): brightness/value/name ${brightness} -> ${lit} -> ${unlit}`);
+    check(step !== 0 && lit === `${brightness + step} 1 ${NI.OBJNI_ILLUMULET_B}`,
+      'a worn Illumulet lights the party and reads as its _b');
+    check(unlit === `${brightness} 0 ${NI.OBJNI_ILLUMULET_A}`, 'and taken off it goes dark again');
+    party.objectInHand = OBJECT_ID_NULL;
+    const symal = newObject(g, NI.OBJNI_JEWEL_SYMAL_A);
+    dsaOf(g).findCharacterDestination(1, 10, symal, true);
+    const symalOn = gNameIndex(symal);
+    dsaOf(g).findCharacterSource(1, 10, true);
+    console.log(`a Jewel Symal round the neck by a DSA move: name ${symalOn}, off: ${gNameIndex(symal)}`);
+    check(symalOn === NI.OBJNI_JEWEL_SYMAL_B && gNameIndex(symal) === NI.OBJNI_JEWEL_SYMAL_A,
+      'a worn Jewel Symal reads as its _b, and as its _a again off');
+
+    // The notices. Any change to a weapon hand asks the UI to close that champion's attack
+    // menu (`:1888-1891`, `:1977-1980`); a chest out of the weapon hand of the champion
+    // whose inventory is open asks it to repack the chest (`:1906-1914`).
+    const chest = firstRecord(g, DBType.CHEST);
+    notices.length = 0;
+    party.objectInHand = chest;
+    handleClothingClick(ui, 8 + 1);
+    const chestIn = notices.join(' ');
+    notices.length = 0;
+    handleClothingClick(ui, 8 + 1);
+    const chestOut = notices.join(' ');
+    party.objectInHand = OBJECT_ID_NULL;
+    notices.length = 0;
+    g.addCharacterPossession(0, chest, 1);
+    g.removeCharacterPossession(0, 1);
+    const otherChest = notices.join(' ');
+    notices.length = 0;
+    g.addCharacterPossession(1, chest, 0);
+    g.removeCharacterPossession(1, 0);
+    const shieldHand = notices.join(' ') || 'none';
+    console.log(`a chest into champion 1's weapon hand: ${chestIn}; out: ${chestOut}`);
+    console.log(`into and out of champion 0's (inventory closed): ${otherChest}; champion 1's shield hand: ${shieldHand}`);
+    check(chestIn === 'closeAttackMenuOf(1)' && chestOut === 'closeAttackMenuOf(1) repackChest',
+      'the open inventory\'s chest is repacked when it leaves the weapon hand, and the attack menu closes both ways');
+    check(otherChest === 'closeAttackMenuOf(0) closeAttackMenuOf(0)' && shieldHand === 'none',
+      'another champion\'s chest is not repacked, and the shield hand notices nothing');
+  }
+  {
+    // ZED's mirror hands out a torch, and `AddCharacter` puts it in with
+    // `AddCharacterPossession` (`Character.cpp:789`), so if it lands in a hand it is lit.
+    const g = makeGame();
+    const data = g.dungeonState.getData();
+    const zed = (data.presetHeroes ?? []).find((h) => h.name === 'ZED');
+    if (!zed) throw new Error('no ZED in dungeon.dat');
+    const facing = (zed.location.wall + 2) & 3;
+    const party = g.party.state;
+    party.position = new Position(
+      zed.location.x - [0, 1, 0, -1][facing]!, zed.location.y - [-1, 0, 1, 0][facing]!, zed.location.map,
+    );
+    party.facing = facing as Direction;
+    g.handleWallClick();
+    const recruit = party.champions[0];
+    const slot = recruit?.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL
+      && decodeObjectID(rn).category === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type
+        === data.databases.weapons.records[rn & 0x3ff]!.weaponType) ?? -1;
+    const torch = slot >= 0 ? recruit!.possessions[slot]! : OBJECT_ID_NULL;
+    const lit = slot >= 0 && data.databases.weapons.records[torch & 0x3ff]!.litTorch;
+    console.log(`ZED recruited: the torch is in slot ${slot}, lit ${lit}`);
+    check(slot === 1 && lit, 'a recruit\'s torch, put in the weapon hand, is lit');
   }
 
   finish();

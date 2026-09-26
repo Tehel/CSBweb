@@ -3,21 +3,19 @@
  *
  * Mirrors CSBWin `doc/CSBwin-src/Character.cpp` — portraits, hand icons, shield dots,
  * life/stamina/mana bars, the attribute and food/water panels, carried load, and the
- * possession slots those panels read and write.
+ * possession slots those panels read. Writing a slot is the engine's
+ * (`CharacterSystem.addCharacterPossession` / `removeCharacterPossession`).
  */
 import { ImageFormat } from '../../core/imageDecoder';
-import { OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B, OBJNI_TORCH_A } from '../../core/objectNameIndex';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
-import { sw } from '../../core/intCast';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
-import { getChampionPossession, SLOT_SHIELD_HAND, SLOT_WEAPON_HAND, Champion } from '../../engine/gameTypes';
+import { getChampionPossession, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
-import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, isBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';
-import { AdjustStatsForItemCarried } from '../../engine/AdjustStatsForItemCarried';
+import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
@@ -599,21 +597,6 @@ export function drawHeldObjectName(ui: UIState): void {
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, 0xe9, 0x25, 4, 0, padded);
 }
 
-export function setChampionPossession(ui: UIState, champion: Champion, slot: number, value: ObjectID): void {
-  const previous = getChampionPossession(champion, slot);
-  champion.possessions[slot] = value;
-  // `AdjustStatsForItemCarried`, `-1` from `RemoveCharacterPossession` and `+1` from
-  // `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1858`, `:1970`).
-  const nameIndex = (rn: ObjectID): number => resolveObjectNameIndex(ui, rn);
-  if (previous !== OBJECT_ID_NULL) {
-    AdjustStatsForItemCarried(champion, slot, -1, previous, ui.dungeonState, nameIndex);
-  }
-  if (value !== OBJECT_ID_NULL) {
-    AdjustStatsForItemCarried(champion, slot, 1, value, ui.dungeonState, nameIndex);
-  }
-  updateLightForPossessionChange(ui, slot, previous, value);
-}
-
 export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boolean {
   if (!ui.objectTables || !ui.uiTables) return true;
   const descIndex = descIndexForObject(ui, objectId as ObjectID);
@@ -628,36 +611,3 @@ export function getInventoryItemIndex(ui: UIState, champion: Champion, slot: num
   return value === OBJECT_ID_NULL ? -1 : resolveObjectNameIndex(ui, value);
 }
 
-export function updateLightForPossessionChange(ui: UIState, slot: number, previous: ObjectID, next: ObjectID): void {
-  if (!ui.partyState || !ui.uiTables) return;
-  if (slot !== 0 && slot !== 1 && slot !== 10) return;
-
-  if (slot === 10) {
-    const word1074 = ui.uiTables.graphic232.word1074;
-    const stepValue = word1074[2] ?? 0;
-    if (stepValue !== 0) {
-      const prevIsIllumulet = previous !== OBJECT_ID_NULL
-        && isBaseObjectNameIndex(ui, previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-      const nextIsIllumulet = next !== OBJECT_ID_NULL
-        && isBaseObjectNameIndex(ui, next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-      const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
-      if (delta !== 0) {
-        const current = ui.partyState.brightness ?? 0;
-        ui.partyState.brightness = sw(current + delta);
-      }
-    }
-  }
-
-  if (slot === SLOT_SHIELD_HAND || slot === SLOT_WEAPON_HAND) {
-    setTorchLitState(ui, previous, false);
-    setTorchLitState(ui, next, true);
-  }
-}
-
-export function setTorchLitState(ui: UIState, objectId: ObjectID, lit: boolean): void {
-  if (objectId === OBJECT_ID_NULL) return;
-  if (!isBaseObjectNameIndex(ui, objectId, OBJNI_TORCH_A, OBJNI_TORCH_A)) return;
-  const weapon = ui.dungeonState.getWeaponRecord(objectId as ObjectID);
-  if (!weapon) return;
-  weapon.litTorch = lit;
-}

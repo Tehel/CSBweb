@@ -126,7 +126,7 @@ export class HallOfChampions {
       setHandOwner(party, 0);
     }
 
-    this.collectMirrorPossessions(champion, possessions);
+    this.collectMirrorPossessions(index, possessions);
 
     // `ShowHideInventory(LOCAL_2)` (`:792`) — the inventory opens on the new
     // champion, and `potentialChampionIndex` turns its eye panel into the
@@ -294,10 +294,9 @@ export class HallOfChampions {
   /**
    * `doc/CSBwin-src/Character.cpp:715-790` — every object at the mirror's wall becomes
    * a possession. CSBWin does *not* unlink them from the room here: they stay in the
-   * cell until Resurrect or Reincarnate is pressed, which is what makes Cancel a
-   * clean undo.
+   * cell until Resurrect or Reincarnate is pressed, so a Cancel leaves them there.
    */
-  private collectMirrorPossessions(champion: Champion, possessions: ObjectID[]): void {
+  private collectMirrorPossessions(chIdx: number, possessions: ObjectID[]): void {
     const party = this.ctx.party.state;
     const mirror = this.getMirrorCell();
     const wall = (party.facing + 2) & 3;
@@ -318,14 +317,11 @@ export class HallOfChampions {
       });
     }
 
-    assignAddCharacterPossessions(items, this.addCharacterTables, possessions);
-    // `AddCharacter` places each object with `AddCharacterPossession`
-    // (`doc/CSBwin-src/Character.cpp:789`), so a recruit arrives with the bonuses of
-    // what they carry. Only the stat half is here; the rest is `DEBT.md` C34.
-    for (let slot = 0; slot < 30; slot++) {
-      const obj = possessions[slot]!;
-      if (obj !== OBJECT_ID_NULL) this.ctx.systems.character.adjustStatsForItemCarried(champion, slot, 1, obj);
-    }
+    // Each object goes in with `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:789`),
+    // so a recruit arrives with the bonuses of what they carry, their torch lit and their
+    // Illumulet lighting the party. Cancel undoes none of it (`CSBCode.cpp:6629-6658`).
+    assignAddCharacterPossessions(items, this.addCharacterTables, possessions,
+      (rn, slot) => this.ctx.systems.character.addCharacterPossession(chIdx, rn, slot));
   }
 
   /**

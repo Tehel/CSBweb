@@ -324,8 +324,11 @@ export class MagicSystem {
           case 7: {
             const zokathra = this.createMiscObject(51);
             if (zokathra) {
-              if (this.ctx.systems.character.setChampionHand(champion, 0, zokathra) || this.ctx.systems.character.setChampionHand(champion, 1, zokathra)) {
-                // placed in hand
+              // The first empty hand, the shield hand first (`doc/CSBwin-src/Magic.cpp:1360-1378`).
+              const hand = getChampionPossession(champion, 0) === OBJECT_ID_NULL ? 0
+                : getChampionPossession(champion, 1) === OBJECT_ID_NULL ? 1 : -1;
+              if (hand !== -1) {
+                this.ctx.systems.character.addCharacterPossession(casterIdx, zokathra, hand);
               } else {
                 const placed = this.dungeon.addObjectToCell(
                   this.ctx.party.state.position,

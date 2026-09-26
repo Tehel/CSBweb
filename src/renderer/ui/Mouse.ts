@@ -9,7 +9,7 @@
  */
 import { IndexedBitmap } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../csbwin/UITables';
-import { canPlaceInSlot, setChampionPossession } from './Character';
+import { canPlaceInSlot } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
@@ -266,6 +266,12 @@ export function handleClothingClick(ui: UIState, button: number): void {
 
   if (objectInHand !== OBJECT_ID_NULL && !canPlaceInSlot(ui, objectInHand, slot)) return;
 
+  // `RemoveCharacterPossession` and `AddCharacterPossession` are the engine's; a chest
+  // slot is `d.rnChestContents`, which is ours, and all the pair does past slot 29 is
+  // write it (`CharacterSystem.removeCharacterPossession`).
+  const remove = ui.onRemoveCharacterPossession;
+  const add = ui.onAddCharacterPossession;
+  if (!remove || !add) return;
   if (objectInHand !== OBJECT_ID_NULL) {
     ui.partyState.objectInHand = OBJECT_ID_NULL;
   }
@@ -273,7 +279,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = OBJECT_ID_NULL;
     } else {
-      setChampionPossession(ui, champ, slot, OBJECT_ID_NULL);
+      remove(chIdx, slot);
     }
     ui.partyState.objectInHand = slotObject;
   }
@@ -281,7 +287,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = objectInHand;
     } else {
-      setChampionPossession(ui, champ, slot, objectInHand);
+      add(chIdx, objectInHand, slot);
     }
   }
 }

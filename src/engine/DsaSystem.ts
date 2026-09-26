@@ -13,8 +13,7 @@ import {
   RoomType,
   withObjectPosition,
 } from '../core/types';
-import { DescIndex, GetBasicObjectType, NameIndex } from './objectIndex';
-import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
+import { DescIndex } from './objectIndex';
 import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
 import type { SpellParameters } from './magicTypes';
 import {
@@ -40,13 +39,8 @@ import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
 import type { WorldMove } from './WorldMove';
 import type { CsbRandom } from '../core/random';
-import { sw } from '../core/intCast';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
-import {
-    OBJNI_ILLUMULET_A,
-    OBJNI_ILLUMULET_B,
-} from '../core/objectNameIndex';
 
 export interface ViewingFilterOptions {
   phraseMask: number;
@@ -384,10 +378,7 @@ export class DsaSystem {
   private readonly roomTimerFunctions: ArrayLike<number>;
   /** `d.ObjDesc[].word4`. */
   private readonly objDescCarryMask: ArrayLike<number>;
-  private readonly objDescObjectType: ArrayLike<number>;
   private readonly carryLocation: ArrayLike<number>;
-  private readonly word1074: ArrayLike<number>;
-  private readonly byte640: ArrayLike<number>;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
   private adjustSkillsParameters = new Int32Array(5);
@@ -408,11 +399,8 @@ export class DsaSystem {
     this.random = ctx.random;
     this.roomTimerFunctions = ctx.tables.byte1596;
     this.objDescCarryMask = ctx.tables.objDescWord4;
-    this.objDescObjectType = ctx.tables.objDescObjectType;
     this.carryLocation = ctx.tables.carryLocation;
-    this.word1074 = ctx.tables.word1074;
     this.monsterDesc = ctx.tables.monsterDesc;
-    this.byte640 = ctx.tables.byte640;
   }
 
   setParameters(count: number, values: ArrayLike<number>): void {
@@ -1372,7 +1360,7 @@ export class DsaSystem {
           if (!loc) break;
           const champ = this.getChampion(party, loc.chIdx);
           if (!champ) break;
-          this.setChampionPossession(champ, loc.posIdx, cloned);
+          this.ctx.systems.character.addCharacterPossession(loc.chIdx, cloned, loc.posIdx);
         } else {
           const monsterId = this.decodeMonsterLocation(location);
           if (monsterId === null) break;
@@ -2228,8 +2216,7 @@ export class DsaSystem {
     if (loc.posIdx < 0 || loc.posIdx >= possessions.length) return null;
     const removed = possessions[loc.posIdx]!;
     if (removed === OBJECT_ID_NULL) return null;
-    this.setChampionPossession(champ, loc.posIdx, OBJECT_ID_NULL);
-    return removed;
+    return this.ctx.systems.character.removeCharacterPossession(loc.chIdx, loc.posIdx);
   }
 
   /** `EX_DEL`'s scroll arm (`doc/CSBwin-src/DSA.cpp:1715-1722`): its text goes first. */
@@ -2293,53 +2280,6 @@ export class DsaSystem {
     if (index < 0 || index >= party.champions.length) return null;
     return party.champions[index] ?? null;
   }
-
-  private setChampionPossession(champion: Champion, slot: number, next: ObjectID): void {
-    if (slot < 0 || slot >= 30) return;
-    const previous = champion.possessions[slot]!;
-    champion.possessions[slot] = next;
-    // `AdjustStatsForItemCarried`, `-1` from `RemoveCharacterPossession` and `+1` from
-    // `AddCharacterPossession` (`doc/CSBwin-src/Character.cpp:1858`, `:1970`).
-    const nameIndex = (rn: ObjectID): number => NameIndex(
-      this.dungeon,
-      { objDescObjectType: this.objDescObjectType, byte640: this.byte640 },
-      this.ctx.party.state.facing,
-      rn,
-    );
-    if (previous !== OBJECT_ID_NULL) AdjustStatsForItemCarried(champion, slot, -1, previous, this.dungeon, nameIndex);
-    if (next !== OBJECT_ID_NULL) AdjustStatsForItemCarried(champion, slot, 1, next, this.dungeon, nameIndex);
-    this.updateLightForPossessionChange(slot, previous, next);
-  }
-
-  private updateLightForPossessionChange(slot: number, previous: ObjectID, next: ObjectID): void {
-    if (slot !== 10) return;
-    const word1074 = this.word1074;
-    const party = this.ctx.party.state;
-    if (!word1074 || !party) return;
-    const stepValue = word1074[2] ?? 0;
-    if (stepValue === 0) return;
-
-    const prevIsIllumulet = previous !== OBJECT_ID_NULL
-      && this.isBaseObjectNameIndex(previous, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-    const nextIsIllumulet = next !== OBJECT_ID_NULL
-      && this.isBaseObjectNameIndex(next, OBJNI_ILLUMULET_A, OBJNI_ILLUMULET_B);
-    const delta = (nextIsIllumulet ? stepValue : 0) - (prevIsIllumulet ? stepValue : 0);
-    if (delta === 0) return;
-
-    const current = party.brightness ?? 0;
-    party.brightness = sw(current + delta);
-  }
-
-  private isBaseObjectNameIndex(objectId: ObjectID, min: number, max: number): boolean {
-    const base = this.getBaseObjectNameIndex(objectId);
-    return base >= min && base <= max;
-  }
-
-  /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
-  private getBaseObjectNameIndex(objectId: ObjectID): number {
-    return GetBasicObjectType(this.dungeon, this.objDescObjectType, objectId);
-  }
-
 
   private addObjectToMonster(monsterId: ObjectID, objectId: ObjectID): void {
     const monster = this.dungeon.getCreatureRecord(monsterId);
@@ -2503,7 +2443,7 @@ export class DsaSystem {
     if (decodeObjectID(obj).category === DBType.CLOUD) {
       return { error: DsaMoveError.SER_NoCloudsPlease, object: OBJECT_ID_EOF };
     }
-    if (doit) this.setChampionPossession(champ, carryLoc, OBJECT_ID_NULL);
+    if (doit) this.ctx.systems.character.removeCharacterPossession(chIdx, carryLoc);
     return { error: DsaMoveError.SER_OK, object: obj };
   }
 
@@ -2669,7 +2609,7 @@ export class DsaSystem {
     if (carryMask === null || (carryMask & slotMask) === 0) {
       return DsaMoveError.DER_IllegalObjectForCarryLocation;
     }
-    if (doit) this.setChampionPossession(champ, carryLoc, object);
+    if (doit) this.ctx.systems.character.addCharacterPossession(chIdx, object, carryLoc);
     return DsaMoveError.DER_OK;
   }
 

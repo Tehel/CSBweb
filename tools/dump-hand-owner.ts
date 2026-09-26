@@ -30,6 +30,7 @@ import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { CharacterStats } from '../src/engine/CharacterStats';
+import { CharacterSystem } from '../src/engine/CharacterSystem';
 import { CsbRandom } from '../src/core/random';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
@@ -156,7 +157,12 @@ async function main(): Promise<void> {
   ui.objectTables = objectTables;
   // Without this the UI's load and weight readouts silently return 0 — they delegate
   // to the engine now (`src/engine/CharacterStats.ts`).
-  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
+  ui.characterStats = new CharacterStats(ctx);
+  // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`, as `main.ts` wires them.
+  const character = new CharacterSystem(ctx);
+  ui.onRemoveCharacterPossession = (chIdx, slot) => character.removeCharacterPossession(chIdx, slot);
+  ui.onAddCharacterPossession = (chIdx, object, slot) => character.addCharacterPossession(chIdx, object, slot);
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
 
