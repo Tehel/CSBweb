@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
 | C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
 | C39 | `MonsterAI`'s copy of `d.MonsterDamageResult` is never 1 | S | ⏳ |
 | C40 | `CheckMoveFromMissile` uses the missile timer's filter state | S | ⏳ |
@@ -89,6 +88,8 @@ In payoff order: the first row is the next item.
 | C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
 | C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
 | C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
+| C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
+| C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -124,23 +125,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C37 ⏳ A door button or a touched wall does not set `d.clockTick`
-
-CSBWin's door button sets `d.clockTick = 1` before queueing the sound and the `TT_DOOR`
-timer (`doc/CSBwin-src/Mouse.cpp:1078`), so the door starts moving on the next VBL.
-`TouchWallF1` sets `d.clockTick = TouchWall(...)` (`Mouse.cpp:788`), and `TouchWall`
-returns 0 (`:315`) unless it worked a wall switch (`:537-539`). So a switch that fired makes
-a tick due at once, and a touch that fired nothing clears a due tick, the way an inhibited
-move does (the port's `ctx.loop.clockTickCleared`). Only a cell ahead that is off the map
-leaves `d.clockTick` alone (`:784-787`). The port's `MouseSystem.handleDoorSwitchClick`
-and `handleWallClick` (`src/engine/MouseSystem.ts:304-338`, `:282-286`) set neither flag, so a door
-starts moving, and a switch's effects land, up to a tick late.
-
-Set `ctx.loop.clockTickSet` for the door button and a switch that fired, and
-`clockTickCleared` for a touch that fired nothing, after checking that
-`ActuatorSystem.triggerWallSwitch`'s result is `TouchWall`'s. Prove it with a check that
-counts the frames from the click to the timer firing.
 
 ### C38 ⏳ `SetTimer`'s sequence repack at 0xffff is not ported
 
@@ -298,7 +282,7 @@ The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
 (`doc/CSBwin-src/CSBCode.cpp:1819`), which looks the ordinal up in `d.sound1772` and
 attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
-`src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:375`, `:510`), three
+`src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:374`, `:509`), three
 teleporters in `WorldMove.resolveCellEffects` (`:296`, `:313`, `:320`) and a door's step
 in `TimerSystem` (`:751`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
@@ -377,6 +361,39 @@ draws them (`:1500-1503`), shows a shaded hand. The port's `drawAttackButton`
 (`src/renderer/ui/Attack.ts:305`) tests only the busy bit and sleep. Add
 `potentialChampionIndex >= 0`. Evidence: a check or a golden frame of a candidate's
 attack hand.
+
+### C53 ⏳ Five mouse handlers do not set `d.clockTick`
+
+The port models `d.clockTick` as `ctx.loop.clockTickSet` (`= 1`: a tick runs in this VBL)
+and `clockTickCleared` (`= 0`: a tick that was due waits a VBL), in `src/engine/LoopState.ts`.
+`WakeUp`, a refused move, the door button and `TouchWallF1` write them. Five more handlers
+that the mouse queue runs write `d.clockTick` in CSBWin, and their counterparts write
+neither flag:
+
+- `ShowHideInventory` sets it to 1 once it has passed its dead-champion and
+  pressed-eye/mouth returns (`doc/CSBwin-src/CSBCode.cpp:7441`).
+- `TAG01a148`, the pick-up from the floor, ends with `d.clockTick = 1` (`Mouse.cpp:840`),
+  which its early returns skip.
+- `DropObject` ends the same way (`Mouse.cpp:964`).
+- The attack menu, `_TAG019fac`, sets it to `ExecuteAttack`'s result
+  (`Character.cpp:4716-4717`): 0 puts a due tick off, and 1 or a pass's -1 makes one due.
+- The cast button, in `_MagicSelection`, sets it to `CastMagic`'s result (`Magic.cpp:564`).
+
+Set the flags where each of these lands in the port. Evidence: a row per handler in
+`tools/dump-mouse-queue.ts` case 9, counting the frames from the click to the next tick.
+
+### C54 ⏳ `extraTicks`: a turn or a step does not make a tick due
+
+`_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`
+(`doc/CSBwin-src/CSBCode.cpp:7866-7869`, `:8084-8087`), so every turn and step runs a tick
+in the VBL that handles it. `extraTicks` is CSBWin's "Extra Ticks" menu option
+(`OPT_EXTRATICKS`, `CSBUI.cpp:987-988`), initialised `true` (`data.cpp:279`) and turned off
+only for the playback of a recording (`CSBUI.cpp:964`, `:2160`, `:2201`) or by a recording's
+`#NoExtraTicks` line (`Recording.cpp:300-303`). The port follows CSBWin's option defaults
+(`DM_rules`, `src/engine/HallOfChampions.ts:251`), so `extraTicks` is on. The port's
+`MovementSystem` sets neither flag for a turn or a step that goes through. Set
+`clockTickSet` at the top of both. Evidence: a row in `tools/dump-mouse-queue.ts` counting
+the frames from an arrow click to the next tick.
 
 ---
 

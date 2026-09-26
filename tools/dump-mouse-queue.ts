@@ -20,13 +20,18 @@
  * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7532-7544`).
  * - While the eye or the mouth is pressed, every button after 81 — the disk icon, 140,
  *   among them — is swallowed (`Mouse.cpp:1679-1680`), until the button-up.
+ * - A viewport click on a door button, or on a wall switch that fires, sets
+ *   `d.clockTick = 1`, so a tick runs in the frame of the click. A touch of the wall that
+ *   fires nothing sets it to 0, and a tick that was due waits a frame. A cell ahead off
+ *   the map leaves it alone (`Mouse.cpp:784-788`, `:1078`).
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { OBJECT_ID_EOF, Position, RoomType } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { ActuatorAction, getActuatorAction, getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -34,6 +39,7 @@ import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -266,6 +272,116 @@ async function main(): Promise<void> {
   check(diskAfterRelease, 'the disk icon should ask for the menu once the eye is let go');
   party.champions = [];
   party.selectedCharacterIndex = -1;
+
+  // ---- 9: a click that works something makes a tick due -----------------------------
+  // The main loop runs a tick after `HandleMouseEvents` whenever `d.clockTick` is set
+  // (doc/CSBwin-src/CSBCode.cpp:763-764). The door button sets it to 1 before queueing its
+  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085), so the door moves in the frame of the
+  // click. `TouchWallF1` sets it to what `TouchWall` returns (`:788`): 1 when a switch
+  // fired, 0 when nothing did, which puts off a tick that was due. A cell ahead off the
+  // map leaves it alone (`:784-787`).
+  const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;
+  const stone = (x: number, y: number): boolean =>
+    inMap(x, y) && ((dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7) === RoomType.STONE;
+  let doorScene: { x: number; y: number; dir: number; door: Position } | null = null;
+  let switchScene: { x: number; y: number; dir: number } | null = null;
+  let bareScene: { x: number; y: number; dir: number } | null = null;
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      const at = new Position(x, y, level);
+      const cellFlag = dungeon.getCellFlag(at);
+      if (((cellFlag >> 5) & 0x7) === RoomType.DOOR && !doorScene) {
+        const doorRN = dungeon.findFirstDoor(at);
+        if (doorRN === OBJECT_ID_EOF || !dungeon.getDoorRecordByIndex(decodeObjectID(doorRN).index)?.hasButton) continue;
+        for (let dir = 0; dir < 4 && !doorScene; dir++) {
+          // The button is on the faces the door is seen across (`MouseSystem.handleDoorSwitchClick`).
+          if (((cellFlag & 0x8) >> 3) === (dir & 1)) continue;
+          const px = x - DIRS[dir][0], py = y - DIRS[dir][1];
+          if (inMap(px, py)) doorScene = { x: px, y: py, dir, door: at };
+        }
+      }
+      if (!stone(x, y)) continue;
+      let objects = 0;
+      for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+        objects++;
+        const { category, position: side } = decodeObjectID(rn);
+        const rec = category === DBType.ACTUATOR ? dungeon.getActuatorRecord(rn) : null;
+        if (!rec || switchScene || getActuatorType(rec) !== 1) continue;
+        if (getActuatorAction(rec) === ActuatorAction.CONSTPRESSURE) continue;
+        const px = x + DIRS[side][0], py = y + DIRS[side][1];
+        if (inMap(px, py) && !stone(px, py)) switchScene = { x: px, y: py, dir: (side + 2) & 3 };
+      }
+      for (let side = 0; side < 4 && objects === 0 && !bareScene; side++) {
+        const px = x + DIRS[side][0], py = y + DIRS[side][1];
+        if (inMap(px, py) && !stone(px, py)) bareScene = { x: px, y: py, dir: (side + 2) & 3 };
+      }
+    }
+  }
+  if (!doorScene || !switchScene || !bareScene) throw new Error(`level ${level} lacks a door button, a wall switch or a bare wall`);
+
+  let viewportArm: 'door' | 'wall' = 'wall';
+  game.setMouseEventHandlers({
+    button: (num) => {
+      if (num !== 80) return;
+      if (viewportArm === 'door') game.handleDoorSwitchClick();
+      else game.handleWallClick();
+    },
+    unclick: () => {},
+  });
+  /** One VBL on the real clock: a tick runs once 250 ms have passed, or `d.clockTick` says so. */
+  const vbl = (): void => {
+    t += 17;
+    frameNo++;
+    game.runFrame(t);
+  };
+  /**
+   * Stand at `at`, facing `dir`, just after a tick, and click the viewport: the frames from
+   * the click to the first tick after it that leaves `done()` true, the click's own frame
+   * counting 1.
+   */
+  const framesUntil = (at: { x: number; y: number; dir: number }, arm: 'door' | 'wall', done = (): boolean => true): number => {
+    reset();
+    party.position = new Position(at.x, at.y, level);
+    game.party.setFacing(at.dir);
+    viewportArm = arm;
+    frame(true);
+    const ticksAtClick = game.ctx.state.tickCount;
+    game.onMouseClick(80, 100, 100);
+    for (let n = 1; n <= 30; n++) {
+      vbl();
+      if (game.ctx.state.tickCount !== ticksAtClick && done()) return n;
+    }
+    return -1;
+  };
+  const doorTimerQueued = (): boolean => game.ctx.timers.getTimers().some((timer) =>
+    timer.function === TimerFunction.TT_DOOR && timer.uByte6 === doorScene!.door.x && timer.uByte7 === doorScene!.door.y);
+  const doorFrames = framesUntil(doorScene, 'door', () => !doorTimerQueued());
+  console.log(`door button at (${doorScene.door.x},${doorScene.door.y}): its TT_DOOR fired ${doorFrames} frame(s) from the click`);
+  check(doorFrames === 1, "the door button's TT_DOOR fires in the frame of the click (d.clockTick = 1)");
+
+  const switchFrames = framesUntil(switchScene, 'wall');
+  console.log(`wall switch touched from (${switchScene.x},${switchScene.y}) facing ${switchScene.dir}: ` +
+    `the next tick ran ${switchFrames} frame(s) from the click`);
+  check(switchFrames === 1, 'a wall switch that fired brings the tick on in the frame of the click');
+
+  /** A tick is due by the clock; does it run in the frame that handles a wall click? */
+  const tickDueRunsAfterTouch = (at: { x: number; y: number; dir: number }): boolean => {
+    reset();
+    party.position = new Position(at.x, at.y, level);
+    game.party.setFacing(at.dir);
+    viewportArm = 'wall';
+    frame(true);
+    game.onMouseClick(80, 100, 100);
+    const before = game.ctx.state.tickCount;
+    frame(true);
+    return game.ctx.state.tickCount !== before;
+  };
+  const bareTicked = tickDueRunsAfterTouch(bareScene);
+  const offMapTicked = tickDueRunsAfterTouch({ x: 0, y: 0, dir: 3 });
+  console.log(`a tick due at the click: after a bare wall at (${bareScene.x},${bareScene.y}) facing ${bareScene.dir} ` +
+    `${bareTicked ? 'ran' : 'waited'}; after a touch off the map ${offMapTicked ? 'ran' : 'waited'}`);
+  check(!bareTicked, 'a touch that fired nothing puts off the tick that was due (d.clockTick = 0)');
+  check(offMapTicked, 'a touch of a cell off the map leaves d.clockTick alone');
 
   finish();
 }

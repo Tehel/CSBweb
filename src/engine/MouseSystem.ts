@@ -276,13 +276,24 @@ export class MouseSystem {
 
   /**
    * `HandleClickInViewport`'s wall arm, `TouchWallF1` (doc/CSBwin-src/Mouse.cpp:776,
-   * reached at `:1127`): touch the wall ahead, on the side that faces the party.
-   * Not ported: `d.clockTick = TouchWall(...)` (`:788`, `DEBT.md` C37).
+   * reached at `:1127`): touch the wall ahead, on the side that faces the party. A cell
+   * ahead off the map is not touched, and leaves `d.clockTick` alone (`:784-787`).
+   * Otherwise `d.clockTick = TouchWall(...)` (`:788`): a switch that fired makes a tick
+   * due at once, and a touch that fired nothing puts off a tick that was due.
    */
   handleWallClick(): boolean {
-    const pos = this.ctx.party.state.position;
-    const facing = this.ctx.party.state.facing;
-    return this.ctx.systems.actuators.triggerWallSwitch(pos, facing);
+    const party = this.ctx.party.state;
+    const facing = party.facing & 0x3;
+    const pos = party.position;
+    const touched = facing === 0 ? pos.north : facing === 1 ? pos.east : facing === 2 ? pos.south : pos.west;
+    const map = this.ctx.dungeon.getMap(pos.z);
+    if (!map) return false;
+    if (touched.x < 0 || touched.x >= map.descriptor.width) return false;
+    if (touched.y < 0 || touched.y >= map.descriptor.height) return false;
+    const fired = this.ctx.systems.actuators.touchWall(touched, (facing + 2) & 0x3);
+    this.ctx.loop.clockTickSet = fired;
+    this.ctx.loop.clockTickCleared = !fired;
+    return fired;
   }
 
   /**
@@ -297,9 +308,9 @@ export class MouseSystem {
 
   /**
    * `HandleClickInViewport`'s door-button arm (doc/CSBwin-src/Mouse.cpp:1060-1086): an
-   * empty hand on the button of the door ahead plays the switch sound and queues a
-   * `TT_DOOR` toggle for the next tick. Not ported: `d.clockTick = 1` (`:1078`,
-   * `DEBT.md` C37).
+   * empty hand on the button of the door ahead makes a tick due at once
+   * (`d.clockTick = 1`, `:1078`), plays the switch sound and queues a `TT_DOOR` toggle for
+   * the next tick, so the door starts moving in the tick the click brings on.
    */
   handleDoorSwitchClick(): boolean {
     const party = this.ctx.party.state;
@@ -324,6 +335,8 @@ export class MouseSystem {
     const door = this.ctx.dungeon.getDoorRecordByIndex(index);
     if (!door || !door.hasButton) return false;
 
+    this.ctx.loop.clockTickSet = true;
+    this.ctx.loop.clockTickCleared = false;
     this.ctx.host.playSound(SoundIndex.SWITCH);
     this.ctx.timers.createTimer(
       TimerFunction.TT_DOOR,

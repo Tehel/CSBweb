@@ -2764,6 +2764,20 @@ Evidence: `tools/dump-mouse-queue.ts` (it crashes before the port had the queue;
 fails before the eye gate),
 `tools/dump-party-collision.ts` case 9.
 
+## A door button or a wall switch makes a tick due; a touch that fires nothing postpones one
+
+- The door button sets `d.clockTick = 1` before it queues the switch sound and the
+  `TT_DOOR` for `d.Time + 1` (`doc/CSBwin-src/Mouse.cpp:1078-1085`). The main loop tests
+  `d.clockTick` right after `HandleMouseEvents` (`CSBCode.cpp:763-764`), so the tick runs
+  in the VBL of the click, and the door moves in it.
+- `TouchWallF1` returns, touching nothing, when the cell ahead is off the map
+  (`Mouse.cpp:784-787`), and otherwise sets `d.clockTick = TouchWall(...)` (`:788`).
+  `TouchWall` returns 1 when a switch fired, `result = 1` under `if (!switchOpen)`
+  (`:537-539`), and 0 otherwise (`:315`). So a switch makes a tick due at once, and a
+  touch that fired nothing puts off a tick that was due by one VBL, as a refused move does.
+
+Evidence: `tools/dump-mouse-queue.ts`, case 9.
+
 ## A level change discards all input, at the top of the next tick
 
 Taking a stairway, falling or being teleported to another level only sets

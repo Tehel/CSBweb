@@ -8,15 +8,17 @@ import type { GameContext } from './GameContext';
 
 export interface LoopFlags {
   /**
-   * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050): a tick is due at
-   * once, whatever the VBL count. The tick itself clears it again (`:704`), so a party
-   * woken by a blow during `ProcessTimers` gets no extra tick.
+   * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050), a door button
+   * (`Mouse.cpp:1078`) or a wall switch that fired (`TouchWallF1`, `:788`): a tick is due
+   * at once, whatever the VBL count. The tick itself clears it again (`CSBCode.cpp:704`),
+   * so a party woken by a blow during `ProcessTimers` gets no extra tick.
    */
   clockTickSet: boolean;
   /**
-   * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313). The VBL
-   * sets `clockTick` again on every VBL once `vblCount >= d.Speed` (`:1066-1077`), so
-   * a tick that was due waits one frame.
+   * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313) or a touch
+   * of the wall that fired nothing (`TouchWallF1`, `Mouse.cpp:788`). The VBL sets
+   * `clockTick` again on every VBL once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`),
+   * so a tick that was due waits one frame.
    */
   clockTickCleared: boolean;
   /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */

@@ -179,14 +179,13 @@ export class ActuatorSystem {
     return triggered;
   }
 
-  triggerWallSwitch(position: Position, facing: number): boolean {
-    const target = this.getForwardPosition(position, facing);
-    if (!target) return false;
-    const switchPosition = (facing + 2) & 0x3;
-    return this.touchWall(target, switchPosition);
-  }
-
-  private touchWall(position: Position, touchedPosition: number): boolean {
+  /**
+   * `TouchWall` (doc/CSBwin-src/Mouse.cpp:290): the party's hand on side
+   * `touchedPosition` of the wall at `position`. True when a switch fired, CSBWin's
+   * `result = 1` (`:537-539`), which `TouchWallF1` makes `d.clockTick`
+   * (`MouseSystem.handleWallClick`).
+   */
+  touchWall(position: Position, touchedPosition: number): boolean {
     const remainingActuators = [0, 0, 0, 0];
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
@@ -803,14 +802,6 @@ export class ActuatorSystem {
     }
 
     this.delayedAction = -1;
-  }
-
-  private getForwardPosition(position: Position, facing: number): Position {
-    const dir = facing & 3;
-    return (dir === 0) ? position.north
-      : (dir === 1) ? position.east
-      : (dir === 2) ? position.south
-      : position.west;
   }
 
   /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). */
