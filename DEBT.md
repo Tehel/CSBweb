@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C43 | `CheckMonsterVersusMissiles` masks the positions byte | S | ⏳ |
 | C44 | The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody | S | ⏳ |
 | C45 | Saving does not re-attach the monsters | S | ⏳ |
 | C46 | The cursor's viewport click reads `d.CellTypeJustAhead == 0` off the cell flags | S | ⏳ |
@@ -126,17 +125,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C43 ⏳ `CheckMonsterVersusMissiles` masks the positions byte
-
-Both of CSBWin's calls pass the group's whole positions byte, `pI16A2->positions()`, as
-`position` (`doc/CSBwin-src/Monster.cpp:3882`, `:3960`), and the scan skips every missile
-whose `objD6.pos() != position` (`:4478`). `RN::pos()` is 0-3 (`CSBTypes.h:331-335`), so a
-missile is met only while bits 2-7 of the byte are all 0, and never by a centred lone
-monster (255). The port's `MonsterAI.checkMonsterVersusMissiles` compares the corner with
-`positions & 3` (`src/engine/MonsterAI.ts:1178`), so wherever those bits are set it meets
-the missiles in that corner, which CSBWin lets through. Compare the whole byte. Evidence: a
-check that parks a missile in corner 3 of a centred lone monster's cell and runs its turn.
 
 ### C44 ⏳ The save menu's `TAG02076e` and `TAG0207cc` hooks are set by nobody
 

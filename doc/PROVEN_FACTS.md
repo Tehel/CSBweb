@@ -2667,6 +2667,14 @@ monster, a champion or a door is `DetermineMagicDamage` of the potion — a rand
 half its weight — and the explosion comes after it, and `nonPoison_Spell` is false for a
 potion. Evidence: `tools/dump-missile-monster.ts`.
 
+**A monster walks into a missile only when its positions byte is that missile's corner.**
+Both calls of `CheckMonsterVersusMissiles` pass the group's whole positions byte,
+`pI16A2->positions()` (`Monster.cpp:3882`, `:3960`), and the scan skips every missile with
+`objD6.pos() != position` (`:4478`). `RN::pos()` is `(dataTypeMap[…] >> 4) & 3`
+(`CSBTypes.h:331-335`), 0 to 3, so a byte with any of bits 2-7 set meets no missile: a lone
+monster spread over its cell (`positions() = 0xff`, `:3855`) never does, nor one whose byte
+still holds a second member's corner. Evidence: `tools/dump-missile-monster.ts` scenario 6.
+
 ## Torches burn down every 512 ticks, and a recruit's does not
 
 The game tick calls `NinetySecondUpdate` when `(d.Time & 511) == 0`

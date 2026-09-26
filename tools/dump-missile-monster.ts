@@ -28,6 +28,11 @@
  * then 1, some but not all died, and the sidestep leaves the corners as the encounter
  * left them (`Monster.cpp:3959-3970`).
  *
+ * Scenario 6: `CheckMonsterVersusMissiles` skips every missile whose `pos()` is not the
+ * group's whole positions byte (`Monster.cpp:4478`), which both callers pass unmasked
+ * (`:3882`, `:3960`). A lone monster spread over its cell (255), or one whose byte still
+ * holds another member's corner, meets no missile at all.
+ *
  * Run: `npx tsx tools/dump-missile-monster.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -341,7 +346,7 @@ function main(): void {
     const { game, group, desc, target } = arena;
     const slot = game.dungeonState.getAttachedItem16(group)!;
     // Member 0 in corner 2, member 1 in corner 0: the whole byte is 2, which is what the
-    // scan compares a missile's corner with (C43 is about the other bits).
+    // scan compares a missile's corner with (scenario 6).
     slot.positions = 2 | (0 << 2);
     group.hp[0] = 1;
     const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
@@ -390,6 +395,55 @@ function main(): void {
       `the falchion killed member 0 and not member 1: d.MonsterDamageResult is 1 (${encounter.monsterDamageResult})`);
     check(leftByEncounter >= 0 && slot.positions === leftByEncounter,
       `so the corners stay as the encounter left them (${leftByEncounter}), not moved to corner 1 (${slot.positions})`);
+  }
+
+  /* ----------------------- 6. the scan compares the whole positions byte ----------- */
+  console.log('');
+  console.log('=== 6. CheckMonsterVersusMissiles against a missile in corner 3 of a lone monster ===');
+  {
+    const arena = makeArena(1)!;
+    const { game, group, desc, target } = arena;
+    const slot = game.dungeonState.getAttachedItem16(group)!;
+    const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
+      nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
+      cursed: false, important: false, weaponType: WEAPON_FALCHION,
+    });
+    game.magic.launchThrownMissile(falchion, target, 3, EAST, 255, 255, 0, game.state.tickCount);
+    const missilesIn = (): number => {
+      let n = 0;
+      for (let rn = game.dungeonState.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+        if (decodeObjectID(rn).category === DBType.MISSILE && decodeObjectID(rn).position === 3) n++;
+      }
+      return n;
+    };
+    check(missilesIn() === 1, 'the missile is parked in corner 3 of the group\'s cell');
+
+    const c: AiConst = {
+      monsterRn: game.dungeonState.findFirstMonster(target), monster: group, slot,
+      slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
+      timeUntilAlternateUpdate: 0, indexOfLastMonster: 0, horizSize: 0, invincible: false,
+      xDistance: 0, yDistance: 1, attackDistance: 0, timerFunction: TimerFunction.TT_MONSTER_B0,
+      fearFactorIs6: false, processingATimer: true,
+    };
+    const ai = game.ctx.systems.monsterAI as unknown as {
+      checkMonsterVersusMissiles(c: AiConst): boolean;
+    };
+    const log = spy(game);
+    // `objD6.pos() != position` (Monster.cpp:4478): RN::pos() is 0-3, so only a byte whose
+    // bits 2-7 are all 0 can equal it. 255 is a centred lone monster, as the shuffle at
+    // Monster.cpp:3855 leaves one; 7 is member 0 in corner 3 over a stale member-1 corner.
+    for (const positions of [255, 3 | (1 << 2)]) {
+      slot.positions = positions;
+      ai.checkMonsterVersusMissiles(c);
+      console.log(`positions ${positions}: DamageMonster ${JSON.stringify(log.hits)}, missiles in corner 3: ${missilesIn()}`);
+      check(log.hits.length === 0 && missilesIn() === 1 && group.hp[0] === 900,
+        `positions ${positions} is not the missile's corner 3: the scan passes it by`);
+    }
+    slot.positions = 3;
+    ai.checkMonsterVersusMissiles(c);
+    console.log(`positions 3: DamageMonster ${JSON.stringify(log.hits)}, missiles in corner 3: ${missilesIn()}`);
+    check(log.hits.length === 1 && log.hits[0]?.index === 0 && missilesIn() === 0,
+      'positions 3 is: the missile meets member 0 and is gone');
   }
 
   finish();

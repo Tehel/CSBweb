@@ -1151,7 +1151,8 @@ export class MonsterAI {
   /**
    * `CheckMonsterVersusMissiles` (`doc/CSBwin-src/Monster.cpp:4462`) — shifting
    * position inside a cell can walk the monster into a missile already there. Resolves
-   * every missile in that corner, stopping early if the group is wiped out.
+   * every missile whose corner is the group's positions byte, stopping early if the group
+   * is wiped out.
    *
    * Returns true when that wiped out the group, in which case the turn ends. The
    * encounter leaves `d.MonsterDamageResult` in `MissileEncounter.monsterDamageResult`,
@@ -1174,11 +1175,12 @@ export class MonsterAI {
       ) {
         const decoded = decodeObjectID(rn);
         if (decoded.category !== DBType.MISSILE) continue;
-        // CSBWin compares the corner with the whole positions byte (`DEBT.md` C43).
-        if ((decoded.position & 0x3) !== (position & 0x3)) continue;
+        // The whole positions byte, as both callers pass it (`Monster.cpp:3882`, `:3960`):
+        // a corner is 0-3, so a byte with any of bits 2-7 set meets no missile.
+        if (decoded.position !== position) continue;
         const missile = this.dungeon.getMissileRecord(rn);
         const timerIndex = missile?.timerIndex;
-        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, level, position & 0x3, rn)) {
+        if (encounter.processMissileEncounter(-1, mapX, mapY, mapX, mapY, level, position, rn)) {
           if (timerIndex !== undefined) this.timers.deleteTimer(timerIndex);
           hitSomething = true;
           break;
