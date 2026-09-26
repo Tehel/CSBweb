@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C25 | The stairs do not turn a monster's corner | M | ⚠️ |
 | C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
@@ -123,24 +122,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Next, now that tiers D and E are empty, in the index's order (see "Priority").
-
-### C25 ⚠️ The stairs do not turn a monster's corner
-
-`MoveObject`'s stairs arm turns whatever it moves to face the stairs with
-`objD7.pos(LOCAL_28)` (`doc/CSBwin-src/Code11f52.cpp:3124-3130`). `RN::pos` writes the
-corner into the global `dataTypeMap` (`CSBTypes.h:336-341`), so a monster's corner changes
-too. The port's `WorldMove.resolveCellEffects` computes the turned corner for a monster, but
-`MonsterSystem.moveMonster` sets the group down under the ID it came with (and says so,
-`MonsterSystem.ts:542-545`). The port's `ObjectID` carries the corner, and
-`DungeonState.removeObjectFromCell` and every caller holding the ID compare it whole. CSBWin's
-`RN ==` compares only the indirect index (`CSBTypes.h:349-356`). Believed invisible, since a
-group's members are placed by `ITEM16`/`uByte5` and not by the RN's corner, but not verified.
-
-A type cannot fix this: the `ObjectID` brand cannot forbid `===`. The fix is an
-`rnEquals(a, b)` (`(a & 0x3fff) === (b & 0x3fff)`, with the `RNVAL`s compared whole), used
-by `removeObjectFromCell` and every chain walker that CSBWin writes as `RN ==`. Only then
-can `moveMonster` set the group down under the turned ID without the next lift missing it
-(the lift still holds the old ID). That touches every chain operation, hence M.
 
 ### C35 ⏳ A monster that throws nothing reports missile 0, not `RNnul`
 
@@ -230,7 +211,7 @@ writes `missileFilterObject` / `missileFilterTimer`, the globals `MissileTimer` 
   exits, so `MissileEncounterFilter`'s parameter 6, `BITS10_11(missileFilterTimer.timerWord8())`
   (`Code11f52.cpp:1681`), is the direction of the last missile `MissileTimer` ran. The
   port's is the struck missile's own direction in `checkMoveFromMissile`, and 0 in
-  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1508`,
+  `checkMonsterVersusMissiles` (`TimerSystem.clearMissileFilterState`, `TimerSystem.ts:1507`,
   then `?? 0` at `MissileEncounter.ts:440`). Only a dungeon with a missile encounter
   filter can see this half.
 
@@ -246,8 +227,8 @@ CSBWin moves the party with one function, the world `MoveObject(RNnul, …)`
 Four call sites each assemble it from `checkMoveFromMissile`, `resolvePartyMove` (or
 `resolvePartyMoveWithTeleporter`), `notePartyMoved` and two `triggerObjectMove`s: the step
 (`MovementSystem.moveParty`, `src/engine/MovementSystem.ts:60-89`),
-`AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3087`) and
-`TimerSystem.wiggleParty` (`:1763`). They do not agree:
+`AttackSystem.climbDownIntoPit` (`:1353`), `DsaSystem.teleportParty` (`:3028`) and
+`TimerSystem.wiggleParty` (`:1760`). They do not agree:
 
 - `MoveObject` calls `CheckMoveFromMissile(oldX, oldY, newX, newY)` first, with the cells
   its caller passed, before any teleporter or pit (`Code11f52.cpp:2847-2853`). The step and
@@ -272,7 +253,7 @@ reads the result back from `d.NewX`, `d.NewY` and `d.NewDir`
 (`doc/CSBwin-src/Timer.cpp:383-390`). The port's `TimerSystem.processMissileTimer` does not
 call `WorldMove.moveObject`. It runs the teleporter loop through
 `WorldMove.resolveMissileMove`, with the direction it holds, and unlinks and relinks the
-missile itself (`TimerSystem.ts:1424-1434`). `moveObject` has a missile arm of its own,
+missile itself (`TimerSystem.ts:1423-1433`). `moveObject` has a missile arm of its own,
 which reads the direction from the timer the missile record names (`WorldMove.ts:161-165`).
 Whether the two ever give a different result is not verified. Move the missile through
 `moveObject`, as CSBWin does, and delete `resolveMissileMove`. Evidence: a check that flies
@@ -346,9 +327,9 @@ The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
 (`doc/CSBwin-src/CSBCode.cpp:1819`), which looks the ordinal up in `d.sound1772` and
 attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
 `ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
-`src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:374`, `:509`), three
-teleporters in `WorldMove.resolveCellEffects` (`:294`, `:311`, `:318`) and a door's step
-in `TimerSystem` (`:754`). For the door button CSBWin queues
+`src/engine/MouseSystem.ts:327`), two switches in `ActuatorSystem` (`:375`, `:510`), three
+teleporters in `WorldMove.resolveCellEffects` (`:296`, `:313`, `:320`) and a door's step
+in `TimerSystem` (`:753`). For the door button CSBWin queues
 `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
 `SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
 not yet read. All seven escape whatever `QueueSound` does that the host does not: the
@@ -456,7 +437,7 @@ uses CSBWin's defaults.
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
   `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:463` and `MonsterSystem.ts:531`.
+  `MonsterDamage.ts:463` and `MonsterSystem.ts:540`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
   (`MonsterAttack.ts:139`). C35 is about what it would see.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or

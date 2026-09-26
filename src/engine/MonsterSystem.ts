@@ -14,7 +14,7 @@
  * The AI itself lives in `MonsterAI.ts`; this module owns only the bookkeeping that
  * decides which groups are *active* and when they next get a turn.
  */
-import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../core/types';
+import { DBType, decodeObjectID, encodeObjectID, OBJECT_ID_EOF, Position, RoomType, withObjectPosition, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
 import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
@@ -466,6 +466,13 @@ export class MonsterSystem {
    * (`CSBCode.cpp:6088-6090`), and a frightened group heads back there
    * (`Monster.cpp:2273-2277`) — or its `ubPrevX`/`ubPrevY`, which the AI caller sets.
    *
+   * The stairs turn the group's corner (`:3124-3130`). CSBWin keeps the corner beside the
+   * record, so the turn follows the group wherever it goes, and the group is set down,
+   * or parked, under the turned ID here. A caller still holding the ID it passed reaches
+   * the same group through `rnEquals`. `cornerAfter` is a DSA's `object.pos(p)` after its
+   * `MoveObject` (`MoveObject.cpp:538`), which overrides the turn the same way. Nothing
+   * reads a group's corner in between: the pads read it only in a stone cell.
+   *
    * Returns `code`, CSBWin's return value, and `position`, its `d.NewX`, `d.NewY` and
    * `d.NewLevel` (`:3174-3176`) — where the group ended up. Every caller that goes on
    * after a move does so only when `code` is 0 (`Monster.cpp:1711`, `:2105`, `:2440`,
@@ -489,6 +496,7 @@ export class MonsterSystem {
     newX: number,
     newY: number,
     level: number,
+    cornerAfter?: number,
   ): { code: number; position: Position } {
     const requested = new Position(newX, newY, level);
     const monster = this.dungeon.getCreatureRecord(monsterRn);
@@ -526,6 +534,7 @@ export class MonsterSystem {
     const destination = resolved.position;
     const destLevel = destination.z | 0;
     let code = resolved.code;
+    const placed = withObjectPosition(monsterRn, cornerAfter ?? resolved.corner);
 
     // Killed by the fall, or not allowed where it landed: gone (`:3147-3176`).
     // `ProcessMonsterDeleteFilter` is not ported (DEBT.md G2), so `dropResidue` is its
@@ -533,21 +542,20 @@ export class MonsterSystem {
     if (resolved.groupDied || !this.dungeon.monsterAllowedOnLevel(monster.creatureType, destLevel)) {
       this.ctx.systems.monsterDamage.flushPendingDroppings(monster.creatureType, destLevel, destination.x, destination.y);
       this.ctx.systems.monsterDamage.dropMonsterRemains(
-        destLevel, destination.x, destination.y, monsterRn, 2, fromDungeon ? level : -1, true,
+        destLevel, destination.x, destination.y, placed, 2, fromDungeon ? level : -1, true,
       );
       if (fromDungeon) this.ctx.systems.monsterDamage.deleteMonster(level, oldX, oldY);
       return { code: 1, position: destination };
     }
 
     // Still on the square it started on, in the same corner: nothing is lifted, pressed
-    // or set down (`:3183-3213`). Only the stairs turn a monster's corner (`:3122-3129`),
-    // and they always take it to another square, so the square alone decides. That turn
-    // is not applied to the group's ID here (DEBT.md C25).
+    // or set down (`:3183-3213`). Only the stairs turn a monster's corner (`:3124-3130`),
+    // and they always take it to another square, so the square alone decides.
     if (destLevel === level && destination.x === oldX && destination.y === oldY) {
       return { code: 0, position: destination };
     }
 
-    if (fromDungeon) this.liftMonster(monsterRn, oldX, oldY, level, levitated);
+    if (fromDungeon) this.liftMonster(placed, oldX, oldY, level, levitated);
 
     // The destination is unusable if the party is standing there or another monster
     // already is. CSBWin then parks the group on a TT_60/TT_61 timer to retry.
@@ -559,7 +567,7 @@ export class MonsterSystem {
     if (blockedByParty || occupant !== OBJECT_ID_EOF) {
       if (fromDungeon) this.timers.deleteMonsterMovementTimers(oldX, oldY, level, (line) => this.trace(line));
       if (item16Attached) this.detachItem16(monster.groupIndex);
-      this.createMovementTimer(monsterRn, destination, resolved.audible);
+      this.createMovementTimer(placed, destination, resolved.audible);
       return { code: 1, position: destination };
     }
 
@@ -568,13 +576,13 @@ export class MonsterSystem {
       this.detachItem16(monster.groupIndex);
       code = 1;
     } else if (destLevel === partyLevel && !item16Attached) {
-      this.attachItem16ToMonster(monsterRn, destination.x, destination.y);
+      this.attachItem16ToMonster(placed, destination.x, destination.y);
       code++;
     }
 
     // Set it down (`:3384-3399`): "Not current room. Room changed."
-    this.dungeon.addObjectToCell(destination, monsterRn);
-    if (!levitated) this.ctx.systems.actuators.triggerObjectMove(destination, monsterRn, true, false, this.ctx.party.state.facing);
+    this.dungeon.addObjectToCell(destination, placed);
+    if (!levitated) this.ctx.systems.actuators.triggerObjectMove(destination, placed, true, false, this.ctx.party.state.facing);
 
     // A freshly attached group, or one placed from nowhere, needs its first timer.
     if (code !== 0 || !fromDungeon) {

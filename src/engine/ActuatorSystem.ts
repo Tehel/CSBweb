@@ -1,6 +1,7 @@
 import { GetBasicObjectType } from './objectIndex';
 import {
   decodeObjectID,
+  rnEquals,
   withObjectPosition,
   DBType,
   OBJECT_ID_EOF,
@@ -590,7 +591,7 @@ export class ActuatorSystem {
     let differentTypeObjectPresent = false;
 
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (ignoreObject !== null && rn === ignoreObject) continue;
+      if (ignoreObject !== null && rnEquals(rn, ignoreObject)) continue;
       const decoded = decodeObjectID(rn);
       const dbType = decoded.category;
 

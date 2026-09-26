@@ -154,6 +154,18 @@ export function withObjectPosition(rn: ObjectID, position: number): ObjectID {
 }
 
 /**
+ * `RN ==` (doc/CSBwin-src/CSBTypes.h:349-356), and `IsSameObjectAs` (`:362`): the same
+ * object, whatever corner each ID names. CSBWin's `RN` is an indirect index and keeps the
+ * corner beside the record (`pos`, `:331-341`); the port's ID carries it, so a chain
+ * walker compares the rest. An `RNVAL` (`:235-250`, `>= 0xff00` for `==`, `:357-361`) is
+ * compared whole.
+ */
+export function rnEquals(a: ObjectID, b: ObjectID): boolean {
+    if (a >= 0xFF00 || b >= 0xFF00) return a === b;
+    return (a & 0x3FFF) === (b & 0x3FFF);
+}
+
+/**
  * `LOCATIONREL` (doc/CSBwin-src/CSB.h:423) — a level, a cell and a corner. CSBWin packs it
  * into 18 bits as `p:2 l:6 x:5 y:5` for DSA stacks, actuator parameters and filter
  * locations.

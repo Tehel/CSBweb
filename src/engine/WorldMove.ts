@@ -210,13 +210,14 @@ export class WorldMove {
    * - `audible` is `LOCAL_26`, whether the last teleporter buzzed (`:2965`).
    * - `groupDied` is `LOCAL_18` (`:3099-3100`): the fall killed the whole group, and
    *   the loop stopped at the square below.
+   * - `corner` is `objD7.pos()`: the stairs turn it (`:3124-3130`), nothing else does.
    */
   resolveMonsterDestination(
     destination: Position,
     monsterRn: ObjectID,
     oldX: number,
     oldY: number,
-  ): { position: Position; code: number; audible: boolean; groupDied: boolean } {
+  ): { position: Position; code: number; audible: boolean; groupDied: boolean; corner: number } {
     const rec = this.dungeon.getCreatureRecord(monsterRn);
     const decoded = decodeObjectID(monsterRn);
     const canFall = !this.isMonsterLevitating(rec);
@@ -237,6 +238,7 @@ export class WorldMove {
       code: result.teleportCode,
       audible: result.teleportAudible,
       groupDied: result.groupDied,
+      corner: result.objectPos,
     };
   }
 

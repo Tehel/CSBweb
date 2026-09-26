@@ -1,4 +1,4 @@
-import { decodeObjectID, encodeObjectID, DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, withObjectPosition, type LocationRel, type ObjectID } from '../core/types';
+import { decodeObjectID, encodeObjectID, DBType, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
 import { SoundIndex } from '../core/constants';
 
 /**
@@ -1057,9 +1057,8 @@ export class TimerSystem {
   }
 
   private findViAltarBones(bones: ObjectID, location: Position, posInCell: number): ObjectID | null {
-    const target = bones as number;
     for (let rn = this.dungeon.findFirstObject(location); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (rn !== target) continue;
+      if (!rnEquals(rn, bones)) continue;
       const decoded = decodeObjectID(rn);
       if ((decoded.position & 0x3) !== (posInCell & 0x3)) continue;
       return rn;
@@ -1201,7 +1200,7 @@ export class TimerSystem {
       if (!rec) continue;
       if (getActuatorType(rec) !== 0) continue;
       if (firstTypeZero === null) firstTypeZero = rn;
-      if (timer.object !== undefined && rn === timer.object) {
+      if (timer.object !== undefined && rnEquals(rn, timer.object)) {
         match = rn;
         break;
       }
@@ -1748,8 +1747,7 @@ export class TimerSystem {
         // is part of the ID, so the timer is handed the placed ID outright.
         for (const entry of this.timers.getTimers()) {
           if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
-          if (entry.object === undefined
-            || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(rn as ObjectID, 0)) continue;
+          if (entry.object === undefined || !rnEquals(entry.object, rn)) continue;
           entry.uByte6 = to.x & 0xff;
           entry.uByte7 = to.y & 0xff;
           entry.object = moved.placed;

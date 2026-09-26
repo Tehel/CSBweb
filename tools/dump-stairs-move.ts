@@ -5,13 +5,18 @@
  * a stairs square goes one level down when bit 2 of the cell is clear (`IncrementLevel`,
  * `:3114-3118`), then one square out through `ExitStairsDirection` (`:290-325`) on the
  * level it is now on, and its corner turns to face the stairs (`:3124-3130`). The loop
- * goes on from there. `resolveCellEffects` had no stairs arm: the object stayed on the
- * stairs.
+ * goes on from there.
  *
  *  1. An item set down on stairs going down lands beside the stairs one level below.
  *  2. An item set down on stairs going up stays on its level, beside the stairs.
- *  3. A monster moved onto stairs going down goes the same way.
- *  4. The party is not moved by the arm (`:3111`).
+ *  3. A monster moved onto stairs going down goes the same way, and its corner turns.
+ *     `RN::pos` writes the corner beside the record (`CSBTypes.h:336-341`), so the group
+ *     lies at the exit in the turned corner, and the ID it came with still lifts it:
+ *     `RN ==` ignores the corner (`:349-356`).
+ *  4. A DSA that moves a group onto the stairs gives it the DSA's corner after the move,
+ *     whatever the stairs made of it (`MoveObject(object, -1, 0, x, y)`, then
+ *     `object.pos(p)`, `MoveObject.cpp:537-538`).
+ *  5. The party is not moved by the arm (`:3111`).
  *
  * The stairs are real ones from `dungeon.dat`.
  *
@@ -20,7 +25,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID } from '../src/core/types';
+import {
+  DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObjectID, locationRelToInteger, withObjectPosition,
+} from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -156,8 +163,12 @@ function main(): void {
     check(landed !== null && decodeObjectID(landed).position === want, 'its corner turns to face the stairs');
   }
 
-  /* ---------------------------------------------- 3. a monster moved onto stairs ---- */
-  {
+  /* ------------------------------------ 3-4. a monster moved onto stairs ---- */
+  /**
+   * A group beside stairs going down, in a corner the stairs turn: neither of the two
+   * corners they can leave it in (`:3124-3130`), so a group set down unturned shows.
+   */
+  const monsterBesideStairs = (): { game: Game; stairs: Stairs; rn: ObjectID; corner: number; type: number } => {
     const game = makeGame();
     const dungeon = game.dungeonState;
     let type = -1;
@@ -169,26 +180,61 @@ function main(): void {
       return false;
     });
     const beside = stairs.beside!;
-    const rn = createMonsterAt(game, {
+    const made = createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: beside.x, mapY: beside.y, level: beside.z, invisible: false, drawAsSize4: false,
     });
-    if (rn === null) throw new Error('createMonster failed');
+    if (made === null) throw new Error('createMonster failed');
+    const corner = (stairs.dir + 2 + 2) & 3;
+    const rn = withObjectPosition(made, corner);
+    dungeon.removeObjectFromCell(beside, made);
+    dungeon.addObjectToCell(beside, rn);
+    return { game, stairs, rn, corner, type };
+  };
+
+  {
+    const { game, stairs, rn, corner, type } = monsterBesideStairs();
+    const dungeon = game.dungeonState;
+    const beside = stairs.beside!;
     const result = game.monsterSystem.moveMonster(rn, beside.x, beside.y, stairs.at.x, stairs.at.y, stairs.at.z);
     const there = dungeon.findFirstMonster(stairs.exit);
-    console.log(`3. type ${type} group (${beside.x},${beside.y}) -> stairs (${stairs.at.x},${stairs.at.y}) `
+    const want = turnedCorner(corner, stairs.dir);
+    console.log(`3. type ${type} group (${beside.x},${beside.y}) corner ${corner} -> stairs (${stairs.at.x},${stairs.at.y}) `
       + `L${stairs.at.z}: code ${result.code}, ended (${result.position.x},${result.position.y}) L${result.position.z}, `
-      + `on the stairs ${dungeon.findFirstMonster(stairs.at) !== OBJECT_ID_EOF}, at the exit ${there !== OBJECT_ID_EOF}`);
+      + `on the stairs ${dungeon.findFirstMonster(stairs.at) !== OBJECT_ID_EOF}, at the exit ${there !== OBJECT_ID_EOF}, `
+      + `corner ${there !== OBJECT_ID_EOF ? decodeObjectID(there).position : '-'} (want ${want})`);
     check(same(result.position, stairs.exit) && there !== OBJECT_ID_EOF
       && dungeon.findFirstMonster(stairs.at) === OBJECT_ID_EOF, 'the group goes down the stairs and out');
+    check(there !== OBJECT_ID_EOF && decodeObjectID(there).position === want, 'its corner turns to face the stairs');
+    const lifted = game.monsterSystem.moveMonster(rn, stairs.exit.x, stairs.exit.y, -1, 0, stairs.exit.z);
+    console.log(`   lifted with the ID it came with (corner ${corner}): code ${lifted.code}, `
+      + `at the exit ${dungeon.findFirstMonster(stairs.exit) !== OBJECT_ID_EOF}`);
+    check(dungeon.findFirstMonster(stairs.exit) === OBJECT_ID_EOF, 'the ID it came with still lifts it');
+  }
+  {
+    const { game, stairs, rn, type } = monsterBesideStairs();
+    const dungeon = game.dungeonState;
+    const beside = stairs.beside!;
+    const turned = turnedCorner(decodeObjectID(rn).position, stairs.dir);
+    const p = (turned + 2) & 3;
+    const error = (game as any).dsaSystem.moveObjectDsa(
+      1, 1 << DBType.CREATURE, 0xf, locationRelToInteger({ l: beside.z, x: beside.x, y: beside.y, p: 0 }), 0,
+      1, 0, 1 << p, locationRelToInteger({ l: stairs.at.z, x: stairs.at.x, y: stairs.at.y, p: 0 }), 0,
+    );
+    const there = dungeon.findFirstMonster(stairs.exit);
+    console.log(`4. a DSA moves the type ${type} group onto the stairs in corner ${p}: error ${error}, `
+      + `at the exit ${there !== OBJECT_ID_EOF}, corner ${there !== OBJECT_ID_EOF ? decodeObjectID(there).position : '-'} `
+      + `(the stairs alone: ${turned})`);
+    check(error === 0 && there !== OBJECT_ID_EOF && decodeObjectID(there).position === p,
+      "the DSA's corner, set after the move, overrides the stairs' turn");
   }
 
-  /* ------------------------------------------------------ 4. the party is not moved ---- */
+  /* ------------------------------------------------------ 5. the party is not moved ---- */
   {
     const game = makeGame();
     const stairs = findStairs(game, true);
     const result = game.worldMove.resolvePartyMove(stairs.at, 0);
-    console.log(`4. the party resolved on the stairs: moved ${result.moved}`);
+    console.log(`5. the party resolved on the stairs: moved ${result.moved}`);
     check(!result.moved && same(result.position, stairs.at), 'the stairs arm breaks for the party');
   }
 

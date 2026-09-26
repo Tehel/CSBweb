@@ -26,7 +26,7 @@ import type {
     DatabaseRecord,
     Databases,
 } from '../data/dungeonTypes';
-import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType } from '../core/types';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEquals } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
 import { textStart } from '../data/CsbwinDungeonConversions';
 import type { DungeonSnapshot } from './DungeonSnapshot';
@@ -348,7 +348,7 @@ export class DungeonState {
         let head = this.data.objectList[idx] ?? OBJECT_ID_EOF;
         if (head === OBJECT_ID_EOF) return false;
 
-        if (head === rn) {
+        if (rnEquals(head, rn)) {
             const next = this.getDBRecordLink(head);
             if (next === OBJECT_ID_EOF) {
                 this.data.objectList.splice(idx, 1);
@@ -368,7 +368,7 @@ export class DungeonState {
         let prev = head;
         let current = this.getDBRecordLink(prev);
         while (current !== OBJECT_ID_EOF) {
-            if (current === rn) {
+            if (rnEquals(current, rn)) {
                 const next = this.getDBRecordLink(current);
                 this.setDBRecordLink(prev, next);
                 this.setDBRecordLink(current, OBJECT_ID_EOF);

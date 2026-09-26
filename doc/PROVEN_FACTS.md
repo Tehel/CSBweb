@@ -3102,9 +3102,18 @@ flying monster takes the stairs too.
 
 `objD7.pos(p)` changes the object itself, not a copy: `RN::pos(p)` writes the corner into the
 global `dataTypeMap` entry for the RN's indirect index (`CSBTypes.h:336-341`), and `RN`
-equality compares only that index (`:349-356`).
+equality compares only that index (`:349-356`, `IsSameObjectAs` `:362-365`). So does an
+integer compare: `ConvertToInteger` returns the indirect index (`:371`), as in the DSA's
+`&DEL` (`DSA.cpp:1690`). No compare in CSBWin sees a corner. The port's ID carries the corner,
+so its chain walkers compare with `rnEquals`, and a group the stairs turned is set down under
+the turned ID.
 
-Evidence: `tools/dump-stairs-move.ts` (5 of 6 checks fail before).
+A DSA's cell move sets the corner *after* its `MoveObject` (`MoveObject(object, -1, 0, x, y)`,
+then `object.pos(p)`, `MoveObject.cpp:537-538`), so a group a DSA sends down the stairs ends in
+the DSA's corner. The same-level monster branch (`:546`) sets none, and the stairs' turn stands.
+
+Evidence: `tools/dump-stairs-move.ts`: the corner of an item and of a group, a lift with the
+ID the group came with, and the DSA's corner.
 
 ## `WiggleEverything` moves each object with `MoveObject`, and walks a counted stretch of the chain
 
@@ -3126,7 +3135,7 @@ attaches its `ITEM16` and gets fresh AI timers like any other monster move. A gr
 on the square it started on — a teleporter not open to monsters, or one aimed at its own square
 — takes `MoveObject`'s unchanged-room return (`Code11f52.cpp:3183-3213`): `return 0` before
 anything is lifted, so no pad sees it leave or arrive. Only the stairs turn a monster's corner
-(`:3122-3129`), and they always move it to another square.
+(`:3124-3130`), and they always move it to another square.
 
 Evidence: `tools/dump-wiggle-objects.ts` (the moves; the count's monster case has no scenario),
 `tools/dump-wiggle-monster.ts` (the monster; 5 of 9 checks fail before).

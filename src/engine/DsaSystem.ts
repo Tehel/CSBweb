@@ -11,7 +11,7 @@ import {
   locationRelToInteger,
   Position,
   RoomType,
-  withObjectPosition,
+  rnEquals,
 } from '../core/types';
 import { DescIndex } from './objectIndex';
 import type { ActuatorRecord, CreatureRecord, DsaDefinition, DsaState, TeleporterRecord, TextRecord } from '../data/dungeonTypes';
@@ -826,7 +826,7 @@ export class DsaSystem {
     let result = false;
     while (bank.objectDeleteList !== OBJECT_ID_EOF) {
       const obj = bank.objectDeleteList;
-      if (withObjectPosition(obj as ObjectID, 0) === withObjectPosition(rnSlave as ObjectID, 0)) result = true;
+      if (rnEquals(obj, rnSlave)) result = true;
       bank.objectDeleteList = this.dungeon.getDBRecordLink(obj as ObjectID);
       this.dungeon.deleteDBEntry(obj as ObjectID);
     }
@@ -1321,7 +1321,7 @@ export class DsaSystem {
         }
         const pos = new Position(locr.x, locr.y, locr.l);
         for (let rn = this.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
-          if (rn !== objId) continue;
+          if (!this.isValidObjectId(objId) || !rnEquals(rn, objId)) continue;
           const { category } = decodeObjectID(rn);
           if (!this.canDeleteFromCell(category)) break;
           this.dungeon.removeObjectFromCell(pos, rn);
@@ -2497,7 +2497,7 @@ export class DsaSystem {
       // The first match in `TIMER_SEARCH` order (`MoveObject.cpp:233-241`).
       for (const entry of this.timers.searchOrder()) {
         if (entry.function !== TimerFunction.TT_25 && entry.function !== TimerFunction.TT_24) continue;
-        if (entry.object === undefined || withObjectPosition(entry.object as ObjectID, 0) !== withObjectPosition(object as ObjectID, 0)) continue;
+        if (entry.object === undefined || !rnEquals(entry.object, object)) continue;
         return { error: DsaMoveError.SER_OK, object, timer: entry.index };
       }
       return { error: DsaMoveError.SER_BadCloudTimer, object };
@@ -2679,8 +2679,8 @@ export class DsaSystem {
         this.dungeon.setDBRecordLink(object, OBJECT_ID_EOF);
         if (decoded.category === DBType.CREATURE) {
           // `object.pos(p)` rewrites the indirect index, so the monster's corner is `p`
-          // wherever it ends up; nothing in the monster branch reads it before.
-          mover.moveMonster(placed, -1, 0, locr.x, locr.y, locr.l);
+          // wherever it ends up, whatever the stairs made of it.
+          mover.moveMonster(object, -1, 0, locr.x, locr.y, locr.l, pos);
         } else {
           // `MoveObject(object, -1, 0, x, y)` and then `object.pos(p)` (`:531-538`): the
           // pads see the corner the object came with, and it lies in corner `p`.
@@ -2736,7 +2736,8 @@ export class DsaSystem {
     const { worldMove, monsters } = this.ctx.systems;
     return {
       moveObject: (object, oldX, oldY, newX, newY, level) => worldMove.moveObject(object, oldX, oldY, newX, newY, level),
-      moveMonster: (monster, oldX, oldY, newX, newY, level) => monsters.moveMonster(monster, oldX, oldY, newX, newY, level),
+      moveMonster: (monster, oldX, oldY, newX, newY, level, cornerAfter) =>
+        monsters.moveMonster(monster, oldX, oldY, newX, newY, level, cornerAfter),
     };
   }
 
@@ -2796,7 +2797,7 @@ export class DsaSystem {
   }
 
 
-  private isObjectInCharactersOrCursor(objectId: number): boolean {
+  private isObjectInCharactersOrCursor(objectId: ObjectID): boolean {
     const party = this.ctx.party.state;
     if (!party) return false;
     const visited = new Set<number>();
@@ -2813,9 +2814,9 @@ export class DsaSystem {
     return false;
   }
 
-  private searchListForObject(target: number, head: ObjectID, visited: Set<number>): boolean {
+  private searchListForObject(target: ObjectID, head: ObjectID, visited: Set<number>): boolean {
     for (let rn = head; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = this.dungeon.getDBRecordLink(rn)) {
-      if (rn === target) return true;
+      if (rnEquals(rn, target)) return true;
       if (visited.has(rn)) continue;
       visited.add(rn);
       const decoded = decodeObjectID(rn);
