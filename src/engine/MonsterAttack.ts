@@ -91,6 +91,12 @@ export class MonsterAttack {
   private readonly dungeon: DungeonState;
   private readonly random: CsbRandom;
 
+  /**
+   * `attackParameters`, the file-scope block `MonsterAttacks` fills
+   * (`doc/CSBwin-src/Monster.cpp:917-938`): the last attack's, `null` before the first.
+   */
+  attackParameters: AttackParameters | null = null;
+
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.random = ctx.random;
@@ -135,6 +141,7 @@ export class MonsterAttack {
     const p = this.buildAttackParameters(
       monsterRn, monster, slot, desc, mapX, mapY, monsterIndex, context,
     );
+    this.attackParameters = p;
 
     // `MonsterAttackFilter`, the DSA that may rewrite the whole block, is not ported
     // (DEBT.md G2).
@@ -305,9 +312,9 @@ export class MonsterAttack {
       case MonsterType.mon_Dragon:
         return RN_FIREBALL;
       default:
-        // ⚠️ CSBWin starts from `missile = RNnul` (doc/CSBwin-src/Monster.cpp:1041), not 0
-        // — DEBT.md C35.
-        return 0 as ObjectID;
+        // `missile = RNnul` (doc/CSBwin-src/Monster.cpp:1041), stored as its integer,
+        // 0xffff (`:1076`).
+        return OBJECT_ID_NULL;
     }
   }
 

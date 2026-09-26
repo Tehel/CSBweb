@@ -73,7 +73,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C35 | A monster that throws nothing reports missile 0, not `RNnul` | S | ⏳ |
 | C36 | `EnableCharacterAction` keeps the attack type, and frees only its own timer | S | ⏳ |
 | C37 | A door button or a touched wall does not set `d.clockTick` | S | ⏳ |
 | C38 | `SetTimer`'s sequence repack at 0xffff is not ported | S | ⏳ |
@@ -122,17 +121,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Next, now that tiers D and E are empty, in the index's order (see "Priority").
-
-### C35 ⏳ A monster that throws nothing reports missile 0, not `RNnul`
-
-CSBWin's monster attack starts from `missile = RNnul` and stores
-`attackParameters.missileType = missile.ConvertToInteger()`
-(`doc/CSBwin-src/Monster.cpp:1041`, `:1076`), so a monster with no missile reports
-0xffff. `MonsterAttack.chooseMissile`'s default returns 0 (`MonsterAttack.ts:307-309`).
-Nothing reads it today: 0 is not in `THROWABLE`, so no missile flies. But the parameters
-are what CSBWin copies to the Monster Attack Filter (`:1129-1165`, unported, G2), so once
-that filter exists a DSA would see 0 where CSBWin shows `RNnul`. Return `OBJECT_ID_NULL`,
-with a check that reads the parameters of a monster that throws nothing.
 
 ### C36 ⏳ `EnableCharacterAction` keeps the attack type, and frees only its own timer
 
@@ -364,7 +352,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
   (`ActuatorSystem`, `DsaSystem`) pass `ctx.tables.byte1596`, a required field, so it
   looks unreachable. Confirm that, then delete it and the `| null`.
 - `MonsterAttack.determineAttackOrder` returns `[0, 1, 2, 3]` when its `byte586` row is
-  missing, with no warning (`src/engine/MonsterAttack.ts:786`).
+  missing, with no warning (`src/engine/MonsterAttack.ts:793`).
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
@@ -439,7 +427,10 @@ uses CSBWin's defaults.
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
   `MonsterDamage.ts:463` and `MonsterSystem.ts:540`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
-  (`MonsterAttack.ts:139`). C35 is about what it would see.
+  (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
+  (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its
+  `disableTime`, which no C++ reads, so a filter sees the value the last filter left there.
+  The port builds a fresh block each attack, with `disableTime` 0.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
   `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:260`).
@@ -552,7 +543,7 @@ marching order cannot be changed.
 
 A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
 (`doc/CSBwin-src/Monster.cpp:239`). The port spends the blow and takes nothing
-(`MonsterAttack.ts:188-190`). Port it there, through `ctx.systems`, with a tool that has a
+(`MonsterAttack.ts:195-197`). Port it there, through `ctx.systems`, with a tool that has a
 giggler rob a champion.
 
 ### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record

@@ -946,11 +946,14 @@ four years we didn't increment heroToDamage!"
 ## Only some monsters throw, and each type throws its own thing
 
 `monsterShouldLaunchMissile` requires `word14_12_15 > 1` *and* either distance above 1 or a
-coin toss (`doc/CSBwin-src/Monster.cpp:1025-1027`) — so a thrower next to you sometimes
-punches instead. The missile is fixed per type (`:1029-1058`): Vexirk and Lord Chaos roll
+coin toss (`doc/CSBwin-src/Monster.cpp:1034-1036`) — so a thrower next to you sometimes
+punches instead. The missile is fixed per type (`:1040-1075`): Vexirk and Lord Chaos roll
 between a fireball and one of four spells, Slime Devils spit poison, Flying Eyes throw
 lightning seven times in eight, Zytaz alternate poison cloud and fireball, Demons and
-Dragons breathe fire. Everything else has no missile at all and the launch is skipped.
+Dragons breathe fire. Everything else has no missile at all: `missile` starts as `RNnul`
+(`:1041`), so the block's `missileType` is 0xffff, not 0 (`:1076`), and the launch switch,
+which lets only the seven spell RNs through, skips it (`:1179-1191`). Checked by
+`tools/dump-monster-missile-type.ts` over every monster type in the shipped dungeon.
 
 ## Two independent chances to avoid a blow entirely
 
