@@ -5,8 +5,9 @@ from CSBWin, duplicated, or left unfinished in code that is otherwise considered
 lists **open items only**. `PLAN.md` carries the live phases and points here; paying this
 list off is the current project priority (`PLAN.md` → "Current priority").
 
-Paid items are in `doc/PLAN_ARCHIVE.md` → "Resolved debt", under the ID they had here. An
-ID is never reused, so a `DEBT.md C23` in a code comment is found there.
+A paid item is deleted. Its commits name its ID, so `git log --grep C33` finds the work,
+and an ID is never reused. Items paid before 2026-09-26 are in `doc/PLAN_ARCHIVE.md` →
+"Resolved debt", which is where a `DEBT.md` ID cited in the code but absent here is found.
 
 Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not started ·
 🚫 deliberately not done.
@@ -20,10 +21,10 @@ tier C, and the unported features of tier G come last. Two reasons:
 - A feature built on a structure that is about to move gets built twice: once now, and
   again when the move lands — or the move has to carry it, which doubles the diff to
   review.
-- A structural fix makes every later port cheaper. Before E1, each tier-C fix cost a new
-  hook in `Game`'s constructor and a fresh round of `?? 0` guesses; since E1, a subsystem
-  just calls another through `ctx.systems`. E3 does the same for `TimerSystem.ts`, which
-  every missile, cloud and world-move change goes through.
+- The structure sets the price of every later port. With one `GameContext`, a fix calls
+  across systems through `ctx.systems` instead of adding a hook and a round of `?? 0`
+  guesses. E3 gives `TimerSystem.ts`, which every missile, cloud and world-move change
+  goes through, the same shape.
 
 The order, then:
 
@@ -31,8 +32,8 @@ The order, then:
    queue.
 2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
    found along the way is recorded here and not fixed, unless it blocks the D/E item at
-   hand or corrupts saves. C33 and C34 no longer wait on anything, so they come first
-   once E is paid, unless the author pulls them forward.
+   hand or corrupts saves. C33 and C34 come first once E is empty, unless the author
+   pulls them forward.
 3. **G — Unported CSBWin features.** Last. A missing feature is started only once D and E
    are empty, even when a dungeon, a save or a playtest needs it — note the need under the
    item instead. The author can always ask for one out of order.
@@ -46,12 +47,12 @@ The order, then:
    (`CLAUDE.md` → "Working economically"). Stop before a size-M item would overrun the
    session. Split an L item into steps and record the split in its entry.
 2. **Re-verify first.** Every pointer below was checked against the code on 2026-09-26, but
-   line numbers drift. If an item turns out to be already paid, archive it and say how you
-   know.
+   line numbers drift. If an item turns out to be already paid, delete it and say how you
+   know in the commit message.
 3. **Refactors change no behaviour.** Tiers D and E are refactors: `npm test` before and
    after, and `npm test -- --frames` whenever anything under `src/renderer/` or `src/ui/`
-   moves. E1 and E2 were proved the stronger way, and E3 should be too: every tool's full
-   output is byte-identical before and after (only `dump-save-menu` varies on its own, by
+   moves. Better still, and expected for a split like E3: every tool's full output is
+   byte-identical before and after (only `dump-save-menu` varies on its own, by
    one byte, the save date), and the author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
@@ -59,14 +60,17 @@ The order, then:
 4. **A fix owes the usual five things** (`.claude/skills/playtest-bug/`): the CSBWin
    citation, the fix, a `tools/` check that fails before it, a `doc/PROVEN_FACTS.md` entry
    if a new fact was verified, and the bookkeeping here.
-5. **When an item is paid,** move its entry to `doc/PLAN_ARCHIVE.md` → "Resolved debt" with
-   a one-line outcome (the commits, the evidence), and delete its row from the index.
+5. **When an item is paid,** delete its entry and its index row, and rewrite or remove
+   every code comment that cites its ID: an ID in the code means the debt is still open.
+   Name the ID in the commit message (`Debt C33: …`); that is the record.
 6. **New debt goes here,** in the tier it belongs to, with the next free ID. Not only in a
-   code comment, and not in `PLAN.md` once its phase is closed.
+   code comment, and not in `PLAN.md` once its phase is closed. Write the entry as the
+   state of the code, not the story of how it was found (`CLAUDE.md` → "Write down the
+   present, not the past").
 
 ## Index
 
-In payoff order.
+In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
@@ -121,8 +125,8 @@ light, shields, poison…) it holds these groups (start lines as of 2026-09-26):
 | Character action | `enableCharacterAction` 282 | `EnableCharacterAction` `Timer.cpp:2638` |
 
 **Settle the grouping first,** and write the decision into this entry before any code
-moves, as E2 did. E2's rule applies: a method goes to the system that ports its CSBWin
-file. That keeps every `Timer.cpp` function in `TimerSystem`: the Vi altar, `ProcessTT_25`,
+moves. The rule `Game`'s split followed applies: a method goes to the system that ports
+its CSBWin file. That keeps every `Timer.cpp` function in `TimerSystem`: the Vi altar, `ProcessTT_25`,
 `MissileTimer`, `TriggerMissileLauncher`, `ThrowMissile`, `WiggleEverything` and
 `EnableCharacterAction`. What leaves is `Code11f52.cpp`'s: the world `MoveObject` and
 `TeleportMonster`, `ProcessMissileEncounter` and `CheckMoveFromMissile`, `CreateCloud` and
@@ -138,8 +142,8 @@ from `doc/CSBWIN_SYMBOL_INDEX.tsv`. Look up every other method there before grou
 
 ### E4 ⏳ `ViewportRenderer` has become the UI host; `main.ts`'s `init()`
 
-Phase 14 cut `src/renderer/ViewportRenderer.ts` from 3809 lines to 723, and it is back to
-1023. It no longer renders only the viewport. It hosts the save menu and the Reincarnate
+`src/renderer/ViewportRenderer.ts` is 1023 lines and no longer renders only the viewport.
+It hosts the save menu and the Reincarnate
 screen (`saveMenuClick` / `saveMenuKey` / `saveMenuWheel`, `reincarnateClick` /
 `reincarnateKey`) and the UI state, and it has thirteen handler setters that `main.ts`
 calls one by one: `setCharacterStats`, `setPlaySound`, `setViewingFilter`,
@@ -150,8 +154,8 @@ calls one by one: `setCharacterStats`, `setPlaySound`, `setViewingFilter`,
 
 Keep the viewport composition (`drawViewportFrame` and its helpers) in a class that
 deserves the name. Move the screen and UI hosting into a class named for what it is, and
-have it take the handlers as one object at construction, the way `GameHost` gathered the
-engine's callbacks (E1d). `main.ts`'s `init()` (`src/main.ts:168-429`, about 260 lines)
+have it take the handlers as one object at construction, the way `GameHost` gathers the
+engine's callbacks. `main.ts`'s `init()` (`src/main.ts:168-429`, about 260 lines)
 needs the same treatment: load, construct, wire and start as separate functions.
 Evidence: `npm test -- --frames`.
 
@@ -159,14 +163,14 @@ Evidence: `npm test -- --frames`.
 
 `src/engine/DungeonSnapshot.ts` lists what play can change in `DungeonData`, and both the
 quick-save (`src/engine/RuntimeSave.ts`) and the CSBWin save (`src/data/CsbwinSaveGame.ts`)
-restore the world through `captureDungeonSnapshot`. A hand list fails silently, and it has
-done so once. It left out `data.columnIndex` as "structural", but `DungeonState.
-addObjectToCell` / `removeObjectFromCell` rewrite it whenever a cell gains or loses its
-last object, as CSBWin does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`). `columnIndex`,
-`header.objectListSize` and `header.objectCounts` are captured now, and
-`tools/dump-savegame.ts` compares the whole mutable `DungeonData` and asserts that loading
-twice with play in between gives the same world. But any field added to `DungeonData`
-later still has to be remembered by hand. Derive the list from the type, or snapshot the
+restore the world through `captureDungeonSnapshot`. A hand list fails silently: a field
+that play changes and the list misses is simply not restored. Such fields are not always
+obvious. `data.columnIndex` looks structural, but `DungeonState.addObjectToCell` /
+`removeObjectFromCell` rewrite it whenever a cell gains or loses its last object, as CSBWin
+does (`doc/CSBwin-src/CSBCode.cpp:5211-5224`). It is on the list, with
+`header.objectListSize` and `header.objectCounts`, and `tools/dump-savegame.ts` compares
+the whole mutable `DungeonData` and asserts that loading twice with play in between gives
+the same world. But a field added to `DungeonData` later still has to be added by hand. Derive the list from the type, or snapshot the
 whole structure and subtract what is immutable. This pairs naturally with Phase 10's
 remaining save work.
 
@@ -174,7 +178,6 @@ remaining save work.
 
 ### E6 ⏳ `CHARDESC::Possession` is written out once per module
 
-Left over from E1, whose design note gave it "one free function next to `Champion`".
 CSBWin reads a slot through `CHARDESC::Possession(slot)`. The port writes it out as a
 one-line `possessions[slot] ?? OBJECT_ID_NULL`: as a private helper in `CharacterStats.ts:238`,
 `AttackSystem.ts:291`, `PeriodicUpdates.ts:230` and `MonsterAttack.ts:685`; as the UI's
@@ -254,7 +257,7 @@ have their own copy of `updateLightForPossessionChange`.
 Port `AddCharacterPossession` into `CharacterSystem` beside `removeCharacterPossession`,
 and route all five writers through the pair, so that `AdjustStatsForItemCarried` has one
 caller per direction again. Add the two engine→UI notices (close the attack menu, repack
-the open chest) to `GameHost` (`src/engine/GameHost.ts`), which E1d left room for. Needs
+the open chest) to `GameHost` (`src/engine/GameHost.ts`). Needs
 the frames, because the inventory click is UI. `tools/dump-item-bonuses.ts` section 4
 already drives four of the writers.
 
@@ -325,11 +328,10 @@ past 0xffff and compares the stamps, and the queue order, before and after a sav
 
 ### F1 ⏳ Silent fallbacks for tables that are always there
 
-The eye panel's mastery ranks once vanished because a table was initialised empty and
-read through a `continue`-on-falsy guard, which gave no warning and left no marker. Every
-table is now a required field of `GameTables`, built once for `main.ts` and every tool
-(E1a). So a guard against a missing table is either dead code or a silent placeholder
-that hides a short one. Known cases:
+A table that is initialised empty, or read through a `continue`-on-falsy guard, fails
+without a warning or a marker: the output is just missing. Every table is a required field
+of `GameTables`, built once for `main.ts` and every tool, so a guard against a missing table
+is either dead code or a silent placeholder that hides a short one. Known cases:
 
 - `DEFAULT_ROOM_TIMER_FUNCTIONS` (`src/engine/roomTimers.ts:10`), a hardcoded copy of
   `d.Byte1596` that `roomTimerFunction` uses when it gets no table. Its two callers
@@ -346,20 +348,15 @@ that hides a short one. Known cases:
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy
 guard.
 
-<sub>Context: `doc/PLAN_ARCHIVE.md` → “The eye panel prints the mastery ranks again”.</sub>
-
 ### F2 ⏳ No golden frame covers an edge decoration
 
 None of the nine golden frames (`tools/frames/`) shows a wall decoration on an edge
-position. That is why the position-7 wall-decoration bug survived so long.
-`tools/dump-hall-of-champions.ts` pins the geometry that makes position 7 special across
+position, where the position-7 geometry is special. `tools/dump-hall-of-champions.ts` pins the geometry that makes position 7 special across
 all 8 rect sets: both edge slots are narrower than the bitmap, the front-left window ends
 flush with its right edge, and the front-right one starts flush with its left edge. The
 pixels themselves are still verified only by screenshot. A new frame needs a way to place
 the party, which the probe does not have. That is the same missing affordance as the
 "fixed set of party positions" in `PLAN.md` → Phase 15 step 2, so build it once for both.
-
-<sub>Context: `doc/PLAN_ARCHIVE.md` → “A wall decoration one cell ahead and to the left is no longer…”.</sub>
 
 ### F3 — Phase 15 steps 3–5 stay in `PLAN.md`
 
@@ -501,9 +498,9 @@ rather than being copied here.
 `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and `_FusionSequence` (`:2220`) are not ported.
 `atk_FUSE` runs its filter and does nothing else (`src/engine/AttackSystem.ts:28-30`). What
 the fusion depends on is ported: the Fluxcage, `IsCellFluxcage`, `IsLordChaosHere`, and
-`MonsterPerception`'s Fluxcage test. The code's reason for waiting ("it cannot be exercised
-until Lord Chaos himself works") dates from before the monsters were finished, so re-check it
-when this comes up.
+`MonsterPerception`'s Fluxcage test. The code gives a reason for waiting ("it cannot be
+exercised until Lord Chaos himself works"). Check whether it still holds, now that the
+monsters are ported.
 
 ### G9 ⏳ Changing the marching order
 
@@ -538,8 +535,7 @@ Recorded so that nobody "fixes" them.
   `srcOffsetX = 15 - (finalBitmapWidth & 15)` for positions 1 and 6
   (`doc/CSBwin-src/CSBCode.cpp:3542`), compensates for `MakeMirror` reversing a
   byte-aligned buffer. `getMirroredBitmap` reverses the exact bitmap, so applying it would
-  shift a correctly aligned image. The reasoning is in the code. <sub>Context:
-  `doc/PLAN_ARCHIVE.md` → “A wall decoration one cell ahead and to the left is no longer…”.</sub>
+  shift a correctly aligned image. The reasoning is in the code.
 - 🚫 **`CHARDESC.load` is recomputed** from the possessions, rather than cached and adjusted
   at each of CSBWin's eight possession writers. Same value, and it cannot drift. `Party.ts`
   made the same choice for `SetHandOwner`. Recorded in the module comment of
@@ -572,7 +568,7 @@ Recorded so that nobody "fixes" them.
 - 🚫 **Crack Switch (In) placement.** `Byte4100[55]` is read as 2, not `graphics.dat`'s 0,
   so a pressed crack switch stays low on the wall as in the Atari ST original:
   `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
-- **Not debt, per the 2026-09-23 review** (listed so it is not raised again):
+- **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.
   - The giant `switch`es in `DsaSystem.execute` / `executeAmpersand`,

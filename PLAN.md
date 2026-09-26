@@ -13,151 +13,22 @@ markers; keep them honest. Marker meanings:
 **When you defer part of a job, record the deferral here.** A phase marked ✅ with silent
 gaps is worse than one marked ⚠️.
 
-This file carries only the phases that still have work in them. Completed phases are
-archived in `doc/PLAN_ARCHIVE.md` — but their unfinished business is **not** archived with
-them: it is listed in **`DEBT.md`**, which is the authority on debt. When you finish a
-phase, move its body to the archive and lift anything still open into `DEBT.md`.
+This file carries only the phases that still have work in them, and describes them as
+they stand (`CLAUDE.md` → "Write down the present, not the past"). When a phase is
+finished, lift anything still open into **`DEBT.md`**, which is the authority on debt, and
+any verified fact into `doc/`; then delete the phase's body and add its line to
+"Completed phases".
 
-## Current priority: paying off `DEBT.md` (since 2026-09-23)
+## Current priority: paying off `DEBT.md`
 
-The next work is the technical debt, not new phases. `DEBT.md` gathers it — the findings of
-a whole-codebase review plus everything that used to be listed here as carried-over debt —
-in payoff order: data-structure and architecture debt first, then the known divergences
-from CSBWin, and the unported CSBWin features last. That file gives the reasoning for the
-order and how to work an item. **One item per commit, a few per session**, then `/clear`.
+The next work is the technical debt, not new phases. `DEBT.md` lists it in payoff order —
+data-structure and architecture debt first, then the known divergences from CSBWin, and the
+unported CSBWin features last — and says how to work an item. **One item per commit, a few
+per session**, then `/clear`. `DEBT.md`'s index is the live status; its first row is the
+next item.
 
-Until tiers A–E of `DEBT.md` are paid, new phase work — Phase 10's block 1, Phase 15's
-steps 3–5 — comes after the debt, unless a debt item needs it.
-
-Progress (the index at the top of `DEBT.md` is the live status): tiers A and B, C1–C24,
-C26–C32, all of tier D (D1–D6), all of E1 (E1a–d) and F4, paid by 2026-09-25, and E2 on 2026-09-26 (`Game` is the loop, the construction and facades); E3 next. C13 closed `MoveParty`: stamina per step, the move delay as
-`d.partyMoveDisableTimer` in ticks (and with it Phase 10's three unmodelled `GAMEBLOCK2`
-words), a queue depth (corrected by C21), the input discard on a level change, and room type 7. C14 closed
-`DrawClouds`: the scale, the size, the source graphic and colour map, lightning (which had
-never been drawn one or two cells ahead) and the cloud under the party, which tiles the
-whole viewport. C20 loads a level a timer moved the party to in the same tick. C15 ported
-CSBWin's low-level `MoveObject` for objects (`TimerSystem.moveObject`) and put a DSA cell
-move through it and `MonsterSystem.moveMonster`. C16 ported `FindEmptyDBEntry` as
-`DungeonState.findEmptyDBEntry`, which every allocator now uses: the lowest freed record
-from index 1, else append. C22: a walking monster presses and releases floor pads, and only
-a DSA move re-aims its AI timers. C23's first bullet: `WiggleEverything` moves each object
-through `TimerSystem.moveObject` (a cloud falls down an opening pit, a missile presses no
-pad). C24: `moveMonster` returns CSBWin's value and `d.NewX/NewY`, and the AI stops on any
-non-zero value; a fatal fall or a forbidden level deletes the group; `CreateMonster` is `RNnul`
-on the party's level. C23's second bullet: `WiggleEverything` moves a monster through
-`moveMonster`, which leaves a group on its own square alone. The rest of C23: the cursor
-drop and a thrown item's landing go through `moveObject` (`unchangedRoom` is "the party
-stands here", and a dropped item keeps its corner on a relative teleporter);
-`DeleteMonster` lifts the group through `moveMonster`'s new `newX < 0` path, so a group
-killed on a pad releases it; and `resolveCellEffects` has the stairs arm. Recorded along the way: C18 (a Fluxcage never expired and freed door record 0 — found
-and paid with C17); C21 (clicks do not go through the input queue); C23 (the other object
-movers — the monster wiggle, drop, a thrown object landing — are not `MoveObject`, and no
-mover has its stairs arm); C24 (`moveMonster`'s return value and what the AI does with it,
-its `ITEM16` bookkeeping, and the pit / level-ban deletions); D5 (cell flags stored twice);
-G1 and G4 gained the unported `STKOP_Throw` and the monster design options; C23 gained
-`DeleteMonster` (not a `MoveObject`, so no pad release), and G2 `ProcessMonsterDeleteFilter`;
-C25 (the stairs do not turn a monster's corner, because the port's `ObjectID` carries it —
-knowingly left for D4).
-C21: clicks and keys share CSBWin's one mouse queue, which lives in `Game`. It is 8 entries
-long, not 3: `Data.h:1513` leaves `NoKeyQue` undefined, so C13's depth of two was read off
-a dead `#ifdef` branch. `Game.handleMouseEvents` takes one entry per tick. It handles
-turns and steps itself and gives every other button to the UI's dispatcher. A click
-stamps `lastTime` just as a turn does, and a held step blocks the entries behind it. The
-viewport click (button 80) goes through the queue, and the on-screen arrows (buttons 1-6),
-which the queue used to drop, work. C26: the disk icon waits for the eye to be let go.
-Recorded with them: G9 (the marching-order buttons 125-128). G5 gained the sleep and
-freeze buttons (145-148). G6 gained `FlashButton`.
-D1: a champion's hands live only in `possessions` (the `shieldHand` / `weaponHand` /
-`quiver` mirrors are gone). D2 was split into D2a–d. D2a: an empty possession slot is
-`RNnul` and the array is a required thirty. D2b: so is the cursor, `objectInHand`, and the
-chest view; the four normalizers are gone. D2c: `isLikelyObjectRecord` is gone, with the
-object-*type* overloads it chose between. `RUNTIME_SAVE_VERSION` is 10. Fixed on the way:
-C27 (a dead champion kept a ghost of slot 8) and C29 (the save writer wrote an empty cursor
-as `RNempty`, 0, where CSBWin writes `RNnul`). Recorded: C28 (`DropAllPossessions` has
-neither `DropOrder` nor `MoveObject`) and D2d.
-D2d: every possession reader returns `RNnul`, like CSBWin's `Possession()`, so D2 is paid.
-C28: a dying champion's possessions drop in `d.DropOrder` order (now read from graphic
-`0x232`), through `MoveObject`, so they fall down a pit. Recorded on the way: C30
-(`removeCharacterPossession` is a bare slot clear — no Illumulet light, no torch), C31
-(the bones are not set down by `MoveObject`) and C32 (`AdjustStatsForItemCarried` is not
-ported: no worn object changes a stat).
-Sleep (G5's first half, asked for out of order as the most-missed gameplay feature): the
-sleep icon, 145, puts the party to sleep. A tick then runs every VBL (`d.Speed = 0`),
-the viewport shows `DisplaySleepScreen` and only a viewport click (146) or Return wakes it.
-A monster's blow or an armour-branch `DamageCharacter` wakes it too. `WakeUp`'s
-`d.clockTick = 1` runs a tick at once. Fixed on the way: `PROVEN_FACTS` claimed a sleeping
-party gets no dodge or luck check, but `WakeUp` runs before that guard. Also,
-`TenSecondUpdate` used the real Wizard and Priest masteries asleep, where CSBWin's
-`DetermineMastery` reports 1. The freeze
-(147/148) stays in G5.
-C31: a dead champion's bones are set down by `MoveObject`, so over a pit they fall, still
-paired in the expool. C30: `RemoveCharacterPossession` puts out a torch, closes a scroll,
-and un-wears an Illumulet (its light comes off the party) or a Jewel Symal. C32:
-`AdjustStatsForItemCarried` is ported, and all five possession writers call it, so the
-staffs, the Rabbit's Foot, curses, Powertowers and the rest change their bearer's stats
-(`tools/dump-item-bonuses.ts`). Recorded: C34 (five possession writers, none of them
-CSBWin's whole — the UI and DSA paths lack the scroll, `value()`, the attack menu and the
-chest repack) and, in G1, `STKOP_SetCurse` with `SetCursed`.
-On 2026-09-25 the order changed: tiers D and E now come before the rest of tier C, which is
-frozen. A new divergence is recorded, not fixed, unless it blocks the D/E item at hand or
-corrupts saves. D5: the cell flag byte is stored once (`MapData.tiles` is gone). D3 was
-split into D3a–g, and D3a–f are paid: `PartyState` has no optional field left, and
-`Champion` keeps only `fingerprint` (D3g) and four fields whose absence carries meaning
-(`portrait` / `portraitGraphic`, `titleField` / `incantationField`). `initialPartyState`
-and `addCharacterDefaults` are the two initializers. `Party.setState` fills an older runtime
-save's gaps from them, so `RUNTIME_SAVE_VERSION` stays 10 and the author's saves still load.
-Fixed on the way, each in its own commit: a recruit's `facing3` starts as the party's facing
-(`Character.cpp:531`), and `byte33` is derived from the incantation instead of carried
-stale from the save it was read from.
-D3g closed D3: a champion gets its `fingerprint` once, on joining (`addCharacter`, and
-`addChampion` for the tools), and the field is required. Fixed first, in its own commit:
-a fingerprint of 0 pairs a dead champion's bones too (`Character.cpp:2646`). D4: `ObjectID`
-is a branded type, as CSBWin's `RN` is a class. A plain number becomes one only through
-`as ObjectID` where CSBWin converts (file words, timer words, a checked DSA word, the
-`RNVAL`s). Measured first: 140 `tsc` errors, no live bug, one latent confusion (a cloud
-type passed as an RN). Found and recorded: C35 (a monster that throws nothing reports 0,
-not `RNnul`). C25 turned out to need an `RN ==` that ignores the corner, which the brand
-cannot give, so it is re-sized to M and stays in the frozen tier C. E1's design note is in
-`DEBT.md`: one `GameContext` (dungeon, party, state, random, timers, sounds, tables, host,
-systems), direct calls through `ctx.systems` instead of setters and hooks, one
-`GameTables`. Split into E1a–d.
-E1a: one `GameTables` (`src/engine/GameTables.ts`), every field required and named as
-CSBWin names it, built once by `buildGameTables` for `main.ts` and — through
-`tools/lib/game.ts` — for the 44 tools, none of which turned out to depend on a table it had
-left out. E1b: one `GameContext` (`src/engine/GameContext.ts`; dungeon, party, state,
-random, footprints, timers, sounds, tables), the first argument of every subsystem; the
-getter lambdas, the seven table slices and their `setTables`, the `queueSound` /
-`isGameWon` / `nameIndex` hooks are gone. `d.Word11694` and `d.CurrentPalette` live in
-`GameState`. No `RUNTIME_SAVE_VERSION` change. Found and recorded: D6 (`GameState.party`
-is a second copy of `Party.state`, resynced by hand) and F4 (four suite tools unseeded).
-F4: the four unseeded suite tools are seeded, so every tool's output is reproducible
-(`dump-save-menu` still varies by a byte, the save date). D6: `GameState.party` is gone;
-the thirteen resyncs were all redundant. E1c: `ctx.systems` — subsystems call each other
-directly; the second constructor arguments, the five setters and the inter-system hooks
-are gone, and `Game`'s constructor shrank from 233 lines to 49. The `Game` methods a
-subsystem still calls go through `ctx.systems.game`, typed `GameMethods` (22 names): E2's
-worklist. Found and recorded: G10 (`StealFromCharacter` is not ported) and a fifth DSA
-filter under G2 (`MonsterAttackFilter`). E1d: one `GameHost` at `ctx.host` (`playSound`,
-`trace`, `cursorFilter`, `messages`, `sleepChanged`, `openReincarnateScreen`, a null object
-for whatever the host leaves out), passed to `Game` by `main.ts` and `tools/lib/game.ts`;
-the per-subsystem host hooks and `GameOptions` are gone, and every subsystem takes `ctx`
-alone. E2, first six commits: `MagicSystem` (`Magic.cpp`'s engine half), `MagicShield`
-into `AttackSystem`, `CharacterSystem` (`Character.cpp`'s possession writers, C34's future
-home), and three one-caller methods folded into their callers; `Game.ts` 2172 lines,
-`GameMethods` down from 22 names to 8. E2, next five commits: the loop's state onto the
-context (`ctx.mouseQueue`, CSBWin's one mouse queue with `DiscardAllInput`; `ctx.loop`,
-`d.clockTick` and `d.newPartyLevel` as other files write them; `wakeUp(ctx)`), not into
-`GameState`, so the quick-save's shape is unchanged; `climbDownIntoPit`, the DSA's party
-teleport and the footprint step into `AttackSystem`, `DsaSystem` and `TimerSystem`;
-`EnableCharacterAction` into `TimerSystem` and the hand refills into `CharacterSystem`;
-`MouseSystem` (`Mouse.cpp`'s engine half: drop, throw, `ThrowByCharacter`); and
-`HallOfChampions` (`AddCharacter`, `_ResurrectReincarnateCancel`, `ReIncarnate`'s tail).
-**`GameMethods` is gone** and `Game.ts` is 1364 lines. Found and recorded: C36
-(`EnableCharacterAction` keeps the attack type). The rest of E2 left `Game` the loop, the
-construction and one-line facades; found on the way: C37. On 2026-09-26 `DEBT.md` was
-cut down to its open items (the paid ones are in `doc/PLAN_ARCHIVE.md` → "Resolved
-debt"), and three residuals of paid items got IDs of their own: E6, C38, G11. Next: E3,
-then E4–E6; after tier E, C33 and C34, then the rest of tier C.
+New phase work (Phase 10's block 1, Phase 15's steps 3–5) waits until tiers C–E of
+`DEBT.md` are empty, unless a debt item needs it.
 
 ## Ground rules
 
@@ -171,124 +42,64 @@ then E4–E6; after tier E, C33 and C34, then the rest of tier C.
 3. **One renderer is authoritative**: the bytecode-based path.
 4. Prefer small tooling over manual reasoning: table dumps, render probes, trace hooks.
 
-## Status (September 2026)
+## Status
 
-Verified against the code, not inherited from earlier revisions of this file.
-
-**Solid:**
-- Data loading: `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, save games (base + extended).
-- Bytecode viewport renderer — the authoritative path. All `0x22e` rectangle tables are
+**Working:**
+- Data loading: `dungeon.dat`, `graphics.dat`, `CSBgraphics.dat`, save games (base and
+  extended).
+- The bytecode viewport renderer, the authoritative path. Every `0x22e` rectangle table is
   extracted at runtime; no guessed geometry remains in the renderer.
-- Movement + collision, CSBWin-style 3-deep key queue, immediate post-move timer processing.
-- Timer queue with CSBWin duplicate-timer suppression.
+- Movement and collision: stamina per step, the move delay in ticks, CSBWin's one mouse
+  queue for keys and clicks, and timers processed straight after a move.
+- The timer queue, with CSBWin's duplicate-timer rules.
 - Actuators, DSA scripting, teleporters, pits, doors, false walls.
-- Missiles and throwing (lifecycle, encounters, DSA filters).
-- Skills/experience (mastery, AdjustSkills, LevelUp), magic casting (all three spell classes).
-- Light levels / palette switching, sound, most of the DM UI.
-- The whole pre-game sequence (Phase 16): the title animation, the dungeon entrance with
-  its three buttons, the door-opening animation and the credits scroll.
+- Missiles, throwing and clouds.
+- Skills and experience (mastery, `AdjustSkills`, `LevelUp`), magic casting (all three
+  spell classes), worn-object bonuses.
+- Light levels and palette switching, sound, the message area (`SCROLLING_TEXT`), most of
+  the DM UI.
+- Monsters (`Monster.cpp`): groups hunt, flee, throw missiles, hit the party, take damage
+  and die. The champions' own attacks (`Attack.cpp`), through the Party Attack Filter.
+- The champion lifecycle: the Hall of Champions mirrors, the Reincarnate screen, feeding,
+  poison, pit falls, death and bones, the Altar of Vi; sleep.
+- The pre-game sequence: the title animation, the dungeon entrance, the door animation and
+  the credits scroll.
+- Debug scaffolding is confined to `src/dev.ts`, reached only through
+  `isDebugFeaturesEnabled()`.
 
-**Known-incomplete, in rough priority order:**
-1. ✅ **Message area** — done (Phase 11). CSBWin's `SCROLLING_TEXT` is ported: fragment-based
-   emission, 53-column word wrap, 4 rows with 70-tick expiry, and `updateDebug()` demoted to
-   the external debug log. Scroll *animation* and save-game serialization remain deferred.
-2. ✅ **Combat works both ways** — done (Phase 12). `Monster.cpp` is ported: groups
-   hunt, flee, throw missiles, hit the party, take damage and die, and a killed
-   champion leaves bones. `Attack.cpp` is ported too: the attack menu offers each
-   champion's legal options and every attack type resolves, through the Party Attack
-   Filter. Lord Chaos's fusion endgame is the one deliberate omission.
-3. ✅ **The champion lifecycle is done** (Phase 13). Champions are created at the Hall
-   of Champions mirrors, named on the Reincarnate keyboard screen, fed, poisoned,
-   drained, dropped down pits, killed — leaving bones — and brought back at the Altar
-   of Vi. What is left of the phase is a short list of deferrals, all of them either
-   DSA filters no dungeon we load defines or the **wings**, a store of departed
-   champions this port does not have; they are listed in `DEBT.md` (tier G).
-4. ✅ **Clouds work** — `CreateCloud` schedules its `TT_25` timer and `ProcessTT_25` is
-   ported, so clouds shrink, damage and expire (Phase 9 step 13).
-5. ✅ **Throw stats** — done. `WEAPONDESC` is extracted and `ThrowByCharacter` is
-   ported over the real `DetermineThrowingDistance` chain (Phase 9 step 11).
-6. ✅ **Debug scaffolding** — done (Phase 14). Now confined to `src/dev.ts` and reached only
-   through `isDebugFeaturesEnabled()`.
-7. ✅ **`ViewportRenderer.ts` god object** — done (Phase 14). Split from 3809 lines to 723;
-   the UI now lives in `src/renderer/ui/`.
-8. ⚠️ **CSBWin-binary-compatible save files** — the **reader is done** (Phase 10 step 12,
-   September 13th) and **the live path now writes a whole file** (September 14th): the
-   game's own save button emits all sixteen blocks, and
-   `tools/dump-live-save-file.ts` writes one from a game played out of `dungeon.dat` and
-   one from a game played on from a genuine save, and loads both back into a running
-   engine with the world, the party, a thrown object still in flight and the object on
-   the cursor intact. What that needed was not plumbing: CSBWin's three load-time
-   conversions are ported (`src/data/CsbwinDungeonConversions.ts`), so the in-memory
-   world is always save-shaped. What is left of the phase is **block 1**, which is still
-   a stub of valid checksums over fields this port does not model. See Phase 10's "What
-   is left, in one place".
-9. ✅ **The party's own pit-fall damage** is ported (Phase 13 step 6), and
-   `supressPitDamage` now has something to suppress.
+**Incomplete:**
+- ⚠️ **CSBWin-compatible save files.** The reader is done, and the game's own save button
+  writes all sixteen blocks: `tools/dump-live-save-file.ts` writes a file from a game
+  played out of `dungeon.dat` and one from a game played on from a genuine save, and loads
+  both back with the world, the party, a thrown object in flight and the object on the
+  cursor intact. Block 1 is still a stub of valid checksums over fields this port does not
+  model. See Phase 10 → "What is left, in one place".
+- ⚠️ **Validation.** Several completed phases listed validation steps (render tests, render
+  probes, pixel comparisons against CSBWin screenshots) that were never carried out.
+  Phase 15 gathers them.
+- Everything in `DEBT.md`: the technical debt, the known divergences from CSBWin, and the
+  unported CSBWin features (tier G).
 
-**Validation debt:** several phases below list "Validation" steps (render tests, render
-probes, pixel comparisons against CSBWin screenshots) that were **never carried out** —
-there is no test framework in the project at all. Verification has been visual and ad hoc.
-Those items are now marked 🚫 where they were silently skipped; Phase 15 addresses this.
+**The evidence.** `npm test` runs `tsc` and every tool listed in `tools/run-checks.mjs`;
+`npm test -- --frames` adds the golden frames. There is still no test *framework*:
 
-`npm test` now exists (Phase 15 step 1) and runs both standing forms of evidence in ~14s,
-or ~33s with `--frames`. There is still no test *framework*; what there is:
-
-1. `tools/probe-frames.mjs` + `tools/check-frames.sh` drive the real app over the
-   DevTools Protocol and compare eight screen states against `tools/frames/`. Built
-   to make the Phase 14 split safe. No assertions beyond equality. The script starts
-   its own dev server and headless Chrome.
-
-   Pinning the viewport was **not** enough to make the frames portable, as a move to a
-   second machine showed: a full-page screenshot carries the DOM debug chrome, drawn with
-   the host's fonts and widget theme, and `cmp` on two PNGs tests the Chrome build's
-   encoder rather than the rendering. The probe now reads the 320x200 canvas back with
-   `getImageData`, writes the PNG itself (`tools/lib/png.mjs`), and
-   `tools/compare-frames.mjs` decodes both sides and compares pixels. Nothing in the
-   comparison depends on the host any more.
-
-   The same pass found `04-inventory-sel` had been identical to `03-inventory` since it
-   was captured: it clicked (15,15), which is champion 0's party block (button id 12),
-   not the inventory grid, so no selection ever happened and the frame could not fail.
-   It now clicks (41,66) — body slot 2, HALK's Bezerker Helm — and covers the three
-   things a selection changes: the vacated slot, the held object's name in the top-right
-   line, and the `LOAD` readout. `compare-frames.mjs` fails a baseline containing two
-   identical frames, so a dead frame cannot come back unnoticed.
-2. **Forty assertion-carrying verification tools**, plus four run for crashes only.
-   **`tools/run-checks.mjs` is the authority on the list** — it is not repeated here,
-   because the hand-kept copy that used to sit in this bullet drifted to thirteen tools
-   out of date before anyone noticed. Run `npm test` to see the roll. Broadly: the save
-   and CSBWin-file group (`dump-savegame*.ts`, `dump-csbwin-*.ts`,
-   `dump-character-block.ts`, `dump-save-roundtrip.ts`, `dump-portraits.ts`), the monster
-   group (`dump-monster-*.ts`, `watch-monster*.ts`), the champion group
-   (`dump-champion-*.ts`, `dump-feeding.ts`, `dump-hall-of-champions.ts`,
-   `dump-vi-altar.ts`, `dump-pit-fall.ts`, `dump-reincarnate-entry.ts`), and the UI and
-   codec group (`dump-status-boxes.ts`, `dump-mastery-panel.ts`, `dump-save-menu.ts`,
-   `dump-intro.ts`, `dump-image-codec.ts`, `dump-key-bindings.ts`).
-   These load the real game files, drive the real engine with a fixed RNG seed, print a
-   human-readable table and assert invariants, exiting non-zero on failure. They are the de-facto regression
-   suite for everything the frames cannot see, and they caught two real bugs and two
-   wrong tests.
-
-   ⚠️ Three of the "assertion-carrying" seven were nothing of the kind when the runner
-   was built: `dump-monster-{tables,activation,perception}.ts` printed `PROBLEMS: …` and
-   exited 0, and `watch-monster-attacks.ts` had a verdict line that overwrote its own
-   armour and wound failures. All four now assert through `tools/lib/check.ts`, whose
-   `finish()` also fails a run that made **no** checks. `dump-monster-activation.ts` also
-   defaulted to a level with no creatures on it, so the no-argument run activated nothing.
-
-   The pattern is written up in `.claude/skills/verification-tools/`. What Phase 15 still
-   owes is shared fixtures and the render probe — not the idea.
-
-## Carried-over debt → `DEBT.md`
-
-Moved out on 2026-09-23. Every open item that used to be listed here is now in
-**`DEBT.md`**, merged with the findings of a whole-codebase review and ordered for payoff.
-The resolved entries are in `doc/PLAN_ARCHIVE.md` → "Resolved debt (moved out of
-`PLAN.md`)".
+1. **Golden frames.** `tools/probe-frames.mjs` and `tools/check-frames.sh` drive the real
+   app over the DevTools Protocol and compare the screen states in `tools/frames/`. The
+   probe reads the 320x200 canvas back and `tools/compare-frames.mjs` compares pixels, so
+   nothing depends on the host machine. It also fails a baseline that holds two identical
+   frames, so a frame that can no longer fail is caught.
+2. **Verification tools.** `tools/run-checks.mjs` is the one list of them; don't copy it
+   anywhere. They load the real game files, drive the real engine with a fixed RNG seed,
+   print a human-readable table and assert invariants through `tools/lib/check.ts`, whose
+   `finish()` also fails a run that made no checks. They are the regression suite for
+   everything the frames cannot see. The pattern is in `.claude/skills/verification-tools/`;
+   what Phase 15 still owes is shared fixtures and the render probe.
 
 ## Completed phases
 
-Full working notes in **`doc/PLAN_ARCHIVE.md`**. Open items from them are in `DEBT.md`.
+Open items from them are in `DEBT.md`. `doc/PLAN_ARCHIVE.md` (frozen) holds the working
+notes of the phases closed up to 2026-09-26; for a phase closed later, its line here and
+`git log` are the record.
 
 | Phase | Subject |
 | --- | --- |
@@ -314,7 +125,7 @@ Full working notes in **`doc/PLAN_ARCHIVE.md`**. Open items from them are in `DE
 
 ## Next Steps (Phased)
 
-Only the phases with work left in them. Completed phases are in `doc/PLAN_ARCHIVE.md`.
+Only the phases with work left in them.
 
 ### Phase 10 — CSBWin-Compatible Save/Load
 

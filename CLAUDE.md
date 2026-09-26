@@ -30,7 +30,7 @@ Corollaries:
 | `CLAUDE.md` | This file. High-level orientation only; keep it short. |
 | `PLAN.md` | **Authority on detailed project status.** Live phases. |
 | `DEBT.md` | **Authority on technical debt**, in payoff order. Paying it off is the current priority. |
-| `doc/PLAN_ARCHIVE.md` | Working notes for completed phases. Reference only — read on demand. |
+| `doc/PLAN_ARCHIVE.md` | Working notes of the phases and debt items closed up to 2026-09-26. **Frozen**, reference only — read on demand. |
 | `doc/CSBWIN_REFERENCE_INDEX.md` | Index of the per-topic CSBWin reference docs. |
 | `doc/PROVEN_FACTS.md` | Verified facts with `File.cpp:line` citations. |
 | `doc/CSBWIN_SYMBOL_INDEX.tsv` | Every CSBWin symbol → `File.cpp:line`. Grep this before grepping the tree. |
@@ -43,6 +43,16 @@ Only 100%-certain facts go in; speculation stays out. Update `PLAN.md` progress 
 you go, and **record every deferral** — a phase marked done with silent gaps is worse than
 one marked incomplete.
 Debt — a deferral from a closed phase, a divergence found along the way — goes in `DEBT.md`.
+
+**Write down the present, not the past.** Every document here describes the project as it
+is now: what works, what is left, the rules and the reasons for them. None of them narrates
+how the project got there: no "fixed in `abc1234`", "used to", "since 2026-09-25", "found
+while paying C21", and no progress logs. When something changes, rewrite the text to say
+the new state rather than adding to it, and delete what is finished. History belongs in a
+document only as the reason for a rule that still holds (the ray-casting false start, the
+months of broken `tsc`). The record of what happened is `git log`: a commit message names
+its phase step or debt ID, so `git log --grep C33` finds the work. `doc/PLAN_ARCHIVE.md`
+keeps what it has, and nothing new goes in.
 
 ## Tech stack
 
@@ -184,20 +194,15 @@ were three lines each is not.
 
 ## Current state
 
-See `PLAN.md` for the audited detail. In one paragraph: data loading, the bytecode viewport
-renderer, movement (stamina, the move delay in ticks, and CSBWin's one mouse queue that
-keys and clicks share), timers, actuators, DSA scripting, missiles,
-skills/experience, magic casting, light levels, worn-object bonuses, sound, the pre-game screens (Phase 16 —
-title, dungeon entrance, doors, credits) and most of the DM UI all work. The message area (Phase 11),
-the structural cleanup (Phase 14), **monsters** (Phase 12 — `Monster.cpp`, AI, movement and
-combat both ways) and the **champion lifecycle** (Phase 13 — death, bones, the Hall of
-Champions, resurrection) are all done. Genuine CSBWin save files **load** (Phase 10 step
-12). What is left is the other half of **Phase 10**, *writing* a CSBWin-compatible save;
-the **validation debt** (Phase 15, steps 3–5); and the technical debt in `DEBT.md` —
-**paying that off is the current priority**, one item per commit, in the order it gives.
-Since 2026-09-25 that order puts tiers D (state representation) and E (architecture)
-before the rest of tier C, which is frozen: new divergences are recorded, not fixed. Tier D
-is paid; so is E1 (one `GameTables`, one `GameContext` every subsystem takes, subsystems
-calling each other through `ctx.systems`, one `GameHost` at `ctx.host`), and so is E2:
-`Game` is only the loop, the construction and one-line facades, and every other method
-lives in the system that ports its CSBWin file. Next is E3, splitting `TimerSystem.ts`.
+See `PLAN.md` for the detail. Working: data loading, the bytecode viewport renderer,
+movement (stamina, the move delay in ticks, and CSBWin's one mouse queue that keys and
+clicks share), timers, actuators, DSA scripting, missiles and clouds, skills/experience,
+magic casting, light levels, worn-object bonuses, sound, the message area, monsters
+(`Monster.cpp`: AI, movement and combat both ways), the champion lifecycle (the Hall of
+Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
+entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and the
+port writes all sixteen blocks, block 1 still a stub (Phase 10). What is left: that block,
+the validation debt (Phase 15, steps 3–5), and the technical debt in `DEBT.md`. **Paying
+the debt off is the current priority**, one item per commit, in `DEBT.md`'s order:
+structure first (tiers D and E), then the known divergences (tier C, frozen until then),
+then the unported features. The first row of its index is the next item.
