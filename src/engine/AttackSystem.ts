@@ -1357,8 +1357,8 @@ export class AttackSystem {
   private climbDownIntoPit(target: Position): void {
     const party = this.ctx.party.state;
     const oldPos = new Position(party.position.x, party.position.y, party.position.z);
-    const resolved = this.ctx.systems.timer.withSupressedPitDamage(() =>
-      this.ctx.systems.timer.resolvePartyMove(target, party.facing & 0x3),
+    const resolved = this.ctx.systems.worldMove.withSupressedPitDamage(() =>
+      this.ctx.systems.worldMove.resolvePartyMove(target, party.facing & 0x3),
     );
     this.ctx.systems.timer.checkMoveFromMissile(oldPos, resolved.position, null);
     party.position = resolved.position;
@@ -1366,7 +1366,7 @@ export class AttackSystem {
     const unchanged = oldPos.x === resolved.position.x
       && oldPos.y === resolved.position.y
       && oldPos.z === resolved.position.z;
-    if (!unchanged) this.ctx.systems.timer.notePartyMoved();
+    if (!unchanged) this.ctx.systems.worldMove.notePartyMoved();
     this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
     this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
     this.ctx.systems.monsters.loadPartyLevelOnArrival();

@@ -38,6 +38,7 @@ import type { MonsterSystem } from './MonsterSystem';
 import type { MouseSystem } from './MouseSystem';
 import type { MovementSystem } from './MovementSystem';
 import type { TimerSystem } from './TimerSystem';
+import type { WorldMove } from './WorldMove';
 
 /**
  * The subsystems, so that one calls another directly (`DEBT.md` E1c). `Game` fills it
@@ -50,6 +51,7 @@ export interface GameSystems {
   actuators: ActuatorSystem;
   dsa: DsaSystem;
   timer: TimerSystem;
+  worldMove: WorldMove;
   monsters: MonsterSystem;
   monsterDamage: MonsterDamage;
   monsterPerception: MonsterPerception;

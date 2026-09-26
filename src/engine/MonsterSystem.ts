@@ -521,7 +521,7 @@ export class MonsterSystem {
     }
 
     // Follow teleporters and fall down pits, exactly as the party does.
-    const resolved = this.ctx.systems.timer.resolveMonsterDestination(requested, monsterRn, oldX, oldY);
+    const resolved = this.ctx.systems.worldMove.resolveMonsterDestination(requested, monsterRn, oldX, oldY);
 
     const destination = resolved.position;
     const destLevel = destination.z | 0;

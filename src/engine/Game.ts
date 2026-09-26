@@ -16,6 +16,7 @@ import { MovementSystem } from './MovementSystem';
 import { ActuatorSystem } from './ActuatorSystem';
 import { TimerQueue } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
+import { WorldMove } from './WorldMove';
 import { MonsterSystem } from './MonsterSystem';
 import type { SoundQueue } from './SoundQueue';
 import { createGameContext, type GameContext, type GameSystems } from './GameContext';
@@ -115,6 +116,11 @@ export class Game {
      * `processTimers` directly to turn the clock without a browser.
      */
     readonly timerSystem: TimerSystem;
+    /**
+     * The world `MoveObject`: teleporters, pits and stairs for the party, a monster and
+     * any object. Public because `tools/` moves things through it directly.
+     */
+    readonly worldMove: WorldMove;
     /** Monster group lifecycle and movement. Public for the same reason. */
     readonly monsterSystem: MonsterSystem;
     /**
@@ -192,6 +198,7 @@ export class Game {
         this.actuators = new ActuatorSystem(ctx);
         this.dsaSystem = new DsaSystem(ctx);
         this.timerSystem = new TimerSystem(ctx);
+        this.worldMove = new WorldMove(ctx);
         this.monsterSystem = new MonsterSystem(ctx);
         this.monsterDamage = new MonsterDamage(ctx);
         this.monsterPerception = new MonsterPerception(ctx);
@@ -210,6 +217,7 @@ export class Game {
             actuators: this.actuators,
             dsa: this.dsaSystem,
             timer: this.timerSystem,
+            worldMove: this.worldMove,
             monsters: this.monsterSystem,
             monsterDamage: this.monsterDamage,
             monsterPerception: this.monsterPerception,

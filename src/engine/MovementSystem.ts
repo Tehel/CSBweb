@@ -62,11 +62,11 @@ export class MovementSystem {
             const oldFacing = this.party.state.facing;
             let resolvedPosition = result.newPosition;
             let resolvedFacing = result.newFacing ?? oldFacing;
-            const timer = this.ctx.systems.timer;
+            const { timer, worldMove } = this.ctx.systems;
 
             if (resolvedPosition) {
                 timer.checkMoveFromMissile(oldPos, resolvedPosition, null);
-                const teleported = timer.resolvePartyMove(resolvedPosition, resolvedFacing);
+                const teleported = worldMove.resolvePartyMove(resolvedPosition, resolvedFacing);
                 resolvedPosition = teleported.position;
                 resolvedFacing = teleported.facing;
                 result.newPosition = resolvedPosition;
@@ -84,7 +84,7 @@ export class MovementSystem {
                 actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, resolvedFacing);
                 actuators.triggerObjectMove(resolvedPosition, OBJECT_ID_NULL, true, unchanged, resolvedFacing);
             }
-            timer.notePartyMoved();
+            worldMove.notePartyMoved();
             this.ctx.systems.monsters.loadPartyLevelOnArrival();
             timer.processTimers(this.ctx.state.tickCount);
         } else if (result.inhibited) {

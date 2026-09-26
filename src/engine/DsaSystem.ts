@@ -38,7 +38,7 @@ import { TimerFunction } from './TimerQueue';
 import { roomTimerFunction } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
-import type { TimerSystem } from './TimerSystem';
+import type { WorldMove } from './WorldMove';
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
@@ -2789,13 +2789,13 @@ export class DsaSystem {
 
   /**
    * The two halves of CSBWin's low-level `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:2796`)
-   * a DSA cell move goes through: `TimerSystem.moveObject`, and its monster branch,
+   * a DSA cell move goes through: `WorldMove.moveObject`, and its monster branch,
    * `MonsterSystem.moveMonster`.
    */
-  private objectMover(): { moveObject: TimerSystem['moveObject']; moveMonster: MonsterSystem['moveMonster'] } {
-    const { timer, monsters } = this.ctx.systems;
+  private objectMover(): { moveObject: WorldMove['moveObject']; moveMonster: MonsterSystem['moveMonster'] } {
+    const { worldMove, monsters } = this.ctx.systems;
     return {
-      moveObject: (object, oldX, oldY, newX, newY, level) => timer.moveObject(object, oldX, oldY, newX, newY, level),
+      moveObject: (object, oldX, oldY, newX, newY, level) => worldMove.moveObject(object, oldX, oldY, newX, newY, level),
       moveMonster: (monster, oldX, oldY, newX, newY, level) => monsters.moveMonster(monster, oldX, oldY, newX, newY, level),
     };
   }
@@ -3100,14 +3100,14 @@ export class DsaSystem {
     };
 
     this.ctx.systems.timer.checkMoveFromMissile(oldPos, oldPos, null);
-    const resolved = this.ctx.systems.timer.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
+    const resolved = this.ctx.systems.worldMove.resolvePartyMoveWithTeleporter(oldPos, oldFacing, pretendTeleporter);
     party.position = resolved.position;
     this.ctx.party.setFacing(resolved.facing);
 
     const unchanged = oldPos.x === resolved.position.x
       && oldPos.y === resolved.position.y
       && oldPos.z === resolved.position.z;
-    if (!unchanged) this.ctx.systems.timer.notePartyMoved();
+    if (!unchanged) this.ctx.systems.worldMove.notePartyMoved();
     this.ctx.systems.actuators.triggerObjectMove(oldPos, OBJECT_ID_NULL, false, unchanged, party.facing);
     this.ctx.systems.actuators.triggerObjectMove(resolved.position, OBJECT_ID_NULL, true, unchanged, party.facing);
   }

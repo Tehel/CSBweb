@@ -112,6 +112,7 @@ data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, He
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
+            WorldMove (the world `MoveObject`: teleporters, pits, stairs),
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /

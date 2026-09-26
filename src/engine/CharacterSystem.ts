@@ -100,7 +100,7 @@ export class CharacterSystem {
     for (let D4W = 0; D4W < 30; D4W++) {
       const objD5 = this.removeCharacterPossession(chIdx, this.ctx.tables.dropOrder[D4W]!);
       if (objD5 === OBJECT_ID_NULL) continue;
-      this.ctx.systems.timer.moveObject(
+      this.ctx.systems.worldMove.moveObject(
         withObjectPosition(objD5, D6W), -1, 0, party.position.x, party.position.y, party.position.z,
       );
     }

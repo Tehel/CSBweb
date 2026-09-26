@@ -208,7 +208,7 @@ function whereIs(game: Game, rn: ObjectID): Position[] {
   return found;
 }
 
-/** An open pit (`0x08` set, not imaginary) — the test `TimerSystem.isActivePitAt` makes. */
+/** An open pit (`0x08` set, not imaginary) — the test `WorldMove.isActivePitAt` makes. */
 function findOpenPit(game: Game): Position | null {
   const dungeon = game.dungeonState;
   for (let z = 0; z < dungeon.getMapCount() - 1; z++) {

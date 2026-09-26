@@ -88,6 +88,11 @@ export class Position {
     get west() { return new Position(this.x-1, this.y, this.z); }
 }
 
+/** Whether `a` and `b` are the same square of the same level. */
+export function isSamePosition(a: Position, b: Position): boolean {
+    return a.x === b.x && a.y === b.y && a.z === b.z;
+}
+
 /**
  * Party starting position
  */

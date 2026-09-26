@@ -113,7 +113,7 @@ function main(): void {
     const g = makeGame();
     const before = healths(g);
     const staminaBefore = staminas(g);
-    const resolved = g.timerSystem.resolvePartyMove(pit, 0);
+    const resolved = g.worldMove.resolvePartyMove(pit, 0);
     const after = healths(g);
     for (let i = 0; i < after.length; i++) {
       console.log([`HERO${i}`, before[i], after[i]].join('\t'));
@@ -140,7 +140,7 @@ function main(): void {
     const g = makeGame();
     const healthBefore = healths(g);
     const staminaBefore = staminas(g);
-    const resolved = g.timerSystem.withSupressedPitDamage(() => g.timerSystem.resolvePartyMove(pit, 0));
+    const resolved = g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
     const staminaAfter = staminas(g);
     const healthAfter = healths(g);
     for (let i = 0; i < staminaAfter.length; i++) {
@@ -175,10 +175,10 @@ function main(): void {
 
   {
     const g = makeGame();
-    g.timerSystem.withSupressedPitDamage(() => g.timerSystem.resolvePartyMove(pit, 0));
+    g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
     const healthBefore = healths(g);
     // Put the party back at the pit and fall again, this time without a rope.
-    g.timerSystem.resolvePartyMove(pit, 0);
+    g.worldMove.resolvePartyMove(pit, 0);
     const healthAfter = healths(g);
     check(healthAfter.some((h, i) => h < healthBefore[i]!), 'the next fall hurts again');
   }
@@ -194,7 +194,7 @@ function main(): void {
     dead.alive = false;
     dead.attributes.health = 0;
     const staminaBefore = dead.attributes.stamina;
-    g.timerSystem.withSupressedPitDamage(() => g.timerSystem.resolvePartyMove(pit, 0));
+    g.worldMove.withSupressedPitDamage(() => g.worldMove.resolvePartyMove(pit, 0));
     check(dead.attributes.stamina === staminaBefore, 'a dead champion is skipped by the climb cost');
   }
 

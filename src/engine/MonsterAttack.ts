@@ -558,7 +558,7 @@ export class MonsterAttack {
     const bones = this.createBonesRecord();
     if (bones !== null) {
       const objD4 = withObjectPosition(bones, champ.partyPosition & 0x3);
-      this.ctx.systems.timer.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
+      this.ctx.systems.worldMove.moveObject(objD4, -1, 0, party.position.x, party.position.y, party.position.z);
       // `AddChampionBonesRecord`, whatever the fingerprint (`:2646`): 0 pairs the bones too.
       this.dungeon.addChampionBonesRecord(objD4, champ.fingerprint);
     }

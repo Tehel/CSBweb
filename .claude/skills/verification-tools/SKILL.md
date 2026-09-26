@@ -163,6 +163,11 @@ A passing check can hide a changed number the check does not look at. Run a diff
 tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
 `node_modules` and `static/gamefiles` symlinked in) to tell a real change from a tool that
 varies on its own.
+The other half is the saves: for every file in `static/gamefiles/saves`, a seeded
+`newGame` with `applyCsbwinSave`, then `getRuntimeSaveState()` hashed as JSON after the load
+and again after 600 `runFrame`s 250 ms apart, on both trees. Zero `savedAt` and
+`elapsedTimeMs` in the hash (a `JSON.stringify` replacer): both are wall-clock, and with
+them two runs of the same tree never agree.
 
 **Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
 overrides `Math.random` to make the golden frames reproducible; anything that draws

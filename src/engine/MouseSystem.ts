@@ -96,7 +96,7 @@ export class MouseSystem {
     // through an active teleporter or open pit on the cell it lands on.
     const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
     party.objectInHand = OBJECT_ID_NULL;
-    this.ctx.systems.timer.moveObject(dropped, -1, 0, target.x, target.y, target.z);
+    this.ctx.systems.worldMove.moveObject(dropped, -1, 0, target.x, target.y, target.z);
     this.ctx.systems.monsters.loadPartyLevelOnArrival();
     this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
     if (options?.viAltar) {

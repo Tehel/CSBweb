@@ -143,7 +143,7 @@ function main(): void {
     const game = makeGame();
     const stairs = findStairs(game, down);
     const rn = takeWeapon(game, 1);
-    const moved = game.timerSystem.moveObject(rn, -1, 0, stairs.at.x, stairs.at.y, stairs.at.z);
+    const moved = game.worldMove.moveObject(rn, -1, 0, stairs.at.x, stairs.at.y, stairs.at.z);
     const landed = findWeapon(game, stairs.exit, decodeObjectID(rn).index);
     const want = turnedCorner(1, stairs.dir);
     const n = down ? 1 : 2;
@@ -187,7 +187,7 @@ function main(): void {
   {
     const game = makeGame();
     const stairs = findStairs(game, true);
-    const result = game.timerSystem.resolvePartyMove(stairs.at, 0);
+    const result = game.worldMove.resolvePartyMove(stairs.at, 0);
     console.log(`4. the party resolved on the stairs: moved ${result.moved}`);
     check(!result.moved && same(result.position, stairs.at), 'the stairs arm breaks for the party');
   }
