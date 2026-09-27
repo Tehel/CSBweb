@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G13 | `_ShowCredits`: the game never ends | M | ⏳ |
+| G13 | `_ShowCredits`: the game never ends | L | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -436,17 +436,40 @@ rather than being copied here.
 
 `_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won, and
 it is not ported. `KillCharacter` sets `d.GameIsLost` when nobody is left
-(`Character.cpp:2680`), which stops the clock (`CSBCode.cpp:658`) and makes `MainLoop`
-return on that tick (`:777-778`), and the loop around it then calls
-`ShowCredits(d.GameIsLost)` (`:11325`). The port sets `PartyState.gameIsLost`
-(`src/engine/MonsterAttack.ts:598`) and nothing reads it, so a party that has died keeps
-playing. `_ShowCredits(1)` of a lost game plays the dying sound, shows graphic 6, the end
-picture, offers "RESTART THIS GAME" for 900 VBLs (button `0xd7`, `Code1f9e6.cpp:227-318`),
-then the credits picture, graphic `0x8005` (`:328`), and a click there goes back to the
-end picture (`:341-348`). Won (`d.Word11694`), it shows each champion's portrait, name,
-title and levels over graphic 208 and ends the game there (`:171-225`). "SAVE AND QUIT"
-calls `ShowCredits(0)`, straight to the credits picture (`SaveGame.cpp:1252`), and has no
-equivalent in the port (`PLAN.md` → Phase 10). G8 ends in it.
+(`Character.cpp:2680`). The tick then runs `StartQueuedSound` and `DisplayCharacterDamage`
+and skips everything under `if (d.GameIsLost == 0)` (`CSBCode.cpp:658`): `d.Time++`, the
+periodic updates, the mouse queue. `MainLoop` returns, and `_StartCSB` clears
+`d.DynamicPaletteSwitching` and calls `ShowCredits(d.GameIsLost)` (`:11322-11326`). The
+port sets `PartyState.gameIsLost` (`src/engine/MonsterAttack.ts:598`) and nothing reads it,
+so a party that has died keeps playing. "SAVE AND QUIT" calls `ShowCredits(0)`, straight to
+the credits picture (`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` →
+Phase 10). G8 ends in the won screen.
+
+Size L, in three steps:
+
+1. **The lost game ends, with no restart.** `Game` stops at the tick of death and asks the
+   host for `ShowCredits(1)`. The screen runs over an `IntroHost`: the dying sound
+   (`QueueSound(6, …)`), 240 VBLs, the fade to black, graphic 6 ("THE END") on
+   `d.Word108` in a palette of `0x002` with colour 15 at `0x777`, 300 VBLs, the fade, the
+   credits picture (graphic 5) in `d.Palette328` until a click or a key, then
+   `UIM_TERMINATE` (`Code1f9e6.cpp:113-170`, `:227-238`, `:326-353`). Evidence: a tool
+   that kills the party and one that runs the screen over a headless host.
+2. **"RESTART THIS GAME".** `d.CanRestartFromSavegame`, set by a save or a load
+   (`SaveGame.cpp:1260`, `:1883`) and cleared by a new game (`:1494`) and the two wins
+   (`Timer.cpp:2370`, `Attack.cpp:2428`), and by `Code17818.cpp:380`. With it set, the end
+   picture carries the button `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on
+   the credits picture goes back to it without the 300-VBL wait (`:339-348`). The button
+   sets `d.PartyHasDied` (`Mouse.cpp:1798`), and `GameSetup(0)` reads the chooser with that
+   flag: only a save of the same `RandomGameID` loads ("THAT'S NOT THE SAME GAME",
+   `SaveGame.cpp:1604-1607`), and a cancel puts the dungeon entrance back up
+   (`CSBCode.cpp:10634-10641`), whose "enter" needs a fresh dungeon the port cannot build
+   in place today.
+3. **The won screen.** `d.Word11694`: with `d.DynamicPaletteSwitching` the eight `Darken`
+   steps instead of the fade (`Code1f9e6.cpp:148-166`), then each champion's frame
+   (graphic 208), portrait, name, title and masteries over colour 12, the palette of
+   `LOCAL_78`, and the game ends there (`:171-225`). The CSB win it follows, actuator type
+   18 in `ProcessTimers` (`Timer.cpp:2366-2371`, `ProcessTimers` returning true,
+   `CSBCode.cpp:626-633`), is not ported either (`src/engine/TimerSystem.ts:512-518`).
 
 ### G8 ⏳ Lord Chaos's fusion endgame
 
