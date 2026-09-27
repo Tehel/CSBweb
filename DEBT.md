@@ -460,12 +460,22 @@ G8 ends in the won screen.
 
 Size L, in three steps. Steps 1 and 2, the lost game and the restart, are done. Left:
 
-3. **The won screen.** `d.Word11694`: with `d.DynamicPaletteSwitching` the eight `Darken`
-   steps instead of the fade (`Code1f9e6.cpp:148-166`), then each champion's frame
-   (graphic 208), portrait, name, title and masteries over colour 12, the palette of
-   `LOCAL_78`, and the game ends there (`:171-225`). The CSB win it follows, actuator type
-   18 in `ProcessTimers` (`Timer.cpp:2366-2371`, `ProcessTimers` returning true,
-   `CSBCode.cpp:626-633`), is not ported either (`src/engine/TimerSystem.ts:512-518`).
+3. **The won game**, in two parts.
+   - **3a, the won screen.** `_ShowCredits(1)` with `d.Word11694` set: no dying sound;
+     with `d.DynamicPaletteSwitching` the eight `Darken` steps of both palettes, the
+     interface's saved in `LOCAL_78`, instead of the fade (`Code1f9e6.cpp:148-166`); then
+     the screen flooded with colour 12 and, for each champion, 48 lines apart, the frame
+     (graphic 208) at `d.Word132`, the portrait at `d.Word140`, the name and title
+     through `DisplayHeroName` and each mastery above 1, faded up to `LOCAL_78`, and the
+     game ends there (`:171-225`). Without `d.DynamicPaletteSwitching`, `LOCAL_78` is a
+     static nothing has written, so the fade is to black. Evidence: the screen over a
+     headless `IntroHost` in `tools/dump-show-credits.ts`, with graphic 208 and the two
+     rectangles as canaries.
+   - **3b, the CSB win.** Actuator type 18 under a stone-room timer
+     (`Timer.cpp:2366-2371`): `d.CanRestartFromSavegame = 0`, `d.Word11694 = 1`, and
+     `ProcessTimers` returns true at once; `MainLoop` waits 300 VBLs and calls
+     `ShowCredits(1)` (`CSBCode.cpp:626-633`). The port's stone-room arm has no type 18
+     (`src/engine/TimerSystem.ts:512-518`). Evidence: a tool that fires one.
 
 ### G8 ⏳ Lord Chaos's fusion endgame
 
