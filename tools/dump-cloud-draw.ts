@@ -38,6 +38,8 @@
  *     `351 + 3·D4W + (value>>5 != 0) + (value>>5 > 3)`, tiled over `d.Word2530` by
  *     `TAG008c98` (`Graphics.cpp:1169`) from group `STRandom() & 63`, wrapping at
  *     `STRandom0_3() + 87`.
+ *  8. a Fluxcage (type 50): no cloud, but the teleporter's shimmer over its cell from cell 4
+ *     on, which `d.Word1868` takes away (`Code51a4.cpp:2769-2782`).
  *
  * Run: `npx tsx tools/dump-cloud-draw.ts`
  */
@@ -374,6 +376,39 @@ for (const [cloudType, value, graphic] of [[0, 0, 351], [0, 40, 352], [2, 200, 3
   check(r.requested.length === 1 && r.requested[0] === graphic, `under the party, ${what}: reads graphic ${graphic} only (read ${r.requested.join()})`);
   check(Array.from(r.pixels).join() === Array.from(expected).join(), `under the party, ${what}: tiles Word2530 pixel for pixel`);
   check(r.seedAfter === oracle.getSeed(), `under the party, ${what}: exactly two viewport-stream draws`);
+}
+
+// 8. A Fluxcage (type 50) draws no cloud, but `DrawRoomObjects` draws a teleporter's
+// shimmer over its cell, from its teleporter rectangle one pixel on (`x1 + 1`), from
+// cell 4 on and not from the far side of a door, and only while `d.Word1868` is clear
+// (`doc/CSBwin-src/Code51a4.cpp:2769-2782`); `_FusionSequence` sets it (`Attack.cpp:2367`).
+console.log('\nthe Fluxcage\'s shimmer (Code51a4.cpp:2769-2782):');
+for (const word1868 of [false, true]) {
+  for (const relativeCell of [0, 1, 4]) {
+    const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 50, bit7: false };
+    const shimmers: Array<{ x1: number; wall: unknown }> = [];
+    const context: any = {
+      viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
+      objectTables: realTables,
+      wallRectangles: viewportTables.wallRectangles,
+      teleporterRectangles: viewportTables.teleporterRectangles,
+      getGraphicBitmap: (n: number) => fakeGraphic(n),
+      dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+      word1868,
+    };
+    const interp = new BytecodeInterpreter(context) as any;
+    interp.drawTeleporter = (teleporter: { x1: number }, wall: unknown) => shimmers.push({ x1: teleporter.x1, wall });
+    // Position list 1: the cell's first position, at the cloud's (0) with facing 0.
+    interp.drawRoomObjects(cloudRn, 0, 0, 0, relativeCell, 0x1);
+    const teleporter = viewportTables.teleporterRectangles[relativeCell]!;
+    const drawn = shimmers.length === 1 && shimmers[0]!.x1 === teleporter.x1 + 1
+      && shimmers[0]!.wall === viewportTables.wallRectangles[relativeCell];
+    const what = `cell ${relativeCell + 3}, d.Word1868 ${word1868 ? 1 : 0}`;
+    console.log(`  ${what}: ${shimmers.length} shimmer(s)`);
+    check(word1868 || relativeCell === 0 ? shimmers.length === 0 : drawn,
+      word1868 ? `${what}: no shimmer` : relativeCell === 0 ? `${what}: no shimmer, the cell is 3`
+        : `${what}: the shimmer, with teleporterRectangles[${relativeCell}] one pixel on`);
+  }
 }
 
 finish();

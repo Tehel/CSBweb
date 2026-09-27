@@ -70,6 +70,11 @@ export interface InterpreterContext {
   seeThruDoorEdgeRect?: RectPos;
   /** `(RectPos *)d.Byte2546` — where a Hall of Champions portrait lands in the viewport. */
   championPortraitRect?: RectPos;
+  /**
+   * `d.Word1868`: set, a Fluxcage's shimmer is not drawn (`DrawRoomObjects`,
+   * `doc/CSBwin-src/Code51a4.cpp:2774`). Only `_FusionSequence` sets it (`Attack.cpp:2367`).
+   */
+  word1868?: boolean;
 
   // Current per-frame style context (CSBWin LEVELDESC.word14 bits)
   wallGraphicSet?: number;
@@ -2096,7 +2101,9 @@ export class BytecodeInterpreter {
 
     if (cloudPresent) {
       const fluxcage = this.drawClouds(relativeCellNumber, firstObject, facing, lastAbsPos);
-      if (fluxcage && sideOfDoor !== SideOfDoor.FarSide) {
+      // `if ((pdb_150!=NULL) && (sideOfDoor!=SOD_FarSideOfDoor) && (d.Word1868==0))`
+      // (`doc/CSBwin-src/Code51a4.cpp:2774`).
+      if (fluxcage && sideOfDoor !== SideOfDoor.FarSide && !this.context.word1868) {
         const teleporter = this.context.teleporterRectangles?.[relativeCellNumber];
         const wallRect = this.context.wallRectangles[relativeCellNumber];
         if (teleporter && wallRect) {

@@ -116,6 +116,7 @@ export function createGameContext(
     currentTime: Date.now(),
     tickCount: 0,
     gameWon: false,
+    word1868: false,
     currentPalette: 0,
   };
   return {

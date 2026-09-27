@@ -18,9 +18,11 @@
  *    near square may be occupied, only not a Fluxcage or a wall.
  * 6. **Boxed in.** The square behind the party is stone: he stays, "toast" (`:213`),
  *    and `_FusionSequence` (`:2220`) holds the loop to the credits, `executeAttack`'s
- *    tail left undone: the game won, the light and shields up, the cages on his square
+ *    tail left undone: the game won, an open inventory hidden before the first view
+ *    (run with one open and with none), the light and shields up, the cages on his square
  *    and the party's gone, the type at each of its 33 views, sound 17 thirteen times,
- *    every other monster on the level deleted, and `ShowCredits(1)` after its 1593 VBLs
+ *    `d.Word1868` set for the last two views, every other monster on the level deleted,
+ *    and `ShowCredits(1)` after its 1593 VBLs
  *    (`doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the game").
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
@@ -70,6 +72,10 @@ interface Arena {
   game: Game;
   /** `showCredits` as the host was asked it. */
   credits: boolean[];
+  /** `showHideInventory` as the host was asked it: the argument, and the views drawn before. */
+  inventory: Array<{ chIdx: number; views: number }>;
+  /** The views drawn so far (`drawViewport`). */
+  views: number;
   /** Called on each `drawViewport`, the host's share of `_ProcessTimersViewportAndSound`. */
   drawn: () => void;
   frames: number;
@@ -90,7 +96,11 @@ function arena(withLordChaos: boolean): Arena {
   const hooks = { credits: [] as boolean[], drawn: (): void => {} };
   const game = newGame(data, stockGraphics(), {
     showCredits: (word11694) => hooks.credits.push(word11694),
-    drawViewport: () => a.drawn(),
+    showHideInventory: (chIdx) => a.inventory.push({ chIdx, views: a.views }),
+    drawViewport: () => {
+      a.views++;
+      a.drawn();
+    },
   });
   game.setRandomSeed(0x12345678);
   game.addChampion(champion());
@@ -106,7 +116,9 @@ function arena(withLordChaos: boolean): Arena {
   game.party.state.facing = 0;
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
-  const a: Arena = { game, seedAfterCloud: null, credits: hooks.credits, drawn: hooks.drawn, frames: 0 };
+  const a: Arena = {
+    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], views: 0, drawn: hooks.drawn, frames: 0,
+  };
   const encounter = game.ctx.systems.missileEncounter;
   const createCloud = encounter.createCloud.bind(encounter);
   encounter.createCloud = (...args: Parameters<typeof createCloud>): void => {
@@ -265,9 +277,10 @@ function expectedTypes(): number[] {
 /** The VBLs of `_FusionSequence`'s `VBLDelay`s, before the texts of cell (0, 0) (`Attack.cpp:2305-2389`, `:2427`). */
 const SEQUENCE_VBLS = 6 * 31 + 31 + 6 * 31 + (4 * 2 + 4 * 1) * 31 + 25 + 50 + 50 + 31 + 31 + 31 + 600;
 
-function checkBoxedIn(): void {
+function checkBoxedIn(inventoryOpen: boolean): void {
   console.log('');
-  console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits ===');
+  console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits,'
+    + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'} ===`);
   const a = arena(true);
   const game = a.game;
   cage(game, CX, CY - 1);
@@ -279,7 +292,12 @@ function checkBoxedIn(): void {
   game.savedGameRead();
   const types: number[] = [];
   const lordChaos = game.dungeonState.getCreatureRecord(game.dungeonState.findFirstMonster(new Position(CX, CY, LEVEL)))!;
-  a.drawn = () => types.push(lordChaos.creatureType);
+  const word1868: boolean[] = [];
+  a.drawn = () => {
+    types.push(lordChaos.creatureType);
+    word1868.push(game.state.word1868);
+  };
+  if (inventoryOpen) game.party.state.selectedCharacterIndex = 0;
   const sounds: number[] = [];
   const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
   game.ctx.sounds.queueSound = (ordinal, x, y, delta, level) => {
@@ -309,6 +327,13 @@ function checkBoxedIn(): void {
     'and the ones around him stay');
   check(champion.attributes.stamina === stamina && champion.attackType === attackType,
     'the attack\'s tail does not run: no stamina spent, no attack type recorded');
+  console.log(`  showHideInventory ${JSON.stringify(a.inventory)}`);
+  check(inventoryOpen
+    ? a.inventory.length === 1 && a.inventory[0]!.chIdx === 4 && a.inventory[0]!.views === 0
+    : a.inventory.length === 0,
+  inventoryOpen
+    ? 'ShowHideInventory(4) hides the open inventory, before the first view (Attack.cpp:2269-2272)'
+    : 'with no inventory open, ShowHideInventory is not called');
 
   let creditsAt = 0;
   for (let n = 1; n <= SEQUENCE_VBLS + 20; n++) {
@@ -321,6 +346,9 @@ function checkBoxedIn(): void {
   console.log(`  credits ${creditsAt} VBLs after the attack (expected ${SEQUENCE_VBLS}); asked ${JSON.stringify(a.credits)}; ticks ${game.state.tickCount - tick}`);
   console.log(`  sound 17 ${sounds.filter((n) => n === 17).length} times; monsters on the level ${monstersOnLevel(game)} (other than him before: ${others})`);
   check(types.join() === want.join(), `${want.length} views, each with the type the sequence gives him then`);
+  console.log(`  d.Word1868 ${word1868.map((w) => (w ? 1 : 0)).join('')}`);
+  check(word1868.length === want.length && word1868.every((w, i) => w === (i >= want.length - 2)),
+    'd.Word1868 is set for the last two views, once the Grey Lord has been seen (Attack.cpp:2364-2369)');
   check(game.state.tickCount - tick === want.length, 'each view is a turn of the clock');
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
@@ -366,7 +394,8 @@ function main(): void {
   checkFree();
   checkOverTheParty();
   checkOverAMonster();
-  checkBoxedIn();
+  checkBoxedIn(false);
+  checkBoxedIn(true);
   checkWall();
   finish();
 }

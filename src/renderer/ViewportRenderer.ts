@@ -148,9 +148,11 @@ export class ViewportRenderer {
    * `d.SeeThruWalls`, read as a boolean each frame:
    * `case SeeThroughWalls: push(d.SeeThruWalls?1:0);` (doc/CSBwin-src/Viewport.cpp:2638).
    * The engine maintains the counter (`Magic.cpp:1314` increments it, TT_73 decrements
-   * it — see `TimerSystem.processSeeThruWallsTimer`).
+   * it — see `TimerSystem.processSeeThruWallsTimer`). `word1868` is `d.Word1868`, which
+   * hides the Fluxcages' shimmer (`InterpreterContext.word1868`).
    */
-  draw(position: Position, facing: number, seeThroughWalls: boolean): void {
+  draw(position: Position, facing: number, seeThroughWalls: boolean, word1868: boolean): void {
+    this.context.word1868 = word1868;
     this.drawViewportFrame(this.dungeonState, position, facing, this.dungeonState.getMap(position.z), seeThroughWalls);
   }
 
@@ -461,6 +463,7 @@ export class ViewportRenderer {
   renderPrisonInterior(seeThroughWalls: boolean): IndexedBitmap {
     const seed = this.dungeonState.getData().header.randomSeed ?? 0;
     const dungeonState = createPrisonDungeonState(seed);
+    this.context.word1868 = false;
     this.drawViewportFrame(
       dungeonState,
       prisonPartyPosition(),

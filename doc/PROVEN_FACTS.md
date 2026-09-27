@@ -3931,6 +3931,9 @@ after them runs. In order:
   VBLs: twelve views, and the last four type changes are never shown (`:2327-2352`).
 - A size-255 fireball, 25 VBLs before it and 50 after, and a size-255 dispell, 50 VBLs
   after (`:2353-2363`); `mon_GreyLord`, 31 VBLs; `d.Word1868 = 1`, 31 VBLs (`:2364-2369`).
+  That is the only write of `d.Word1868`, and its one read is `DrawRoomObjects`: while it
+  is set, a Fluxcage's teleporter shimmer is not drawn (`Code51a4.cpp:2774`), so the
+  cages still around the Grey Lord vanish from the view.
 - Every monster on the level but his deleted, after `ProcessMonsterDeleteFilter` with
   `DMW_Fusion` (`:2370-2387`), 31 VBLs (`:2388-2389`).
 - The texts of cell (0, 0), up to eight, printed in the order of their second character,
@@ -3938,4 +3941,5 @@ after them runs. In order:
   `VBLDelay(600)`, `d.CanRestartFromSavegame = 0` and `ShowCredits(1)` (`:2424-2429`).
 
 Each view is a `_ProcessTimersViewportAndSound`: 33 of them before the texts, and 1593 VBLs.
-The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`.
+The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`, and
+`tools/dump-cloud-draw.ts` for the shimmer.

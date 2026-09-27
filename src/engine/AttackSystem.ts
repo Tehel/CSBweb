@@ -958,11 +958,12 @@ export class AttackSystem {
    * on him, his flicker between `mon_25` and `mon_LordChaos`, a last fireball and dispell,
    * the Grey Lord in his place, every other monster on the level deleted, and after
    * `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame` cleared. Each step shows
-   * through `_ProcessTimersViewportAndSound`, which also runs the timers.
+   * through `_ProcessTimersViewportAndSound`, which also runs the timers. An open inventory
+   * is hidden first, and once the Grey Lord stands there `d.Word1868` takes the shimmer
+   * off the Fluxcages still around him.
    *
-   * ⏳ The screen's share is not ported yet (`DEBT.md` G8, step 3b): `ShowHideInventory(4)`
-   * and `WaitForButtonFlash` (`:2269-2273`), `MarkAllPortraitsChanged` (`:2279`),
-   * `d.Word1868` (`:2367`), and the texts of cell (0, 0) with "THE END." (`:2390-2426`).
+   * ⏳ Not ported yet (`DEBT.md` G8, step 3c): the texts of cell (0, 0) with "THE END."
+   * (`:2390-2426`).
    */
   private *fusionSequence(): LoopScript {
     const mainLoop = this.ctx.systems.mainLoop;
@@ -970,12 +971,15 @@ export class AttackSystem {
     const party = this.ctx.party.state;
     const level = party.position.z;
     this.ctx.state.gameWon = true;
+    if (party.selectedCharacterIndex >= 0) this.ctx.host.showHideInventory(4);
+    // `WaitForButtonFlash()` waits for no flash: the port draws none (`DEBT.md` G6).
     party.brightness = 200;
     // `SelectPaletteForLightLevel()`: the screen picks the palette from `d.Brightness`
     // whenever it draws (`selectPaletteIndexForLightLevel`).
     party.partyShield = 100;
     party.spellShield = 100;
     party.fireShield = 100;
+    // `MarkAllPortraitsChanged()`: the screen draws every portrait on every frame.
     yield* mainLoop.processTimersViewportAndSound();
     const w4 = sw(party.position.x + DELTA_X[party.facing & 3]!);
     const w6 = sw(party.position.y + DELTA_Y[party.facing & 3]!);
@@ -1026,6 +1030,7 @@ export class AttackSystem {
     monster.creatureType = MonsterType.mon_GreyLord;
     yield* mainLoop.processTimersViewportAndSound();
     yield ms2vbl(TEST_DELAY);
+    this.ctx.state.word1868 = true;
     yield* mainLoop.processTimersViewportAndSound();
     yield ms2vbl(TEST_DELAY);
     const map = this.ctx.dungeon.getMap(level)!;

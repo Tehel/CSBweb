@@ -39,6 +39,11 @@ export interface GameHost {
    */
   closeAttackMenuOf(chIdx: number): void;
   /**
+   * `ShowHideInventory(chIdx)` (`doc/CSBwin-src/CSBCode.cpp:7419`), 4 to hide: the
+   * inventory is the UI's. `_FusionSequence` hides an open one (`Attack.cpp:2269-2272`).
+   */
+  showHideInventory(chIdx: number): void;
+  /**
    * `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`): a chest left the weapon hand of
    * the champion whose inventory is open (`:1906-1914`). The open chest is the UI's.
    */
@@ -92,6 +97,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     sleepChanged: host.sleepChanged ?? (() => {}),
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
+    showHideInventory: host.showHideInventory ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),

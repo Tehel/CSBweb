@@ -329,6 +329,12 @@ export interface GameState {
      */
     gameWon: boolean;
     /**
+     * `d.Word1868`, set only by `_FusionSequence` once the Grey Lord stands in Lord Chaos's
+     * place (`doc/CSBwin-src/Attack.cpp:2367`). While set, `DrawRoomObjects` draws no
+     * Fluxcage's shimmer (`Code51a4.cpp:2774`). Not in a save: the credits follow.
+     */
+    word1868: boolean;
+    /**
      * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
      * The renderer computes it and writes it each frame; the monster AI reads it to
      * shorten sight distance in the dark (`doc/CSBwin-src/Monster.cpp:577-581`), the same

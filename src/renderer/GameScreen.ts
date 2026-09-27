@@ -53,6 +53,7 @@ import {
   marchingOrderPointerMoved,
   drawHoverHighlights,
   handleMouseButton,
+  handleInventoryToggle,
   handleMouseUnclick,
   searchMouseButtons,
   syncInventoryButtons,
@@ -143,6 +144,7 @@ export class GameScreen {
   private readonly onPaletteSelected: (index: number) => void;
   private lastRenderPosition: Position | null = null;
   private lastRenderFacing: number = 0;
+  private lastRenderWord1868 = false;
   private bootFrameRenderer: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
@@ -243,6 +245,11 @@ export class GameScreen {
   /** `if (d.AttackingCharacterOrdinal == chIdx+1) TAG01b1c0();` — the host's `closeAttackMenuOf`. */
   closeAttackMenuOf(chIdx: number): void {
     if (this.ui.attackingCharacterOrdinal === chIdx + 1) closeAttackMenu(this.ui);
+  }
+
+  /** `ShowHideInventory` (`doc/CSBwin-src/CSBCode.cpp:7419`) — the host's `showHideInventory`. */
+  showHideInventory(chIdx: number): void {
+    handleInventoryToggle(this.ui, chIdx);
   }
 
   /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`) — the host's `repackChest`. */
@@ -435,11 +442,15 @@ export class GameScreen {
     return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
   }
 
-  /** The screen for the party at `position`: the dungeon view, then the interface over it. */
-  render(position: Position, facing: number): void {
+  /**
+   * The screen for the party at `position`: the dungeon view, then the interface over it.
+   * `word1868` is the engine's `d.Word1868` (`GameState.word1868`).
+   */
+  render(position: Position, facing: number, word1868: boolean): void {
     const { x, y, z } = position;
     this.lastRenderPosition = new Position(x, y, z);
     this.lastRenderFacing = facing;
+    this.lastRenderWord1868 = word1868;
 
     this.viewport.selectLevel(z);
     // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:765), so nothing draws over "GAME
@@ -447,7 +458,7 @@ export class GameScreen {
     // party sleeps (`:637`); `DisplaySleepScreen` holds the viewport.
     if (this.isFrozen()) displayFrozenScreen(this.ui);
     else if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
-    else this.viewport.draw(position, facing, this.seeThroughWalls());
+    else this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
     this.presentViewport();
   }
 
@@ -567,7 +578,7 @@ export class GameScreen {
       return;
     }
     if (!this.lastRenderPosition) return;
-    this.render(this.lastRenderPosition, this.lastRenderFacing);
+    this.render(this.lastRenderPosition, this.lastRenderFacing, this.lastRenderWord1868);
   }
 
   private blitViewportToScreen(): void {

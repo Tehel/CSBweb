@@ -168,7 +168,7 @@ function renderView() {
     const facing = party.state.facing;
 
     screen.setPartyState(party.state);
-    screen.render(pos, facing);
+    screen.render(pos, facing, game.state.word1868);
 }
 
 /** What `init` reads from the server before anything is built. */
@@ -244,8 +244,9 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // screen's answer comes back through `onReincarnateNamed` below.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
         // A weapon hand changed, or a chest left the open inventory's weapon hand:
-        // the attack menu and the open chest are the screen's.
+        // the attack menu, the inventory and the open chest are the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
+        showHideInventory: (chIdx) => screen?.showHideInventory(chIdx),
         repackChest: () => screen?.repackChest(),
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
