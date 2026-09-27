@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { freeze, setClockTick, thaw, wakeUp } from './LoopState';
+import { createLoopFlags, freeze, setClockTick, thaw, wakeUp } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -290,6 +290,30 @@ export class Game {
     /** Whether `MainLoop` has returned: the game is over, and the page's input is dead. */
     mainLoopHasReturned(): boolean {
         return this.mainLoopReturned;
+    }
+
+    /**
+     * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game, through
+     * the path a save takes (doc/CSBwin-src/SaveGame.cpp:1480-1494). `data` must be a
+     * fresh parse of the file, since play writes into the `DungeonData` it runs on. A
+     * scratch `Game` stands the new world up, and a load restores it here, so every
+     * system keeps its object and the page its wiring.
+     */
+    readNewGame(data: DungeonData): void {
+        const fresh = new Game(data, this.ctx.tables);
+        this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
+    }
+
+    /**
+     * `_StartCSB` calls `MainLoop` again once `ShowCredits` returns from a restart
+     * (doc/CSBwin-src/CSBCode.cpp:11320-11327). The loop's state is `d`'s, which
+     * `d.Initialize()` has reset (`Code1f9e6.cpp:309`), and the input goes
+     * (`DiscardAllInput`, `:321`). The page starts the loop (`start`).
+     */
+    resumeMainLoop(): void {
+        Object.assign(this.ctx.loop, createLoopFlags());
+        this.ctx.mouseQueue.discardAllInput();
+        this.mainLoopReturned = false;
     }
 
     /**

@@ -221,7 +221,7 @@ CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then
 (`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
 (`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
 saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
-(`src/engine/Game.ts:375`) and runs `processTimers` on the new value. A timer set between
+(`src/engine/Game.ts:399`) and runs `processTimers` on the new value. A timer set between
 ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
 game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
 (`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
@@ -445,24 +445,21 @@ straight to the credits picture (`SaveGame.cpp:1252`), and has no equivalent in 
 
 Size L, in three steps. Step 1, the lost game with no restart, is done. Left:
 
-2. **"RESTART THIS GAME"**, in three parts. The author's decision: the dungeon entrance's
-   "enter" after a cancelled restart rebuilds the `Game` in place; the page is never
-   reloaded.
-   - **2a. A new game in place.** `_ReadEntireGame` reads `dungeon.dat` through the path a
-     save takes (`SaveGame.cpp:1480-1494`), into the same `d` that `Cleanup(false)` and
-     `d.Initialize()` have just cleared (`Code1f9e6.cpp:302-310`). Play mutates the parsed
-     `DungeonData` in place (`DungeonState` keeps it, `src/engine/DungeonState.ts:66-68`),
-     so the port re-reads the file and restores the fresh world into the running `Game`
-     the way a load does (`applyRuntimeSaveState`), then starts its loop again, which
-     `mainLoopReturned` keeps shut. Evidence: a tool that plays a game, rebuilds it, and
-     finds its whole runtime state equal to a fresh `Game`'s.
+2. **"RESTART THIS GAME"**. The author's decision: the dungeon entrance's "enter" after a
+   cancelled restart rebuilds the `Game` in place; the page is never reloaded. The engine
+   half of that is done: `Game.readNewGame` restores a fresh parse of `dungeon.dat` into the
+   running game the way a load does, and `Game.resumeMainLoop` opens the loop again
+   (`tools/dump-new-game.ts`). Left:
    - **2b. The button and the chooser.** `d.CanRestartFromSavegame`, set by a save or a load
      (`SaveGame.cpp:1260`, `:1883`) and cleared by a new game (`:1494`) and the two wins
      (`Timer.cpp:2370`, `Attack.cpp:2428`). With it set, the end picture carries the button
      `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on the credits picture goes
      back to it without the 300-VBL wait (`:339-348`). The button sets `d.PartyHasDied`
      (`Mouse.cpp:1798`), and `GameSetup(0)` reads the chooser with that flag; a cancel puts
-     the dungeon entrance back up (`CSBCode.cpp:10634-10641`), whose "enter" is 2a.
+     the dungeon entrance back up (`CSBCode.cpp:10634-10641`), whose "enter" is
+     `readNewGame` over a fresh fetch of `dungeon.dat`. Either way the page then does what
+     `d.Initialize()` and `TAG021028` do to the screen — no open inventory, chest or
+     attack menu from the lost game — and calls `resumeMainLoop` and `start`.
      `showCredits` marks where the branch goes.
    - **2c. "THAT'S NOT THE SAME GAME".** With `d.PartyHasDied` set, only a save of the same
      `d.RandomGameID` loads (`SaveGame.cpp:1602-1607`). The ID is drawn when the prison

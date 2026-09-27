@@ -45,6 +45,7 @@ const CHECKS = [
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-champion-death.ts' },
   { tool: 'dump-show-credits.ts' },
+  { tool: 'dump-new-game.ts' },
   { tool: 'dump-item-bonuses.ts' },
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-ten-second-update.ts' },

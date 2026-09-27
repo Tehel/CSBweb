@@ -526,8 +526,13 @@ which runs its timers and ends the same way.
 5. `tag01fd10`: the screen cleared, graphic 6 blitted to `d.Word108`, and a palette of sixteen
    `0x002` (`fillMemory(&LOCAL_110, 16, 2, 2)`) with colour 15 at `0x777` faded up; then
    `VBLDelay(300)`, the first time only (`LOCAL_132`) (`:227-238`).
-6. With `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button (`:240-325`).
-   Otherwise the fade to `LOCAL_110`, the dark blue (`:326`).
+6. With `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button (`:240-325`). A
+   press clears the whole of `d` (`Cleanup(false)`, `d.Initialize()`) and runs
+   `GameSetup(_25_, 0)`, which reads the save chooser; a cancel there puts the entrance up,
+   and its "enter" reads `dungeon.dat` through the same `_ReadEntireGame`
+   (`:302-310`, `CSBCode.cpp:10634-10641`, `SaveGame.cpp:1480-1494`). `ShowCredits` then
+   returns, and `_StartCSB` runs `MainLoop` again (`CSBCode.cpp:11320-11327`). The port's
+   rebuild is `Game.readNewGame`. Otherwise the fade to `LOCAL_110`, the dark blue (`:326`).
 7. Graphic 5 over the whole screen, faded to `d.Palette328`, and a wait of one VBL a poll
    until a button is held (`d.MouseSwitches`) or a key waits (`UI_CONSTAT()`) (`:328-337`).
    Unlike the entrance's scroll, this loop has no counter to run out.
