@@ -302,7 +302,7 @@ what was queued.
 A click on an attack option sets `d.clockTick = intResult` after `ExecuteAttack`
 (`doc/CSBwin-src/Character.cpp:4716-4717`), which `handleAttackAreaClick` mirrors
 (`src/renderer/ui/Attack.ts`). The attack option keys reach `executeAttack` through
-`performAttack` (`src/renderer/ui/Keyboard.ts:163`), which drops the result, so a keyed
+`performAttack` (`src/renderer/ui/Keyboard.ts:161`), which drops the result, so a keyed
 attack waits for the next tick where a clicked one brings it on at once. The module comment
 of `Keyboard.ts` promises the two routes stay equivalent. Set the clock tick there as the
 click does, with a case in `tools/dump-key-bindings.ts`.

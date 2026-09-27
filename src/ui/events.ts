@@ -227,12 +227,12 @@ export function bindUIEvents(): void {
             if (ctx.game.mainLoopHasReturned()) return;
             // The Reincarnate name-entry screen is modal on the keyboard as well as
             // the mouse (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`): while
-            // it is up every key is a letter being typed, so none of the movement or
-            // debug keys below may see one. 'W' would otherwise walk the party into a
-            // wall while the player named their champion.
+            // it is up every key is a letter being typed, so none of the panel, movement
+            // or debug keys below may see one. 'Q' would otherwise open an attack menu
+            // while the player named their champion.
             // The save/load screen takes the keyboard whole, for the reason the
-            // Reincarnate screen does: 'S' would otherwise walk the party backwards
-            // while the player scrolled a list of saves.
+            // Reincarnate screen does: 'S' would otherwise open an attack menu while the
+            // player scrolled a list of saves.
             if (ctx.screen?.isSaveMenuOpen()) {
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
                 ctx.screen.handleSaveMenuKey(e.key);

@@ -127,6 +127,7 @@ async function main(): Promise<void> {
   };
 
   const { handleUIKey } = await importKeyboard();
+  const { attackPanelTick, closeAttackMenu, handleAttackAreaClick } = await import('../src/renderer/ui/Attack');
   const press = (key: string): boolean => {
     const taken = handleUIKey(ui, key);
     row(ui, key, taken);
@@ -136,54 +137,63 @@ async function main(): Promise<void> {
   console.log(`champions: ${party.state.champions[0].name} and ${party.state.champions[1].name}`);
   console.log(['key', 'claimed', 'ordinal', 'inv', 'caster', 'runes'].join('\t'));
 
-  // ---- 1. The attack keys open, replace and close — never stack.
+  // ---- 1. The attack keys are a column per champion. A key of a champion whose menu is
+  //         not open opens it, replacing any other — never stacking.
+  attacks = [];
   press('q');
   check(ui.attackingCharacterOrdinal === 1, "'q' should open champion 1's attack menu");
   check(ui.word20252 === 0, "'q' should put the panel into its option-list state");
   check(ui.word20248 >= 1, 'an empty hand should still offer at least one attack');
+  const offered = ui.word20248;
+
+  press('x');
+  check(ui.attackingCharacterOrdinal === 2, "'x' should replace the open menu with champion 2's, not stack on it");
+  check(attacks.length === 0, "'x' should open champion 2's menu, not attack for champion 1");
 
   press('w');
-  check(ui.attackingCharacterOrdinal === 2, "'w' should replace the open menu, not stack on it");
-
-  press('w');
-  check(ui.attackingCharacterOrdinal === 0, "'w' again should close champion 2's menu");
+  check(attacks.length === 1 && attacks[0].chIdx === 1,
+    "'w' with champion 2's menu open should perform their first attack");
+  check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
   check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
 
-  // ---- 2. An attack option only fires while a menu is open, and only for a row that
-  //         `word20248` says is real (`handleAttackAreaClick`).
+  // ---- 2. Any of the column's three keys opens the menu; with it open, each is its row,
+  //         and only a row that `word20248` says is real (`handleAttackAreaClick`).
   attacks = [];
-  check(press('a'), "'a' is bound, so it is claimed even with no menu open");
-  check(attacks.length === 0, 'no attack should fire while the menu is closed');
-
-  press('q');
-  const offered = ui.word20248;
-  press('a');
-  check(attacks.length === 1 && attacks[0].chIdx === 0,
-    "'a' should perform champion 1's first attack");
-  check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
-
-  attacks = [];
-  press('q');
-  press('d');
+  press('z');
+  check(ui.attackingCharacterOrdinal === 1 && attacks.length === 0,
+    "'z' with no menu open should open champion 1's, and attack nothing");
+  press('z');
   if (offered < 3) {
-    check(attacks.length === 0, `only ${offered} attack(s) offered, so 'd' must do nothing`);
+    check(attacks.length === 0, `only ${offered} attack(s) offered, so 'z' must do nothing`);
     check(ui.attackingCharacterOrdinal === 1, 'a dead option must leave the menu open');
+    press('q');
   } else {
-    check(attacks.length === 1, "'d' should perform the third attack when one is offered");
+    check(attacks.length === 1, "'z' should perform the third attack when one is offered");
   }
-  press('q'); // back to a closed panel for the blocks below
   check(ui.attackingCharacterOrdinal === 0, 'the panel should be closed again');
 
+  press('a');
+  press('a');
+  if (offered < 2) {
+    check(ui.attackingCharacterOrdinal === 1, `only ${offered} attack offered, so 'a' must do nothing`);
+    closeAttackMenu(ui);
+  } else {
+    check(attacks.length >= 1 && attacks[attacks.length - 1].chIdx === 0 && ui.attackingCharacterOrdinal === 0,
+      "'a' should perform champion 1's second attack");
+  }
+
   // ---- 3. The inventory keys, the same toggle `handleInventoryToggle` gives a click.
-  press('z');
-  check(party.state.selectedCharacterIndex === 0, "'z' should open champion 1's inventory");
-  press('x');
-  check(party.state.selectedCharacterIndex === 1, "'x' should replace it with champion 2's");
-  press('x');
-  check(party.state.selectedCharacterIndex === -1, "'x' again should close it");
-  press('c');
+  press('7');
+  check(party.state.selectedCharacterIndex === 0, "'7' should open champion 1's inventory");
+  press('8');
+  check(party.state.selectedCharacterIndex === 1, "'8' should replace it with champion 2's");
+  press('8');
+  check(party.state.selectedCharacterIndex === -1, "'8' again should close it");
+  press('9');
   check(party.state.selectedCharacterIndex === -1,
-    "'c' should do nothing — there is no third champion");
+    "'9' should do nothing — there is no third champion");
+  press('e');
+  check(ui.attackingCharacterOrdinal === 0, "'e' should do nothing — there is no third champion");
 
   // ---- 4. The magic keys. No caster, no keypad (button id 100's guard in `Mouse.ts`).
   check(party.state.magicCasterIndex === -1, 'no caster should be selected yet');
@@ -226,7 +236,7 @@ async function main(): Promise<void> {
   //         to movement, so a bound key leaking through would walk the party instead.
   check(press('Q'), "'Q' should be claimed the same as 'q'");
   check(ui.attackingCharacterOrdinal === 1, 'a capital should reach the same binding');
-  press('q');
+  closeAttackMenu(ui);
 
   for (const key of ['k', 'j', 'l', 'm', ',', '.', 'Escape', 'F5', 'F9', 'ArrowUp']) {
     check(!handleUIKey(ui, key), `'${key}' must be left for the movement and debug keys`);
@@ -237,7 +247,7 @@ async function main(): Promise<void> {
   party.state.potentialChampionIndex = 0;
   press('q');
   check(ui.attackingCharacterOrdinal === 0, 'no attack menu while a champion is only provisional');
-  press('z');
+  press('7');
   check(party.state.selectedCharacterIndex === -1, 'no inventory either');
   press('1');
   check(runes(party.state) === '-', 'and no runes');
@@ -247,7 +257,6 @@ async function main(): Promise<void> {
   //         `PrepareAttack` returns on `CHARFLAG_attackDisable`
   //         (`doc/CSBwin-src/Character.cpp:4916`). The stub attack busies the attacker, as
   //         the real one's `DisableCharacterAction` does.
-  const { attackPanelTick, handleAttackAreaClick } = await import('../src/renderer/ui/Attack');
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     party.state.champions[chIdx].charFlags |= CHARFLAG_ATTACK_DISABLE;
@@ -262,7 +271,7 @@ async function main(): Promise<void> {
   };
   attacks = [];
   press('q');
-  press('a');
+  press('q');
   attackPanelTick(ui); // the tick brings the hands back: word20252 = 1
   check(attacks.length === 1 && (party.state.champions[0].charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
     'the attack should leave champion 1 busy');
@@ -273,7 +282,7 @@ async function main(): Promise<void> {
   party.state.champions[0].charFlags &= ~CHARFLAG_ATTACK_DISABLE;
   clickHand();
   check(ui.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
-  press('q');
+  closeAttackMenu(ui);
 
   // ---- 8. An attack that starts a script (the fusion's `_FusionSequence`) never returns
   //         to its caller (`doc/CSBwin-src/Character.cpp:4972`): `TAG01b1c0` leaves the
@@ -297,7 +306,7 @@ async function main(): Promise<void> {
   check(attacks.length === 1 && held, 'the click attacks, and the attack holds the loop');
   check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
   check(clockTicks.length === 0, 'd.clockTick is not set');
-  const heldKeys = ['q', 'w', 'a', 'z', 'F2', '1', 'Tab'].map((key) => press(key));
+  const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', 'Tab'].map((key) => press(key));
   check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
   check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
     && party.state.magicCasterIndex === 0 && runes(party.state) === '-',

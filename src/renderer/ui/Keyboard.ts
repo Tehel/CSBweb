@@ -18,23 +18,25 @@
  * `d.PotentialCharacterOrdinal` makes every panel inert
  * (`doc/CSBwin-src/Mouse.cpp:1578-1650`).
  *
+ * The attack keys are a column per champion — Q/A/Z for the first, W/S/X, E/D/C and
+ * R/F/V for the others — one key per attack row. With that champion's menu open a key
+ * performs its row; otherwise it opens the menu.
+ *
  * ⚠️ One deliberate divergence, and it is the reason for the direct calls: an attack key
  * pressed while *another* champion's attack menu is open replaces that menu. A click
  * cannot do that — with a menu open the panel area is the option list, not the four
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
 import { selectMagicCaster } from '../../engine/Party';
-import { closeAttackMenu, executeAttack, prepareAttack } from './Attack';
+import { executeAttack, prepareAttack } from './Attack';
 import { applyMagicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
 import { UIState } from './UIState';
 
-/** Open/close the attack menu of champion 0-3. */
-const ATTACK_PANEL_KEYS = ['q', 'w', 'e', 'r'];
-/** Perform the first, second or third of the offered attacks. */
-const ATTACK_OPTION_KEYS = ['a', 's', 'd'];
+/** Champion 0-3's attack keys, one per attack row: each opens the menu or performs its row. */
+const ATTACK_KEYS = [['q', 'a', 'z'], ['w', 's', 'x'], ['e', 'd', 'c'], ['r', 'f', 'v']];
 /** Open/close the inventory of champion 0-3. */
-const INVENTORY_KEYS = ['z', 'x', 'c', 'v'];
+const INVENTORY_KEYS = ['7', '8', '9', '0'];
 /** The six runes of the current incantation step — magic buttons 101-106. */
 const RUNE_KEYS = ['1', '2', '3', '4', '5', '6'];
 /** Select the champion who is casting. */
@@ -46,7 +48,7 @@ const CAST_KEY = 'Tab';
 
 /** Whether `k`, lower-cased, is one of the panel bindings. */
 function isUIKey(k: string): boolean {
-  return [ATTACK_PANEL_KEYS, ATTACK_OPTION_KEYS, INVENTORY_KEYS, RUNE_KEYS, CASTER_KEYS]
+  return [...ATTACK_KEYS, INVENTORY_KEYS, RUNE_KEYS, CASTER_KEYS]
     .some((keys) => keys.includes(k)) || k === RUNE_BACK_KEY || k === CAST_KEY;
 }
 
@@ -91,19 +93,15 @@ export function handleUIKey(ui: UIState, key: string): boolean {
   // key is claimed, and does nothing.
   if (ui.isRunningScript?.()) return isUIKey(k);
 
-  let index = ATTACK_PANEL_KEYS.indexOf(k);
-  if (index >= 0) {
-    toggleAttackMenu(ui, index);
-    return true;
+  for (let chIdx = 0; chIdx < ATTACK_KEYS.length; chIdx++) {
+    const option = ATTACK_KEYS[chIdx].indexOf(k);
+    if (option >= 0) {
+      attackKey(ui, chIdx, option);
+      return true;
+    }
   }
 
-  index = ATTACK_OPTION_KEYS.indexOf(k);
-  if (index >= 0) {
-    performAttack(ui, index);
-    return true;
-  }
-
-  index = INVENTORY_KEYS.indexOf(k);
+  let index = INVENTORY_KEYS.indexOf(k);
   if (index >= 0) {
     toggleInventory(ui, index);
     return true;
@@ -140,17 +138,17 @@ function championPending(ui: UIState): boolean {
 }
 
 /**
- * The attack keys. Pressing the key of the champion whose menu is open closes it
- * (`TAG01b1c0`); any other opens that champion's, replacing whatever was there.
- * `prepareAttack` refuses a dead champion and a weapon with no attacks, and the menu
- * already on screen is left alone when it does.
+ * An attack key: with `chIdx`'s menu open, the attack of row `option`; otherwise that
+ * champion's menu opens, replacing whatever was there. `prepareAttack` refuses a dead or
+ * busy champion and a weapon with no attacks, and the menu already on screen is left
+ * alone when it does.
  */
-function toggleAttackMenu(ui: UIState, chIdx: number): void {
+function attackKey(ui: UIState, chIdx: number, option: number): void {
   const party = ui.partyState;
   if (!party || championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
   if (ui.attackingCharacterOrdinal === chIdx + 1) {
-    closeAttackMenu(ui);
+    performAttack(ui, option);
     return;
   }
   prepareAttack(ui, chIdx);
@@ -161,8 +159,6 @@ function toggleAttackMenu(ui: UIState, chIdx: number): void {
  * real; the rest are dead, as they are for a click (`handleAttackAreaClick`).
  */
 function performAttack(ui: UIState, option: number): void {
-  if (championPending(ui)) return;
-  if (ui.attackingCharacterOrdinal === 0) return;
   if (option >= ui.word20248) return;
   executeAttack(ui, option);
 }
