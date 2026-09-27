@@ -83,7 +83,6 @@ In payoff order: the first row is the next item.
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
-| C72 | No door is drawn with its ornament: the entrance is a grid, not the black door | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -273,36 +272,6 @@ a row in `tools/dump-marching-order.ts` that draws a party with a dead champion.
 entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straight into the
 adventure in both (`init` and `showEndOfGame`, `src/main.ts`). Show the menu, with
 `src/renderer/ui/Menu.ts`, before the loop starts. Evidence: a golden frame of it.
-
-
-### C72 ⏳ No door is drawn with its ornament: the entrance is a grid, not the black door
-
-`DrawDoor` (`doc/CSBwin-src/CSBCode.cpp:4134`) copies the door's graphic into `tempBitmap`
-and calls `TAG004b26(DB0.ornateness(), nearness)` (`:3993-4059`, called at `:4155`) to draw
-the door's ornament onto it before the blit. A bashed door gets `TAG004b26(16, nearness)`
-too (`:4184-4185`), and a near door under See-Thru-Walls `TAG004b26(17, 2)` (`:4171-4174`).
-The port's `opStdDrawDoor` (`src/renderer/bytecode/BytecodeInterpreter.ts:1177`) blits the
-bare door graphic and calls none of them (`:1253`, and `src/renderer/DrawViewport.ts:137`).
-So no door shows its ornament: 89 of the 170 doors in `dm-atari/dungeon.dat` have one.
-Among them is the entrance door on level 0 (door 107, ornament 1): the level's one door
-decoration is 7 (`doorDecorationTOC`), graphic 310, the opaque black door. The port draws
-the grid under it. In play that also means no smashed or reinforced wooden doors, no
-grids with a small central grid, and none of the custom locks. On level 6 the wooden doors
-(door type 1, graphics 111-113) carry ornaments 305 (four doors) and 306 (one), the
-turquoise-key doors' skin, and show as plain wood. The dragon room's doors on level 13 look
-right because their look is a door type (graphics 114-116), but one of the two has an
-ornament too, graphic 314.
-
-`TAG004b26` needs what `ReadGraphicsForLevel` sets up per level (`Code390e.cpp:275-300`):
-`d.Word2514[i]`, the ornament's graphic (`303 + DoorDecorationTOC[i]`) and its position set
-(`d.Byte4122[…]`), and two derived-graphic sizes from `d.Byte5070`. At F2 and F3 the
-ornament is shrunk (`ShrinkBLT`) through the colour maps `d.Byte4172` / `d.Byte4188` into a
-derived graphic, and at F1 it is drawn at full size; either way it goes onto `tempBitmap`
-with colour 9 transparent. None of `Byte5070`, `Byte5058`, `Byte4122`, `Byte4172` or
-`Byte4188` is extracted yet (`Data.h:1149-1170`, graphic 0x22e). `Word2514` is declared
-`[1][2]` followed by `FILL(2510,2446)` (`Data.h:1320-1321`), so the entries ornaments 16
-and 17 read (`Word2514[15]` and `[16]`) lie in that span: where they are set is still to be
-read. Evidence: a golden frame facing the entrance door, and one facing a locked door.
 
 ---
 

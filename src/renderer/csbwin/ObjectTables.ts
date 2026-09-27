@@ -233,6 +233,18 @@ export interface ObjectTables {
   doorSwitchRectSets: DecorationDesc[][]; // d.Byte5094[?][4]
   doorSwitchSourceDescSets: DecorationDesc[][]; // d.Byte5076[?][4]
 
+  // Door ornaments (TAG004b26, doc/CSBwin-src/CSBCode.cpp:3993-4059)
+  /**
+   * `d.Byte5070[18*set + 6*nearness]`: where an ornament goes on the door's bitmap, per
+   * position set and nearness (0 F3, 1 F2, 2 F1). `Byte5070[12]` is declared short, and
+   * `TAG004b26` reads its four 18-byte sets on into `Byte5058[60]`, which follows it
+   * (`Data.h:1149-1150`); `Byte5058[18*set]`, the source size of a shrink, is set's F1 entry.
+   */
+  doorOrnamentRectSets: DecorationDesc[][];
+  doorOrnamentRectSetIndex: Uint8Array; // d.Byte4122[12], a door ornament's position set
+  doorOrnamentColorMapF3: Uint8Array; // d.Byte4172[16]
+  doorOrnamentColorMapF2: Uint8Array; // d.Byte4188[16]
+
   // Floor decorations (DrawFloorDecorations, CSBCode.cpp:3780+)
   floorDecorationDescSets: DecorationDesc[][]; // d.floorDecorDesc[3][9]
   floorDecorationRectSetIndex: Uint8Array; // d.Byte4110[10]
@@ -283,6 +295,10 @@ const ABS_WORD4040 = 4040; // Word4040[1]
 const ABS_BYTE4124 = 4124; // Byte4124[2] (door switch rect set indices)
 const ABS_BYTE5094 = 5094; // Byte5094[?] (door switch rectangles)
 const ABS_BYTE5076 = 5076; // Byte5076[?] (door switch source desc)
+const ABS_BYTE5070 = 5070; // Byte5070[12] and Byte5058[60] after it (door ornament rectangles)
+const ABS_BYTE4122 = 4122; // Byte4122[12] (door ornament position sets)
+const ABS_BYTE4172 = 4172; // Byte4172[16] (door ornament colour map, F3)
+const ABS_BYTE4188 = 4188; // Byte4188[16] (door ornament colour map, F2)
 const ABS_FLOOR_DECOR_DESC = 4998; // floorDecorDesc[3][9]
 const ABS_FLOOR_DECOR_RECT_SET_INDEX = 4110; // Byte4110[10]
 const ABS_REL_CELL_GRAPHIC_INCREMENT = 4034; // RelativeCellGraphicIncrement[10]
@@ -821,6 +837,10 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const doorSwitchRectIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4124);
   const doorSwitchRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5094);
   const doorSwitchSourceDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5076);
+  const doorOrnamentRectOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE5070);
+  const doorOrnamentRectSetIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4122);
+  const doorOrnamentColorMapF3Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4172);
+  const doorOrnamentColorMapF2Offset = computeOffsetFromWall(wallRectanglesOffset, ABS_BYTE4188);
   const floorDecorationDescOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_FLOOR_DECOR_DESC);
   const floorDecorationRectSetIndexOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_FLOOR_DECOR_RECT_SET_INDEX);
   const relativeCellGraphicIncrementOffset = computeOffsetFromWall(wallRectanglesOffset, ABS_REL_CELL_GRAPHIC_INCREMENT);
@@ -857,6 +877,10 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     doorSwitchRectIndexOffset < 0 ||
     doorSwitchRectOffset < 0 ||
     doorSwitchSourceDescOffset < 0 ||
+    doorOrnamentRectOffset < 0 ||
+    doorOrnamentRectSetIndexOffset < 0 ||
+    doorOrnamentColorMapF3Offset < 0 ||
+    doorOrnamentColorMapF2Offset < 0 ||
     floorDecorationDescOffset < 0 ||
     floorDecorationRectSetIndexOffset < 0 ||
     relativeCellGraphicIncrementOffset < 0 ||
@@ -923,6 +947,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   }
   const doorSwitchRectSets = readDecorationDescSets(raw22e, doorSwitchRectOffset, doorSwitchSetCount, 4);
   const doorSwitchSourceDescSets = readDecorationDescSets(raw22e, doorSwitchSourceDescOffset, doorSwitchSetCount, 4);
+  // Four sets: `TAG004b26` asserts the set is below 4 (`CSBCode.cpp:4021`).
+  const doorOrnamentRectSets = readDecorationDescSets(raw22e, doorOrnamentRectOffset, 4, 3);
+  const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 12);
+  const doorOrnamentColorMapF3 = raw22e.slice(doorOrnamentColorMapF3Offset, doorOrnamentColorMapF3Offset + 16);
+  const doorOrnamentColorMapF2 = raw22e.slice(doorOrnamentColorMapF2Offset, doorOrnamentColorMapF2Offset + 16);
   const floorDecorationDescSets = readFloorDecorationDescTable22e(raw22e, floorDecorationDescOffset);
   const floorDecorationRectSetIndex = raw22e.slice(
     floorDecorationRectSetIndexOffset,
@@ -1010,6 +1039,10 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     doorSwitchRectIndex,
     doorSwitchRectSets,
     doorSwitchSourceDescSets,
+    doorOrnamentRectSets,
+    doorOrnamentRectSetIndex,
+    doorOrnamentColorMapF3,
+    doorOrnamentColorMapF2,
     floorDecorationDescSets,
     floorDecorationRectSetIndex,
     relativeCellGraphicIncrement,

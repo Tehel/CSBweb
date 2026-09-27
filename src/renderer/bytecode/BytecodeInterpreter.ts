@@ -87,6 +87,14 @@ export interface InterpreterContext {
   frameMapIndex?: number;
   doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)
   doorTOC?: number[]; // d.DoorTOC[2], resolved from DoorCharacteristics for the current level
+  /**
+   * `d.Word2514[17][2]`: per door ornament, its graphic and its position set
+   * (`d.Byte4122`). Slots 15 and 16, the bashed door (graphic 301) and See-Thru-Walls
+   * (302), are set once (`doc/CSBwin-src/CSBCode.cpp:10251-10262`), and the level's own
+   * from its `DoorDecorationTOC` (`Code390e.cpp:275-284`), which leaves any slot past
+   * the level's count as the last level to fill it left it.
+   */
+  doorOrnaments?: Array<[number, number]>;
   numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5798)
   useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6740)
 
@@ -1222,14 +1230,33 @@ export class BytecodeInterpreter {
     const viewport = this.context.viewportIndexBuffer;
     if (!getGraphic || !viewport) return true;
 
-    let bitmap = getGraphic(doorGraphicNum);
-    if (!bitmap) {
+    const graphic = getGraphic(doorGraphicNum);
+    if (!graphic) {
       // (skip) StdDrawDoor could not load door graphic ${doorGraphicNum}
       return true;
     }
 
     const s = doorState | 0;
     if (s === 0) return true; // fully open
+
+    // `StdDrawDoor`: door graphic index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2594-2598`).
+    const nearness = 2 - (doorGraphicIndex | 0);
+
+    // `DrawDoor` copies the door's graphic into `tempBitmap` and draws on the copy
+    // (`doc/CSBwin-src/CSBCode.cpp:4151-4154`). The port copies only when an ornament is
+    // drawn, and again after a mirror or a flip, whose result is cached and shared.
+    let bitmap: IndexedBitmap = graphic;
+    let ownBitmap = false;
+    const drawOrnament = (ornament: number, near: number) => {
+      if (ornament === 0) return; // `TAG004b26` returns at once (`:4002`)
+      if (!ownBitmap) {
+        bitmap = { width: bitmap.width, height: bitmap.height, pixels: bitmap.pixels.slice() };
+        ownBitmap = true;
+      }
+      this.drawDoorOrnament(bitmap, ornament, near);
+    };
+
+    drawOrnament(record.ornateNumber, nearness); // `:4155`
 
     // A "lightning door" (`d.DoorTOC[doorType] & 0x400`) redraws with a random
     // mirror and a random vertical flip every frame it isn't bashed
@@ -1240,18 +1267,26 @@ export class BytecodeInterpreter {
     // never perturb the game's own RNG, so this draws from a dedicated instance.
     const isLightningDoor = ((this.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
     if (isLightningDoor && s !== 5) {
-      if (BytecodeInterpreter.viewportRandom.bool()) bitmap = this.getMirroredBitmap(bitmap);
-      if (BytecodeInterpreter.viewportRandom.bool()) bitmap = this.getFlippedBitmapVertical(bitmap);
+      if (BytecodeInterpreter.viewportRandom.bool()) {
+        bitmap = this.getMirroredBitmap(bitmap);
+        ownBitmap = false;
+      }
+      if (BytecodeInterpreter.viewportRandom.bool()) {
+        bitmap = this.getFlippedBitmapVertical(bitmap);
+        ownBitmap = false;
+      }
     }
 
+    // The near door under See-Thru-Walls (`:4168-4174`).
+    if ((rectPtr | 0) === StdRectPtr.RECT_StdDoorRectsF1 && this.context.seeThroughWalls) drawOrnament(17, 2);
+
     const blit = (r: RectPos | undefined) => {
-      if (!r || !bitmap) return;
+      if (!r) return;
       bltShapeToViewportIndex(bitmap, viewport, r);
     };
 
     if (s === 4 || s === 5) {
-      // closed or bashed. CSBWin draws the door's ornament, and a bashed door's, onto the
-      // panel first (`TAG004b26`, doc/CSBwin-src/CSBCode.cpp:4155, `:4184`): `DEBT.md` C72.
+      if (s === 5) drawOrnament(16, nearness); // bashed (`:4184`)
       blit(rectRef[0]);
       return true;
     }
@@ -1266,6 +1301,46 @@ export class BytecodeInterpreter {
     }
 
     return true;
+  }
+
+  /**
+   * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:3993-4059`): draws door ornament `ornament`,
+   * slot `ornament - 1` of `d.Word2514`, onto `door`, a copy of the door's graphic at
+   * `nearness` (0 F3, 1 F2, 2 F1), with colour 9 transparent. At F1 the ornament is its
+   * graphic; nearer than that it is shrunk from its F1 size to the rectangle's through
+   * `d.Byte4172` (F3) or `d.Byte4188` (F2), the derived graphic `68 + 2*slot + nearness`.
+   */
+  private drawDoorOrnament(door: IndexedBitmap, ornament: number, nearness: number): void {
+    const tables = this.context.objectTables;
+    const getGraphic = this.context.getGraphicBitmap;
+    const slot = this.context.doorOrnaments?.[ornament - 1];
+    if (!tables || !getGraphic || !slot) return;
+    const [graphicNum, set] = slot;
+    const rect = tables.doorOrnamentRectSets[set][nearness];
+    const graphic = getGraphic(graphicNum);
+    if (!graphic) return;
+
+    let ornamentBitmap = graphic;
+    if (nearness !== 2) {
+      const cache = this.context.graphicCache;
+      const key = `doorOrnament:${graphicNum}:${set}:${nearness}`;
+      const cached = cache?.get(key);
+      if (cached) {
+        ornamentBitmap = cached;
+      } else {
+        const size = tables.doorOrnamentRectSets[set][2]; // `Byte5058[18*set]`
+        const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
+        ornamentBitmap = this.shrinkBltIndexedBitmap(
+          this.cropBitmap(graphic, 2 * size.widthBytes, size.height),
+          rect.x2 - rect.x1 + 1,
+          rect.height,
+          colorMap
+        );
+        cache?.set(key, ornamentBitmap);
+      }
+    }
+
+    tag0088b2Index(ornamentBitmap, door, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 9);
   }
 
   private opStdDrawWallDecoration(): boolean {

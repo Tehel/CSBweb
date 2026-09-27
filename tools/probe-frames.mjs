@@ -217,6 +217,24 @@ await evaluate(`(()=>{
 await wait(3000);
 console.log('state: crack switch');      await shot('09-crack-switch');
 
+// Door ornaments (`TAG004b26`, `doc/CSBwin-src/CSBCode.cpp:3993`), drawn onto the door's
+// bitmap before the blit. The entrance door, level 0 (1,2), seen from the start square:
+// ornament 7 at full size, the black double door, over the grid that is its door type.
+// Then level 4 door 60 at (4,25), two squares east of (2,25): a wooden door whose lock
+// plate, ornament 5 in position set 2, is shrunk to its F2 size through `d.Byte4188`.
+const FACE = (x, y, z, facing) => `(()=>{
+  const { game, renderView } = window.__probe;
+  const party = game.party.state;
+  party.position.x = ${x}; party.position.y = ${y}; party.position.z = ${z};
+  party.facing = ${facing};
+  party.brightness = 1000;
+  renderView();
+})()`;
+await evaluate(FACE(1, 3, 0, 0)); await wait(500);
+console.log('state: entrance door');     await shot('10-entrance-door');
+await evaluate(FACE(2, 25, 4, 1)); await wait(500);
+console.log('state: door lock, F2');     await shot('11-door-lock-f2');
+
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');
 ws.close();

@@ -688,6 +688,33 @@ d.DoorTOC[1] = d.DoorCharacteristics[D0W];
 two. The low byte is the force needed to bash the door (`doc/CSBwin-src/Code11f52.cpp:2277`)
 and bit 8 marks a door monsters may walk through (`doc/CSBwin-src/Monster.cpp:320`).
 
+## A door's ornament is drawn onto its bitmap, from four tables of item `0x22e`
+
+`DrawDoor` copies the door's graphic into `tempBitmap`, draws on the copy and blits that
+(`doc/CSBwin-src/CSBCode.cpp:4151-4190`), in this order: the door's own ornament,
+`TAG004b26(DB0.ornateness(), nearness)` (`:4155`); a lightning door's random mirror and flip
+(`:4156-4166`); `TAG004b26(17, 2)` for the centre F1 door under See-Thru-Walls (`:4168-4174`);
+and `TAG004b26(16, nearness)` for a bashed one (`:4182-4185`). Nearness is 2 at F1, 1 at F2,
+0 at F3 (`doc/CSBwin-src/Viewport.cpp:2594-2598`).
+
+`TAG004b26(ornament, nearness)` (`CSBCode.cpp:3993-4059`) does nothing for ornament 0, and
+otherwise reads slot `ornament - 1` of `d.Word2514[17][2]`: a graphic and a position set.
+`ReadGraphicsForLevel` fills slot `i` from the level's `DoorDecorationTOC[i]` with graphic
+`303 + TOC[i]` and set `d.Byte4122[TOC[i]]` (`doc/CSBwin-src/Code390e.cpp:275-284`), and
+never clears the slots past the level's count. Slots 15 and 16 are set once, to graphics
+301 and 302 in set 1 (`CSBCode.cpp:10251-10262`). `Word2514` is declared `[1][2]` and
+followed by `FILL(2510,2446)`, 64 bytes, so the seventeen slots fit (`Data.h:1320-1321`).
+
+The ornament's rectangle on the door's bitmap is `d.Byte5070 + 18*set + 6*nearness`, a
+6-byte `x1 x2 y1 y2 widthBytes height`. `Byte5070` is declared 12 bytes, and the four sets
+run on into `Byte5058[60]`, which follows it (`Data.h:1149-1150`); `Byte5058[18*set]` is the
+set's F1 rectangle. At F1 the ornament's graphic is drawn as it is. Nearer than that it is
+first shrunk (`ShrinkBLT`) from its F1 size to the rectangle's, through the colour map
+`d.Byte4172` at F3 or `d.Byte4188` at F2, into derived graphic `68 + 2*slot + nearness`. It
+is drawn with colour 9 transparent. In `graphics.dat`, every ornament's F1 rectangle is its
+graphic's size, and set 1's three rectangles are the whole door at each nearness
+(`tools/dump-door-ornaments.ts`).
+
 ## `AddFootprintEntry` is acknowledged broken, and still load-bearing
 
 `doc/CSBwin-src/Code11f52.cpp:4343-4346` carries Paul Stevens' own verdict:

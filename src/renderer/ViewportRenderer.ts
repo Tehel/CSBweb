@@ -129,6 +129,7 @@ export class ViewportRenderer {
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],
+      doorOrnaments: Array.from({ length: 17 }, (_, i): [number, number] => (i >= 15 ? [i + 286, 1] : [0, 0])),
     };
   }
 
@@ -244,6 +245,15 @@ export class ViewportRenderer {
       [base0 + 1, base1 + 1],
       [base0 + 0, base1 + 0],
     ];
+
+    // `d.Word2514[i] = { 303 + DoorDecorationTOC[i], Byte4122[DoorDecorationTOC[i]] }`
+    // (`doc/CSBwin-src/Code390e.cpp:275-284`).
+    const doorOrnaments = this.context.doorOrnaments!;
+    const doorDecorationTOC = map?.doorDecorationTOC ?? [];
+    for (let i = 0; i < doorDecorationTOC.length; i++) {
+      const decoration = doorDecorationTOC[i];
+      doorOrnaments[i] = [303 + decoration, this.objectTables.doorOrnamentRectSetIndex[decoration]];
+    }
 
     // `d.DoorTOC[2] = d.DoorCharacteristics[doorType0Index/doorType1Index]`
     // (`doc/CSBwin-src/CSBCode.cpp:5780-5783`) — the level's two door "types" resolved
