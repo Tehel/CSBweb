@@ -91,7 +91,8 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G8 | Lord Chaos's fusion endgame | — | ⏳ |
+| G13 | `_ShowCredits`: the game never ends | M | ⏳ |
+| G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G9 | Changing the marching order | — | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -100,7 +101,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C70 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C70 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -192,7 +193,7 @@ With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
 `ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
 The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
 `TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
-bash (`src/engine/AttackSystem.ts:1000`), a champion's wound
+bash (`src/engine/AttackSystem.ts:999`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
 `:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
@@ -417,14 +418,51 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
+### G13 ⏳ `_ShowCredits`: the game never ends
+
+`_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won, and
+it is not ported. `KillCharacter` sets `d.GameIsLost` when nobody is left
+(`Character.cpp:2680`), which stops the clock (`CSBCode.cpp:658`) and makes `MainLoop`
+return on that tick (`:777-778`), and the loop around it then calls
+`ShowCredits(d.GameIsLost)` (`:11325`). The port sets `PartyState.gameIsLost`
+(`src/engine/MonsterAttack.ts:598`) and nothing reads it, so a party that has died keeps
+playing. `_ShowCredits(1)` of a lost game plays the dying sound, shows graphic 6, the end
+picture, offers "RESTART THIS GAME" for 900 VBLs (button `0xd7`, `Code1f9e6.cpp:227-318`),
+then the credits picture, graphic `0x8005` (`:328`), and a click there goes back to the
+end picture (`:341-348`). Won (`d.Word11694`), it shows each champion's portrait, name,
+title and levels over graphic 208 and ends the game there (`:171-225`). "SAVE AND QUIT"
+calls `ShowCredits(0)`, straight to the credits picture (`SaveGame.cpp:1252`), and has no
+equivalent in the port (`PLAN.md` → Phase 10). G8 ends in it.
+
 ### G8 ⏳ Lord Chaos's fusion endgame
 
 `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and `_FusionSequence` (`:2220`) are not ported.
-`atk_FUSE` runs its filter and does nothing else (`src/engine/AttackSystem.ts:28-30`). What
-the fusion depends on is ported: the Fluxcage, `IsCellFluxcage`, `IsLordChaosHere`, and
-`MonsterPerception`'s Fluxcage test. The code gives a reason for waiting ("it cannot be
-exercised until Lord Chaos himself works"). Check whether it still holds, now that the
-monsters are ported.
+`atk_FUSE` runs its filter and does nothing else (`src/engine/AttackSystem.ts:1090-1097`).
+Everything Lord Chaos does before the fusion is ported: the Fluxcage, `IsCellFluxcage`,
+`IsLordChaosHere`, `MonsterPerception`'s Fluxcage test, his wander step
+(`MonsterSystem.ts:712`, `Timer.cpp:2601`) and his missiles (`MonsterAttack.ts:297`,
+`Monster.cpp:1045`). So he can be boxed in and fused against. What is missing is the
+ending, and it is size L, in three steps:
+
+1. **G13 first.** `_FusionSequence` ends in `ShowCredits(_20_, 1)` (`:2429`), the won
+   screen.
+2. **A scripted sequence inside the game loop.** `_FusionSequence` is a `RESTARTABLE`
+   coroutine: it runs `ProcessTimersViewportAndSound` (`:2192`: `ProcessTimers`, the
+   viewport, the queued sound, `d.Time++`) some thirty times between `VBLDelay`s, with no
+   mouse handling, and prints the ending's texts. `Game.runFrame` has no way to run such a
+   script in place of its pass; the intro's `async` `IntroHost` is the pattern to follow.
+   `testdelay` is 500 (`Attack.cpp:19`) and `MS2VBL` divides by 16 (`:17`), so every
+   `if (testdelay) VBLDelay(…)` waits 31 VBLs.
+3. **`_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion` branch, `:161-213`):
+   the dispell cloud on the square, then Lord Chaos steps to a free square next to him,
+   or two away, unless a Fluxcage or a wall is in that direction; boxed in, the sequence
+   starts. `_FusionSequence`: the shields, the cages removed, the fireball and dispell
+   clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey Lord, `d.Word1868`
+   (which stops the teleporter field over a cloud being drawn, `Code51a4.cpp:2774`), every
+   other monster on the level deleted (with `ProcessMonsterDeleteFilter`'s `DMW_Fusion`,
+   G2), the texts of cell (0, 0) printed in order of their second character, "THE END",
+   and `d.CanRestartFromSavegame = 0`. Evidence: a tool that fuses a boxed-in Lord Chaos
+   and one that lets him escape.
 
 ### G9 ⏳ Changing the marching order
 

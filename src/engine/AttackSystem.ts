@@ -25,9 +25,8 @@
  * to a signed 16-bit word, and several steps can leave the running total negative, so
  * the `sw()` calls are load-bearing rather than decoration.
  *
- * ⏳ Lord Chaos's endgame — `_Fusion` (`:133`), `_FusionSequence` (`:2220`) — is
- * deliberately not ported: it cannot be exercised until Lord Chaos himself works, so it
- * would land untested. `atk_FUSE` runs its filter and does nothing else. See `PLAN.md`.
+ * ⏳ Lord Chaos's endgame — `_Fusion` (`:133`), `_FusionSequence` (`:2220`) — is not
+ * ported yet: `atk_FUSE` runs its filter and does nothing else. See `DEBT.md` G8.
  */
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sw } from '../core/intCast';
@@ -1089,8 +1088,8 @@ export class AttackSystem {
         break;
 
       case AttackType.atk_FUSE:
-        // ⏳ `Fusion` (`doc/CSBwin-src/Attack.cpp:133`) is not ported — see the file
-        // header. The filter still runs, so a dungeon's own FUSE handling works.
+        // ⏳ `Fusion` (`doc/CSBwin-src/Attack.cpp:133`) is not ported (`DEBT.md` G8). The
+        // filter still runs, so a dungeon's own FUSE handling works.
         this.setCharToPartyFacing(pChar);
         params.attackX = party.position.x + DELTA_X[party.facing & 3];
         params.attackY = party.position.y + DELTA_Y[party.facing & 3];
