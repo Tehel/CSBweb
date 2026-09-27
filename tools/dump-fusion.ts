@@ -21,8 +21,10 @@
  *    tail left undone: the game won, an open inventory hidden before the first view
  *    (run with one open and with none), the light and shields up, the cages on his square
  *    and the party's gone, the type at each of its 33 views, sound 17 thirteen times,
- *    `d.Word1868` set for the last two views, every other monster on the level deleted,
- *    and `ShowCredits(1)` after its 1593 VBLs
+ *    `d.Word1868` set from the view after the Grey Lord's first, every other monster on
+ *    the level deleted, the four texts of cell (0, 0) printed in the order of their letters
+ *    780 VBLs apart, "THE END.", and `ShowCredits(1)` after its 4713 VBLs. A third run takes
+ *    the "B" text off the cell, and only "A" is printed
  *    (`doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the game").
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
@@ -38,6 +40,7 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { CloudType } from '../src/engine/cloudTypes';
 import type { Game } from '../src/engine/Game';
+import { createGameHost } from '../src/engine/GameHost';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
@@ -74,6 +77,8 @@ interface Arena {
   credits: boolean[];
   /** `showHideInventory` as the host was asked it: the argument, and the views drawn before. */
   inventory: Array<{ chIdx: number; views: number }>;
+  /** `PrintLines` as the host was asked it, and the VBL it came in. */
+  printed: Array<{ color: number; text: string; frame: number }>;
   /** The views drawn so far (`drawViewport`). */
   views: number;
   /** Called on each `drawViewport`, the host's share of `_ProcessTimersViewportAndSound`. */
@@ -97,6 +102,10 @@ function arena(withLordChaos: boolean): Arena {
   const game = newGame(data, stockGraphics(), {
     showCredits: (word11694) => hooks.credits.push(word11694),
     showHideInventory: (chIdx) => a.inventory.push({ chIdx, views: a.views }),
+    messages: {
+      ...createGameHost().messages,
+      printLines: (color, text) => a.printed.push({ color, text, frame: a.frames }),
+    },
     drawViewport: () => {
       a.views++;
       a.drawn();
@@ -117,7 +126,7 @@ function arena(withLordChaos: boolean): Arena {
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
   const a: Arena = {
-    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], views: 0, drawn: hooks.drawn, frames: 0,
+    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
   };
   const encounter = game.ctx.systems.missileEncounter;
   const createCloud = encounter.createCloud.bind(encounter);
@@ -256,9 +265,10 @@ function checkOverAMonster(): void {
  * The creature type at each `_ProcessTimersViewportAndSound` of `_FusionSequence`
  * (`Attack.cpp:2280-2388`): Lord Chaos through the six fireballs, `mon_25` through the six
  * dispells, the flicker (for `D6W` 3, 2 and 1, four types each shown `D6W - 1` times,
- * `mon_25` on odd `D7w`), `mon_25` for the last fireball and dispell, then the Grey Lord.
+ * `mon_25` on odd `D7w`), `mon_25` for the last fireball and dispell, then the Grey Lord,
+ * through the deletions and one view for each text of cell (0, 0) printed.
  */
-function expectedTypes(): number[] {
+function expectedTypes(texts: number): number[] {
   const types: number[] = [];
   const lc = MonsterType.mon_LordChaos;
   const m25 = MonsterType.mon_25;
@@ -270,19 +280,33 @@ function expectedTypes(): number[] {
     }
   }
   types.push(m25, m25, m25);
-  types.push(MonsterType.mon_GreyLord, MonsterType.mon_GreyLord, MonsterType.mon_GreyLord);
+  for (let n = 0; n < 3 + texts; n++) types.push(MonsterType.mon_GreyLord);
   return types;
 }
 
-/** The VBLs of `_FusionSequence`'s `VBLDelay`s, before the texts of cell (0, 0) (`Attack.cpp:2305-2389`, `:2427`). */
+/** The VBLs of `_FusionSequence`'s `VBLDelay`s, but the texts' (`Attack.cpp:2305-2389`, `:2427`). */
 const SEQUENCE_VBLS = 6 * 31 + 31 + 6 * 31 + (4 * 2 + 4 * 1) * 31 + 25 + 50 + 50 + 31 + 31 + 31 + 600;
+/** Each text's `VBLDelay(780)` (`Attack.cpp:2415`). */
+const TEXT_VBLS = 780;
+/**
+ * The texts on cell (0, 0) of level 12, chained D, C, B, A, as `DecodeText(…, 0x8001)` gives
+ * them: a linefeed, the letter, the text. "THANK YOU MY FRIENDS." holds two spaces.
+ */
+const ENDING_TEXTS: Record<string, { rn: ObjectID; text: string }> = {
+  A: { rn: 0x866 as ObjectID, text: 'THANK YOU MY FRIENDS.  YOU HAVE BANISHED CHAOS AND REJECTED THE FALSE PATH OF UNCOMPROMISING ORDER.' },
+  B: { rn: 0x868 as ObjectID, text: 'ONLY BY LEARNING THE TRUTH AND SEEKING THE PATH OF BALANCE DID YOU GUESS THE TRUE NATURE OF THE FIRESTAFF.' },
+  C: { rn: 0x85d as ObjectID, text: 'BY YOUR BRAVE DEEDS I AM MADE WHOLE AGAIN AND HARMONY IS RESTORED TO THE WORLD.' },
+  D: { rn: 0x877 as ObjectID, text: 'YOUR NAMES WILL BE RECORDED IN THE GREAT HALL AND REMEMBERED BY THE FUTURE GENERATIONS YOU HAVE MADE POSSIBLE.' },
+};
 
-function checkBoxedIn(inventoryOpen: boolean): void {
+function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   console.log('');
   console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits,'
-    + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'} ===`);
+    + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''} ===`);
   const a = arena(true);
   const game = a.game;
+  if (withoutB) game.dungeonState.removeObjectFromCell(new Position(0, 0, LEVEL), ENDING_TEXTS.B!.rn);
+  const letters = withoutB ? ['A'] : ['A', 'B', 'C', 'D'];
   cage(game, CX, CY - 1);
   cage(game, CX + 1, CY);
   cage(game, CX - 1, CY);
@@ -336,23 +360,39 @@ function checkBoxedIn(inventoryOpen: boolean): void {
     : 'with no inventory open, ShowHideInventory is not called');
 
   let creditsAt = 0;
-  for (let n = 1; n <= SEQUENCE_VBLS + 20; n++) {
+  const wantCredits = SEQUENCE_VBLS + letters.length * TEXT_VBLS;
+  for (let n = 1; n <= wantCredits + 20; n++) {
     a.frames++;
     game.runFrame(1_000_000 + a.frames * 250);
     if (a.credits.length > 0 && creditsAt === 0) creditsAt = n;
   }
-  const want = expectedTypes();
+  const want = expectedTypes(letters.length);
   console.log(`  types ${types.join(' ')}`);
-  console.log(`  credits ${creditsAt} VBLs after the attack (expected ${SEQUENCE_VBLS}); asked ${JSON.stringify(a.credits)}; ticks ${game.state.tickCount - tick}`);
+  console.log(`  credits ${creditsAt} VBLs after the attack (expected ${wantCredits}); asked ${JSON.stringify(a.credits)}; ticks ${game.state.tickCount - tick}`);
   console.log(`  sound 17 ${sounds.filter((n) => n === 17).length} times; monsters on the level ${monstersOnLevel(game)} (other than him before: ${others})`);
   check(types.join() === want.join(), `${want.length} views, each with the type the sequence gives him then`);
   console.log(`  d.Word1868 ${word1868.map((w) => (w ? 1 : 0)).join('')}`);
-  check(word1868.length === want.length && word1868.every((w, i) => w === (i >= want.length - 2)),
-    'd.Word1868 is set for the last two views, once the Grey Lord has been seen (Attack.cpp:2364-2369)');
+  const unset = want.length - 2 - letters.length;
+  check(word1868.length === want.length && word1868.every((w, i) => w === (i >= unset)),
+    'd.Word1868 is set for the views after the Grey Lord\'s first, and the texts\' (Attack.cpp:2364-2369)');
   check(game.state.tickCount - tick === want.length, 'each view is a turn of the clock');
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
-  check(creditsAt === SEQUENCE_VBLS, 'ShowCredits(1) after the VBLs the sequence waits');
+  for (const p of a.printed) console.log(`  printed at VBL ${p.frame}, colour ${p.color}: ${JSON.stringify(p.text)}`);
+  const wantPrinted = [
+    ...letters.map((l) => ({ color: 15, text: `\n${ENDING_TEXTS[l]!.text}` })),
+    { color: 0, text: '\n' }, { color: 15, text: 'THE END.' }, { color: 0, text: '\n' },
+  ];
+  check(JSON.stringify(a.printed.map(({ color, text }) => ({ color, text }))) === JSON.stringify(wantPrinted),
+    withoutB
+      ? 'with no "B", only the "A" text is printed: the letters stop at the gap (Attack.cpp:2398-2422)'
+      : 'the four texts in the order of their letters, each letter a linefeed, then "THE END." between linefeeds (Attack.cpp:2398-2426)');
+  const frames = a.printed.map((p) => p.frame);
+  const endAt = frames[letters.length]!;
+  check(frames.slice(0, letters.length).every((f, i) => frames[i + 1]! - f === TEXT_VBLS)
+    && frames.slice(letters.length).every((f) => f === endAt),
+  'each text stays 780 VBLs before the next line, and the three of "THE END." come together');
+  check(creditsAt === wantCredits && creditsAt - endAt === 600, 'ShowCredits(1) after the VBLs the sequence waits, 600 of them after "THE END."');
   check(a.credits.join() === 'true', 'once, with d.Word11694 set');
   check(!game.canRestartFromSavegame() && game.mainLoopHasReturned(), 'd.CanRestartFromSavegame is cleared, and MainLoop is over');
 }
@@ -396,6 +436,7 @@ function main(): void {
   checkOverAMonster();
   checkBoxedIn(false);
   checkBoxedIn(true);
+  checkBoxedIn(false, true);
   checkWall();
   finish();
 }

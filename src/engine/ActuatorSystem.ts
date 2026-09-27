@@ -76,6 +76,8 @@ export type CursorFilterHook = (packet: CursorFilterPacket) => boolean;
 export interface MessageSink {
   printLinefeed(): void;
   quePrintLines(color: number, text: string): void;
+  /** `PrintLines`, straight onto the strip rather than through `printQueue`, with `d.Time`. */
+  printLines(color: number, text: string, time: number): void;
   /** `scrollingText.SetNewSpeed(oldSpeed, newSpeed)`, with `d.Time`. */
   setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void;
   /** `scrollingText.ResetTime(newTime)`, with `d.Time`. */

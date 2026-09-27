@@ -933,8 +933,8 @@ export class DungeonState {
         return this.decodeTextFromWords(start.words, start.at, typeOfText, max, tables);
     }
 
-    decodeTextString(record: TextRecord, typeOfText: number, tables?: TextDecodeTables): string | null {
-        const bytes = this.decodeTextBytes(record, typeOfText, 990, tables);
+    decodeTextString(record: TextRecord, typeOfText: number, tables?: TextDecodeTables, max = 990): string | null {
+        const bytes = this.decodeTextBytes(record, typeOfText, max, tables);
         if (!bytes) return null;
         return typeOfText === 0
             ? this.wallTextBytesToString(bytes)

@@ -3936,10 +3936,25 @@ after them runs. In order:
   cages still around the Grey Lord vanish from the view.
 - Every monster on the level but his deleted, after `ProcessMonsterDeleteFilter` with
   `DMW_Fusion` (`:2370-2387`), 31 VBLs (`:2388-2389`).
-- The texts of cell (0, 0), up to eight, printed in the order of their second character,
-  'A' first, each with `VBLDelay(780)` (`:2390-2423`); "THE END." between linefeeds, then
-  `VBLDelay(600)`, `d.CanRestartFromSavegame = 0` and `ShowCredits(1)` (`:2424-2429`).
+- The texts of cell (0, 0) of the party's level, which `ProcessTimers` loads again after
+  each timer (`CSBCode.cpp:6582`), gathered in chain order into `obj_26[8]` (`:2228`,
+  `:2390-2396`): a ninth would run past the array. Each is decoded with
+  `DecodeText(…, 0x8001, 200)`, which writes a linefeed first (`CSBCode.cpp:5511-5514`), so
+  the byte compared, `b_226[1]`, is the text's first letter. The loop makes one pass per
+  text, and each pass prints the first text in chain order whose letter is `b_9`, 'A' at
+  the start, and only then moves `b_9` on (`:2398-2422`): a missing letter ends the texts,
+  however many passes are left. The letter is overwritten with a linefeed and the rest
+  printed with `PrintLines(15, …)` straight onto the strip, not through `printQueue`, then
+  a view and `VBLDelay(780)` (`:2410-2416`). `TAG00187e`, called before each, writes only
+  the hint oracle's `f.` state (`Hint.cpp:1816-1821`), which only `Hint.cpp` reads.
+- "THE END." between linefeeds, then `VBLDelay(600)`, `d.CanRestartFromSavegame = 0` and
+  `ShowCredits(1)` (`:2424-2429`).
 
-Each view is a `_ProcessTimersViewportAndSound`: 33 of them before the texts, and 1593 VBLs.
-The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`, and
+In `dm-atari/dungeon.dat` cell (0, 0) of level 12 holds four texts, chained D, C, B, A:
+"THANK YOU MY FRIENDS. …", "ONLY BY LEARNING THE TRUTH …", "BY YOUR BRAVE DEEDS …" and
+"YOUR NAMES WILL BE RECORDED …".
+
+Each view is a `_ProcessTimersViewportAndSound`: 33 of them and 1593 VBLs besides the
+texts, and each text printed adds a view and 780 VBLs, so 37 and 4713 in the shipped
+dungeon. The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`, and
 `tools/dump-cloud-draw.ts` for the shimmer.

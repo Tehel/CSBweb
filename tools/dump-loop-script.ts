@@ -60,6 +60,7 @@ function watchedGame(): Watched {
   const messages: MessageSink = {
     printLinefeed: () => {},
     quePrintLines: () => {},
+    printLines: () => {},
     setNewSpeed: () => {},
     resetTime: () => {},
     clockTick: () => { w.clockTicks++; },

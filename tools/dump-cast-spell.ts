@@ -70,6 +70,7 @@ async function main(): Promise<void> {
     messages: {
       printLinefeed: () => {},
       quePrintLines: (_color, text) => { printed.push(text); },
+      printLines: () => {},
       setNewSpeed: () => {},
       resetTime: () => {},
       clockTick: () => {},

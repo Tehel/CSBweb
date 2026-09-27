@@ -88,6 +88,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     messages: host.messages ?? {
       printLinefeed: () => {},
       quePrintLines: () => {},
+      printLines: () => {},
       setNewSpeed: () => {},
       resetTime: () => {},
       clockTick: () => {},

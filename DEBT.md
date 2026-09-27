@@ -83,6 +83,7 @@ In payoff order: the first row is the next item.
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
+| C73 | A room's message drops its "THE" and "YOU" | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -101,7 +102,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C73 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C74 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -193,7 +194,7 @@ With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
 `ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
 The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
 `TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
-bash (`src/engine/AttackSystem.ts:1233`), a champion's wound
+bash (`src/engine/AttackSystem.ts:1258`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
 `:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
@@ -274,6 +275,20 @@ a row in `tools/dump-marching-order.ts` that draws a party with a dead champion.
 entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straight into the
 adventure in both (`init` and `showEndOfGame`, `src/main.ts`). Show the menu, with
 `src/renderer/ui/Menu.ts`, before the loop starts. Evidence: a golden frame of it.
+
+### C73 ⏳ A room's message drops its "THE" and "YOU"
+
+CSBWin's `DecodeText` expands codes 29 and 30 through the escape tables `d.Byte10080` and
+`d.Byte10016` for any text but a wall's (`doc/CSBwin-src/CSBCode.cpp:5559-5574`), and the
+dungeon compresses "THE " and "YOU " that way. `DungeonState.decodeTextBytes` drops an
+escape when it is given no tables (`src/engine/DungeonState.ts`), and the one caller that
+gives none is the text a party finds on a square, which `ActuatorSystem` decodes with
+`decodeMessageText(rec)` and queues (`src/engine/ActuatorSystem.ts:618`,
+`Code11f52.cpp:3960-3963`). So "PUT THE GEM BACK..." prints as "PUT GEM BACK...", "YOU MUST
+PAY FOR YOUR ENTRANCE." as "MUST PAY FOR YOUR ENTRANCE.", and so on for most of the
+dungeon's messages. The tables are `ctx.tables.textDecode`. Pass them, and make the
+`tables` parameter required, so no decode can leave them out again. Evidence: a row in a
+`tools/` check that steps onto a square with a message and reads what was queued.
 
 ---
 
@@ -448,25 +463,17 @@ rather than being copied here.
 
 ### G8 ⏳ Lord Chaos's fusion endgame
 
-The fusion is ported up to the screen: `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and
-`_FusionSequence` (`:2220`) are `AttackSystem.fusion` and `AttackSystem.fusionSequence`
-(`src/engine/AttackSystem.ts:968`), which holds the main loop as a `LoopScript` from the
+The fusion is ported up to the UI around it: `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`)
+and `_FusionSequence` (`:2220`) are `AttackSystem.fusion` and `AttackSystem.fusionSequence`
+(`src/engine/AttackSystem.ts:966`), which holds the main loop as a `LoopScript` from the
 attack to the credits (`Game.runScript`, `Game.processTimersViewportAndSound`), and none of
-the attack's engine tail runs after it (`AttackSystem.ts:1333`, `CharacterSystem.ts:248`).
-An open inventory is hidden through the host's `showHideInventory`, and `d.Word1868`
-(`GameState.word1868`) takes the Fluxcages' shimmer off the view.
+the attack's engine tail runs after it (`AttackSystem.ts:1358`, `CharacterSystem.ts:248`).
+An open inventory is hidden through the host's `showHideInventory`, `d.Word1868`
+(`GameState.word1868`) takes the Fluxcages' shimmer off the view, and the texts of cell
+(0, 0) and "THE END." go straight onto the message strip (`MessageSink.printLines`).
 Evidence: `tools/dump-fusion.ts`, `tools/dump-loop-script.ts`, `tools/dump-cloud-draw.ts`.
 Size L, in steps: 1 (the loop script), 2 (`_Fusion`), 3a (`_FusionSequence`'s engine
-half) and 3b (the inventory and `d.Word1868`) are done.
-
-**Step 3c: the texts.** Marked ⏳ in `fusionSequence`'s comment. The texts of cell (0, 0),
-up to eight, printed in the order of their second character with `TAG00187e`,
-`PrintLines(15, …)`, a view and `VBLDelay(780)` each, then "THE END." between linefeeds
-(`:2390-2426`). `MessageSink` has no direct `PrintLines`, only `quePrintLines`.
-`TAG00187e` (`Hint.cpp:1816`) writes only the hint oracle's `f.` state: check whether it is
-linked into the game before porting it as a no-op. Evidence: `tools/dump-fusion.ts`'s
-boxed-in case, which counts 1593 VBLs to the credits now, then counts the texts'
-`VBLDelay(780)`s and what they print.
+half), 3b (the inventory and `d.Word1868`) and 3c (the texts) are done.
 
 **Step 3d: the UI around the script.**
 
@@ -475,8 +482,8 @@ boxed-in case, which counts 1593 VBLs to the credits now, then counts the texts'
 - The inputs outside the queue. While a script holds the loop no queued click or key is
   taken, but the save menu and the panel keys (tier H, "Three inputs bypass the mouse
   queue") are gated only on `Game.mainLoopHasReturned` (`src/ui/events.ts:31`, `:227`),
-  so they still act. The CSB win's 300 VBLs share the gap; the fusion's 1593 VBLs and
-  more make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
+  so they still act. The CSB win's 300 VBLs share the gap; the fusion's 4713 VBLs
+  make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
   `VBLDelay` lets the UI do.
 
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing

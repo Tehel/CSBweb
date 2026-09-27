@@ -23,6 +23,7 @@ import {
 } from '../renderer/csbwin/ObjectTables';
 import { extractUITables, type SoundTableEntry } from '../renderer/csbwin/UITables';
 import { extractViewportTables } from '../renderer/csbwin/ViewportTables';
+import type { TextDecodeTables } from './DungeonState';
 
 export interface GameTables {
   // --- Objects: `d.ObjDesc`, where a possession may go, and in what order it drops ---
@@ -72,6 +73,11 @@ export interface GameTables {
   readonly byte1596: ArrayLike<number>;
   /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
   readonly word1074: number[];
+  /**
+   * `DecodeText`'s escape strings (`doc/CSBwin-src/CSBCode.cpp:5559-5574`): `d.Byte10080[64]`
+   * after code 29, `d.Byte10336[256]` (wall text) and `d.Byte10016[256]` (any other) after 30.
+   */
+  readonly textDecode: TextDecodeTables;
 
   // --- The party: where a blow lands, how a shield covers it, the message colours ---
 
@@ -141,6 +147,11 @@ export function buildGameTables(graphics: GraphicsLoader): GameTables {
     doorCharacteristics: objects.doorCharacteristics,
     byte1596: g232.byte1596,
     word1074: g232.word1074,
+    textDecode: {
+      escape1: objects.textEscape1,
+      escape2Wall: objects.textEscape2Wall,
+      escape2Other: objects.textEscape2Other,
+    },
 
     uByte590: g232.uByte590,
     byte586: g232.byte586,

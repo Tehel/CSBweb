@@ -956,14 +956,12 @@ export class AttackSystem {
    * up, Lord Chaos made all but unkillable and turned to face the party, the Fluxcages on
    * the party's square and his taken away, six fireballs of growing size and six dispells
    * on him, his flicker between `mon_25` and `mon_LordChaos`, a last fireball and dispell,
-   * the Grey Lord in his place, every other monster on the level deleted, and after
-   * `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame` cleared. Each step shows
-   * through `_ProcessTimersViewportAndSound`, which also runs the timers. An open inventory
-   * is hidden first, and once the Grey Lord stands there `d.Word1868` takes the shimmer
-   * off the Fluxcages still around him.
-   *
-   * ⏳ Not ported yet (`DEBT.md` G8, step 3c): the texts of cell (0, 0) with "THE END."
-   * (`:2390-2426`).
+   * the Grey Lord in his place, every other monster on the level deleted, the texts of
+   * cell (0, 0) whose first letters run on from "A", in that order and each for 780 VBLs,
+   * "THE END.", and after `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame`
+   * cleared. Each step shows through `_ProcessTimersViewportAndSound`, which also runs the
+   * timers. An open inventory is hidden first, and once the Grey Lord stands there
+   * `d.Word1868` takes the shimmer off the Fluxcages still around him.
    */
   private *fusionSequence(): LoopScript {
     const mainLoop = this.ctx.systems.mainLoop;
@@ -1044,6 +1042,33 @@ export class AttackSystem {
     }
     yield* mainLoop.processTimersViewportAndSound();
     yield ms2vbl(TEST_DELAY);
+    // The texts of cell (0, 0), `obj_26`. CSBWin's array holds eight, and a ninth text
+    // would run past it; no dungeon we load has any there.
+    const dungeon = this.ctx.dungeon;
+    const texts: ObjectID[] = [];
+    for (let rn = dungeon.findFirstObject(new Position(0, 0, level)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category === DBType.TEXT) texts.push(rn);
+    }
+    const messages = this.ctx.host.messages;
+    let letter = 'A'.charCodeAt(0);
+    for (let n = texts.length; n !== 0; n--) {
+      for (const rn of texts) {
+        // `DecodeText(…, 0x8001, 200)` puts a linefeed in front, so the letter is the second
+        // byte, and the text is printed from there with the letter turned into a linefeed.
+        const text = dungeon.decodeTextString(dungeon.getTextRecord(rn)!, 0x8001, this.ctx.tables.textDecode, 200);
+        if (text === null || text.charCodeAt(1) !== letter) continue;
+        // `TAG00187e()` (`doc/CSBwin-src/Hint.cpp:1816`) resets the hint oracle's `f.`
+        // state, which only the oracle reads.
+        messages.printLines(15, '\n' + text.slice(2), this.ctx.state.tickCount);
+        yield* mainLoop.processTimersViewportAndSound();
+        yield 780;
+        letter++;
+        break;
+      }
+    }
+    messages.printLines(0, '\n', this.ctx.state.tickCount);
+    messages.printLines(15, 'THE END.', this.ctx.state.tickCount);
+    messages.printLines(0, '\n', this.ctx.state.tickCount);
     yield 600;
     mainLoop.clearCanRestartFromSavegame();
     yield* mainLoop.showCreditsAndEnd();
