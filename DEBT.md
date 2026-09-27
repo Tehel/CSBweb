@@ -445,17 +445,30 @@ straight to the credits picture (`SaveGame.cpp:1252`), and has no equivalent in 
 
 Size L, in three steps. Step 1, the lost game with no restart, is done. Left:
 
-2. **"RESTART THIS GAME".** `d.CanRestartFromSavegame`, set by a save or a load
-   (`SaveGame.cpp:1260`, `:1883`) and cleared by a new game (`:1494`) and the two wins
-   (`Timer.cpp:2370`, `Attack.cpp:2428`). With it set, the end picture carries the button
-   `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on the credits picture goes
-   back to it without the 300-VBL wait (`:339-348`). The button
-   sets `d.PartyHasDied` (`Mouse.cpp:1798`), and `GameSetup(0)` reads the chooser with that
-   flag: only a save of the same `RandomGameID` loads ("THAT'S NOT THE SAME GAME",
-   `SaveGame.cpp:1604-1607`), and a cancel puts the dungeon entrance back up
-   (`CSBCode.cpp:10634-10641`), whose "enter" needs a fresh dungeon the port cannot build
-   in place today. A restart also starts `Game`'s loop again, which `mainLoopReturned`
-   keeps shut. `showCredits` marks where the branch goes.
+2. **"RESTART THIS GAME"**, in three parts. The author's decision: the dungeon entrance's
+   "enter" after a cancelled restart rebuilds the `Game` in place; the page is never
+   reloaded.
+   - **2a. A new game in place.** `_ReadEntireGame` reads `dungeon.dat` through the path a
+     save takes (`SaveGame.cpp:1480-1494`), into the same `d` that `Cleanup(false)` and
+     `d.Initialize()` have just cleared (`Code1f9e6.cpp:302-310`). Play mutates the parsed
+     `DungeonData` in place (`DungeonState` keeps it, `src/engine/DungeonState.ts:66-68`),
+     so the port re-reads the file and restores the fresh world into the running `Game`
+     the way a load does (`applyRuntimeSaveState`), then starts its loop again, which
+     `mainLoopReturned` keeps shut. Evidence: a tool that plays a game, rebuilds it, and
+     finds its whole runtime state equal to a fresh `Game`'s.
+   - **2b. The button and the chooser.** `d.CanRestartFromSavegame`, set by a save or a load
+     (`SaveGame.cpp:1260`, `:1883`) and cleared by a new game (`:1494`) and the two wins
+     (`Timer.cpp:2370`, `Attack.cpp:2428`). With it set, the end picture carries the button
+     `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on the credits picture goes
+     back to it without the 300-VBL wait (`:339-348`). The button sets `d.PartyHasDied`
+     (`Mouse.cpp:1798`), and `GameSetup(0)` reads the chooser with that flag; a cancel puts
+     the dungeon entrance back up (`CSBCode.cpp:10634-10641`), whose "enter" is 2a.
+     `showCredits` marks where the branch goes.
+   - **2c. "THAT'S NOT THE SAME GAME".** With `d.PartyHasDied` set, only a save of the same
+     `d.RandomGameID` loads (`SaveGame.cpp:1602-1607`). The ID is drawn when the prison
+     opens (`:1521-1532`) and saved in block 1 (`:1060`), which the port still writes as a
+     stub (`PLAN.md` → Phase 10), and its own saves do not carry it. Until then any save
+     loads after a death.
 3. **The won screen.** `d.Word11694`: with `d.DynamicPaletteSwitching` the eight `Darken`
    steps instead of the fade (`Code1f9e6.cpp:148-166`), then each champion's frame
    (graphic 208), portrait, name, title and masteries over colour 12, the palette of
