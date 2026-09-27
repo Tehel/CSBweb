@@ -26,7 +26,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
 import type { Game } from '../src/engine/Game';
 import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
-import { TimerFunction, TimerQueue } from '../src/engine/TimerQueue';
+import { TimerFunction, TimerQueue, timerLess } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -50,9 +50,10 @@ function label(q: TimerQueue, name: number): number {
   return q.createTimer(TimerFunction.TT_LIGHT, name, 0, 0, 0, DUE, LEVEL).sequence;
 }
 
-/** The labelled timers, in queue order, with their stamps. */
+/** The labelled timers in their firing order, `timerLess`'s, with their stamps. */
 function labelled(q: TimerQueue): string {
-  return q.getTimers().filter((t) => t.time === DUE).map((t) => `${t.uByte6}@${t.sequence}`).join(' ');
+  return q.getTimers().filter((t) => t.time === DUE).sort((a, b) => (timerLess(a, b) ? -1 : 1))
+    .map((t) => `${t.uByte6}@${t.sequence}`).join(' ');
 }
 
 /**

@@ -190,8 +190,7 @@ writes one. Of what it emits:
   else, so a file this project wrote said when nothing was due.
 - block 6 — **complete**: the queue array, which CSBWin keeps as a binary heap and never
   reorders on load (`doc/PROVEN_FACTS.md` → "CSBWin's timer queue is a binary heap"). The
-  port writes its own sorted array there, which is not the heap CSBWin would have
-  (`DEBT.md` C51).
+  port keeps the same heap, and writes its array.
 - block 0 — **complete**, and byte-identical to all fourteen committed saves. The
   512-byte header, `dataTypeMap`, `dataIndexMap`, the game info and the DSA level index
   with its three-byte 0xff terminator; `src/data/CsbwinExtendedFeatures.ts` has the whole

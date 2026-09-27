@@ -24,8 +24,9 @@ export interface SaveGameState {
   item16: Item16Record[];
   timers?: TimerRecord[];
   /**
-   * The live timer queue: `gb2.NumTimer` indices into `timers`, in firing order
-   * (`GameTimers::TimerQueue`). Empty when the file carries none.
+   * The live timer queue: `gb2.NumTimer` indices into `timers`, in the order of CSBWin's
+   * heap (`GameTimers::TimerQueue`), not their firing order. Empty when the file carries
+   * none.
    */
   timerQueue?: number[];
   /** `gb2.TimerSequence` — the stamp the next queued timer takes. */
@@ -960,8 +961,9 @@ function parseTimers(buf: Uint8Array, maxTimers: number, timerSize: number): Tim
  * The timer *queue*: `MaxTimer` big-endian words, of which the first `NumTimer` are
  * live, each the index of a timer in the table above
  * (`doc/CSBwin-src/SaveGame.cpp:1694-1699`, `GameTimers::swapTimerQue`,
- * `doc/CSBwin-src/Data.h:1582`). The order **is** the firing order; CSBWin keeps it
- * sorted as it inserts and restores it verbatim rather than re-sorting.
+ * `doc/CSBwin-src/Data.h:1582`). The order is the array of CSBWin's binary heap, which
+ * `LoadGame` restores verbatim (`doc/PROVEN_FACTS.md` → "CSBWin's timer queue is a
+ * binary heap").
  */
 function parseTimerQueue(buf: Uint8Array, maxTimers: number, numTimer: number): number[] {
   const out: number[] = [];

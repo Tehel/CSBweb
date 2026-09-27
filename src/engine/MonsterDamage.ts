@@ -591,13 +591,11 @@ export class MonsterDamage {
    * The dead member's own timer is deleted; every timer belonging to a *higher*
    * member index slides down by one, in both the A and B families, and its queue
    * priority is re-evaluated because the function code is part of the sort key
-   * (`doc/CSBwin-src/Code11f52.cpp:1152-1196`).
+   * (`doc/CSBwin-src/Code11f52.cpp:1152-1196`). One `TIMER_SEARCH` walk does both, in
+   * the order it meets the timers, as CSBWin's does.
    */
   private renumberIndividualTimers(indexInGroup: number, level: number, mapX: number, mapY: number): void {
-    const doomed: number[] = [];
-    const renumbered: { index: number; fn: number }[] = [];
-
-    for (const timer of this.timers.getTimers()) {
+    for (const timer of this.timers.searchOrder()) {
       if (timer.level !== (level & 0xff)) continue;
       if (timer.uByte6 !== (mapX & 0xff)) continue;
       if (timer.uByte7 !== (mapY & 0xff)) continue;
@@ -610,18 +608,11 @@ export class MonsterDamage {
           : fn - TimerFunction.TT_MONSTER_B0;
 
       if (memberIndex === indexInGroup) {
-        doomed.push(timer.index);
+        this.timers.deleteTimer(timer.index);
       } else if (memberIndex > indexInGroup) {
-        renumbered.push({ index: timer.index, fn: fn - 1 });
+        timer.function = fn - 1;
+        this.timers.reprioritizeTimer(timer.index);
       }
-    }
-
-    for (const index of doomed) this.timers.deleteTimer(index);
-    for (const { index, fn } of renumbered) {
-      const timer = this.timers.getTimer(index);
-      if (!timer) continue;
-      timer.function = fn;
-      this.timers.reprioritizeTimer(index);
     }
   }
 

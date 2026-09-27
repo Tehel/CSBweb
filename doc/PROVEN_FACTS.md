@@ -1347,12 +1347,12 @@ reuse one local `TIMER` as a template across a loop. `MaybeDelTimers_Fear6_TurnI
 (`doc/CSBwin-src/Monster.cpp:1476-1553`) does exactly that: it mutates one `timer_70` and
 calls `SetMonsterTimerB` once per group member.
 
-Storing the object by reference instead — as `TimerQueue.addTimer` did — puts the *same*
-entry in the queue up to four times, and every later mutation rewrites entries already
-queued. The queue then stops being sorted, and because `processTimers` stops at the first
-entry that is not yet due, every timer behind the misplaced one stalls. `addTimer` now
-copies and mints the index, and callers must read the queued `index` from its **return**,
-which is what CSBWin does at `doc/CSBwin-src/Timer.cpp:429`.
+Storing the object by reference instead puts the *same* entry in the queue up to four
+times, and every later mutation rewrites entries already queued behind the heap's back:
+a timer whose key changes in place is out of heap order, and the head is no longer sure to
+be the timer due first. `TimerQueue.addTimer` copies and mints the index, and callers must
+read the queued `index` from its **return**, which is what CSBWin does at
+`doc/CSBwin-src/Timer.cpp:429`.
 
 ## Skill makes a champion's blows harder, not more frequent
 
@@ -1890,11 +1890,11 @@ code to decide which (`doc/CSBwin-src/SaveGame.cpp:565-607`). Same byte order ei
 way, so a reader can simply take both.
 
 **The timer queue is `MaxTimer` big-endian words of which the first `NumTimer` are
-live**, each an index into the table, and the order **is** the firing order. CSBWin keeps
-it sorted as it inserts and restores it verbatim — it never re-sorts on load
-(`GameTimers::swapTimerQue`, `doc/CSBwin-src/Data.h:1582`). Re-inserting them through
-`SetTimer` instead would also run the duplicate-timer rules over timers that legitimately
-coexist, and drop some.
+live**, each an index into the table, in the array order of CSBWin's binary heap (see
+"CSBWin's timer queue is a binary heap"). `LoadGame` restores it verbatim and never
+reorders it (`GameTimers::swapTimerQue`, `doc/CSBwin-src/Data.h:1582`). Re-inserting the
+timers through `SetTimer` instead would build another array, and would also run the
+duplicate-timer rules over timers that legitimately coexist, and drop some.
 
 Proven by two save files made to order: `csbgame4-door-opening.dat` and
 `csbgame4-door-closing.dat`, both a fresh game with the party at (1,15) facing north, one
@@ -2858,7 +2858,10 @@ fails before the eye gate),
 - The door button sets `d.clockTick = 1` before it queues the switch sound and the
   `TT_DOOR` for `d.Time + 1` (`doc/CSBwin-src/Mouse.cpp:1078-1085`). The main loop tests
   `d.clockTick` right after `HandleMouseEvents` (`CSBCode.cpp:763-764`), so the tick runs
-  in the VBL of the click, and the door moves in it.
+  in the VBL of the click. The door moves in the tick after it: a tick runs
+  `ProcessTimers` before its `d.Time++` (`CSBCode.cpp:626`, `:660`), so the tick the click
+  brings on sees the `d.Time` the timer was set from. The port moves it in the click's tick
+  (`DEBT.md` C68).
 - `TouchWallF1` returns, touching nothing, when the cell ahead is off the map
   (`Mouse.cpp:784-787`), and otherwise sets `d.clockTick = TouchWall(...)` (`:788`).
   `TouchWall` returns 1 when a switch fired, `result = 1` under `if (!switchOpen)`
@@ -3635,5 +3638,21 @@ section 8.
   so a save's block 6 is the heap as it stood. Every committed save's queue is heap-ordered
   by time, and none with more than two timers is sorted: 33 of `csbgame7.dat`'s 76 entries
   follow a later one.
+- Two timers equal on all of that are ordered by their slots: `operator<` ends with
+  `if (&timer2 >= this) return true;` (`Timer.cpp:790`, `:807`), so a timer is less than
+  itself.
+- `TIMER_SEARCH::AdjustTimerPriority` is `AdjustTimerQueue` at the timer's queue position
+  (`:913-916`), for a timer whose key its caller changed in place.
+- A search that deletes or re-sorts as it walks leaves an array that depends on the order
+  of the walk, which is `TIMER_SEARCH`'s, from the heap's last array entry (see
+  "`TIMER_SEARCH` walks the queue backwards"): `DeleteMonsterMovementTimers`
+  (`Monster.cpp:1297-1330`), `CurePoison` (`Character.cpp:3007-3031`), `DamageMonster`'s
+  renumbering, which deletes and re-sorts in one walk (`Code11f52.cpp:1148-1196`), and
+  `SetTimer`'s `TT_BASH_DOOR` rule (`Timer.cpp:1102-1123`).
 
-The port keeps a sorted array instead (`DEBT.md` C51).
+`TimerQueue` keeps the same heap, with `timerLess` for `operator<`, and a save writes its
+array. Evidence: `tools/dump-timer-heap.ts`. Every committed save's queue is a heap under
+`timerLess`, and each of three comparators with one rule broken fails on some save;
+`csbgame7.dat`'s queue drains in `timerLess` order; hand-worked arrays after each insertion
+and deletion; and a loaded game runs every timer due by its first tick, `csbgame6.dat`'s
+IAIDO `TT_11` among them.

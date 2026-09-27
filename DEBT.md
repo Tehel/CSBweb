@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
 | C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
 | C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
@@ -87,6 +86,8 @@ In payoff order: the first row is the next item.
 | C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
 | C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
 | C66 | A delayed sound plays at once | S | ⏳ |
+| C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
+| C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -106,7 +107,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C67 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C69 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -126,30 +127,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C51 ⏳ A restored timer queue is read as a sorted list, but CSBWin's is a heap
-
-CSBWin's `m_timerQueue` is a binary min-heap over `TIMER::operator<`
-(`doc/CSBwin-src/Timer.cpp:765-810`). `SetTimer` appends the new timer and sifts it
-(`:1200-1202`, `AdjustTimerQueue` at `:831-896`), `GetNextTimerEntry` takes
-`m_timerQueue[0]` (`:1222-1235`), and `DeleteTimer` moves the last entry into the hole and
-sifts it (`:959-984`). `LoadGame` reads the array back as it was written
-(`SaveGame.cpp:1693-1699`). The port's `TimerQueue` is a sorted array instead: `addTimer`
-and `reprioritizeTimer` insert in order, `shiftNext` and `deleteTimer` shift and splice,
-`restore` takes the saved array as the firing order (`src/engine/TimerQueue.ts:315`), and
-`processTimers` stops at the first entry not yet due (`src/engine/TimerSystem.ts:87-111`).
-`searchOrder`, `TIMER_SEARCH`'s walk from the end of the array, which decides which
-duplicate `SetTimer` keeps, then visits the timers in another order than CSBWin's.
-
-Every committed save's queue is heap-ordered by time, and none with more than two timers is
-sorted (33 of `csbgame7.dat`'s 76 entries follow a later one). So a loaded game fires its timers
-out of order, and a due timer waits behind later ones: IAIDO's `TT_11` in `csbgame6.dat`,
-due at the saved `d.Time`, fires 17 ticks after the load. The port's own insertions and
-deletions then work on an array that is neither sorted nor a heap, and the save writer
-carries that array as the queue (`src/engine/SaveGamePayload.ts:241`), which CSBWin would
-read as a heap. Port the heap, so the port writes back the array CSBWin would. Evidence: a
-check that loads `csbgame7.dat` and compares the order the timers fire in with the heap's
-`operator<` order.
 
 ### C52 ⏳ The attack hands are not shaded while a candidate is in the party
 
@@ -352,6 +329,40 @@ bash (`src/engine/AttackSystem.ts:1000`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
 `:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
+
+### C67 ⏳ The timer table has no size, and a save writes it too small
+
+CSBWin's timer table has a size, `m_maxTimers`. A new game allocates 100 slots and one more
+per record of the monster database and of each database from the missiles on
+(`doc/CSBwin-src/SaveGame.cpp:2549`, `:2612-2616`), 467 in every committed save, and a save
+carries it as `gb2.MaxTimers`, which `LoadGame` allocates (`:1638`). `SetTimer` checks it
+first: once `m_numTimer >= m_maxTimers - 5`, it moves `m_firstAvailTimer` to `m_maxTimers`,
+past every hole, and enlarges the table to `(m_maxTimers+10)*5/4` (`Timer.cpp:1001-1010`).
+The port's `TimerQueue` has no size: `addTimer` always takes the lowest free slot, and a save
+writes `MaxTimers` as one past the highest live slot (`buildTimerRecords`,
+`src/engine/RuntimeSave.ts`; `maxTimers`, `src/engine/SaveGamePayload.ts:245`, `:302`). So a
+table CSBWin reads back from a port save is nearly full, and its next `SetTimer` jumps past
+the holes, and a game that fills its table numbers the slots that follow differently. A slot
+is what `busyTimerIndex` holds, and the last tie-break of `timerLess`. Keep the size, read
+from the save and grown as `SetTimer` grows it. Evidence: a check that a save written from
+`csbgame7.dat` carries `MaxTimers` 467, and one that fills a table to the jump.
+
+### C68 ⏳ `d.Time` moves on before the timers, not after them
+
+CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then `d.Time++`
+(`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
+(`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
+saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
+(`src/engine/Game.ts:366`) and runs `processTimers` on the new value. A timer set between
+ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
+game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
+(`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
+it in the tick after, and `tools/dump-mouse-queue.ts` case 9 asserts the port's timing. A
+timer that a handler sets inside the pass, from `TimerSystem.now`, is due one tick later by
+the clock than CSBWin's, and fires in the same tick. Move the increment after the timers.
+The tools that turn the clock themselves (`tickCount++` then `processTimers`) move with it.
+Evidence: a row in `tools/dump-mouse-queue.ts` case 9 counting the ticks from the door
+button to the door's first step.
 
 ---
 

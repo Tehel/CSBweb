@@ -411,11 +411,11 @@ export class TimerSystem {
   /**
    * The timer sweep of `CurePoison` (`doc/CSBwin-src/Character.cpp:3007-3031`) —
    * delete every outstanding `TT_75` for this champion. Zeroing `poisonCount` is the
-   * caller's half.
+   * caller's half. CSBWin walks a `TIMER_SEARCH`, so this walks `searchOrder`.
    */
   cancelPoisonTimers(chIdx: number): void {
     if (chIdx === -1) return;
-    for (const timer of [...this.timers.getTimers()]) {
+    for (const timer of this.timers.searchOrder()) {
       if (timer.function !== TimerFunction.TT_75) continue;
       if ((timer.uByte5 & 0xff) !== (chIdx & 0xff)) continue;
       this.timers.deleteTimer(timer.index);

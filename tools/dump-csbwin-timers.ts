@@ -46,7 +46,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { Game } from '../src/engine/Game';
-import { TimerFunction } from '../src/engine/TimerQueue';
+import { TimerFunction, timerLess, type TimerEntry } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -114,15 +114,15 @@ function main(): void {
       `${file}: the timer table is MaxTimers long`,
     );
 
-    // The queue *is* the firing order — CSBWin keeps it sorted as it inserts and
-    // restores it verbatim (`doc/CSBwin-src/SaveGame.cpp:1687-1723`).
-    let ordered = true;
+    // The queue is CSBWin's binary heap, restored verbatim
+    // (`doc/CSBwin-src/SaveGame.cpp:1687-1723`): no timer is `timerLess` than its parent.
+    // `dump-timer-heap.ts` checks every committed save's.
+    const entry = (i: number): TimerEntry => ({ ...save.timers![queue[i]], index: queue[i] });
+    let heap = true;
     for (let i = 1; i < queue.length; i++) {
-      const a = save.timers?.[queue[i - 1]];
-      const b = save.timers?.[queue[i]];
-      if (a && b && a.time > b.time) ordered = false;
+      if (timerLess(entry(i), entry((i - 1) >> 1))) heap = false;
     }
-    check(ordered, `${file}: the queue is in non-decreasing time order`);
+    check(heap, `${file}: the queue is a heap under timerLess`);
 
     const door = (save.timers ?? []).filter(
       (t, i) => queue.includes(i) && t.function === TimerFunction.TT_DOOR_STEP,

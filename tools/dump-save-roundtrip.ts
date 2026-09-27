@@ -378,19 +378,20 @@ function main(): void {
 
     // A genuine CSBWin save of a busy champion: IAIDO, champion 0 of `csbgame6.dat`, has
     // bit 3 and a busy timer. The bit is the file's, and only his TT_11 clears it. The
-    // timer is due at the saved d.Time, but the port fires it 17 ticks after the load
-    // (DEBT.md C51), so this steps until it has fired rather than to its due time.
+    // timer is due at the saved d.Time, so the first tick after the load fires it.
     const saved = fromCsbwinSave('csbgame6.dat');
     report('csbgame6.dat', saved);
     check(busy(champion(saved)) && saved.ctx.timers.getTimer(champion(saved).busyTimerIndex)?.function === 11,
       'csbgame6.dat: champion 0 is saved busy, with bit 3 and a TT_11');
     let heldUntilTimer = true;
-    for (let i = 0; i < 100 && champion(saved).busyTimerIndex >= 0; i++) {
+    let steps = 0;
+    for (; steps < 100 && champion(saved).busyTimerIndex >= 0; steps++) {
       heldUntilTimer &&= busy(champion(saved));
       advance(saved, 1);
     }
     report('csbgame6.dat, freed', saved);
     check(heldUntilTimer, 'csbgame6.dat: the bit holds for as long as his TT_11 is queued');
+    check(steps === 1, `csbgame6.dat: his TT_11 fires on the first tick after the load (${steps})`);
     check(!busy(champion(saved)) && champion(saved).busyTimerIndex === -1,
       'csbgame6.dat: his TT_11 clears the bit the file set, and the busy timer');
     check(!busy(written(saved)), 'csbgame6.dat: a save written after carries no bit 3');

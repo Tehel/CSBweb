@@ -43,8 +43,8 @@ import type { TimerEntry } from './TimerQueue';
  * written — so it is refused like any other older format.
  *
  * Version 6 stores the timer table as CSBWin's array has it — by timer index, holes
- * included — and adds `timerQueue` (which of those timers are live, in firing order)
- * and `timerSequence` (the stamp the next queued timer takes), so a restored queue
+ * included — and adds `timerQueue` (which of those timers are live, in the heap's array
+ * order) and `timerSequence` (the stamp the next queued timer takes), so a restored queue
  * fires in the same order it would have. It came with loading genuine CSBWin save
  * files, whose timer blocks have that shape.
  *
@@ -90,7 +90,7 @@ export interface RuntimeSaveState {
         item16?: Item16Record[];
         /** The timer table, by timer index — holes included, as CSBWin's array has them. */
         timers?: TimerRecord[];
-        /** Which of those timers are live, in firing order (`GameTimers::TimerQueue`). */
+        /** Which of those timers are live, in the heap's array order (`GameTimers::TimerQueue`). */
         timerQueue?: number[];
         /** `gameTimers.TimerSequence()` — the stamp the next queued timer will take. */
         timerSequence?: number;
@@ -276,7 +276,7 @@ function collapseTimerBytes(record: TimerRecord, object: number | undefined): Ti
  * This used to write a single field per timer, `timerWord8`, so no save of any kind
  * restored *when* anything was due: a door caught mid-close stayed put, a fuse
  * stopped burning. The whole `TIMER` is written now, and `timerQueue` carries the
- * firing order, which is what `TimerQueue.restore` puts back.
+ * heap's array, which is what `TimerQueue.restore` puts back.
  *
  * An index with no live timer is filled with an empty record — `TT_EMPTY` is
  * function 0 — exactly as CSBWin's array has holes wherever `m_firstAvailTimer`'s
@@ -309,7 +309,7 @@ function buildTimerRecords(ctx: GameContext): { records: TimerRecord[]; queue: n
 }
 
 /**
- * Rebuild the live queue from a saved table and firing order.
+ * Rebuild the live queue from a saved table and the heap's array order.
  *
  * The records are a table *by index*; the queue names which of them are live and in
  * what order. Both readings of bytes 6-9 come back, because which one a timer means

@@ -276,8 +276,8 @@ async function main(): Promise<void> {
   // ---- 9: a click that works something makes a tick due -----------------------------
   // The main loop runs a tick after `HandleMouseEvents` whenever `d.clockTick` is set
   // (doc/CSBwin-src/CSBCode.cpp:763-764). The door button sets it to 1 before queueing its
-  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085), so the door moves in the frame of the
-  // click. `TouchWallF1` sets it to what `TouchWall` returns (`:788`): 1 when a switch
+  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085). ⚠️ The port moves the door in the frame
+  // of the click, where CSBWin's moves it a tick later (`DEBT.md` C68). `TouchWallF1` sets it to what `TouchWall` returns (`:788`): 1 when a switch
   // fired, 0 when nothing did, which puts off a tick that was due. A cell ahead off the
   // map leaves it alone (`:784-787`).
   const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;

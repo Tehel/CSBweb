@@ -252,7 +252,15 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
   check(same(beforeTimers.timerQueue, afterTimers.timerQueue), `${label}: the timer queue order`);
   check(same((beforeTimers.timers ?? []).map(strip), (afterTimers.timers ?? []).map(strip)),
     `${label}: every timer record but its sequence stamp`);
-  check(same(beforeTimers.item16, afterTimers.item16), `${label}: the ITEM16 monster pool`);
+  // Less each member's status byte: a load attaches the party level's groups again, and
+  // `AttachItem16ToMonster` clears the byte and re-rolls it through `NextMonsterUpdateTime`
+  // (`doc/CSBwin-src/CSBCode.cpp:6107-6110`), from a seed the load itself has moved on, so
+  // two loads of one game roll it differently.
+  const pool = (d: typeof beforeTimers) => (d.item16 ?? []).map((slot) => {
+    const { singleMonsterStatus, ...rest } = slot; void singleMonsterStatus; return rest;
+  });
+  check(same(pool(beforeTimers), pool(afterTimers)),
+    `${label}: the ITEM16 monster pool, but for the status bytes a load re-rolls`);
 }
 
 /**

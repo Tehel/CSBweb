@@ -121,6 +121,14 @@ export class TimerQueue {
    */
   missileFilterObject = OBJECT_ID_NULL;
   missileFilterTimer: TimerEntry | null = null;
+  /**
+   * `m_timerQueue` (`doc/CSBwin-src/Data.h:1535`), `m_numTimer` entries long: the live
+   * timers as CSBWin's binary min-heap over `timerLess`. The head, `queue[0]`, is the next
+   * timer due, and each entry is not `timerLess` than its parent at `(i - 1) >> 1`. The
+   * rest of the array is in no firing order, and the order it is in is CSBWin's, because
+   * every insertion, deletion and re-sort moves entries as `AdjustTimerQueue` does. A save
+   * writes this array as the queue and a load reads it back.
+   */
   private queue: TimerEntry[] = [];
   /** `m_timerSequence` (`Data.h:1542`), a `ui16`: the stamp the next queued timer takes. */
   private nextSequence = 0;
@@ -137,6 +145,7 @@ export class TimerQueue {
   private indexMap = new Map<number, TimerEntry>();
   private deleteDuplicateTimers = true; // CSBWin deleteDuplicateTimers default
 
+  /** The live timers in `m_timerQueue`'s heap order, not their firing order. */
   getTimers(): readonly TimerEntry[] {
     return this.queue;
   }
@@ -150,14 +159,11 @@ export class TimerQueue {
    * of the queue and **free its slot**, which is what the `DeleteTimer(*index)` on its
    * last line does. The entry is handed back by value, as CSBWin `memcpy`s it out
    * before deleting, so a handler still sees the timer it was woken by.
-   *
-   * This used to pop the queue and leave `indexMap` alone, so a fired timer's index
-   * stayed live to `getTimer` and its slot was never reused.
    */
   shiftNext(): TimerEntry | undefined {
-    const entry = this.queue.shift();
+    const entry = this.queue[0];
     if (!entry) return undefined;
-    this.releaseIndex(entry.index);
+    this.deleteTimer(entry.index);
     return entry;
   }
 
@@ -235,11 +241,10 @@ export class TimerQueue {
    * **The entry is copied**, exactly as CSBWin copies the struct into its timer array.
    * Callers legitimately reuse one `TimerEntry` as a template across a loop — CSBWin's
    * `MaybeDelTimers_Fear6_TurnIndividuals` does it for every member of a monster group
-   * (`doc/CSBwin-src/Monster.cpp:1476-1553`) — and storing the object by reference put
-   * the *same* entry in the queue several times, so each later mutation rewrote entries
-   * already queued. That left the queue unsorted, and since `processTimers` stops at the
-   * first entry that is not yet due, everything behind the misplaced one stalled
-   * forever. Read the returned entry, never the argument, for the queued `index`.
+   * (`doc/CSBwin-src/Monster.cpp:1476-1553`) — and storing the object by reference would put
+   * the *same* entry in the queue several times, so each later mutation would rewrite
+   * entries already queued and break the heap. Read the returned entry, never the
+   * argument, for the queued `index`.
    */
   addTimer(entry: TimerEntry): TimerEntry {
     const deduped = this.applyDuplicateTimerRules(entry);
@@ -256,13 +261,42 @@ export class TimerQueue {
     this.nextSequence = (this.nextSequence + 1) & 0xffff;
     this.indexMap.set(stored.index, stored);
     while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
-    const idx = this.queue.findIndex((existing) => compareTimers(stored, existing) < 0);
-    if (idx === -1) {
-      this.queue.push(stored);
-    } else {
-      this.queue.splice(idx, 0, stored);
-    }
+    // `m_timerQueue[m_numTimer] = D5W; m_numTimer++; AdjustTimerQueue(m_numTimer-1)`
+    // (`Timer.cpp:1200-1202`).
+    this.queue.push(stored);
+    this.adjustTimerQueue(this.queue.length - 1);
     return stored;
+  }
+
+  /**
+   * `GameTimers::AdjustTimerQueue` (`doc/CSBwin-src/Timer.cpp:831-896`): move the entry at
+   * `timerQueueIndex` up the heap while it is `timerLess` than its parent and, if it did
+   * not move up, down while the lesser of its children is `timerLess` than it.
+   */
+  private adjustTimerQueue(timerQueueIndex: number): void {
+    const numTimer = this.queue.length;
+    if (numTimer === 1) return;
+    let d7 = timerQueueIndex;
+    const moving = this.queue[d7];
+    let swapped = false;
+    while (d7 !== 0) {
+      const d6 = (d7 - 1) >> 1;
+      if (!timerLess(moving, this.queue[d6])) break;
+      this.queue[d7] = this.queue[d6];
+      d7 = d6;
+      swapped = true;
+    }
+    if (!swapped) {
+      const lastParent = Math.trunc((numTimer - 2) / 2);
+      while (d7 <= lastParent) {
+        let d6 = 2 * d7 + 1;
+        if (d6 + 1 < numTimer && timerLess(this.queue[d6 + 1], this.queue[d6])) d6++;
+        if (!timerLess(this.queue[d6], moving)) break;
+        this.queue[d7] = this.queue[d6];
+        d7 = d6;
+      }
+    }
+    this.queue[d7] = moving;
   }
 
   /**
@@ -287,11 +321,10 @@ export class TimerQueue {
   /**
    * Replace the whole queue with a saved one.
    *
-   * `LoadGame` restores CSBWin's timer array and its queue verbatim and then **does not
-   * re-sort** (`doc/CSBwin-src/SaveGame.cpp:1687-1723`). ⚠️ That queue is CSBWin's binary
-   * heap, not the sorted list this class keeps, so the order taken here is not the firing
-   * order (`DEBT.md` C51). This takes the order as given rather than re-inserting through
-   * `addTimer`, which would also run the duplicate-timer rules over a set of timers that
+   * `LoadGame` restores CSBWin's timer array and its queue verbatim
+   * (`doc/CSBwin-src/SaveGame.cpp:1687-1723`): the queue is the heap as the save left it,
+   * so this takes it as given. Re-inserting through `addTimer` would build another heap
+   * array, and would also run the duplicate-timer rules over a set of timers that
    * legitimately coexist — two door steps on the same cell at different times, say — and
    * quietly drop some.
    *
@@ -353,50 +386,52 @@ export class TimerQueue {
   }
 
   /**
-   * `TIMER_SEARCH::AdjustTimerPriority` (`doc/CSBwin-src/Code11f52.cpp:1194`).
-   *
-   * Re-sort one timer in place after its sort key changed. The function code is part
-   * of the ordering (see `compareTimers`), so renumbering a monster's per-member AI
-   * timer moves it in the queue — CSBWin adjusts the position rather than removing
-   * and re-inserting, and this does the same so that the duplicate-timer rules and
-   * the entry's `sequence` are both left alone.
+   * `TIMER_SEARCH::AdjustTimerPriority` (`doc/CSBwin-src/Timer.cpp:913-916`), as
+   * `Code11f52.cpp:1194` calls it: `AdjustTimerQueue` at the timer's queue position,
+   * after its sort key changed. The function code is part of the ordering (see
+   * `timerLess`), so renumbering a monster's per-member AI timer moves it in the heap.
+   * The timer is not removed and queued again, so the duplicate-timer rules and its
+   * `sequence` are both left alone.
    */
   reprioritizeTimer(index: number): void {
     const entry = this.indexMap.get(index);
     if (!entry) return;
     const at = this.queue.indexOf(entry);
     if (at < 0) return;
-    this.queue.splice(at, 1);
-    const insertAt = this.queue.findIndex((existing) => compareTimers(entry, existing) < 0);
-    if (insertAt === -1) this.queue.push(entry);
-    else this.queue.splice(insertAt, 0, entry);
+    this.adjustTimerQueue(at);
   }
 
+  /**
+   * `GameTimers::DeleteTimer` (`doc/CSBwin-src/Timer.cpp:959-984`): free the slot, then
+   * move the heap's last entry into the hole the timer leaves and `AdjustTimerQueue` it.
+   */
   deleteTimer(index: number): void {
     const entry = this.indexMap.get(index);
     if (!entry) return;
-    const idx = this.queue.indexOf(entry);
-    if (idx >= 0) this.queue.splice(idx, 1);
     this.releaseIndex(index);
+    const qPos = this.queue.indexOf(entry);
+    const last = this.queue.pop()!;
+    if (qPos !== this.queue.length) {
+      this.queue[qPos] = last;
+      this.adjustTimerQueue(qPos);
+    }
   }
 
   /**
    * `DeleteMonsterMovementTimers` (`doc/CSBwin-src/Monster.cpp:1297`) — drop every
-   * timer of type 29-41 on this level at this square. `trace` receives CSBWin's
-   * `AITraceActive` line.
+   * timer of type 29-41 on this level at this square, in `searchOrder`. `trace` receives
+   * CSBWin's `AITraceActive` line.
    */
   deleteMonsterMovementTimers(mapX: number, mapY: number, level: number, trace?: (line: string) => void): void {
     trace?.(`      MAI Delete all Monster Timers at (${mapX},${mapY})`);
-    const doomed: number[] = [];
-    for (const timer of this.queue) {
+    for (const timer of this.searchOrder()) {
       if (timer.level !== (level & 0xff)) continue;
       if (timer.function < TimerFunction.TT_FIRST_MONSTER_AI) continue;
       if (timer.function > TimerFunction.TT_LAST_MONSTER_AI) continue;
       if (timer.uByte6 !== (mapX & 0xff)) continue;
       if (timer.uByte7 !== (mapY & 0xff)) continue;
-      doomed.push(timer.index);
+      this.deleteTimer(timer.index);
     }
-    for (const index of doomed) this.deleteTimer(index);
   }
 
   /**
@@ -411,9 +446,9 @@ export class TimerQueue {
   /**
    * `TIMER_SEARCH`'s order: a snapshot of the queue (`CreateSearchList`,
    * `doc/CSBwin-src/Timer.cpp:1209-1215`) walked from its **end** (`FindNextTimer`,
-   * `:2924-2933`). It is a snapshot, so deleting the current entry does not disturb the
-   * walk. ⚠️ CSBWin's queue is a heap, so its walk starts at the heap's last array entry;
-   * this sorted array starts it at the timer due last (`DEBT.md` C51).
+   * `:2924-2933`), which starts at the heap's last array entry. It is a snapshot, so
+   * deleting the current entry does not disturb the walk. Where the walk deletes or
+   * re-sorts timers, its order decides the heap array it leaves.
    */
   searchOrder(): TimerEntry[] {
     return this.queue.slice().reverse();
@@ -468,12 +503,12 @@ export class TimerQueue {
     // A bashed door cancels every door timer on its cell, whenever it was due
     // (`doc/CSBwin-src/Timer.cpp:1102-1123`).
     if (entry.function === TimerFunction.TT_BASH_DOOR) {
-      const doomed = this.queue.filter((existing) =>
-        existing.level === entry.level
-        && existing.uByte6 === entry.uByte6
-        && existing.uByte7 === entry.uByte7
-        && (existing.function === TimerFunction.TT_DOOR_STEP || existing.function === TimerFunction.TT_DOOR));
-      for (const existing of doomed) this.deleteTimer(existing.index);
+      for (const existing of this.searchOrder()) {
+        if (existing.uByte6 !== entry.uByte6 || existing.uByte7 !== entry.uByte7) continue;
+        if (existing.level !== entry.level) continue;
+        if (existing.function !== TimerFunction.TT_DOOR_STEP && existing.function !== TimerFunction.TT_DOOR) continue;
+        this.deleteTimer(existing.index);
+      }
     }
 
     return null;
@@ -491,19 +526,30 @@ export class TimerQueue {
   }
 }
 
-function compareTimers(a: TimerEntry, b: TimerEntry): number {
-  if (a.time !== b.time) return a.time - b.time;
-
-  const aParam = a.function === TimerFunction.TT_PARAMETER_MESSAGE;
-  const bParam = b.function === TimerFunction.TT_PARAMETER_MESSAGE;
-  if (aParam || bParam) {
-    if (aParam && !bParam) return -1;
-    if (!aParam && bParam) return 1;
-    if (a.uByte5 !== b.uByte5) return a.uByte5 - b.uByte5;
-    return a.sequence - b.sequence;
+/**
+ * `TIMER::operator<` (`doc/CSBwin-src/Timer.cpp:765-810`), with `SEQUENCED_TIMERS`
+ * defined (`stdafx.h:17`): the earlier time first; at the same time a parameter message
+ * before anything else, and two of them by the lower `uByte5`; any other pair by the
+ * higher function, then the higher `uByte5`; then the lower sequence. The last test,
+ * `&timer2 >= this`, orders the timers' slots, so a timer is `timerLess` than itself.
+ */
+export function timerLess(a: TimerEntry, b: TimerEntry): boolean {
+  if (a.time < b.time) return true;
+  if (a.time > b.time) return false;
+  if (a.function === TimerFunction.TT_PARAMETER_MESSAGE) {
+    if (b.function !== TimerFunction.TT_PARAMETER_MESSAGE) return true;
+    if (a.uByte5 < b.uByte5) return true;
+    if (a.uByte5 > b.uByte5) return false;
+    if (a.sequence < b.sequence) return true;
+    if (a.sequence > b.sequence) return false;
+    return b.index >= a.index;
   }
-
-  if (a.function !== b.function) return b.function - a.function;
-  if (a.uByte5 !== b.uByte5) return b.uByte5 - a.uByte5;
-  return a.sequence - b.sequence;
+  if (b.function === TimerFunction.TT_PARAMETER_MESSAGE) return false;
+  if (a.function > b.function) return true;
+  if (a.function < b.function) return false;
+  if (a.uByte5 > b.uByte5) return true;
+  if (a.uByte5 < b.uByte5) return false;
+  if (a.sequence < b.sequence) return true;
+  if (a.sequence > b.sequence) return false;
+  return b.index >= a.index;
 }

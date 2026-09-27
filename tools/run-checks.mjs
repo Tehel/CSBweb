@@ -81,6 +81,7 @@ const CHECKS = [
   { tool: 'dump-cast-spell.ts' },
   { tool: 'dump-timer-dedupe.ts' },
   { tool: 'dump-timer-sequence.ts' },
+  { tool: 'dump-timer-heap.ts' },
   { tool: 'dump-throwing.ts' },
   { tool: 'dump-clouds.ts' },
   { tool: 'dump-player-attacks.ts' },
