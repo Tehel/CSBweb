@@ -3598,6 +3598,11 @@ Evidence: `tools/dump-viewport-click.ts`.
 - A champion busied again while busy keeps the bit, and the busy timer is replaced: with
   `D7 = d.Time + delay` and the old timer due at `D6`, the new one is due at
   `D7 + ((D6 - d.Time) >> 1)` if `D7 >= D6`, else at `D6 + delay / 2` (`Magic.cpp:514-527`).
+  `DisableCharacterAction` has no guard on the delay (`Magic.cpp:502-537`): 0 ticks busies
+  an idle champion with a `TT_11` due at `d.Time`, and replaces a busy one's timer with one
+  due when the old one was. Every replacement's `timerUByte6`, the slot a throw refills, is
+  0 (`:512`). The callers guard it themselves: an attack disables only for a non-zero time
+  (`Attack.cpp:2149-2152`). Evidence: `tools/dump-throwing.ts` section 9.
 - IAIDO is saved busy in `csbgame6.dat` and `csbgame-flying-sword.dat`: `charFlags` 0x0018,
   with a `TT_11` as his `busyTimer`.
 - `_ExecuteAttack` records the attack in `attackType` after running it

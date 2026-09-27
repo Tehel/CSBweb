@@ -477,10 +477,10 @@ export class MagicSystem {
 
   /**
    * `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502`) — busy the champion for
-   * `timeDelay` ticks, or stretch the busy timer they already have.
+   * `timeDelay` ticks, or stretch the busy timer they already have. Any delay is taken,
+   * 0 or less included, as CSBWin has no guard.
    */
   disableCharacterAction(chIdx: number, timeDelay: number): void {
-    if (timeDelay <= 0) return; // ⚠️ CSBWin has no such guard (DEBT.md C50)
     const party = this.ctx.party.state;
     const champion = party.champions[chIdx];
     if (!champion) return;
@@ -493,7 +493,8 @@ export class MagicSystem {
         if (targetTime >= existingTime) {
           targetTime = (targetTime + ((existingTime - this.ctx.state.tickCount) >> 1)) >>> 0;
         } else {
-          targetTime = (existingTime + ((timeDelay | 0) >> 1)) >>> 0;
+          // `timeDelay/2`, C's division, which truncates a negative delay toward 0.
+          targetTime = (existingTime + Math.trunc((timeDelay | 0) / 2)) >>> 0;
         }
       }
       this.timers.deleteTimer(existingIndex);

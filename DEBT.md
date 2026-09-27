@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
 | C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
 | C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
 | C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
@@ -127,20 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C50 ⏳ `DisableCharacterAction` refuses a delay of 0
-
-CSBWin's `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502-537`) has no guard on
-`timeDelay`. A delay of 0 queues a `TT_11` due at `d.Time`, and for a champion who is
-already busy it replaces the busy timer with one due at the same time (`:517-525`), whose
-`timerUByte6`, the slot a throw refills, is 0 (`:512`). The port's
-`MagicSystem.disableCharacterAction` returns on `timeDelay <= 0`
-(`src/engine/MagicSystem.ts:484`). No shipped path passes 0 or less: every spell in
-`dm-atari/graphics.dat` has a disable time of 12 to 63 (`BITS10_15(word6)`,
-`Magic.cpp:1399`), an attack disables only when its time is non-zero (`Attack.cpp:2149`),
-and a throw turns a negative time into 4 (`Mouse.cpp:723`). Such a time comes only from a
-filter (G2) or another game's spell table. Remove the guard. Evidence: a check that
-disables a champion for 0 ticks, once idle and once busy.
 
 ### C51 ⏳ A restored timer queue is read as a sorted list, but CSBWin's is a heap
 

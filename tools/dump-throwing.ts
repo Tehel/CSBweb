@@ -472,6 +472,38 @@ async function main(): Promise<void> {
   check(archer.busyTimerIndex === -1 && (archer.charFlags & CHARFLAG_ATTACK_DISABLE) === 0,
     "the spell's TT_11 frees the champion");
 
+  /* -------------------------- 9. DisableCharacterAction for 0 ticks -------------- */
+
+  // `DisableCharacterAction` (`doc/CSBwin-src/Magic.cpp:502-537`) has no guard on the
+  // delay. Idle, 0 ticks queues a TT_11 due at d.Time. Busy, the busy timer is replaced by
+  // one due at `D6 + 0 / 2` (`:514-525`), whose uByte6, the slot a throw refills, is 0
+  // (`:512`).
+  console.log('');
+  console.log('=== 9. DisableCharacterAction for 0 ticks, idle and busy ===');
+  game.ctx.systems.magic.disableCharacterAction(0, 0);
+  const idleTimer = game.ctx.timers.getTimer(archer.busyTimerIndex);
+  console.log(`idle: busy timer ${archer.busyTimerIndex}, due ${idleTimer ? idleTimer.time - clock.tickCount : '-'} `
+    + `ticks from now, busy flag ${(archer.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0}`);
+  check(idleTimer !== null && idleTimer.function === 11 && idleTimer.time === clock.tickCount
+    && (archer.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
+    'an idle champion disabled for 0 ticks is busy, with a TT_11 due at d.Time');
+  const idleTicks = runUntilFree();
+  check(idleTicks === 1 && (archer.charFlags & CHARFLAG_ATTACK_DISABLE) === 0,
+    `that TT_11 frees the champion on the next tick (${idleTicks})`);
+
+  game.ctx.systems.magic.disableCharacterAction(0, 12);
+  const busyBefore = game.ctx.timers.getTimer(archer.busyTimerIndex)!;
+  busyBefore.uByte6 = 7; // as a throw leaves it
+  const dueBefore = busyBefore.time;
+  game.ctx.systems.magic.disableCharacterAction(0, 0);
+  const busyAfter = game.ctx.timers.getTimer(archer.busyTimerIndex);
+  console.log(`busy: TT_11 due ${dueBefore - clock.tickCount} ticks from now, uByte6 7 -> `
+    + `due ${busyAfter ? busyAfter.time - clock.tickCount : '-'}, uByte6 ${busyAfter?.uByte6 ?? '-'}`);
+  check(busyAfter !== null && busyAfter.time === dueBefore && busyAfter.uByte6 === 0
+    && game.ctx.timers.getTimers().filter((t) => t.function === 11).length === 1,
+    'a busy champion disabled for 0 ticks gets a new TT_11 due when the old one was, with uByte6 0');
+  runUntilFree();
+
   console.log('');
   finish();
 }
