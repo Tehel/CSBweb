@@ -9,7 +9,7 @@ import type { Party } from './Party';
 import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType } from '../core/types';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { setClockTick } from './LoopState';
@@ -109,10 +109,15 @@ export class MovementSystem {
             return this.traverseStairway(position, (cellFlags & 0x04) !== 0, null);
         }
 
-        // `SetPartyFacing((d.partyFacing + deltaFacing) & 3)` (doc/CSBwin-src/CSBCode.cpp:7927).
-        // The pads around it are not pressed (DEBT.md C58).
+        // `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)`, then
+        // `SetPartyFacing((d.partyFacing + deltaFacing) & 3)`, then the same with `1`
+        // (doc/CSBwin-src/CSBCode.cpp:7912-7934): the pads see the party leave and come
+        // back, the room unchanged, facing the new way.
+        const actuators = this.ctx.systems.actuators;
+        actuators.triggerObjectMove(position, OBJECT_ID_NULL, false, true, this.party.state.facing);
         const newFacing = this.party.calculateNewFacing(action);
         this.party.setFacing(newFacing);
+        actuators.triggerObjectMove(position, OBJECT_ID_NULL, true, true, this.party.state.facing);
 
         return {
             success: true,

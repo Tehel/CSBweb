@@ -2765,6 +2765,17 @@ turns the overshoot into `DamageCharacter(chIdx, over / 2, 0, 0)`. A turn is
 `TurnParty` (`:7854`), which charges nothing. Evidence: `tools/dump-party-collision.ts`
 case 7.
 
+## A turn lifts the party off its square and places it back
+
+Off the stairs, `_TurnParty` brackets `SetPartyFacing((d.partyFacing + deltaFacing) & 3)`
+with `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0, NULL)` before and
+the same with `1` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`). The fourth argument is
+`unchangedRoom`, the fifth `place` (`Code11f52.cpp:3882-3888`). So every actuator on the
+square gets `PressurePadOrAlcove` twice, the room unchanged: once as the party leaves,
+facing the old way, once as it comes back, facing the new one (`d.partyFacing`, which
+`PressurePadOrAlcove` reads, `:3776`). On stairs a turn is `TraverseStairway(D7W & 4,
+true)` instead (`CSBCode.cpp:7906-7909`). Evidence: `tools/dump-party-move.ts` case 7.
+
 ## The move delay is `d.partyMoveDisableTimer`, in ticks, from the slowest living champion
 
 A step `MoveParty` takes — the `D5W == 0` arm, after `MoveObject` — sets

@@ -22,7 +22,9 @@
  *     and 5. as nothing happens: the missiles in the party's own square are still met;
  *  6. the step into stairs (`CSBCode.cpp:8212`, `:7774`): lifted twice, then arriving on
  *     the stairs of the other level;
- *  7. a turn, which is not a `MoveObject` and leaves no footprint;
+ *  7. a turn, which is not a `MoveObject` and leaves no footprint, but lifts the party off
+ *     its square and places it back facing the new way, the room unchanged
+ *     (`CSBCode.cpp:7912-7934`);
  *  8. a champion the fall kills leaves their bones on the square below, where the party
  *     is by then.
  *
@@ -299,9 +301,20 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, from, facing);
+  const facings: number[] = [];
+  const actuators = game.ctx.systems.actuators;
+  const pads = actuators.triggerObjectMove.bind(actuators);
+  actuators.triggerObjectMove = (position, object, place, unchangedRoom, faced) => {
+    facings.push(faced);
+    return pads(position, object, place, unchangedRoom, faced);
+  };
   game.move(MovementAction.TURN_RIGHT);
   tick(game, log);
-  compare('7. a turn', log, ['tick']);
+  compare('7. a turn', log, [`remove ${at(from)} same`, `place ${at(from)} same`, 'tick']);
+  check(
+    facings.join(',') === `${facing},${(facing + 1) & 3}`,
+    `the pads see the party leave facing ${facing} and come back facing ${(facing + 1) & 3} (got ${facings.join(',')})`,
+  );
 }
 
 /* ------------------------------------------------ 8. a death in the fall -------- */

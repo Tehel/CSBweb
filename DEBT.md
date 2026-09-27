@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C58 | A turn does not lift and place the party | S | ⏳ |
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
@@ -124,16 +123,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C58 ⏳ A turn does not lift and place the party
-
-Off the stairs, `_TurnParty` brackets its `SetPartyFacing` with
-`PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)` before and
-`(…, true, 1)` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`), so the pads under the party
-see it leave and come back, with `unchangedRoom` true, facing the new way. The port's turn,
-`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:103`), only sets the facing.
-Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
-calls.
 
 ### C59 ⏳ A missile leaving the map is dropped, not met as the exterior wall
 
