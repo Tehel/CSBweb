@@ -38,6 +38,7 @@ const dev = createDevTools({
     // F5 packs a `CHARDESC` like any other save, and that needs graphic 26 for the
     // champions who carry only a portrait index.
     portraitOf: (champion) => screen?.portraitPixelsFor(champion),
+    repackOpenChest: () => screen?.repackChest(),
 });
 
 const GAME_DATA_DIR = '/gamefiles/dm-atari';

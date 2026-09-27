@@ -27,7 +27,7 @@
  *    (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`). The first repacks a chest open in the
  *    inventory, which is what puts its objects in the save; the second shows the
  *    inventory again and brings the attack buttons back. Run over a real chest, with a
- *    real save restored into a fresh game.
+ *    real save restored into a fresh game. The port's quick-save repacks the chest too.
  *
  * Run: `npx tsx tools/dump-save-menu.ts`
  */
@@ -662,6 +662,45 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   check(ui.word20252 === 0, 'and, closing, leaves the attack panel alone');
 }
 
+/**
+ * The quick-save (`src/dev.ts`), which CSBWin does not have, over the same open chest: it
+ * must repack it as the disk menu does, or the save restores the chest empty.
+ */
+async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<void> {
+  console.log('');
+  console.log('=== the quick-save over an open chest ===');
+  const { buildQuickSavePayload } = await import('../src/dev');
+  const game = await loadGame();
+  game.addChampion(healthyChampion('DAROO'));
+  const party = game.party.state;
+  const found = findChest(game);
+  if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
+  const { chest, cell } = found;
+  const packed = chestContents(game, chest);
+  game.dungeonState.removeObjectFromCell(cell, chest);
+  party.champions[0]!.possessions[1] = chest;
+  party.selectedCharacterIndex = 0;
+
+  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  ui.uiTables = extractUITables(graphics);
+  ui.partyState = party;
+  const draw = (): void => {
+    Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, party.champions[0]!));
+  };
+  draw();
+  check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
+
+  // Wired as `main.ts` wires it.
+  const payload = buildQuickSavePayload(game, { game, renderView: () => {}, repackOpenChest: () => Inventory.repackOpenChest(ui) });
+  const fresh = await loadGame();
+  applySaveBytes(fresh, encodeSavePayload(payload));
+  const saved = chestContents(fresh, chest);
+  console.log(`  quick-saved with the chest open, restored into a fresh game: the chest holds ${saved} of ${packed}`);
+  check(saved === packed, 'the quick-save repacks the chest: the restored chest holds its objects');
+  draw();
+  check(ui.openChestId === chest && chestContents(game, chest) === 0, 'and the next draw opens the chest again');
+}
+
 /* ------------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
@@ -674,6 +713,7 @@ async function main(): Promise<void> {
   await checkPayload();
   checkCsbwinListing();
   await checkEnterAndLeave(graphics);
+  await checkQuickSaveOverOpenChest(graphics);
   finish();
 }
 

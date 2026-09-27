@@ -16,6 +16,7 @@ import {
     decodeSavePayload,
     encodeSavePayload,
     makeSaveFileName,
+    type SavePayload,
 } from './engine/SaveGamePayload';
 import type { Game } from './engine';
 import type { Champion } from './engine/gameTypes';
@@ -31,6 +32,20 @@ export interface DevHost {
      * `SavePayloadOptions`.
      */
     portraitOf?: (champion: Champion) => number[] | undefined;
+    /** `RepackChest` (`doc/CSBwin-src/Character.cpp:3108`), the screen's open chest. */
+    repackOpenChest?: () => void;
+}
+
+/**
+ * The quick-save's payload. An open chest's objects are out of its chain
+ * (`doc/PROVEN_FACTS.md` → "The disk menu saves an open chest packed"), so it is repacked
+ * first, as the disk menu's `TAG02076e` repacks it (`doc/CSBwin-src/Character.cpp:5116-5125`),
+ * and the inventory's next draw opens it again, as after the menu's `TAG0207cc`. The
+ * rest of the pair, the shading and the cursor, would last no frame here.
+ */
+export function buildQuickSavePayload(game: Game, host: DevHost): SavePayload {
+    host.repackOpenChest?.();
+    return buildSavePayload(game, { portraitOf: host.portraitOf });
 }
 
 /** Where the quick-save used to live, before F5/F9 joined the save list. */
@@ -99,7 +114,7 @@ export function createDevTools(host: DevHost): DevTools {
         if (!host.game) return;
         await migrateLegacyQuickSave();
         try {
-            const payload = buildSavePayload(host.game, { portraitOf: host.portraitOf });
+            const payload = buildQuickSavePayload(host.game, host);
             // The quick-save does not stop the clock, so the save's tail runs now, on
             // the world the payload holds, not once the write below comes back: a
             // failed write keeps the re-attached monsters, where CSBWin's skips it.

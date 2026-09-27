@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
 | C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
 | C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
@@ -121,16 +120,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C61 ⏳ The dev quick-save writes an open chest empty
-
-An open chest's objects are out of its chain until it is repacked (`doc/PROVEN_FACTS.md` →
-"The disk menu saves an open chest packed"). The disk menu repacks it before a save
-(`tag02076e`), but the dev quick-save (`quickSave`, `src/dev.ts:99`) builds its payload
-straight from the game, so a quick-save made with a chest open restores the chest empty
-and its objects nowhere. CSBWin has no quick-save; its only save repacks. Repack before
-the payload is built and open the chest again after, as the disk menu does. Evidence: a
-check that quick-saves over an open chest and restores it.
 
 ### C62 ⏳ Most of the graphics.dat key tables bind nothing
 
