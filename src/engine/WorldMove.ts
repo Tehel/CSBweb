@@ -12,7 +12,6 @@
  * missiles in its way through `CheckMoveFromMissile`, which is `MissileEncounter`'s.
  */
 import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { SoundIndex } from '../core/constants';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
 import { monsterHorizontalSize, monsterLevitating } from '../renderer/csbwin/ObjectTables';
 import type { DungeonState } from './DungeonState';
@@ -22,8 +21,10 @@ import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { setPackedBits } from './MonsterSystem';
 import { StateOfFear } from './monsterTypes';
 import { decodeMissileTimerWord8 } from './missileHelpers';
-import { getPartyDistance } from './Party';
 import type { TimerQueue } from './TimerQueue';
+
+/** `soundTELEPORT` (`doc/CSBwin-src/CSB.h:625`). */
+const SOUND_TELEPORT = 17;
 
 /**
  * What `MoveObject`'s loop knows about a monster group it is moving
@@ -319,10 +320,6 @@ export class WorldMove {
         if (objectType === -1) {
           curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
           teleportAudible = teleporter.sound;
-          if (teleporter.sound) {
-            const distance = getPartyDistance(this.ctx.party.state, position.x, position.y, position.z);
-            if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 0, distance);
-          }
         } else if (objectType === DBType.MISSILE) {
           if (teleporter.absoluteRotation) {
             curDir = rotation;
@@ -331,22 +328,16 @@ export class WorldMove {
             curPos = (curPos + rotation) & 0x3;
           }
         } else if (objectType === DBType.CREATURE) {
+          teleportAudible = teleporter.sound;
+          // `QueueSound(17, newX, newY, 1)` before `TeleportMonster`, on the destination
+          // level that `LoadLevel` has just loaded (`:2955`, `:2983-2986`).
+          if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, destination.x, destination.y, 1, destination.z);
           const result = monster ? this.teleportMonster(monster, teleporter) : null;
           if (result) {
             curFacing = result.facing & 0x3;
             teleportCode = result.code;
-            teleportAudible = teleporter.sound;
-            if (teleporter.sound) {
-              const distance = getPartyDistance(this.ctx.party.state, position.x, position.y, position.z);
-              if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 1, distance);
-            }
           } else {
             curFacing = teleporter.absoluteRotation ? rotation : (curFacing + rotation) & 0x3;
-            teleportAudible = teleporter.sound;
-            if (teleporter.sound) {
-              const distance = getPartyDistance(this.ctx.party.state, position.x, position.y, position.z);
-              if (distance !== null) this.ctx.host.playSound(SoundIndex.TELEPORT, 1, distance);
-            }
           }
         } else {
           if (!teleporter.absoluteRotation && oldX !== -1) {
@@ -356,9 +347,11 @@ export class WorldMove {
 
         position = destination;
         moved = true;
-        // `d.partyX = newX; d.partyY = newY;` and `SetPartyFacing` at every jump (`:2958-2977`).
+        // `d.partyX = newX; d.partyY = newY;`, the buzz at the party's new square, and
+        // `SetPartyFacing` at every jump (`:2958-2977`).
         if (objectType === -1) {
           this.ctx.party.state.position = position;
+          if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, position.x, position.y, 0);
           this.ctx.party.setFacing(curFacing);
         }
         if (isSamePosition(prev, position)) break;

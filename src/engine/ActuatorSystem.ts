@@ -34,7 +34,6 @@ import {
   setActuatorType,
 } from '../data/actuatorHelpers';
 import { TimerQueue } from './TimerQueue';
-import { SoundIndex } from '../core/constants';
 import { constructPredefinedMissile } from './missileHelpers';
 import type { CsbRandom } from '../core/random';
 import { roomTimerFunction } from './roomTimers';
@@ -92,6 +91,9 @@ export interface MessageSink {
 /** CSBWin message colours (`doc/CSBWIN_MESSAGES_REFERENCE.md`). */
 export const MSG_COLOR_SPELL = 4;
 export const MSG_COLOR_ROOM_TEXT = 15;
+
+/** `soundPRESSUREPAD` (`doc/CSBwin-src/CSB.h:623`). */
+const SOUND_PRESSURE_PAD = 1;
 
 export class ActuatorSystem {
   private readonly dungeon: DungeonState;
@@ -381,7 +383,7 @@ export class ActuatorSystem {
           if (!switchOpen) {
             result = true;
             if (isActuatorAudible(rec)) {
-              this.ctx.host.playSound(SoundIndex.SWITCH);
+              this.ctx.sounds.queueSound(1, party.position.x, party.position.y, 1);
             }
             if (!emptyHanded && (actuatorType === 4 || actuatorType === 11 || actuatorType === 17)) {
               const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand, position, actuatorPos);
@@ -516,7 +518,7 @@ export class ActuatorSystem {
     }
 
     if (isActuatorAudible(rec)) {
-      this.ctx.host.playSound(SoundIndex.SWITCH);
+      this.ctx.sounds.queueSound(SOUND_PRESSURE_PAD, position.x, position.y, 1, position.z);
     }
 
     // Always -1, an alcove's wall position included (doc/CSBwin-src/Code11f52.cpp:3875).

@@ -1,5 +1,4 @@
 import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
-import { SoundIndex } from '../core/constants';
 
 /**
  * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
@@ -8,6 +7,8 @@ import { SoundIndex } from '../core/constants';
 const SOUND_DOOR_OPENING = 18;
 /** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
 const SOUND_DOOR_STRUGGLE = 4;
+/** The ordinal `ProcessTT_1` queues for each step a door moves (`QueueSound(2, …)`, Timer.cpp:1375). */
+const SOUND_DOOR_STEP = 2;
 /** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
 const SOUND_TELEPORT = 17;
 import type { CsbRandom } from '../core/random';
@@ -54,7 +55,6 @@ import { AttackType } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
 import { monsterNonMaterial, monsterVerticalSize } from '../renderer/csbwin/ObjectTables';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
-import { getPartyDistance } from './Party';
 
 
 export type MissileDropTarget = { monster: ObjectID } | null;
@@ -734,14 +734,10 @@ export class TimerSystem {
       return;
     }
 
-    const prevState = doorState;
     const delta = action === ActuatorAction.SET ? -1 : 1;
     doorState = Math.max(0, Math.min(4, doorState + delta));
     setDoorState(map, x, y, doorState);
-    if (prevState !== doorState) {
-      const distance = getPartyDistance(this.ctx.party.state, x, y, timer.level);
-      if (distance !== null) this.ctx.host.playSound(SoundIndex.DOOR, 0, distance);
-    }
+    this.ctx.sounds.queueSound(SOUND_DOOR_STEP, x, y, 1, timer.level);
 
     if ((action === ActuatorAction.SET && doorState !== 0) || (action === ActuatorAction.CLEAR && doorState !== 4)) {
       this.timers.addTimer(timer);

@@ -8,7 +8,7 @@
  *
  * Moved out of `Game` by `DEBT.md` E2; the other systems reach it as `ctx.systems.mouse`.
  */
-import { MISC_BONES_OF_HERO, SoundIndex } from '../core/constants';
+import { MISC_BONES_OF_HERO } from '../core/constants';
 import { applyLimits } from '../core/intCast';
 import {
   DBType,
@@ -338,7 +338,7 @@ export class MouseSystem {
 
     this.ctx.loop.clockTickSet = true;
     this.ctx.loop.clockTickCleared = false;
-    this.ctx.host.playSound(SoundIndex.SWITCH);
+    this.ctx.sounds.queueSound(1, pos.x, pos.y, 1);
     this.ctx.timers.createTimer(
       TimerFunction.TT_DOOR,
       target.x,

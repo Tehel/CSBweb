@@ -10,7 +10,6 @@ import type { DungeonState } from './DungeonState';
 import type { MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
-import { SoundIndex } from '../core/constants';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
 import { TimerFunction } from './TimerQueue';
@@ -281,12 +280,12 @@ export class MovementSystem {
             const local10 = this.ctx.systems.monsterAttack.getCharacterToDamage(newPosition.x, newPosition.y, (direction + 1) & 3);
             const local30 = local10 & 0xffff;
             if (local8 !== local30) k |= this.ctx.systems.monsterAttack.damageCharacter(local10, 1, 24, 2);
+            if (k !== 0) this.ctx.sounds.queueSound(18, this.party.state.position.x, this.party.state.position.y, 0);
         }
         return {
             success: false,
             blocked: true,
             inhibited: true,
-            soundId: k !== 0 ? SoundIndex.WALL_BUMP : undefined,
         };
     }
 

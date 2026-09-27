@@ -51,8 +51,9 @@ The order, then:
 3. **Refactors change no behaviour.** Tiers D and E are refactors: `npm test` before and
    after, and `npm test -- --frames` whenever anything under `src/renderer/` or `src/ui/`
    moves. Better still, and expected for any split of a module: every tool's full output is
-   byte-identical before and after (only `dump-save-menu` varies on its own, by
-   one byte, the save date), and the author's runtime saves hash the same after load and
+   byte-identical before and after (only `dump-save-menu`, by one byte, and
+   `dump-savegame`, by its payload's size, vary on their own: both carry the save's
+   wall-clock date), and the author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
    behaviour-neutral or a fix, never both.
@@ -73,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C47 | Seven engine sounds bypass `QueueSound` | M | ⏳ |
 | C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
 | C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
@@ -87,12 +87,15 @@ In payoff order: the first row is the next item.
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
+| C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
+| C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
+| C66 | A delayed sound plays at once | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
-| G2 | Nine DSA filters | — | ⏳ |
+| G2 | Ten DSA filters | — | ⏳ |
 | G3 | The wings | — | ⏳ |
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
@@ -106,7 +109,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C64 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C67 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -126,22 +129,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C47 ⏳ Seven engine sounds bypass `QueueSound`
-
-The engine's sounds go through `SoundQueue.queueSound`, CSBWin's `QueueSound`
-(`doc/CSBwin-src/CSBCode.cpp:1819`), which looks the ordinal up in `d.sound1772` and
-attenuates it by the distance to the party. Seven calls play a `SoundIndex` item through
-`ctx.host.playSound` instead: the door button (`MouseSystem.handleDoorSwitchClick`,
-`src/engine/MouseSystem.ts:340`), two switches in `ActuatorSystem` (`:384`, `:519`), three
-teleporters in `WorldMove.resolveCellEffects` (`:324`, `:341`, `:348`) and a door's step
-in `TimerSystem` (`:743`). For the door button CSBWin queues
-`QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:1079`), and ordinal 1 is item 534,
-`SoundIndex.SWITCH`, the sample the port plays. The CSBWin calls behind the other six are
-not yet read. All seven escape whatever `QueueSound` does that the host does not: the
-sound table's distances today, and its delayed sounds and `SoundFilter` once they are
-ported (`SoundQueue`'s module comment). Read each site's CSBWin call and queue its ordinal.
-Evidence: a check per site that records the ordinal queued.
 
 ### C48 ⏳ A Zokathra with both hands full is linked into the cell, not dropped
 
@@ -257,7 +244,7 @@ party through its square again, leaves a second footprint and presses the pads, 
 `DiscardAllInput`. Until then `d.partyLevel` is the old level while `d.partyX` and
 `d.partyY` are already the new square's. The port runs the load and the second
 `MoveObject` from inside the move, in `WorldMove.arriveOnPartyLevel`
-(`src/engine/WorldMove.ts:124`), and leaves only the discard to the tick
+(`src/engine/WorldMove.ts:125`), and leaves only the discard to the tick
 (`MonsterSystem.loadPartyLevelOnArrival`, `Game.loadNewPartyLevel`). So whatever runs
 between the move and that tick sees the new level loaded, its groups attached and its pads
 pressed, where CSBWin's sees the old party level: the rest of the timers in the pass that
@@ -273,7 +260,7 @@ Off the stairs, `_TurnParty` brackets its `SetPartyFacing` with
 `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)` before and
 `(…, true, 1)` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`), so the pads under the party
 see it leave and come back, with `unchangedRoom` true, facing the new way. The port's turn,
-`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:109`), only sets the facing.
+`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:108`), only sets the facing.
 Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
 calls.
 
@@ -285,7 +272,7 @@ missile meets it through `ProcessMissileEncounter(nextRoomType, …)` (`:351-364
 runs filter 6 (`Code11f52.cpp:1841-1843`) and goes on into the shared tail
 (`:2044-2121`), where a spell becomes its cloud (`CreateCloud`, `:2099`). The port's
 `processMissileTimer` meets nothing off the map: it drops the missile through
-`processObjectFromMissile` (`src/engine/TimerSystem.ts:1409-1414`), so filter 6 never runs
+`processObjectFromMissile` (`src/engine/TimerSystem.ts:1404-1409`), so filter 6 never runs
 and a fireball ends without its explosion. `processMissileEncounter`'s arm for the
 exterior, `case 8` (`src/engine/MissileEncounter.ts:287`), is unreachable. Pass the
 exterior to the encounter as CSBWin does. Evidence: a check that flies a fireball off an
@@ -355,6 +342,55 @@ port's own bindings, and keep those bindings only where they claim no key a tabl
 `TAG0196da` queues every `pKeyXlate1` match after a `pKeyXlate2` one (`:8460-8475`), where
 `translateKey` returns the first. Evidence: a row per table entry in
 `tools/dump-key-bindings.ts`.
+
+### C64 ⏳ Twelve sounds on another level are heard as if on the party's
+
+CSBWin's `QueueSound` drops a sound with a non-zero `deltaTime` unless `d.LoadedLevel`, the
+level its caller has loaded, is the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). The
+port's `SoundQueue.queueSound` takes that level as its fifth argument, and assumes the
+party's when it gets none (`src/engine/SoundQueue.ts`). These callers pass none, although
+each can run on another level: from a timer, which `ProcessTimers` acts on with the timer's
+level loaded (`CSBCode.cpp:6416-6417`), or on a missile's or a group's square.
+
+- `TimerSystem`: a door rebounding off a group (`src/engine/TimerSystem.ts:725`), a
+  generator's new group (`:1151`), the `RNffe4` cloud (`:1587`, `Timer.cpp:556`).
+- `MissileEncounter`: the encounter's sound and `CreateCloud`'s two
+  (`src/engine/MissileEncounter.ts:589`, `:604`, `:608`).
+- `MonsterDamage`: a monster's death (`src/engine/MonsterDamage.ts:212`, `:324`).
+- `MonsterSystem`: the Deth Knight's flip (`src/engine/MonsterSystem.ts:418`), a group
+  waiting on a teleporter (`:709`), `CreateMonster` (`:841`), and `playTeleportSound`
+  (`:879`), which `MonsterAI` calls.
+
+So each of them, with `deltaTime` 1, is heard from any level whenever its x and y are near
+the party's. Pass each call's level, then make the argument required. Evidence: a row per
+caller in `tools/dump-queue-sound.ts` with the party on another level.
+
+### C65 ⏳ The host takes a sound's volume from its SND item, not its ordinal
+
+CSBWin's `QueueSound` makes the volume from the ordinal's own entry, loud at or below
+`byte6` and quiet below `byte7` (`LOCAL_12`, `doc/CSBwin-src/CSBCode.cpp:1867-1876`), and
+hands `StartSound` that choice (`:1894-1896`), which attenuates a quiet sound 18 times
+(`Sound.cpp:663`). The port's `SoundQueue` hands the host the distance instead, and
+`SoundManager.getDistanceVolume` (`src/audio/SoundManager.ts`) looks the thresholds up
+again by SND item, in a catalog where the last ordinal to name an item wins
+(`buildSoundCatalog`, `src/audio/soundsIndex.ts`). Ordinals 5 and 20 both name item 537
+(`doc/PROVEN_FACTS.md` → "`QueueSound`'s argument is an ordinal into the sound table"), so
+a big explosion, ordinal 5 (`byte6` 3, `byte7` 7), plays with ordinal 20's 0 and 4: quiet
+one to three squares away, where CSBWin's is loud, and silent four to six away, where
+CSBWin's is quiet. Every other item has one ordinal. Hand the host `LOCAL_12`, not the
+distance. Evidence: a row in `tools/dump-queue-sound.ts` for ordinal 5 three squares away.
+
+### C66 ⏳ A delayed sound plays at once
+
+With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
+`d.Time + deltaTime - 1` instead of playing (`doc/CSBwin-src/CSBCode.cpp:1832-1848`), and
+`ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
+The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
+`TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
+bash (`src/engine/AttackSystem.ts:1000`), a champion's wound
+(`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
+`:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
+check that queues a sound with `deltaTime` 2 and finds it played a tick later.
 
 ---
 
@@ -435,14 +471,14 @@ they are listed so nothing is lost. They come last (see "Priority").
   extended cell flag. It is omitted at `src/renderer/csbwin/SummarizeRoomInfo.ts:515`. The
   DSA decoration gating (actuator type 47) is ported.
 
-### G2 ⏳ Nine DSA filters
+### G2 ⏳ Ten DSA filters
 
 No dungeon we load defines any of them, so none could be verified if written. Each place
 uses CSBWin's defaults.
 
 - `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`).
 - `ESL_FEEDINGFILTER` (`Character.cpp:4288-4344`). Its insertion point is marked in
-  `src/renderer/ui/Feeding.ts:110`.
+  `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
   (`HallOfChampions.ts:333`).
@@ -459,7 +495,7 @@ uses CSBWin's defaults.
   The port builds a fresh block each attack, with `disableTime` 0.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
-  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:240`).
+  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:239`).
 - `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
   attack option. The names come straight from `AttackNames`.
 - `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is
@@ -473,6 +509,9 @@ uses CSBWin's defaults.
   slot, once with timer function 1 for the object leaving and once with 0 for the object
   arriving (`Character.cpp:2917-2998`). Both halves of the pair write through it
   (`:1850`, `:1962`). The port's pair writes with `CharacterSystem.setPossessionDirect`.
+- `SoundFilter` (`ESL_SOUNDFILTER`, `doc/CSBwin-src/Sound.cpp:670`), which `QueueSound`
+  calls once it has the volume, and which may play the sound through a DSA instead
+  (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
 
 ### G3 ⏳ The wings
 

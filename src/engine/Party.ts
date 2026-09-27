@@ -352,13 +352,3 @@ export function setPartyFacing(party: PartyState, newFacing: number): void {
     }
 }
 
-/**
- * How many squares, across plus down, the party is from `(x, y)` on `level`, or `null`
- * when it is on another level: the distance `GameHost.playSound` takes.
- */
-export function getPartyDistance(party: PartyState, x: number, y: number, level: number): number | null {
-    if (party.position.z !== level) return null;
-    const dx = Math.abs((party.position.x ?? 0) - x);
-    const dy = Math.abs((party.position.y ?? 0) - y);
-    return dx + dy;
-}

@@ -34,8 +34,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
-import type { Champion, MovementResult } from '../src/engine/gameTypes';
-import { SoundIndex } from '../src/core/constants';
+import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
@@ -118,15 +117,14 @@ async function main(): Promise<void> {
       `${MonsterType[creature.creatureType]} at (${scene.mx},${scene.my})\n`,
   );
 
-  // `Game.move` does not play the bump sound — it puts a `soundId` on the
-  // `MovementResult` and `main.ts` plays it (its `wire`, `game.onMove`). So the sound has to
-  // be read off the result, not off a sound hook; the first draft of this tool
-  // counted hook calls and saw silence for the wall too.
-  let lastResult: MovementResult | undefined;
-  game.onMove((_success, result) => {
-    lastResult = result;
-  });
-  const soundOfLastMove = (): number | undefined => lastResult?.soundId;
+  // The bump's sound is the ordinal it queues, `QueueSound(18, d.partyX, d.partyY, 0)`.
+  let lastQueued: number | undefined;
+  const queueSound = game.sounds.queueSound.bind(game.sounds);
+  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, soundLevel) => {
+    lastQueued = ordinal;
+    queueSound(ordinal, mapX, mapY, deltaTime, soundLevel);
+  };
+  const soundOfLastMove = (): number | undefined => lastQueued;
 
   const stand = (): void => {
     game.party.state.position = new Position(scene!.px, scene!.py, level);
@@ -136,7 +134,7 @@ async function main(): Promise<void> {
   const rows: string[][] = [];
   const attempt = (label: string): { moved: boolean; soundId: number | undefined } => {
     stand();
-    lastResult = undefined;
+    lastQueued = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const pos = game.party.state.position;
     const soundId = soundOfLastMove();
@@ -171,7 +169,7 @@ async function main(): Promise<void> {
   if (wall) {
     game.party.state.position = new Position(wall.px, wall.py, level);
     game.party.setFacing(wall.facing);
-    lastResult = undefined;
+    lastQueued = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const pos = game.party.state.position;
     wallResult = { moved, soundId: soundOfLastMove() };
@@ -250,7 +248,7 @@ async function main(): Promise<void> {
     const standAtWall = (): void => {
       game.party.state.position = new Position(wall!.px, wall!.py, level);
       game.party.setFacing(wall!.facing);
-      lastResult = undefined;
+      lastQueued = undefined;
     };
     game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
     standAtWall();
@@ -726,7 +724,7 @@ async function main(): Promise<void> {
   check(blocked.soundId === undefined, 'the monster bump should be silent — CSBWin queues no sound for it');
   if (wall) {
     check(!wallResult.moved, 'the party should be blocked by the wall');
-    check(wallResult.soundId === SoundIndex.WALL_BUMP, 'the wall bump should carry a sound, unlike the monster bump');
+    check(wallResult.soundId === 18, 'the wall bump should queue sound 18, unlike the monster bump');
   }
   check(bumps === 20, 'twenty bumps should all be refused — the party never gets through');
 
@@ -737,7 +735,7 @@ async function main(): Promise<void> {
       `both champions on the wall side should lose 2 HP to the bump (lost ${wallHurt.front.join('/')})`,
     );
     check(wallHurt.back.every((n) => n === 0), `the back row should be unhurt (lost ${wallHurt.back.join('/')})`);
-    check(wallHurt.soundId === SoundIndex.WALL_BUMP, 'a bump that hurt someone should queue sound 18');
+    check(wallHurt.soundId === 18, 'a bump that hurt someone should queue sound 18');
     check(!emptyWall.moved, 'an empty party should still be stopped by the wall');
     check(emptyWall.soundId === undefined, 'a bump that hurt nobody should be silent — CSBWin gates the sound on k != 0');
   } else {

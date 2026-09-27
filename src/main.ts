@@ -244,7 +244,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         characterStats: game.characterStats,
     }, {
-        playSound,
+        queueSound: (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
         viewingFilter: (options) => game.processViewingFilter(options),
         onObjectMove: (position, object, place, unchangedRoom, facing) => {
             game.triggerObjectMove(position, object, place, unchangedRoom, facing);
@@ -363,15 +363,11 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
         getSoundVolume: () => sound.getVolume(),
     });
 
-    game.onMove((success, result) => {
+    game.onMove((success) => {
         const posInfo = game.getPositionInfo();
         console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo);
 
         if (success) updateDebug(posInfo || 'Moved');
-
-        if (result?.soundId !== undefined) {
-            sound.playSound(result.soundId, result.soundRateIdx);
-        }
 
         // Render 3D view after movement
         if (success) {

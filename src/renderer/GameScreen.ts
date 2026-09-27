@@ -86,7 +86,7 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
  * documented there, except `onPaletteSelected`.
  */
 export interface GameScreenHooks extends Required<Pick<UIState,
-  | 'playSound'
+  | 'queueSound'
   | 'viewingFilter'
   | 'onObjectMove'
   | 'onSpellCast'
@@ -149,7 +149,7 @@ export class GameScreen {
     });
     this.ui = ui;
     ui.characterStats = deps.characterStats;
-    ui.playSound = hooks.playSound;
+    ui.queueSound = hooks.queueSound;
     ui.viewingFilter = hooks.viewingFilter;
     ui.onObjectMove = hooks.onObjectMove;
     ui.onSpellCast = hooks.onSpellCast;

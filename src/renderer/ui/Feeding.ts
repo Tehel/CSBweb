@@ -13,7 +13,9 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
 import { descIndexForObject, resolveObjectNameIndex } from './Objects';
 import { UIState, nowMs } from './UIState';
-import { SoundIndex } from '@/core';
+
+/** The swallow, sound ordinal 8 (`fp.gulp = 8`, `doc/CSBwin-src/Character.cpp:4111`). */
+const SOUND_GULP = 8;
 
 /**
  * The derivation half of `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4062-4287`).
@@ -61,7 +63,7 @@ export function computeFeedParameters(
       fp.emptyFlask = false;
     } else {
       fp.waterValue = 800;
-      fp.gulp = SoundIndex.SWALLOW;
+      fp.gulp = SOUND_GULP;
       fp.emptyFlask = true;
     }
     fp.emptyHand = false;
@@ -73,7 +75,7 @@ export function computeFeedParameters(
     const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
     if (!rec) return null;
     fp.emptyHand = false;
-    fp.gulp = SoundIndex.SWALLOW;
+    fp.gulp = SOUND_GULP;
     derivePotionFeeding(fp, champ, rec.potionType | 0, rec.power | 0);
     return fp;
   }
@@ -83,7 +85,7 @@ export function computeFeedParameters(
     fp.emptyHand = true;
     fp.performFeeding = true;
     fp.chew = true;
-    fp.gulp = SoundIndex.SWALLOW;
+    fp.gulp = SOUND_GULP;
     return fp;
   }
 
@@ -132,7 +134,7 @@ export function handleMouthPress(ui: UIState): void {
     ui.dungeonState.deleteDBEntry(objectId as ObjectID);
   }
 
-  if (fp.gulp >= 0) ui.playSound?.(fp.gulp);
+  if (fp.gulp >= 0) ui.queueSound?.(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0);
 }
 
 export function getFoodValue(ui: UIState, nameIndex: number): number {

@@ -5,20 +5,19 @@
  * (`doc/CSBwin-src/CSBCode.cpp:1819`). The engine names sounds by **ordinal** into
  * `graphic232`'s sound table, not by raw SND item — `d.sound1772[soundNum]` — and
  * the table entry supplies the item number, the playback rate and the two distance
- * thresholds that decide how loud it is (or whether it plays at all).
+ * thresholds that decide how loud it is (or whether it plays at all). Every engine
+ * sound goes through here; nothing in `src/engine/` names a SND item.
  *
- * This exists because the engine previously had two unrelated habits: passing raw
- * SND ids from `SoundIndex` straight through, and (in the renderer) resolving an
- * ordinal by hand. The monster code is written against ordinals throughout, so the
- * resolution belongs in one place.
+ * CSBWin's sound is on `d.LoadedLevel`, the level its caller has loaded. The port loads
+ * no level, so a caller passes it as `level`. A caller that passes none is taken to be
+ * on the party's level, and some of them are not (`DEBT.md` C64).
  *
  * Two parts of CSBWin's version are **not ported**:
  *
  * - `deltaTime > 1` schedules the sound as a `TT_20` timer rather than playing it
- *   (`doc/CSBwin-src/CSBCode.cpp:1832-1848`); here it plays immediately.
- * - `SoundFilter` can hand the sound to a DSA instead (`doc/CSBwin-src/Sound.cpp:670`).
- *
- * Both are recorded in PLAN.md Phase 12.
+ *   (`doc/CSBwin-src/CSBCode.cpp:1832-1848`); here it plays immediately (`DEBT.md` C66).
+ * - `SoundFilter` can hand the sound to a DSA instead (`doc/CSBwin-src/Sound.cpp:670`,
+ *   `DEBT.md` G2).
  */
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { GameHost } from './GameHost';
@@ -36,26 +35,18 @@ export class SoundQueue {
   ) {}
 
   /**
-   * The level whose sounds are audible — CSBWin's `d.LoadedLevel`. Only the party's level
-   * is ever loaded in this port; CSBWin's can differ transiently while it walks another.
-   */
-  private loadedLevel(): number {
-    return this.party.state.position.z;
-  }
-
-  /**
-   * `QueueSound(ordinal, mapX, mapY, deltaTime)`.
+   * `QueueSound(ordinal, mapX, mapY, deltaTime)`, on `level`, CSBWin's `d.LoadedLevel`.
    *
    * A non-zero `deltaTime` means the sound is only audible when the loaded level is
    * the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). Volume comes from the
    * total *orthogonal* distance `|dx| + |dy|` compared against the entry's `byte6`
    * (fully loud at or below) and `byte7` (silent at or above).
    */
-  queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number): void {
+  queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level = this.party.state.position.z): void {
     const entry = this.soundTable[ordinal];
     if (!entry) return;
 
-    if (deltaTime !== 0 && this.loadedLevel() !== this.party.state.position.z) return;
+    if (deltaTime !== 0 && level !== this.party.state.position.z) return;
 
     const party = this.party.state.position;
     const distance = Math.abs(mapX - party.x) + Math.abs(mapY - party.y);

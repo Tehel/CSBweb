@@ -151,7 +151,8 @@ export interface UIState {
   championPortraitCache: WeakMap<object, IndexedBitmap>;
 
   /* ---- hooks out to the engine / host ---- */
-  playSound?: (soundId: number, rateIdx?: number, distance?: number) => void;
+  /** `QueueSound(ordinal, mapX, mapY, deltaTime)`, the engine's `SoundQueue`. */
+  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   onObjectMove?: ObjectMoveHandler;
   onSpellCast?: (chIdx: number, incantation: number[]) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */

@@ -2617,6 +2617,30 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
+## The `QueueSound` calls behind the switches, doors, teleporters, bump and gulp
+
+| Sound | CSBWin's call | Ordinal → SND item | Level |
+| --- | --- | --- | --- |
+| The door button | `QueueSound(1, d.partyX, d.partyY, 1)` (`doc/CSBwin-src/Mouse.cpp:1079`) | 1 → 534 | the party's |
+| A wall switch | `QueueSound(1, d.partyX, d.partyY, 1)` (`Mouse.cpp:542`) | 1 → 534 | the party's |
+| A pressure pad | `QueueSound(soundPRESSUREPAD, mapX, mapY, 1)` (`Code11f52.cpp:3864`), `soundPRESSUREPAD` = 1 (`CSB.h:623`) | 1 → 534 | the pad's |
+| The party through a teleporter | `QueueSound(soundTELEPORT, d.partyX, d.partyY, 0)` (`Code11f52.cpp:2964`), `soundTELEPORT` = 17 (`CSB.h:625`) | 17 → 547 | not tested (`deltaTime` 0) |
+| A group through a teleporter | `QueueSound(17, newX, newY, 1)` (`Code11f52.cpp:2985`) | 17 → 547 | the destination's |
+| A door's step | `QueueSound(2, x, y, 1)` (`Timer.cpp:1375`) | 2 → 535 | the timer's |
+| The wall bump | `QueueSound(18, d.partyX, d.partyY, 0)` (`CSBCode.cpp:8289`) | 18 → 549 | not tested (`deltaTime` 0) |
+| The gulp | `QueueSound(fp.gulp, d.partyX, d.partyY, 0)` (`Character.cpp:4485`), `fp.gulp = 8` (`:4111`, `:4126`, `:4282`) | 8 → 540 | not tested (`deltaTime` 0) |
+
+The level is the one `QueueSound` tests, `d.LoadedLevel`, and only when `deltaTime` is
+non-zero (`CSBCode.cpp:1827-1830`). A timer's is its own: `ProcessTimers` calls
+`LoadLevel(timeEnt.Level())` before it acts on each (`CSBCode.cpp:6416-6417`). A teleporter
+loads its destination level before either sound (`LoadLevel(curLevel)`,
+`Code11f52.cpp:2955`). The party's sound is queued once `d.partyX` and `d.partyY` are the
+destination's (`:2960-2961`), so it is at distance 0, and the group's before
+`TeleportMonster` (`:2988`). A door's step queues its sound on every step, unconditionally.
+The items and thresholds are `dm-atari/graphics.dat`'s sound table: ordinal 1 is heard up
+to 2 squares away (`byte6` 0, `byte7` 3), ordinal 2 up to 5 (3, 6), ordinal 17 up to 3
+(1, 4). `tools/dump-queue-sound.ts` and `tools/dump-party-collision.ts` check each call.
+
 ## A melee blow shatters a door two ticks late, and cancels the door's own timers
 
 `Attack.cpp`'s door arm — `BASH`, `HACK`, `BERZERK`, `KICK`, `SWING` or `CHOP` aimed at a

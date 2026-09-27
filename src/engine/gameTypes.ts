@@ -303,8 +303,6 @@ export interface MovementResult {
      * (doc/CSBwin-src/CSBCode.cpp:8315-8349).
      */
     stepped?: boolean;
-    soundId?: number;           // Optional sound effect to play
-    soundRateIdx?: number;      // Optional rate index for sound playback
 }
 
 /**

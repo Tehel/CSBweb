@@ -53,6 +53,7 @@ const CHECKS = [
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-vi-altar.ts' },
   { tool: 'dump-viewport-click.ts' },
+  { tool: 'dump-queue-sound.ts' },
   { tool: 'dump-crack-switch.ts' },
   { tool: 'dump-status-boxes.ts' },
   { tool: 'dump-mastery-panel.ts' },
