@@ -244,6 +244,8 @@ export class CharacterSystem {
     // champion is free again. Mostly negative: swinging leaves you open.
     champion.attackStatModifier = this.attackStatModifier(attackType);
     const result = this.ctx.systems.attack.attack(chIdx, attackType);
+    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): see `AttackSystem`.
+    if (this.ctx.systems.mainLoop.isRunningScript()) return result;
     champion.attackType = attackType;
     return result;
   }

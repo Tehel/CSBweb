@@ -25,8 +25,8 @@
  * to a signed 16-bit word, and several steps can leave the running total negative, so
  * the `sw()` calls are load-bearing rather than decoration.
  *
- * Lord Chaos's endgame starts in `_Fusion` (`:133`). ⏳ `_FusionSequence` (`:2220`), which
- * a boxed-in Lord Chaos starts, is not ported yet (`DEBT.md` G8).
+ * Lord Chaos's endgame is here too: `_Fusion` (`:133`), and `_FusionSequence` (`:2220`),
+ * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sw } from '../core/intCast';
@@ -36,6 +36,7 @@ import { getPartyChampion } from './Party';
 import { MonsterDamageResult } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
 import type { PartyAttackFilter } from './DsaSystem';
+import type { LoopScript } from './LoopState';
 import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
@@ -52,6 +53,14 @@ import {
   monsterWord16_8_11,
 } from '../renderer/csbwin/ObjectTables';
 
+
+/** `testdelay` (`doc/CSBwin-src/Attack.cpp:19`): every `if (testdelay) VBLDelay(MS2VBL(testdelay))`. */
+const TEST_DELAY = 500;
+
+/** `MS2VBL(milliseconds)` (`doc/CSBwin-src/Attack.cpp:17`): 16 ms a VBL, truncated. */
+function ms2vbl(milliseconds: number): number {
+  return Math.trunc(milliseconds / 16);
+}
 
 /**
  * `objNI_*` for the three named blades the damage formula singles out
@@ -937,8 +946,124 @@ export class AttackSystem {
         }
       }
     }
-    // "Sorry, Mr. Chaos.  You are toast." ⏳ `FusionSequence(_3_)` (`:259`) is not ported
-    // (`DEBT.md` G8, step 3).
+    // "Sorry, Mr. Chaos.  You are toast."
+    this.ctx.systems.mainLoop.runScript(this.fusionSequence());
+  }
+
+  /**
+   * `_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`), the end of the game, which holds
+   * the main loop to the credits (`LoopScript`): the game won, the light and the shields
+   * up, Lord Chaos made all but unkillable and turned to face the party, the Fluxcages on
+   * the party's square and his taken away, six fireballs of growing size and six dispells
+   * on him, his flicker between `mon_25` and `mon_LordChaos`, a last fireball and dispell,
+   * the Grey Lord in his place, every other monster on the level deleted, and after
+   * `VBLDelay(600)` the credits, with `d.CanRestartFromSavegame` cleared. Each step shows
+   * through `_ProcessTimersViewportAndSound`, which also runs the timers.
+   *
+   * ⏳ The screen's share is not ported yet (`DEBT.md` G8, step 3b): `ShowHideInventory(4)`
+   * and `WaitForButtonFlash` (`:2269-2273`), `MarkAllPortraitsChanged` (`:2279`),
+   * `d.Word1868` (`:2367`), and the texts of cell (0, 0) with "THE END." (`:2390-2426`).
+   */
+  private *fusionSequence(): LoopScript {
+    const mainLoop = this.ctx.systems.mainLoop;
+    const encounter = this.ctx.systems.missileEncounter;
+    const party = this.ctx.party.state;
+    const level = party.position.z;
+    this.ctx.state.gameWon = true;
+    party.brightness = 200;
+    // `SelectPaletteForLightLevel()`: the screen picks the palette from `d.Brightness`
+    // whenever it draws (`selectPaletteIndexForLightLevel`).
+    party.partyShield = 100;
+    party.spellShield = 100;
+    party.fireShield = 100;
+    yield* mainLoop.processTimersViewportAndSound();
+    const w4 = sw(party.position.x + DELTA_X[party.facing & 3]!);
+    const w6 = sw(party.position.y + DELTA_Y[party.facing & 3]!);
+    const monster = this.ctx.dungeon.getCreatureRecord(this.findFirstMonsterAt(w4, w6));
+    if (!monster) throw new Error('_FusionSequence: no monster in front of the party');
+    monster.hp[0] = 10000;
+    const monsterDamage = this.ctx.systems.monsterDamage;
+    monsterDamage.setMonsterPositionByte(monster, 255, level, false);
+    monsterDamage.setMonsterFacingByte(monster, (party.facing + 2) & 3, level, false);
+    const squares: Array<[number, number]> = [[party.position.x, party.position.y], [w4, w6]];
+    for (const [x, y] of squares) {
+      while (this.removeFluxcage(x, y, level)) { /* the next one */ }
+    }
+    yield* mainLoop.processTimersViewportAndSound();
+    const at = new Position(w4, w6, level);
+    for (let size = 55; size <= 255; size += 40) {
+      encounter.createCloud(RN_FIREBALL, size, w4, w6, at, 255);
+      yield* mainLoop.processTimersViewportAndSound();
+      yield ms2vbl(TEST_DELAY);
+    }
+    this.ctx.sounds.queueSound(17, w4, w6, 1);
+    monster.creatureType = MonsterType.mon_25;
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(TEST_DELAY);
+    for (let size = 55; size <= 255; size += 40) {
+      encounter.createCloud(RN_DISPELL_MISSILE, size, w4, w6, at, 255);
+      yield* mainLoop.processTimersViewportAndSound();
+      yield ms2vbl(TEST_DELAY);
+    }
+    for (let d6 = 3; d6 !== 0; d6--) {
+      for (let d7 = 4; d7 !== 0; d7--) {
+        this.ctx.sounds.queueSound(17, w4, w6, 1);
+        monster.creatureType = (d7 & 1) !== 0 ? MonsterType.mon_25 : MonsterType.mon_LordChaos;
+        for (let d5 = d6 - 1; d5 !== 0; d5--) {
+          yield* mainLoop.processTimersViewportAndSound();
+          yield ms2vbl(TEST_DELAY);
+        }
+      }
+    }
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(400);
+    encounter.createCloud(RN_FIREBALL, 0xff, w4, w6, at, 255);
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(800);
+    encounter.createCloud(RN_DISPELL_MISSILE, 0xff, w4, w6, at, 255);
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(800);
+    monster.creatureType = MonsterType.mon_GreyLord;
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(TEST_DELAY);
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(TEST_DELAY);
+    const map = this.ctx.dungeon.getMap(level)!;
+    for (let x = 0; x < map.descriptor.width; x++) {
+      for (let y = 0; y < map.descriptor.height; y++) {
+        if (this.findFirstMonsterAt(x, y) === OBJECT_ID_EOF) continue;
+        if (x === w4 && y === w6) continue;
+        // `ProcessMonsterDeleteFilter(…, DMW_Fusion)` first, which is not ported (`DEBT.md` G2).
+        monsterDamage.deleteMonster(level, x, y);
+      }
+    }
+    yield* mainLoop.processTimersViewportAndSound();
+    yield ms2vbl(TEST_DELAY);
+    yield 600;
+    mainLoop.clearCanRestartFromSavegame();
+    yield* mainLoop.showCreditsAndEnd();
+  }
+
+  /**
+   * One pass of `_FusionSequence`'s cage removal (`doc/CSBwin-src/Attack.cpp:2288-2302`):
+   * the first Fluxcage from the square's first drawable object on
+   * (`FindFirstDrawableObject`, `CSBCode.cpp:5140`) taken out of the square
+   * (`RemoveObjectFromRoom`). Says whether there was one.
+   */
+  private removeFluxcage(x: number, y: number, level: number): boolean {
+    const dungeon = this.ctx.dungeon;
+    const position = new Position(x, y, level);
+    let rn = dungeon.findFirstObject(position);
+    while (rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL && decodeObjectID(rn).category < DBType.CREATURE) {
+      rn = dungeon.getDBRecordLink(rn);
+    }
+    for (; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = dungeon.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
+      if (dungeon.getCloudRecord(rn)?.cloudType !== CloudType.CT_FLUXCAGE) continue;
+      dungeon.removeObjectFromCell(position, rn);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -1198,6 +1323,9 @@ export class AttackSystem {
         params.dataType = AttackDataType.ADT_Fusion;
         this.callAttackFilter(filter, params, 1);
         this.fusion(params.attackX, params.attackY);
+        // `_FusionSequence` has started: `Fusion(_8_, …)` never returns in CSBWin
+        // (`doc/CSBwin-src/Attack.cpp:1971`), so none of the attack's tail runs.
+        if (this.ctx.systems.mainLoop.isRunningScript()) return successfulAttack;
         break;
 
       case AttackType.atk_HEAL: {

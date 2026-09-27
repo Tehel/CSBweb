@@ -115,8 +115,10 @@ there he tries to escape, in shuffled directions: a square next to him first, th
 away, which lets him jump over the party or a monster but never through a Fluxcage or a
 wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md` → "The
 fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
-evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2220`), the ending itself, is not
-ported yet (`DEBT.md` G8).
+evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2220`), the ending itself, holds the
+main loop to the credits: `doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the
+game", ported as `AttackSystem.fusionSequence` except for its share of the screen
+(`DEBT.md` G8).
 
 ## The menu
 

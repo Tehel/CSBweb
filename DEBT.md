@@ -193,7 +193,7 @@ With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
 `ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
 The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
 `TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
-bash (`src/engine/AttackSystem.ts:1103`), a champion's wound
+bash (`src/engine/AttackSystem.ts:1228`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
 `:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
@@ -448,53 +448,38 @@ rather than being copied here.
 
 ### G8 ⏳ Lord Chaos's fusion endgame
 
-`_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`), the ending itself, is not ported.
-Everything before it is: the Fluxcage, `IsCellFluxcage`, `IsLordChaosHere`,
-`MonsterPerception`'s Fluxcage test, his wander step (`MonsterSystem.ts:712`,
-`Timer.cpp:2601`), his missiles (`MonsterAttack.ts:297`, `Monster.cpp:1045`), and `_Fusion`
-(`:133`), `atk_FUSE`'s dispell cloud and his escape from it (`AttackSystem.fusion`,
-evidence `tools/dump-fusion.ts`). A boxed-in Lord Chaos stays where he is, and nothing
-follows (`AttackSystem.ts:940`). The won screen the sequence ends in is ported too:
-`_FusionSequence` sets `d.Word11694` (`:2268`), which is `GameState.gameWon`, and ends in
-`ShowCredits(_20_, 1)` (`:2429`), which the host shows through `GameHost.showCredits(true)`
-(`showEndOfGame`, `src/main.ts`), as it does after the CSB win (`Game.gameTick`).
+The fusion is ported up to the screen: `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and
+`_FusionSequence` (`:2220`) are `AttackSystem.fusion` and `AttackSystem.fusionSequence`
+(`src/engine/AttackSystem.ts:967`), which holds the main loop as a `LoopScript` from the
+attack to the credits (`Game.runScript`, `Game.processTimersViewportAndSound`), and none of
+the attack's engine tail runs after it (`AttackSystem.ts:1328`, `CharacterSystem.ts:248`).
+Evidence: `tools/dump-fusion.ts`, `tools/dump-loop-script.ts`. Size L, in steps: 1 (the
+loop script), 2 (`_Fusion`) and 3a (`_FusionSequence`'s engine half) are done.
 
-Size L, in three steps, two of them done:
+**Step 3b, what is left: the screen's share.** Each item is marked ⏳ in
+`fusionSequence`'s comment.
 
-1. **Done: the loop can be held in a scripted sequence.** A `LoopScript` is a generator
-   that yields the length of each `VBLDelay`; `Game.runScript` runs one up to its first
-   delay and `Game.runFrame` runs the rest in place of its passes;
-   `Game.processTimersViewportAndSound` is `_ProcessTimersViewportAndSound` (`:2192`), and
-   `Game.showCreditsAndEnd` is a `ShowCredits(n, 1)` that never returns. The CSB win's
-   `VBLDelay(300)` runs on it (`Game.wonByTimers`). Evidence: `tools/dump-loop-script.ts`.
-2. **Done: `_Fusion`**, above.
-3. **Left: `_FusionSequence`**, started where `AttackSystem.fusion` ends.
-
-**Step 3.** `_FusionSequence`: the shields, the cages removed, the fireball and dispell
-clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey Lord, `d.Word1868` (which stops the teleporter field over a cloud being drawn,
-`Code51a4.cpp:2774`), every other monster on the level deleted (with
-`ProcessMonsterDeleteFilter`'s `DMW_Fusion`, G2), the texts of cell (0, 0) printed in order
-of their second character, "THE END", and `d.CanRestartFromSavegame = 0`. Each
-`if (testdelay) VBLDelay(MS2VBL(testdelay))` is a `yield 31` (`doc/PROVEN_FACTS.md` → "A
-`RESTARTABLE` sequence holds the main loop"). Three things to settle in the port:
-
-- **Reach.** The script's methods are `Game`'s, and `AttackSystem` reaches no `Game`: give
-  `GameSystems` the loop (a `mainLoop` that `Game` fills with itself, typed by an interface
-  of those methods and a way to clear `d.CanRestartFromSavegame`).
-- **The attack's tail.** In CSBWin the pass that took the click is suspended inside
-  `Fusion(_8_, …)` (`Attack.cpp:1971`) for good, so nothing after it in `Attack` runs.
-  `runScript` returns at the first `VBLDelay`, so the port's attack would go on to its
-  tail (the stamina, the disable time, the experience) unless it stops once a script
-  holds the loop.
-- **The inputs outside the queue.** While a script holds the loop, no queued click or key
-  is taken, but the save menu and the panel keys (tier H, "Three inputs bypass the mouse
+- `ShowHideInventory(4)` when a champion's inventory is open, and `WaitForButtonFlash`
+  (`:2269-2273`); `MarkAllPortraitsChanged` (`:2279`).
+- `d.Word1868 = 1` (`:2367`), which stops the `DrawTeleporter` that follows
+  `DrawClouds` when that returns a record (`Code51a4.cpp:2769-2782`). A renderer change:
+  run the frames.
+- The texts of cell (0, 0), up to eight, printed in the order of their second character
+  with `TAG00187e`, `PrintLines(15, …)`, a view and `VBLDelay(780)` each, then "THE END."
+  between linefeeds (`:2390-2426`). `MessageSink` has no direct `PrintLines`, only
+  `quePrintLines`. `TAG00187e` is in `Hint.cpp:1816` and writes only the hint oracle's
+  `f.` state: check whether it is linked into the game before porting it as a no-op.
+- The UI's tail. `executeAttack` in `src/renderer/ui/Attack.ts:169` closes the attack menu
+  after the engine returns, where CSBWin's caller is suspended with it.
+- The inputs outside the queue. While a script holds the loop no queued click or key is
+  taken, but the save menu and the panel keys (tier H, "Three inputs bypass the mouse
   queue") are gated only on `Game.mainLoopHasReturned` (`src/ui/events.ts:31`, `:227`),
-  so they still act. The CSB win's 300 VBLs share the gap; the fusion's twenty-odd seconds
-  make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
+  so they still act. The CSB win's 300 VBLs share the gap; the fusion's 1593 VBLs and
+  more make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
   `VBLDelay` lets the UI do.
 
-Evidence: `tools/dump-fusion.ts`'s boxed-in case, carried on through the sequence to the
-credits.
+Evidence: `tools/dump-fusion.ts`'s boxed-in case, which counts 1593 VBLs to the credits
+now, then counts the texts' `VBLDelay(780)`s and what they print.
 
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
 

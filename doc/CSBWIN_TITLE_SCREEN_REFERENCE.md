@@ -498,8 +498,8 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 `d.GameIsLost` (`CSBCode.cpp:11322-11326`); `MainLoop` itself when `ProcessTimers` reports the
 CSB win (`:626-633`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1252`). `_FusionSequence`
 ends in it too (`Attack.cpp:2429`). The port has the first two
-(`src/renderer/intro/ShowCredits.ts`, `Game.gameTick`); `_FusionSequence` is `DEBT.md` G8, and
-"SAVE AND QUIT" is `PLAN.md` Phase 10.
+(`src/renderer/intro/ShowCredits.ts`, `Game.gameTick`) and the fusion's
+(`AttackSystem.fusionSequence`); "SAVE AND QUIT" is `PLAN.md` Phase 10.
 
 **The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2680`). The tick
 has run its timers; at `tag000730` it runs `WaitForButtonFlash`, `StartQueuedSound` and

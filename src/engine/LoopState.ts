@@ -46,6 +46,33 @@ export interface LoopFlags {
   gameFrozen: boolean;
 }
 
+/**
+ * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as
+ * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2220) and `MainLoop`'s wait after the
+ * CSB win (`CSBCode.cpp:627-633`). It yields the length of each `VBLDelay`, in VBLs, and
+ * does its work between them. `MainLoop.runScript` starts one, and `Game.runFrame` runs it in
+ * place of the loop's pass. A generator rather than the intro's `async` (`IntroHost`) because
+ * `runFrame` is stepped by `tools/`, one VBL at a time.
+ */
+export type LoopScript = Generator<number, void, void>;
+
+/**
+ * What a system asks of the main loop itself, which `Game` is (`ctx.systems.mainLoop`):
+ * to be held in a `LoopScript`, and the calls such a script makes.
+ */
+export interface MainLoop {
+  /** Hold the loop in `script`: run it now, up to its first `VBLDelay`. */
+  runScript(script: LoopScript): void;
+  /** Whether a script holds the loop. */
+  isRunningScript(): boolean;
+  /** `_ProcessTimersViewportAndSound` (doc/CSBwin-src/Attack.cpp:2192). */
+  processTimersViewportAndSound(): LoopScript;
+  /** `ShowCredits(n, 1)` from inside the loop, which never returns. */
+  showCreditsAndEnd(): LoopScript;
+  /** `d.CanRestartFromSavegame = 0`. */
+  clearCanRestartFromSavegame(): void;
+}
+
 export function createLoopFlags(): LoopFlags {
   return { clockTickSet: false, clockTickCleared: false, newPartyLevel: -1, clockRunning: true, gameFrozen: false };
 }

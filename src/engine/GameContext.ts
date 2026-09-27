@@ -20,7 +20,7 @@ import { NameIndex } from './objectIndex';
 import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { MouseQueue } from './MouseQueue';
-import { createLoopFlags, type LoopFlags } from './LoopState';
+import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
@@ -66,6 +66,8 @@ export interface GameSystems {
   character: CharacterSystem;
   mouse: MouseSystem;
   hallOfChampions: HallOfChampions;
+  /** The main loop itself (`Game`), for the scripts that hold it. */
+  mainLoop: MainLoop;
 }
 
 export interface GameContext {

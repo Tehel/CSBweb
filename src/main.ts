@@ -255,6 +255,8 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         showCredits: (word11694) => {
             if (screen) void showEndOfGame(game, screen, sound, word11694);
         },
+        // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
+        drawViewport: () => renderView(),
     });
 
     screen = new GameScreen(gameCanvasEl, {

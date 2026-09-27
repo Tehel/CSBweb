@@ -63,6 +63,12 @@ export interface GameHost {
    * by then (`Game.mainLoopHasReturned`).
    */
   showCredits(word11694: boolean): void;
+  /**
+   * `DrawViewport(d.partyFacing, d.partyX, d.partyY); display();` from a script's tick,
+   * `_ProcessTimersViewportAndSound` (`doc/CSBwin-src/Attack.cpp:2205-2206`), which runs
+   * none of the main loop's tick listeners.
+   */
+  drawViewport(): void;
 }
 
 /**
@@ -90,5 +96,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),
     showCredits: host.showCredits ?? (() => {}),
+    drawViewport: host.drawViewport ?? (() => {}),
   };
 }

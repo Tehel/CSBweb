@@ -28,7 +28,8 @@ import { resolve } from 'node:path';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { MessageSink } from '../src/engine/ActuatorSystem';
-import { WON_GAME_VBLS, type Game, type LoopScript } from '../src/engine/Game';
+import { WON_GAME_VBLS, type Game } from '../src/engine/Game';
+import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 

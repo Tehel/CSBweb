@@ -16,8 +16,12 @@
  *    the square behind the party is: he jumps over the party (`:200-212`).
  * 5. **Caged on two sides, a monster on the third.** He jumps over the monster: the
  *    near square may be occupied, only not a Fluxcage or a wall.
- * 6. **Boxed in.** The square behind the party is stone: he stays, "toast" (`:213`).
- *    The sequence that follows is not ported yet (`DEBT.md` G8, step 3).
+ * 6. **Boxed in.** The square behind the party is stone: he stays, "toast" (`:213`),
+ *    and `_FusionSequence` (`:2220`) holds the loop to the credits, `executeAttack`'s
+ *    tail left undone: the game won, the light and shields up, the cages on his square
+ *    and the party's gone, the type at each of its 33 views, sound 17 thirteen times,
+ *    every other monster on the level deleted, and `ShowCredits(1)` after its 1593 VBLs
+ *    (`doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the game").
  * 7. **A wall next door** blocks the square two away in that direction, open as it is.
  *
  * Run: `npx tsx tools/dump-fusion.ts`
@@ -64,6 +68,11 @@ function champion(): Champion {
 
 interface Arena {
   game: Game;
+  /** `showCredits` as the host was asked it. */
+  credits: boolean[];
+  /** Called on each `drawViewport`, the host's share of `_ProcessTimersViewportAndSound`. */
+  drawn: () => void;
+  frames: number;
   /** The random seed right after `atk_FUSE`'s dispell cloud: where `_Fusion`'s shuffle starts. */
   seedAfterCloud: number | null;
 }
@@ -78,7 +87,11 @@ function arena(withLordChaos: boolean): Arena {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const game = newGame(data, stockGraphics());
+  const hooks = { credits: [] as boolean[], drawn: (): void => {} };
+  const game = newGame(data, stockGraphics(), {
+    showCredits: (word11694) => hooks.credits.push(word11694),
+    drawViewport: () => a.drawn(),
+  });
   game.setRandomSeed(0x12345678);
   game.addChampion(champion());
   for (let x = CX - 3; x <= CX + 3; x++) {
@@ -93,7 +106,7 @@ function arena(withLordChaos: boolean): Arena {
   game.party.state.facing = 0;
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
-  const a: Arena = { game, seedAfterCloud: null };
+  const a: Arena = { game, seedAfterCloud: null, credits: hooks.credits, drawn: hooks.drawn, frames: 0 };
   const encounter = game.ctx.systems.missileEncounter;
   const createCloud = encounter.createCloud.bind(encounter);
   encounter.createCloud = (...args: Parameters<typeof createCloud>): void => {
@@ -227,33 +240,124 @@ function checkOverAMonster(): void {
   check(at !== null && at.x === CX - 2 && at.y === CY, 'he lands two squares west, past the monster');
 }
 
+/**
+ * The creature type at each `_ProcessTimersViewportAndSound` of `_FusionSequence`
+ * (`Attack.cpp:2280-2388`): Lord Chaos through the six fireballs, `mon_25` through the six
+ * dispells, the flicker (for `D6W` 3, 2 and 1, four types each shown `D6W - 1` times,
+ * `mon_25` on odd `D7w`), `mon_25` for the last fireball and dispell, then the Grey Lord.
+ */
+function expectedTypes(): number[] {
+  const types: number[] = [];
+  const lc = MonsterType.mon_LordChaos;
+  const m25 = MonsterType.mon_25;
+  for (let n = 0; n < 8; n++) types.push(lc);
+  for (let n = 0; n < 7; n++) types.push(m25);
+  for (let d6 = 3; d6 !== 0; d6--) {
+    for (let d7 = 4; d7 !== 0; d7--) {
+      for (let d5 = d6 - 1; d5 !== 0; d5--) types.push((d7 & 1) !== 0 ? m25 : lc);
+    }
+  }
+  types.push(m25, m25, m25);
+  types.push(MonsterType.mon_GreyLord, MonsterType.mon_GreyLord, MonsterType.mon_GreyLord);
+  return types;
+}
+
+/** The VBLs of `_FusionSequence`'s `VBLDelay`s, before the texts of cell (0, 0) (`Attack.cpp:2305-2389`, `:2427`). */
+const SEQUENCE_VBLS = 6 * 31 + 31 + 6 * 31 + (4 * 2 + 4 * 1) * 31 + 25 + 50 + 50 + 31 + 31 + 31 + 600;
+
 function checkBoxedIn(): void {
   console.log('');
-  console.log('=== 6. boxed in: toast (Attack.cpp:213) ===');
+  console.log('=== 6. boxed in: toast (Attack.cpp:213), and _FusionSequence (:2220) to the credits ===');
   const a = arena(true);
-  cage(a.game, CX, CY - 1);
-  cage(a.game, CX + 1, CY);
-  cage(a.game, CX - 1, CY);
-  setRoom(a.game, CX, CY + 2, RoomType.STONE);
-  const at = fuse(a);
+  const game = a.game;
+  cage(game, CX, CY - 1);
+  cage(game, CX + 1, CY);
+  cage(game, CX - 1, CY);
+  cage(game, CX, CY);
+  cage(game, CX, CY + 1);
+  setRoom(game, CX, CY + 2, RoomType.STONE);
+  game.savedGameRead();
+  const types: number[] = [];
+  const lordChaos = game.dungeonState.getCreatureRecord(game.dungeonState.findFirstMonster(new Position(CX, CY, LEVEL)))!;
+  a.drawn = () => types.push(lordChaos.creatureType);
+  const sounds: number[] = [];
+  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
+  game.ctx.sounds.queueSound = (ordinal, x, y, delta, level) => {
+    sounds.push(ordinal);
+    queueSound(ordinal, x, y, delta, level);
+  };
+  const others = monstersOnLevel(game) - 1;
+  const champion = game.party.state.champions[0]!;
+  const stamina = champion.attributes.stamina;
+  const attackType = champion.attackType;
+  const tick = game.state.tickCount;
+
+  game.ctx.systems.character.executeAttack(0, AttackType.atk_FUSE);
+  const at = lordChaosAt(game);
+  console.log(`  Lord Chaos ${at ? `at (${at.x},${at.y})` : 'nowhere'}; hit points ${lordChaos.hp[0]}; ticks ${game.state.tickCount - tick}`);
   check(at !== null && at.x === CX && at.y === CY, 'he stays where he is');
-  check(!movementTimerAt(a.game, CX, CY), 'and no movement timer starts for him');
-  check(dispellClouds(a.game, CX, CY) === 1, 'under the dispell cloud');
+  check(!movementTimerAt(game, CX, CY), 'and no movement timer starts for him');
+  check(game.isRunningScript(), '_FusionSequence holds the loop');
+  check(game.state.gameWon, 'd.Word11694 is set');
+  const party = game.party.state;
+  check(party.brightness === 200 && party.partyShield === 100 && party.spellShield === 100 && party.fireShield === 100,
+    'd.Brightness is 200, and the three shields 100');
+  check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
+  check(!game.attackSystem.isCellFluxcage(CX, CY) && !game.attackSystem.isCellFluxcage(CX, CY + 1),
+    'the Fluxcages on his square and the party\'s are gone');
+  check(game.attackSystem.isCellFluxcage(CX, CY - 1) && game.attackSystem.isCellFluxcage(CX + 1, CY),
+    'and the ones around him stay');
+  check(champion.attributes.stamina === stamina && champion.attackType === attackType,
+    'the attack\'s tail does not run: no stamina spent, no attack type recorded');
+
+  let creditsAt = 0;
+  for (let n = 1; n <= SEQUENCE_VBLS + 20; n++) {
+    a.frames++;
+    game.runFrame(1_000_000 + a.frames * 250);
+    if (a.credits.length > 0 && creditsAt === 0) creditsAt = n;
+  }
+  const want = expectedTypes();
+  console.log(`  types ${types.join(' ')}`);
+  console.log(`  credits ${creditsAt} VBLs after the attack (expected ${SEQUENCE_VBLS}); asked ${JSON.stringify(a.credits)}; ticks ${game.state.tickCount - tick}`);
+  console.log(`  sound 17 ${sounds.filter((n) => n === 17).length} times; monsters on the level ${monstersOnLevel(game)} (other than him before: ${others})`);
+  check(types.join() === want.join(), `${want.length} views, each with the type the sequence gives him then`);
+  check(game.state.tickCount - tick === want.length, 'each view is a turn of the clock');
+  check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
+  check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
+  check(creditsAt === SEQUENCE_VBLS, 'ShowCredits(1) after the VBLs the sequence waits');
+  check(a.credits.join() === 'true', 'once, with d.Word11694 set');
+  check(!game.canRestartFromSavegame() && game.mainLoopHasReturned(), 'd.CanRestartFromSavegame is cleared, and MainLoop is over');
+}
+
+function monstersOnLevel(game: Game): number {
+  const map = game.dungeonState.getMap(LEVEL)!;
+  let n = 0;
+  for (let x = 0; x < map.descriptor.width; x++) {
+    for (let y = 0; y < map.descriptor.height; y++) {
+      if (game.dungeonState.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) n++;
+    }
+  }
+  return n;
+}
+
+function greyLordAt(game: Game, x: number, y: number): boolean {
+  const rn = game.dungeonState.findFirstMonster(new Position(x, y, LEVEL));
+  return rn !== OBJECT_ID_EOF && game.dungeonState.getCreatureRecord(rn)?.creatureType === MonsterType.mon_GreyLord;
 }
 
 function checkWall(): void {
   console.log('');
   console.log('=== 7. a wall next door blocks the square beyond it ===');
-  const a = arena(true);
-  cage(a.game, CX, CY - 1);
-  cage(a.game, CX + 1, CY);
-  setRoom(a.game, CX - 1, CY, RoomType.STONE);
-  setRoom(a.game, CX, CY + 2, RoomType.STONE);
-  const at = fuse(a);
-  check(at !== null && at.x === CX && at.y === CY, 'he stays: the square two west is open, but the one next to him is a wall');
-  setRoom(a.game, CX - 1, CY, RoomType.FALSEWALL);
-  const b = fuse(a);
-  check(b !== null && b.x === CX && b.y === CY, 'and so is a false wall');
+  for (const wall of [RoomType.STONE, RoomType.FALSEWALL]) {
+    const a = arena(true);
+    cage(a.game, CX, CY - 1);
+    cage(a.game, CX + 1, CY);
+    setRoom(a.game, CX - 1, CY, wall);
+    setRoom(a.game, CX, CY + 2, RoomType.STONE);
+    const at = fuse(a);
+    check(at !== null && at.x === CX && at.y === CY,
+      `he stays: the square two west is open, but the one next to him is ${wall === RoomType.STONE ? 'a wall' : 'a false wall'}`);
+  }
 }
 
 function main(): void {

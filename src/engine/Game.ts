@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { createLoopFlags, freeze, setClockTick, thaw, wakeUp } from './LoopState';
+import { createLoopFlags, freeze, setClockTick, thaw, wakeUp, type LoopScript, type MainLoop } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -61,16 +61,6 @@ export interface MouseEventHandlers {
 export const WON_GAME_VBLS = 300;
 
 /**
- * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as
- * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2220) and `MainLoop`'s wait after the
- * CSB win (`CSBCode.cpp:627-633`). It yields the length of each `VBLDelay`, in VBLs, and
- * does its work between them. `Game.runScript` starts one, and `runFrame` runs it in place
- * of the loop's pass. A generator rather than the intro's `async` (`IntroHost`) because
- * `runFrame` is stepped by `tools/`, one VBL at a time.
- */
-export type LoopScript = Generator<number, void, void>;
-
-/**
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:7946-7951):
  * 1-2 turn left and right; 3-6 step forward, right, backward, left, so `num - 3` is the
  * step's direction relative to the party's facing. The on-screen arrows are these
@@ -91,7 +81,7 @@ const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
 /**
  * Game class - main game controller
  */
-export class Game {
+export class Game implements MainLoop {
     state: GameState;
     party: Party;
     dungeonState: DungeonState;
@@ -264,6 +254,7 @@ export class Game {
             character: this.character,
             mouse: this.mouse,
             hallOfChampions: this.hallOfChampions,
+            mainLoop: this,
         } satisfies GameSystems);
     }
 
@@ -339,6 +330,11 @@ export class Game {
     /** `d.CanRestartFromSavegame`. */
     canRestartFromSavegame(): boolean {
         return this.canRestart;
+    }
+
+    /** `d.CanRestartFromSavegame = 0`, as `_FusionSequence` ends (doc/CSBwin-src/Attack.cpp:2428). */
+    clearCanRestartFromSavegame(): void {
+        this.canRestart = false;
     }
 
     /**
@@ -559,15 +555,16 @@ export class Game {
      * (`wonByTimers`); then `d.Time++` and `scrollingText.ClockTick()`. Not the rest of the
      * main loop's tick: no input, no periodic update, no print-queue entry. The port turns
      * the clock before the timers, as `gameTick` does (`DEBT.md` C68). `DrawViewport` and
-     * `display` are the frame callbacks', at the next VBL; `StartQueuedSound` has no
-     * counterpart, since the port plays a sound when it is queued (C66); nor have the
-     * overlay's timeout and `parameterMessageSequence`, which the port does not model.
+     * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart,
+     * since the port plays a sound when it is queued (C66); nor have the overlay's
+     * timeout and `parameterMessageSequence`, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
         this.state.tickCount++;
         if (this.timerSystem.processTimers(this.state.tickCount)) {
             yield* this.wonByTimers();
         }
+        this.ctx.host.drawViewport();
         this.ctx.host.messages.clockTick(this.state.tickCount);
     }
 

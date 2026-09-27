@@ -3907,3 +3907,35 @@ In order:
   (`:259`).
 
 The port: `AttackSystem.fusion`. Evidence: `tools/dump-fusion.ts`.
+
+## `_FusionSequence`: the end of the game
+
+`_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`) is called only from `_Fusion` with
+Lord Chaos boxed in (`:259`), and `Fusion(_8_, …)` in `_Attack` (`:1971`) and
+`Attack(_1_, …)` in `_ExecuteAttack` (`Character.cpp:4972`) never return from it: nothing
+after them runs. In order:
+
+- `d.Word11694 = 1`; the inventory hidden if open; `WaitForButtonFlash`; `d.Brightness =
+  200` and `SelectPaletteForLightLevel`; the party, spell and fire shields all 100;
+  `MarkAllPortraitsChanged` (`:2268-2279`).
+- The monster on the square in front: `hitPoints6[0] = 10000`, position byte 255, and
+  facing byte `(d.partyFacing + 2) & 3` (`:2281-2287`). With an `ITEM16` that is the raw
+  value, not the byte's four copies (`SetMonsterFacingByte`, `Code11f52.cpp:237-252`).
+- Every Fluxcage on the party's square, then on his, removed, one per scan from the
+  square's first drawable object (`:2288-2302`).
+- Six fireballs on his square, sizes 55 to 255 by 40, each shown and followed by
+  `VBLDelay(MS2VBL(500))`, 31 VBLs (`:2305-2313`); sound 17, `mon_25`, 31 VBLs
+  (`:2314-2318`); six dispells the same way (`:2319-2326`).
+- The flicker: for `D6W` 3, 2, 1 and `D7w` 4 down to 1, sound 17 and the type set to
+  `mon_25` on odd `D7w`, `mon_LordChaos` (23) on even, each shown `D6W - 1` times with 31
+  VBLs: twelve views, and the last four type changes are never shown (`:2327-2352`).
+- A size-255 fireball, 25 VBLs before it and 50 after, and a size-255 dispell, 50 VBLs
+  after (`:2353-2363`); `mon_GreyLord`, 31 VBLs; `d.Word1868 = 1`, 31 VBLs (`:2364-2369`).
+- Every monster on the level but his deleted, after `ProcessMonsterDeleteFilter` with
+  `DMW_Fusion` (`:2370-2387`), 31 VBLs (`:2388-2389`).
+- The texts of cell (0, 0), up to eight, printed in the order of their second character,
+  'A' first, each with `VBLDelay(780)` (`:2390-2423`); "THE END." between linefeeds, then
+  `VBLDelay(600)`, `d.CanRestartFromSavegame = 0` and `ShowCredits(1)` (`:2424-2429`).
+
+Each view is a `_ProcessTimersViewportAndSound`: 33 of them before the texts, and 1593 VBLs.
+The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`.
