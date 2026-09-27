@@ -320,6 +320,11 @@ export class GameScreen {
     return saveMenuWheel(this.ui, delta);
   }
 
+  /** `CHARDESC.portrait`, as the status box draws it; the won screen draws it too. */
+  championPortrait(champion: Champion): IndexedBitmap | null {
+    return getChampionPortrait(this.ui, champion);
+  }
+
   /**
    * `AddCharacter`'s portrait blit, deferred to save time.
    *

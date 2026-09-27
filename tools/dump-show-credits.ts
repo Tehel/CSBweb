@@ -27,6 +27,12 @@
  *    written yet: black. Graphic 208 and `d.Word132` / `d.Word140` are canaries for each
  *    other, as graphic 6 and `d.Word108` are.
  *
+ * 5. **The CSB win.** A stone-room timer on an actuator of type 18, at any position, sets
+ *    `d.Word11694`, clears `d.CanRestartFromSavegame` and makes `ProcessTimers` return at
+ *    once, the timers behind it left queued (`Timer.cpp:2366-2372`, `CSBCode.cpp:6459-6464`).
+ *    The tick ends there, and `MainLoop` waits 300 VBLs, their `vblInterrupt` and no pass,
+ *    before `ShowCredits(1)` (`CSBCode.cpp:627-633`).
+ *
  * Run: `npx tsx tools/dump-show-credits.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -56,6 +62,10 @@ import {
   showCredits,
 } from '../src/renderer/intro/ShowCredits';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
+import { DBType, decodeObjectID, OBJECT_ID_EOF, RoomType, type ObjectID } from '../src/core/types';
+import { setActuatorType } from '../src/data/actuatorHelpers';
+import { WON_GAME_VBLS } from '../src/engine/Game';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 
@@ -104,7 +114,7 @@ function watchedGame(healths: number[]): Watched {
     printNextQueued: () => {},
     vblInterrupt: () => { w.vbls++; },
   };
-  w.game = newGame(data, stockGraphics(), { messages, showCredits: (lost) => w.credits.push(lost) });
+  w.game = newGame(data, stockGraphics(), { messages, showCredits: (word11694) => w.credits.push(word11694) });
   w.game.setRandomSeed(0x12345678);
   healths.forEach((health, i) => w.game.addChampion(champion(i, health)));
   w.game.party.state.position = new Position(6, 14, 2);
@@ -132,7 +142,7 @@ function runPastDeath(label: string, w: Watched, limit: number): number {
     if (!f.lost) continue;
     lostAt = w.frames;
     console.log([label, `frame ${w.frames}`, `tick ${f.tick}`, `credits ${f.credits}`, `clockTick ${f.clockTicks - before}`].join('\t'));
-    check(f.credits === 1 && w.credits[0] === true, `${label}: ShowCredits(1) is asked for once, in the frame of the death`);
+    check(f.credits === 1 && w.credits[0] === false, `${label}: ShowCredits(1) is asked for once, in the frame of the death, d.Word11694 clear`);
     check(f.clockTicks === before, `${label}: the tick of death runs no scrollingText.ClockTick()`);
     check(w.game.mainLoopHasReturned(), `${label}: MainLoop has returned`);
   }
@@ -576,8 +586,66 @@ async function checkWon(): Promise<void> {
   check(inkIn(pixels, 87 + 24, 14, 1, 9) === 0, 'nor anything in the 5 pixels after ALEX');
 }
 
+/* ------------------------------------------------------- 5. the CSB win ---- */
+
+function checkCsbWin(): void {
+  console.log('');
+  console.log('=== the CSB win: actuator type 18 (Timer.cpp:2366-2372, CSBCode.cpp:627-633) ===');
+  const w = watchedGame([200]);
+  const game = w.game;
+  const dungeon = game.dungeonState;
+  // The first actuator on a wall of the real dungeon, made type 18.
+  let found: { rn: ObjectID; x: number; y: number; z: number } | null = null;
+  for (let z = 0; z < dungeon.getMapCount() && !found; z++) {
+    const map = dungeon.getMap(z)!;
+    for (let x = 0; x < map.cellFlags.length && !found; x++) {
+      for (let y = 0; y < map.cellFlags[x]!.length && !found; y++) {
+        if (((map.cellFlags[x]![y]! >> 5) & 7) !== RoomType.STONE) continue;
+        for (let rn = dungeon.findFirstObject(new Position(x, y, z)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+          if (decodeObjectID(rn).category === DBType.ACTUATOR) { found = { rn, x, y, z }; break; }
+        }
+      }
+    }
+  }
+  if (!found) throw new Error('no wall actuator in dungeon.dat');
+  const { rn, x, y, z } = found;
+  setActuatorType(dungeon.getActuatorRecord(rn)!, 18);
+  // A position other than the actuator's: type 18 ignores it. And a timer due with it,
+  // behind it in the queue.
+  const due = game.state.tickCount + 1;
+  const otherPos = (decodeObjectID(rn).position + 1) & 3;
+  game.timerQueue.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);
+  game.timerQueue.createTimer(TimerFunction.TT_OPENROOM, 0, 0, 0, 0, due, z);
+  game.savedGameRead();
+  console.log(`actuator ${rn.toString(16)} at (${x},${y}) level ${z}, position ${decodeObjectID(rn).position}; the timer's ${otherPos}`);
+
+  const clockTicks = w.clockTicks;
+  const f = frame(w);
+  const queued = game.timerQueue.getTimers().length;
+  console.log(`the tick of the win: tick ${f.tick}, timers ${queued}, credits ${f.credits}`);
+  check(f.tick === due && f.credits === 0 && !game.mainLoopHasReturned(), 'the tick of the win asks for nothing yet');
+  check(game.timerQueue.getTimers().some((t) => t.function === TimerFunction.TT_OPENROOM && t.time === due),
+    'ProcessTimers returned at once: the timer behind it is still queued');
+  check(w.clockTicks === clockTicks, 'and the rest of the tick did not run: no scrollingText.ClockTick()');
+  check(!game.canRestartFromSavegame(), 'd.CanRestartFromSavegame is cleared');
+
+  let creditsAt = 0;
+  const vbls = w.vbls;
+  for (let n = 1; n <= WON_GAME_VBLS + 20; n++) {
+    const g = frame(w);
+    if (g.credits > 0 && creditsAt === 0) creditsAt = n;
+  }
+  console.log(`credits ${creditsAt} VBLs after the tick; tick ${game.state.tickCount}; vblInterrupts ${w.vbls - vbls}; asked ${JSON.stringify(w.credits)}`);
+  check(creditsAt === WON_GAME_VBLS, 'ShowCredits(1) is asked for 300 VBLs after the tick of the win');
+  check(w.credits.length === 1 && w.credits[0] === true, 'once, with d.Word11694 set');
+  check(game.state.tickCount === due, 'no tick runs meanwhile, nor after');
+  check(w.vbls - vbls === WON_GAME_VBLS, 'and the 300 VBLs run their vblInterrupt, and no more after');
+  check(game.mainLoopHasReturned(), 'MainLoop is over');
+}
+
 async function main(): Promise<void> {
   checkTickOfDeath();
+  checkCsbWin();
   await checkScreen();
   await checkRestart();
   await checkWon();

@@ -57,6 +57,9 @@ export interface MouseEventHandlers {
     unclick(): void;
 }
 
+/** `VBLDelay(_1_, 300);  //about 5 seconds` after the CSB win (doc/CSBwin-src/CSBCode.cpp:630). */
+export const WON_GAME_VBLS = 300;
+
 /**
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:7946-7951):
  * 1-2 turn left and right; 3-6 step forward, right, backward, left, so `num - 3` is the
@@ -182,11 +185,17 @@ export class Game {
     private running: boolean = false;
     private lastTickTime: number = 0;
     private animationFrameId: number | null = null;
-    /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`). */
+    /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /**
-     * `d.CanRestartFromSavegame`: set by a save and by a load, cleared by a new game. With
-     * it, the end of a lost game offers "RESTART THIS GAME" (`ShowCredits.ts`).
+     * The VBLs left of `MainLoop`'s `VBLDelay(_1_, 300)` once `ProcessTimers` has won the
+     * game, before its `ShowCredits(_2_, 1)` (doc/CSBwin-src/CSBCode.cpp:627-633); 0 else.
+     */
+    private wonGameDelay = 0;
+    /**
+     * `d.CanRestartFromSavegame`: set by a save and by a load, cleared by a new game and by
+     * the CSB win. With it, the end of a lost game offers "RESTART THIS GAME"
+     * (`ShowCredits.ts`).
      */
     private canRestart = false;
 
@@ -376,6 +385,19 @@ export class Game {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
         this.state.currentTime = currentTime;
+        if (this.wonGameDelay > 0) {
+            // `VBLDelay(_1_, 300)` after the win: the VBLs go by, with their
+            // `vblInterrupt`, and the loop makes no pass. Then `ShowCredits(_2_, 1)`, which
+            // never returns (doc/CSBwin-src/CSBCode.cpp:629-632).
+            this.ctx.host.messages.vblInterrupt();
+            for (const callback of this.onFrameCallbacks) callback(this);
+            if (--this.wonGameDelay === 0) {
+                this.mainLoopReturned = true;
+                this.stop();
+                this.ctx.host.showCredits(this.state.gameWon);
+            }
+            return;
+        }
         // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
         // (doc/CSBwin-src/system.cpp:624-630, CSBUI.cpp:1253-1272): the message strip's
         // scroll moves on first. It runs frozen or not, and under the save menu.
@@ -401,6 +423,8 @@ export class Game {
                 this.gameTick();
             }
             this.lastTickTime = currentTime;
+            // Won: `MainLoop` is in its `VBLDelay`, and this pass goes no further.
+            if (this.wonGameDelay > 0) return;
         }
         // `tag0007c8` (doc/CSBwin-src/CSBCode.cpp:714-721): one print-queue entry a pass,
         // ticked or not, frozen or not. The save menu holds the loop in `DisplayDiskMenu`
@@ -431,7 +455,15 @@ export class Game {
         // in this tick.
         this.loadNewPartyLevel();
         do {
-            this.timerSystem.processTimers(this.state.tickCount);
+            if (this.timerSystem.processTimers(this.state.tickCount)) {
+                // "Game has been won." `ProcessTT_STONEROOM`'s actuator type 18 has set
+                // `d.Word11694` and cleared `d.CanRestartFromSavegame`, which is kept here
+                // (doc/CSBwin-src/Timer.cpp:2370-2371). `MainLoop` waits 300 VBLs
+                // (`runFrame`) and shows the credits (CSBCode.cpp:627-633).
+                this.canRestart = false;
+                this.wonGameDelay = WON_GAME_VBLS;
+                return;
+            }
         } while (this.loadNewPartyLevel());
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
@@ -440,7 +472,7 @@ export class Game {
         if (this.party.state.gameIsLost) {
             this.mainLoopReturned = true;
             this.stop();
-            this.ctx.host.showCredits(true);
+            this.ctx.host.showCredits(this.state.gameWon);
             return;
         }
         // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:660-677):

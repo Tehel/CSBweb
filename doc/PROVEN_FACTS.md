@@ -3827,3 +3827,13 @@ with switching off — an inventory open — fades the champions up to sixteen z
 and stays there (`RepeatGame` false, `:219-222`). The glyphs `DisplayHeroName` prints with
 (`:39-57`, `A`-`Z` minus 0x40) are font 0x22d's codes 1-26, which differ from its `A`-`Z`.
 `tools/dump-show-credits.ts` checks both.
+
+## The CSB win ends the tick where it happens, and 300 VBLs later the game
+
+An actuator of type 18 under a stone-room timer wins the game at any position: the arm is
+the `else` of `if (type in 7-10, 14, 15 && position == timer's)`
+(`doc/CSBwin-src/Timer.cpp:2355-2372`). It sets `d.CanRestartFromSavegame = 0` and
+`d.Word11694 = 1` and returns true before `RotateActuatorList` (`:2382`); `ProcessTimers`
+returns true at once, leaving the timers behind it queued (`doc/CSBwin-src/CSBCode.cpp:6459-6464`),
+and `MainLoop` runs `VBLDelay(_1_, 300)` and `ShowCredits(_2_, 1)` (`:627-633`), which does
+not return. `tools/dump-show-credits.ts` checks it.

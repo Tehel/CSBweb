@@ -20,7 +20,8 @@ import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
 import { runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
-import { SOUND_DYING } from './renderer/intro/ShowCredits';
+import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
+import { determineMastery } from './engine/skills';
 import { loadUISettings } from './ui/settings';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -249,9 +250,10 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
-        // `MainLoop` has returned on a lost game (doc/CSBwin-src/CSBCode.cpp:11325).
-        showCredits: () => {
-            if (screen) void showEndOfGame(game, screen, sound);
+        // `ShowCredits(1)`: `MainLoop` has returned on a lost game
+        // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
+        showCredits: (word11694) => {
+            if (screen) void showEndOfGame(game, screen, sound, word11694);
         },
     });
 
@@ -328,15 +330,15 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
 }
 
 /**
- * `_ShowCredits(1)`: the end of a lost game, over the last frame the adventure drew
- * (`src/renderer/intro/ShowCredits.ts`). The adventure's cursor is drawn into the screen,
+ * `_ShowCredits(1)`: the end of the game, lost or won, over the last frame the adventure
+ * drew (`src/renderer/intro/ShowCredits.ts`). The adventure's cursor is drawn into the screen,
  * so it is lifted first, as `STHideCursor(HC50)` lifts CSBWin's.
  *
  * A game that was saved or loaded can be restarted from it. Then the chooser or the
  * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
  * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
  */
-async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager): Promise<void> {
+async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
     const { x, y } = game.party.state.position;
@@ -350,10 +352,11 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
         {
             queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0),
             canRestartFromSavegame: game.canRestartFromSavegame(),
-            // The won game is not reached yet (DEBT.md G13 step 3b).
-            word11694: false,
-            champions: [],
-            palette11946: null,
+            word11694,
+            champions: word11694 ? wonChampions(game, screen) : [],
+            // `_StartCSB` turns palette switching off before a lost game's credits
+            // (doc/CSBwin-src/CSBCode.cpp:11323); `MainLoop`'s won game leaves it as it was.
+            palette11946: word11694 ? screen.palette11946() : null,
         },
     );
     if (end === 'terminate') return;
@@ -366,6 +369,19 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
     game.start();
     renderView();
     drawMapPreview(game.party.state.position.z);
+}
+
+/** `d.CH16482[0 … d.NumCharacter - 1]` as the won screen shows them (`Code1f9e6.cpp:176-215`). */
+function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
+    const partySleeping = game.party.state.sleeping;
+    return game.party.state.champions.map((champion) => ({
+        name: champion.name,
+        title: champion.title,
+        // `*(name + 9)`: the title's second byte, its raw field's where there is one.
+        titleByte1: champion.titleField?.[1] ?? (champion.title.length > 1 ? champion.title.charCodeAt(1) : 0),
+        portrait: screen.championPortrait(champion),
+        masteries: [0, 1, 2, 3].map((skill) => determineMastery(champion, skill | 0xc000, { partySleeping })),
+    }));
 }
 
 /** The optional CRT effect over the canvas. Without glfx, the button reports it unavailable. */

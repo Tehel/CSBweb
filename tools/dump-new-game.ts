@@ -2,7 +2,7 @@
  * A new game in place: `Game.readNewGame`, then `Game.resumeMainLoop`.
  *
  * After a lost game, the dungeon entrance's "enter" starts a new game without the page
- * being reloaded (`DEBT.md` G13). CSBWin reads `dungeon.dat` into the same `d` it has just
+ * being reloaded. CSBWin reads `dungeon.dat` into the same `d` it has just
  * cleared (`doc/CSBwin-src/Code1f9e6.cpp:302-310`, `SaveGame.cpp:1480-1494`); the port
  * restores a fresh world into the running `Game` the way a load does. What that could get
  * wrong while still looking like a new game: a door left open, a bones object left on the

@@ -84,7 +84,11 @@ export class TimerSystem {
     this.dungeon.setTimerWord8Lookup((index) => this.timers.getTimerWord8(index));
   }
 
-  processTimers(currentTime: number): void {
+  /**
+   * `ProcessTimers` (doc/CSBwin-src/CSBCode.cpp:6383): every timer due by `currentTime`.
+   * True, at once, when one has won the game (`:6459-6464`), and the rest wait.
+   */
+  processTimers(currentTime: number): boolean {
     this.now = currentTime >>> 0;
     let processed = 0;
     let next = this.timers.peekNext();
@@ -92,7 +96,7 @@ export class TimerSystem {
     while (next && next.time <= currentTime) {
       const timer = this.timers.shiftNext();
       if (!timer) break;
-      this.dispatch(timer);
+      if (this.dispatch(timer)) return true;
 
       processed++;
       if (processed > 50000) {
@@ -109,9 +113,11 @@ export class TimerSystem {
       }
       next = this.timers.peekNext();
     }
+    return false;
   }
 
-  private dispatch(timer: TimerEntry): void {
+  /** One timer. True when it has won the game: `ProcessTT_STONEROOM`'s actuator type 18. */
+  private dispatch(timer: TimerEntry): boolean {
     // The monster AI is routed off before the switch, exactly as CSBWin does
     // (doc/CSBwin-src/CSBCode.cpp:6422-6429) — timer types 29-41 never reach the
     // ordinary timer dispatch.
@@ -126,7 +132,7 @@ export class TimerSystem {
         timerFunction: timer.function,
         timeUntilAlternateUpdate: timer.uByte8,
       });
-      return;
+      return false;
     }
 
     switch (timer.function) {
@@ -184,8 +190,7 @@ export class TimerSystem {
         this.processOpenRoom(timer);
         break;
       case TimerFunction.TT_STONEROOM:
-        this.processStoneRoom(timer);
-        break;
+        return this.processStoneRoom(timer);
       case TimerFunction.TT_FALSEWALL:
         this.processFalseWall(timer);
         break;
@@ -205,14 +210,14 @@ export class TimerSystem {
         this.processOpenRoom(timer);
         break;
       case TimerFunction.TT_PARAMETER_MESSAGE:
-        this.processParameterMessage(timer);
-        break;
+        return this.processParameterMessage(timer);
       case TimerFunction.TT_REACTIVATE_GENERATOR:
         this.processReactivateGenerator(timer);
         break;
       default:
         break;
     }
+    return false;
   }
 
   private processActionDisableTimer(timer: TimerEntry): void {
@@ -476,9 +481,9 @@ export class TimerSystem {
     }
   }
 
-  private processStoneRoom(timer: TimerEntry): void {
+  private processStoneRoom(timer: TimerEntry): boolean {
     const action = this.getTimerAction(timer);
-    if (action === 3) return;
+    if (action === 3) return false;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const targetPos = timer.uByte8 & 3;
 
@@ -511,13 +516,18 @@ export class TimerSystem {
         this.processBitwiseCompare(timer, rec, target, decoded.position);
         continue;
       }
-      if ((type >= 7 && type <= 10) || type === 14 || type === 15) {
-        if (decoded.position === targetPos) {
-          this.triggerMissileLauncher(rec, timer);
-          if (isActuatorOnceOnly(rec)) setActuatorType(rec, 0);
-        }
+      if (((type >= 7 && type <= 10) || type === 14 || type === 15) && decoded.position === targetPos) {
+        this.triggerMissileLauncher(rec, timer);
+        if (isActuatorOnceOnly(rec)) setActuatorType(rec, 0);
+      } else if (type === 18) {
+        // The CSB win, at any position (doc/CSBwin-src/Timer.cpp:2366-2372):
+        // `d.CanRestartFromSavegame = 0`, which the caller clears (`Game.gameTick`), and
+        // `d.Word11694 = 1`, and "Tell folks this is the end of the game".
+        this.ctx.state.gameWon = true;
+        return true;
       }
     }
+    return false;
   }
 
   private processFalseWall(timer: TimerEntry): void {
@@ -744,19 +754,19 @@ export class TimerSystem {
     }
   }
 
-  private processParameterMessage(timer: TimerEntry): void {
+  private processParameterMessage(timer: TimerEntry): boolean {
     const map = this.dungeon.getMap(timer.level);
-    if (!map) return;
+    if (!map) return false;
     const x = timer.uByte6;
     const y = timer.uByte7;
     const cellFlag = map.cellFlags[x]?.[y];
-    if (cellFlag === undefined) return;
+    if (cellFlag === undefined) return false;
     const roomType = (cellFlag >> 5) & 0x7;
     if (roomType !== RoomType.STONE) {
       this.processOpenRoom(timer);
-    } else {
-      this.processStoneRoom(timer);
+      return false;
     }
+    return this.processStoneRoom(timer);
   }
 
   private operateCounterActuator(timer: TimerEntry, actuator: ActuatorRecord, target: Position): void {

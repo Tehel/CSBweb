@@ -497,8 +497,9 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 `_ShowCredits(P1)` is reached three ways: `_StartCSB` once `MainLoop` has returned, with
 `d.GameIsLost` (`CSBCode.cpp:11322-11326`); `MainLoop` itself when `ProcessTimers` reports the
 CSB win (`:626-633`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1252`). `_FusionSequence`
-ends in it too (`Attack.cpp:2429`). The port has the first, and the won screen the other two
-end in (`src/renderer/intro/ShowCredits.ts`); what reaches it is `DEBT.md` G13 step 3b and G8.
+ends in it too (`Attack.cpp:2429`). The port has the first two
+(`src/renderer/intro/ShowCredits.ts`, `Game.gameTick`); `_FusionSequence` is `DEBT.md` G8, and
+"SAVE AND QUIT" is `PLAN.md` Phase 10.
 
 **The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2680`). The tick
 has run its timers; at `tag000730` it runs `WaitForButtonFlash`, `StartQueuedSound` and
@@ -564,6 +565,16 @@ zeroed both, members of `DBank` (`Data.h:606`, `:614`), with `memset(this, 0, �
 **The won game, `P1 = 1`, `d.Word11694 = 1`** (`:122-225`). The CSB win (actuator type 18,
 `Timer.cpp:2366-2371`) and `_FusionSequence` (`Attack.cpp:2268`) set `d.Word11694`, and both
 reach `_ShowCredits` without `_StartCSB`'s clearing of `d.DynamicPaletteSwitching`.
+
+**The CSB win.** `ProcessTT_STONEROOM` meets an actuator of type 18, at any position — the
+arm is the `else` of the missile launchers' `type && position` test — and sets
+`d.CanRestartFromSavegame = 0` and `d.Word11694 = 1` and returns true at once, without its
+`RotateActuatorList` (`Timer.cpp:2355-2372`). `ProcessTimers` returns true straight away,
+the timers behind it left queued (`CSBCode.cpp:6459-6464`), and `MainLoop` runs
+`VBLDelay(_1_, 300)` and `ShowCredits(_2_, 1)` (`:627-633`), which never returns: the rest
+of the tick, `d.Time++` and `scrollingText.ClockTick()` among it, does not run. The port's
+`Game.gameTick` stops there, and `runFrame` then runs 300 VBLs of `vblInterrupt` alone
+before `GameHost.showCredits(true)`. `d.Word11694` is `GameState.gameWon`.
 
 1. As the lost game's step 1, but no dying sound and no wait (`:124`).
 2. Graphic 208, the champion frame, is read after graphic 6 (`:138-143`): 64×43, the 1376

@@ -93,7 +93,6 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G13 | `_ShowCredits`: nothing reaches the won screen | L | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -159,8 +158,8 @@ party's when it gets none (`src/engine/SoundQueue.ts`). These callers pass none,
 each can run on another level: from a timer, which `ProcessTimers` acts on with the timer's
 level loaded (`CSBCode.cpp:6416-6417`), or on a missile's or a group's square.
 
-- `TimerSystem`: a door rebounding off a group (`src/engine/TimerSystem.ts:725`), a
-  generator's new group (`:1151`), the `RNffe4` cloud (`:1576`, `Timer.cpp:556`).
+- `TimerSystem`: a door rebounding off a group (`src/engine/TimerSystem.ts:735`), a
+  generator's new group (`:1161`), the `RNffe4` cloud (`:1586`, `Timer.cpp:556`).
 - `MissileEncounter`: the encounter's sound and `CreateCloud`'s two
   (`src/engine/MissileEncounter.ts:589`, `:604`, `:608`).
 - `MonsterDamage`: a monster's death (`src/engine/MonsterDamage.ts:212`, `:324`).
@@ -222,7 +221,7 @@ CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then
 (`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
 (`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
 saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
-(`src/engine/Game.ts:399`) and runs `processTimers` on the new value. A timer set between
+(`src/engine/Game.ts:441`) and runs `processTimers` on the new value. A timer set between
 ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
 game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
 (`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
@@ -245,7 +244,8 @@ made: `MovementSystem.moveParty` after a turn or a step that went through
 (`:275`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
 the handler, before the rest of the queue's entries in that pass and before the top of the
 tick, where CSBWin's waits for the tick. After a move to another level they run before the
-tick has loaded it (`d.newPartyLevel`), with the party still on its old level. Remove the
+tick has loaded it (`d.newPartyLevel`), with the party still on its old level, and they
+drop what `processTimers` returns, so a CSB win among those timers is lost. Remove the
 three calls. Evidence: a check that drops an object on a pad whose
 action is due at once, and finds its timer still queued when the handler returns.
 
@@ -254,7 +254,7 @@ action is due at once, and finds its timer still queued when the handler returns
 CSBWin draws a champion's square in the top view of positions from `DrawCharacterState`,
 once per champion in the party, and only inside `if (pcA3->HP() != 0)`
 (`doc/CSBwin-src/Character.cpp:1308-1513`): a dead champion has none, their square blanked
-by `KillCharacter` (`:2663-2666`). The port's `drawPartyStatus` (`src/renderer/ui/Character.ts:389`)
+by `KillCharacter` (`:2663-2666`). The port's `drawPartyStatus` (`src/renderer/ui/Character.ts:390`)
 draws one for each of the four boxes, alive, dead or empty, an empty box's in the slot of
 its own index. So the golden frame `01-boot` shows four coloured squares over an empty
 party, where CSBWin shows none; with three champions, the empty fourth box paints its
@@ -293,7 +293,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:274`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:279`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy
@@ -444,31 +444,6 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
-### G13 ⏳ `_ShowCredits`: nothing reaches the won screen
-
-`_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won. The
-port has the lost game: `Game.gameTick` ends `MainLoop` on the tick of death
-(`CSBCode.cpp:658`) and asks the host for `ShowCredits(1)`, which
-`src/renderer/intro/ShowCredits.ts` runs over an `IntroHost`: the dying sound, "THE END",
-the credits picture, and, once the game has been saved or loaded, the "RESTART THIS GAME"
-button (`tools/dump-show-credits.ts`). Its chooser, or the entrance behind a cancel, sets
-up the next game in the running `Game`, with the message strip emptied
-(`showEndOfGame`, `src/main.ts`; `tools/dump-new-game.ts`, `tools/dump-messages.ts`).
-"SAVE AND QUIT" calls `ShowCredits(0)`, straight to the credits picture
-(`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` → Phase 10).
-The won screen is ported, and G8 ends in it too.
-
-Size L, in three steps. Steps 1 and 2, the lost game and the restart, are done. Left:
-
-3. **The won game**, in two parts. 3a, the won screen, is done: `showCredits` with
-   `word11694` (`src/renderer/intro/ShowCredits.ts`, `tools/dump-show-credits.ts`), which
-   `showEndOfGame` never passes yet. Left:
-   - **3b, the CSB win.** Actuator type 18 under a stone-room timer
-     (`Timer.cpp:2366-2371`): `d.CanRestartFromSavegame = 0`, `d.Word11694 = 1`, and
-     `ProcessTimers` returns true at once; `MainLoop` waits 300 VBLs and calls
-     `ShowCredits(1)` (`CSBCode.cpp:626-633`). The port's stone-room arm has no type 18
-     (`src/engine/TimerSystem.ts:512-518`). Evidence: a tool that fires one.
-
 ### G8 ⏳ Lord Chaos's fusion endgame
 
 `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and `_FusionSequence` (`:2220`) are not ported.
@@ -476,19 +451,21 @@ Size L, in three steps. Steps 1 and 2, the lost game and the restart, are done. 
 Everything Lord Chaos does before the fusion is ported: the Fluxcage, `IsCellFluxcage`,
 `IsLordChaosHere`, `MonsterPerception`'s Fluxcage test, his wander step
 (`MonsterSystem.ts:712`, `Timer.cpp:2601`) and his missiles (`MonsterAttack.ts:297`,
-`Monster.cpp:1045`). So he can be boxed in and fused against. What is missing is the
-ending, and it is size L, in three steps:
+`Monster.cpp:1045`). So he can be boxed in and fused against, and the won screen the
+fusion ends in is ported too: `_FusionSequence` sets `d.Word11694` (`:2268`), which is
+`GameState.gameWon`, and ends in `ShowCredits(_20_, 1)` (`:2429`), which the host shows
+through `GameHost.showCredits(true)` (`showEndOfGame`, `src/main.ts`), as it does after the
+CSB win (`Game.gameTick`). What is missing is the ending itself, and it is size L, in two
+steps:
 
-1. **G13 step 3 first.** `_FusionSequence` ends in `ShowCredits(_20_, 1)` (`:2429`), the
-   won screen.
-2. **A scripted sequence inside the game loop.** `_FusionSequence` is a `RESTARTABLE`
+1. **A scripted sequence inside the game loop.** `_FusionSequence` is a `RESTARTABLE`
    coroutine: it runs `ProcessTimersViewportAndSound` (`:2192`: `ProcessTimers`, the
    viewport, the queued sound, `d.Time++`) some thirty times between `VBLDelay`s, with no
    mouse handling, and prints the ending's texts. `Game.runFrame` has no way to run such a
    script in place of its pass; the intro's `async` `IntroHost` is the pattern to follow.
    `testdelay` is 500 (`Attack.cpp:19`) and `MS2VBL` divides by 16 (`:17`), so every
    `if (testdelay) VBLDelay(…)` waits 31 VBLs.
-3. **`_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion` branch, `:161-213`):
+2. **`_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion` branch, `:161-213`):
    the dispell cloud on the square, then Lord Chaos steps to a free square next to him,
    or two away, unless a Fluxcage or a wall is in that direction; boxed in, the sequence
    starts. `_FusionSequence`: the shields, the cages removed, the fireball and dispell

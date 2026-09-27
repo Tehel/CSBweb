@@ -56,11 +56,13 @@ export interface GameHost {
    */
   tag0207cc(): void;
   /**
-   * `MainLoop` has returned and `_StartCSB` calls `ShowCredits(_3_, d.GameIsLost)`
-   * (`doc/CSBwin-src/CSBCode.cpp:11322-11326`): the end of the game, which the engine
-   * does not draw. The loop has stopped by then (`Game.mainLoopHasReturned`).
+   * `ShowCredits(1)`, the end of the game, which the engine does not draw: from
+   * `_StartCSB` once `MainLoop` has returned on a lost game
+   * (`doc/CSBwin-src/CSBCode.cpp:11322-11326`), or from `MainLoop` 300 VBLs after
+   * `ProcessTimers` has won it (`:627-633`), with `d.Word11694` set. The loop has stopped
+   * by then (`Game.mainLoopHasReturned`).
    */
-  showCredits(gameIsLost: boolean): void;
+  showCredits(word11694: boolean): void;
 }
 
 /**
