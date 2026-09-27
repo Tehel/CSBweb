@@ -1250,7 +1250,8 @@ export class BytecodeInterpreter {
     };
 
     if (s === 4 || s === 5) {
-      // closed or bashed (CSBWin applies ornament effects; we currently draw the base panel).
+      // closed or bashed. CSBWin draws the door's ornament, and a bashed door's, onto the
+      // panel first (`TAG004b26`, doc/CSBwin-src/CSBCode.cpp:4155, `:4184`): `DEBT.md` C72.
       blit(rectRef[0]);
       return true;
     }

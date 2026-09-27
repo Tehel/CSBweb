@@ -134,7 +134,7 @@ export function DrawViewport(
   // `SeeThroughWalls` opcode reads `context.seeThroughWalls`
   // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.drawViewportFrame`.
   //
-  // Still unported: CSBWin also recolours a near door when See-Thru-Walls is active
+  // Still unported (`DEBT.md` C72): CSBWin also recolours a near door when See-Thru-Walls is active
   // (`TAG004b26(17, 2)` at doc/CSBwin-src/CSBCode.cpp:4171-4174).
 }
 
