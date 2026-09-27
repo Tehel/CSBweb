@@ -37,7 +37,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { TimerFunction } from '../src/engine/TimerQueue';
+import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -288,6 +288,8 @@ async function main(): Promise<void> {
   // (`:1066-1077`), so the tick runs one frame later.
   type Internals = { lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
+  /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
+  const loadedLevel = (): number | null => (game.monsterSystem as unknown as { loadedLevel: number | null }).loadedLevel;
   const T0 = Date.now() + 60_000;
   let discard: {
     wallQueue: number; tickHeld: boolean; tickNextFrame: boolean; facingKept: boolean;
@@ -549,7 +551,9 @@ async function main(): Promise<void> {
   // next tick, `LoadPartyLevel(...); MoveObject(...); d.newPartyLevel = -1;
   // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:615-623). The step brings that tick on
   // in its own VBL (`extraTicks`, `:8084-8087`), before the queue's next entry is looked
-  // at, so a turn queued behind a step onto the stairs is lost at once.
+  // at, so a turn queued behind a step onto the stairs is lost at once. Until that tick,
+  // `TraverseStairway` leaves the party on the new level's square with `d.partyLevel`
+  // still the old one (`:7775-7781`).
   {
     let stairs: { px: number; py: number; dir: number } | null = null;
     for (let x = 0; x < width && !stairs; x++) {
@@ -598,6 +602,29 @@ async function main(): Promise<void> {
       check(newLevel !== level, 'the step onto the stairs should change level');
       check(stairsTicked, 'the step brings its tick on in its own VBL (extraTicks)');
       check(queuedAfterStairs === 0 && !turned, 'whose top discards the queued turn (DiscardAllInput)');
+
+      // The step alone, with no tick after it.
+      party.position = new Position(stairs.px, stairs.py, level);
+      game.party.setFacing(stairs.dir);
+      game.monsterSystem.loadPartyLevel(level);
+      party.partyMoveDisableTimer = 0;
+      game.move(MovementAction.MOVE_FORWARD);
+      const held = { level: party.position.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
+      frame(true);
+      const after = { level: party.position.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
+      console.log(
+        `stairs, before the tick: party level ${held.level}, d.newPartyLevel ${held.pending}, loaded ${held.loaded}; ` +
+          `after it: ${after.level}, ${after.pending}, ${after.loaded}`,
+      );
+      console.log('');
+      check(
+        held.level === level && held.pending === newLevel && held.loaded === level,
+        'before the tick the party is still on its old level, and the new one waits in d.newPartyLevel',
+      );
+      check(
+        after.level === newLevel && after.pending === -1 && after.loaded === newLevel,
+        'the top of the tick loads the new level and moves d.partyLevel on (LoadPartyLevel)',
+      );
       game.party.state.position = new Position(scene.px, scene.py, level);
       game.monsterSystem.loadPartyLevel(level);
     }
@@ -644,7 +671,10 @@ async function main(): Promise<void> {
   // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:635): a pit a timer opens under the party has
   // the new level loaded, the input discarded and `ProcessTimers` run again, all before
   // the tick ends (`:615-635`). A turn queued before the pit opened is lost, and never
-  // runs on the new level.
+  // runs on the new level. `ProcessTimers` does not test `d.newPartyLevel`, so a timer due
+  // in the same pass after the pit's runs with the party on the new level's square and
+  // `d.partyLevel` still the old one, nothing of the new level loaded
+  // (`Code11f52.cpp:3319-3324`).
   {
     let pit: { x: number; y: number } | null = null;
     for (let x = 0; x < width && !pit; x++) {
@@ -668,7 +698,7 @@ async function main(): Promise<void> {
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
-      game.ctx.loop.newPartyLevel = false;
+      game.ctx.loop.newPartyLevel = -1;
       // An event was handled this tick, so the turn waits for the next one
       // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
       internals.lastInputTime = game.state.tickCount;
@@ -680,6 +710,26 @@ async function main(): Promise<void> {
         uByte5: 0, uByte6: pit.x, uByte7: pit.y, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
+      // A probe due at the same time, whose function (1) is lower than `TT_PIT`'s (9), so it
+      // comes after it in the pass (`timerLess`). The hook records what it sees and runs
+      // nothing.
+      const probeTime = game.state.tickCount + 1;
+      game.timerQueue.addTimer({
+        index: 0, function: TimerFunction.TT_DOOR_STEP, time: probeTime, level,
+        uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,
+        sequence: 0, timerWord8: 0, timerWord6: 0,
+      });
+      const timerSystem = game.timerSystem as unknown as { dispatch(timer: TimerEntry): void };
+      const dispatch = timerSystem.dispatch;
+      let probeSaw: { x: number; y: number; level: number; pending: number; loaded: number | null } | null = null;
+      timerSystem.dispatch = function (this: unknown, timer: TimerEntry): void {
+        if (timer.function === TimerFunction.TT_DOOR_STEP && timer.uByte5 === 0xab) {
+          const p = party.position;
+          probeSaw = { x: p.x, y: p.y, level: p.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
+          return;
+        }
+        dispatch.call(this, timer);
+      };
       let t = T0 + 400_000;
       const frame = (tickDue: boolean): void => {
         t += 17;
@@ -687,10 +737,24 @@ async function main(): Promise<void> {
         game.runFrame(t);
       };
       frame(true);
+      timerSystem.dispatch = dispatch;
       const newLevel = party.position.z;
+      const below = dungeon.incrementLevel(new Position(pit.x, pit.y, level), 1)!;
       const queuedAfterTick = game.queuedInputCount();
       const loadedAfterTick = game.monsterSystem.needsLevelReload() ? 'not yet' : 'loaded';
       const owedAfterTick = game.ctx.loop.newPartyLevel;
+      const saw = probeSaw as { x: number; y: number; level: number; pending: number; loaded: number | null } | null;
+      console.log(
+        saw
+          ? `a timer after the pit's in the same pass sees the party at (${saw.x},${saw.y}) on level ${saw.level}, ` +
+              `d.newPartyLevel ${saw.pending}, level ${saw.loaded} loaded`
+          : 'the probe timer never ran',
+      );
+      check(
+        saw !== null && saw.x === below.x && saw.y === below.y && saw.level === level &&
+          saw.pending === below.z && saw.loaded === level,
+        "a timer after the pit's sees the new square, the old d.partyLevel and the old level loaded (Code11f52.cpp:3319-3324)",
+      );
       frame(false);
       const turned = party.facing !== facingBefore;
       console.log(
@@ -699,7 +763,7 @@ async function main(): Promise<void> {
       );
       console.log('');
       check(newLevel !== level, 'the pit timer should drop the party a level');
-      check(loadedAfterTick === 'loaded' && !owedAfterTick, 'the new level should be loaded in the tick the timer ran (CSBCode.cpp:635)');
+      check(loadedAfterTick === 'loaded' && owedAfterTick === -1, 'the new level should be loaded in the tick the timer ran (CSBCode.cpp:635)');
       check(queuedAfterTick === 0, 'the queued turn should be discarded in that same tick');
       check(!turned, 'the queued turn should never run on the new level');
       setCell(saved);

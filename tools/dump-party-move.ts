@@ -8,10 +8,11 @@
  * party already on the square below (`:3053-3086`); nothing more when it is back on its
  * square facing the same way (`:3194-3201`); a footprint when it left it (`:3224-3247`);
  * the old square's pads (`:3258-3268`); then on its level the new square's pads
- * (`:3309-3317`), and on another the arrival, `LoadPartyLevel` and
- * `MoveObject(RNnul, -1, 0, x, y)` (`CSBCode.cpp:618-623`), which leaves a second
- * footprint and presses the pads there. Each case records those steps and compares them
- * with that order:
+ * (`:3309-3317`), and on another nothing more until the top of the next tick, which
+ * makes the arrival, `LoadPartyLevel` and `MoveObject(RNnul, -1, 0, x, y)`
+ * (`d.newPartyLevel`, `CSBCode.cpp:618-623`), which leaves a second footprint and presses
+ * the pads there. Each case records those steps, runs the top of the tick (`tick` in the
+ * record), and compares them with that order:
  *
  *  1. the step onto a pit (`CSBCode.cpp:8324`), past a fireball in the square it leaves;
  *  2. the climb down (`Attack.cpp:2032`), which passes the pit, not the square below, so
@@ -195,6 +196,12 @@ function inCell(game: Game, p: Position, rn: ObjectID): boolean {
   return false;
 }
 
+/** The top of the next tick, `Game.loadNewPartyLevel`, marked in the record. */
+function tick(game: Game, log: string[]): void {
+  log.push('tick');
+  game.loadNewPartyLevel();
+}
+
 function compare(label: string, log: string[], expected: string[]): void {
   console.log(`${label}:\n  ${log.join('\n  ') || '(nothing)'}`);
   check(log.join('|') === expected.join('|'), `${label}: in MoveObject's order (expected ${expected.join(', ') || 'nothing'})`);
@@ -203,7 +210,7 @@ function compare(label: string, log: string[], expected: string[]): void {
 /** What the fall onto the square below does, arrival included. */
 const fallTail = (old: Position, below: Position): string[] => [
   `fall at ${at(below)}`, `footprint ${at(below)}`, `remove ${at(old)} moved`,
-  `load ${below.z}`, `footprint ${at(below)}`, `place ${at(below)} moved`,
+  'tick', `load ${below.z}`, `footprint ${at(below)}`, `place ${at(below)} moved`,
 ];
 
 const probe = makeGame().game;
@@ -217,6 +224,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const fireball = launch(game, from, 2);
   log.length = 0;
   game.move(MovementAction.MOVE_FORWARD);
+  tick(game, log);
   compare('1. the step onto the pit', log, [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below)]);
   check(!inCell(game, from, fireball), 'the fireball in the square the party leaves is met');
 }
@@ -231,6 +239,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   log.length = 0;
   const climb = game.attackSystem as unknown as { climbDownIntoPit(target: Position): void };
   climb.climbDownIntoPit(pit);
+  tick(game, log);
   compare('2. the climb down', log, [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below)]);
   check(!inCell(game, pit, fireball), 'the fireball in the pit\'s square is met by the second half-step');
 }
@@ -241,6 +250,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   stand(game, log, from, facing);
   const dsa = (game as unknown as { dsaSystem: { teleportParty(locr: LocationRel): void } }).dsaSystem;
   dsa.teleportParty({ l: game.dungeonState.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
+  tick(game, log);
   compare('3. the DSA teleport onto the pit', log, [`missile ${at(from)}->${at(from)}`, ...fallTail(from, below)]);
 }
 
@@ -250,6 +260,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   stand(game, log, pit, facing);
   const wiggle = game.timerSystem as unknown as { wiggleEverything(x: number, y: number, level: number): void };
   wiggle.wiggleEverything(pit.x, pit.y, pit.z);
+  tick(game, log);
   compare('4. the wiggle of the party\'s square as its pit opens', log, [`missile ${at(pit)}->${at(pit)}`, ...fallTail(pit, below)]);
 }
 {
@@ -259,7 +270,8 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   log.length = 0;
   const wiggle = game.timerSystem as unknown as { wiggleEverything(x: number, y: number, level: number): void };
   wiggle.wiggleEverything(from.x, from.y, from.z);
-  compare('5. the wiggle of the party\'s square as nothing happens', log, [`missile ${at(from)}->${at(from)}`]);
+  tick(game, log);
+  compare('5. the wiggle of the party\'s square as nothing happens', log, [`missile ${at(from)}->${at(from)}`, 'tick']);
   check(!inCell(game, from, fireball), 'the fireball in a champion\'s corner of that square is met');
 }
 
@@ -269,11 +281,17 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const s = findStairs(game);
   stand(game, log, s.from, s.facing);
   game.move(MovementAction.MOVE_FORWARD);
+  const held = game.party.state.position;
+  tick(game, log);
   compare(`6. the step into the stairs at ${at(s.stairs)}`, log, [
     `missile ${at(s.from)}->none`, `remove ${at(s.from)} moved`,
     `missile ${at(s.stairs)}->none`, `remove ${at(s.stairs)} moved`,
-    `load ${s.next.z}`, `footprint ${at(s.next)}`, `place ${at(s.next)} moved`,
+    'tick', `load ${s.next.z}`, `footprint ${at(s.next)}`, `place ${at(s.next)} moved`,
   ]);
+  check(
+    at(held) === at(new Position(s.next.x, s.next.y, s.from.z)),
+    'until the tick, the party is on the new square with its old level (TraverseStairway, CSBCode.cpp:7775-7781)',
+  );
   check(at(game.party.state.position) === at(s.next), `the party stands on the stairs below, ${at(s.next)}`);
 }
 
@@ -282,7 +300,8 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const { game, log } = makeGame();
   stand(game, log, from, facing);
   game.move(MovementAction.TURN_RIGHT);
-  compare('7. a turn', log, []);
+  tick(game, log);
+  compare('7. a turn', log, ['tick']);
 }
 
 /* ------------------------------------------------ 8. a death in the fall -------- */

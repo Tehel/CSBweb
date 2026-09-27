@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
@@ -126,34 +125,13 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
 
-### C57 ⏳ The party's arrival on another level runs at once, not at the top of the next tick
-
-When a `MoveObject` of the party ends on another level, CSBWin sets `d.newPartyLevel` and
-presses no pads (`doc/CSBwin-src/Code11f52.cpp:3319-3324`), and `TraverseStairway` sets it
-too (`CSBCode.cpp:7775`). The main loop acts on it at the top of the next tick, or at once
-after `ProcessTimers` when a timer moved the party (`CSBCode.cpp:618-623`, `:635`):
-`LoadPartyLevel`, then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the
-party through its square again, leaves a second footprint and presses the pads, then
-`DiscardAllInput`. Until then `d.partyLevel` is the old level while `d.partyX` and
-`d.partyY` are already the new square's. The port runs the load and the second
-`MoveObject` from inside the move, in `WorldMove.arriveOnPartyLevel`
-(`src/engine/WorldMove.ts:125`), and leaves only the discard to the tick
-(`MonsterSystem.loadPartyLevelOnArrival`, `Game.loadNewPartyLevel`). So whatever runs
-between the move and that tick sees the new level loaded, its groups attached and its pads
-pressed, where CSBWin's sees the old party level: the rest of the timers in the pass that
-moved the party, for one, since `ProcessTimers` does not test `d.newPartyLevel`. Porting
-it means a pending level that `Game.loadNewPartyLevel` acts on, and a `party.position` that
-can hold CSBWin's half-moved state without the renderer drawing it (CSBWin draws only after
-the check, `CSBCode.cpp:635-639`). Evidence: a check that drops the party down a pit from a
-timer with a second timer due in the same pass, and records the level the second one sees.
-
 ### C58 ⏳ A turn does not lift and place the party
 
 Off the stairs, `_TurnParty` brackets its `SetPartyFacing` with
 `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)` before and
 `(…, true, 1)` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`), so the pads under the party
 see it leave and come back, with `unchangedRoom` true, facing the new way. The port's turn,
-`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:115`), only sets the facing.
+`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:103`), only sets the facing.
 Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
 calls.
 
@@ -179,9 +157,9 @@ neither half:
 
 - Sleep, button 145: `TAG02076e` after the inventory is hidden
   (`doc/CSBwin-src/Mouse.cpp:1691`). Port: the UI's sleep click, then `MouseSystem.sleep`
-  (`src/engine/MouseSystem.ts:366`).
+  (`src/engine/MouseSystem.ts:364`).
 - `WakeUp`: `TAG0207cc` last (`CSBCode.cpp:7061`). Port: `wakeUp`
-  (`src/engine/LoopState.ts:75`).
+  (`src/engine/LoopState.ts:84`).
 - `AddCharacter`: `TAG02076e` after `ShowHideInventory` shows the candidate
   (`Character.cpp:796-797`). Port: `HallOfChampions.addCharacter`
   (`src/engine/HallOfChampions.ts:86`).
@@ -250,9 +228,9 @@ level loaded (`CSBCode.cpp:6416-6417`), or on a missile's or a group's square.
 - `MissileEncounter`: the encounter's sound and `CreateCloud`'s two
   (`src/engine/MissileEncounter.ts:589`, `:604`, `:608`).
 - `MonsterDamage`: a monster's death (`src/engine/MonsterDamage.ts:212`, `:324`).
-- `MonsterSystem`: the Deth Knight's flip (`src/engine/MonsterSystem.ts:418`), a group
-  waiting on a teleporter (`:709`), `CreateMonster` (`:841`), and `playTeleportSound`
-  (`:879`), which `MonsterAI` calls.
+- `MonsterSystem`: the Deth Knight's flip (`src/engine/MonsterSystem.ts:411`), a group
+  waiting on a teleporter (`:702`), `CreateMonster` (`:834`), and `playTeleportSound`
+  (`:872`), which `MonsterAI` calls.
 
 So each of them, with `deltaTime` 1, is heard from any level whenever its x and y are near
 the party's. Pass each call's level, then make the argument required. Evidence: a row per
@@ -326,11 +304,12 @@ and from `_FusionSequence` (`Attack.cpp:2199`), nowhere else. The port also runs
 `processTimers(tickCount)` from three handlers the mouse queue runs, once their move is
 made: `MovementSystem.moveParty` after a turn or a step that went through
 (`src/engine/MovementSystem.ts:66`), `MouseSystem.dropObjectFromCursor`
-(`src/engine/MouseSystem.ts:103`) and `MouseSystem.triggerObjectMove`, the pick-up
-(`:277`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
+(`src/engine/MouseSystem.ts:102`) and `MouseSystem.triggerObjectMove`, the pick-up
+(`:275`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
 the handler, before the rest of the queue's entries in that pass and before the top of the
-tick, where CSBWin's waits for the tick. The `loadPartyLevelOnArrival` beside each call is
-C57's. Remove the three calls. Evidence: a check that drops an object on a pad whose
+tick, where CSBWin's waits for the tick. After a move to another level they run before the
+tick has loaded it (`d.newPartyLevel`), with the party still on its old level. Remove the
+three calls. Evidence: a check that drops an object on a pad whose
 action is due at once, and finds its timer still queued when the handler returns.
 
 ---
@@ -428,7 +407,7 @@ uses CSBWin's defaults.
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
   `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:463` and `MonsterSystem.ts:553`.
+  `MonsterDamage.ts:463` and `MonsterSystem.ts:546`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
   (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its

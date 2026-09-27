@@ -502,15 +502,25 @@ export class Game {
 
     /**
      * `tag0006a4` (doc/CSBwin-src/CSBCode.cpp:615-623): `if (d.newPartyLevel != -1)`,
-     * `LoadPartyLevel(...); MoveObject(RN(RNnul), -1, 0, ...); d.newPartyLevel = -1;
-     * DiscardAllInput();`. The port has already loaded the level and placed the party
-     * there, as soon as it arrived (`WorldMove.arriveOnPartyLevel`, DEBT.md C57), so only
-     * the discard is still owed, unless something else changed the party's level (see
-     * `loadPartyLevelIfChanged`). Says whether it ran.
+     * `LoadPartyLevel(d.newPartyLevel)`, whose `SetPartyLevel` moves `d.partyLevel` on
+     * (`:5793`), then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the
+     * party through the square it stands on again, leaves a second footprint and presses
+     * the pads, then `d.newPartyLevel = -1; DiscardAllInput();`. A party put on another
+     * level by hand, as a tool does, has that level loaded and the input discarded
+     * (`loadPartyLevelIfChanged`). Says whether it ran. Public so that `tools/` can run
+     * the top of a tick alone.
      */
-    private loadNewPartyLevel(): boolean {
-        if (!this.monsterSystem.loadPartyLevelIfChanged() && !this.ctx.loop.newPartyLevel) return false;
-        this.ctx.loop.newPartyLevel = false;
+    loadNewPartyLevel(): boolean {
+        const level = this.ctx.loop.newPartyLevel;
+        if (level === -1) {
+            if (!this.monsterSystem.loadPartyLevelIfChanged()) return false;
+        } else {
+            const party = this.party.state;
+            party.position = new Position(party.position.x, party.position.y, level);
+            this.monsterSystem.loadPartyLevel(level);
+            this.ctx.systems.worldMove.moveParty(-1, 0, party.position.x, party.position.y);
+            this.ctx.loop.newPartyLevel = -1;
+        }
         this.discardAllInput();
         return true;
     }

@@ -310,9 +310,10 @@ export class MovementSystem {
      * `TraverseStairway(UpOrDown, true)` (doc/CSBwin-src/CSBCode.cpp:7733-7782) from the
      * stairs at `stairs`. For a step into them, `MoveParty` first lifts the party off the
      * square it leaves, `enteredFrom`, and stands it on the stairs (`:8209-8214`). Then
-     * the party is lifted off the stairs, put on the square below or above facing
-     * `ExitStairsDirection`, and placed there when it arrives on that level
-     * (`WorldMove.arriveOnPartyLevel`). `CallPartyMoveFilter` is not ported (DEBT.md G2).
+     * the party is lifted off the stairs and put on the square below or above facing
+     * `ExitStairsDirection`, still on the level it left: the top of the next tick loads
+     * the new one and places the party there (`d.newPartyLevel`, `Game.loadNewPartyLevel`).
+     * `CallPartyMoveFilter` is not ported (DEBT.md G2).
      *
      * A stairway to no level is a malformed dungeon, where CSBWin would `LoadLevel(-1)`;
      * the party stays where it is.
@@ -333,13 +334,15 @@ export class MovementSystem {
             this.party.state.position = stairs;
         }
         worldMove.moveParty(stairs.x, stairs.y, -1, 0);
-        this.party.state.position = next;
+        // `d.newPartyLevel = newPartyLevel; d.partyX = sw(x); d.partyY = sw(y);`, then
+        // `SetPartyFacing(newPartyFacing)` (doc/CSBwin-src/CSBCode.cpp:7775-7781).
+        this.ctx.loop.newPartyLevel = next.z;
+        this.party.state.position = new Position(next.x, next.y, stairs.z);
         this.party.setFacing(newFacing);
-        worldMove.arriveOnPartyLevel();
 
         return {
             success: true,
-            newPosition: this.party.state.position,
+            newPosition: next,
             newFacing,
         };
     }

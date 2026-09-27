@@ -64,11 +64,13 @@ function makeGame(): Game {
 
 /**
  * Stand the party on the pit's level and drop it in, `MoveObject(RNnul, -1, 0, x, y)`,
- * and say where it landed.
+ * then run the top of the next tick, which loads the level it reached
+ * (`d.newPartyLevel`), and say where it landed.
  */
 function fall(g: Game, pit: Position): Position {
   g.party.state.position = new Position(pit.x, pit.y, pit.z);
   g.worldMove.moveParty(-1, 0, pit.x, pit.y);
+  g.loadNewPartyLevel();
   return g.party.state.position;
 }
 

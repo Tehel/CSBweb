@@ -369,19 +369,22 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
         console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo);
 
         if (success) updateDebug(posInfo || 'Moved');
-
-        // Render 3D view after movement
-        if (success) {
-            renderView();
-            drawMapPreview(game.party.state.position.z);
-        }
     });
 
+    // A move draws nothing: it brings a tick on at once (`d.clockTick = 1`), and CSBWin
+    // draws the viewport only in the tick, once a new party level is loaded
+    // (doc/CSBwin-src/CSBCode.cpp:618-639).
+    let mapPreviewAt = '';
     game.onTick(() => {
         // `TAG01b29a` — the champion flinch and the attack panel's redraw
         // state, before the frame is drawn (doc/CSBwin-src/CSBCode.cpp:685).
         screen.attackPanelTick();
         renderView();
+        const { x, y, z } = game.party.state.position;
+        if (`${x},${y},${z}` !== mapPreviewAt) {
+            mapPreviewAt = `${x},${y},${z}`;
+            drawMapPreview(z);
+        }
     });
 
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll

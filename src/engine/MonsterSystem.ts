@@ -235,8 +235,8 @@ export class MonsterSystem {
    *
    * CSBWin reaches this from the main loop via `d.newPartyLevel`, which `MoveObject`
    * sets when the party lands on a different level — and it runs *before*
-   * `ProcessTimers` (`doc/CSBwin-src/CSBCode.cpp:618-635`). Callers must preserve
-   * that ordering.
+   * `ProcessTimers` (`doc/CSBwin-src/CSBCode.cpp:618-635`). `Game.loadNewPartyLevel` is
+   * that call.
    */
   loadPartyLevel(level: number): void {
     this.detachAllItem16();
@@ -278,17 +278,10 @@ export class MonsterSystem {
   }
 
   /**
-   * The port loads a new party level as soon as the party arrives on it; CSBWin only
-   * sets `d.newPartyLevel` there and loads it at the top of the next tick, where
-   * `DiscardAllInput()` follows (doc/CSBwin-src/CSBCode.cpp:615-623) (DEBT.md C57). So
-   * the discard is left for the tick (`ctx.loop.newPartyLevel`): input queued between the
-   * arrival and that tick is lost too.
+   * Run `loadPartyLevel` if, and only if, the party's level is not the one loaded; say
+   * whether it ran. A move never needs it (it sets `d.newPartyLevel`); a tool that puts
+   * the party on another level by hand does.
    */
-  loadPartyLevelOnArrival(): void {
-    if (this.loadPartyLevelIfChanged()) this.ctx.loop.newPartyLevel = true;
-  }
-
-  /** Run `loadPartyLevel` if, and only if, the party's level has changed; say whether it ran. */
   loadPartyLevelIfChanged(): boolean {
     const level = this.ctx.party.state.position.z | 0;
     if (this.loadedLevel === level) return false;

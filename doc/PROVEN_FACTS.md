@@ -2951,6 +2951,17 @@ between the arrival and that tick is lost. A move queued before a timer — an o
 pit, a teleporter switched on — carries the party to another level is lost too, and never
 runs on the new level. Evidence: `tools/dump-party-collision.ts` cases 10 and 12.
 
+Until that tick the party is half moved. The move sets `d.partyX` and `d.partyY` to the new
+level's square (`Code11f52.cpp:2868-2869`, `:2960-2961`, `:3055-3056`; `TraverseStairway`,
+`CSBCode.cpp:7775-7777`) and leaves `d.partyLevel` alone, which in play only
+`SetPartyLevel` moves on (`:5793`), from `LoadPartyLevel` (`:796`); the other writers are
+the game's start and load (`:9563`, `SaveGame.cpp:1635`, `:2409`). `ProcessTimers` does not test
+`d.newPartyLevel`, so a timer due after the move in the same pass runs with the new square,
+the old `d.partyLevel` and the old level's groups attached. `d.newPartyLevel = -1` comes
+after the arrival's `MoveObject` (`:620-622`), so a level change that `MoveObject` makes
+is dropped. The viewport is drawn only after the check (`:635-639`). Evidence:
+`tools/dump-party-collision.ts` cases 10 and 12, `tools/dump-party-move.ts` case 6.
+
 ## At most 31 groups wait on one square; the next is deleted unless it is unique or carries something
 
 `CreateMovementTimer` (`doc/CSBwin-src/Code11f52.cpp:2446`) counts the active timers of its

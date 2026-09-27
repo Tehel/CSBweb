@@ -24,8 +24,14 @@ export interface LoopFlags {
    * so a tick that was due waits one frame.
    */
   clockTickCleared: boolean;
-  /** `d.newPartyLevel != -1`: a level change whose `DiscardAllInput` is still owed. */
-  newPartyLevel: boolean;
+  /**
+   * `d.newPartyLevel`: -1, or the level the party has just reached, which the top of the
+   * next tick loads (`Game.loadNewPartyLevel`). A `MoveObject` of the party that ends on
+   * another level sets it (doc/CSBwin-src/Code11f52.cpp:3319-3324), and so does
+   * `TraverseStairway` (`CSBCode.cpp:7775`). Until then the party's square is the new
+   * level's and its level the old one (`d.partyX`, `d.partyY` and `d.partyLevel`).
+   */
+  newPartyLevel: number;
   /**
    * `d.ClockRunning`, 1 from the game start (doc/CSBwin-src/CSBCode.cpp:10549) and 0 while
    * the game is frozen: `if (d.ClockRunning == 0) goto tag0007b4;` (`:765`), so a tick
@@ -41,7 +47,7 @@ export interface LoopFlags {
 }
 
 export function createLoopFlags(): LoopFlags {
-  return { clockTickSet: false, clockTickCleared: false, newPartyLevel: false, clockRunning: true, gameFrozen: false };
+  return { clockTickSet: false, clockTickCleared: false, newPartyLevel: -1, clockRunning: true, gameFrozen: false };
 }
 
 /**

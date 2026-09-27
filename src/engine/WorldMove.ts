@@ -66,9 +66,11 @@ export class WorldMove {
    * - the old square's pads (`:3258-3268`), a monster where it landed deleted
    *   (`:3298-3308`), then the new square's pads (`:3309-3317`).
    *
-   * On another level, CSBWin sets `d.newPartyLevel` instead of pressing the pads
-   * (`:3319-3324`), and the top of the next tick places the party there. The port does
-   * that at once, in `arriveOnPartyLevel` (DEBT.md C57).
+   * On another level, CSBWin presses no pads there: it sets `d.newPartyLevel`
+   * (`:3319-3324`), and the top of the next tick loads the level and places the party on
+   * it (`Game.loadNewPartyLevel`). Until then `d.partyLevel` is the level it left.
+   * Inside the move, the party's level follows every jump and fall, as `d.LoadedLevel`
+   * does, so a champion the fall kills leaves their bones on the level they reach.
    */
   moveParty(oldX: number, oldY: number, newX: number, newY: number, pretendTeleporter?: TeleporterRecord): void {
     const party = this.ctx.party.state;
@@ -110,22 +112,10 @@ export class WorldMove {
     if (at.z === level) {
       actuators.triggerObjectMove(at, OBJECT_ID_NULL, true, unchangedRoom, party.facing);
     } else {
-      this.arriveOnPartyLevel();
+      // `LoadLevel(AttachedLevel_4); d.newPartyLevel = sw(curLevel);` (`:3321-3323`).
+      party.position = new Position(at.x, at.y, level);
+      this.ctx.loop.newPartyLevel = at.z;
     }
-  }
-
-  /**
-   * `tag0006a4` (`doc/CSBwin-src/CSBCode.cpp:618-623`), which CSBWin runs at the top of
-   * the tick after the party reached another level: `LoadPartyLevel(d.newPartyLevel)`,
-   * then `MoveObject(RN(RNnul), -1, 0, d.partyX, d.partyY)`, which takes the party
-   * through the square it stands on again, leaves a second footprint and presses its
-   * pads. The port runs both as soon as the party is on the level, and leaves the
-   * `DiscardAllInput` to the tick (`loadPartyLevelOnArrival`, DEBT.md C57).
-   */
-  arriveOnPartyLevel(): void {
-    this.ctx.systems.monsters.loadPartyLevelOnArrival();
-    const at = this.ctx.party.state.position;
-    this.moveParty(-1, 0, at.x, at.y);
   }
 
   /**
