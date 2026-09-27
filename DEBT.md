@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
 | C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
@@ -123,20 +122,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C59 ⏳ A missile leaving the map is dropped, not met as the exterior wall
-
-When the cell a missile flies into is off the map, CSBWin's `MissileTimer` makes it
-`roomEXTERIOR` (`doc/CSBwin-src/Timer.cpp:329`), which counts as stone (`:340`), so the
-missile meets it through `ProcessMissileEncounter(nextRoomType, …)` (`:351-364`). That
-runs filter 6 (`Code11f52.cpp:1841-1843`) and goes on into the shared tail
-(`:2044-2121`), where a spell becomes its cloud (`CreateCloud`, `:2099`). The port's
-`processMissileTimer` meets nothing off the map: it drops the missile through
-`processObjectFromMissile` (`src/engine/TimerSystem.ts:1404-1409`), so filter 6 never runs
-and a fireball ends without its explosion. `processMissileEncounter`'s arm for the
-exterior, `case 8` (`src/engine/MissileEncounter.ts:287`), is unreachable. Pass the
-exterior to the encounter as CSBWin does. Evidence: a check that flies a fireball off an
-open cell on a map's border and looks for its cloud.
 
 ### C60 ⏳ Six other callers of `TAG02076e` / `TAG0207cc` do not call them
 
@@ -213,7 +198,7 @@ each can run on another level: from a timer, which `ProcessTimers` acts on with 
 level loaded (`CSBCode.cpp:6416-6417`), or on a missile's or a group's square.
 
 - `TimerSystem`: a door rebounding off a group (`src/engine/TimerSystem.ts:725`), a
-  generator's new group (`:1151`), the `RNffe4` cloud (`:1587`, `Timer.cpp:556`).
+  generator's new group (`:1151`), the `RNffe4` cloud (`:1576`, `Timer.cpp:556`).
 - `MissileEncounter`: the encounter's sound and `CreateCloud`'s two
   (`src/engine/MissileEncounter.ts:589`, `:604`, `:608`).
 - `MonsterDamage`: a monster's death (`src/engine/MonsterDamage.ts:212`, `:324`).

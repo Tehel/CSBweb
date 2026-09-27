@@ -2573,6 +2573,18 @@ RN. Nothing consumed one until the engine started restoring a timer's object at 
 `CsbwinSaveGame.resolveTimerObjects` is where the translation happens now, and without it
 a restored missile names whatever record our own numbering put at that slot.
 
+## A missile flying off the map meets the exterior wall
+
+When the cell a missile leaves its own for is off the map, `MissileTimer` sets its room to
+`roomEXTERIOR` (20, `doc/CSBwin-src/CSB.h:571`) whatever `GetCellFlags` answered
+(`doc/CSBwin-src/Timer.cpp:321-330`), and `nextIsStoneWall` counts it as stone (`:340`).
+So the missile meets it through `ProcessMissileEncounter(roomEXTERIOR, origMapX, origMapY,
+origMapX, origMapY, curPos, …)` (`:349-364`), whose exterior arm runs filter 6 and ignores
+its answer (`Code11f52.cpp:1841-1843`), where the stone arm lets filter 4 keep the missile
+flying (`:1835-1840`). The shared tail follows (`:2044-2135`), which always returns 1: a
+spell becomes its cloud in the square it was flying from (`CreateCloud`, `:2099`), anything
+else sounds and drops there. Evidence: `tools/dump-missile-exterior.ts`.
+
 ## A door-blocked missile drops at its own `.pos()`, not at the `objectPos` it filters with
 
 `MissileTimer` (`doc/CSBwin-src/Timer.cpp:302-423`) tracks a flying missile's position

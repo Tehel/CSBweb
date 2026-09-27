@@ -35,7 +35,8 @@ export enum RoomType {
     DOOR = 4,       // Door
     TELEPORTER = 5, // Teleporter
     FALSEWALL = 6,  // Trick wall
-    EMPTY = 7       // Empty (DM II only)
+    EMPTY = 7,      // Empty (DM II only)
+    EXTERIOR = 20,  // `roomEXTERIOR` (CSB.h:571): off the map, the dungeon's exterior wall
 }
 
 /**

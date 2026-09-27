@@ -1357,8 +1357,6 @@ export class TimerSystem {
     let missileDir = initialDir & 0x3;
     let curPos = decoded.position & 0x3;
     let leavingThisCell = false;
-    let nextRoomType: number = RoomType.OPEN;
-    let outOfBounds = false;
 
     do {
       missileDir = (timer.timerWord8 >> 10) & 0x3;
@@ -1366,30 +1364,28 @@ export class TimerSystem {
       leavingThisCell = (missileDir === curPos) || (((missileDir + 1) & 3) === curPos);
       curMapX = origMapX;
       curMapY = origMapY;
-      outOfBounds = false;
 
       if (leavingThisCell) {
         curMapX += missileDir === 1 ? 1 : missileDir === 3 ? -1 : 0;
         curMapY += missileDir === 2 ? 1 : missileDir === 0 ? -1 : 0;
 
-        const map = this.dungeon.getMap(timer.level);
-        if (!map || curMapX < 0 || curMapY < 0 || curMapX >= map.descriptor.width || curMapY >= map.descriptor.height) {
-          nextRoomType = 8;
-          outOfBounds = true;
-        } else {
-          const nextCellFlags = map.cellFlags[curMapX][curMapY];
-          nextRoomType = (nextCellFlags >> 5) & 0x7;
-          const origCellFlags = map.cellFlags[origMapX][origMapY];
-          const nextIsStoneWall = nextRoomType === RoomType.STONE;
-          const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
-          const falseWallIsSolid = (nextCellFlags & 0x5) === 0;
-          const nextIsStairs = nextRoomType === RoomType.STAIRS;
-          const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
-          if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
-            if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, timer.level, curPos, missileRn)) {
-              this.timers.missileFilterObject = OBJECT_ID_NULL;
-              return;
-            }
+        // Off the map, `GetCellFlags` answers a stone cell (doc/CSBwin-src/CSBCode.cpp:4609)
+        // and the room is `roomEXTERIOR`, which counts as stone (Timer.cpp:321-340), so the
+        // missile meets the exterior wall.
+        const map = this.dungeon.getMap(timer.level)!;
+        const onMap = curMapX >= 0 && curMapY >= 0 && curMapX < map.descriptor.width && curMapY < map.descriptor.height;
+        const nextCellFlags = onMap ? map.cellFlags[curMapX][curMapY] : 0;
+        const nextRoomType = onMap ? (nextCellFlags >> 5) & 0x7 : RoomType.EXTERIOR;
+        const origCellFlags = map.cellFlags[origMapX][origMapY];
+        const nextIsStoneWall = nextRoomType === RoomType.STONE || nextRoomType === RoomType.EXTERIOR;
+        const nextIsFalseWall = nextRoomType === RoomType.FALSEWALL;
+        const falseWallIsSolid = (nextCellFlags & 0x5) === 0;
+        const nextIsStairs = nextRoomType === RoomType.STAIRS;
+        const origIsStairs = ((origCellFlags >> 5) & 0x7) === RoomType.STAIRS;
+        if (nextIsStoneWall || (nextIsFalseWall && falseWallIsSolid) || (nextIsStairs && origIsStairs)) {
+          if (this.ctx.systems.missileEncounter.processMissileEncounter(nextRoomType, origMapX, origMapY, origMapX, origMapY, timer.level, curPos, missileRn)) {
+            this.timers.missileFilterObject = OBJECT_ID_NULL;
+            return;
           }
         }
       }
@@ -1402,13 +1398,6 @@ export class TimerSystem {
     }
 
     if (leavingThisCell) {
-      if (outOfBounds) {
-        const dropPos = new Position(origMapX, origMapY, timer.level);
-        this.processObjectFromMissile(missileRn, null, dropPos);
-        this.timers.missileFilterObject = OBJECT_ID_NULL;
-        return;
-      }
-
       // `MoveObject(missileFilterObject, origMapX, origMapY, curMapX, curMapY, NULL, NULL)`
       // (`doc/CSBwin-src/Timer.cpp:382-397`), which reads the direction off the copy, and
       // `d.NewX`, `d.NewY`, `d.NewDir`, `d.NewPos` and `d.NewLevel` back from it. A missile

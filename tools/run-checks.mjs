@@ -75,6 +75,7 @@ const CHECKS = [
   { tool: 'dump-missile-door.ts' },
   { tool: 'dump-move-from-missile.ts' },
   { tool: 'dump-missile-teleport.ts' },
+  { tool: 'dump-missile-exterior.ts' },
   { tool: 'dump-party-move.ts' },
   { tool: 'dump-last-monster-attack.ts' },
   { tool: 'dump-monster-missile-type.ts' },

@@ -284,7 +284,7 @@ export class MissileEncounter {
           return false;
         }
         break;
-      case 8:
+      case RoomType.EXTERIOR:
         this.missileEncounterFilter(6, position, objectPos, missileRn, filterProjectile, -1);
         break;
       case RoomType.DOOR: {
