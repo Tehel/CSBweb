@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
 | C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
@@ -127,16 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C52 ⏳ The attack hands are not shaded while a candidate is in the party
-
-CSBWin's `DrawAttackButton` shades the hand while `d.PotentialCharacterOrdinal` is set,
-as it does for a busy champion and a sleeping party (`doc/CSBwin-src/Character.cpp:4875-4880`),
-so a champion being considered at a Hall of Champions mirror, once `DrawCharacterState`
-draws them (`:1500-1503`), shows a shaded hand. The port's `drawAttackButton`
-(`src/renderer/ui/Attack.ts:304`) tests only the busy bit and sleep. Add
-`potentialChampionIndex >= 0`. Evidence: a check or a golden frame of a candidate's
-attack hand.
 
 ### C53 ⏳ Five mouse handlers do not set `d.clockTick`
 

@@ -29,10 +29,14 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
+import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
+import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
+import { createUIState } from '../src/renderer/ui/UIState';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
@@ -133,6 +137,29 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
   return out;
 }
 
+/**
+ * Draw champion `chIdx`'s attack hand, `DrawAttackButton` (`doc/CSBwin-src/Character.cpp:4815`),
+ * and say whether it came out shaded. `ShadeRectangleInScreen(&LOCAL_8, 0)` blacks every
+ * pixel of the box whose x + y is odd, and an unshaded box has its blue border there.
+ */
+function attackHandShaded(game: Game, chIdx: number): boolean {
+  const graphics = sharedGraphics!;
+  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  ui.uiTables = extractUITables(graphics);
+  ui.objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+  ui.partyState = game.party.state;
+  ui.screenIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
+  drawAttackButton(ui, chIdx);
+  const { pixels, width } = ui.screenIndexBuffer;
+  const rect = attackButtonRect(chIdx);
+  for (let y = rect.y1; y <= rect.y2; y++) {
+    for (let x = rect.x1; x <= rect.x2; x++) {
+      if ((x + y) & 1 && pixels[y * width + x] !== 0) return false;
+    }
+  }
+  return true;
+}
+
 function heroByName(game: Game, name: string): PresetHero {
   const hero = (game.dungeonState.getData().presetHeroes ?? []).find((h) => h.name === name);
   if (!hero) throw new Error(`no preset hero named ${name}`);
@@ -197,6 +224,9 @@ function main(): void {
   check(party.potentialChampionIndex === 0, 'the champion is only provisional');
   check(party.selectedCharacterIndex === 0, 'the inventory opened on them (ShowHideInventory)');
   check(party.cursorOwner === 0, 'the first champion in the party gets the cursor');
+  console.log(`attack hand shaded: ${attackHandShaded(game, 0)}`);
+  check(attackHandShaded(game, 0),
+    "the candidate's attack hand is shaded while d.PotentialCharacterOrdinal is set (Character.cpp:4876)");
 
   /* ------------------------------------ 2. possessions, and where they still are - */
 
@@ -272,6 +302,7 @@ function main(): void {
     'clicking the dead mirror adds nobody');
   check(party.magicCasterIndex === 0, 'SelectMagicCaster(0) for the only champion');
   check(party.cursorOwner === 0, 'SetHandOwner(0) likewise');
+  check(!attackHandShaded(game, 0), 'and the attack hand is no longer shaded');
 
   const messages = probeMessages(game);
   const printed = messages.map((m) => m.text);
@@ -293,6 +324,8 @@ function main(): void {
   standAtMirror(game, boris);
   check(game.handleWallClick() === false && party.champions.length === 2,
     'BORIS joins provisionally at his own mirror');
+  check(attackHandShaded(game, 0),
+    "HALK's attack hand is shaded too: the test is d.PotentialCharacterOrdinal, not the champion");
 
   const wizard = party.champions[1]!;
   const before = {

@@ -268,7 +268,8 @@ export function attackPanelTick(ui: UIState): void {
  * A dead champion's button is a black hole rather than a blue box; a living one shows
  * the icon of whatever it is fighting with, or the bare-fist icon for an empty hand. An
  * object that *is* held but has no attacks leaves the box empty. The box is shaded when
- * the champion is mid-action, or while the party sleeps.
+ * the champion is mid-action, while a champion at a Hall of Champions mirror has not yet
+ * been resurrected, reincarnated or cancelled, or while the party sleeps.
  */
 export function drawAttackButton(ui: UIState, chIdx: number): void {
   if (!ui.screenIndexBuffer || !ui.uiTables) return;
@@ -299,10 +300,10 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
     );
   }
 
-  // ⚠️ CSBWin also shades while `d.PotentialCharacterOrdinal` is set
-  // (`Character.cpp:4876`): DEBT.md C52.
+  // `Character.cpp:4875-4880`: busy, a candidate in the party, or asleep.
   const busy = (champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
-  if (busy || (ui.partyState?.sleeping ?? false)) {
+  const candidate = (ui.partyState?.potentialChampionIndex ?? -1) >= 0;
+  if (busy || candidate || (ui.partyState?.sleeping ?? false)) {
     shadeRectIndex(ui, rect, 0);
   }
 }
