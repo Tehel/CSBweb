@@ -121,7 +121,7 @@ function masteryOf(ui: UIState, champ: Champion, skill: number): number {
 
 /**
  * `PrepareAttack` (`doc/CSBwin-src/Character.cpp:4904`) — open the attack menu for one
- * champion.
+ * champion, unless they are busy or dead (`:4916`).
  *
  * An empty fighting hand still has attacks: attack class 2, which is the bare-handed
  * row. A held object whose attack class is 0 has none at all and the click is ignored.
@@ -129,8 +129,7 @@ function masteryOf(ui: UIState, champ: Champion, skill: number): number {
 export function prepareAttack(ui: UIState, chIdx: number): void {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return;
-  // ⚠️ CSBWin also refuses a busy champion, `CHARFLAG_attackDisable`
-  // (`Character.cpp:4916`): DEBT.md C49.
+  if ((champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0) return;
   if (champ.alive === false || (champ.attributes.health | 0) === 0) return;
 
   const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);

@@ -3593,7 +3593,8 @@ Evidence: `tools/dump-viewport-click.ts`.
   (`Magic.cpp:528-531`). `EnableCharacterAction`, the `TT_11`, clears it unconditionally,
   after `busyTimer = -1` (`Timer.cpp:2645-2646`). `DrawAttackButton` shades the hand while it,
   `d.PotentialCharacterOrdinal` or `d.PartySleeping` is set (`Character.cpp:4875-4880`), and
-  `PrepareAttack` opens no menu while it is set (`:4916`).
+  `PrepareAttack` opens no menu while it is set (`:4916`), by key or by a click on the hand
+  (evidence: `tools/dump-key-bindings.ts`).
 - A champion busied again while busy keeps the bit, and the busy timer is replaced: with
   `D7 = d.Time + delay` and the old timer due at `D6`, the new one is due at
   `D7 + ((D6 - d.Time) >> 1)` if `D7 >= D6`, else at `D6 + delay / 2` (`Magic.cpp:514-527`).

@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
 | C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
 | C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
 | C52 | The attack hands are not shaded while a candidate is in the party | S | ⏳ |
@@ -128,17 +127,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C49 ⏳ `PrepareAttack` does not refuse a busy champion
-
-CSBWin's `PrepareAttack` returns at once when the champion has `CHARFLAG_attackDisable` set
-(`doc/CSBwin-src/Character.cpp:4916`), so a click on a shaded hand, or its attack key,
-opens no menu. The port's `prepareAttack` (`src/renderer/ui/Attack.ts:129-134`) tests only
-health, and neither caller (`Attack.ts:212`, `src/renderer/ui/Keyboard.ts:120`) nor
-`executeAttack` tests more, so a busy champion's menu opens, and an option picked from it
-attacks again before the busy timer has fired. Test `CHARFLAG_ATTACK_DISABLE` in
-`charFlags`, as `drawAttackButton` does. Evidence: a check that attacks, then clicks the
-same hand at once.
 
 ### C50 ⏳ `DisableCharacterAction` refuses a delay of 0
 

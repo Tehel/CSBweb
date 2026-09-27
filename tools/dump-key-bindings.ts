@@ -31,6 +31,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -241,6 +242,38 @@ async function main(): Promise<void> {
   press('1');
   check(runes(party.state) === '-', 'and no runes');
   party.state.potentialChampionIndex = -1;
+
+  // ---- 7. A busy champion opens no menu, by key or by a click on their hand:
+  //         `PrepareAttack` returns on `CHARFLAG_attackDisable`
+  //         (`doc/CSBwin-src/Character.cpp:4916`). The stub attack busies the attacker, as
+  //         the real one's `DisableCharacterAction` does.
+  const { attackPanelTick, handleAttackAreaClick } = await import('../src/renderer/ui/Attack');
+  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+    attacks.push({ chIdx, attackType });
+    party.state.champions[chIdx].charFlags |= CHARFLAG_ATTACK_DISABLE;
+    return 1;
+  };
+  const hand = ui.uiTables.graphic231.buttons.buttons17952.find((b) => b.word0 === 116);
+  check(hand !== undefined, 'buttons17952 should hold champion 1\'s hand, button 116');
+  const clickHand = (): void => {
+    if (!hand) return;
+    handleAttackAreaClick(ui, (hand.x1 + hand.x2) >> 1, (hand.y1 + hand.y2) >> 1);
+    row(ui, 'hand', true);
+  };
+  attacks = [];
+  press('q');
+  press('a');
+  attackPanelTick(ui); // the tick brings the hands back: word20252 = 1
+  check(attacks.length === 1 && (party.state.champions[0].charFlags & CHARFLAG_ATTACK_DISABLE) !== 0,
+    'the attack should leave champion 1 busy');
+  press('q');
+  check(ui.attackingCharacterOrdinal === 0, "'q' should open no menu for a busy champion");
+  clickHand();
+  check(ui.attackingCharacterOrdinal === 0, 'a click on a busy champion\'s hand should open no menu');
+  party.state.champions[0].charFlags &= ~CHARFLAG_ATTACK_DISABLE;
+  clickHand();
+  check(ui.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
+  press('q');
 
   finish();
 }
