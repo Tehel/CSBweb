@@ -481,6 +481,17 @@ filter's `skillRequired` replaces the spell's only in the experience,
 which is what classes 2 and 3 act on; the class-1 potion type is `pSpell->word6` whatever
 the filter says (`:1250`). Evidence: `tools/dump-cast-spell.ts`.
 
+## Zokathra goes into a hand, or is dropped like any drop
+
+`CastSpell`'s class-3 type 7 makes a `misc_ZokathraSpell` in a new misc record
+(`doc/CSBwin-src/Magic.cpp:1356-1359`) and puts it in the caster's first empty hand, slot 0
+before slot 1, with `AddCharacterPossession` (`:1360-1378`). With both hands full it is
+dropped in the party's cell on the party's level, `MoveObject(obj_2, -1, 0, d.partyX,
+d.partyY, NULL, NULL)` between a `LoadLevel(d.partyLevel)` and a `LoadLevel(oldLevel)`
+(`:1380-1387`), so it lies at corner 0 and the pads there see it placed, with
+`unchangedRoom` true because the party stands there. When no misc record is free, nothing
+is made (`:1357`). Evidence: `tools/dump-cast-spell.ts`.
+
 ## Blocked movement has no message
 
 CSBWin answers a blocked move with a **sound only**. Verified by grep over the whole of

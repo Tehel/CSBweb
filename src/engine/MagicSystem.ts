@@ -12,7 +12,7 @@
 import type { SpellDefinition } from '../data/spellTypes';
 import { applyLimits, sw } from '../core/intCast';
 import { OBJNI_EMPTY_FLASK } from '../core/objectNameIndex';
-import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, withObjectPosition, type ObjectID } from '../core/types';
+import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
 import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
@@ -331,11 +331,10 @@ export class MagicSystem {
               if (hand !== -1) {
                 this.ctx.systems.character.addCharacterPossession(casterIdx, zokathra, hand);
               } else {
-                const placed = this.dungeon.addObjectToCell(
-                  this.ctx.party.state.position,
-                  withObjectPosition(zokathra, 0),
-                );
-                if (!placed) this.dungeon.deleteDBEntry(zokathra);
+                // Both hands full: dropped in the party's cell like any drop, so it presses
+                // a pad there (`MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`, `:1380-1387`).
+                const at = this.ctx.party.state.position;
+                this.ctx.systems.worldMove.moveObject(zokathra, -1, 0, at.x, at.y, at.z);
               }
             }
             break;

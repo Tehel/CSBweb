@@ -13,13 +13,17 @@
  * - `action` is handled first, before `chIdx >= d.NumCharacter` and `HP() == 0`
  *   (`:1110-1153`): a filter's abort message prints for a dead caster, and an action with
  *   no message (8) casts normally.
+ * - Zokathra (missile type 7) goes into the first empty hand, and with both hands full is
+ *   dropped in the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY)`
+ *   (`:1360-1387`), so the pads there see it placed, with `unchangedRoom` true.
  *
  * Run: `npx tsx tools/dump-cast-spell.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Position } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
+import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -108,6 +112,39 @@ async function main(): Promise<void> {
   const silentAbort = cast({ action: 1 });
   const unknownAction = cast({ action: 8 });
 
+  // Zokathra, through a filter's missile type 7, with the hands full or not. Every pad call
+  // for a misc object is recorded.
+  const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+  const realTrigger = actuators.triggerObjectMove.bind(actuators);
+  const padCalls: string[] = [];
+  actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+    if (decodeObjectID(object).category === DBType.MISC) {
+      padCalls.push(`(${position.x},${position.y},${position.z}) ${place ? 'place' : 'lift'} unchanged ${unchangedRoom}`);
+    }
+    return realTrigger(position, object, place, unchangedRoom, facing);
+  };
+  const party = game.party.state.position;
+  const miscAtParty = (): number[] => {
+    const found: number[] = [];
+    for (let rn = game.dungeonState.findFirstObject(party); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+      if (decodeObjectID(rn).category === DBType.MISC) found.push(rn);
+    }
+    return found;
+  };
+  const zokathra = (hands: number) => {
+    const before = miscAtParty().length;
+    padCalls.length = 0;
+    const r = cast({ missileType: 7 }, (c) => {
+      for (let slot = 0; slot < hands; slot++) c.possessions[slot] = encodeObjectID(0, DBType.WEAPON, slot);
+    });
+    const [hand0, hand1] = game.party.state.champions[0].possessions;
+    const inCell = miscAtParty();
+    return { result: r.result, hand0, hand1, dropped: inCell.length - before, last: inCell[inCell.length - 1], pads: [...padCalls] };
+  };
+  const zokEmpty = zokathra(0);
+  const zokFull = zokathra(2);
+  actuators.triggerObjectMove = realTrigger;
+
   const row = (label: string, r: ReturnType<typeof cast>): void =>
     console.log(`${label.padEnd(28)} result ${r.result}  exp +${r.experience}  seeThru ${r.seeThruWalls}  printed ${JSON.stringify(r.printed)}`);
   row('unfiltered', plain);
@@ -116,6 +153,11 @@ async function main(): Promise<void> {
   row('action 3, dead caster', deadAbort);
   row('action 1', silentAbort);
   row('action 8', unknownAction);
+  const hex = (v: number | undefined): string => (v === undefined ? '-' : `0x${v.toString(16)}`);
+  for (const [label, z] of [['zokathra, hands empty', zokEmpty], ['zokathra, both hands full', zokFull]] as const) {
+    console.log(`${label.padEnd(28)} result ${z.result}  hands ${hex(z.hand0)} ${hex(z.hand1)}  dropped ${z.dropped}  `
+      + `pads ${JSON.stringify(z.pads)}`);
+  }
   console.log('');
 
   check(plain.result === 1, 'the unfiltered spell should succeed (mastery 3 >= D4W 3)');
@@ -132,6 +174,14 @@ async function main(): Promise<void> {
     `a filter's abort should print for a dead caster, as CSBWin checks the action first (${JSON.stringify(deadAbort.printed)})`);
   check(silentAbort.result === 0 && silentAbort.printed === '', 'action 1 should abort silently');
   check(unknownAction.result === 1, 'an action with no message (8) should cast normally');
+  check(zokEmpty.result === 1 && decodeObjectID(zokEmpty.hand0).category === DBType.MISC
+    && zokEmpty.dropped === 0 && zokEmpty.pads.length === 0,
+    'Zokathra with a hand empty goes into hand 0, and nothing is dropped');
+  check(zokFull.result === 1 && zokFull.dropped === 1 && zokFull.last !== undefined
+    && decodeObjectID(zokFull.last).position === 0,
+    'Zokathra with both hands full lies in the party\'s cell, at corner 0');
+  check(zokFull.pads.length === 1 && zokFull.pads[0] === `(${party.x},${party.y},${party.z}) place unchanged true`,
+    `Zokathra with both hands full is placed through MoveObject, so the pads see it (Magic.cpp:1380-1387): ${JSON.stringify(zokFull.pads)}`);
 
   finish();
 }

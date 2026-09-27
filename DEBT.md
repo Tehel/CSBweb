@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C48 | A Zokathra with both hands full is linked into the cell, not dropped | S | ⏳ |
 | C49 | `PrepareAttack` does not refuse a busy champion | S | ⏳ |
 | C50 | `DisableCharacterAction` refuses a delay of 0 | S | ⏳ |
 | C51 | A restored timer queue is read as a sorted list, but CSBWin's is a heap | M | ⏳ |
@@ -129,17 +128,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C48 ⏳ A Zokathra with both hands full is linked into the cell, not dropped
-
-When neither of the caster's hands is empty, CSBWin's Zokathra drops the new object into
-the party's cell with `MoveObject(obj_2, -1, 0, d.partyX, d.partyY, NULL, NULL)`, on the
-party's level (`doc/CSBwin-src/Magic.cpp:1380-1387`), so it presses a pad there as any
-drop does. The port's `MagicSystem` links it in with `DungeonState.addObjectToCell`
-(`src/engine/MagicSystem.ts:334-338`), which triggers nothing, and deletes the record if
-that fails, a case CSBWin does not have. Drop it with `WorldMove.moveObject(obj, -1, 0, …)`,
-as `CharacterSystem.dropAllPossessions` does. Evidence: a check that casts Zokathra with
-both hands full on a pressure pad.
 
 ### C49 ⏳ `PrepareAttack` does not refuse a busy champion
 
