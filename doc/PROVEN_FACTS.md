@@ -3817,3 +3817,13 @@ zeroes the print position, `d.PushTextUp` and `d.PartySleeping` and sets
 (`:716`), so an entry queued before the death is printed in the new game's first pass.
 `doc/CSBWIN_MESSAGES_REFERENCE.md` → "Persistence" has the detail;
 `tools/dump-messages.ts` checks `ScrollingText.restart`.
+
+## A won game without palette switching fades up to black
+
+`_ShowCredits`' `LOCAL_78` is a `static PALETTE` (`doc/CSBwin-src/Code1f9e6.cpp:76`), and its
+only writer is the `d.DynamicPaletteSwitching` branch, which saves `d.Palette11978` in it
+(`:150`). The won screen always ends in `FadeToPalette(&LOCAL_78)` (`:218`), so a win reached
+with switching off — an inventory open — fades the champions up to sixteen zeros, black,
+and stays there (`RepeatGame` false, `:219-222`). The glyphs `DisplayHeroName` prints with
+(`:39-57`, `A`-`Z` minus 0x40) are font 0x22d's codes 1-26, which differ from its `A`-`Z`.
+`tools/dump-show-credits.ts` checks both.

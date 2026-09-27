@@ -93,7 +93,7 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G13 | `_ShowCredits`: no won screen | L | ⏳ |
+| G13 | `_ShowCredits`: nothing reaches the won screen | L | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -444,7 +444,7 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
-### G13 ⏳ `_ShowCredits`: no won screen
+### G13 ⏳ `_ShowCredits`: nothing reaches the won screen
 
 `_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won. The
 port has the lost game: `Game.gameTick` ends `MainLoop` on the tick of death
@@ -456,21 +456,13 @@ up the next game in the running `Game`, with the message strip emptied
 (`showEndOfGame`, `src/main.ts`; `tools/dump-new-game.ts`, `tools/dump-messages.ts`).
 "SAVE AND QUIT" calls `ShowCredits(0)`, straight to the credits picture
 (`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` → Phase 10).
-G8 ends in the won screen.
+The won screen is ported, and G8 ends in it too.
 
 Size L, in three steps. Steps 1 and 2, the lost game and the restart, are done. Left:
 
-3. **The won game**, in two parts.
-   - **3a, the won screen.** `_ShowCredits(1)` with `d.Word11694` set: no dying sound;
-     with `d.DynamicPaletteSwitching` the eight `Darken` steps of both palettes, the
-     interface's saved in `LOCAL_78`, instead of the fade (`Code1f9e6.cpp:148-166`); then
-     the screen flooded with colour 12 and, for each champion, 48 lines apart, the frame
-     (graphic 208) at `d.Word132`, the portrait at `d.Word140`, the name and title
-     through `DisplayHeroName` and each mastery above 1, faded up to `LOCAL_78`, and the
-     game ends there (`:171-225`). Without `d.DynamicPaletteSwitching`, `LOCAL_78` is a
-     static nothing has written, so the fade is to black. Evidence: the screen over a
-     headless `IntroHost` in `tools/dump-show-credits.ts`, with graphic 208 and the two
-     rectangles as canaries.
+3. **The won game**, in two parts. 3a, the won screen, is done: `showCredits` with
+   `word11694` (`src/renderer/intro/ShowCredits.ts`, `tools/dump-show-credits.ts`), which
+   `showEndOfGame` never passes yet. Left:
    - **3b, the CSB win.** Actuator type 18 under a stone-room timer
      (`Timer.cpp:2366-2371`): `d.CanRestartFromSavegame = 0`, `d.Word11694 = 1`, and
      `ProcessTimers` returns true at once; `MainLoop` waits 300 VBLs and calls

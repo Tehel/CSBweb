@@ -18,7 +18,8 @@ import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMas
 import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import type { Rect } from '../csbwin/UITables';
-const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
+/** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:363-366`), the four base skills. */
+export const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
 /**
  * `d.Pointer16770` (`doc/CSBwin-src/CSBCode.cpp:370-384`), indexed by the mastery

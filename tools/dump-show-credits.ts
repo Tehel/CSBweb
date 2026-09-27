@@ -20,6 +20,13 @@
  *    hard-coded rectangle checks — and answering only a left click on it; the credits
  *    going back to "THE END" without the 300 VBLs; and the black screen a restart leaves.
  *
+ * 4. **The won screen.** With `d.Word11694`: no dying sound; with switching on, eight
+ *    `Darken` steps of both palettes to black, then each champion's frame, portrait, name,
+ *    title and masteries over colour 12, 48 lines apart, faded up to the interface's
+ *    palette; with it off, the same screen faded up to `LOCAL_78`, a static nothing has
+ *    written yet: black. Graphic 208 and `d.Word132` / `d.Word140` are canaries for each
+ *    other, as graphic 6 and `d.Word108` are.
+ *
  * Run: `npx tsx tools/dump-show-credits.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -37,7 +44,11 @@ import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import {
+  darken,
   DYING_SOUND_VBLS,
+  GRAPHIC_CHAMPION_FRAME,
+  WON_CHAMPION_PITCH,
+  type WonChampion,
   PALETTE_LOCAL_46,
   PALETTE_RESTART,
   RESTART_BUTTON_VBLS,
@@ -47,6 +58,9 @@ import {
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
+
+/** The hooks of a lost game: `_StartCSB` has turned palette switching off. */
+const LOST = { word11694: false, champions: [], palette11946: null };
 
 /* ------------------------------------------------ 1. the tick of death ---- */
 
@@ -241,7 +255,7 @@ async function checkScreen(): Promise<void> {
   // A key comes on the third poll: three VBLs of waiting.
   const r = recordingHost(ui, { heldAfterPolls: Infinity, keyAfterPolls: 3 });
   const log: string[] = [];
-  const hooks = { queueDyingSound: () => { r.steps.push({ kind: 'sound' }); }, canRestartFromSavegame: false };
+  const hooks = { queueDyingSound: () => { r.steps.push({ kind: 'sound' }); }, canRestartFromSavegame: false, ...LOST };
   const ending = await showCredits(r.host, hooks);
   check(ending === 'terminate', `without d.CanRestartFromSavegame the credits are the end (${ending})`);
   for (const s of r.steps) log.push(s.kind === 'sound' ? 'sound 6' : `vbl ${s.count}`);
@@ -275,7 +289,7 @@ async function checkScreen(): Promise<void> {
 
   // A button already held: no VBL of waiting at all.
   const held = recordingHost(ui, { heldAfterPolls: 0, keyAfterPolls: Infinity });
-  await showCredits(held.host, { queueDyingSound: () => {}, canRestartFromSavegame: false });
+  await showCredits(held.host, { queueDyingSound: () => {}, canRestartFromSavegame: false, ...LOST });
   const last = held.steps[held.steps.length - 1];
   console.log(`a held button: the last wait is ${last?.kind === 'vbl' ? `vbl ${last.count}` : last?.kind}`);
   check(held.steps.filter((s) => s.kind === 'vbl' && s.count === 1).length === 32, 'a held button ends the wait before its first VBL');
@@ -387,7 +401,7 @@ async function checkRestart(): Promise<void> {
 
   // The button, clicked in the tenth VBL of the wait.
   const b = scriptedHost(ui, (time, vbls) => (time === 0 && vbls === 18 ? [click(160, 152, 2)] : []));
-  const end = await showCredits(b.host, { queueDyingSound: () => { b.log.push('sound'); }, canRestartFromSavegame: true });
+  const end = await showCredits(b.host, { queueDyingSound: () => { b.log.push('sound'); }, canRestartFromSavegame: true, ...LOST });
   console.log(`clicked: ${end}; ${compact(b.log)}`);
   check(end === 'restart', 'a click on the button restarts the game');
   check(
@@ -438,7 +452,7 @@ async function checkRestart(): Promise<void> {
     if (time === 1 && vbls === 8) return [click(160, 152, 2)];
     return [];
   });
-  const end2 = await showCredits(m.host, { queueDyingSound: () => { m.log.push('sound'); }, canRestartFromSavegame: true });
+  const end2 = await showCredits(m.host, { queueDyingSound: () => { m.log.push('sound'); }, canRestartFromSavegame: true, ...LOST });
   console.log(`missed: ${end2}; ${compact(m.log)}`);
   check(
     compact(m.log) ===
@@ -450,10 +464,123 @@ async function checkRestart(): Promise<void> {
     'the second button is the first, drawn again');
 }
 
+/* ------------------------------------------------------ 4. the won game ---- */
+
+/** Pixels of `color` in the text box whose baseline is `y`, `length` glyphs from `x`. */
+function inkIn(pixels: Uint8Array, x: number, y: number, length: number, color: number): number {
+  let n = 0;
+  for (let py = y - 4; py < y + 2; py++) {
+    for (let px = x; px < x + 6 * length; px++) if (pixels[py * SCREEN_WIDTH + px] === color) n++;
+  }
+  return n;
+}
+
+async function checkWon(): Promise<void> {
+  console.log('');
+  console.log('=== _ShowCredits(1), a won game (Code1f9e6.cpp:122-225) ===');
+  const graphics = stockGraphics();
+  const ui = extractUITables(graphics);
+  const g = ui.graphic232;
+  const frame = graphics.getImage(GRAPHIC_CHAMPION_FRAME);
+  const size = (r: { x1: number; x2: number; y1: number; y2: number }): string => `${r.x2 - r.x1 + 1}x${r.y2 - r.y1 + 1}`;
+  console.log(`graphic 208 ${frame.width}x${frame.height}; Word132 ${size(g.word132)} at (${g.word132.x1},${g.word132.y1}); Word140 ${size(g.word140)} at (${g.word140.x1},${g.word140.y1})`);
+  check(frame.width === 64 && frame.height === 43, 'graphic 208 is 64x43: 32 bytes a line, 1376 in all');
+  check(size(g.word132) === '64x43', 'Word132 is the 64x43 BLT2Screen(…, 32, 10) fills');
+  check(size(g.word140) === '32x29', 'Word140 is the 32x29 portrait BLT2Screen(…, 16, 1) fills');
+  check(g.word140.x1 >= g.word132.x1 && g.word140.x2 <= g.word132.x2 && g.word140.y1 >= g.word132.y1 && g.word140.y2 <= g.word132.y2,
+    'and the portrait sits inside the frame');
+
+  // A portrait of colour 5, with colour 1, the transparent one, down its left column.
+  const portrait: IndexedBitmap = { width: 32, height: 29, pixels: new Uint8Array(32 * 29).map((_, i) => (i % 32 === 0 ? 1 : 5)) };
+  const champions: WonChampion[] = [
+    { name: 'ALEX', title: 'THE BOLD', titleByte1: 'H'.charCodeAt(0), portrait, masteries: [1, 3, 10, 20] },
+    { name: 'BO', title: 'X, THE KIND', titleByte1: ','.charCodeAt(0), portrait, masteries: [2, 1, 1, 1] },
+  ];
+  const interface552 = g.palette552[0] ?? PALETTE_11914;
+  const viewport552 = g.palette552[3] ?? PALETTE_11914;
+
+  const run = async (palette11946: readonly number[] | null) => {
+    const r = recordingHost(ui, { heldAfterPolls: Infinity, keyAfterPolls: Infinity });
+    const shown: { global: number[]; viewport: number[] | null }[] = [];
+    r.host.present = () => { shown.push({ global: [...r.host.globalPalette], viewport: r.host.palette11946 ? [...r.host.palette11946] : null }); };
+    let sounds = 0;
+    const end = await showCredits(r.host, {
+      queueDyingSound: () => { sounds++; }, canRestartFromSavegame: true, word11694: true, champions, palette11946,
+    });
+    const vbls = r.steps.map((step) => (step.kind === 'vbl' ? step.count : -1));
+    return { r, shown, end, sounds, vbls };
+  };
+
+  // Switching off first: `LOCAL_78` is still what the program started with.
+  const off = await run(null);
+  console.log(`switching off: ${off.vbls.length} VBLs, palette ${off.r.host.globalPalette.map((c) => c.toString(16)).join(' ')}`);
+  check(off.sounds === 0 && off.vbls.every((count) => count === 1) && off.vbls.length === 16,
+    'switching off: no dying sound, the fade to black and a fade, a VBL a step');
+  check(off.r.host.globalPalette.every((c) => c === 0), 'and LOCAL_78, never written, is black');
+  check(off.end === 'terminate', 'the won screen is where the game ends, restartable or not');
+
+  const on = await run(viewport552);
+  console.log(`switching on: ${on.vbls.length} VBLs, palette ${on.r.host.globalPalette.map((c) => c.toString(16)).join(' ')}`);
+  check(on.sounds === 0 && on.vbls.every((count) => count === 1) && on.vbls.length === 9 + 8,
+    'switching on: eight Darken steps a VBL each, one more, and the fade');
+  const first = on.shown[1];
+  check(first !== undefined && first.global.every((c, i) => c === darken(interface552[i] ?? 0)) &&
+    first.viewport !== null && first.viewport.every((c, i) => c === darken(viewport552[i] ?? 0)),
+    'the first step darkens both palettes');
+  const black = on.shown[8];
+  check(black !== undefined && black.global.every((c) => c === 0) && (black.viewport ?? [1]).every((c) => c === 0),
+    'the eighth leaves both black');
+  check(on.shown.slice(9).every((shot) => shot.viewport === null), 'the champions are shown with switching off');
+  check(on.r.host.globalPalette.every((c, i) => c === interface552[i]), 'and faded up to LOCAL_78, the interface palette');
+
+  const pixels = on.r.host.screen.pixels;
+  const at = (x: number, y: number): number => pixels[y * SCREEN_WIDTH + x]!;
+  let frameOk = true;
+  let portraitOk = true;
+  champions.forEach((_, k) => {
+    const down = WON_CHAMPION_PITCH * k;
+    for (let y = 0; y < frame.height; y++) {
+      for (let x = 0; x < frame.width; x++) {
+        const px = g.word132.x1 + x;
+        const py = g.word132.y1 + down + y;
+        const inPortrait = px >= g.word140.x1 && px <= g.word140.x2 && py >= g.word140.y1 + down && py <= g.word140.y2 + down;
+        const want = frame.pixels[y * frame.width + x]!;
+        if (!inPortrait && want !== 10 && at(px, py) !== want) frameOk = false;
+      }
+    }
+    for (let y = 0; y < 29; y++) {
+      for (let x = 0; x < 32; x++) {
+        const want = x === 0 ? null : 5;
+        if (want !== null && at(g.word140.x1 + x, g.word140.y1 + down + y) !== want) portraitOk = false;
+      }
+    }
+  });
+  check(frameOk, 'each frame is graphic 208 at Word132, 48 lines further down each, colour 10 left out');
+  check(portraitOk, 'each portrait at Word140, colour 1 left out');
+  check(at(0, 0) === 12 && at(SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1) === 12, 'the rest is colour 12');
+
+  // ALEX: the title 5 pixels after the name, then NOVICE NINJA, ` MASTER PRIEST and
+  // ARCHMASTER WIZARD, 8 lines apart from the title's line + 1. BO: ", THE KIND" straight
+  // after the name, and NEOPHYTE FIGHTER.
+  const lines: [string, number, number, number, number][] = [
+    ['ALEX', 87, 14, 4, 9], ['THE BOLD', 87 + 24 + 5, 14, 8, 9],
+    ['NOVICE NINJA', 105, 23, 12, 13], ['` MASTER PRIEST', 105, 31, 15, 13], ['ARCHMASTER WIZARD', 105, 39, 17, 13],
+    ['BO', 87, 62, 2, 9], ['X, THE KIND', 87 + 12, 62, 11, 9], ['NEOPHYTE FIGHTER', 105, 71, 16, 13],
+  ];
+  for (const [text, x, y, length, color] of lines) {
+    const n = inkIn(pixels, x, y, length, color);
+    console.log(`  ${text.padEnd(18)} at (${x},${y}) colour ${color}: ${n} pixels`);
+    check(n > 0, `${text} is printed at (${x},${y}) in colour ${color}`);
+  }
+  check(inkIn(pixels, 105, 47, 17, 13) === 0 && inkIn(pixels, 105, 79, 17, 13) === 0, 'and no fourth mastery line: mastery 1 is left out');
+  check(inkIn(pixels, 87 + 24, 14, 1, 9) === 0, 'nor anything in the 5 pixels after ALEX');
+}
+
 async function main(): Promise<void> {
   checkTickOfDeath();
   await checkScreen();
   await checkRestart();
+  await checkWon();
   finish();
 }
 

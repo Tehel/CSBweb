@@ -497,8 +497,8 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 `_ShowCredits(P1)` is reached three ways: `_StartCSB` once `MainLoop` has returned, with
 `d.GameIsLost` (`CSBCode.cpp:11322-11326`); `MainLoop` itself when `ProcessTimers` reports the
 CSB win (`:626-633`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1252`). `_FusionSequence`
-ends in it too (`Attack.cpp:2429`). The port has the first (`src/renderer/intro/ShowCredits.ts`;
-the rest is `DEBT.md` G13).
+ends in it too (`Attack.cpp:2429`). The port has the first, and the won screen the other two
+end in (`src/renderer/intro/ShowCredits.ts`); what reaches it is `DEBT.md` G13 step 3b and G8.
 
 **The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2680`). The tick
 has run its timers; at `tag000730` it runs `WaitForButtonFlash`, `StartQueuedSound` and
@@ -560,6 +560,39 @@ save of another `d.RandomGameID` only while `d.PartyHasDied` is set
 zeroed both, members of `DBank` (`Data.h:606`, `:614`), with `memset(this, 0, …)`
 (`CSBCode.cpp:329`) before `GameSetup` reads anything. Button `0xd7` is the only writer of
 `d.PartyHasDied` = 1. So every save loads after a restart, in CSBWin as in the port.
+
+**The won game, `P1 = 1`, `d.Word11694 = 1`** (`:122-225`). The CSB win (actuator type 18,
+`Timer.cpp:2366-2371`) and `_FusionSequence` (`Attack.cpp:2268`) set `d.Word11694`, and both
+reach `_ShowCredits` without `_StartCSB`'s clearing of `d.DynamicPaletteSwitching`.
+
+1. As the lost game's step 1, but no dying sound and no wait (`:124`).
+2. Graphic 208, the champion frame, is read after graphic 6 (`:138-143`): 64×43, the 1376
+   bytes `A3` skips.
+3. With `d.DynamicPaletteSwitching` set: `d.Palette11978` saved in `LOCAL_78`, then eight
+   times a VBL and `Darken` (`:27`: each non-zero channel down one) on every colour of
+   `d.Palette11946` and `d.Palette11978`, which takes the 3-bit channels to black; a VBL,
+   and `LOCAL_78` copied back into `d.Palette11978` (`:148-166`). The display showed
+   `d.Palette11978` through `globalPalette` meanwhile (`WinScreen.cpp:1493-1498`), so
+   `globalPalette` is left black. Without it, the lost game's fade to black (`:168-170`).
+   `LOCAL_78` is a `static` (`:76`) and this is its only writer, so without switching it
+   holds the zeros the program started with.
+4. `Flood(d.LogicalScreenBase, 12, 0xfa0)`, the whole screen in colour 12 (`:175`). For
+   each champion `D7W`, `D6W = 48 * D7W` (`:176-215`): graphic 208 at `d.Word132` with
+   colour 10 transparent, the portrait at `d.Word140` with colour 1 transparent;
+   `DisplayHeroName(87, D6W += 14, 9, name)`; the title at `6 * StrLen(name) + 87`, 5
+   further unless `name[9]` — the title's second byte — is `,`, `;` or `-`, on the same
+   line, `D6W` then one lower; and for each base skill whose `DetermineMastery(D7W, skill |
+   0xc000)`, capped at 16, is not 1, `d.Pointer16770[mastery] + " " + d.Pointer16596[skill]`
+   at `(105, D6W += 8)` in colour 13 (0 dies, `0x8d49`). Then `d.Word132` and `d.Word140`
+   move 48 down. `DisplayHeroName` (`:39`) takes `A`-`Z` down 0x40 to glyphs 1-26 of the
+   font, which are other letterforms than `A`-`Z` at 65-90, and prints on colour 12.
+5. `d.DynamicPaletteSwitching = 0`, and the fade to `LOCAL_78` (`:217-218`). Then
+   `for (i=0; (i<2000)&&(RepeatGame) || (!RepeatGame); i++) wvbl(_24_);` (`:219-222`):
+   with `RepeatGame` false it never ends, and the champions stay up for good.
+
+The port gives `IntroHost` a `palette11946`, drawn over the viewport by `present` while it is
+set, for step 3; the page's is the viewport palette the adventure showed, or `null` with an
+inventory open (`GameScreen.palette11946`). `tools/dump-show-credits.ts` checks both branches.
 
 
 ## Skipping it

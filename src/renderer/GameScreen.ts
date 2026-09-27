@@ -539,6 +539,15 @@ export class GameScreen {
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
   }
 
+  /**
+   * `d.Palette11946` if `d.DynamicPaletteSwitching` is on, a copy, or `null`: on while the
+   * dungeon view is shown, off while an inventory is open (`present`).
+   */
+  palette11946(): number[] | null {
+    if (this.isInventoryOpen()) return null;
+    return this.getViewportPalette()?.slice() ?? null;
+  }
+
   private getViewportPalette(): number[] | null {
     const palettes = this.viewport.viewportPalettes;
     if (!palettes || palettes.length === 0) return null;
@@ -593,8 +602,13 @@ export class GameScreen {
   }
 
   /** Push the screen buffer to the canvas through an explicit palette. */
-  presentScreen(palette: number[]): void {
-    updateImageDataFromIndex(this.screenImageData, this.screen, palette);
+  presentScreen(palette: number[], palette11946: number[] | null = null): void {
+    if (palette11946) {
+      const viewport = { x1: VIEWPORT_X, y1: VIEWPORT_Y, x2: VIEWPORT_X + VIEWPORT_WIDTH - 1, y2: VIEWPORT_Y + VIEWPORT_HEIGHT - 1 };
+      updateImageDataFromIndexWithViewportPalette(this.screenImageData, this.screen, viewport, palette11946, palette);
+    } else {
+      updateImageDataFromIndex(this.screenImageData, this.screen, palette);
+    }
     this.screenCtx.putImageData(this.screenImageData, 0, 0);
   }
 

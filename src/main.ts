@@ -350,6 +350,10 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
         {
             queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0),
             canRestartFromSavegame: game.canRestartFromSavegame(),
+            // The won game is not reached yet (DEBT.md G13 step 3b).
+            word11694: false,
+            champions: [],
+            palette11946: null,
         },
     );
     if (end === 'terminate') return;

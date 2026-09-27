@@ -41,6 +41,13 @@ export interface IntroHost {
    * reads it.
    */
   readonly globalPalette: number[];
+  /**
+   * `d.Palette11946` while `d.DynamicPaletteSwitching` is on, `null` while it is off. On,
+   * the display draws the viewport in it and the rest in `d.Palette11978`, which it copies
+   * into `globalPalette` (`doc/CSBwin-src/WinScreen.cpp:1493-1498`); off, everything in
+   * `globalPalette`. `present` reads it. Only the won game's `_ShowCredits` turns it on.
+   */
+  palette11946?: number[] | null;
   /** `ReadAndExpandGraphic(n, …)` — one `graphics.dat` item, one byte per pixel. */
   getGraphic(graphicNum: number): IndexedBitmap;
   /** Push `screen` to the canvas through `globalPalette`. */

@@ -20,12 +20,15 @@
  * 6. with `d.CanRestartFromSavegame` set, back to "THE END" without the 300 VBLs
  *    (`:339-348`); otherwise `UI_PushMessage(UIM_TERMINATE)` (`:349`), and the program ends.
  *
- * Only the lost game is ported. The won game shows the champions instead (`DEBT.md` G13
- * step 3).
+ * A won game, `d.Word11694` set, has no dying sound, and after the fade shows the
+ * champions instead, for good (`:171-225`, `showChampions`). What sets it is not ported
+ * yet (`DEBT.md` G13 step 3b).
  */
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
-import { drawTextLineIndex } from '../csbwin/TextRenderer';
+import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
+import type { IndexedBitmap } from '../csbwin/CanvasBlitter';
 import type { UIButton } from '../csbwin/UITables';
+import { MASTERY_LABELS, ROLE_LABELS } from '../ui/Character';
 import { searchButtonList } from '../ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../ViewportGraphics';
 import { PALETTE_11914, fadeToPalette, type IntroHost } from './IntroHost';
@@ -34,6 +37,13 @@ import { PALETTE_11914, fadeToPalette, type IntroHost } from './IntroHost';
 const GRAPHIC_THE_END = 6;
 /** `ReadAndExpandGraphic(0x8005, …)` (`:145`), the picture the entrance's scroll shows too. */
 const GRAPHIC_CREDITS = 5;
+/**
+ * `ReadAndExpandGraphic(208, …)` (`:141`): the frame round a champion on the won screen,
+ * 64x43 — the 1376 bytes `A3` skips.
+ */
+export const GRAPHIC_CHAMPION_FRAME = 208;
+/** `D6L = 48 * D7W`, and `d.Word132` and `d.Word140` moved down 48 a champion (`:177`, `:211-214`). */
+export const WON_CHAMPION_PITCH = 48;
 /** `QueueSound(6, d.partyX, d.partyY, 0); //Dying sound` (`:126`). */
 export const SOUND_DYING = 6;
 /** `VBLDelay(_1_, 240); // About 4 seconds` (`:127`). */
@@ -54,11 +64,39 @@ export const PALETTE_LOCAL_46: readonly number[] = PALETTE_LOCAL_110.map((c, i) 
 /** `LOCAL_46` once the button is drawn: its border `0x437`, its text white (`:248-249`). */
 export const PALETTE_RESTART: readonly number[] = PALETTE_LOCAL_46.map((c, i) => (i === 1 ? 0x437 : i === 4 ? 0x777 : c));
 
+/**
+ * `LOCAL_78` (`:76`), a static: the `Darken` branch saves `d.Palette11978` in it (`:150`),
+ * and nothing else writes it, so without `d.DynamicPaletteSwitching` the won screen fades
+ * up to sixteen zeros, black.
+ */
+const LOCAL_78: number[] = new Array(16).fill(0);
+
+/** What the won screen shows of a champion, `d.CH16482[D7W]` (`:178-210`). */
+export interface WonChampion {
+  name: string;
+  title: string;
+  /** `*(name + 9)` (`:187`): the title's second byte, as `CHARDESC.name` is 8 bytes. */
+  titleByte1: number;
+  /** `CHARDESC.portrait`, 32x29. */
+  portrait: IndexedBitmap | null;
+  /** `DetermineMastery(D7W, D5W | 0xc000)` for the four base skills (`:195`). */
+  masteries: readonly number[];
+}
+
 export interface ShowCreditsHooks {
   /** `QueueSound(6, d.partyX, d.partyY, 0)`: the engine's, at the party's square. */
   queueDyingSound(): void;
   /** `d.CanRestartFromSavegame`: the game was saved or loaded since it began. */
   canRestartFromSavegame: boolean;
+  /** `d.Word11694`: the game is won. */
+  word11694: boolean;
+  /** `d.CH16482[0 … d.NumCharacter - 1]`, for the won screen. */
+  champions: readonly WonChampion[];
+  /**
+   * `d.Palette11946` if `d.DynamicPaletteSwitching` is on, `null` if it is off. `_StartCSB`
+   * turns it off before a lost game's `ShowCredits` (`doc/CSBwin-src/CSBCode.cpp:11323`).
+   */
+  palette11946: readonly number[] | null;
 }
 
 /**
@@ -78,15 +116,38 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
   // `SetCursorShape(0); STHideCursor(HC50);` and the four input tables emptied (`:116-121`):
   // the caller has stopped the adventure's input.
   host.setCursorVisible(false);
-  hooks.queueDyingSound();
-  await host.vbl(DYING_SOUND_VBLS);
+  if (!hooks.word11694) {
+    hooks.queueDyingSound();
+    await host.vbl(DYING_SOUND_VBLS);
+  }
 
   const theEnd = host.getGraphic(GRAPHIC_THE_END);
   const credits = host.getGraphic(GRAPHIC_CREDITS);
-  // `d.DynamicPaletteSwitching` is 0: the whole screen is in `globalPalette`, the
-  // interface's, and fades from it (`:168-170`).
+  host.palette11946 = hooks.palette11946 ? [...hooks.palette11946] : null;
   host.present();
-  await fadeToPalette(host, PALETTE_11914);
+  if (host.palette11946) {
+    // `:148-166`: `d.Palette11978` saved in `LOCAL_78`, then both palettes darkened a step
+    // a VBL, eight times: black. The display copies `d.Palette11978` into `globalPalette`
+    // while switching is on, so the port darkens `globalPalette`; the copy back into
+    // `d.Palette11978` (`:165`) never reaches it, as switching is off before the next.
+    LOCAL_78.splice(0, 16, ...host.globalPalette);
+    for (let step = 0; step <= 7; step++) {
+      await host.vbl(1);
+      for (let i = 0; i < 16; i++) {
+        host.palette11946[i] = darken(host.palette11946[i] ?? 0);
+        host.globalPalette[i] = darken(host.globalPalette[i] ?? 0);
+      }
+      host.present();
+    }
+    await host.vbl(1);
+  } else {
+    // The whole screen is in `globalPalette`, the interface's, and fades from it (`:168-170`).
+    await fadeToPalette(host, PALETTE_11914);
+  }
+  if (hooks.word11694) {
+    await showChampions(host, hooks.champions);
+    return 'terminate';
+  }
 
   // `LOCAL_132`: only the first "THE END" waits its 300 VBLs.
   let firstTime = true;
@@ -120,6 +181,64 @@ export async function showCredits(host: IntroHost, hooks: ShowCreditsHooks): Pro
     firstTime = false;
     await fadeToPalette(host, PALETTE_LOCAL_110);
   }
+}
+
+/** `Darken` (`doc/CSBwin-src/Code1f9e6.cpp:27`): each channel one step nearer 0. */
+export function darken(color: number): number {
+  if (color & 0x007) color -= 0x001;
+  if (color & 0x070) color -= 0x010;
+  if (color & 0x700) color -= 0x100;
+  return color;
+}
+
+/**
+ * `DisplayHeroName` (`doc/CSBwin-src/Code1f9e6.cpp:39`): `A`-`Z` moved down 0x40, to the
+ * font's glyphs 1-26, and printed on colour 12.
+ */
+function displayHeroName(host: IntroHost, x: number, y: number, color: number, text: string): void {
+  let codes = '';
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    codes += code >= 0x41 && code <= 0x5a ? String.fromCharCode(code - 0x40) : ch;
+  }
+  drawTextLineIndexRaw(host.screen, host.font, x, y, color, 12, codes);
+}
+
+/**
+ * The won screen (`:171-225`): each champion's frame, portrait, name, title and masteries
+ * on colour 12, faded up to `LOCAL_78` with switching off. `RepeatGame` is false, so its
+ * wait never ends (`:219-222`), and neither does the game: the screen stays.
+ */
+async function showChampions(host: IntroHost, champions: readonly WonChampion[]): Promise<void> {
+  const rects = host.uiTables.graphic232;
+  const frame = host.getGraphic(GRAPHIC_CHAMPION_FRAME);
+  // `Flood(d.LogicalScreenBase, 12, 0xfa0)`: 4000 words, the whole screen.
+  host.screen.pixels.fill(12);
+  champions.forEach((champion, d7) => {
+    const down = WON_CHAMPION_PITCH * d7;
+    const r132 = rects.word132;
+    const r140 = rects.word140;
+    tag0088b2Index(frame, host.screen, { x1: r132.x1, x2: r132.x2, y1: r132.y1 + down, y2: r132.y2 + down, srcX: 0, srcY: 0, srcStride: frame.width }, 10);
+    if (champion.portrait) {
+      const portrait = champion.portrait;
+      tag0088b2Index(portrait, host.screen, { x1: r140.x1, x2: r140.x2, y1: r140.y1 + down, y2: r140.y2 + down, srcX: 0, srcY: 0, srcStride: portrait.width }, 1);
+    }
+    let d6 = down + 14;
+    displayHeroName(host, 87, d6, 9, champion.name);
+    let d5 = 6 * champion.name.length + 87;
+    const byte9 = champion.titleByte1;
+    if (byte9 !== 44 && byte9 !== 59 && byte9 !== 45) d5 += 5;
+    displayHeroName(host, d5, d6++, 9, champion.title);
+    for (let skill = 0; skill <= 3; skill++) {
+      const d4 = Math.min(16, champion.masteries[skill] ?? 0);
+      if (d4 === 1) continue;
+      if (d4 === 0) throw new Error('Mastery = 0'); // `die(0x8d49, …)`
+      displayHeroName(host, 105, (d6 += 8), 13, `${MASTERY_LABELS[d4]} ${ROLE_LABELS[skill]}`);
+    }
+  });
+  // `d.DynamicPaletteSwitching = 0; videoMode = VM_CAST;`
+  host.palette11946 = null;
+  await fadeToPalette(host, LOCAL_78);
 }
 
 /**

@@ -158,6 +158,10 @@ export interface UITables {
     word612: number[];
     /** The prison door's right half on the static entrance screen. */
     word100: WordRect;
+    /** A champion's portrait on the won screen, the first of them (`doc/CSBwin-src/Code1f9e6.cpp:182`). */
+    word140: WordRect;
+    /** A champion's frame, graphic 208, on the won screen, the first of them (`Code1f9e6.cpp:181`). */
+    word132: WordRect;
     /**
      * The "RESTART THIS GAME" button's border, filled with colour 1, and its face inside
      * it, filled with 0 (`doc/CSBwin-src/Code1f9e6.cpp:243-246`).
@@ -716,6 +720,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const wordRects = readWordRectArray(view, off, 17);
   // The title animation and the prison door (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`).
   // The end of the game (`_ShowCredits`, `doc/CSBwin-src/Code1f9e6.cpp:66`).
+  const word140 = wordRects[0];
+  const word132 = wordRects[1];
   const word124 = wordRects[2];
   const word116 = wordRects[3];
   const word108 = wordRects[4];
@@ -776,6 +782,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     iconDisplay,
     word612,
     word100,
+    word140,
+    word132,
     word124,
     word116,
     word108,

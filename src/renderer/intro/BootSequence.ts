@@ -140,7 +140,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
     globalPalette,
     getGraphic: (graphicNum) => gameScreen.getBitmap(graphicNum),
     present: () => {
-      const paint = (): void => gameScreen.presentScreen(globalPalette);
+      const paint = (): void => gameScreen.presentScreen(globalPalette, host.palette11946 ?? null);
       if (!cursorVisible) paint();
       else withCursor(screen, arrow, pointerX, pointerY, paint);
     },
