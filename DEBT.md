@@ -83,7 +83,7 @@ In payoff order: the first row is the next item.
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
-| C73 | A room's message drops its "THE" and "YOU" | S | ⏳ |
+| C73 | A room's message decodes without the escape tables | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -276,19 +276,26 @@ entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straig
 adventure in both (`init` and `showEndOfGame`, `src/main.ts`). Show the menu, with
 `src/renderer/ui/Menu.ts`, before the loop starts. Evidence: a golden frame of it.
 
-### C73 ⏳ A room's message drops its "THE" and "YOU"
+### C73 ⏳ A room's message decodes without the escape tables
 
 CSBWin's `DecodeText` expands codes 29 and 30 through the escape tables `d.Byte10080` and
 `d.Byte10016` for any text but a wall's (`doc/CSBwin-src/CSBCode.cpp:5559-5574`), and the
 dungeon compresses "THE " and "YOU " that way. `DungeonState.decodeTextBytes` drops an
-escape when it is given no tables (`src/engine/DungeonState.ts`), and the one caller that
-gives none is the text a party finds on a square, which `ActuatorSystem` decodes with
-`decodeMessageText(rec)` and queues (`src/engine/ActuatorSystem.ts:618`,
-`Code11f52.cpp:3960-3963`). So "PUT THE GEM BACK..." prints as "PUT GEM BACK...", "YOU MUST
-PAY FOR YOUR ENTRANCE." as "MUST PAY FOR YOUR ENTRANCE.", and so on for most of the
-dungeon's messages. The tables are `ctx.tables.textDecode`. Pass them, and make the
-`tables` parameter required, so no decode can leave them out again. Evidence: a row in a
-`tools/` check that steps onto a square with a message and reads what was queued.
+escape when it is given no tables (`src/engine/DungeonState.ts`). The wall text
+(`BytecodeInterpreter`) and the scroll (`Inventory`) pass them. The one caller that passes
+none is the text the party finds on a square it enters, which `ActuatorSystem` decodes
+with `decodeMessageText(rec)` and queues (`src/engine/ActuatorSystem.ts:618`,
+`Code11f52.cpp:3960-3963`).
+
+In `dm-atari/dungeon.dat` only one text can take that path: of the 30 texts on squares
+that are not walls, 29 are hidden (the champions' records, "WELCOME BACK BRAVE
+ADVENTURERS.", the four ending texts of level 12's cell (0, 0)) and use no escape. The one
+visible text is on level 0 at (9, 1), a teleporter square: "IT IS TOO BAD YOU DID NOT
+DISCOVER THE TRUE SECRET OF THE FIRESTAFF.", which the port would print without its two
+"THE"s. When the party reaches that square has not been checked. The tables are
+`ctx.tables.textDecode`. Pass them, and make the `tables` parameter required, so no decode
+can leave them out. Evidence: a `tools/` check that puts the party on that square and reads
+what was queued.
 
 ---
 
