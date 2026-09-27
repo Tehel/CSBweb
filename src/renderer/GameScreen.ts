@@ -95,6 +95,7 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onObjectMove'
   | 'onSpellCast'
   | 'onChampionAttack'
+  | 'isRunningScript'
   | 'onConsumeAttackDamage'
   | 'applyFeeding'
   | 'onRemoveCharacterPossession'
@@ -160,6 +161,7 @@ export class GameScreen {
     ui.onObjectMove = hooks.onObjectMove;
     ui.onSpellCast = hooks.onSpellCast;
     ui.onChampionAttack = hooks.onChampionAttack;
+    ui.isRunningScript = hooks.isRunningScript;
     ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
     ui.applyFeeding = hooks.applyFeeding;
     ui.onRemoveCharacterPossession = hooks.onRemoveCharacterPossession;

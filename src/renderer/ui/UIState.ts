@@ -170,6 +170,11 @@ export interface UIState {
   onSpellCast?: (chIdx: number, incantation: number[]) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
   onChampionAttack?: (chIdx: number, attackType: number) => number;
+  /**
+   * Whether a script holds the loop (`Game.isRunningScript`): the pass that started it is
+   * suspended inside it, as CSBWin's is inside a `RESTARTABLE` sequence.
+   */
+  isRunningScript?: () => boolean;
   /** `d.attackDamageToDisplay`, read and cleared. */
   onConsumeAttackDamage?: () => number;
   /**

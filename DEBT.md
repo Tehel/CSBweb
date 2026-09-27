@@ -84,6 +84,7 @@ In payoff order: the first row is the next item.
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
+| C74 | A keyed attack makes no tick due | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -94,7 +95,6 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
@@ -102,7 +102,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C74 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C75 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -297,6 +297,16 @@ DISCOVER THE TRUE SECRET OF THE FIRESTAFF.", which the port would print without 
 can leave them out. Evidence: a `tools/` check that puts the party on that square and reads
 what was queued.
 
+### C74 ⏳ A keyed attack makes no tick due
+
+A click on an attack option sets `d.clockTick = intResult` after `ExecuteAttack`
+(`doc/CSBwin-src/Character.cpp:4716-4717`), which `handleAttackAreaClick` mirrors
+(`src/renderer/ui/Attack.ts`). The attack option keys reach `executeAttack` through
+`performAttack` (`src/renderer/ui/Keyboard.ts:163`), which drops the result, so a keyed
+attack waits for the next tick where a clicked one brings it on at once. The module comment
+of `Keyboard.ts` promises the two routes stay equivalent. Set the clock tick there as the
+click does, with a case in `tools/dump-key-bindings.ts`.
+
 ---
 
 ## F — Verification debt
@@ -468,31 +478,6 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
-### G8 ⏳ Lord Chaos's fusion endgame
-
-The fusion is ported up to the UI around it: `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`)
-and `_FusionSequence` (`:2220`) are `AttackSystem.fusion` and `AttackSystem.fusionSequence`
-(`src/engine/AttackSystem.ts:966`), which holds the main loop as a `LoopScript` from the
-attack to the credits (`Game.runScript`, `Game.processTimersViewportAndSound`), and none of
-the attack's engine tail runs after it (`AttackSystem.ts:1358`, `CharacterSystem.ts:248`).
-An open inventory is hidden through the host's `showHideInventory`, `d.Word1868`
-(`GameState.word1868`) takes the Fluxcages' shimmer off the view, and the texts of cell
-(0, 0) and "THE END." go straight onto the message strip (`MessageSink.printLines`).
-Evidence: `tools/dump-fusion.ts`, `tools/dump-loop-script.ts`, `tools/dump-cloud-draw.ts`.
-Size L, in steps: 1 (the loop script), 2 (`_Fusion`), 3a (`_FusionSequence`'s engine
-half), 3b (the inventory and `d.Word1868`) and 3c (the texts) are done.
-
-**Step 3d: the UI around the script.**
-
-- The UI's tail. `executeAttack` in `src/renderer/ui/Attack.ts:169` closes the attack menu
-  after the engine returns, where CSBWin's caller is suspended with it.
-- The inputs outside the queue. While a script holds the loop no queued click or key is
-  taken, but the save menu and the panel keys (tier H, "Three inputs bypass the mouse
-  queue") are gated only on `Game.mainLoopHasReturned` (`src/ui/events.ts:31`, `:227`),
-  so they still act. The CSB win's 300 VBLs share the gap; the fusion's 4713 VBLs
-  make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
-  `VBLDelay` lets the UI do.
-
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
 
 A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
@@ -539,7 +524,16 @@ Recorded so that nobody "fixes" them.
   feeding animation (`src/renderer/ui/Attack.ts`, module comment).
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
-  comment gives the reason.
+  comment gives the reason. While a script holds the loop (`Game.isRunningScript`) the
+  panel keys do nothing, as CSBWin's would wait in the queue for a pass that never comes
+  before the credits; the two screens open only from a pass, so neither is up then.
+- 🚫 **A script's caller finishes at once.** `Game.runScript` returns as soon as the script
+  reaches its first `VBLDelay`, so what CSBWin's suspended caller would do after the script
+  ends, the port's does before it. Both scripts end the game, and the callers' tails that
+  anything could still see are skipped (`executeAttack` and `handleAttackAreaClick`,
+  `src/renderer/ui/Attack.ts`). What is left is `HandleMouseEvents`' `lastTime = d.Time`
+  (`doc/CSBwin-src/Mouse.cpp:1647-1649`), stamped at the click, which nothing reads after
+  the credits.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
   change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing

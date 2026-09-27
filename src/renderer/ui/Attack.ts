@@ -176,6 +176,10 @@ export function executeAttack(ui: UIState, option: number): number {
     const attackType = ui.possibleAttackTypes[option] & 0xff;
     if (attackType === ATTACK_TYPE_NONE) return 0;
     result = ui.onChampionAttack?.(chIdx, attackType) ?? 0;
+    // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): `_FusionSequence`
+    // ends in `ShowCredits` (`Attack.cpp:2429`), so `TAG01b1c0` does not run and the menu
+    // stays on the panel to the end of the game.
+    if (ui.isRunningScript?.()) return result;
   }
   closeAttackMenu(ui);
   return result;
@@ -201,7 +205,10 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
     // Only the options actually offered are live; the rows below `word20248` are dead
     // even though the button list covers them. `d.clockTick = (i16)intResult`
     // (`Character.cpp:4716-4717`): an attack makes a tick due, and a 0 puts one off.
-    if (id - 112 <= ui.word20248) ui.setClockTick?.(executeAttack(ui, id - 113));
+    if (id - 112 > ui.word20248) return;
+    const result = executeAttack(ui, id - 113);
+    // Nor does `ExecuteAttack(_6_, …)` return to set `d.clockTick` (`:4717`).
+    if (!ui.isRunningScript?.()) ui.setClockTick?.(result);
     return;
   }
 

@@ -307,12 +307,14 @@ export function bindUIEvents(): void {
                     handled = true;
                     break;
                 }
+                // Not while a script holds the loop: the save could not resume it, and a
+                // load would run it on in the loaded world.
                 case 'F5':
-                    ctx.onQuickSave();
+                    if (!ctx.game.isRunningScript()) ctx.onQuickSave();
                     handled = true;
                     break;
                 case 'F9':
-                    ctx.onQuickLoad();
+                    if (!ctx.game.isRunningScript()) ctx.onQuickLoad();
                     handled = true;
                     break;
             }

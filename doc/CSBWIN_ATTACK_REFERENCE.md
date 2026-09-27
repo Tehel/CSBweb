@@ -117,8 +117,7 @@ wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md`
 fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
 evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2220`), the ending itself, holds the
 main loop to the credits: `doc/PROVEN_FACTS.md` → "`_FusionSequence`: the end of the
-game", ported as `AttackSystem.fusionSequence` except for its share of the screen
-(`DEBT.md` G8).
+game", ported as `AttackSystem.fusionSequence`.
 
 ## The menu
 

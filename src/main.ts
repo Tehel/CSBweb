@@ -274,6 +274,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         onSpellCast: (chIdx, incantation) => game.castSpellFromUi(chIdx, incantation),
         // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
+        isRunningScript: () => game.isRunningScript(),
         onConsumeAttackDamage: () => game.consumeAttackDamageToDisplay(),
         applyFeeding: (chIdx, fp) => game.applyFeeding(chIdx, fp),
         // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`.

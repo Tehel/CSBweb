@@ -275,6 +275,44 @@ async function main(): Promise<void> {
   check(ui.attackingCharacterOrdinal === 1, 'the same click opens the menu once the champion is idle');
   press('q');
 
+  // ---- 8. An attack that starts a script (the fusion's `_FusionSequence`) never returns
+  //         to its caller (`doc/CSBwin-src/Character.cpp:4972`): `TAG01b1c0` leaves the
+  //         menu up, and `d.clockTick = intResult` (`:4717`) is not set. While the script
+  //         holds the loop every panel key is claimed and dead: CSBWin's UI only queues.
+  let held = false;
+  const clockTicks: number[] = [];
+  ui.isRunningScript = () => held;
+  ui.setClockTick = (value: number) => clockTicks.push(value);
+  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+    attacks.push({ chIdx, attackType });
+    held = true;
+    return 1;
+  };
+  const option = ui.uiTables.graphic231.buttons.buttons17892.find((b) => b.word0 === 113);
+  check(option !== undefined, 'buttons17892 should hold the first attack option, button 113');
+  attacks = [];
+  press('q');
+  if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
+  row(ui, 'option', true);
+  check(attacks.length === 1 && held, 'the click attacks, and the attack holds the loop');
+  check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
+  check(clockTicks.length === 0, 'd.clockTick is not set');
+  const heldKeys = ['q', 'w', 'a', 'z', 'F2', '1', 'Tab'].map((key) => press(key));
+  check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
+  check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
+    && party.state.magicCasterIndex === 0 && runes(party.state) === '-',
+  'and none acts: no attack, the same menu, no inventory, the same caster, no rune');
+  check(!press('k'), 'a key that is not the panel\'s is still passed on');
+  held = false;
+  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+    attacks.push({ chIdx, attackType });
+    return 1;
+  };
+  if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
+  row(ui, 'option', true);
+  check(ui.attackingCharacterOrdinal === 0 && clockTicks.join() === '1',
+    'with no script, the same click closes the menu and makes a tick due');
+
   finish();
 }
 

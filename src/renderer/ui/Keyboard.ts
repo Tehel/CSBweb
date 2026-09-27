@@ -44,6 +44,12 @@ const RUNE_BACK_KEY = '`';
 /** Magic button 108. */
 const CAST_KEY = 'Tab';
 
+/** Whether `k`, lower-cased, is one of the panel bindings. */
+function isUIKey(k: string): boolean {
+  return [ATTACK_PANEL_KEYS, ATTACK_OPTION_KEYS, INVENTORY_KEYS, RUNE_KEYS, CASTER_KEYS]
+    .some((keys) => keys.includes(k)) || k === RUNE_BACK_KEY || k === CAST_KEY;
+}
+
 /**
  * The keyscan CSBWin's key tables hold for a `KeyboardEvent.key`: Return and Esc, the two
  * keys `Byte18440` and `Byte18448` bind. The rest of `Byte18400` and `Byte18428`,
@@ -79,6 +85,11 @@ export function translateKey(ui: UIState, keyscan: number): number {
  */
 export function handleUIKey(ui: UIState, key: string): boolean {
   const k = key.length === 1 ? key.toLowerCase() : key;
+  // While a script holds the loop, CSBWin's pass is suspended in `wvbl`
+  // (doc/CSBwin-src/system.cpp:639-661) and its UI only queues: the key becomes a click
+  // (`UIM_KEYDOWN`, `CSBUI.cpp:1120-1164`) that no pass takes before the credits. So the
+  // key is claimed, and does nothing.
+  if (ui.isRunningScript?.()) return isUIKey(k);
 
   let index = ATTACK_PANEL_KEYS.indexOf(k);
   if (index >= 0) {

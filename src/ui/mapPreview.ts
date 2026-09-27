@@ -47,7 +47,8 @@ export function drawMapPreview(levelIndex: number): void {
 export function handleMapCanvasClick(e: MouseEvent): void {
     if (!isDebugFeaturesEnabled() || !mapCanvasEl) return;
     const ctx = getUIContext();
-    if (!ctx) return;
+    // A script holding the loop (the fusion) runs on the party where it stands.
+    if (!ctx || ctx.game.isRunningScript()) return;
 
     const map = ctx.dungeonData.maps[ctx.game.party.state.position.z];
     const { cellSize, offsetX, offsetY } = getMapPreviewLayout(mapCanvasEl, map);

@@ -711,6 +711,8 @@ export class Game implements MainLoop {
      * The turns and steps are handled here (`TurnParty`, `MoveParty`, `:1550-1570`), the
      * button-up and every other button by `mouseEventHandlers`. Every button stamps
      * `lastTime`; the button-up does not, and lets the next entry follow (`:1523-1549`).
+     * A handler that starts a script stamps it at once, not when the script ends
+     * (`DEBT.md` H, "A script's caller finishes at once").
      *
      * Frozen, every entry but 148 is thrown away, one per call, and nothing else happens
      * (`:1433-1444`). `CauseFakeMouseClick`, which follows every take, replays a click

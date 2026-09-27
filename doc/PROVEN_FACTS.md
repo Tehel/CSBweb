@@ -3913,7 +3913,13 @@ The port: `AttackSystem.fusion`. Evidence: `tools/dump-fusion.ts`.
 `_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`) is called only from `_Fusion` with
 Lord Chaos boxed in (`:259`), and `Fusion(_8_, …)` in `_Attack` (`:1971`) and
 `Attack(_1_, …)` in `_ExecuteAttack` (`Character.cpp:4972`) never return from it: nothing
-after them runs. In order:
+after them runs. So `TAG01b1c0` leaves the attack menu on the panel to the end, `_TAG019fac`
+does not set `d.clockTick` (`Character.cpp:4717`), and `HandleMouseEvents` does not stamp
+`lastTime = d.Time` (`Mouse.cpp:1647-1649`). Meanwhile the pass waits in `wvbl`
+(`system.cpp:639-661`) and the UI only queues: a click goes into the mouse queue, a key
+into the key queue or through `OnMouseSwitchAction` into the same mouse queue
+(`CSBUI.cpp:1120-1164`, `:1185-1222`), and no pass takes either before the credits.
+In order:
 
 - `d.Word11694 = 1`; the inventory hidden if open; `WaitForButtonFlash`; `d.Brightness =
   200` and `SelectPaletteForLightLevel`; the party, spell and fire shields all 100;
@@ -3956,5 +3962,8 @@ In `dm-atari/dungeon.dat` cell (0, 0) of level 12 holds four texts, chained D, C
 
 Each view is a `_ProcessTimersViewportAndSound`: 33 of them and 1593 VBLs besides the
 texts, and each text printed adds a view and 780 VBLs, so 37 and 4713 in the shipped
-dungeon. The port: `AttackSystem.fusionSequence`. Evidence: `tools/dump-fusion.ts`, and
-`tools/dump-cloud-draw.ts` for the shimmer.
+dungeon. The port: `AttackSystem.fusionSequence`, the suspended callers in
+`executeAttack` and `handleAttackAreaClick` (`src/renderer/ui/Attack.ts`), and the dead
+keys in `handleUIKey`. Evidence: `tools/dump-fusion.ts`,
+`tools/dump-key-bindings.ts` for the menu and the keys, and `tools/dump-cloud-draw.ts` for
+the shimmer.
