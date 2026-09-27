@@ -3864,3 +3864,19 @@ the `else` of `if (type in 7-10, 14, 15 && position == timer's)`
 returns true at once, leaving the timers behind it queued (`doc/CSBwin-src/CSBCode.cpp:6459-6464`),
 and `MainLoop` runs `VBLDelay(_1_, 300)` and `ShowCredits(_2_, 1)` (`:627-633`), which does
 not return. `tools/dump-show-credits.ts` checks it.
+
+## A `RESTARTABLE` sequence holds the main loop, and `_ProcessTimersViewportAndSound` is its tick
+
+`_VBLDelay(n)` is `n` calls of `wvbl` (`doc/CSBwin-src/CSBCode.cpp:1137-1147`): `n` VBLs go
+by, `VBLDelay(0)` waits for none, and while a sequence called from the loop waits, the loop
+makes no pass (no `HandleMouseEvents`, no tick, no print-queue entry). `_FusionSequence`
+waits `if (testdelay) VBLDelay(MS2VBL(testdelay))` again and again, with `testdelay = 500`
+and `MS2VBL(ms) = ms/16` (`Attack.cpp:17-19`): 31 VBLs.
+Its tick is `_ProcessTimersViewportAndSound` (`Attack.cpp:2192-2213`), which only
+`_FusionSequence` calls: `ProcessTimers()`, and on a win `VBLDelay(300)` and
+`ShowCredits(1)`, which does not return (`:2199-2204`); then `DrawViewport`, `display`,
+`StartQueuedSound`, `d.Time++` after the timers, the overlay's timeout,
+`parameterMessageSequence = 0` and `scrollingText.ClockTick()`. Nothing else of the main
+loop's tick: no periodic update, no timer countdown.
+The port: `LoopScript`, `Game.runScript` and `Game.processTimersViewportAndSound`.
+Evidence: `tools/dump-loop-script.ts`.

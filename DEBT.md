@@ -221,7 +221,7 @@ CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then
 (`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
 (`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
 saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
-(`src/engine/Game.ts:441`) and runs `processTimers` on the new value. A timer set between
+(`src/engine/Game.ts:449`) and runs `processTimers` on the new value. A timer set between
 ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
 game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
 (`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
@@ -229,7 +229,9 @@ it in the tick after, and `tools/dump-mouse-queue.ts` case 9 asserts the port's 
 timer that a handler sets inside the pass, from `TimerSystem.now`, is due one tick later by
 the clock than CSBWin's, and fires in the same tick. Move the increment after the timers,
 and after the lost game's return, which skips it (`CSBCode.cpp:658`).
-The tools that turn the clock themselves (`tickCount++` then `processTimers`) move with it.
+The tools that turn the clock themselves (`tickCount++` then `processTimers`) move with it,
+and so does `Game.processTimersViewportAndSound`, whose `d.Time++` is also after its
+timers (`doc/CSBwin-src/Attack.cpp:2199-2208`).
 Evidence: a row in `tools/dump-mouse-queue.ts` case 9 counting the ticks from the door
 button to the door's first step.
 
@@ -455,26 +457,43 @@ Everything Lord Chaos does before the fusion is ported: the Fluxcage, `IsCellFlu
 fusion ends in is ported too: `_FusionSequence` sets `d.Word11694` (`:2268`), which is
 `GameState.gameWon`, and ends in `ShowCredits(_20_, 1)` (`:2429`), which the host shows
 through `GameHost.showCredits(true)` (`showEndOfGame`, `src/main.ts`), as it does after the
-CSB win (`Game.gameTick`). What is missing is the ending itself, and it is size L, in two
-steps:
+CSB win (`Game.gameTick`).
 
-1. **A scripted sequence inside the game loop.** `_FusionSequence` is a `RESTARTABLE`
-   coroutine: it runs `ProcessTimersViewportAndSound` (`:2192`: `ProcessTimers`, the
-   viewport, the queued sound, `d.Time++`) some thirty times between `VBLDelay`s, with no
-   mouse handling, and prints the ending's texts. `Game.runFrame` has no way to run such a
-   script in place of its pass; the intro's `async` `IntroHost` is the pattern to follow.
-   `testdelay` is 500 (`Attack.cpp:19`) and `MS2VBL` divides by 16 (`:17`), so every
-   `if (testdelay) VBLDelay(…)` waits 31 VBLs.
-2. **`_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion` branch, `:161-213`):
-   the dispell cloud on the square, then Lord Chaos steps to a free square next to him,
-   or two away, unless a Fluxcage or a wall is in that direction; boxed in, the sequence
-   starts. `_FusionSequence`: the shields, the cages removed, the fireball and dispell
-   clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey Lord, `d.Word1868`
-   (which stops the teleporter field over a cloud being drawn, `Code51a4.cpp:2774`), every
-   other monster on the level deleted (with `ProcessMonsterDeleteFilter`'s `DMW_Fusion`,
-   G2), the texts of cell (0, 0) printed in order of their second character, "THE END",
-   and `d.CanRestartFromSavegame = 0`. Evidence: a tool that fuses a boxed-in Lord Chaos
-   and one that lets him escape.
+Size L, in two steps. **Step 1 is done:** the loop can be held in a scripted sequence.
+A `LoopScript` is a generator that yields the length of each `VBLDelay`; `Game.runScript`
+runs one up to its first delay and `Game.runFrame` runs the rest in place of its passes;
+`Game.processTimersViewportAndSound` is `_ProcessTimersViewportAndSound` (`:2192`), and
+`Game.showCreditsAndEnd` is a `ShowCredits(n, 1)` that never returns. The CSB win's
+`VBLDelay(300)` runs on it (`Game.wonByTimers`). Evidence: `tools/dump-loop-script.ts`.
+
+**Step 2, what is left: `_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion`
+branch, `:161-213`): the dispell cloud on the square, then Lord Chaos steps to a free
+square next to him, or two away, unless a Fluxcage or a wall is in that direction; boxed
+in, the sequence starts (`:259`). `_FusionSequence`: the shields, the cages removed, the
+fireball and dispell clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey
+Lord, `d.Word1868` (which stops the teleporter field over a cloud being drawn,
+`Code51a4.cpp:2774`), every other monster on the level deleted (with
+`ProcessMonsterDeleteFilter`'s `DMW_Fusion`, G2), the texts of cell (0, 0) printed in order
+of their second character, "THE END", and `d.CanRestartFromSavegame = 0`. Each
+`if (testdelay) VBLDelay(MS2VBL(testdelay))` is a `yield 31` (`doc/PROVEN_FACTS.md` → "A
+`RESTARTABLE` sequence holds the main loop"). Two things to settle in the port:
+
+- **Reach.** The script's methods are `Game`'s, and `AttackSystem` reaches no `Game`: give
+  `GameSystems` the loop (a `mainLoop` that `Game` fills with itself, typed by an interface
+  of those methods and a way to clear `d.CanRestartFromSavegame`).
+- **The attack's tail.** In CSBWin the pass that took the click is suspended inside
+  `Fusion(_8_, …)` (`Attack.cpp:1971`) for good, so nothing after it in `Attack` runs.
+  `runScript` returns at the first `VBLDelay`, so the port's attack would go on to its
+  tail (the stamina, the disable time, the experience) unless it stops once a script
+  holds the loop.
+- **The inputs outside the queue.** While a script holds the loop, no queued click or key
+  is taken, but the save menu and the panel keys (tier H, "Three inputs bypass the mouse
+  queue") are gated only on `Game.mainLoopHasReturned` (`src/ui/events.ts:31`, `:227`),
+  so they still act. The CSB win's 300 VBLs share the gap; the fusion's twenty-odd seconds
+  make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
+  `VBLDelay` lets the UI do.
+
+Evidence: a tool that fuses a boxed-in Lord Chaos and one that lets him escape.
 
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
 

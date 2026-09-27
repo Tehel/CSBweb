@@ -61,6 +61,16 @@ export interface MouseEventHandlers {
 export const WON_GAME_VBLS = 300;
 
 /**
+ * A `RESTARTABLE` sequence that holds the main loop inside one of its calls, as
+ * `_FusionSequence` does (doc/CSBwin-src/Attack.cpp:2220) and `MainLoop`'s wait after the
+ * CSB win (`CSBCode.cpp:627-633`). It yields the length of each `VBLDelay`, in VBLs, and
+ * does its work between them. `Game.runScript` starts one, and `runFrame` runs it in place
+ * of the loop's pass. A generator rather than the intro's `async` (`IntroHost`) because
+ * `runFrame` is stepped by `tools/`, one VBL at a time.
+ */
+export type LoopScript = Generator<number, void, void>;
+
+/**
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:7946-7951):
  * 1-2 turn left and right; 3-6 step forward, right, backward, left, so `num - 3` is the
  * step's direction relative to the party's facing. The on-screen arrows are these
@@ -187,11 +197,10 @@ export class Game {
     private animationFrameId: number | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
-    /**
-     * The VBLs left of `MainLoop`'s `VBLDelay(_1_, 300)` once `ProcessTimers` has won the
-     * game, before its `ShowCredits(_2_, 1)` (doc/CSBwin-src/CSBCode.cpp:627-633); 0 else.
-     */
-    private wonGameDelay = 0;
+    /** The `LoopScript` the loop is held in, or `null` (`runScript`). */
+    private script: LoopScript | null = null;
+    /** The VBLs left of the `VBLDelay` the script is in. */
+    private scriptDelay = 0;
     /**
      * `d.CanRestartFromSavegame`: set by a save and by a load, cleared by a new game and by
      * the CSB win. With it, the end of a lost game offers "RESTART THIS GAME"
@@ -340,6 +349,7 @@ export class Game {
      */
     resumeMainLoop(): void {
         Object.assign(this.ctx.loop, createLoopFlags());
+        this.script = null;
         this.ctx.mouseQueue.discardAllInput();
         this.mainLoopReturned = false;
     }
@@ -385,17 +395,13 @@ export class Game {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
         this.state.currentTime = currentTime;
-        if (this.wonGameDelay > 0) {
-            // `VBLDelay(_1_, 300)` after the win: the VBLs go by, with their
-            // `vblInterrupt`, and the loop makes no pass. Then `ShowCredits(_2_, 1)`, which
-            // never returns (doc/CSBwin-src/CSBCode.cpp:629-632).
+        if (this.script !== null) {
+            // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1137-1147): the VBLs
+            // go by, with their `vblInterrupt`, and the loop makes no pass. The last one
+            // resumes the script, up to its next delay.
             this.ctx.host.messages.vblInterrupt();
             for (const callback of this.onFrameCallbacks) callback(this);
-            if (--this.wonGameDelay === 0) {
-                this.mainLoopReturned = true;
-                this.stop();
-                this.ctx.host.showCredits(this.state.gameWon);
-            }
+            if (--this.scriptDelay === 0) this.resumeScript();
             return;
         }
         // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
@@ -405,7 +411,9 @@ export class Game {
         this.ctx.loop.clockTickCleared = false;
         // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
         // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
-        while (this.handleMouseEvents(1) & 1) { /* the next entry, in the same pass */ }
+        while (this.handleMouseEvents(1) & 1 && this.script === null) { /* the next entry, in the same pass */ }
+        // A handler has started a script (the fusion): the pass is held inside it.
+        if (this.script !== null) return;
 
         // Calculate time since last tick
         const timeSinceLastTick = currentTime - this.lastTickTime;
@@ -424,7 +432,7 @@ export class Game {
             }
             this.lastTickTime = currentTime;
             // Won: `MainLoop` is in its `VBLDelay`, and this pass goes no further.
-            if (this.wonGameDelay > 0) return;
+            if (this.script !== null) return;
         }
         // `tag0007c8` (doc/CSBwin-src/CSBCode.cpp:714-721): one print-queue entry a pass,
         // ticked or not, frozen or not. The save menu holds the loop in `DisplayDiskMenu`
@@ -456,12 +464,8 @@ export class Game {
         this.loadNewPartyLevel();
         do {
             if (this.timerSystem.processTimers(this.state.tickCount)) {
-                // "Game has been won." `ProcessTT_STONEROOM`'s actuator type 18 has set
-                // `d.Word11694` and cleared `d.CanRestartFromSavegame`, which is kept here
-                // (doc/CSBwin-src/Timer.cpp:2370-2371). `MainLoop` waits 300 VBLs
-                // (`runFrame`) and shows the credits (CSBCode.cpp:627-633).
-                this.canRestart = false;
-                this.wonGameDelay = WON_GAME_VBLS;
+                // "Game has been won." (doc/CSBwin-src/CSBCode.cpp:627-633)
+                this.runScript(this.wonByTimers());
                 return;
             }
         } while (this.loadNewPartyLevel());
@@ -491,6 +495,80 @@ export class Game {
         if (this.party.state.word11712 !== 0) this.party.state.word11712--;
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
         this.ctx.loop.clockTickSet = false;
+    }
+
+    /**
+     * `ShowCredits(1)` once `ProcessTimers` has won the game, by the loop's tick
+     * (`MainLoop`, doc/CSBwin-src/CSBCode.cpp:627-633) or a script's
+     * (`_ProcessTimersViewportAndSound`, Attack.cpp:2199-2204): `VBLDelay(300)`, then the
+     * credits. `ProcessTT_STONEROOM`'s actuator type 18 has set `d.Word11694` and cleared
+     * `d.CanRestartFromSavegame`, which is kept here (`Timer.cpp:2370-2371`).
+     */
+    private *wonByTimers(): LoopScript {
+        this.canRestart = false;
+        yield WON_GAME_VBLS;
+        yield* this.showCreditsAndEnd();
+    }
+
+    /**
+     * `ShowCredits(n, 1)` from inside the loop: `MainLoop` is over, and the host shows the
+     * end of the game. `ShowCredits` never returns, so neither does this: the script is
+     * never resumed.
+     */
+    *showCreditsAndEnd(): LoopScript {
+        this.mainLoopReturned = true;
+        this.stop();
+        this.ctx.host.showCredits(this.state.gameWon);
+        yield Infinity;
+    }
+
+    /**
+     * Hold the loop in `script`: run it now, up to its first `VBLDelay`, and let `runFrame`
+     * run the rest in place of its passes. The caller returns at once, as the pass that
+     * called a `RESTARTABLE` sequence is suspended inside it.
+     */
+    runScript(script: LoopScript): void {
+        this.script = script;
+        this.resumeScript();
+    }
+
+    /** Whether the loop is held in a script (`runScript`). */
+    isRunningScript(): boolean {
+        return this.script !== null;
+    }
+
+    /** Run the script up to its next `VBLDelay` of one VBL or more; a `VBLDelay(0)` waits for none. */
+    private resumeScript(): void {
+        const script = this.script!;
+        for (;;) {
+            const step = script.next();
+            if (step.done) {
+                this.script = null;
+                return;
+            }
+            if (step.value > 0) {
+                this.scriptDelay = step.value;
+                return;
+            }
+        }
+    }
+
+    /**
+     * `_ProcessTimersViewportAndSound` (doc/CSBwin-src/Attack.cpp:2192), the tick a script
+     * runs between its `VBLDelay`s: `ProcessTimers`, and a win there ends the game
+     * (`wonByTimers`); then `d.Time++` and `scrollingText.ClockTick()`. Not the rest of the
+     * main loop's tick: no input, no periodic update, no print-queue entry. The port turns
+     * the clock before the timers, as `gameTick` does (`DEBT.md` C68). `DrawViewport` and
+     * `display` are the frame callbacks', at the next VBL; `StartQueuedSound` has no
+     * counterpart, since the port plays a sound when it is queued (C66); nor have the
+     * overlay's timeout and `parameterMessageSequence`, which the port does not model.
+     */
+    *processTimersViewportAndSound(): LoopScript {
+        this.state.tickCount++;
+        if (this.timerSystem.processTimers(this.state.tickCount)) {
+            yield* this.wonByTimers();
+        }
+        this.ctx.host.messages.clockTick(this.state.tickCount);
     }
 
     /**
