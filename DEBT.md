@@ -157,7 +157,7 @@ CSBWin's `DrawAttackButton` shades the hand while `d.PotentialCharacterOrdinal` 
 as it does for a busy champion and a sleeping party (`doc/CSBwin-src/Character.cpp:4875-4880`),
 so a champion being considered at a Hall of Champions mirror, once `DrawCharacterState`
 draws them (`:1500-1503`), shows a shaded hand. The port's `drawAttackButton`
-(`src/renderer/ui/Attack.ts:305`) tests only the busy bit and sleep. Add
+(`src/renderer/ui/Attack.ts:304`) tests only the busy bit and sleep. Add
 `potentialChampionIndex >= 0`. Evidence: a check or a golden frame of a candidate's
 attack hand.
 
