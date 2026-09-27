@@ -356,6 +356,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
     // The entrance's "enter": `_ReadEntireGame` over `dungeon.dat`, parsed afresh, since the
     // lost game wrote into the last parse (doc/CSBwin-src/SaveGame.cpp:1480-1494).
     if (end === 'enter') game.readNewGame(await new DungeonLoader().load(`${GAME_DATA_DIR}/dungeon.dat`));
+    scrollingText.restart();
     screen.initializePlayState();
     game.resumeMainLoop();
     game.start();

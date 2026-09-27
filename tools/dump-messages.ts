@@ -15,6 +15,8 @@
  *   nothing (`:1505-1508`). A piece printed during the scroll waits for the next
  *   `ClockTick`: the tick's own, after the timers (`:677`), or the next `PrintLines`.
  * - `DiscardText` stops the scroll (`:1441-1464`).
+ * - A restart after a lost game empties the strip, and leaves `printQueue`
+ *   (`ScrollingText.restart`).
  *
  * Run: `npx tsx tools/dump-messages.ts`
  */
@@ -186,6 +188,25 @@ function main(): void {
   check(rows().every((line) => line === '') && ink(strip()) === '.'.repeat(STRIP_HEIGHT), 'and the strip is blank');
   check(messages.backlog().printQueue === 1 && messages.timeouts().join() === timeoutsBefore,
     'the print queue and the timeouts are left as they are');
+
+  console.log('');
+  console.log('=== a restart empties the strip (Code1f9e6.cpp:302-316) ===');
+  messages.setPartySleeping(true);
+  for (const text of ['A', 'B', 'C', 'D', 'E', 'KEPT']) say(text);
+  while (messages.backlog().printQueue > 1) frame();
+  check(messages.hasText() && messages.backlog().futureLines > 0,
+    'the lost game leaves lines in the strip, and a piece waiting');
+  messages.restart();
+  console.log(`after restart: ${state()}`);
+  const restarted = messages.scrollState();
+  check(rows().every((line) => line === '') && ink(strip()) === '.'.repeat(STRIP_HEIGHT) &&
+    messages.backlog().futureLines === 0, 'Cleanup and TAG021028: nothing waits, and the strip is blank');
+  check(restarted.pushTextUp === 0 && restarted.textScanlineScrollCount === -1 &&
+    messages.timeouts().every((timeout) => timeout === -1), 'd.Initialize and TAG001c6e: no scroll, no timeout');
+  check(messages.backlog().printQueue === 1, 'printQueue is left as it is');
+  frame();
+  check(rows()[0] === 'KEPT' && messages.timeouts()[0] === internals.state.tickCount + 70,
+    'the next pass prints it at (0, 0), awake: SetPrintPosition(0, 0), d.PartySleeping 0');
 
   finish();
 }

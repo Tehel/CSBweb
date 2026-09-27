@@ -319,6 +319,36 @@ export class ScrollingText {
     this.changed = true;
   }
 
+  /**
+   * The strip's share of a restart after a lost game, which runs `Cleanup(false)`,
+   * `d.Initialize()`, `GameSetup` and `TAG021028` before `MainLoop` runs again
+   * (`doc/CSBwin-src/Code1f9e6.cpp:302-316`):
+   *
+   * - `Cleanup(false)` → `CleanupGraphics` → `scrollingText.Cleanup()`
+   *   (`data.cpp:2015`, `Graphics.cpp:2207`, `CSBCode.cpp:1434-1439`): the pieces waiting go.
+   * - `d.Initialize()` zeroes `d` (`CSBCode.cpp:329`), `d.PushTextUp` and `d.PartySleeping`
+   *   among it, and sets `d.TextScanlineScrollCount = -1` (`:352`).
+   * - `GameSetup`'s `TAG001c6e` (`:10608`, `:1773-1779`): `SetPrintPosition(0, 0)` and the
+   *   four `d.TextTimeout` -1.
+   * - `TAG021028` fills the strip with colour 0, or clears the screen after a load
+   *   (`:10536`, `:10543`), and sets `d.PartySleeping = 0` (`:10479`).
+   *
+   * `m_printLinesCount`, `PrintLines`' static count and `printQueue` (`:200`), which only
+   * the main loop drains (`:716`), are left as they are.
+   */
+  restart(): void {
+    this.futureLines = [];
+    this.pushTextUp = 0;
+    this.textScanlineScrollCount = -1;
+    this.printColumn = 0;
+    this.printRow = 0;
+    for (let row = 0; row < NUM_ROWS; row++) this.textTimeout[row] = -1;
+    this.rows = [[], [], [], []];
+    this.scrollingOut = [];
+    this.partySleeping = false;
+    this.changed = true;
+  }
+
   /** CSBWin `SCROLLING_TEXT::ResetTime()` (`doc/CSBwin-src/CSBCode.cpp:1564`). */
   resetTime(newTime: number, currentTime: number): void {
     for (let row = 0; row < NUM_ROWS; row++) {

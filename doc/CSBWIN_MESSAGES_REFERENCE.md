@@ -152,6 +152,18 @@ CSBWin saves no message state. `SCROLLING_TEXT::Serialize` is declared
 (`doc/CSBwin-src/Data.h:1665`) but has no body and no caller anywhere in the tree. A load
 keeps whatever is on screen and rebases its timeouts (`ResetTime`, above).
 
+A restart after a lost game empties the strip (`Code1f9e6.cpp:302-316`). `Cleanup(false)`
+runs `CleanupGraphics` (`data.cpp:2015`), whose `scrollingText.Cleanup()`
+(`Graphics.cpp:2207`) frees the three line lists (`CSBCode.cpp:1434-1439`), the pieces
+waiting among them. `d.Initialize()` zeroes `d` (`CSBCode.cpp:329`) — `d.PrintColumn`,
+`d.PrintRow`, `d.PushTextUp`, `d.PartySleeping` — and sets `d.TextScanlineScrollCount = -1`
+(`:352`). `GameSetup`'s `TAG001c6e` (`:10608`) sets the print position to (0, 0) and the
+four `d.TextTimeout` to -1 (`:1773-1779`). `TAG021028` fills the strip with colour 0, or
+clears the whole screen after a load (`:10536`, `:10543`), and sets `d.PartySleeping = 0`
+again (`:10479`). Nothing touches `m_printLinesCount`, `PrintLines`' static count, or
+`printQueue` (`:200`), a global whose only reader is the main loop's `GetEntry` (`:716`):
+an entry still queued when `MainLoop` returned is printed in the new game's first pass.
+
 ## The port
 
 `src/renderer/csbwin/ScrollingText.ts` ports the queue, the tokenizer, the four rows and
@@ -164,6 +176,7 @@ index buffer at the geometry above. The engine reaches it through `GameHost.mess
 - Sleep and `WakeUp` call `setNewSpeed` with `d.Speed` (`speed` in
   `src/engine/LoopState.ts`), and every load calls `resetTime` just before it replaces the
   tick count (`applyRuntimeSaveState`).
+- A restart calls `restart()` (`showEndOfGame`, `src/main.ts`).
 
 The port redraws the strip every frame from its row model: `draw` offsets the rows by the
 scroll count and keeps the row scrolling out until it has gone, and `main.ts` redraws the

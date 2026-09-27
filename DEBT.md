@@ -93,7 +93,7 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G13 | `_ShowCredits`: the message strip on a restart, and no won screen | L | ⏳ |
+| G13 | `_ShowCredits`: no won screen | L | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -444,7 +444,7 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
-### G13 ⏳ `_ShowCredits`: the message strip on a restart, and no won screen
+### G13 ⏳ `_ShowCredits`: no won screen
 
 `_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won. The
 port has the lost game: `Game.gameTick` ends `MainLoop` on the tick of death
@@ -452,25 +452,14 @@ port has the lost game: `Game.gameTick` ends `MainLoop` on the tick of death
 `src/renderer/intro/ShowCredits.ts` runs over an `IntroHost`: the dying sound, "THE END",
 the credits picture, and, once the game has been saved or loaded, the "RESTART THIS GAME"
 button (`tools/dump-show-credits.ts`). Its chooser, or the entrance behind a cancel, sets
-up the next game in the running `Game` (`showEndOfGame`, `src/main.ts`;
-`tools/dump-new-game.ts`). "SAVE AND QUIT" calls `ShowCredits(0)`, straight to the credits
-picture (`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` → Phase 10).
+up the next game in the running `Game`, with the message strip emptied
+(`showEndOfGame`, `src/main.ts`; `tools/dump-new-game.ts`, `tools/dump-messages.ts`).
+"SAVE AND QUIT" calls `ShowCredits(0)`, straight to the credits picture
+(`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` → Phase 10).
 G8 ends in the won screen.
 
-Size L, in three steps. Step 1, the lost game, and step 2 up to the new game in place are
-done. Left:
+Size L, in three steps. Steps 1 and 2, the lost game and the restart, are done. Left:
 
-2. **The message strip after a restart.** A restarted game opens with the lost game's
-   last lines in the strip. CSBWin's restart empties it: `Cleanup(false)` runs
-   `CleanupGraphics` (`doc/CSBwin-src/data.cpp:2015`), which runs `scrollingText.Cleanup()`
-   (`Graphics.cpp:2207`), the three line lists (`CSBCode.cpp:1434-1439`); `d.Initialize()`
-   (`Code1f9e6.cpp:309`) zeroes `d`, `d.PrintRow` and `d.PushTextUp` among it, and sets
-   `d.TextScanlineScrollCount = -1` (`CSBCode.cpp:352`); and `GameSetup` runs `TAG001c6e`
-   (`:10608`), which sets the print position to (0, 0) and the four `d.TextTimeout` to -1
-   (`:1773-1779`). Whether anything empties `printQueue` (`:200`) is still to be read.
-   Map that onto `ScrollingText`, and call it from `showEndOfGame` beside
-   `screen.initializePlayState()`. Evidence: a check that a strip with lines in it, after
-   the restart's calls, holds none.
 3. **The won screen.** `d.Word11694`: with `d.DynamicPaletteSwitching` the eight `Darken`
    steps instead of the fade (`Code1f9e6.cpp:148-166`), then each champion's frame
    (graphic 208), portrait, name, title and masteries over colour 12, the palette of

@@ -3804,3 +3804,16 @@ so is `d.gameState`. So the chooser `GameSetup` opens reads with `d.PartyHasDied
 The same zeroed `d.gameState` is `GAMESTATE_ResumeSavedGame`, which is why the chooser, not
 the entrance, comes first. `tools/dump-show-credits.ts` checks the button, and
 `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game" has the rest of the screen.
+
+## A restart empties the message strip, and keeps `printQueue`
+
+Between "RESTART THIS GAME" and the next `MainLoop`, `Cleanup(false)`'s
+`scrollingText.Cleanup()` frees the pieces waiting (`doc/CSBwin-src/data.cpp:2015`,
+`doc/CSBwin-src/Graphics.cpp:2207`, `doc/CSBwin-src/CSBCode.cpp:1434-1439`), `d.Initialize()`
+zeroes the print position, `d.PushTextUp` and `d.PartySleeping` and sets
+`d.TextScanlineScrollCount = -1` (`CSBCode.cpp:329`, `:352`), `TAG001c6e` sets the four
+`d.TextTimeout` to -1 (`:1773-1779`), and `TAG021028` blanks the strip, or the whole screen
+(`:10536`, `:10543`). `printQueue` is a global (`:200`) whose only reader is the main loop
+(`:716`), so an entry queued before the death is printed in the new game's first pass.
+`doc/CSBWIN_MESSAGES_REFERENCE.md` → "Persistence" has the detail;
+`tools/dump-messages.ts` checks `ScrollingText.restart`.
