@@ -2870,6 +2870,33 @@ fails before the eye gate),
 
 Evidence: `tools/dump-mouse-queue.ts`, case 9.
 
+## Five more handlers write `d.clockTick`
+
+- `ShowHideInventory` sets `d.clockTick = 1` once past its return for a dead champion
+  (`chIdx != 4` only) and its returns while the mouth or the eye is pressed
+  (`doc/CSBwin-src/CSBCode.cpp:7434-7441`), whoever calls it: buttons 7-11, 83 and 145
+  (`Mouse.cpp:1618`, `:1628`, `:1689`), and the Hall of Champions menu's Cancel and
+  Resurrect or Reincarnate (`CSBCode.cpp:6634`, `:6807`). `AddCharacter`'s call
+  (`Character.cpp:796`) is made from inside `TouchWall` (`Mouse.cpp:518`), so
+  `TouchWallF1`'s `d.clockTick = TouchWall(...)` (`:788`) overwrites it.
+- The pick-up, `TAG01a148`, ends with `d.clockTick = 1` (`Mouse.cpp:840`), which its
+  returns skip: no cursor owner (`:802`), a monster that is not levitating at the position
+  (`:819`), and a cursor filter's cancel (`:835`). The test for an object in the slot
+  (`:825`) does not guard it.
+- `DropObject` ends with `d.clockTick = 1` (`Mouse.cpp:964`).
+- The attack menu, `_TAG019fac`, sets `d.clockTick = (i16)intResult` after an option's
+  `ExecuteAttack` (`Character.cpp:4716-4717`). PASS, button 112, calls `ExecuteAttack(-1)`
+  and writes nothing (`:4679-4682`). `ExecuteAttack` returns 0 without attacking when the
+  option's attack type is 255 (`:4955-4959`), and `Attack`'s result otherwise.
+- The cast button, 108, sets `d.clockTick = CastMagic(0)` (`Magic.cpp:564`), and
+  `CastMagic` returns `CastSpell`'s result with 3, the potion cast without a flask, made 0
+  (`:945-956`).
+
+So a click that did something makes a tick due in its own VBL, and an attack or a cast
+that came to nothing puts off a tick that was due, as a refused move does.
+
+Evidence: `tools/dump-mouse-queue.ts`, case 10; `tools/dump-hall-of-champions.ts`.
+
 ## The party moves through one `MoveObject`, in one order
 
 Every move of the party is `MoveObject(RN(RNnul), oldX, oldY, newX, newY, …)`

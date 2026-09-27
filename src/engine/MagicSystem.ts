@@ -18,6 +18,7 @@ import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
+import { setClockTick } from './LoopState';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import type { SpellParameters } from './magicTypes';
 import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
@@ -664,7 +665,9 @@ export class MagicSystem {
 
   /**
    * The magic panel's cast button. CSBWin's caller hands `CastMagic` nothing but the
-   * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune.
+   * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune. It sets
+   * `d.clockTick` to what `CastMagic` returns, which is `CastSpell`'s result with 3 made 0
+   * (`:945-956`).
    */
   castSpellFromUi(chIdx: number, incantation: number[]): number {
     if (chIdx < 0 || chIdx >= this.ctx.party.state.champions.length) return 0;
@@ -674,6 +677,7 @@ export class MagicSystem {
     champion.incantation = [...incantation];
     const result = this.castMagic(chIdx);
     if (result !== 3) champion.incantation = [];
+    setClockTick(this.ctx, result === 3 ? 0 : result);
     return result;
   }
 }

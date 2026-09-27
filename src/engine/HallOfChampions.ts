@@ -36,6 +36,7 @@ import {
 } from './attributes';
 import type { GameContext } from './GameContext';
 import { emptyPossessions, type Champion } from './gameTypes';
+import { setClockTick } from './LoopState';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { selectMagicCaster, setHandOwner } from './Party';
 
@@ -152,7 +153,9 @@ export class HallOfChampions {
     if (button === 162) {
       // Cancel (`:6629-6658`): hide the inventory and take the champion back out.
       // Their possessions were never removed from the mirror, so they stay there.
+      // `ShowHideInventory(4)` sets `d.clockTick = 1` (`:7441`).
       party.selectedCharacterIndex = -1;
+      setClockTick(this.ctx, 1);
       if (party.champions.length === 1) {
         setHandOwner(party, -1);
       }
@@ -208,7 +211,9 @@ export class HallOfChampions {
     messages.quePrintLines(color, champion.name);
     messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
 
+    // `ShowHideInventory(4)` (`:6807`), with its `d.clockTick = 1` (`:7441`).
     party.selectedCharacterIndex = -1;
+    setClockTick(this.ctx, 1);
   }
 
   /**

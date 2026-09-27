@@ -197,6 +197,8 @@ export interface UIState {
   onSetPaused?: (paused: boolean) => void;
   /** Button 145 — `Game.sleep`, after the inventory has been hidden. */
   onSleep?: () => void;
+  /** `d.clockTick = value` from a handler the mouse queue runs — `Game.setClockTick`. */
+  setClockTick?: (value: number) => void;
   /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
   onWakeUp?: () => void;
   /** Button 147, the engine's half of the freeze — `Game.freeze`. */

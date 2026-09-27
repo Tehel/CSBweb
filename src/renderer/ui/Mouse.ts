@@ -222,24 +222,27 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
 
 export function handleInventoryToggle(ui: UIState, button: number): void {
   if (!ui.partyState) return;
+  if (button !== 4) {
+    if (button < 0 || button > 3) return;
+    const champ = getPartyChampion(ui.partyState, button);
+    if (!champ || champ.alive === false) return;
+  }
+  // `if (d.PressingMouth != 0) return; if (d.PressingEye != 0) return; d.clockTick = 1;`
+  // (`doc/CSBwin-src/CSBCode.cpp:7439-7441`). The port has no pressed mouth:
+  // `handleMouthPress` feeds on the press.
+  if (ui.pressingEye) return;
+  ui.setClockTick?.(1);
   if (button === 4) {
     syncOpenChest(ui, null);
     ui.partyState.selectedCharacterIndex = -1;
-    ui.pressingEye = false;
     syncInventoryButtons(ui);
     return;
   }
-  if (button < 0 || button > 3) return;
-  const champ = getPartyChampion(ui.partyState, button);
-  if (!champ || champ.alive === false) return;
   const previous = ui.partyState.selectedCharacterIndex;
   ui.partyState.selectedCharacterIndex =
     ui.partyState.selectedCharacterIndex === button ? -1 : button;
   if (ui.partyState.selectedCharacterIndex !== previous) {
     syncOpenChest(ui, null);
-  }
-  if (ui.partyState.selectedCharacterIndex < 0) {
-    ui.pressingEye = false;
   }
   syncInventoryButtons(ui);
 }

@@ -79,6 +79,9 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   const target = getPickupCellForRelativePos(ui, hit.relativeLocation);
   if (!target) return false;
   if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
+  // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:840`), which only
+  // its returns for no cursor owner and a monster in the way skip.
+  ui.setClockTick?.(1);
   if (!ui.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
   ui.onObjectMove?.(target, hit.rn, false, false, ui.partyState.facing & 0x3);
 

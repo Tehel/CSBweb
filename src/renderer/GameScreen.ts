@@ -98,6 +98,7 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onResurrectReincarnateCancel'
   | 'onReincarnateNamed'
   | 'onSleep'
+  | 'setClockTick'
   | 'onWakeUp'
   | 'onFreeze'
   | 'onThaw'
@@ -161,6 +162,7 @@ export class GameScreen {
     ui.onResurrectReincarnateCancel = hooks.onResurrectReincarnateCancel;
     ui.onReincarnateNamed = hooks.onReincarnateNamed;
     ui.onSleep = hooks.onSleep;
+    ui.setClockTick = hooks.setClockTick;
     ui.onWakeUp = hooks.onWakeUp;
     ui.onFreeze = hooks.onFreeze;
     ui.onThaw = hooks.onThaw;

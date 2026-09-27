@@ -195,12 +195,13 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
     const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17892 ?? null, x, y, 2);
     if (id === 0) return;
     if (id === 112) {
-      executeAttack(ui, -1); // PASS
+      executeAttack(ui, -1); // PASS, which leaves `d.clockTick` alone
       return;
     }
     // Only the options actually offered are live; the rows below `word20248` are dead
-    // even though the button list covers them.
-    if (id - 112 <= ui.word20248) executeAttack(ui, id - 113);
+    // even though the button list covers them. `d.clockTick = (i16)intResult`
+    // (`Character.cpp:4716-4717`): an attack makes a tick due, and a 0 puts one off.
+    if (id - 112 <= ui.word20248) ui.setClockTick?.(executeAttack(ui, id - 113));
     return;
   }
 

@@ -24,13 +24,17 @@
  *   `d.clockTick = 1`, so a tick runs in the frame of the click. A touch of the wall that
  *   fires nothing sets it to 0, and a tick that was due waits a frame. A cell ahead off
  *   the map leaves it alone (`Mouse.cpp:784-788`, `:1078`).
+ * - `ShowHideInventory`, the pick-up and the drop set it to 1 as well (`CSBCode.cpp:7441`,
+ *   `Mouse.cpp:840`, `:964`), the eye's press aside; the attack menu and the cast button
+ *   set it to what the attack or the cast returned (`Character.cpp:4716-4717`,
+ *   `Magic.cpp:564`), and a pass leaves it alone.
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, decodeObjectID, type ObjectID } from '../src/core/types';
 import { ActuatorAction, getActuatorAction, getActuatorType } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -38,6 +42,10 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
 import { createUIState } from '../src/renderer/ui/UIState';
+import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
+import { setHandOwner } from '../src/engine/Party';
+import { ensureSkills } from '../src/engine/skills';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { newGame } from './lib/game';
@@ -382,6 +390,197 @@ async function main(): Promise<void> {
     `${bareTicked ? 'ran' : 'waited'}; after a touch off the map ${offMapTicked ? 'ran' : 'waited'}`);
   check(!bareTicked, 'a touch that fired nothing puts off the tick that was due (d.clockTick = 0)');
   check(offMapTicked, 'a touch of a cell off the map leaves d.clockTick alone');
+
+  // ---- 10: the other handlers that write d.clockTick -------------------------------
+  // `ShowHideInventory` sets it to 1 once past its dead-champion and pressed-eye/mouth
+  // returns (doc/CSBwin-src/CSBCode.cpp:7434-7441). The pick-up `TAG01a148` and
+  // `DropObject` end with it (Mouse.cpp:840, :964). The attack menu sets it to
+  // `ExecuteAttack`'s result, and a pass leaves it alone (Character.cpp:4679-4682,
+  // :4716-4717). The cast button sets it to `CastMagic`'s result, `CastSpell`'s with 3
+  // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
+  // handler: the UI's dispatcher, or for the viewport the call `src/ui/events.ts` makes.
+  ui.uiTables = uiTables;
+  ui.setClockTick = (value) => game.setClockTick(value);
+  let castResult = -99;
+  ui.onSpellCast = (chIdx, incantation) => (castResult = game.castSpellFromUi(chIdx, incantation));
+  let attackResult = -99;
+  ui.onChampionAttack = (chIdx, attackType) => (attackResult = game.championAttack(chIdx, attackType));
+  const centreOf = (list: Array<{ word0: number; x1: number; y1: number; x2: number; y2: number }> | null, id: number): [number, number] => {
+    const b = list?.find((entry) => entry.word0 === id);
+    if (!b) throw new Error(`no button ${id} in the list`);
+    return [(b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1];
+  };
+  const buttons = uiTables.graphic231.buttons;
+  let onClick: () => void = () => {};
+  game.setMouseEventHandlers({ button: () => onClick(), unclick: () => {} });
+  /** A fresh party of one, at the scene, holding the cursor and the magic tab. */
+  const soloParty = (): void => {
+    reset();
+    party.champions = [champion()];
+    setHandOwner(party, 0);
+    party.magicCasterIndex = 0;
+    party.selectedCharacterIndex = -1;
+    party.objectInHand = OBJECT_ID_NULL;
+    ui.pressingEye = false;
+    ui.attackingCharacterOrdinal = 0;
+    ui.word20252 = 1;
+    game.ctx.loop.clockTickSet = false;
+    game.ctx.loop.clockTickCleared = false;
+  };
+  /** Just after a tick, the click `handler` is: the frames to the next tick, its own frame 1. */
+  const framesToTick = (handler: () => void): number => {
+    onClick = handler;
+    frame(true);
+    const ticksAtClick = game.ctx.state.tickCount;
+    game.onMouseClick(80, 100, 100);
+    for (let n = 1; n <= 30; n++) {
+      vbl();
+      if (game.ctx.state.tickCount !== ticksAtClick) return n;
+    }
+    return -1;
+  };
+  /** With a tick due by the clock, does it run in the frame that handles the click? */
+  const dueTickRuns = (handler: () => void): boolean => {
+    onClick = handler;
+    frame(true);
+    game.onMouseClick(80, 100, 100);
+    const before = game.ctx.state.tickCount;
+    frame(true);
+    return game.ctx.state.tickCount !== before;
+  };
+  /** Some item lying in the level, taken out of its cell for the hand. */
+  const looseItem = (): ObjectID => {
+    for (let x = 0; x < width; x++) {
+      for (let y = 0; y < height; y++) {
+        const at = new Position(x, y, level);
+        for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+          const { category } = decodeObjectID(rn);
+          if (category < DBType.WEAPON || category === DBType.MISSILE || category === DBType.CLOUD) continue;
+          dungeon.removeObjectFromCell(at, rn);
+          return rn;
+        }
+      }
+    }
+    throw new Error(`level ${level} has no item to hold`);
+  };
+
+  console.log('');
+  console.log(['handler', 'result', 'frames to tick', 'due tick runs', 'expected'].join('\t'));
+  const row = (what: string, result: string, frames: number, runs: boolean | string, expected: string): void => {
+    console.log([what, result, frames, runs, expected].join('\t'));
+  };
+
+  soloParty();
+  const inventoryFrames = framesToTick(() => handleMouseButton(ui, 7, 0, 0));
+  const inventoryOpened = party.selectedCharacterIndex === 0;
+  row('ShowHideInventory (button 7)', inventoryOpened ? 'opened' : 'shut', inventoryFrames, '-', 'set');
+  check(inventoryOpened && inventoryFrames === 1, 'the inventory button makes a tick due (ShowHideInventory, d.clockTick = 1)');
+
+  const closeFrames = framesToTick(() => handleMouseButton(ui, 11, 0, 0));
+  row('ShowHideInventory(4) (button 11)', party.selectedCharacterIndex < 0 ? 'shut' : 'open', closeFrames, '-', 'set');
+  check(party.selectedCharacterIndex < 0 && closeFrames === 1, 'so does hiding it');
+
+  soloParty();
+  ui.pressingEye = true;
+  const eyeFrames = framesToTick(() => handleMouseButton(ui, 7, 0, 0));
+  const openedUnderEye = party.selectedCharacterIndex === 0;
+  row('button 7, eye pressed', openedUnderEye ? 'opened' : 'refused', eyeFrames, '-', 'untouched');
+  check(!openedUnderEye, 'ShowHideInventory returns while the eye is pressed (CSBCode.cpp:7440)');
+  check(eyeFrames > 1, 'and leaves d.clockTick alone');
+
+  soloParty();
+  party.objectInHand = looseItem();
+  const dropFrames = framesToTick(() => game.dropObjectFromCursor(0));
+  const dropped = party.objectInHand === OBJECT_ID_NULL;
+  row('DropObject', dropped ? 'dropped' : 'kept', dropFrames, '-', 'set');
+  check(dropped && dropFrames === 1, 'a drop makes a tick due (DropObject, d.clockTick = 1)');
+
+  // The dropped object lies on the party's own square, near left: viewport slot 0.
+  const onFloor = dungeon.findFirstObject(party.position);
+  let floorItem: ObjectID = OBJECT_ID_EOF as ObjectID;
+  for (let rn = onFloor; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
+    if (decodeObjectID(rn).category >= DBType.WEAPON) floorItem = rn;
+  }
+  const unset = { x1: 255, y1: 0, x2: 0, y2: 0 };
+  ui.context = {
+    viewportObjectButtons: [{ x1: 10, y1: 10, x2: 30, y2: 30 }, unset, unset, unset, unset, unset],
+    viewportObjectRNs: [floorItem, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
+  } as unknown as InterpreterContext;
+  const pickFrames = framesToTick(() => tryPickViewportObject(ui, 20, 20 + 33));
+  const picked = party.objectInHand === floorItem;
+  row('TAG01a148 (pick-up)', picked ? 'picked up' : 'left', pickFrames, '-', 'set');
+  check(picked && pickFrames === 1, 'a pick-up makes a tick due (TAG01a148, d.clockTick = 1)');
+  ui.context = null;
+  party.objectInHand = OBJECT_ID_NULL;
+
+  // The attack menu of an empty hand, opened on champion 0's button (116).
+  const [champX, champY] = centreOf(buttons.buttons17952, 116);
+  const [passX, passY] = centreOf(buttons.buttons17892, 112);
+  const attackOnce = (measure: 'frames' | 'due', option: [number, number]): number | boolean => {
+    soloParty();
+    handleMouseButton(ui, 111, champX, champY);
+    if (ui.attackingCharacterOrdinal !== 1) throw new Error('the attack menu did not open');
+    attackResult = -99;
+    const click = (): void => handleMouseButton(ui, 111, option[0], option[1]);
+    return measure === 'frames' ? framesToTick(click) : dueTickRuns(click);
+  };
+  soloParty();
+  handleMouseButton(ui, 111, champX, champY);
+  const optionCount = ui.word20248;
+  const offered = new Set<number>();
+  for (let option = 0; option < optionCount; option++) {
+    const at = centreOf(buttons.buttons17892, 113 + option);
+    const frames = attackOnce('frames', at) as number;
+    const result = attackResult;
+    const runs = attackOnce('due', at) as boolean;
+    offered.add(result);
+    row(`ExecuteAttack (option ${option})`, String(result), frames, runs, result !== 0 ? 'set' : 'cleared');
+    check(result !== -99, `option ${option} ran an attack`);
+    if (result !== 0) check(frames === 1, `an attack that returns ${result} makes a tick due`);
+    else check(!runs, 'an attack that returns 0 puts off a tick that was due');
+  }
+  check(offered.has(0), 'an empty hand at an empty square has an attack that returns 0');
+  // Every real attack there returns 0, so the engine's `Attack` is stood in for once by
+  // one that lands: the handler hands on what it gets.
+  ui.onChampionAttack = () => (attackResult = 1);
+  const landedFrames = attackOnce('frames', centreOf(buttons.buttons17892, 113)) as number;
+  row('ExecuteAttack (Attack stood in, 1)', String(attackResult), landedFrames, '-', 'set');
+  check(attackResult === 1 && landedFrames === 1, 'an attack that returns 1 makes a tick due');
+  ui.onChampionAttack = (chIdx, attackType) => (attackResult = game.championAttack(chIdx, attackType));
+  const passFrames = attackOnce('frames', [passX, passY]) as number;
+  const passDueRuns = attackOnce('due', [passX, passY]) as boolean;
+  row('PASS', String(attackResult), passFrames, passDueRuns, 'untouched');
+  check(ui.attackingCharacterOrdinal === 0 && attackResult === -99, 'PASS closes the menu and attacks nothing');
+  check(passFrames > 1 && passDueRuns, 'and leaves d.clockTick alone');
+
+  // The cast button (108), by a champion with every skill mastered, so no cast fails on
+  // the dice: a lone power rune names no spell (0), LO FUL is the torch (1), and LO VI is
+  // a potion, which with no flask in hand is `CastSpell`'s 3.
+  const [castX, castY] = centreOf(buttons.buttons18060, 108);
+  const castOnce = (measure: 'frames' | 'due', runes: number[]): number | boolean => {
+    soloParty();
+    const caster = party.champions[0]!;
+    caster.skills = ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 }));
+    caster.incantation = [...runes];
+    castResult = -99;
+    const click = (): void => handleMouseButton(ui, 100, castX, castY);
+    return measure === 'frames' ? framesToTick(click) : dueTickRuns(click);
+  };
+  const castResults = new Set<number>();
+  for (const [name, runes] of [['LO', [0x60]], ['LO FUL', [0x60, 0x69]], ['LO VI', [0x60, 0x67]]] as const) {
+    const frames = castOnce('frames', [...runes]) as number;
+    const result = castResult;
+    const runs = castOnce('due', [...runes]) as boolean;
+    const tick = result === 3 ? 0 : result;
+    castResults.add(result);
+    row(`CastMagic (${name})`, String(result), frames, runs, tick !== 0 ? 'set' : 'cleared');
+    check(result !== -99, `the cast button cast ${name}`);
+    if (tick !== 0) check(frames === 1, `a cast of ${name} that returns ${result} makes a tick due`);
+    else check(!runs, `a cast of ${name} that returns ${result} puts off a tick that was due`);
+  }
+  check(castResults.has(0) && castResults.has(1) && castResults.has(3), 'the casts return 0, 1 and 3');
+  party.champions = [];
+  party.selectedCharacterIndex = -1;
 
   finish();
 }

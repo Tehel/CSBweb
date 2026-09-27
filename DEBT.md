@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C53 | Five mouse handlers do not set `d.clockTick` | S | ⏳ |
 | C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
@@ -87,6 +86,7 @@ In payoff order: the first row is the next item.
 | C66 | A delayed sound plays at once | S | ⏳ |
 | C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
 | C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
+| C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -106,7 +106,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C69 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
+Next free IDs: C70 · D9 · E7 · F12 · G13. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -127,26 +127,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
 
-### C53 ⏳ Five mouse handlers do not set `d.clockTick`
-
-The port models `d.clockTick` as `ctx.loop.clockTickSet` (`= 1`: a tick runs in this VBL)
-and `clockTickCleared` (`= 0`: a tick that was due waits a VBL), in `src/engine/LoopState.ts`.
-`WakeUp`, a refused move, the door button and `TouchWallF1` write them. Five more handlers
-that the mouse queue runs write `d.clockTick` in CSBWin, and their counterparts write
-neither flag:
-
-- `ShowHideInventory` sets it to 1 once it has passed its dead-champion and
-  pressed-eye/mouth returns (`doc/CSBwin-src/CSBCode.cpp:7441`).
-- `TAG01a148`, the pick-up from the floor, ends with `d.clockTick = 1` (`Mouse.cpp:840`),
-  which its early returns skip.
-- `DropObject` ends the same way (`Mouse.cpp:964`).
-- The attack menu, `_TAG019fac`, sets it to `ExecuteAttack`'s result
-  (`Character.cpp:4716-4717`): 0 puts a due tick off, and 1 or a pass's -1 makes one due.
-- The cast button, in `_MagicSelection`, sets it to `CastMagic`'s result (`Magic.cpp:564`).
-
-Set the flags where each of these lands in the port. Evidence: a row per handler in
-`tools/dump-mouse-queue.ts` case 9, counting the frames from the click to the next tick.
-
 ### C54 ⏳ `extraTicks`: a turn or a step does not make a tick due
 
 `_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`
@@ -155,7 +135,7 @@ in the VBL that handles it. `extraTicks` is CSBWin's "Extra Ticks" menu option
 (`OPT_EXTRATICKS`, `CSBUI.cpp:987-988`), initialised `true` (`data.cpp:279`) and turned off
 only for the playback of a recording (`CSBUI.cpp:964`, `:2160`, `:2201`) or by a recording's
 `#NoExtraTicks` line (`Recording.cpp:300-303`). The port follows CSBWin's option defaults
-(`DM_rules`, `src/engine/HallOfChampions.ts:251`), so `extraTicks` is on. The port's
+(`DM_rules`, `src/engine/HallOfChampions.ts:256`), so `extraTicks` is on. The port's
 `MovementSystem` sets neither flag for a turn or a step that goes through. Set
 `clockTickSet` at the top of both. Evidence: a row in `tools/dump-mouse-queue.ts` counting
 the frames from an arrow click to the next tick.
@@ -213,15 +193,15 @@ neither half:
 
 - Sleep, button 145: `TAG02076e` after the inventory is hidden
   (`doc/CSBwin-src/Mouse.cpp:1691`). Port: the UI's sleep click, then `MouseSystem.sleep`
-  (`src/engine/MouseSystem.ts:362`).
+  (`src/engine/MouseSystem.ts:366`).
 - `WakeUp`: `TAG0207cc` last (`CSBCode.cpp:7061`). Port: `wakeUp`
-  (`src/engine/LoopState.ts:41`).
+  (`src/engine/LoopState.ts:75`).
 - `AddCharacter`: `TAG02076e` after `ShowHideInventory` shows the candidate
   (`Character.cpp:796-797`). Port: `HallOfChampions.addCharacter`
-  (`src/engine/HallOfChampions.ts:85`).
+  (`src/engine/HallOfChampions.ts:86`).
 - `_ResurrectReincarnateCancel`: `TAG0207cc` after a cancel (`CSBCode.cpp:6657`) and after a
   resurrection or reincarnation (`:6808`). Port: `HallOfChampions.resurrectReincarnateCancel`
-  (`:142`).
+  (`:143`).
 - The main loop: the pair back to back, about every ten seconds, while `d.Word11722` is
   non-zero (`CSBCode.cpp:766-774`). The port does not model `d.Word11722`.
 
@@ -353,6 +333,20 @@ The tools that turn the clock themselves (`tickCount++` then `processTimers`) mo
 Evidence: a row in `tools/dump-mouse-queue.ts` case 9 counting the ticks from the door
 button to the door's first step.
 
+### C69 ⏳ A step, a drop and a pick-up run the timers at once
+
+CSBWin runs `ProcessTimers` from the main loop's tick (`doc/CSBwin-src/CSBCode.cpp:627`)
+and from `_FusionSequence` (`Attack.cpp:2199`), nowhere else. The port also runs
+`processTimers(tickCount)` from three handlers the mouse queue runs, once their move is
+made: `MovementSystem.moveParty` after a turn or a step that went through
+(`src/engine/MovementSystem.ts:59`), `MouseSystem.dropObjectFromCursor`
+(`src/engine/MouseSystem.ts:103`) and `MouseSystem.triggerObjectMove`, the pick-up
+(`:277`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
+the handler, before the rest of the queue's entries in that pass and before the top of the
+tick, where CSBWin's waits for the tick. The `loadPartyLevelOnArrival` beside each call is
+C57's. Remove the three calls. Evidence: a check that drops an object on a pad whose
+action is due at once, and finds its timer still queued when the handler returns.
+
 ---
 
 ## F — Verification debt
@@ -442,7 +436,7 @@ uses CSBWin's defaults.
   `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:333`).
+  (`HallOfChampions.ts:338`).
 - `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
   statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with

@@ -9,14 +9,17 @@ import type { GameContext } from './GameContext';
 export interface LoopFlags {
   /**
    * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050), a door button
-   * (`Mouse.cpp:1078`) or a wall switch that fired (`TouchWallF1`, `:788`): a tick is due
-   * at once, whatever the VBL count. The tick itself clears it again (`CSBCode.cpp:704`),
+   * (`Mouse.cpp:1078`), a wall switch that fired (`TouchWallF1`, `:788`), a pick-up
+   * (`:840`), a drop (`:964`), `ShowHideInventory` (`CSBCode.cpp:7441`), or an attack or
+   * a cast that went through (`setClockTick`): a tick is due at once, whatever the VBL
+   * count. The tick itself clears it again (`CSBCode.cpp:704`),
    * so a party woken by a blow during `ProcessTimers` gets no extra tick.
    */
   clockTickSet: boolean;
   /**
-   * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313) or a touch
-   * of the wall that fired nothing (`TouchWallF1`, `Mouse.cpp:788`). The VBL sets
+   * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313), a touch
+   * of the wall that fired nothing (`TouchWallF1`, `Mouse.cpp:788`), or an attack or a
+   * cast that returned 0 (`setClockTick`). The VBL sets
    * `clockTick` again on every VBL once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`),
    * so a tick that was due waits one frame.
    */
@@ -39,6 +42,15 @@ export interface LoopFlags {
 
 export function createLoopFlags(): LoopFlags {
   return { clockTickSet: false, clockTickCleared: false, newPartyLevel: false, clockRunning: true, gameFrozen: false };
+}
+
+/**
+ * `d.clockTick = value` from a handler the mouse queue runs: non-zero makes a tick due at
+ * once, and 0 puts off a tick that was due by a VBL.
+ */
+export function setClockTick(ctx: GameContext, value: number): void {
+  ctx.loop.clockTickSet = value !== 0;
+  ctx.loop.clockTickCleared = value === 0;
 }
 
 /**

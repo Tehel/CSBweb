@@ -256,12 +256,14 @@ function main(): void {
 
   console.log('');
   console.log('=== Cancel (button 162) ===');
+  game.ctx.loop.clockTickSet = false;
   game.resurrectReincarnateCancel(CANCEL);
   console.log(`champions ${party.champions.length}, potential ${party.potentialChampionIndex}, cursorOwner ${party.cursorOwner}, inventory ${party.selectedCharacterIndex}`);
   check(party.champions.length === 0, 'Cancel takes the champion back out of the party');
   check(party.potentialChampionIndex === -1, 'and clears the provisional marker');
   check(party.cursorOwner === -1, 'SetHandOwner(-1), because that was the only champion');
   check(party.selectedCharacterIndex === -1, 'the inventory is hidden again');
+  check(game.ctx.loop.clockTickSet, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6634, :7441)");
 
   const mirrorAfterCancel = cellObjects(game, mirror);
   check(mirrorAfterCancel.length === mirrorBefore.length
@@ -281,7 +283,9 @@ function main(): void {
   const possessionsBeforeResurrect = possessionList(game, 0).map(({ rn }) => rn);
   const skillsBefore = party.champions[0]!.skills.map((s) => s.experience);
   const strengthBefore = attributeCurrent(party.champions[0]!.attributes.stats[1]!);
+  game.ctx.loop.clockTickSet = false;
   game.resurrectReincarnateCancel(RESURRECT);
+  const tickDueAfterResurrect = game.ctx.loop.clockTickSet;
 
   const mirrorAfterResurrect = cellObjects(game, mirror);
   console.log(`mirror now holds ${mirrorAfterResurrect.length} objects (was ${mirrorBefore.length})`);
@@ -290,6 +294,7 @@ function main(): void {
 
   check(party.potentialChampionIndex === -1, 'the champion is fully in the party now');
   check(party.selectedCharacterIndex === -1, 'and the menu screen is gone');
+  check(tickDueAfterResurrect, "ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6807, :7441)");
   check(
     possessionsBeforeResurrect.every((rn) => !mirrorAfterResurrect.includes(rn)),
     'RemoveObjectFromRoom unlinked every possession from the mirror',

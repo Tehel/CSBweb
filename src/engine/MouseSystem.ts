@@ -22,7 +22,7 @@ import {
 } from '../core/types';
 import { ActuatorAction } from '../data/actuatorHelpers';
 import { nameIndexOf, type GameContext } from './GameContext';
-import { speed } from './LoopState';
+import { setClockTick, speed } from './LoopState';
 import type { Champion } from './gameTypes';
 import { findChampionByFingerprint } from './Party';
 import { AdjustSkillsWhy, determineMastery } from './skills';
@@ -62,7 +62,8 @@ export class MouseSystem {
   }
 
   /**
-   * Drop the cursor object into the current/front cell, following CSBWin's DropObject positioning rules.
+   * Drop the cursor object into the current/front cell, following CSBWin's DropObject positioning rules,
+   * and make a tick due at once (`d.clockTick = 1`, `doc/CSBwin-src/Mouse.cpp:964`).
    */
   dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
     const party = this.ctx.party.state;
@@ -103,6 +104,7 @@ export class MouseSystem {
     if (options?.viAltar) {
       this.maybeScheduleViAltar(dropped, target, newPos);
     }
+    setClockTick(this.ctx, 1);
     return true;
   }
 

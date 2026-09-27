@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { freeze, thaw, wakeUp } from './LoopState';
+import { freeze, setClockTick, thaw, wakeUp } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -484,6 +484,11 @@ export class Game {
     /** Button 148, the engine's half (`LoopState.thaw`). */
     thaw(): void {
         thaw(this.ctx);
+    }
+
+    /** `d.clockTick = value` from a UI handler (`LoopState.setClockTick`). */
+    setClockTick(value: number): void {
+        setClockTick(this.ctx, value);
     }
 
     /** `gameFrozen`: between buttons 147 and 148. */

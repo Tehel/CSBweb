@@ -268,6 +268,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         },
         // Buttons 145 and 146 (the host's `sleepChanged` is the engine's answer).
         onSleep: () => game.sleep(),
+        setClockTick: (value) => game.setClockTick(value),
         onWakeUp: () => game.wakeUp(),
         // Buttons 147 and 148 (the screen's halves are `handleMouseButton`'s).
         onFreeze: () => game.freeze(),
