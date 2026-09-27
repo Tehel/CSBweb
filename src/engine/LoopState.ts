@@ -10,9 +10,9 @@ export interface LoopFlags {
   /**
    * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050), a door button
    * (`Mouse.cpp:1078`), a wall switch that fired (`TouchWallF1`, `:788`), a pick-up
-   * (`:840`), a drop (`:964`), `ShowHideInventory` (`CSBCode.cpp:7441`), or an attack or
-   * a cast that went through (`setClockTick`): a tick is due at once, whatever the VBL
-   * count. The tick itself clears it again (`CSBCode.cpp:704`),
+   * (`:840`), a drop (`:964`), `ShowHideInventory` (`CSBCode.cpp:7441`), a turn or a step
+   * (`:7866-7869`, `:8084-8087`), or an attack or a cast that went through
+   * (`setClockTick`): a tick is due at once, whatever the VBL count. The tick itself clears it again (`CSBCode.cpp:704`),
    * so a party woken by a blow during `ProcessTimers` gets no extra tick.
    */
   clockTickSet: boolean;

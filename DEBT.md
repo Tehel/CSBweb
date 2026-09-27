@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C54 | `extraTicks`: a turn or a step does not make a tick due | S | ⏳ |
 | C57 | The party's arrival on another level runs at once, not at the top of the next tick | M | ⏳ |
 | C58 | A turn does not lift and place the party | S | ⏳ |
 | C59 | A missile leaving the map is dropped, not met as the exterior wall | S | ⏳ |
@@ -127,19 +126,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
 
-### C54 ⏳ `extraTicks`: a turn or a step does not make a tick due
-
-`_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`
-(`doc/CSBwin-src/CSBCode.cpp:7866-7869`, `:8084-8087`), so every turn and step runs a tick
-in the VBL that handles it. `extraTicks` is CSBWin's "Extra Ticks" menu option
-(`OPT_EXTRATICKS`, `CSBUI.cpp:987-988`), initialised `true` (`data.cpp:279`) and turned off
-only for the playback of a recording (`CSBUI.cpp:964`, `:2160`, `:2201`) or by a recording's
-`#NoExtraTicks` line (`Recording.cpp:300-303`). The port follows CSBWin's option defaults
-(`DM_rules`, `src/engine/HallOfChampions.ts:256`), so `extraTicks` is on. The port's
-`MovementSystem` sets neither flag for a turn or a step that goes through. Set
-`clockTickSet` at the top of both. Evidence: a row in `tools/dump-mouse-queue.ts` counting
-the frames from an arrow click to the next tick.
-
 ### C57 ⏳ The party's arrival on another level runs at once, not at the top of the next tick
 
 When a `MoveObject` of the party ends on another level, CSBWin sets `d.newPartyLevel` and
@@ -167,7 +153,7 @@ Off the stairs, `_TurnParty` brackets its `SetPartyFacing` with
 `PlaceOrRemoveObjectInRoom(d.partyX, d.partyY, RN(RNnul), true, 0)` before and
 `(…, true, 1)` after (`doc/CSBwin-src/CSBCode.cpp:7912-7934`), so the pads under the party
 see it leave and come back, with `unchangedRoom` true, facing the new way. The port's turn,
-`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:108`), only sets the facing.
+`MovementSystem.handleTurn` (`src/engine/MovementSystem.ts:115`), only sets the facing.
 Add the pair around it. Evidence: a row in `tools/dump-party-move.ts` case 7 with the two
 calls.
 
@@ -339,7 +325,7 @@ CSBWin runs `ProcessTimers` from the main loop's tick (`doc/CSBwin-src/CSBCode.c
 and from `_FusionSequence` (`Attack.cpp:2199`), nowhere else. The port also runs
 `processTimers(tickCount)` from three handlers the mouse queue runs, once their move is
 made: `MovementSystem.moveParty` after a turn or a step that went through
-(`src/engine/MovementSystem.ts:59`), `MouseSystem.dropObjectFromCursor`
+(`src/engine/MovementSystem.ts:66`), `MouseSystem.dropObjectFromCursor`
 (`src/engine/MouseSystem.ts:103`) and `MouseSystem.triggerObjectMove`, the pick-up
 (`:277`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
 the handler, before the rest of the queue's entries in that pass and before the top of the
@@ -450,7 +436,7 @@ uses CSBWin's defaults.
   The port builds a fresh block each attack, with `disableTime` 0.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
-  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:239`).
+  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:246`).
 - `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
   attack option. The names come straight from `AttackNames`.
 - `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is

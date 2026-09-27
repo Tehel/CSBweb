@@ -12,6 +12,7 @@ import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, Position, RoomType, getRoomType } from '../core/types';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
+import { setClockTick } from './LoopState';
 import { TimerFunction } from './TimerQueue';
 
 
@@ -49,10 +50,16 @@ export class MovementSystem {
     /**
      * `MoveParty` (doc/CSBwin-src/CSBCode.cpp:7944) and `_TurnParty` (`:7854`) whole:
      * `move` makes the turn, the stairs or the step, each through the party's world
-     * `MoveObject` (`WorldMove.moveParty`); this adds, on an inhibited step,
-     * `DiscardAllInput(); d.clockTick = 0;`. `HandleMouseEvents` (`Game.move`) calls it.
+     * `MoveObject` (`WorldMove.moveParty`); this adds the `d.clockTick = 1` both open
+     * with and, on an inhibited step, `DiscardAllInput(); d.clockTick = 0;`.
+     * `HandleMouseEvents` (`Game.move`) calls it.
      */
     moveParty(action: MovementAction): MovementResult {
+        // `if (extraTicks) d.clockTick = 1;` (doc/CSBwin-src/CSBCode.cpp:7866-7869,
+        // `:8084-8087`), before either can return. `extraTicks` is the "Extra Ticks"
+        // option, `true` from the start (`data.cpp:279`) and turned off only to play a
+        // recording back (`CSBUI.cpp:964`, `:2160`, `:2201`), so it is always on here.
+        setClockTick(this.ctx, 1);
         const result = this.move(action);
 
         if (result.success) {

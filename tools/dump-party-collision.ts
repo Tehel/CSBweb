@@ -18,8 +18,9 @@
  * - every attempted step costs each champion `3 * load / MaxLoad + 1` stamina, bump or
  *   not (`:8088-8101`, `:8129-8135`); a turn costs nothing.
  * - a step sets a move delay, in ticks, from the slowest living champion's `TimeToMove`;
- *   a throw locks steps in its direction for 4 ticks; one turn or step per tick
- *   (`:8326-8349`, `Mouse.cpp:1468-1496`).
+ *   a throw locks steps in its direction for 4 ticks; one turn or step per tick, and each
+ *   brings its own tick on at once, "Extra Ticks" being on (`:8326-8349`, `:7866-7869`,
+ *   `:8084-8087`, `Mouse.cpp:1468-1496`).
  *
  * None of that is visible in `tools/check-frames.sh` — the party either arrives in a
  * cell or does not, and until this was ported it always arrived.
@@ -400,7 +401,10 @@ async function main(): Promise<void> {
   // `HandleMouseEvents` holds a queued *step* while it is non-zero, or while a throw's
   // `d.Word11712` lock is on and the step heads in direction `d.Word11714`
   // (Mouse.cpp:1482-1496). Any turn or step also waits for the next tick
-  // (`d.Time < lastTime + 1`, `:1468-1476`). A turn ignores the move delay.
+  // (`d.Time < lastTime + 1`, `:1468-1476`), and brings that tick on at once
+  // (`if (extraTicks) d.clockTick = 1;`, CSBCode.cpp:7866-7869, :8084-8087), so the tick
+  // after a step runs in the step's own VBL and takes one off its delay. A turn ignores
+  // the move delay.
   {
     const open = (x: number, y: number): boolean =>
       x >= 0 && y >= 0 && x < width && y < height && roomTypeAt(x, y) === RoomType.OPEN &&
@@ -434,8 +438,10 @@ async function main(): Promise<void> {
 
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
+      const ticksBeforeStep = game.state.tickCount;
       frame(false);
       const firstStep = stepsFrom();
+      const stepTicked = game.state.tickCount !== ticksBeforeStep;
       const delayAfterStep = party.partyMoveDisableTimer;
       const ticks0 = game.state.tickCount;
       frame(false);
@@ -447,13 +453,12 @@ async function main(): Promise<void> {
       }
       const ticksToSecond = game.state.tickCount - ticks0;
 
-      // A turn waits for the next tick, but not for the move delay.
+      // A turn does not wait for the move delay. It waits for `d.Time` to pass the second
+      // step's, which the step's own tick has already moved on, so it goes in the next VBL.
+      const delayAtTurn = party.partyMoveDisableTimer;
       game.enqueueMovement(MovementAction.TURN_LEFT);
       frame(false);
-      const turnedSameTick = party.facing !== run.dir;
-      frame(true);
-      frame(false);
-      const turnedUnderDelay = party.facing !== run.dir && party.partyMoveDisableTimer !== 0;
+      const turnedUnderDelay = party.facing !== run.dir && delayAtTurn !== 0;
 
       // The throw lock holds a step in the thrown direction and lets others through.
       game.discardAllInput();
@@ -500,19 +505,21 @@ async function main(): Promise<void> {
       stats.characterLoad = realLoad;
 
       console.log(
-        `move delay: first step ${firstStep}, delay ${delayAfterStep}, second step held in the same tick ` +
-          `${heldSameTick === 1}, taken after ${ticksToSecond} tick(s); a turn in the same tick ${turnedSameTick}, ` +
-          `under the delay ${turnedUnderDelay}; throw lock held ${lockHeld}, the other way passed ${otherWayPassed}`,
+        `move delay: first step ${firstStep}, its tick in its VBL ${stepTicked}, delay after it ${delayAfterStep}, ` +
+          `second step held in the same tick ${heldSameTick === 1}, taken after ${ticksToSecond} tick(s); ` +
+          `a turn in the next VBL, under the delay ${turnedUnderDelay}; throw lock held ${lockHeld}, ` +
+          `the other way passed ${otherWayPassed}`,
       );
       console.log(`TimeToMove: ${JSON.stringify(table)} (over expected ${overExpected}); slowest living ${slowestLiving}`);
       console.log('');
 
       check(firstStep === 1, 'the first queued step should be taken at once');
-      check(delayAfterStep === 2, `an unladen party's step should set a delay of 2 ticks (${delayAfterStep})`);
+      check(stepTicked, 'and bring its tick on in the same VBL (extraTicks)');
+      check(delayAfterStep === 1,
+        `an unladen party's step sets a delay of 2 ticks, and its own tick takes one off (${delayAfterStep})`);
       check(heldSameTick === 1, 'the second step should be held while the delay runs');
       check(ticksToSecond === 2, `the second step should come 2 ticks after the first (${ticksToSecond})`);
-      check(!turnedSameTick, 'a turn should wait for the next tick (one event per tick)');
-      check(turnedUnderDelay, 'a turn should not wait for the move delay');
+      check(turnedUnderDelay, "a turn should not wait for the move delay, and goes once the step's tick has run");
       check(lockHeld, "a step in the thrown direction should be held while d.Word11712 is set");
       check(otherWayPassed, 'a step the other way should not be held by the throw lock');
       check(table.empty === 2 && table.laden === 3 && table.over === overExpected,
@@ -540,8 +547,9 @@ async function main(): Promise<void> {
   // ---- Case 10: a level change discards all input, at the next tick ---------
   // CSBWin sets `d.newPartyLevel` when the party changes level and, at the top of the
   // next tick, `LoadPartyLevel(...); MoveObject(...); d.newPartyLevel = -1;
-  // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:615-623). A turn queued behind a step
-  // onto the stairs is therefore lost.
+  // DiscardAllInput();` (doc/CSBwin-src/CSBCode.cpp:615-623). The step brings that tick on
+  // in its own VBL (`extraTicks`, `:8084-8087`), before the queue's next entry is looked
+  // at, so a turn queued behind a step onto the stairs is lost at once.
   {
     let stairs: { px: number; py: number; dir: number } | null = null;
     for (let x = 0; x < width && !stairs; x++) {
@@ -574,22 +582,22 @@ async function main(): Promise<void> {
         internals.lastTickTime = tickDue ? t - 1000 : t;
         game.runFrame(t);
       };
+      const ticksBeforeStairs = game.state.tickCount;
       frame(false);
       const newLevel = party.position.z;
+      const stairsTicked = game.state.tickCount !== ticksBeforeStairs;
       const queuedAfterStairs = game.queuedInputCount();
-      frame(true);
-      const queuedAfterTick = game.queuedInputCount();
       const facingAfter = party.facing;
       for (let i = 0; i < 6; i++) frame(i % 2 === 0);
       const turned = party.facing !== facingAfter;
       console.log(
-        `stairs: level ${level} -> ${newLevel}; queued after the step ${queuedAfterStairs}, ` +
-          `after the next tick ${queuedAfterTick}; the queued turn ran ${turned}`,
+        `stairs: level ${level} -> ${newLevel}; its tick in its VBL ${stairsTicked}; ` +
+          `queued after that VBL ${queuedAfterStairs}; the queued turn ran ${turned}`,
       );
       console.log('');
       check(newLevel !== level, 'the step onto the stairs should change level');
-      check(queuedAfterStairs === 1, 'the turn should still be queued until the next tick');
-      check(queuedAfterTick === 0 && !turned, 'the next tick should discard the queued turn (DiscardAllInput)');
+      check(stairsTicked, 'the step brings its tick on in its own VBL (extraTicks)');
+      check(queuedAfterStairs === 0 && !turned, 'whose top discards the queued turn (DiscardAllInput)');
       game.party.state.position = new Position(scene.px, scene.py, level);
       game.monsterSystem.loadPartyLevel(level);
     }

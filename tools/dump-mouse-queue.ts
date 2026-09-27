@@ -27,7 +27,8 @@
  * - `ShowHideInventory`, the pick-up and the drop set it to 1 as well (`CSBCode.cpp:7441`,
  *   `Mouse.cpp:840`, `:964`), the eye's press aside; the attack menu and the cast button
  *   set it to what the attack or the cast returned (`Character.cpp:4716-4717`,
- *   `Magic.cpp:564`), and a pass leaves it alone.
+ *   `Magic.cpp:564`), and a pass leaves it alone. A turn and a step set it to 1 before
+ *   anything else, "Extra Ticks" being on (`CSBCode.cpp:7866-7869`, `:8084-8087`).
  *
  * Run: `npx tsx tools/dump-mouse-queue.ts [level]`
  */
@@ -427,12 +428,15 @@ async function main(): Promise<void> {
     game.ctx.loop.clockTickSet = false;
     game.ctx.loop.clockTickCleared = false;
   };
-  /** Just after a tick, the click `handler` is: the frames to the next tick, its own frame 1. */
-  const framesToTick = (handler: () => void): number => {
+  /**
+   * Just after a tick, queue button `num`, which the UI's `handler` answers unless it is an
+   * arrow: the frames to the next tick, the click's own frame counting 1.
+   */
+  const framesToTick = (handler: () => void, num = 80): number => {
     onClick = handler;
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
-    game.onMouseClick(80, 100, 100);
+    game.onMouseClick(num, 100, 100);
     for (let n = 1; n <= 30; n++) {
       vbl();
       if (game.ctx.state.tickCount !== ticksAtClick) return n;
@@ -440,10 +444,10 @@ async function main(): Promise<void> {
     return -1;
   };
   /** With a tick due by the clock, does it run in the frame that handles the click? */
-  const dueTickRuns = (handler: () => void): boolean => {
+  const dueTickRuns = (handler: () => void, num = 80): boolean => {
     onClick = handler;
     frame(true);
-    game.onMouseClick(80, 100, 100);
+    game.onMouseClick(num, 100, 100);
     const before = game.ctx.state.tickCount;
     frame(true);
     return game.ctx.state.tickCount !== before;
@@ -579,6 +583,28 @@ async function main(): Promise<void> {
     else check(!runs, `a cast of ${name} that returns ${result} puts off a tick that was due`);
   }
   check(castResults.has(0) && castResults.has(1) && castResults.has(3), 'the casts return 0, 1 and 3');
+
+  // `_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`, and
+  // `extraTicks` is on (CSBCode.cpp:7866-7869, :8084-8087, data.cpp:279). A step the
+  // terrain refuses then sets it to 0 (:8310-8314).
+  soloParty();
+  const facingBefore = party.facing;
+  const turnFrames = framesToTick(() => {}, 1);
+  const turned = party.facing !== facingBefore;
+  row('_TurnParty (button 1)', turned ? 'turned' : 'still', turnFrames, '-', 'set');
+  check(turned && turnFrames === 1, 'a turn makes a tick due (extraTicks)');
+  soloParty();
+  const stepFrames = framesToTick(() => {}, 3);
+  const steppedOnce = party.position.x !== scene.x || party.position.y !== scene.y;
+  row('MoveParty (button 3)', steppedOnce ? 'stepped' : 'still', stepFrames, '-', 'set');
+  check(steppedOnce && stepFrames === 1, 'a step makes a tick due (extraTicks)');
+  soloParty();
+  party.position = new Position(bareScene.x, bareScene.y, level);
+  game.party.setFacing(bareScene.dir);
+  const bumpRuns = dueTickRuns(() => {}, 3);
+  const bumped = party.position.x === bareScene.x && party.position.y === bareScene.y;
+  console.log(['MoveParty into stone', bumped ? 'refused' : 'stepped', '-', bumpRuns, 'cleared'].join('\t'));
+  check(bumped && !bumpRuns, 'a step into stone still puts off a tick that was due');
   party.champions = [];
   party.selectedCharacterIndex = -1;
 

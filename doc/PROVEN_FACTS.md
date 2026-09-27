@@ -2870,7 +2870,15 @@ fails before the eye gate),
 
 Evidence: `tools/dump-mouse-queue.ts`, case 9.
 
-## Five more handlers write `d.clockTick`
+## The other handlers that write `d.clockTick`
+
+- `_TurnParty` and `MoveParty` open with `if (extraTicks) d.clockTick = 1;`
+  (`doc/CSBwin-src/CSBCode.cpp:7866-7869`, `:8084-8087`), before either can return.
+  `extraTicks` is the "Extra Ticks" option (`OPT_EXTRATICKS`, `CSBUI.cpp:987-988`), `true`
+  from the start (`data.cpp:279`) and turned off only to play a recording back
+  (`CSBUI.cpp:964`, `:2160`, `:2201`, `Recording.cpp:300-303`). So every turn and step runs
+  a tick in its own VBL, which counts one off the move delay the step has just set, and a
+  refused step's `d.clockTick = 0` (`:8310-8314`) comes after it.
 
 - `ShowHideInventory` sets `d.clockTick = 1` once past its return for a dead champion
   (`chIdx != 4` only) and its returns while the mouth or the eye is pressed
@@ -2895,7 +2903,8 @@ Evidence: `tools/dump-mouse-queue.ts`, case 9.
 So a click that did something makes a tick due in its own VBL, and an attack or a cast
 that came to nothing puts off a tick that was due, as a refused move does.
 
-Evidence: `tools/dump-mouse-queue.ts`, case 10; `tools/dump-hall-of-champions.ts`.
+Evidence: `tools/dump-mouse-queue.ts`, case 10; `tools/dump-hall-of-champions.ts`;
+`tools/dump-party-collision.ts`, cases 8 and 10.
 
 ## The party moves through one `MoveObject`, in one order
 
