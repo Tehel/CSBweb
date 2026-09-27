@@ -286,7 +286,12 @@ bare door graphic and calls none of them (`:1253`, and `src/renderer/DrawViewpor
 So no door shows its ornament: 89 of the 170 doors in `dm-atari/dungeon.dat` have one.
 Among them is the entrance door on level 0 (door 107, ornament 1): the level's one door
 decoration is 7 (`doorDecorationTOC`), graphic 310, the opaque black door. The port draws
-the grid under it.
+the grid under it. In play that also means no smashed or reinforced wooden doors, no
+grids with a small central grid, and none of the custom locks. On level 6 the wooden doors
+(door type 1, graphics 111-113) carry ornaments 305 (four doors) and 306 (one), the
+turquoise-key doors' skin, and show as plain wood. The dragon room's doors on level 13 look
+right because their look is a door type (graphics 114-116), but one of the two has an
+ornament too, graphic 314.
 
 `TAG004b26` needs what `ReadGraphicsForLevel` sets up per level (`Code390e.cpp:275-300`):
 `d.Word2514[i]`, the ornament's graphic (`303 + DoorDecorationTOC[i]`) and its position set
