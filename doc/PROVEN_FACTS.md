@@ -3509,6 +3509,17 @@ its chain: `ShowChestContents` clears their links and the chest's `contents`
 pair is in `doc/CSBWIN_MENU_REFERENCE.md` → "Entering and leaving". Evidence:
 `tools/dump-save-menu.ts`, "the disk menu over an open chest".
 
+## `d.Word11722` is always zero
+
+The main loop calls `TAG02076e(); TAG0207cc();` about every ten seconds while
+`d.Word11722` is non-zero (`doc/CSBwin-src/CSBCode.cpp:766-774`), and never does.
+`DBank::Initialize` zeroes the whole bank and sets `Word1870 = 1` (`CSBCode.cpp:328-331`).
+The only live write of `d.Word11722` is `TAG00456c`'s `|= 1` (`:3059-3061`), behind
+`if (d.Word1870 == 0)` (`:3055`), and nothing writes `d.Word1870` again: its other
+mentions are reads (`:959`, `:3301`) and `Pointer2066[2]`, which nothing reads. The other
+writes are inside comments (`:1932`, `Viewport.cpp:4608`). So the port has no
+counterpart of the call.
+
 ## A load keeps the message area
 
 CSBWin saves no message state: `SCROLLING_TEXT::Serialize` is declared

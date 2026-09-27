@@ -43,6 +43,18 @@ export interface GameHost {
    * the champion whose inventory is open (`:1906-1914`). The open chest is the UI's.
    */
   repackChest(): void;
+  /**
+   * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`): the open chest repacked, the
+   * interface shaded and the arrow cursor, all the UI's. `AddCharacter` calls it once the
+   * candidate's inventory is shown (`:796-797`).
+   */
+  tag02076e(): void;
+  /**
+   * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`), `TAG02076e`'s undoing: `WakeUp` calls it
+   * last (`:7061`), and `_ResurrectReincarnateCancel` once the inventory is hidden (`:6657`,
+   * `:6808`).
+   */
+  tag0207cc(): void;
 }
 
 /**
@@ -67,5 +79,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     openReincarnateScreen: host.openReincarnateScreen ?? (() => {}),
     closeAttackMenuOf: host.closeAttackMenuOf ?? (() => {}),
     repackChest: host.repackChest ?? (() => {}),
+    tag02076e: host.tag02076e ?? (() => {}),
+    tag0207cc: host.tag0207cc ?? (() => {}),
   };
 }

@@ -8,6 +8,8 @@
  * - `Buttons17796` is the viewport, either mouse button, as button 146; nothing else can
  *   be clicked. The key table `Byte18440` binds Return to 146 (read from graphics.dat).
  * - Asleep, `d.Speed = 0`, and a tick is due on every VBL (`CSBCode.cpp:1066-1077`).
+ * - `TAG02076e` on the way to sleep (`Mouse.cpp:1691`) shades the interface and shows the
+ *   arrow cursor until `WakeUp`'s `TAG0207cc` (`CSBCode.cpp:7061`).
  * - `WakeUp` (`CSBCode.cpp:7047`): `d.clockTick = 1` — the tick runs in the very frame —
  *   and the adventure lists back. A blow wakes the party from `MonsterDamagesCharacter`
  *   *before* its dodge test (`Monster.cpp:4531-4536`), and from `DamageCharacter` only
@@ -101,6 +103,7 @@ async function main(): Promise<void> {
       Mouse.updateButtonLists(ui);
       Mouse.syncInventoryButtons(ui);
     },
+    tag0207cc: () => Mouse.tag0207cc(ui),
   });
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
@@ -166,6 +169,7 @@ async function main(): Promise<void> {
     check(game.isPartySleeping(), 'the party is asleep');
     check(notified.join() === 'true', 'the listeners heard it once');
     check(party.selectedCharacterIndex === -1, 'ShowHideInventory(4): the inventory is closed');
+    check(ui.shadedByTag02076e, 'TAG02076e (Mouse.cpp:1691): the interface shaded, the arrow cursor');
     check(ui.primaryButtons === lists.buttons17796 && ui.secondaryButtons === null,
       'PrimaryButtonList = Buttons17796, SecondaryButtonList = NULL');
     check(game.queuedInputCount() === 0 && !handled.includes(1), 'DiscardAllInput(): the turn behind it is gone');
@@ -197,6 +201,7 @@ async function main(): Promise<void> {
     check(notified.join() === 'false', 'the listeners heard it');
     check(ui.primaryButtons === lists.buttons17196 && ui.secondaryButtons === lists.buttons17304,
       'the adventure lists are back');
+    check(!ui.shadedByTag02076e, 'TAG0207cc last (CSBCode.cpp:7061): the interface and cursor restored');
     check(internals.state.tickCount - before === 1, 'd.clockTick = 1: the tick runs in the same frame');
     const awake = internals.state.tickCount;
     for (let i = 0; i < 10; i++) frame(-1);

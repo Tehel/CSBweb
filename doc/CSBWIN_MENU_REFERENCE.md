@@ -222,7 +222,8 @@ Ten VBLs is **1/6 s at 60 Hz**, which is how long the port holds it.
 ## Entering and leaving
 
 `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) runs *before* the menu
-(`SaveGame.cpp:860`, `Mouse.cpp:1691`, `:1736`):
+(`SaveGame.cpp:860`), and on the way to sleep (`Mouse.cpp:1691`), at the freeze (`:1736`)
+and once a Hall of Champions candidate's inventory is shown (`Character.cpp:797`):
 
 ```c
   if (d.PartySleeping) return;
@@ -246,7 +247,10 @@ takes the arrow for both (`CSBCode.cpp:2254-2255`).
 
 `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`) is the mirror, called on the way out
 (`SaveGame.cpp:1274`, and at `:854` after "SAVES ARE DISABLED", which skipped
-`TAG02076e`). Asleep it only redraws the sleep screen (`:9938-9942`). Otherwise it selects
+`TAG02076e`), at the thaw (`Mouse.cpp:1765`), last in `WakeUp` (`CSBCode.cpp:7061`), and
+by `_ResurrectReincarnateCancel` once the candidate's inventory is hidden (`:6657`,
+`:6808`). The main loop's call of the pair is dead (`doc/PROVEN_FACTS.md` →
+"`d.Word11722` is always zero"). Asleep it only redraws the sleep screen (`:9938-9942`). Otherwise it selects
 the magic caster again through `SelectMagicCaster` with `d.MagicCaster` set to -1 first,
 which refuses a dead champion (`Magic.cpp:723-724`) and so leaves none; sets
 `d.Word20252 = 1`, the attack buttons, when no attack menu is open (`:9948-9951`); redraws
@@ -258,11 +262,13 @@ back from the hand (`:2030-2050`).
 `_ReadEntireGame` (`SaveGame.cpp:1435`), the load at the entrance, calls neither.
 
 The port: `tag02076e` and `tag0207cc` in `src/renderer/ui/Mouse.ts`, which `SaveMenu.ts`
-calls around its full screen and not its load-only one, and the freeze calls around its
-frozen game. The redraws are the frame's: `tag02076e` sets `UIState.shadedByTag02076e` and
+calls around its full screen and not its load-only one, the freeze around its frozen game,
+and the sleep click before the engine's `sleep`. The engine's callers, `wakeUp` and
+`HallOfChampions`, reach them through `GameHost`'s `tag02076e` and `tag0207cc`. The redraws are the frame's: `tag02076e` sets `UIState.shadedByTag02076e` and
 `tag0207cc` clears it, and while it is set `GameScreen.presentViewport` shades the three
-areas and `drawCursorItem` draws the arrow. No inventory is drawn while the menu is up. Evidence: `tools/dump-save-menu.ts`, "the disk
-menu over an open chest".
+areas and `drawCursorItem` draws the arrow. No inventory is drawn while the menu is up.
+Evidence: `tools/dump-save-menu.ts`, "the disk menu over an open chest";
+`tools/dump-sleep.ts` and `tools/dump-hall-of-champions.ts` for the other callers.
 
 
 ## What the disk menu itself does

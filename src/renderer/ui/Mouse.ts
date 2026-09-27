@@ -103,10 +103,12 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   if (id === 145) {
     // The sleep icon, `buttons17760` beside the disk (`doc/CSBWIN_MENU_REFERENCE.md`), so
     // it is only ever clicked with an inventory open. `ShowHideInventory(4)` closes it
-    // before anything else (`doc/CSBwin-src/Mouse.cpp:1683-1691`); the rest is the
-    // engine's. Refused, like the disk, while a champion is only provisionally joined.
+    // and `TAG02076e` shades the interface before anything else
+    // (`doc/CSBwin-src/Mouse.cpp:1683-1691`); the rest is the engine's. Refused, like the
+    // disk, while a champion is only provisionally joined.
     if (!potential) {
       if ((ui.partyState?.selectedCharacterIndex ?? -1) >= 0) handleInventoryToggle(ui, 4);
+      tag02076e(ui);
       ui.onSleep?.();
     }
     return;
@@ -249,7 +251,10 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
 
 /**
  * `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108-5135`), before the disk menu goes up
- * (`SaveGame.cpp:860`). Its state half: an open inventory showing a chest
+ * (`SaveGame.cpp:860`), at the freeze (`Mouse.cpp:1736`), on the way to sleep (`:1691`),
+ * and once a Hall of Champions candidate's inventory is shown (the host's `tag02076e`,
+ * `Character.cpp:797`). The main loop's call, with `TAG0207cc`, is dead in CSBWin
+ * (`doc/PROVEN_FACTS.md` → "`d.Word11722` is always zero"). Its state half: an open inventory showing a chest
  * (`d.DisplayResurrectChestOrScroll == 4`) has it repacked (`:5116-5125`), so the save
  * finds the chest's objects in the chest. Asleep, it does nothing (`:5111`). The drawing
  * half is `shadedByTag02076e`, which `GameScreen.presentViewport` reads for the three
@@ -264,7 +269,9 @@ export function tag02076e(ui: UIState): void {
 
 /**
  * `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934-9968`), once the disk menu has gone
- * (`SaveGame.cpp:1274`). Its state half: the magic caster is selected again, which a
+ * (`SaveGame.cpp:1274`), at the thaw (`Mouse.cpp:1765`), and through the host's
+ * `tag0207cc` from `WakeUp` (`CSBCode.cpp:7061`) and `_ResurrectReincarnateCancel`
+ * (`:6657`, `:6808`). Its state half: the magic caster is selected again, which a
  * dead one does not survive (`:9945-9947`); the attack buttons come back unless an
  * attack menu is open (`d.Word20252 = 1`, `:9948-9951`); and an open inventory is shut
  * without a repack and shown again through `ShowHideInventory` (`:9953-9958`), which

@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C60 | Six other callers of `TAG02076e` / `TAG0207cc` do not call them | M | ⏳ |
 | C61 | The dev quick-save writes an open chest empty | S | ⏳ |
 | C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
 | C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
@@ -122,34 +121,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C60 ⏳ Six other callers of `TAG02076e` / `TAG0207cc` do not call them
-
-The pair is ported as `tag02076e` and `tag0207cc` (`src/renderer/ui/Mouse.ts`), and only the
-save menu calls it. CSBWin calls it from six more places, and the port's counterparts do
-neither half:
-
-- Sleep, button 145: `TAG02076e` after the inventory is hidden
-  (`doc/CSBwin-src/Mouse.cpp:1691`). Port: the UI's sleep click, then `MouseSystem.sleep`
-  (`src/engine/MouseSystem.ts:364`).
-- `WakeUp`: `TAG0207cc` last (`CSBCode.cpp:7061`). Port: `wakeUp`
-  (`src/engine/LoopState.ts:84`).
-- `AddCharacter`: `TAG02076e` after `ShowHideInventory` shows the candidate
-  (`Character.cpp:796-797`). Port: `HallOfChampions.addCharacter`
-  (`src/engine/HallOfChampions.ts:86`).
-- `_ResurrectReincarnateCancel`: `TAG0207cc` after a cancel (`CSBCode.cpp:6657`) and after a
-  resurrection or reincarnation (`:6808`). Port: `HallOfChampions.resurrectReincarnateCancel`
-  (`:143`).
-- The main loop: the pair back to back, about every ten seconds, while `d.Word11722` is
-  non-zero (`CSBCode.cpp:766-774`). The port does not model `d.Word11722`.
-
-What each misses is the halves' state: `SetCursorShape(0)`, the arrow cursor until
-`TAG0207cc`'s `TAG002572` puts it back (while asleep, for one); the caster selected again;
-`d.Word20252 = 1` when no attack menu is open; the inventory shown again. The pair's
-drawing is `UIState.shadedByTag02076e`, which `tag02076e` sets and `tag0207cc` clears, and
-which `presentViewport` and `drawCursorItem` read; `presentViewport`'s separate shading
-while asleep goes once sleep calls the pair. Call the pair at each site. Evidence: a check per site, in `tools/dump-sleep.ts` and
-`tools/dump-hall-of-champions.ts`.
 
 ### C61 ⏳ The dev quick-save writes an open chest empty
 
@@ -375,7 +346,7 @@ uses CSBWin's defaults.
   `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:338`).
+  (`HallOfChampions.ts:342`).
 - `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
   statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with

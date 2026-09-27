@@ -129,10 +129,11 @@ export class HallOfChampions {
 
     this.collectMirrorPossessions(index, possessions);
 
-    // `ShowHideInventory(LOCAL_2)` (`:792`) — the inventory opens on the new
+    // `ShowHideInventory(LOCAL_2)` (`:796`) — the inventory opens on the new
     // champion, and `potentialChampionIndex` turns its eye panel into the
-    // Resurrect/Reincarnate/Cancel menu.
+    // Resurrect/Reincarnate/Cancel menu. Then `TAG02076e()` (`:797`).
     party.selectedCharacterIndex = index;
+    this.ctx.host.tag02076e();
     return true;
   }
 
@@ -160,6 +161,7 @@ export class HallOfChampions {
         setHandOwner(party, -1);
       }
       party.champions.pop();
+      this.ctx.host.tag0207cc(); // `:6657`
       return true;
     }
 
@@ -211,9 +213,11 @@ export class HallOfChampions {
     messages.quePrintLines(color, champion.name);
     messages.quePrintLines(color, button === 160 ? ' RESURRECTED' : ' REINCARNATED');
 
-    // `ShowHideInventory(4)` (`:6807`), with its `d.clockTick = 1` (`:7441`).
+    // `ShowHideInventory(4)` (`:6807`), with its `d.clockTick = 1` (`:7441`), then
+    // `TAG0207cc()` (`:6808`).
     party.selectedCharacterIndex = -1;
     setClockTick(this.ctx, 1);
+    this.ctx.host.tag0207cc();
   }
 
   /**

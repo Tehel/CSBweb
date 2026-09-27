@@ -55,6 +55,8 @@ import {
   handleMouseUnclick,
   searchMouseButtons,
   syncInventoryButtons,
+  tag02076e,
+  tag0207cc,
   updateButtonLists,
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
@@ -247,6 +249,16 @@ export class GameScreen {
     repackOpenChest(this.ui);
   }
 
+  /** `TAG02076e` (`doc/CSBwin-src/Character.cpp:5108`) — the host's `tag02076e`. */
+  tag02076e(): void {
+    tag02076e(this.ui);
+  }
+
+  /** `TAG0207cc` (`doc/CSBwin-src/CSBCode.cpp:9934`) — the host's `tag0207cc`. */
+  tag0207cc(): void {
+    tag0207cc(this.ui);
+  }
+
   /**
    * Offer a key to the interface's own bindings (`src/renderer/ui/Keyboard.ts`).
    * Returns whether it was claimed. The modal screens must be offered the key first.
@@ -344,6 +356,10 @@ export class GameScreen {
   }
 
   setPartyState(state: PartyState | null): void {
+    // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
+    // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
+    // `TAG0207cc` follows).
+    if (state !== this.ui.partyState) this.ui.shadedByTag02076e = false;
     this.ui.partyState = state;
     syncInventoryButtons(this.ui);
   }
@@ -470,20 +486,11 @@ export class GameScreen {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui);
-    if (this.ui.partyState?.sleeping && this.ui.uiTables) {
-      // `TAG02076e` ran on the way to sleep (`doc/CSBwin-src/Mouse.cpp:1691`): the
-      // movement arrows, the magic area and the weapon-ready area stay shaded until
-      // `WakeUp`'s `TAG0207cc` redraws them (`CSBCode.cpp:9934`). The inventory is
-      // always closed by then, so the arrows are always there to shade.
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
-      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);
-    }
     if ((this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) && this.ui.uiTables) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
-      // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), before
-      // the disk menu goes up and when the game freezes. The load-only save screen, which
-      // calls no `TAG02076e`, draws over the same interface and shades it too.
+      // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), until
+      // `TAG0207cc` redraws them (`tag02076e` lists the callers). The load-only save
+      // screen, which calls no `TAG02076e`, draws over the same interface and shades it too.
       if (!inventoryOpen) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word12, 0);
       shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word20, 0);

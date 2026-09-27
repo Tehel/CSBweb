@@ -236,6 +236,9 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // the attack menu and the open chest are the screen's.
         closeAttackMenuOf: (chIdx) => screen?.closeAttackMenuOf(chIdx),
         repackChest: () => screen?.repackChest(),
+        // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
+        tag02076e: () => screen?.tag02076e(),
+        tag0207cc: () => screen?.tag0207cc(),
     });
 
     screen = new GameScreen(gameCanvasEl, {

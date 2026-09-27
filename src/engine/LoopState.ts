@@ -79,7 +79,7 @@ export function speed(ctx: GameContext): number {
  * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
  * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
  * (`scrollingText.SetNewSpeed(d.Speed, …)`, `:7053`), the adventure button lists back (the
- * host's listeners), `DiscardAllInput()`.
+ * host's listeners), `DiscardAllInput()`, and `TAG0207cc` last (`:7061`).
  */
 export function wakeUp(ctx: GameContext): void {
   const oldSpeed = speed(ctx);
@@ -89,6 +89,7 @@ export function wakeUp(ctx: GameContext): void {
   ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
   ctx.host.sleepChanged(false);
   ctx.mouseQueue.discardAllInput();
+  ctx.host.tag0207cc();
 }
 
 /**

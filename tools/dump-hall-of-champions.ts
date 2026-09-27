@@ -52,6 +52,11 @@ const CANCEL = 162;
 let sharedGraphics: GraphicsLoader | null = null;
 /** Where the games' `GameHost.openReincarnateScreen` goes; a scenario points it at its screen. */
 let reincarnateScreen: (chIdx: number) => void = () => {};
+/**
+ * The games' `GameHost.tag02076e` / `tag0207cc`, the UI's pair: each call, with the
+ * inventory open at the time (`selectedCharacterIndex`) and the party's size.
+ */
+const pairCalls: string[] = [];
 
 function makeGame(): Game {
   const loader = new DungeonLoader();
@@ -75,10 +80,17 @@ function makeGame(): Game {
       vblInterrupt: () => {},
     },
     openReincarnateScreen: (chIdx) => reincarnateScreen(chIdx),
+    tag02076e: () => pairCalls.push(pairCall(game, 'TAG02076e')),
+    tag0207cc: () => pairCalls.push(pairCall(game, 'TAG0207cc')),
   });
   game.setRandomSeed(0x12345678);
   (game as unknown as { probeMessages: typeof messages }).probeMessages = messages;
   return game;
+}
+
+function pairCall(game: Game, name: string): string {
+  const party = game.party.state;
+  return `${name} inventory ${party.selectedCharacterIndex} champions ${party.champions.length}`;
 }
 
 function probeMessages(game: Game): Array<{ color: number; text: string }> {
@@ -180,8 +192,12 @@ function main(): void {
   console.log(`party at (${party.position.x},${party.position.y}) level ${party.position.z} facing ${facing}`);
   console.log(`mirror at (${mirror.x},${mirror.y}) wall ${wall}, ${mirrorBefore.length} objects in the cell`);
 
+  pairCalls.length = 0;
   const clicked = game.handleWallClick();
   check(clicked === false, 'the portrait actuator reports no switch action (it only adds a champion)');
+  console.log(`pair: ${JSON.stringify(pairCalls)}`);
+  check(pairCalls.join() === 'TAG02076e inventory 0 champions 1',
+    "TAG02076e once the candidate's inventory is shown (Character.cpp:796-797)");
   check(party.champions.length === 1, 'HALK is in the party after the wall click');
 
   const champ = party.champions[0];
@@ -257,7 +273,11 @@ function main(): void {
   console.log('');
   console.log('=== Cancel (button 162) ===');
   game.ctx.loop.clockTickSet = false;
+  pairCalls.length = 0;
   game.resurrectReincarnateCancel(CANCEL);
+  console.log(`pair: ${JSON.stringify(pairCalls)}`);
+  check(pairCalls.join() === 'TAG0207cc inventory -1 champions 0',
+    'TAG0207cc once the inventory is hidden and the champion gone (CSBCode.cpp:6657)');
   console.log(`champions ${party.champions.length}, potential ${party.potentialChampionIndex}, cursorOwner ${party.cursorOwner}, inventory ${party.selectedCharacterIndex}`);
   check(party.champions.length === 0, 'Cancel takes the champion back out of the party');
   check(party.potentialChampionIndex === -1, 'and clears the provisional marker');
@@ -284,8 +304,12 @@ function main(): void {
   const skillsBefore = party.champions[0]!.skills.map((s) => s.experience);
   const strengthBefore = attributeCurrent(party.champions[0]!.attributes.stats[1]!);
   game.ctx.loop.clockTickSet = false;
+  pairCalls.length = 0;
   game.resurrectReincarnateCancel(RESURRECT);
   const tickDueAfterResurrect = game.ctx.loop.clockTickSet;
+  console.log(`pair: ${JSON.stringify(pairCalls)}`);
+  check(pairCalls.join() === 'TAG0207cc inventory -1 champions 1',
+    'TAG0207cc once the inventory is hidden (CSBCode.cpp:6807-6808)');
 
   const mirrorAfterResurrect = cellObjects(game, mirror);
   console.log(`mirror now holds ${mirrorAfterResurrect.length} objects (was ${mirrorBefore.length})`);
@@ -352,13 +376,18 @@ function main(): void {
   // so this stands in for the screen — which is what `main.ts` wires the real one as.
   let screenOpenedFor = -1;
   reincarnateScreen = (chIdx) => { screenOpenedFor = chIdx; };
+  pairCalls.length = 0;
   game.resurrectReincarnateCancel(REINCARNATE);
   check(screenOpenedFor === 1, 'Reincarnate raises the name-entry screen for the new champion');
+  check(pairCalls.length === 0, 'and no TAG0207cc while the name is being typed');
   check(
     wizard.skills.every((skill, i) => skill.experience === before.skills[i]),
     'and charges nothing at all until it is answered — CSBWin calls ReIncarnate first',
   );
   game.reincarnateNamed(screenOpenedFor, 'ZED', 'THE RENAMED');
+  console.log(`pair: ${JSON.stringify(pairCalls)}`);
+  check(pairCalls.join() === 'TAG0207cc inventory -1 champions 2',
+    'TAG0207cc once the answered menu is hidden (CSBCode.cpp:6807-6808)');
   check(wizard.name === 'ZED', 'the typed name replaces the hero text\'s');
   check(wizard.title === 'THE RENAMED', 'and the typed title');
 
