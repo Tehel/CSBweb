@@ -44,6 +44,7 @@ import {
   createPaletteIndexViewportBuffer,
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
+import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { decodeCursorBitmap, extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
 import { searchButtonList } from '../src/renderer/ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from '../src/renderer/ViewportGraphics';
@@ -265,6 +266,7 @@ function makeHost(graphics: GraphicsLoader, ui: UITables): IntroHost {
   return {
     screen,
     uiTables: ui,
+    font: loadFontData(graphics),
     globalPalette: [...PALETTE_11914],
     getGraphic(graphicNum: number): IndexedBitmap {
       let bitmap = cache.get(graphicNum);
@@ -280,6 +282,7 @@ function makeHost(graphics: GraphicsLoader, ui: UITables): IntroHost {
     startSound: () => {},
     drawPrisonInterior: () => viewport,
     nextEvent: () => Promise.resolve({ kind: 'click' as const, x: 0, y: 0, buttons: 2 }),
+    takeClick: () => null,
     discardAllInput: () => {},
     mouseSwitches: () => 0,
     keyWaiting: () => true,

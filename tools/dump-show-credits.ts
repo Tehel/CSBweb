@@ -15,6 +15,11 @@
  *    the parse of item 0x232: `BLT2Screen(…, d.Word108, 40, -1)` blits a 40-byte-wide
  *    source, and graphic 6 fills the 560 bytes `A3` skips (`Code1f9e6.cpp:136`, `:229`).
  *
+ * 3. **"RESTART THIS GAME".** With `d.CanRestartFromSavegame` set, the button under "THE
+ *    END" for 899 VBLs, drawn from `d.Word116` and `d.Word124` — whose parse the button's
+ *    hard-coded rectangle checks — and answering only a left click on it; the credits
+ *    going back to "THE END" without the 300 VBLs; and the black screen a restart leaves.
+ *
  * Run: `npx tsx tools/dump-show-credits.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -28,11 +33,14 @@ import type { Game } from '../src/engine/Game';
 import type { MessageSink } from '../src/engine/ActuatorSystem';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
+import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
-import { PALETTE_11914, type IntroHost } from '../src/renderer/intro/IntroHost';
+import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import {
   DYING_SOUND_VBLS,
   PALETTE_LOCAL_46,
+  PALETTE_RESTART,
+  RESTART_BUTTON_VBLS,
   THE_END_VBLS,
   showCredits,
 } from '../src/renderer/intro/ShowCredits';
@@ -183,6 +191,7 @@ function recordingHost(ui: UITables, input: { heldAfterPolls: number; keyAfterPo
   r.host = {
     screen,
     uiTables: ui,
+    font: loadFontData(graphics),
     globalPalette: [...(ui.graphic232.palette552[0] ?? PALETTE_11914)],
     getGraphic(graphicNum: number): IndexedBitmap {
       const image = graphics.getImage(graphicNum);
@@ -197,6 +206,7 @@ function recordingHost(ui: UITables, input: { heldAfterPolls: number; keyAfterPo
     startSound: () => {},
     drawPrisonInterior: () => { throw new Error('not on this screen'); },
     nextEvent: () => { throw new Error('the credits poll, they do not wait on the queue'); },
+    takeClick: () => { throw new Error('no button without d.CanRestartFromSavegame'); },
     discardAllInput: () => {},
     mouseSwitches: () => (polls++ >= input.heldAfterPolls ? 2 : 0),
     keyWaiting: () => polls >= input.keyAfterPolls,
@@ -231,8 +241,9 @@ async function checkScreen(): Promise<void> {
   // A key comes on the third poll: three VBLs of waiting.
   const r = recordingHost(ui, { heldAfterPolls: Infinity, keyAfterPolls: 3 });
   const log: string[] = [];
-  const hooks = { queueDyingSound: () => { r.steps.push({ kind: 'sound' }); } };
-  await showCredits(r.host, hooks);
+  const hooks = { queueDyingSound: () => { r.steps.push({ kind: 'sound' }); }, canRestartFromSavegame: false };
+  const ending = await showCredits(r.host, hooks);
+  check(ending === 'terminate', `without d.CanRestartFromSavegame the credits are the end (${ending})`);
   for (const s of r.steps) log.push(s.kind === 'sound' ? 'sound 6' : `vbl ${s.count}`);
   const compact = log.join(', ').replace(/(vbl 1, ){7}vbl 1/g, 'fade');
   console.log(compact);
@@ -264,15 +275,185 @@ async function checkScreen(): Promise<void> {
 
   // A button already held: no VBL of waiting at all.
   const held = recordingHost(ui, { heldAfterPolls: 0, keyAfterPolls: Infinity });
-  await showCredits(held.host, { queueDyingSound: () => {} });
+  await showCredits(held.host, { queueDyingSound: () => {}, canRestartFromSavegame: false });
   const last = held.steps[held.steps.length - 1];
   console.log(`a held button: the last wait is ${last?.kind === 'vbl' ? `vbl ${last.count}` : last?.kind}`);
   check(held.steps.filter((s) => s.kind === 'vbl' && s.count === 1).length === 32, 'a held button ends the wait before its first VBL');
 }
 
+/* -------------------------------------------------- 3. RESTART THIS GAME ---- */
+
+interface Scripted {
+  host: IntroHost;
+  /** `sound`, `vbl n`, and `on` / `off` as the cursor is shown and hidden. */
+  log: string[];
+  /** The screen and palette as each wait for the button begins. */
+  buttons: { pixels: Uint8Array; palette: number[] }[];
+}
+
+/**
+ * A host whose input arrives on cue. The cursor is up only while the button is: `arrive`
+ * is asked after each VBL of that, with which time the button is up (from 0) and how many
+ * VBLs it has been, the eight of the fade to `PALETTE_RESTART` first.
+ */
+function scriptedHost(ui: UITables, arrive: (time: number, vbls: number) => IntroEvent[]): Scripted {
+  const graphics = stockGraphics();
+  const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+  screen.pixels.fill(9);
+  const r = { log: [], buttons: [] } as unknown as Scripted;
+  let queue: IntroEvent[] = [];
+  let cursor = false;
+  let time = -1;
+  let vbls = 0;
+  r.host = {
+    screen,
+    uiTables: ui,
+    font: loadFontData(graphics),
+    globalPalette: [...(ui.graphic232.palette552[0] ?? PALETTE_11914)],
+    getGraphic(graphicNum: number): IndexedBitmap {
+      const image = graphics.getImage(graphicNum);
+      return { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
+    },
+    present: () => {},
+    vbl: (count) => {
+      r.log.push(`vbl ${count}`);
+      if (cursor) {
+        vbls += count;
+        if (vbls === 9) r.buttons.push({ pixels: screen.pixels.slice(), palette: [...r.host.globalPalette] });
+        queue.push(...arrive(time, vbls));
+      }
+      return Promise.resolve();
+    },
+    startSound: () => {},
+    drawPrisonInterior: () => { throw new Error('not on this screen'); },
+    nextEvent: () => { throw new Error('the end screen polls, it does not wait on the queue'); },
+    takeClick: () => {
+      const at = queue.findIndex((event) => event.kind === 'click');
+      return at < 0 ? null : queue.splice(at, 1)[0];
+    },
+    discardAllInput: () => { queue = []; },
+    mouseSwitches: () => 0,
+    keyWaiting: () => queue.some((event) => event.kind === 'key'),
+    setCursorVisible: (visible) => {
+      if (visible === cursor) return;
+      cursor = visible;
+      r.log.push(visible ? 'on' : 'off');
+      if (visible) {
+        time++;
+        vbls = 0;
+      }
+    },
+  };
+  return r;
+}
+
+/** The log with each run of `vbl 1` counted: `1x16` is two fades. */
+function compact(log: string[]): string {
+  const out: string[] = [];
+  let run = 0;
+  for (const entry of log) {
+    if (entry === 'vbl 1') {
+      run++;
+      continue;
+    }
+    if (run) out.push(`1x${run}`);
+    run = 0;
+    out.push(entry.startsWith('vbl ') ? entry.slice(4) : entry);
+  }
+  if (run) out.push(`1x${run}`);
+  return out.join(', ');
+}
+
+const click = (x: number, y: number, buttons: number): IntroEvent => ({ kind: 'click', x, y, buttons });
+const KEY: IntroEvent = { kind: 'key', x: 0, y: 0, buttons: 0 };
+
+async function checkRestart(): Promise<void> {
+  console.log('');
+  console.log('=== RESTART THIS GAME, with d.CanRestartFromSavegame (Code1f9e6.cpp:240-348) ===');
+  const graphics = stockGraphics();
+  const ui = extractUITables(graphics);
+  const g = ui.graphic232;
+  const r116 = g.word116;
+  const r124 = g.word124;
+  const theEnd = graphics.getImage(6);
+  const theEndBitmap = { width: theEnd.width, height: theEnd.height, pixels: Uint8Array.from(theEnd.pixels) };
+  const mask = ui.graphic231.buttons.buttons16956[0]?.button;
+  console.log(`Word116 (${r116.x1},${r116.y1})-(${r116.x2},${r116.y2}); Word124 (${r124.x1},${r124.y1})-(${r124.x2},${r124.y2}); Buttons16956[0] mask ${mask}`);
+  // The canary for the parse: `Word116` is the button's frame, and the button's own
+  // rectangle is hard-coded (`:252-255`), so the two must agree.
+  check(r116.x1 === 0x67 && r116.x2 === 0xd9 && r116.y1 === 0x91 && r116.y2 === 0x9f, 'Word116 is the rectangle the button answers in');
+  check(r124.x1 === r116.x1 + 2 && r124.x2 === r116.x2 - 2 && r124.y1 === r116.y1 + 2 && r124.y2 === r116.y2 - 2, 'Word124 is its face, two pixels in');
+  check(mask === 2, 'and the entry the button takes over answers the left button only');
+
+  // The button, clicked in the tenth VBL of the wait.
+  const b = scriptedHost(ui, (time, vbls) => (time === 0 && vbls === 18 ? [click(160, 152, 2)] : []));
+  const end = await showCredits(b.host, { queueDyingSound: () => { b.log.push('sound'); }, canRestartFromSavegame: true });
+  console.log(`clicked: ${end}; ${compact(b.log)}`);
+  check(end === 'restart', 'a click on the button restarts the game');
+  check(
+    compact(b.log) === `sound, ${DYING_SOUND_VBLS}, 1x16, ${THE_END_VBLS}, 1x1, on, 1x19, off, 1x16`,
+    'THE END, a VBL, the button faded up, the click taken in the next VBL, and two fades',
+  );
+  check(b.host.screen.pixels.every((p) => p === 0), 'the screen is left black');
+  check(b.host.globalPalette.every((c, i) => c === g.palette552[0][i]), 'in d.Palette552[0], the interface\'s palette');
+
+  const button = b.buttons[0];
+  check(button !== undefined, 'the button is up');
+  if (button) {
+    check(button.palette.every((c, i) => c === PALETTE_RESTART[i]), 'in LOCAL_46 with colour 1 at 0x437 and 4 at 0x777');
+    let frame = 0;
+    let face = 0;
+    let text = 0;
+    let [tx1, tx2, ty1, ty2] = [SCREEN_WIDTH, -1, SCREEN_HEIGHT, -1];
+    let outside = 0;
+    for (let y = 0; y < SCREEN_HEIGHT; y++) {
+      for (let x = 0; x < SCREEN_WIDTH; x++) {
+        const p = button.pixels[y * SCREEN_WIDTH + x];
+        const in116 = x >= r116.x1 && x <= r116.x2 && y >= r116.y1 && y <= r116.y2;
+        const in124 = x >= r124.x1 && x <= r124.x2 && y >= r124.y1 && y <= r124.y2;
+        const in108 = x >= g.word108.x1 && x <= g.word108.x2 && y >= g.word108.y1 && y <= g.word108.y2;
+        if (in124) {
+          if (p === 4) {
+            text++;
+            [tx1, tx2, ty1, ty2] = [Math.min(tx1, x), Math.max(tx2, x), Math.min(ty1, y), Math.max(ty2, y)];
+          } else if (p !== 0) face++;
+        } else if (in116) {
+          if (p !== 1) frame++;
+        } else if (!in108 && p !== 0) outside++;
+      }
+    }
+    console.log(`text in colour 4: ${text} pixels, (${tx1},${ty1})-(${tx2},${ty2})`);
+    check(frame === 0, `the frame is colour 1 (${frame} pixels are not)`);
+    check(face === 0, `the face is colour 0 under colour-4 text (${face} pixels are neither)`);
+    check(text > 0 && tx1 >= 110 && tx2 <= 110 + 17 * 6 - 1 && ty1 >= 0x9a - 4 && ty2 <= 0x9a + 1,
+      'the text is seventeen characters from x 110, on the line of y 0x9a');
+    check(sameRegion(button.pixels, theEndBitmap, g.word108.x1, g.word108.y1) && outside === 0,
+      `THE END is still up above it, alone (${outside} stray pixels)`);
+  }
+
+  // Clicks that miss, a key, and no click on the button: the wait runs out, the key ends
+  // the credits a VBL later, and "THE END" comes back without its 300 VBLs.
+  const m = scriptedHost(ui, (time, vbls) => {
+    if (time === 0 && vbls === 9) return [click(50, 50, 2), click(160, 152, 1), KEY];
+    if (time === 1 && vbls === 8) return [click(160, 152, 2)];
+    return [];
+  });
+  const end2 = await showCredits(m.host, { queueDyingSound: () => { m.log.push('sound'); }, canRestartFromSavegame: true });
+  console.log(`missed: ${end2}; ${compact(m.log)}`);
+  check(
+    compact(m.log) ===
+      `sound, ${DYING_SOUND_VBLS}, 1x16, ${THE_END_VBLS}, 1x1, on, 1x${8 + RESTART_BUTTON_VBLS}, off, 1x34, on, 1x9, off, 1x16`,
+    'no hit for 899 VBLs; the credits for one VBL; THE END again with no wait; the button again',
+  );
+  check(end2 === 'restart', 'and the second button restarts the game');
+  check(m.buttons.length === 2 && m.buttons[0].pixels.every((p, i) => p === m.buttons[1]?.pixels[i]),
+    'the second button is the first, drawn again');
+}
+
 async function main(): Promise<void> {
   checkTickOfDeath();
   await checkScreen();
+  await checkRestart();
   finish();
 }
 

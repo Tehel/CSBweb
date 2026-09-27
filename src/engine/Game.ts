@@ -184,6 +184,11 @@ export class Game {
     private animationFrameId: number | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`). */
     private mainLoopReturned = false;
+    /**
+     * `d.CanRestartFromSavegame`: set by a save and by a load, cleared by a new game. With
+     * it, the end of a lost game offers "RESTART THIS GAME" (`ShowCredits.ts`).
+     */
+    private canRestart = false;
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
@@ -302,6 +307,20 @@ export class Game {
     readNewGame(data: DungeonData): void {
         const fresh = new Game(data, this.ctx.tables);
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
+        this.canRestart = false;
+    }
+
+    /**
+     * The tail of `_ReadEntireGame` once a saved game is in: `d.CanRestartFromSavegame = 1`
+     * (doc/CSBwin-src/SaveGame.cpp:1883). `applySaveBytes` calls it.
+     */
+    savedGameRead(): void {
+        this.canRestart = true;
+    }
+
+    /** `d.CanRestartFromSavegame`. */
+    canRestartFromSavegame(): boolean {
+        return this.canRestart;
     }
 
     /**
@@ -755,10 +774,12 @@ export class Game {
      * The tail of CSBWin's `SaveGame`, once the file is written
      * (`MonsterSystem.reattachAfterSave`). A save that fails skips it: CSBWin's
      * `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1264`). The same tail's
-     * `SmartDiscard(true)` is not ported (DEBT.md G12).
+     * `SmartDiscard(true)` is not ported (DEBT.md G12). It ends in
+     * `d.CanRestartFromSavegame = 1` (`:1260`).
      */
     saveWritten(): void {
         this.monsterSystem.reattachAfterSave();
+        this.canRestart = true;
     }
 
     /**

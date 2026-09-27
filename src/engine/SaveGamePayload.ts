@@ -432,13 +432,14 @@ function looksLikeJson(bytes: Uint8Array): boolean {
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
     if (looksLikeJson(bytes)) {
         applySavePayload(game, decodeSavePayload(bytes));
-        return;
+    } else {
+        try {
+            applyCsbwinSave(game, bytes);
+        } catch (error) {
+            throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
+        }
     }
-    try {
-        applyCsbwinSave(game, bytes);
-    } catch (error) {
-        throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
-    }
+    game.savedGameRead();
 }
 
 /**

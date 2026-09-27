@@ -497,8 +497,8 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 `_ShowCredits(P1)` is reached three ways: `_StartCSB` once `MainLoop` has returned, with
 `d.GameIsLost` (`CSBCode.cpp:11322-11326`); `MainLoop` itself when `ProcessTimers` reports the
 CSB win (`:626-633`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1252`). `_FusionSequence`
-ends in it too (`Attack.cpp:2429`). The port has the first, for a game that cannot be
-restarted (`src/renderer/intro/ShowCredits.ts`; the rest is `DEBT.md` G13).
+ends in it too (`Attack.cpp:2429`). The port has the first (`src/renderer/intro/ShowCredits.ts`;
+the rest is `DEBT.md` G13).
 
 **The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2680`). The tick
 has run its timers; at `tag000730` it runs `WaitForButtonFlash`, `StartQueuedSound` and
@@ -526,19 +526,40 @@ which runs its timers and ends the same way.
 5. `tag01fd10`: the screen cleared, graphic 6 blitted to `d.Word108`, and a palette of sixteen
    `0x002` (`fillMemory(&LOCAL_110, 16, 2, 2)`) with colour 15 at `0x777` faded up; then
    `VBLDelay(300)`, the first time only (`LOCAL_132`) (`:227-238`).
-6. With `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button (`:240-325`). A
-   press clears the whole of `d` (`Cleanup(false)`, `d.Initialize()`) and runs
-   `GameSetup(_25_, 0)`, which reads the save chooser; a cancel there puts the entrance up,
-   and its "enter" reads `dungeon.dat` through the same `_ReadEntireGame`
-   (`:302-310`, `CSBCode.cpp:10634-10641`, `SaveGame.cpp:1480-1494`). `ShowCredits` then
-   returns, and `_StartCSB` runs `MainLoop` again (`CSBCode.cpp:11320-11327`). The port's
-   rebuild is `Game.readNewGame`. Otherwise the fade to `LOCAL_110`, the dark blue (`:326`).
+6. With `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button (`:240-282`).
+   `d.CanRestartFromSavegame` is set by a save (`SaveGame.cpp:1260`) and a load (`:1883`),
+   and cleared by a new game (`:1494`) and the two wins. The frame `d.Word116` is filled
+   with colour 1 and, a VBL later, the face `d.Word124` with 0 and
+   `TextOutToScreen(110, 0x9a, 4, 0, "RESTART THIS GAME")`; `LOCAL_46` gets colour 1 at
+   `0x437` and 4 at `0x777`, and the fade to it shows the button. `d.Buttons16956[0]` is
+   rewritten as button `0xd7` over `(0x67, 0x91)-(0xd9, 0x9f)`, `d.Word116` exactly, and
+   keeps its left-button mask. Then up to 899 VBLs (`for (D7W=900; --D7W!=0 && …)`) of
+   `HandleMouseEvents`, whose button `0xd7` sets `d.PartyHasDied` (`Mouse.cpp:1798`). A
+   key pressed meanwhile is not read, and ends the credits wait of step 7 after one VBL.
+   Pressed (`:283-322`): the fade to `LOCAL_110`, the screen cleared, the fade to
+   `d.Palette552[0]`, then `Cleanup(false)` and `d.Initialize()`, which clear the whole of
+   `d`, and `GameSetup(_25_, 0)`. With `d.gameState` zeroed, `GAMESTATE_ResumeSavedGame`,
+   its `ReadEntireGame` is the save chooser; a cancel puts the entrance up, and its
+   "enter" reads `dungeon.dat` through the same `_ReadEntireGame`
+   (`CSBCode.cpp:10634-10641`, `SaveGame.cpp:1480-1494`). `ShowCredits` then returns, and
+   `_StartCSB` runs `MainLoop` again (`CSBCode.cpp:11320-11327`). The port runs the
+   chooser and the entrance over the end screen's host, then `showEndOfGame`
+   (`src/main.ts`) reads a new game with `Game.readNewGame` if the entrance was entered,
+   puts the screen's play state back (`GameScreen.initializePlayState`) and starts the
+   loop. Otherwise, after 899 VBLs, the fade to `LOCAL_110`, the dark blue (`:326`).
 7. Graphic 5 over the whole screen, faded to `d.Palette328`, and a wait of one VBL a poll
    until a button is held (`d.MouseSwitches`) or a key waits (`UI_CONSTAT()`) (`:328-337`).
    Unlike the entrance's scroll, this loop has no counter to run out.
-8. With `d.CanRestartFromSavegame` set, back to 5 without the delay (`:339-348`). Otherwise
-   `UI_PushMessage(UIM_TERMINATE)` (`:349`): CSBWin closes. The port leaves the credits up
-   (`DEBT.md` → H).
+8. With `d.CanRestartFromSavegame` set, the fade to `LOCAL_110` and back to 5, without the
+   300 VBLs (`LOCAL_132`, `:339-348`). Otherwise `UI_PushMessage(UIM_TERMINATE)` (`:349`):
+   CSBWin closes. The port leaves the credits up (`DEBT.md` → H).
+
+**"THAT'S NOT THE SAME GAME" cannot happen after a restart.** `_ReadEntireGame` refuses a
+save of another `d.RandomGameID` only while `d.PartyHasDied` is set
+(`SaveGame.cpp:1604-1605`), but the restart's `d.Initialize()` (`Code1f9e6.cpp:309`) has
+zeroed both, members of `DBank` (`Data.h:606`, `:614`), with `memset(this, 0, …)`
+(`CSBCode.cpp:329`) before `GameSetup` reads anything. Button `0xd7` is the only writer of
+`d.PartyHasDied` = 1. So every save loads after a restart, in CSBWin as in the port.
 
 
 ## Skipping it

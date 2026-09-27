@@ -3788,3 +3788,19 @@ steps (`doc/CSBwin-src/Code1f9e6.cpp:148-170`), from `globalPalette`, which the 
 equal to `d.Palette11978` (`doc/CSBwin-src/WinScreen.cpp:1493-1498`). The rest of the
 screen is in `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game";
 `tools/dump-show-credits.ts` checks both halves.
+
+
+## "RESTART THIS GAME" clears `d` before the chooser, so any save loads after it
+
+The button `0xd7` on the end screen is the only writer of `d.PartyHasDied = 1`
+(`doc/CSBwin-src/Mouse.cpp:1798`). Pressed, `_ShowCredits` runs `Cleanup(false)` and
+`d.Initialize()` (`doc/CSBwin-src/Code1f9e6.cpp:302`, `:309`) before `GameSetup(_25_, 0)`
+(`:310`), and `DBank::Initialize` begins with `memset(this, 0, sizeof(*this))`
+(`doc/CSBwin-src/CSBCode.cpp:329`). `d.PartyHasDied`, `d.RandomGameID` and
+`d.CanRestartFromSavegame` are all members of `DBank` (`doc/CSBwin-src/Data.h:606-614`), and
+so is `d.gameState`. So the chooser `GameSetup` opens reads with `d.PartyHasDied` 0, and its
+"THAT'S NOT THE SAME GAME" test, taken only while that flag is set
+(`doc/CSBwin-src/SaveGame.cpp:1604-1606`), never runs: every save loads after a restart.
+The same zeroed `d.gameState` is `GAMESTATE_ResumeSavedGame`, which is why the chooser, not
+the entrance, comes first. `tools/dump-show-credits.ts` checks the button, and
+`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game" has the rest of the screen.

@@ -29,8 +29,15 @@ console.log('Dungeon Master Web - Initializing...');
 let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtController | null = null;
-/** Set by `onRestoreSave`, read and cleared by the boot sequence. */
+/** Set by `onRestoreSave`, read and cleared by the save chooser (`consumeRestored`). */
 let restoredFromSave = false;
+
+/** Whether the chooser's last `onRestoreSave` restored anything, and forget it. */
+function consumeRestored(): boolean {
+    const restored = restoredFromSave;
+    restoredFromSave = false;
+    return restored;
+}
 
 // Dev-only harness (PLAN.md Phase 14). Reached only via isDebugFeaturesEnabled().
 const dev = createDevTools({
@@ -324,15 +331,36 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
  * `_ShowCredits(1)`: the end of a lost game, over the last frame the adventure drew
  * (`src/renderer/intro/ShowCredits.ts`). The adventure's cursor is drawn into the screen,
  * so it is lifted first, as `STHideCursor(HC50)` lifts CSBWin's.
+ *
+ * A game that was saved or loaded can be restarted from it. Then the chooser or the
+ * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
+ * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
  */
 async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
     const { x, y } = game.party.state.position;
-    await runShowCredits(
-        { canvas: gameCanvasEl, gameScreen: screen, playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx) },
-        { queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0) },
+    const end = await runShowCredits(
+        {
+            canvas: gameCanvasEl,
+            gameScreen: screen,
+            playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
+            consumeRestored,
+        },
+        {
+            queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0),
+            canRestartFromSavegame: game.canRestartFromSavegame(),
+        },
     );
+    if (end === 'terminate') return;
+    // The entrance's "enter": `_ReadEntireGame` over `dungeon.dat`, parsed afresh, since the
+    // lost game wrote into the last parse (doc/CSBwin-src/SaveGame.cpp:1480-1494).
+    if (end === 'enter') game.readNewGame(await new DungeonLoader().load(`${GAME_DATA_DIR}/dungeon.dat`));
+    screen.initializePlayState();
+    game.resumeMainLoop();
+    game.start();
+    renderView();
+    drawMapPreview(game.party.state.position.z);
 }
 
 /** The optional CRT effect over the canvas. Without glfx, the button reports it unavailable. */
@@ -360,11 +388,7 @@ async function runIntro(screen: GameScreen, sound: SoundManager): Promise<void> 
         canvas: gameCanvasEl,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-        consumeRestored: () => {
-            const restored = restoredFromSave;
-            restoredFromSave = false;
-            return restored;
-        },
+        consumeRestored,
         skip: skipIntro,
     });
 }

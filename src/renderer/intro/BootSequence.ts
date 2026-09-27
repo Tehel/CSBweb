@@ -24,7 +24,7 @@
  */
 import { updateDebug } from '../../ui';
 import type { GameScreen } from '../GameScreen';
-import { decodeCursorBitmap } from '../csbwin/UITables';
+import { decodeCursorBitmap, type UIButton } from '../csbwin/UITables';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
 import { showCredits, type ShowCreditsHooks } from './ShowCredits';
@@ -136,6 +136,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   const host: IntroHost = {
     screen,
     uiTables,
+    font: gameScreen.getFontData(),
     globalPalette,
     getGraphic: (graphicNum) => gameScreen.getBitmap(graphicNum),
     present: () => {
@@ -162,8 +163,13 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
         if (queued) resolve(queued);
         else waiting = resolve;
       }),
+    takeClick: () => {
+      const at = queue.findIndex((event) => event.kind === 'click');
+      return at < 0 ? null : queue.splice(at, 1)[0];
+    },
     discardAllInput: () => {
       queue = [];
+      mouseSwitches = 0;
     },
     mouseSwitches: () => mouseSwitches,
     keyWaiting: () => queue.some((event) => event.kind === 'key'),
@@ -204,7 +210,7 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
  * Cancelling returns false, and `_GameSetup`'s retry loop puts the entrance back up
  * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
  */
-async function openLoadMenu(host: IntroHost, deps: BootSequenceDeps): Promise<boolean> {
+async function openLoadMenu(host: IntroHost, deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeRestored'>): Promise<boolean> {
   const { gameScreen } = deps;
   const menuPalette = host.uiTables.graphic232.palette552[0] ?? host.globalPalette;
 
@@ -233,6 +239,17 @@ async function openLoadMenu(host: IntroHost, deps: BootSequenceDeps): Promise<bo
 /* ------------------------------------------------------------------- entry ---- */
 
 /**
+ * `d.Buttons16932`. Dungeon Master's `graphics.dat` stops 48 bytes short of carrying it,
+ * and CSBWin patches in a hardcoded copy for exactly that case
+ * (`doc/CSBwin-src/CSBCode.cpp:10148-10156`); `extractUITables` returns an empty list
+ * under the same condition.
+ */
+function prisonDoorButtons(host: IntroHost): UIButton[] {
+  const extracted = host.uiTables.graphic231.buttons.buttons16932;
+  return extracted.length > 0 ? extracted : MISSING_PRISON_DOOR_BUTTONS;
+}
+
+/**
  * Play the title, show the entrance, and return how the player got in.
  *
  * With `skip` set there is no animation and no entrance — the dungeon starts fresh, which
@@ -246,15 +263,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   const { host, detach } = createIntroHost(deps, PALETTE_11914);
   try {
     await displayChaosStrikesBack(host);
-
-    // `d.Buttons16932`. Dungeon Master's `graphics.dat` stops 48 bytes short of carrying
-    // it, and CSBWin patches in a hardcoded copy for exactly that case
-    // (`doc/CSBwin-src/CSBCode.cpp:10148-10156`); `extractUITables` returns an empty list
-    // under the same condition.
-    const extracted = host.uiTables.graphic231.buttons.buttons16932;
-    const buttons = extracted.length > 0 ? extracted : MISSING_PRISON_DOOR_BUTTONS;
-
-    return await showPrisonDoor(host, buttons, () => openLoadMenu(host, deps));
+    return await showPrisonDoor(host, prisonDoorButtons(host), () => openLoadMenu(host, deps));
   } catch (error) {
     console.error('Boot sequence failed; entering the dungeon anyway', error);
     updateDebug(`Intro failed: ${error}`);
@@ -266,20 +275,42 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
 
 /* ------------------------------------------------------------- the end ---- */
 
+/** How the end of a lost game comes out: a game set up again, or the credits left up. */
+export type EndOfGame = PrisonDoorChoice | 'terminate';
+
 /**
  * `_ShowCredits(1)` once `MainLoop` has returned on a lost game (`ShowCredits.ts`). The
- * page has stopped the adventure's input; this host takes the canvas from here, and keeps
- * it, since the credits are where the game ends.
+ * page has stopped the adventure's input; this host takes the canvas from here. It keeps
+ * it when the credits are where the game ends, and hands it back once a game is set up
+ * again.
  *
  * The colour registers are the interface's: with `d.DynamicPaletteSwitching` set the VBL
  * copies `d.Palette11978` into `globalPalette` on every frame
  * (`doc/CSBwin-src/WinScreen.cpp:1493-1498`), and `_GameSetup` fills `Palette11978` from
  * `d.Palette552[0]` (`CSBCode.cpp:10623`).
  */
-export async function runShowCredits(deps: HostDeps, hooks: ShowCreditsHooks): Promise<void> {
+export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
   const uiTables = deps.gameScreen.getUITables();
   if (!uiTables) throw new Error('Screen not initialized');
   const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
-  const { host } = createIntroHost(deps, palette11978);
-  await showCredits(host, hooks);
+  const { host, detach } = createIntroHost(deps, palette11978);
+  if ((await showCredits(host, hooks)) === 'terminate') return 'terminate';
+  try {
+    return await gameSetupAfterRestart(host, deps);
+  } finally {
+    detach();
+  }
+}
+
+/**
+ * `GameSetup(_25_, 0)` (`doc/CSBwin-src/Code1f9e6.cpp:310`, `CSBCode.cpp:10589`): no
+ * entrance first. `d.Initialize()` has just left `d.gameState` at 0,
+ * `GAMESTATE_ResumeSavedGame`, so its `ReadEntireGame` is the save chooser; a cancel puts
+ * the entrance up, and the loop goes on from there as it does at boot (`:10634-10641`).
+ * `'enter'` leaves `dungeon.dat` to be read, which is the page's.
+ */
+async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
+  const resume = (): Promise<boolean> => openLoadMenu(host, deps);
+  if (await resume()) return 'resume';
+  return showPrisonDoor(host, prisonDoorButtons(host), resume);
 }

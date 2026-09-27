@@ -17,6 +17,7 @@
  * label, and it keeps the order of operations identical to the C++.
  */
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
+import type { FontData } from '../csbwin/TextRenderer';
 import type { UITables } from '../csbwin/UITables';
 
 /** One item off the input queue. `buttons` is CSBWin's mask: 2 = left, 1 = right. */
@@ -32,6 +33,8 @@ export interface IntroHost {
   readonly screen: PaletteIndexViewportBuffer;
   /** The `graphics.dat` tables; these screens want the 0x232 rectangles and palettes. */
   readonly uiTables: UITables;
+  /** `graphics.dat` item 0x22d, the font `TextOutToScreen` draws with. */
+  readonly font: FontData;
   /**
    * The shifter's sixteen colour registers (`globalPalette` in `_FadeToPalette`,
    * `doc/CSBwin-src/Graphics.cpp:1609`). Mutated in place by `fadeToPalette`; `present`
@@ -54,7 +57,13 @@ export interface IntroHost {
   drawPrisonInterior(): IndexedBitmap;
   /** The next click or keypress. Modal, the way `d.PrimaryButtonList` is modal. */
   nextEvent(): Promise<IntroEvent>;
-  /** `DiscardAllInput()`. */
+  /**
+   * `HandleMouseEvents`' read of the mouse queue: the oldest click, taken off the queue, or
+   * `null`. A key stays where it is: the mouse queue does not hold keys, and `UI_CONSTAT`
+   * still sees it.
+   */
+  takeClick(): IntroEvent | null;
+  /** `DiscardAllInput()`: the queue emptied, and `d.MouseSwitches = 0` (`CSBCode.cpp:7532-7542`). */
   discardAllInput(): void;
   /** `d.MouseSwitches`: the buttons held down now, in CSBWin's mask. */
   mouseSwitches(): number;

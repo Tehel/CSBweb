@@ -235,6 +235,55 @@ export interface UIState {
   renderLastFrame(): void;
 }
 
+/** The fields of `UIState` that a game in play sets, and a restart clears. */
+type PlayState = Pick<UIState,
+  | 'uiMode' | 'modeBeforeFreeze' | 'shadedByTag02076e' | 'reincarnate' | 'diskMenuNeeded'
+  | 'pressingEye' | 'word23144' | 'pointer23178' | 'pointer23182'
+  | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
+  | 'word20250' | 'word20252' | 'attackFlashValue' | 'attackFlashUntilMs'
+  | 'displayResurrectChestOrScroll' | 'openChestId' | 'openChestContents' | 'openChestIconIndex'>;
+
+/**
+ * The screen's share of `d` as a game begins: `d.Initialize()` zeroes the whole of `d`
+ * (`doc/CSBwin-src/CSBCode.cpp:323-330`), and `TAG021028` sets the adventure's lists and
+ * `d.Word20252` (`:10473-10490`).
+ */
+function initialPlayState(): PlayState {
+  return {
+    uiMode: UIMode.Adventure,
+    modeBeforeFreeze: UIMode.Adventure,
+    shadedByTag02076e: false,
+    reincarnate: null,
+    diskMenuNeeded: false,
+    pressingEye: false,
+    word23144: 0,
+    pointer23178: null,
+    pointer23182: null,
+    attackingCharacterOrdinal: 0,
+    possibleAttackTypes: Int8Array.from([-1, -1, -1, -1]),
+    byte20256: new Uint8Array(4),
+    word20248: 0,
+    word20250: 0,
+    // The panel starts showing the four attack buttons.
+    word20252: 1,
+    attackFlashValue: 0,
+    attackFlashUntilMs: 0,
+    displayResurrectChestOrScroll: 0,
+    openChestId: null,
+    openChestContents: emptyChestContents(),
+    openChestIconIndex: null,
+  };
+}
+
+/**
+ * A restarted game's `d.Initialize()` and `TAG021028` (`doc/CSBwin-src/Code1f9e6.cpp:309`,
+ * `:318`), the screen's half: no open chest, attack menu, marching-order drag or
+ * sleep left over from the lost game. The caller sets the button lists for `uiMode`.
+ */
+export function initializePlayState(ui: UIState): void {
+  Object.assign(ui, initialPlayState());
+}
+
 export function createUIState(
   graphicsLoader: GraphicsLoader,
   dungeonState: DungeonState,
@@ -250,33 +299,9 @@ export function createUIState(
     characterStats: null,
     fontData: null,
     partyState: null,
-    uiMode: UIMode.Adventure,
-    modeBeforeFreeze: UIMode.Adventure,
-    shadedByTag02076e: false,
-
-    reincarnate: null,
+    ...initialPlayState(),
     saveMenu: null,
-    diskMenuNeeded: false,
-    pressingEye: false,
     hoverPoint: null,
-    word23144: 0,
-    pointer23178: null,
-    pointer23182: null,
-
-    attackingCharacterOrdinal: 0,
-    possibleAttackTypes: Int8Array.from([-1, -1, -1, -1]),
-    byte20256: new Uint8Array(4),
-    word20248: 0,
-    word20250: 0,
-    // The panel starts showing the four attack buttons, as CSBWin does after
-    // `TAG01b29a`'s first pass.
-    word20252: 1,
-    attackFlashValue: 0,
-    attackFlashUntilMs: 0,
-    displayResurrectChestOrScroll: 0,
-    openChestId: null,
-    openChestContents: emptyChestContents(),
-    openChestIconIndex: null,
     mouthChewStartMs: null,
     mouthChewEndMs: 0,
     mouthChewFrameHandle: null,

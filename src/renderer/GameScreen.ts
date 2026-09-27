@@ -24,7 +24,7 @@ import {
   updateImageDataFromIndexWithViewportPalette,
 } from './csbwin/CanvasBlitter';
 import { extractUITables, type UITables } from './csbwin/UITables';
-import { loadFontData } from './csbwin/TextRenderer';
+import { loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
   VIEWPORT_WIDTH,
@@ -36,7 +36,7 @@ import {
 } from './ViewportGraphics';
 import { Position } from '@/core';
 import { ViewportRenderer } from './ViewportRenderer';
-import { createUIState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
+import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
 import { selectPaletteIndexForLightLevel } from './ui/Light';
 import {
@@ -417,6 +417,15 @@ export class GameScreen {
     syncInventoryButtons(this.ui);
   }
 
+  /**
+   * A game set up again after a lost one (`doc/CSBwin-src/Code1f9e6.cpp:309-318`): the
+   * screen's state as a new game has it, and the adventure's button lists and key tables.
+   */
+  initializePlayState(): void {
+    initializePlayState(this.ui);
+    this.setUIMode(UIMode.Adventure);
+  }
+
   isInventoryOpen(): boolean {
     return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
   }
@@ -568,6 +577,12 @@ export class GameScreen {
   /** The 320x200 screen the intro modules draw into (`d.LogicalScreenBase`). */
   getScreenBuffer(): ScreenIndexBuffer {
     return this.screen;
+  }
+
+  /** The font, graphic 0x22d, for the pre-game screens' `TextOutToScreen`. */
+  getFontData(): FontData {
+    if (!this.ui.fontData) throw new Error('Screen not initialized');
+    return this.ui.fontData;
   }
 
   /** `ReadAndExpandGraphic(n, …)`. Throws rather than return a blank screen. */

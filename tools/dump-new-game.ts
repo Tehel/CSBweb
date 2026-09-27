@@ -16,6 +16,9 @@
  * played. Then both run 600 ticks and are compared again, which catches state the snapshot
  * does not carry but the game reads.
  *
+ * Along the way, `d.CanRestartFromSavegame`, which decides whether the end of a lost game
+ * offers "RESTART THIS GAME": clear in a new game, set by a save and by a load.
+ *
  * Run: `npx tsx tools/dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
@@ -30,6 +33,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine';
+import { applySaveBytes, buildSavePayload, encodeSavePayload } from '../src/engine/SaveGamePayload';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 
@@ -100,6 +104,23 @@ function main(): void {
     if (n % 8 === 0) played.enqueueMovement(n % 16 === 0 ? MovementAction.TURN_LEFT : MovementAction.MOVE_FORWARD);
     played.runFrame(t0 + n * 250);
   }
+
+  // `d.CanRestartFromSavegame`: cleared by a new game, set by a save and by a load
+  // (doc/CSBwin-src/SaveGame.cpp:1494, :1260, :1883).
+  console.log('=== d.CanRestartFromSavegame ===');
+  const newAtFirst = played.canRestartFromSavegame();
+  const bytes = encodeSavePayload(buildSavePayload(played));
+  played.saveWritten();
+  const loaded = newGame(parse(), stockGraphics());
+  applySaveBytes(loaded, bytes);
+  console.log(['new', newAtFirst, 'saved', played.canRestartFromSavegame(), 'loaded', loaded.canRestartFromSavegame()].join('\t'));
+  check(!newAtFirst, 'a new game cannot be restarted');
+  check(played.canRestartFromSavegame(), 'a saved one can');
+  check(loaded.canRestartFromSavegame(), 'and so can a loaded one');
+  loaded.readNewGame(parse());
+  check(!loaded.canRestartFromSavegame(), 'until a new game is read into it');
+  console.log('');
+
   played.monsterAttack.killCharacter(0);
   played.monsterAttack.killCharacter(1);
   runFrames(played, t0 + 40 * 250, 4);
