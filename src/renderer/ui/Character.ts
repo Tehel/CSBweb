@@ -12,11 +12,12 @@ import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
 import { getChampionPossession, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
-import { IndexedBitmap, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { IndexedBitmap, PaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
 import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
+import type { Rect } from '../csbwin/UITables';
 const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];
 /**
@@ -262,6 +263,43 @@ export function formatMaxLoad(value: number): string {
   return String(Math.floor((value + 5) / 10)).padStart(3, ' ');
 }
 
+/**
+ * A champion's square in the top view of positions: `DrawCharacterState` fills it with
+ * the champion's colour and lays the facing arrow, graphic 28, over it
+ * (`doc/CSBwin-src/Character.cpp:1458-1476`). `TAG0025a6` makes its cursor of it too.
+ */
+export function drawPositionSquare(
+  ui: UIState,
+  dst: PaletteIndexViewportBuffer,
+  rect: Rect,
+  chIdx: number,
+  champion: Champion | null,
+  facing: number,
+): void {
+  if (!ui.uiTables) return;
+  fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx] ?? 13);
+  const indicator = ui.getGraphicBitmap(28);
+  if (!indicator) return;
+  const champFacing = champion?.facing ?? facing;
+  const srcX = ((champFacing + 4 - facing) & 3) * 19;
+  tag0088b2Index(
+    indicator,
+    dst,
+    {
+      x1: rect.x1,
+      y1: rect.y1,
+      x2: rect.x2,
+      y2: rect.y2,
+      srcX,
+      srcY: 0,
+      srcStride: indicator.width,
+      srcWidth: 19,
+      srcHeight: indicator.height,
+    },
+    12
+  );
+}
+
 export function drawPartyStatus(ui: UIState): void {
   if (!ui.uiTables || !ui.screenIndexBuffer || !ui.partyState || !ui.fontData) return;
 
@@ -348,32 +386,13 @@ export function drawPartyStatus(ui: UIState): void {
 
     const charPos = champion?.partyPosition ?? chIdx;
     const dir = (charPos + 4 - facing) & 3;
-    const posRect = g232.wRectPos1454[dir];
-    const color = g232.byte1386[chIdx] ?? 13;
-    fillRectIndex(ui.screenIndexBuffer, posRect, color);
-
-    const indicator = ui.getGraphicBitmap(28);
-    if (indicator) {
-      const champFacing = champion?.facing ?? facing;
-      const srcX = ((champFacing + 4 - facing) & 3) * 19;
-      tag0088b2Index(
-        indicator,
-        ui.screenIndexBuffer,
-        {
-          x1: posRect.x1,
-          y1: posRect.y1,
-          x2: posRect.x2,
-          y2: posRect.y2,
-          srcX,
-          srcY: 0,
-          srcStride: indicator.width,
-          srcWidth: 19,
-          srcHeight: indicator.height,
-        },
-        12
-      );
-    }
+    drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir], chIdx, champion, facing);
   }
+
+  // `TAG0025a6` blanks the square it picks a champion up from, and `DrawCharacterState`
+  // leaves that square alone until the champion is put down
+  // (`doc/CSBwin-src/CSBCode.cpp:2108-2111`, `Character.cpp:1458-1461`).
+  if (ui.word23144 !== 0) fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1454[ui.word23144 - 1], 0);
 
   drawTopBarHandIcons(ui);
 }

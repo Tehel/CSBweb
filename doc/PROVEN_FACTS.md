@@ -3520,6 +3520,40 @@ mentions are reads (`:959`, `:3301`) and `Pointer2066[2]`, which nothing reads. 
 writes are inside comments (`:1932`, `Viewport.cpp:4608`). So the port has no
 counterpart of the call.
 
+## Changing the marching order: a champion in hand is a square turned cursor
+
+Buttons 125-128 of `Buttons17196` are the four squares of the top view of positions, in
+`d.wRectPos1454`'s order and counted from the party's facing, and they call `TAG0025a6`
+with no guard (`doc/CSBwin-src/Mouse.cpp:1586-1597`, `CSBCode.cpp:2053`). With nobody in
+hand (`d.Word23144 == 0`) it picks up `CharacterAtPosition((d.partyFacing + p) & 3)`, if
+anyone: the square becomes the cursor and is filled with colour 0, and `d.Word23144 = p + 1`
+(`:2061-2113`). `DrawCharacterState` leaves that square alone while `d.Word23144` names it
+(`Character.cpp:1458-1461`). With a champion in hand, the next click puts them down facing
+`d.partyFacing`, and the champion on the target square, if any, takes the square they left
+(`CSBCode.cpp:2115-2151`).
+
+The cursor is 21x16, drawn 9 pixels left of the pointer and 7 above it (`d.Word23156`,
+`d.Word23158`, `:2308-2322`). `d.Pointer23178` is the square, with colour 0 transparent,
+over its shadow two pixels down and right (`d.wRectPos23214`, `:449-452`) recoloured through
+`d.Byte1382`, which maps every colour but 12 to 0. `d.Pointer23182` has the same shadow
+under the square recoloured through `d.Byte1366`, which maps every colour but 12 to 4
+(`:2069-2107`). `ShrinkBLT` of a buffer to itself at the same size only recolours it, colour
+`c` becoming `pColorMap[c] / 10` (`Graphics.cpp:457-479`). With
+`d.DynamicPaletteSwitching`, the cursor rows on screen row 29 and below come from
+`d.Pointer23182` (`CSBCode.cpp:2325-2386`). `DynamicPaletteSwitching` follows
+`MarkViewportUpdated`'s argument (`:908`, `:2903-2918`): 1 once the dungeon view is drawn
+(`Viewport.cpp:7168-7169`), 0 once the inventory covers it (`Character.cpp:1511`).
+
+Each VBL, a pointer left of x 274 or below y 28 lets go through `TAG002818`, which draws
+`d.Pointer23178` back into the square (`CSBCode.cpp:938-945`, `:2155-2195`). The button -1
+it records is for a replay only (`Mouse.cpp:1800-1805`).
+
+`KillCharacter` and `RemoveCharacter` clear `d.Word23244`, a graphics reference count
+(`Graphics.cpp:1770`), where the drag's word is `d.Word23144` (`Character.cpp:2653-2658`,
+`:5299-5304`). So a champion who dies in hand stays in hand. Put down, they are
+`CharacterAtPosition`'s -1, and `TAG0025a6` writes their facing and position to
+`d.CH16482[-1]` (`CSBCode.cpp:2120-2122`, `:2147`). Evidence: `tools/dump-marching-order.ts`.
+
 ## A load keeps the message area
 
 CSBWin saves no message state: `SCROLLING_TEXT::Serialize` is declared

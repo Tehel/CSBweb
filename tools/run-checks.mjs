@@ -39,6 +39,7 @@ const CHECKS = [
   { tool: 'dump-monster-ai.ts' },
   { tool: 'dump-attributes.ts' },
   { tool: 'dump-hand-owner.ts' },
+  { tool: 'dump-marching-order.ts' },
   { tool: 'dump-inventory-routing.ts' },
   { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-champion-state.ts' },

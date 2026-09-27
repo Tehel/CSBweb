@@ -7,9 +7,9 @@
  * `Game.handleMouseEvents` handles the turns and steps itself and hands every other button
  * to `handleMouseButton`, the dispatcher on the `word0` ids `searchButtonList` returns.
  */
-import { IndexedBitmap } from '../csbwin/CanvasBlitter';
+import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../csbwin/UITables';
-import { canPlaceInSlot } from './Character';
+import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { drawObjectIconAt } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
@@ -21,6 +21,7 @@ import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
+import { characterAtPosition } from '../../engine/AddCharacter';
 import { updateHover } from '@/ui';
 
 export { decodeCursorBitmap };
@@ -83,6 +84,12 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     if (button < numChampions && !potential) {
       handlePartyBlockClick(ui, button, x, y);
     }
+    return;
+  }
+  if (id >= 125 && id <= 128) {
+    // The four squares of the top view of positions (`doc/CSBwin-src/Mouse.cpp:1586-1597`),
+    // with no guard: the marching order changes even in the Hall of Champions.
+    tag0025a6(ui, id - 125);
     return;
   }
   if (id >= 28 && id <= 65) {
@@ -399,8 +406,127 @@ export function updateButtonLists(ui: UIState): void {
   }
 }
 
-export function drawCursorItem(ui: UIState): void {
+/** `d.wRectPos23214` (`doc/CSBwin-src/CSBCode.cpp:449-452`): the shadow, two pixels down and right. */
+const W_RECT_POS_23214 = { x1: 2, x2: 20, y1: 2, y2: 15 };
+/** `d.wRectPos23222` (`doc/CSBwin-src/CSBCode.cpp:453-456`): the square itself, 19x14. */
+const W_RECT_POS_23222 = { x1: 0, x2: 18, y1: 0, y2: 13 };
+
+/**
+ * `ShrinkBLT` from a buffer to itself at the same size (`doc/CSBwin-src/Graphics.cpp:380`),
+ * which moves no pixel and only recolours the first `rows` rows: a pixel of colour `c`
+ * becomes `pColorMap[c] / 10` (`:457-479`).
+ */
+function recolourRows(buffer: IndexedBitmap, rows: number, colorMap: number[]): void {
+  for (let i = 0; i < rows * buffer.width; i++) {
+    buffer.pixels[i] = Math.floor(colorMap[buffer.pixels[i] & 0x0f] / 10);
+  }
+}
+
+/**
+ * `TAG0025a6` (`doc/CSBwin-src/CSBCode.cpp:2053-2152`): a click on square `p1` of the top
+ * view of positions, counted from the party's facing. With no champion in hand it picks
+ * up the one standing there: the square becomes the cursor, and a black hole on screen
+ * (`Character.drawPartyStatus`). With one in hand it puts them down there, facing the
+ * party's way, and whoever stood there takes the square they left.
+ *
+ * The cursor is made of the square as `DrawCharacterState` last drew it, which the port
+ * draws again rather than reads back, since its screen holds the cursor on top. Over a
+ * black shadow two pixels down and right, `d.Pointer23178` is the square and
+ * `d.Pointer23182` its silhouette in colour 4, for the rows below the palette split
+ * (`drawMarchingOrderCursor`). Colour 0 is transparent in both copies (`:2071-2107`).
+ *
+ * `KillCharacter` does not let go of a champion who dies in hand: it clears
+ * `d.Word23244`, not `d.Word23144` (`doc/CSBwin-src/Character.cpp:2653-2658`). Put down,
+ * such a champion is `CharacterAtPosition`'s -1, and CSBWin writes the facing and the
+ * position to `d.CH16482[-1]` (`CSBCode.cpp:2120-2122`, `:2147`); the port writes them to
+ * nobody (`DEBT.md` H).
+ */
+export function tag0025a6(ui: UIState, p1: number): void {
+  const party = ui.partyState;
+  if (!party || !ui.uiTables) return;
+  const g232 = ui.uiTables.graphic232;
+  const d7 = p1;
+  if (ui.word23144 === 0) {
+    const chIdx = characterAtPosition(party.champions, (party.facing + d7) & 3);
+    if (chIdx === -1) return;
+    const square = createPaletteIndexViewportBuffer(19, 14);
+    drawPositionSquare(ui, square, W_RECT_POS_23222, chIdx, party.champions[chIdx], party.facing);
+
+    const a2 = createPaletteIndexViewportBuffer(32, 16, 12);
+    tag0088b2Index(square, a2, W_RECT_POS_23214, 0);
+    recolourRows(a2, 16, g232.cursorColorMapLight);
+    const pointer23178 = { width: 32, height: 16, pixels: a2.pixels.slice() };
+    tag0088b2Index(square, pointer23178, W_RECT_POS_23222, 0);
+
+    const saved = createPaletteIndexViewportBuffer(32, 16, 12);
+    tag0088b2Index(square, saved, W_RECT_POS_23222, 0);
+    recolourRows(saved, 14, g232.cursorColorMapDark);
+    tag0088b2Index(saved, a2, W_RECT_POS_23222, 12);
+
+    ui.pointer23178 = pointer23178;
+    ui.pointer23182 = a2;
+    ui.word23144 = d7 + 1;
+    return;
+  }
+  const d6 = ui.word23144 - 1;
+  ui.word23144 = 0;
+  const d4 = characterAtPosition(party.champions, (party.facing + d6) & 3);
+  if (d4 >= 0) party.champions[d4].facing = party.facing;
+  // Put down where they were picked up, `CHARFLAG_positionChanged` redraws the square,
+  // which the port does every frame.
+  if (d6 === d7) return;
+  const d5 = characterAtPosition(party.champions, (d7 + party.facing) & 3);
+  if (d5 >= 0) party.champions[d5].partyPosition = (d6 + party.facing) & 3;
+  if (d4 >= 0) party.champions[d4].partyPosition = (d7 + party.facing) & 3;
+}
+
+/**
+ * The VBL's test while a champion is in hand (`doc/CSBwin-src/CSBCode.cpp:938-945`): a
+ * pointer outside the top view of positions, left of x 274 or below y 28, lets go of them
+ * through `TAG002818` (`:2155`), which puts the square back as it was. CSBWin asks at
+ * every VBL; the port asks when the pointer moves, which is when the answer can change.
+ * `TAG002818` also records button -1 for a replay, which the port does not make.
+ */
+export function marchingOrderPointerMoved(ui: UIState, x: number, y: number): void {
+  if (ui.word23144 === 0) return;
+  if (x < 274 || y > 28) ui.word23144 = 0;
+}
+
+/**
+ * `CreateCursorBitmap`'s arm for a champion in hand (`doc/CSBwin-src/CSBCode.cpp:2308-2388`):
+ * 21 columns and 16 rows of `d.Pointer23178`, drawn with the pointer 9 pixels in and 7
+ * down (`d.Word23156`, `d.Word23158`). With `d.DynamicPaletteSwitching`, which is on while
+ * the dungeon view is shown, the rows that fall on screen row 29 or below come from
+ * `d.Pointer23182` instead (`:2325-2386`).
+ */
+function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPaletteSwitching: boolean): void {
+  const upper = ui.pointer23178;
+  const lower = ui.pointer23182;
+  if (!upper || !lower || !ui.screenIndexBuffer) return;
+  const d6 = y - 20;
+  const split = dynamicPaletteSwitching && d6 > 0 ? 16 - d6 : 16;
+  const dst = ui.screenIndexBuffer;
+  for (let row = 0; row < 16; row++) {
+    const dy = y - 7 + row;
+    if (dy < 0 || dy >= dst.height) continue;
+    const src = row < split ? upper : lower;
+    for (let col = 0; col <= 20; col++) {
+      const dx = x - 9 + col;
+      if (dx < 0 || dx >= dst.width) continue;
+      const pixel = src.pixels[row * src.width + col];
+      if (pixel === 12) continue;
+      dst.pixels[dy * dst.width + dx] = pixel;
+    }
+  }
+}
+
+export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): void {
   if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
+  if (ui.word23144 !== 0) {
+    // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2234`).
+    drawMarchingOrderCursor(ui, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), dynamicPaletteSwitching);
+    return;
+  }
   if (ui.shadedByTag02076e) {
     // `tag02076e`'s `SetCursorShape(0)`: the arrow, and no object, until `TAG0207cc`'s
     // `TAG002572` (`doc/CSBwin-src/CSBCode.cpp:2030`) sets the cursor from the hand again.

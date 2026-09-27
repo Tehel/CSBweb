@@ -81,6 +81,7 @@ In payoff order: the first row is the next item.
 | C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
 | C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
+| C70 | The top view of positions has a square for nobody | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -93,7 +94,6 @@ In payoff order: the first row is the next item.
 | G7 | Save-format gaps | — | in `PLAN.md` |
 | G13 | `_ShowCredits`: the game never ends | M | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
-| G9 | Changing the marching order | — | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
@@ -101,7 +101,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C70 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C71 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -246,6 +246,20 @@ tick, where CSBWin's waits for the tick. After a move to another level they run 
 tick has loaded it (`d.newPartyLevel`), with the party still on its old level. Remove the
 three calls. Evidence: a check that drops an object on a pad whose
 action is due at once, and finds its timer still queued when the handler returns.
+
+### C70 ⏳ The top view of positions has a square for nobody
+
+CSBWin draws a champion's square in the top view of positions from `DrawCharacterState`,
+once per champion in the party, and only inside `if (pcA3->HP() != 0)`
+(`doc/CSBwin-src/Character.cpp:1308-1513`): a dead champion has none, their square blanked
+by `KillCharacter` (`:2663-2666`). The port's `drawPartyStatus` (`src/renderer/ui/Character.ts:389`)
+draws one for each of the four boxes, alive, dead or empty, an empty box's in the slot of
+its own index. So the golden frame `01-boot` shows four coloured squares over an empty
+party, where CSBWin shows none; with three champions, the empty fourth box paints its
+colour, 14, over whichever champion stands in position 3; and a dead champion keeps a
+square.
+Draw it for a living champion only, and capture `01-boot` again. Evidence: the frame, and
+a row in `tools/dump-marching-order.ts` that draws a party with a dead champion.
 
 ---
 
@@ -464,15 +478,6 @@ ending, and it is size L, in three steps:
    and `d.CanRestartFromSavegame = 0`. Evidence: a tool that fuses a boxed-in Lord Chaos
    and one that lets him escape.
 
-### G9 ⏳ Changing the marching order
-
-Buttons 125-128, the four position squares at the top right of `buttons17196`, go to
-`TAG0025a6` (`doc/CSBwin-src/Mouse.cpp:1586-1597`, `CSBCode.cpp:2053`). That function picks
-up the champion at that position so the player can drag them to another square. The drag's
-"cursor left the rectangle" event is button -1 (`Mouse.cpp:1800-1805`). The port queues
-these buttons, and `handleMouseButton` (`src/renderer/ui/Mouse.ts`) drops them, so the
-marching order cannot be changed.
-
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
 
 A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
@@ -520,6 +525,11 @@ Recorded so that nobody "fixes" them.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
   comment gives the reason.
+- 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a
+  change of the marching order, and `TAG0025a6` then writes the dead champion's facing and
+  position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing
+  the marching order"). The port writes them to no one and does the rest: whoever stood on
+  the target square still moves (`tag0025a6`, `src/renderer/ui/Mouse.ts`).
 - 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8200-8204`) is not ported,
   because CSBWin cannot reach it either. Move Up / Down (`0x1124` / `0x1125`) come only from
   the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, whose flags are

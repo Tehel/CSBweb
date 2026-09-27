@@ -50,6 +50,7 @@ import {
 } from './ui/ViewportPicking';
 import {
   drawCursorItem,
+  marchingOrderPointerMoved,
   drawHoverHighlights,
   handleMouseButton,
   handleMouseUnclick,
@@ -359,13 +360,18 @@ export class GameScreen {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
     // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
     // `TAG0207cc` follows).
-    if (state !== this.ui.partyState) this.ui.shadedByTag02076e = false;
+    // Nor does a champion in hand (`d.Word23144 = 0`, `doc/CSBwin-src/CSBCode.cpp:10485`).
+    if (state !== this.ui.partyState) {
+      this.ui.shadedByTag02076e = false;
+      this.ui.word23144 = 0;
+    }
     this.ui.partyState = state;
     syncInventoryButtons(this.ui);
   }
 
   setHoverPoint(point: { x: number; y: number } | null): void {
     this.ui.hoverPoint = point;
+    if (point) marchingOrderPointerMoved(this.ui, Math.floor(point.x), Math.floor(point.y));
   }
 
   /**
@@ -501,7 +507,7 @@ export class GameScreen {
       drawSaveMenu(this.ui);
     }
     drawHoverHighlights(this.ui);
-    drawCursorItem(this.ui);
+    drawCursorItem(this.ui, !inventoryOpen);
 
     const uiPalette = this.uiPalette;
     const viewportPalette = inventoryOpen ? uiPalette : (this.getViewportPalette() ?? uiPalette);

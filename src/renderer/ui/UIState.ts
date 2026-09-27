@@ -100,6 +100,19 @@ export interface UIState {
   diskMenuNeeded: boolean;
   pressingEye: boolean;
   hoverPoint: { x: number; y: number } | null;
+  /**
+   * `d.Word23144` — the marching order being changed: 0, or one more than the position,
+   * relative to the party's facing, of the square a champion was picked up from
+   * (`TAG0025a6`, `doc/CSBwin-src/CSBCode.cpp:2053`).
+   */
+  word23144: number;
+  /**
+   * `d.Pointer23178` and `d.Pointer23182` (`doc/CSBwin-src/CSBCode.cpp:1950-1951`), the
+   * 32x16 cursor `TAG0025a6` makes of the square it picks up, for the palette above the
+   * split and the one below it.
+   */
+  pointer23178: IndexedBitmap | null;
+  pointer23182: IndexedBitmap | null;
 
   /* ---- the attack menu (doc/CSBwin-src/Character.cpp) ---- */
   /** `d.AttackingCharacterOrdinal` — 1-based champion with the menu open, 0 for none. */
@@ -246,6 +259,9 @@ export function createUIState(
     diskMenuNeeded: false,
     pressingEye: false,
     hoverPoint: null,
+    word23144: 0,
+    pointer23178: null,
+    pointer23182: null,
 
     attackingCharacterOrdinal: 0,
     possibleAttackTypes: Int8Array.from([-1, -1, -1, -1]),
