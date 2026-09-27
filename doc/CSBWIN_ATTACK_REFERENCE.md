@@ -107,6 +107,17 @@ all. On success the group drops to `StateOfFear5` and its `ITEM16.uByte5` pause 
 attack — has its attack cleared and its movement timers restarted first. On failure the
 skill reward is halved. Either way skill 14 is credited.
 
+### `_Fusion`
+
+`atk_FUSE` aims at the square in front of the party, runs the `msg` 1 filter, then
+`_Fusion` (`:1963-1972`). A dispell cloud lands on the square, and if Lord Chaos stands
+there he tries to escape, in shuffled directions: a square next to him first, then one two
+away, which lets him jump over the party or a monster but never through a Fluxcage or a
+wall. Boxed in, `_FusionSequence` starts. The rules are in `doc/PROVEN_FACTS.md` → "The
+fusion: a dispell cloud, then Lord Chaos's escape"; the port is `AttackSystem.fusion`, the
+evidence `tools/dump-fusion.ts`. `_FusionSequence` (`:2220`), the ending itself, is not
+ported yet (`DEBT.md` G8).
+
 ## The menu
 
 The strip under the viewport is a two-state panel, and `d.Word20252` is the state:
@@ -136,10 +147,6 @@ centres itself whatever its width. Two negative values are messages instead: -1
 
 ## Deliberately not ported
 
-- **Lord Chaos's endgame**: `_Fusion` (`:133`), `_FusionSequence` (`:2220`). It cannot be
-  exercised until Lord Chaos himself works, so it would land untested. `atk_FUSE` runs its
-  filter and does nothing else. `FluxCage`, `IsCellFluxcage` and `IsLordChaosHere` *are*
-  ported, since they are reachable now.
 - **`ActionNameFilter`** (`CSBCode.cpp:8680`), the DSA that can rename an attack option in
   the menu. `ESL_ACTIONNAMEFILTER` is unported; option names come straight from
   `AttackNames`.

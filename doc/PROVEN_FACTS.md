@@ -3880,3 +3880,30 @@ Its tick is `_ProcessTimersViewportAndSound` (`Attack.cpp:2192-2213`), which onl
 loop's tick: no periodic update, no timer countdown.
 The port: `LoopScript`, `Game.runScript` and `Game.processTimersViewportAndSound`.
 Evidence: `tools/dump-loop-script.ts`.
+
+## The fusion: a dispell cloud, then Lord Chaos's escape
+
+`_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) runs the `NewFusion` branch: `#define NewFusion`
+sits right above its `#ifdef` (`:161-162`), so the `OldFusion` code (`:214-257`) is dead.
+In order:
+
+- A square off the loaded level returns before anything (`:150-157`). Otherwise a dispell
+  cloud, `CreateCloud(RNDispellMissile, 0xff, x, y, x, y, 0xff)`, lands on it (`:158`),
+  Lord Chaos or not; without him `_Fusion` returns there (`:159-160`).
+- The four directions, north, east, south, west, are shuffled: for `i` from 3 down to 1,
+  swap `direction[i]` with `direction[STRandom(i+1)]` (`:163-171`).
+- For each direction, CSBWin notes whether the square next to him is a Fluxcage or a wall
+  (`IsCellWall`: stone or false wall, `:106-111`); whether it is open or a pit
+  (`IsCellOpenOrPit`, `:113-118`) and unoccupied (`IsCellOccupied`: a monster, or the
+  party, `:120-127`); and whether the square two away is on the map (`legalXY`, `:99-104`),
+  open or a pit, unoccupied, and not a Fluxcage (`:172-186`).
+- He moves to the first square next to him, in shuffled order, that is free and neither a
+  Fluxcage nor a wall (`:187-199`); failing that, to the first square two away whose near
+  square is neither a Fluxcage nor a wall (`:200-212`). The near square may be occupied,
+  so he can jump over the party or another monster. A `MoveObject` that returns 0 starts
+  his movement timers where he lands (`StartMonsterMovementTimers`) and ends `_Fusion`;
+  one that does not tries the next square.
+- With nowhere to go, "Sorry, Mr. Chaos. You are toast." (`:213`): `FusionSequence(_3_)`
+  (`:259`).
+
+The port: `AttackSystem.fusion`. Evidence: `tools/dump-fusion.ts`.

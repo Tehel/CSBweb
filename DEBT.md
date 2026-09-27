@@ -193,7 +193,7 @@ With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
 `ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
 The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
 `TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
-bash (`src/engine/AttackSystem.ts:999`), a champion's wound
+bash (`src/engine/AttackSystem.ts:1103`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
 `:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
@@ -448,35 +448,35 @@ rather than being copied here.
 
 ### G8 ⏳ Lord Chaos's fusion endgame
 
-`_Fusion` (`doc/CSBwin-src/Attack.cpp:133`) and `_FusionSequence` (`:2220`) are not ported.
-`atk_FUSE` runs its filter and does nothing else (`src/engine/AttackSystem.ts:1090-1097`).
-Everything Lord Chaos does before the fusion is ported: the Fluxcage, `IsCellFluxcage`,
-`IsLordChaosHere`, `MonsterPerception`'s Fluxcage test, his wander step
-(`MonsterSystem.ts:712`, `Timer.cpp:2601`) and his missiles (`MonsterAttack.ts:297`,
-`Monster.cpp:1045`). So he can be boxed in and fused against, and the won screen the
-fusion ends in is ported too: `_FusionSequence` sets `d.Word11694` (`:2268`), which is
-`GameState.gameWon`, and ends in `ShowCredits(_20_, 1)` (`:2429`), which the host shows
-through `GameHost.showCredits(true)` (`showEndOfGame`, `src/main.ts`), as it does after the
-CSB win (`Game.gameTick`).
+`_FusionSequence` (`doc/CSBwin-src/Attack.cpp:2220`), the ending itself, is not ported.
+Everything before it is: the Fluxcage, `IsCellFluxcage`, `IsLordChaosHere`,
+`MonsterPerception`'s Fluxcage test, his wander step (`MonsterSystem.ts:712`,
+`Timer.cpp:2601`), his missiles (`MonsterAttack.ts:297`, `Monster.cpp:1045`), and `_Fusion`
+(`:133`), `atk_FUSE`'s dispell cloud and his escape from it (`AttackSystem.fusion`,
+evidence `tools/dump-fusion.ts`). A boxed-in Lord Chaos stays where he is, and nothing
+follows (`AttackSystem.ts:940`). The won screen the sequence ends in is ported too:
+`_FusionSequence` sets `d.Word11694` (`:2268`), which is `GameState.gameWon`, and ends in
+`ShowCredits(_20_, 1)` (`:2429`), which the host shows through `GameHost.showCredits(true)`
+(`showEndOfGame`, `src/main.ts`), as it does after the CSB win (`Game.gameTick`).
 
-Size L, in two steps. **Step 1 is done:** the loop can be held in a scripted sequence.
-A `LoopScript` is a generator that yields the length of each `VBLDelay`; `Game.runScript`
-runs one up to its first delay and `Game.runFrame` runs the rest in place of its passes;
-`Game.processTimersViewportAndSound` is `_ProcessTimersViewportAndSound` (`:2192`), and
-`Game.showCreditsAndEnd` is a `ShowCredits(n, 1)` that never returns. The CSB win's
-`VBLDelay(300)` runs on it (`Game.wonByTimers`). Evidence: `tools/dump-loop-script.ts`.
+Size L, in three steps, two of them done:
 
-**Step 2, what is left: `_Fusion` and `_FusionSequence`.** `_Fusion` (the `NewFusion`
-branch, `:161-213`): the dispell cloud on the square, then Lord Chaos steps to a free
-square next to him, or two away, unless a Fluxcage or a wall is in that direction; boxed
-in, the sequence starts (`:259`). `_FusionSequence`: the shields, the cages removed, the
-fireball and dispell clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey
-Lord, `d.Word1868` (which stops the teleporter field over a cloud being drawn,
+1. **Done: the loop can be held in a scripted sequence.** A `LoopScript` is a generator
+   that yields the length of each `VBLDelay`; `Game.runScript` runs one up to its first
+   delay and `Game.runFrame` runs the rest in place of its passes;
+   `Game.processTimersViewportAndSound` is `_ProcessTimersViewportAndSound` (`:2192`), and
+   `Game.showCreditsAndEnd` is a `ShowCredits(n, 1)` that never returns. The CSB win's
+   `VBLDelay(300)` runs on it (`Game.wonByTimers`). Evidence: `tools/dump-loop-script.ts`.
+2. **Done: `_Fusion`**, above.
+3. **Left: `_FusionSequence`**, started where `AttackSystem.fusion` ends.
+
+**Step 3.** `_FusionSequence`: the shields, the cages removed, the fireball and dispell
+clouds, the flicker between `mon_25` and `mon_LordChaos`, the Grey Lord, `d.Word1868` (which stops the teleporter field over a cloud being drawn,
 `Code51a4.cpp:2774`), every other monster on the level deleted (with
 `ProcessMonsterDeleteFilter`'s `DMW_Fusion`, G2), the texts of cell (0, 0) printed in order
 of their second character, "THE END", and `d.CanRestartFromSavegame = 0`. Each
 `if (testdelay) VBLDelay(MS2VBL(testdelay))` is a `yield 31` (`doc/PROVEN_FACTS.md` → "A
-`RESTARTABLE` sequence holds the main loop"). Two things to settle in the port:
+`RESTARTABLE` sequence holds the main loop"). Three things to settle in the port:
 
 - **Reach.** The script's methods are `Game`'s, and `AttackSystem` reaches no `Game`: give
   `GameSystems` the loop (a `mainLoop` that `Game` fills with itself, typed by an interface
@@ -493,7 +493,8 @@ of their second character, "THE END", and `d.CanRestartFromSavegame = 0`. Each
   make it reachable. Gate them on `Game.isRunningScript` too, after checking what CSBWin's
   `VBLDelay` lets the UI do.
 
-Evidence: a tool that fuses a boxed-in Lord Chaos and one that lets him escape.
+Evidence: `tools/dump-fusion.ts`'s boxed-in case, carried on through the sequence to the
+credits.
 
 ### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
 

@@ -25,8 +25,8 @@
  * to a signed 16-bit word, and several steps can leave the running total negative, so
  * the `sw()` calls are load-bearing rather than decoration.
  *
- * ⏳ Lord Chaos's endgame — `_Fusion` (`:133`), `_FusionSequence` (`:2220`) — is not
- * ported yet: `atk_FUSE` runs its filter and does nothing else. See `DEBT.md` G8.
+ * Lord Chaos's endgame starts in `_Fusion` (`:133`). ⏳ `_FusionSequence` (`:2220`), which
+ * a boxed-in Lord Chaos starts, is not ported yet (`DEBT.md` G8).
  */
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import { div, sw } from '../core/intCast';
@@ -837,6 +837,110 @@ export class AttackSystem {
     return !!monster && monster.creatureType === MonsterType.mon_LordChaos;
   }
 
+  /** `legalXY` (`doc/CSBwin-src/Attack.cpp:99`), on the party's level. */
+  private legalXY(x: number, y: number): boolean {
+    const map = this.ctx.dungeon.getMap(this.ctx.party.state.position.z);
+    if (!map) return false;
+    if (y < 0 || y >= map.descriptor.height) return false;
+    if (x < 0 || x >= map.descriptor.width) return false;
+    return true;
+  }
+
+  /** `(GetCellFlags(x, y) & 255) >> 5` on the party's level; off the map, stone. */
+  private roomTypeAt(x: number, y: number): number {
+    return (this.ctx.dungeon.getCellFlag(new Position(x, y, this.ctx.party.state.position.z)) & 255) >> 5;
+  }
+
+  /** `IsCellWall` (`doc/CSBwin-src/Attack.cpp:106`). */
+  private isCellWall(x: number, y: number): boolean {
+    const cf = this.roomTypeAt(x, y);
+    return cf === RoomType.STONE || cf === RoomType.FALSEWALL;
+  }
+
+  /** `IsCellOpenOrPit` (`doc/CSBwin-src/Attack.cpp:113`). */
+  private isCellOpenOrPit(x: number, y: number): boolean {
+    const cf = this.roomTypeAt(x, y);
+    return cf === RoomType.OPEN || cf === RoomType.PIT;
+  }
+
+  /**
+   * `IsCellOccupied` (`doc/CSBwin-src/Attack.cpp:120`): a monster, or the party. The level
+   * loaded during an attack is the party's, so `d.LoadedLevel == d.partyLevel` holds.
+   */
+  private isCellOccupied(x: number, y: number): boolean {
+    if (this.findFirstMonsterAt(x, y) !== OBJECT_ID_EOF) return true;
+    const party = this.ctx.party.state.position;
+    return party.x === x && party.y === y;
+  }
+
+  /**
+   * `_Fusion` (`doc/CSBwin-src/Attack.cpp:133`), the `NewFusion` branch, which the
+   * `#define` just above it makes the live one (`:161-213`): a dispell cloud on the square
+   * in front, and if Lord Chaos stands there, his escape. The four directions are
+   * shuffled (`:163-171`); he steps to the first square next to him
+   * that is open or a pit, unoccupied, and neither a Fluxcage nor a wall, and failing
+   * that, to the first square two away in a direction whose near square is neither a
+   * Fluxcage nor a wall, which may be occupied, and whose far square is on the map, open
+   * or a pit, unoccupied and not a Fluxcage (`:172-212`). So he can jump over the party.
+   * A `MoveObject` that leaves him in the dungeon (0) starts his movement timers there,
+   * and he is gone. Nowhere to go, he is toast (`:213`), and `_FusionSequence` starts
+   * (`:259`).
+   */
+  private fusion(attackX: number, attackY: number): void {
+    const level = this.ctx.party.state.position.z;
+    const x = sw(attackX);
+    const y = sw(attackY);
+    const map = this.ctx.dungeon.getMap(level);
+    if (!map) return;
+    if (x < 0 || x >= map.descriptor.width) return;
+    if (y < 0 || y >= map.descriptor.height) return;
+    this.ctx.systems.missileEncounter.createCloud(RN_DISPELL_MISSILE, 0xff, x, y, new Position(x, y, level), 0xff);
+    if (!this.isLordChaosHere(x, y)) return;
+    const lordChaos = this.findFirstMonsterAt(x, y);
+    const direction = [0, 1, 2, 3];
+    for (let i = 3; i > 0; i--) {
+      const j = this.ctx.random.below(i + 1);
+      const temp = direction[i]!;
+      direction[i] = direction[j]!;
+      direction[j] = temp;
+    }
+    const x1: number[] = [], y1: number[] = [], x2: number[] = [], y2: number[] = [];
+    const fluxCageOrWall: boolean[] = [], empty1: boolean[] = [], empty2: boolean[] = [];
+    for (let i = 0; i < 4; i++) {
+      const dx = DELTA_X[direction[i]!]!;
+      const dy = DELTA_Y[direction[i]!]!;
+      x1[i] = x + dx;
+      y1[i] = y + dy;
+      x2[i] = x + 2 * dx;
+      y2[i] = y + 2 * dy;
+      fluxCageOrWall[i] = this.isCellFluxcage(x1[i]!, y1[i]!) || this.isCellWall(x1[i]!, y1[i]!);
+      empty1[i] = this.isCellOpenOrPit(x1[i]!, y1[i]!) && !this.isCellOccupied(x1[i]!, y1[i]!);
+      empty2[i] = this.legalXY(x2[i]!, y2[i]!)
+        && this.isCellOpenOrPit(x2[i]!, y2[i]!)
+        && !this.isCellOccupied(x2[i]!, y2[i]!)
+        && !this.isCellFluxcage(x2[i]!, y2[i]!);
+    }
+    const monsters = this.ctx.systems.monsters;
+    for (let i = 0; i < 4; i++) {
+      if (!fluxCageOrWall[i] && empty1[i]) {
+        if (monsters.moveMonster(lordChaos, x, y, x1[i]!, y1[i]!, level).code === 0) {
+          monsters.startMonsterMovementTimers(x1[i]!, y1[i]!, level);
+          return;
+        }
+      }
+    }
+    for (let i = 0; i < 4; i++) {
+      if (!fluxCageOrWall[i] && empty2[i]) {
+        if (monsters.moveMonster(lordChaos, x, y, x2[i]!, y2[i]!, level).code === 0) {
+          monsters.startMonsterMovementTimers(x2[i]!, y2[i]!, level);
+          return;
+        }
+      }
+    }
+    // "Sorry, Mr. Chaos.  You are toast." ⏳ `FusionSequence(_3_)` (`:259`) is not ported
+    // (`DEBT.md` G8, step 3).
+  }
+
   /**
    * `FluxCage` (`doc/CSBwin-src/Attack.cpp:1549`).
    *
@@ -1088,13 +1192,12 @@ export class AttackSystem {
         break;
 
       case AttackType.atk_FUSE:
-        // ⏳ `Fusion` (`doc/CSBwin-src/Attack.cpp:133`) is not ported (`DEBT.md` G8). The
-        // filter still runs, so a dungeon's own FUSE handling works.
         this.setCharToPartyFacing(pChar);
         params.attackX = party.position.x + DELTA_X[party.facing & 3];
         params.attackY = party.position.y + DELTA_Y[party.facing & 3];
         params.dataType = AttackDataType.ADT_Fusion;
         this.callAttackFilter(filter, params, 1);
+        this.fusion(params.attackX, params.attackY);
         break;
 
       case AttackType.atk_HEAL: {
