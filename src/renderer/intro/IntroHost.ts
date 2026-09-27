@@ -4,11 +4,12 @@
  * CSBWin's title animation, dungeon entrance and credits scroll all run *before* there is
  * a party, a level or a main loop: `_AskWhatToDo` (`doc/CSBwin-src/CSBCode.cpp:11338`)
  * calls `_DisplayChaosStrikesBack`, then `_StartCSB` -> `_ShowPrisonDoor` -> `_GameSetup`
- * -> `_TAG01f746`. They talk to the Atari hardware directly — the logical screen base, the
+ * -> `_TAG01f746`. `_ShowCredits`, the end of the game, runs once `MainLoop` has returned
+ * (`:11325`). They talk to the Atari hardware directly — the logical screen base, the
  * shifter's sixteen colour registers, the VBL counter, the sound chip — and nothing else.
  *
- * This interface is that hardware. `BootSequence` builds it over `GameScreen`, the
- * three modules in this directory are the ports, and neither knows about the other's
+ * This interface is that hardware. `BootSequence` builds it over `GameScreen`, the other
+ * modules in this directory are the ports, and neither knows about the other's
  * internals. Full spec and citations: `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
  *
  * Everything here is `async` because CSBWin's screens are `RESTARTABLE` coroutines that
@@ -55,6 +56,10 @@ export interface IntroHost {
   nextEvent(): Promise<IntroEvent>;
   /** `DiscardAllInput()`. */
   discardAllInput(): void;
+  /** `d.MouseSwitches`: the buttons held down now, in CSBWin's mask. */
+  mouseSwitches(): number;
+  /** `UI_CONSTAT()`: whether a key waits, unread. */
+  keyWaiting(): boolean;
   /**
    * `STShowCursor` / `STHideCursor` (`doc/CSBwin-src/Mouse.cpp:1818`, `:1839`).
    *

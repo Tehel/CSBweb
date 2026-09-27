@@ -127,7 +127,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
   csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
             SummarizeRoomInfo, CanvasBlitter, TextRenderer
   intro/    Everything before the party is in the dungeon: the title animation, the
-            dungeon entrance, the door animation, the credits scroll. See
+            dungeon entrance, the door animation, the credits scroll. And the end of
+            the game (`ShowCredits`), on the same host. See
             doc/CSBWIN_TITLE_SCREEN_REFERENCE.md.
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
             MagicPanel, Feeding, Objects, Light, Draw, HitTest, ViewportPicking, all over

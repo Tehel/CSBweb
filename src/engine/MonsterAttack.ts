@@ -594,7 +594,7 @@ export class MonsterAttack {
     }
 
     if (living < 0) {
-      // Nobody left. CSBWin sets `d.GameIsLost` here and the VBL loop takes over.
+      // Nobody left. The tick ends the game once its timers have run (`Game.gameTick`).
       party.gameIsLost = true;
       setHandOwner(party, -1);
     } else {

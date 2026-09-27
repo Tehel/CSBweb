@@ -19,7 +19,8 @@ import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabl
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
-import { runBootSequence } from './renderer/intro/BootSequence';
+import { runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
+import { SOUND_DYING } from './renderer/intro/ShowCredits';
 import { loadUISettings } from './ui/settings';
 
 console.log('Dungeon Master Web - Initializing...');
@@ -151,7 +152,8 @@ function isCrtEnabled(): boolean {
 
 // Render the 3D view
 function renderView() {
-    if (!game || !screen) return;
+    // Once `MainLoop` has returned the screen is `_ShowCredits`'s.
+    if (!game || !screen || game.mainLoopHasReturned()) return;
 
     const party = game.party;
     const pos = party.state.position;
@@ -240,6 +242,10 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // `TAG02076e` / `TAG0207cc` from the engine: the Hall of Champions and `WakeUp`.
         tag02076e: () => screen?.tag02076e(),
         tag0207cc: () => screen?.tag0207cc(),
+        // `MainLoop` has returned on a lost game (doc/CSBwin-src/CSBCode.cpp:11325).
+        showCredits: () => {
+            if (screen) void showEndOfGame(game, screen, sound);
+        },
     });
 
     screen = new GameScreen(gameCanvasEl, {
@@ -312,6 +318,21 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         },
     });
     return { game, screen };
+}
+
+/**
+ * `_ShowCredits(1)`: the end of a lost game, over the last frame the adventure drew
+ * (`src/renderer/intro/ShowCredits.ts`). The adventure's cursor is drawn into the screen,
+ * so it is lifted first, as `STHideCursor(HC50)` lifts CSBWin's.
+ */
+async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager): Promise<void> {
+    screen.setHoverPoint(null);
+    screen.refreshOverlay();
+    const { x, y } = game.party.state.position;
+    await runShowCredits(
+        { canvas: gameCanvasEl, gameScreen: screen, playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx) },
+        { queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0) },
+    );
 }
 
 /** The optional CRT effect over the canvas. Without glfx, the button reports it unavailable. */

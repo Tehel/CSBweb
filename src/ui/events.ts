@@ -25,8 +25,13 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     if (canvas.dataset.uiBound === 'true') return;
     canvas.dataset.uiBound = 'true';
 
+    // Once `MainLoop` has returned, `_ShowCredits` has emptied every button list and key
+    // table (`doc/CSBwin-src/Code1f9e6.cpp:116-121`) and owns the screen: the adventure's
+    // handlers neither act nor draw.
+    const ended = (): boolean => ctx.game.mainLoopHasReturned();
+
     canvas.addEventListener('mousemove', (e) => {
-        if (!ctx.screen) return;
+        if (!ctx.screen || ended()) return;
         const { x, y } = getEventPosition(canvas, e);
         ctx.screen.setHoverPoint({ x, y });
         // Cursor tracking only — never a full `renderView()`. That would re-run
@@ -37,6 +42,7 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 
     canvas.addEventListener('mousedown', (e) => {
+        if (ended()) return;
         const { x, y } = getEventPosition(canvas, e);
         const buttonMask = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
         // The save/load screen is modal, the way `_WaitForMenuSelect` is modal: it
@@ -62,12 +68,12 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 
     canvas.addEventListener('mouseup', () => {
-        if (ctx.screen?.isSaveMenuOpen()) return;
+        if (ended() || ctx.screen?.isSaveMenuOpen()) return;
         ctx.game.onMouseUnClick();
     });
 
     canvas.addEventListener('wheel', (e) => {
-        if (!ctx.screen?.isSaveMenuOpen()) return;
+        if (ended() || !ctx.screen?.isSaveMenuOpen()) return;
         e.preventDefault();
         ctx.screen.handleSaveMenuWheel(e.deltaY);
     }, { passive: false });
@@ -77,6 +83,7 @@ function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): voi
     });
 
     canvas.addEventListener('mouseleave', () => {
+        if (ended()) return;
         ctx.screen.setHoverPoint(null);
         ctx.renderView();
     });
@@ -215,6 +222,9 @@ export function bindUIEvents(): void {
         ctx.game.onTick(() => updateChampionPanel());
 
         document.addEventListener('keydown', (e) => {
+            // `_ShowCredits` has emptied `d.pKeyXlate1` and `d.pKeyXlate2`
+            // (`doc/CSBwin-src/Code1f9e6.cpp:120-121`): no key is the adventure's any more.
+            if (ctx.game.mainLoopHasReturned()) return;
             // The Reincarnate name-entry screen is modal on the keyboard as well as
             // the mouse (`keyboardMode = 2`, `doc/CSBwin-src/Code13ea4.cpp:38`): while
             // it is up every key is a letter being typed, so none of the movement or

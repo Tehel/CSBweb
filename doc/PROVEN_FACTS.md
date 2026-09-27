@@ -3771,3 +3771,20 @@ array. Evidence: `tools/dump-timer-heap.ts`. Every committed save's queue is a h
 `csbgame7.dat`'s queue drains in `timerLess` order; hand-worked arrays after each insertion
 and deletion; and a loaded game runs every timer due by its first tick, `csbgame6.dat`'s
 IAIDO `TT_11` among them.
+
+
+## A lost game ends on the tick of death, with the palette switching off
+
+`KillCharacter` sets `d.GameIsLost` when no champion is left
+(`doc/CSBwin-src/Character.cpp:2680`). The tick that follows, or the one it happens in, runs
+its timers as usual; then `if (d.GameIsLost == 0)` (`doc/CSBwin-src/CSBCode.cpp:658`) guards
+everything from `d.Time++` to the mouse queue, and `MainLoop` returns (`:777-778`) without
+`d.Time` moving on. `_StartCSB` sets `d.DynamicPaletteSwitching = 0` and calls
+`ShowCredits(_3_, d.GameIsLost)` (`:11322-11326`). Nothing turns the switching back on:
+the VBL restores it from `d.Word11740` only while `d.ViewportUpdated` is set (`:906-909`),
+and `MarkViewportUpdated` consumes that flag at once by calling `vblInterrupt()` itself
+(`:2916-2917`, `:1006-1010`). So `_ShowCredits` takes its fade to black, not the `Darken`
+steps (`doc/CSBwin-src/Code1f9e6.cpp:148-170`), from `globalPalette`, which the VBL kept
+equal to `d.Palette11978` (`doc/CSBwin-src/WinScreen.cpp:1493-1498`). The rest of the
+screen is in `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md` → "The end of the game";
+`tools/dump-show-credits.ts` checks both halves.

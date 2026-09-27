@@ -211,8 +211,9 @@ export interface PartyState {
      */
     potentialChampionIndex: number;
     /**
-     * `d.GameIsLost` (`doc/CSBwin-src/Character.cpp:2683`) — set when `KillCharacter`
-     * finds no living champion left.
+     * `d.GameIsLost` (`doc/CSBwin-src/Character.cpp:2680`) — set when `KillCharacter`
+     * finds no living champion left. The tick's timers still run, then `MainLoop` returns
+     * (`Game.gameTick`).
      */
     gameIsLost: boolean;
     /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */

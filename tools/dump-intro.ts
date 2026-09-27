@@ -281,6 +281,8 @@ function makeHost(graphics: GraphicsLoader, ui: UITables): IntroHost {
     drawPrisonInterior: () => viewport,
     nextEvent: () => Promise.resolve({ kind: 'click' as const, x: 0, y: 0, buttons: 2 }),
     discardAllInput: () => {},
+    mouseSwitches: () => 0,
+    keyWaiting: () => true,
     setCursorVisible: () => {},
   };
 }

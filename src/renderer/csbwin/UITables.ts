@@ -158,6 +158,8 @@ export interface UITables {
     word612: number[];
     /** The prison door's right half on the static entrance screen. */
     word100: WordRect;
+    /** "THE END", graphic 6, on the end screen (`doc/CSBwin-src/Code1f9e6.cpp:229`). */
+    word108: WordRect;
     /** The prison door's left half on the static entrance screen. */
     word92: WordRect;
     /** The entrance interior saved off before the doors go over it. */
@@ -707,6 +709,8 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   // forward indexes them in reverse (`doc/CSBwin-src/Data.h:1475-1487`).
   const wordRects = readWordRectArray(view, off, 17);
   // The title animation and the prison door (`doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`).
+  // The end of the game (`_ShowCredits`, `doc/CSBwin-src/Code1f9e6.cpp:66`).
+  const word108 = wordRects[4];
   const word100 = wordRects[5];
   const word92 = wordRects[6];
   const word84 = wordRects[7];
@@ -764,6 +768,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     iconDisplay,
     word612,
     word100,
+    word108,
     word92,
     word84,
     word76,

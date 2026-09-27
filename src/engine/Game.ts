@@ -182,6 +182,8 @@ export class Game {
     private running: boolean = false;
     private lastTickTime: number = 0;
     private animationFrameId: number | null = null;
+    /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`). */
+    private mainLoopReturned = false;
 
     // Event callbacks
     private onTickCallbacks: GameEventCallback[] = [];
@@ -285,6 +287,11 @@ export class Game {
         console.log('Game stopped');
     }
 
+    /** Whether `MainLoop` has returned: the game is over, and the page's input is dead. */
+    mainLoopHasReturned(): boolean {
+        return this.mainLoopReturned;
+    }
+
     /**
      * Stop and restart the clock around the save menu (`UIState.onSetPaused`). The game's
      * own stop is the freeze, buttons 147 and 148.
@@ -323,6 +330,8 @@ export class Game {
      * Public so that `tools/` can step frames at chosen times.
      */
     runFrame(currentTime: number): void {
+        // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
+        if (this.mainLoopReturned) return;
         this.state.currentTime = currentTime;
         // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
         // (doc/CSBwin-src/system.cpp:624-630, CSBUI.cpp:1253-1272): the message strip's
@@ -381,6 +390,16 @@ export class Game {
         do {
             this.timerSystem.processTimers(this.state.tickCount);
         } while (this.loadNewPartyLevel());
+        // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
+        // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
+        // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
+        // (`:11322-11326`).
+        if (this.party.state.gameIsLost) {
+            this.mainLoopReturned = true;
+            this.stop();
+            this.ctx.host.showCredits(true);
+            return;
+        }
         // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:660-677):
         // after the timers, so what they print is placed in this tick.
         this.ctx.host.messages.clockTick(this.state.tickCount);

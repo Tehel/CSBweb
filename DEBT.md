@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 | G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
-| G13 | `_ShowCredits`: the game never ends | L | ⏳ |
+| G13 | `_ShowCredits`: no restart, and no won screen | L | ⏳ |
 | G8 | Lord Chaos's fusion endgame | L | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -221,13 +221,14 @@ CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then
 (`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
 (`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
 saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
-(`src/engine/Game.ts:366`) and runs `processTimers` on the new value. A timer set between
+(`src/engine/Game.ts:375`) and runs `processTimers` on the new value. A timer set between
 ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
 game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
 (`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
 it in the tick after, and `tools/dump-mouse-queue.ts` case 9 asserts the port's timing. A
 timer that a handler sets inside the pass, from `TimerSystem.now`, is due one tick later by
-the clock than CSBWin's, and fires in the same tick. Move the increment after the timers.
+the clock than CSBWin's, and fires in the same tick. Move the increment after the timers,
+and after the lost game's return, which skips it (`CSBCode.cpp:658`).
 The tools that turn the clock themselves (`tickCount++` then `processTimers`) move with it.
 Evidence: a row in `tools/dump-mouse-queue.ts` case 9 counting the ticks from the door
 button to the door's first step.
@@ -432,38 +433,29 @@ of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
 rather than being copied here.
 
-### G13 ⏳ `_ShowCredits`: the game never ends
+### G13 ⏳ `_ShowCredits`: no restart, and no won screen
 
-`_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won, and
-it is not ported. `KillCharacter` sets `d.GameIsLost` when nobody is left
-(`Character.cpp:2680`). The tick then runs `StartQueuedSound` and `DisplayCharacterDamage`
-and skips everything under `if (d.GameIsLost == 0)` (`CSBCode.cpp:658`): `d.Time++`, the
-periodic updates, the mouse queue. `MainLoop` returns, and `_StartCSB` clears
-`d.DynamicPaletteSwitching` and calls `ShowCredits(d.GameIsLost)` (`:11322-11326`). The
-port sets `PartyState.gameIsLost` (`src/engine/MonsterAttack.ts:598`) and nothing reads it,
-so a party that has died keeps playing. "SAVE AND QUIT" calls `ShowCredits(0)`, straight to
-the credits picture (`SaveGame.cpp:1252`), and has no equivalent in the port (`PLAN.md` →
-Phase 10). G8 ends in the won screen.
+`_ShowCredits` (`doc/CSBwin-src/Code1f9e6.cpp:66`) is the end of the game, lost or won. The
+port has the lost game with no restart: `Game.gameTick` ends `MainLoop` on the tick of death
+(`CSBCode.cpp:658`) and asks the host for `ShowCredits(1)`, which
+`src/renderer/intro/ShowCredits.ts` runs over an `IntroHost` — the dying sound, "THE END",
+the credits picture (`tools/dump-show-credits.ts`). "SAVE AND QUIT" calls `ShowCredits(0)`,
+straight to the credits picture (`SaveGame.cpp:1252`), and has no equivalent in the port
+(`PLAN.md` → Phase 10). G8 ends in the won screen.
 
-Size L, in three steps:
+Size L, in three steps. Step 1, the lost game with no restart, is done. Left:
 
-1. **The lost game ends, with no restart.** `Game` stops at the tick of death and asks the
-   host for `ShowCredits(1)`. The screen runs over an `IntroHost`: the dying sound
-   (`QueueSound(6, …)`), 240 VBLs, the fade to black, graphic 6 ("THE END") on
-   `d.Word108` in a palette of `0x002` with colour 15 at `0x777`, 300 VBLs, the fade, the
-   credits picture (graphic 5) in `d.Palette328` until a click or a key, then
-   `UIM_TERMINATE` (`Code1f9e6.cpp:113-170`, `:227-238`, `:326-353`). Evidence: a tool
-   that kills the party and one that runs the screen over a headless host.
 2. **"RESTART THIS GAME".** `d.CanRestartFromSavegame`, set by a save or a load
    (`SaveGame.cpp:1260`, `:1883`) and cleared by a new game (`:1494`) and the two wins
-   (`Timer.cpp:2370`, `Attack.cpp:2428`), and by `Code17818.cpp:380`. With it set, the end
-   picture carries the button `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on
-   the credits picture goes back to it without the 300-VBL wait (`:339-348`). The button
+   (`Timer.cpp:2370`, `Attack.cpp:2428`). With it set, the end picture carries the button
+   `0xd7` for 900 VBLs (`Code1f9e6.cpp:240-324`), and a click on the credits picture goes
+   back to it without the 300-VBL wait (`:339-348`). The button
    sets `d.PartyHasDied` (`Mouse.cpp:1798`), and `GameSetup(0)` reads the chooser with that
    flag: only a save of the same `RandomGameID` loads ("THAT'S NOT THE SAME GAME",
    `SaveGame.cpp:1604-1607`), and a cancel puts the dungeon entrance back up
    (`CSBCode.cpp:10634-10641`), whose "enter" needs a fresh dungeon the port cannot build
-   in place today.
+   in place today. A restart also starts `Game`'s loop again, which `mainLoopReturned`
+   keeps shut. `showCredits` marks where the branch goes.
 3. **The won screen.** `d.Word11694`: with `d.DynamicPaletteSwitching` the eight `Darken`
    steps instead of the fade (`Code1f9e6.cpp:148-166`), then each champion's frame
    (graphic 208), portrait, name, title and masteries over colour 12, the palette of
@@ -481,8 +473,8 @@ Everything Lord Chaos does before the fusion is ported: the Fluxcage, `IsCellFlu
 `Monster.cpp:1045`). So he can be boxed in and fused against. What is missing is the
 ending, and it is size L, in three steps:
 
-1. **G13 first.** `_FusionSequence` ends in `ShowCredits(_20_, 1)` (`:2429`), the won
-   screen.
+1. **G13 step 3 first.** `_FusionSequence` ends in `ShowCredits(_20_, 1)` (`:2429`), the
+   won screen.
 2. **A scripted sequence inside the game loop.** `_FusionSequence` is a `RESTARTABLE`
    coroutine: it runs `ProcessTimersViewportAndSound` (`:2192`: `ProcessTimers`, the
    viewport, the queued sound, `d.Time++`) some thirty times between `VBLDelay`s, with no
@@ -565,10 +557,14 @@ Recorded so that nobody "fixes" them.
   The port's `Game.runFrame` is one pass a VBL, and `onMouseClick` only queues: a click
   waits for the next VBL, at worst about 17 ms, and takes no print-queue entry of its own.
   The author's decision: the delay is too small to matter.
-- 🚫 **The intro runs on wall-clock time** through `requestAnimationFrame`, not on a VBL
-  counter shared with the game loop. Nothing else exists yet when it plays, so there is
-  nothing for it to drift against. If a boot-time animation ever has to agree with `d.Time`,
+- 🚫 **The intro and the end screen run on wall-clock time** through
+  `requestAnimationFrame`, not on a VBL counter shared with the game loop. Nothing else
+  runs while they play (the end screen starts once the loop has stopped), so there is
+  nothing for them to drift against. If a boot-time animation ever has to agree with `d.Time`,
   this is the place that would have to change.
+- 🚫 **The game does not quit.** `_ShowCredits` ends in `UI_PushMessage(UIM_TERMINATE)`
+  (`doc/CSBwin-src/Code1f9e6.cpp:349`), which closes CSBWin. A page cannot close itself,
+  so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
   developer affordance with no CSBWin counterpart, kept deliberately: six of the nine golden
   frames boot through it.

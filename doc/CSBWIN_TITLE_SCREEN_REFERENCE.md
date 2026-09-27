@@ -1,12 +1,14 @@
 # CSBWin Title Screen / Dungeon Entrance Reference (Sourced)
 
 Everything before the party is in the dungeon: the title animation, the entrance screen with
-its three buttons, the door-opening animation, the credits scroll and the "Resume" path.
+its three buttons, the door-opening animation, the credits scroll and the "Resume" path. And
+the end of the game, `_ShowCredits`, which draws through the same hardware.
 Every line number is `doc/CSBwin-src/<File>.cpp:<line>`. Rectangle and button values marked
 **(from data)** were printed by `tools/dump-intro.ts`, which asserts them on every run.
 
 The port is `src/renderer/intro/`: `IntroHost.ts` (the hardware these screens talk to),
-`TitleSequence.ts`, `PrisonDoor.ts`, `PrisonLevel.ts` and `BootSequence.ts` (the wiring).
+`TitleSequence.ts`, `PrisonDoor.ts`, `PrisonLevel.ts`, `ShowCredits.ts` and `BootSequence.ts`
+(the wiring).
 
 
 ## The startup chain
@@ -83,12 +85,16 @@ right are **painted into graphic 4**. Nothing is drawn as text at runtime.
 | `Word84` | 0 | 231 | 0 | 160 | 232×161 | the entrance interior, saved |
 | `Word92` | 0 | 104 | 30 | 190 | 105×161 | the left door, static |
 | `Word100` | 105 | 231 | 30 | 190 | 127×161 | the right door, static |
+| `Word108` | 120 | 199 | 95 | 108 | 80×14 | "THE END", graphic 6 |
 
 They are the last 136 bytes of a 1826-byte item and they are read by a parser that walks the
 whole thing field by field, so `tools/dump-intro.ts` checks each one against something
 CSBWin states independently: `Word84` against `allocateMemory(20608,0)` at `:9484`, `Word60`
 against the `SrcByteWidth` of 112 at `:9406`, `Word44` against `pGraphic += 9120; // =57*160`
 at `:9270`, and `Word92`/`Word100` against each other tiling 0..231 with no seam.
+`tools/dump-show-credits.ts` checks `Word108` against graphic 6, 80×14: the 40-byte source
+width of `BLT2Screen(…, d.Word108, 40, -1)` and the 560 bytes `A3` skips past it
+(`Code1f9e6.cpp:136`, `:229`).
 
 Note `Word84`, `Word100` and `Word76` all reach **x = 231**, eight columns past the 224-wide
 viewport. The door art and the interior save therefore cover a sliver of wall to the right of
@@ -484,6 +490,50 @@ void StartSound(ui8 *SoundBytes, i32 /*timerData*/, i32 highVolume)   // Sound.c
 
 — and hard-codes 6000 Hz in `SoundDecode` (`Sound.cpp:293`). This port does not: see
 `doc/PROVEN_FACTS.md` → "The Timer-A values in `StartSound` are the sample rates".
+
+
+## The end of the game — `_ShowCredits`, Code1f9e6.cpp:66
+
+`_ShowCredits(P1)` is reached three ways: `_StartCSB` once `MainLoop` has returned, with
+`d.GameIsLost` (`CSBCode.cpp:11322-11326`); `MainLoop` itself when `ProcessTimers` reports the
+CSB win (`:626-633`); and "SAVE AND QUIT" with `P1 = 0` (`SaveGame.cpp:1252`). `_FusionSequence`
+ends in it too (`Attack.cpp:2429`). The port has the first, for a game that cannot be
+restarted (`src/renderer/intro/ShowCredits.ts`; the rest is `DEBT.md` G13).
+
+**The tick of death.** `KillCharacter` sets `d.GameIsLost` (`Character.cpp:2680`). The tick
+has run its timers; at `tag000730` it runs `WaitForButtonFlash`, `StartQueuedSound` and
+`DisplayCharacterDamage`, and then `if (d.GameIsLost == 0)` (`CSBCode.cpp:658`) guards the
+whole rest of the loop — `d.Time++`, the periodic updates, the mouse queue — so `MainLoop`
+returns (`:777-778`). A death between ticks, from a mouse handler, waits for the next tick,
+which runs its timers and ends the same way.
+
+**The lost game, `P1 = 1`, `d.Word11694 = 0`:**
+
+1. `SetCursorShape(0)`, `STHideCursor(HC50)`, and both button lists and both key tables
+   emptied (`:116-121`).
+2. `QueueSound(6, d.partyX, d.partyY, 0)`, the dying sound, and `VBLDelay(240)` (`:126-127`).
+3. Graphics 6 (80×14, "THE END") and 5 (the credits picture, read compressed as `0x8005` and
+   expanded later) are read (`:132-145`).
+4. `d.DynamicPaletteSwitching` is 0, so `FadeToPalette(Palette11914)` — to black — rather
+   than the `Darken` steps (`:148-170`). It is 0 because `_StartCSB` cleared it, and the VBL
+   that could restore it from `d.Word11740` does so only while `d.ViewportUpdated` is set
+   (`CSBCode.cpp:906-909`), which `MarkViewportUpdated` has already consumed by calling
+   `vblInterrupt()` itself (`:2916-2917`, `:1006-1010`; the `d.Word23138` guard around that
+   block at `:924` is set only for an instant inside `STHideCursor`, `Mouse.cpp:1848-1857`).
+   The fade starts from
+   `globalPalette`, which the VBL had kept equal to `d.Palette11978`
+   (`WinScreen.cpp:1493-1498`), that is `d.Palette552[0]` (`CSBCode.cpp:10623`).
+5. `tag01fd10`: the screen cleared, graphic 6 blitted to `d.Word108`, and a palette of sixteen
+   `0x002` (`fillMemory(&LOCAL_110, 16, 2, 2)`) with colour 15 at `0x777` faded up; then
+   `VBLDelay(300)`, the first time only (`LOCAL_132`) (`:227-238`).
+6. With `d.CanRestartFromSavegame` set, the "RESTART THIS GAME" button (`:240-325`).
+   Otherwise the fade to `LOCAL_110`, the dark blue (`:326`).
+7. Graphic 5 over the whole screen, faded to `d.Palette328`, and a wait of one VBL a poll
+   until a button is held (`d.MouseSwitches`) or a key waits (`UI_CONSTAT()`) (`:328-337`).
+   Unlike the entrance's scroll, this loop has no counter to run out.
+8. With `d.CanRestartFromSavegame` set, back to 5 without the delay (`:339-348`). Otherwise
+   `UI_PushMessage(UIM_TERMINATE)` (`:349`): CSBWin closes. The port leaves the credits up
+   (`DEBT.md` → H).
 
 
 ## Skipping it

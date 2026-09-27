@@ -27,6 +27,7 @@ import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap } from '../csbwin/UITables';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
+import { showCredits, type ShowCreditsHooks } from './ShowCredits';
 import { displayChaosStrikesBack } from './TitleSequence';
 
 /** 60 Hz. `wvbl()` is one of these; `VBLDelay(n)` is n. */
@@ -53,14 +54,16 @@ interface AttachedHost {
   detach: () => void;
 }
 
-function createIntroHost(deps: BootSequenceDeps): AttachedHost {
+/** What a host needs from the page: `BootSequenceDeps` without the boot's own decisions. */
+type HostDeps = Pick<BootSequenceDeps, 'canvas' | 'gameScreen' | 'playSound'>;
+
+/** `palette` is the shifter's colour registers as the host finds them. */
+function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHost {
   const { canvas, gameScreen } = deps;
   const screen = gameScreen.getScreenBuffer();
   const uiTables = gameScreen.getUITables();
   if (!uiTables) throw new Error('Screen not initialized');
-  // The ST's colour registers as the boot ROM leaves them: black. Every screen here opens
-  // with a fade, so the first thing the player sees is a fade up from this.
-  const globalPalette = [...PALETTE_11914];
+  const globalPalette = [...palette];
 
   let queue: IntroEvent[] = [];
   let waiting: ((event: IntroEvent) => void) | null = null;
@@ -71,6 +74,9 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
   let cursorVisible = false;
   let pointerX = -100;
   let pointerY = -100;
+  // `d.MouseSwitches`: set on a press, cleared on any release (`doc/CSBwin-src/system.cpp:455-461`,
+  // `CSBCode.cpp:7585`).
+  let mouseSwitches = 0;
 
   const push = (event: IntroEvent): void => {
     if (waiting) {
@@ -96,7 +102,11 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
     pointerY = y;
     const buttons = e.button === 2 ? 1 : e.button === 0 ? 2 : 0;
     if (buttons === 0) return;
+    mouseSwitches = buttons;
     push({ kind: 'click', x, y, buttons });
+  };
+  const onMouseUp = (): void => {
+    mouseSwitches = 0;
   };
   // The screens between animations are static, so nothing would repaint and the arrow
   // would sit where it was drawn. CSBWin has the VBL handler for this; here the move is
@@ -117,6 +127,7 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
   const onKeyDown = (): void => push({ kind: 'key', x: 0, y: 0, buttons: 0 });
 
   canvas.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mouseup', onMouseUp);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mouseleave', onMouseLeave);
   canvas.addEventListener('contextmenu', onContextMenu);
@@ -154,6 +165,8 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
     discardAllInput: () => {
       queue = [];
     },
+    mouseSwitches: () => mouseSwitches,
+    keyWaiting: () => queue.some((event) => event.kind === 'key'),
     setCursorVisible: (visible) => {
       if (visible === cursorVisible) return;
       cursorVisible = visible;
@@ -165,6 +178,7 @@ function createIntroHost(deps: BootSequenceDeps): AttachedHost {
     host,
     detach: () => {
       canvas.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mouseup', onMouseUp);
       canvas.removeEventListener('mousemove', onMouseMove);
       canvas.removeEventListener('mouseleave', onMouseLeave);
       canvas.removeEventListener('contextmenu', onContextMenu);
@@ -227,7 +241,9 @@ async function openLoadMenu(host: IntroHost, deps: BootSequenceDeps): Promise<bo
 export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoorChoice> {
   if (deps.skip) return 'enter';
 
-  const { host, detach } = createIntroHost(deps);
+  // The ST's colour registers as the boot ROM leaves them: black. Every screen here opens
+  // with a fade, so the first thing the player sees is a fade up from this.
+  const { host, detach } = createIntroHost(deps, PALETTE_11914);
   try {
     await displayChaosStrikesBack(host);
 
@@ -246,4 +262,24 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   } finally {
     detach();
   }
+}
+
+/* ------------------------------------------------------------- the end ---- */
+
+/**
+ * `_ShowCredits(1)` once `MainLoop` has returned on a lost game (`ShowCredits.ts`). The
+ * page has stopped the adventure's input; this host takes the canvas from here, and keeps
+ * it, since the credits are where the game ends.
+ *
+ * The colour registers are the interface's: with `d.DynamicPaletteSwitching` set the VBL
+ * copies `d.Palette11978` into `globalPalette` on every frame
+ * (`doc/CSBwin-src/WinScreen.cpp:1493-1498`), and `_GameSetup` fills `Palette11978` from
+ * `d.Palette552[0]` (`CSBCode.cpp:10623`).
+ */
+export async function runShowCredits(deps: HostDeps, hooks: ShowCreditsHooks): Promise<void> {
+  const uiTables = deps.gameScreen.getUITables();
+  if (!uiTables) throw new Error('Screen not initialized');
+  const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
+  const { host } = createIntroHost(deps, palette11978);
+  await showCredits(host, hooks);
 }

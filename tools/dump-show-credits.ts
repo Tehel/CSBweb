@@ -1,0 +1,279 @@
+/**
+ * The end of a lost game — `MainLoop` returning, and `_ShowCredits(1)` after it.
+ *
+ * 1. **The loop ends on the tick of death.** `KillCharacter` sets `d.GameIsLost` when
+ *    nobody is left (`doc/CSBwin-src/Character.cpp:2680`); the tick's timers have run, and
+ *    everything under `if (d.GameIsLost == 0)` does not (`CSBCode.cpp:658-778`): no
+ *    `scrollingText.ClockTick()`, no periodic update, and no tick after it. `_StartCSB`
+ *    then calls `ShowCredits(_3_, d.GameIsLost)` (`:11325`). Three deaths: one inside a
+ *    timer (poison), one between ticks (as a mouse handler kills), and one that leaves a
+ *    champion standing.
+ * 2. **The screen.** `showCredits` over a headless `IntroHost` and the real
+ *    `graphics.dat`: the dying sound before any wait, the waits CSBWin names, "THE END"
+ *    alone at `d.Word108` in the dark-blue palette, and the credits picture in
+ *    `d.Palette328` until a button is held or a key waits. The rectangle is a canary for
+ *    the parse of item 0x232: `BLT2Screen(…, d.Word108, 40, -1)` blits a 40-byte-wide
+ *    source, and graphic 6 fills the 560 bytes `A3` skips (`Code1f9e6.cpp:136`, `:229`).
+ *
+ * Run: `npx tsx tools/dump-show-credits.ts`
+ */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { Position } from '../src/core/types';
+import { DungeonLoader } from '../src/data/DungeonLoader';
+import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { makeAddCharacterAttributes } from '../src/engine/attributes';
+import type { Game } from '../src/engine/Game';
+import type { MessageSink } from '../src/engine/ActuatorSystem';
+import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
+import { extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
+import { PALETTE_11914, type IntroHost } from '../src/renderer/intro/IntroHost';
+import {
+  DYING_SOUND_VBLS,
+  PALETTE_LOCAL_46,
+  THE_END_VBLS,
+  showCredits,
+} from '../src/renderer/intro/ShowCredits';
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
+import { check, finish } from './lib/check';
+import { newGame, stockGraphics } from './lib/game';
+
+/* ------------------------------------------------ 1. the tick of death ---- */
+
+function champion(i: number, health: number): Champion {
+  return {
+    ...addCharacterDefaults(),
+    name: `HERO${i}`,
+    attributes: {
+      health, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
+      stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
+      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
+    },
+    alive: true, incantation: [], food: 1500, water: 1500,
+    skills: [],
+    possessions: emptyPossessions(),
+    partyPosition: i,
+  };
+}
+
+interface Watched {
+  game: Game;
+  credits: boolean[];
+  clockTicks: number;
+  vbls: number;
+  /** Frames run so far. */
+  frames: number;
+}
+
+function watchedGame(healths: number[]): Watched {
+  const loader = new DungeonLoader();
+  loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
+  const data = loader.getData();
+  if (!data) throw new Error('dungeon.dat did not load');
+  const w = { credits: [] as boolean[], clockTicks: 0, vbls: 0, frames: 0 } as Watched;
+  const messages: MessageSink = {
+    printLinefeed: () => {},
+    quePrintLines: () => {},
+    setNewSpeed: () => {},
+    resetTime: () => {},
+    clockTick: () => { w.clockTicks++; },
+    printNextQueued: () => {},
+    vblInterrupt: () => { w.vbls++; },
+  };
+  w.game = newGame(data, stockGraphics(), { messages, showCredits: (lost) => w.credits.push(lost) });
+  w.game.setRandomSeed(0x12345678);
+  healths.forEach((health, i) => w.game.addChampion(champion(i, health)));
+  w.game.party.state.position = new Position(6, 14, 2);
+  return w;
+}
+
+/** The next `runFrame`, a game tick after the last, and what it did. */
+function frame(w: Watched): { tick: number; lost: boolean; credits: number; clockTicks: number } {
+  w.frames++;
+  w.game.runFrame(1_000_000 + w.frames * 250);
+  return {
+    tick: w.game.state.tickCount,
+    lost: w.game.party.state.gameIsLost,
+    credits: w.credits.length,
+    clockTicks: w.clockTicks,
+  };
+}
+
+/** Run until the game is lost, then twenty frames more. Returns the frame it was lost in. */
+function runPastDeath(label: string, w: Watched, limit: number): number {
+  let lostAt = -1;
+  for (let n = 1; n <= limit && lostAt < 0; n++) {
+    const before = w.clockTicks;
+    const f = frame(w);
+    if (!f.lost) continue;
+    lostAt = w.frames;
+    console.log([label, `frame ${w.frames}`, `tick ${f.tick}`, `credits ${f.credits}`, `clockTick ${f.clockTicks - before}`].join('\t'));
+    check(f.credits === 1 && w.credits[0] === true, `${label}: ShowCredits(1) is asked for once, in the frame of the death`);
+    check(f.clockTicks === before, `${label}: the tick of death runs no scrollingText.ClockTick()`);
+    check(w.game.mainLoopHasReturned(), `${label}: MainLoop has returned`);
+  }
+  check(lostAt > 0, `${label}: the party died within ${limit} frames`);
+  const tick = w.game.state.tickCount;
+  const timers = w.game.timerQueue.getTimers().length;
+  const { clockTicks, vbls } = w;
+  for (let n = 1; n <= 20; n++) frame(w);
+  console.log([label, 'twenty frames on', `tick ${w.game.state.tickCount}`, `timers ${w.game.timerQueue.getTimers().length}`, `credits ${w.credits.length}`].join('\t'));
+  check(w.game.state.tickCount === tick, `${label}: no tick runs after it`);
+  check(w.game.timerQueue.getTimers().length === timers, `${label}: and no timer fires`);
+  check(w.clockTicks === clockTicks && w.vbls === vbls, `${label}: and the loop's VBL half is gone too`);
+  check(w.credits.length === 1, `${label}: ShowCredits is asked for only once`);
+  return lostAt;
+}
+
+function checkTickOfDeath(): void {
+  console.log('=== MainLoop returns on the tick of death (CSBCode.cpp:658-778) ===');
+
+  // Poison of strength 128: 2 now (`max(1, 128/64)`), then 1 from `TT_75` 36 ticks later,
+  // inside `ProcessTimers`.
+  {
+    const w = watchedGame([3]);
+    w.game.monsterAttack.poisonCharacter(0, 128);
+    check(w.game.party.state.champions[0]!.attributes.health === 1, 'poison: the first dose leaves 1 health');
+    runPastDeath('poison', w, 60);
+  }
+
+  // A death between ticks, as a click or a step would cause: the next tick runs its
+  // timers, then ends.
+  {
+    const w = watchedGame([200]);
+    for (let n = 1; n <= 3; n++) frame(w);
+    const tick = w.game.state.tickCount;
+    w.game.monsterAttack.killCharacter(0);
+    check(w.credits.length === 0, 'between ticks: nothing ends until the next tick');
+    runPastDeath('between ticks', w, 1);
+    check(w.game.state.tickCount === tick + 1, 'between ticks: the next tick is the last');
+  }
+
+  // One of two dies: the game goes on.
+  {
+    const w = watchedGame([200, 200]);
+    w.game.monsterAttack.killCharacter(1);
+    let tick = 0;
+    for (let n = 1; n <= 10; n++) tick = frame(w).tick;
+    console.log(['one of two dies', `tick ${tick}`, `credits ${w.credits.length}`].join('\t'));
+    check(w.credits.length === 0 && !w.game.mainLoopHasReturned(), 'one of two dies: the game is not over');
+    check(tick === 10, 'one of two dies: every frame still ticks');
+  }
+}
+
+/* ---------------------------------------------------------- 2. the screen ---- */
+
+type Step = { kind: 'sound' } | { kind: 'vbl'; count: number };
+
+interface Recorder {
+  host: IntroHost;
+  steps: Step[];
+  /** Screen and palette at the start of the 300-VBL wait: "THE END" is up. */
+  theEnd: { pixels: Uint8Array; palette: number[] } | null;
+}
+
+function recordingHost(ui: UITables, input: { heldAfterPolls: number; keyAfterPolls: number }): Recorder {
+  const graphics = stockGraphics();
+  const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
+  screen.pixels.fill(9); // The adventure's last frame, as far as this screen cares.
+  const r: Recorder = { steps: [], theEnd: null } as unknown as Recorder;
+  let polls = 0;
+  r.host = {
+    screen,
+    uiTables: ui,
+    globalPalette: [...(ui.graphic232.palette552[0] ?? PALETTE_11914)],
+    getGraphic(graphicNum: number): IndexedBitmap {
+      const image = graphics.getImage(graphicNum);
+      return { width: image.width, height: image.height, pixels: Uint8Array.from(image.pixels) };
+    },
+    present: () => {},
+    vbl: (count) => {
+      if (count === THE_END_VBLS) r.theEnd = { pixels: screen.pixels.slice(), palette: [...r.host.globalPalette] };
+      r.steps.push({ kind: 'vbl', count });
+      return Promise.resolve();
+    },
+    startSound: () => {},
+    drawPrisonInterior: () => { throw new Error('not on this screen'); },
+    nextEvent: () => { throw new Error('the credits poll, they do not wait on the queue'); },
+    discardAllInput: () => {},
+    mouseSwitches: () => (polls++ >= input.heldAfterPolls ? 2 : 0),
+    keyWaiting: () => polls >= input.keyAfterPolls,
+    setCursorVisible: () => {},
+  };
+  return r;
+}
+
+function sameRegion(pixels: Uint8Array, src: IndexedBitmap, x1: number, y1: number): boolean {
+  for (let y = 0; y < src.height; y++) {
+    for (let x = 0; x < src.width; x++) {
+      if (pixels[(y1 + y) * SCREEN_WIDTH + x1 + x] !== src.pixels[y * src.width + x]) return false;
+    }
+  }
+  return true;
+}
+
+async function checkScreen(): Promise<void> {
+  console.log('');
+  console.log('=== _ShowCredits(1), a lost game (Code1f9e6.cpp:66) ===');
+  const graphics = stockGraphics();
+  const ui = extractUITables(graphics);
+  const g = ui.graphic232;
+  const theEnd = graphics.getImage(6);
+  const credits = graphics.getImage(5);
+  const r108 = g.word108;
+  console.log(`Word108 ${r108.x2 - r108.x1 + 1}x${r108.y2 - r108.y1 + 1} at (${r108.x1},${r108.y1}); graphic 6 ${theEnd.width}x${theEnd.height}`);
+  check(theEnd.width === 80 && theEnd.height === 14, 'graphic 6 is 80x14: 40 bytes a line, 560 in all');
+  check(r108.x2 - r108.x1 + 1 === 80 && r108.y2 - r108.y1 + 1 === 14, 'Word108 is the 80x14 BLT2Screen fills');
+  check(credits.width === SCREEN_WIDTH && credits.height === SCREEN_HEIGHT, 'graphic 5 is the whole screen');
+
+  // A key comes on the third poll: three VBLs of waiting.
+  const r = recordingHost(ui, { heldAfterPolls: Infinity, keyAfterPolls: 3 });
+  const log: string[] = [];
+  const hooks = { queueDyingSound: () => { r.steps.push({ kind: 'sound' }); } };
+  await showCredits(r.host, hooks);
+  for (const s of r.steps) log.push(s.kind === 'sound' ? 'sound 6' : `vbl ${s.count}`);
+  const compact = log.join(', ').replace(/(vbl 1, ){7}vbl 1/g, 'fade');
+  console.log(compact);
+  check(
+    compact === `sound 6, vbl ${DYING_SOUND_VBLS}, fade, fade, vbl ${THE_END_VBLS}, fade, fade, vbl 1, vbl 1, vbl 1`,
+    'the dying sound, 240, black, THE END, 300, dark blue, the credits, and a VBL a poll',
+  );
+
+  const end = r.theEnd;
+  check(end !== null, 'the 300-VBL wait happens');
+  if (end) {
+    console.log(`THE END palette: ${end.palette.map((c) => c.toString(16).padStart(3, '0')).join(' ')}`);
+    check(end.palette.every((c, i) => c === PALETTE_LOCAL_46[i]), 'THE END is shown in 0x002 with colour 15 at 0x777');
+    const bitmap = { width: theEnd.width, height: theEnd.height, pixels: Uint8Array.from(theEnd.pixels) };
+    check(sameRegion(end.pixels, bitmap, r108.x1, r108.y1), 'graphic 6 sits at Word108');
+    let outside = 0;
+    for (let y = 0; y < SCREEN_HEIGHT; y++) {
+      for (let x = 0; x < SCREEN_WIDTH; x++) {
+        const inside = x >= r108.x1 && x <= r108.x2 && y >= r108.y1 && y <= r108.y2;
+        if (!inside && end.pixels[y * SCREEN_WIDTH + x] !== 0) outside++;
+      }
+    }
+    check(outside === 0, `and the rest of the screen is cleared (${outside} pixels are not)`);
+  }
+
+  const creditsBitmap = { width: credits.width, height: credits.height, pixels: Uint8Array.from(credits.pixels) };
+  check(sameRegion(r.host.screen.pixels, creditsBitmap, 0, 0), 'the screen ends on the credits picture');
+  check(r.host.globalPalette.every((c, i) => c === g.palette328[i]), 'in Palette328');
+
+  // A button already held: no VBL of waiting at all.
+  const held = recordingHost(ui, { heldAfterPolls: 0, keyAfterPolls: Infinity });
+  await showCredits(held.host, { queueDyingSound: () => {} });
+  const last = held.steps[held.steps.length - 1];
+  console.log(`a held button: the last wait is ${last?.kind === 'vbl' ? `vbl ${last.count}` : last?.kind}`);
+  check(held.steps.filter((s) => s.kind === 'vbl' && s.count === 1).length === 32, 'a held button ends the wait before its first VBL');
+}
+
+async function main(): Promise<void> {
+  checkTickOfDeath();
+  await checkScreen();
+  finish();
+}
+
+void main();

@@ -55,6 +55,12 @@ export interface GameHost {
    * `:6808`).
    */
   tag0207cc(): void;
+  /**
+   * `MainLoop` has returned and `_StartCSB` calls `ShowCredits(_3_, d.GameIsLost)`
+   * (`doc/CSBwin-src/CSBCode.cpp:11322-11326`): the end of the game, which the engine
+   * does not draw. The loop has stopped by then (`Game.mainLoopHasReturned`).
+   */
+  showCredits(gameIsLost: boolean): void;
 }
 
 /**
@@ -81,5 +87,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     repackChest: host.repackChest ?? (() => {}),
     tag02076e: host.tag02076e ?? (() => {}),
     tag0207cc: host.tag0207cc ?? (() => {}),
+    showCredits: host.showCredits ?? (() => {}),
   };
 }
