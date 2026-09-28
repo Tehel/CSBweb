@@ -451,7 +451,7 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
     let mapPreviewAt = '';
     game.onTick(() => {
         // `TAG01b29a` — the champion flinch and the attack panel's redraw
-        // state, before the frame is drawn (doc/CSBwin-src/CSBCode.cpp:685).
+        // state (doc/CSBwin-src/CSBCode.cpp:685), before the port's redraw.
         screen.attackPanelTick();
         renderView();
         const { x, y, z } = game.party.state.position;

@@ -409,7 +409,9 @@ export class GameScreen {
 
   /**
    * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), which CSBWin's main loop calls
-   * once per game tick just before drawing (`:685`).
+   * once per game tick (`:685`), after the tick's `DrawViewport` (`:638`). The port runs
+   * it just before its one redraw of the whole screen, so what it changes on the
+   * panels shows in the same frame.
    */
   attackPanelTick(): void {
     attackPanelTick(this.ui);

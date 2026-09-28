@@ -591,6 +591,27 @@ function main(): void {
     check(d.getScrollRecord(scroll)?.open === false, 'the scroll in the weapon hand closes');
   }
 
+  /* ------------------------------ the killing blow's tick draws before it ends ---- */
+  // A monster's blow lands inside `ProcessTimers`. The tick then draws the viewport
+  // (`doc/CSBwin-src/CSBCode.cpp:638`) before it finds the game lost and returns
+  // (`:658`, `:778`), so the last frame shows the blow, not the moment before it.
+  {
+    console.log('');
+    const g = makeGame(1);
+    const cell = findCellWithWestNeighbour(g);
+    if (!cell) { fail('no open cell with an open neighbour'); finish(); return; }
+    g.party.state.position = cell;
+    g.monsterSystem.loadPartyLevel(cell.z);
+    g.timerSystem.processTimers = () => { g.monsterAttack.damageCharacter(0, 999, 0, 0); return false; };
+    const drawn: string[] = [];
+    g.onTick(() => drawn.push(`gameIsLost ${g.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
+    (g as unknown as { gameTick(): void }).gameTick();
+    console.log(`the killing blow's tick draws: ${drawn.join('; ') || 'nothing'}; then main loop returned ${g.mainLoopHasReturned()}`);
+    check(drawn.length === 1 && drawn[0] === 'gameIsLost true, main loop returned false',
+      "the tick of the killing blow draws the frame, after the blow and before the game ends");
+    check(g.mainLoopHasReturned(), 'and then the main loop returns');
+  }
+
   finish();
 }
 
