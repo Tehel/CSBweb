@@ -3853,7 +3853,8 @@ result before the wall and monster tests, so a step they refuse, which brings no
 (`CSBCode.cpp:8310-8314`), flashes as well; only the filter's refusal (`:8120`) returns
 `NULL`. In `dm-atari/graphics.dat`, `d.MoveButn18496` is forward `(263-289, 125-145)`, right
 `(291-318, 147-167)`, backward `(263-289, 147-167)` and left `(234-261, 147-167)`.
-`tools/dump-button-flash.ts` checks the flash of all six arrows.
+`tools/dump-button-flash.ts` checks the flash of all six arrows, the spell panel and the
+attack menu.
 
 The spell panel: `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-581`) is `RESTARTABLE`.
 The cast (button 108, only with a first rune) flashes `(0xea, 0x12f, 0x3f, 0x49)` and calls
@@ -3864,6 +3865,19 @@ then `wvbl(_3_)`, then `WaitForButtonFlash`, and only then `TAG01b990` or
 In `dm-atari/graphics.dat`, `d.Word18552`, read between `Word18560` and `d.MoveButn18496`
 in graphic `0x231`, is exactly the click rectangles of buttons 101-107 in the magic
 panel's button list, and the cast's literal rectangle is button 108's.
+
+The attack menu: with a menu open, `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4677-4717`)
+flashes PASS (button 112) at `(0x11d, 0x13f, 0x4d, 0x53)` and the options (113-115) at
+`(0xea, 0x13e, 0x56, 0x60)`, `(…, 0x62, 0x6c)` and `(…, 0x6e, 0x78)`, each before its
+`ExecuteAttack`, and an option offered past `d.Word20248` flashes nothing. Nothing after the
+flash waits but the fusion's own `WaitForButtonFlash` (`Attack.cpp:2273`): a blow that
+lands sets `d.clockTick`, so the tick draws the option inverted and the next VBL puts it
+back; a PASS, or a blow that returns 0, brings no tick, and the pass's wait (`CSBCode.cpp:763`)
+puts it back. In `dm-atari/graphics.dat`, `d.Buttons17892` holds the options' flash
+rectangles exactly as click rectangles, and PASS's as `(285-318, 77-83)`, a column short of
+its flash. CSBWin flashes nothing on a blow itself: an attack's one light change is
+`atk_LIGHT` (`Attack.cpp:2077`). `_InvertButton` serves only `Chaos.cpp`'s
+`_UtilityDialogBox` and `_TAG004518`, not the game's screens.
 
 ## PASS reads `d.PossibleAttackTypes[-1]`, which is always 0
 

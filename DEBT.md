@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -137,45 +136,6 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G6 ⏳ UI effects: `FlashButton` (step 2 of 3 left)
-
-CSBWin's button effect is `_FlashButton` (`doc/CSBwin-src/CSBCode.cpp:7713`), and its
-mechanism is ported (`doc/PROVEN_FACTS.md` → "The button flash"): the four words are
-`LoopFlags` (`src/engine/LoopState.ts`), with `flashButton`, `vblFlashButton` at
-`Game.runFrame`'s VBL and `waitForButtonFlash` at its five callers; `GameScreen` applies
-`vblFlashButn` (`src/renderer/csbwin/CanvasBlitter.ts`) after composing each frame, for as
-long as `d.Word11776` stands. The turn and step arrows flash, and so does the spell panel:
-`_MagicSelection` is `RESTARTABLE`, and the port runs it as a `LoopScript`
-(`magicSelection`, `src/renderer/ui/MagicPanel.ts`) whose flashes wait their VBLs
-(`flashButtonScript`, `waitForButtonFlashScript`). `tools/dump-button-flash.ts` checks it.
-How the main loop's pass, which does not stop for a VBL, times the flash is in H.
-
-The step left:
-
-2. **The attack options** (`_TAG019fac`, `Character.cpp:4679-4716`): the pass (button 112)
-   flashes `(0x11d, 0x13f, 0x4d, 0x53)`, the three attacks `(0xea, 0x13e, 0x56, 0x60)`,
-   `(…, 0x62, 0x6c)` and `(…, 0x6e, 0x78)`, each before its `ExecuteAttack`; in the port
-   that is `handleAttackAreaClick` (`src/renderer/ui/Attack.ts`), and the attack keys'
-   route in `Keyboard.ts`. Nothing after the flash waits except the fusion, so the
-   immediate `flashButton` fits, through a new UI hook. A script would not: the fusion
-   starts its own inside `ExecuteAttack`, and `Game.runScript` does not nest.
-   An attack then goes as in CSBWin: the click's pass inverts the option; the tick's
-   redraw paints the menu, still on screen, inverted; its `WaitForButtonFlash` asks for
-   the put-back, which holds the paint (`Game.paintHeld`); and `TAG01b29a`'s new panel is
-   painted at the put-back's VBL. After a PASS, `:763`'s wait puts the menu back at the
-   next VBL, and the menu stays until the next tick.
-
-The UI reaches the flash through `UIState`'s hooks (`flashedButton`, `waitForButtonFlash`,
-`runScript`, `flashButtonScript`, `waitForButtonFlashScript`), which `main.ts` wires to
-`Game`.
-
-Not part of this item: `_InvertButton` serves `Chaos.cpp`'s `_UtilityDialogBox` and
-`_TAG004518`, not the game's screens; `_WaitForMenuSelect`'s press is ported
-(`src/renderer/ui/SaveMenu.ts`); `DrawSpellControls` calls `vblFlashButn` directly to draw
-the caster tabs, which `drawSpellControls` fills with index 4 over the black. CSBWin flashes
-nothing on a blow: the one light change an attack makes is `atk_LIGHT` (`Attack.cpp:2077`),
-which is ported.
 
 ### G12 ⏳ `SmartDiscard`: a filling database is not thinned
 

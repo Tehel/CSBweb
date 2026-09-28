@@ -187,6 +187,8 @@ export interface UIState {
    * returns at once, and the script runs on, a VBL at a time.
    */
   runScript?: (script: LoopScript) => void;
+  /** `_FlashButton` from the main loop's pass, which inverts at once (`Game.flashButton`). */
+  flashButton?: (x1: number, x2: number, y1: number, y2: number) => void;
   /** `_FlashButton` for a script, which waits its VBLs (`flashButtonScript`). */
   flashButtonScript?: (x1: number, x2: number, y1: number, y2: number) => LoopScript;
   /** `WaitForButtonFlash` for a script, which waits its VBL (`waitForButtonFlashScript`). */

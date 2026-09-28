@@ -865,6 +865,11 @@ export class Game implements MainLoop {
         waitForButtonFlash(this.ctx);
     }
 
+    /** `_FlashButton` (`LoopState.flashButton`), for the UI's attack menu. */
+    flashButton(x1: number, x2: number, y1: number, y2: number): void {
+        flashButton(this.ctx, x1, x2, y1, y2);
+    }
+
     /** `_FlashButton` for a script (`LoopState.flashButtonScript`), for the UI's. */
     flashButtonScript(x1: number, x2: number, y1: number, y2: number): LoopScript {
         return flashButtonScript(this.ctx, x1, x2, y1, y2);

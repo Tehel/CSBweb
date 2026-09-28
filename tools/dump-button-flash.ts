@@ -23,6 +23,11 @@
  *   `(0xea, 0x12f, 0x3f, 0x49)`, then `CastMagic` waits the flash out and casts; a rune or
  *   the take-back flashes `d.Word18552[4 * (button - 101)]`, waits a VBL, waits the flash
  *   out, and only then changes the incantation. The port runs it as a script.
+ * - `_TAG019fac` flashes the attack menu's PASS `(0x11d, 0x13f, 0x4d, 0x53)` and its three
+ *   options `(0xea, 0x13e, 0x56, 0x60)`, `(…, 0x62, 0x6c)`, `(…, 0x6e, 0x78)`, each before its
+ *   `ExecuteAttack` (`Character.cpp:4677-4717`). The attack's tick draws the option
+ *   inverted, and the next VBL puts it back; a PASS brings no tick, and `:763`'s wait puts
+ *   it back. An attack key flashes its row as the click would.
  * - `vblFlashButn` flips bit plane 2 over the rectangle, corners included (`VBL.cpp:60-122`),
  *   which is bit 2 of the pixel's index (`WinScreen.cpp:314-330`).
  *
@@ -40,6 +45,7 @@ import { emptyPossessions, MovementAction, type Champion } from '../src/engine/g
 import { flashButton, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { createUIState } from '../src/renderer/ui/UIState';
 import type { Rect } from '../src/renderer/csbwin/UITables';
@@ -336,6 +342,69 @@ async function main(): Promise<void> {
     'the cast button should stand inverted for one VBL, the incantation still there');
   check(cast[2]!.flashed === null && castAt === 2 && !cast[2]!.running,
     "CastMagic's WaitForButtonFlash should put it back at the next VBL, and the cast follow");
+
+  // ---- the attack menu: `_TAG019fac` flashes the option taken ----------------------------
+  const PASS: Rect = { x1: 0x11d, x2: 0x13f, y1: 0x4d, y2: 0x53 };
+  const OPTIONS: Rect[] = [0x56, 0x62, 0x6e].map((y1) => ({ x1: 0xea, x2: 0x13e, y1, y2: y1 + 10 }));
+  const buttons17892 = ui.uiTables.graphic231.buttons.buttons17892;
+  console.log(`d.Buttons17892: ${buttons17892.map((b) => `${b.word0} ${show(b)}`).join(' ')}`);
+  // The canary: the options flash exactly their click rectangles; PASS one column more.
+  const attackRect = (id: number): Rect => buttons17892.find((b) => b.word0 === id)!;
+  check(OPTIONS.every((r, i) => same(attackRect(113 + i), r)),
+    "the three options' flashes should be the click rectangles of buttons 113-115");
+  check(same(attackRect(112), { ...PASS, x2: PASS.x2 - 1 }), "PASS's flash should be button 112's rectangle and one column right of it");
+
+  const partner: Champion = { ...caster, name: 'TWO', possessions: emptyPossessions(), partyPosition: 1, incantation: [] };
+  party.champions = [caster, partner];
+  party.magicCasterIndex = -1;
+  ui.flashButton = (x1, x2, y1, y2) => game.flashButton(x1, x2, y1, y2);
+  ui.onChampionAttack = (chIdx, attackType) => game.championAttack(chIdx, attackType);
+  ui.setClockTick = (value) => game.setClockTick(value);
+  ui.isRunningScript = () => game.isRunningScript();
+  ui.onConsumeAttackDamage = () => game.consumeAttackDamageToDisplay();
+  game.setMouseEventHandlers({ button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });
+  const clickAt = (r: Rect) => () => { game.onMouseClick(111, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1); };
+
+  prepareAttack(ui, 0);
+  const pass = flashOf('PASS', clickAt(attackRect(112)));
+  check(pass.tick === undefined && same(pass.after[0]!, PASS) && pass.after[1] === null && pass.after[2] === null,
+    'PASS should flash (0x11d, 0x13f, 0x4d, 0x53) with no tick, and the next VBL put it back (:763)');
+  check(ui.attackingCharacterOrdinal === 0, 'PASS should close the menu');
+
+  prepareAttack(ui, 0);
+  const offered = ui.word20248;
+  const air = flashOf('option 113 at the air', clickAt(attackRect(113)));
+  check(air.tick === undefined && same(air.after[0]!, OPTIONS[0]!) && air.after[1] === null,
+    'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:763)');
+  // A blow that lands returns 1, which makes a tick due. Whether one lands is the attack
+  // tools' business: here the hook stands for it.
+  ui.onChampionAttack = () => 1;
+  prepareAttack(ui, 0);
+  const first = flashOf('option 113, a blow that lands', clickAt(attackRect(113)));
+  check(same(first.tick ?? null, OPTIONS[0]!) && same(first.after[0]!, OPTIONS[0]!) && first.after[1] === null,
+    "the first option's tick should draw it inverted, and the next VBL put it back");
+  check(ui.attackingCharacterOrdinal === 0, 'the attack should close the menu');
+
+  // Champion 1's key column: W opens its menu, then each key of the column is a row. As in
+  // `tools/dump-freeze.ts`: `ui/Keyboard` reaches `@/ui`, which touches `document`.
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  const { handleUIKey } = await import('../src/renderer/ui/Keyboard');
+  reset();
+  const keyRow = (key: string): { inverted: Rect | null; ordinal: number } => {
+    handleUIKey(ui, key);
+    const result = { inverted: game.flashedButton(), ordinal: ui.attackingCharacterOrdinal };
+    frame();
+    frame();
+    return result;
+  };
+  const opened = keyRow('w');
+  const third = keyRow('x');
+  console.log(`attack keys: W opens (menu ${opened.ordinal}, inverted ${show(opened.inverted)}); ` +
+    `X, row 3 of ${offered}, inverted ${show(third.inverted)}, menu ${third.ordinal}`);
+  check(opened.ordinal === 2 && opened.inverted === null, "W should open champion 1's menu and flash nothing");
+  check(offered === 3 && same(third.inverted, OPTIONS[2]!) && third.ordinal === 0 && game.flashedButton() === null,
+    'X should flash the third row, as its click does, the attack close the menu, and the next VBLs put it back');
 
   finish();
 }

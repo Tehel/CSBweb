@@ -213,6 +213,26 @@ export function takeAttackOption(ui: UIState, option: number): void {
 }
 
 /**
+ * `_TAG019fac`'s half with the menu open (`doc/CSBwin-src/Character.cpp:4677-4717`): button
+ * `id` of `d.Buttons17892`, 112 for PASS and 113-115 for the options. Each is flashed
+ * before its `ExecuteAttack`.
+ */
+export function attackMenuButton(ui: UIState, id: number): void {
+  if (id === 112) {
+    ui.flashButton?.(0x11d, 0x13f, 0x4d, 0x53);
+    executeAttack(ui, -1); // PASS, which leaves `d.clockTick` alone
+    return;
+  }
+  // Only the options actually offered are live; the rows below `word20248` are dead
+  // even though the button list covers them.
+  if (id - 112 > ui.word20248) return;
+  if (id === 113) ui.flashButton?.(0xea, 0x13e, 0x56, 0x60);
+  else if (id === 114) ui.flashButton?.(0xea, 0x13e, 0x62, 0x6c);
+  else ui.flashButton?.(0xea, 0x13e, 0x6e, 0x78);
+  takeAttackOption(ui, id - 113);
+}
+
+/**
  * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`) — button 111, the panel area.
  *
  * Which button list is consulted depends on the panel's state, so the same screen
@@ -224,15 +244,7 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
 
   if (ui.attackingCharacterOrdinal !== 0) {
     const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17892 ?? null, x, y, 2);
-    if (id === 0) return;
-    if (id === 112) {
-      executeAttack(ui, -1); // PASS, which leaves `d.clockTick` alone
-      return;
-    }
-    // Only the options actually offered are live; the rows below `word20248` are dead
-    // even though the button list covers them.
-    if (id - 112 > ui.word20248) return;
-    takeAttackOption(ui, id - 113);
+    if (id !== 0) attackMenuButton(ui, id);
     return;
   }
 

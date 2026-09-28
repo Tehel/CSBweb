@@ -279,6 +279,8 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
         isRunningScript: () => game.isRunningScript(),
+        // `_TAG019fac`'s flash of the attack option taken.
+        flashButton: (x1, x2, y1, y2) => game.flashButton(x1, x2, y1, y2),
         // `_MagicSelection`, which the spell panel runs as a script for its flashes.
         runScript: (script) => game.runScript(script),
         flashButtonScript: (x1, x2, y1, y2) => game.flashButtonScript(x1, x2, y1, y2),

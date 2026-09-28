@@ -35,7 +35,7 @@
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
 import { selectMagicCaster } from '../../engine/Party';
-import { prepareAttack, takeAttackOption } from './Attack';
+import { attackMenuButton, prepareAttack } from './Attack';
 import { magicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
 import { UIState } from './UIState';
@@ -199,19 +199,11 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
   if (!party || championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
   if (ui.attackingCharacterOrdinal === chIdx + 1) {
-    performAttack(ui, option);
+    // The attack options are button ids 113-115, flashed and taken as a click's are.
+    attackMenuButton(ui, 113 + option);
     return;
   }
   prepareAttack(ui, chIdx);
-}
-
-/**
- * The attack options, button ids 113-115. `word20248` is how many of the three rows are
- * real; the rest are dead, as they are for a click (`handleAttackAreaClick`).
- */
-function performAttack(ui: UIState, option: number): void {
-  if (option >= ui.word20248) return;
-  takeAttackOption(ui, option);
 }
 
 /** Button ids 7-10 — the same toggle, and the same "replace" the click path gives. */

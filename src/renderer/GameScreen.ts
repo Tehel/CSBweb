@@ -101,6 +101,7 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onChampionAttack'
   | 'isRunningScript'
   | 'runScript'
+  | 'flashButton'
   | 'flashButtonScript'
   | 'waitForButtonFlashScript'
   | 'onConsumeAttackDamage'
@@ -174,6 +175,7 @@ export class GameScreen {
     ui.onChampionAttack = hooks.onChampionAttack;
     ui.isRunningScript = hooks.isRunningScript;
     ui.runScript = hooks.runScript;
+    ui.flashButton = hooks.flashButton;
     ui.flashButtonScript = hooks.flashButtonScript;
     ui.waitForButtonFlashScript = hooks.waitForButtonFlashScript;
     ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
