@@ -14,7 +14,7 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers D, E and C are empty. **The goal now is a complete, faithful game on the default
+Tiers D and E are empty. **The goal now is a complete, faithful game on the default
 dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -81,7 +81,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G6 | UI effects | — | ⏳ |
+| C81 | The spell panel's clicks are not a port of `Magic.cpp` | M | ⚠️ |
+| G6 | UI effects: `FlashButton` | L | ⏳ step 1 of 3 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -98,7 +99,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C81 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C82 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -119,6 +120,32 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
+### C81 ⚠️ The spell panel's clicks are not a port of `Magic.cpp`
+
+`src/renderer/ui/MagicPanel.ts` re-implements the spell panel's input instead of
+translating `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:589`), `_MagicSelection`
+(`:545`), `TAG01b990` (`CSBCode.cpp:8963`), `BackspaceMagicSelection` (`Magic.cpp:806`) and
+`DrawSpellControls` (`Character.cpp:4984`). Where it disagrees:
+
+- **The cost of a rune after the first** is `(cost * Byte19016[first - 96]) >> 3`
+  (`CSBCode.cpp:8973-8979`). The port divides by 8 without truncating, so a cost whose
+  product is not a multiple of 8 takes a fraction of a point of mana.
+- **The caster tabs.** `DrawSpellControls` draws a tab for every champion whose `HP()` is
+  not zero (`Character.cpp:4994-5087`), and `_HandleMagicClick` picks a tab by fixed x
+  ranges per `d.MagicCaster` under `clickY <= 48` (`Magic.cpp:596-699`), then
+  `SelectMagicCaster` refuses a dead champion (`:724`). `drawSpellControls` and
+  `handleMagicClick` also skip a champion with no maximum mana, and hit-test the drawn
+  rectangle. The comment on `selectCaster` in `src/renderer/ui/Keyboard.ts` repeats the
+  mana rule.
+- **The cast button** (108) acts in CSBWin whenever `incantation[0]` is not zero
+  (`Magic.cpp:556-567`). The port also checks the caster's `alive`, and clears the
+  incantation in the panel, where CSBWin's `CastMagic` does it (`:949-955`).
+
+Port the five functions line by line, keeping their names, except for the fifth rune, which
+stays refused (H → "A fifth rune is refused"), and a `tools/dump-*.ts` that drives a
+second-rune cost with a remainder, a tab click for a champion without mana, and a fifth
+rune. G6 step 3 builds on this.
+
 ---
 
 ## F — Verification debt
@@ -138,15 +165,44 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G6 ⏳ UI effects
+### G6 ⏳ UI effects: `FlashButton` (step 1 of 3)
 
-- **Rune click flash** in the magic panel.
-- **Interaction highlights**: button press and selection effects (flash, shading, invert)
-  across UI regions, consistent with the hit-test rectangles.
-- **`FlashButton`** on a movement arrow that was clicked or keyed. `MoveParty` returns the
-  button and `HandleMouseEvents` flashes it (`doc/CSBwin-src/Mouse.cpp:1560-1567`).
-- **The viewport flash on a blow**, and a light-level trace hook. `atk_LIGHT` itself works;
-  this item is the flash, not the LIGHT attack.
+CSBWin's button effect is `_FlashButton` (`doc/CSBwin-src/CSBCode.cpp:7713`). It stores a
+screen rectangle in `d.FlashButnX1`…`Y2`, sets `d.FlashButnActive` and waits a VBL. The VBL
+handler clears `FlashButnActive`, toggles `d.Word11776` and inverts the rectangle
+(`:1028-1038`). `vblFlashButn` (`VBL.cpp:60`) XORs only the word at `+4` of each 16-pixel
+group, which is plane 2 (`UnpackScreen` shifts `src[4]` by 2, `WinScreen.cpp:314-330`), so
+the flash is `index ^ 4` over the rectangle, both corners included. `WaitForButtonFlash`
+(`CSBCode.cpp:8561`) waits out a pending flash, and while `Word11776` is set it asks for the
+same rectangle again and waits a VBL, which puts it back. It is called at the main loop's
+top (`:655`), on a pass without a tick (`:763`), and by `CastMagic` (`Magic.cpp:939`),
+`TAG02076e` (`Character.cpp:5113`) and the win (`Attack.cpp:2273`). The game start clears
+both words (`CSBCode.cpp:10477-10478`). None of it is ported. `flashRectIndex`
+(`src/renderer/csbwin/CanvasBlitter.ts:82`) has no caller, and XORs `0x0f`.
+
+The steps:
+
+1. **The mechanism, and the movement arrows.** The four words as state; the VBL's invert at
+   the port's VBL; the XOR applied after the screen is composed, for as long as
+   `Word11776` says the rectangle is inverted, since the port recomposes every frame where
+   CSBWin inverts its screen memory once; `WaitForButtonFlash` at its five callers (the
+   comment at `src/engine/AttackSystem.ts:973` becomes the call). Then the two users that
+   need nothing else: `HandleMouseEvents` flashes the move button `MoveParty` returns
+   (`Mouse.cpp:1560-1567`), which keyed moves reach through the same queue, and
+   `MoveParty` flashes the turn buttons (`CSBCode.cpp:7896-7903`). A `tools/` check drives
+   a move and reads the rectangle's state over the following VBLs.
+2. **The attack options** (`Character.cpp:4679-4716`): the pass (button 112) and the
+   three attacks.
+3. **The spell panel**, after C81, since both flashes are in `_MagicSelection`: the cast
+   button (`Magic.cpp:561`) and a rune, whose rectangle is `d.Word18552[4 * (button -
+   101)]` (`:568-570`). The `graphic231` parser skips `Word18552` today
+   (`src/renderer/csbwin/UITables.ts:488-491`).
+
+Not part of this item: `_InvertButton` serves `Chaos.cpp`'s `_UtilityDialogBox` and
+`_TAG004518`, not the game's screens; `_WaitForMenuSelect`'s press is ported
+(`src/renderer/ui/SaveMenu.ts`); `DrawSpellControls` calls `vblFlashButn` directly to draw
+the caster tabs (C81). CSBWin flashes nothing on a blow: the one light change an attack
+makes is `atk_LIGHT` (`Attack.cpp:2077`), which is ported.
 
 ### G12 ⏳ `SmartDiscard`: a filling database is not thinned
 
@@ -328,6 +384,13 @@ Recorded so that nobody "fixes" them.
   position to `d.CH16482[-1]`, outside the champions (`doc/PROVEN_FACTS.md` → "Changing
   the marching order"). The port writes them to no one and does the rest: whoever stood on
   the target square still moves (`tag0025a6`, `src/renderer/ui/Mouse.ts`).
+- 🚫 **A fifth rune is refused.** `TAG01b990` writes the rune at `byte33`, then sets
+  `byte33 = (byte33 + 1) & 3` (`doc/CSBwin-src/CSBCode.cpp:8985-8988`), so after four
+  runes CSBWin's keypad shows the first row again and the next rune starts a new
+  incantation over the old one. The author's decision: the port refuses any rune past the
+  fourth, and the keypad keeps showing the fourth row (`applyMagicSelection` and
+  `drawSpellPanel`, `src/renderer/ui/MagicPanel.ts`). A save still carries `byte33` as
+  CSBWin's writers leave it, `strlen(incantation) & 3` (`CsbwinCharacters.ts`).
 - 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8200-8204`) is not ported,
   because CSBWin cannot reach it either. Move Up / Down (`0x1124` / `0x1125`) come only from
   the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, whose flags are

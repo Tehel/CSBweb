@@ -158,6 +158,8 @@ export function applyMagicSelection(ui: UIState, buttonId: number): void {
 
   // Add rune
   const step = champion.incantation.length;
+  // A deliberate divergence (`DEBT.md` → H, "A fifth rune is refused"): CSBWin wraps
+  // `byte33` and starts a new incantation (`doc/CSBwin-src/CSBCode.cpp:8985-8988`).
   if (step > 3) return;
 
   const runeId = buttonId - 101;
