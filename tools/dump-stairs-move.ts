@@ -17,6 +17,11 @@
  *     whatever the stairs made of it (`MoveObject(object, -1, 0, x, y)`, then
  *     `object.pos(p)`, `MoveObject.cpp:537-538`).
  *  5. The party is not moved by the arm (`:3111`).
+ *  6. The party's own step into the stairs (`TraverseStairway`, `CSBCode.cpp:7775-7781`)
+ *     leaves it on its old level at the new x and y; the next tick loads the new level
+ *     (`LoadPartyLevel`, `:621`) before its `DrawViewport` (`:638`). So the tick's redraw
+ *     (`Game.onTick`) sees the party at the new x and y *on the new level*, never the new
+ *     square on the level it left.
  *
  * The stairs are real ones from `dungeon.dat`.
  *
@@ -32,6 +37,7 @@ import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
+import { MovementAction } from '../src/engine/gameTypes';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
@@ -238,6 +244,31 @@ function main(): void {
     const landed = game.party.state.position;
     console.log(`5. the party set down on the stairs: at level ${landed.z} (${landed.x},${landed.y})`);
     check(same(landed, stairs.at), 'the stairs arm breaks for the party');
+  }
+
+  /* ---------------------------------- 6. the party's step: the tick draws the new level ---- */
+  {
+    const game = makeGame();
+    const stairs = findStairs(game, true, (s) => s.beside !== null);
+    const beside = stairs.beside!;
+    const towards = [0, 1, 2, 3].find((d) => beside.x + DX[d]! === stairs.at.x && beside.y + DY[d]! === stairs.at.y)!;
+    game.party.state.position = beside;
+    game.monsterSystem.loadPartyLevelIfChanged();
+    game.party.setFacing(towards);
+    const moved = game.move(MovementAction.MOVE_FORWARD);
+    const between = game.party.state.position;
+    const drawn: string[] = [];
+    game.onTick(() => {
+      const p = game.party.state.position;
+      drawn.push(`(${p.x},${p.y}) L${p.z}${game.ctx.loop.newPartyLevel !== -1 ? ' pending' : ''}`);
+    });
+    (game as unknown as { gameTick(): void }).gameTick();
+    const want = `(${stairs.exitLevel.x},${stairs.exitLevel.y}) L${stairs.exitLevel.z}`;
+    console.log(`6. the party steps from (${beside.x},${beside.y}) L${beside.z} into the stairs (${stairs.at.x},${stairs.at.y}): `
+      + `moved ${moved}, after the step (${between.x},${between.y}) L${between.z}; the tick draws ${drawn.join(', ') || 'nothing'} `
+      + `(want ${want})`);
+    check(moved && between.z === beside.z, 'the step leaves the party on its level until the tick');
+    check(drawn.length === 1 && drawn[0] === want, "the tick's redraw sees the new level, not the new square on the old one");
   }
 
   finish();

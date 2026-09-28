@@ -189,6 +189,13 @@ CallPartyMoveFilter(&partyMoveData);
 if (partyMoveData.flags & PM_INHIBITMOVE) return;
 ```
 
+It then sets `d.newPartyLevel`, `d.partyX` and `d.partyY` (`doc/CSBwin-src/CSBCode.cpp:7775-7781`)
+and loads nothing: for a moment the party stands at the new x and y on the level it left.
+A pit does the same through `MoveObject` (`doc/CSBwin-src/Code11f52.cpp:3321-3323`). The
+main loop's tick loads the new level first (`LoadPartyLevel`, `CSBCode.cpp:621`), runs
+the timers, loads again if they moved the party (`:635`), and only then draws the viewport
+(`DrawViewport`, `:638`). So no frame ever shows the new square on the old level.
+
 ### Exit Stair Facing (Code11f52.cpp lines 290-325)
 `ExitStairsDirection()` searches for a non-blocking adjacent cell on the destination level:
 

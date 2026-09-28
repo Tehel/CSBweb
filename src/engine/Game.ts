@@ -448,11 +448,6 @@ export class Game implements MainLoop {
         // Reset movement flags from previous tick
         this.party.resetMovementFlags();
 
-        // Call tick callbacks
-        for (const callback of this.onTickCallbacks) {
-            callback(this);
-        }
-
         // The top of a tick, then `ProcessTimers()` and `if (d.newPartyLevel != -1) goto
         // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:615-635): a timer that moved the party
         // to another level has it loaded, input discarded and the timers run again, all
@@ -465,6 +460,12 @@ export class Game implements MainLoop {
                 return;
             }
         } while (this.loadNewPartyLevel());
+        // `DrawViewport(d.partyFacing, d.partyX, d.partyY)` (doc/CSBwin-src/CSBCode.cpp:638):
+        // the tick's redraw comes after the timers and after a new party level is loaded,
+        // so a step down the stairs never draws the new square on the old level.
+        for (const callback of this.onTickCallbacks) {
+            callback(this);
+        }
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
@@ -806,7 +807,8 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Register callback for game tick
+     * Register a callback for each game tick, run where CSBWin's tick draws the viewport:
+     * after the timers and any new party level (doc/CSBwin-src/CSBCode.cpp:615-638).
      */
     onTick(callback: GameEventCallback): void {
         this.onTickCallbacks.push(callback);
