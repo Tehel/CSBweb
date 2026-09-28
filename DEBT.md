@@ -74,7 +74,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
+| C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | M | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
 | C74 | A keyed attack makes no tick due | S | ⏳ |
 | C75 | A generator makes its group on the party's level | S | ⏳ |
@@ -91,11 +91,12 @@ In payoff order: the first row is the next item.
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
+| G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏳ |
 | H | Deliberate divergences | — | 🚫 |
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C76 · D10 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C76 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -118,13 +119,29 @@ Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
 ### C71 ⏳ A resumed game has no "GAME LOADED, READY TO PLAY."
 
-`TAG021028`, the hand-off to the adventure, puts up `DoMenu("GAME LOADED, READY TO PLAY.",
-"PLAY GAME", "ASCII DUMP")` when `d.gameState` is `GAMESTATE_ResumeSavedGame`, and runs
-`AsciiDump` for its second button until the first is chosen
-(`doc/CSBwin-src/CSBCode.cpp:10493-10515`). That is every game the chooser loaded: from the
-entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straight into the
-adventure in both (`init` and `showEndOfGame`, `src/main.ts`). Show the menu, with
-`src/renderer/ui/Menu.ts`, before the loop starts. Evidence: a golden frame of it.
+`TAG021028`, the hand-off to the adventure, puts up `DoMenu(_6_, NULL, "GAME LOADED, READY
+TO PLAY.", "PLAY GAME", "ASCII DUMP", NULL, NULL, 1, 1, 1)` when `d.gameState` is
+`GAMESTATE_ResumeSavedGame`, and runs `AsciiDump` for its second button until the first is
+chosen (`doc/CSBwin-src/CSBCode.cpp:10493-10515`). That is every game the chooser loaded:
+from the entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straight
+into the adventure in both (`init` and `showEndOfGame`, `src/main.ts`).
+
+The work, sized M:
+
+- **Where.** Both paths go through `BootSequence.openLoadMenu` returning true
+  (`runBootSequence` and `gameSetupAfterRestart`, `src/renderer/intro/BootSequence.ts`),
+  on an `IntroHost` that still owns the canvas. The menu goes there, before the host
+  detaches, with `src/renderer/ui/Menu.ts`.
+- **How it looks.** `I1`, `ClearOldScreen` and `FadeOldScreen` are all 1, as for the
+  chooser's own `DoMenu` (`doc/CSBwin-src/SaveGame.cpp:1549`): cleared screen, a fade to
+  `d.Palette11914` first, the menu centred at (47, 33) (`doc/CSBWIN_MENU_REFERENCE.md`).
+  Title 1 is `NULL`, so only the second title line prints.
+- **"ASCII DUMP".** `AsciiDump` is unported (G14). Until it is, the button's arm is the
+  loop's `DoMenu` again, with the dump left out and marked at that point.
+- **Evidence: a golden frame of the menu.** The chooser lists the browser store
+  (IndexedDB, `src/data/saves/BrowserSaveStore.ts`), so `tools/probe-frames.mjs` has to
+  save a game from a `?intro=0` boot first, then boot with the intro, take the entrance's
+  "resume" and pick that slot.
 
 ### C73 ⏳ A room's message decodes without the escape tables
 
@@ -368,6 +385,13 @@ and clothing databases (`:764-793`): count the records in use, fifty a step, and
 count reaches three quarters of the database's maximum (`:805-821`), scan the dungeon for
 objects and discard them in priority order. None of it is ported. `Game.saveWritten`, the
 save's tail, leaves out its `SmartDiscard(true)`.
+
+### G14 ⏳ `AsciiDump`: the resumed game's "ASCII DUMP"
+
+`AsciiDump` (`doc/CSBwin-src/AsciiDump.cpp:2137`) writes the whole dungeon as text to
+`ASCIIDUMP.TXT`, starting with the game's and the levels' information, every cell, the
+objects, and the monsters (`:2152-2160`). The one route to it is the second button of the
+"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`, C71). In a page it would be a download.
 
 ---
 
