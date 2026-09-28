@@ -131,8 +131,17 @@ export function handleUIKey(ui: UIState, key: string): boolean {
   const k = key.length === 1 ? key.toLowerCase() : key;
   // While a script holds the loop, CSBWin's pass is suspended in `wvbl`
   // (doc/CSBwin-src/system.cpp:639-661) and its UI only queues: the key becomes a click
-  // (`UIM_KEYDOWN`, `CSBUI.cpp:1120-1164`) that no pass takes before the credits. So the
-  // key is claimed, and does nothing.
+  // (`UIM_KEYDOWN`, `CSBUI.cpp:1120-1164`) that the first pass after the script takes. So
+  // the key is claimed, and does nothing: a known loss (`DEBT.md` H, "Three inputs bypass
+  // the mouse queue"). After the fusion no pass comes before the credits, so nothing is
+  // lost there. After `_MagicSelection`, which holds the loop three VBLs (about 50 ms) for
+  // a rune's flash (`magicSelectionScript`), a rune key pressed that soon after the last is
+  // dropped where CSBWin would cast it; only deliberately fast typing does that. If it ever
+  // matters, keep the key rather than drop it: either queue it through the mouse queue as
+  // the click it stands for (`Game.onMouseClick` at the key's button rectangle, which
+  // `buttons18060` gives, so `handleMagicClick` answers it in its pass), or hold the keys
+  // that arrive during a script in a small queue of their own and replay them, in order,
+  // once `isRunningScript` turns false.
   if (ui.isRunningScript?.()) return isUIKey(k);
 
   for (let chIdx = 0; chIdx < ATTACK_KEYS.length; chIdx++) {

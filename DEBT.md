@@ -330,8 +330,12 @@ Recorded so that nobody "fixes" them.
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
   comment gives the reason. While a script holds the loop (`Game.isRunningScript`) the
-  panel keys do nothing, as CSBWin's would wait in the queue for a pass that never comes
-  before the credits; the two screens open only from a pass, so neither is up then.
+  panel keys do nothing, where CSBWin's would wait in the queue for the first pass after
+  the script. After the fusion that pass never comes before the credits. After
+  `_MagicSelection`'s three VBLs it does, so a rune key typed within about 50 ms of the
+  last is dropped; the author finds that acceptable, and `handleUIKey`'s comment has the
+  two ways to keep such keys. The two screens open only from a pass, so neither is up
+  while a script runs.
 - 🚫 **F1-F4 select the caster.** CSBWin's adventure key table `Byte18400` binds them to
   buttons 7-10, the four inventories (`doc/PROVEN_FACTS.md` → "The key tables: CSBWin's own
   keys"). The author finds the caster on F1-F4 and the inventories on 7-0 more convenient,
