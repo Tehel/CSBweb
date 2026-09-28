@@ -25,14 +25,14 @@
  *     40 ticks, one door must open and the other shut, exactly as
  *     `dump-csbwin-timers.ts` shows them doing when loaded straight from the file.
  *  3. **The table does not grow.** Five save/load cycles in a row on a save with live
- *     monsters must leave the timer table the same size it started. This is the
- *     regression that motivated the tool: `TimerQueue.restore` used to mint new indices
- *     above the highest restored one, and `LoadGame` is followed by
- *     `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
- *     movement timers of every monster group on the party's level
- *     (`LoadPartyLevel`, `doc/CSBwin-src/CSBCode.cpp:10491`). Each load abandoned one slot
- *     per re-created timer — two per cycle on `csbgame7.dat`, for ever, in a fixed-size
- *     array CSBWin gives 5000 entries before it calls `die`.
+ *     monsters must leave the timer table its 467 slots, with the live timers still in
+ *     the lowest ones. `LoadGame` is followed by `reloadAfterSaveGame`, whose
+ *     `processMonstersOnLevel` deletes and re-creates the movement timers of every
+ *     monster group on the party's level (`LoadPartyLevel`,
+ *     `doc/CSBwin-src/CSBCode.cpp:10491`), so a restore that numbered new timers above the
+ *     restored ones would abandon two slots a cycle on `csbgame7.dat`.
+ *     3b. A table filled to `SetTimer`'s jump (`Timer.cpp:999-1008`) is written with its
+ *     new size and its cursor, and read back with both.
  *
  * What is deliberately **not** asserted, because CSBWin does it too: that load is a
  * no-op. `processMonstersOnLevel` really does create new timers, so their `sequence`
@@ -54,9 +54,11 @@ import { resolve } from 'node:path';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { Game } from '../src/engine/Game';
 import type { RuntimeSaveState } from '../src/engine/RuntimeSave';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes } from '../src/engine/SaveGamePayload';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { CHARFLAG_ATTACK_DISABLE, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
@@ -266,9 +268,48 @@ function main(): void {
       `cycle ${cycle}: the timer table is still ${slotsAtStart} slots, not ${slots}`);
     check(live === liveAtStart,
       `cycle ${cycle}: ${liveAtStart} timers are still live, not ${live}`);
-    // No holes: every slot in the table is a live timer, which is what makes the count
-    // above meaningful rather than a table that happens to be padded.
-    check(slots === live, `cycle ${cycle}: the table has no abandoned slots`);
+    // No abandoned slots: the live timers still fill the table from slot 0 up.
+    const highest = Math.max(-1, ...(state.dungeon.timerQueue ?? []));
+    check(highest + 1 === live, `cycle ${cycle}: the table has no abandoned slots (highest ${highest})`);
+  }
+
+  /* ---- 3b. a table that filled keeps its size and its cursor ---- */
+
+  // `SetTimer` jumps `m_firstAvailTimer` to `m_maxTimers` and enlarges the table once it
+  // is within five of full (`doc/CSBwin-src/Timer.cpp:999-1008`); `SaveGame` writes both
+  // and `LoadGame` reads both back (`SaveGame.cpp:1638-1640`).
+  console.log('\n=== csbgame7.dat filled to the jump, then saved and loaded ===');
+  {
+    const filled = fromCsbwinSave('csbgame7.dat');
+    const q = filled.timerQueue;
+    const firstMax = q.getMaxTimers();
+    let t = 0;
+    while (q.getMaxTimers() === firstMax) {
+      q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, filled.state.tickCount + 1000 + t++, 0);
+    }
+    // The timer that found the table within five of full took slot `firstMax`, and left
+    // the five below it empty.
+    const skipped = [1, 2, 3, 4, 5].map((i) => q.getTimer(firstMax - i));
+    const cursor = q.getFirstAvailTimer();
+    const max = q.getMaxTimers();
+    const raw = decodeBase64ToBytes(buildSavePayload(filled).raw);
+    const block2 = loadSaveGameState(raw).block2!;
+    // The restore re-creates the monster timers of the party's level
+    // (`reloadAfterSaveGame`), and their deletes lower the cursor into the skipped slots,
+    // so the cursor is checked on the state the file gives, before that runs.
+    const fromFile = buildCsbwinRuntimeState(loadCsbwinWorld(raw));
+    const fresh = loadWorld();
+    fresh.applyRuntimeSaveState(fromFile);
+    console.log(`max ${firstMax} -> ${max}, cursor ${cursor}; written MaxTimers ${block2.maxTimers} ` +
+      `FirstAvailTimer ${block2.firstAvailTimer}; read back ${fromFile.dungeon.timers?.length} / ` +
+      `${fromFile.dungeon.firstAvailTimer}; restored ${fresh.timerQueue.getMaxTimers()} / ${fresh.timerQueue.getFirstAvailTimer()}`);
+    check(max === Math.trunc((firstMax + 10) * 5 / 4), `the full table grows to (${firstMax}+10)*5/4 = ${max}`);
+    check(skipped.every((timer) => timer === null) && q.getTimer(firstMax) !== null && cursor === firstMax + 1,
+      `the timer that filled it took slot ${firstMax}, the five below it stay empty, and the cursor is ${firstMax + 1}`);
+    check(block2.maxTimers === max && block2.firstAvailTimer === cursor, 'a save writes the new size and the cursor');
+    check(fromFile.dungeon.timers?.length === max && fromFile.dungeon.firstAvailTimer === cursor,
+      'and reading the file back gives both');
+    check(fresh.timerQueue.getMaxTimers() === max, `and a game restored from it has ${max} slots`);
   }
 
   /* ---- 4. GAMEBLOCK2, built from the live game ---- */
@@ -301,6 +342,8 @@ function main(): void {
     check(block2.partyFacing === party.facing, `${file}: gb2.partyfacing is the party's facing`);
     check(block2.maxItem16 === (state.dungeon.item16?.length ?? 0), `${file}: gb2.MaxITEM16 is the pool size`);
     check(block2.maxTimers === (state.dungeon.timers?.length ?? 0), `${file}: gb2.MaxTimers is the table size`);
+    check(block2.maxTimers === live.timerQueue.getMaxTimers(),
+      `${file}: gb2.MaxTimers is m_maxTimers, ${block2.maxTimers}`);
     check(block2.numTimer === (state.dungeon.timerQueue?.length ?? 0), `${file}: gb2.NumTimer is the queue length`);
     check(block2.firstAvailTimer === live.timerQueue.getFirstAvailTimer(),
       `${file}: gb2.FirstAvailTimer is the free cursor`);

@@ -191,6 +191,11 @@ export interface ObjectTables {
   objDescAttackClass: Int8Array; // d.ObjDesc[180].attackClass
   objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
+  /**
+   * `d.Byte7302[16]` (doc/CSBwin-src/Data.h:1099): the extra records a new game gives each
+   * database (`doc/CSBwin-src/SaveGame.cpp:2556-2564`), read as unsigned there.
+   */
+  byte7302: Uint8Array;
   objectNames: string[]; // d.ObjectNames[199]
   weaponWeights: Uint8Array; // d.weapons[46].weight
   /**
@@ -308,6 +313,7 @@ const ABS_FLOOR_COLOR_MAP_FAR = 4140; // FarColorMapping[16]
 // Absolute offsets in CSBWin's `d` struct for graphic 0x22f (doc/CSBwin-src/Data.h).
 const ABS_22F_START = 10340; // Byte10340[4] - start of graphic 0x22f
 const ABS_OBJDESC = 8382; // ObjDesc[180]
+const ABS_BYTE7302 = 7302; // Byte7302[16], right after ObjDesc[180]
 const ABS_WEAPONS = 8658; // weapons[46]
 const ABS_CLOTHING = 8890; // ClothingDesc[58]
 const ABS_FOOD_VALUE = 8962; // FoodValue[8]
@@ -479,6 +485,12 @@ function readObjDescGraphicClass22f(raw: Uint8Array): Uint8Array {
     out[i] = raw[start + i * stride + 2] ?? 0; // graphicClass byte
   }
   return out;
+}
+
+function readByte7302_22f(raw: Uint8Array): Uint8Array {
+  const start = ABS_22F_START - ABS_BYTE7302;
+  if (start < 0 || start + 16 > raw.length) throw new Error('graphics.dat item 0x22f too small for Byte7302[16]');
+  return raw.slice(start, start + 16);
 }
 
 function readObjDescAttackClass22f(raw: Uint8Array): Int8Array {
@@ -924,6 +936,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objDescAttackClass = readObjDescAttackClass22f(raw22f);
   const objDescObjectType = readObjDescObjectType22f(raw22f);
   const objDescCarryMask = readObjDescCarryMask22f(raw22f);
+  const byte7302 = readByte7302_22f(raw22f);
   const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
   const clothingWeights = readClothingWeights22f(raw22f);
@@ -1022,6 +1035,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     objDescAttackClass,
     objDescCarryMask,
     objDescObjectType,
+    byte7302,
     objectNames,
     weaponWeights,
     clothingWeights,

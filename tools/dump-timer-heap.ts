@@ -21,6 +21,14 @@
  * 4. **A loaded game runs what is due.** Each save is loaded into a real `Game` and given
  *    one tick. No timer due by then is left, and `csbgame6.dat`'s `TT_11`, the end of
  *    IAIDO's action, due at the saved `d.Time`, is gone.
+ * 5. **The table's size.** A new game's table is 100 slots, and one per record of the
+ *    monster database and of the missile and cloud ones, each the file's count plus
+ *    `d.Byte7302`'s extra records (`SaveGame.cpp:2549`, `:2556-2564`, `:2612-2616`). Every
+ *    committed save of the stock dungeon was written with that table, so each file's
+ *    `gb2.MaxTimers` is the canary for `Byte7302`'s offset in graphics.dat item 0x22f.
+ *    Then a table filled by hand: within five of full, `SetTimer` moves the cursor to
+ *    `m_maxTimers`, past every hole, and grows the table to `(m_maxTimers+10)*5/4`
+ *    (`Timer.cpp:999-1008`); a delete below the cursor lowers it again (`:966-969`).
  *
  * Run: `npx tsx tools/dump-timer-heap.ts`
  */
@@ -37,6 +45,8 @@ import { check, finish } from './lib/check';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const SAVES = 'static/gamefiles/saves';
 
+const json = (v: unknown): string => JSON.stringify(v);
+
 type Less = (a: TimerEntry, b: TimerEntry) => boolean;
 
 /** `GameTimers::CheckTimers`' order test (`Timer.cpp:932-953`): no child less than its parent. */
@@ -50,7 +60,9 @@ function heapFault(queue: readonly TimerEntry[], less: Less): number {
 }
 
 /** The saved queue as the port's entries, in the file's array order. */
-function savedEntries(file: string): { entries: TimerEntry[]; sequence: number; time: number } {
+function savedEntries(file: string): {
+  entries: TimerEntry[]; sequence: number; time: number; maxTimers: number; firstAvailTimer: number;
+} {
   const save = loadSaveGameState(new Uint8Array(readFileSync(resolve(SAVES, file))));
   const entries = (save.timerQueue ?? []).map((index): TimerEntry => {
     const t = save.timers![index];
@@ -60,7 +72,10 @@ function savedEntries(file: string): { entries: TimerEntry[]; sequence: number; 
       sequence: t.sequence, timerWord8: t.timerWord8, timerWord6: t.timerWord6,
     };
   });
-  return { entries, sequence: save.timerSequence ?? 0, time: save.block2?.time ?? 0 };
+  return {
+    entries, sequence: save.timerSequence ?? 0, time: save.block2?.time ?? 0,
+    maxTimers: save.maxTimers, firstAvailTimer: save.block2?.firstAvailTimer ?? 0,
+  };
 }
 
 /** `timerLess` with one of its rules broken, for the canaries. */
@@ -107,9 +122,9 @@ function checkSavedHeaps(files: string[]): void {
 
 function checkDrain(): void {
   console.log('\n=== 2. csbgame7.dat drained through shiftNext ===');
-  const { entries, sequence } = savedEntries('csbgame7.dat');
+  const { entries, sequence, maxTimers, firstAvailTimer } = savedEntries('csbgame7.dat');
   const q = new TimerQueue();
-  q.restore(entries, sequence);
+  q.restore(entries, sequence, maxTimers, firstAvailTimer);
   const expected = entries.slice().sort((a, b) => (timerLess(a, b) ? -1 : 1)).map((e) => e.index);
   const taken: number[] = [];
   let everyTakeLeast = true;
@@ -179,8 +194,8 @@ function checkRandom(): void {
     return (seed >>> 8) % n;
   };
   const q = new TimerQueue();
-  const { entries, sequence } = savedEntries('csbgame7.dat');
-  q.restore(entries, sequence);
+  const { entries, sequence, maxTimers, firstAvailTimer } = savedEntries('csbgame7.dat');
+  q.restore(entries, sequence, maxTimers, firstAvailTimer);
   const FUNCTIONS = [
     TimerFunction.TT_11, TimerFunction.TT_MISSILE, TimerFunction.TT_PARAMETER_MESSAGE,
     TimerFunction.TT_MONSTER_A0, TimerFunction.TT_MONSTER_A3, TimerFunction.TT_MONSTER_B1,
@@ -249,6 +264,39 @@ function checkLoadedGames(files: string[]): void {
   check(firedSome >= 5, `timers were due in ${firedSome} of the loads`);
 }
 
+function checkTableSize(files: string[]): void {
+  console.log('\n=== 5. the table\'s size ===');
+  const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
+  const size = newGame(data, stockGraphics()).timerQueue.getMaxTimers();
+  const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(resolve(SAVES, file)))).maxTimers);
+  console.log(`  a new game: ${size} slots; the saves: ${[...new Set(saved)].join(', ')}`);
+  check(size === 467, `a new game's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467 slots, not ${size}`);
+  check(saved.every((n) => n === size), 'and every committed save carries that gb2.MaxTimers');
+
+  const q = new TimerQueue();
+  q.allocate(20);
+  const add = (t: number): number => q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, 1000 + t, 0).index;
+  const slots: number[] = [];
+  for (let t = 0; t < 15; t++) slots.push(add(t));
+  q.deleteTimer(3);
+  const refill = add(15);
+  const beforeJump = q.getMaxTimers();
+  q.deleteTimer(7);
+  const refill7 = add(16);
+  const jumped = add(17);
+  const after = add(18);
+  const grown = q.getMaxTimers();
+  q.deleteTimer(2);
+  const lowered = add(19);
+  console.log(`  20 slots: filled ${slots.join(',')}; refilled ${refill}, ${refill7}; then ${jumped}, ${after}; ` +
+    `size ${beforeJump} -> ${grown}; after a delete, ${lowered}`);
+  check(json(slots) === json([...Array(15).keys()]) && refill === 3 && refill7 === 7,
+    'short of full, a timer takes the lowest free slot');
+  check(beforeJump === 20 && jumped === 20 && after === 21 && grown === 37,
+    'with 15 of 20 slots live, the next timer takes slot 20, past 15-19, and the table grows to (20+10)*5/4 = 37');
+  check(q.getTimer(15) === null && lowered === 2, 'the slots it passed stay empty until a delete below the cursor lowers it');
+}
+
 function main(): void {
   const files = readdirSync(resolve(SAVES)).filter((f) => f.endsWith('.dat')).sort();
   checkSavedHeaps(files);
@@ -256,6 +304,7 @@ function main(): void {
   checkByHand();
   checkRandom();
   checkLoadedGames(files);
+  checkTableSize(files);
   finish();
 }
 

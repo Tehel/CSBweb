@@ -71,6 +71,8 @@ export interface GameTables {
   readonly doorCharacteristics: ArrayLike<number>;
   /** `d.Byte1596[8]` — the room-type timer functions (the port's `roomTimerFunctions`). */
   readonly byte1596: ArrayLike<number>;
+  /** `d.Byte7302[16]` — the extra records a new game gives each database (`Data.h:1099`). */
+  readonly byte7302: ArrayLike<number>;
   /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
   readonly word1074: number[];
   /**
@@ -146,6 +148,7 @@ export function buildGameTables(graphics: GraphicsLoader): GameTables {
 
     doorCharacteristics: objects.doorCharacteristics,
     byte1596: g232.byte1596,
+    byte7302: objects.byte7302,
     word1074: g232.word1074,
     textDecode: {
       escape1: objects.textEscape1,

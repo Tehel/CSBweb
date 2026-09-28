@@ -94,6 +94,8 @@ export interface RuntimeSaveState {
         timerQueue?: number[];
         /** `gameTimers.TimerSequence()` — the stamp the next queued timer will take. */
         timerSequence?: number;
+        /** `gameTimers.FirstAvailTimer()`, the free cursor; absent, the lowest free slot. */
+        firstAvailTimer?: number;
         missiles?: MissileRecord[];
         /** Everything play can change: cell flags, object chains, all DB records. */
         snapshot: DungeonSnapshot;
@@ -133,6 +135,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
             timers,
             timerQueue,
             timerSequence: ctx.timers.getNextSequence(),
+            firstAvailTimer: ctx.timers.getFirstAvailTimer(),
             missiles,
             snapshot: ctx.dungeon.captureSnapshot(),
         },
@@ -186,6 +189,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
         timers,
         save.dungeon.timerQueue ?? [],
         save.dungeon.timerSequence ?? 0,
+        save.dungeon.firstAvailTimer,
     );
     const saveGameState: SaveGameState = {
         item16,
@@ -271,25 +275,17 @@ function collapseTimerBytes(record: TimerRecord, object: number | undefined): Ti
 
 /**
  * The timer table, laid out by timer index as CSBWin's array is, plus the queue
- * order beside it.
+ * order beside it. The whole `TIMER` is written, and `timerQueue` carries the heap's
+ * array, which is what `TimerQueue.restore` puts back.
  *
- * This used to write a single field per timer, `timerWord8`, so no save of any kind
- * restored *when* anything was due: a door caught mid-close stayed put, a fuse
- * stopped burning. The whole `TIMER` is written now, and `timerQueue` carries the
- * heap's array, which is what `TimerQueue.restore` puts back.
- *
- * An index with no live timer is filled with an empty record — `TT_EMPTY` is
- * function 0 — exactly as CSBWin's array has holes wherever `m_firstAvailTimer`'s
- * free list has slots.
+ * The table is `m_maxTimers` records long, so its length is the `gb2.MaxTimers` a save
+ * writes, and every slot with no live timer is an empty record — `TT_EMPTY` is
+ * function 0 — as in CSBWin's array. A save written before the table had a size is
+ * as long as its highest live slot, and the table it restores fills at once.
  */
 function buildTimerRecords(ctx: GameContext): { records: TimerRecord[]; queue: number[] } {
     const entries = ctx.timers.getTimers();
-    let maxIndex = -1;
-    for (const entry of entries) {
-        if (entry.index > maxIndex) maxIndex = entry.index;
-    }
-    if (maxIndex < 0) return { records: [], queue: [] };
-    const records: TimerRecord[] = Array.from({ length: maxIndex + 1 }, () => emptyTimerRecord());
+    const records: TimerRecord[] = Array.from({ length: ctx.timers.getMaxTimers() }, () => emptyTimerRecord());
     for (const entry of entries) {
         records[entry.index] = collapseTimerBytes({
             time: entry.time >>> 0,
@@ -315,7 +311,13 @@ function buildTimerRecords(ctx: GameContext): { records: TimerRecord[]; queue: n
  * what order. Both readings of bytes 6-9 come back, because which one a timer means
  * depends on its function and the queue entry carries both.
  */
-function restoreTimerQueue(ctx: GameContext, records: TimerRecord[], order: number[], nextSequence: number): void {
+function restoreTimerQueue(
+    ctx: GameContext,
+    records: TimerRecord[],
+    order: number[],
+    nextSequence: number,
+    firstAvailTimer: number | undefined,
+): void {
     const entries: TimerEntry[] = [];
     for (const index of order) {
         const record = records[index];
@@ -345,7 +347,7 @@ function restoreTimerQueue(ctx: GameContext, records: TimerRecord[], order: numb
             object,
         });
     }
-    ctx.timers.restore(entries, nextSequence);
+    ctx.timers.restore(entries, nextSequence, records.length, firstAvailTimer);
 }
 
 /** A free slot in the timer table: `TT_EMPTY`, and nothing else set. */

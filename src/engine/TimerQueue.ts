@@ -139,15 +139,20 @@ export class TimerQueue {
   /** `m_timerSequence` (`Data.h:1542`), a `ui16`: the stamp the next queued timer takes. */
   private nextSequence = 0;
   /**
-   * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) — the lowest slot of the timer
-   * array that holds no live timer, and the one the next `SetTimer` will take.
+   * `m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) — the slot the next `SetTimer`
+   * will take.
    *
    * It is a cursor, not a counter: `deleteTimer` lowers it whenever a slot below it
-   * frees, and `addTimer` walks it forward past whatever is occupied. The invariant is
-   * that it is always the *lowest* free slot, which is why `restore` can derive it
-   * rather than needing the `gb2.FirstAvailTimer` the file carries.
+   * frees, and `addTimer` walks it forward past whatever is occupied, so it is the
+   * lowest free slot, until the table fills: then `addTimer` moves it to the old
+   * `maxTimers`, past every hole, and the holes below it wait for a delete to lower it.
    */
   private firstAvailTimer = 0;
+  /**
+   * `m_maxTimers`, a `ui16`: the timer table's size. A new game allocates it
+   * (`allocate`), a save carries it as `gb2.MaxTimers`, and `addTimer` enlarges it.
+   */
+  private maxTimers = 0;
   private indexMap = new Map<number, TimerEntry>();
   private deleteDuplicateTimers = true; // CSBWin deleteDuplicateTimers default
 
@@ -253,6 +258,13 @@ export class TimerQueue {
    * argument, for the queued `index`.
    */
   addTimer(entry: TimerEntry): TimerEntry {
+    // A table within five of full jumps its cursor past every hole and grows by a
+    // quarter, before the duplicate rules (`doc/CSBwin-src/Timer.cpp:999-1008`).
+    if (this.queue.length >= this.maxTimers - 5) {
+      if (this.maxTimers >= 5000) throw new Error('TimerQueue: No empty Timer entries'); // die(45)
+      this.firstAvailTimer = this.maxTimers;
+      this.allocate(Math.trunc((this.maxTimers + 10) * 5 / 4));
+    }
     const deduped = this.applyDuplicateTimerRules(entry);
     if (deduped) return deduped;
 
@@ -272,6 +284,20 @@ export class TimerQueue {
     this.queue.push(stored);
     this.adjustTimerQueue(this.queue.length - 1);
     return stored;
+  }
+
+  /**
+   * `GameTimers::Allocate` (`doc/CSBwin-src/Timer.cpp:657-685`): the table is `numEnt`
+   * slots, if that is more than it has. The new slots are empty.
+   */
+  allocate(numEnt: number): void {
+    if (this.maxTimers >= numEnt) return;
+    this.maxTimers = numEnt & 0xffff;
+  }
+
+  /** `gameTimers.MaxTimer()`, the table's size, which a save writes as `gb2.MaxTimers`. */
+  getMaxTimers(): number {
+    return this.maxTimers;
   }
 
   /**
@@ -339,10 +365,10 @@ export class TimerQueue {
    * at them: `CHARDESC.busyTimerIndex` names a champion's pending action, and
    * `DungeonState`'s `timerWord8` lookup is by index.
    *
-   * The free cursor is restored too — CSBWin saves it as `gb2.FirstAvailTimer` and reads
-   * it straight back (`doc/CSBwin-src/SaveGame.cpp:1023,1640`). Since the cursor is
-   * always the lowest free slot, deriving it from the holes in the restored table is the
-   * same value, and costs the save format nothing.
+   * The table's size and the free cursor come back as `LoadGame` reads them,
+   * `gb2.MaxTimers` and `gb2.FirstAvailTimer` (`doc/CSBwin-src/SaveGame.cpp:1638-1640`),
+   * into a table that is not first allocated as a new game's. A save that carries no
+   * cursor gets the lowest free slot, which is the cursor unless the table has filled.
    *
    * It used to mint new timers above the highest restored index instead, on the grounds
    * that it "costs nothing but the numbering". It cost more than that: `LoadGame` is
@@ -351,12 +377,17 @@ export class TimerQueue {
    * load abandoned one slot per re-created timer. A quick-save/quick-load cycle on a
    * level with monsters grew the table by two slots every time, for ever.
    */
-  restore(entries: readonly TimerEntry[], nextSequence: number): void {
+  restore(entries: readonly TimerEntry[], nextSequence: number, maxTimers: number, firstAvailTimer?: number): void {
     this.queue = entries.map((entry) => ({ ...entry }));
     this.indexMap.clear();
     for (const entry of this.queue) this.indexMap.set(entry.index, entry);
-    this.firstAvailTimer = 0;
-    while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
+    this.maxTimers = maxTimers & 0xffff;
+    if (firstAvailTimer === undefined) {
+      this.firstAvailTimer = 0;
+      while (this.indexMap.has(this.firstAvailTimer)) this.firstAvailTimer++;
+    } else {
+      this.firstAvailTimer = firstAvailTimer;
+    }
     this.nextSequence = nextSequence & 0xffff;
   }
 

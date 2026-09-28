@@ -2209,10 +2209,10 @@ with one open the panel area is the option list (`handleAttackAreaClick`). And t
 `config.txt` is not part of the source tree — the bindings are the player's, not the
 game's.
 
-## The timer array has a free list, and a save carries its cursor
+## The timer array has a size and a free list, and a save carries both
 
-`m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) is the lowest slot of the timer array
-holding no live timer. Three places maintain it:
+`m_firstAvailTimer` (`doc/CSBwin-src/Data.h:1540`) is the slot the next timer takes. Four
+places maintain it:
 
 - `SetTimer` allocates at it — `D5L = m_firstAvailTimer`, `ASSERT(m_firstAvailTimer <
   m_maxTimers)` (`doc/CSBwin-src/Timer.cpp:1129-1130`) — and then walks it forward to the
@@ -2221,12 +2221,27 @@ holding no live timer. Three places maintain it:
   (`doc/CSBwin-src/Timer.cpp:965-969`). `GetNextTimerEntry` copies the head of the queue
   out and then calls `DeleteTimer` on it (`:1222-1233`), so **firing a timer frees its
   slot** — the array is not append-only.
+- `SetTimer`, first of all, jumps it when the table is within five of full: once
+  `m_numTimer >= m_maxTimers - 5`, it sets the cursor to `m_maxTimers`, past every hole,
+  and `EnlargeTimerQueue((m_maxTimers+10)*5/4)` grows the table, or `die(45)` at 5000
+  (`doc/CSBwin-src/Timer.cpp:999-1008`). This is before the duplicate rules, so it happens
+  even for a timer those rules then drop. The five slots below the old size stay empty
+  until a `DeleteTimer` below the cursor lowers it.
 - `LoadGame` reads the cursor straight back out of the file: it is written as
   `gb2.FirstAvailTimer` (`doc/CSBwin-src/SaveGame.cpp:1023`) and restored at `:1640`.
 
-The invariant that falls out of the first two is that the cursor is always the *lowest*
-free slot, which is why this port derives it from the holes in the restored table on load
-rather than adding a field to the save format.
+So the cursor is the lowest free slot until the table first fills, and not after.
+
+The size, `m_maxTimers`, is `gb2.MaxTimers` in a save, which `LoadGame` allocates
+(`doc/CSBwin-src/SaveGame.cpp:1638`); `Allocate` only ever grows the table
+(`Timer.cpp:657-685`). A new game allocates 100 (`SaveGame.cpp:2549`), then, for the
+monster database and every database from the missiles on, one more per record
+(`:2612-2616`), a record count being the file's count plus `d.Byte7302[db]` extra ones
+(`:2556-2564`). `Byte7302[16]` (`Data.h:1099`) sits in graphics.dat item 0x22f right after
+`ObjDesc[180]`, and reads `0,0,0,0,75,100,120,0,5,0,140,0,0,0,60,50` in the stock file, so
+the stock dungeon's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467, the
+`gb2.MaxTimers` of every committed save. `tools/dump-timer-heap.ts` section 5, and
+`tools/dump-save-roundtrip.ts` 3b for a filled table through a save.
 
 Why it is not merely tidy numbering: a restore is followed by `ProcessMonstersOnLevel`,
 which deletes and re-creates the movement timers of every monster group on the party's

@@ -10,7 +10,8 @@
  * CSBWin's functions do; `host` holds the calls that leave the engine (`GameHost`).
  */
 import type { DungeonData } from '../data/dungeonTypes';
-import type { ObjectID } from '../core/types';
+import { DBType, type ObjectID } from '../core/types';
+import { sw } from '../core/intCast';
 import { CsbRandom } from '../core/random';
 import { DungeonState } from './DungeonState';
 import type { GameState } from './gameTypes';
@@ -98,6 +99,23 @@ export interface GameContext {
 }
 
 /**
+ * A new game's timer table, as `ReadDatabases` sizes it (`doc/CSBwin-src/SaveGame.cpp:2549`,
+ * `:2556-2564`, `:2612-2616`): 100 slots, and one more per record of the monster
+ * database and of each database from the missiles on, a record count being the file's
+ * and `d.Byte7302`'s extra ones together.
+ */
+function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQueue {
+  const timers = new TimerQueue();
+  timers.allocate(100);
+  for (let db = 0; db < 16; db++) {
+    if (db !== DBType.CREATURE && db < DBType.MISSILE) continue;
+    const dbSize = sw((dungeonData.header.objectCounts[db] ?? 0) + (tables.byte7302[db] ?? 0));
+    timers.allocate(sw(timers.getMaxTimers() + dbSize));
+  }
+  return timers;
+}
+
+/**
  * The context for a new game over `dungeonData`: the party at the dungeon's start, the
  * clock at 0, an empty timer queue, and `host` (a null host by default).
  */
@@ -119,7 +137,7 @@ export function createGameContext(
     word1868: false,
     currentPalette: 0,
   };
-  const timers = new TimerQueue();
+  const timers = newGameTimerQueue(dungeonData, tables);
   return {
     dungeon,
     party,

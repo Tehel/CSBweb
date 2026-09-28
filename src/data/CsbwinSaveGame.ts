@@ -200,6 +200,7 @@ export function buildCsbwinRuntimeState(
             timers: resolveTimerObjects(world),
             timerQueue: world.save.timerQueue,
             timerSequence: world.save.timerSequence,
+            firstAvailTimer: gb2.firstAvailTimer,
             missiles: world.save.missiles,
             // The image holds none of these five: the save carries them beside it.
             snapshot: captureDungeonSnapshot({

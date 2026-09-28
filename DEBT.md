@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
 | C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
@@ -119,23 +118,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C67 ⏳ The timer table has no size, and a save writes it too small
-
-CSBWin's timer table has a size, `m_maxTimers`. A new game allocates 100 slots and one more
-per record of the monster database and of each database from the missiles on
-(`doc/CSBwin-src/SaveGame.cpp:2549`, `:2612-2616`), 467 in every committed save, and a save
-carries it as `gb2.MaxTimers`, which `LoadGame` allocates (`:1638`). `SetTimer` checks it
-first: once `m_numTimer >= m_maxTimers - 5`, it moves `m_firstAvailTimer` to `m_maxTimers`,
-past every hole, and enlarges the table to `(m_maxTimers+10)*5/4` (`Timer.cpp:1001-1010`).
-The port's `TimerQueue` has no size: `addTimer` always takes the lowest free slot, and a save
-writes `MaxTimers` as one past the highest live slot (`buildTimerRecords`,
-`src/engine/RuntimeSave.ts`; `maxTimers`, `src/engine/SaveGamePayload.ts:245`, `:302`). So a
-table CSBWin reads back from a port save is nearly full, and its next `SetTimer` jumps past
-the holes, and a game that fills its table numbers the slots that follow differently. A slot
-is what `busyTimerIndex` holds, and the last tie-break of `timerLess`. Keep the size, read
-from the save and grown as `SetTimer` grows it. Evidence: a check that a save written from
-`csbgame7.dat` carries `MaxTimers` 467, and one that fills a table to the jump.
 
 ### C68 ⏳ `d.Time` moves on before the timers, not after them
 
