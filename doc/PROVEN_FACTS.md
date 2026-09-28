@@ -447,6 +447,13 @@ sleeps (`Code17818.cpp:28-35`): the experience is still added, but a sleeping ch
 never levels up. A monster's blow wakes the party before it trains defence
 (`Monster.cpp:4530`).
 
+The filter may answer another `chIdx` and `skillNumber` (`Magic.cpp:304-305`), but the
+champion (`pcA2`), the skill credited (`psA3`), `basicSkill` and `oldMastery` were all
+taken before it (`:233-250`). So the experience still goes to the original champion's
+original skill. The answer decides only whether that champion's basic skill is credited
+too (`skillNumber >= 4`, `:332`), whose mastery is compared with the old one (`:341`), and
+who gets `LevelUp` (`:354`).
+
 Evidence: `tools/dump-adjust-skills.ts`.
 
 ## Throwing awards skill 10 with a literal experience base

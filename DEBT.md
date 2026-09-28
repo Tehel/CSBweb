@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C78 | A filter that retargets `AdjustSkills` moves the experience with it | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -113,19 +112,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
-A divergence found along the way goes here, with the next free ID.
-
-### C78 ⏳ A filter that retargets `AdjustSkills` moves the experience with it
-
-CSBWin's `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) takes the champion (`pcA2`), the
-skill (`psA3 = &pcA2->skills92[skillNumber]`), `basicSkill` and `oldMastery` before the
-Adjust Skills Filter runs (`:233-250`). The filter may hand back another `chIdx` and
-`skillNumber` (`:304-305`), but the experience still goes into the skill `psA3` already
-points at, and the basic skill of `pcA2`. Only the `skillNumber >= 4` test (`:332`),
-`DetermineMastery(chIdx, …)` for `newMastery` (`:341`) and `LevelUp(chIdx, basicSkill)`
-(`:354`) see the new values. The port's `adjustSkills` (`src/engine/skills.ts:186`)
-re-selects the champion and the skill from the filter's answer and writes there. Only a
-dungeon with an Adjust Skills Filter that changes the champion or the skill can see it.
+Empty. A divergence found along the way goes here, with the next free ID.
 
 ---
 

@@ -220,8 +220,15 @@ export function adjustSkills(
     }
   }
 
+  // `pcA2`, `basicSkill`, `oldMastery` and `psA3` are all taken before the filter
+  // (`Magic.cpp:233-250`), and the experience goes where they point whatever the filter
+  // answers. Only the `skillNumber >= 4` test, `newMastery` and `LevelUp` see its
+  // `chIdx` and `skillNumber` (`:332`, `:341`, `:354`).
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
   const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
+  const skills = ensureSkills(champ.skills ?? []);
+  champ.skills = skills;
+  const skillEntry = skills[skillNumber];
 
   const filtered = ctx.systems.dsa.processAdjustSkillsFilter({
     chIdx,
@@ -235,16 +242,10 @@ export function adjustSkills(
     adjustedExp = filtered.experience & 0xfffff;
   }
 
-  const finalChamp = champions[chIdx];
-  if (!finalChamp || skillNumber < 0 || skillNumber >= TOTAL_SKILLS) {
-    return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
-  }
   if (adjustedExp === 0) {
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
 
-  const skills = ensureSkills(finalChamp.skills ?? []);
-  const skillEntry = skills[skillNumber];
   skillEntry.experience = limitSkillExperience((skillEntry.experience ?? 0) + adjustedExp);
   if (skillEntry.tempAdjust < 32000) {
     const inc = applyLimits(1, Math.trunc(adjustedExp / 8), 100);
@@ -256,13 +257,12 @@ export function adjustSkills(
     base.experience = limitSkillExperience((base.experience ?? 0) + adjustedExp);
   }
 
-  finalChamp.skills = skills;
-
-  const newMastery = determineMastery(finalChamp, basicSkill | 0xc000, { partySleeping });
-
+  // A filter may name a champion who is not there: an empty `CHARDESC`, whose mastery
+  // of 1 is never a gain.
+  const target = champions[chIdx];
   let leveledUp = false;
-  if (newMastery > oldMastery) {
-    levelUp(finalChamp, basicSkill, ctx.random);
+  if (target && determineMastery(target, basicSkill | 0xc000, { partySleeping }) > oldMastery) {
+    levelUp(target, basicSkill, ctx.random);
     printLevelUp(ctx, chIdx, basicSkill);
     leveledUp = true;
   }

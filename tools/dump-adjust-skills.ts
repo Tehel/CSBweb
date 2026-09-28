@@ -9,6 +9,10 @@
  * `doc/CSBwin-src/Monster.cpp:4535`), which trains the Fighter's defence skill 7: it must
  * go through the filter and announce the level like any other caller.
  *
+ * A filter may answer another champion or skill, but CSBWin has already taken the
+ * champion, the skill it credits and the old mastery (`Magic.cpp:233-250`): only the basic
+ * skill's `skillNumber >= 4` test, the new mastery and `LevelUp` see the answer.
+ *
  *   npx tsx tools/dump-adjust-skills.ts
  */
 import { readFileSync } from 'node:fs';
@@ -125,6 +129,45 @@ for (const sleeping of [false, true]) {
   } else {
     check(result.leveledUp && announced() === levelLine, 'awake: the level is gained and announced');
   }
+}
+
+// --- a filter that retargets: the experience stays where `psA3` and `pcA2` point ---
+// (`Magic.cpp:233-250` before the filter, `:304-305` its answer, `:332`/`:341`/`:354` after.)
+game.addChampion(champion(1));
+const skillsOf = (i: number): number[] => party.champions[i].skills.map((s) => s.experience);
+const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter: number): ReturnType<typeof adjustSkills> => {
+  primeFighter();
+  for (const s of party.champions[1].skills) { s.experience = 0; s.tempAdjust = 0; }
+  party.champions[1].skills[0].experience = champ1Fighter;
+  party.lastMonsterAttackTime = ctx.state.tickCount;
+  dsa.processAdjustSkillsFilter = (params) => {
+    filtered.push(params.why);
+    return { chIdx: answer.chIdx, skillNumber: answer.skillNumber, experience: params.experience };
+  };
+  return adjustSkills(ctx, 0, 7, 4, AdjustSkillsWhy.SkillIncreaser1, 0);
+};
+{
+  const r = retarget({ chIdx: 1, skillNumber: 4 }, 0);
+  console.log(`=== filter answers champion 1, skill 4 ===`);
+  console.log(`  champion 0 ${skillsOf(0).join(',')} | champion 1 ${skillsOf(1).join(',')} | levelled ${r.leveledUp}`);
+  check(skillsOf(0)[7] === 8 && skillsOf(0)[0] === 507, 'the experience still goes to champion 0\'s skill 7 and its basic skill');
+  check(skillsOf(1).every((e) => e === 0), 'champion 1 gets none of it');
+  check(!r.leveledUp && announced() === '', 'newMastery is champion 1\'s Fighter, 1: no LevelUp though champion 0 crossed');
+}
+{
+  const r = retarget({ chIdx: 0, skillNumber: 2 }, 0);
+  console.log(`=== filter answers champion 0, skill 2 ===`);
+  console.log(`  champion 0 ${skillsOf(0).join(',')} | levelled ${r.leveledUp}`);
+  check(skillsOf(0)[7] === 8 && skillsOf(0)[2] === 0, 'the experience goes to skill 7, not skill 2');
+  check(skillsOf(0)[0] === 499, 'skill 2 is basic, so the `skillNumber >= 4` test credits no basic skill');
+  check(!r.leveledUp, 'so Fighter is unchanged and nobody levels');
+}
+{
+  const r = retarget({ chIdx: 1, skillNumber: 4 }, 600);
+  console.log(`=== filter answers champion 1, whose Fighter is already mastery 2 ===`);
+  console.log(`  levelled ${r.leveledUp}, printed ${JSON.stringify(announced())}`);
+  check(r.leveledUp && announced() === 'HERO1 JUST GAINED A FIGHTER LEVEL',
+    'LevelUp(chIdx, basicSkill) goes to the filter\'s champion when its mastery beats champion 0\'s old one');
 }
 
 finish();
