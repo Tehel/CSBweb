@@ -1094,8 +1094,8 @@ export class BytecodeInterpreter {
     if (!tables || !viewport || !getGraphic) return true;
 
     const setIndex = tables.doorSwitchRectIndex[doorSwitchId - 1] ?? 0;
-    const rectSet = tables.doorSwitchRectSets?.[setIndex];
-    const srcSet = tables.doorSwitchSourceDescSets?.[setIndex];
+    const rectSet = tables.doorSwitchRectSets[setIndex];
+    const srcSet = tables.doorSwitchSourceDescSets[setIndex];
     const distanceIndex = distance | 0;
     if (distanceIndex < 0 || distanceIndex > 3) return true;
     const desc = rectSet?.[distanceIndex];
@@ -1482,7 +1482,7 @@ export class BytecodeInterpreter {
       if (this.context.facingAlcove !== undefined) this.context.facingAlcove = isAlcove;
       if (this.context.facingViAltar !== undefined) this.context.facingViAltar = decorationIndex === 2;
       if (this.context.facingWaterFountain !== undefined) {
-        const fountainIdx = tables.fountainDecorationIndex ?? -1;
+        const fountainIdx = tables.fountainDecorationIndex;
         this.context.facingWaterFountain = decorationIndex === (fountainIdx | 0);
       }
     }

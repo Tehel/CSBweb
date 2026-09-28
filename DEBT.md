@@ -74,7 +74,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F1 | Silent fallbacks for tables that are always there | S | ⏳ |
+| C77 | A monster's blow levels a champion up without the filter or the message | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C77 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
+Next free IDs: C78 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -113,33 +113,31 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
-Empty. A divergence found along the way goes here, with the next free ID.
+A divergence found along the way goes here, with the next free ID.
+
+### C77 ⏳ A monster's blow levels a champion up without the filter or the message
+
+CSBWin's `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) is one function: every caller
+runs the `ESL_ADJUSTSKILLSFILTER` DSA, and a mastery gained calls `LevelUp`, which prints
+"… JUST GAINED A … LEVEL" itself (`Magic.cpp:172-176`). The port's `adjustSkills`
+(`src/engine/skills.ts:190`) leaves both to its caller, through `applyAdjustSkillsFilter`
+and `onLevelUp`, and `MonsterAttack.monsterDamagesCharacter`
+(`src/engine/MonsterAttack.ts:346`, CSBWin `Monster.cpp:4535`) passes neither. So the
+Fighter defence skill a blow trains skips the filter, and a level it gains is granted
+silently. `ActuatorSystem` and `MagicSystem` pass both.
+
+The same seam loses the sleep test: CSBWin's `DetermineMastery` returns 1 while
+`d.PartySleeping` (`doc/CSBwin-src/Code17818.cpp:28-35`), so `AdjustSkills` never levels a
+sleeping champion, but no caller passes `partySleeping` to `adjustSkills`. The monster
+blow wakes the party first (`Monster.cpp:4530`), so only the actuator path can reach it
+asleep.
+
+The fix is to make `adjustSkills` run the filter and the message itself, from `ctx`, as
+CSBWin does, rather than a third caller growing the two callbacks.
 
 ---
 
 ## F — Verification debt
-
-### F1 ⏳ Silent fallbacks for tables that are always there
-
-A table that is initialised empty, or read through a `continue`-on-falsy guard, fails
-without a warning or a marker: the output is just missing. Every table is a required field
-of `GameTables`, built once for `main.ts` and every tool, so a guard against a missing table
-is either dead code or a silent placeholder that hides a short one. Known cases:
-
-- `DEFAULT_ROOM_TIMER_FUNCTIONS` (`src/engine/roomTimers.ts:10`), a hardcoded copy of
-  `d.Byte1596` that `roomTimerFunction` uses when it gets no table. Its two callers
-  (`ActuatorSystem`, `DsaSystem`) pass `ctx.tables.byte1596`, a required field, so it
-  looks unreachable. Confirm that, then delete it and the `| null`.
-- `MonsterAttack.determineAttackOrder` returns `[0, 1, 2, 3]` when its `byte586` row is
-  missing, with no warning (`src/engine/MonsterAttack.ts:793`).
-- `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
-  (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
-  engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:280`) returns silently when
-  `word1074` is empty.
-
-Then sweep for the rest: arrays and tables initialised empty, or read through a falsy
-guard.
 
 ### F2 ⏳ No golden frame covers an edge decoration
 

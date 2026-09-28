@@ -1,5 +1,5 @@
 import { getChampionPossession, type Champion, type Skill } from './gameTypes';
-import { CsbRandom } from '../core/random';
+import type { CsbRandom } from '../core/random';
 import type { ObjectID } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
@@ -57,11 +57,10 @@ export interface AdjustSkillsContext {
   lastMonsterAttackTime?: number;
   experienceMultiplier?: number;
   partySleeping?: boolean;
-  adjustSkillsParameters?: ArrayLike<number> | null;
   applyAdjustSkillsFilter?: (params: AdjustSkillsFilterParams) => AdjustSkillsFilterResult | null;
   onLevelUp?: (chIdx: number, basicSkill: number) => void;
-  /** CSBWin's `d.RandomNumber` stream. See `src/core/random.ts`. */
-  random?: CsbRandom;
+  /** CSBWin's `d.RandomNumber` stream, which `LevelUp` draws from. See `src/core/random.ts`. */
+  random: CsbRandom;
   getObjectNameIndex?: (objectId: ObjectID) => number | null;
 }
 
@@ -194,7 +193,7 @@ export function adjustSkills(
   skillNumber: number,
   experience: number,
   why: AdjustSkillsWhy,
-  context: AdjustSkillsContext = {},
+  context: AdjustSkillsContext,
 ): AdjustSkillsResult {
   const champ = champions[chIdx];
   if (!champ || skillNumber < 0 || skillNumber >= TOTAL_SKILLS) {
@@ -283,7 +282,7 @@ export function addToSkill(
   chIdx: number,
   skillNumber: number,
   experience: number,
-  context: AdjustSkillsContext = {},
+  context: AdjustSkillsContext,
 ): AdjustSkillsResult {
   const champ = champions[chIdx];
   if (!champ || skillNumber < 0 || skillNumber >= TOTAL_SKILLS) {
@@ -321,11 +320,10 @@ export function addToSkill(
   return { chIdx, skillNumber, experienceApplied: experience, leveledUp };
 }
 
-export function levelUp(champion: Champion, basicSkill: number, random?: CsbRandom): void {
+export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom): void {
   // CSBWin's `LevelUp` draws from three different generators, in a fixed order
   // (doc/CSBwin-src/Magic.cpp:79-160). They are not interchangeable — each advances
   // the seed once but keeps different bits — so the mapping is kept explicit here.
-  const rng = random ?? new CsbRandom();
   const randInt = (maxExclusive: number): number => rng.below(maxExclusive); // STRandom(n)
   const randBool = (): number => rng.bool(); // STRandomBool()
   const rand0_3 = (): number => rng.zeroTo3(); // STRandom0_3()

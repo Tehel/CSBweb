@@ -277,7 +277,6 @@ export class TimerSystem {
 
   applyBrightnessSteps(steps: number, sign: number): void {
     const word1074 = this.ctx.tables.word1074;
-    if (!word1074 || word1074.length === 0) return;
     let idx = steps | 0;
     if (idx < 0) idx = -idx;
     if (idx >= word1074.length) idx = word1074.length - 1;
@@ -288,8 +287,6 @@ export class TimerSystem {
 
   private processLightLevelTimer(timer: TimerEntry): void {
     const word1074 = this.ctx.tables.word1074;
-    if (!word1074 || word1074.length < 2) return;
-
     let steps = sw(timer.timerWord6);
     if (steps === 0) return;
 
@@ -1085,7 +1082,6 @@ export class TimerSystem {
    */
   private isNonMaterialMonsterAt(position: Position): boolean {
     const table = this.ctx.tables.monsterDesc;
-    if (!table) return false;
     for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category !== DBType.CREATURE) continue;
       const rec = this.dungeon.getCreatureRecord(rn);
