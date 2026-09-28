@@ -212,6 +212,38 @@ async function main(): Promise<void> {
   check(dying.partyPosition === 1, 'the dead champion should stay where they died');
   check(state.champions[0].partyPosition === 1, 'the champion on square 0 should have moved to square 1');
 
+  // ---- The top view has a square for a living champion only: the dead champion 1 and
+  //      the empty fourth box have none (`Character.cpp:1308`, `:2664-2667`), so the dead
+  //      champion does not paint over champion 0, who shares their square. The screen is
+  //      cleared first, as `GameScreen.presentViewport` does.
+  screen.pixels.fill(0);
+  drawPartyStatus(ui);
+  const byte1386 = g232.byte1386;
+  const squares: string[] = [];
+  for (let sq = 0; sq < 4; sq++) {
+    const r = g232.wRectPos1454[sq];
+    const counts = [0, 0, 0, 0];
+    let lit = 0;
+    for (let y = r.y1; y <= r.y2; y++) {
+      for (let x = r.x1; x <= r.x2; x++) {
+        const p = screen.pixels[y * 320 + x];
+        if (p !== 0) lit++;
+        for (let c = 0; c < 4; c++) if (p === byte1386[c]) counts[c]++;
+      }
+    }
+    const owner = state.champions.findIndex((c) => c.attributes.health !== 0 && c.partyPosition === sq);
+    squares.push(`${sq}:${owner < 0 ? '-' : owner}/${lit}`);
+    if (owner < 0) {
+      check(lit === 0, `square ${sq} has no living champion and should be black (${lit} pixels lit)`);
+    } else {
+      check(counts[owner] > 0, `square ${sq} should carry champion ${owner}'s colour ${byte1386[owner]}`);
+      for (let c = 0; c < 4; c++) {
+        if (c !== owner) check(counts[c] === 0, `square ${sq} should carry no colour of box ${c} (${counts[c]} pixels)`);
+      }
+    }
+  }
+  console.log(['top view', 'square:owner/lit', squares.join(' ')].join('\t'));
+
   // ---- `GameScreen.setPartyState` empties the hand for another game (`CSBCode.cpp:10485`)
   //      — covered by reading; it has no engine to drive here.
 

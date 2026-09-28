@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
 | C74 | A keyed attack makes no tick due | S | ⏳ |
@@ -116,20 +115,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
-### C70 ⏳ The top view of positions has a square for nobody
-
-CSBWin draws a champion's square in the top view of positions from `DrawCharacterState`,
-once per champion in the party, and only inside `if (pcA3->HP() != 0)`
-(`doc/CSBwin-src/Character.cpp:1308-1513`): a dead champion has none, their square blanked
-by `KillCharacter` (`:2663-2666`). The port's `drawPartyStatus` (`src/renderer/ui/Character.ts:390`)
-draws one for each of the four boxes, alive, dead or empty, an empty box's in the slot of
-its own index. So the golden frame `01-boot` shows four coloured squares over an empty
-party, where CSBWin shows none; with three champions, the empty fourth box paints its
-colour, 14, over whichever champion stands in position 3; and a dead champion keeps a
-square.
-Draw it for a living champion only, and capture `01-boot` again. Evidence: the frame, and
-a row in `tools/dump-marching-order.ts` that draws a party with a dead champion.
 
 ### C71 ⏳ A resumed game has no "GAME LOADED, READY TO PLAY."
 

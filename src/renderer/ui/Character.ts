@@ -385,9 +385,13 @@ export function drawPartyStatus(ui: UIState): void {
       drawShieldDots(ui, baseX, champion);
     }
 
-    const charPos = champion?.partyPosition ?? chIdx;
-    const dir = (charPos + 4 - facing) & 3;
-    drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir], chIdx, champion, facing);
+    // `DrawCharacterState` draws the square inside `if (pcA3->HP() != 0)`, and only for a
+    // champion in the party (`doc/CSBwin-src/Character.cpp:1308`, `:1457-1475`): an empty
+    // box has none, and `KillCharacter` blanks a dead champion's (`:2664-2667`).
+    if (champion && champion.attributes.health !== 0) {
+      const dir = (champion.partyPosition + 4 - facing) & 3;
+      drawPositionSquare(ui, ui.screenIndexBuffer, g232.wRectPos1454[dir], chIdx, champion, facing);
+    }
   }
 
   // `TAG0025a6` blanks the square it picks a champion up from, and `DrawCharacterState`

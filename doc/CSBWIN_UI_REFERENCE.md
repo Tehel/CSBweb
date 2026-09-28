@@ -25,6 +25,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 
 - The facing/position indicator uses `wRectPos1454[4]`, filled with the character color, and overlays basic graphic 28 with a 19-pixel X offset per facing (`doc/CSBwin-src/Character.cpp:1464`, `doc/CSBwin-src/Character.cpp:1468`, `doc/CSBwin-src/Character.cpp:1471`).
 - `wRectPos1454` is part of graphic `0x232` (`doc/CSBwin-src/Data.h:1408`).
+- Only a living champion has a square: `DrawCharacterState` draws it inside `if (pcA3->HP() != 0)` (`doc/CSBwin-src/Character.cpp:1308`), and `KillCharacter` fills a dying champion's with colour 0 (`doc/CSBwin-src/Character.cpp:2664-2667`). A box with no champion has none either, so an empty party's top view is black.
 
 ## Attack buttons (right panel)
 
