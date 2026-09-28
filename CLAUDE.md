@@ -2,6 +2,8 @@
 
 A TypeScript/Canvas port of **Dungeon Master** (Atari ST), running in the browser.
 
+Project memory index: @.claude/memory/MEMORY.md
+
 ## The one non-negotiable rule
 
 `doc/CSBwin-src/` (Paul R. Stevens' C++ port of the disassembled original, ~120k LOC) is the
