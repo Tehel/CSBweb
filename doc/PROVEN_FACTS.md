@@ -4142,3 +4142,16 @@ dungeon. The port: `AttackSystem.fusionSequence`, the suspended callers in
 keys in `handleUIKey`. Evidence: `tools/dump-fusion.ts`,
 `tools/dump-key-bindings.ts` for the menu and the keys, and `tools/dump-cloud-draw.ts` for
 the shimmer.
+
+## `AddObjectToRoom` clears the new object's link before either arm
+
+`AddObjectToRoom(newObj, prevObj, mapX, mapY, pmmr)` (`doc/CSBwin-src/Code11f52.cpp:392`)
+sets `newObj`'s link to `RNeof` (`:428`) before it looks at `mapX`, so the object always
+ends its chain and never brings the rest of an old chain with it. With a cell, it becomes
+the first object of a cell whose `0x10` flag is clear (the flag set, the column indexes
+past it bumped, and the object list opened up at its slot, `:455-482`), is stuffed into
+an `RNeof` root when the flag is set but the cell holds nothing (`:441-453`, tolerated for
+converted dungeons), or is hung off the last object of the cell's chain (`:491-499`).
+With `mapX` -1 there is no cell, and it is hung off the last object of the chain
+`prevObj` is in. The port: `DungeonState.addObjectToCell` and
+`DungeonState.addObjectToChain`. Evidence: `tools/dump-add-object-to-room.ts`.

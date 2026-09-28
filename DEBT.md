@@ -14,7 +14,7 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers D and E are empty, and C holds only small items found along the way. **The goal now is a complete, faithful game on the default
+Tiers D, E and C are empty. **The goal now is a complete, faithful game on the default
 dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C80 | `addObjectToCell` keeps a stale link on a cell's first object | S | ⏳ |
 | G15 | The magic footprint decoration | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
@@ -120,16 +119,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C80 ⏳ `addObjectToCell` keeps a stale link on a cell's first object
-
-`AddObjectToRoom` sets the new object's link to `RNeof` before either arm
-(`doc/CSBwin-src/Code11f52.cpp:428`). `DungeonState.addObjectToCell`
-(`src/engine/DungeonState.ts:294`) writes it only when it appends behind another object;
-an object that becomes a cell's first object, in either the new-root arm or the `RNeof`
-root arm, keeps whatever link it had, and the objects of its old chain come with it. Clear
-the link first, as CSBWin does, with a tool that puts an object with a live link on an
-empty cell.
 
 ---
 

@@ -288,8 +288,9 @@ export class DungeonState {
     }
 
     /**
-     * Append an object to the end of the cell's object list.
-     * Returns false if the cell is out of bounds.
+     * `AddObjectToRoom(newObj, RNnul, mapX, mapY, NULL)` (`doc/CSBwin-src/Code11f52.cpp:392`):
+     * clear the new object's link (`:428`), then make it the cell's first object or hang it
+     * off the last one. Returns false if the cell is out of bounds.
      */
     addObjectToCell(position: Position, rn: ObjectID): boolean {
         const { x, y, z } = position;
@@ -297,6 +298,7 @@ export class DungeonState {
         if (!map) return false;
         if (x < 0 || y < 0 || x >= map.descriptor.width || y >= map.descriptor.height) return false;
 
+        this.setDBRecordLink(rn, OBJECT_ID_EOF);
         const cellFlag = map.cellFlags[x][y];
         const hasObjects = (cellFlag & 0x10) !== 0;
         const baseCol = this.data.levelIndex[z] + x;
@@ -329,7 +331,6 @@ export class DungeonState {
             current = next;
         }
         this.setDBRecordLink(current, rn);
-        this.setDBRecordLink(rn, OBJECT_ID_EOF);
         return true;
     }
 

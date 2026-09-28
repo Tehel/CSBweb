@@ -39,6 +39,7 @@ const CHECKS = [
   { tool: 'dump-monster-generator.ts' },
   { tool: 'dump-monster-ai.ts' },
   { tool: 'dump-giggler-steal.ts' },
+  { tool: 'dump-add-object-to-room.ts' },
   { tool: 'dump-attributes.ts' },
   { tool: 'dump-adjust-skills.ts' },
   { tool: 'dump-hand-owner.ts' },
