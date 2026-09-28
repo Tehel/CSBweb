@@ -19,6 +19,7 @@ import {
   type PaletteIndexViewportBuffer
 } from '../csbwin/CanvasBlitter';
 import type { DungeonState } from '../../engine/DungeonState';
+import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { CreatureRecord } from '../../data/dungeonTypes';
 import type { ObjectTables } from '../csbwin/ObjectTables';
 import {
@@ -88,6 +89,8 @@ export interface InterpreterContext {
   objectTables?: ObjectTables;
   csbGraphics?: CSBGraphicsLoader;
   dungeonState?: DungeonState;
+  /** `d.PartyFootprints`, which `SummarizeRoomInfo` searches for the magic prints. */
+  footprints?: PartyFootprints;
   frameFacing?: number;
   frameMapIndex?: number;
   doorGraphics?: number[][]; // d.DoorGraphic[3][2] resolved for current level (Code390e.cpp:180+)

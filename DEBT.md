@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G15 | The magic footprint decoration | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -139,17 +138,6 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G15 ⏳ The magic footprint decoration
-
-YA BRO ROS is cast, and its timer runs, but the viewport never shows a print.
-`SummarizeRoomInfo`'s footprint arm (`doc/CSBwin-src/Codea59a.cpp:401-418`) sets
-`decorations[2] |= 0x8000` when `SearchFootprints` (`CSBCode.cpp:7066`) finds a print on
-the cell whose index lies between `d.IndexOfFirstMagicFootprint` (inclusive) and
-`d.IndexOfLastMagicFootprint` (exclusive), which `PartyFootprints` holds
-(`getIndexOfFirstMagicFootprint` / `getIndexOfLastMagicFootprint`). The port omits the arm
-at `src/renderer/csbwin/SummarizeRoomInfo.ts:515`; the draw side already tests the bit
-(`BytecodeInterpreter.ts:1774`). The arm's `ECF_FOOTPRINTS` half is G1's.
-
 ### G6 ⏳ UI effects
 
 - **Rune click flash** in the magic panel.
@@ -205,8 +193,8 @@ Not taken in order; the author names one to start it (see "Priority").
   laid on a carried weapon costs 3 Luck at once. Port both together.
 - **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
   cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
-  DSA or a custom dungeon sets extended cell flags. The magic footprints themselves are
-  G15.
+  DSA or a custom dungeon sets extended cell flags. The magic footprints are drawn
+  (`src/renderer/csbwin/SummarizeRoomInfo.ts`, beside a comment naming this item).
 
 ### G2 ⏸️ Ten DSA filters
 

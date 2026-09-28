@@ -18,6 +18,7 @@ import {
   prisonPartyPosition,
 } from './intro/PrisonLevel';
 import type { DungeonState } from '../engine/DungeonState';
+import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, tag0088b2Index } from './csbwin/CanvasBlitter';
@@ -52,6 +53,8 @@ export interface FloorCeiling {
 export interface ViewportRendererDeps {
   graphicsLoader: GraphicsLoader;
   dungeonState: DungeonState;
+  /** `d.PartyFootprints`, whose magic prints `SummarizeRoomInfo` shows. */
+  footprints?: PartyFootprints;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /** `graphic232.palette552`: the viewport's palettes, one per light level. */
   palette552: number[][];
@@ -124,6 +127,7 @@ export class ViewportRenderer {
       objectTables: this.objectTables,
       csbGraphics: deps.csbGraphicsLoader,
       dungeonState: this.dungeonState,
+      footprints: deps.footprints,
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],

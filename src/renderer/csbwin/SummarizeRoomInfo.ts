@@ -1,6 +1,7 @@
 import { decodeObjectID, DBType, OBJECT_ID_EOF, type ObjectID, type ui8, Position } from '../../core/types';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../bytecode/Types';
 import type { DungeonState } from '../../engine/DungeonState';
+import type { PartyFootprints } from '../../engine/PartyFootprints';
 import {
   getActuatorDsaParameters,
   getActuatorDsaSelector,
@@ -343,7 +344,8 @@ export function summarizeRoomInfoCsbwin(
   dungeon: DungeonState,
   position: Position,
   facing: number,
-  tables?: ObjectTables
+  tables?: ObjectTables,
+  footprints?: PartyFootprints,
 ): void {
   const { z } = position;
   rslt.text = [RN_EOF, RN_EOF, RN_EOF];
@@ -399,6 +401,7 @@ export function summarizeRoomInfoCsbwin(
       }
       rslt.roomType = RoomType.OPEN;
       cellFlags = (cellFlags & 8) !== 0 ? 8 : 0;
+      // Falls through into `roomOPEN`, and on to `tag00a85c`'s `cfD4 = 1`.
       if (map && numRandomFloorDecorations > 0) {
         rslt.decorations[2] = randomFloorDecorationCsbwin(
           cellFlags & 8,
@@ -412,6 +415,7 @@ export function summarizeRoomInfoCsbwin(
           z
         );
       }
+      cellFlags = 1;
       skipLowDbForRn2 = false;
       scanFloorDecorations = true;
       break;
@@ -512,7 +516,19 @@ export function summarizeRoomInfoCsbwin(
     }
   }
 
-  // Codea59a.cpp:401-425: the footprint arm is not ported (DEBT.md G15, G1).
+  // `tag00a984` (Codea59a.cpp:401-418): where footprints can show, the newest print on the
+  // cell, if it is one of the trail's magic ones, sets the footprint bit.
+  // The `ECF_FOOTPRINTS` half (`:419-426`) is not ported (DEBT.md G1).
+  if (cellFlags !== 0 && footprints) {
+    let found = footprints.searchFootprints(z, rslt.x, rslt.y) & 0xff;
+    if (found !== 0) {
+      found = (found - 1) & 0xff;
+      if (found >= (footprints.getIndexOfFirstMagicFootprint() & 0xff)
+        && found < (footprints.getIndexOfLastMagicFootprint() & 0xff)) {
+        rslt.decorations[2] |= 0x8000;
+      }
+    }
+  }
   rslt.rn2 = local;
   rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
 }

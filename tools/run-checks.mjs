@@ -91,6 +91,7 @@ const CHECKS = [
   { tool: 'dump-monster-missile-type.ts' },
   { tool: 'dump-cast-spell.ts' },
   { tool: 'dump-magic-footprints.ts' },
+  { tool: 'dump-footprint-decoration.ts' },
   { tool: 'dump-timer-dedupe.ts' },
   { tool: 'dump-timer-sequence.ts' },
   { tool: 'dump-timer-heap.ts' },

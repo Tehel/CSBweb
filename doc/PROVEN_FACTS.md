@@ -800,6 +800,16 @@ until the party's first move: an end of 0 marks nothing, the weak spell's empty 
 marks nothing either, and the first move makes both the same. The timer's end,
 `TT_79`, only decrements the counter (`CSBCode.cpp:6572`), so a range outlives the spell.
 
+`SummarizeRoomInfo` tests only a cell whose `cfD4` the room-type switch left non-zero
+(`doc/CSBwin-src/Codea59a.cpp:401`): an open floor, a teleporter and a door set it to 1
+(`tag00a85c`, `:307`), an open false wall too, since it falls through into `roomOPEN`
+(`:293-308`), and a pit keeps its flag bit 0 when bit 3 is set, else counts as open floor
+(`:263-275`). Stairs clear it (`:373`), and a stone or closed false wall returns before the
+test. It takes only the newest print on the cell, `SearchFootprints`' 1-based index less
+one, and sets bit 15 of `decorations[2]` (`:402-416`), the floor decoration. The port:
+`summarizeRoomInfoCsbwin` with the `PartyFootprints` `DrawViewport` hands it. Evidence:
+`tools/dump-footprint-decoration.ts`.
+
 ## A monster follows staler footprints the keener its nose
 
 `doc/CSBwin-src/Monster.cpp:615-620`:

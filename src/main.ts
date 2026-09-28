@@ -263,6 +263,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
         dungeonState: game.dungeonState,
+        footprints: game.footprints,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         characterStats: game.characterStats,
     }, {

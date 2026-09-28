@@ -16,6 +16,7 @@ import type { Champion, PartyState } from '../engine/gameTypes';
 import type { CharacterStats } from '../engine/CharacterStats';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { DungeonState } from '../engine/DungeonState';
+import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
@@ -126,6 +127,8 @@ export interface GameScreenHooks extends Required<Pick<UIState,
 export interface GameScreenDeps {
   graphicsLoader: GraphicsLoader;
   dungeonState: DungeonState;
+  /** The party's trail, `d.PartyFootprints`, for the magic prints in the viewport. */
+  footprints: PartyFootprints;
   csbGraphicsLoader?: CSBGraphicsLoader;
   /**
    * The engine's `CharacterStats`, so the load and weight figures the eye panel prints
@@ -192,6 +195,7 @@ export class GameScreen {
     this.viewport = new ViewportRenderer({
       graphicsLoader,
       dungeonState: deps.dungeonState,
+      footprints: deps.footprints,
       csbGraphicsLoader: deps.csbGraphicsLoader,
       palette552,
       graphicCache: ui.graphicCache,
