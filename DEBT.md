@@ -81,13 +81,19 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G16 | A compressed `dungeon.dat` | M | ⏳ |
+| C87 | A save with no Extended Features does not load | S | ⏳ |
+| C88 | `DM_rules` is not modelled | S | ⏳ |
+| G16 | A compressed `dungeon.dat` | S | ⏳ |
+| G18 | One game's data set, chosen before the boot | M | ⏳ |
+| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Ten DSA filters | — | ⏸️ |
 | G3 | The wings | — | ⏸️ |
 | G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
+| G20 | The hint oracle | — | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. The ⏸️ rows are postponed (see "Priority") and are
@@ -95,7 +101,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C87 · D11 · E8 · F12 · G17. An ID recorded and paid in one commit has no
+Next free IDs: C89 · D11 · E8 · F12 · G21. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -114,7 +120,41 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Empty. A divergence found along the way goes here, with the next free ID.
+A divergence found along the way goes here, with the next free ID.
+
+### C87 — A save with no Extended Features does not load
+
+A save written without the Extended Features prefix (the Atari-era format, which is what
+Chaos Strikes Back ships: `mini.dat` and `csbgame2.dat` in
+`static/gamefiles/CSB_Windows_x86-32_20151213/`) carries no `cellFlagArraySize`, and
+`ReadDatabases` then takes the image header's `word2`, `LegacyCellFlagArraySize()`
+(`doc/CSBwin-src/SaveGame.cpp:2412-2415`, `CSB.h:2072`). `loadCsbwinWorld`
+(`src/data/CsbwinDungeonImage.ts`) takes 0 instead, so both files fail its closure check
+("cell flags end at 34050, file ends at 42813"). The port reads the word as
+`DungeonHeader.mapDataSize`. It is 8763 in both files, which closes the layout on the
+file's last word exactly. With that fallback (tried in a scratch script) both load:
+11 levels, blocks 1-6 passing their checksums, the conversions giving a save-shaped world,
+and a `Game` on CSB's `graphics.dat` running 600 ticks from either. The fix owes a check
+over both files in a `tools/` script, the CSB folder's saves beside DM's.
+
+### C88 — `DM_rules` is not modelled
+
+`DM_rules` is CSBWin's one switch between the two games' rules, and it is read in one
+place: `_ResurrectReincarnateCancel`'s reincarnation, which lowers attributes 1-6 by
+`reincarnateAttributePenalty / 16` and scales HP, stamina and mana by
+`(16 - reincarnateStatPenalty) / 16` only `if (!DM_rules)`
+(`doc/CSBwin-src/CSBCode.cpp:6740-6769`). It is `false` by default (`data.cpp:251`), set
+from a file's `extendedFlags & DMRulesOption` by every `ReadExtendedFeatures`
+(`SaveGame.cpp:396-398`), forced `true` by the designer's `flags & DMRules`
+(`DMRulesDesignOption`, `:392-393`) when `_ShowPrisonDoor` starts (`CSBCode.cpp:10672-10676`),
+toggled by the player's "DM Rules" menu item (`CSBUI.cpp:912-914`), and written back to a
+save (`SaveGame.cpp:950-955`). The port applies the penalties unconditionally
+(`HallOfChampions.ts`, "`DM_rules` is false by default") and writes both flags off
+(`buildLiveExtendedFeatures`), yet the five newest committed DM saves carry
+`DMRulesOption` (`extendedFlags` 0xf8) and `DMRules` (`flags` 0xe9): CSBWin reincarnates
+at no cost in them, and the port does not. Modelling it means the flag on the game, set as
+CSBWin sets it, read at the reincarnation, and written; the player's toggle belongs with
+the dungeon chooser (G18).
 
 ---
 
@@ -139,11 +179,89 @@ postponed ones follow, under their own heading (see "Priority").
 
 `ReadDatabases` reads a new game's `dungeon.dat` through `ExpandData` when its first word
 is 33028, and then takes `d.Word22592` from its word 3
-(`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `DungeonLoader` reads only a plain file, and
-`newGameBlock1` (`src/engine/GameContext.ts`) keeps the 13 `_ReadEntireGame` sets
-(`:1470`). Neither dungeon in `static/gamefiles/` is compressed (DM's opens with 99,
-Conflux's with 0x1abd), so whether a dungeon this project will load needs it is still to
-be checked, Chaos Strikes Back's first; if none does, the author may postpone it.
+(`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `ExpandData` is about 66 lines with its
+`getBits` helper (`CSBCode.cpp:9846-9929`): a 20-byte table of 4 and 16 entries, then
+2-bit, 6-bit and 10-bit codes. Chaos Strikes Back's `dungeon.dat` is compressed: 2098
+bytes opening `81 04`, the expanded size 2622, `Word22592` 12. It is the prison, two
+levels with sentinel 8, where a CSB game begins (G17). `DungeonLoader` reads only a plain
+file, and `newGameBlock1` (`src/engine/GameContext.ts`) keeps the 13 `_ReadEntireGame`
+sets (`:1470`), where it should take the file's word. DM's `dungeon.dat` is plain.
+
+### G18 — One game's data set, chosen before the boot
+
+The page loads `dungeon.dat`, `graphics.dat` and `CSBgraphics.dat` from a fixed
+`/gamefiles/dm-atari` (`src/main.ts`, `GAME_DATA_DIR`), builds `GameTables` and the sound
+from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
+`this.ctx.tables`, and a loaded save is restored into the running game's tables. CSBWin
+takes its rules from the data too. `DM_rules` aside (C88), nothing in its code branches
+on the game, and CSB's differences are the dungeon's content and the tables in its
+`graphics.dat`. Measured against DM's: the same 563 items, 77 of them different (the
+title's, portraits, and runs at 489-526 and 556-562), and 6 of the 35 tables
+`buildGameTables` extracts (`monsterDesc`, `spells`, `skillNumber`,
+`experienceForAttacking`, `byte20046`, `textDecode`). So a CSB save loaded into today's
+page runs on DM's monsters and spells. The title animation and the credits read
+`graphics.dat` too (graphic 1, `CSBCode.cpp:9205`), so the choice has to come before the
+title. Item 0x231 is the long form in CSB's file (0x804 bytes, where DM's and Conflux's
+are 0x7d4, `CSBCode.cpp:10135-10151`): `extractUITables` then reads `d.Buttons16932` from
+it rather than `MISSING_PRISON_DOOR_BUTTONS`, and no data set has yet proven that path or
+the offsets of the tables after it. That wants a canary. The CSB folder has no
+`CSBgraphics.dat`, which CSBWin opens only on demand for its extensions
+(`Graphics.cpp:1840-1858`, `:3201-3273`).
+
+What is needed: a data set per game (a folder, its files, a name), chosen before
+`loadGameFiles`, and everything built from it — the tables, the sound, the intro — with
+nothing that assumes `dm-atari`. **Where to choose, the author's decision.** The
+recommended answer is outside the game, on the page (a menu that reloads it with, say,
+`?dungeon=csb`): that is where CSBWin makes the same choice, from the command line's
+`directory=` or `config.txt`'s `DIRECTORY` (`CSBUI.cpp:2032`, `:799`), and its launcher
+`_AskWhatToDo` offers no dungeon (`CSBCode.cpp:11338-11444`). A reload also rebuilds every
+boot-time structure for free, where an in-game switch would have to rebuild the tables,
+the sound and the screen's caches in place. Conflux (`static/gamefiles/conflux-3.5-b8/`)
+is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
+parse, and nothing has examined its format.
+
+### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
+
+CSBWin makes a CSB game in three steps (the utility's own header,
+`doc/CSBwin-src/Chaos.cpp:1-5`):
+
+1. **DUNGEON → Enter** reads `dungeon.dat`, the prison (G16), and the party is saved from
+   it as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`). Where the champions are chosen in it is
+   not yet traced; the prison has to be decompressed first.
+2. **UTILITY → "MAKE NEW ADVENTURE"** (`_StartChaos`, `Chaos.cpp:2686`; the editor screen
+   `_DrawCharacterEditorScreen`, `:3755-3789`, and its dispatcher `_TAG004518`,
+   `:3874-4022`, where only button 13 does real work). It loads the source save
+   (`_ReadSavedGame(0)`, `:2207-2496`, a CSB or a DM save: `DMGAME.DAT` is offered,
+   `:376-377`), refuses one already used (`_TAG00260e`, `:2501-2546`: "ALREADY UTILIZED"
+   unless `Byte22596` or `Word22594` is 1 and `Word22592 <= 13`) or with duplicate names
+   (`CheckChampionNames`, `:1434-1462`), loads `mini.dat` (the eleven-level CSB dungeon,
+   `:2246`), which must have `Word22592` 13 (`_TAG0026c4`, `:2551-2566`), and copies the
+   party in (`TAG002724`, `:2571-2680`): the four `CHARDESC`s with their facing rotated,
+   HP, stamina and mana full, food and water `1500 + (rand & 255)`, every attribute at its
+   maximum with minimum 30 (Luck 10), skills' `tempAdjust` 0 but experience kept, every
+   possession slot empty, `RandomGameID + 1`, and `Word22594`. It writes the result as a
+   new save (`_TAG000fc4`, `:1643-1898`).
+3. **DUNGEON → Resume** loads that save, which needs C87.
+
+A DM party can therefore be carried into CSB, which is the classic way to play it.
+**The author's decision:** how the port offers step 2. The options: (a) port the
+utility's screen as CSBWin has it, a separate mode of the program; (b) port only its
+engine (the checks and `TAG002724`'s copy) and run it from the page or the save menu on a
+chosen source save, writing a new save; (c) run step 2 automatically when the prison's
+party is saved. (b) keeps the rules faithful and leaves the screen out.
+
+### G19 — Saves that know their dungeon
+
+A save's header names its date, level and party, not its game (`SaveHeader`,
+`src/engine/SaveGamePayload.ts`), and both stores list every save together, so a DM save
+could be offered to a CSB game and restored into the wrong tables. CSBWin keeps a game's
+saves in that game's directory (`CSBGAME.DAT` to `CSBGAME4.DAT`, `CSBCode.cpp:9747-9756`),
+and it guards against the wrong graphics with the signatures an Extended Features block
+may carry (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
+`Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves stored
+and listed per data set (G18), a genuine `.dat` accepted in the set whose files it was
+made from, and G17's source save picked across sets (a DM save feeds a CSB game). It
+belongs with the save menu rework (`PLAN.md` → Phase 10, step 11).
 
 ### Postponed until the default dungeon is validated
 
@@ -273,6 +391,13 @@ objects, and the monsters (`:2152-2160`). The one route to it is the second butt
 "GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`), which in the port only puts
 the menu up again (`tag021028`, `src/renderer/intro/BootSequence.ts`). In a page it would be
 a download.
+
+### G20 ⏸️ The hint oracle
+
+CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`, a 7936-line file)
+reads `hcsb.hct` and `hcsb.dat`, deciphered with RC4 under the `hintKey` of a save's
+Extended Features block (`:5401-5628`, `SaveGame.cpp:382`), and answers questions about
+a CSB game in progress. It is not the game, so it waits; the author names it to start it.
 
 ---
 
