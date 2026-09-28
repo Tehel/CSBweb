@@ -15,6 +15,9 @@
  *   0x7d, 0x91)` for a turn right (`:7896-7903`); `HandleMouseEvents` flashes the step
  *   arrow `d.MoveButn18496[button - 3]` that `MoveParty` returns (`Mouse.cpp:1556-1567`,
  *   `CSBCode.cpp:8137-8139`), even a step a wall refuses, which brings no tick (`:8310-8314`).
+ * - `TAG01b29a` comes after `d.Time++` and `d.freezeLifeTimer--` (`:660-685`), and after
+ *   the put-back `WaitForButtonFlash` waits for: a tick that asked for one paints nothing
+ *   more in its VBL (`Game.paintHeld`), and the put-back's redraw paints `TAG01b29a`.
  * - `CastMagic` calls `WaitForButtonFlash` first (`Magic.cpp:939`).
  * - `_MagicSelection` is `RESTARTABLE` and waits (`Magic.cpp:545-581`): the cast flashes
  *   `(0xea, 0x12f, 0x3f, 0x49)`, then `CastMagic` waits the flash out and casts; a rune or
@@ -59,7 +62,12 @@ async function main(): Promise<void> {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
 
   const level = Number(process.argv[2] ?? 1);
-  const game = newGame(data, graphics);
+  // The tick's `TAG01b29a` and the paint after it, as the host sees them.
+  const hostLog: string[] = [];
+  const game = newGame(data, graphics, {
+    tag01b29a: () => hostLog.push(`TAG01b29a d.Time ${game.state.tickCount} freezeLifeTimer ${game.party.state.freezeLifeTimer}`),
+    drawViewport: () => hostLog.push('paint'),
+  });
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
   game.monsterSystem.loadPartyLevel(level);
@@ -195,6 +203,41 @@ async function main(): Promise<void> {
   console.log(`flash, then passes without a tick: standing ${standing}, put-back asked ${askedWithoutTick}, back ${backWithoutTick}`);
   check(standing, 'FlashButton should invert its rectangle before it returns, with nothing left pending');
   check(askedWithoutTick && backWithoutTick, 'a pass without a tick should ask for the put-back, and the next VBL make it');
+
+  // ---- TAG01b29a after d.Time++, painted in its tick unless a put-back waits --------
+  // `DrawViewport` (:638), `WaitForButtonFlash` (:655), `d.Time++` (:660),
+  // `d.freezeLifeTimer--` (:684), `TAG01b29a` (:685). CSBWin's `WaitForButtonFlash` holds
+  // the pass until the put-back, so what `TAG01b29a` draws is on screen only after it.
+  game.onTick(() => hostLog.push(`DrawViewport d.Time ${game.state.tickCount} freezeLifeTimer ${party.freezeLifeTimer}`));
+  const tickOrder = (flash: boolean): { time: number; log: string[]; held: boolean; next: { inverted: Rect | null; changed: boolean; held: boolean } } => {
+    reset();
+    party.freezeLifeTimer = 5;
+    hostLog.length = 0;
+    const time = game.state.tickCount;
+    if (flash) {
+      flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
+      game.setClockTick(1);
+    }
+    frame(!flash);
+    const log = [...hostLog];
+    const held = game.paintHeld();
+    game.takeFlashChanged();
+    frame();
+    return { time, log, held, next: { inverted: game.flashedButton(), changed: game.takeFlashChanged(), held: game.paintHeld() } };
+  };
+  const plain = tickOrder(false);
+  console.log(`a tick: ${plain.log.join(' | ')}; paint held ${plain.held}`);
+  check(plain.log.join(' | ') === `DrawViewport d.Time ${plain.time} freezeLifeTimer 5 | TAG01b29a d.Time ${plain.time + 1} freezeLifeTimer 4 | paint`,
+    'TAG01b29a should run after DrawViewport, d.Time++ and d.freezeLifeTimer-- (CSBCode.cpp:638-685), and be painted in its tick');
+  check(!plain.held, 'a tick that asked for no put-back should not hold the paint');
+  const flashed = tickOrder(true);
+  console.log(`a flash, then its tick: ${flashed.log.join(' | ')}; paint held ${flashed.held}; ` +
+    `next VBL inverted ${show(flashed.next.inverted)}, redraw due ${flashed.next.changed}, held ${flashed.next.held}`);
+  check(flashed.log.join(' | ') === `DrawViewport d.Time ${flashed.time} freezeLifeTimer 5 | TAG01b29a d.Time ${flashed.time + 1} freezeLifeTimer 4`,
+    'with a put-back asked, TAG01b29a should draw without a paint after it');
+  check(flashed.held, 'with a put-back asked, the tick should hold the paint for the rest of its VBL');
+  check(flashed.next.inverted === null && flashed.next.changed && !flashed.next.held,
+    'the next VBL should put the rectangle back and ask for the redraw that paints TAG01b29a');
 
   // ---- a second flash waits out the first ------------------------------------------
   reset();

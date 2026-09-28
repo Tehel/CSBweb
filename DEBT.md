@@ -81,8 +81,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
-| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C83 |
+| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -118,22 +117,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-A divergence found along the way goes here, with the next free ID.
-
-### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
-
-CSBWin's tick calls `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:685`) after `DrawViewport`
-(`:638`), `WaitForButtonFlash` (`:655`), `d.Time++`, `scrollingText.ClockTick()`,
-`SmartDiscard`, `NinetySecondUpdate` and `d.freezeLifeTimer--` (`:660-684`), and before
-`TenSecondUpdate`. The port calls `attackPanelTick` from `main.ts`'s `onTick`
-(`src/main.ts:464`), which `Game.gameTick` runs where `DrawViewport` is, before all of
-those. The fix moves it to its place, through a host call from `gameTick`, with a redraw
-after it: every screen change `TAG01b29a` makes (the flinch, the damage, the buttons) must
-still be painted in its tick. The one exception is when the tick's `WaitForButtonFlash`
-has asked for a put-back: CSBWin paints what `TAG01b29a` drew only after that VBL, and so
-must the port, at the put-back's own redraw (`Game.takeFlashChanged`). Without it, a
-single painted frame shows both states, because the port paints once per `runFrame`.
-Check the golden frames: the flinch and the damage are on screen in several of them.
+Empty. A divergence found along the way goes here, with the next free ID.
 
 ---
 
@@ -176,12 +160,11 @@ The step left:
    route in `Keyboard.ts`. Nothing after the flash waits except the fusion, so the
    immediate `flashButton` fits, through a new UI hook. A script would not: the fusion
    starts its own inside `ExecuteAttack`, and `Game.runScript` does not nest.
-   This step needs C83 first. With it paid, an attack goes as in CSBWin: the
-   click's pass inverts the option; the tick's redraw paints the menu, still on screen,
-   inverted; its `WaitForButtonFlash` asks for the put-back; and `TAG01b29a`'s new panel is
+   An attack then goes as in CSBWin: the click's pass inverts the option; the tick's
+   redraw paints the menu, still on screen, inverted; its `WaitForButtonFlash` asks for
+   the put-back, which holds the paint (`Game.paintHeld`); and `TAG01b29a`'s new panel is
    painted at the put-back's VBL. After a PASS, `:763`'s wait puts the menu back at the
-   next VBL, and the menu stays until the next tick. Without it, the one flashed frame
-   shows the inversion over the new panel.
+   next VBL, and the menu stays until the next tick.
 
 The UI reaches the flash through `UIState`'s hooks (`flashedButton`, `waitForButtonFlash`,
 `runScript`, `flashButtonScript`, `waitForButtonFlashScript`), which `main.ts` wires to

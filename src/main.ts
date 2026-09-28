@@ -256,8 +256,11 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         showCredits: (word11694) => {
             if (screen) void showEndOfGame(game, screen, sound, word11694);
         },
-        // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
+        // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself;
+        // the main loop's tick paints what `TAG01b29a` drew with it.
         drawViewport: () => renderView(),
+        // `TAG01b29a`, after the tick's `d.Time++`: the flinch and the attack panel.
+        tag01b29a: () => screen?.attackPanelTick(),
     });
 
     screen = new GameScreen(gameCanvasEl, {
@@ -459,9 +462,6 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
     // (doc/CSBwin-src/CSBCode.cpp:618-639).
     let mapPreviewAt = '';
     game.onTick(() => {
-        // `TAG01b29a` — the champion flinch and the attack panel's redraw
-        // state (doc/CSBwin-src/CSBCode.cpp:685), before the port's redraw.
-        screen.attackPanelTick();
         renderView();
         const { x, y, z } = game.party.state.position;
         if (`${x},${y},${z}` !== mapPreviewAt) {
@@ -472,8 +472,10 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
 
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
     // a VBL; CSBWin's `vblInterrupt` invalidates the window after each
-    // (doc/CSBwin-src/CSBCode.cpp:1003). A VBL that inverted a flashed button is drawn too.
+    // (doc/CSBwin-src/CSBCode.cpp:1003). A VBL that inverted a flashed button is drawn too,
+    // unless its tick holds the paint until the put-back (`Game.paintHeld`).
     game.onFrame(() => {
+        if (game.paintHeld()) return;
         const scrolled = scrollingText.takeChanged();
         const flashed = game.takeFlashChanged();
         if (scrolled || flashed) renderView();

@@ -1613,6 +1613,19 @@ and leaves `maxRecentDamage` as it is, so a blow taken then turns the champion a
 tick after. Either way it closes an open menu (`TAG01b1c0`) and stops. Asleep it stops
 anyway; with a candidate it goes on to service `d.Word20250`.
 
+## `TAG01b29a` runs after `d.Time++`, and after the put-back of a flash
+
+The main loop's tick (`doc/CSBwin-src/CSBCode.cpp:636-688`) runs `DrawViewport` (`:638`),
+`WaitForButtonFlash` (`:655`), then, while `d.GameIsLost == 0`, `d.Time++` (`:660`),
+`scrollingText.ClockTick()`, `SmartDiscard(false)`, `NinetySecondUpdate` every 512 ticks,
+`d.freezeLifeTimer--` (`:676-684`), `TAG01b29a` (`:685`) and `TenSecondUpdate`
+(`:686-688`). `WaitForButtonFlash` waits for the VBL that puts a flashed rectangle back
+(`:8561-8601`), so what `TAG01b29a` draws in a tick that flashed a button comes after the
+put-back. The port's pass does not wait (`DEBT.md` H): `Game.gameTick` calls the host's
+`tag01b29a` in its place and paints it at once, unless that tick asked for a put-back, in
+which case the rest of the VBL paints nothing (`Game.paintHeld`) and the put-back's redraw
+paints it. `tools/dump-button-flash.ts` checks the order and the held paint.
+
 ## `atk_SHOOT` throws away the damage it computes
 
 `doc/CSBwin-src/Attack.cpp:1905-1906`:

@@ -192,6 +192,8 @@ export class Game implements MainLoop {
     private script: LoopScript | null = null;
     /** The VBLs left of the `VBLDelay` the script is in. */
     private scriptDelay = 0;
+    /** This VBL's tick asked for a put-back before `TAG01b29a` drew (`paintHeld`). */
+    private paintIsHeld = false;
     /**
      * `d.CanRestartFromSavegame`: set by a save and by a load, cleared by a new game and by
      * the CSB win. With it, the end of a lost game offers "RESTART THIS GAME"
@@ -392,6 +394,7 @@ export class Game implements MainLoop {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
         this.state.currentTime = currentTime;
+        this.paintIsHeld = false;
         if (this.script !== null) {
             // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1137-1147): the VBLs
             // go by, with their `vblInterrupt`, and the loop makes no pass. The last one
@@ -471,8 +474,10 @@ export class Game implements MainLoop {
             callback(this);
         }
         // `tag000730: WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:653-655), asleep
-        // or not.
+        // or not. CSBWin waits there for the VBL that puts the flashed rectangle back;
+        // the port's pass does not (`DEBT.md` H), so whether it asked for one is kept.
         waitForButtonFlash(this.ctx);
+        const putBackAsked = this.ctx.loop.flashButnActive;
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
@@ -488,13 +493,20 @@ export class Game implements MainLoop {
         // last tick, and what they printed is placed in this tick.
         this.advanceTime();
         this.ctx.host.messages.clockTick(this.state.tickCount);
-        // `if ((d.Time&511)==0) NinetySecondUpdate();` and `if ((d.Time & (d.PartySleeping ?
-        // 15 : 63)) == 0) TenSecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-688).
+        // `if ((d.Time&511)==0) NinetySecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-683).
         if (isNinetySecondTick(this.state.tickCount)) ninetySecondUpdate(this.ctx);
-        if (isTenSecondTick(this.state.tickCount, this.party.state.sleeping)) tenSecondUpdate(this.ctx);
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
         // (doc/CSBwin-src/CSBCode.cpp:684).
         if (this.party.state.freezeLifeTimer !== 0) this.party.state.freezeLifeTimer--;
+        // `TAG01b29a(_4_);` (doc/CSBwin-src/CSBCode.cpp:685). What it draws is painted in
+        // this tick, unless a put-back was asked above: CSBWin draws it only after that
+        // VBL, so the port paints it at the put-back's redraw, and the frame shows the
+        // tick's `DrawViewport` until then (`paintHeld`).
+        this.ctx.host.tag01b29a();
+        if (putBackAsked) this.paintIsHeld = true;
+        else this.ctx.host.drawViewport();
+        // `if ((d.Time & (d.PartySleeping ? 15 : 63)) == 0) TenSecondUpdate();` (`:686-688`).
+        if (isTenSecondTick(this.state.tickCount, this.party.state.sleeping)) tenSecondUpdate(this.ctx);
         // `if (d.partyMoveDisableTimer != 0) d.partyMoveDisableTimer--;` and the same for
         // `d.Word11712` (doc/CSBwin-src/CSBCode.cpp:689-695).
         if (this.party.state.partyMoveDisableTimer !== 0) this.party.state.partyMoveDisableTimer--;
@@ -868,6 +880,15 @@ export class Game implements MainLoop {
         const changed = this.ctx.loop.flashChanged;
         this.ctx.loop.flashChanged = false;
         return changed;
+    }
+
+    /**
+     * Whether nothing more is to be painted in this VBL: its tick asked the next VBL to put
+     * a flashed rectangle back, and `TAG01b29a` has drawn since. The put-back's redraw
+     * paints it (`takeFlashChanged`).
+     */
+    paintHeld(): boolean {
+        return this.paintIsHeld;
     }
 
     /** Called at the end of every frame, whether or not a tick ran in it. */
