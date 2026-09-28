@@ -46,6 +46,7 @@ const CHECKS = [
   { tool: 'dump-marching-order.ts' },
   { tool: 'dump-inventory-routing.ts' },
   { tool: 'dump-key-bindings.ts' },
+  { tool: 'dump-attack-panel.ts' },
   { tool: 'dump-magic-panel.ts' },
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-champion-death.ts' },

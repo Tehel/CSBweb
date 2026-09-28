@@ -15,7 +15,7 @@ import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
 import { handleMagicClick } from './MagicPanel';
-import { handleAttackAreaClick } from './Attack';
+import { drawLegalAttackTypes, handleAttackAreaClick } from './Attack';
 import { resolveObjectNameIndex } from './Objects';
 import { OBJECT_ID_NULL } from '../../core/types';
 import { UIMode, UIState } from './UIState';
@@ -297,6 +297,7 @@ export function tag0207cc(ui: UIState): void {
   party.magicCasterIndex = -1;
   selectMagicCaster(party, caster);
   if (ui.attackingCharacterOrdinal === 0) ui.word20252 = 1;
+  drawLegalAttackTypes(ui);
   const selected = party.selectedCharacterIndex;
   if (selected >= 0) {
     party.selectedCharacterIndex = -1;

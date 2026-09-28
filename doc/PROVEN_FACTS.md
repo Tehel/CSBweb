@@ -1592,6 +1592,21 @@ PUNCH, KICK and WAR CRY, all free.
 `d.Byte20256` records the requirement that was met, and nothing ever reads it —
 `DrawLegalAttackTypes` does not draw it.
 
+## The attack panel keeps its last drawing until the next tick
+
+Only two functions draw the panel under the viewport: `DrawLegalAttackTypes`
+(`doc/CSBwin-src/CSBCode.cpp:8719-8794`), which fills it black and draws the buttons if
+`d.Word20252` is set, else the open menu, and clears `d.Word20250`; and `_FlashAttackDamage`
+(`doc/CSBwin-src/Attack.cpp:949-1042`), which draws the damage and waits `VBLDelay(15)`.
+`DrawAttackButton` draws one button, and nothing while `d.Word20252` is 0
+(`doc/CSBwin-src/Character.cpp:4827`). `TAG01b1c0`, which every close of the menu goes
+through (the PASS and the attacks in `_ExecuteAttack`, `:4976`), draws nothing on the panel:
+it sets `d.AttackingCharacterOrdinal = 0` and `d.Word20250 = 1` (`:4887-4897`). So the
+closed menu stays on the screen until the next tick's `TAG01b29a`
+(`doc/CSBwin-src/CSBCode.cpp:8843-8854`) flashes the damage over it, or draws the
+buttons. After the flash, `d.Word20250` is still 1, so the damage stays up until the tick
+after, whose `TAG01b29a` draws the buttons. `tools/dump-attack-panel.ts` checks the port.
+
 ## `atk_SHOOT` throws away the damage it computes
 
 `doc/CSBwin-src/Attack.cpp:1905-1906`:

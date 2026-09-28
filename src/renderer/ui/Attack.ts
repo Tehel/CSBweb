@@ -147,15 +147,27 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   ui.attackingCharacterOrdinal = chIdx + 1;
   getLegalAttackTypes(ui, chIdx, row);
   ui.word20252 = 0;
+  drawLegalAttackTypes(ui);
   ui.word20250 = 0;
 }
 
 /**
+ * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`), the state it leaves: the
+ * panel shows what `word20252` and the ordinal say, which `drawAttackPanel` composes each
+ * frame, so a menu `TAG01b1c0` closed is off the screen.
+ */
+export function drawLegalAttackTypes(ui: UIState): void {
+  ui.closedAttackMenuOrdinal = 0;
+}
+
+/**
  * `TAG01b1c0` (`doc/CSBwin-src/Character.cpp:4886`) — close the menu again, and ask for
- * the panel to be redrawn on the next tick.
+ * the panel to be redrawn on the next tick. It draws nothing there, so the menu stays on
+ * the screen until `TAG01b29a` draws the damage or the buttons over it.
  */
 export function closeAttackMenu(ui: UIState): void {
   if (ui.attackingCharacterOrdinal === 0) return;
+  ui.closedAttackMenuOrdinal = ui.attackingCharacterOrdinal;
   ui.attackingCharacterOrdinal = 0;
   ui.word20250 = 1;
 }
@@ -266,15 +278,18 @@ export function attackPanelTick(ui: UIState): void {
     if (damage !== 0) {
       ui.attackFlashValue = damage;
       ui.attackFlashUntilMs = nowMs() + FLASH_MS;
+      ui.closedAttackMenuOrdinal = 0;
       return;
     }
     ui.attackFlashValue = 0;
     ui.word20252 = 1;
+    drawLegalAttackTypes(ui);
     ui.word20250 = 0;
     return;
   }
 
   ui.word20252 = 0;
+  drawLegalAttackTypes(ui);
   ui.word20250 = 0;
 }
 
@@ -349,8 +364,10 @@ export function drawAttackPanel(ui: UIState): void {
     return;
   }
 
-  if (ui.attackingCharacterOrdinal === 0) return;
-  const champ = ui.partyState && getPartyChampion(ui.partyState, ui.attackingCharacterOrdinal - 1);
+  // A closed menu is still what CSBWin's screen shows (`closeAttackMenu`).
+  const ordinal = ui.attackingCharacterOrdinal || ui.closedAttackMenuOrdinal;
+  if (ordinal === 0) return;
+  const champ = getPartyChampion(ui.partyState, ordinal - 1);
   if (!champ) return;
 
   let numAttackOption = 3;

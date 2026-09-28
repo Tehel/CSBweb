@@ -81,9 +81,11 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C82 | A closed attack menu goes black until `TAG01b29a` | S | ⏳ |
 | C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
-| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C82 and C83 |
+| C84 | The damage figure goes black when its timer runs out | S | ⏳ |
+| C85 | `TAG0207cc` leaves `d.Word20250` set | S | ⏳ |
+| C86 | `attackPanelTick` ignores a candidate at the mirror | S | ⏳ |
+| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C83 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -100,7 +102,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C84 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C87 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -121,19 +123,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C82 ⏳ A closed attack menu goes black until `TAG01b29a`
-
-`TAG01b1c0` closes the menu (`d.AttackingCharacterOrdinal = 0`, `d.Word20250 = 1`) and
-redraws only the champion's status box (`doc/CSBwin-src/Character.cpp:4887-4897`), and
-`DrawAttackButton` draws nothing while `d.Word20252` is 0 (`:4827`). So CSBWin's screen
-keeps the menu, as the last thing drawn there, until the next tick's `TAG01b29a` draws the
-damage or the champions' buttons (`CSBCode.cpp:8843-8854`). The port composes the panel
-from state: `drawAttackPanel` (`src/renderer/ui/Attack.ts:334`) fills it black and returns
-once the ordinal is 0 and `word20252` is 0 (`:337`, `:352`). After a PASS, which brings no
-tick, the panel is black for up to a tick where CSBWin's shows the menu. The fix keeps
-drawing the menu that was closed, which means remembering the ordinal `TAG01b1c0` cleared
-(the menu's title is the champion's name, `:387`), until `TAG01b29a` redraws.
-
 ### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
 
 CSBWin's tick calls `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:685`) after `DrawViewport`
@@ -148,6 +137,38 @@ has asked for a put-back: CSBWin paints what `TAG01b29a` drew only after that VB
 must the port, at the put-back's own redraw (`Game.takeFlashChanged`). Without it, a
 single painted frame shows both states, because the port paints once per `runFrame`.
 Check the golden frames: the flinch and the damage are on screen in several of them.
+
+### C84 ⏳ The damage figure goes black when its timer runs out
+
+`_FlashAttackDamage` draws the damage and waits `VBLDelay(15)` (`doc/CSBwin-src/Attack.cpp:949-1042`),
+and `d.Word20250` is still 1 after it, so CSBWin's screen keeps the figure until the next
+tick's `TAG01b29a` draws the buttons (`doc/PROVEN_FACTS.md` → "The attack panel keeps its
+last drawing until the next tick"). The port times the flash instead (H), and
+`drawAttackPanel` (`src/renderer/ui/Attack.ts`) draws it only while `attackFlashUntilMs`
+is ahead of the clock: once it runs out, the panel is black until the next tick. When a
+tick comes just before the timer runs out, `attackPanelTick` leaves the panel owed, and it
+is black for a whole tick. The fix draws the damage while `attackFlashValue` is set, and
+has `drawLegalAttackTypes` clear it, as `DrawLegalAttackTypes` draws over it.
+`tools/dump-attack-panel.ts` is where the check goes.
+
+### C85 ⏳ `TAG0207cc` leaves `d.Word20250` set
+
+`TAG0207cc` redraws the panel with `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:9948-9952`),
+which clears `d.Word20250` (`:8793`). The port's `tag0207cc` (`src/renderer/ui/Mouse.ts`)
+calls `drawLegalAttackTypes`, which does not, so a menu closed just before a freeze or
+the save menu still has the damage flashed at the first tick after, where CSBWin's shows
+the buttons and keeps the damage for the next close. The fix moves `word20250 = 0` into
+`drawLegalAttackTypes`, out of its three other callers in `src/renderer/ui/Attack.ts`.
+
+### C86 ⏳ `attackPanelTick` ignores a candidate at the mirror
+
+`TAG01b29a` takes its sleeping branch while `d.PotentialCharacterOrdinal` is set too
+(`doc/CSBwin-src/CSBCode.cpp:8808-8815`): no champion turns to face their attacker, and
+`maxRecentDamage` is not cleared, so a champion hit while a candidate stands in the party
+turns at the first tick after the candidate is resolved. Only asleep does it stop there;
+with a candidate it goes on to service `d.Word20250`. The port's `attackPanelTick`
+(`src/renderer/ui/Attack.ts`) tests only `party.sleeping`, so it runs the loop, and
+clears `maxRecentDamage`, while a candidate stands (`potentialChampionIndex`).
 
 ---
 
@@ -190,12 +211,12 @@ The step left:
    route in `Keyboard.ts`. Nothing after the flash waits except the fusion, so the
    immediate `flashButton` fits, through a new UI hook. A script would not: the fusion
    starts its own inside `ExecuteAttack`, and `Game.runScript` does not nest.
-   This step needs C82 and C83 first. With both paid, an attack goes as in CSBWin: the
+   This step needs C83 first. With it paid, an attack goes as in CSBWin: the
    click's pass inverts the option; the tick's redraw paints the menu, still on screen,
    inverted; its `WaitForButtonFlash` asks for the put-back; and `TAG01b29a`'s new panel is
    painted at the put-back's VBL. After a PASS, `:763`'s wait puts the menu back at the
-   next VBL, and the menu stays until the next tick. Without them, the one flashed frame
-   shows the inversion over the new panel, or over a black one.
+   next VBL, and the menu stays until the next tick. Without it, the one flashed frame
+   shows the inversion over the new panel.
 
 The UI reaches the flash through `UIState`'s hooks (`flashedButton`, `waitForButtonFlash`,
 `runScript`, `flashButtonScript`, `waitForButtonFlashScript`), which `main.ts` wires to
