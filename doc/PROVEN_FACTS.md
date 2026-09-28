@@ -1097,6 +1097,29 @@ Dragons breathe fire. Everything else has no missile at all: `missile` starts as
 which lets only the seven spell RNs through, skips it (`:1179-1191`). Checked by
 `tools/dump-monster-missile-type.ts` over every monster type in the shipped dungeon.
 
+## A giggler's blow steals only from the ready hand
+
+A giggler's attack (`monsterShouldSteal`, `doc/CSBwin-src/Monster.cpp:1080`) goes to
+`StealFromCharacter` (`:239`) instead of `MonsterDamagesCharacter` (`:1231-1234`). It makes
+`100 - Quickness` worth of tries, twenty a try, while the champion is not lucky
+(`IsCharacterLucky(pcA2, D7W)`, so the luck needed falls as the tries go). Each try looks
+at slot `d.uByte13126[D5W]`, `D5W` starting at `STRandom(8)` and stepping by one, and a slot
+of 13 would be a random backpack slot, `13 + STRandom(17)` (`:254-258`). A filled slot is
+emptied with `RemoveCharacterPossession` onto the group's possessions: as the head when it
+has none, else by `AddObjectToRoom` with no cell, which clears the object's link and hangs
+it off the last object of the chain (`doc/CSBwin-src/Code11f52.cpp:428`, `:491-499`). Then
+an unused `STRandom(8)`, and one time in eight, or on `STRandomBool` when something was
+taken, the group's `ITEM16.uByte5` becomes `STRandom(64) + 20` and its fear state 5
+(`Monster.cpp:277-285`).
+
+`d.uByte13126[8]` is never written. Its only reference is that read. `DBank::Initialize`
+zeroes all of `d` (`doc/CSBwin-src/CSBCode.cpp:329`), none of the four graphics loaded
+into `d` reaches it (`CSBCode.cpp:10125-10162`; the nearest, `0x231` and `0x22f`, span
+addresses 18936-16885 and 10340-7255), and
+it lies below the 3328 bytes of the save's character block (`Data.h:765-785`). So every
+try names slot 0: a giggler takes what is in the ready hand, or nothing, and the backpack
+arm never runs. Checked by `tools/dump-giggler-steal.ts`.
+
 ## Two independent chances to avoid a blow entirely
 
 `MonsterDamagesCharacter` (`doc/CSBwin-src/Monster.cpp:4536-4545`) checks, before rolling any

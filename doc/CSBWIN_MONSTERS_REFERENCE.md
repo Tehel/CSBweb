@@ -96,9 +96,10 @@ global design option read from the save game's extended-features block —
 (`doc/CSBwin-src/CSB.h:494-496`, set at `doc/CSBwin-src/SaveGame.cpp:394-400`). Both
 default to false, so plain Dungeon Master never sees them.
 
-`STATE_OF_FEAR` (`doc/CSBwin-src/CSBTypes.h:164`) has no state 1. A giggler that has
-just stolen something is put into state 5, and `DetachItem16` resets any state ≥ 4
-back to 0 (`doc/CSBwin-src/CSBCode.cpp:6129`).
+`STATE_OF_FEAR` (`doc/CSBwin-src/CSBTypes.h:164`) has no state 1. A giggler's steal puts
+its group into state 5 one time in eight, or on a coin toss when it took something
+(`doc/CSBwin-src/Monster.cpp:279-285`), and `DetachItem16` resets any state ≥ 4 back to 0
+(`doc/CSBwin-src/CSBCode.cpp:6129`).
 
 ### `ITEM16` — the per-group runtime slot
 

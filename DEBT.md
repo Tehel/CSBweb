@@ -14,8 +14,7 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers D, E and C are empty: the data structures, the architecture and the known
-divergences are paid. **The goal now is a complete, faithful game on the default
+Tier D is empty, and E and C hold only small items found along the way. **The goal now is a complete, faithful game on the default
 dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -82,7 +81,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
+| E7 | Two private copies of `AddObjectToRoom`'s chain arm | S | ⏳ |
+| C80 | `addObjectToCell` keeps a stale link on a cell's first object | S | ⏳ |
 | G15 | The magic footprint decoration | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
@@ -101,7 +101,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C80 · D11 · E7 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C81 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -114,13 +114,34 @@ Empty. New state-representation debt goes here, and jumps the queue.
 
 ## E — Architecture
 
-Empty. New architecture debt goes here, and jumps the queue.
+New architecture debt goes here, and jumps the queue.
+
+### E7 ⏳ Two private copies of `AddObjectToRoom`'s chain arm
+
+`DungeonState.addObjectToChain` (`src/engine/DungeonState.ts:341`) is `AddObjectToRoom`
+with no cell (`doc/CSBwin-src/Code11f52.cpp:428`, `:491-499`). Two private helpers do the
+same walk to the end of a monster's possession chain on their own:
+`DsaSystem.addObjectToMonster` (`src/engine/DsaSystem.ts:2281`) and
+`TimerSystem.addObjectToMonsterPossession` (`src/engine/TimerSystem.ts:1647`). Both also
+treat an `RNnul` head as an empty chain and write the head's link, which is what their
+CSBWin call sites have to settle. Route each through `addObjectToChain`, the head arm as its
+own CSBWin caller writes it, with the whole-output diff as proof.
 
 ---
 
 ## C — Known divergences from CSBWin
 
-Empty. A divergence found along the way goes here, with the next free ID.
+A divergence found along the way goes here, with the next free ID.
+
+### C80 ⏳ `addObjectToCell` keeps a stale link on a cell's first object
+
+`AddObjectToRoom` sets the new object's link to `RNeof` before either arm
+(`doc/CSBwin-src/Code11f52.cpp:428`). `DungeonState.addObjectToCell`
+(`src/engine/DungeonState.ts:294`) writes it only when it appends behind another object;
+an object that becomes a cell's first object, in either the new-root arm or the `RNeof`
+root arm, keeps whatever link it had, and the objects of its old chain come with it. Clear
+the link first, as CSBWin does, with a tool that puts an object with a live link on an
+empty cell.
 
 ---
 
@@ -140,13 +161,6 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
-
-A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
-(`doc/CSBwin-src/Monster.cpp:239`). The port spends the blow and takes nothing
-(`MonsterAttack.ts:195-197`). Port it there, through `ctx.systems`, with a tool that has a
-giggler rob a champion.
 
 ### G15 ⏳ The magic footprint decoration
 

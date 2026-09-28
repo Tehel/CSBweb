@@ -334,6 +334,21 @@ export class DungeonState {
     }
 
     /**
+     * `AddObjectToRoom(newObj, prevObj, -1, 0, NULL)` — the arm with no cell
+     * (`doc/CSBwin-src/Code11f52.cpp:428`, `:491-499`): clear the new object's link,
+     * then hang it off the last object of the chain `prevObj` is in.
+     */
+    addObjectToChain(newObj: ObjectID, prevObj: ObjectID): void {
+        if (newObj === OBJECT_ID_EOF) return;
+        this.setDBRecordLink(newObj, OBJECT_ID_EOF);
+        let last = prevObj;
+        for (let next = this.getDBRecordLink(last); next !== OBJECT_ID_EOF; next = this.getDBRecordLink(next)) {
+            last = next;
+        }
+        this.setDBRecordLink(last, newObj);
+    }
+
+    /**
      * Remove an object RN from the cell's object list.
      * Returns true if removed.
      */

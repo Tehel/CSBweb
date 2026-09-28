@@ -304,9 +304,11 @@ takes a step 185 times as often as a rock pile.
 
 Four genuine behavioural differences, rather than numeric ones:
 
-**The giggler** does not damage you. It steals an item and, having stolen, is put into
-a special agitated state and runs. It is also the only creature in the game with zero
-bravery, so it flees at the slightest provocation.
+**The giggler** does not damage you. It steals what the champion holds in the ready hand,
+and nothing else (`doc/PROVEN_FACTS.md` → "A giggler's blow steals only from the ready
+hand"), and then, one time in eight or on a coin toss when it took something, is put into
+fear state 5 and runs. It is also the only creature in the game with zero bravery, so it
+flees at the slightest provocation.
 
 **The throwers** — slime devil, flying eye, vexirk, zytaz, demon, dragon, Lord Chaos —
 each have a fixed repertoire. A vexirk or Lord Chaos rolls between a fireball and one

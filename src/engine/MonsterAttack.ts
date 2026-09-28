@@ -25,7 +25,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { getPartyChampion } from './Party';
-import { MonsterType } from './monsterTypes';
+import { MonsterType, StateOfFear } from './monsterTypes';
 import { selectMagicCaster, setHandOwner } from './Party';
 import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
@@ -49,6 +49,12 @@ import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_POISON,
   RN_POISON_BOLT, RN_POISON_CLOUD, RN_ZO_SPELL,
 } from '../core/spellRn';
+
+/**
+ * `d.uByte13126[8]`, the slots `StealFromCharacter` tries. CSBWin never writes it, so it
+ * is `DBank::Initialize`'s zeroes (see `stealFromCharacter`).
+ */
+const U_BYTE_13126: ArrayLike<number> = new Uint8Array(8);
 
 const THROWABLE: ReadonlySet<number> = new Set([
   RN_FIREBALL, RN_POISON, RN_LIGHTNING, RN_DISPELL_MISSILE,
@@ -193,8 +199,7 @@ export class MonsterAttack {
       }
 
       if (amended.monsterShouldSteal) {
-        // `StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`), the giggler, is not
-        // ported (DEBT.md G10): the blow is spent and nothing is taken.
+        this.stealFromCharacter(monster, chIdx);
       } else {
         const dealt = 1 + this.monsterDamagesCharacter(monster, chIdx, amended.supressPoison === 1);
         const champ = getPartyChampion(this.ctx.party.state, chIdx);
@@ -211,6 +216,52 @@ export class MonsterAttack {
       if (ordinal) this.ctx.sounds.queueSound(ordinal, amended.monsterX, amended.monsterY, 1, context.level);
     }
     return true;
+  }
+
+  /**
+   * `StealFromCharacter` (`doc/CSBwin-src/Monster.cpp:239`) — the giggler's blow.
+   *
+   * The less quick the champion, the more tries: `100 - Quickness`, twenty a try, while
+   * the champion is not lucky. Each try looks at the slot `d.uByte13126` names (13, the
+   * backpack's first slot, meaning a random one of the seventeen), and a filled slot is
+   * emptied into the group's possessions. Then, one time in eight, or on a coin toss
+   * when something was taken, the group is frightened: fear state 5, and 20-83 in its
+   * `ITEM16`'s `uByte5`, as a successful war cry leaves it (`AttackSystem`).
+   *
+   * `d.uByte13126[8]` is never written in CSBWin: `DBank::Initialize` zeroes all of `d`
+   * (`doc/CSBwin-src/CSBCode.cpp:329`), no graphic is loaded over it, and it lies below
+   * the 3328 bytes of the save's character block (`Data.h:765-785`). So every try looks at
+   * slot 0, the ready hand. `DrawCharacterState` has no counterpart: the panels are drawn
+   * from live state.
+   */
+  private stealFromCharacter(monster: CreatureRecord, chIdx: number): void {
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
+    if (!champ) return;
+    let w_2 = 0;
+    let D7W = sw(100 - sw(this.quickness(champ)));
+    let D5W = this.random.below(8);
+    while (D7W > 0 && !this.isCharacterLucky(champ, D7W)) {
+      let D6W = U_BYTE_13126[D5W]!;
+      if (D6W === 13) D6W = sw(D6W + this.random.below(17));
+      if (getChampionPossession(champ, D6W) !== OBJECT_ID_NULL) {
+        w_2 = 1;
+        const objD4 = this.ctx.systems.character.removeCharacterPossession(chIdx, D6W);
+        if (monster.possession === OBJECT_ID_EOF) {
+          monster.possession = objD4;
+        } else {
+          this.dungeon.addObjectToChain(objD4, monster.possession);
+        }
+      }
+      D5W = (D5W + 1) & 7;
+      D7W = sw(D7W - 20);
+    }
+    this.random.below(8); // `D0W = STRandom(8)`, overwritten before it is read.
+    if (this.random.below(8) === 0 || (w_2 !== 0 && this.random.bool() !== 0)) {
+      const pause = this.random.below(64) + 20;
+      const slot = this.dungeon.getAttachedItem16(monster);
+      if (slot) slot.uByte5 = pause & 0xff;
+      monster.fear = StateOfFear.StateOfFear5;
+    }
   }
 
   /**
