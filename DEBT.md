@@ -81,7 +81,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
+| G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ waiting on the author |
 | G7 | Save-format gaps | — | in `PLAN.md` |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
@@ -148,6 +148,20 @@ actuators and 768 for database 15 (`doc/CSBwin-src/data.cpp:967-972`, `:813-876`
 away from the party. The same limit keeps the port's `SmartDiscard` counting, because
 it starts at 6000 records in use (`doc/PROVEN_FACTS.md`). The retail dungeon's largest
 database, the actuators, holds 683 records.
+
+**Waiting on the author.** The port cannot reach CSBWin's `db.Max` without changing what an
+`ObjectID` is, so one of these has to be chosen:
+
+- **(a) Discard at 1024.** Port `MakeMoreRoomInDB` whole, with `Enlarge` failing at 1024
+  records, the port's `db.Max`. A full database then discards objects away from the party,
+  as the Atari original does. This is a new deliberate divergence (tier H): CSBWin
+  discards at 8000.
+- **(b) CSBWin's indirect `RN`.** Give the port `dataIndexMap` / `dataTypeMap`
+  (`doc/CSBwin-src/CSBTypes.h:265-341`, `data.cpp:919-993`), so that databases grow to
+  `db.Max` and `MakeMoreRoomInDB` and `SmartDiscard` both work at CSBWin's limits. This is
+  a tier-D, size-L change to every reader of an `ObjectID`, and to the save format.
+- **(c) Leave it.** Move this entry to H: a database stops at 1024, and an object created
+  beyond that is refused. Unreachable on the retail dungeon.
 
 ### G7 — Save-format gaps stay in `PLAN.md`
 
