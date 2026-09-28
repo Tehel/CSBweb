@@ -18,6 +18,8 @@
  * - The on-screen arrows are buttons 1-6 (`buttons17304`); `HandleMouseEvents` sends
  *   1-2 to `TurnParty` and 3-6 to `MoveParty` (`Mouse.cpp:1550-1570`).
  * - `DiscardAllInput` empties the queue, clicks included (`CSBCode.cpp:7532-7544`).
+ * - `totalMoveCount` counts each entry `HandleMouseEvents` takes past the held-step test
+ *   (`Mouse.cpp:1506`), below 0x2000 and not the no-op (`Recording.cpp:1011-1019`).
  * - While the eye or the mouth is pressed, every button after 81 — the disk icon, 140,
  *   among them — is swallowed (`Mouse.cpp:1679-1680`), until the button-up.
  * - A viewport click on a door button, or on a wall switch that fires, sets
@@ -249,6 +251,49 @@ async function main(): Promise<void> {
   frame();
   console.log(`click then DiscardAllInput: handled ${handled.length}, queue ${game.queuedInputCount()}`);
   check(handled.length === 0 && game.queuedInputCount() === 0, 'DiscardAllInput should drop a queued click');
+
+  // ---- 7b: totalMoveCount counts what HandleMouseEvents records -------------------
+  // `RecordFile_Record(&pMouseQueue[d.MouseQStart])` once an entry is past the held-step
+  // test (doc/CSBwin-src/Mouse.cpp:1506), counted when below 0x2000 and not the no-op
+  // (`Recording.cpp:1011-1019`). A held step and a frozen game's discard come first.
+  reset();
+  const moves = (): number => game.state.block1.totalMoveCount;
+  const m0 = moves();
+  party.partyMoveDisableTimer = 2;
+  game.enqueueMovement(MovementAction.MOVE_FORWARD);
+  frame();
+  const whileHeld = moves() - m0;
+  frame(true);
+  frame(true);
+  frame();
+  const afterStep = moves() - m0;
+  frame(true);
+  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  game.onMouseUnClick();
+  frame();
+  frame(true); // the click stamped lastTime: its button-up goes in the next tick
+  frame();
+  const afterClick = moves() - m0;
+  frame(true);
+  game.onMouseClick(0x64, 0x114, 0x2f);
+  frame();
+  frame(true);
+  game.enqueueKeyButton(0x2000);
+  frame();
+  const afterIgnored = moves() - m0;
+  game.freeze();
+  frame(true);
+  game.onMouseClick(NUM_INVENTORY, 10, 50);
+  frame();
+  const whileFrozen = moves() - m0;
+  game.thaw();
+  console.log(`totalMoveCount: held step +${whileHeld}, once it went +${afterStep}, ` +
+    `click and button-up +${afterClick}, the no-op and 0x2000 +${afterIgnored}, frozen click +${whileFrozen}`);
+  check(whileHeld === 0 && afterStep === 1, 'a held step is counted when it goes, not while it waits');
+  check(afterClick === 3, 'a click and its button-up count one each');
+  check(afterIgnored === 3, 'button 0x64 at (0x114, 0x2f) and an entry at 0x2000 are not counted');
+  check(whileFrozen === 3, 'a click a frozen game discards is not counted');
+  reset();
 
   // ---- 8: the disk icon waits for the eye to be let go ----------------------------
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81

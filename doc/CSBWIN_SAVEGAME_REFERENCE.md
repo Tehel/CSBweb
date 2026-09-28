@@ -40,6 +40,37 @@ the block keeps native PC order. A save file is therefore mixed-endian, and
 `SaveGameLoader` reads it that way: `readU16LE`/`readU32LE` for that one header,
 `readU16BE` everywhere else.
 
+## GAMEBLOCK1 (512 bytes)
+
+`doc/CSBwin-src/SaveGame.cpp:60-104` gives every offset; `SaveGame` fills the block at
+`:1058-1107` and `LoadGame` reads it at `:1603-1614` and `:1859-1881`. Byte order is
+big-endian except the two fields `swapBlock1` leaves alone (`:435-453`).
+
+| Off | Field | Order | Written from | Read into |
+| --- | --- | --- | --- | --- |
+| 0 | `Byte740[300]` | — | words 0-127 by `ScrambleAndWrite`: zeros, then word 127 balancing the second half's sum (`:706-750`); 256-299 never | — |
+| 300 | `Byte22598` | byte | `(i8)d.Word22598` | `d.Word22598` |
+| 301 | `Byte22596` | byte | `ub(d.Word22596)` | `d.Word22596`, or 1: an Atari DM save |
+| 302 | `FILL438[4]` | — | never | — |
+| 306 | `SaveOption` | **LE** | 1 SAVE AND PLAY, 0 SAVE AND QUIT | — |
+| 308 | `RandomGameID` | BE | `d.RandomGameID` | `d.RandomGameID` |
+| 312 | five hashes | BE | 0 | open blocks 2-6 |
+| 322 | `totalMoveCount` | **LE** | the global | the global |
+| 326 | `Hash326`…`342` | — | 0 | — |
+| 344 | five checksums | BE | `GenChecksum` of blocks 2-6 | checked |
+| 354 | `Checksum354`…`374` | — | never | — |
+| 376 | `Word22594` | BE | `d.Word22594` | `d.Word22594` |
+| 378 | `Word22592` | BE | `d.Word22592` | `d.Word22592`, or from the dungeon for an Atari save |
+| 380 | `Byte22808[132]` | bytes | `d.Byte22808` | `d.Byte22808` |
+
+This port reads every field into `SaveGameState.block1` and writes them back
+(`src/data/SaveGameLoader.ts`); the game holds the `d.` side in `GameState.block1`, which
+`buildCsbwinRuntimeState` fills as `LoadGame` does and `buildSavePayload` writes with
+`SaveOption` 1. The values, the new game's draw and the Atari branch are in
+`doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes there, and which two fields
+are little-endian", and how `totalMoveCount` counts in "`totalMoveCount` counts every
+mouse-queue entry `HandleMouseEvents` takes, once".
+
 ## GAMEBLOCK2 (128 bytes)
 
 `doc/CSBwin-src/SaveGame.cpp:107-133` gives every offset; `LoadGame` assigns them at
@@ -282,18 +313,19 @@ than a state-modelling one. The caveat that used to sit here — that nothing ha
 validated against a genuine CSBWin file, and a format that only round-trips through itself
 proves nothing — is answered for the reader *and* for every block the writer emits.
 `tools/dump-save-blocks-vs-file.ts` parses each of the fourteen committed saves, writes
-blocks 2-6 again from what came out, and compares them with the file's own bytes: **all
-five are identical in all fourteen**. Two exemptions are named and sourced rather than
-compared away — `TIMER.unused13` in a freed slot and the timer queue past `NumTimer`, both
-allocation debris CSBWin never reads back (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is
-0xcd in a slot that has been used").
+blocks 1-6 again from what came out, and compares them with the file's own bytes: **all
+six are identical in all fourteen**. Three exemptions are named and sourced rather than
+compared away: block 1's bytes `SaveGame` never assigns, and `TIMER.unused13` in a freed
+slot and the timer queue past `NumTimer`, both allocation debris CSBWin never reads back
+(`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is 0xcd in a slot that has been used"), with
+block 1's checksums of that debris.
 
 Writing that harness immediately found two defects in blocks marked complete: block 5 wrote
 zeros into `unused13` where a real file holds 0xcd, and block 6's tail was never looked at
-at all. Block 1 remains the one region the writer emits and cannot reproduce — it carries
-`RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount` and
-`Word22592`/`Word22594`, none of which this port models. The tool reports it and does not
-assert it.
+at all. Block 1 is compared the same way: every field it carries is asserted, and the
+bytes `SaveGame` never assigns are reported, since two of the saves carry 0xba there
+(`doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes there, and which two fields
+are little-endian").
 
 
 ## Where the dungeon image parse stands

@@ -18,7 +18,7 @@
  * front of the file. They are **derived**, never authoritative: `applySavePayload`
  * ignores the header entirely and restores from `runtime`.
  */
-import { loadSaveGameState, applySaveGameState, saveSaveGameState, type Block2, type SaveGameState } from '../data/SaveGameLoader';
+import { loadSaveGameState, applySaveGameState, saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from '../data/CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
@@ -251,6 +251,7 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
         extendedTimers: true,
         handChar: runtime.party.cursorOwner ?? -1,
         magicCaster: runtime.party.magicCasterIndex ?? -1,
+        block1: buildBlock1FromGame(runtime),
         block2: {
             ...buildBlock2FromGame(game, runtime),
             objectInHand: file.objectInHand,
@@ -265,6 +266,26 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
         header: makeSaveHeader(runtime),
         runtime,
         raw: encodeBytesToBase64(saveSaveGameState(saveGameState)),
+    };
+}
+
+/**
+ * `GAMEBLOCK1`'s fields, from the live game, as `SaveGame` fills them
+ * (`doc/CSBwin-src/SaveGame.cpp:1058-1072`). `SaveOption` is 1, "SAVE AND PLAY" (`:893`):
+ * the port saves and plays on, and has no "SAVE AND QUIT".
+ */
+function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
+    const b = runtime.game.block1;
+    if (!b) throw new Error('the runtime state carries no GAMEBLOCK1 fields');
+    return {
+        byte22598: b.word22598 & 0xff,
+        byte22596: b.word22596 & 0xff,
+        saveOption: 1,
+        randomGameID: b.randomGameID >>> 0,
+        totalMoveCount: b.totalMoveCount >>> 0,
+        word22594: b.word22594 & 0xffff,
+        word22592: b.word22592 & 0xffff,
+        byte22808: Uint8Array.from(b.byte22808),
     };
 }
 

@@ -20,8 +20,14 @@
  *
  * Three things are **reported and not asserted**, each for a stated reason:
  *
- * - **Block 1** carries `RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount`
- *   and `Word22592`/`Word22594`, none of which this port models. See `PLAN.md` Phase 10.
+ * - **The bytes of block 1 `SaveGame` never assigns**: `Byte740[256…299]`, `FILL438` and
+ *   `Checksum354…374`. `SaveGame` memsets the block before filling it
+ *   (`doc/CSBwin-src/SaveGame.cpp:864-865`) and `ScrambleAndWrite` writes only words
+ *   0-127 of `Byte740` (`:706-750`), so a CSBWin build of this source writes zeros there
+ *   and so does this port — twelve of the saves agree — but `csbgame.dat` and
+ *   `csbgame2.dat` carry 0xba in all three, so whatever wrote those two did not clear the
+ *   block. Every field of the block is asserted, bar the checksum words of a block whose
+ *   own exempt bytes differ (below) and word 127, which sums them.
  * - **`TIMER.unused13[3]`** in a slot that is *not* live. The three padding bytes hold
  *   0xcd in every slot CSBWin has ever put a timer in and 0 in every slot it has not
  *   (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is 0xcd in a slot that has been used"),
@@ -46,6 +52,37 @@ const DEFAULT_DIR = 'static/gamefiles/saves';
 
 const BLOCK1_SIZE = 512;
 const BLOCK2_SIZE = 128;
+
+/** Which `GAMEBLOCK1` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:60-104`). */
+const BLOCK1_FIELDS: Array<[number, number, string]> = [
+  [0, 256, 'Byte740 (ScrambleAndWrite)'], [256, 300, 'Byte740 tail'], [300, 301, 'Byte22598'],
+  [301, 302, 'Byte22596'], [302, 306, 'FILL438'], [306, 308, 'SaveOption'],
+  [308, 312, 'RandomGameID'], [312, 322, 'hashes'], [322, 326, 'totalMoveCount'],
+  [326, 344, 'Hash326-342'], [344, 354, 'checksums'], [354, 376, 'Checksum354-374'],
+  [376, 378, 'Word22594'], [378, 380, 'Word22592'], [380, 512, 'Byte22808'],
+];
+
+function block1Field(offset: number): string {
+  return BLOCK1_FIELDS.find(([from, to]) => offset >= from && offset < to)?.[2] ?? `+${offset}`;
+}
+
+/** The bytes `SaveGame` never assigns: `Byte740[256…299]`, `FILL438`, `Checksum354…374`. */
+function block1Unassigned(offset: number): boolean {
+  return (offset >= 256 && offset < 300) || (offset >= 302 && offset < 306) ||
+    (offset >= 354 && offset < 376);
+}
+
+/**
+ * Block 1's words that sum debris: `TimersChecksum` (350) when block 5 differs from the
+ * file in exempt bytes, `TimerQueChecksum` (352) when block 6 does, and word 127 (254),
+ * `ScrambleAndWrite`'s sum of the second half, when either does.
+ */
+function block1DebrisSums(offset: number, timers: boolean, queue: boolean): boolean {
+  if (offset >= 350 && offset < 352) return timers;
+  if (offset >= 352 && offset < 354) return queue;
+  if (offset >= 254 && offset < 256) return timers || queue;
+  return false;
+}
 const CHARACTER_SIZE = 3328;
 
 /** Which `GAMEBLOCK2` field an offset falls in (`doc/CSBwin-src/SaveGame.cpp:107-133`). */
@@ -115,6 +152,19 @@ function main(): void {
     const live = new Set(state.timerQueue ?? []);
     const liveWords = (state.timerQueue ?? []).length * 2;
     const dataMapLength = state.objectIndex?.length ?? 0;
+    // Whether blocks 5 and 6 differ from the file in their exempt bytes, which block 1's
+    // checksums of them sum: a region's own exemption carries over to its checksum.
+    const block5At = prefix + BLOCK1_SIZE + BLOCK2_SIZE + 16 * state.maxItem16 + CHARACTER_SIZE;
+    const block5Size = timerSize * state.maxTimers;
+    const differsAt = (at: number, size: number, exempt: (i: number) => boolean): boolean => {
+      for (let i = 0; i < size; i++) {
+        if (exempt(i) && written[at + i] !== file[at + i]) return true;
+      }
+      return false;
+    };
+    const timerDebris = differsAt(block5At, block5Size,
+      (i) => timerSize === 16 && i % 16 >= 13 && !live.has(Math.floor(i / 16)));
+    const queueDebris = differsAt(block5At + block5Size, 2 * state.maxTimers, (i) => i >= liveWords);
     const regions: Region[] = [
       {
         name: 'block 0  ext features', size: prefix, assert: true,
@@ -125,8 +175,9 @@ function main(): void {
             : 'DSAs / game info / DSA level index',
       },
       {
-        name: 'block 1  GAMEBLOCK1', size: BLOCK1_SIZE, assert: false,
-        why: 'RandomGameID, Byte22808[132], SaveOption, totalMoveCount are not modelled',
+        name: 'block 1  GAMEBLOCK1', size: BLOCK1_SIZE, assert: true, field: block1Field,
+        exempt: (i) => block1Unassigned(i) || block1DebrisSums(i, timerDebris, queueDebris),
+        exemptWhy: 'the bytes SaveGame never assigns, or the sums of blocks 5-6\'s debris',
       },
       { name: 'block 2  GAMEBLOCK2', size: BLOCK2_SIZE, assert: true, field: block2Field },
       { name: 'block 3  ITEM16', size: 16 * state.maxItem16, assert: true },

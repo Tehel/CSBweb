@@ -342,4 +342,34 @@ export interface GameState {
      * direction of flow as CSBWin, where the renderer sets the global and `Blocked` reads it.
      */
     currentPalette: number;
+    /** The `d.` fields `GAMEBLOCK1` carries, and `totalMoveCount`. */
+    block1: Block1State;
+}
+
+/**
+ * What a save's `GAMEBLOCK1` holds of the game, besides the other blocks' checksums
+ * (`doc/CSBwin-src/SaveGame.cpp:1058-1072`). Nothing in play reads any of it: `LoadGame`
+ * refuses a save whose `RandomGameID` is not the dead party's, a test no path reaches
+ * (`doc/PROVEN_FACTS.md` → "RESTART THIS GAME" clears `d` before the chooser), and
+ * CSBWin shows `totalMoveCount` in a debug message. It is here so a save carries it on.
+ */
+export interface Block1State {
+    /** `d.RandomGameID`: two draws of the stream when a new game is read (`SaveGame.cpp:1523-1532`). */
+    randomGameID: number;
+    /** `d.Word22592`, 13 for `dungeon.dat` (`SaveGame.cpp:1470`). */
+    word22592: number;
+    /** `d.Word22594`, 1 (`:1469`). */
+    word22594: number;
+    /** `d.Word22596`, 2 (`:1467`); a save with 1 here is an Atari DM save to `LoadGame`. */
+    word22596: number;
+    /** `d.Word22598`, 1 (`:1468`). */
+    word22598: number;
+    /** `d.Byte22808[132]`: zero, and only a loaded save's own otherwise (`:1611`). */
+    byte22808: number[];
+    /**
+     * CSBWin's global `totalMoveCount` (`doc/CSBwin-src/data.cpp:253`): every mouse-queue
+     * entry `RECORDFILE::Record` sees below 0x2000, bar its no-op
+     * (`doc/CSBwin-src/Recording.cpp:1011-1019`). Not `d.`'s, so a new game keeps it.
+     */
+    totalMoveCount: number;
 }

@@ -51,6 +51,11 @@
  * every record of every database a slot whether anything references it or not. The pass
  * is CSBWin's and is kept because CSBWin has it, not because this dungeon needs it.
  *
+ * `GAMEBLOCK1` travels too: `d.RandomGameID`, `totalMoveCount`, `d.Word22592`-`22598`
+ * and `d.Byte22808` come back, `SaveOption` is SAVE AND PLAY's 1, and a third section
+ * takes `LoadGame`'s branch for an Atari DM save, which no committed save does
+ * (`doc/CSBwin-src/SaveGame.cpp:1861-1877`).
+ *
  * Run: `npx tsx tools/dump-live-save-file.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -62,7 +67,7 @@ import {
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { applyCsbwinSave, buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import type { Databases, DungeonData, PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
@@ -165,6 +170,15 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     `${label}: the object on the cursor is the same record ` +
     `(${b.objectInHand} vs ${a.objectInHand})`);
   check(before.getTickCount() === after.getTickCount(), `${label}: the clock`);
+  // `GAMEBLOCK1` (SaveGame.cpp:1058-1072, :1603-1611, :1859-1881).
+  const g1 = before.state.block1;
+  const g2 = after.state.block1;
+  check(g1.randomGameID === g2.randomGameID && g1.totalMoveCount === g2.totalMoveCount,
+    `${label}: d.RandomGameID 0x${g2.randomGameID.toString(16)} and totalMoveCount ${g2.totalMoveCount}`);
+  check(g1.word22592 === g2.word22592 && g1.word22594 === g2.word22594 &&
+    g1.word22596 === g2.word22596 && g1.word22598 === g2.word22598 &&
+    same(g1.byte22808, g2.byte22808),
+    `${label}: d.Word22592-22598 and d.Byte22808`);
   // `gb2.partyMoveDisableTimer`, `Word11712`, `Word11714` (SaveGame.cpp:1029-1031, :1645-1647).
   check(b.partyMoveDisableTimer === a.partyMoveDisableTimer && b.word11712 === a.word11712 &&
     b.word11714 === a.word11714,
@@ -338,6 +352,7 @@ function writeAndReload(label: string, game: Game): Game | null {
   // `gb2.ObjectInHand = d.objectInHand.ConvertToInteger()` (`SaveGame.cpp:1033`): an
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
   // would load in CSBWin as an object in hand (`:1649`, `:2753`).
+  check(parsed.save.block1?.saveOption === 1, `${label}: SaveOption is SAVE AND PLAY's 1`);
   const inHand = game.party.state.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
     const word = parsed.save.block2?.objectInHand;
@@ -461,6 +476,14 @@ function main(): void {
   check(carrying > 0,
     'a timer is carrying an object at the moment of the save — the case the writer has to translate by hand');
 
+  // The vacuity guard for `GAMEBLOCK1`: a file that wrote zeros there would carry
+  // nothing a fresh load does not already have. The walk above goes round the mouse
+  // queue, which is where moves are counted (`tools/dump-mouse-queue.ts`), so the count
+  // is set here to one that has to travel.
+  fresh.state.block1.totalMoveCount = 0x12345;
+  check(fresh.state.block1.randomGameID !== 0 && fresh.state.block1.totalMoveCount > 0,
+    `dungeon.dat: the game drew a RandomGameID and counted its moves ` +
+    `(0x${fresh.state.block1.randomGameID.toString(16)}, ${fresh.state.block1.totalMoveCount})`);
   const freshBack = writeAndReload('dungeon.dat', fresh);
   if (freshBack) {
     compareGames('dungeon.dat', fresh, freshBack, true);
@@ -483,6 +506,9 @@ function main(): void {
     `${played.state.dungeon.item16?.length ?? 0} ITEM16 slots)`);
   check((played.state.dungeon.expool?.length ?? 0) > 0,
     'csbgame7.dat: and an EXPOOL that dungeon.dat does not have');
+  check(played.state.block1.randomGameID === 0x261fdc50 && played.state.block1.totalMoveCount === 69897,
+    `csbgame7.dat: the loaded game has the file's RandomGameID and totalMoveCount ` +
+    `(0x${played.state.block1.randomGameID.toString(16)}, ${played.state.block1.totalMoveCount})`);
 
   // **A load is not a no-op, and CSBWin's is not either.** `reloadAfterSaveGame` deletes
   // and re-creates the movement timers of every monster group on the party's level, and
@@ -504,6 +530,23 @@ function main(): void {
     const twice = writeAndReload('csbgame7.dat (again)', once);
     if (twice) compareGames('csbgame7.dat fixed point', once, twice, true);
   }
+
+  // `LoadGame`'s other branch, which no committed save takes: `Byte22596 == 1` marks an
+  // Atari DM save, whose `Word22592` comes from the dungeon it holds and whose
+  // `Word22596` / `Word22594` stay `_ReadEntireGame`'s 2 and 1
+  // (doc/CSBwin-src/SaveGame.cpp:1467-1470, :1861-1877). DM's image has fourteen levels
+  // and a sentinel of 99, which is the 10.
+  console.log('\n=== 3. GAMEBLOCK1 of an Atari DM save ===');
+  const world = loadCsbwinWorld(new Uint8Array(readFileSync(resolve(SAVES, 'csbgame7.dat'))));
+  const own = buildCsbwinRuntimeState(world).game.block1;
+  world.save.block1!.byte22596 = 1;
+  const atari = buildCsbwinRuntimeState(world).game.block1;
+  console.log(`  csbgame7.dat as written: Word22592 ${own?.word22592}, Word22596 ${own?.word22596}; ` +
+    `with Byte22596 1: ${atari?.word22592}, ${atari?.word22596}`);
+  check(own?.word22592 === 13 && own?.word22594 === 1 && own?.word22596 === 2 && own?.word22598 === 1,
+    'a CSBWin save brings its own words: 13, 1, 2 and 1');
+  check(atari?.word22592 === 10 && atari?.word22594 === 1 && atari?.word22596 === 2,
+    'an Atari DM save takes Word22592 10 from fourteen levels and sentinel 99');
 
   console.log();
   finish();

@@ -24,8 +24,8 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 
 The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
-1. **`DEBT.md`'s active rows**: the structural item left, then the unported CSBWin features
-   the default dungeon reaches, and Phase 10's block 1 (`DEBT.md` G7). `DEBT.md` says how
+1. **`DEBT.md`'s active rows**: the unported CSBWin features the default dungeon and
+   Chaos Strikes Back reach. `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
    the live status; its first row is the next item.
 2. **Rework the save menu** (Phase 10, step 11). The author sets its scope when it starts.
@@ -74,12 +74,12 @@ Back** are not postponed: it is the next dungeon to try.
   `isDebugFeaturesEnabled()`.
 
 **Incomplete:**
-- ⚠️ **CSBWin-compatible save files.** The reader is done, and the game's own save button
-  writes all sixteen blocks: `tools/dump-live-save-file.ts` writes a file from a game
-  played out of `dungeon.dat` and one from a game played on from a genuine save, and loads
-  both back with the world, the party, a thrown object in flight and the object on the
-  cursor intact. Block 1 is still a stub of valid checksums over fields this port does not
-  model. See Phase 10 → "What is left, in one place".
+- ⚠️ **The save menu.** Save files are done: the reader, and the game's own save button,
+  which writes all sixteen blocks as CSBWin fills them. `tools/dump-live-save-file.ts`
+  writes a file from a game played out of `dungeon.dat` and one from a game played on from
+  a genuine save, and loads both back with the world, the party, a thrown object in flight
+  and the object on the cursor intact. The menu behind the disk icon is to be reworked
+  (Phase 10, step 11).
 - ⚠️ **Validation.** Several completed phases listed validation steps (render tests, render
   probes, pixel comparisons against CSBWin screenshots) that were never carried out.
   Phase 15 gathers them.
@@ -135,8 +135,9 @@ Only the phases with work left in them.
 
 ### Phase 10 — CSBWin-Compatible Save/Load
 
-Goal: read and write a save file CSBWin itself can load. **Reading is done. Writing is the
-only phase in this file with substantial engine work left in it.**
+Goal: read and write a save file CSBWin itself can load. **Reading and writing are done**;
+what is left is the rework of the save menu (step 11). What the file cannot carry for a
+dungeon with DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
 #### What is left, in one place
 
@@ -149,7 +150,7 @@ writes a whole file**. Against the sixteen-block write order in
 | Block | What it holds | State |
 | --- | --- | --- |
 | 0 | Extended Features, `dataTypeMap`/`dataIndexMap`, DSA blocks | ✅ written and byte-identical to all fourteen saves — header, both maps, the game info and the DSA level index with its 0xff terminator. `buildObjectIndirectIndex` builds the maps for a world this port holds, which is what blocks 10-13 will encode their RNs through |
-| 1 | GAMEBLOCK1 | ✅ |
+| 1 | GAMEBLOCK1 | ✅ every field, from `GameState.block1`: `RandomGameID` drawn for a new game, `totalMoveCount` counted at `HandleMouseEvents`' record point, `Word22592`-`Word22598`, `Byte22808`, `SaveOption` 1. Byte-identical to all fourteen saves outside the bytes `SaveGame` never assigns |
 | 2 | GAMEBLOCK2 (128 b) | ✅ all 21 fields, byte-identical to all fourteen saves. `partyMoveDisableTimer` (40), `Word11712` (42) and `Word11714` (44) are `PartyState`'s since DEBT.md C13. `ObjectInHand` (8) is an indirect slot now, encoded through the same index as the image; an empty hand is written as `RNnul` since DEBT.md C29 |
 | 3 | ITEM16 | ✅ |
 | 4 | characters + party tail | ✅ byte-identical to all fourteen committed saves, the thirty possession slots included — they go out through `encodeRN` as slot numbers |
@@ -235,11 +236,9 @@ marked complete: block 5 wrote zeros into `TIMER.unused13` where a real file hol
 and nothing had ever looked at block 6's tail. Two regions are reported rather than
 asserted, each for a sourced reason — `unused13` in a freed slot and the timer queue past
 `NumTimer`, both CSBWin allocation debris (`doc/PROVEN_FACTS.md` → "`TIMER.unused13` is
-0xcd in a slot that has been used"). **Block 1 is the exception**: it carries
-`RandomGameID`, `Byte22808[132]`, `SaveOption`, `totalMoveCount` and
-`Word22592`/`Word22594`, none of which this port models, so it is reported and not
-asserted. Any new block should arrive with the same comparison, and step 10's
-load → re-serialize → binary-compare is the end state.
+0xcd in a slot that has been used"), and block 1's bytes that `SaveGame` never assigns,
+0xba in two of the saves (`doc/PROVEN_FACTS.md` → "`GAMEBLOCK1`: what `SaveGame` writes
+there, and which two fields are little-endian").
 
 **Deferred on purpose, and none of it blocking:** the DSA global variables are not read from
 `EXPOOL`; `d.Word11694` (`gameWon`) and `d.PartySleeping` are not restored; a record index
@@ -254,14 +253,8 @@ above 1023 cannot be expressed. All three are detailed under step 12.
 - ✅ **Resolved: `ObjectInHand`** (offset 8) goes out as an indirect slot number, through
   the index `buildSavePayload` builds for the image — the same one block 4's thirty
   possession slots use, which was always the same dependency rather than two.
-- ⏳ **DSA programs are not re-serialized.** A save that carries DSAs is written back
-  with the byte range it was read with (`SaveGameState.dsaBlock`), so a DSA whose state
-  machine has moved since the load would be written where it stood. `DSA::Write`
-  (`doc/CSBwin-src/Chaos.cpp`) is unported. No dungeon this project loads defines a DSA
-  — `numDSA` is 0 in every committed save — so nothing exercises it.
-- ⏳ **`SimpleEncryption` is neither written nor readable past the header.** The flag
-  (`EF_FLAGS.SimpleEncryption`, 0x04) puts the *whole* file behind RC4 with key `{1,0}`,
-  not just the 512-byte block the reader deciphers. No committed save sets it.
+- ⏸️ **DSA programs are not re-serialized** (`DEBT.md` G1).
+- ⏸️ **`SimpleEncryption` is neither written nor readable past the header** (`DEBT.md` G4).
 - ✅ **The live path writes a whole file** (September 14th). `buildSavePayload` builds the
   object indirect index, the dungeon image, the Extended Features header and the character
   block together — they are one numbering — and `saveSaveGameState` closes the file with
@@ -318,28 +311,18 @@ above 1023 cannot be expressed. All three are detailed under step 12.
 
 **Deferred by the live-path work (September 14th):**
 
-- ⏳ **A converted scroll's `m_word4` bits 1-15 go out as zero.** `convertScrolls` writes
+- **A converted scroll's `m_word4` bits 1-15 go out as zero.** `convertScrolls` writes
   bit 0 over two bytes nothing initialises, so a genuine save carries allocation debris
   there — 28 of DM's 35 scrolls in `csbgame4.dat`. Zero is the only honest value for a
   scroll this port converts; reported rather than asserted, like `TIMER.unused13`.
-- ⏳ **`buildSavePayload` refuses a dungeon with DSA programs** rather than writing a file
-  that silently lost them, because `DSA::Write` is unported. No dungeon this project
-  loads defines one.
-- ⏳ **`MakeBigActuators` reads the actuator type after the byte swap, CSBWin before it.**
-  A knowing divergence with no effect on DM, and asserted rather than assumed:
-  `tools/dump-dungeon-conversions.ts` fails if any actuator is type 47 under *either*
-  reading. <sub>`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap".</sub>
-- ⏳ **Scenario 2 of `dump-live-save-file.ts` holds the monster state to a fixed point**
+- ⏸️ **`buildSavePayload` refuses a dungeon with DSA programs** (`DEBT.md` G1).
+- ⏸️ **`MakeBigActuators` reads the actuator type after the byte swap, CSBWin before it**
+  (`DEBT.md` G4).
+- **Scenario 2 of `dump-live-save-file.ts` holds the monster state to a fixed point**
   rather than to the played game, because a load is not a no-op — `reloadAfterSaveGame`
   re-creates every monster group's movement timers and re-rolls their walk offsets, as
   CSBWin's does. Everything the reload does not touch is still compared one round trip
   earlier.
-
-- ⏳ **Block 1 is still a stub with valid checksums.** `RandomGameID`, `Byte22808[132]`,
-  `SaveOption`, `totalMoveCount`, `Word22592`/`Word22594` and `Byte22596`/`Byte22598` are
-  all zero. `LoadGame` reads `RandomGameID` only to refuse a save from a different game
-  after the party has died (`doc/CSBwin-src/SaveGame.cpp:1602-1606`) and lets
-  `Byte22596 != 1` through, so this is untested rather than known-broken.
 
 #### The original pre-work checklist
 
@@ -506,8 +489,8 @@ Kept because the rescoring below is written against its numbering.
      committed save is 682; `CsbwinObjectIndex.resolve` throws rather than alias, so a
      third-party dungeon that needed it would say so.
 
-Status: 🔄 **the reader is finished; the writer is what is left.** Rescored against the
-code in September 2026, and again on the 13th when step 12 landed:
+Status: 🔄 **the reader and the writer are finished; the save menu rework (step 11) is what
+is left.** The steps of the checklist above:
 
 - Step 1 (inventory the blocks) — ✅ done. The full write order, every block's size and
   the EXPOOL side-writes are tabulated in `doc/CSBWIN_SAVEGAME_REFERENCE.md`.
@@ -547,8 +530,9 @@ code in September 2026, and again on the 13th when step 12 landed:
   have.</sub>
 - Step 9 (checksum/scramble parity) — ✅ proven for blocks 0-6 in both directions, and
   now against files this project did not write.
-- Step 10 (round-trip validation) — ⚠️ half. `tools/dump-csbwin-save.ts` reads genuine
-  saves; the load → re-serialize → binary-compare half waits on the writer.
+- Step 10 (round-trip validation) — ✅ `tools/dump-csbwin-save.ts` reads genuine saves;
+  `tools/dump-save-blocks-vs-file.ts` and `tools/dump-dungeon-image-blocks.ts` re-serialize
+  each and compare it with the file's own bytes, block by block.
 - ✅ **Resolved: the dungeon image layout is solved.** (Kept here because the route to it
   is the lesson.) The blocker was never the text section alone — two database record
   sizes differ from `dungeon.dat` (ACTUATOR is 10 bytes with `bigActuators`, SCROLL is 6

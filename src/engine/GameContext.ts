@@ -14,7 +14,7 @@ import { DBType, type ObjectID } from '../core/types';
 import { sw } from '../core/intCast';
 import { CsbRandom } from '../core/random';
 import { DungeonState } from './DungeonState';
-import type { GameState } from './gameTypes';
+import type { Block1State, GameState } from './gameTypes';
 import { createGameHost, type GameHost } from './GameHost';
 import type { GameTables } from './GameTables';
 import { NameIndex } from './objectIndex';
@@ -125,6 +125,26 @@ function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQ
 }
 
 /**
+ * `_ReadEntireGame`'s `d.` for a new game: the four words it sets first
+ * (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), `Word22592` staying 13 for a `dungeon.dat`
+ * that is not compressed (`:2350-2358`), and `d.RandomGameID`, the product of the low
+ * words of two draws (`:1523-1532`).
+ */
+function newGameBlock1(random: CsbRandom): Block1State {
+    const d0 = random.next() & 0xffff;
+    const d1 = random.next() & 0xffff;
+    return {
+        randomGameID: (d0 * d1) >>> 0,
+        word22592: 13,
+        word22594: 1,
+        word22596: 2,
+        word22598: 1,
+        byte22808: new Array<number>(132).fill(0),
+        totalMoveCount: 0,
+    };
+}
+
+/**
  * The context for a new game over `dungeonData`: the party at the dungeon's start, the
  * clock at 0, an empty timer queue, and `host` (a null host by default).
  */
@@ -135,6 +155,7 @@ export function createGameContext(
 ): GameContext {
   const dungeon = new DungeonState(dungeonData);
   const party = new Party(dungeon.getStartPosition(), dungeon.getStartFacing());
+  const random = new CsbRandom();
   const state: GameState = {
     dungeon: dungeonData,
     running: false,
@@ -145,13 +166,14 @@ export function createGameContext(
     gameWon: false,
     word1868: false,
     currentPalette: 0,
+    block1: newGameBlock1(random),
   };
   const timers = newGameTimerQueue(dungeonData, tables);
   return {
     dungeon,
     party,
     state,
-    random: new CsbRandom(),
+    random,
     footprints: new PartyFootprints(),
     timers,
     mouseQueue: new MouseQueue(),

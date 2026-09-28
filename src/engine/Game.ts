@@ -33,7 +33,7 @@ import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
-import { MOUSE_UNCLICK } from './MouseQueue';
+import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
 import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, waitForButtonFlashScript, wakeUp, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
@@ -321,7 +321,11 @@ export class Game implements MainLoop {
      */
     readNewGame(data: DungeonData): void {
         const fresh = new Game(data, this.ctx.tables);
+        // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:253`), so
+        // `d.Initialize()` leaves it and the new game counts on from the last one.
+        const { totalMoveCount } = this.state.block1;
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
+        this.state.block1.totalMoveCount = totalMoveCount;
         this.canRestart = false;
     }
 
@@ -775,6 +779,12 @@ export class Game implements MainLoop {
             (party.word11712 !== 0 && ((party.facing + num - 3) & 3) === party.word11714)
         )) return result;
         queue.take();
+        // `RecordFile_Record(&pMouseQueue[d.MouseQStart])` (doc/CSBwin-src/Mouse.cpp:1506),
+        // the entry's one count in `totalMoveCount` (`Recording.cpp:1011-1019`). A viewport
+        // click, button 80, is recorded by `HandleClickInViewport` instead, exactly once on
+        // each of its paths, and it runs whenever `d.ClockRunning`, which is 0 only while
+        // frozen, when this entry would have been discarded above (`Mouse.cpp:1665-1668`).
+        this.recordFileRecord(entry);
         if (num === MOUSE_UNCLICK) {
             this.mouseEventHandlers?.unclick();
             return result | 1;
@@ -796,6 +806,16 @@ export class Game implements MainLoop {
         }
         this.lastInputTime = time;
         return result;
+    }
+
+    /**
+     * The count in `RECORDFILE::Record(MouseQueueEnt *)` (doc/CSBwin-src/Recording.cpp:1011-1019):
+     * `totalMoveCount` goes up for every entry below 0x2000 except the no-op, button 0x64
+     * at (0x114, 0x2f). The recording file itself is not ported.
+     */
+    private recordFileRecord(entry: MouseQueueEntry): void {
+        if (entry.num === 0x64 && entry.x === 0x114 && entry.y === 0x2f) return;
+        if (entry.num < 0x2000) this.state.block1.totalMoveCount++;
     }
 
     /** A pre-built champion joins, as the tools' do (`HallOfChampions.addChampion`). */

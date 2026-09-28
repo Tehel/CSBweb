@@ -12,7 +12,7 @@ import { sw } from '../core/intCast';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import type { GameContext } from './GameContext';
 import { VBL_PER_TICK } from './LoopState';
-import type { PartyState } from './gameTypes';
+import type { Block1State, PartyState } from './gameTypes';
 import { ensureHandOwner } from './Party';
 import type { FootprintsSnapshot } from './PartyFootprints';
 import type { TimerEntry } from './TimerQueue';
@@ -85,6 +85,11 @@ export interface RuntimeSaveState {
         footprints: FootprintsSnapshot;
         /** The DSA global variables, where a dungeon keeps its puzzle progress. */
         dsaGlobals: number[];
+        /**
+         * What `GAMEBLOCK1` carries (`GameState.block1`). Optional, so a payload written
+         * before it loads without a version bump; the running game's values stay then.
+         */
+        block1?: Block1State;
     };
     dungeon: {
         item16?: Item16Record[];
@@ -129,6 +134,7 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
             gameWon: ctx.state.gameWon,
             footprints: ctx.footprints.capture(),
             dsaGlobals: ctx.systems.dsa.getGlobalVariables(),
+            block1: { ...ctx.state.block1, byte22808: [...ctx.state.block1.byte22808] },
         },
         dungeon: {
             item16,
@@ -172,6 +178,9 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     ctx.state.startTime = now - save.game.elapsedTimeMs;
     ctx.random.setSeed(save.game.randomSeed);
     ctx.state.gameWon = save.game.gameWon;
+    if (save.game.block1) {
+        ctx.state.block1 = { ...save.game.block1, byte22808: [...save.game.block1.byte22808] };
+    }
     ctx.systems.dsa.setGlobalVariables(save.game.dsaGlobals);
 
     // The world first: cell flags, object chains and every database record. This

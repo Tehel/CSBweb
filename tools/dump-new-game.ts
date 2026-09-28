@@ -19,6 +19,12 @@
  * Along the way, `d.CanRestartFromSavegame`, which decides whether the end of a lost game
  * offers "RESTART THIS GAME": clear in a new game, set by a save and by a load.
  *
+ * `GAMEBLOCK1`'s fields (`GameState.block1`) are the one part a rebuilt game must *not*
+ * share with a fresh one, so the whole-state comparison leaves them out and they are
+ * checked on their own: `d.RandomGameID` is drawn again from the new game's stream
+ * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and `totalMoveCount`, a global outside `d`
+ * (`data.cpp:253`), counts on from the lost game.
+ *
  * Run: `npx tsx tools/dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
@@ -65,10 +71,10 @@ function champion(i: number): Champion {
   };
 }
 
-/** The runtime state, hashed without its two wall-clock fields. */
+/** The runtime state, hashed without its two wall-clock fields and `GAMEBLOCK1`'s. */
 function stateHash(game: Game): string {
   const json = JSON.stringify(game.getRuntimeSaveState(), (key, value) =>
-    key === 'savedAt' || key === 'elapsedTimeMs' ? 0 : value);
+    key === 'savedAt' || key === 'elapsedTimeMs' || key === 'block1' ? 0 : value);
   return createHash('sha256').update(json).digest('hex').slice(0, 16);
 }
 
@@ -79,11 +85,25 @@ function differingParts(a: Game, b: Game): string[] {
   const out: string[] = [];
   for (const part of ['party', 'game', 'dungeon']) {
     for (const key of Object.keys({ ...sa[part], ...sb[part] })) {
-      if (key === 'elapsedTimeMs') continue;
+      if (key === 'elapsedTimeMs' || key === 'block1') continue;
       if (JSON.stringify(sa[part]?.[key]) !== JSON.stringify(sb[part]?.[key])) out.push(`${part}.${key}`);
     }
   }
   return out;
+}
+
+/**
+ * `d.RandomGameID` for a stream that is now at `seed` after the two draws: step the LCG
+ * back twice (`0xbb40e62d` is odd, so it has an inverse mod 2^32) and redo them.
+ */
+function expectedGameID(seed: number): number {
+  let inverse = 1;
+  for (let i = 0; i < 32; i++) inverse = Math.imul(inverse, 2 - Math.imul(0xbb40e62d, inverse));
+  const back = (s: number) => Math.imul((s - 11) >>> 0, inverse) >>> 0;
+  const s0 = back(back(seed >>> 0));
+  const s1 = (Math.imul(s0, 0xbb40e62d) + 11) >>> 0;
+  const s2 = (Math.imul(s1, 0xbb40e62d) + 11) >>> 0;
+  return ((((s1 >>> 8) & 0xffff)) * ((s2 >>> 8) & 0xffff)) >>> 0;
 }
 
 function runFrames(game: Game, from: number, count: number): void {
@@ -130,9 +150,27 @@ function main(): void {
   check(played.mainLoopHasReturned(), 'the played game is lost, and its MainLoop has returned');
   check(stateHash(played) !== stateHash(fresh), 'and its world is not a new one');
 
+  const lostBlock1 = { ...played.state.block1 };
+  // The stream the rebuilt game's `d.RandomGameID` came from: the fresh parse's own
+  // `Game`, whose seed `readNewGame` restores along with the rest.
   played.readNewGame(parse());
+  const rebuiltSeed = played.getRuntimeSaveState().game.randomSeed;
   played.resumeMainLoop();
   played.setRandomSeed(SEED);
+
+  console.log('');
+  console.log('=== GAMEBLOCK1, lost game and rebuilt ===');
+  const rebuilt = played.state.block1;
+  console.log(['lost', `id ${lostBlock1.randomGameID.toString(16)}`, `moves ${lostBlock1.totalMoveCount}`,
+    'rebuilt', `id ${rebuilt.randomGameID.toString(16)}`, `moves ${rebuilt.totalMoveCount}`].join('\t'));
+  check(lostBlock1.totalMoveCount === 5,
+    `the lost game counted its five dequeued moves (${lostBlock1.totalMoveCount})`);
+  check(rebuilt.totalMoveCount === lostBlock1.totalMoveCount, 'and the new game counts on from them');
+  check(rebuilt.word22592 === 13 && rebuilt.word22594 === 1 && rebuilt.word22596 === 2 &&
+    rebuilt.word22598 === 1 && rebuilt.byte22808.every((b) => b === 0),
+    'its four words are _ReadEntireGame\'s 13, 1, 2, 1 and Byte22808 is zero');
+  check(rebuilt.randomGameID === expectedGameID(rebuiltSeed),
+    'its RandomGameID is the product of two draws of its stream');
 
   console.log('');
   console.log('=== rebuilt, against a Game never played ===');

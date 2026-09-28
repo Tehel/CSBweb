@@ -54,6 +54,11 @@ export interface SaveGameState {
   /** `gb2.MagicCaster`, restored on the next line of the same function (`:1637`). */
   magicCaster?: number;
   /**
+   * `GAMEBLOCK1` less the five blocks' hashes and checksums, which the writer computes.
+   * Present when the block was parsed; `saveSaveGameState` writes `emptyBlock1()` without it.
+   */
+  block1?: Block1;
+  /**
    * The rest of `GAMEBLOCK2`, as `LoadGame` reads it
    * (`doc/CSBwin-src/SaveGame.cpp:1617-1650`). Present when the block was parsed.
    */
@@ -123,7 +128,47 @@ export interface SaveGameState {
   dungeonImage?: Uint8Array;
 }
 
-interface Block1 {
+/**
+ * `GAMEBLOCK1`'s own fields: the 512 bytes less `Byte740`, which `ScrambleAndWrite`
+ * overwrites, and the ten hashes and checksums of blocks 2-6
+ * (`doc/CSBwin-src/SaveGame.cpp:60-104`). `SaveGame` fills them from `d.` at
+ * `:1058-1064` and `:1072`, and `LoadGame` reads them back at `:1603-1614` and
+ * `:1859-1881`.
+ *
+ * `swapBlock1` byte-swaps `RandomGameID`, the hashes, the checksums, `Word22594` and
+ * `Word22592` and nothing else (`:435-453`), so on the little-endian build CSBWin ships
+ * as those are big-endian in the file and **`SaveOption` and `totalMoveCount` are
+ * little-endian**: every committed save holds `SaveOption` 1 as `01 00`.
+ */
+export interface Block1 {
+  /** `Byte22598` (offset 300): `(i8)d.Word22598`. */
+  byte22598: number;
+  /** `Byte22596` (301): `ub(d.Word22596)`. 1 marks an Atari DM save to `LoadGame`. */
+  byte22596: number;
+  /** `SaveOption` (306, little-endian): 1 for "SAVE AND PLAY", 0 for "SAVE AND QUIT" (`:893`). */
+  saveOption: number;
+  /** `RandomGameID` (308): `d.RandomGameID`, drawn when a new game is read (`:1523-1532`). */
+  randomGameID: number;
+  /** `totalMoveCount` (322, little-endian): the recorded mouse-queue entries. */
+  totalMoveCount: number;
+  /** `Word22594` (376). */
+  word22594: number;
+  /** `Word22592` (378). */
+  word22592: number;
+  /** `Byte22808[132]` (380), moved as a unit to and from `d.Byte22808`. */
+  byte22808: Uint8Array;
+}
+
+/** Every field zero, for a caller that has none of them. */
+export function emptyBlock1(): Block1 {
+  return {
+    byte22598: 0, byte22596: 0, saveOption: 0, randomGameID: 0, totalMoveCount: 0,
+    word22594: 0, word22592: 0, byte22808: new Uint8Array(132),
+  };
+}
+
+/** The ten words of `GAMEBLOCK1` that open the other five scrambled blocks. */
+interface Block1Hashes {
   block2Hash: number;
   item16Hash: number;
   characterHash: number;
@@ -219,6 +264,16 @@ const ESL_SPECIAL_LOCATION_MAX = 15;
 function writeU16BE(buf: Uint8Array, off: number, value: number): void {
   buf[off] = (value >> 8) & 0xff;
   buf[off + 1] = value & 0xff;
+}
+
+function writeU16LE(buf: Uint8Array, off: number, value: number): void {
+  buf[off] = value & 0xff;
+  buf[off + 1] = (value >> 8) & 0xff;
+}
+
+function writeU32LE(buf: Uint8Array, off: number, value: number): void {
+  writeU16LE(buf, off, value & 0xffff);
+  writeU16LE(buf, off + 2, (value >>> 16) & 0xffff);
 }
 
 function writeU32BE(buf: Uint8Array, off: number, value: number): void {
@@ -834,7 +889,7 @@ function unscrambleStream(
   return { buf, next: end };
 }
 
-function parseBlock1(buf: Uint8Array): Block1 {
+function parseBlock1Hashes(buf: Uint8Array): Block1Hashes {
   return {
     block2Hash: readU16BE(buf, 312),
     item16Hash: readU16BE(buf, 314),
@@ -846,6 +901,20 @@ function parseBlock1(buf: Uint8Array): Block1 {
     characterChecksum: readU16BE(buf, 348),
     timersChecksum: readU16BE(buf, 350),
     timerQueueChecksum: readU16BE(buf, 352),
+  };
+}
+
+/** `GAMEBLOCK1`'s own fields, in the byte orders `swapBlock1` leaves them (see `Block1`). */
+function parseBlock1(buf: Uint8Array): Block1 {
+  return {
+    byte22598: buf[300],
+    byte22596: buf[301],
+    saveOption: readU16LE(buf, 306),
+    randomGameID: readU32BE(buf, 308),
+    totalMoveCount: readU32LE(buf, 322),
+    word22594: readU16BE(buf, 376),
+    word22592: readU16BE(buf, 378),
+    byte22808: buf.slice(380, 512),
   };
 }
 
@@ -978,7 +1047,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
   const { buf: block1Buf, next: afterBlock1 } = readUnscrambleBlock(saveData, offset);
   offset = afterBlock1;
 
-  const block1 = parseBlock1(block1Buf);
+  const block1 = parseBlock1Hashes(block1Buf);
 
   const { buf: block2Buf, next: afterBlock2 } = unscrambleStream(
     saveData,
@@ -1070,6 +1139,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     spellFilterLocation: extended.spellFilterLocation,
     handChar: block2.handChar,
     magicCaster: block2.magicCaster,
+    block1: parseBlock1(block1Buf),
     block2,
     characterBlock,
     extendedFeatures: extended.header,
@@ -1296,40 +1366,59 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   const timersChecksum = genChecksum(timers, timersHash, timers.length / 2);
   const timerQueueChecksum = genChecksum(timerQueue, timerQueueHash, timerQueue.length / 2);
 
+  // `SaveGame` memsets the block (`doc/CSBwin-src/SaveGame.cpp:864-865`) and fills it
+  // from `d.` (`:1058-1072`); `swapBlock1` then turns the fields it lists big-endian
+  // and leaves `SaveOption` and `totalMoveCount` native (see `Block1`).
+  const b1 = save.block1 ?? emptyBlock1();
   const block1Plain = new Uint8Array(BLOCK1_SIZE);
-  const wordOffset = 256;
-  writeU16BE(block1Plain, wordOffset + 56, block2Hash);
-  writeU16BE(block1Plain, wordOffset + 58, item16Hash);
-  writeU16BE(block1Plain, wordOffset + 60, characterHash);
-  writeU16BE(block1Plain, wordOffset + 62, timersHash);
-  writeU16BE(block1Plain, wordOffset + 64, timerQueueHash);
-  writeU16BE(block1Plain, wordOffset + 88, block2Checksum);
-  writeU16BE(block1Plain, wordOffset + 90, item16Checksum);
-  writeU16BE(block1Plain, wordOffset + 92, characterChecksum);
-  writeU16BE(block1Plain, wordOffset + 94, timersChecksum);
-  writeU16BE(block1Plain, wordOffset + 96, timerQueueChecksum);
+  block1Plain[300] = b1.byte22598 & 0xff;
+  block1Plain[301] = b1.byte22596 & 0xff;
+  writeU16LE(block1Plain, 306, b1.saveOption);
+  writeU32BE(block1Plain, 308, b1.randomGameID);
+  writeU16BE(block1Plain, 312, block2Hash);
+  writeU16BE(block1Plain, 314, item16Hash);
+  writeU16BE(block1Plain, 316, characterHash);
+  writeU16BE(block1Plain, 318, timersHash);
+  writeU16BE(block1Plain, 320, timerQueueHash);
+  writeU32LE(block1Plain, 322, b1.totalMoveCount);
+  writeU16BE(block1Plain, 344, block2Checksum);
+  writeU16BE(block1Plain, 346, item16Checksum);
+  writeU16BE(block1Plain, 348, characterChecksum);
+  writeU16BE(block1Plain, 350, timersChecksum);
+  writeU16BE(block1Plain, 352, timerQueueChecksum);
+  writeU16BE(block1Plain, 376, b1.word22594);
+  writeU16BE(block1Plain, 378, b1.word22592);
+  block1Plain.set(b1.byte22808.subarray(0, 132), 380);
 
+  // `ScrambleAndWrite` (`doc/CSBwin-src/SaveGame.cpp:706-750`): `D5` sums the second
+  // half's words, the first 127 words are zeroed and folded into `D6` by turns of add,
+  // xor, subtract and xor, and word 127 is `D5 ^ D6` — so the reader's fold over all
+  // 128 words ends at `D5`. The second half is then scrambled with word 29 as its hash.
+  let d5 = 0;
+  for (let i = 256; i < BLOCK1_SIZE; i += 2) d5 = (d5 + readU16BE(block1Plain, i)) & 0xffff;
   let d6 = 0;
   let pos = 0;
-  for (let i = 0; i < 32; i++) {
+  for (let d7 = 32; ; ) {
+    writeU16BE(block1Plain, pos, 0);
     d6 = (d6 + readU16BE(block1Plain, pos)) & 0xffff;
     pos += 2;
+    writeU16BE(block1Plain, pos, 0);
     d6 ^= readU16BE(block1Plain, pos);
     pos += 2;
+    writeU16BE(block1Plain, pos, 0);
     d6 = (d6 - readU16BE(block1Plain, pos)) & 0xffff;
     pos += 2;
-    d6 ^= readU16BE(block1Plain, pos);
-    pos += 2;
+    d7--;
+    if (d7 !== 0) {
+      writeU16BE(block1Plain, pos, 0);
+      d6 ^= readU16BE(block1Plain, pos);
+      pos += 2;
+      continue;
+    }
+    writeU16BE(block1Plain, pos, d5 ^ d6);
+    break;
   }
-
-  let sum = 0;
-  for (let i = 258; i < BLOCK1_SIZE; i += 2) {
-    sum = (sum + readU16BE(block1Plain, i)) & 0xffff;
-  }
-  writeU16BE(block1Plain, 256, (d6 - sum) & 0xffff);
-
-  const block1Hash = readU16BE(block1Plain, 58);
-  scramble(block1Plain.subarray(256), block1Hash, 128);
+  scramble(block1Plain.subarray(256), readU16BE(block1Plain, 58), 128);
 
   scramble(block2, block2Hash, BLOCK2_SIZE / 2);
   scramble(item16, item16Hash, item16.length / 2);

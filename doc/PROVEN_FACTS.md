@@ -4338,3 +4338,56 @@ converted dungeons), or is hung off the last object of the cell's chain (`:491-4
 With `mapX` -1 there is no cell, and it is hung off the last object of the chain
 `prevObj` is in. The port: `DungeonState.addObjectToCell` and
 `DungeonState.addObjectToChain`. Evidence: `tools/dump-add-object-to-room.ts`.
+
+## `GAMEBLOCK1`: what `SaveGame` writes there, and which two fields are little-endian
+
+`SaveGame` allocates the 512-byte block, memsets it (`doc/CSBwin-src/SaveGame.cpp:864-865`)
+and fills it from `d.`: `SaveOption` (306) is 1 for "SAVE AND PLAY" and 0 for "SAVE AND
+QUIT" (`:893`, `:1058`), then `Byte22808[132]` (380), `RandomGameID` (308), `Byte22596`
+(301, `ub(d.Word22596)`), `Byte22598` (300, `(i8)d.Word22598`), `Word22594` (376) and
+`Word22592` (378) (`:1059-1064`), the five hashes 0 and `totalMoveCount` (322)
+(`:1067-1072`), and the five checksums (`:1091-1107`). `swapBlock1` byte-swaps
+`RandomGameID`, the hashes, the checksums, `Word22594` and `Word22592` and nothing else
+(`:435-453`), so on the little-endian build **`SaveOption` and `totalMoveCount` are
+little-endian in the file**. Measured on all fourteen committed saves: `SaveOption` reads
+`01 00` in thirteen and `00 00` in `csbgame3.dat`, and `totalMoveCount` is a small
+little-endian count (`35 00 00 00`, 53 moves, in `csbgame-early-1hero.dat`).
+
+`ScrambleAndWrite` zeroes words 0-126, folds them into `D6` by turns of add, xor, subtract
+and xor, writes word 127 as `D6 ^ D5`, `D5` being the sum of the second half's words, and
+scrambles the second half with word 29, which is 0, as its hash (`:706-750`). The reader's
+fold over all 128 words therefore ends at `D5` (`ReadUnscrambleBlock`,
+`doc/CSBwin-src/CSBCode.cpp:9083-9098`). Bytes 256-299 of `Byte740`, `FILL438` (302) and
+`Checksum354`…`374` are never assigned. They are zero in twelve of the saves, and 0xba in
+`csbgame.dat` and `csbgame2.dat`, whose writer did not clear the block.
+
+`_ReadEntireGame` sets `d.Word22596 = 2`, `d.Word22598 = 1`, `d.Word22594 = 1`,
+`d.Word22592 = 13` before anything else (`SaveGame.cpp:1467-1470`); only a compressed
+`dungeon.dat` (first word 33028) changes `Word22592`, to its word 3 (`:2350-2358`). A new
+game draws `d.RandomGameID` as the product of the low words of two `STRandom()` draws
+(`:1523-1532`). `LoadGame` copies `totalMoveCount`, `RandomGameID` and `Byte22808`
+(`:1603`, `:1610-1611`) and `Word22598` from its byte (`:1859-1860`); when `Byte22596` is 1,
+an Atari DM save, it sets `Word22592` to 10 for fourteen levels and a sentinel of 99, 13
+for ten levels and 76, and 0 otherwise, and keeps the 2 and 1 above (`:1861-1877`);
+otherwise it copies all three words (`:1878-1881`). Every committed save holds 1, 2, 1
+and 13. `tools/dump-save-blocks-vs-file.ts` rewrites block 1 of each and finds it
+byte-identical outside the unassigned bytes above and the checksums of the timer debris
+blocks 5 and 6 already exempt.
+
+## `totalMoveCount` counts every mouse-queue entry `HandleMouseEvents` takes, once
+
+`RECORDFILE::Record(MouseQueueEnt *)` adds one to the global `totalMoveCount` for an entry
+below 0x2000, the no-op (button 0x64 at 0x114, 0x2f) aside, whether or not a recording is
+open (`doc/CSBwin-src/Recording.cpp:1011-1019`, `doc/CSBwin-src/data.cpp:253`).
+`HandleMouseEvents` records the entry it takes once it is past the frozen-game discard and
+the held-step test, button 80 excepted (`doc/CSBwin-src/Mouse.cpp:1432-1506`). Button 80
+goes to `HandleClickInViewport` whenever `d.ClockRunning` (`:1665-1668`), which is 0 only
+while the game is frozen (`:1733`, `:1762`), when the entry was discarded before this point.
+`HandleClickInViewport` records exactly once on each of its paths (`:1031-1251`), and a
+throw from the hand records in `ThrowByCharacter`, which then returns 1 (`:701-704`, `:756`), after which the
+viewport returns without recording again; a throw that returns 0 records nothing and falls
+through to the tail's record. So every entry taken past the held-step test counts once.
+The keyboard mode's entries are 0x4444 (`doc/CSBwin-src/Code13ea4.cpp:149-153`, `:228-232`) and a new
+game's is 0x3333 (`SaveGame.cpp:1515-1520`), neither of which counts. `totalMoveCount` is
+not `d.`'s, so a new game after a restart counts on. `tools/dump-mouse-queue.ts` checks the
+count, and `tools/dump-new-game.ts` the restart.

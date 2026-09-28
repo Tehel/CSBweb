@@ -25,6 +25,7 @@
  * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
  * | `ITEM16`, missiles | blocks 3 and the image, through `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
+ * | `d.RandomGameID`, `totalMoveCount`, `d.Byte22808`, `d.Word22592`-`d.Word22598` | `GAMEBLOCK1` (`buildBlock1State`) |
  *
  * **What is not restored**, all of it recorded in `PLAN.md`:
  *
@@ -46,7 +47,7 @@ import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from '../engine/RuntimeSa
 import type { TimerRecord } from './dungeonTypes';
 import { OBJECT_ID_NULL, Position } from '../core/types';
 import type { Direction, ObjectID } from '../core/types';
-import type { PartyState } from '../engine/gameTypes';
+import type { Block1State, PartyState } from '../engine/gameTypes';
 
 export interface CsbwinRuntimeOptions {
     /**
@@ -155,6 +156,40 @@ function resolveTimerObjects(world: CsbwinWorld): TimerRecord[] | undefined {
 }
 
 /**
+ * `GAMEBLOCK1` into `d.`, as `LoadGame` takes it. `_ReadEntireGame` first sets the four
+ * words to 2, 1, 1 and 13 (`doc/CSBwin-src/SaveGame.cpp:1467-1470`); the load copies
+ * `totalMoveCount`, `RandomGameID` and `Byte22808` (`:1603`, `:1610-1611`), then
+ * `Word22598` from its byte (`:1859-1860`). A save whose `Byte22596` is 1 is an Atari DM
+ * save, whose `Word22592` is set from the dungeon it holds: 10 for fourteen levels and a
+ * sentinel of 99, 13 for ten levels and 76, otherwise 0 (`:1861-1877`). Any other save
+ * brings its own three words (`:1878-1881`).
+ */
+function buildBlock1State(world: CsbwinWorld): Block1State {
+    const gb1 = world.save.block1;
+    if (!gb1) throw new Error('save has no GAMEBLOCK1');
+    const block1: Block1State = {
+        randomGameID: gb1.randomGameID >>> 0,
+        word22592: 13,
+        word22594: 1,
+        word22596: 2,
+        word22598: gb1.byte22598 & 0xff,
+        byte22808: [...gb1.byte22808],
+        totalMoveCount: gb1.totalMoveCount >>> 0,
+    };
+    if ((gb1.byte22596 & 0xff) === 1) {
+        const { numMaps, randomSeed: sentinel } = world.dungeon.header;
+        block1.word22592 = numMaps === 14 && sentinel === 99 ? 10
+            : numMaps === 10 && sentinel === 76 ? 13
+            : 0;
+    } else {
+        block1.word22596 = gb1.byte22596 & 0xff;
+        block1.word22594 = gb1.word22594;
+        block1.word22592 = gb1.word22592;
+    }
+    return block1;
+}
+
+/**
  * Everything a CSBWin save says, in the shape `Game.applyRuntimeSaveState` takes.
  *
  * Pure: no `Game` is touched, so a verification tool can build one and read it without
@@ -191,6 +226,7 @@ export function buildCsbwinRuntimeState(
                 indexOfLastMagic: tail.indexOfLastMagicFootprint,
             },
             dsaGlobals: options.dsaGlobals ?? [],
+            block1: buildBlock1State(world),
         },
         dungeon: {
             item16: world.save.item16,

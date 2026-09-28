@@ -81,7 +81,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G7 | Save-format gaps | — | in `PLAN.md` |
+| G16 | A compressed `dungeon.dat` | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Ten DSA filters | — | ⏸️ |
@@ -95,7 +95,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C87 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C87 · D11 · E8 · F12 · G17. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -135,10 +135,15 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G7 — Save-format gaps stay in `PLAN.md`
+### G16 — A compressed `dungeon.dat`
 
-Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
-rather than being copied here.
+`ReadDatabases` reads a new game's `dungeon.dat` through `ExpandData` when its first word
+is 33028, and then takes `d.Word22592` from its word 3
+(`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `DungeonLoader` reads only a plain file, and
+`newGameBlock1` (`src/engine/GameContext.ts`) keeps the 13 `_ReadEntireGame` sets
+(`:1470`). Neither dungeon in `static/gamefiles/` is compressed (DM's opens with 99,
+Conflux's with 0x1abd), so whether a dungeon this project will load needs it is still to
+be checked, Chaos Strikes Back's first; if none does, the author may postpone it.
 
 ### Postponed until the default dungeon is validated
 
@@ -160,6 +165,11 @@ Not taken in order; the author names one to start it (see "Priority").
   (`Character.cpp:1782-1816`), which finds the champion carrying the object and brackets
   the curse change with `AdjustStatsForItemCarried(…, -1, …)` and `(…, +1, …)`, so a curse
   laid on a carried weapon costs 3 Luck at once. Port both together.
+- **Saving a dungeon with DSAs.** `DSA::Write` (`doc/CSBwin-src/Chaos.cpp`) is unported, so
+  `buildSavePayload` refuses a dungeon that defines one rather than write a file without
+  them (`src/engine/SaveGamePayload.ts`), and `saveSaveGameState` writes a loaded save's
+  DSA section back verbatim (`SaveGameState.dsaBlock`), where a DSA whose state has moved
+  since the load would be written as it stood.
 - **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
   cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
   DSA or a custom dungeon sets extended cell flags. The magic footprints are drawn
@@ -235,6 +245,15 @@ party.
 
 No shipped DM hero touches any of these.
 
+**Two save-file matters.** `SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file behind
+RC4 with the key `{1,0}`, and CSBWin sets it only when it reads a file already enciphered
+(`doc/CSBwin-src/SaveGame.cpp:326-338`); the reader deciphers the 512-byte header and no
+more, and the writer never sets it. And `MakeBigActuators` reads each actuator's type before
+the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
+(`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap");
+`tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
+reading, and DM has none.
+
 **The monster design options.** `DB4::invisible()` is gated on `invisibleMonsters`, and
 `drawAsSize4()`, `Unique()` and `Poisoned()` on `drawAsSize4Monsters`
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
@@ -276,7 +295,10 @@ Recorded so that nobody "fixes" them.
   feeding animation (`src/renderer/ui/Attack.ts`, module comment).
 - 🚫 **Three inputs bypass the mouse queue:** the save menu and the Reincarnate screen,
   which are modal, and the panel keys in `src/renderer/ui/Keyboard.ts`, whose module
-  comment gives the reason. While a script holds the loop (`Game.isRunningScript`) the
+  comment gives the reason. So none of them reaches `totalMoveCount`: CSBWin's save menu
+  counts its SAVE AND PLAY or CANCEL click, since `_WaitForMenuSelect` takes it through
+  `HandleMouseEvents` (`doc/CSBwin-src/Menu.cpp:33-41`), and a file the port writes counts
+  one move fewer than CSBWin's would. While a script holds the loop (`Game.isRunningScript`) the
   panel keys do nothing, where CSBWin's would wait in the queue for the first pass after
   the script. After the fusion that pass never comes before the credits. After
   `_MagicSelection`'s three VBLs it does, so a rune key typed within about 50 ms of the
