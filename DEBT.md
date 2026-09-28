@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ waiting on the author |
 | G7 | Save-format gaps | — | in `PLAN.md` |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
@@ -135,33 +134,6 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record
-
-`DungeonState.findEmptyDBEntry` (`src/engine/DungeonState.ts:544`) returns `null` once a
-database holds 1024 records (`:551`), the ten-bit index of the port's `ObjectID`. CSBWin's
-`RN` is an indirect index, so its `FindEmptyDBEntry` `Enlarge`s a full database by 100
-records at a time, without asking (`AutoEnlarge`), up to `db.Max`: 8000, or 16000 for the
-actuators and 768 for database 15 (`doc/CSBwin-src/data.cpp:967-972`, `:813-876`,
-`CSB.h:1646`). Only a database at `db.Max` reaches `MakeMoreRoomInDB`
-(`doc/CSBwin-src/Character.cpp:182`), which tries `Enlarge` again and then discards objects
-away from the party. The same limit keeps the port's `SmartDiscard` counting, because
-it starts at 6000 records in use (`doc/PROVEN_FACTS.md`). The retail dungeon's largest
-database, the actuators, holds 683 records.
-
-**Waiting on the author.** The port cannot reach CSBWin's `db.Max` without changing what an
-`ObjectID` is, so one of these has to be chosen:
-
-- **(a) Discard at 1024.** Port `MakeMoreRoomInDB` whole, with `Enlarge` failing at 1024
-  records, the port's `db.Max`. A full database then discards objects away from the party,
-  as the Atari original does. This is a new deliberate divergence (tier H): CSBWin
-  discards at 8000.
-- **(b) CSBWin's indirect `RN`.** Give the port `dataIndexMap` / `dataTypeMap`
-  (`doc/CSBwin-src/CSBTypes.h:265-341`, `data.cpp:919-993`), so that databases grow to
-  `db.Max` and `MakeMoreRoomInDB` and `SmartDiscard` both work at CSBWin's limits. This is
-  a tier-D, size-L change to every reader of an `ObjectID`, and to the save format.
-- **(c) Leave it.** Move this entry to H: a database stops at 1024, and an object created
-  beyond that is refused. Unreachable on the retail dungeon.
 
 ### G7 — Save-format gaps stay in `PLAN.md`
 
@@ -383,6 +355,23 @@ Recorded so that nobody "fixes" them.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
   the branch is dead (`src/engine/PeriodicUpdates.ts:88`).
+- 🚫 **Databases stop at 1024 records.** The port's `ObjectID` is the original's packed
+  word, `[corner:2][database:4][index:10]`, so a record past 1023 cannot be named, and
+  `DungeonState.findEmptyDBEntry` treats 1024 as `db.Max`: a full database falls back on
+  `MakeMoreRoomInDB` (`src/engine/MakeMoreRoomInDB.ts`) at once. CSBWin first grows it by
+  100 records at a time, up to 8000 (16000 for the actuators, 768 for database 15)
+  (`doc/CSBwin-src/data.cpp:813-876`, `:967-972`, `CSB.h:1646`), and `SmartDiscard`, which
+  starts at 6000 in use, therefore never acts here. The author's decision: 1024 is already
+  more than the Atari original held (its databases were the file's records plus
+  `Byte7302`'s spares, 420 for misc: `doc/PROVEN_FACTS.md`), and CSBWin's way past it is
+  not wanted. **If it is ever needed:** CSBWin's `RN` is not the packed word but a 16-bit
+  index into `dataIndexMap` / `dataTypeMap` (`doc/CSBwin-src/CSBTypes.h:265-341`), whose
+  entries hold the record's index, its database and its corner; `FindEmptyDBEntry` hands
+  out a slot of that map with the record (`data.cpp:919-993`), `DeleteDBEntry` frees both
+  (`:995-1016`), and loading builds the map from the file's packed words. Porting it
+  means every `decodeObjectID` / `encodeObjectID` / `withObjectPosition` and hand-written
+  mask reading the map instead (about 240 places in 37 files), and working out how
+  CSBWin's saves store the words.
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
 - 🚫 **Crack Switch (In) placement.** `Byte4100[55]` is read as 2, not `graphics.dat`'s 0,

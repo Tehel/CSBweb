@@ -84,6 +84,7 @@ const CHECKS = [
   { tool: 'dump-dsa-delete.ts' },
   { tool: 'dump-db-reuse.ts' },
   { tool: 'watch-smart-discard.ts' },
+  { tool: 'dump-make-more-room.ts' },
   { tool: 'dump-missile-monster.ts' },
   { tool: 'dump-missile-door.ts' },
   { tool: 'dump-move-from-missile.ts' },

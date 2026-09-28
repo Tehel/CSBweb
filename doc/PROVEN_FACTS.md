@@ -3415,6 +3415,38 @@ in chests and in monsters' hands, except three floor weapons. So what `SmartDisc
 is what play creates. The port's databases stop at 1024 records, so it never gets past
 counting. Evidence: `tools/watch-smart-discard.ts`.
 
+## A full database throws one object out of the dungeon: `MakeMoreRoomInDB`
+
+Every `FindEmptyDB<n>Entry` (`doc/CSBwin-src/CSBCode.cpp:4942-5084`) falls back on
+`MakeMoreRoomInDB` (`Character.cpp:182-358`) when `FindEmptyDBEntry` returns `RNnul`, and
+reuses the record it returns. It first tries `Enlarge` again (`:214-218`), and for the cloud
+database gives up (`:220-223`). Then it sweeps: from `d.LevelCleared[db]` (`Data.h:941`, zero
+at the start), stepping past the party's level (`:225-232`), square by square, column by
+column, through each square's floor chain (`:233-331`). On the party's level it skips any
+square within 5 of the party on both axes, `uw(x - partyX + 5) <= 10` (`:250-256`). In a
+chain, an actuator of type 0 is passed and any other ends the square (`:260-264`). The first
+object of the database that is not `important()` is taken (`:268-327`):
+
+- a monster group: `DropMonsterRemains(x, y, rn, -1, level, dropResidue < 2)`, which drops
+  what it carries and no droppings, then `DeleteMonster`;
+- a missile: its timer deleted (`TAG00e156`, `Code11f52.cpp:1545-1551`), then
+  `RemoveObjectFromRoom` and `ProcessObjectFromMissile`, which drops its object;
+- a weapon, garment, misc object or potion: `MoveObject(rn, x, y, -1, 0)`;
+- any other database: the record is returned where it lies (`default:`).
+
+`d.LevelCleared[db]` becomes that level and the record is returned at corner 0. A level with
+nothing to take moves the sweep on, skipping the party's level. Back at the level it started
+on, it goes to the party's level. When the party's level (or a one-level dungeon) has nothing
+either, `LevelCleared` is set to it and the result is `RNnul` (`:340-355`).
+
+The function is the Atari original's (`TAG009d9e`, the `00a0a8` address comment); `Enlarge`
+is CSBWin's addition. The original's databases did not grow: a new game sizes each at the
+file's record count plus `d.Byte7302[db]` spares (`SaveGame.cpp:2556-2564`, with a
+commented-out cap of 1024, and 768 for database 15). The stock `Byte7302` gives 420 misc
+records (280 + 140), 207 weapons, 241 clothing, 257 monsters, 60 missiles and 50 clouds.
+`dungeon.dat` plants every monster group `important()`, so only a spawned group can go.
+Evidence: `tools/dump-make-more-room.ts`.
+
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
 
 `EX_DEL` (`doc/CSBwin-src/DSA.cpp:1643-1737`) removes the object from its square, the cursor

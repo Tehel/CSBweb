@@ -93,6 +93,12 @@ export interface GameContext {
   readonly sounds: SoundQueue;
   /** `SmartDiscard.cpp`'s statics: where the discard cycle stands. */
   readonly smartDiscard: SmartDiscardState;
+  /**
+   * `d.LevelCleared[16]` (`doc/CSBwin-src/Data.h:941`), one per database: the level
+   * `MakeMoreRoomInDB` last took an object from, where its next sweep starts. Zero at
+   * the start and never saved.
+   */
+  readonly levelCleared: Uint8Array;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -152,6 +158,7 @@ export function createGameContext(
     loop: createLoopFlags(),
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     smartDiscard: createSmartDiscardState(),
+    levelCleared: new Uint8Array(16),
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

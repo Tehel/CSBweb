@@ -14,7 +14,7 @@
  * are `ctx.smartDiscard` here.
  *
  * The port's databases stop at 1024 records, the ten-bit index of its `ObjectID`
- * (`DungeonState.findEmptyDBEntry`, `DEBT.md` G11), so no database reaches the limit in
+ * (`DEBT.md` H, "Databases stop at 1024 records"), so no database reaches the limit in
  * play and this never gets past counting. `tools/watch-smart-discard.ts` pads one past it.
  */
 import { getActuatorType } from '../data/actuatorHelpers';

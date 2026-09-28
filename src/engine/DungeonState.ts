@@ -60,6 +60,12 @@ const DATABASE_CATEGORY: Record<keyof Databases, DBType> = {
 
 export class DungeonState {
     private data: DungeonData;
+
+    /**
+     * `MakeMoreRoomInDB`, which `Game` supplies because it needs the systems
+     * (`engine/MakeMoreRoomInDB`). Without it a full database refuses the record.
+     */
+    makeMoreRoomInDB: ((db: DBType) => ObjectID) | null = null;
     private championBonesRecords = new Map<number, number>();
     private timerWord8Lookup?: (index: number) => ui16 | null;
 
@@ -537,9 +543,11 @@ export class DungeonState {
      * only `deleteDBEntry` writes `RNnul` into a link.
      *
      * Appending keeps `count` and the header's `objectCounts` — the size the image
-     * writer declares — equal to the number of records. ⚠️ At 1024 records, the ten-bit
-     * index, this returns `null`, where CSBWin goes on enlarging up to 8000 and then
-     * calls `MakeMoreRoomInDB` (`Character.cpp:182`), which is not ported (`DEBT.md` G11).
+     * writer declares — equal to the number of records. At 1024 records, the ten-bit
+     * index and the port's `db.Max` (`DEBT.md` H, "Databases stop at 1024 records"), it
+     * falls back on `MakeMoreRoomInDB` (`makeMoreRoomInDB`), as `FindEmptyDB<n>Entry` does
+     * (`CSBCode.cpp:4942-5084`), and stores `record` over the one that frees. `null` when
+     * that frees none.
      */
     findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number]): number | null {
         const database = this.data.databases[db] as Database<DatabaseRecord>;
@@ -548,7 +556,13 @@ export class DungeonState {
             database.records[i] = record;
             return i;
         }
-        if (database.records.length >= 1024) return null;
+        if (database.records.length >= 1024) {
+            const freed = this.makeMoreRoomInDB?.(DATABASE_CATEGORY[db]) ?? OBJECT_ID_NULL;
+            if (freed === OBJECT_ID_NULL) return null;
+            const index = decodeObjectID(freed).index;
+            database.records[index] = record;
+            return index;
+        }
         database.records.push(record);
         database.count = database.records.length;
         const category = DATABASE_CATEGORY[db];

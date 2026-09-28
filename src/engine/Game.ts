@@ -35,6 +35,7 @@ import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
 import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, waitForButtonFlashScript, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
@@ -239,6 +240,7 @@ export class Game implements MainLoop {
         this.character = new CharacterSystem(ctx);
         this.mouse = new MouseSystem(ctx);
         this.hallOfChampions = new HallOfChampions(ctx);
+        ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
 
         Object.assign(ctx.systems, {
             actuators: this.actuators,
