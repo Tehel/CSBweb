@@ -638,6 +638,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
   // the buttons back has not run.
   ui.word20252 = 0;
+  ui.word20250 = 1;
   const draw = (): void => {
     // `drawInventoryScreen`'s state half: open the chest in the weapon hand, and leave
     // `d.DisplayResurrectChestOrScroll` at 4 behind it.
@@ -661,19 +662,22 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   check(saved === packed, 'so a save taken with the menu up keeps the chest\'s objects');
 
   SaveMenu.closeSaveMenu(ui);
-  console.log(`  menu gone: inventory ${party.selectedCharacterIndex}, caster ${party.magicCasterIndex}, word20252 ${ui.word20252}`);
+  console.log(`  menu gone: inventory ${party.selectedCharacterIndex}, caster ${party.magicCasterIndex}, word20252 ${ui.word20252}, word20250 ${ui.word20250}`);
   check(party.selectedCharacterIndex === 0 && party.magicCasterIndex === 0,
     'TAG0207cc shows the inventory again and keeps the living caster (CSBCode.cpp:9945-9958)');
   check(ui.word20252 === 1, 'and, with no attack menu open, brings the attack buttons back (d.Word20252 = 1)');
+  check(ui.word20250 === 0,
+    'its DrawLegalAttackTypes owes the panel nothing more, so no damage is flashed at the next tick (CSBCode.cpp:8793)');
   draw();
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the next draw opens the chest again');
 
   // The load-only screen is `_ReadEntireGame`, which calls neither.
   ui.word20252 = 0;
+  ui.word20250 = 1;
   SaveMenu.openSaveMenu(ui, 'loadOnly');
   check(ui.openChestId === chest, 'the load-only screen leaves the chest open');
   SaveMenu.closeSaveMenu(ui);
-  check(ui.word20252 === 0, 'and, closing, leaves the attack panel alone');
+  check(ui.word20252 === 0 && ui.word20250 === 1, 'and, closing, leaves the attack panel alone');
 }
 
 /**

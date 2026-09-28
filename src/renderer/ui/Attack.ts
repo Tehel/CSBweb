@@ -150,7 +150,6 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   getLegalAttackTypes(ui, chIdx, row);
   ui.word20252 = 0;
   drawLegalAttackTypes(ui);
-  ui.word20250 = 0;
 }
 
 /**
@@ -162,6 +161,7 @@ export function drawLegalAttackTypes(ui: UIState): void {
   ui.closedAttackMenuOrdinal = 0;
   ui.attackFlashValue = 0;
   ui.attackFlashUntilMs = 0;
+  ui.word20250 = 0;
 }
 
 /**
@@ -287,13 +287,11 @@ export function attackPanelTick(ui: UIState): void {
     }
     ui.word20252 = 1;
     drawLegalAttackTypes(ui);
-    ui.word20250 = 0;
     return;
   }
 
   ui.word20252 = 0;
   drawLegalAttackTypes(ui);
-  ui.word20250 = 0;
 }
 
 /**

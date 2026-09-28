@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C85 | `TAG0207cc` leaves `d.Word20250` set | S | ⏳ |
 | C86 | `attackPanelTick` ignores a candidate at the mirror | S | ⏳ |
 | C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
 | G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C83 |
@@ -121,15 +120,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C85 ⏳ `TAG0207cc` leaves `d.Word20250` set
-
-`TAG0207cc` redraws the panel with `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:9948-9952`),
-which clears `d.Word20250` (`:8793`). The port's `tag0207cc` (`src/renderer/ui/Mouse.ts`)
-calls `drawLegalAttackTypes`, which does not, so a menu closed just before a freeze or
-the save menu still has the damage flashed at the first tick after, where CSBWin's shows
-the buttons and keeps the damage for the next close. The fix moves `word20250 = 0` into
-`drawLegalAttackTypes`, out of its three other callers in `src/renderer/ui/Attack.ts`.
 
 ### C86 ⏳ `attackPanelTick` ignores a candidate at the mirror
 
