@@ -30,7 +30,7 @@ import {
   setActuatorParameterA,
   setActuatorParameterB,
 } from '../data/actuatorHelpers';
-import type { DungeonState, TextDecodeTables } from './DungeonState';
+import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
@@ -46,7 +46,6 @@ export interface ViewingFilterOptions {
   phraseMask: number;
   objectId: number;
   selectedCharacter: number;
-  textTables?: TextDecodeTables;
 }
 
 /** The one type-47 actuator `SetupDSAParam` picked out (`doc/CSBwin-src/Attack.cpp:434`). */
@@ -238,7 +237,6 @@ interface ViewingFilterContext {
   phraseMask: number;
   phraseTextOverrides: Array<string | null>;
   phraseColorOverrides: Array<number | null>;
-  textTables?: TextDecodeTables;
   modified: boolean;
 }
 
@@ -502,7 +500,6 @@ export class DsaSystem {
       phraseMask: options.phraseMask | 0,
       phraseTextOverrides: Array.from({ length: 8 }, () => null),
       phraseColorOverrides: Array.from({ length: 8 }, () => null),
-      textTables: options.textTables,
       modified: false,
     };
 
@@ -2134,7 +2131,7 @@ export class DsaSystem {
     if (!this.dungeon.isValidLocation(locr)) return;
     const record = this.findTextRecordAtLocation(locr);
     if (!record) return;
-    const text = this.dungeon.decodeTextString(record, 0x8001, ctx.textTables);
+    const text = this.dungeon.decodeTextString(record, 0x8001, this.ctx.tables.textDecode);
     if (!text) return;
     ctx.phraseTextOverrides[index] = text;
     ctx.phraseMask |= 1 << index;

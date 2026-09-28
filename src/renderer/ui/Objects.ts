@@ -9,7 +9,6 @@ import { OBJNI_BONES_A, OBJNI_COMPASS_N, OBJNI_COMPASS_W, OBJNI_EMPTY_FLASK, OBJ
 import { DescIndex, GetBasicObjectType, NameIndex } from '../../engine/objectIndex';
 import { DBType, ObjectID, decodeObjectID } from '../../core/types';
 import { ViewingFilterResult } from '../../engine/DsaSystem';
-import { TextDecodeTables } from '../../engine/DungeonState';
 import { Champion } from '../../engine/gameTypes';
 import { findChampionByFingerprint } from '../../engine/Party';
 import { determineMastery as determineMasteryEngine } from '../../engine/skills';
@@ -246,19 +245,13 @@ export function buildPhraseSummary(mask: number, phrases: string[], colors: numb
 }
 
 export function applyViewingFilter(ui: UIState, objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
-  if (!ui.viewingFilter || !ui.objectTables) return null;
+  if (!ui.viewingFilter) return null;
   const selected = ui.partyState?.selectedCharacterIndex ?? -1;
   if (selected < 0) return null;
-  const textTables: TextDecodeTables = {
-    escape1: ui.objectTables.textEscape1,
-    escape2Wall: ui.objectTables.textEscape2Wall,
-    escape2Other: ui.objectTables.textEscape2Other,
-  };
   return ui.viewingFilter({
     phraseMask,
     objectId: objectId | 0,
     selectedCharacter: selected,
-    textTables,
   });
 }
 

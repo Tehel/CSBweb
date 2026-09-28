@@ -918,11 +918,11 @@ export class DungeonState {
         return this.data.header.facing;
     }
 
-    decodeWallTextBytes(record: TextRecord, tables?: TextDecodeTables): Uint8Array | null {
+    decodeWallTextBytes(record: TextRecord, tables: TextDecodeTables): Uint8Array | null {
         return this.decodeTextBytes(record, 0, 990, tables);
     }
 
-    decodeTextBytes(record: TextRecord, typeOfText: number, max: number, tables?: TextDecodeTables): Uint8Array | null {
+    decodeTextBytes(record: TextRecord, typeOfText: number, max: number, tables: TextDecodeTables): Uint8Array | null {
         const force = (typeOfText & 0x8000) !== 0;
         if (!record.visible && !force) return null;
 
@@ -933,7 +933,7 @@ export class DungeonState {
         return this.decodeTextFromWords(start.words, start.at, typeOfText, max, tables);
     }
 
-    decodeTextString(record: TextRecord, typeOfText: number, tables?: TextDecodeTables, max = 990): string | null {
+    decodeTextString(record: TextRecord, typeOfText: number, tables: TextDecodeTables, max = 990): string | null {
         const bytes = this.decodeTextBytes(record, typeOfText, max, tables);
         if (!bytes) return null;
         return typeOfText === 0
@@ -941,11 +941,11 @@ export class DungeonState {
             : this.textBytesToString(bytes);
     }
 
-    decodeMessageText(record: TextRecord, tables?: TextDecodeTables): string | null {
+    decodeMessageText(record: TextRecord, tables: TextDecodeTables): string | null {
         return this.decodeTextString(record, 1, tables);
     }
 
-    decodeScrollText(scroll: ScrollRecord, tables?: TextDecodeTables): string | null {
+    decodeScrollText(scroll: ScrollRecord, tables: TextDecodeTables): string | null {
         const rec = this.getTextRecordByIndex(scroll.textReference);
         if (!rec) return null;
         return this.decodeTextString(rec, 0x8002, tables);
@@ -956,7 +956,7 @@ export class DungeonState {
         startWord: number,
         typeOfText: number,
         max: number,
-        tables?: TextDecodeTables
+        tables: TextDecodeTables
     ): Uint8Array | null {
         if (startWord < 0 || startWord >= words.length) return null;
 
@@ -992,13 +992,11 @@ export class DungeonState {
             else slashCount = 0;
 
             if (escapeCode !== 0) {
-                if (tables) {
-                    if (escapeCode === 30) {
-                        const table = typeOfText === 0 ? tables.escape2Wall : tables.escape2Other;
-                        this.appendEscapeString(out, table, 8, code, max);
-                    } else {
-                        this.appendEscapeString(out, tables.escape1, 2, code, max);
-                    }
+                if (escapeCode === 30) {
+                    const table = typeOfText === 0 ? tables.escape2Wall : tables.escape2Other;
+                    this.appendEscapeString(out, table, 8, code, max);
+                } else {
+                    this.appendEscapeString(out, tables.escape1, 2, code, max);
                 }
                 escapeCode = 0;
                 continue;

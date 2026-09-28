@@ -1697,11 +1697,11 @@ export class BytecodeInterpreter {
     const rec = dungeon.getTextRecord(textRN);
     if (!rec) return;
 
-    const textBytes = dungeon.decodeWallTextBytes(rec, tables ? {
+    const textBytes = dungeon.decodeWallTextBytes(rec, {
       escape1: tables.textEscape1,
       escape2Other: tables.textEscape2Other,
       escape2Wall: tables.textEscape2Wall,
-    } : undefined);
+    });
     if (!textBytes) return;
 
     const font = getGraphic(120);

@@ -615,7 +615,7 @@ export class ActuatorSystem {
         }
         if (dbType === DBType.TEXT && movedObjectDBType === -1 && place && !unchangedRoom) {
           const rec = this.dungeon.getTextRecord(rn);
-          const text = rec ? this.dungeon.decodeMessageText(rec) : null;
+          const text = rec ? this.dungeon.decodeMessageText(rec, this.ctx.tables.textDecode) : null;
           // CSBWin: `QuePrintLines(15, text)` with no preceding PrintLinefeed() — the
           // decoder prepends the linefeed itself for typeOfText 1
           // (doc/CSBwin-src/Code11f52.cpp:3962, doc/CSBwin-src/CSBCode.cpp:5510).

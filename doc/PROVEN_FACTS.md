@@ -242,6 +242,14 @@ Escape code tables used by `DecodeText()` live in graphics.dat item `0x22f` (Dat
 - `Byte10336[256]`: escape code 2 table for wall texts (`typeOfText == 0`)
 - `Byte10016[256]`: escape code 2 table for non-wall texts
 
+Every text goes through the escape tables, whatever its type (`CSBCode.cpp:5559-5574`),
+the text the party finds on a square it enters included: `PlaceOrRemoveObjectInRoom`
+decodes it with `DecodeText(text, …, 1, 990)` and queues it with `QuePrintLines(15, text)`
+(`Code11f52.cpp:3960-3963`). In `dm-atari/dungeon.dat` the one visible such text is on
+level 0 at (9, 1), and three of its pieces are escapes: "IT IS TOO BAD YOU DID NOT DISCOVER
+THE TRUE SECRET OF THE FIRESTAFF. NOW THAT I HAVE IT I HAVE NO FURTHER NEED FOR YOU!"
+(`tools/dump-room-text.ts`).
+
 ### Bytecode Example (Viewport.cpp line 979)
 ```cpp
 ui16 StdDrawF3Stone[] = {
