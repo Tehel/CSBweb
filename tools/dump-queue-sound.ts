@@ -26,7 +26,8 @@
  *     none of them. One row per caller:
  *     a. `CreateMonster`'s `QueueSound(soundTELEPORT, mapX, mapY, 1)` (`Monster.cpp:230`);
  *     b. a door rebounding off a group, `QueueSound(4, x, y, 1)` (`Timer.cpp:1352`);
- *     c. an audible generator, `QueueSound(soundTELEPORT, targetX, targetY, 1)`
+ *     c. an audible generator, which makes its group on its own level, so two:
+ *        `CreateMonster`'s, then its own `QueueSound(soundTELEPORT, targetX, targetY, 1)`
  *        (`Timer.cpp:1798`);
  *     d. a group out of abeyance, `TT_61`'s `QueueSound(17, x, y, 1)` (`Timer.cpp:2591`);
  *     e. a group's death, `DropMonsterRemains`'s

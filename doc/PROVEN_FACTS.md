@@ -3487,6 +3487,15 @@ made on the party's level, and only otherwise queues the teleport sound; its one
 generator, ignores the value and queues the sound itself when it is audible
 (`Timer.cpp:1787-1800`).
 
+The generator works on its own level, whatever the party's: `ProcessTimers` loads the
+timer's level first (`CSBCode.cpp:6416-6417`), so the hit-point multiplier is the
+actuator's, or that level's `experienceMultiplier()` when the actuator's is 0
+(`Timer.cpp:1782-1786`), and `CreateMonster` makes the group on that level at the
+generator's x and y. Every member's hit points are then
+`baseHealth * multiplier + STRandom() % (baseHealth / 4 + 1)` (`Monster.cpp:207`). In
+`dm-atari/dungeon.dat` most generators have a multiplier of 0 and take the level's.
+Evidence: `tools/dump-monster-generator.ts`.
+
 Evidence: `tools/dump-monster-move-code.ts` (13 of 17 checks fail before the fix),
 `tools/dump-monster-move.ts` case 1.
 

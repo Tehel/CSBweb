@@ -36,6 +36,7 @@ const CHECKS = [
   { tool: 'dump-monster-move.ts' },
   { tool: 'dump-monster-pad.ts' },
   { tool: 'dump-monster-move-code.ts' },
+  { tool: 'dump-monster-generator.ts' },
   { tool: 'dump-monster-ai.ts' },
   { tool: 'dump-attributes.ts' },
   { tool: 'dump-hand-owner.ts' },

@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C75 | A generator makes its group on the party's level | S | ⏳ |
 | C76 | A menu button's second press pass is drawn without the first | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
@@ -114,22 +113,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
-### C75 ⏳ A generator makes its group on the party's level
-
-CSBWin's generator runs in a timer, with the timer's level loaded (`ProcessTimers`,
-`doc/CSBwin-src/CSBCode.cpp:6416-6417`). It takes the hit-point multiplier from the
-actuator, or from that level's descriptor when the actuator's is 0
-(`d.pCurLevelDesc->experienceMultiplier()`, `Timer.cpp:1782-1786`), and `CreateMonster`'s
-`MoveObject` puts the group on that level (`curLevel = d.LoadedLevel`,
-`Code11f52.cpp:2857`). The port's `TimerSystem.spawnMonsterGenerator`
-(`src/engine/TimerSystem.ts`) passes `createMonster` the party's level, and a multiplier of
-0 when the actuator's is 0, so every member's hit points are the random spread alone. A
-generator whose timer fires once the party has left its level makes its group on the
-party's level, at the generator's x and y, where CSBWin's appears beside the generator.
-Pass `timer.level`, and the timer level's `difficulty` when the actuator's multiplier is 0.
-Evidence: a row in a `tools/` check firing a generator with the party on another level, and
-one with a multiplier-0 generator.
 
 ### C76 ⏳ A menu button's second press pass is drawn without the first
 

@@ -1136,7 +1136,11 @@ export class TimerSystem {
       countMinus1 = (countMinus1 - 1) & 0xffff;
     }
 
-    const hitPointMultiplier = getActuatorHitPointMultiplier(actuator) || 0;
+    // `ProcessTimers` has loaded the timer's level (`doc/CSBwin-src/CSBCode.cpp:6416-6417`),
+    // so a 0 takes that level's multiplier (`Timer.cpp:1782-1786`), and the group is made
+    // there (`CreateMonster`'s `MoveObject` on `d.LoadedLevel`, `Code11f52.cpp:2857`).
+    const hitPointMultiplier = getActuatorHitPointMultiplier(actuator)
+      || (this.dungeon.getMap(timer.level)?.descriptor.difficulty ?? 0);
     const facing = this.random.zeroTo3(); // doc/CSBwin-src/Timer.cpp:1791
     const drawAsSize4 = getActuatorDrawAsSize4(actuator);
     const normallyClosed = isActuatorNormallyClosed(actuator);
@@ -1149,7 +1153,7 @@ export class TimerSystem {
       facing,
       mapX: target.x,
       mapY: target.y,
-      level: this.ctx.party.state.position.z,
+      level: timer.level,
       // CSBWin passes `normallyClosed()` as `invisible` and `drawAsSize4()` as itself
       // (doc/CSBwin-src/Timer.cpp:1785-1793).
       invisible: normallyClosed,
