@@ -36,6 +36,8 @@ export function drawSpellControls(ui: UIState): void {
   fillRectIndex(screen, rect, 0);
 
   ui.partyState.champions.forEach((champion, chIdx) => {
+    // No tab without mana: a deliberate divergence (`DEBT.md` → H, "No caster tab without
+    // mana"). CSBWin draws one for every champion whose HP is not zero.
     if (!champion || !champion.alive || champion.attributes.maxMana === 0) return;
     const rct = spellControlGetRect(rect, chIdx, casterIdx);
     fillRectIndex(screen, rct, 4);
@@ -187,6 +189,8 @@ export function handleMagicClick(ui: UIState, clickX: number, clickY: number): v
   const champions = ui.partyState.champions;
   for (let chIdx = 0; chIdx < champions.length; chIdx++) {
     const champion = champions[chIdx];
+    // The tabs `drawSpellControls` draws, and no others (`DEBT.md` → H, "No caster tab
+    // without mana").
     if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
     const rct = spellControlGetRect(rect, chIdx, ui.partyState.magicCasterIndex);
     if (pointInRect(clickX, clickY, rct)) {

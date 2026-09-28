@@ -130,21 +130,18 @@ translating `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:589`), `_MagicSelecti
 - **The cost of a rune after the first** is `(cost * Byte19016[first - 96]) >> 3`
   (`CSBCode.cpp:8973-8979`). The port divides by 8 without truncating, so a cost whose
   product is not a multiple of 8 takes a fraction of a point of mana.
-- **The caster tabs.** `DrawSpellControls` draws a tab for every champion whose `HP()` is
-  not zero (`Character.cpp:4994-5087`), and `_HandleMagicClick` picks a tab by fixed x
-  ranges per `d.MagicCaster` under `clickY <= 48` (`Magic.cpp:596-699`), then
-  `SelectMagicCaster` refuses a dead champion (`:724`). `drawSpellControls` and
-  `handleMagicClick` also skip a champion with no maximum mana, and hit-test the drawn
-  rectangle. The comment on `selectCaster` in `src/renderer/ui/Keyboard.ts` repeats the
-  mana rule.
+- **The caster tabs.** `_HandleMagicClick` picks a tab by fixed x ranges per
+  `d.MagicCaster` under `clickY <= 48` (`Magic.cpp:596-699`), then `SelectMagicCaster`
+  refuses a dead champion (`:724`). `handleMagicClick` hit-tests the drawn rectangle
+  instead.
 - **The cast button** (108) acts in CSBWin whenever `incantation[0]` is not zero
   (`Magic.cpp:556-567`). The port also checks the caster's `alive`, and clears the
   incantation in the panel, where CSBWin's `CastMagic` does it (`:949-955`).
 
-Port the five functions line by line, keeping their names, except for the fifth rune, which
-stays refused (H → "A fifth rune is refused"), and a `tools/dump-*.ts` that drives a
-second-rune cost with a remainder, a tab click for a champion without mana, and a fifth
-rune. G6 step 3 builds on this.
+Port the five functions line by line, keeping their names, except for two deliberate
+divergences that stay (H → "A fifth rune is refused" and "No caster tab without mana"),
+and a `tools/dump-*.ts` that drives a second-rune cost with a remainder, a tab click for
+each caster, and the two divergences. G6 step 3 builds on this.
 
 ---
 
@@ -391,6 +388,13 @@ Recorded so that nobody "fixes" them.
   fourth, and the keypad keeps showing the fourth row (`applyMagicSelection` and
   `drawSpellPanel`, `src/renderer/ui/MagicPanel.ts`). A save still carries `byte33` as
   CSBWin's writers leave it, `strlen(incantation) & 3` (`CsbwinCharacters.ts`).
+- 🚫 **No caster tab without mana.** `DrawSpellControls` draws a tab for every champion
+  whose `HP()` is not zero (`doc/CSBwin-src/Character.cpp:4994-5087`), and
+  `_HandleMagicClick` picks among them (`Magic.cpp:596-699`). The author's decision: the
+  port draws no tab for a champion whose maximum mana is zero, and neither a click nor a
+  key selects one (`drawSpellControls` and `handleMagicClick`,
+  `src/renderer/ui/MagicPanel.ts`; `selectCaster`, `src/renderer/ui/Keyboard.ts`). The tab
+  appears once the champion's maximum mana rises above zero.
 - 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8200-8204`) is not ported,
   because CSBWin cannot reach it either. Move Up / Down (`0x1124` / `0x1125`) come only from
   the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, whose flags are

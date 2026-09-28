@@ -222,7 +222,8 @@ function magicButton(ui: UIState, buttonId: number): void {
 
 /**
  * The caster tabs. A tab is only drawn for a living champion with mana to spend
- * (`drawSpellControls`), so only those can be picked — the keys reach exactly the tabs
+ * (`drawSpellControls`; a deliberate divergence, `DEBT.md` → H, "No caster tab without
+ * mana"), so only those can be picked — the keys reach exactly the tabs
  * `handleMagicClick` does.
  */
 function selectCaster(ui: UIState, chIdx: number): void {
