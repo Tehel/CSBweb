@@ -214,6 +214,10 @@ export class TimerSystem {
       case TimerFunction.TT_REACTIVATE_GENERATOR:
         this.processReactivateGenerator(timer);
         break;
+      case TimerFunction.TT_20:
+        // `doc/CSBwin-src/CSBCode.cpp:6485-6492`, on `d.LoadedLevel`, the timer's.
+        this.ctx.sounds.queueSound(timer.timerWord8, timer.uByte6, timer.uByte7, 1, timer.level);
+        break;
       default:
         break;
     }

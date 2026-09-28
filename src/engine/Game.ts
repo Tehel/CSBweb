@@ -556,9 +556,10 @@ export class Game implements MainLoop {
      * (`wonByTimers`); then `d.Time++` and `scrollingText.ClockTick()`. Not the rest of the
      * main loop's tick: no input, no periodic update, no print-queue entry. The port turns
      * the clock before the timers, as `gameTick` does (`DEBT.md` C68). `DrawViewport` and
-     * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart,
-     * since the port plays a sound when it is queued (C66); nor have the overlay's
-     * timeout and `parameterMessageSequence`, which the port does not model.
+     * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart: it
+     * plays nothing, since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is
+     * commented out (`doc/CSBwin-src/CSBCode.cpp:1906`) and `QueueSound` calls `StartSound`
+     * itself. Nor have the overlay's timeout and `parameterMessageSequence`, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
         this.state.tickCount++;

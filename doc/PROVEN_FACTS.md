@@ -2675,6 +2675,16 @@ From the orthogonal distance `|dx| + |dy|`, `LOCAL_12` is 1 at or below the entr
 three squares and quiet up to six, and ordinal 20 (0 and 4) is loud only on the square
 and quiet up to three, although both play item 537. `tools/dump-queue-sound.ts` case 9.
 
+A sound queued with `deltaTime > 1` is not played: `QueueSound` sets a `TT_20` (20) due at
+`d.Time + (deltaTime & 0xffff) - 1`, on `d.LoadedLevel`, with the entry's `byte4` in
+`timerUByte5`, the square in `timerUByte6`/`timerUByte7` and the ordinal in `timerWord8`
+(`doc/CSBwin-src/CSBCode.cpp:1832-1848`), after the other-level test that drops any sound
+with a non-zero `deltaTime` (`:1827-1830`). When it fires, `ProcessTimers` calls
+`QueueSound(timerWord8, timerUByte6, timerUByte7, 1)` (`:6485-6492`) with the timer's level
+loaded. The callers with a delay are a champion's wound, `deltaTime` 2
+(`Monster.cpp:4584`), the door bash (`Attack.cpp:1808`) and a group's death.
+`tools/dump-queue-sound.ts` case 10.
+
 `ProcessMissileEncounter`'s shared ending (`Code11f52.cpp:2101-2121`) and `CreateCloud`'s
 own sound (`Code11f52.cpp:1432-1447`) are the two call sites `TimerSystem` used to read
 past — `playMissileImpactSound` and `playCloudSound` called `playSound` with a hand-typed

@@ -27,6 +27,12 @@ export enum TimerFunction {
   TT_11 = 11,
   TT_VI_ALTAR = 13,
   /**
+   * A delayed sound (`QueueSound` with `deltaTime > 1`, doc/CSBwin-src/CSBCode.cpp:1832-1848):
+   * `timerWord8` is the ordinal, played with `QueueSound(ordinal, x, y, 1)` on the
+   * timer's level when it fires (`:6485-6492`).
+   */
+  TT_20 = 20,
+  /**
    * The cloud's life (`ProcessTT_25`, doc/CSBwin-src/Timer.cpp:436). One tick at a
    * time: deal the cloud's damage, shrink it, and reschedule — or fall out of the
    * switch and delete the cloud. Without it a cloud renders at full size forever.

@@ -47,6 +47,13 @@
  *     it, and the sound is dropped at or above `byte7` (`CSBCode.cpp:1867-1878`), and
  *     `StartSound` gets that choice (`:1894-1896`). So ordinal 5 is loud three squares
  *     away and quiet six away, where ordinal 20 is quiet at three and not heard at four.
+ * 10. A delayed sound: with `deltaTime > 1`, `QueueSound` plays nothing and sets a `TT_20`
+ *     due at `d.Time + deltaTime - 1`, the ordinal in `timerWord8` and the entry's `byte4`
+ *     in `timerUByte5` (`CSBCode.cpp:1832-1848`), and `ProcessTimers` queues it again
+ *     with `deltaTime` 1 on the timer's level when it fires (`:6485-6492`). A champion's
+ *     wound, `QueueSound(chIdx + 9, d.partyX, d.partyY, 2)` (`Monster.cpp:4584`),
+ *     is heard a tick later, and a delayed sound on another
+ *     level than the party's sets no timer at all (`:1827-1830`).
  *
  * The wall bump's `QueueSound(18, …)` is `tools/dump-party-collision.ts`'s.
  *
@@ -77,14 +84,14 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
-import { TimerFunction } from '../src/engine/TimerQueue';
+import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
-import { newGame, stockGraphics } from './lib/game';
+import { gameTablesOf, newGame, stockGraphics } from './lib/game';
 
 /** North, east, south, west: `DELTA_X` / `DELTA_Y`. */
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -593,6 +600,45 @@ function main(): void {
     check(json(at(20, 0)) === json([[537, 0, 1]]), 'ordinal 20, the same item, is loud only on the square (byte6 = 0)');
     check(json(at(20, 3)) === json([[537, 0, 0]]), 'quiet three away');
     check(json(at(20, 4)) === json([]), 'and not heard four away (byte7 = 4)');
+  }
+
+  /* ---------------------------------------------------- 10. a delayed sound ---- */
+  {
+    const s = scene();
+    const { game } = s;
+    const p = new Position(5, 5, 0);
+    stand(game, p, 0);
+    const tt20 = (): TimerEntry[] => game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_20);
+    const tick = (): void => {
+      game.state.tickCount++;
+      game.timerSystem.processTimers(game.state.tickCount);
+    };
+    const t0 = game.state.tickCount;
+    game.sounds.queueSound(9, p.x, p.y, 2, p.z);
+    const [timer] = tt20();
+    console.log(['10. a wound, deltaTime 2', json(s.queued), json(s.played),
+      json(timer && [timer.time - t0, timer.level, timer.uByte5, timer.uByte6, timer.uByte7, timer.timerWord8])].join('\t'));
+    check(s.played.length === 0, 'a delayed sound is not played at once');
+    check(tt20().length === 1, 'it sets one TT_20');
+    const byte4 = gameTablesOf(graphics).sound1772[9].byte4;
+    check(json(timer && [timer.time - t0, timer.level, timer.uByte5, timer.uByte6, timer.uByte7, timer.timerWord8])
+      === json([1, p.z, byte4, p.x, p.y, 9]), 'due at d.Time + 1, on the party\'s level, byte4 in uByte5, at the party, ordinal 9 in timerWord8');
+    tick();
+    row('10. a tick later', s);
+    check(json(s.queued.slice(1)) === json([[9, p.x, p.y, 1, p.z]]), 'the TT_20 queues QueueSound(9, x, y, 1) on its level');
+    check(json(s.played) === json([[541, 0, 1]]), 'and ordinal 9, item 541, is heard loud a tick later');
+    check(tt20().length === 0, 'and the timer is gone');
+
+    clear(s);
+    game.sounds.queueSound(9, p.x, p.y, 3, p.z);
+    tick();
+    check(s.played.length === 0, 'with deltaTime 3 nothing is heard a tick later');
+    tick();
+    check(json(s.played) === json([[541, 0, 1]]), 'but two ticks later');
+
+    clear(s);
+    game.sounds.queueSound(9, p.x, p.y, 2, p.z + 1);
+    check(tt20().length === 0 && s.played.length === 0, 'a delayed sound on another level sets no timer');
   }
 
   finish();

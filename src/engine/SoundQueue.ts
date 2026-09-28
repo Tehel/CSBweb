@@ -13,26 +13,31 @@
  * timer does (`ProcessTimers` loads it, `doc/CSBwin-src/CSBCode.cpp:6416-6417`), the
  * square's for a missile or a group, the party's for a mouse handler.
  *
- * Two parts of CSBWin's version are **not ported**:
+ * `deltaTime > 1` does not play the sound: it sets a `TT_20` timer, which
+ * `TimerSystem` answers with `QueueSound(ordinal, x, y, 1)` on the timer's level.
  *
- * - `deltaTime > 1` schedules the sound as a `TT_20` timer rather than playing it
- *   (`doc/CSBwin-src/CSBCode.cpp:1832-1848`); here it plays immediately (`DEBT.md` C66).
- * - `SoundFilter` can hand the sound to a DSA instead (`doc/CSBwin-src/Sound.cpp:670`,
- *   `DEBT.md` G2).
+ * `SoundFilter`, which can hand the sound to a DSA instead
+ * (`doc/CSBwin-src/Sound.cpp:670`), is **not ported** (`DEBT.md` G2).
  */
 import type { SoundTableEntry } from '../renderer/csbwin/UITables';
 import type { GameHost } from './GameHost';
+import type { GameState } from './gameTypes';
 import type { Party } from './Party';
+import { TimerFunction, type TimerQueue } from './TimerQueue';
 
 export class SoundQueue {
   /**
    * @param soundTable `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
    * @param host where a sample goes (`GameHost.playSound`).
+   * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
+   * @param timers where a delayed sound's `TT_20` goes.
    */
   constructor(
     private readonly party: Party,
     private readonly soundTable: ArrayLike<SoundTableEntry>,
     private readonly host: Pick<GameHost, 'playSound'>,
+    private readonly state: Pick<GameState, 'tickCount'>,
+    private readonly timers: TimerQueue,
   ) {}
 
   /**
@@ -49,6 +54,17 @@ export class SoundQueue {
     if (!entry) return;
 
     if (deltaTime !== 0 && level !== this.party.state.position.z) return;
+
+    if (deltaTime > 1) {
+      // `doc/CSBwin-src/CSBCode.cpp:1832-1848`: due at `d.Time + deltaTime - 1`, the
+      // entry's `byte4` in `timerUByte5`, the ordinal in `timerWord8` (bytes 8-9).
+      const time = (this.state.tickCount + (deltaTime & 0xffff) - 1) >>> 0;
+      this.timers.createTimerWithUByte5(
+        TimerFunction.TT_20, mapX, mapY, (ordinal >> 8) & 0xff, ordinal & 0xff, time, level,
+        entry.byte4, undefined, ordinal,
+      );
+      return;
+    }
 
     const party = this.party.state.position;
     const distance = Math.abs(mapX - party.x) + Math.abs(mapY - party.y);

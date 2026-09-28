@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C66 | A delayed sound plays at once | S | ⏳ |
 | C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
 | C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
@@ -120,18 +119,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C66 ⏳ A delayed sound plays at once
-
-With `deltaTime > 1`, CSBWin's `QueueSound` sets a `TT_20` timer due at
-`d.Time + deltaTime - 1` instead of playing (`doc/CSBwin-src/CSBCode.cpp:1832-1848`), and
-`ProcessTimers` queues the sound again, with `deltaTime` 1, when it fires (`:6485-6492`).
-The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` has no
-`TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
-bash (`src/engine/AttackSystem.ts:1258`), a champion's wound
-(`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
-`:325`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
-check that queues a sound with `deltaTime` 2 and finds it played a tick later.
 
 ### C67 ⏳ The timer table has no size, and a save writes it too small
 
@@ -277,7 +264,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:279`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:283`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy

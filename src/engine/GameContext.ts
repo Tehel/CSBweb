@@ -119,16 +119,17 @@ export function createGameContext(
     word1868: false,
     currentPalette: 0,
   };
+  const timers = new TimerQueue();
   return {
     dungeon,
     party,
     state,
     random: new CsbRandom(),
     footprints: new PartyFootprints(),
-    timers: new TimerQueue(),
+    timers,
     mouseQueue: new MouseQueue(),
     loop: createLoopFlags(),
-    sounds: new SoundQueue(party, tables.sound1772, host),
+    sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
