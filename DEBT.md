@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C62 | Most of the graphics.dat key tables bind nothing | M | ⏳ |
 | C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
 | C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
 | C66 | A delayed sound plays at once | S | ⏳ |
@@ -122,33 +121,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C62 ⏳ Most of the graphics.dat key tables bind nothing
-
-`TAG0196da` (`doc/CSBwin-src/CSBCode.cpp:8428-8475`) turns a key into a button through the
-two `KeyXlate` tables that `d.pKeyXlate2` and `d.pKeyXlate1` point at. The port reads all
-four tables (`UITables`' `graphic231.keys`), sets them with the button lists
-(`updateButtonLists`, `src/renderer/ui/Mouse.ts`), and looks keys up in them
-(`translateKey`, `src/renderer/ui/Keyboard.ts`), but `keyScanOf` knows only Return and Esc,
-so only the sleep and frozen tables and the adventure table's Esc bind anything. Awake the
-tables are `Byte18400` and `Byte18428` (`CSBCode.cpp:7058-7059`, `:10489-10490`):
-
-- `Byte18400`: F1-F4 (`0x3b00`-`0x3e00`) are buttons 7-10, Ctrl-S (`0x13`) is 140, the disk
-  menu, and Esc (`0x1b`) is 147, the freeze.
-- `Byte18428`: Insert (`0x5200`) and Clr/Home (`0x4700`) turn left and right (buttons 1
-  and 2), and the four arrows are buttons 3-6: up steps forward, down back, left and
-  right strafe.
-
-The port binds the rest itself in `src/ui/events.ts` and `src/renderer/ui/Keyboard.ts`: F1-F4
-select the caster, Ctrl-S is left to the browser, and the left and right arrows turn.
-Keyboard.ts's module comment says CSBWin has no keys of its own beyond `config.txt`, which
-these tables contradict. **The author's decision:** the arrow keys take CSBWin's roles, so
-left and right strafe, and Insert and Home turn. Give `keyScanOf` the scancodes of F1-F4,
-Ctrl-S, the four arrows, Insert and Home, route every key through `translateKey` before the
-port's own bindings, and keep those bindings only where they claim no key a table binds.
-`TAG0196da` queues every `pKeyXlate1` match after a `pKeyXlate2` one (`:8460-8475`), where
-`translateKey` returns the first. Evidence: a row per table entry in
-`tools/dump-key-bindings.ts`.
 
 ### C64 ⏳ Twelve sounds on another level are heard as if on the party's
 
@@ -527,6 +499,12 @@ Recorded so that nobody "fixes" them.
   comment gives the reason. While a script holds the loop (`Game.isRunningScript`) the
   panel keys do nothing, as CSBWin's would wait in the queue for a pass that never comes
   before the credits; the two screens open only from a pass, so neither is up then.
+- 🚫 **F1-F4 select the caster.** CSBWin's adventure key table `Byte18400` binds them to
+  buttons 7-10, the four inventories (`doc/PROVEN_FACTS.md` → "The key tables: CSBWin's own
+  keys"). The author finds the caster on F1-F4 and the inventories on 7-0 more convenient,
+  so `tableKeyButton` (`src/renderer/ui/Keyboard.ts`) leaves F1-F4 to `handleUIKey`. Every
+  other table key keeps CSBWin's role. A rebinding screen, if players ever disagree, would
+  make this a default rather than a divergence.
 - 🚫 **A script's caller finishes at once.** `Game.runScript` returns as soon as the script
   reaches its first `VBLDelay`, so what CSBWin's suspended caller would do after the script
   ends, the port's does before it. Both scripts end the game, and the callers' tails that

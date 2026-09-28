@@ -63,7 +63,7 @@ import {
 } from './ui/Mouse';
 import { drawSpellControls, drawSpellPanel } from './ui/MagicPanel';
 import { attackPanelTick, closeAttackMenu, drawAttackPanel } from './ui/Attack';
-import { handleUIKey, keyScanOf, translateKey } from './ui/Keyboard';
+import { handleUIKey, tableKeyButton } from './ui/Keyboard';
 import {
   drawReincarnateScreen,
   isReincarnateScreenOpen,
@@ -422,9 +422,12 @@ export class GameScreen {
     return this.ui.uiMode === UIMode.Frozen;
   }
 
-  /** `TAG0196da`'s table half: the button the current key tables bind `key` to, or 0. */
-  translateKey(key: string): number {
-    return translateKey(this.ui, keyScanOf(key));
+  /**
+   * `TAG0196da`'s table half: the button the current key tables bind `key` to, or 0 — and
+   * 0 for F1-F4, the port's caster keys (`tableKeyButton`).
+   */
+  translateKey(key: string, ctrl = false): number {
+    return tableKeyButton(this.ui, key, ctrl);
   }
 
   setUIMode(mode: UIMode): void {

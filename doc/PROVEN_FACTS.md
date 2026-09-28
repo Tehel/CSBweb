@@ -3621,6 +3621,29 @@ tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:612-616`). Evidence: `tools/dump
 The port: `Game.runFrame` and `ScrollingText` (`doc/CSBWIN_MESSAGES_REFERENCE.md` → "The
 port"). Evidence: `tools/dump-messages.ts`.
 
+## The key tables: CSBWin's own keys
+
+- **What a key is.** `UIM_KEYDOWN` turns a PC key into an Atari key through `config.txt`'s
+  `SCAN` lines (`keyxlate.translate(…, TYPESCAN)`, `doc/CSBwin-src/CSBUI.cpp:1120-1139`);
+  CSBWin has no built-in map. `TAG0196da` then compares the ASCII code, or, for a key with
+  none, the scancode moved to the high byte (`if ((key&0xffff) == 0) key >>= 8`,
+  `CSBCode.cpp:8438`).
+- **The adventure tables** (`d.pKeyXlate2 = Byte18400`, `d.pKeyXlate1 = Byte18428`,
+  `CSBCode.cpp:7058-7059`, `:10489-10490`), as graphics.dat `0x231` holds them.
+  `Byte18400`: F1-F4 (`0x3b00`-`0x3e00`) are buttons 7-10, the four inventories; Ctrl-S
+  (`0x13`) is 140, the disk menu; Esc (`0x1b`) is 147, the freeze. `Byte18428`: Insert
+  (`0x5200`) is 1 and Clr/Home (`0x4700`) 2, the turns; up (`0x4800`) is 3, right
+  (`0x4d00`) 4, down (`0x5000`) 5, left (`0x4b00`) 6 — so the left and right arrows strafe.
+- **Every match is written.** `TAG0196da` stops at the first `pKeyXlate2` match, but goes
+  on through `pKeyXlate1`, writing each match one queue slot further back and moving
+  `d.MouseQEnd` with it (`CSBCode.cpp:8446-8475`): a key bound twice would leave only the
+  last match queued, over the entry before it. No keyscan appears twice in any mode's
+  pair of tables.
+
+The port: `keyScanOf` and `translateKey` (`src/renderer/ui/Keyboard.ts`), queued by
+`src/ui/events.ts` before the port's own bindings, except F1-F4, which select the caster
+(`DEBT.md` H). Evidence: `tools/dump-key-bindings.ts`.
+
 ## The freeze: button 147 in, button 148 out, no tick in between
 
 - **The keys and buttons.** `TAG0196da` turns a key into a button through `d.pKeyXlate2`,

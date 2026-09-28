@@ -247,22 +247,30 @@ export function bindUIEvents(): void {
                 e.preventDefault();
                 return;
             }
+            // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8428): awake,
+            // `Byte18400` and `Byte18428` bind Ctrl-S, Esc, Insert, Clr/Home and the arrows,
+            // and F1-F4, which the port keeps for the caster (`DEBT.md` H); asleep `Byte18440` binds Return and Esc, and frozen `Byte18448` Esc
+            // alone (doc/CSBwin-src/Mouse.cpp:1700-1701, :1754-1755). A bound key is queued
+            // as its button, like a click.
+            if (!e.metaKey && !e.altKey) {
+                const button = ctx.screen?.translateKey(e.key, e.ctrlKey) ?? 0;
+                if (button !== 0) {
+                    ctx.game.enqueueKeyButton(button);
+                    e.preventDefault();
+                    return;
+                }
+            }
             // A browser or OS shortcut keeps its key: nothing below is bound with a
             // modifier, so Ctrl-R still reloads rather than opening a rune keypad.
             if (e.ctrlKey || e.metaKey || e.altKey) return;
-            // Asleep or frozen, `d.pKeyXlate1` is NULL and `d.pKeyXlate2` is `Byte18440`
-            // (doc/CSBwin-src/Mouse.cpp:1700-1701) or `Byte18448` (`:1754-1755`), which
-            // graphics.dat fills with Return 146, the wake-up, and Esc 147, the freeze, or
-            // with Esc 148, the thaw (`TAG0196da`, `CSBCode.cpp:8428`). Every other key is
-            // dead, the movement keys and the panel bindings included.
+            // Asleep or frozen, every key the table does not bind is dead, the movement
+            // keys and the panel bindings included.
             if (ctx.game.isPartySleeping() || ctx.game.isFrozen()) {
-                const button = ctx.screen?.translateKey(e.key) ?? 0;
-                if (button !== 0) ctx.game.enqueueKeyButton(button);
                 e.preventDefault();
                 return;
             }
-            // The panel bindings come first. They are the larger half of the table and
-            // they claim their keys whatever the game state, so the movement switch
+            // Then the port's own bindings, which claim no other key a table binds: the
+            // panel keys, which claim theirs whatever the game state, so the movement switch
             // below never sees one.
             if (ctx.screen?.handleUIKey(e.key)) {
                 ctx.renderView();
@@ -271,22 +279,18 @@ export function bindUIEvents(): void {
             }
             let handled = false;
             switch (e.key.length === 1 ? e.key.toLowerCase() : e.key) {
-                case 'ArrowUp':
                 case 'k':
                     ctx.game.enqueueMovement(MovementAction.MOVE_FORWARD);
                     handled = true;
                     break;
-                case 'ArrowDown':
                 case ',':
                     ctx.game.enqueueMovement(MovementAction.MOVE_BACKWARD);
                     handled = true;
                     break;
-                case 'ArrowLeft':
                 case 'j':
                     ctx.game.enqueueMovement(MovementAction.TURN_LEFT);
                     handled = true;
                     break;
-                case 'ArrowRight':
                 case 'l':
                     ctx.game.enqueueMovement(MovementAction.TURN_RIGHT);
                     handled = true;
@@ -299,14 +303,6 @@ export function bindUIEvents(): void {
                     ctx.game.enqueueMovement(MovementAction.STRAFE_RIGHT);
                     handled = true;
                     break;
-                case 'Escape': {
-                    // Esc is 147, the freeze, in the adventure table `Byte18400`
-                    // (`TAG0196da`, doc/CSBwin-src/CSBCode.cpp:8428).
-                    const button = ctx.screen?.translateKey(e.key) ?? 0;
-                    if (button !== 0) ctx.game.enqueueKeyButton(button);
-                    handled = true;
-                    break;
-                }
                 // Not while a script holds the loop: the save could not resume it, and a
                 // load would run it on in the loaded world.
                 case 'F5':

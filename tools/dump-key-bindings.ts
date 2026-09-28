@@ -11,6 +11,8 @@
  * attack menu is up (0 for none), `inv` is `selectedCharacterIndex`, and `runes` is the
  * incantation being assembled. The replace-not-stack rule is the point of the middle
  * block — a second attack or inventory key must move the panel, never leave two open.
+ * The last block is a row per entry of the graphics.dat key tables: the mode, the table,
+ * the button, the keyscan and the browser key that reaches it.
  *
  * Run: `npx tsx tools/dump-key-bindings.ts`
  */
@@ -30,7 +32,7 @@ import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
@@ -200,10 +202,12 @@ async function main(): Promise<void> {
   press('1');
   check(runes(party.state) === '-', 'a rune key with no caster selected should do nothing');
 
+  // F1-F4 select the caster, not the inventories `Byte18400` binds them to (`DEBT.md` H).
   press('F1');
   check(party.state.magicCasterIndex === 0, 'F1 should select the first champion as caster');
   press('F2');
   check(party.state.magicCasterIndex === 1, 'F2 should move the caster to the second champion');
+  check(party.state.selectedCharacterIndex === -1, 'and open no inventory');
   press('F1');
   check(party.state.magicCasterIndex === 0, 'F1 should bring it back');
 
@@ -238,8 +242,11 @@ async function main(): Promise<void> {
   check(ui.attackingCharacterOrdinal === 1, 'a capital should reach the same binding');
   closeAttackMenu(ui);
 
-  for (const key of ['k', 'j', 'l', 'm', ',', '.', 'Escape', 'F5', 'F9', 'ArrowUp']) {
+  for (const key of ['k', 'j', 'l', 'm', ',', '.', 'F5', 'F9']) {
     check(!handleUIKey(ui, key), `'${key}' must be left for the movement and debug keys`);
+  }
+  for (const key of TABLE_KEYS.filter((key) => !CASTER_KEYS.includes(key))) {
+    check(!handleUIKey(ui, key), `'${key}' must be left for the key tables`);
   }
 
   // ---- 6. `d.PotentialCharacterOrdinal` makes every panel inert
@@ -322,7 +329,68 @@ async function main(): Promise<void> {
   check(ui.attackingCharacterOrdinal === 0 && clockTicks.join() === '1',
     'with no script, the same click closes the menu and makes a tick due');
 
+  // ---- 9. The graphics.dat key tables `TAG0196da` searches (doc/CSBwin-src/CSBCode.cpp:
+  //         8428-8475), a row per entry, in each mode's pair (`updateButtonLists`). Every
+  //         entry has a browser key, and none is bound twice in a pair, so the first match
+  //         `translateKey` returns is what CSBWin queues.
+  const { keyScanOf, tableKeyButton, translateKey } = await importKeyboard();
+  const { updateButtonLists } = await import('../src/renderer/ui/Mouse');
+  const keyOf = (keyscan: number): string | undefined =>
+    TABLE_KEYS.find((key) => keyScanOf(key) === keyscan)
+    ?? CTRL_LETTERS.map((letter) => `Ctrl-${letter}`).find((name) => keyScanOf(name.slice(5), true) === keyscan);
+  const pressed = (name: string): number => name.startsWith('Ctrl-')
+    ? translateKey(ui, keyScanOf(name.slice(5), true))
+    : translateKey(ui, keyScanOf(name));
+  const expected: Record<string, Record<string, number>> = {
+    // Awake, the author's roles for the arrows are CSBWin's: left and right strafe.
+    Adventure: {
+      F1: 7, F2: 8, F3: 9, F4: 10, 'Ctrl-S': 140, Escape: 147,
+      Insert: 1, Home: 2, ArrowUp: 3, ArrowRight: 4, ArrowDown: 5, ArrowLeft: 6,
+    },
+    Sleeping: { Enter: 146, Escape: 147 },
+    Frozen: { Escape: 148 },
+  };
+  console.log(['mode', 'table', 'button', 'keyscan', 'key'].join('\t'));
+  for (const mode of ['Adventure', 'Sleeping', 'Frozen'] as const) {
+    ui.uiMode = UIMode[mode];
+    updateButtonLists(ui);
+    const pair = [['pKeyXlate2', ui.keyXlate2 ?? []], ['pKeyXlate1', ui.keyXlate1 ?? []]] as const;
+    const scans = pair.flatMap(([, table]) => table.map((entry) => entry.keyscan));
+    check(new Set(scans).size === scans.length, `${mode}: no keyscan is bound twice`);
+    const bound: Record<string, number> = {};
+    for (const [name, table] of pair) {
+      for (const entry of table) {
+        const key = keyOf(entry.keyscan);
+        console.log([mode, name, entry.mouse, `0x${entry.keyscan.toString(16)}`, key ?? '-'].join('\t'));
+        check(key !== undefined, `${mode}: keyscan 0x${entry.keyscan.toString(16)} should have a browser key`);
+        if (key === undefined) continue;
+        bound[key] = entry.mouse;
+        check(pressed(key) === entry.mouse, `${mode}: ${key} should queue button ${entry.mouse}`);
+      }
+    }
+    check(JSON.stringify(Object.entries(bound).sort()) === JSON.stringify(Object.entries(expected[mode]).sort()),
+      `${mode}: the tables should bind ${JSON.stringify(expected[mode])}`);
+  }
+  ui.uiMode = UIMode.Adventure;
+  updateButtonLists(ui);
+  check(pressed('Ctrl-R') === 0 && pressed('F5') === 0 && pressed('k') === 0,
+    'a key no table binds is left to the browser and the port');
+  for (const key of CASTER_KEYS) {
+    check(pressed(key) !== 0 && tableKeyButton(ui, key) === 0,
+      `${key} is bound in Byte18400, and left to the caster binding (DEBT.md H)`);
+  }
+  check(tableKeyButton(ui, 'ArrowLeft') === 6 && tableKeyButton(ui, 's', true) === 140,
+    'every other table key goes through the tables');
+
   finish();
 }
+
+/** Every key `keyScanOf` gives a keyscan without Ctrl. */
+const TABLE_KEYS = ['Enter', 'Escape', 'F1', 'F2', 'F3', 'F4', 'Home', 'ArrowUp', 'ArrowLeft', 'ArrowRight',
+  'ArrowDown', 'Insert'];
+/** The table keys the port keeps for the caster (`DEBT.md` H). */
+const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
+/** And the letters it gives one with Ctrl. */
+const CTRL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 main();
