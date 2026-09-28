@@ -1363,7 +1363,10 @@ export class DsaSystem {
           if (monsterId === null) break;
           const monster = this.dungeon.getCreatureRecord(monsterId);
           if (!monster) break;
-          this.addObjectToMonster(monsterId, cloned);
+          // `doc/CSBwin-src/DSA.cpp:2083-2085`: the copy, its link already `RNeof`,
+          // heads an empty chain, else `AddObjectToRoom(newObj, *pDest, -1, 0, NULL)`.
+          if (monster.possession === OBJECT_ID_EOF) monster.possession = cloned;
+          else this.dungeon.addObjectToChain(cloned, monster.possession);
         }
         break;
       }
@@ -2276,25 +2279,6 @@ export class DsaSystem {
   private getChampion(party: PartyState, index: number): Champion | null {
     if (index < 0 || index >= party.champions.length) return null;
     return party.champions[index] ?? null;
-  }
-
-  private addObjectToMonster(monsterId: ObjectID, objectId: ObjectID): void {
-    const monster = this.dungeon.getCreatureRecord(monsterId);
-    if (!monster) return;
-    let head = monster.possession;
-    if (head === OBJECT_ID_EOF || head === OBJECT_ID_NULL) {
-      monster.possession = objectId;
-      this.dungeon.setDBRecordLink(objectId, OBJECT_ID_EOF);
-      return;
-    }
-    let current = head;
-    for (;;) {
-      const next = this.dungeon.getDBRecordLink(current);
-      if (next === OBJECT_ID_EOF) break;
-      current = next;
-    }
-    this.dungeon.setDBRecordLink(current, objectId);
-    this.dungeon.setDBRecordLink(objectId, OBJECT_ID_EOF);
   }
 
   private moveObjectDsa(

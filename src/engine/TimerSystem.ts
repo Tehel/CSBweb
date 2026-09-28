@@ -1485,7 +1485,15 @@ export class TimerSystem {
 
     if (!projectileIsMagic && projectileDbType !== DBType.CLOUD) {
       if (dest && dest.monster !== OBJECT_ID_EOF) {
-        this.addObjectToMonsterPossession(dest.monster, projectile);
+        // `doc/CSBwin-src/Timer.cpp:140-151`: an empty possession chain takes the object
+        // as its head, its link cleared; otherwise `AddObjectToRoom(objD6, objD7, -1, 0, NULL)`.
+        const monster = this.dungeon.getCreatureRecord(dest.monster);
+        if (monster && monster.possession === OBJECT_ID_EOF) {
+          this.dungeon.setDBRecordLink(projectile, OBJECT_ID_EOF);
+          monster.possession = projectile;
+        } else if (monster) {
+          this.dungeon.addObjectToChain(projectile, monster.possession);
+        }
       } else {
         this.dropMissileObject(projectile, position, decodeObjectID(missileRn).position & 0x3);
       }
@@ -1642,25 +1650,6 @@ export class TimerSystem {
     const map = this.dungeon.getMap(timer.level);
     if (!map) return;
     setDoorState(map, timer.uByte6, timer.uByte7, 5);
-  }
-
-  private addObjectToMonsterPossession(monsterRn: ObjectID, objectRn: ObjectID): void {
-    const monster = this.dungeon.getCreatureRecord(monsterRn);
-    if (!monster) return;
-    const head = monster.possession ?? OBJECT_ID_EOF;
-    if (head === OBJECT_ID_EOF || head === OBJECT_ID_NULL) {
-      monster.possession = objectRn;
-      this.dungeon.setDBRecordLink(objectRn, OBJECT_ID_EOF);
-      return;
-    }
-    let current = head;
-    for (;;) {
-      const next = this.dungeon.getDBRecordLink(current);
-      if (next === OBJECT_ID_EOF) break;
-      current = next;
-    }
-    this.dungeon.setDBRecordLink(current, objectRn);
-    this.dungeon.setDBRecordLink(objectRn, OBJECT_ID_EOF);
   }
 
   /**

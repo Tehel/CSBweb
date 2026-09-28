@@ -14,7 +14,7 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tier D is empty, and E and C hold only small items found along the way. **The goal now is a complete, faithful game on the default
+Tiers D and E are empty, and C holds only small items found along the way. **The goal now is a complete, faithful game on the default
 dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E7 | Two private copies of `AddObjectToRoom`'s chain arm | S | ⏳ |
 | C80 | `addObjectToCell` keeps a stale link on a cell's first object | S | ⏳ |
 | G15 | The magic footprint decoration | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
@@ -114,18 +113,7 @@ Empty. New state-representation debt goes here, and jumps the queue.
 
 ## E — Architecture
 
-New architecture debt goes here, and jumps the queue.
-
-### E7 ⏳ Two private copies of `AddObjectToRoom`'s chain arm
-
-`DungeonState.addObjectToChain` (`src/engine/DungeonState.ts:341`) is `AddObjectToRoom`
-with no cell (`doc/CSBwin-src/Code11f52.cpp:428`, `:491-499`). Two private helpers do the
-same walk to the end of a monster's possession chain on their own:
-`DsaSystem.addObjectToMonster` (`src/engine/DsaSystem.ts:2281`) and
-`TimerSystem.addObjectToMonsterPossession` (`src/engine/TimerSystem.ts:1647`). Both also
-treat an `RNnul` head as an empty chain and write the head's link, which is what their
-CSBWin call sites have to settle. Route each through `addObjectToChain`, the head arm as its
-own CSBWin caller writes it, with the whole-output diff as proof.
+Empty. New architecture debt goes here, and jumps the queue.
 
 ---
 
