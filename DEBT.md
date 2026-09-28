@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C76 | A menu button's second press pass is drawn without the first | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -114,19 +113,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
-### C76 ⏳ A menu button's second press pass is drawn without the first
-
-`_WaitForMenuSelect` paints its press animation into the screen in two passes five VBLs
-apart, the second over the first, and puts the saved pixels back only after both
-(`doc/CSBwin-src/Menu.cpp:121-179`). So during the second pass the first pass's edges are
-still up: the top row and the left column in colour 5, the right column and the row above
-the bottom in 0. `drawMenuPress` (`src/renderer/ui/Menu.ts`) paints only the pass `nowMs`
-falls in, and the save menu redraws the whole screen every frame of the press
-(`beginPress`, `src/renderer/ui/SaveMenu.ts`), so its second pass shows without the first.
-The boot's "GAME LOADED, READY TO PLAY." paints both passes into the screen in turn, as
-CSBWin does (`waitForMenuSelect`, `src/renderer/intro/BootSequence.ts`). Paint both passes
-in `drawMenuPress` once the second has begun. Evidence: a `tools/` check that reads the
-pixels of a press in its second pass.
+Empty. A divergence found along the way goes here, with the next free ID.
 
 ---
 

@@ -28,6 +28,10 @@
  *    inventory, which is what puts its objects in the save; the second shows the
  *    inventory again and brings the attack buttons back. Run over a real chest, with a
  *    real save restored into a fresh game. The port's quick-save repacks the chest too.
+ * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
+ *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
+ *    save menu redraws the whole screen on every frame of the press, so the pixels of a
+ *    frame in the second pass are read back here: both passes' edges must be up.
  *
  * Run: `npx tsx tools/dump-save-menu.ts`
  */
@@ -61,7 +65,17 @@ import {
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { MENU_HEIGHT, MENU_PANEL_COLOR, MENU_WIDTH, drawMenuBitmap, splitLongLine } from '../src/renderer/ui/Menu';
+import {
+  MENU_HEIGHT,
+  MENU_PANEL_COLOR,
+  MENU_PRESS_PHASE_MS,
+  MENU_WIDTH,
+  drawMenuBitmap,
+  drawMenuPress,
+  menuButtonList,
+  menuButtonRect,
+  splitLongLine,
+} from '../src/renderer/ui/Menu';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { newGame } from './lib/game';
@@ -701,6 +715,84 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'and the next draw opens the chest again');
 }
 
+/* ----------------------------------------------------- 7. the press animation ---- */
+
+/**
+ * A press on SAVE, drawn as the save menu draws it: onto a fresh screen each frame. The
+ * screen is a colour none of the edges use, so every pixel the press leaves is its own.
+ */
+function checkPressAnimation(graphics: GraphicsLoader): void {
+  console.log('');
+  console.log('=== the press animation (`doc/CSBwin-src/Menu.cpp:100-180`) ===');
+  const ui = makeDrawingUI(graphics);
+  const saveId = SaveMenu.SAVE_MENU_GEOMETRY.saveButtonId;
+  const rect = menuButtonRect(menuButtonList(ui, 4, false), saveId);
+  if (!rect) { check(false, `the four-option set has button ${saveId}`); return; }
+  const press = { buttonId: saveId, rect, startedMs: 0 };
+  const SCREEN = 7;
+  const frame = (elapsed: number): Uint8Array => {
+    ui.screenIndexBuffer!.pixels.fill(SCREEN);
+    drawMenuPress(ui, press, elapsed);
+    return ui.screenIndexBuffer!.pixels.slice();
+  };
+  const passA = frame(0);
+  const passB = frame(MENU_PRESS_PHASE_MS);
+  const after = frame(MENU_PRESS_PHASE_MS * 2);
+
+  // `rect34`, grown as `Menu.cpp:103-106` grows it.
+  const x1 = rect.x1 - 3;
+  const x2 = rect.x2 + 3;
+  const y1 = rect.y1 - 3;
+  const y2 = rect.y2 + 4;
+  const w = ui.screenIndexBuffer!.width;
+  const at = (pixels: Uint8Array, x: number, y: number): number => pixels[y * w + x];
+  const count = (pixels: Uint8Array, xa: number, xb: number, ya: number, yb: number, color: number): number => {
+    let wrong = 0;
+    for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) if (at(pixels, x, y) !== color) wrong++;
+    return wrong;
+  };
+  const changed = (pixels: Uint8Array): number => pixels.reduce((n, p) => n + (p === SCREEN ? 0 : 1), 0);
+  console.log(`  SAVE at (${rect.x1},${rect.y1})-(${rect.x2},${rect.y2}), grown to (${x1},${y1})-(${x2},${y2})`);
+  console.log(`  pixels painted: first pass ${changed(passA)}, second pass ${changed(passB)}, after ${changed(after)}`);
+
+  // The first pass alone: its four edges, and nothing of the second's yet.
+  check(count(passA, x1, x2 - 1, y1, y1, 5) === 0, 'first pass: the top row is colour 5 (Menu.cpp:123-125)');
+  check(count(passA, x1, x1, y1, y2 - 2, 5) === 0, 'first pass: the left column is colour 5 (:126-129)');
+  check(count(passA, x1 - 2, x2, y2 - 1, y2 - 1, 0) === 0, 'first pass: the row above the bottom is colour 0 (:130-134)');
+  check(count(passA, x2, x2, y1, y2, 0) === 0, 'first pass: the right column is colour 0 (:135-137)');
+  check(at(passA, x1 + 2, y1 + 1) === SCREEN && at(passA, x2 + 3, y1) === SCREEN, 'first pass: the second pass is not up yet');
+
+  // The second pass, over the first: the first pass's edges are still there, except
+  // where the second paints over them (column x2-1 crosses the top row, column x1+1 the
+  // row above the bottom).
+  check(count(passB, x1, x2 - 2, y1, y1, 5) === 0, 'second pass: the first pass\'s top row is still colour 5');
+  check(count(passB, x1, x1, y1, y2 - 2, 5) === 0, 'second pass: the first pass\'s left column is still colour 5');
+  check(count(passB, x2, x2, y1, y2, 0) === 0, 'second pass: the first pass\'s right column is still colour 0');
+  check(
+    count(passB, x1 - 2, x1, y2 - 1, y2 - 1, 0) === 0 && count(passB, x1 + 2, x2, y2 - 1, y2 - 1, 0) === 0,
+    'second pass: the first pass\'s row above the bottom is still colour 0',
+  );
+  check(count(passB, x1, x2 - 2, y1 + 1, y1 + 1, 5) === 0, 'second pass: its own top row is colour 5 (:139-143)');
+  // Its row above the bottom, drawn after it, crosses it at y2-2.
+  check(
+    count(passB, x1 + 1, x1 + 1, y1, y2 - 3, 5) === 0 && at(passB, x1 + 1, y2 - 1) === 5,
+    'second pass: its own left column is colour 5 (:144-148)',
+  );
+  check(count(passB, x2 - 1, x2 - 1, y1, y2, 0) === 0, 'second pass: its own right column is colour 0 (:149-152)');
+  check(count(passB, x1 + 1, x2, y2 - 2, y2 - 2, 0) === 0, 'second pass: its own row above the bottom is colour 0 (:153-157)');
+  check(count(passB, x1 - 1, x2 + 2, y2 + 2, y2 + 2, 13) === 0, 'second pass: the highlight below is colour 13 (:158-163)');
+  check(count(passB, x2 + 3, x2 + 3, y1, y2 + 2, 13) === 0, 'second pass: the highlight to the right is colour 13 (:164-168)');
+
+  // The boot's `waitForMenuSelect` paints the first pass into the screen and the second
+  // over it, without a redraw between them; a fresh screen must come out the same.
+  ui.screenIndexBuffer!.pixels.set(passA);
+  drawMenuPress(ui, press, MENU_PRESS_PHASE_MS);
+  const layered = ui.screenIndexBuffer!.pixels;
+  check(layered.every((p, i) => p === passB[i]), 'the second pass on a fresh screen is the second pass over the first');
+
+  check(changed(after) === 0, 'after both passes nothing is painted: the saved screen is back (:170-179)');
+}
+
 /* ------------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
@@ -714,6 +806,7 @@ async function main(): Promise<void> {
   checkCsbwinListing();
   await checkEnterAndLeave(graphics);
   await checkQuickSaveOverOpenChest(graphics);
+  checkPressAnimation(graphics);
   finish();
 }
 

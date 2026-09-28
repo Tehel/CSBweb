@@ -216,11 +216,15 @@ honest equivalent of "the main loop is not running".
    **0**; `VBLDelay(5)`.
 4. Pass B — inner top and inner left (y1+1, x1+1) in **5**, inner right (x2-1) and inner
    bottom (y2-2) in **0**, plus an outer bottom (y2+2) and outer right (x2+3) highlight
-   in colour **13**; `VBLDelay(5)`.
+   in colour **13**; `VBLDelay(5)`. It is painted over pass A, which stays up until the
+   restore.
 5. Restore the saved pixels (`x2 += 3; y2 += 3` first), restore the input state,
    `DiscardAllInput()`.
 
-Ten VBLs is **1/6 s at 60 Hz**, which is how long the port holds it.
+Ten VBLs is **1/6 s at 60 Hz**, which is how long the port holds it. `drawMenuPress`
+(`src/renderer/ui/Menu.ts`) paints pass A alone for the first five, then pass A with pass B
+over it, so the save menu, which redraws the whole screen each frame, shows what CSBWin's
+screen holds. Evidence: `tools/dump-save-menu.ts`, "the press animation".
 
 
 ## Entering and leaving

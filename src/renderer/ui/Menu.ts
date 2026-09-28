@@ -370,9 +370,10 @@ export function menuButtonRect(buttons: UIButton[], id: number): MenuPress['rect
  *
  * CSBWin grows the rectangle by 3 on three sides and 4 at the bottom, then draws two
  * passes of single-pixel edges five vertical blanks apart. It paints them straight into
- * the screen and restores the saved pixels afterwards; this port redraws the whole
- * screen every frame, so it just paints the current phase's edges and stops painting
- * when the animation is over.
+ * the screen, the second over the first, and restores the saved pixels only after both;
+ * so during the second pass the first pass's edges are still up. A caller that redraws
+ * the whole screen every frame gets the same picture from this: the first pass alone,
+ * then both, then nothing once the animation is over.
  */
 export function drawMenuPress(ui: UIState, press: MenuPress, nowMs: number): void {
   const buf = ui.screenIndexBuffer;
@@ -397,14 +398,14 @@ export function drawMenuPress(ui: UIState, press: MenuPress, nowMs: number): voi
     }
   };
 
-  if (elapsed < MENU_PRESS_PHASE_MS) {
-    // Pass A (`Menu.cpp:121-136`): top and left in 5, bottom and right in 0.
-    fill(x1, y1, x2, y1, 5);
-    fill(x1, y1, x1, y2 - 1, 5);
-    fill(x1 - 2, y2 - 1, x2, y2 - 1, 0);
-    fill(x2, y1, x2, y2, 0);
-  } else {
-    // Pass B (`Menu.cpp:138-166`): the inner edges, plus an outer highlight in 13.
+  // Pass A (`Menu.cpp:123-137`): top and left in 5, bottom and right in 0.
+  fill(x1, y1, x2, y1, 5);
+  fill(x1, y1, x1, y2 - 1, 5);
+  fill(x1 - 2, y2 - 1, x2, y2 - 1, 0);
+  fill(x2, y1, x2, y2, 0);
+  if (elapsed >= MENU_PRESS_PHASE_MS) {
+    // Pass B (`Menu.cpp:139-168`), over pass A: the inner edges, plus an outer highlight
+    // in 13.
     fill(x1, y1 + 1, x2 - 2, y1 + 1, 5);
     fill(x1 + 1, y1, x1 + 1, y2 - 1, 5);
     fill(x2 - 1, y1, x2 - 1, y2, 0);
