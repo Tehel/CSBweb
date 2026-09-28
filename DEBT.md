@@ -101,7 +101,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C79 · D11 · E7 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C80 · D11 · E7 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---

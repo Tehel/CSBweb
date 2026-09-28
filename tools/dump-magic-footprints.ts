@@ -14,8 +14,13 @@
  * cast to the count after the walk, whatever the spell's power, and a game loaded from
  * that save reads the same range back.
  *
- * The party is the one of `csbgame-early-3hero-nospace.dat`, a genuine CSBWin save whose
- * trail holds three prints, so the walk leaves the ring short of its 24.
+ * The parties are two genuine CSBWin saves', and the walk leaves the ring short of its 24:
+ *
+ * - `csbgame-early-3hero-nospace.dat`, whose trail holds three prints;
+ * - `csbgame-early-1hero.dat`, whose trail is empty. Only the first move's
+ *   `AddFootprintEntry` waits for a print (`if (D6W != 0)`, `Code11f52.cpp:3231-3234`): the
+ *   move still counts and stores its own, so the trail grows from nothing, as CSBWin's
+ *   `csbgame-early-2hero-renamed.dat`, one move later, shows with its one print.
  *
  * Run: `npx tsx tools/dump-magic-footprints.ts`
  */
@@ -32,7 +37,7 @@ import { applySaveBytes, buildSavePayload, decodeBase64ToBytes, encodeSavePayloa
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 
-const SAVE = 'static/gamefiles/saves/csbgame-early-3hero-nospace.dat';
+const SAVES = 'static/gamefiles/saves';
 
 /** YA BRO ROS: element YA (0x66), form BRO (0x70), class ROS (0x73), after a power rune. */
 const YA_BRO_ROS = [0x66, 0x70, 0x73];
@@ -58,10 +63,10 @@ function openNeighbour(game: Game): { x: number; y: number } {
   throw new Error('no open square beside the party');
 }
 
-function scenario(power: number): void {
-  const label = `power ${power}`;
+function scenario(save: string, power: number): void {
+  const label = `${save}, power ${power}`;
   const game = loadWorld();
-  applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVE))));
+  applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, save))));
   const prints = game.footprints;
   const party = game.party.state;
 
@@ -110,6 +115,7 @@ function scenario(power: number): void {
   `${label}: a game loaded from the save reads the range back`);
 }
 
-scenario(2);
-scenario(4);
+scenario('csbgame-early-3hero-nospace.dat', 2);
+scenario('csbgame-early-3hero-nospace.dat', 4);
+scenario('csbgame-early-1hero.dat', 4);
 finish();

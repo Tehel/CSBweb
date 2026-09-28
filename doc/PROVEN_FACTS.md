@@ -770,6 +770,15 @@ It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 value, and `DeleteFootprintEntry`'s `MemMove` shifts the tail *up* rather than down
 (`doc/CSBwin-src/Code11f52.cpp:4328-4329`). Both are ported as written.
 
+## The party's trail grows from empty
+
+In `MoveObject`'s footprint block (`doc/CSBwin-src/Code11f52.cpp:3227-3246`) the
+`if (D6W != 0)` guards only the first `AddFootprintEntry`, the one that ages the departed
+square. The count still grows and the new square is still stored, so the first move a
+party with champions makes stores print 0. CSBWin's own saves show it:
+`csbgame-early-1hero.dat` has `NumFootprintEnt` 0 and `csbgame-early-2hero-renamed.dat`,
+later in the same game, 1.
+
 ## YA BRO ROS marks the trail from the cast onwards
 
 The magic footprints are a range of the one trail, `[d.IndexOfFirstMagicFootprint,

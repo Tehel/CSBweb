@@ -98,9 +98,9 @@ export class PartyFootprints {
    * (`doc/CSBwin-src/Code11f52.cpp:3225-3247`).
    *
    * The order is load-bearing: the trail is first trimmed to 23 entries or fewer,
-   * then the *departed* square's age is written by `addFootprintEntry`, then the
-   * count grows, then the *new* square is stored, and finally `addFootprintEntry` is
-   * called again with the sentinel `0x8018`.
+   * then the *departed* square's age is written by `addFootprintEntry` (unless the trail
+   * is empty), then the count grows, then the *new* square is stored, and finally
+   * `addFootprintEntry` is called again with the sentinel `0x8018`.
    */
   recordPartyMove(
     time: number,
@@ -116,14 +116,9 @@ export class PartyFootprints {
       this.deleteFootprintEntry(0);
       index--;
     }
-    if (index === 0) {
-      // CSBWin skips the whole block when the trail is empty, so the very first move
-      // after the party appears records nothing.
-      this.lastPartyMoveTime = time;
-      return;
+    if (index !== 0) {
+      this.addFootprintEntry((time - this.lastPartyMoveTime) & 0xffff);
     }
-
-    this.addFootprintEntry((time - this.lastPartyMoveTime) & 0xffff);
     this.lastPartyMoveTime = time;
     this.count++;
     if (magicFootprintsActive) this.indexOfLastMagic = this.count;
