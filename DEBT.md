@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C74 | A keyed attack makes no tick due | S | ⏳ |
 | C75 | A generator makes its group on the party's level | S | ⏳ |
 | C76 | A menu button's second press pass is drawn without the first | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
@@ -115,16 +114,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
-### C74 ⏳ A keyed attack makes no tick due
-
-A click on an attack option sets `d.clockTick = intResult` after `ExecuteAttack`
-(`doc/CSBwin-src/Character.cpp:4716-4717`), which `handleAttackAreaClick` mirrors
-(`src/renderer/ui/Attack.ts`). The attack option keys reach `executeAttack` through
-`performAttack` (`src/renderer/ui/Keyboard.ts:161`), which drops the result, so a keyed
-attack waits for the next tick where a clicked one brings it on at once. The module comment
-of `Keyboard.ts` promises the two routes stay equivalent. Set the clock tick there as the
-click does, with a case in `tools/dump-key-bindings.ts`.
 
 ### C75 ⏳ A generator makes its group on the party's level
 

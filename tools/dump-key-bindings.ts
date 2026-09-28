@@ -120,8 +120,10 @@ async function main(): Promise<void> {
   let attacks: Array<{ chIdx: number; attackType: number }> = [];
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
-    return 0;
+    return 1;
   };
+  let clockTicks: number[] = [];
+  ui.setClockTick = (value: number) => { clockTicks.push(value); };
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
   ui.onSpellCast = (chIdx: number, incantation: number[]) => {
     casts.push({ chIdx, incantation });
@@ -156,6 +158,8 @@ async function main(): Promise<void> {
   check(attacks.length === 1 && attacks[0].chIdx === 1,
     "'w' with champion 2's menu open should perform their first attack");
   check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
+  check(clockTicks.join() === '1',
+    "and set d.clockTick to what it returned, as the click does (Character.cpp:4716-4717)");
   check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
 
   // ---- 2. Any of the column's three keys opens the menu; with it open, each is its row,
@@ -296,9 +300,8 @@ async function main(): Promise<void> {
   //         menu up, and `d.clockTick = intResult` (`:4717`) is not set. While the script
   //         holds the loop every panel key is claimed and dead: CSBWin's UI only queues.
   let held = false;
-  const clockTicks: number[] = [];
+  clockTicks = [];
   ui.isRunningScript = () => held;
-  ui.setClockTick = (value: number) => clockTicks.push(value);
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     held = true;

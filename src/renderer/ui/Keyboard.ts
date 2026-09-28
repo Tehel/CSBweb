@@ -35,7 +35,7 @@
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
 import { selectMagicCaster } from '../../engine/Party';
-import { executeAttack, prepareAttack } from './Attack';
+import { prepareAttack, takeAttackOption } from './Attack';
 import { applyMagicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
 import { UIState } from './UIState';
@@ -202,7 +202,7 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
  */
 function performAttack(ui: UIState, option: number): void {
   if (option >= ui.word20248) return;
-  executeAttack(ui, option);
+  takeAttackOption(ui, option);
 }
 
 /** Button ids 7-10 — the same toggle, and the same "replace" the click path gives. */

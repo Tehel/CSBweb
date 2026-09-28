@@ -186,6 +186,17 @@ export function executeAttack(ui: UIState, option: number): number {
 }
 
 /**
+ * One of the listed attacks (0-2) taken, by a click or its key: `ExecuteAttack`, then
+ * `d.clockTick = (i16)intResult` (`doc/CSBwin-src/Character.cpp:4716-4717`), so an attack
+ * makes a tick due and a 0 puts one off. The fusion's `ExecuteAttack(_6_, …)` does not
+ * return to set it.
+ */
+export function takeAttackOption(ui: UIState, option: number): void {
+  const result = executeAttack(ui, option);
+  if (!ui.isRunningScript?.()) ui.setClockTick?.(result);
+}
+
+/**
  * `_TAG019fac` (`doc/CSBwin-src/Character.cpp:4661`) — button 111, the panel area.
  *
  * Which button list is consulted depends on the panel's state, so the same screen
@@ -203,12 +214,9 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
       return;
     }
     // Only the options actually offered are live; the rows below `word20248` are dead
-    // even though the button list covers them. `d.clockTick = (i16)intResult`
-    // (`Character.cpp:4716-4717`): an attack makes a tick due, and a 0 puts one off.
+    // even though the button list covers them.
     if (id - 112 > ui.word20248) return;
-    const result = executeAttack(ui, id - 113);
-    // Nor does `ExecuteAttack(_6_, …)` return to set `d.clockTick` (`:4717`).
-    if (!ui.isRunningScript?.()) ui.setClockTick?.(result);
+    takeAttackOption(ui, id - 113);
     return;
   }
 
