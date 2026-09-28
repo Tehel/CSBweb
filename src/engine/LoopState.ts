@@ -4,6 +4,7 @@
  * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or in the
  * port's quick-save.
  */
+import type { Rect } from '../renderer/csbwin/UITables';
 import type { GameContext } from './GameContext';
 
 export interface LoopFlags {
@@ -44,6 +45,22 @@ export interface LoopFlags {
    * `:1463-1476`).
    */
   gameFrozen: boolean;
+  /**
+   * `d.FlashButnActive`: `FlashButton` or `WaitForButtonFlash` has asked the next VBL to
+   * invert `flashButn` (`vblFlashButton`).
+   */
+  flashButnActive: boolean;
+  /** `d.FlashButnX1`, `…X2`, `…Y1` and `…Y2`: the screen rectangle, corners included. */
+  flashButn: Rect;
+  /**
+   * `d.Word11776`, which each inversion toggles: whether `flashButn` stands inverted.
+   * CSBWin inverts its screen memory once; the port composes its screen afresh for every
+   * frame, so `GameScreen` applies the inversion (`vblFlashButn`) after composing, for as
+   * long as this is set.
+   */
+  word11776: boolean;
+  /** An inversion since the page last took it (`Game.takeFlashChanged`): a redraw is due. */
+  flashChanged: boolean;
 }
 
 /**
@@ -74,7 +91,51 @@ export interface MainLoop {
 }
 
 export function createLoopFlags(): LoopFlags {
-  return { clockTickSet: false, clockTickCleared: false, newPartyLevel: -1, clockRunning: true, gameFrozen: false };
+  // `d.FlashButnActive = 0; d.Word11776 = 0;` at the game start
+  // (doc/CSBwin-src/CSBCode.cpp:10477-10478).
+  return {
+    clockTickSet: false, clockTickCleared: false, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
+    flashButnActive: false, flashButn: { x1: 0, x2: 0, y1: 0, y2: 0 }, word11776: false, flashChanged: false,
+  };
+}
+
+/**
+ * The vertical blank's share of the button flash (doc/CSBwin-src/CSBCode.cpp:1028-1038):
+ * `d.FlashButnActive = 0`, `d.Word11776 ^= 0xffff`, and `vblFlashButn` inverts the
+ * rectangle.
+ */
+export function vblFlashButton(loop: LoopFlags): void {
+  if (!loop.flashButnActive) return;
+  loop.flashButnActive = false;
+  loop.word11776 = !loop.word11776;
+  loop.flashChanged = true;
+}
+
+/**
+ * `_FlashButton(x1, x2, y1, y2)` (doc/CSBwin-src/CSBCode.cpp:7713-7730): wait out a pending
+ * flash, store the rectangle, set `d.FlashButnActive` and wait a VBL, whose handler inverts
+ * it. The port's pass does not stop for VBLs, so each wait runs its VBL's share at once:
+ * the rectangle is inverted where CSBWin's is, before the rest of the pass.
+ */
+export function flashButton(ctx: GameContext, x1: number, x2: number, y1: number, y2: number): void {
+  const loop = ctx.loop;
+  // `while (d.FlashButnActive != 0) {};`
+  vblFlashButton(loop);
+  loop.flashButn = { x1, x2, y1, y2 };
+  loop.flashButnActive = true;
+  // `wvbl(_1_);`
+  vblFlashButton(loop);
+}
+
+/**
+ * `WaitForButtonFlash` (doc/CSBwin-src/CSBCode.cpp:8561-8601): an inverted rectangle is
+ * handed to the next VBL to put back (`d.FlashButnActive = 1`), and CSBWin waits for that
+ * VBL. The port does not wait: the next VBL puts it back, and the frame this pass draws
+ * still shows it, which is the one frame a flash is seen (`DEBT.md` H). A put-back already
+ * asked for is the flash CSBWin's first loop waits out, after which `d.Word11776` is clear.
+ */
+export function waitForButtonFlash(ctx: GameContext): void {
+  if (ctx.loop.word11776) ctx.loop.flashButnActive = true;
 }
 
 /**

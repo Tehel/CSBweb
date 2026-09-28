@@ -270,6 +270,8 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
 export function tag02076e(ui: UIState): void {
   const party = ui.partyState;
   if (!party || party.sleeping) return;
+  // `WaitForButtonFlash(); //If any are active` (`:5113`).
+  ui.waitForButtonFlash?.();
   if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
   ui.shadedByTag02076e = true;
 }

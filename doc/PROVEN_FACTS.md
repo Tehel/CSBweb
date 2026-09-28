@@ -3795,6 +3795,32 @@ tick's `SetNewSpeed(0, 15)` would (`CSBCode.cpp:612-616`). Evidence: `tools/dump
 The port: `Game.runFrame` and `ScrollingText` (`doc/CSBWIN_MESSAGES_REFERENCE.md` → "The
 port"). Evidence: `tools/dump-messages.ts`.
 
+## The button flash: one VBL inverts plane 2, the next puts it back
+
+`_FlashButton(x1, x2, y1, y2)` (`doc/CSBwin-src/CSBCode.cpp:7713-7730`) waits out a pending
+flash, stores the rectangle in `d.FlashButnX1`…`Y2`, sets `d.FlashButnActive` and waits a
+VBL. The VBL handler clears `d.FlashButnActive`, toggles `d.Word11776` and calls
+`vblFlashButn` (`:1028-1038`), which flips the word at `+4` of every 16-pixel group from
+`x1` to `x2` on rows `y1` to `y2`, corners included (`VBL.cpp:60-122`): bit plane 2, which
+`UnpackScreen` makes bit 2 of the pixel's index (`WinScreen.cpp:314-330`), so a flashed
+pixel is `index ^ 4`. `WaitForButtonFlash` (`CSBCode.cpp:8561-8601`) waits out a pending
+flash, then, while `d.Word11776` is set, sets `d.FlashButnActive` and waits a VBL, which
+inverts the rectangle back. The main loop calls it at `tag000730`, after the tick's
+`DrawViewport` (`:638`, `:655`), and after the mouse queue on a pass whose `d.clockTick` is 0
+(`:763`); `CastMagic` (`Magic.cpp:939`), `TAG02076e` (`Character.cpp:5113`) and
+`_FusionSequence` (`Attack.cpp:2273`) call it too. The game start clears both words
+(`CSBCode.cpp:10477-10478`).
+
+The movement arrows: `_TurnParty` flashes `(0xea, 0x105, 0x7d, 0x91)` for a turn left and
+`(0x123, 0x13e, 0x7d, 0x91)` for a turn right (`CSBCode.cpp:7896-7903`), after the
+party-move filter and before the stairs. `MoveParty` returns `&d.MoveButn18496[button - 3]`
+(`:8137-8139`), which `HandleMouseEvents` flashes (`Mouse.cpp:1556-1567`). It sets that
+result before the wall and monster tests, so a step they refuse, which brings no tick
+(`CSBCode.cpp:8310-8314`), flashes as well; only the filter's refusal (`:8120`) returns
+`NULL`. In `dm-atari/graphics.dat`, `d.MoveButn18496` is forward `(263-289, 125-145)`, right
+`(291-318, 147-167)`, backward `(263-289, 147-167)` and left `(234-261, 147-167)`.
+`tools/dump-button-flash.ts` checks the flash of all six arrows.
+
 ## The key tables: CSBWin's own keys
 
 - **What a key is.** `UIM_KEYDOWN` turns a PC key into an Atari key through `config.txt`'s

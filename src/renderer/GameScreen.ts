@@ -20,6 +20,7 @@ import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
+  vblFlashButn,
   createPaletteIndexViewportBuffer,
   updateImageDataFromIndex,
   updateImageDataFromIndexWithViewportPalette,
@@ -110,6 +111,8 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onWakeUp'
   | 'onFreeze'
   | 'onThaw'
+  | 'waitForButtonFlash'
+  | 'flashedButton'
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
@@ -178,6 +181,8 @@ export class GameScreen {
     ui.onWakeUp = hooks.onWakeUp;
     ui.onFreeze = hooks.onFreeze;
     ui.onThaw = hooks.onThaw;
+    ui.waitForButtonFlash = hooks.waitForButtonFlash;
+    ui.flashedButton = hooks.flashedButton;
     ui.onCreateSave = hooks.onCreateSave;
     ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;
@@ -533,6 +538,12 @@ export class GameScreen {
       drawSaveMenu(this.ui);
     }
     drawHoverHighlights(this.ui);
+    // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
+    // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
+    // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:883-884),
+    // and draws it back after (`:1039-1042`).
+    const flashed = this.ui.flashedButton?.() ?? null;
+    if (flashed) vblFlashButn(this.screen, flashed);
     drawCursorItem(this.ui, !inventoryOpen);
 
     const uiPalette = this.uiPalette;

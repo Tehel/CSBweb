@@ -12,7 +12,7 @@ import { MovementAction } from './gameTypes';
 import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, getRoomType } from '../core/types';
 import { div, sw } from '../core/intCast';
 import type { GameContext } from './GameContext';
-import { setClockTick } from './LoopState';
+import { flashButton, setClockTick } from './LoopState';
 import { TimerFunction } from './TimerQueue';
 
 
@@ -99,6 +99,12 @@ export class MovementSystem {
      * Handle turning
      */
     private handleTurn(action: MovementAction): MovementResult {
+        // `FlashButton(_2_, 0xea, 0x0105, 0x7d, 0x91)` for a turn left, `(_3_, 0x123,
+        // 0x13e, 0x7d, 0x91)` for a turn right (doc/CSBwin-src/CSBCode.cpp:7896-7903),
+        // once the party-move filter (`DEBT.md` G2) has let the turn through, and before
+        // the stairs.
+        if (action === MovementAction.TURN_LEFT) flashButton(this.ctx, 0xea, 0x0105, 0x7d, 0x91);
+        else flashButton(this.ctx, 0x123, 0x13e, 0x7d, 0x91);
         const position = this.party.state.position;
         const cellFlags = this.dungeon.getCellFlag(position);
         const roomType = (cellFlags >> 5) & 0x7;

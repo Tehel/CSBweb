@@ -21,7 +21,7 @@ import {
   type MonsterDesc,
   type WeaponDesc,
 } from '../renderer/csbwin/ObjectTables';
-import { extractUITables, type SoundTableEntry } from '../renderer/csbwin/UITables';
+import { extractUITables, type Rect, type SoundTableEntry } from '../renderer/csbwin/UITables';
 import { extractViewportTables } from '../renderer/csbwin/ViewportTables';
 import type { TextDecodeTables } from './DungeonState';
 
@@ -115,6 +115,14 @@ export interface GameTables {
   /** The spell table graphic `0x230` carries, for `CastSpell`. */
   readonly spells: readonly SpellDefinition[];
 
+  // --- Interface ---
+
+  /**
+   * `d.MoveButn18496[4]` — the step arrows' screen rectangles, forward, right, backward
+   * and left (`doc/CSBwin-src/Data.h:699`), which `FlashButton` flashes.
+   */
+  readonly moveButtons: readonly Rect[];
+
   // --- Sound ---
 
   /** `d.sound1772[22]` — `QueueSound`'s table (the port's `soundTable`, `Data.h:1402`). */
@@ -170,6 +178,8 @@ export function buildGameTables(graphics: GraphicsLoader): GameTables {
     byte20090: g230.byte20090,
     attackNames: g230.attackNames,
     spells: g230.spells,
+
+    moveButtons: ui.graphic231.moveButtons,
 
     sound1772: g232.soundTable,
   };

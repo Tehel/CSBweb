@@ -13,7 +13,7 @@ import type { FeedParameters } from '../../engine/Feeding';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
-import type { KeyXlate, UIButton, UITables } from '../csbwin/UITables';
+import type { KeyXlate, Rect, UIButton, UITables } from '../csbwin/UITables';
 import type { ObjectTables } from '../csbwin/ObjectTables';
 import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
@@ -219,6 +219,10 @@ export interface UIState {
   setClockTick?: (value: number) => void;
   /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
   onWakeUp?: () => void;
+  /** `WaitForButtonFlash` (`doc/CSBwin-src/CSBCode.cpp:8561`) — the engine's `waitForButtonFlash`. */
+  waitForButtonFlash?: () => void;
+  /** The button rectangle a flash has inverted, or `null` — `Game.flashedButton`. */
+  flashedButton?: () => Rect | null;
   /** Button 147, the engine's half of the freeze — `Game.freeze`. */
   onFreeze?: () => void;
   /** Button 148, the engine's half of the thaw — `Game.thaw`. */

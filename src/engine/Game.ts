@@ -34,10 +34,11 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { createLoopFlags, freeze, setClockTick, thaw, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { createLoopFlags, flashButton, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, wakeUp, type LoopScript, type MainLoop } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
+import type { Rect } from '../renderer/csbwin/UITables';
 import { CsbRandom } from '../core/random';
 
 import { CharacterStats } from './CharacterStats';
@@ -396,14 +397,17 @@ export class Game implements MainLoop {
             // go by, with their `vblInterrupt`, and the loop makes no pass. The last one
             // resumes the script, up to its next delay.
             this.ctx.host.messages.vblInterrupt();
+            vblFlashButton(this.ctx.loop);
             for (const callback of this.onFrameCallbacks) callback(this);
             if (--this.scriptDelay === 0) this.resumeScript();
             return;
         }
         // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
         // (doc/CSBwin-src/system.cpp:624-630, CSBUI.cpp:1253-1272): the message strip's
-        // scroll moves on first. It runs frozen or not, and under the save menu.
+        // scroll moves on first, then the button flash (`:1028-1038`). It runs frozen or
+        // not, and under the save menu.
         this.ctx.host.messages.vblInterrupt();
+        vblFlashButton(this.ctx.loop);
         this.ctx.loop.clockTickCleared = false;
         // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
         // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
@@ -422,6 +426,8 @@ export class Game implements MainLoop {
         // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
         // frozen, the due tick waits, and runs in the frame that thaws.
         const tickDue = this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared);
+        // `if (d.clockTick == 0) WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:763).
+        if (!tickDue) waitForButtonFlash(this.ctx);
         if (tickDue && this.ctx.loop.clockRunning) {
             if (!this.state.paused) {
                 this.gameTick();
@@ -464,6 +470,9 @@ export class Game implements MainLoop {
         for (const callback of this.onTickCallbacks) {
             callback(this);
         }
+        // `tag000730: WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:653-655), asleep
+        // or not.
+        waitForButtonFlash(this.ctx);
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
@@ -756,6 +765,15 @@ export class Game implements MainLoop {
         const action = BUTTON_MOVEMENT[num];
         if (action !== undefined) {
             this.move(action);
+            // `pButton = MoveParty(D6W); if (pButton != NULL) FlashButton(…)`
+            // (doc/CSBwin-src/Mouse.cpp:1556-1567): a step's arrow, `d.MoveButn18496[button
+            // - 3]`, which `MoveParty` returns unless a party-move filter refused the step
+            // (`CSBCode.cpp:8120`, `:8137-8139`; the filter is `DEBT.md` G2). A turn
+            // flashes its own, in `_TurnParty`.
+            if (num >= 3 && num <= 6) {
+                const button = this.ctx.tables.moveButtons[num - 3]!;
+                flashButton(this.ctx, button.x1, button.x2, button.y1, button.y2);
+            }
         } else {
             this.mouseEventHandlers?.button(num, entry.x, entry.y);
         }
@@ -820,6 +838,26 @@ export class Game implements MainLoop {
      */
     onTick(callback: GameEventCallback): void {
         this.onTickCallbacks.push(callback);
+    }
+
+    /**
+     * The rectangle `vblFlashButn` has inverted while `d.Word11776` says it stands
+     * inverted, or `null`: the screen inverts it after composing a frame.
+     */
+    flashedButton(): Rect | null {
+        return this.ctx.loop.word11776 ? this.ctx.loop.flashButn : null;
+    }
+
+    /** `WaitForButtonFlash` (`LoopState.waitForButtonFlash`), for the UI's `TAG02076e`. */
+    waitForButtonFlash(): void {
+        waitForButtonFlash(this.ctx);
+    }
+
+    /** Whether a VBL inverted the flashed rectangle since the last call: a redraw is due. */
+    takeFlashChanged(): boolean {
+        const changed = this.ctx.loop.flashChanged;
+        this.ctx.loop.flashChanged = false;
+        return changed;
     }
 
     /** Called at the end of every frame, whether or not a tick ran in it. */

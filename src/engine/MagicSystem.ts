@@ -18,7 +18,7 @@ import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
-import { setClockTick } from './LoopState';
+import { setClockTick, waitForButtonFlash } from './LoopState';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import type { SpellParameters } from './magicTypes';
 import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
@@ -116,6 +116,8 @@ export class MagicSystem {
   }
 
   private castMagic(casterIdx: number): number {
+    // `WaitForButtonFlash(); // If any are active.` (doc/CSBwin-src/Magic.cpp:939).
+    waitForButtonFlash(this.ctx);
     const party = this.ctx.party.state;
     const champion = party.champions[casterIdx];
     if (!champion) return 0;

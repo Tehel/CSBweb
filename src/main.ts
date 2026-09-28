@@ -296,6 +296,10 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         onWakeUp: () => game.wakeUp(),
         // Buttons 147 and 148 (the screen's halves are `handleMouseButton`'s).
         onFreeze: () => game.freeze(),
+        // The button flash: `TAG02076e`'s `WaitForButtonFlash`, and the rectangle the
+        // screen inverts.
+        waitForButtonFlash: () => game.waitForButtonFlash(),
+        flashedButton: () => game.flashedButton(),
         onThaw: () => game.thaw(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
@@ -464,9 +468,11 @@ function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: Sound
 
     // The engine drives the message strip (`GameHost.messages`), a scanline of its scroll
     // a VBL; CSBWin's `vblInterrupt` invalidates the window after each
-    // (doc/CSBwin-src/CSBCode.cpp:1003).
+    // (doc/CSBwin-src/CSBCode.cpp:1003). A VBL that inverted a flashed button is drawn too.
     game.onFrame(() => {
-        if (scrollingText.takeChanged()) renderView();
+        const scrolled = scrollingText.takeChanged();
+        const flashed = game.takeFlashChanged();
+        if (scrolled || flashed) renderView();
     });
 }
 
