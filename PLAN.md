@@ -8,6 +8,7 @@ markers; keep them honest. Marker meanings:
 - ✅ done and believed faithful to CSBWin
 - ⚠️ implemented but knowingly diverges or is incomplete — the note says how
 - ⏳ not started, or a placeholder stands in for the real logic
+- ⏸️ postponed until the default dungeon is validated (`DEBT.md` → "Priority")
 - 🚫 deliberately skipped (the note says why)
 
 **When you defer part of a job, record the deferral here.** A phase marked ✅ with silent
@@ -19,16 +20,21 @@ finished, lift anything still open into **`DEBT.md`**, which is the authority on
 any verified fact into `doc/`; then delete the phase's body and add its line to
 "Completed phases".
 
-## Current priority: paying off `DEBT.md`
+## Current priority: a working game on the default dungeon
 
-The next work is the technical debt, not new phases. `DEBT.md` lists it in payoff order —
-data-structure and architecture debt first, then the known divergences from CSBWin, and the
-unported CSBWin features last — and says how to work an item. **One item per commit, a few
-per session**, then `/clear`. `DEBT.md`'s index is the live status; its first row is the
-next item.
+The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
-New phase work (Phase 10's block 1, Phase 15's steps 4–5) waits until tiers C–E of
-`DEBT.md` are empty, unless a debt item needs it.
+1. **`DEBT.md`'s active rows**: the structural item left, then the unported CSBWin features
+   the default dungeon reaches, and Phase 10's block 1 (`DEBT.md` G7). `DEBT.md` says how
+   to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
+   the live status; its first row is the next item.
+2. **Rework the save menu** (Phase 10, step 11). The author sets its scope when it starts.
+3. Phase 15 step 4 interleaves anywhere.
+
+⏸️ **Postponed until the default dungeon is validated**: DSA extensibility and CSBWin's
+custom-dungeon extensions (`DEBT.md` G1-G4), its debugging features (G14, the ASCII dump),
+and Phase 15 step 5. The retail dungeon uses none of them. Features of **Chaos Strikes
+Back** are not postponed: it is the next dungeon to try.
 
 ## Ground rules
 
@@ -486,7 +492,8 @@ Kept because the rescoring below is written against its numbering.
    both paths.
 
    ⏳ **Still deferred, and none of it new debt:**
-   - **The DSA global variables are not read from `EXPOOL`.** CSBWin takes them from
+   - ⏸️ **The DSA global variables are not read from `EXPOOL`** (postponed with DSA
+     extensibility, `DEBT.md` → "Priority"). CSBWin takes them from
      `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` a record
      (`doc/CSBwin-src/SaveGame.cpp:1746-1763`); `locateExpoolRecord` finds a record but
      returns only its first word. No committed save needs it — the shipped DM dungeon
@@ -628,7 +635,9 @@ never carried out, because the project has **no test framework**.
    which is what caught the codec bug's blast radius, and checks each opcode on a hand-built
    stream. The *table* extraction (`0x22e`..`0x232`) still has no round-trip check beyond the
    canaries individual tools assert.
-5. ⏳ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
-   validation).
+5. ⏸️ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
+   validation). Postponed, perhaps for good: staging the same scene in CSBWin without
+   cheats costs more than it would prove, and the golden frames and the render probe
+   already catch any pixel that changes unintentionally.
 
-Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 remains.
+Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 postponed.

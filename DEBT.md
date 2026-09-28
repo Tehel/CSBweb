@@ -10,32 +10,40 @@ and an ID is never reused. Items paid before 2026-09-26 are in `doc/PLAN_ARCHIVE
 "Resolved debt", which is where a `DEBT.md` ID cited in the code but absent here is found.
 
 Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not started ·
-🚫 deliberately not done.
+⏸️ postponed · 🚫 deliberately not done.
 
-## Priority: structure before features
+## Priority: a working game on the default dungeon
 
-**Data-structure and architecture debt is paid before any missing feature is built.**
-Tiers D (state representation) and E (architecture) come first, then the divergences of
-tier C, and the unported features of tier G come last. Two reasons:
-
-- A feature built on a structure that is about to move gets built twice: once now, and
-  again when the move lands — or the move has to carry it, which doubles the diff to
-  review.
-- The structure sets the price of every later port. With one `GameContext`, a fix calls
-  across systems through `ctx.systems` instead of adding a hook and a round of `?? 0`
-  guesses.
+Tiers E and C are empty, and D holds only D10: the data structures, the architecture and
+the known divergences are paid. **The goal now is a complete, faithful game on the default
+dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
+not need waits.
 
 The order, then:
 
-1. **D and E.** New structural debt goes into D or E and jumps the queue.
-2. **C — Known divergences from CSBWin.** Frozen while D and E have items: a divergence
-   found along the way is recorded here and not fixed, unless it blocks the D/E item at
-   hand or corrupts saves. Taken in the index's order, unless the author pulls another
-   forward.
-3. **G — Unported CSBWin features.** Last. A missing feature is started only once D and E
-   are empty, even when a dungeon, a save or a playtest needs it — note the need under the
-   item instead. The author can always ask for one out of order.
-4. **F — Verification debt** is independent of the rest. Interleave it anywhere.
+1. **D and E.** New structural debt still goes into D or E and jumps the queue.
+2. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
+   taken before the G items: a known bug outranks a missing feature.
+3. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
+4. **The save menu rework** (`PLAN.md` → "Current priority"), once the active G rows are
+   paid.
+5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
+
+**Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
+and no session picks one up unless the author names it:
+
+- **DSA extensibility.** The retail dungeon defines no DSA (`PLAN.md` → Phase 10), so
+  nothing it does could be verified: the missing opcodes, the DSA filters, and what only a
+  DSA reaches (the wings, `talents`).
+- **CSBWin's extensions for custom dungeons**: malformed heroes, external portraits, the
+  monster design options.
+- **CSBWin's debugging features** that are not part of the game (the ASCII dump).
+- **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
+  staging the same scene in CSBWin, without cheats, costs more than it proves.
+
+A **Chaos Strikes Back** feature is *not* postponed: CSB is the next dungeon to try once the
+default one is satisfying, and DM is a subset of it. A feature CSB needs stays in the
+active list, even if DM never reaches it.
 
 **H** is not debt: deliberate divergences, recorded so nobody "fixes" them.
 
@@ -74,29 +82,55 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F3 | Phase 15 steps 4–5 | — | in `PLAN.md` |
-| G1 | DSA gaps, and the footprint decoration | — | ⏳ |
-| G2 | Ten DSA filters | — | ⏳ |
-| G3 | The wings | — | ⏳ |
-| G4 | CSB extensions, malformed heroes, the monster design options | — | ⏳ |
-| G6 | UI effects | — | ⏳ |
-| G7 | Save-format gaps | — | in `PLAN.md` |
+| D10 | The magic footprint indices are held twice | S | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
-| G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
+| G15 | The magic footprint decoration | — | ⏳ |
+| G6 | UI effects | — | ⏳ |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
-| G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏳ |
+| G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
+| G7 | Save-format gaps | — | in `PLAN.md` |
+| F3 | Phase 15 step 4 | — | in `PLAN.md` |
+| G1 | DSA gaps | — | ⏸️ |
+| G2 | Ten DSA filters | — | ⏸️ |
+| G3 | The wings | — | ⏸️ |
+| G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
+| G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
+
+The rows above G1 are the active list. The ⏸️ rows are postponed (see "Priority") and are
+never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C79 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
+Next free IDs: C79 · D11 · E7 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
 
 ## D — State representation
 
-Empty. New state-representation debt goes here, and jumps the queue.
+New state-representation debt goes here, and jumps the queue.
+
+### D10 ⏳ The magic footprint indices are held twice
+
+CSBWin has one `d.NumFootprintEnt`, one `d.IndexOfFirstMagicFootprint` and one
+`d.IndexOfLastMagicFootprint`. The port holds each twice: on `PartyState`
+(`src/engine/gameTypes.ts:227-230`) and inside `PartyFootprints` (`count`,
+`indexOfFirstMagic`, `indexOfLastMagic`, `src/engine/PartyFootprints.ts:42-43`).
+
+- YA BRO ROS (`doc/CSBwin-src/Magic.cpp:1331-1342`) writes only the `PartyState` pair, and
+  from `PartyState.numFootprintEnt`, which only a load writes (`MagicSystem.ts:318-321`).
+- The trail's moves and deletions keep only `PartyFootprints`'s
+  (`PartyFootprints.ts:129`, `:153-154`), as CSBWin's do (`Code11f52.cpp:3240`,
+  `:4331-4337`).
+- The CSBWin save writes `PartyFootprints.count` but the `PartyState` pair
+  (`SaveGamePayload.ts:343-346`).
+
+So the spell marks a range the trail never reads, and a save carries a mixed state. Give
+the three one owner, `PartyFootprints`, which holds the ring they index. Nothing reads the
+magic range until G15 does, so the one observable change is the party tail a save writes
+after the spell: a fix, not a neutral refactor, and a `tools/` check casts the spell, walks,
+saves and reads the range back.
 
 ---
 
@@ -108,28 +142,83 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
 Empty. A divergence found along the way goes here, with the next free ID.
 
 ---
 
 ## F — Verification debt
 
-### F3 — Phase 15 steps 4–5 stay in `PLAN.md`
+### F3 — Phase 15 step 4 stays in `PLAN.md`
 
-The table-extraction round-trip checks and the comparison against CSBWin screenshots are a
-live phase, so they stay in `PLAN.md` → "Phase 15" rather than being copied here. The
-never-executed validation steps of phases 2, 4 and 7 are folded into it.
+The table-extraction round-trip checks are a live phase, so they stay in `PLAN.md` →
+"Phase 15" rather than being copied here. The never-executed validation steps of phases 2,
+4 and 7 are folded into it. Step 5, the comparison against CSBWin screenshots, is postponed
+(see "Priority").
 
 ---
 
 ## G — Unported CSBWin features
 
 Things CSBWin does that the port has not built. These are not defects in existing code;
-they are listed so nothing is lost. They come last (see "Priority").
+they are listed so nothing is lost. The active ones come in the index's order; the
+postponed ones follow, under their own heading (see "Priority").
 
-### G1 ⏳ DSA gaps, and the footprint decoration
+### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
+
+A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
+(`doc/CSBwin-src/Monster.cpp:239`). The port spends the blow and takes nothing
+(`MonsterAttack.ts:195-197`). Port it there, through `ctx.systems`, with a tool that has a
+giggler rob a champion.
+
+### G15 ⏳ The magic footprint decoration
+
+YA BRO ROS is cast, and its timer runs, but the viewport never shows a print.
+`SummarizeRoomInfo`'s footprint arm (`doc/CSBwin-src/Codea59a.cpp:401-418`) sets
+`decorations[2] |= 0x8000` when `SearchFootprints` (`CSBCode.cpp:7066`) finds a print on
+the cell whose index lies between `d.IndexOfFirstMagicFootprint` (inclusive) and
+`d.IndexOfLastMagicFootprint` (exclusive). The port omits the arm at
+`src/renderer/csbwin/SummarizeRoomInfo.ts:515`; the draw side already tests the bit
+(`BytecodeInterpreter.ts:1774`). Needs D10 first, or the arm reads indices the spell never
+set. The arm's `ECF_FOOTPRINTS` half is G1's.
+
+### G6 ⏳ UI effects
+
+- **Rune click flash** in the magic panel.
+- **Interaction highlights**: button press and selection effects (flash, shading, invert)
+  across UI regions, consistent with the hit-test rectangles.
+- **`FlashButton`** on a movement arrow that was clicked or keyed. `MoveParty` returns the
+  button and `HandleMouseEvents` flashes it (`doc/CSBwin-src/Mouse.cpp:1560-1567`).
+- **The viewport flash on a blow**, and a light-level trace hook. `atk_LIGHT` itself works;
+  this item is the flash, not the LIGHT attack.
+
+### G12 ⏳ `SmartDiscard`: a filling database is not thinned
+
+CSBWin's main loop calls `SmartDiscard(false)` on every tick
+(`doc/CSBwin-src/CSBCode.cpp:678`), and the game start (`:10636`) and the tail of a save
+(`SaveGame.cpp:1245`) call `SmartDiscard(true)`, which starts it over on a new database
+(`SmartDiscard.cpp:747-757`). Each call does one step of a cycle through the misc, weapon
+and clothing databases (`:764-793`): count the records in use, fifty a step, and once the
+count reaches three quarters of the database's maximum (`:805-821`), scan the dungeon for
+objects and discard them in priority order. None of it is ported. `Game.saveWritten`, the
+save's tail, leaves out its `SmartDiscard(true)`.
+
+### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record
+
+`DungeonState.findEmptyDBEntry` (`src/engine/DungeonState.ts:528`) returns `null` once a
+database holds 1024 records (`:535`). At that point CSBWin calls `MakeMoreRoomInDB`
+(`doc/CSBwin-src/Character.cpp:182`) to make room. This cannot happen in the shipped
+dungeons.
+
+### G7 — Save-format gaps stay in `PLAN.md`
+
+Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
+rather than being copied here.
+
+### Postponed until the default dungeon is validated
+
+Not taken in order; the author names one to start it (see "Priority").
+
+### G1 ⏸️ DSA gaps
 
 - **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are reported once each through
   `warnedOps` (`src/engine/DsaSystem.ts:1261`, `:1865`). Those warnings are the list.
@@ -145,14 +234,12 @@ they are listed so nothing is lost. They come last (see "Priority").
   (`Character.cpp:1782-1816`), which finds the champion carrying the object and brackets
   the curse change with `AdjustStatsForItemCarried(…, -1, …)` and `(…, +1, …)`, so a curse
   laid on a carried weapon costs 3 Luck at once. Port both together.
-- **The footprint decoration.** `SummarizeRoomInfo`'s footprint arm
-  (`Codea59a.cpp:401-424`) sets `decorations[2] |= 0x8000` when `SearchFootprints`
-  (`CSBCode.cpp:7066`) finds a footprint between `d.IndexOfFirstMagicFootprint` and
-  `d.IndexOfLastMagicFootprint` on the cell, or when the cell has the `ECF_FOOTPRINTS`
-  extended cell flag. It is omitted at `src/renderer/csbwin/SummarizeRoomInfo.ts:515`. The
-  DSA decoration gating (actuator type 47) is ported.
+- **`ECF_FOOTPRINTS`.** The footprint arm of `SummarizeRoomInfo` also shows prints on any
+  cell with this extended cell flag once `d.Time > 0` (`Codea59a.cpp:419-425`). Only a
+  DSA or a custom dungeon sets extended cell flags. The magic footprints themselves are
+  G15.
 
-### G2 ⏳ Ten DSA filters
+### G2 ⏸️ Ten DSA filters
 
 No dungeon we load defines any of them, so none could be verified if written. Each place
 uses CSBWin's defaults.
@@ -194,7 +281,7 @@ uses CSBWin's defaults.
   calls once it has the volume, and which may play the sound through a DSA instead
   (`CSBCode.cpp:1877`). `SoundQueue.queueSound` plays straight on.
 
-### G3 ⏳ The wings
+### G3 ⏸️ The wings
 
 CSBWin keeps champions who have left the party in a store that `CHARDESC::GetFromWings` /
 `SaveToWings` reach (`doc/CSBwin-src/Character.cpp:5239`). Two things consult it, and
@@ -204,13 +291,17 @@ cannot here:
 - `ProcessTT_ViAltar` state 1, which heals such a champion to `MaxHP/2` and saves them
   back (`Timer.cpp:2769-2782`).
 
-`Party.findChampionByFingerprint` is where both would grow their second half. This is a
-feature to build, not a branch to port: nothing in the port ever removes a living champion
-from the party.
+`Party.findChampionByFingerprint` is where both would grow their second half. Only a DSA
+fills the wings: `STKOP_SwapCharacter` (`DSA.cpp:4413-4419`) is the one caller of
+`SwapCharacter` (`Character.cpp:5472`), and through it of `CharacterDelete` / `CharacterAdd`
+and every `SaveToWings`. Nothing in the retail game removes a living champion from the
+party.
 
-### G4 ⏳ CSB extensions, malformed heroes, the monster design options
+### G4 ⏸️ Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options
 
-- `pcA3->talents`, which `Champion` has no field for;
+- `pcA3->talents`, which `Champion` has no field for. `AddCharacter` decodes it from the
+  hero text (`Character.cpp:688`), and only a DSA reads it (`DSA.cpp:4220`, `:4287`,
+  `:4337`);
 - the `legalHero` fallback (`Character.cpp:475`), which clamps an out-of-range hero text
   and retries it against "BOGUS / ILLEGAL HERO", where `HeroExtractor` rejects it
   outright;
@@ -229,47 +320,7 @@ constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 `SaveGameLoader` and gating every accessor.
 
-### G6 ⏳ UI effects
-
-- **Rune click flash** in the magic panel.
-- **Interaction highlights**: button press and selection effects (flash, shading, invert)
-  across UI regions, consistent with the hit-test rectangles.
-- **`FlashButton`** on a movement arrow that was clicked or keyed. `MoveParty` returns the
-  button and `HandleMouseEvents` flashes it (`doc/CSBwin-src/Mouse.cpp:1560-1567`).
-- **The viewport flash on a blow**, and a light-level trace hook. `atk_LIGHT` itself works;
-  this item is the flash, not the LIGHT attack.
-
-### G7 — Save-format gaps stay in `PLAN.md`
-
-Writing a CSBWin-compatible save is live work, so it stays in `PLAN.md` → "Phase 10"
-rather than being copied here.
-
-### G10 ⏳ `StealFromCharacter`: the giggler steals nothing
-
-A monster attack with `monsterShouldSteal` calls `StealFromCharacter`
-(`doc/CSBwin-src/Monster.cpp:239`). The port spends the blow and takes nothing
-(`MonsterAttack.ts:195-197`). Port it there, through `ctx.systems`, with a tool that has a
-giggler rob a champion.
-
-### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record
-
-`DungeonState.findEmptyDBEntry` (`src/engine/DungeonState.ts:528`) returns `null` once a
-database holds 1024 records (`:535`). At that point CSBWin calls `MakeMoreRoomInDB`
-(`doc/CSBwin-src/Character.cpp:182`) to make room. This cannot happen in the shipped
-dungeons.
-
-### G12 ⏳ `SmartDiscard`: a filling database is not thinned
-
-CSBWin's main loop calls `SmartDiscard(false)` on every tick
-(`doc/CSBwin-src/CSBCode.cpp:678`), and the game start (`:10636`) and the tail of a save
-(`SaveGame.cpp:1245`) call `SmartDiscard(true)`, which starts it over on a new database
-(`SmartDiscard.cpp:747-757`). Each call does one step of a cycle through the misc, weapon
-and clothing databases (`:764-793`): count the records in use, fifty a step, and once the
-count reaches three quarters of the database's maximum (`:805-821`), scan the dungeon for
-objects and discard them in priority order. None of it is ported. `Game.saveWritten`, the
-save's tail, leaves out its `SmartDiscard(true)`.
-
-### G14 ⏳ `AsciiDump`: the resumed game's "ASCII DUMP"
+### G14 ⏸️ `AsciiDump`: the resumed game's "ASCII DUMP"
 
 `AsciiDump` (`doc/CSBwin-src/AsciiDump.cpp:2137`) writes the whole dungeon as text to
 `ASCIIDUMP.TXT`, starting with the game's and the levels' information, every cell, the

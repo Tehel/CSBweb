@@ -512,7 +512,7 @@ export function summarizeRoomInfoCsbwin(
     }
   }
 
-  // Codea59a.cpp:400+: footprints/ext flags omitted for now.
+  // Codea59a.cpp:401-425: the footprint arm is not ported (DEBT.md G15, G1).
   rslt.rn2 = local;
   rslt.graphicRoomType = graphicRoomTypes[rslt.roomType] as GraphicRoomType;
 }

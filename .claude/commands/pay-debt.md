@@ -24,7 +24,8 @@ name a different item, take that one instead of the first row.
 
 ## Work
 
-- Take the first row of the index. If it is size L, work one step of it. If its entry has
+- Take the first row of the index. The ⏸️ rows are postponed and never the first row;
+  take one only when the notes name it. If the row is size L, work one step of it. If its entry has
   no split yet, the first step is to write the split, and any decision the entry asks for,
   into the entry, and commit that before any code moves.
 - Aim for one item or one step per session, or two or three if they are size S. Stop
@@ -36,7 +37,7 @@ name a different item, take that one instead of the first row.
   `.claude/skills/verification-tools/` ("A refactor is proven by diffing every tool's whole
   output"), and run `npm test -- --frames` when anything under `src/renderer/` or `src/ui/`
   moves. If a refactor uncovers a divergence from CSBWin, record it in tier C with the
-  next free ID. Don't fix it: tier C is frozen until tier E is empty.
+  next free ID. Don't fix it in the same commit: a fix is a commit of its own.
 - A fix owes the five things listed in `.claude/skills/playtest-bug/`.
 - Run `npm test` before every commit. Commit messages are one line, `Debt <ID>: …` or
   `Docs: …`, with no trailers. Never push.

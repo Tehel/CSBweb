@@ -208,9 +208,10 @@ magic casting, light levels, worn-object bonuses, sound, the message area, monst
 (`Monster.cpp`: AI, movement and combat both ways), the champion lifecycle (the Hall of
 Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
 entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and the
-port writes all sixteen blocks, block 1 still a stub (Phase 10). What is left: that block,
-the validation debt (Phase 15, steps 4–5), and the technical debt in `DEBT.md`. **Paying
-the debt off is the current priority**, one item per commit, in `DEBT.md`'s order:
-structure first (tiers D and E are empty), then the known divergences (tier C),
-then the unported features. The first row of its index is the next item, and `/pay-debt`
-starts a session on it.
+port writes all sixteen blocks, block 1 still a stub (Phase 10). **The current priority
+is a complete game on the default dungeon**: `DEBT.md`'s active rows, one item per commit
+(the unported features the retail dungeon reaches, and that block), then a rework of the
+save menu. DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
+frames with CSBWin's are postponed until the default dungeon is validated; Chaos Strikes
+Back's own features are not. The first row of `DEBT.md`'s index is the next item, and
+`/pay-debt` starts a session on it.
