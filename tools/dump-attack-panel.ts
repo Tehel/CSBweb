@@ -12,6 +12,9 @@
  * The panel is drawn with the real graphics and font; each row of the output is a state
  * and a hash of the panel's pixels, and the checks compare the states' pixels.
  *
+ * The last block is `TAG01b29a`'s other job, the flinch, which it skips while a
+ * candidate stands at a mirror as it does asleep (`CSBCode.cpp:8808-8816`).
+ *
  * Run: `npx tsx tools/dump-attack-panel.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -136,6 +139,34 @@ async function main(): Promise<void> {
   executeAttack(ui, -1);
   attackPanelTick(ui);
   check(render('PASS, and the tick') === buttons, 'and its PASS brings the buttons back at the tick');
+
+  console.log('');
+  console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8808-8837) ===');
+  const champ = party.state.champions[0]!;
+  party.state.cursorOwner = -1;
+  const flinch = (label: string): void => console.log([label, `facing ${champ.facing}`,
+    `from ${champ.damageFromDirection}`, `maxRecentDamage ${champ.maxRecentDamage}`,
+    `ordinal ${ui.attackingCharacterOrdinal}`].join('\t'));
+  const facing = champ.facing;
+  champ.damageFromDirection = (facing + 2) & 3;
+  champ.maxRecentDamage = 12;
+  party.state.potentialChampionIndex = 1;
+  prepareAttack(ui, 0);
+  attackPanelTick(ui);
+  flinch('candidate, menu open: tick');
+  check(ui.attackingCharacterOrdinal === 0, 'the tick closes the menu (TAG01b1c0)');
+  check(champ.facing === facing && champ.maxRecentDamage === 12, 'and nobody turns');
+  attackPanelTick(ui);
+  flinch('candidate: tick');
+  check(champ.facing === facing && champ.maxRecentDamage === 12,
+    'while the candidate stands, nobody turns, and the damage is kept');
+  render('candidate: the panel, its buttons shaded');
+  check(ui.word20250 === 0 && ui.word20252 === 1, 'but the buttons are drawn again (CSBCode.cpp:8849-8853)');
+  party.state.potentialChampionIndex = -1;
+  attackPanelTick(ui);
+  flinch('candidate gone: tick');
+  check(champ.facing === champ.damageFromDirection && champ.maxRecentDamage === 0,
+    'the first tick after it, the champion turns to the blow');
 
   finish();
 }

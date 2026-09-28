@@ -1607,6 +1607,12 @@ closed menu stays on the screen until the next tick's `TAG01b29a`
 buttons. After the flash, `d.Word20250` is still 1, so the damage stays up until the tick
 after, whose `TAG01b29a` draws the buttons. `tools/dump-attack-panel.ts` checks the port.
 
+`TAG01b29a` turns no champion to face their attacker while the party sleeps or a candidate
+stands at a mirror (`d.PotentialCharacterOrdinal`, `doc/CSBwin-src/CSBCode.cpp:8808-8816`),
+and leaves `maxRecentDamage` as it is, so a blow taken then turns the champion at the first
+tick after. Either way it closes an open menu (`TAG01b1c0`) and stops. Asleep it stops
+anyway; with a candidate it goes on to service `d.Word20250`.
+
 ## `atk_SHOOT` throws away the damage it computes
 
 `doc/CSBwin-src/Attack.cpp:1905-1906`:

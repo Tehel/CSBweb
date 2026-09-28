@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C86 | `attackPanelTick` ignores a candidate at the mirror | S | ⏳ |
 | C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
 | G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C83 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
@@ -120,16 +119,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C86 ⏳ `attackPanelTick` ignores a candidate at the mirror
-
-`TAG01b29a` takes its sleeping branch while `d.PotentialCharacterOrdinal` is set too
-(`doc/CSBwin-src/CSBCode.cpp:8808-8815`): no champion turns to face their attacker, and
-`maxRecentDamage` is not cleared, so a champion hit while a candidate stands in the party
-turns at the first tick after the candidate is resolved. Only asleep does it stop there;
-with a candidate it goes on to service `d.Word20250`. The port's `attackPanelTick`
-(`src/renderer/ui/Attack.ts`) tests only `party.sleeping`, so it runs the loop, and
-clears `maxRecentDamage`, while a candidate stands (`potentialChampionIndex`).
 
 ### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
 

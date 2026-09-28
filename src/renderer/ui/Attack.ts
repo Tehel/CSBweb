@@ -255,22 +255,28 @@ export function attackPanelTick(ui: UIState): void {
   const party = ui.partyState;
   if (!party || party.champions.length === 0) return;
 
-  if (party.sleeping) {
-    if (ui.attackingCharacterOrdinal !== 0) closeAttackMenu(ui);
-    return;
-  }
-
-  const cursorOwner = party.cursorOwner ?? -1;
-  party.champions.forEach((champ, idx) => {
-    if (!champ) return;
-    // Not the champion holding the cursor, and not the one with the menu open: those
-    // two keep facing the way the player left them.
-    if (idx !== cursorOwner && idx + 1 !== ui.attackingCharacterOrdinal && champ.maxRecentDamage) {
-      const from = champ.damageFromDirection;
-      if (champ.facing !== from) champ.facing = from;
+  // Asleep, or with a candidate at the mirror, nobody turns and the damage is kept for
+  // the first tick after (`CSBCode.cpp:8808-8816`).
+  const candidate = party.potentialChampionIndex >= 0;
+  if (party.sleeping || candidate) {
+    if (ui.attackingCharacterOrdinal !== 0) {
+      closeAttackMenu(ui);
+      return;
     }
-    champ.maxRecentDamage = 0;
-  });
+    if (!candidate) return;
+  } else {
+    const cursorOwner = party.cursorOwner ?? -1;
+    party.champions.forEach((champ, idx) => {
+      if (!champ) return;
+      // Not the champion holding the cursor, and not the one with the menu open: those
+      // two keep facing the way the player left them.
+      if (idx !== cursorOwner && idx + 1 !== ui.attackingCharacterOrdinal && champ.maxRecentDamage) {
+        const from = champ.damageFromDirection;
+        if (champ.facing !== from) champ.facing = from;
+      }
+      champ.maxRecentDamage = 0;
+    });
+  }
 
   if (ui.word20250 === 0) return;
 
