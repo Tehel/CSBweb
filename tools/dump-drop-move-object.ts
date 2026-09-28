@@ -28,6 +28,8 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
+import { MovementAction } from '../src/engine/gameTypes';
+import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -208,6 +210,48 @@ function main(): void {
       + `${landed !== null}, corner ${landed !== null ? decodeObjectID(landed).position : '-'}`);
     check(landed !== null && decodeObjectID(landed).position === 3,
       'it is carried to the destination and turned: oldX is -2, not -1 (Code11f52.cpp:3000-3006)');
+  }
+
+  /* ------------------- 5. a pad's timer due at once waits for the tick ---- */
+  // `ProcessTimers` runs from the main loop's tick (`CSBCode.cpp:627`) and from
+  // `_FusionSequence` (`Attack.cpp:2199`), nowhere else: not from `DropObject`
+  // (`Mouse.cpp:860-890`), the pick-up's `MoveObject` (`:836`) or `MoveParty`. A pad
+  // pressed by the object queues its action for `d.Time`, and it is still queued when
+  // the handler returns.
+  {
+    const game = makeGame();
+    const { party, front } = stage(game, 0);
+    const rn = takeWeapon(game);
+    const queue = game.timerQueue;
+    const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+    const real = actuators.triggerObjectMove.bind(actuators);
+    let padTimer = -1;
+    actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
+      padTimer = queue.createTimer(TimerFunction.TT_DOOR, position.x, position.y, 0, 0, game.state.tickCount, position.z).index;
+      return real(position, object, place, unchangedRoom, facing);
+    };
+    const queued = (): boolean => padTimer >= 0 && queue.getTimers().some((t) => t.index === padTimer);
+
+    game.party.state.cursorOwner = 0;
+    game.party.state.objectInHand = rn;
+    game.dropObjectFromCursor(2);
+    const afterDrop = queued();
+
+    padTimer = -1;
+    const lying = find(game, front, decodeObjectID(rn).index)!;
+    game.dungeonState.removeObjectFromCell(front, lying);
+    game.ctx.systems.mouse.triggerObjectMove(front, lying, false, false, 0);
+    const afterPickUp = queued();
+
+    padTimer = queue.createTimer(TimerFunction.TT_DOOR, party.x, party.y, 0, 0, game.state.tickCount, party.z).index;
+    const turned = game.ctx.systems.movement.moveParty(MovementAction.TURN_RIGHT).success;
+    const afterTurn = queued();
+
+    console.log(`5. a timer due at d.Time ${game.state.tickCount} still queued after the drop ${afterDrop}, `
+      + `the pick-up ${afterPickUp}, a turn ${afterTurn} (turned ${turned})`);
+    check(afterDrop, 'a drop runs no timer pass: the pad\'s timer waits for the tick');
+    check(afterPickUp, 'a pick-up runs no timer pass');
+    check(turned && afterTurn, 'a turn that went through runs no timer pass');
   }
 
   finish();

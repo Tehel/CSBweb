@@ -62,9 +62,7 @@ export class MovementSystem {
         setClockTick(this.ctx, 1);
         const result = this.move(action);
 
-        if (result.success) {
-            this.ctx.systems.timer.processTimers();
-        } else if (result.inhibited) {
+        if (result.inhibited) {
             // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
             this.ctx.mouseQueue.discardAllInput();
             this.ctx.loop.clockTickCleared = true;

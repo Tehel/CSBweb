@@ -2966,6 +2966,11 @@ fails before the eye gate),
   `ProcessTimers` has no time of its own: it is `bool ProcessTimers(void)`
   (`CSBCode.cpp:6383`) and runs what is due by `d.Time`, the one clock, which the port
   keeps in `ctx.state.tickCount` (evidence: `tools/dump-csbwin-timers.ts`, its last case).
+  It is called from the main loop's tick (`CSBCode.cpp:627`) and from `_FusionSequence`
+  (`Attack.cpp:2199`), nowhere else: not from `DropObject`, the pick-up or `MoveParty`, so
+  a timer a drop or a step queues for `d.Time` waits for the tick like any other
+  (evidence: `tools/dump-drop-move-object.ts` case 5, `tools/dump-party-collision.ts`
+  case 1).
 - `TouchWallF1` returns, touching nothing, when the cell ahead is off the map
   (`Mouse.cpp:784-787`), and otherwise sets `d.clockTick = TouchWall(...)` (`:788`).
   `TouchWall` returns 1 when a switch fired, `result = 1` under `if (!switchOpen)`

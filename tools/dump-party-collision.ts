@@ -778,6 +778,7 @@ async function main(): Promise<void> {
   // party lands (`doc/CSBwin-src/Code11f52.cpp:3298-3308`).
   const champions = game.party.state.champions;
   game.party.state.champions = [];
+  const thereBefore = monsterAt(scene.mx, scene.my);
   const empty = attempt('no champions (gate off)');
   game.party.state.champions = champions;
   const crushed = !monsterAt(scene.mx, scene.my);
@@ -791,6 +792,7 @@ async function main(): Promise<void> {
   // The vacuity guard: without the `d.NumCharacter != 0` gate the block would fire
   // for everyone, and case 2 would pass for the wrong reason.
   check(empty.moved, 'a party with no champions should walk into the monster (CSBWin gates on d.NumCharacter)');
+  check(thereBefore, 'the monster is still in its square when the empty party steps: no move ran a timer pass');
   check(crushed, 'and the monster it lands on is deleted');
 
   check(!blocked.moved, 'a real party should be blocked by the monster');

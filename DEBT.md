@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
@@ -117,22 +116,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
-### C69 ⏳ A step, a drop and a pick-up run the timers at once
-
-CSBWin runs `ProcessTimers` from the main loop's tick (`doc/CSBwin-src/CSBCode.cpp:627`)
-and from `_FusionSequence` (`Attack.cpp:2199`), nowhere else. The port also runs
-`processTimers()` from three handlers the mouse queue runs, once their move is
-made: `MovementSystem.moveParty` after a turn or a step that went through
-(`src/engine/MovementSystem.ts:66`), `MouseSystem.dropObjectFromCursor`
-(`src/engine/MouseSystem.ts:102`) and `MouseSystem.triggerObjectMove`, the pick-up
-(`:275`). So a timer the move queues for the current time, a pad's or a pit's, fires inside
-the handler, before the rest of the queue's entries in that pass and before the top of the
-tick, where CSBWin's waits for the tick. After a move to another level they run before the
-tick has loaded it (`d.newPartyLevel`), with the party still on its old level, and they
-drop what `processTimers` returns, so a CSB win among those timers is lost. Remove the
-three calls. Evidence: a check that drops an object on a pad whose
-action is due at once, and finds its timer still queued when the handler returns.
 
 ### C70 ⏳ The top view of positions has a square for nobody
 
@@ -308,7 +291,7 @@ uses CSBWin's defaults.
   The port builds a fresh block each attack, with `disableTime` 0.
 - `CallPartyMoveFilter` (`CSBCode.cpp:8119`), which may rewrite the stamina adjustments or
   refuse the move, with its `PM_SETDELAY` / `PM_ADDDELAY` arms (`:8122-8128`,
-  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:246`).
+  `:8336-8346`). See `MovementSystem.chargeStamina`'s comment (`MovementSystem.ts:249`).
 - `ActionNameFilter` (`ESL_ACTIONNAMEFILTER`, `CSBCode.cpp:8680`), which may rename an
   attack option. The names come straight from `AttackNames`.
 - `CursorFilter` (`ESL_CURSORFILTER`, `MoveObject.cpp:797`), which may cancel what is

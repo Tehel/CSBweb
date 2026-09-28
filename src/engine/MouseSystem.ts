@@ -99,7 +99,6 @@ export class MouseSystem {
     const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
     party.objectInHand = OBJECT_ID_NULL;
     this.ctx.systems.worldMove.moveObject(dropped, -1, 0, target.x, target.y, target.z);
-    this.ctx.systems.timer.processTimers();
     if (options?.viAltar) {
       this.maybeScheduleViAltar(dropped, target, newPos);
     }
@@ -267,12 +266,12 @@ export class MouseSystem {
    * The UI's object move: today only the pick-up from the floor (`ViewportPicking`),
    * whose `TAG01a148` ends in `MoveObject(obj, x, y, -1, 0)`
    * (doc/CSBwin-src/Mouse.cpp:836). The UI has already taken the object out of the cell;
-   * this is `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`), then the
-   * timers it queued, at once (DEBT.md C69).
+   * this is `ActuatorSystem.triggerObjectMove` (`PlaceOrRemoveObjectInRoom`). The timers
+   * it queues wait for the tick, as every timer does: `ProcessTimers` runs only from the
+   * tick (doc/CSBwin-src/CSBCode.cpp:627) and `_FusionSequence` (`Attack.cpp:2199`).
    */
   triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
     this.ctx.systems.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
-    this.ctx.systems.timer.processTimers();
   }
 
   /**
