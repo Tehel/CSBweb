@@ -33,6 +33,7 @@
 // This is the closest thing the project has to a rendering test (PLAN.md Phase 15) — it
 // caught nothing during the Phase 14 split, which is exactly what it was there to do.
 import { writeFileSync } from 'node:fs';
+import { BUILD_PARTY } from './lib/buildParty.mjs';
 import { encodePng } from './lib/png.mjs';
 
 const PORT = Number(process.env.CDP_PORT ?? 9222);
@@ -123,34 +124,7 @@ console.log('state: booted');            await shot('01-boot');
 await evaluate(`(()=>{const b=document.getElementById('btn-debug');
   if(!b.classList.contains('is-pressed')) b.click(); return b.classList.contains('is-pressed');})()`);
 await wait(200);
-// Build the party the way a player does: stand at each of the first four preset heroes'
-// mirrors, click the portrait (`AddCharacter`) and press Resurrect (button 160). This
-// used to press F8, a dev-only random-party key that no longer exists; driving the real
-// Hall of Champions needs no scaffolding in the app, only the public game API that
-// `tools/dump-hall-of-champions.ts` drives headlessly.
-const BUILD_PARTY = `(()=>{
-  const { game, renderView } = window.__probe;
-  const DELTA_X = [0, 1, 0, -1], DELTA_Y = [-1, 0, 1, 0];
-  // HALK first: champion 0 is the one the frames below open an inventory and an attack
-  // panel on, and DAROOU (first in mirror order) is empty-handed, which would leave
-  // frame 05 showing PUNCH/KICK/WAR CRY instead of a weapon's attack list.
-  const all = game.dungeonState.getData().presetHeroes ?? [];
-  const halk = all.find(h => h.name === 'HALK');
-  const heroes = [halk, ...all.filter(h => h !== halk)].filter(Boolean).slice(0, 4);
-  for (const hero of heroes) {
-    // Face the mirror from the cell in front of it, as a player walking up would.
-    const facing = (hero.location.wall + 2) & 3;
-    const party = game.party.state;
-    party.position.x = hero.location.x - DELTA_X[facing];
-    party.position.y = hero.location.y - DELTA_Y[facing];
-    party.position.z = hero.location.map;
-    party.facing = facing;
-    game.handleWallClick();
-    game.resurrectReincarnateCancel(160);
-  }
-  renderView();
-  return game.party.state.champions.map(c => c.name).join(',');
-})()`;
+// The four champions, from the Hall of Champions mirrors (`tools/lib/buildParty.mjs`).
 await evaluate(BUILD_PARTY).then(names => console.log('  party:', names));
 await wait(600);
 console.log('state: party built');       await shot('02-party');

@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
 | G2 | Ten DSA filters | — | ⏳ |
@@ -116,12 +115,6 @@ Empty. A divergence found along the way goes here, with the next free ID.
 ---
 
 ## F — Verification debt
-
-### F11 ⏳ `probe-ui.mjs --boot` boots with an empty party
-
-`tools/probe-ui.mjs --boot` still presses F8 for a random dev party (`:146`), a key that no
-longer exists, so it boots with an empty party. `tools/probe-frames.mjs` builds its party
-at the Hall of Champions instead, and `--boot` should do the same.
 
 ### F3 — Phase 15 steps 3–5 stay in `PLAN.md`
 

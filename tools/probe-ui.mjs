@@ -23,6 +23,7 @@ import { writeFileSync } from 'node:fs';
 import { spawn, execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BUILD_PARTY } from './lib/buildParty.mjs';
 
 const CDP = Number(process.env.CDP_PORT ?? 9222);
 const APP = Number(process.env.DEV_PORT ?? 9000);
@@ -52,8 +53,9 @@ if (argv.includes('--help') || argv.length === 0) {
 
 Actions, applied in the order given:
   --boot              reload with a cleared localStorage and a seeded Math.random,
-                      switch Debug on, and inject the dev party (F8)
-  --key <K>           dispatch a keydown, e.g. --key F8
+                      switch Debug on, and build the golden frames' party
+                      at the Hall of Champions mirrors
+  --key <K>           dispatch a keydown, e.g. --key ArrowUp
   --click X,Y[,right] click canvas pixel X,Y (0..319, 0..199); 'right' opens inventory
   --wait <ms>         pause
   --shot <file.png>   screenshot to file
@@ -143,8 +145,9 @@ const boot = async () => {
                           return ((seed >>> 0) % 1000000) / 1000000; };` });
   await send('Page.reload', { ignoreCache: true });
   await wait(3500);
-  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'F8',bubbles:true})),1`);
-  await wait(600); // F8 injects the random dev party
+  // The golden frames' party, from the Hall of Champions mirrors.
+  console.error('party:', await evaluate(BUILD_PARTY));
+  await wait(600);
 };
 const click = async (spec) => {
   const [x, y, btn] = spec.split(',');
