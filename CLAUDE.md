@@ -121,6 +121,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
             `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates),
+            SmartDiscard (thinning a filling database),
             RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),

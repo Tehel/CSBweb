@@ -3385,6 +3385,36 @@ it finds only a free slot, and the record is the second loop's.
 116 (of 280). The first arrow `ConstructPredefinedMissile` (`Mouse.cpp:105`) makes is weapon 105.
 Evidence: `tools/dump-db-reuse.ts`.
 
+## `SmartDiscard` thins a database only at 6000 records in use, and never an important object
+
+`SmartDiscard(false)` runs once per tick of the main loop (`doc/CSBwin-src/CSBCode.cpp:678`).
+Each call is one step of a cycle over the weapon, clothing and misc databases, in that order
+from a start, which `SmartDiscard(true)` makes after `ReadEntireGame` (`:10635-10636`) and at
+the tail of a save (`SaveGame.cpp:1245`) by setting misc as the current database
+(`SmartDiscard.cpp:747-757`, `:764-798`). A step counts fifty records whose link is not
+`RNnul` (`:799-876`). Once all are counted, a count below `db.Max(n) * 3/4` moves on to the
+next database (`:807-815`). `db.Max` is 8000 for every database but actuators (16000) and
+database 15 (768) (`CSB.h:1646`), so the limit is 6000. At or above it the dungeon is scanned,
+fifty objects a step (`:877-883`, `:622-660`), into a heap of the 200 highest priorities
+(`:11`, `:173-201`), and then one object is discarded per step, highest first, until the
+count is back below 6000 (`:884-900`, `:662-732`). The count drops by one for every attempt,
+including a failed one.
+
+The priority is `20 + |level - partyLevel|` off the party's level and the square distance
+`|x - partyX| + |y - partyY|` on it. The Nth object of a type on a corner adds N, plus
+`N - 20` more past twenty, or ten times that for clothing (`:517-607`). An object whose
+`important()` bit is set is never listed. On a cell whose chain has an actuator of type 1-9
+or 16 before the object, neither is the first of each type on each corner (`:491-510`,
+`:543-546`). Before it discards, `DiscardObject` scans the cell again and goes ahead only if
+the object is still listed at a priority no lower (`:712-714`, `:345-356`). The discard is
+`MoveObject(obj, x, y, -1, 0)` on the object's level, then `DeleteDBEntry` (`:716-721`).
+
+`dungeon.dat` sets `important()` (bit 7 of `word2` for `DB5`, `DB6` and `DB10`,
+`CSB.h:1165`, `:1185`, `:1269`) on every weapon, garment and misc object it places, on floors,
+in chests and in monsters' hands, except three floor weapons. So what `SmartDiscard` can take
+is what play creates. The port's databases stop at 1024 records, so it never gets past
+counting. Evidence: `tools/watch-smart-discard.ts`.
+
 ## A DSA's `&DEL` frees nothing until the run is over, and tells the caller if it deleted itself
 
 `EX_DEL` (`doc/CSBwin-src/DSA.cpp:1643-1737`) removes the object from its square, the cursor

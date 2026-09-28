@@ -538,8 +538,8 @@ export class DungeonState {
      *
      * Appending keeps `count` and the header's `objectCounts` — the size the image
      * writer declares — equal to the number of records. ⚠️ At 1024 records, the ten-bit
-     * index, this returns `null` where CSBWin would call `MakeMoreRoomInDB`
-     * (`Character.cpp:182`), which is not ported.
+     * index, this returns `null`, where CSBWin goes on enlarging up to 8000 and then
+     * calls `MakeMoreRoomInDB` (`Character.cpp:182`), which is not ported (`DEBT.md` G11).
      */
     findEmptyDBEntry<K extends keyof Databases>(db: K, record: Databases[K]['records'][number]): number | null {
         const database = this.data.databases[db] as Database<DatabaseRecord>;

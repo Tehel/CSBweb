@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -137,23 +136,18 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G12 ⏳ `SmartDiscard`: a filling database is not thinned
-
-CSBWin's main loop calls `SmartDiscard(false)` on every tick
-(`doc/CSBwin-src/CSBCode.cpp:678`), and the game start (`:10636`) and the tail of a save
-(`SaveGame.cpp:1245`) call `SmartDiscard(true)`, which starts it over on a new database
-(`SmartDiscard.cpp:747-757`). Each call does one step of a cycle through the misc, weapon
-and clothing databases (`:764-793`): count the records in use, fifty a step, and once the
-count reaches three quarters of the database's maximum (`:805-821`), scan the dungeon for
-objects and discard them in priority order. None of it is ported. `Game.saveWritten`, the
-save's tail, leaves out its `SmartDiscard(true)`.
-
 ### G11 ⏳ `MakeMoreRoomInDB`: a full database refuses the record
 
-`DungeonState.findEmptyDBEntry` (`src/engine/DungeonState.ts:528`) returns `null` once a
-database holds 1024 records (`:535`). At that point CSBWin calls `MakeMoreRoomInDB`
-(`doc/CSBwin-src/Character.cpp:182`) to make room. This cannot happen in the shipped
-dungeons.
+`DungeonState.findEmptyDBEntry` (`src/engine/DungeonState.ts:544`) returns `null` once a
+database holds 1024 records (`:551`), the ten-bit index of the port's `ObjectID`. CSBWin's
+`RN` is an indirect index, so its `FindEmptyDBEntry` `Enlarge`s a full database by 100
+records at a time, without asking (`AutoEnlarge`), up to `db.Max`: 8000, or 16000 for the
+actuators and 768 for database 15 (`doc/CSBwin-src/data.cpp:967-972`, `:813-876`,
+`CSB.h:1646`). Only a database at `db.Max` reaches `MakeMoreRoomInDB`
+(`doc/CSBwin-src/Character.cpp:182`), which tries `Enlarge` again and then discards objects
+away from the party. The same limit keeps the port's `SmartDiscard` counting, because
+it starts at 6000 records in use (`doc/PROVEN_FACTS.md`). The retail dungeon's largest
+database, the actuators, holds 683 records.
 
 ### G7 — Save-format gaps stay in `PLAN.md`
 

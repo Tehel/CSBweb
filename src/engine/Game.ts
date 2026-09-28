@@ -35,6 +35,7 @@ import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
 import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, waitForButtonFlashScript, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -493,6 +494,8 @@ export class Game implements MainLoop {
         // last tick, and what they printed is placed in this tick.
         this.advanceTime();
         this.ctx.host.messages.clockTick(this.state.tickCount);
+        // `SmartDiscard(false);` (doc/CSBwin-src/CSBCode.cpp:678).
+        smartDiscard(this.ctx, false);
         // `if ((d.Time&511)==0) NinetySecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-683).
         if (isNinetySecondTick(this.state.tickCount)) ninetySecondUpdate(this.ctx);
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
@@ -966,22 +969,26 @@ export class Game implements MainLoop {
     /**
      * The tail of CSBWin's `SaveGame`, once the file is written
      * (`MonsterSystem.reattachAfterSave`). A save that fails skips it: CSBWin's
-     * `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1264`). The same tail's
-     * `SmartDiscard(true)` is not ported (DEBT.md G12). It ends in
-     * `d.CanRestartFromSavegame = 1` (`:1260`).
+     * `SaveError` jumps past it (`doc/CSBwin-src/SaveGame.cpp:1264`). The same tail
+     * starts `SmartDiscard` over (`:1245`), and ends in `d.CanRestartFromSavegame = 1`
+     * (`:1260`).
      */
     saveWritten(): void {
         this.monsterSystem.reattachAfterSave();
+        smartDiscard(this.ctx, true);
         this.canRestart = true;
     }
 
     /**
      * Restore a quick-save (`RuntimeSave.applyRuntimeSaveState`), then the loop's own
      * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
-     * (doc/CSBwin-src/SaveGame.cpp:1661, `Mouse.cpp:1372-1376`).
+     * (doc/CSBwin-src/SaveGame.cpp:1661, `Mouse.cpp:1372-1376`). Every game read comes
+     * through here, and `_GameSetup` follows each `ReadEntireGame` with
+     * `SmartDiscard(true)` (`CSBCode.cpp:10635-10636`).
      */
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         applyRuntimeSaveState(this.ctx, save);
         this.lastInputTime = 0;
+        smartDiscard(this.ctx, true);
     }
 }

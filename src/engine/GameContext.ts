@@ -22,6 +22,7 @@ import { Party } from './Party';
 import { PartyFootprints } from './PartyFootprints';
 import { MouseQueue } from './MouseQueue';
 import { createLoopFlags, type LoopFlags, type MainLoop } from './LoopState';
+import { createSmartDiscardState, type SmartDiscardState } from './SmartDiscard';
 import { SoundQueue } from './SoundQueue';
 import { TimerQueue } from './TimerQueue';
 import type { ActuatorSystem } from './ActuatorSystem';
@@ -90,6 +91,8 @@ export interface GameContext {
   readonly loop: LoopFlags;
   /** `QueueSound`. */
   readonly sounds: SoundQueue;
+  /** `SmartDiscard.cpp`'s statics: where the discard cycle stands. */
+  readonly smartDiscard: SmartDiscardState;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /** What only the host can do: play a sample, trace, tell the UI something. */
@@ -148,6 +151,7 @@ export function createGameContext(
     mouseQueue: new MouseQueue(),
     loop: createLoopFlags(),
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
+    smartDiscard: createSmartDiscardState(),
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.
