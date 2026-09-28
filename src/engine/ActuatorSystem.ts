@@ -385,7 +385,7 @@ export class ActuatorSystem {
           if (!switchOpen) {
             result = true;
             if (isActuatorAudible(rec)) {
-              this.ctx.sounds.queueSound(1, party.position.x, party.position.y, 1);
+              this.ctx.sounds.queueSound(1, party.position.x, party.position.y, 1, party.position.z);
             }
             if (!emptyHanded && (actuatorType === 4 || actuatorType === 11 || actuatorType === 17)) {
               const allow = this.applyCursorFilter(CursorFilterType.TakeKey, objectInHand, position, actuatorPos);

@@ -202,7 +202,7 @@ export class MouseSystem {
   ): boolean {
     const party = this.ctx.party.state;
 
-    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
+    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
     this.ctx.systems.monsterAttack.adjustStamina(chIdx, this.throwStaminaCost(obj));
     // A negative disable time means "use the default", which is 4 ticks.
     const disableTime = overrides && overrides.disableTime >= 0 ? overrides.disableTime : 4;
@@ -304,7 +304,7 @@ export class MouseSystem {
    */
   handleStoneClick(): void {
     const pos = this.ctx.party.state.position;
-    this.ctx.sounds.queueSound(4, pos.x, pos.y, 0);
+    this.ctx.sounds.queueSound(4, pos.x, pos.y, 0, pos.z);
   }
 
   /**
@@ -338,7 +338,7 @@ export class MouseSystem {
 
     this.ctx.loop.clockTickSet = true;
     this.ctx.loop.clockTickCleared = false;
-    this.ctx.sounds.queueSound(1, pos.x, pos.y, 1);
+    this.ctx.sounds.queueSound(1, pos.x, pos.y, 1, pos.z);
     this.ctx.timers.createTimer(
       TimerFunction.TT_DOOR,
       target.x,

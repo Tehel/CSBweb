@@ -266,7 +266,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         characterStats: game.characterStats,
     }, {
-        queueSound: (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime),
+        queueSound: (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.party.state.position.z),
         viewingFilter: (options) => game.processViewingFilter(options),
         onObjectMove: (position, object, place, unchangedRoom, facing) => {
             game.triggerObjectMove(position, object, place, unchangedRoom, facing);
@@ -345,7 +345,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
 async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
-    const { x, y } = game.party.state.position;
+    const { x, y, z } = game.party.state.position;
     const end = await runShowCredits(
         {
             canvas: gameCanvasEl,
@@ -354,7 +354,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
             consumeRestored,
         },
         {
-            queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0),
+            queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0, z),
             canRestartFromSavegame: game.canRestartFromSavegame(),
             word11694,
             champions: word11694 ? wonChampions(game, screen) : [],

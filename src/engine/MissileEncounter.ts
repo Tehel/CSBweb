@@ -586,7 +586,7 @@ export class MissileEncounter {
     } else {
       soundNum = 4;
     }
-    this.ctx.sounds.queueSound(soundNum, position.x, position.y, 1);
+    this.ctx.sounds.queueSound(soundNum, position.x, position.y, 1, position.z);
   }
 
   /**
@@ -601,11 +601,11 @@ export class MissileEncounter {
    */
   private playCloudSound(projectile: ObjectID, size: number, position: Position): void {
     if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
-      this.ctx.sounds.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1);
+      this.ctx.sounds.queueSound(size > 80 ? 5 : 20, position.x, position.y, 1, position.z);
       return;
     }
     if (projectile !== RN_MONSTER_DEATH) {
-      this.ctx.sounds.queueSound(13, position.x, position.y, 1);
+      this.ctx.sounds.queueSound(13, position.x, position.y, 1, position.z);
     }
   }
 

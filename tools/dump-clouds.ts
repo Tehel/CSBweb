@@ -229,9 +229,9 @@ async function main(): Promise<void> {
     const game = await makeGame();
     let ordinal: number | null = null;
     const original = SoundQueue.prototype.queueSound;
-    SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime) {
+    SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
       ordinal = o;
-      return original.call(this, o, mapX, mapY, deltaTime);
+      return original.call(this, o, mapX, mapY, deltaTime, level);
     };
     game.missileEncounter.createDeathCloud(RN_FIREBALL, size, at, 255);
     SoundQueue.prototype.queueSound = original;

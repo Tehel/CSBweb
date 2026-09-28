@@ -573,7 +573,7 @@ export class AttackSystem {
     const phys = params.attdep.physicalAttack;
 
     this.trace(`Enter AttackWithPhysicalForce (attackType=${params.attackType}, skillNumber=${params.skillNumber})`);
-    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
+    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
 
     if (this.monsterUnderAttack === OBJECT_ID_EOF) {
       this.trace('No monster in attacked square.  Return 0');
@@ -998,7 +998,7 @@ export class AttackSystem {
       yield* mainLoop.processTimersViewportAndSound();
       yield ms2vbl(TEST_DELAY);
     }
-    this.ctx.sounds.queueSound(17, w4, w6, 1);
+    this.ctx.sounds.queueSound(17, w4, w6, 1, party.position.z);
     monster.creatureType = MonsterType.mon_25;
     yield* mainLoop.processTimersViewportAndSound();
     yield ms2vbl(TEST_DELAY);
@@ -1009,7 +1009,7 @@ export class AttackSystem {
     }
     for (let d6 = 3; d6 !== 0; d6--) {
       for (let d7 = 4; d7 !== 0; d7--) {
-        this.ctx.sounds.queueSound(17, w4, w6, 1);
+        this.ctx.sounds.queueSound(17, w4, w6, 1, party.position.z);
         monster.creatureType = (d7 & 1) !== 0 ? MonsterType.mon_25 : MonsterType.mon_LordChaos;
         for (let d5 = d6 - 1; d5 !== 0; d5--) {
           yield* mainLoop.processTimersViewportAndSound();
@@ -1242,7 +1242,7 @@ export class AttackSystem {
         // way (CSBWin's own "breakable" comment is wrong). Anything else falls through
         // to the melee code.
         if (((cellFlag & 0xff) >> 5) === RoomType.DOOR && (cellFlag & 7) === 4) {
-          this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
+          this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
           params.dataType = AttackDataType.ADT_HitDoor;
           params.disableTime = 6;
           params.attdep.hitDoor.strength =
@@ -1255,7 +1255,7 @@ export class AttackSystem {
             2, // delay
             this.ctx.state.tickCount,
           );
-          this.ctx.sounds.queueSound(4, party.position.x, party.position.y, 2);
+          this.ctx.sounds.queueSound(4, party.position.x, party.position.y, 2, party.position.z);
           break;
         }
         // NOTE: fallthrough, exactly as CSBWin (`doc/CSBwin-src/Attack.cpp:1804`).
@@ -1583,7 +1583,7 @@ export class AttackSystem {
 
     this.setCharToPartyFacing(pChar);
     const projectile = this.ctx.systems.character.removeCharacterPossession(params.charIdx, 0);
-    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1);
+    this.ctx.sounds.queueSound(16, party.position.x, party.position.y, 1, party.position.z);
     const mastery = sw(this.masteryOf(pChar, 11));
     params.attdep.shoot.range = launcherDesc.uByte3 + ammoDesc.uByte3;
     params.attdep.shoot.damage = 2 * (launcherDesc.word4 + mastery);

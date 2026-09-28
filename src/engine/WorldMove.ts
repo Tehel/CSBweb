@@ -341,7 +341,7 @@ export class WorldMove {
         // `SetPartyFacing` at every jump (`:2958-2977`).
         if (objectType === -1) {
           this.ctx.party.state.position = position;
-          if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, position.x, position.y, 0);
+          if (teleporter.sound) this.ctx.sounds.queueSound(SOUND_TELEPORT, position.x, position.y, 0, position.z);
           this.ctx.party.setFacing(curFacing);
         }
         if (isSamePosition(prev, position)) break;
@@ -490,7 +490,7 @@ export class WorldMove {
     } else {
       const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(20, 48, 2);
       if (hurt !== 0) {
-        this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0);
+        this.ctx.sounds.queueSound(6, party.position.x, party.position.y, 0, party.position.z);
       }
     }
     this.supressPitDamage = false;

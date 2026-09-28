@@ -252,9 +252,9 @@ function main(): void {
   game.party.state.position = PARTY;
   const queued: number[][] = [];
   const queueSound = game.sounds.queueSound.bind(game.sounds);
-  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime) => {
+  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
     queued.push([ordinal, mapX, mapY, deltaTime]);
-    queueSound(ordinal, mapX, mapY, deltaTime);
+    queueSound(ordinal, mapX, mapY, deltaTime, level);
   };
   played.length = 0;
   game.handleStoneClick();

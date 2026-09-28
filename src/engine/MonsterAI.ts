@@ -432,6 +432,7 @@ export class MonsterAI {
         ((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0,
         c.mapX,
         c.mapY,
+        c.level,
       );
       this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
       return;
@@ -447,7 +448,7 @@ export class MonsterAI {
       return;
     }
 
-    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY);
+    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY, c.level);
     this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, true);
   }
 
@@ -473,7 +474,7 @@ export class MonsterAI {
     const member = c.timerFunction - TimerFunction.TT_MONSTER_B0;
     if (((c.slot.singleMonsterStatus[member] ?? 0) & SMS_ATTACKING) !== 0) {
       // Mid-attack: schedule the follow-through.
-      frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY);
+      frame.i60 = this.ctx.systems.monsters.nextMonsterUpdateTime(c.slot, member, false, c.mapX, c.mapY, c.level);
       const roll = this.random.zeroTo3();
       const attackTicks = c.desc.attackTicks07 & 0xff;
       frame.timer.time = (frame.timer.time + ((attackTicks + roll - 1) & 0xffff)) >>> 0;
@@ -538,6 +539,7 @@ export class MonsterAI {
           }),
           c.mapX,
           c.mapY,
+          c.level,
         );
         frame.timer.time =
           (frame.timer.time + ((monsterWord20_0_3(c.desc) + this.random.bool()) & 0xffff)) >>> 0;
@@ -624,7 +626,7 @@ export class MonsterAI {
     const delay = Math.max(1, Math.trunc(c.desc.movementTicks06 / 2) + this.random.bool());
     frame.timer.time = (frame.timer.time + delay) >>> 0;
     frame.timer.function = c.timerFunction;
-    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY);
+    frame.i60 = this.ensureI60NonZero(frame.i60, c.slot, c.mapX, c.mapY, c.level);
     this.setMonsterTimer(frame.timer, frame.i60, c.timeUntilAlternateUpdate, false);
     return true;
   }
@@ -1011,7 +1013,7 @@ export class MonsterAI {
     frame.d5 = dir;
     const newX = c.mapX + 2 * (DELTA_X[dir] ?? 0);
     const newY = c.mapY + 2 * (DELTA_Y[dir] ?? 0);
-    this.ctx.systems.monsters.playTeleportSound(newX, newY);
+    this.ctx.systems.monsters.playTeleportSound(newX, newY, c.level);
 
     const remaining = frame.timePerMove / 2 - frame.sinceLastUpdate;
     frame.bool36 = remaining <= 0;
@@ -1429,9 +1431,9 @@ export class MonsterAI {
   }
 
   /** `EnsureI60NonZero` (`doc/CSBwin-src/Monster.cpp:1381`). */
-  ensureI60NonZero(i60: number, slot: Item16Record, monsterX: number, monsterY: number): number {
+  ensureI60NonZero(i60: number, slot: Item16Record, monsterX: number, monsterY: number, level: number): number {
     if (i60 !== 0) return i60;
-    return this.ctx.systems.monsters.nextMonsterUpdateTime(slot, -1, false, monsterX, monsterY);
+    return this.ctx.systems.monsters.nextMonsterUpdateTime(slot, -1, false, monsterX, monsterY, level);
   }
 
   /**
@@ -1453,7 +1455,7 @@ export class MonsterAI {
     monsterY: number,
   ): void {
     timer.function = TimerFunction.TT_MONSTER_BGROUP;
-    const ensured = this.ensureI60NonZero(i60, slot, monsterX, monsterY);
+    const ensured = this.ensureI60NonZero(i60, slot, monsterX, monsterY, timer.level);
     this.setMonsterTimer(timer, ensured, timeUntilAlternateUpdate, processingATimer);
   }
 
@@ -1574,7 +1576,7 @@ export class MonsterAI {
       // mutating it, which left the queue unsorted and stalled every timer behind it.
       this.setMonsterTimerB(
         timer,
-        this.ctx.systems.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY),
+        this.ctx.systems.monsters.nextMonsterUpdateTime(slot, monIdx, false, mapX, mapY, level),
       );
     }
   }

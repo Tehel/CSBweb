@@ -379,9 +379,9 @@ function main(): void {
 
       let ordinal: number | null = null;
       const original = SoundQueue.prototype.queueSound;
-      SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime) {
+      SoundQueue.prototype.queueSound = function (this: SoundQueue, o, mapX, mapY, deltaTime, level) {
         if (mapX === door.at.x && mapY === door.at.y) ordinal = o;
-        return original.call(this, o, mapX, mapY, deltaTime);
+        return original.call(this, o, mapX, mapY, deltaTime, level);
       };
       game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 40, 100, 5, 0);
       for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);

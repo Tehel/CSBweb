@@ -2674,7 +2674,7 @@ along the way substituted ordinal 5's item for ordinal 4's (a plain object's imp
 ordinal 13's item for ordinal 20's (a small blast) — see PLAN.md for the fix and its
 evidence.
 
-## The `QueueSound` calls behind the switches, doors, teleporters, bump and gulp
+## The `QueueSound` calls, and the level each is on
 
 | Sound | CSBWin's call | Ordinal → SND item | Level |
 | --- | --- | --- | --- |
@@ -2686,6 +2686,14 @@ evidence.
 | A door's step | `QueueSound(2, x, y, 1)` (`Timer.cpp:1375`) | 2 → 535 | the timer's |
 | The wall bump | `QueueSound(18, d.partyX, d.partyY, 0)` (`CSBCode.cpp:8289`) | 18 → 549 | not tested (`deltaTime` 0) |
 | The gulp | `QueueSound(fp.gulp, d.partyX, d.partyY, 0)` (`Character.cpp:4485`), `fp.gulp = 8` (`:4111`, `:4126`, `:4282`) | 8 → 540 | not tested (`deltaTime` 0) |
+| A new group | `QueueSound(soundTELEPORT, mapX, mapY, 1)` in `CreateMonster` (`Monster.cpp:230`), once `MoveObject` has put it on `d.LoadedLevel` (`curLevel = d.LoadedLevel`, `Code11f52.cpp:2857`) | 17 → 547 | the group's |
+| A door coming down on a group | `QueueSound(4, x, y, 1)` (`Timer.cpp:1352`) | 4 → 536 | the timer's |
+| An audible generator | `QueueSound(soundTELEPORT, targetX, targetY, 1)` (`Timer.cpp:1798`) | 17 → 547 | the timer's |
+| A group out of abeyance | `QueueSound(17, D7W, D6W, 1)` (`Timer.cpp:2591`), `TT_61` only | 17 → 547 | the timer's |
+| A group's death | `QueueSound(droppedWeapon?0:soundMONDEATH, D7W, D6W, bodyPartSoundDelay)` (`Code11f52.cpp:913`) | 4 → 536, 0 → 533 | the group's |
+| A missile's impact | `QueueSound(soundNum, missileX, missileY, 1)` (`Code11f52.cpp:2120`) | 0 → 533 for a weapon | the missile's |
+| A missile's cloud | `QueueSound(size>80 ? 5 : 20, …, 1)`, else `QueueSound(13, …, 1)` (`Code11f52.cpp:1436-1445`) | 5, 20 → 537; 13 → 545 | the missile's |
+| The `RNffe4` cloud's tick | `QueueSound(5, D7W, D6W, 1)` (`Timer.cpp:556`) | 5 → 537 | the timer's |
 
 The level is the one `QueueSound` tests, `d.LoadedLevel`, and only when `deltaTime` is
 non-zero (`CSBCode.cpp:1827-1830`). A timer's is its own: `ProcessTimers` calls

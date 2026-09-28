@@ -267,7 +267,7 @@ async function main(): Promise<void> {
     partyOn(game, z, [at]);
     const sounds: number[] = [];
     const queue = game.sounds.queueSound.bind(game.sounds);
-    game.sounds.queueSound = (ordinal, x, y, dt) => { sounds.push(ordinal); queue(ordinal, x, y, dt); };
+    game.sounds.queueSound = (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); };
     const made = game.monsterSystem.createMonster({
       value: typeOn(game, z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,

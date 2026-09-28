@@ -208,7 +208,7 @@ export class MonsterAttack {
 
     if (amended.attackSoundOrdinal !== 0) {
       const ordinal = this.ctx.tables.uByte9672[amended.attackSoundOrdinal - 1] ?? 0;
-      if (ordinal) this.ctx.sounds.queueSound(ordinal, amended.monsterX, amended.monsterY, 1);
+      if (ordinal) this.ctx.sounds.queueSound(ordinal, amended.monsterX, amended.monsterY, 1, context.level);
     }
     return true;
   }
@@ -391,7 +391,7 @@ export class MonsterAttack {
     if (dealt === 0) return 0;
 
     // Sound ordinal `chIdx + 9` names *which* champion was hurt.
-    this.ctx.sounds.queueSound(chIdx + 9, party.position.x, party.position.y, 2);
+    this.ctx.sounds.queueSound(chIdx + 9, party.position.x, party.position.y, 2, party.position.z);
 
     const poison = desc.poisonAttack11;
     if (poison !== 0 && this.random.bool() !== 0) {

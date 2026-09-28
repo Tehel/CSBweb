@@ -149,7 +149,7 @@ export class MonsterSystem {
    * of the field assignments matters: the DB4's packed positions byte is copied into
    * the slot *before* `groupIndex` is overwritten with the slot number.
    */
-  attachItem16ToMonster(rn: ObjectID, mapX: number, mapY: number): number | null {
+  attachItem16ToMonster(rn: ObjectID, mapX: number, mapY: number, level: number): number | null {
     const monster = this.dungeon.getCreatureRecord(rn);
     if (!monster) return null;
     const desc = this.getDesc(monster);
@@ -184,7 +184,7 @@ export class MonsterSystem {
       slot.singleMonsterStatus[i] = 0;
     }
 
-    this.nextMonsterUpdateTime(slot, -1, false, mapX, mapY);
+    this.nextMonsterUpdateTime(slot, -1, false, mapX, mapY, level);
     return index;
   }
 
@@ -310,7 +310,7 @@ export class MonsterSystem {
         const rn = this.dungeon.findFirstMonster(position);
         if (rn === OBJECT_ID_EOF) continue;
         this.timers.deleteMonsterMovementTimers(mapX, mapY, level, (line) => this.trace(line));
-        this.attachItem16ToMonster(rn, mapX, mapY);
+        this.attachItem16ToMonster(rn, mapX, mapY, level);
         this.startMonsterMovementTimers(mapX, mapY, level);
       }
     }
@@ -373,6 +373,7 @@ export class MonsterSystem {
     attacking: boolean,
     monsterX: number,
     monsterY: number,
+    level: number,
   ): number {
     const monster = this.dungeon.getCreatureRecordByIndex(slot.word0);
     if (!monster) return this.ctx.state.tickCount;
@@ -408,7 +409,7 @@ export class MonsterSystem {
             // makes a noise doing it (doc/CSBwin-src/CSBCode.cpp:5900-5908).
             if (this.random.bool()) {
               sms ^= SMS_MIRROR;
-              this.ctx.sounds.queueSound(SOUND_ORDINAL_DETH_KNIGHT_FLIP, monsterX, monsterY, 1);
+              this.ctx.sounds.queueSound(SOUND_ORDINAL_DETH_KNIGHT_FLIP, monsterX, monsterY, 1, level);
             }
           } else if (!wasAttacking || !monsterWord4Bit10(desc)) {
             sms = this.random.bool() ? sms | SMS_MIRROR : sms & ~SMS_MIRROR;
@@ -582,7 +583,7 @@ export class MonsterSystem {
       this.detachItem16(monster.groupIndex);
       code = 1;
     } else if (destLevel === partyLevel && !item16Attached) {
-      this.attachItem16ToMonster(placed, destination.x, destination.y);
+      this.attachItem16ToMonster(placed, destination.x, destination.y, destLevel);
       code++;
     }
 
@@ -699,7 +700,7 @@ export class MonsterSystem {
         this.dungeon.findFirstMonster(new Position(mapX, mapY, level)) === OBJECT_ID_EOF;
       if (free) {
         if (timer.function === TimerFunction.TT_61) {
-          this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
+          this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1, level);
         }
         this.moveMonster(monsterRn as ObjectID, -1, 0, mapX, mapY, level);
         return;
@@ -831,7 +832,7 @@ export class MonsterSystem {
     // generator queues its own when it is audible (`Timer.cpp:1797-1800`).
     const placed = this.moveMonster(rn, -1, 0, options.mapX, options.mapY, options.level);
     if (placed.code !== 0) return null;
-    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1);
+    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, options.mapX, options.mapY, 1, options.level);
     return rn;
   }
 
@@ -868,8 +869,8 @@ export class MonsterSystem {
     return fillsCell ? GROUP_INDEX_DETACHED_SIZE4 : GROUP_INDEX_DETACHED;
   }
 
-  playTeleportSound(mapX: number, mapY: number): void {
-    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1);
+  playTeleportSound(mapX: number, mapY: number, level: number): void {
+    this.ctx.sounds.queueSound(SOUND_ORDINAL_TELEPORT, mapX, mapY, 1, level);
   }
 
   private getDesc(monster: CreatureRecord): MonsterDesc | null {

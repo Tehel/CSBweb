@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C64 | Twelve sounds on another level are heard as if on the party's | M | ⏳ |
 | C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
 | C66 | A delayed sound plays at once | S | ⏳ |
 | C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
@@ -84,6 +83,7 @@ In payoff order: the first row is the next item.
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
 | C74 | A keyed attack makes no tick due | S | ⏳ |
+| C75 | A generator makes its group on the party's level | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -101,7 +101,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C75 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C76 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -121,28 +121,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C64 ⏳ Twelve sounds on another level are heard as if on the party's
-
-CSBWin's `QueueSound` drops a sound with a non-zero `deltaTime` unless `d.LoadedLevel`, the
-level its caller has loaded, is the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). The
-port's `SoundQueue.queueSound` takes that level as its fifth argument, and assumes the
-party's when it gets none (`src/engine/SoundQueue.ts`). These callers pass none, although
-each can run on another level: from a timer, which `ProcessTimers` acts on with the timer's
-level loaded (`CSBCode.cpp:6416-6417`), or on a missile's or a group's square.
-
-- `TimerSystem`: a door rebounding off a group (`src/engine/TimerSystem.ts:735`), a
-  generator's new group (`:1161`), the `RNffe4` cloud (`:1586`, `Timer.cpp:556`).
-- `MissileEncounter`: the encounter's sound and `CreateCloud`'s two
-  (`src/engine/MissileEncounter.ts:589`, `:604`, `:608`).
-- `MonsterDamage`: a monster's death (`src/engine/MonsterDamage.ts:212`, `:324`).
-- `MonsterSystem`: the Deth Knight's flip (`src/engine/MonsterSystem.ts:411`), a group
-  waiting on a teleporter (`:702`), `CreateMonster` (`:834`), and `playTeleportSound`
-  (`:872`), which `MonsterAI` calls.
-
-So each of them, with `deltaTime` 1, is heard from any level whenever its x and y are near
-the party's. Pass each call's level, then make the argument required. Evidence: a row per
-caller in `tools/dump-queue-sound.ts` with the party on another level.
 
 ### C65 ⏳ The host takes a sound's volume from its SND item, not its ordinal
 
@@ -168,7 +146,7 @@ The port's `SoundQueue.queueSound` plays it at once, and `TimerSystem.dispatch` 
 `TT_20` arm, so a `TT_20` in a CSBWin save is dropped. The delayed callers are the door
 bash (`src/engine/AttackSystem.ts:1258`), a champion's wound
 (`src/engine/MonsterAttack.ts:394`) and a monster's death (`src/engine/MonsterDamage.ts:212`,
-`:324`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
+`:325`), whose delay varies. Queue the timer, and give `TimerSystem` the arm. Evidence: a
 check that queues a sound with `deltaTime` 2 and finds it played a tick later.
 
 ### C67 ⏳ The timer table has no size, and a save writes it too small
@@ -278,6 +256,22 @@ A click on an attack option sets `d.clockTick = intResult` after `ExecuteAttack`
 attack waits for the next tick where a clicked one brings it on at once. The module comment
 of `Keyboard.ts` promises the two routes stay equivalent. Set the clock tick there as the
 click does, with a case in `tools/dump-key-bindings.ts`.
+
+### C75 ⏳ A generator makes its group on the party's level
+
+CSBWin's generator runs in a timer, with the timer's level loaded (`ProcessTimers`,
+`doc/CSBwin-src/CSBCode.cpp:6416-6417`). It takes the hit-point multiplier from the
+actuator, or from that level's descriptor when the actuator's is 0
+(`d.pCurLevelDesc->experienceMultiplier()`, `Timer.cpp:1782-1786`), and `CreateMonster`'s
+`MoveObject` puts the group on that level (`curLevel = d.LoadedLevel`,
+`Code11f52.cpp:2857`). The port's `TimerSystem.spawnMonsterGenerator`
+(`src/engine/TimerSystem.ts`) passes `createMonster` the party's level, and a multiplier of
+0 when the actuator's is 0, so every member's hit points are the random spread alone. A
+generator whose timer fires once the party has left its level makes its group on the
+party's level, at the generator's x and y, where CSBWin's appears beside the generator.
+Pass `timer.level`, and the timer level's `difficulty` when the actuator's multiplier is 0.
+Evidence: a row in a `tools/` check firing a generator with the party on another level, and
+one with a multiplier-0 generator.
 
 ---
 

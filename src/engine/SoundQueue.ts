@@ -9,8 +9,9 @@
  * sound goes through here; nothing in `src/engine/` names a SND item.
  *
  * CSBWin's sound is on `d.LoadedLevel`, the level its caller has loaded. The port loads
- * no level, so a caller passes it as `level`. A caller that passes none is taken to be
- * on the party's level, and some of them are not (`DEBT.md` C64).
+ * no level, so every caller passes it as `level`: a timer's own level for anything a
+ * timer does (`ProcessTimers` loads it, `doc/CSBwin-src/CSBCode.cpp:6416-6417`), the
+ * square's for a missile or a group, the party's for a mouse handler.
  *
  * Two parts of CSBWin's version are **not ported**:
  *
@@ -42,7 +43,7 @@ export class SoundQueue {
    * total *orthogonal* distance `|dx| + |dy|` compared against the entry's `byte6`
    * (fully loud at or below) and `byte7` (silent at or above).
    */
-  queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level = this.party.state.position.z): void {
+  queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
     const entry = this.soundTable[ordinal];
     if (!entry) return;
 

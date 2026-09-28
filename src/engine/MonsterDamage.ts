@@ -214,6 +214,7 @@ export class MonsterDamage {
       mapX,
       mapY,
       soundDelay,
+      level,
     );
   }
 
@@ -326,6 +327,7 @@ export class MonsterDamage {
         mapX,
         mapY,
         bodyPartSoundDelay,
+        level,
       );
     }
   }

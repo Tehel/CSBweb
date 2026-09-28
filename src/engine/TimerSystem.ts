@@ -697,7 +697,7 @@ export class TimerSystem {
         if (this.ctx.party.state.champions.length > 0) {
           setDoorState(map, x, y, 0);
           const hurt = this.ctx.systems.monsterAttack.damageAllCharacters(5, 4, 2);
-          if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1);
+          if (hurt !== 0) this.ctx.sounds.queueSound(SOUND_DOOR_OPENING, x, y, 1, timer.level);
         }
         this.timers.addTimer(timer);
         return;
@@ -732,7 +732,7 @@ export class TimerSystem {
             }
             // The rebound: one step back up, floored at 0, then re-queue.
             setDoorState(map, x, y, doorState === 0 ? 0 : doorState - 1);
-            this.ctx.sounds.queueSound(SOUND_DOOR_STRUGGLE, x, y, 1);
+            this.ctx.sounds.queueSound(SOUND_DOOR_STRUGGLE, x, y, 1, timer.level);
             this.timers.addTimer(timer);
             return;
           }
@@ -1158,7 +1158,7 @@ export class TimerSystem {
     });
     // `CreateMonster` makes its own sound only off the party's level; an audible
     // generator always queues one (`doc/CSBwin-src/Timer.cpp:1797-1800`).
-    if (audible) this.ctx.sounds.queueSound(SOUND_TELEPORT, target.x, target.y, 1);
+    if (audible) this.ctx.sounds.queueSound(SOUND_TELEPORT, target.x, target.y, 1, timer.level);
 
     if (isActuatorOnceOnly(actuator)) {
       setActuatorType(actuator, 0);
@@ -1583,7 +1583,7 @@ export class TimerSystem {
 
       case RN_FFE4:
         cloud.cloudType = (cloud.cloudType + 1) & 0x7f;
-        this.ctx.sounds.queueSound(5, x, y, 1);
+        this.ctx.sounds.queueSound(5, x, y, 1, timer.level);
         reschedule = true;
         break;
 
