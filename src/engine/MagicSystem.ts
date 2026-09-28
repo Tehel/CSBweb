@@ -414,14 +414,7 @@ export class MagicSystem {
     if (experience <= 0) return;
     const map = this.dungeon.getMap(this.ctx.party.state.position.z);
     const experienceMultiplier = map?.descriptor.difficulty ?? 0;
-    adjustSkills(this.ctx.party.state.champions, chIdx, skillNumber, experience, why, {
-      time: this.ctx.state.tickCount,
-      lastMonsterAttackTime: this.ctx.party.state.lastMonsterAttackTime,
-      random: this.ctx.random,
-      experienceMultiplier,
-      applyAdjustSkillsFilter: (params) => this.ctx.systems.dsa.processAdjustSkillsFilter(params),
-      onLevelUp: (levelIdx, basicSkill) => this.ctx.systems.actuators.notifyLevelUp(levelIdx, basicSkill),
-    });
+    adjustSkills(this.ctx, chIdx, skillNumber, experience, why, experienceMultiplier);
   }
 
   private computeSpellExperience(required: number, spellPower: number, skillRequired: number): number {

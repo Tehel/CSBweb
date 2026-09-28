@@ -343,12 +343,10 @@ export class MonsterAttack {
     const experienceTerm = 2 * this.getExperienceMultiplier();
 
     // Being attacked trains the Fighter defence skill regardless of the outcome.
-    adjustSkills(party.champions, chIdx, 7, monsterWord16_8_11(desc), AdjustSkillsWhy.MonsterDamagesCharacter, {
-      time: this.ctx.state.tickCount,
-      lastMonsterAttackTime: party.lastMonsterAttackTime,
-      experienceMultiplier: this.getExperienceMultiplier(),
-      random: this.random,
-    });
+    adjustSkills(
+      this.ctx, chIdx, 7, monsterWord16_8_11(desc), AdjustSkillsWhy.MonsterDamagesCharacter,
+      this.getExperienceMultiplier(),
+    );
 
     if (!party.sleeping) {
       const quickness = this.quickness(champ);

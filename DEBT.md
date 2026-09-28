@@ -74,7 +74,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C77 | A monster's blow levels a champion up without the filter or the message | S | ⏳ |
+| C78 | A filter that retargets `AdjustSkills` moves the experience with it | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
@@ -92,7 +92,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C78 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
+Next free IDs: C79 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -115,25 +115,17 @@ Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C77 ⏳ A monster's blow levels a champion up without the filter or the message
+### C78 ⏳ A filter that retargets `AdjustSkills` moves the experience with it
 
-CSBWin's `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) is one function: every caller
-runs the `ESL_ADJUSTSKILLSFILTER` DSA, and a mastery gained calls `LevelUp`, which prints
-"… JUST GAINED A … LEVEL" itself (`Magic.cpp:172-176`). The port's `adjustSkills`
-(`src/engine/skills.ts:190`) leaves both to its caller, through `applyAdjustSkillsFilter`
-and `onLevelUp`, and `MonsterAttack.monsterDamagesCharacter`
-(`src/engine/MonsterAttack.ts:346`, CSBWin `Monster.cpp:4535`) passes neither. So the
-Fighter defence skill a blow trains skips the filter, and a level it gains is granted
-silently. `ActuatorSystem` and `MagicSystem` pass both.
-
-The same seam loses the sleep test: CSBWin's `DetermineMastery` returns 1 while
-`d.PartySleeping` (`doc/CSBwin-src/Code17818.cpp:28-35`), so `AdjustSkills` never levels a
-sleeping champion, but no caller passes `partySleeping` to `adjustSkills`. The monster
-blow wakes the party first (`Monster.cpp:4530`), so only the actuator path can reach it
-asleep.
-
-The fix is to make `adjustSkills` run the filter and the message itself, from `ctx`, as
-CSBWin does, rather than a third caller growing the two callbacks.
+CSBWin's `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) takes the champion (`pcA2`), the
+skill (`psA3 = &pcA2->skills92[skillNumber]`), `basicSkill` and `oldMastery` before the
+Adjust Skills Filter runs (`:233-250`). The filter may hand back another `chIdx` and
+`skillNumber` (`:304-305`), but the experience still goes into the skill `psA3` already
+points at, and the basic skill of `pcA2`. Only the `skillNumber >= 4` test (`:332`),
+`DetermineMastery(chIdx, …)` for `newMastery` (`:341`) and `LevelUp(chIdx, basicSkill)`
+(`:354`) see the new values. The port's `adjustSkills` (`src/engine/skills.ts:186`)
+re-selects the champion and the skill from the filter's answer and writes there. Only a
+dungeon with an Adjust Skills Filter that changes the champion or the skill can see it.
 
 ---
 

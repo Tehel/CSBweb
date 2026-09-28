@@ -433,6 +433,22 @@ consult the counter per frame rather than latch a flag.
 One related effect is **not** ported: while the counter is non-zero, CSBWin recolours a
 door in the nearest rank via `TAG004b26(17, 2)` (`doc/CSBwin-src/CSBCode.cpp:4171-4174`).
 
+## Every `AdjustSkills` runs the filter, and every level gained is announced
+
+`AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`) is the same for every caller: it runs the
+Adjust Skills Filter DSA (`:252-311`), and when the basic skill's mastery rises it calls
+`LevelUp`, which prints a linefeed and then "<NAME>", " JUST GAINED A ", the skill's name,
+" LEVEL", all in `d.Byte1386[chIdx]` (`:172-176`). So a monster's blow, which trains
+defence skill 7 (`Monster.cpp:4535`), is filtered and announced like a spell or an
+actuator's skill increase.
+
+The masteries it compares come from `DetermineMastery`, which returns 1 while the party
+sleeps (`Code17818.cpp:28-35`): the experience is still added, but a sleeping champion
+never levels up. A monster's blow wakes the party before it trains defence
+(`Monster.cpp:4530`).
+
+Evidence: `tools/dump-adjust-skills.ts`.
+
 ## Throwing awards skill 10 with a literal experience base
 
 `doc/CSBwin-src/Mouse.cpp:724-737`:

@@ -35,7 +35,6 @@ import {
 } from '../data/actuatorHelpers';
 import { TimerQueue } from './TimerQueue';
 import { constructPredefinedMissile } from './missileHelpers';
-import type { CsbRandom } from '../core/random';
 import { roomTimerFunction } from './roomTimers';
 import {
     OBJNI_CHEST,
@@ -100,7 +99,6 @@ const SOUND_PRESSURE_PAD = 1;
 export class ActuatorSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
-  private readonly random: CsbRandom;
   /** `d.Byte1596`, the room-type timer functions. */
   private readonly roomTimerFunctions: ArrayLike<number>;
   private readonly objDescObjectType: ArrayLike<number>;
@@ -115,7 +113,6 @@ export class ActuatorSystem {
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
-    this.random = ctx.random;
     this.roomTimerFunctions = ctx.tables.byte1596;
     this.objDescObjectType = ctx.tables.objDescObjectType;
     this.championMessageColors = ctx.tables.byte1386;
@@ -719,36 +716,7 @@ export class ActuatorSystem {
     why: AdjustSkillsWhy,
   ): void {
     if (!champion || index < 0) return;
-    const party = this.ctx.party.state;
-    adjustSkills(party.champions, chIdx, index, delta, why, {
-      time: this.ctx.state.tickCount,
-      lastMonsterAttackTime: party.lastMonsterAttackTime,
-      experienceMultiplier,
-      random: this.random,
-      applyAdjustSkillsFilter: (params) => this.ctx.systems.dsa.processAdjustSkillsFilter(params),
-      onLevelUp: (levelIdx, basicSkill) => this.queueLevelUpMessage(levelIdx, basicSkill),
-    });
-  }
-
-  private queueLevelUpMessage(chIdx: number, basicSkill: number): void {
-    const party = this.ctx.party.state;
-    const champ = party.champions[chIdx];
-    if (!champ) return;
-    const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
-    const label = labels[basicSkill] ?? 'SKILL';
-    // CSBWin LevelUp (doc/CSBwin-src/Magic.cpp:173-177): linefeed, then four fragments in
-    // the champion's own colour, flowing onto one wrapped line.
-    const color = this.getChampionMessageColor(chIdx);
-    const messages = this.ctx.host.messages;
-    messages.printLinefeed();
-    messages.quePrintLines(color, champ.name);
-    messages.quePrintLines(color, ' JUST GAINED A ');
-    messages.quePrintLines(color, label);
-    messages.quePrintLines(color, ' LEVEL');
-  }
-
-  notifyLevelUp(chIdx: number, basicSkill: number): void {
-    this.queueLevelUpMessage(chIdx, basicSkill);
+    adjustSkills(this.ctx, chIdx, index, delta, why, experienceMultiplier);
   }
 
   private isDebugTimersEnabled(): boolean {

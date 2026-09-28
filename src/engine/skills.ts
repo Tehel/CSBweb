@@ -1,5 +1,6 @@
 import { getChampionPossession, type Champion, type Skill } from './gameTypes';
 import type { CsbRandom } from '../core/random';
+import type { GameContext } from './GameContext';
 import type { ObjectID } from '../core/types';
 import { applyLimits } from '../core/intCast';
 import { AttributeIndex, incrAttributeMaximum } from './attributes';
@@ -50,18 +51,6 @@ export interface AdjustSkillsFilterResult {
   chIdx: number;
   skillNumber: number;
   experience: number;
-}
-
-export interface AdjustSkillsContext {
-  time?: number;
-  lastMonsterAttackTime?: number;
-  experienceMultiplier?: number;
-  partySleeping?: boolean;
-  applyAdjustSkillsFilter?: (params: AdjustSkillsFilterParams) => AdjustSkillsFilterResult | null;
-  onLevelUp?: (chIdx: number, basicSkill: number) => void;
-  /** CSBWin's `d.RandomNumber` stream, which `LevelUp` draws from. See `src/core/random.ts`. */
-  random: CsbRandom;
-  getObjectNameIndex?: (objectId: ObjectID) => number | null;
 }
 
 export interface AdjustSkillsResult {
@@ -187,57 +176,63 @@ export function determineMastery(
   return mastery;
 }
 
+/**
+ * `AdjustSkills` (`doc/CSBwin-src/Magic.cpp:185`). As in CSBWin, every caller gets the
+ * Adjust Skills Filter DSA and, when a mastery is gained, `LevelUp` and its message.
+ *
+ * `experienceMultiplier` is CSBWin's `d.pCurLevelDesc->experienceMultiplier()`, the loaded
+ * level's, which the caller knows.
+ */
 export function adjustSkills(
-  champions: Champion[],
+  ctx: GameContext,
   chIdx: number,
   skillNumber: number,
   experience: number,
   why: AdjustSkillsWhy,
-  context: AdjustSkillsContext,
+  experienceMultiplier: number,
 ): AdjustSkillsResult {
+  const party = ctx.party.state;
+  const champions = party.champions;
   const champ = champions[chIdx];
   if (!champ || skillNumber < 0 || skillNumber >= TOTAL_SKILLS) {
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
 
-  const time = context.time ?? 0;
-  const lastMonsterAttackTime = context.lastMonsterAttackTime;
+  const time = ctx.state.tickCount;
+  const lastMonsterAttackTime = party.lastMonsterAttackTime;
+  // `DetermineMastery` reports 1 while the party sleeps (`Code17818.cpp:28-35`).
+  const partySleeping = party.sleeping;
   let adjustedExp = experience | 0;
 
-  if (skillNumber >= 4 && skillNumber <= 11 && typeof lastMonsterAttackTime === 'number') {
+  if (skillNumber >= 4 && skillNumber <= 11) {
     if (lastMonsterAttackTime < time - 150) {
       adjustedExp = Math.trunc(adjustedExp / 2);
     }
   }
 
-  const multiplier = context.experienceMultiplier ?? 0;
-  if (multiplier !== 0) {
-    adjustedExp = adjustedExp * multiplier;
+  if (experienceMultiplier !== 0) {
+    adjustedExp = adjustedExp * experienceMultiplier;
   }
 
-  if (skillNumber >= 4 && typeof lastMonsterAttackTime === 'number') {
+  if (skillNumber >= 4) {
     if (lastMonsterAttackTime > time - 25) {
       adjustedExp = adjustedExp * 2;
     }
   }
 
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
-  const oldMastery = determineMastery(champ, basicSkill | 0xc000, {
-    partySleeping: context.partySleeping,
-  });
+  const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
 
-  if (context.applyAdjustSkillsFilter) {
-    const filtered = context.applyAdjustSkillsFilter({
-      chIdx,
-      skillNumber,
-      experience: adjustedExp,
-      why,
-    });
-    if (filtered) {
-      chIdx = filtered.chIdx & 0x3;
-      skillNumber = ((filtered.skillNumber % TOTAL_SKILLS) + TOTAL_SKILLS) % TOTAL_SKILLS;
-      adjustedExp = filtered.experience & 0xfffff;
-    }
+  const filtered = ctx.systems.dsa.processAdjustSkillsFilter({
+    chIdx,
+    skillNumber,
+    experience: adjustedExp,
+    why,
+  });
+  if (filtered) {
+    chIdx = filtered.chIdx & 0x3;
+    skillNumber = ((filtered.skillNumber % TOTAL_SKILLS) + TOTAL_SKILLS) % TOTAL_SKILLS;
+    adjustedExp = filtered.experience & 0xfffff;
   }
 
   const finalChamp = champions[chIdx];
@@ -263,28 +258,30 @@ export function adjustSkills(
 
   finalChamp.skills = skills;
 
-  const newMastery = determineMastery(finalChamp, basicSkill | 0xc000, {
-    partySleeping: context.partySleeping,
-  });
+  const newMastery = determineMastery(finalChamp, basicSkill | 0xc000, { partySleeping });
 
   let leveledUp = false;
   if (newMastery > oldMastery) {
-    levelUp(finalChamp, basicSkill, context.random);
-    context.onLevelUp?.(chIdx, basicSkill);
+    levelUp(finalChamp, basicSkill, ctx.random);
+    printLevelUp(ctx, chIdx, basicSkill);
     leveledUp = true;
   }
 
   return { chIdx, skillNumber, experienceApplied: adjustedExp, leveledUp };
 }
 
+/**
+ * `AddToSkill` (`doc/CSBwin-src/Magic.cpp:360`): `AdjustSkills` without the time terms, the
+ * multiplier or the filter. Its one CSBWin caller is a DSA opcode (`DSA.cpp:4554`), not
+ * yet ported (`DEBT.md` G1).
+ */
 export function addToSkill(
-  champions: Champion[],
+  ctx: GameContext,
   chIdx: number,
   skillNumber: number,
   experience: number,
-  context: AdjustSkillsContext,
 ): AdjustSkillsResult {
-  const champ = champions[chIdx];
+  const champ = ctx.party.state.champions[chIdx];
   if (!champ || skillNumber < 0 || skillNumber >= TOTAL_SKILLS) {
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
@@ -292,10 +289,9 @@ export function addToSkill(
     return { chIdx, skillNumber, experienceApplied: 0, leveledUp: false };
   }
 
+  const partySleeping = ctx.party.state.sleeping;
   const basicSkill = skillNumber >= 4 ? Math.floor((skillNumber - 4) / 4) : skillNumber;
-  const oldMastery = determineMastery(champ, basicSkill | 0xc000, {
-    partySleeping: context.partySleeping,
-  });
+  const oldMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
 
   const skills = ensureSkills(champ.skills ?? []);
   const skillEntry = skills[skillNumber];
@@ -306,18 +302,32 @@ export function addToSkill(
   }
   champ.skills = skills;
 
-  const newMastery = determineMastery(champ, basicSkill | 0xc000, {
-    partySleeping: context.partySleeping,
-  });
+  const newMastery = determineMastery(champ, basicSkill | 0xc000, { partySleeping });
 
   let leveledUp = false;
   if (newMastery > oldMastery) {
-    levelUp(champ, basicSkill, context.random);
-    context.onLevelUp?.(chIdx, basicSkill);
+    levelUp(champ, basicSkill, ctx.random);
+    printLevelUp(ctx, chIdx, basicSkill);
     leveledUp = true;
   }
 
   return { chIdx, skillNumber, experienceApplied: experience, leveledUp };
+}
+
+/**
+ * The tail of CSBWin `LevelUp` (`doc/CSBwin-src/Magic.cpp:172-176`): a linefeed, then four
+ * fragments in the champion's own colour, `d.Byte1386[chIdx]`, flowing onto one line.
+ */
+function printLevelUp(ctx: GameContext, chIdx: number, basicSkill: number): void {
+  const champ = ctx.party.state.champions[chIdx];
+  const labels = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD']; // d.Pointer16596
+  const color = ctx.tables.byte1386[chIdx];
+  const messages = ctx.host.messages;
+  messages.printLinefeed();
+  messages.quePrintLines(color, champ.name);
+  messages.quePrintLines(color, ' JUST GAINED A ');
+  messages.quePrintLines(color, labels[basicSkill]);
+  messages.quePrintLines(color, ' LEVEL');
 }
 
 export function levelUp(champion: Champion, basicSkill: number, rng: CsbRandom): void {
