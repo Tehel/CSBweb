@@ -2666,6 +2666,15 @@ distance (`byte7`: 4 against 7) and a slightly different playback-rate byte. `Cr
 for a fireball, poison bolt or lightning bolt — so a small blast is the *same* explosion
 sample, just quieter, never ordinal 13's unrelated sample.
 
+The volume is the ordinal's, decided in `QueueSound` and not by whoever plays the sample.
+From the orthogonal distance `|dx| + |dy|`, `LOCAL_12` is 1 at or below the entry's
+`byte6`, 0 above it, and -1 at or above `byte7`, and a -1 is not played
+(`doc/CSBwin-src/CSBCode.cpp:1867-1876`, `:1878`). `StartSound` receives `LOCAL_12` as
+`highVolume` (`:1894-1896`) and attenuates a 0 eighteen times
+(`doc/CSBwin-src/Sound.cpp:662-663`). So ordinal 5 (`byte6` 3, `byte7` 7) is loud up to
+three squares and quiet up to six, and ordinal 20 (0 and 4) is loud only on the square
+and quiet up to three, although both play item 537. `tools/dump-queue-sound.ts` case 9.
+
 `ProcessMissileEncounter`'s shared ending (`Code11f52.cpp:2101-2121`) and `CreateCloud`'s
 own sound (`Code11f52.cpp:1432-1447`) are the two call sites `TimerSystem` used to read
 past — `playMissileImpactSound` and `playCloudSound` called `playSound` with a hand-typed

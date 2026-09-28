@@ -11,8 +11,12 @@
 import type { CursorFilterHook, MessageSink } from './ActuatorSystem';
 
 export interface GameHost {
-  /** Play a sample; `QueueSound` and the few direct `StartSound`s end here. */
-  playSound(soundId: number, rateIdx?: number, distance?: number): void;
+  /**
+   * Play a sample, CSBWin's `StartSound`; `QueueSound` and the few direct `StartSound`s
+   * end here. `highVolume` is `QueueSound`'s `LOCAL_12`: 1 loud, 0 quiet
+   * (`doc/CSBwin-src/Sound.cpp:663`); left out, the sample plays loud.
+   */
+  playSound(soundId: number, rateIdx?: number, highVolume?: number): void;
   /** Dev-only trace, CSBWin's `AITraceActive` / `AttackTraceActive` output. */
   trace(line: string): void;
   /** `CursorFilter`, the host's view of the object on the cursor. */

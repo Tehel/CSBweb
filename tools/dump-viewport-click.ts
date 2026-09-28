@@ -58,7 +58,7 @@ const BUTTON_4: RectPos = { x1: 104, x2: 119, y1: 82, y2: 90 };
 const BUTTON_5: RectPos = { x1: 64, x2: 159, y1: 36, y2: 91 };
 const UNSET: RectPos = { x1: 255, x2: 0, y1: 0, y2: 0 };
 
-/** Every `playSound` the host is asked for: the SND item and the distance. */
+/** Every `playSound` the host is asked for: the SND item and `highVolume`. */
 const played: Array<[number, number]> = [];
 
 function makeGame(): Game {
@@ -66,7 +66,7 @@ function makeGame(): Game {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  return newGame(data, stockGraphics(), { playSound: (soundId, _rateIdx, distance) => played.push([soundId, distance ?? -1]) });
+  return newGame(data, stockGraphics(), { playSound: (soundId, _rateIdx, highVolume) => played.push([soundId, highVolume ?? -1]) });
 }
 
 /** The items (not actuators, not text) in a cell, first to last. */
@@ -264,7 +264,7 @@ function main(): void {
   console.log([JSON.stringify(queued), JSON.stringify(played), item].join('\t'));
   check(JSON.stringify(queued) === JSON.stringify([[4, PARTY.x, PARTY.y, 0]]), 'QueueSound(4, d.partyX, d.partyY, 0)');
   check(item === 536, "ordinal 4 is SND item 536 (doc/PROVEN_FACTS.md, the impact sounds)");
-  check(JSON.stringify(played) === JSON.stringify([[536, 0]]), 'the host plays item 536 at distance 0');
+  check(JSON.stringify(played) === JSON.stringify([[536, 1]]), 'the host plays item 536 loud');
 
   finish();
 }

@@ -39,9 +39,10 @@ export class SoundQueue {
    * `QueueSound(ordinal, mapX, mapY, deltaTime)`, on `level`, CSBWin's `d.LoadedLevel`.
    *
    * A non-zero `deltaTime` means the sound is only audible when the loaded level is
-   * the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). Volume comes from the
-   * total *orthogonal* distance `|dx| + |dy|` compared against the entry's `byte6`
-   * (fully loud at or below) and `byte7` (silent at or above).
+   * the party's (`doc/CSBwin-src/CSBCode.cpp:1827-1830`). The volume, `LOCAL_12`, comes
+   * from the total *orthogonal* distance `|dx| + |dy|` against the ordinal's own entry:
+   * loud at or below `byte6`, quiet above it, silent at or above `byte7`
+   * (`:1867-1878`). The host is handed that choice, not the distance (`:1894-1896`).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
     const entry = this.soundTable[ordinal];
@@ -51,13 +52,15 @@ export class SoundQueue {
 
     const party = this.party.state.position;
     const distance = Math.abs(mapX - party.x) + Math.abs(mapY - party.y);
-    if (distance >= (entry.byte7 & 0xff)) return; // CSBWin's LOCAL_12 = -1: inaudible
+    let highVolume = distance <= (entry.byte6 & 0xff) ? 1 : 0;
+    if (distance >= (entry.byte7 & 0xff)) highVolume = -1;
+    if (highVolume < 0) return;
 
     const soundId = entry.word0 | 0;
     if (!soundId) return;
     // `rateIdx` selects among the decoded variants a SND item may have; it is not
     // CSBWin's `byte3` playback rate, which `StartSound` consumes inside the audio
     // layer (doc/CSBwin-src/Sound.cpp:647). Everything else in the port passes 0.
-    this.host.playSound(soundId, 0, distance);
+    this.host.playSound(soundId, 0, highVolume);
   }
 }

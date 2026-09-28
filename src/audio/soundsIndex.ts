@@ -1,19 +1,8 @@
 import { SoundIndex } from '../core/constants';
 
-export interface SoundMeta {
-  tableIndex?: number;
-  byte2?: number;
-  byte3?: number;
-  byte4?: number;
-  byte5?: number;
-  distanceNear?: number;
-  distanceFar?: number;
-}
-
 export interface SoundInfo {
   name: string;
   rates?: number[];
-  meta?: SoundMeta;
 }
 
 export interface SoundTableEntry {
@@ -68,24 +57,10 @@ export function buildSoundCatalog(soundTable?: SoundTableEntry[]): Record<number
   }
 
   if (!soundTable) return catalog;
-  for (let i = 0; i < soundTable.length; i++) {
-    const entry = soundTable[i];
+  for (const entry of soundTable) {
     const soundId = entry.word0 | 0;
     if (soundId <= 0) continue;
-    const existing = catalog[soundId] ?? { name: `Sound ${soundId}` };
-    catalog[soundId] = {
-      ...existing,
-      meta: {
-        ...(existing.meta ?? {}),
-        tableIndex: i,
-        byte2: entry.byte2,
-        byte3: entry.byte3,
-        byte4: entry.byte4,
-        byte5: entry.byte5,
-        distanceNear: entry.byte6,
-        distanceFar: entry.byte7,
-      },
-    };
+    catalog[soundId] ??= { name: `Sound ${soundId}` };
   }
   return catalog;
 }

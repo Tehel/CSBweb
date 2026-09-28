@@ -42,11 +42,17 @@
  *     an `ITEM16`, and only a group on the party's level holds one. Both pass the group's
  *     level all the same.
  *
+ *  9. The volume is the ordinal's, not its SND item's: ordinals 5 and 20 both name item
+ *     537, with `byte6`/`byte7` 3/7 and 0/4. `LOCAL_12` is 1 at or below `byte6`, 0 above
+ *     it, and the sound is dropped at or above `byte7` (`CSBCode.cpp:1867-1878`), and
+ *     `StartSound` gets that choice (`:1894-1896`). So ordinal 5 is loud three squares
+ *     away and quiet six away, where ordinal 20 is quiet at three and not heard at four.
+ *
  * The wall bump's `QueueSound(18, …)` is `tools/dump-party-collision.ts`'s.
  *
  * Each row is what `queueSound` received, `[ordinal, x, y, deltaTime, level]`, and what
  * the host was asked to play,
- * `[SND item, rate variant, distance]`. The squares are real ones from `dungeon.dat`: the
+ * `[SND item, rate variant, highVolume]`, `QueueSound`'s `LOCAL_12` (1 loud, 0 quiet). The squares are real ones from `dungeon.dat`: the
  * first audible door button, wall switch, party pad and teleporter it holds.
  *
  * Run: `npx tsx tools/dump-queue-sound.ts`
@@ -89,7 +95,7 @@ interface Scene {
   game: Game;
   /** `[ordinal, x, y, deltaTime, level]`. */
   queued: number[][];
-  /** `[SND item, rate variant, distance]`. */
+  /** `[SND item, rate variant, highVolume]`. */
   played: number[][];
 }
 
@@ -116,7 +122,7 @@ function scene(): Scene {
   if (!data) throw new Error('dungeon.dat did not load');
   const played: number[][] = [];
   const game = newGame(data, graphics, {
-    playSound: (soundId, rateIdx, distance) => played.push([soundId, rateIdx ?? 0, distance ?? -1]),
+    playSound: (soundId, rateIdx, highVolume) => played.push([soundId, rateIdx ?? 0, highVolume ?? -1]),
   });
   game.setRandomSeed(0x12345678);
   game.party.state.champions = [champion(0)];
@@ -178,7 +184,7 @@ function stand(game: Game, at: Position, facing: number): void {
 }
 
 function main(): void {
-  console.log(['case', 'queued [ordinal, x, y, deltaTime, level]', 'played [item, rate, distance]'].join('\t'));
+  console.log(['case', 'queued [ordinal, x, y, deltaTime, level]', 'played [item, rate, highVolume]'].join('\t'));
 
   /* ------------------------------------------------------------ 1. the door button ---- */
   {
@@ -201,7 +207,7 @@ function main(): void {
     row(`1. door button, party (${at.party.x},${at.party.y}) L${at.party.z}`, s);
     check(clicked, 'the click reaches the door button');
     check(json(s.queued) === json([[1, at.party.x, at.party.y, 1, at.party.z]]), 'the door button queues QueueSound(1, d.partyX, d.partyY, 1)');
-    check(json(s.played) === json([[534, 0, 0]]), 'ordinal 1 is SND item 534, at distance 0');
+    check(json(s.played) === json([[534, 0, 1]]), 'ordinal 1 is SND item 534, loud at distance 0');
   }
 
   /* ------------------------------------------------------------- 2. a wall switch ---- */
@@ -229,7 +235,7 @@ function main(): void {
     row(`2. wall switch, party (${at.party.x},${at.party.y}) L${at.party.z}`, s);
     check(fired, 'the click fires the switch');
     check(json(s.queued) === json([[1, at.party.x, at.party.y, 1, at.party.z]]), 'the wall switch queues QueueSound(1, d.partyX, d.partyY, 1)');
-    check(json(s.played) === json([[534, 0, 0]]), 'and the host plays item 534 at distance 0');
+    check(json(s.played) === json([[534, 0, 1]]), 'and the host plays item 534 loud');
   }
 
   /* ------------------------------------------------------------ 3. a pressure pad ---- */
@@ -256,7 +262,7 @@ function main(): void {
     game.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
     row(`3a. pad (${at.x},${at.y}) L${at.z}, the party on it`, s);
     check(json(s.queued) === json([[1, at.x, at.y, 1, at.z]]), "the pad queues QueueSound(soundPRESSUREPAD, mapX, mapY, 1) on its own level");
-    check(json(s.played) === json([[534, 0, 0]]), 'and the party on it hears item 534');
+    check(json(s.played) === json([[534, 0, 1]]), 'and the party on it hears item 534, loud');
 
     // The same press, with the party on another level, as a group or an object pressing a
     // pad there would be: `d.LoadedLevel != d.partyLevel`, so `QueueSound` returns.
@@ -298,7 +304,7 @@ function main(): void {
     row(`4. party (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${tp.z}`, s);
     check(now.x === dest.x && now.y === dest.y && now.z === dest.z, 'the party is at the destination');
     check(json(s.queued) === json([[17, dest.x, dest.y, 0, dest.z]]), 'the buzz is QueueSound(soundTELEPORT, d.partyX, d.partyY, 0) at the destination');
-    check(json(s.played) === json([[547, 0, 0]]), 'ordinal 17 is SND item 547, at distance 0');
+    check(json(s.played) === json([[547, 0, 1]]), 'ordinal 17 is SND item 547, loud at distance 0');
   }
 
   {
@@ -328,7 +334,7 @@ function main(): void {
     row(`5. type-${type} group (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${tp.z}, party (${party.x},${party.y})`, s);
     check(moved.position.x === dest.x && moved.position.y === dest.y, 'the group is at the destination');
     check(json(s.queued) === json([[17, dest.x, dest.y, 1, dest.z]]), 'the buzz is QueueSound(17, newX, newY, 1) on the destination level');
-    check(json(s.played) === json([[547, 0, 2]]), 'the host plays item 547, the one variant it has, at distance 2');
+    check(json(s.played) === json([[547, 0, 0]]), 'the host plays item 547, the one variant it has, quiet at distance 2 (byte6 = 1)');
   }
 
   /* ------------------------------------------------------------ 6. a door's step ---- */
@@ -359,7 +365,7 @@ function main(): void {
 
     step(new Position(d.x, d.y + 1, d.z), 'a');
     check(json(doorSteps()) === json([[2, d.x, d.y, 1, d.z]]), 'a step queues QueueSound(2, x, y, 1) on the timer\'s level');
-    check(json(heard()) === json([[535, 0, 1]]), 'ordinal 2 is SND item 535, heard beside the door');
+    check(json(heard()) === json([[535, 0, 1]]), 'ordinal 2 is SND item 535, loud beside the door');
 
     step(new Position(d.x, d.y + 6, d.z), 'b');
     check(json(doorSteps()) === json([[2, d.x, d.y, 1, d.z]]), 'the next step queues it again');
@@ -391,7 +397,7 @@ function main(): void {
     handleMouthPress(ui);
     row(`7. champion 0 drinks potion ${index}, party (${at.x},${at.y}) L${at.z}`, s);
     check(json(s.queued) === json([[8, at.x, at.y, 0, at.z]]), 'the gulp queues QueueSound(8, d.partyX, d.partyY, 0)');
-    check(json(s.played) === json([[540, 0, 0]]), 'ordinal 8 is SND item 540, at distance 0');
+    check(json(s.played) === json([[540, 0, 1]]), 'ordinal 8 is SND item 540, loud at distance 0');
   }
 
   /* ----------------------------------------------- 8. another level than the party's ---- */
@@ -567,6 +573,26 @@ function main(): void {
       }
       heardNothing(s, `8g. its timer, at (${at.x},${at.y}) L${L}`, [5]);
     }
+  }
+
+  /* ------------------------------------------- 9. the volume is the ordinal's own ---- */
+  {
+    const s = scene();
+    const { game } = s;
+    stand(game, new Position(0, 0, 0), 0);
+    const at = (ordinal: number, distance: number): number[][] => {
+      clear(s);
+      game.sounds.queueSound(ordinal, distance, 0, 0, 0);
+      row(`9. ordinal ${ordinal}, ${distance} squares away`, s);
+      return s.played;
+    };
+    check(json(at(5, 3)) === json([[537, 0, 1]]), 'ordinal 5 is loud three squares away (byte6 = 3)');
+    check(json(at(5, 4)) === json([[537, 0, 0]]), 'and quiet four away');
+    check(json(at(5, 6)) === json([[537, 0, 0]]), 'and six away');
+    check(json(at(5, 7)) === json([]), 'and not heard seven away (byte7 = 7)');
+    check(json(at(20, 0)) === json([[537, 0, 1]]), 'ordinal 20, the same item, is loud only on the square (byte6 = 0)');
+    check(json(at(20, 3)) === json([[537, 0, 0]]), 'quiet three away');
+    check(json(at(20, 4)) === json([]), 'and not heard four away (byte7 = 4)');
   }
 
   finish();

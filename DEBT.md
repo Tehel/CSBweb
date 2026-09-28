@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C65 | The host takes a sound's volume from its SND item, not its ordinal | S | ⏳ |
 | C66 | A delayed sound plays at once | S | ⏳ |
 | C67 | The timer table has no size, and a save writes it too small | S | ⏳ |
 | C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
@@ -121,21 +120,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C65 ⏳ The host takes a sound's volume from its SND item, not its ordinal
-
-CSBWin's `QueueSound` makes the volume from the ordinal's own entry, loud at or below
-`byte6` and quiet below `byte7` (`LOCAL_12`, `doc/CSBwin-src/CSBCode.cpp:1867-1876`), and
-hands `StartSound` that choice (`:1894-1896`), which attenuates a quiet sound 18 times
-(`Sound.cpp:663`). The port's `SoundQueue` hands the host the distance instead, and
-`SoundManager.getDistanceVolume` (`src/audio/SoundManager.ts`) looks the thresholds up
-again by SND item, in a catalog where the last ordinal to name an item wins
-(`buildSoundCatalog`, `src/audio/soundsIndex.ts`). Ordinals 5 and 20 both name item 537
-(`doc/PROVEN_FACTS.md` → "`QueueSound`'s argument is an ordinal into the sound table"), so
-a big explosion, ordinal 5 (`byte6` 3, `byte7` 7), plays with ordinal 20's 0 and 4: quiet
-one to three squares away, where CSBWin's is loud, and silent four to six away, where
-CSBWin's is quiet. Every other item has one ordinal. Hand the host `LOCAL_12`, not the
-distance. Evidence: a row in `tools/dump-queue-sound.ts` for ordinal 5 three squares away.
 
 ### C66 ⏳ A delayed sound plays at once
 

@@ -223,7 +223,7 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
  * `GameHost`, the screen its `GameScreenHooks`.
  */
 function construct(files: GameFiles, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen } {
-    const playSound = (soundId: number, rateIdx?: number, distance?: number) => sound.playSound(soundId, rateIdx, distance);
+    const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.
     let screen: GameScreen | null = null;
