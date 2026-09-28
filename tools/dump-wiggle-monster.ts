@@ -29,7 +29,7 @@ import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables, monsterLevitating } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
@@ -111,7 +111,7 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
   };
   // At tick 0: the group's first AI timer is due at tick 1, and must not move it first.
   game.timerQueue.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
-  game.timerSystem.processTimers(0);
+  processTimersAt(game, 0);
   return { game, at, dest, rn, slot, calls, timersBefore };
 }
 

@@ -18,7 +18,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType } from '../sr
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 
   for (let t = 0; t < ticks; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerSystem.processTimers(t);
+    processTimersAt(game, t);
     if (followed >= 0) {
       const s = pool[followed]!;
       const at = where(s.word0);

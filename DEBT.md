@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D9 | `TimerSystem.now` is a second copy of `d.Time` | M | ⏳ |
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
@@ -105,24 +104,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 
 ## D — State representation
 
-### D9 ⏳ `TimerSystem.now` is a second copy of `d.Time`
-
-CSBWin has one `d.Time`. The port keeps it in `ctx.state.tickCount`, and again in
-`TimerSystem.now` (`src/engine/TimerSystem.ts:76`), which `processTimers(currentTime)` sets
-to the time it is given and `Game.advanceTime` moves on with the clock. `MissileEncounter`'s
-`CreateCloud`, `HitDoor` and its Zo-at-a-door arm, and `TimerSystem`'s Ya-potion and poison
-timers (`scheduleChampionShieldExpiry`, `schedulePoison`) schedule from `now`; the rest of
-the engine from `ctx.state.tickCount`. In the game the two agree except after a load, until
-the first timer pass: nothing sets `now` when a runtime save or a CSBWin save sets the
-clock, so a cloud or a potion a click makes before that tick is scheduled from the old
-game's `now`, or 0. The copy exists for the tools that call `processTimers(t)` with their
-own `t` and leave `tickCount` alone (`dump-clouds`, `dump-missile-drop`, `dump-wiggle-*`,
-`dump-move-from-missile`, `dump-missile-teleport`, `dump-party-move`, among others), whose
-passes then read a `tickCount` the pass is not running on. Read `d.Time` from
-`ctx.state.tickCount` everywhere and remove `now`; the tools set the clock before they run
-a pass, as `Game` does. Their output moves wherever a pass reads the clock, so prove the
-engine half neutral on the tools that already keep the two together, and take the rest's
-diffs one by one.
+Empty. New state-representation debt goes here, and jumps the queue.
 
 ---
 
@@ -134,13 +116,13 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Frozen while tier D has D9; then taken in the index's order (see "Priority").
+Taken in the index's order (see "Priority"), now that tiers D and E are empty.
 
 ### C69 ⏳ A step, a drop and a pick-up run the timers at once
 
 CSBWin runs `ProcessTimers` from the main loop's tick (`doc/CSBwin-src/CSBCode.cpp:627`)
 and from `_FusionSequence` (`Attack.cpp:2199`), nowhere else. The port also runs
-`processTimers(tickCount)` from three handlers the mouse queue runs, once their move is
+`processTimers()` from three handlers the mouse queue runs, once their move is
 made: `MovementSystem.moveParty` after a turn or a step that went through
 (`src/engine/MovementSystem.ts:66`), `MouseSystem.dropObjectFromCursor`
 (`src/engine/MouseSystem.ts:102`) and `MouseSystem.triggerObjectMove`, the pick-up
@@ -243,7 +225,7 @@ is either dead code or a silent placeholder that hides a short one. Known cases:
 - `levelUp` falls back to a fresh, unseeded `CsbRandom` when no stream is passed
   (`src/engine/skills.ts:328`), and `AdjustSkillsContext.random` is optional (`:64`). The
   engine passes `ctx.random`, but a tool that forgets it silently becomes unreproducible.
-- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:283`) returns silently when
+- `TimerSystem.applyBrightnessSteps` (`TimerSystem.ts:280`) returns silently when
   `word1074` is empty.
 
 Then sweep for the rest: arrays and tables initialised empty, or read through a falsy

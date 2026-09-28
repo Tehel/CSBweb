@@ -27,7 +27,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { setHandOwner, selectMagicCaster } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -73,7 +73,7 @@ function withParty(count: number): Game {
 function tickTo(game: Game, from: number, to: number): void {
   for (let t = from; t <= to; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerSystem.processTimers(t);
+    processTimersAt(game, t);
   }
 }
 

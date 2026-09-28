@@ -182,7 +182,7 @@ function stand(game: Game, log: string[], p: Position, facing: Direction): void 
 function launch(game: Game, p: Position, corner: number): ObjectID {
   const before = new Set<ObjectID>();
   for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.timerSystem.now + 9, true)) {
+  if (!game.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.state.tickCount + 9, true)) {
     throw new Error('missile not launched');
   }
   for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {

@@ -16,7 +16,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   let firstDeathTick = -1;
   for (let t = 0; t < ticks; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerSystem.processTimers(t);
+    processTimersAt(game, t);
     const hurt = game.party.state.champions.some((c, i) => c.attributes.health < start[i]!);
     if (hurt && firstHitTick < 0) firstHitTick = t;
     const dead = game.party.state.champions.some((c) => c.alive === false);

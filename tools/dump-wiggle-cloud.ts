@@ -26,7 +26,7 @@ import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -135,7 +135,7 @@ function main(): void {
   const index = decodeObjectID(born).index;
   game.timerQueue.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
 
-  game.timerSystem.processTimers(1);
+  processTimersAt(game, 1);
   check((map.cellFlags[at.x]![at.y]! & 0x08) !== 0, 'the teleporter switched on');
   check(cloudIn(game, at, index) === null, 'the cloud has left the teleporter');
   const landed = cloudIn(game, dest, index);
@@ -158,10 +158,10 @@ function main(): void {
   // And it lives out its life there: it shrinks, then leaves the cell and its record is
   // freed, with nothing left behind in either cell.
   const value0 = dungeon.getCloudRecord(landed)?.value ?? -1;
-  game.timerSystem.processTimers(2);
+  processTimersAt(game, 2);
   const value1 = dungeon.getCloudRecord(landed)?.value ?? -1;
   check(value1 === value0 - 3, `the cloud shrinks at the destination (${value0} -> ${value1})`);
-  for (let t = 3; t <= 200; t++) game.timerSystem.processTimers(t);
+  for (let t = 3; t <= 200; t++) processTimersAt(game, t);
   check(cloudIn(game, dest, index) === null, 'the cloud has gone from the destination by the end of its life');
   check(game.timerQueue.getTimers().every((t) => t.function !== TimerFunction.TT_25),
     'no TT_25 outlives it');

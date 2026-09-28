@@ -120,7 +120,7 @@ async function main(): Promise<void> {
   };
 
   const tick = (): void => {
-    game.timerSystem.processTimers(game.state.tickCount);
+    game.timerSystem.processTimers();
     game.state.tickCount++;
   };
 

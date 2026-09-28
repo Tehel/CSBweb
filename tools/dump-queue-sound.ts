@@ -364,7 +364,7 @@ function main(): void {
     const step = (party: Position, label: string): void => {
       game.party.state.position = party;
       clear(s);
-      game.timerSystem.processTimers(game.state.tickCount);
+      game.timerSystem.processTimers();
       game.state.tickCount++;
       row(`6${label}. door (${d.x},${d.y}) L${d.z} to state ${game.dungeonState.getCellFlag(d) & 7}, party (${party.x},${party.y}) L${party.z}`, s);
     };
@@ -472,7 +472,7 @@ function main(): void {
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.timerSystem.processTimers(game.state.tickCount);
+      game.timerSystem.processTimers();
       game.state.tickCount++;
       heardNothing(s, `8b. door (${door.x},${door.y}) L${L} shuts on a group`, [4]);
     }
@@ -497,7 +497,7 @@ function main(): void {
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.timerSystem.processTimers(game.state.tickCount);
+      game.timerSystem.processTimers();
       game.state.tickCount++;
       heardNothing(s, `8c. generator (${gen.x},${gen.y}) L${gen.z}, the party on L${game.party.state.position.z}`, [17], gen.z);
     }
@@ -554,7 +554,7 @@ function main(): void {
       clear(s);
       game.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.state.tickCount);
       for (let t = 0; t < 20; t++) {
-        game.timerSystem.processTimers(game.state.tickCount);
+        game.timerSystem.processTimers();
         game.state.tickCount++;
       }
       heardNothing(s, `8f. a weapon thrown north from (${south.x},${south.y}) L${L}`, [0]);
@@ -576,7 +576,7 @@ function main(): void {
       heardNothing(s, `8g. an RNffe4 cloud at (${at.x},${at.y}) L${L}`, [13]);
       clear(s);
       for (let t = 0; t < 6; t++) {
-        game.timerSystem.processTimers(game.state.tickCount);
+        game.timerSystem.processTimers();
         game.state.tickCount++;
       }
       heardNothing(s, `8g. its timer, at (${at.x},${at.y}) L${L}`, [5]);
@@ -611,7 +611,7 @@ function main(): void {
     stand(game, p, 0);
     const tt20 = (): TimerEntry[] => game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_20);
     const tick = (): void => {
-      game.timerSystem.processTimers(game.state.tickCount);
+      game.timerSystem.processTimers();
       game.state.tickCount++;
     };
     // Queued inside a timer pass, as the wound is: the pass ends with `d.Time++`.

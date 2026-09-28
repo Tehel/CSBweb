@@ -26,7 +26,7 @@ import type { TeleporterRecord } from '../src/data/dungeonTypes';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { decodeMissileTimerWord8 } from '../src/engine/missileHelpers';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 const DELTA = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -90,7 +90,6 @@ function missileIn(game: Game, at: Position, index: number): ObjectID | null {
 }
 
 const game = makeGame();
-const ts = game.timerSystem;
 const tq = game.timerQueue;
 const site = findSite(game);
 const at = (p: Position): string => `L${p.z}(${p.x},${p.y})`;
@@ -107,7 +106,7 @@ for (const c of cases) {
   site.teleporter.rotation = c.rotation;
   const before = new Set<number>();
   for (let rn = game.dungeonState.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, ts.now, true)) {
+  if (!game.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, game.state.tickCount, true)) {
     throw new Error('missile not launched');
   }
   let launched: ObjectID | null = null;
@@ -117,7 +116,7 @@ for (const c of cases) {
   if (launched === null) throw new Error('missile not placed');
   const index = decodeObjectID(launched).index;
 
-  ts.processTimers(ts.now + 1);
+  processTimersAt(game, game.state.tickCount + 1);
 
   // `MissileTimer`: the corner it enters the next cell by (`Timer.cpp:370-377`), then
   // `TeleportMissile` (`Code11f52.cpp:2392-2411`).

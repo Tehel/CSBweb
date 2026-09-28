@@ -452,7 +452,7 @@ export class Game implements MainLoop {
         // in this tick.
         this.loadNewPartyLevel();
         do {
-            if (this.timerSystem.processTimers(this.state.tickCount)) {
+            if (this.timerSystem.processTimers()) {
                 // "Game has been won." (doc/CSBwin-src/CSBCode.cpp:627-633)
                 this.runScript(this.wonByTimers());
                 return;
@@ -561,7 +561,7 @@ export class Game implements MainLoop {
      * itself. Nor have the overlay's timeout and `parameterMessageSequence`, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
-        if (this.timerSystem.processTimers(this.state.tickCount)) {
+        if (this.timerSystem.processTimers()) {
             yield* this.wonByTimers();
         }
         this.ctx.host.drawViewport();
@@ -571,13 +571,10 @@ export class Game implements MainLoop {
 
     /**
      * `d.Time++`, after the timers, in the main loop's tick (doc/CSBwin-src/CSBCode.cpp:660)
-     * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`). `TimerSystem.now` follows,
-     * so what schedules from it between ticks (a monster's death cloud from an attack click)
-     * schedules from the `d.Time` CSBWin's does (`DEBT.md` D9).
+     * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`).
      */
     private advanceTime(): void {
         this.state.tickCount++;
-        this.timerSystem.now = this.state.tickCount >>> 0;
     }
 
     /**

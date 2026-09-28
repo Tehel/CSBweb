@@ -18,7 +18,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 async function main(): Promise<void> {
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
   turnsStarted = 0; turnsPassedGate = 0;
   for (let t = 0; t < ticks; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerSystem.processTimers(t);
+    processTimersAt(game, t);
   }
   const fired = turnsStarted;
   const passed = turnsPassedGate;
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
   turnsStarted = 0; turnsPassedGate = 0;
   for (let t = ticks; t < ticks + 400; t++) {
     (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-    game.timerSystem.processTimers(t);
+    processTimersAt(game, t);
   }
   const firedFrozen = turnsStarted;
   const passedFrozen = turnsPassedGate;
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     console.log(`Zero-HP gate — ${MonsterType[rec.creatureType]} at (${groupSlot.uByte10},${groupSlot.uByte11}), numMonM1 ${n0}`);
     for (let t = ticks + 400; t < ticks + 900; t++) {
       (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
-      game.timerSystem.processTimers(t);
+      processTimersAt(game, t);
     }
     console.log(`  numMonM1 now ${rec.numMonM1}, member 0 hp ${rec.hp[0]}`);
     check(rec.numMonM1 === n0 - 1 || rec.hp[0] !== 0,

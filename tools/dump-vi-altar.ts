@@ -219,7 +219,7 @@ function cloudsAt(game: Game, cell: Position): number {
 /** Run the clock forward, letting the altar's self-rescheduling timer advance. */
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers(game.state.tickCount);
+    game.timerSystem.processTimers();
     game.state.tickCount++;
   }
 }

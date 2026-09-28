@@ -301,7 +301,7 @@ export class MissileEncounter {
         // is spent either way.
         if (doorState !== 5 && projectile === RN_ZO_SPELL) {
           if (door.hasButton) {
-            this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, (this.ctx.systems.timer.now + 1) >>> 0, position.z);
+            this.timers.createTimer(TimerFunction.TT_DOOR, objX, objY, 0, ActuatorAction.TOGGLE, (this.ctx.state.tickCount + 1) >>> 0, position.z);
           }
           break;
         }
@@ -679,7 +679,7 @@ export class MissileEncounter {
       position.y,
       0,
       0,
-      (this.ctx.systems.timer.now + delay) >>> 0,
+      (this.ctx.state.tickCount + delay) >>> 0,
       position.z,
       rn,
     );
@@ -735,10 +735,10 @@ export class MissileEncounter {
    * force must also beat the door type's entry in `DoorTOC`.
    *
    * With a `delay` — `Attack.cpp`'s melee bash passes 2 (`doc/CSBwin-src/Attack.cpp:1803-1808`)
-   * — the door does not shatter now: a `TT_BASH_DOOR` timer at `time + delay` does it.
+   * — the door does not shatter now: a `TT_BASH_DOOR` timer at `d.Time + delay` does it.
    * A fireball passes none and the door goes at once.
    */
-  hitDoor(position: Position, force: number, explosion: boolean, delay = 0, time = this.ctx.systems.timer.now): boolean {
+  hitDoor(position: Position, force: number, explosion: boolean, delay = 0): boolean {
     const doorRn = this.dungeon.findFirstObject(position);
     if (doorRn === OBJECT_ID_EOF) return false;
     const door = this.dungeon.getDoorRecordByIndex(decodeObjectID(doorRn).index);
@@ -755,7 +755,7 @@ export class MissileEncounter {
     // Bottom three bits 4 means a closed door; 5 is the shattered state.
     if ((cellFlag & 7) !== 4) return false;
     if (delay !== 0) {
-      this.timers.createTimer(TimerFunction.TT_BASH_DOOR, position.x, position.y, 0, 0, (time + delay) >>> 0, position.z);
+      this.timers.createTimer(TimerFunction.TT_BASH_DOOR, position.x, position.y, 0, 0, (this.ctx.state.tickCount + delay) >>> 0, position.z);
     } else {
       setDoorState(map, position.x, position.y, 5);
     }

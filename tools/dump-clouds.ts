@@ -35,7 +35,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
       if (rn === null) break;
       values.push(dungeon.getCloudRecord(rn)?.value ?? -1);
       ticks = t;
-      game.timerSystem.processTimers(t);
+      processTimersAt(game, t);
     }
     return { values, ticks };
   };
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
   gameD.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, at, 255);
   const born = cloudIn(gameD, at);
   check(born !== null, 'the cloud is in the cell to begin with');
-  for (let t = 1; t <= 20; t++) gameD.timerSystem.processTimers(t);
+  for (let t = 1; t <= 20; t++) processTimersAt(gameD, t);
   check(cloudIn(gameD, at) === null, 'the cloud has left the cell');
   if (born !== null) {
     // `DeleteDBEntry` marks a DB15 free by setting its link to RNnul.
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
   const here = new Position(party.position.x, party.position.y, party.position.z);
   const healthBefore = party.champions[0]!.attributes.health;
   gameP.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, here, 255);
-  for (let t = 1; t <= 120; t++) gameP.timerSystem.processTimers(t);
+  for (let t = 1; t <= 120; t++) processTimersAt(gameP, t);
   const healthAfter = party.champions[0]!.attributes.health;
   console.log(`champion standing in a poison cloud: ${healthBefore} -> ${healthAfter} health`);
   check(healthAfter < healthBefore, 'a poison cloud hurts a champion standing in it');
@@ -212,7 +212,7 @@ async function main(): Promise<void> {
     const before = map.cellFlags[doorAt.x]![doorAt.y]! & 7;
     // A big fireball, so the force clears the door type's DoorTOC threshold.
     gameF.missileEncounter.createDeathCloud(RN_FIREBALL, 255, doorAt, 255);
-    for (let t = 1; t <= 10; t++) gameF.timerSystem.processTimers(t);
+    for (let t = 1; t <= 10; t++) processTimersAt(gameF, t);
     const after = map.cellFlags[doorAt.x]![doorAt.y]! & 7;
     console.log(`=== a fireball at the door on level ${doorAt.z} (${doorAt.x},${doorAt.y}) ===`);
     console.log(`door state ${before} -> ${after} (5 is burst open)`);
@@ -254,7 +254,7 @@ async function main(): Promise<void> {
   const level = 2;
   gameK.party.state.position = new Position(6, 14, level);
   gameK.monsterSystem.loadPartyLevelIfChanged();
-  gameK.timerSystem.processTimers(0);
+  processTimersAt(gameK, 0);
 
   // Find any activated group and kill it outright.
   const pool = gameK.dungeonState.getItem16Pool().filter((s) => s.word0 >= 0);
@@ -274,7 +274,7 @@ async function main(): Promise<void> {
 
       let lived = 0;
       for (let t = 1; t <= 30; t++) {
-        gameK.timerSystem.processTimers(t);
+        processTimersAt(gameK, t);
         if (cloudIn(gameK, where) === null) { lived = t; break; }
       }
       console.log(`it cleared after ${lived} ticks`);
@@ -297,9 +297,9 @@ async function main(): Promise<void> {
   const door0Link = door0?.nextObject;
   const cage = gameX.missileEncounter.createFluxcage(at, 0);
   check(cage !== null && cloudIn(gameX, at) === cage, 'the cage stands in the cell');
-  for (let t = 1; t <= 99; t++) gameX.timerSystem.processTimers(t);
+  for (let t = 1; t <= 99; t++) processTimersAt(gameX, t);
   check(cloudIn(gameX, at) === cage, 'it is still there at tick 99');
-  gameX.timerSystem.processTimers(100);
+  processTimersAt(gameX, 100);
   check(cloudIn(gameX, at) === null, 'it leaves the cell at tick 100');
   const cageRec = cage === null ? null : dungeonX.getCloudRecord(cage);
   check(cageRec !== null && cageRec.nextObject === OBJECT_ID_NULL,

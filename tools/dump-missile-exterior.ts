@@ -20,7 +20,7 @@ import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../sr
 import { RN_FIREBALL } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 function makeGame(): Game {
@@ -80,7 +80,7 @@ check(launched, 'the fireball launches');
 // Stop at the tick the missile meets the wall: the cloud has a timer of its own, due the
 // tick after.
 let tick = 1;
-for (; tick <= 3 && filters.length === 0; tick++) game.timerSystem.processTimers(tick);
+for (; tick <= 3 && filters.length === 0; tick++) processTimersAt(game, tick);
 
 const here = categoriesAt(game, at);
 console.log(`tick ${tick - 1}: filters run: ${filters.join(', ') || 'none'}; in the square: ${here.map((c) => DBType[c]).join(', ') || 'nothing'}`);

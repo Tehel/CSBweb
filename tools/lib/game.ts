@@ -51,3 +51,13 @@ export function newGame(data: DungeonData, graphics: GraphicsLoader, host?: Part
 export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
   return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };
 }
+
+/**
+ * A timer pass at `time`: the clock set to it, then `ProcessTimers`, which reads `d.Time`
+ * (`doc/CSBwin-src/CSBCode.cpp:6383`) as `processTimers` reads `ctx.state.tickCount`.
+ * For a tool that steps the timers on a clock of its own rather than through `Game`'s tick.
+ */
+export function processTimersAt(game: Game, time: number): boolean {
+  game.state.tickCount = time;
+  return game.timerSystem.processTimers();
+}

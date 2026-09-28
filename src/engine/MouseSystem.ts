@@ -99,7 +99,7 @@ export class MouseSystem {
     const dropped = encodeObjectID(newPos, decoded.category, decoded.index);
     party.objectInHand = OBJECT_ID_NULL;
     this.ctx.systems.worldMove.moveObject(dropped, -1, 0, target.x, target.y, target.z);
-    this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
+    this.ctx.systems.timer.processTimers();
     if (options?.viAltar) {
       this.maybeScheduleViAltar(dropped, target, newPos);
     }
@@ -272,7 +272,7 @@ export class MouseSystem {
    */
   triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
     this.ctx.systems.actuators.triggerObjectMove(position, object, place, unchangedRoom, facing);
-    this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
+    this.ctx.systems.timer.processTimers();
   }
 
   /**

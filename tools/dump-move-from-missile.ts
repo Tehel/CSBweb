@@ -39,7 +39,7 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -95,7 +95,7 @@ function findCellBeforeEastWall(game: Game): Position {
 function launch(game: Game, at: Position, corner: number, direction: Direction, delay: number, firstTick = false): ObjectID {
   const before = new Set<ObjectID>();
   for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.timerSystem.now + delay - 1, !firstTick)) {
+  if (!game.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.state.tickCount + delay - 1, !firstTick)) {
     throw new Error('missile not launched');
   }
   for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
@@ -128,7 +128,6 @@ function wallBesideParty(game: Game): Direction {
 interface FilterCall { type: number; missile: number; direction: number; filterObjectSet: boolean }
 
 const game = makeGame();
-const ts = game.timerSystem;
 const tq = game.timerQueue;
 const party = game.party.state.position;
 const north = new Position(party.x, party.y - 1, party.z);
@@ -158,7 +157,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   const flying = launch(game, wallSide, 1, Direction.EAST, 1);
   onWall = () => game.missileEncounter.checkPartyMoveFromMissile(party, north);
 
-  ts.processTimers(ts.now + 1);
+  processTimersAt(game, game.state.tickCount + 1);
 
   const wall = calls.find((c) => c.type === 4 && c.missile === flying);
   const met = calls.find((c) => c.type === 7 && c.missile === struck);
@@ -199,12 +198,12 @@ const show = (label: string, c: FilterCall | undefined): void =>
     indexInside = record.timerIndex;
     // A timer queued by the filter takes the lowest free slot, the one the fireball's
     // timer left.
-    squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, ts.now + 1000, party.z).index;
+    squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, game.state.tickCount + 1000, party.z).index;
     game.missileEncounter.checkPartyMoveFromMissile(party, null);
   };
   calls.length = 0;
 
-  ts.processTimers(ts.now + 1);
+  processTimersAt(game, game.state.tickCount + 1);
 
   const met = calls.find((c) => c.type === 7 && c.missile === flying);
   console.log(`3. the fireball's timer was ${firstTimer}; inside it the record names ${indexInside}, and the filter's timer took slot ${squatter}`);

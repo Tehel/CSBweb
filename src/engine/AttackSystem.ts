@@ -1253,7 +1253,6 @@ export class AttackSystem {
             params.attdep.hitDoor.strength,
             false, // not a ZO spell
             2, // delay
-            this.ctx.state.tickCount,
           );
           this.ctx.sounds.queueSound(4, party.position.x, party.position.y, 2, party.position.z);
           break;

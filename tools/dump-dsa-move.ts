@@ -36,7 +36,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { RN_POISON_CLOUD, RN_POISON_BOLT } from '../src/core/spellRn';
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
 
     let ticks = 0;
     for (let t = 1; t <= 400 && inCell(game, to, DBType.CLOUD).length > 0; t++) {
-      game.timerSystem.processTimers(t);
+      processTimersAt(game, t);
       ticks = t;
     }
     console.log(`2. it lived ${ticks} more ticks at the destination`);

@@ -58,7 +58,7 @@ import { Game } from '../src/engine/Game';
 import { SoundQueue } from '../src/engine/SoundQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -265,7 +265,7 @@ function main(): void {
         const launched = game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 5, 100, 5, 0);
         check(launched, 'the throw launches');
 
-        for (let t = 1; t <= 6; t++) game.timerSystem.processTimers(t);
+        for (let t = 1; t <= 6; t++) processTimersAt(game, t);
 
         check(!findsObjectAt(game, teleporter.at, item.rn), 'the thrown object does not stay sitting on the teleporter cell');
         check(findsObjectAt(game, teleporter.dest, item.rn), 'the thrown object is teleported to the destination on landing');
@@ -303,7 +303,7 @@ function main(): void {
         const launched = game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 5, 100, 5, 0);
         check(launched, 'the throw launches');
 
-        for (let t = 1; t <= 6; t++) game.timerSystem.processTimers(t);
+        for (let t = 1; t <= 6; t++) processTimersAt(game, t);
 
         ActuatorSystem.prototype.triggerObjectMove = originalTrigger;
 
@@ -345,7 +345,7 @@ function main(): void {
           for (let rn = game.dungeonState.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
             if (decodeObjectID(rn as ObjectID).category === DBType.MISSILE) restingCorner = decodeObjectID(rn as ObjectID).position;
           }
-          game.timerSystem.processTimers(t);
+          processTimersAt(game, t);
         }
 
         check(restingCorner !== null, 'the missile is seen resting at the door before it lands');
@@ -384,7 +384,7 @@ function main(): void {
         return original.call(this, o, mapX, mapY, deltaTime, level);
       };
       game.magic.launchThrownMissile(item.rn, party.position, 0, 0, 40, 100, 5, 0);
-      for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);
+      for (let t = 1; t <= 20; t++) processTimersAt(game, t);
       SoundQueue.prototype.queueSound = original;
       return ordinal;
     };

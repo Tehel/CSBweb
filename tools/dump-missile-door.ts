@@ -115,7 +115,6 @@ function encounter(
   pick?: (game: Game) => ObjectID,
 ): Outcome {
   const game = makeGame(door.toc);
-  const ts = game.timerSystem as any;
   const me = game.missileEncounter as any;
   const at = findClosedDoor(game);
   const map = game.dungeonState.getMap(at.z)!;
@@ -126,7 +125,7 @@ function encounter(
   record.destructibleByChop = door.chop ?? true;
 
   const thrown = pick ? pick(game) : projectile;
-  ts.now = 100;
+  game.state.tickCount = 100;
   game.magic.launchThrownMissile(thrown, at, 0, 0, range, 100, 1, 99);
   let missileRn: ObjectID | null = null;
   for (let r = game.dungeonState.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.dungeonState.getDBRecordLink(r)) {

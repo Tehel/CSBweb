@@ -67,13 +67,6 @@ export function setDoorState(map: MapData, x: number, y: number, doorState: numb
 }
 
 export class TimerSystem {
-  /**
-   * `d.Time`: `processTimers` sets it to its pass's time, and `Game.advanceTime` moves it
-   * on with the clock. `MissileEncounter`'s `CreateCloud`, `HitDoor` and Zo-at-a-door arm
-   * schedule from it, also when they are reached from outside a timer pass (a monster
-   * death). A second copy of `ctx.state.tickCount` (`DEBT.md` D9).
-   */
-  now = 0;
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
@@ -86,11 +79,12 @@ export class TimerSystem {
   }
 
   /**
-   * `ProcessTimers` (doc/CSBwin-src/CSBCode.cpp:6383): every timer due by `currentTime`.
-   * True, at once, when one has won the game (`:6459-6464`), and the rest wait.
+   * `ProcessTimers` (doc/CSBwin-src/CSBCode.cpp:6383): every timer due by `d.Time`,
+   * `ctx.state.tickCount`. True, at once, when one has won the game (`:6459-6464`), and
+   * the rest wait.
    */
-  processTimers(currentTime: number): boolean {
-    this.now = currentTime >>> 0;
+  processTimers(): boolean {
+    const currentTime = this.ctx.state.tickCount;
     let processed = 0;
     let next = this.timers.peekNext();
 
@@ -371,7 +365,7 @@ export class TimerSystem {
       0,
       0,
       0,
-      (this.now + duration) >>> 0,
+      (this.ctx.state.tickCount + duration) >>> 0,
       level,
       chIdx & 0xff,
       undefined,
@@ -409,7 +403,7 @@ export class TimerSystem {
       0,
       0,
       0,
-      (this.now + 36) >>> 0,
+      (this.ctx.state.tickCount + 36) >>> 0,
       level,
       chIdx & 0xff,
       undefined,

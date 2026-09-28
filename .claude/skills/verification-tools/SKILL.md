@@ -185,6 +185,12 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 then silently tests nothing. Call `game.timerQueue.deleteMonsterMovementTimers(x, y, level)`
 after placing it (`dump-missile-monster.ts`).
 
+**A timer pass runs on the game's clock.** `processTimers()` takes no time: it is
+`ProcessTimers(void)` and reads `d.Time`, `ctx.state.tickCount`, as does everything that
+schedules from "now" (a cloud, poison, a door bash). A tool that steps the timers on its
+own clock sets that clock first: `processTimersAt(game, t)` (`tools/lib/game.ts`), or
+`tickCount++` after each `processTimers()`, as the tick does.
+
 **Stepping frames.** `game.runFrame(t)` is one VBL at a time you choose: the mouse queue
 (`HandleMouseEvents`), then a tick if `t - lastTickTime` reaches the tick interval. Queue
 input with `enqueueMovement` (a key) or `onMouseClick(num, x, y)` / `onMouseUnClick()`,

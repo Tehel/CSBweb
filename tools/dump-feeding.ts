@@ -31,7 +31,7 @@ import {
 import { clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -252,7 +252,7 @@ function main(): void {
 
     for (let t = 0; t <= fp.shieldDuration + 1; t++) {
       (g as unknown as { state: { tickCount: number } }).state.tickCount = t;
-      g.timerSystem.processTimers(t);
+      processTimersAt(g, t);
     }
     console.log(`after ${fp.shieldDuration + 1} ticks: shield ${champ.shieldStrength}`);
     check(champ.shieldStrength === 0, `the shield expired back to 0 (got ${champ.shieldStrength})`);

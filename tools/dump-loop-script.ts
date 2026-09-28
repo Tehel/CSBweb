@@ -72,9 +72,9 @@ function watchedGame(): Watched {
   w.game.onFrame(() => { w.frameCallbacks++; });
   const timers = w.game.timerSystem;
   const processTimers = timers.processTimers.bind(timers);
-  timers.processTimers = (time: number): boolean => {
-    w.timerPasses.push(time);
-    return processTimers(time) || w.win;
+  timers.processTimers = (): boolean => {
+    w.timerPasses.push(w.game.state.tickCount);
+    return processTimers() || w.win;
   };
   return w;
 }

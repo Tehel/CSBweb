@@ -21,7 +21,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -87,7 +87,7 @@ function main(): void {
   // A fireball (the spell RN itself, as `CharacterThrowsSpell` launches it), two cells
   // north, flying south at the party.
   game.magic.launchThrownMissile(RN_FIREBALL, new Position(at.x, at.y - 2, 0), 2, 2, 100, 100, 1, 0);
-  for (let t = 1; t <= 20; t++) game.timerSystem.processTimers(t);
+  for (let t = 1; t <= 20; t++) processTimersAt(game, t);
   console.log(`after the fireball: health ${health()}; lastMonsterAttackTime ${party.lastMonsterAttackTime}`);
 
   check(health() < health0, 'the fireball reached the party and hurt it');

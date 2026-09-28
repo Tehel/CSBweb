@@ -63,7 +63,7 @@ export class MovementSystem {
         const result = this.move(action);
 
         if (result.success) {
-            this.ctx.systems.timer.processTimers(this.ctx.state.tickCount);
+            this.ctx.systems.timer.processTimers();
         } else if (result.inhibited) {
             // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
             this.ctx.mouseQueue.discardAllInput();

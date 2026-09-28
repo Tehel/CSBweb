@@ -34,7 +34,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { RN_POISON_CLOUD, RN_FIREBALL } from '../src/core/spellRn';
 
@@ -124,7 +124,7 @@ function switchOn(game: Game, at: Position, tt: TimerFunction, stand: () => void
   map.cellFlags[at.x]![at.y]! &= ~0x08;
   stand();
   game.timerQueue.createTimer(tt, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
-  game.timerSystem.processTimers(1);
+  processTimersAt(game, 1);
 }
 
 function main(): void {

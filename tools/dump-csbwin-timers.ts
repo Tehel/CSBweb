@@ -40,6 +40,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { RN_POISON_CLOUD } from '../src/core/spellRn';
 import { Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -78,7 +79,7 @@ function doorState(game: Game): number {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers(state.state.tickCount);
+    game.timerSystem.processTimers();
     state.state.tickCount++;
   }
 }
@@ -197,6 +198,28 @@ function main(): void {
     doorState(idle) === idleBefore,
     `a fresh dungeon.dat leaves the door alone (${idleBefore} -> ${doorState(idle)})`,
   );
+
+  /* ---- a timer set after the load, before the first timer pass ---- */
+
+  // The save sets `d.Time` (`LoadGame`, doc/CSBwin-src/SaveGame.cpp:1624), and what is
+  // scheduled before the first tick schedules from it: poison 36 ticks on
+  // (`CSBCode.cpp:7228-7235`), a Ya potion's shield (`Character.cpp:4386-4391`), a
+  // cloud's first turn (`Code11f52.cpp:1428`, one tick on).
+  const loaded = loadWorld();
+  applyCsbwinSave(loaded, new Uint8Array(readFileSync(resolve(SAVES, cases[0].file))));
+  const clock = loaded.state.tickCount;
+  const at = new Position(DOOR.x, DOOR.y + 1, DOOR.level);
+  loaded.timerSystem.schedulePoison(0, 3, at.z);
+  loaded.timerSystem.scheduleChampionShieldExpiry(0, 10, 50, at.z);
+  loaded.missileEncounter.createCloud(RN_POISON_CLOUD, 100, at.x, at.y, at, 0);
+  const setAt = (fn: number): number | undefined =>
+    loaded.timerQueue.getTimers().find((t) => t.function === fn)?.time;
+  console.log(`  after the load, d.Time ${clock}: poison due ${setAt(TimerFunction.TT_75)}, ` +
+    `shield ${setAt(TimerFunction.TT_72)}, cloud ${setAt(TimerFunction.TT_25)}`);
+  check(clock > 0, `the save sets the clock (d.Time ${clock})`);
+  check(setAt(TimerFunction.TT_75) === clock + 36, 'poison set after the load is due 36 ticks after the saved d.Time');
+  check(setAt(TimerFunction.TT_72) === clock + 50, 'a shield set after the load ends 50 ticks after the saved d.Time');
+  check(setAt(TimerFunction.TT_25) === clock + 1, 'a cloud made after the load turns one tick after the saved d.Time');
 
   finish();
 }

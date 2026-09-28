@@ -445,7 +445,7 @@ async function main(): Promise<void> {
     check(onDoor(TimerFunction.TT_DOOR_STEP).length === 0, 'queueing it cancelled the door-step timer');
 
     const tick = (): void => {
-      game.timerSystem.processTimers(game.state.tickCount);
+      game.timerSystem.processTimers();
       game.state.tickCount++;
     };
     // The blow is a click, between ticks: the first tick runs its timers on the d.Time of
