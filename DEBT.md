@@ -74,10 +74,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | M | ⏳ |
 | C73 | A room's message decodes without the escape tables | S | ⏳ |
 | C74 | A keyed attack makes no tick due | S | ⏳ |
 | C75 | A generator makes its group on the party's level | S | ⏳ |
+| C76 | A menu button's second press pass is drawn without the first | S | ⏳ |
 | F1 | Silent fallbacks for tables that are always there | S | ⏳ |
 | F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
@@ -96,7 +96,7 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C76 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
+Next free IDs: C77 · D10 · E7 · F12 · G15. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -116,32 +116,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 ## C — Known divergences from CSBWin
 
 Taken in the index's order (see "Priority"), now that tiers D and E are empty.
-
-### C71 ⏳ A resumed game has no "GAME LOADED, READY TO PLAY."
-
-`TAG021028`, the hand-off to the adventure, puts up `DoMenu(_6_, NULL, "GAME LOADED, READY
-TO PLAY.", "PLAY GAME", "ASCII DUMP", NULL, NULL, 1, 1, 1)` when `d.gameState` is
-`GAMESTATE_ResumeSavedGame`, and runs `AsciiDump` for its second button until the first is
-chosen (`doc/CSBwin-src/CSBCode.cpp:10493-10515`). That is every game the chooser loaded:
-from the entrance's "resume" at boot, and after "RESTART THIS GAME". The port goes straight
-into the adventure in both (`init` and `showEndOfGame`, `src/main.ts`).
-
-The work, sized M:
-
-- **Where.** Both paths go through `BootSequence.openLoadMenu` returning true
-  (`runBootSequence` and `gameSetupAfterRestart`, `src/renderer/intro/BootSequence.ts`),
-  on an `IntroHost` that still owns the canvas. The menu goes there, before the host
-  detaches, with `src/renderer/ui/Menu.ts`.
-- **How it looks.** `I1`, `ClearOldScreen` and `FadeOldScreen` are all 1, as for the
-  chooser's own `DoMenu` (`doc/CSBwin-src/SaveGame.cpp:1549`): cleared screen, a fade to
-  `d.Palette11914` first, the menu centred at (47, 33) (`doc/CSBWIN_MENU_REFERENCE.md`).
-  Title 1 is `NULL`, so only the second title line prints.
-- **"ASCII DUMP".** `AsciiDump` is unported (G14). Until it is, the button's arm is the
-  loop's `DoMenu` again, with the dump left out and marked at that point.
-- **Evidence: a golden frame of the menu.** The chooser lists the browser store
-  (IndexedDB, `src/data/saves/BrowserSaveStore.ts`), so `tools/probe-frames.mjs` has to
-  save a game from a `?intro=0` boot first, then boot with the intro, take the entrance's
-  "resume" and pick that slot.
 
 ### C73 ⏳ A room's message decodes without the escape tables
 
@@ -190,6 +164,20 @@ Pass `timer.level`, and the timer level's `difficulty` when the actuator's multi
 Evidence: a row in a `tools/` check firing a generator with the party on another level, and
 one with a multiplier-0 generator.
 
+### C76 ⏳ A menu button's second press pass is drawn without the first
+
+`_WaitForMenuSelect` paints its press animation into the screen in two passes five VBLs
+apart, the second over the first, and puts the saved pixels back only after both
+(`doc/CSBwin-src/Menu.cpp:121-179`). So during the second pass the first pass's edges are
+still up: the top row and the left column in colour 5, the right column and the row above
+the bottom in 0. `drawMenuPress` (`src/renderer/ui/Menu.ts`) paints only the pass `nowMs`
+falls in, and the save menu redraws the whole screen every frame of the press
+(`beginPress`, `src/renderer/ui/SaveMenu.ts`), so its second pass shows without the first.
+The boot's "GAME LOADED, READY TO PLAY." paints both passes into the screen in turn, as
+CSBWin does (`waitForMenuSelect`, `src/renderer/intro/BootSequence.ts`). Paint both passes
+in `drawMenuPress` once the second has begun. Evidence: a `tools/` check that reads the
+pixels of a press in its second pass.
+
 ---
 
 ## F — Verification debt
@@ -218,7 +206,7 @@ guard.
 
 ### F2 ⏳ No golden frame covers an edge decoration
 
-None of the nine golden frames (`tools/frames/`) shows a wall decoration on an edge
+None of the golden frames (`tools/frames/`) shows a wall decoration on an edge
 position, where the position-7 geometry is special. `tools/dump-hall-of-champions.ts` pins the geometry that makes position 7 special across
 all 8 rect sets: both edge slots are narrower than the bitmap, the front-left window ends
 flush with its right edge, and the front-right one starts flush with its left edge. The
@@ -391,7 +379,9 @@ save's tail, leaves out its `SmartDiscard(true)`.
 `AsciiDump` (`doc/CSBwin-src/AsciiDump.cpp:2137`) writes the whole dungeon as text to
 `ASCIIDUMP.TXT`, starting with the game's and the levels' information, every cell, the
 objects, and the monsters (`:2152-2160`). The one route to it is the second button of the
-"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`, C71). In a page it would be a download.
+"GAME LOADED, READY TO PLAY." menu (`CSBCode.cpp:10497-10515`), which in the port only puts
+the menu up again (`tag021028`, `src/renderer/intro/BootSequence.ts`). In a page it would be
+a download.
 
 ---
 
@@ -456,7 +446,7 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/Code1f9e6.cpp:349`), which closes CSBWin. A page cannot close itself,
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
-  developer affordance with no CSBWin counterpart, kept deliberately: six of the nine golden
+  developer affordance with no CSBWin counterpart, kept deliberately: nine of the twelve golden
   frames boot through it.
 - 🚫 **Custom skins / `BACKGROUND_LIB`.** The shipped DM dungeon uses no custom
   backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.

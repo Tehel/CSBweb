@@ -308,9 +308,11 @@ export function drawMenuTitles(
 }
 
 /**
- * `_DoMenu` in full: bitmap, layout patch, option labels, titles. `ClearOldScreen` and
- * `FadeOldScreen` are not ported — nothing this port raises uses them (the disk menu
- * passes 0 for all three, `SaveGame.cpp:870-877`).
+ * `_DoMenu`'s drawing: bitmap, layout patch, option labels, titles. `ClearOldScreen` and
+ * `FadeOldScreen` are the caller's, since only a pre-game screen owns the colour
+ * registers: the boot's "GAME LOADED, READY TO PLAY." does both around this
+ * (`doMenuCentred`, `src/renderer/intro/BootSequence.ts`), and the disk menu passes 0 for
+ * all three (`SaveGame.cpp:870-877`).
  */
 export function doMenu(
   ui: UIState,

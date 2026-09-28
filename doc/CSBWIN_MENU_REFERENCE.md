@@ -129,12 +129,16 @@ empty — CSBWin does not fall back to a hard break.
 (`Menu.cpp:450-465`.) With `I1 == 0` the bitmap stays in the viewport, which is already at
 screen **(0,33)**; with `I1 != 0` it is blitted to screen **(47,33)**, centred. The
 in-game disk menu uses `I1 == 0`, so the portraits and panels stay visible beside it; the
-boot-time load screen uses `I1 == 1`.
+boot-time load screen and "GAME LOADED, READY TO PLAY." (`CSBCode.cpp:10499-10508`) use
+`I1 == 1`.
 
 `videoMode` becomes `VM_CENTERMENU` when `ClearOldScreen` is set and `VM_LEFTMENU`
 otherwise (`Menu.cpp:465-472`); `ClearOldScreen` also `ClearMemory(d.LogicalScreenBase,
 32000)` first (`:291`), and `FadeOldScreen` fades to `d.Palette11914` before and
-`d.Palette11978` after (`:287`, `:475`). None of the three is used by the disk menu.
+`d.Palette11978` after (`:287`, `:475`). None of the three is used by the disk menu. The port
+does the fades and the clear on the intro host around `doMenu`'s drawing (`doMenuCentred`,
+`src/renderer/intro/BootSequence.ts`), since only a pre-game screen owns the colour
+registers.
 
 **Therefore viewport coordinates convert to screen coordinates by adding (0,33) for the
 in-game menu and (47,33) for the centred one** — which is why the extracted button
@@ -340,4 +344,6 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
 is used unchanged for the title-only and one-button menus (`"SAVING GAME . . ."`,
-`"UNABLE TO SAVE GAME!"`). The extension lives in `src/renderer/ui/SaveMenu.ts`.
+`"UNABLE TO SAVE GAME!"`), and for "GAME LOADED, READY TO PLAY.", whose `_WaitForMenuSelect`
+runs on the intro host (`waitForMenuSelect`, `src/renderer/intro/BootSequence.ts`). The
+extension lives in `src/renderer/ui/SaveMenu.ts`.

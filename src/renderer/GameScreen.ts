@@ -23,7 +23,7 @@ import {
   updateImageDataFromIndex,
   updateImageDataFromIndexWithViewportPalette,
 } from './csbwin/CanvasBlitter';
-import { extractUITables, type UITables } from './csbwin/UITables';
+import { extractUITables, type UIButton, type UITables } from './csbwin/UITables';
 import { loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
@@ -81,6 +81,7 @@ import {
   saveMenuWheel,
   type SaveMenuMode,
 } from './ui/SaveMenu';
+import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
 import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
@@ -652,6 +653,21 @@ export class GameScreen {
     clearIndex(this.screen, 0);
     drawSaveMenu(this.ui);
     this.presentScreen(palette);
+  }
+
+  /** `_DoMenu`'s drawing into the screen (`ui/Menu.ts`), for a menu a pre-game screen raises. */
+  doMenu(title1: string | null, title2: string | null, options: string[], centred: boolean): void {
+    doMenu(this.ui, title1, title2, options, centred);
+  }
+
+  /** `d.pButn18970[set][count-1]`, the button list `_WaitForMenuSelect` puts up. */
+  menuButtonList(count: number, centred: boolean): UIButton[] {
+    return menuButtonList(this.ui, count, centred);
+  }
+
+  /** One pass of `_WaitForMenuSelect`'s press animation, the one `nowMs` falls in. */
+  drawMenuPress(press: MenuPress, nowMs: number): void {
+    drawMenuPress(this.ui, press, nowMs);
   }
 
   /**

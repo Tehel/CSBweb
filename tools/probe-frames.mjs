@@ -104,7 +104,11 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   // whatever the last probe session saved. Both drivers of this script run Chrome on a
   // throwaway profile (probe-ui.mjs and check-frames.sh both pass --user-data-dir), so
   // there is no real save to lose here.
-  try { indexedDB.deleteDatabase('dmweb-saves'); } catch (e) {}
+  // A page opened with \`keepsaves\` keeps the store, so a game saved on one page can be
+  // resumed from the entrance of the next.
+  if (!location.search.includes('keepsaves')) {
+    try { indexedDB.deleteDatabase('dmweb-saves'); } catch (e) {}
+  }
   let seed = 0x2545f491;
   Math.random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5;
                         return ((seed >>> 0) % 1000000) / 1000000; };
@@ -180,6 +184,8 @@ console.log('state: attack panel');      await shot('05-attack');
 await canvasClick(15, 15, 2);  await wait(600);
 await canvasClick(177, 40, 0); await wait(900);
 console.log('state: save menu');         await shot('06-savemenu');
+// SAVE (id 213, x 123..207, y 138..152), for the resume from the entrance below.
+await canvasClick(165, 145, 0); await wait(1200);
 
 // The dungeon entrance, with the intro left on. The wait has to cover the whole title
 // animation — about 116 vertical blanks — plus the entrance's own fade; once that fade
@@ -189,12 +195,19 @@ console.log('state: save menu');         await shot('06-savemenu');
 // drawn by the real viewport renderer over a synthetic 5x5 level
 // (`src/renderer/intro/PrisonLevel.ts`), and `tools/dump-intro.ts` can check the level and
 // the compositing but not the pixels the bytecode programs produce.
-await send('Page.navigate', { url: APP });
+await send('Page.navigate', { url: `${APP}?keepsaves` });
 await wait(7000);
 console.log('state: entrance');          await shot('07-entrance');
 // The scroll at the bottom of the button column (button id 202).
 await canvasClick(270, 192, 0); await wait(1500);
 console.log('state: credits');           await shot('08-credits');
+// Back to the entrance, "resume" (id 201), the one save the chooser lists, LOAD (id 212):
+// `_TAG021028` puts up "GAME LOADED, READY TO PLAY." on a cleared screen.
+await canvasClick(160, 100, 0); await wait(1000);
+await canvasClick(270, 84, 0);  await wait(1500);
+await canvasClick(100, 60, 0);  await wait(300);
+await canvasClick(58, 145, 0);  await wait(1500);
+console.log('state: game loaded');       await shot('12-game-loaded');
 
 // A pressed crack switch (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"): level 4,
 // (14,29) facing west, after the click. The pushed-in crack must sit low on the wall where

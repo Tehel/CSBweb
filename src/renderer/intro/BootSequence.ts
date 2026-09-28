@@ -9,9 +9,10 @@
  *  ├ DoMenu QUIT/DUNGEON/UTILITY/HINT     not ported: this program is only the dungeon
  *  └ _StartCSB           :11290
  *     └ _ShowPrisonDoor  :10656
- *        └ _GameSetup(1) :10589
- *           ├ _TAG01f746 :9459             the entrance screen
- *           └ _ReadEntireGame               dungeon.dat, or the chosen save
+ *        ├ _GameSetup(1) :10589
+ *        │  ├ _TAG01f746 :9459             the entrance screen
+ *        │  └ _ReadEntireGame               dungeon.dat, or the chosen save
+ *        └ _TAG021028    :10460            "GAME LOADED, READY TO PLAY." after a load
  * ```
  *
  * This module is the two ends of that: it builds the `IntroHost` the screens draw through —
@@ -25,6 +26,7 @@
 import { updateDebug } from '../../ui';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../csbwin/UITables';
+import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';
 import { showCredits, type ShowCreditsHooks } from './ShowCredits';
@@ -209,31 +211,137 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
  *
  * Cancelling returns false, and `_GameSetup`'s retry loop puts the entrance back up
  * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
+ *
+ * A load closes the chooser once the save is read, which is after the click, so the wait
+ * for input also ends when the chooser closes. What the chooser last showed stays on the
+ * screen: `onRestoreSave` has drawn the adventure into the screen by then, which CSBWin
+ * does not draw before `_TAG021028`.
  */
 async function openLoadMenu(host: IntroHost, deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeRestored'>): Promise<boolean> {
   const { gameScreen } = deps;
-  const menuPalette = host.uiTables.graphic232.palette552[0] ?? host.globalPalette;
 
   await fadeToPalette(host, PALETTE_11914);
   host.screen.pixels.fill(0);
 
   // `STShowCursor(HC33)` right before `SelectSaveGame` (`doc/CSBwin-src/SaveGame.cpp:1562`).
   host.setCursorVisible(true);
-  const draw = (): void => gameScreen.presentSaveMenuOnly(host.globalPalette);
+  let shown: Uint8Array | null = null;
+  let chooserClosed: () => void = () => {};
+  const closed = new Promise<null>((resolve) => { chooserClosed = () => resolve(null); });
+  const draw = (): void => {
+    if (gameScreen.isSaveMenuOpen()) {
+      gameScreen.presentSaveMenuOnly(host.globalPalette);
+      shown = host.screen.pixels.slice();
+      return;
+    }
+    if (shown) host.screen.pixels.set(shown);
+    host.present();
+    chooserClosed();
+  };
   gameScreen.setBootFrameRenderer(draw);
   gameScreen.openSaveMenu('loadOnly');
   draw();
-  await fadeToPalette(host, menuPalette);
+  await fadeToPalette(host, palette11978(host));
 
   while (gameScreen.isSaveMenuOpen()) {
-    const event = await host.nextEvent();
+    const event = await Promise.race([host.nextEvent(), closed]);
+    if (!event) break;
     if (event.kind === 'click') gameScreen.handleSaveMenuClick(event.x, event.y, event.buttons);
     else gameScreen.handleSaveMenuKey('Escape');
     draw();
   }
 
   gameScreen.setBootFrameRenderer(null);
+  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`SaveGame.cpp:1564`)
   return deps.consumeRestored();
+}
+
+/**
+ * `d.Palette11978`, the interface's palette: `_GameSetup` fills it from `d.Palette552[0]`
+ * (`doc/CSBwin-src/CSBCode.cpp:10623`).
+ */
+function palette11978(host: IntroHost): readonly number[] {
+  return host.uiTables.graphic232.palette552[0] ?? host.globalPalette;
+}
+
+/* ------------------------------------------------------------- the hand-off ---- */
+
+/**
+ * `_TAG021028`'s menu, when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10493-10537`):
+ * both `_ShowPrisonDoor` (`:10677`) and the restart (`Code1f9e6.cpp:318`) call it once
+ * `_GameSetup` has returned. The rest of `_TAG021028`, the adventure's state and its first
+ * frame, is the page's.
+ *
+ * "ASCII DUMP" runs `AsciiDump`, which is unported (`DEBT.md` G14): here the button only
+ * puts the menu up again, which is what the loop does after the dump.
+ */
+async function tag021028(host: IntroHost, gameScreen: GameScreen, choice: PrisonDoorChoice): Promise<void> {
+  if (choice !== 'resume') return;
+  for (;;) {
+    await doMenuCentred(host, gameScreen, null, 'GAME LOADED, READY TO PLAY.', ['PLAY GAME', 'ASCII DUMP']);
+    host.setCursorVisible(true);        // `STShowCursor(HC33)` (`:10510`)
+    const selected = await waitForMenuSelect(host, gameScreen, 2);
+    host.setCursorVisible(false);       // `STHideCursor(HC33)` (`:10512`)
+    if (selected === 1) break;
+  }
+  await host.vbl(4);
+  host.screen.pixels.fill(0);
+  host.present();
+}
+
+/**
+ * `_DoMenu` with `I1`, `ClearOldScreen` and `FadeOldScreen` all 1 (`doc/CSBwin-src/Menu.cpp:245`):
+ * a fade to black, a cleared screen, the menu centred at (47, 33), and a fade up to
+ * `d.Palette11978`. CSBWin draws the menu off screen first; here it goes into the screen
+ * once it is black.
+ */
+async function doMenuCentred(
+  host: IntroHost,
+  gameScreen: GameScreen,
+  title1: string | null,
+  title2: string | null,
+  options: string[],
+): Promise<void> {
+  await fadeToPalette(host, PALETTE_11914);   // `:285-288`
+  host.screen.pixels.fill(0);                 // `:289-292`
+  gameScreen.doMenu(title1, title2, options, true);
+  await fadeToPalette(host, palette11978(host)); // `:473-476`
+}
+
+/**
+ * `_WaitForMenuSelect` over the centred button set (`doc/CSBwin-src/Menu.cpp:33`): wait for
+ * a click on one of the menu's buttons, run the press animation, discard the input, and
+ * return the 1-based choice. A one-button menu would also take Return (`:82-93`); nothing
+ * here raises one, and the intro's key events do not say which key it was.
+ *
+ * The press paints its two passes into the screen, the second over the first, and puts
+ * back what it covered (`:100-180`).
+ */
+async function waitForMenuSelect(host: IntroHost, gameScreen: GameScreen, numButton: number): Promise<number> {
+  const buttons = gameScreen.menuButtonList(numButton, true);
+  let choice = 0;
+  while (choice === 0) {
+    const event = await host.nextEvent();
+    if (event.kind === 'click') choice = menuHitTest(buttons, event.x, event.y, event.buttons);
+  }
+  const rect = menuButtonRect(buttons, choice + 209);
+  if (rect) {
+    const press = { buttonId: choice + 209, rect, startedMs: 0 };
+    host.setCursorVisible(false);       // `STHideCursor(HC41)` (`:107`)
+    const saved = host.screen.pixels.slice();
+    await host.vbl(1);
+    gameScreen.drawMenuPress(press, 0);
+    host.present();
+    await host.vbl(5);
+    gameScreen.drawMenuPress(press, MENU_PRESS_PHASE_MS);
+    host.present();
+    await host.vbl(5);
+    host.screen.pixels.set(saved);
+    host.present();
+    host.setCursorVisible(true);        // `STShowCursor(HC41)` (`:180`)
+  }
+  host.discardAllInput();
+  return choice;
 }
 
 /* ------------------------------------------------------------------- entry ---- */
@@ -263,7 +371,9 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   const { host, detach } = createIntroHost(deps, PALETTE_11914);
   try {
     await displayChaosStrikesBack(host);
-    return await showPrisonDoor(host, prisonDoorButtons(host), () => openLoadMenu(host, deps));
+    const choice = await showPrisonDoor(host, prisonDoorButtons(host), () => openLoadMenu(host, deps));
+    await tag021028(host, deps.gameScreen, choice);
+    return choice;
   } catch (error) {
     console.error('Boot sequence failed; entering the dungeon anyway', error);
     updateDebug(`Intro failed: ${error}`);
@@ -311,6 +421,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  */
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
   const resume = (): Promise<boolean> => openLoadMenu(host, deps);
-  if (await resume()) return 'resume';
-  return showPrisonDoor(host, prisonDoorButtons(host), resume);
+  const choice = (await resume()) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), resume);
+  await tag021028(host, deps.gameScreen, choice);
+  return choice;
 }
