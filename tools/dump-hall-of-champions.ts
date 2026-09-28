@@ -481,10 +481,10 @@ function main(): void {
  * Positions 7 and 9 are the F2 front walls one cell to the left and right. Both are
  * scaled to the width of the F2 *centre* rectangle (`[8]`) and then drawn into a
  * narrower slot pinned to a screen border, so only part of the bitmap is visible — and
- * which part depends on the side. Getting that backwards drew the decoration cropped on
- * the wrong side with a gap where the off-screen margin should have been; it stood for
- * as long as the renderer has existed, because no golden frame contains an edge
- * decoration.
+ * which part depends on the side. Getting that backwards draws the decoration cropped on
+ * the wrong side, with a gap where the off-screen margin should be. This section pins the
+ * rectangles; the golden frames `13-edge-decoration-left` and `14-edge-decoration-right`
+ * pin the pixels.
  */
 function edgeDecorationSection(): void {
   const graphics = sharedGraphics;

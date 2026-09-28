@@ -247,6 +247,17 @@ await evaluate(FACE(1, 3, 0, 0)); await wait(500);
 console.log('state: entrance door');     await shot('10-entrance-door');
 await evaluate(FACE(2, 25, 4, 1)); await wait(500);
 console.log('state: door lock, F2');     await shot('11-door-lock-f2');
+// A wall decoration on an F2 edge wall, positions 7 and 9 of `DrawWallDecoration`
+// (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). One mirror frame in the Hall of Champions,
+// the south face of level 0 (16,7), seen from two squares south and one to either side,
+// facing north: from (17,9) it is front-left, from (15,9) front-right. It is scaled to the
+// F2 centre width and cut by the screen border, so on the left it must show the bitmap's
+// right end, and on the right its left end. `tools/dump-hall-of-champions.ts` pins the
+// rectangles; these two frames pin the pixels.
+await evaluate(FACE(17, 9, 0, 0)); await wait(500);
+console.log('state: F2 front-left wall'); await shot('13-edge-decoration-left');
+await evaluate(FACE(15, 9, 0, 0)); await wait(500);
+console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right');
 
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');

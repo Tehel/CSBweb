@@ -74,7 +74,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F2 | No golden frame covers an edge decoration | M | ⏳ |
 | F11 | `probe-ui.mjs --boot` boots with an empty party | S | ⏳ |
 | F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
@@ -117,16 +116,6 @@ Empty. A divergence found along the way goes here, with the next free ID.
 ---
 
 ## F — Verification debt
-
-### F2 ⏳ No golden frame covers an edge decoration
-
-None of the golden frames (`tools/frames/`) shows a wall decoration on an edge
-position, where the position-7 geometry is special. `tools/dump-hall-of-champions.ts` pins the geometry that makes position 7 special across
-all 8 rect sets: both edge slots are narrower than the bitmap, the front-left window ends
-flush with its right edge, and the front-right one starts flush with its left edge. The
-pixels themselves are still verified only by screenshot. A new frame needs a way to place
-the party, which the probe does not have. That is the same missing affordance as the
-"fixed set of party positions" in `PLAN.md` → Phase 15 step 2, so build it once for both.
 
 ### F11 ⏳ `probe-ui.mjs --boot` boots with an empty party
 
@@ -360,7 +349,7 @@ Recorded so that nobody "fixes" them.
   (`doc/CSBwin-src/Code1f9e6.cpp:349`), which closes CSBWin. A page cannot close itself,
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
-  developer affordance with no CSBWin counterpart, kept deliberately: nine of the twelve golden
+  developer affordance with no CSBWin counterpart, kept deliberately: eleven of the fourteen golden
   frames boot through it.
 - 🚫 **Custom skins / `BACKGROUND_LIB`.** The shipped DM dungeon uses no custom
   backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.
