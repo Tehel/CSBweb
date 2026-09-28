@@ -103,8 +103,6 @@ export interface InterpreterContext {
   numWallDecoration?: number; // d.NumWallDecoration (CSBCode.cpp:5798)
   useMirrorImages?: boolean; // d.UseMirrorImages (Viewport.cpp:6740)
 
-  // Viewport canvas for drawing
-  viewportContext: CanvasRenderingContext2D;
   viewportIndexBuffer?: PaletteIndexViewportBuffer;
   seeThroughWalls?: boolean; // d.SeeThruWalls (Viewport.cpp:2639)
   facingAlcove?: boolean;

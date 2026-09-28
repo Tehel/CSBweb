@@ -74,7 +74,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| F3 | Phase 15 steps 3–5 | — | in `PLAN.md` |
+| F3 | Phase 15 steps 4–5 | — | in `PLAN.md` |
 | G1 | DSA gaps, and the footprint decoration | — | ⏳ |
 | G2 | Ten DSA filters | — | ⏳ |
 | G3 | The wings | — | ⏳ |
@@ -116,12 +116,11 @@ Empty. A divergence found along the way goes here, with the next free ID.
 
 ## F — Verification debt
 
-### F3 — Phase 15 steps 3–5 stay in `PLAN.md`
+### F3 — Phase 15 steps 4–5 stay in `PLAN.md`
 
-The render probe, the table-extraction round-trip checks and the comparison against CSBWin
-screenshots are a live phase, so they stay in `PLAN.md` → "Phase 15" rather than being
-copied here. The never-executed validation steps of phases 2, 4, 5 and 7 are all folded
-into it.
+The table-extraction round-trip checks and the comparison against CSBWin screenshots are a
+live phase, so they stay in `PLAN.md` → "Phase 15" rather than being copied here. The
+never-executed validation steps of phases 2, 4 and 7 are folded into it.
 
 ---
 

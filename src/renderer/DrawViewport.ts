@@ -19,19 +19,19 @@ import { Position } from '@/core';
  * Relative X coordinates for each cell
  * Port from CSBWin Viewport.cpp lines 361-362
  */
-const relativeX: number[] = [ -2, 2, -2, 2, -1, 1, 0, -1, 1, 0, -2, 2, -1, 1, 0, -1, 1, 0, -1, 1, 0 ];
+export const relativeX: number[] = [ -2, 2, -2, 2, -1, 1, 0, -1, 1, 0, -2, 2, -1, 1, 0, -1, 1, 0, -1, 1, 0 ];
 
 /**
  * Relative Y coordinates for each cell
  * Port from CSBWin Viewport.cpp lines 363-364
  */
-const relativeY: number[] = [ 4, 4, 3, 3, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0 ];
+export const relativeY: number[] = [ 4, 4, 3, 3, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 1, 1, 1, 0, 0, 0 ];
 
 /**
  * Calculate absolute x,y position from relative coordinates
  * Port from CSBWin Viewport.cpp (find in source)
  */
-function RelativeXY(
+export function RelativeXY(
   facing: number,
   relY: number,
   relX: number,
@@ -135,49 +135,51 @@ export function DrawViewport(
   // (doc/CSBwin-src/Viewport.cpp:2638), both set up by `ViewportRenderer.drawViewportFrame`.
 }
 
+/** The 21 cells' names in the program table, by relative cell number. */
+export const cellNames = [
+  'F4L2',
+  'F4R2',
+  'F3L2',
+  'F3R2', // place switched with F3R2 ?
+  'F4L1',
+  'F4R1',
+  'F4',
+  'F3L1',
+  'F3R1',
+  'F3',
+  'F2L2', // place switched with F2L2 ?
+  'F2R2',
+  'F2L1',
+  'F2R1',
+  'F2',
+  'F1L1',
+  'F1R1',
+  'F1',
+  'F0L1',
+  'F0R1',
+  'F0',
+];
+
+/** The program table's name for each `GraphicRoomType`. */
+export const roomTypeNames = [
+  'Stone',
+  'Open',
+  'Pit',
+  'Teleporter',
+  'DoorEdge',
+  'DoorFacing',
+  'StairEdge',
+  'StairFacing',
+];
+
 /**
  * Get the bytecode program for a given cell and room type
  * Port from CSBWin's pStdDrawCode lookup
  */
-function getBytecodeProgram(cellNum: number, graphicRoomType: number): number[] | null {
+export function getBytecodeProgram(cellNum: number, graphicRoomType: number): number[] | null {
   // Map cell number and room type to bytecode program key
   // Cell names: F0, F0L1, F0R1, F1, F1L1, F1R1, etc.
   // Room types: Stone, Open, Pit, Teleporter, StairFacing, StairEdge, DoorFacing, DoorEdge
-
-  const cellNames = [
-    'F4L2',
-    'F4R2',
-    'F3L2',
-    'F3R2', // place switched with F3R2 ?
-    'F4L1',
-    'F4R1',
-    'F4',
-    'F3L1',
-    'F3R1',
-    'F3',
-    'F2L2', // place switched with F2L2 ?
-    'F2R2',
-    'F2L1',
-    'F2R1',
-    'F2',
-    'F1L1',
-    'F1R1',
-    'F1',
-    'F0L1',
-    'F0R1',
-    'F0',
-  ];
-
-  const roomTypeNames = [
-    'Stone',
-    'Open',
-    'Pit',
-    'Teleporter',
-    'DoorEdge',
-    'DoorFacing',
-    'StairEdge',
-    'StairFacing',
-  ];
 
   const cellName = cellNames[cellNum];
   const roomTypeName = roomTypeNames[graphicRoomType] || 'Stone';

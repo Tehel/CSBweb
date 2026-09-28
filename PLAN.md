@@ -27,7 +27,7 @@ unported CSBWin features last — and says how to work an item. **One item per c
 per session**, then `/clear`. `DEBT.md`'s index is the live status; its first row is the
 next item.
 
-New phase work (Phase 10's block 1, Phase 15's steps 3–5) waits until tiers C–E of
+New phase work (Phase 10's block 1, Phase 15's steps 4–5) waits until tiers C–E of
 `DEBT.md` are empty, unless a debt item needs it.
 
 ## Ground rules
@@ -93,7 +93,7 @@ New phase work (Phase 10's block 1, Phase 15's steps 3–5) waits until tiers C�
    print a human-readable table and assert invariants through `tools/lib/check.ts`, whose
    `finish()` also fails a run that made no checks. They are the regression suite for
    everything the frames cannot see. The pattern is in `.claude/skills/verification-tools/`;
-   what Phase 15 still owes is shared fixtures and the render probe.
+   what Phase 15 still owes is shared fixtures.
 
 ## Completed phases
 
@@ -612,8 +612,16 @@ never carried out, because the project has **no test framework**.
    is converted to.
    <sub>Baseline re-capture story: `doc/PLAN_ARCHIVE.md` → "Phase 15".</sub>
 
-3. ⏳ **Render probe tool** (Phase 5's skipped validation): render a single cell program with
-   controlled inputs and dump the viewport as PNG.
+3. ✅ **Render probe.** `tools/dump-render-probe.ts` runs every cell program of
+   `pStdDrawCode` on its own, headless, over hand-built room data, against the real
+   `graphics.dat` and `dm-atari` level 0, in both mirror parities. It asserts that the
+   port's table is null in exactly CSBWin's 46 `NOP` slots, that no program warns or
+   writes a pixel outside the 16 colours, and that all 244 renders hash as
+   `tools/reference/render-probe.tsv` records. A deliberate renderer change looks with
+   `--png` (one contact sheet per parity in `tools/output/`) and rewrites the baseline
+   with `--update`. Each slot is tried with one summary per room type (a closed door, a
+   visible pit and teleporter, no decorations or objects), so wall and floor decorations,
+   text, objects and the other door states are still seen only by the golden frames.
 4. 🔄 **Parser round-trip checks** for `dungeon.dat` / `graphics.dat` table extraction, so
    table regressions surface immediately. Part-paid by Phase 16: `tools/dump-image-codec.ts`
    decodes every image in both data sets and asserts each one fills its own buffer exactly,
@@ -623,4 +631,4 @@ never carried out, because the project has **no test framework**.
 5. ⏳ Compare against CSBWin screenshots for a few known scenes (Phase 7's skipped
    validation).
 
-Status: 🔄 in progress — steps 1 and 2 done, 4 part-done; 3 and 5 remain.
+Status: 🔄 in progress — steps 1, 2 and 3 done, 4 part-done; 5 remains.

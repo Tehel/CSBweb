@@ -12,6 +12,32 @@ import type { Palette } from '../core/types';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 
 /**
+ * Graphic `graphicNum` as palette indices, decoded once and kept in `cache`: the screen's
+ * graphics cache, which the viewport's interpreter and the interface share. `null` for a
+ * negative number or a graphic that does not decode.
+ */
+export function getCachedGraphicBitmap(
+  graphicsLoader: GraphicsLoader,
+  cache: Map<string, IndexedBitmap>,
+  graphicNum: number,
+  format: ImageFormat = ImageFormat.IMG1,
+): IndexedBitmap | null {
+  if (graphicNum < 0) return null;
+  const key = `${graphicNum}-${format}`;
+  const cached = cache.get(key);
+  if (cached) return cached;
+  try {
+    const decoded = graphicsLoader.getImage(graphicNum, format);
+    const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
+    const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
+    cache.set(key, bmp);
+    return bmp;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Wall bitmap dimensions
  * Standard wall graphics are 32x136 pixels
  */

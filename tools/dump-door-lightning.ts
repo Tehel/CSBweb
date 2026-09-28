@@ -49,7 +49,6 @@ const viewportIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
 const context: any = {
   viewportIndexBuffer,
   roomData: [],
-  viewportContext: {} as any,
   doorGraphics: [[0, 0], [0, 0], [0, 0]],
   doorTOC: [objectTables.doorCharacteristics[lightningIndex] ?? 0, 0],
   getGraphicBitmap: () => doorGraphicBitmap,

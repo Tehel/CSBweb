@@ -209,7 +209,7 @@ magic casting, light levels, worn-object bonuses, sound, the message area, monst
 Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
 entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and the
 port writes all sixteen blocks, block 1 still a stub (Phase 10). What is left: that block,
-the validation debt (Phase 15, steps 3–5), and the technical debt in `DEBT.md`. **Paying
+the validation debt (Phase 15, steps 4–5), and the technical debt in `DEBT.md`. **Paying
 the debt off is the current priority**, one item per commit, in `DEBT.md`'s order:
 structure first (tiers D and E are empty), then the known divergences (tier C),
 then the unported features. The first row of its index is the next item, and `/pay-debt`

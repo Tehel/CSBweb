@@ -58,7 +58,6 @@ export interface ViewportRendererDeps {
   /** The screen's graphics cache, which the interpreter shares with the interface. */
   graphicCache: Map<string, IndexedBitmap>;
   getGraphicBitmap: (graphicNum: number) => IndexedBitmap | null;
-  viewportContext: CanvasRenderingContext2D;
 }
 
 export class ViewportRenderer {
@@ -125,7 +124,6 @@ export class ViewportRenderer {
       objectTables: this.objectTables,
       csbGraphics: deps.csbGraphicsLoader,
       dungeonState: this.dungeonState,
-      viewportContext: deps.viewportContext,
       viewportIndexBuffer: this.buffer,
       seeThroughWalls: false,
       roomData: [],

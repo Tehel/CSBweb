@@ -33,6 +33,7 @@ import {
   SCREEN_HEIGHT,
   VIEWPORT_X,
   VIEWPORT_Y,
+  getCachedGraphicBitmap,
 } from './ViewportGraphics';
 import { Position } from '@/core';
 import { ViewportRenderer } from './ViewportRenderer';
@@ -195,7 +196,6 @@ export class GameScreen {
       palette552,
       graphicCache: ui.graphicCache,
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
-      viewportContext: screenCtx,
     });
     ui.objectTables = this.viewport.objectTables;
     this.uiPalette = palette552[0]?.slice() ?? graphicsLoader.getPalette(0);
@@ -476,20 +476,9 @@ export class GameScreen {
   }
 
   private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
-    if (graphicNum < 0) return null;
-    const key = `${graphicNum}-${format}`;
-    const cached = this.ui.graphicCache.get(key);
-    if (cached) return cached;
-    try {
-      const decoded = this.ui.graphicsLoader.getImage(graphicNum, format);
-      const pixels = decoded.pixels instanceof Uint8Array ? decoded.pixels : Uint8Array.from(decoded.pixels as ArrayLike<number>);
-      const bmp: IndexedBitmap = { width: decoded.width, height: decoded.height, pixels };
-      this.ui.graphicCache.set(key, bmp);
-      return bmp;
-    } catch {
-      return null;
-    }
+    return getCachedGraphicBitmap(this.ui.graphicsLoader, this.ui.graphicCache, graphicNum, format);
   }
+
 
   private presentViewport(): void {
     clearIndex(this.screen, 0);

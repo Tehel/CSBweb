@@ -1,11 +1,12 @@
 /**
- * A minimal PNG reader, for tools that hold a rendering up against a captured reference.
+ * A minimal PNG reader and paletted writer, for tools that hold a rendering up against a
+ * captured reference or dump one to look at.
  *
  * Enough of the format to read what a screenshot tool writes: any bit depth for a paletted
  * image, 8 bits per channel otherwise, and all five row filters. No interlace, no 16-bit
  * samples, no colour management — a file it cannot read throws rather than guesses.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import zlib from 'node:zlib';
 
 export interface PngImage {
@@ -76,4 +77,45 @@ export function readPng(path: string): PngImage {
   const palette: number[][] = [];
   if (plte) for (let i = 0; i < plte.length; i += 3) palette.push([plte[i], plte[i + 1], plte[i + 2]]);
   return { width, height, depth, ctype, indices, palette };
+}
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function chunk(type: string, data: Buffer): Buffer {
+  const head = Buffer.alloc(8);
+  head.writeUInt32BE(data.length, 0);
+  head.write(type, 4, 'ascii');
+  let crc = 0xffffffff;
+  for (const byte of Buffer.concat([head.subarray(4), data])) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  const tail = Buffer.alloc(4);
+  tail.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 0);
+  return Buffer.concat([head, data, tail]);
+}
+
+/** Write `indices` (one byte a pixel) as an 8-bit paletted PNG over `palette`'s `[r, g, b]`. */
+export function writeIndexedPng(path: string, width: number, height: number, indices: Uint8Array, palette: number[][]): void {
+  if (indices.length !== width * height) throw new Error(`${indices.length} indices for ${width}x${height}`);
+  if (palette.length === 0 || palette.length > 256) throw new Error(`a palette of ${palette.length} colours`);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  const raw = Buffer.alloc(height * (width + 1));
+  for (let y = 0; y < height; y++) raw.set(indices.subarray(y * width, (y + 1) * width), y * (width + 1) + 1);
+  writeFileSync(path, Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('PLTE', Buffer.from(palette.flat())),
+    chunk('IDAT', zlib.deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]));
 }
