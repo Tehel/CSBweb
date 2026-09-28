@@ -37,7 +37,7 @@ import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
-import { handleMagicClick, spellControlGetRect } from '../src/renderer/ui/MagicPanel';
+import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { CharacterSystem } from '../src/engine/CharacterSystem';
 import { CsbRandom } from '../src/core/random';
@@ -241,13 +241,15 @@ async function main(): Promise<void> {
   //         them out by box index, so the hit test must read the same index.
   party.state.selectedCharacterIndex = -1;
   party.state.objectInHand = OBJECT_ID_NULL;
-  const tabRect = uiTables.graphic230.word20242;
+  // The middle of box `box`'s tab with `caster` casting (`DrawSpellControls`,
+  // `doc/CSBwin-src/Character.cpp:5002-5085`): 12 pixels wide, 14 apart, and the
+  // caster's own 45 wide.
+  const tabX = (box: number, caster: number): number =>
+    box < caster ? 233 + 14 * box + 5 : box > caster ? 266 + 14 * box + 5 : 233 + 14 * box + 22;
+  const tabY = 45;
   for (let box = 0; box < 4; box++) {
     party.state.magicCasterIndex = 0;
-    const rct = spellControlGetRect(tabRect, box, party.state.magicCasterIndex);
-    const x = Math.floor((rct.x1 + rct.x2) / 2);
-    const y = Math.floor((rct.y1 + rct.y2) / 2);
-    handleMagicClick(ui, x, y);
+    handleMagicClick(ui, tabX(box, party.state.magicCasterIndex), tabY);
     row(`east: magic tab of box ${box}`, box, party.state.magicCasterIndex);
     check(party.state.magicCasterIndex === box,
       `after the turn, the magic tab of box ${box} must select champion ${box}`);
@@ -260,10 +262,7 @@ async function main(): Promise<void> {
   party.state.champions[3].attributes.mana = 0;
   party.state.champions[3].attributes.maxMana = 0;
   party.state.magicCasterIndex = 1;
-  const rct0 = spellControlGetRect(tabRect, 0, party.state.magicCasterIndex);
-  handleMagicClick(ui,
-    Math.floor((rct0.x1 + rct0.x2) / 2),
-    Math.floor((rct0.y1 + rct0.y2) / 2));
+  handleMagicClick(ui, tabX(0, party.state.magicCasterIndex), tabY);
   row('east: magic tab of box 0, champion 3 manaless', 0, party.state.magicCasterIndex);
   check(party.state.magicCasterIndex === 0,
     "box 0's magic tab must select champion 0 even when the champion in corner 0 cannot cast");

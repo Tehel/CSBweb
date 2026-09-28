@@ -81,7 +81,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C81 | The spell panel's clicks are not a port of `Magic.cpp` | M | ⚠️ |
 | G6 | UI effects: `FlashButton` | L | ⏳ step 1 of 3 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -120,28 +119,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C81 ⚠️ The spell panel's clicks are not a port of `Magic.cpp`
-
-`src/renderer/ui/MagicPanel.ts` re-implements the spell panel's input instead of
-translating `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:589`), `_MagicSelection`
-(`:545`), `TAG01b990` (`CSBCode.cpp:8963`), `BackspaceMagicSelection` (`Magic.cpp:806`) and
-`DrawSpellControls` (`Character.cpp:4984`). Where it disagrees:
-
-- **The cost of a rune after the first** is `(cost * Byte19016[first - 96]) >> 3`
-  (`CSBCode.cpp:8973-8979`). The port divides by 8 without truncating, so a cost whose
-  product is not a multiple of 8 takes a fraction of a point of mana.
-- **The caster tabs.** `_HandleMagicClick` picks a tab by fixed x ranges per
-  `d.MagicCaster` under `clickY <= 48` (`Magic.cpp:596-699`), then `SelectMagicCaster`
-  refuses a dead champion (`:724`). `handleMagicClick` hit-tests the drawn rectangle
-  instead.
-- **The cast button** (108) acts in CSBWin whenever `incantation[0]` is not zero
-  (`Magic.cpp:556-567`). The port also checks the caster's `alive`, and clears the
-  incantation in the panel, where CSBWin's `CastMagic` does it (`:949-955`).
-
-Port the five functions line by line, keeping their names, except for two deliberate
-divergences that stay (H → "A fifth rune is refused" and "No caster tab without mana"),
-and a `tools/dump-*.ts` that drives a second-rune cost with a remainder, a tab click for
-each caster, and the two divergences. G6 step 3 builds on this.
+Empty.
 
 ---
 
@@ -190,16 +168,17 @@ The steps:
    a move and reads the rectangle's state over the following VBLs.
 2. **The attack options** (`Character.cpp:4679-4716`): the pass (button 112) and the
    three attacks.
-3. **The spell panel**, after C81, since both flashes are in `_MagicSelection`: the cast
-   button (`Magic.cpp:561`) and a rune, whose rectangle is `d.Word18552[4 * (button -
-   101)]` (`:568-570`). The `graphic231` parser skips `Word18552` today
-   (`src/renderer/csbwin/UITables.ts:488-491`).
+3. **The spell panel**, both flashes in `_MagicSelection` (`magicSelection`,
+   `src/renderer/ui/MagicPanel.ts`): the cast button (`Magic.cpp:561`) and a rune, whose
+   rectangle is `d.Word18552[4 * (button - 101)]` (`:568-570`). The `graphic231` parser
+   skips `Word18552` today (`src/renderer/csbwin/UITables.ts:488-491`).
 
 Not part of this item: `_InvertButton` serves `Chaos.cpp`'s `_UtilityDialogBox` and
 `_TAG004518`, not the game's screens; `_WaitForMenuSelect`'s press is ported
 (`src/renderer/ui/SaveMenu.ts`); `DrawSpellControls` calls `vblFlashButn` directly to draw
-the caster tabs (C81). CSBWin flashes nothing on a blow: the one light change an attack
-makes is `atk_LIGHT` (`Attack.cpp:2077`), which is ported.
+the caster tabs, which `drawSpellControls` fills with index 4 over the black. CSBWin flashes
+nothing on a blow: the one light change an attack makes is `atk_LIGHT` (`Attack.cpp:2077`),
+which is ported.
 
 ### G12 ⏳ `SmartDiscard`: a filling database is not thinned
 
@@ -385,7 +364,7 @@ Recorded so that nobody "fixes" them.
   `byte33 = (byte33 + 1) & 3` (`doc/CSBwin-src/CSBCode.cpp:8985-8988`), so after four
   runes CSBWin's keypad shows the first row again and the next rune starts a new
   incantation over the old one. The author's decision: the port refuses any rune past the
-  fourth, and the keypad keeps showing the fourth row (`applyMagicSelection` and
+  fourth, and the keypad keeps showing the fourth row (`tag01b990` and
   `drawSpellPanel`, `src/renderer/ui/MagicPanel.ts`). A save still carries `byte33` as
   CSBWin's writers leave it, `strlen(incantation) & 3` (`CsbwinCharacters.ts`).
 - 🚫 **No caster tab without mana.** `DrawSpellControls` draws a tab for every champion

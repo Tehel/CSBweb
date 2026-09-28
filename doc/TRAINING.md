@@ -188,8 +188,8 @@ exp = random(0-7) + 16·D + 8·(power-1)·required + D²
 
 and it goes to the skill in the spell's own record (`byte5`, graphics `0x230`), whatever the
 caster's class. The mana is the rune table `Byte19010`: the power rune costs 1-6, and every
-later rune costs its base × (8, 12, 16, 20, 24, 28)[power] / 8 (`TAG01b990`,
-`doc/CSBwin-src/CSBCode.cpp:8963`).
+later rune costs its base × (8, 12, 16, 20, 24, 28)[power] shifted right by 3, so a
+remainder is dropped (`TAG01b990`, `doc/CSBwin-src/CSBCode.cpp:8973-8979`).
 
 | Potion | Skill | Exp per mana, LO → MON |
 |---|---|---|

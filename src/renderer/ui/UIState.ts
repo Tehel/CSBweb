@@ -167,7 +167,7 @@ export interface UIState {
   /** `QueueSound(ordinal, mapX, mapY, deltaTime)`, the engine's `SoundQueue`. */
   queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
   onObjectMove?: ObjectMoveHandler;
-  onSpellCast?: (chIdx: number, incantation: number[]) => number | void;
+  onSpellCast?: (chIdx: number) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
   onChampionAttack?: (chIdx: number, attackType: number) => number;
   /**

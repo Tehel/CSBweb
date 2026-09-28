@@ -861,8 +861,8 @@ export class Game implements MainLoop {
 
 
     /** The magic panel's cast button (`MagicSystem.castSpellFromUi`). */
-    castSpellFromUi(chIdx: number, incantation: number[]): number {
-        return this.magic.castSpellFromUi(chIdx, incantation);
+    castSpellFromUi(chIdx: number): number {
+        return this.magic.castSpellFromUi(chIdx);
     }
 
 

@@ -272,7 +272,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         onObjectMove: (position, object, place, unchangedRoom, facing) => {
             game.triggerObjectMove(position, object, place, unchangedRoom, facing);
         },
-        onSpellCast: (chIdx, incantation) => game.castSpellFromUi(chIdx, incantation),
+        onSpellCast: (chIdx) => game.castSpellFromUi(chIdx),
         // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
         isRunningScript: () => game.isRunningScript(),

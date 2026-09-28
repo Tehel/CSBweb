@@ -125,8 +125,12 @@ async function main(): Promise<void> {
   let clockTicks: number[] = [];
   ui.setClockTick = (value: number) => { clockTicks.push(value); };
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
-  ui.onSpellCast = (chIdx: number, incantation: number[]) => {
-    casts.push({ chIdx, incantation });
+  // Stands in for `CastMagic`, which clears the runes of a cast it does not refuse;
+  // `tools/dump-magic-panel.ts` drives the real one.
+  ui.onSpellCast = (chIdx: number) => {
+    const champion = party.state.champions[chIdx]!;
+    casts.push({ chIdx, incantation: [...champion.incantation] });
+    champion.incantation = [];
     return 0;
   };
 
@@ -234,7 +238,6 @@ async function main(): Promise<void> {
   check(casts.length === 1, 'Tab should cast the incantation');
   check(casts[0]?.chIdx === 0 && casts[0]?.incantation.length === 1,
     'the cast should carry the caster and the runes assembled');
-  check(caster.incantation.length === 0, 'a cast that is not refused should clear the runes');
 
   casts = [];
   press('Tab');

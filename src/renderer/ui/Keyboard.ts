@@ -36,7 +36,7 @@
  */
 import { selectMagicCaster } from '../../engine/Party';
 import { prepareAttack, takeAttackOption } from './Attack';
-import { applyMagicSelection } from './MagicPanel';
+import { magicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
 import { UIState } from './UIState';
 
@@ -217,7 +217,7 @@ function toggleInventory(ui: UIState, chIdx: number): void {
 function magicButton(ui: UIState, buttonId: number): void {
   if (championPending(ui)) return;
   if ((ui.partyState?.magicCasterIndex ?? -1) === -1) return;
-  applyMagicSelection(ui, buttonId);
+  magicSelection(ui, buttonId);
 }
 
 /**

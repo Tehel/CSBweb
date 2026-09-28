@@ -1326,6 +1326,25 @@ every record of `dungeon.dat`.
 `const i32` (`Magic.cpp:928`). The mana was already spent rune by rune as the incantation
 was built, so casting totals nothing.
 
+## A rune's mana is truncated to a whole point
+
+`TAG01b990` (`doc/CSBwin-src/CSBCode.cpp:8970-8980`) costs a rune `Byte19010[6 * step +
+button]`, and for any rune after the first multiplies it by `Byte19016[first - 96]` (8, 12,
+16, 20, 24 or 28) and shifts right by 3. An odd base after UM, EE or MON therefore drops
+half a point: VI after UM costs `(3 * 12) >> 3 = 4`, not 4.5. A cost above `Mana()` refuses
+the rune whole; `BackspaceMagicSelection` gives nothing back (`Magic.cpp:806-822`).
+`tools/dump-magic-panel.ts` checks all 36 second-rune costs.
+
+## The caster tabs are hit-tested by fixed x ranges
+
+`_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:596-699`) does not search a button list for
+the tabs: for `clickY <= 48` it picks a champion from literal x ranges for each
+`d.MagicCaster`, which match the tabs `DrawSpellControls` draws (`Character.cpp:4984-5087`),
+so the caster's own wide tab and the two-pixel gaps pick nobody. With the fourth champion
+casting, the first champion's range is `clickX <= 244`. `clickX` 512-515 name champions 0-3.
+Either way the click returns without reaching the keypad, and the pick counts only below
+`d.NumCharacter` and past `SelectMagicCaster`'s dead-champion refusal (`:724`).
+
 ## Every inventory click is gated on `d.HandChar`, and the party always owns it
 
 `doc/CSBwin-src/Mouse.cpp:1600-1606` — the button ids 28 to 65, which are the inventory

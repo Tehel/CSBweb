@@ -118,7 +118,7 @@ export class MagicSystem {
   private castMagic(casterIdx: number): number {
     const party = this.ctx.party.state;
     const champion = party.champions[casterIdx];
-    if (!champion || champion.alive === false) return 0;
+    if (!champion) return 0;
     if (champion.incantation.length === 0) return 0;
     const params = this.fillSpellParameters(casterIdx, champion.incantation, party);
     const filtered = this.ctx.systems.dsa.processSpellFilter(params);
@@ -657,15 +657,13 @@ export class MagicSystem {
   /**
    * The magic panel's cast button. CSBWin's caller hands `CastMagic` nothing but the
    * caster (`doc/CSBwin-src/Magic.cpp:564`): the mana was spent rune by rune. It sets
-   * `d.clockTick` to what `CastMagic` returns, which is `CastSpell`'s result with 3 made 0
-   * (`:945-956`).
+   * `d.clockTick` to what `CastMagic` returns, which is `CastSpell`'s result with 3 made 0,
+   * and any other result clears the incantation (`:945-956`). The raw result is returned,
+   * for the tools.
    */
-  castSpellFromUi(chIdx: number, incantation: number[]): number {
-    if (chIdx < 0 || chIdx >= this.ctx.party.state.champions.length) return 0;
-    if (!incantation || incantation.length === 0) return 0;
+  castSpellFromUi(chIdx: number): number {
     const champion = this.ctx.party.state.champions[chIdx];
-    if (!champion || champion.alive === false) return 0;
-    champion.incantation = [...incantation];
+    if (!champion) return 0;
     const result = this.castMagic(chIdx);
     if (result !== 3) champion.incantation = [];
     setClockTick(this.ctx, result === 3 ? 0 : result);

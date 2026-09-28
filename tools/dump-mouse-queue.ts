@@ -412,7 +412,7 @@ async function main(): Promise<void> {
   ui.uiTables = uiTables;
   ui.setClockTick = (value) => game.setClockTick(value);
   let castResult = -99;
-  ui.onSpellCast = (chIdx, incantation) => (castResult = game.castSpellFromUi(chIdx, incantation));
+  ui.onSpellCast = (chIdx) => (castResult = game.castSpellFromUi(chIdx));
   let attackResult = -99;
   ui.onChampionAttack = (chIdx, attackType) => (attackResult = game.championAttack(chIdx, attackType));
   const centreOf = (list: Array<{ word0: number; x1: number; y1: number; x2: number; y2: number }> | null, id: number): [number, number] => {

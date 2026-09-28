@@ -2,49 +2,55 @@
  * The spell panel.
  *
  * The UI half of CSBWin `doc/CSBwin-src/Magic.cpp`: the rune keypad, the incantation being
- * assembled, and its running mana cost. Casting itself lives in the engine —
- * `applyMagicSelection` only assembles the incantation and hands it to `ui.onSpellCast`.
+ * assembled, and its running mana cost. Casting itself lives in the engine: `CastMagic`
+ * is `ui.onSpellCast`.
  * The attack buttons and the attack menu live in `ui/Attack.ts`, beside the rest of the
  * `Character.cpp` port.
  */
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
-import { Rect } from '../csbwin/UITables';
-import { pointInRect, searchButtonList } from './HitTest';
+import { searchButtonList } from './HitTest';
 import { UIState } from './UIState';
 import { selectMagicCaster } from '../../engine/Party';
 
-export function spellControlGetRect(base: Rect, chIdx: number, casterIdx: number): Rect {
-    const isCaster = chIdx === casterIdx;
-    const isAfterCaster = chIdx > casterIdx;
-    const x = base.x1 + chIdx * 14 + (isAfterCaster ? 33 : 0);
-    return {
-      x1: x,
-      x2: x + (isCaster ? 44 : 11),
-      y1: base.y1,
-      y2: base.y2 - (isCaster ? 0 : 1)
-    };
-}
+/**
+ * The caster tabs `DrawSpellControls` inverts, as CSBWin writes them
+ * (`doc/CSBwin-src/Character.cpp:5002-5085`): `[selected caster][champion]` is
+ * `[x1, x2, y2]`, all from `y1 = 0x2a`. The caster's own tab is the wide one.
+ */
+const SPELL_CONTROL_TABS: ReadonlyArray<ReadonlyArray<readonly [number, number, number]>> = [
+  [[0xe9, 0x115, 0x31], [0x118, 0x123, 0x30], [0x126, 0x131, 0x30], [0x134, 0x13f, 0x30]],
+  [[0xe9, 0x0f4, 0x30], [0x0f7, 0x123, 0x31], [0x126, 0x131, 0x30], [0x134, 0x13f, 0x30]],
+  [[0xe9, 0x0f4, 0x30], [0x0f7, 0x102, 0x30], [0x105, 0x131, 0x31], [0x134, 0x13f, 0x30]],
+  [[0xe9, 0x0f4, 0x30], [0x0f7, 0x102, 0x30], [0x105, 0x110, 0x30], [0x113, 0x13f, 0x31]],
+];
 
+/**
+ * `DrawSpellControls` (`doc/CSBwin-src/Character.cpp:4984-5087`). The panel's strip is
+ * cleared to 0, then `vblFlashButn` inverts plane 2 of each tab, which over the black is
+ * index 4: the caster's own, with the name in it at `(x1 + 2, 0x30)`, and every other
+ * champion's whose `HP()` is not zero. No caster, no tabs (`chIdx != 3`'s return).
+ */
 export function drawSpellControls(ui: UIState): void {
   if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
 
-  const rect = ui.uiTables.graphic230.word20242;
   const screen = ui.screenIndexBuffer;
-  const font = ui.fontData;
-  const casterIdx = ui.partyState.magicCasterIndex;
-  fillRectIndex(screen, rect, 0);
+  const chIdx = ui.partyState.magicCasterIndex;
+  const champions = ui.partyState.champions;
+  fillRectIndex(screen, ui.uiTables.graphic230.word20242, 0);
+  if (chIdx < 0 || chIdx > 3) return;
 
-  ui.partyState.champions.forEach((champion, chIdx) => {
+  const tabs = SPELL_CONTROL_TABS[chIdx]!;
+  for (let i = 0; i < champions.length && i < 4; i++) {
+    const champion = champions[i]!;
     // No tab without mana: a deliberate divergence (`DEBT.md` → H, "No caster tab without
-    // mana"). CSBWin draws one for every champion whose HP is not zero.
-    if (!champion || !champion.alive || champion.attributes.maxMana === 0) return;
-    const rct = spellControlGetRect(rect, chIdx, casterIdx);
-    fillRectIndex(screen, rct, 4);
-    if (chIdx === casterIdx) {
-      drawTextLineIndex(screen, font, rct.x1 + 2, rect.y2 - 1, 0, 4, champion.name);
-    }
-  });
+    // mana").
+    if (champion.attributes.maxMana === 0) continue;
+    if (i !== chIdx && champion.attributes.health === 0) continue;
+    const [x1, x2, y2] = tabs[i]!;
+    fillRectIndex(screen, { x1, x2, y1: 0x2a, y2 }, 4);
+    if (i === chIdx) drawTextLineIndex(screen, ui.fontData, x1 + 2, 0x30, 0, 4, champion.name);
+  }
 }
 
 export function drawSpellPanel(ui: UIState): void {
@@ -122,85 +128,110 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
   }
 }
 
-export function applyMagicSelection(ui: UIState, buttonId: number): void {
-  if (!ui.partyState || !ui.uiTables) return;
-  if (buttonId < 101 || buttonId > 108) return;
-
-  const casterIdx = ui.partyState.magicCasterIndex;
-  if (casterIdx < 0) return;
-
-  const champion = ui.partyState.champions[casterIdx];
-  if (!champion || champion.alive === false) return;
-
-  // buttons: magic runes (101-106), back (107), cast (108)
-
-  // Back
-  if (buttonId === 107) {
-    if (champion.incantation.length === 0) return;
-    champion.incantation.pop();
+/**
+ * `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-575`): buttons 101-106 are the runes,
+ * 107 takes the last one back and 108 casts. The cast needs only a first rune, and
+ * `CastMagic` is the engine's (`ui.onSpellCast`), which sets `d.clockTick` and clears
+ * the incantation. The two `FlashButton`s, and the wait for the rune's, are `DEBT.md` G6
+ * step 3.
+ */
+export function magicSelection(ui: UIState, button: number): void {
+  if (!ui.partyState) return;
+  const party = ui.partyState;
+  if (button === 108) {
+    const pcA0 = party.champions[party.magicCasterIndex];
+    if (!pcA0 || (pcA0.incantation[0] ?? 0) === 0) return;
+    ui.onSpellCast?.(party.magicCasterIndex);
     return;
   }
-
-  // Cast
-  if (buttonId === 108) {
-    if (champion.incantation.length === 0) return;
-    const chIdx = ui.partyState.champions.indexOf(champion);
-    let result: number | void = undefined;
-    if (chIdx >= 0) {
-      result = ui.onSpellCast?.(chIdx, [...champion.incantation]);
-    }
-    if (result !== 3) {
-      champion.incantation = [];
-    }
-    return;
+  const D7 = button - 101;
+  if (D7 < 6) {
+    tag01b990(ui, D7);
+  } else {
+    backspaceMagicSelection(ui);
   }
-
-  // baseMana: [ 1, 2, 3, 4, 5, 6, 2, 3, 4, 5, 6, 7, 4, 5, 6, 7, 7, 9, 2, 2, 3, 4, 6, 7 ]
-  // scaleMana: [ 8, 12, 16, 20, 24, 28 ] ( = [ x1, x1.5, x2, x2.5, x3, x3.5 ])
-
-  // Add rune
-  const step = champion.incantation.length;
-  // A deliberate divergence (`DEBT.md` → H, "A fifth rune is refused"): CSBWin wraps
-  // `byte33` and starts a new incantation (`doc/CSBwin-src/CSBCode.cpp:8985-8988`).
-  if (step > 3) return;
-
-  const runeId = buttonId - 101;
-  const baseMana = ui.uiTables.graphic230.spellBaseMana; // number[24]
-  const scaleMana = ui.uiTables.graphic230.spellFirstRuneScale; // number[6]
-
-  // compute mana cost: rune base cost * [1, 1.5, 2, 2.5, 3, 3.5][firstRune]
-  let manaCost = baseMana[step * 6 + runeId];
-  if (step > 0) manaCost = (manaCost * scaleMana[(champion.incantation[0] - 96)]) / 8;
-  if (champion.attributes.mana < manaCost) return;
-
-  // apply cost en enqueue rune
-  champion.attributes.mana -= manaCost;
-  champion.incantation.push(96 + step * 6 + runeId);
 }
 
+/**
+ * `TAG01b990` (`doc/CSBwin-src/CSBCode.cpp:8963-8995`): add rune `button` of the current
+ * step. It costs `Byte19010[6 * step + button]` (`spellBaseMana`), and after the first
+ * rune that times `Byte19016[first - 96]` (`spellFirstRuneScale`), shifted right by 3.
+ * `byte33` is the step: every CSBWin writer keeps it at `strlen(incantation) & 3`.
+ * `CHARFLAG_statsChanged` has no counterpart: the panels are redrawn every frame.
+ */
+export function tag01b990(ui: UIState, button: number): void {
+  if (!ui.partyState || !ui.uiTables) return;
+  const party = ui.partyState;
+  const pcA3 = party.champions[party.magicCasterIndex];
+  if (!pcA3) return;
+  // A deliberate divergence (`DEBT.md` → H, "A fifth rune is refused"): CSBWin wraps
+  // `byte33` and starts a new incantation (`doc/CSBwin-src/CSBCode.cpp:8985-8988`).
+  if (pcA3.incantation.length > 3) return;
+  const D7 = pcA3.incantation.length & 3;
+  let D6 = ui.uiTables.graphic230.spellBaseMana[6 * D7 + button]!;
+  if (D7 !== 0) {
+    const D5 = pcA3.incantation[0]! - 96;
+    const D1 = ui.uiTables.graphic230.spellFirstRuneScale[D5]!;
+    D6 = (D6 * D1) >> 3;
+  }
+  if (D6 > pcA3.attributes.mana) return;
+  pcA3.attributes.mana -= D6;
+  pcA3.incantation[D7] = 6 * D7 + 96 + button;
+}
+
+/**
+ * `BackspaceMagicSelection` (`doc/CSBwin-src/Magic.cpp:806-822`): the rune before
+ * `byte33` goes. Its mana is not given back.
+ */
+export function backspaceMagicSelection(ui: UIState): void {
+  if (!ui.partyState) return;
+  const party = ui.partyState;
+  const pcA3 = party.champions[party.magicCasterIndex];
+  if (!pcA3 || pcA3.incantation.length === 0) return;
+  const D7 = ((pcA3.incantation.length & 3) + 3) & 3;
+  pcA3.incantation.length = D7;
+}
+
+/**
+ * `_HandleMagicClick` (`doc/CSBwin-src/Magic.cpp:589-709`). A click at `y <= 48` is on
+ * the caster tabs, which CSBWin hit-tests by fixed x ranges for each caster, not by the
+ * rectangles it draws: with the fourth champion casting, everything left of 245 is the
+ * first champion's. `clickX` 512-515 name a champion outright. Either way nothing below
+ * is searched. A lower click is on the keypad.
+ */
 export function handleMagicClick(ui: UIState, clickX: number, clickY: number): void {
   if (!ui.uiTables || !ui.partyState) return;
+  const party = ui.partyState;
 
-  const rect = ui.uiTables.graphic230.word20242;
-  // The tab belongs to the champion's **box**, not to the corner of the cell it stands
-  // in: `drawSpellControls` lays the tabs out by list index and `SelectMagicCaster`
-  // takes one (`doc/CSBwin-src/Magic.cpp:689-696`). Reading `partyPosition` here made
-  // the tabs pick the wrong caster as soon as the party turned.
-  const champions = ui.partyState.champions;
-  for (let chIdx = 0; chIdx < champions.length; chIdx++) {
-    const champion = champions[chIdx];
-    // The tabs `drawSpellControls` draws, and no others (`DEBT.md` → H, "No caster tab
-    // without mana").
-    if (!champion || !champion.alive || champion.attributes?.maxMana === 0) continue;
-    const rct = spellControlGetRect(rect, chIdx, ui.partyState.magicCasterIndex);
-    if (pointInRect(clickX, clickY, rct)) {
-      selectMagicCaster(ui.partyState, chIdx);
-      break;
+  let D6 = -1;
+  if (clickY <= 48) {
+    const caster = party.magicCasterIndex;
+    if (caster === 0) {
+      if ((clickX >= 280 && clickX <= 291) || clickX === 513) D6 = 1;
+      else if ((clickX >= 294 && clickX <= 305) || clickX === 514) D6 = 2;
+      else if ((clickX >= 308 && clickX <= 319) || clickX === 515) D6 = 3;
+    } else if (caster === 1) {
+      if ((clickX >= 233 && clickX <= 244) || clickX === 512) D6 = 0;
+      else if ((clickX >= 294 && clickX <= 305) || clickX === 514) D6 = 2;
+      else if ((clickX >= 308 && clickX <= 319) || clickX === 515) D6 = 3;
+    } else if (caster === 2) {
+      if ((clickX >= 233 && clickX <= 244) || clickX === 512) D6 = 0;
+      else if ((clickX >= 247 && clickX <= 258) || clickX === 513) D6 = 1;
+      else if ((clickX >= 308 && clickX <= 319) || clickX === 515) D6 = 3;
+    } else if (caster === 3) {
+      if ((clickX >= 247 && clickX <= 258) || clickX === 513) D6 = 1;
+      else if ((clickX >= 261 && clickX <= 272) || clickX === 514) D6 = 2;
+      else if (clickX <= 244 || clickX === 512) D6 = 0;
     }
+    if (D6 !== -1 && D6 < party.champions.length) {
+      // The tabs `drawSpellControls` draws, and no others (`DEBT.md` → H, "No caster tab
+      // without mana").
+      if (party.champions[D6]!.attributes.maxMana !== 0) selectMagicCaster(party, D6);
+    }
+    return;
   }
-
-  const magicButton = searchButtonList(ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
-  if (magicButton !== 0) {
-    applyMagicSelection(ui, magicButton);
+  const D7 = searchButtonList(ui.uiTables.graphic231.buttons.buttons18060, clickX, clickY, 2);
+  if (D7 !== 0) {
+    magicSelection(ui, D7);
   }
 }
