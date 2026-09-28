@@ -70,6 +70,12 @@ export interface UITables {
     rect18592: WordRect;
     rect18584: WordRect;
     rect18576: WordRect;
+    /**
+     * `d.Word18552[28]`: the rectangles `_MagicSelection` flashes for magic buttons
+     * 101-107, the six runes and the take-back, four words each, `x1, x2, y1, y2`
+     * (`doc/CSBwin-src/Magic.cpp:568-570`).
+     */
+    word18552: WordRect[];
     moveButtons: WordRect[];
     dropAreas: Rect[];
     /** The key tables `TAG0196da` reads (`KeyXlate`, `doc/CSBwin-src/CSB.h:1379`). */
@@ -312,7 +318,8 @@ function readButtons(view: DataView, off: number, count: number, basename: strin
   return out;
 }
 
-function readMoveButtons(view: DataView, off: number, count: number): WordRect[] {
+/** `count` rectangles of four big-endian words, `x1, x2, y1, y2`. */
+function readWordRects(view: DataView, off: number, count: number, name: string): WordRect[] {
   const out: WordRect[] = [];
   for (let i = 0; i < count; i++) {
     const base = off + i * 8;
@@ -321,7 +328,7 @@ function readMoveButtons(view: DataView, off: number, count: number): WordRect[]
       x2: view.getUint16(base + 2, false),
       y1: view.getUint16(base + 4, false),
       y2: view.getUint16(base + 6, false),
-      name: `moveBtn-${i}`,
+      name: `${name}-${i}`,
     });
   }
   return out;
@@ -485,12 +492,12 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
   const rect18584 = readWordRect(view, off, 'rect18584'); off += 8;
   const rect18576 = readWordRect(view, off, 'rect18576'); off += 8;
 
-  // Word18568[4], Word18560[4], Word18552[28]
+  // Word18568[4], Word18560[4]
   off += 4 * 2;
   off += 4 * 2;
-  off += 28 * 2;
+  const word18552 = readWordRects(view, off, 7, 'word18552'); off += 7 * 8;
 
-  const moveButtons = readMoveButtons(view, off, 4); off += 4 * 8;
+  const moveButtons = readWordRects(view, off, 4, 'moveBtn'); off += 4 * 8;
 
   // DropAreas[16], Byte18448[8], Byte18440[12], Byte18428[7], Byte18400[28]
   requireSize(raw, off, 16, '0x231 DropAreas');
@@ -548,6 +555,7 @@ function parseGraphic231(raw: Uint8Array): UITables['graphic231'] {
     rect18592,
     rect18584,
     rect18576,
+    word18552,
     moveButtons,
     dropAreas,
     keys,

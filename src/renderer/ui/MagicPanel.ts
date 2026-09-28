@@ -12,6 +12,7 @@ import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer'
 import { searchButtonList } from './HitTest';
 import { UIState } from './UIState';
 import { selectMagicCaster } from '../../engine/Party';
+import type { LoopScript } from '../../engine/LoopState';
 
 /**
  * The caster tabs `DrawSpellControls` inverts, as CSBWin writes them
@@ -132,24 +133,55 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
  * `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-575`): buttons 101-106 are the runes,
  * 107 takes the last one back and 108 casts. The cast needs only a first rune, and
  * `CastMagic` is the engine's (`ui.onSpellCast`), which sets `d.clockTick` and clears
- * the incantation. The two `FlashButton`s, and the wait for the rune's, are `DEBT.md` G6
- * step 3.
+ * the incantation. The function is `RESTARTABLE` and waits for VBLs around its flashes, so
+ * the port runs it as a script (`magicSelectionScript`), which holds the loop as CSBWin's
+ * pass is held inside it. With no loop to hold (a tool's bare `UIState`), it runs through.
  */
 export function magicSelection(ui: UIState, button: number): void {
-  if (!ui.partyState) return;
+  if (!ui.partyState || !ui.uiTables) return;
   const party = ui.partyState;
   if (button === 108) {
     const pcA0 = party.champions[party.magicCasterIndex];
     if (!pcA0 || (pcA0.incantation[0] ?? 0) === 0) return;
+  }
+  const script = magicSelectionScript(ui, button);
+  if (ui.runScript) ui.runScript(script);
+  else while (!script.next().done) { /* every wait at once */ }
+}
+
+/** A wait with no loop to wait in. */
+function* noWait(): LoopScript {}
+
+/**
+ * `_MagicSelection` from its first flash on. The cast flashes its button
+ * (`FlashButton(0xea, 0x12f, 0x3f, 0x49)`, `Magic.cpp:561`) and casts. A rune or the
+ * take-back flashes `d.Word18552[4 * (button - 101)]`, waits a VBL, waits for the flash to
+ * be put back, and only then changes the incantation (`:568-581`), so the keypad shows the
+ * pressed rune inverted, not the next step's.
+ */
+function* magicSelectionScript(ui: UIState, button: number): LoopScript {
+  const party = ui.partyState!;
+  if (button === 108) {
+    yield* ui.flashButtonScript?.(0xea, 0x12f, 0x3f, 0x49) ?? noWait();
+    // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:939`), which is waited
+    // out here, where a VBL can pass. The engine's own call then finds the button put back.
+    yield* ui.waitForButtonFlashScript?.() ?? noWait();
     ui.onSpellCast?.(party.magicCasterIndex);
-    return;
-  }
-  const D7 = button - 101;
-  if (D7 < 6) {
-    tag01b990(ui, D7);
   } else {
-    backspaceMagicSelection(ui);
+    const D7 = button - 101;
+    const pwA3 = ui.uiTables!.graphic231.word18552[D7]!;
+    yield* ui.flashButtonScript?.(pwA3.x1, pwA3.x2, pwA3.y1, pwA3.y2) ?? noWait();
+    // `wvbl(_3_);`
+    yield 1;
+    yield* ui.waitForButtonFlashScript?.() ?? noWait();
+    if (D7 < 6) {
+      tag01b990(ui, D7);
+    } else {
+      backspaceMagicSelection(ui);
+    }
   }
+  // The dispatcher drew the click's frame as the script started; the incantation changed since.
+  ui.renderLastFrame();
 }
 
 /**

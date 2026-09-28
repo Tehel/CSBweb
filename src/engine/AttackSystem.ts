@@ -36,7 +36,7 @@ import { getPartyChampion } from './Party';
 import { MonsterDamageResult } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
 import type { PartyAttackFilter } from './DsaSystem';
-import { waitForButtonFlash, type LoopScript } from './LoopState';
+import { waitForButtonFlashScript, type LoopScript } from './LoopState';
 import { AttackType, MonsterType, StateOfFear } from './monsterTypes';
 import { CloudType } from './cloudTypes';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
@@ -970,7 +970,7 @@ export class AttackSystem {
     const level = party.position.z;
     this.ctx.state.gameWon = true;
     if (party.selectedCharacterIndex >= 0) this.ctx.host.showHideInventory(4);
-    waitForButtonFlash(this.ctx);
+    yield* waitForButtonFlashScript(this.ctx);
     party.brightness = 200;
     // `SelectPaletteForLightLevel()`: the screen picks the palette from `d.Brightness`
     // whenever it draws (`selectPaletteIndexForLightLevel`).

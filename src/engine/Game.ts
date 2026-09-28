@@ -34,7 +34,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK } from './MouseQueue';
-import { createLoopFlags, flashButton, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, waitForButtonFlashScript, wakeUp, type LoopScript, type MainLoop } from './LoopState';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
@@ -851,6 +851,16 @@ export class Game implements MainLoop {
     /** `WaitForButtonFlash` (`LoopState.waitForButtonFlash`), for the UI's `TAG02076e`. */
     waitForButtonFlash(): void {
         waitForButtonFlash(this.ctx);
+    }
+
+    /** `_FlashButton` for a script (`LoopState.flashButtonScript`), for the UI's. */
+    flashButtonScript(x1: number, x2: number, y1: number, y2: number): LoopScript {
+        return flashButtonScript(this.ctx, x1, x2, y1, y2);
+    }
+
+    /** `WaitForButtonFlash` for a script (`LoopState.waitForButtonFlashScript`), for the UI's. */
+    waitForButtonFlashScript(): LoopScript {
+        return waitForButtonFlashScript(this.ctx);
     }
 
     /** Whether a VBL inverted the flashed rectangle since the last call: a redraw is due. */

@@ -81,7 +81,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 |
+| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -140,27 +140,28 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G6 ⏳ UI effects: `FlashButton` (step 2 of 3)
+### G6 ⏳ UI effects: `FlashButton` (step 2 of 3 left)
 
 CSBWin's button effect is `_FlashButton` (`doc/CSBwin-src/CSBCode.cpp:7713`), and its
 mechanism is ported (`doc/PROVEN_FACTS.md` → "The button flash"): the four words are
 `LoopFlags` (`src/engine/LoopState.ts`), with `flashButton`, `vblFlashButton` at
 `Game.runFrame`'s VBL and `waitForButtonFlash` at its five callers; `GameScreen` applies
 `vblFlashButn` (`src/renderer/csbwin/CanvasBlitter.ts`) after composing each frame, for as
-long as `d.Word11776` stands; the turn and step arrows flash. `tools/dump-button-flash.ts`
-checks it. How the port's pass, which does not stop for a VBL, times the flash is in H.
+long as `d.Word11776` stands. The turn and step arrows flash, and so does the spell panel:
+`_MagicSelection` is `RESTARTABLE`, and the port runs it as a `LoopScript`
+(`magicSelection`, `src/renderer/ui/MagicPanel.ts`) whose flashes wait their VBLs
+(`flashButtonScript`, `waitForButtonFlashScript`). `tools/dump-button-flash.ts` checks it.
+How the main loop's pass, which does not stop for a VBL, times the flash is in H.
 
-The steps left:
+The step left:
 
 2. **The attack options** (`Character.cpp:4679-4716`): the pass (button 112) and the
-   three attacks.
-3. **The spell panel**, both flashes in `_MagicSelection` (`magicSelection`,
-   `src/renderer/ui/MagicPanel.ts`): the cast button (`Magic.cpp:561`) and a rune, whose
-   rectangle is `d.Word18552[4 * (button - 101)]` (`:568-570`). The `graphic231` parser
-   skips `Word18552` today (`src/renderer/csbwin/UITables.ts:488-491`).
+   three attacks. Read whether their caller waits for VBLs, as `_MagicSelection` does,
+   before choosing between `flashButton` and `flashButtonScript`.
 
-The UI reaches the flash through `UIState`'s `flashedButton` and `waitForButtonFlash`
-hooks, which `main.ts` wires to `Game`.
+The UI reaches the flash through `UIState`'s hooks (`flashedButton`, `waitForButtonFlash`,
+`runScript`, `flashButtonScript`, `waitForButtonFlashScript`), which `main.ts` wires to
+`Game`.
 
 Not part of this item: `_InvertButton` serves `Chaos.cpp`'s `_UtilityDialogBox` and
 `_TAG004518`, not the game's screens; `_WaitForMenuSelect`'s press is ported
@@ -375,16 +376,18 @@ Recorded so that nobody "fixes" them.
   The port's `Game.runFrame` is one pass a VBL, and `onMouseClick` only queues: a click
   waits for the next VBL, at worst about 17 ms, and takes no print-queue entry of its own.
   The author's decision: the delay is too small to matter.
-- 🚫 **`WaitForButtonFlash` does not hold the pass.** CSBWin's waits a VBL for the flashed
-  rectangle to be put back (`doc/CSBwin-src/CSBCode.cpp:8561-8601`), and so does
-  `_FlashButton` for it to be inverted (`:7713-7730`), while the port's pass never stops
-  between VBLs. `flashButton` runs its VBL's share at once, so the rectangle is inverted
-  where CSBWin's is, before the rest of the pass; `waitForButtonFlash` leaves the put-back
-  to the next VBL (`src/engine/LoopState.ts`). Waiting there too would put the rectangle
-  back before the frame is drawn, and no flash would ever be seen. At the main loop's two
-  calls, which end a pass, this is CSBWin's order. At the three calls inside a pass
-  (`CastMagic`, `TAG02076e`, `_FusionSequence`), what the rest of the pass draws over the
-  rectangle shows inverted for that one frame.
+- 🚫 **`WaitForButtonFlash` does not hold the main loop's pass.** CSBWin's waits a VBL for
+  the flashed rectangle to be put back (`doc/CSBwin-src/CSBCode.cpp:8561-8601`), and so
+  does `_FlashButton` for it to be inverted (`:7713-7730`), while the port's pass never
+  stops between VBLs. There, `flashButton` runs its VBL's share at once, so the rectangle
+  is inverted where CSBWin's is, before the rest of the pass; `waitForButtonFlash` leaves
+  the put-back to the next VBL (`src/engine/LoopState.ts`). Waiting there too would put
+  the rectangle back before the frame is drawn, and no flash would ever be seen. At the
+  main loop's two calls, which end a pass, this is CSBWin's order. A `RESTARTABLE` caller
+  the port runs as a script waits as CSBWin does (`flashButtonScript`,
+  `waitForButtonFlashScript`): `_MagicSelection`, and through it `CastMagic`'s call, and
+  `_FusionSequence`. That leaves `TAG02076e`, which comes in a pass after the one that
+  flashed, when the next VBL has already put the rectangle back.
 - 🚫 **The intro and the end screen run on wall-clock time** through
   `requestAnimationFrame`, not on a VBL counter shared with the game loop. Nothing else
   runs while they play (the end screen starts once the loop has stopped), so there is

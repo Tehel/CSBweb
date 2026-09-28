@@ -11,6 +11,7 @@ import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyState } from '../../engine/gameTypes';
 import type { FeedParameters } from '../../engine/Feeding';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
+import type { LoopScript } from '../../engine/LoopState';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { KeyXlate, Rect, UIButton, UITables } from '../csbwin/UITables';
@@ -175,6 +176,15 @@ export interface UIState {
    * suspended inside it, as CSBWin's is inside a `RESTARTABLE` sequence.
    */
   isRunningScript?: () => boolean;
+  /**
+   * Hold the loop in a `RESTARTABLE` sequence (`Game.runScript`): the pass that called it
+   * returns at once, and the script runs on, a VBL at a time.
+   */
+  runScript?: (script: LoopScript) => void;
+  /** `_FlashButton` for a script, which waits its VBLs (`flashButtonScript`). */
+  flashButtonScript?: (x1: number, x2: number, y1: number, y2: number) => LoopScript;
+  /** `WaitForButtonFlash` for a script, which waits its VBL (`waitForButtonFlashScript`). */
+  waitForButtonFlashScript?: () => LoopScript;
   /** `d.attackDamageToDisplay`, read and cleared. */
   onConsumeAttackDamage?: () => number;
   /**

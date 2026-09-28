@@ -16,6 +16,10 @@
  *   arrow `d.MoveButn18496[button - 3]` that `MoveParty` returns (`Mouse.cpp:1556-1567`,
  *   `CSBCode.cpp:8137-8139`), even a step a wall refuses, which brings no tick (`:8310-8314`).
  * - `CastMagic` calls `WaitForButtonFlash` first (`Magic.cpp:939`).
+ * - `_MagicSelection` is `RESTARTABLE` and waits (`Magic.cpp:545-581`): the cast flashes
+ *   `(0xea, 0x12f, 0x3f, 0x49)`, then `CastMagic` waits the flash out and casts; a rune or
+ *   the take-back flashes `d.Word18552[4 * (button - 101)]`, waits a VBL, waits the flash
+ *   out, and only then changes the incantation. The port runs it as a script.
  * - `vblFlashButn` flips bit plane 2 over the rectangle, corners included (`VBL.cpp:60-122`),
  *   which is bit 2 of the pixel's index (`WinScreen.cpp:314-330`).
  *
@@ -32,6 +36,9 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { flashButton, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
+import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
+import { createUIState } from '../src/renderer/ui/UIState';
 import type { Rect } from '../src/renderer/csbwin/UITables';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -221,6 +228,71 @@ async function main(): Promise<void> {
   game.castSpellFromUi(0);
   console.log(`CastMagic with a flash standing: put-back asked ${loop.flashButnActive}`);
   check(loop.flashButnActive, 'CastMagic should ask for the put-back of a standing flash (Magic.cpp:939)');
+  frame();
+
+  // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
+  let redraws = 0;
+  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
+  ui.uiTables = extractUITables(graphics);
+  ui.partyState = party;
+  let castAt = -1;
+  let frameNo = 0;
+  ui.onSpellCast = (chIdx) => { castAt = frameNo; return game.castSpellFromUi(chIdx); };
+  ui.runScript = (script) => game.runScript(script);
+  ui.flashButtonScript = (x1, x2, y1, y2) => game.flashButtonScript(x1, x2, y1, y2);
+  ui.waitForButtonFlashScript = () => game.waitForButtonFlashScript();
+  party.magicCasterIndex = 0;
+  const word18552 = ui.uiTables.graphic231.word18552;
+  const buttons18060 = ui.uiTables.graphic231.buttons.buttons18060;
+  console.log(`d.Word18552: ${word18552.map(show).join(' ')}`);
+  // The canary: the rectangles flashed are the rectangles clicked, buttons 101-107 of the
+  // magic panel's list, and the cast's literal rectangle is button 108's.
+  const clickRect = (id: number): Rect => buttons18060.find((b) => b.word0 === id)!;
+  check(word18552.length === 7 && word18552.every((r, i) => same(r, clickRect(101 + i))),
+    'd.Word18552 should hold the click rectangles of magic buttons 101-107');
+  const CAST: Rect = { x1: 0xea, x2: 0x12f, y1: 0x3f, y2: 0x49 };
+  check(same(clickRect(108), CAST), "the cast's flash should be button 108's rectangle");
+
+  /** Click magic button `id`, then VBLs until the script lets the loop go: what each showed. */
+  const panelClick = (id: number): Array<{ flashed: Rect | null; runes: number; running: boolean }> => {
+    const b = clickRect(id);
+    handleMagicClick(ui, (b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1);
+    frameNo = 0;
+    const seen = [{ flashed: game.flashedButton(), runes: caster.incantation.length, running: game.isRunningScript() }];
+    for (let i = 0; i < 4; i++) {
+      frameNo++;
+      frame();
+      seen.push({ flashed: game.flashedButton(), runes: caster.incantation.length, running: game.isRunningScript() });
+    }
+    return seen;
+  };
+  const trace = (seen: ReturnType<typeof panelClick>): string =>
+    seen.map((f) => `${show(f.flashed)} ${f.runes} rune(s)${f.running ? ' held' : ''}`).join(' | ');
+
+  caster.attributes.mana = 50;
+  redraws = 0;
+  const rune = panelClick(101);
+  console.log(`rune 101, the click then each VBL: ${trace(rune)}; redrawn ${redraws}`);
+  check(rune[0]!.running && rune[0]!.flashed === null && rune[0]!.runes === 0,
+    'the click should start the script, which holds the loop before its first VBL');
+  check(same(rune[1]!.flashed, word18552[0]!) && same(rune[2]!.flashed, word18552[0]!) && rune[2]!.runes === 0,
+    'the rune should stand inverted for two VBLs (FlashButton, then wvbl(_3_)), the incantation unchanged');
+  check(rune[3]!.flashed === null && rune[3]!.runes === 1 && !rune[3]!.running && redraws === 1,
+    'the third VBL should put the rune back, then the rune be added, the loop let go and the panel redrawn');
+
+  const back = panelClick(107);
+  console.log(`take-back 107: ${trace(back)}`);
+  check(same(back[1]!.flashed, word18552[6]!) && back[2]!.runes === 1 && back[3]!.flashed === null && back[3]!.runes === 0,
+    'the take-back should flash d.Word18552[24..27] for two VBLs, then take the rune back');
+
+  panelClick(101);
+  castAt = -1;
+  const cast = panelClick(108);
+  console.log(`cast 108: ${trace(cast)}; cast at VBL ${castAt}`);
+  check(same(cast[1]!.flashed, CAST) && cast[1]!.runes === 1,
+    'the cast button should stand inverted for one VBL, the incantation still there');
+  check(cast[2]!.flashed === null && castAt === 2 && !cast[2]!.running,
+    "CastMagic's WaitForButtonFlash should put it back at the next VBL, and the cast follow");
 
   finish();
 }

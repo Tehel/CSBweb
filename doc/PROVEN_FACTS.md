@@ -3821,6 +3821,16 @@ result before the wall and monster tests, so a step they refuse, which brings no
 `(291-318, 147-167)`, backward `(263-289, 147-167)` and left `(234-261, 147-167)`.
 `tools/dump-button-flash.ts` checks the flash of all six arrows.
 
+The spell panel: `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-581`) is `RESTARTABLE`.
+The cast (button 108, only with a first rune) flashes `(0xea, 0x12f, 0x3f, 0x49)` and calls
+`CastMagic`, whose first act is `WaitForButtonFlash`: one VBL inverted, and the cast after
+the put-back. A rune or the take-back (101-107) flashes `d.Word18552[4 * (button - 101)]`,
+then `wvbl(_3_)`, then `WaitForButtonFlash`, and only then `TAG01b990` or
+`BackspaceMagicSelection`: two VBLs inverted, and the keypad still shows the pressed rune.
+In `dm-atari/graphics.dat`, `d.Word18552`, read between `Word18560` and `d.MoveButn18496`
+in graphic `0x231`, is exactly the click rectangles of buttons 101-107 in the magic
+panel's button list, and the cast's literal rectangle is button 108's.
+
 ## The key tables: CSBWin's own keys
 
 - **What a key is.** `UIM_KEYDOWN` turns a PC key into an Atari key through `config.txt`'s

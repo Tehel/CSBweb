@@ -114,8 +114,10 @@ export function vblFlashButton(loop: LoopFlags): void {
 /**
  * `_FlashButton(x1, x2, y1, y2)` (doc/CSBwin-src/CSBCode.cpp:7713-7730): wait out a pending
  * flash, store the rectangle, set `d.FlashButnActive` and wait a VBL, whose handler inverts
- * it. The port's pass does not stop for VBLs, so each wait runs its VBL's share at once:
- * the rectangle is inverted where CSBWin's is, before the rest of the pass.
+ * it. The main loop's pass does not stop for VBLs, so each wait runs its VBL's share at
+ * once: the rectangle is inverted where CSBWin's is, before the rest of the pass. A
+ * `RESTARTABLE` caller that the port runs as a `LoopScript` waits instead
+ * (`flashButtonScript`).
  */
 export function flashButton(ctx: GameContext, x1: number, x2: number, y1: number, y2: number): void {
   const loop = ctx.loop;
@@ -128,11 +130,39 @@ export function flashButton(ctx: GameContext, x1: number, x2: number, y1: number
 }
 
 /**
+ * `_FlashButton` inside a `LoopScript`, which can wait: each wait is a VBL of the held
+ * loop (`Game.runFrame`), whose `vblFlashButton` inverts the rectangle.
+ */
+export function* flashButtonScript(ctx: GameContext, x1: number, x2: number, y1: number, y2: number): LoopScript {
+  const loop = ctx.loop;
+  // `while (d.FlashButnActive != 0) {};`
+  while (loop.flashButnActive) yield 1;
+  loop.flashButn = { x1, x2, y1, y2 };
+  loop.flashButnActive = true;
+  // `wvbl(_1_);`
+  yield 1;
+}
+
+/**
+ * `WaitForButtonFlash` inside a `LoopScript`, which waits as CSBWin's does: out a pending
+ * flash, then, while `d.Word11776` is set, for the VBL that puts the rectangle back.
+ */
+export function* waitForButtonFlashScript(ctx: GameContext): LoopScript {
+  const loop = ctx.loop;
+  while (loop.flashButnActive) yield 1;
+  if (loop.word11776) {
+    loop.flashButnActive = true;
+    yield 1;
+  }
+}
+
+/**
  * `WaitForButtonFlash` (doc/CSBwin-src/CSBCode.cpp:8561-8601): an inverted rectangle is
  * handed to the next VBL to put back (`d.FlashButnActive = 1`), and CSBWin waits for that
- * VBL. The port does not wait: the next VBL puts it back, and the frame this pass draws
- * still shows it, which is the one frame a flash is seen (`DEBT.md` H). A put-back already
- * asked for is the flash CSBWin's first loop waits out, after which `d.Word11776` is clear.
+ * VBL. The main loop's pass does not wait: the next VBL puts it back, and the frame this
+ * pass draws still shows it, which is the one frame a flash is seen (`DEBT.md` H). A
+ * put-back already asked for is the flash CSBWin's first loop waits out, after which
+ * `d.Word11776` is clear. A `LoopScript` waits instead (`waitForButtonFlashScript`).
  */
 export function waitForButtonFlash(ctx: GameContext): void {
   if (ctx.loop.word11776) ctx.loop.flashButnActive = true;
