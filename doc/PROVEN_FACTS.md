@@ -770,6 +770,27 @@ It is nonetheless the only writer of `d.Byte13220`, the age bytes that
 value, and `DeleteFootprintEntry`'s `MemMove` shifts the tail *up* rather than down
 (`doc/CSBwin-src/Code11f52.cpp:4328-4329`). Both are ported as written.
 
+## YA BRO ROS marks the trail from the cast onwards
+
+The magic footprints are a range of the one trail, `[d.IndexOfFirstMagicFootprint,
+d.IndexOfLastMagicFootprint)`, and nothing else. The spell opens it at the trail's end
+(`doc/CSBwin-src/Magic.cpp:1331-1342`):
+
+```cpp
+d.MagicFootprintsActive++;
+d.IndexOfFirstMagicFootprint = d.NumFootprintEnt;
+if (spellPower < 3) d.IndexOfLastMagicFootprint = d.IndexOfFirstMagicFootprint;
+else                d.IndexOfLastMagicFootprint = 0;
+```
+
+Every party move while `d.MagicFootprintsActive != 0` sets the end to the new count
+(`doc/CSBwin-src/Code11f52.cpp:3237-3241`), `DeleteFootprintEntry` lowers both ends as the
+ring shifts (`:4331-4337`), and `SummarizeRoomInfo` draws a print whose index lies in the
+range (`doc/CSBwin-src/Codea59a.cpp:406-416`). The spell's power therefore matters only
+until the party's first move: an end of 0 marks nothing, the weak spell's empty range
+marks nothing either, and the first move makes both the same. The timer's end,
+`TT_79`, only decrements the counter (`CSBCode.cpp:6572`), so a range outlives the spell.
+
 ## A monster follows staler footprints the keener its nose
 
 `doc/CSBwin-src/Monster.cpp:615-620`:

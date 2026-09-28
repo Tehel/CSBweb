@@ -14,8 +14,8 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers E and C are empty, and D holds only D10: the data structures, the architecture and
-the known divergences are paid. **The goal now is a complete, faithful game on the default
+Tiers D, E and C are empty: the data structures, the architecture and the known
+divergences are paid. **The goal now is a complete, faithful game on the default
 dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -82,7 +82,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D10 | The magic footprint indices are held twice | S | ⏳ |
 | G10 | `StealFromCharacter`: the giggler steals nothing | — | ⏳ |
 | G15 | The magic footprint decoration | — | ⏳ |
 | G6 | UI effects | — | ⏳ |
@@ -109,28 +108,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 
 ## D — State representation
 
-New state-representation debt goes here, and jumps the queue.
-
-### D10 ⏳ The magic footprint indices are held twice
-
-CSBWin has one `d.NumFootprintEnt`, one `d.IndexOfFirstMagicFootprint` and one
-`d.IndexOfLastMagicFootprint`. The port holds each twice: on `PartyState`
-(`src/engine/gameTypes.ts:227-230`) and inside `PartyFootprints` (`count`,
-`indexOfFirstMagic`, `indexOfLastMagic`, `src/engine/PartyFootprints.ts:42-43`).
-
-- YA BRO ROS (`doc/CSBwin-src/Magic.cpp:1331-1342`) writes only the `PartyState` pair, and
-  from `PartyState.numFootprintEnt`, which only a load writes (`MagicSystem.ts:318-321`).
-- The trail's moves and deletions keep only `PartyFootprints`'s
-  (`PartyFootprints.ts:129`, `:153-154`), as CSBWin's do (`Code11f52.cpp:3240`,
-  `:4331-4337`).
-- The CSBWin save writes `PartyFootprints.count` but the `PartyState` pair
-  (`SaveGamePayload.ts:343-346`).
-
-So the spell marks a range the trail never reads, and a save carries a mixed state. Give
-the three one owner, `PartyFootprints`, which holds the ring they index. Nothing reads the
-magic range until G15 does, so the one observable change is the party tail a save writes
-after the spell: a fix, not a neutral refactor, and a `tools/` check casts the spell, walks,
-saves and reads the range back.
+Empty. New state-representation debt goes here, and jumps the queue.
 
 ---
 
@@ -176,10 +154,10 @@ YA BRO ROS is cast, and its timer runs, but the viewport never shows a print.
 `SummarizeRoomInfo`'s footprint arm (`doc/CSBwin-src/Codea59a.cpp:401-418`) sets
 `decorations[2] |= 0x8000` when `SearchFootprints` (`CSBCode.cpp:7066`) finds a print on
 the cell whose index lies between `d.IndexOfFirstMagicFootprint` (inclusive) and
-`d.IndexOfLastMagicFootprint` (exclusive). The port omits the arm at
-`src/renderer/csbwin/SummarizeRoomInfo.ts:515`; the draw side already tests the bit
-(`BytecodeInterpreter.ts:1774`). Needs D10 first, or the arm reads indices the spell never
-set. The arm's `ECF_FOOTPRINTS` half is G1's.
+`d.IndexOfLastMagicFootprint` (exclusive), which `PartyFootprints` holds
+(`getIndexOfFirstMagicFootprint` / `getIndexOfLastMagicFootprint`). The port omits the arm
+at `src/renderer/csbwin/SummarizeRoomInfo.ts:515`; the draw side already tests the bit
+(`BytecodeInterpreter.ts:1774`). The arm's `ECF_FOOTPRINTS` half is G1's.
 
 ### G6 ⏳ UI effects
 

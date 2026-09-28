@@ -316,9 +316,7 @@ export class MagicSystem {
           }
           case 6: {
             this.ctx.party.state.magicFootprintsActive = this.ctx.party.state.magicFootprintsActive + 1;
-            const first = this.ctx.party.state.numFootprintEnt;
-            this.ctx.party.state.indexOfFirstMagicFootprint = first;
-            this.ctx.party.state.indexOfLastMagicFootprint = spellPower < 3 ? first : 0;
+            this.ctx.footprints.markMagicFootprints(spellPower);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_79, duration, 0);
             break;

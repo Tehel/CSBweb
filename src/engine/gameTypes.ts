@@ -224,10 +224,11 @@ export interface PartyState {
     brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
     invisible: i16;             // Active invisibility counter
     seeThruWalls: i16;          // Active see-thru-walls counter
-    magicFootprintsActive: i16; // Active magic footprint counter
-    indexOfFirstMagicFootprint: i16;
-    indexOfLastMagicFootprint: i16;
-    numFootprintEnt: i16;
+    /**
+     * `d.MagicFootprintsActive`: the YA BRO ROS timers still running. The trail it
+     * marks, and the range's two indices, are `PartyFootprints`'s.
+     */
+    magicFootprintsActive: i16;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
     /**
      * `d.PartySleeping` — set by the sleep icon, button 145, and cleared by `WakeUp`

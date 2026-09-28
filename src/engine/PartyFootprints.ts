@@ -202,6 +202,20 @@ export class PartyFootprints {
     }
   }
 
+  /**
+   * YA BRO ROS's mark (`doc/CSBwin-src/Magic.cpp:1333-1342`): the magic range starts at
+   * the trail's end, and a weak spell closes it there too. A spell of power 3 or more
+   * sets the end to 0, which only the next party move (`recordPartyMove`) raises.
+   */
+  markMagicFootprints(spellPower: number): void {
+    this.indexOfFirstMagic = this.count;
+    if (spellPower < 3) {
+      this.indexOfLastMagic = this.indexOfFirstMagic;
+    } else {
+      this.indexOfLastMagic = 0;
+    }
+  }
+
   /** Reset the trail — used when a save game is restored. */
   reset(): void {
     this.prints = [];
