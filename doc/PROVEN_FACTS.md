@@ -3831,6 +3831,14 @@ In `dm-atari/graphics.dat`, `d.Word18552`, read between `Word18560` and `d.MoveB
 in graphic `0x231`, is exactly the click rectangles of buttons 101-107 in the magic
 panel's button list, and the cast's literal rectangle is button 108's.
 
+## PASS reads `d.PossibleAttackTypes[-1]`, which is always 0
+
+`_ExecuteAttack(-1)` tests `(UI8)(d.PossibleAttackTypes[P1]) == 255` before it looks at
+`P1` (`doc/CSBwin-src/Character.cpp:4955-4959`), so a PASS reads the byte before the array.
+That is a byte of `d.unused20262` (`Data.h:621-622`), which nothing in the tree writes, so
+it is 0 and the PASS goes through to `TAG01b1c0`. The port skips the test for -1
+(`executeAttack`, `src/renderer/ui/Attack.ts`), with the same result.
+
 ## The key tables: CSBWin's own keys
 
 - **What a key is.** `UIM_KEYDOWN` turns a PC key into an Atari key through `config.txt`'s

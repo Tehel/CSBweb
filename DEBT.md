@@ -81,7 +81,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left |
+| C82 | A closed attack menu goes black until `TAG01b29a` | S | ⏳ |
+| C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
+| G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C82 and C83 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
 | G7 | Save-format gaps | — | in `PLAN.md` |
@@ -98,7 +100,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C82 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
+Next free IDs: C84 · D11 · E8 · F12 · G16. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -119,7 +121,33 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-Empty.
+### C82 ⏳ A closed attack menu goes black until `TAG01b29a`
+
+`TAG01b1c0` closes the menu (`d.AttackingCharacterOrdinal = 0`, `d.Word20250 = 1`) and
+redraws only the champion's status box (`doc/CSBwin-src/Character.cpp:4887-4897`), and
+`DrawAttackButton` draws nothing while `d.Word20252` is 0 (`:4827`). So CSBWin's screen
+keeps the menu, as the last thing drawn there, until the next tick's `TAG01b29a` draws the
+damage or the champions' buttons (`CSBCode.cpp:8843-8854`). The port composes the panel
+from state: `drawAttackPanel` (`src/renderer/ui/Attack.ts:334`) fills it black and returns
+once the ordinal is 0 and `word20252` is 0 (`:337`, `:352`). After a PASS, which brings no
+tick, the panel is black for up to a tick where CSBWin's shows the menu. The fix keeps
+drawing the menu that was closed, which means remembering the ordinal `TAG01b1c0` cleared
+(the menu's title is the champion's name, `:387`), until `TAG01b29a` redraws.
+
+### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
+
+CSBWin's tick calls `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:685`) after `DrawViewport`
+(`:638`), `WaitForButtonFlash` (`:655`), `d.Time++`, `scrollingText.ClockTick()`,
+`SmartDiscard`, `NinetySecondUpdate` and `d.freezeLifeTimer--` (`:660-684`), and before
+`TenSecondUpdate`. The port calls `attackPanelTick` from `main.ts`'s `onTick`
+(`src/main.ts:464`), which `Game.gameTick` runs where `DrawViewport` is, before all of
+those. The fix moves it to its place, through a host call from `gameTick`, with a redraw
+after it: every screen change `TAG01b29a` makes (the flinch, the damage, the buttons) must
+still be painted in its tick. The one exception is when the tick's `WaitForButtonFlash`
+has asked for a put-back: CSBWin paints what `TAG01b29a` drew only after that VBL, and so
+must the port, at the put-back's own redraw (`Game.takeFlashChanged`). Without it, a
+single painted frame shows both states, because the port paints once per `runFrame`.
+Check the golden frames: the flinch and the damage are on screen in several of them.
 
 ---
 
@@ -155,9 +183,19 @@ How the main loop's pass, which does not stop for a VBL, times the flash is in H
 
 The step left:
 
-2. **The attack options** (`Character.cpp:4679-4716`): the pass (button 112) and the
-   three attacks. Read whether their caller waits for VBLs, as `_MagicSelection` does,
-   before choosing between `flashButton` and `flashButtonScript`.
+2. **The attack options** (`_TAG019fac`, `Character.cpp:4679-4716`): the pass (button 112)
+   flashes `(0x11d, 0x13f, 0x4d, 0x53)`, the three attacks `(0xea, 0x13e, 0x56, 0x60)`,
+   `(…, 0x62, 0x6c)` and `(…, 0x6e, 0x78)`, each before its `ExecuteAttack`; in the port
+   that is `handleAttackAreaClick` (`src/renderer/ui/Attack.ts`), and the attack keys'
+   route in `Keyboard.ts`. Nothing after the flash waits except the fusion, so the
+   immediate `flashButton` fits, through a new UI hook. A script would not: the fusion
+   starts its own inside `ExecuteAttack`, and `Game.runScript` does not nest.
+   This step needs C82 and C83 first. With both paid, an attack goes as in CSBWin: the
+   click's pass inverts the option; the tick's redraw paints the menu, still on screen,
+   inverted; its `WaitForButtonFlash` asks for the put-back; and `TAG01b29a`'s new panel is
+   painted at the put-back's VBL. After a PASS, `:763`'s wait puts the menu back at the
+   next VBL, and the menu stays until the next tick. Without them, the one flashed frame
+   shows the inversion over the new panel, or over a black one.
 
 The UI reaches the flash through `UIState`'s hooks (`flashedButton`, `waitForButtonFlash`,
 `runScript`, `flashButtonScript`, `waitForButtonFlashScript`), which `main.ts` wires to
