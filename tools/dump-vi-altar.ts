@@ -219,8 +219,8 @@ function cloudsAt(game: Game, cell: Position): number {
 /** Run the clock forward, letting the altar's self-rescheduling timer advance. */
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
-    game.state.tickCount++;
     game.timerSystem.processTimers(game.state.tickCount);
+    game.state.tickCount++;
   }
 }
 
@@ -264,24 +264,24 @@ function main(): void {
     };
     snapshot(0);
 
-    // State 2 fires on the tick it was scheduled for and makes the cloud.
+    // State 2 fires on the tick it was scheduled for, the next one, and makes the cloud.
     runTicks(g, 1);
     snapshot(1);
     check(cloudsAt(g, cell) === 1, 'state 2 should put a cloud over the bones — CreateCloud(RNffe4)');
     check(bonesAt(g, cell).length === 1, 'and leave the bones alone for now');
     check(g.party.state.champions[victim]!.alive === false, 'and not yet revive anyone');
 
-    // `Time += 5`: state 1 lands on tick 5, and consumes the bones without yet
-    // reviving anyone — the two halves are a tick apart and must stay so, or a
-    // champion could come back while their bones are still on the floor.
-    runTicks(g, 4);
-    snapshot(5);
+    // `Time += 5`: state 1 lands five ticks after that one, and consumes the bones
+    // without yet reviving anyone — the two halves are a tick apart and must stay so, or
+    // a champion could come back while their bones are still on the floor.
+    runTicks(g, 5);
+    snapshot(6);
     check(bonesAt(g, cell).length === 0, 'state 1 should consume the bones');
     check(g.party.state.champions[victim]!.alive === false, 'and still not revive anyone');
 
-    // `Time += 1`: state 0 on tick 6.
+    // `Time += 1`: state 0 on the tick after.
     runTicks(g, 1);
-    snapshot(6);
+    snapshot(7);
     const revived = g.party.state.champions[victim]!;
     check(revived.alive !== false, 'state 0 should bring the champion back');
 
@@ -325,7 +325,7 @@ function main(): void {
     check(bones.length === 1 && record === 0, 'the death records fingerprint 0 in the expool');
     if (rn !== undefined) {
       g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
-      runTicks(g, 6);
+      runTicks(g, 7);
       check(g.party.state.champions[victim]!.alive !== false, 'and the altar raises the champion');
     }
   }

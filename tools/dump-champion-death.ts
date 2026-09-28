@@ -352,8 +352,8 @@ function main(): void {
       const before = champ.attributes.health;
       g.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.state.tickCount);
       for (let i = 0; i < 6 && alive(); i++) {
-        g.state.tickCount++;
         g.timerSystem.processTimers(g.state.tickCount);
+        g.state.tickCount++;
       }
       console.log([shots, before, champ.attributes.health, alive()].join('\t'));
       if (champ.attributes.health === before && alive()) {

@@ -2959,8 +2959,10 @@ fails before the eye gate),
   `d.clockTick` right after `HandleMouseEvents` (`CSBCode.cpp:763-764`), so the tick runs
   in the VBL of the click. The door moves in the tick after it: a tick runs
   `ProcessTimers` before its `d.Time++` (`CSBCode.cpp:626`, `:660`), so the tick the click
-  brings on sees the `d.Time` the timer was set from. The port moves it in the click's tick
-  (`DEBT.md` C68).
+  brings on sees the `d.Time` the timer was set from. The same holds for any timer a click
+  or a key sets for `d.Time + n`: it fires in the n+1th tick after. `LoadGame` sets
+  `d.Time = gb2.Time` (`SaveGame.cpp:1624`), so the first tick after a load runs the timers
+  due by the saved `d.Time`.
 - `TouchWallF1` returns, touching nothing, when the cell ahead is off the map
   (`Mouse.cpp:784-787`), and otherwise sets `d.clockTick = TouchWall(...)` (`:788`).
   `TouchWall` returns 1 when a switch fired, `result = 1` under `if (!switchOpen)`

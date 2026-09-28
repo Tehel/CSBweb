@@ -285,10 +285,11 @@ async function main(): Promise<void> {
   // ---- 9: a click that works something makes a tick due -----------------------------
   // The main loop runs a tick after `HandleMouseEvents` whenever `d.clockTick` is set
   // (doc/CSBwin-src/CSBCode.cpp:763-764). The door button sets it to 1 before queueing its
-  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085). ⚠️ The port moves the door in the frame
-  // of the click, where CSBWin's moves it a tick later (`DEBT.md` C68). `TouchWallF1` sets it to what `TouchWall` returns (`:788`): 1 when a switch
-  // fired, 0 when nothing did, which puts off a tick that was due. A cell ahead off the
-  // map leaves it alone (`:784-787`).
+  // `TT_DOOR` for `d.Time+1` (Mouse.cpp:1078-1085). A tick runs `ProcessTimers` before its
+  // `d.Time++` (`CSBCode.cpp:626`, `:660`), so the tick in the frame of the click passes the
+  // door by, and the one after it moves it. `TouchWallF1` sets it to what `TouchWall`
+  // returns (`:788`): 1 when a switch fired, 0 when nothing did, which puts off a tick that
+  // was due. A cell ahead off the map leaves it alone (`:784-787`).
   const inMap = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < width && y < height;
   const stone = (x: number, y: number): boolean =>
     inMap(x, y) && ((dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7) === RoomType.STONE;
@@ -346,8 +347,11 @@ async function main(): Promise<void> {
   /**
    * Stand at `at`, facing `dir`, just after a tick, and click the viewport: the frames from
    * the click to the first tick after it that leaves `done()` true, the click's own frame
-   * counting 1.
+   * counting 1. `ticksUntilDone` is left holding the ticks that ran meanwhile, that one
+   * included, and `firstTickFrame` the frame of the first.
    */
+  let ticksUntilDone = 0;
+  let firstTickFrame = 0;
   const framesUntil = (at: { x: number; y: number; dir: number }, arm: 'door' | 'wall', done = (): boolean => true): number => {
     reset();
     party.position = new Position(at.x, at.y, level);
@@ -356,17 +360,22 @@ async function main(): Promise<void> {
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
     game.onMouseClick(80, 100, 100);
+    firstTickFrame = 0;
     for (let n = 1; n <= 30; n++) {
       vbl();
-      if (game.ctx.state.tickCount !== ticksAtClick && done()) return n;
+      ticksUntilDone = game.ctx.state.tickCount - ticksAtClick;
+      if (ticksUntilDone !== 0 && firstTickFrame === 0) firstTickFrame = n;
+      if (ticksUntilDone !== 0 && done()) return n;
     }
     return -1;
   };
   const doorTimerQueued = (): boolean => game.ctx.timers.getTimers().some((timer) =>
     timer.function === TimerFunction.TT_DOOR && timer.uByte6 === doorScene!.door.x && timer.uByte7 === doorScene!.door.y);
   const doorFrames = framesUntil(doorScene, 'door', () => !doorTimerQueued());
-  console.log(`door button at (${doorScene.door.x},${doorScene.door.y}): its TT_DOOR fired ${doorFrames} frame(s) from the click`);
-  check(doorFrames === 1, "the door button's TT_DOOR fires in the frame of the click (d.clockTick = 1)");
+  console.log(`door button at (${doorScene.door.x},${doorScene.door.y}): a tick ran ${firstTickFrame} frame(s) from the click; ` +
+    `its TT_DOOR fired ${doorFrames} frame(s) from it, in tick ${ticksUntilDone}`);
+  check(firstTickFrame === 1, 'the door button brings the tick on in the frame of the click (d.clockTick = 1)');
+  check(doorFrames > 1 && ticksUntilDone === 2, "its TT_DOOR fires in the tick after that one, not in the click's");
 
   const switchFrames = framesUntil(switchScene, 'wall');
   console.log(`wall switch touched from (${switchScene.x},${switchScene.y}) facing ${switchScene.dir}: ` +

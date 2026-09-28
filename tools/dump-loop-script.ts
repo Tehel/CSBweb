@@ -13,8 +13,7 @@
  *    entries behind it stay queued and that pass runs no tick. They are taken once the
  *    script is over and `d.Time` has moved on.
  * 3. **`_ProcessTimersViewportAndSound`** (`Attack.cpp:2192-2213`): one `ProcessTimers`,
- *    one `d.Time++` and one `scrollingText.ClockTick()`, and no VBL goes by. The port
- *    turns the clock first, as its tick does (`DEBT.md` C68).
+ *    then one `d.Time++` and one `scrollingText.ClockTick()`, and no VBL goes by.
  * 4. **A win inside it** (`:2199-2204`): `VBLDelay(300)`, then `ShowCredits(1)`, which
  *    never returns, so the script is never resumed; `d.CanRestartFromSavegame` is cleared
  *    by the stone-room timer that won (`Timer.cpp:2370-2371`), which `tools/dump-show-credits.ts`
@@ -197,8 +196,8 @@ function checkProcessTimersViewportAndSound(): void {
   console.log(`  log ${w.log.join(' ')}; timer passes ${JSON.stringify(w.timerPasses.slice(passes))}; clockTicks ${w.clockTicks - clockTicks}`);
   check(w.log.join(' ') === `t${tick + 1}@${w.frames} t${tick + 2}@${w.frames} t${tick + 3}@${w.frames}`,
     'three in a row turn the clock three times, and no VBL goes by');
-  check(w.timerPasses.slice(passes).join() === [tick + 1, tick + 2, tick + 3].join(),
-    'each runs ProcessTimers once, on the turned clock');
+  check(w.timerPasses.slice(passes).join() === [tick, tick + 1, tick + 2].join(),
+    'each runs ProcessTimers once, on the clock before it turns');
   check(w.clockTicks - clockTicks === 3 && w.vbls === vbls, 'and scrollingText.ClockTick() once');
 
   const start = w.frames;

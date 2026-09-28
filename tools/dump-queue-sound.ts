@@ -51,8 +51,9 @@
  *     due at `d.Time + deltaTime - 1`, the ordinal in `timerWord8` and the entry's `byte4`
  *     in `timerUByte5` (`CSBCode.cpp:1832-1848`), and `ProcessTimers` queues it again
  *     with `deltaTime` 1 on the timer's level when it fires (`:6485-6492`). A champion's
- *     wound, `QueueSound(chIdx + 9, d.partyX, d.partyY, 2)` (`Monster.cpp:4584`),
- *     is heard a tick later, and a delayed sound on another
+ *     wound, `QueueSound(chIdx + 9, d.partyX, d.partyY, 2)` (`Monster.cpp:4584`), is
+ *     queued inside a timer pass, which ends with `d.Time++` (`CSBCode.cpp:660`), so it is
+ *     heard in the tick after, and a delayed sound on another
  *     level than the party's sets no timer at all (`:1827-1830`).
  *
  * The wall bump's `QueueSound(18, …)` is `tools/dump-party-collision.ts`'s.
@@ -356,15 +357,15 @@ function main(): void {
     const d = door;
     // Opening, `uByte9 = 0` (SET): one step a tick, re-queued after each.
     game.timerQueue.addTimer({
-      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount + 1, level: d.z,
+      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount, level: d.z,
       uByte5: 0, uByte6: d.x, uByte7: d.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
       timerWord8: 0, timerWord6: 0,
     });
     const step = (party: Position, label: string): void => {
       game.party.state.position = party;
       clear(s);
-      game.state.tickCount++;
       game.timerSystem.processTimers(game.state.tickCount);
+      game.state.tickCount++;
       row(`6${label}. door (${d.x},${d.y}) L${d.z} to state ${game.dungeonState.getCellFlag(d) & 7}, party (${party.x},${party.y}) L${party.z}`, s);
     };
     const doorSteps = (): number[][] => s.queued.filter((q) => q[0] === 2);
@@ -466,13 +467,13 @@ function main(): void {
       game.timerQueue.deleteMonsterMovementTimers(door.x, door.y, L, () => {});
       game.dungeonState.getMap(L)!.cellFlags[door.x][door.y] = (game.dungeonState.getCellFlag(door) & ~7) | 3;
       game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount + 1, level: L,
+        index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount, level: L,
         uByte5: 0, uByte6: door.x, uByte7: door.y, uByte8: 0, uByte9: ActuatorAction.CLEAR, sequence: 0,
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.state.tickCount++;
       game.timerSystem.processTimers(game.state.tickCount);
+      game.state.tickCount++;
       heardNothing(s, `8b. door (${door.x},${door.y}) L${L} shuts on a group`, [4]);
     }
 
@@ -491,13 +492,13 @@ function main(): void {
       if (!gen) throw new Error('no audible generator on an open square');
       game.party.state.position = new Position(gen.x, gen.y, gen.z === P ? L : P);
       game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_OPENROOM, time: game.state.tickCount + 1, level: gen.z,
+        index: 0, function: TimerFunction.TT_OPENROOM, time: game.state.tickCount, level: gen.z,
         uByte5: 0, uByte6: gen.x, uByte7: gen.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.state.tickCount++;
       game.timerSystem.processTimers(game.state.tickCount);
+      game.state.tickCount++;
       heardNothing(s, `8c. generator (${gen.x},${gen.y}) L${gen.z}, the party on L${game.party.state.position.z}`, [17], gen.z);
     }
 
@@ -553,8 +554,8 @@ function main(): void {
       clear(s);
       game.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.state.tickCount);
       for (let t = 0; t < 20; t++) {
-        game.state.tickCount++;
         game.timerSystem.processTimers(game.state.tickCount);
+        game.state.tickCount++;
       }
       heardNothing(s, `8f. a weapon thrown north from (${south.x},${south.y}) L${L}`, [0]);
     }
@@ -575,8 +576,8 @@ function main(): void {
       heardNothing(s, `8g. an RNffe4 cloud at (${at.x},${at.y}) L${L}`, [13]);
       clear(s);
       for (let t = 0; t < 6; t++) {
-        game.state.tickCount++;
         game.timerSystem.processTimers(game.state.tickCount);
+        game.state.tickCount++;
       }
       heardNothing(s, `8g. its timer, at (${at.x},${at.y}) L${L}`, [5]);
     }
@@ -610,11 +611,16 @@ function main(): void {
     stand(game, p, 0);
     const tt20 = (): TimerEntry[] => game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_20);
     const tick = (): void => {
-      game.state.tickCount++;
       game.timerSystem.processTimers(game.state.tickCount);
+      game.state.tickCount++;
+    };
+    // Queued inside a timer pass, as the wound is: the pass ends with `d.Time++`.
+    const inPass = (deltaTime: number, level: number): void => {
+      game.sounds.queueSound(9, p.x, p.y, deltaTime, level);
+      game.state.tickCount++;
     };
     const t0 = game.state.tickCount;
-    game.sounds.queueSound(9, p.x, p.y, 2, p.z);
+    inPass(2, p.z);
     const [timer] = tt20();
     console.log(['10. a wound, deltaTime 2', json(s.queued), json(s.played),
       json(timer && [timer.time - t0, timer.level, timer.uByte5, timer.uByte6, timer.uByte7, timer.timerWord8])].join('\t'));
@@ -630,14 +636,14 @@ function main(): void {
     check(tt20().length === 0, 'and the timer is gone');
 
     clear(s);
-    game.sounds.queueSound(9, p.x, p.y, 3, p.z);
+    inPass(3, p.z);
     tick();
     check(s.played.length === 0, 'with deltaTime 3 nothing is heard a tick later');
     tick();
     check(json(s.played) === json([[541, 0, 1]]), 'but two ticks later');
 
     clear(s);
-    game.sounds.queueSound(9, p.x, p.y, 2, p.z + 1);
+    inPass(2, p.z + 1);
     check(tt20().length === 0 && s.played.length === 0, 'a delayed sound on another level sets no timer');
   }
 

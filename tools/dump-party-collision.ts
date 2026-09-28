@@ -704,16 +704,17 @@ async function main(): Promise<void> {
       internals.lastInputTime = game.state.tickCount;
       game.enqueueMovement(MovementAction.TURN_LEFT);
       const facingBefore = party.facing;
-      // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick.
+      // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick: it runs its timers on
+      // the `d.Time` the handlers see now (`CSBCode.cpp:626`, `:660`).
       game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_PIT, time: game.state.tickCount + 1, level,
+        index: 0, function: TimerFunction.TT_PIT, time: game.state.tickCount, level,
         uByte5: 0, uByte6: pit.x, uByte7: pit.y, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
       // A probe due at the same time, whose function (1) is lower than `TT_PIT`'s (9), so it
       // comes after it in the pass (`timerLess`). The hook records what it sees and runs
       // nothing.
-      const probeTime = game.state.tickCount + 1;
+      const probeTime = game.state.tickCount;
       game.timerQueue.addTimer({
         index: 0, function: TimerFunction.TT_DOOR_STEP, time: probeTime, level,
         uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,

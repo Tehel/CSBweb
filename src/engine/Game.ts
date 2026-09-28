@@ -443,8 +443,6 @@ export class Game implements MainLoop {
      * Process one game tick (~4 times per second)
      */
     private gameTick(): void {
-        this.state.tickCount++;
-
         // Reset movement flags from previous tick
         this.party.resetMovementFlags();
 
@@ -477,7 +475,9 @@ export class Game implements MainLoop {
             return;
         }
         // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:660-677):
-        // after the timers, so what they print is placed in this tick.
+        // after the timers, so they ran on the `d.Time` the mouse handlers saw since the
+        // last tick, and what they printed is placed in this tick.
+        this.advanceTime();
         this.ctx.host.messages.clockTick(this.state.tickCount);
         // `if ((d.Time&511)==0) NinetySecondUpdate();` and `if ((d.Time & (d.PartySleeping ?
         // 15 : 63)) == 0) TenSecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-688).
@@ -554,20 +554,30 @@ export class Game implements MainLoop {
      * `_ProcessTimersViewportAndSound` (doc/CSBwin-src/Attack.cpp:2192), the tick a script
      * runs between its `VBLDelay`s: `ProcessTimers`, and a win there ends the game
      * (`wonByTimers`); then `d.Time++` and `scrollingText.ClockTick()`. Not the rest of the
-     * main loop's tick: no input, no periodic update, no print-queue entry. The port turns
-     * the clock before the timers, as `gameTick` does (`DEBT.md` C68). `DrawViewport` and
+     * main loop's tick: no input, no periodic update, no print-queue entry. `DrawViewport` and
      * `display` are the host's `drawViewport`. `StartQueuedSound` has no counterpart: it
      * plays nothing, since `d.CurrentSound` stays -1 once `QueueSound`'s assignment is
      * commented out (`doc/CSBwin-src/CSBCode.cpp:1906`) and `QueueSound` calls `StartSound`
      * itself. Nor have the overlay's timeout and `parameterMessageSequence`, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
-        this.state.tickCount++;
         if (this.timerSystem.processTimers(this.state.tickCount)) {
             yield* this.wonByTimers();
         }
         this.ctx.host.drawViewport();
+        this.advanceTime();
         this.ctx.host.messages.clockTick(this.state.tickCount);
+    }
+
+    /**
+     * `d.Time++`, after the timers, in the main loop's tick (doc/CSBwin-src/CSBCode.cpp:660)
+     * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`). `TimerSystem.now` follows,
+     * so what schedules from it between ticks (a monster's death cloud from an attack click)
+     * schedules from the `d.Time` CSBWin's does (`DEBT.md` D9).
+     */
+    private advanceTime(): void {
+        this.state.tickCount++;
+        this.timerSystem.now = this.state.tickCount >>> 0;
     }
 
     /**

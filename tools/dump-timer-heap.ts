@@ -247,9 +247,11 @@ function checkLoadedGames(files: string[]): void {
     const iaido = file === 'csbgame6.dat'
       ? before.find((t) => t.function === TimerFunction.TT_11 && t.time === saved)
       : undefined;
-    game.state.tickCount++;
-    game.timerSystem.processTimers(game.state.tickCount);
+    // The first tick runs its timers on the saved `d.Time`, then turns the clock
+    // (`LoadGame`, SaveGame.cpp:1624; CSBCode.cpp:626, :660).
     const now = game.state.tickCount;
+    game.timerSystem.processTimers(now);
+    game.state.tickCount++;
     const due = before.filter((t) => t.time <= now).length;
     const left = game.timerQueue.getTimers().filter((t) => t.time <= now);
     if (due > 0) firedSome++;

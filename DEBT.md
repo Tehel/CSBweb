@@ -74,7 +74,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C68 | `d.Time` moves on before the timers, not after them | M | ⏳ |
+| D9 | `TimerSystem.now` is a second copy of `d.Time` | M | ⏳ |
 | C69 | A step, a drop and a pick-up run the timers at once | S | ⏳ |
 | C70 | The top view of positions has a square for nobody | S | ⏳ |
 | C71 | A resumed game has no "GAME LOADED, READY TO PLAY." | S | ⏳ |
@@ -98,14 +98,31 @@ In payoff order: the first row is the next item.
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C76 · D9 · E7 · F12 · G14. An ID recorded and paid in one commit has no
+Next free IDs: C76 · D10 · E7 · F12 · G14. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
 
 ## D — State representation
 
-Empty. New state-representation debt goes here, and jumps the queue.
+### D9 ⏳ `TimerSystem.now` is a second copy of `d.Time`
+
+CSBWin has one `d.Time`. The port keeps it in `ctx.state.tickCount`, and again in
+`TimerSystem.now` (`src/engine/TimerSystem.ts:76`), which `processTimers(currentTime)` sets
+to the time it is given and `Game.advanceTime` moves on with the clock. `MissileEncounter`'s
+`CreateCloud`, `HitDoor` and its Zo-at-a-door arm, and `TimerSystem`'s Ya-potion and poison
+timers (`scheduleChampionShieldExpiry`, `schedulePoison`) schedule from `now`; the rest of
+the engine from `ctx.state.tickCount`. In the game the two agree except after a load, until
+the first timer pass: nothing sets `now` when a runtime save or a CSBWin save sets the
+clock, so a cloud or a potion a click makes before that tick is scheduled from the old
+game's `now`, or 0. The copy exists for the tools that call `processTimers(t)` with their
+own `t` and leave `tickCount` alone (`dump-clouds`, `dump-missile-drop`, `dump-wiggle-*`,
+`dump-move-from-missile`, `dump-missile-teleport`, `dump-party-move`, among others), whose
+passes then read a `tickCount` the pass is not running on. Read `d.Time` from
+`ctx.state.tickCount` everywhere and remove `now`; the tools set the clock before they run
+a pass, as `Game` does. Their output moves wherever a pass reads the clock, so prove the
+engine half neutral on the tools that already keep the two together, and take the rest's
+diffs one by one.
 
 ---
 
@@ -117,27 +134,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Tiers D and E are empty, so these are taken in the index's order (see "Priority").
-
-### C68 ⏳ `d.Time` moves on before the timers, not after them
-
-CSBWin's tick runs `ProcessTimers()` (`doc/CSBwin-src/CSBCode.cpp:626`) and then `d.Time++`
-(`:660`), its only per-tick write of `d.Time`, and `LoadGame` sets `d.Time = gb2.Time`
-(`SaveGame.cpp:1624`). So a timer pass fires what is due at the `d.Time` the mouse handlers
-saw since the last tick. The port's `Game.gameTick` increments `tickCount` first
-(`src/engine/Game.ts:449`) and runs `processTimers` on the new value. A timer set between
-ticks for `d.Time + n` therefore fires one tick sooner than CSBWin's, and so does a loaded
-game's timer due at `gb2.Time + 1`. The door button's `TT_DOOR`, set for `d.Time + 1`
-(`Mouse.cpp:1078-1085`), moves the door in the tick the click brings on, where CSBWin's moves
-it in the tick after, and `tools/dump-mouse-queue.ts` case 9 asserts the port's timing. A
-timer that a handler sets inside the pass, from `TimerSystem.now`, is due one tick later by
-the clock than CSBWin's, and fires in the same tick. Move the increment after the timers,
-and after the lost game's return, which skips it (`CSBCode.cpp:658`).
-The tools that turn the clock themselves (`tickCount++` then `processTimers`) move with it,
-and so does `Game.processTimersViewportAndSound`, whose `d.Time++` is also after its
-timers (`doc/CSBwin-src/Attack.cpp:2199-2208`).
-Evidence: a row in `tools/dump-mouse-queue.ts` case 9 counting the ticks from the door
-button to the door's first step.
+Frozen while tier D has D9; then taken in the index's order (see "Priority").
 
 ### C69 ⏳ A step, a drop and a pick-up run the timers at once
 

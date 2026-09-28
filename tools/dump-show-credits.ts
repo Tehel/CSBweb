@@ -173,7 +173,7 @@ function checkTickOfDeath(): void {
   }
 
   // A death between ticks, as a click or a step would cause: the next tick runs its
-  // timers, then ends.
+  // timers, then ends before its `d.Time++` (CSBCode.cpp:658-660).
   {
     const w = watchedGame([200]);
     for (let n = 1; n <= 3; n++) frame(w);
@@ -181,7 +181,7 @@ function checkTickOfDeath(): void {
     w.game.monsterAttack.killCharacter(0);
     check(w.credits.length === 0, 'between ticks: nothing ends until the next tick');
     runPastDeath('between ticks', w, 1);
-    check(w.game.state.tickCount === tick + 1, 'between ticks: the next tick is the last');
+    check(w.game.state.tickCount === tick, 'between ticks: the next tick is the last, and leaves d.Time where it was');
   }
 
   // One of two dies: the game goes on.
@@ -612,8 +612,9 @@ function checkCsbWin(): void {
   const { rn, x, y, z } = found;
   setActuatorType(dungeon.getActuatorRecord(rn)!, 18);
   // A position other than the actuator's: type 18 ignores it. And a timer due with it,
-  // behind it in the queue.
-  const due = game.state.tickCount + 1;
+  // behind it in the queue, both due in the next tick, which runs its timers on the
+  // `d.Time` of now (CSBCode.cpp:626, :660).
+  const due = game.state.tickCount;
   const otherPos = (decodeObjectID(rn).position + 1) & 3;
   game.timerQueue.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);
   game.timerQueue.createTimer(TimerFunction.TT_OPENROOM, 0, 0, 0, 0, due, z);

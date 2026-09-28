@@ -68,9 +68,10 @@ export function setDoorState(map: MapData, x: number, y: number, doorState: numb
 
 export class TimerSystem {
   /**
-   * `d.Time` as `processTimers` last set it. `MissileEncounter`'s `CreateCloud`,
-   * `HitDoor` and Zo-at-a-door arm schedule from it, also when they are reached from
-   * outside a timer pass (a monster death).
+   * `d.Time`: `processTimers` sets it to its pass's time, and `Game.advanceTime` moves it
+   * on with the clock. `MissileEncounter`'s `CreateCloud`, `HitDoor` and Zo-at-a-door arm
+   * schedule from it, also when they are reached from outside a timer pass (a monster
+   * death). A second copy of `ctx.state.tickCount` (`DEBT.md` D9).
    */
   now = 0;
   private readonly dungeon: DungeonState;

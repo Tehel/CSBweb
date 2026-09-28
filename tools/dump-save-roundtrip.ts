@@ -101,8 +101,8 @@ function roundTrip(game: Game): { next: Game; bytes: Uint8Array } {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    state.state.tickCount++;
     game.timerSystem.processTimers(state.state.tickCount);
+    state.state.tickCount++;
   }
 }
 
@@ -406,7 +406,10 @@ function main(): void {
     check(busy(champion(game)) && champion(game).busyTimerIndex >= 0,
       'busied again while busy, the champion keeps the bit and a busy timer');
 
-    for (const [label, g, ticks] of [['live', game, 12], ['restored', next, 8]] as const) {
+    // Set between ticks for d.Time + n, as an attack click sets it, the TT_11 fires in the
+    // n+1th tick: the first runs its timers on the d.Time it was set from (CSBCode.cpp:626,
+    // :660). Live, d.Time + 12; restored, the first timer's d.Time + 8.
+    for (const [label, g, ticks] of [['live', game, 13], ['restored', next, 9]] as const) {
       advance(g, ticks - 1);
       check(busy(champion(g)), `${label}: still busy ${ticks - 1} ticks on, one before the timer`);
       advance(g, 1);

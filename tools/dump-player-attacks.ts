@@ -445,13 +445,17 @@ async function main(): Promise<void> {
     check(onDoor(TimerFunction.TT_DOOR_STEP).length === 0, 'queueing it cancelled the door-step timer');
 
     const tick = (): void => {
-      game.state.tickCount++;
       game.timerSystem.processTimers(game.state.tickCount);
+      game.state.tickCount++;
     };
+    // The blow is a click, between ticks: the first tick runs its timers on the d.Time of
+    // the blow (CSBCode.cpp:626, :660), so d.Time + 2 is the third.
     tick();
     check(doorState() === 4, `one tick later the door still holds (state ${doorState()})`);
     tick();
-    check(doorState() === 5, `two ticks later it is shattered (state ${doorState()})`);
+    check(doorState() === 4, `two ticks later it still holds (state ${doorState()})`);
+    tick();
+    check(doorState() === 5, `three ticks later it is shattered (state ${doorState()})`);
   }
 
   // `HitDoor` compares the force with `d.DoorTOC[doorType]` (`Code11f52.cpp:2277`), and

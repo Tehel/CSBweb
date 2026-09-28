@@ -101,12 +101,12 @@ async function main(): Promise<void> {
 
   // A closing door is CSBWin's `TT_1` — `TimerFunction.TT_DOOR_STEP` here — with
   // `uByte9 = 1` (CLEAR, the door comes down). `processDoorStep` re-queues it each
-  // step, so it is seeded once and then the clock is turned.
+  // step, so it is seeded once, due in the next tick, and then the clock is turned.
   const startClosing = (): void => {
     game.timerQueue.addTimer({
       index: 0,
       function: TimerFunction.TT_DOOR_STEP,
-      time: game.state.tickCount + 1,
+      time: game.state.tickCount,
       level,
       uByte5: 0,
       uByte6: door!.x,
@@ -120,8 +120,8 @@ async function main(): Promise<void> {
   };
 
   const tick = (): void => {
-    game.state.tickCount++;
     game.timerSystem.processTimers(game.state.tickCount);
+    game.state.tickCount++;
   };
 
   const rows: string[][] = [];

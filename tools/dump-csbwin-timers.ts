@@ -78,8 +78,8 @@ function doorState(game: Game): number {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    state.state.tickCount++;
     game.timerSystem.processTimers(state.state.tickCount);
+    state.state.tickCount++;
   }
 }
 
