@@ -134,7 +134,7 @@ export interface UIState {
    * `DrawLegalAttackTypes` or `FlashAttackDamage`, which set it back to 0.
    */
   closedAttackMenuOrdinal: number;
-  /** The damage figure being flashed, and when the flash ends. See `ui/Attack.ts`. */
+  /** The damage figure on the panel (0 for none), and when its flash ends. See `ui/Attack.ts`. */
   attackFlashValue: number;
   attackFlashUntilMs: number;
   /**

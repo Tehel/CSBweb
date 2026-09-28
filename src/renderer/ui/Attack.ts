@@ -22,9 +22,11 @@
  *
  * ⚠️ One deliberate divergence: CSBWin's `_FlashAttackDamage` ends in `VBLDelay(15)`, a
  * quarter-second in which the whole game is stopped. A browser cannot block the frame
- * loop, so the flash is a timed overlay instead — `attackFlashUntilMs` — and the panel
- * returns to the buttons when it expires. Same duration, same appearance; the game
- * simply keeps running underneath, as it already does for the feeding animation.
+ * loop, so the flash is timed instead — `attackFlashUntilMs` — and `tag01b29a` brings
+ * the buttons back no sooner than it runs out. Same duration, same appearance; the game
+ * simply keeps running underneath, as it already does for the feeding animation. The
+ * figure stays up after the flash, as CSBWin's does, until `DrawLegalAttackTypes`
+ * draws over it.
  */
 import { OBJNI_SPECIAL_C } from '../../core/objectNameIndex';
 import { DBType, decodeObjectID, OBJECT_ID_NULL, type ObjectID } from '../../core/types';
@@ -154,10 +156,12 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
 /**
  * `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:8718`), the state it leaves: the
  * panel shows what `word20252` and the ordinal say, which `drawAttackPanel` composes each
- * frame, so a menu `TAG01b1c0` closed is off the screen.
+ * frame, so a menu `TAG01b1c0` closed and the damage figure are off the screen.
  */
 export function drawLegalAttackTypes(ui: UIState): void {
   ui.closedAttackMenuOrdinal = 0;
+  ui.attackFlashValue = 0;
+  ui.attackFlashUntilMs = 0;
 }
 
 /**
@@ -281,7 +285,6 @@ export function attackPanelTick(ui: UIState): void {
       ui.closedAttackMenuOrdinal = 0;
       return;
     }
-    ui.attackFlashValue = 0;
     ui.word20252 = 1;
     drawLegalAttackTypes(ui);
     ui.word20250 = 0;
@@ -351,8 +354,8 @@ export function drawAttackPanel(ui: UIState): void {
 
   fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.word20, 0);
 
-  // The damage flash owns the panel while it lasts.
-  if (ui.attackFlashUntilMs > nowMs()) {
+  // The damage stays up after its flash, until `DrawLegalAttackTypes` draws over it.
+  if (ui.attackFlashValue !== 0) {
     drawAttackDamageFlash(ui);
     return;
   }

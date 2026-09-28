@@ -81,10 +81,9 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
-| C84 | The damage figure goes black when its timer runs out | S | ⏳ |
 | C85 | `TAG0207cc` leaves `d.Word20250` set | S | ⏳ |
 | C86 | `attackPanelTick` ignores a candidate at the mirror | S | ⏳ |
+| C83 | `TAG01b29a` runs at the tick's redraw, not after `d.Time++` | M | ⏳ |
 | G6 | UI effects: `FlashButton` | L | ⏳ step 2 of 3 left, after C83 |
 | G12 | `SmartDiscard`: a filling database is not thinned | — | ⏳ |
 | G11 | `MakeMoreRoomInDB`: a full database refuses the record | — | ⏳ |
@@ -123,34 +122,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
-
-CSBWin's tick calls `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:685`) after `DrawViewport`
-(`:638`), `WaitForButtonFlash` (`:655`), `d.Time++`, `scrollingText.ClockTick()`,
-`SmartDiscard`, `NinetySecondUpdate` and `d.freezeLifeTimer--` (`:660-684`), and before
-`TenSecondUpdate`. The port calls `attackPanelTick` from `main.ts`'s `onTick`
-(`src/main.ts:464`), which `Game.gameTick` runs where `DrawViewport` is, before all of
-those. The fix moves it to its place, through a host call from `gameTick`, with a redraw
-after it: every screen change `TAG01b29a` makes (the flinch, the damage, the buttons) must
-still be painted in its tick. The one exception is when the tick's `WaitForButtonFlash`
-has asked for a put-back: CSBWin paints what `TAG01b29a` drew only after that VBL, and so
-must the port, at the put-back's own redraw (`Game.takeFlashChanged`). Without it, a
-single painted frame shows both states, because the port paints once per `runFrame`.
-Check the golden frames: the flinch and the damage are on screen in several of them.
-
-### C84 ⏳ The damage figure goes black when its timer runs out
-
-`_FlashAttackDamage` draws the damage and waits `VBLDelay(15)` (`doc/CSBwin-src/Attack.cpp:949-1042`),
-and `d.Word20250` is still 1 after it, so CSBWin's screen keeps the figure until the next
-tick's `TAG01b29a` draws the buttons (`doc/PROVEN_FACTS.md` → "The attack panel keeps its
-last drawing until the next tick"). The port times the flash instead (H), and
-`drawAttackPanel` (`src/renderer/ui/Attack.ts`) draws it only while `attackFlashUntilMs`
-is ahead of the clock: once it runs out, the panel is black until the next tick. When a
-tick comes just before the timer runs out, `attackPanelTick` leaves the panel owed, and it
-is black for a whole tick. The fix draws the damage while `attackFlashValue` is set, and
-has `drawLegalAttackTypes` clear it, as `DrawLegalAttackTypes` draws over it.
-`tools/dump-attack-panel.ts` is where the check goes.
-
 ### C85 ⏳ `TAG0207cc` leaves `d.Word20250` set
 
 `TAG0207cc` redraws the panel with `DrawLegalAttackTypes` (`doc/CSBwin-src/CSBCode.cpp:9948-9952`),
@@ -169,6 +140,21 @@ turns at the first tick after the candidate is resolved. Only asleep does it sto
 with a candidate it goes on to service `d.Word20250`. The port's `attackPanelTick`
 (`src/renderer/ui/Attack.ts`) tests only `party.sleeping`, so it runs the loop, and
 clears `maxRecentDamage`, while a candidate stands (`potentialChampionIndex`).
+
+### C83 ⏳ `TAG01b29a` runs at the tick's redraw, not after `d.Time++`
+
+CSBWin's tick calls `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:685`) after `DrawViewport`
+(`:638`), `WaitForButtonFlash` (`:655`), `d.Time++`, `scrollingText.ClockTick()`,
+`SmartDiscard`, `NinetySecondUpdate` and `d.freezeLifeTimer--` (`:660-684`), and before
+`TenSecondUpdate`. The port calls `attackPanelTick` from `main.ts`'s `onTick`
+(`src/main.ts:464`), which `Game.gameTick` runs where `DrawViewport` is, before all of
+those. The fix moves it to its place, through a host call from `gameTick`, with a redraw
+after it: every screen change `TAG01b29a` makes (the flinch, the damage, the buttons) must
+still be painted in its tick. The one exception is when the tick's `WaitForButtonFlash`
+has asked for a put-back: CSBWin paints what `TAG01b29a` drew only after that VBL, and so
+must the port, at the put-back's own redraw (`Game.takeFlashChanged`). Without it, a
+single painted frame shows both states, because the port paints once per `runFrame`.
+Check the golden frames: the flinch and the damage are on screen in several of them.
 
 ---
 

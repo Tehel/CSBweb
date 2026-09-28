@@ -121,8 +121,21 @@ async function main(): Promise<void> {
   const damage = render('the tick: the damage');
   check(damage !== menu && damage !== buttons, "the tick's FlashAttackDamage draws the damage over it");
   ui.attackFlashUntilMs = 0;
+  check(render('the flash over, before the tick') === damage,
+    'the damage stays up after its VBLDelay(15) (Attack.cpp:1039)');
   attackPanelTick(ui);
   check(render('the next tick') === buttons, 'and the next tick draws the buttons');
+
+  prepareAttack(ui, 0);
+  takeAttackOption(ui, 0);
+  attackPanelTick(ui);
+  check(render('the damage again') === damage, 'another attack flashes the damage');
+  prepareAttack(ui, 0);
+  check(render("a key opens champion 1's menu") === menu,
+    'a menu opened over the damage is drawn without it (DrawLegalAttackTypes)');
+  executeAttack(ui, -1);
+  attackPanelTick(ui);
+  check(render('PASS, and the tick') === buttons, 'and its PASS brings the buttons back at the tick');
 
   finish();
 }
