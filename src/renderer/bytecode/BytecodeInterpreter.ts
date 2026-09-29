@@ -2171,16 +2171,19 @@ export class BytecodeInterpreter {
       }
     }
 
+    let lastAbsPos = 0;
     if (drawingAlcoveObjects) {
       const relLoc = 4; // niche slot
       const curAbsPos = (facing + 2) & 3;
+      lastAbsPos = curAbsPos;
       let currentSmallOffset = 2 + ((curAbsPos & 1) << 3);
       this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, true);
-      return;
+      // No return: an alcove's clouds are drawn too, at `CurAbsPos = (facing+2)&3`
+      // (`doc/CSBwin-src/Code51a4.cpp:2180`, `:2768-2773`). The Vi altar's lightning and
+      // explosion (cloud types 100 and 101) are a cloud in the altar's alcove.
     }
 
     let centeredMonsterDrawn = false;
-    let lastAbsPos = 0;
     while (positionList !== 0) {
       const nibble = positionList & 0xf;
       positionList >>>= 4;

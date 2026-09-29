@@ -411,4 +411,31 @@ for (const word1868 of [false, true]) {
   }
 }
 
+// 9. An alcove's clouds. `DrawRoomObjects` with drawing order 0 draws the alcove's
+// objects at `CurAbsPos = (facing+2)&3` (`Code51a4.cpp:2177-2183`) and still ends in
+// `DrawClouds` (`:2768-2773`) with that position. The Vi altar's lightning (type 100) and
+// explosion (101) are a cloud in its alcove (`Timer.cpp:2730`, `:555`); a special cloud
+// is drawn only at `CurAbsPos` (`:111-114`).
+console.log('\nclouds in an alcove (Code51a4.cpp:2177-2183, 2768-2773):');
+for (const facing of [0, 1, 2, 3]) {
+  for (const [cloudType, pos] of [[100, (facing + 2) & 3], [101, (facing + 2) & 3], [100, facing]]) {
+    const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType, bit7: false };
+    const viewportIndexBuffer = createPaletteIndexViewportBuffer(224, 136, 0);
+    const context: any = {
+      viewportIndexBuffer,
+      objectTables: realTables,
+      getGraphicBitmap: (n: number) => fakeGraphic(n),
+      dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
+    };
+    const rn = (pos << 14) | (DBType.CLOUD << 10);
+    // Relative cell 6 is CSBWin's 9: the wall straight ahead, where the altar stands.
+    (new BytecodeInterpreter(context) as any).drawRoomObjects(rn, facing, 0, 0, 6, 0);
+    const lit = viewportIndexBuffer.pixels.some((p) => p !== 0);
+    const atCurAbsPos = pos === ((facing + 2) & 3);
+    const what = `facing ${facing}, type ${cloudType} at position ${pos}`;
+    console.log(`  ${what}: ${lit ? 'drawn' : 'nothing'}`);
+    check(lit === atCurAbsPos, atCurAbsPos ? `${what}: drawn in the alcove` : `${what}: not drawn, it is not at (facing+2)&3`);
+  }
+}
+
 finish();

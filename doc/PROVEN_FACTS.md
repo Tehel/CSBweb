@@ -3603,8 +3603,16 @@ All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21
   asks for. CSBWin pads the buffer with a garbage row ("This error occurs in the standard
   Graphic.dat", `Graphics.cpp:2560-2570`). The tiling wraps within 90 groups, which is 30
   rows, so it never reads the padding row.
+- **An alcove's clouds are drawn.** `DrawRoomObjects` calls `DrawClouds` whatever the
+  drawing order (`Code51a4.cpp:2768-2773`), so with order 0 (an alcove) it does so with the
+  alcove's `CurAbsPos = (facing+2)&3` (`:2177-2183`). A cloud of type 100 or more is drawn
+  only at `CurAbsPos` and only in cells 3-9 (`:111-114`). This is how the Vi altar shows
+  its resurrection: `ProcessTT_ViAltar` puts an `RNffe4` cloud, type 100 (lightning), on the
+  bones in the altar's alcove (`Timer.cpp:2730`), and its first `TT_25` turns it into type
+  101 (the explosion, drawn as cloud graphic 0, `Code51a4.cpp:116`) for one tick before the
+  next removes it (`Timer.cpp:553-557`, `:613-618`).
 
-Evidence: `tools/dump-cloud-draw.ts` sections 4-7.
+Evidence: `tools/dump-cloud-draw.ts` sections 4-7 and 9.
 
 ## A skill-increaser actuator credits the cursor's owner, and an alcove passes it no position
 
