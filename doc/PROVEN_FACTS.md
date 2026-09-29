@@ -2644,12 +2644,60 @@ this port uses the same ones (`src/data/CsbwinDungeonConversions.ts`;
 `word8` the first one lifted out of a DSA actuator's parameters. `convertScrolls` alone
 happens to be idempotent, because it rebuilds the RN from a field it never overwrites.
 
-**The evidence is exact, because CSBWin converted this same dungeon fourteen times.**
-Every committed save was made from `static/gamefiles/dm-atari/dungeon.dat`, so the
-converted form is in the files: converting here and comparing gives 0 differences in the
+**The evidence is exact, because every committed save holds this same dungeon
+converted.** Three were started from `static/gamefiles/dm-atari/dungeon.dat` and
+converted at load. The other eleven were started from the DM Windows package's
+`dungeon.dat`, which is the same dungeon that CSBWin had already converted (see "DM's two
+`dungeon.dat` files"). Either way the converted form is in the files: converting here and
+comparing gives 0 differences in the
 125-entry indirect text index, 0 in all 1749 words of compressed text, 0 in every TEXT
 record's rewritten index word, 0 in every scroll's new text RN and `open` bit, and 0 in
 every actuator's `word8`.
+
+## DM's two `dungeon.dat` files
+
+`static/gamefiles/dm-atari/dungeon.dat` (33442 bytes) is the original Atari file: no
+Extended Features block, 8-byte actuators, 4-byte scrolls, raw text. The DM Windows
+package (`static/gamefiles/DM_Windows_x86-32_20171117/dungeon.dat`, 42025 bytes,
+untracked) is **the same dungeon re-saved by CSBWin** in the shape a save is written in.
+Its `graphics.dat` is byte-identical to `dm-atari`'s.
+
+Read with the port's own parsers (the prefix by hand, the image by `DungeonLoader` with
+`bigActuators`, `newScrolls`, `indirectText`, `expool` and the file's object map as
+`resolveRN`), and compared with `dm-atari` after `convertOriginalDungeon`, the following
+are identical: the header (seed 99, start (1,3) facing 2, 14 levels), every level
+descriptor, every cell flag and per-level table, the object list, all the text, and
+every record of 10 of the 13 databases. The rest differ only as follows:
+
+- **The 24 mirrors** (type-127 actuators): cleaned of the leftover bits in CSBWin's
+  portrait fields, `word4` bits 0-11 and `word6` bits 0-11 and 14-15. `word6` bits 12-13
+  (`Position`) keep the Atari values. Today's `ExtendPortraits` zeroes those too
+  (`doc/CSBwin-src/SaveGame.cpp:1422`), so an earlier CSBWin wrote this file.
+- **29 scrolls** carry allocation debris in `m_word4` bits 1-15 (see "A converted
+  scroll's `m_word4` upper bits are allocation debris"). The free scroll, record 33,
+  holds `RNnul` for its text.
+- **One EXPOOL record**, empty (`0xfffe`, then zeros).
+
+The 8583 extra bytes are all format: 6385 of prefix (the 512-byte header, a 1946-slot
+object map at 3 bytes a slot, 32 bytes of game information reading "No game information
+was provided", and the 3-byte terminator of an empty DSA level index), 1366 for the big
+actuators, 504 for the indirect-text index and its size word, 256 for the EXPOOL record,
+70 for the six-byte scrolls, and a trailing word.
+
+The header declares `flags` 0xeb: `LevelDSAInfoPresent`, `IndirectText`,
+`ExpandedPortraits`, `DMRules`, `BigActuators`, and bit 0x02, which
+`EXTENDEDFEATURESBLOCK::FLAGS` does not name (`doc/CSBwin-src/CSB.h:472-481`). It also
+declares `extendedFlags` 0xf0: `ExtendedWallDecorations`, `SequencedTimers`,
+`DefaultDirectX` and `ExtendedTimers`, with `DMRulesOption` clear. The two timer flags
+choose only the size of a timer record in a save (`doc/CSBwin-src/Chaos.cpp:1695-1697`).
+The one flag that changes play is `DMRules`: `_ShowPrisonDoor` then forces `DM_rules` on
+(`doc/CSBwin-src/CSBCode.cpp:10672-10676`), which a game started from `dm-atari` never
+gets from its file.
+
+The committed saves show which file each game was started from. The three with `flags`
+0xa9 (`csbgame.dat`, `csbgame2.dat`, `csbgame3.dat`) hold mirrors with `word6` entirely
+zero: `dm-atari`, cleaned by today's `ExtendPortraits`. The eleven with 0xe9 keep
+`Position` on 18 mirrors and carry `DMRules`: the Windows package's file.
 
 ## `NumWordsInTextArray` means two different things either side of the conversion
 
