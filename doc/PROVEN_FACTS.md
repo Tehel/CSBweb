@@ -1614,6 +1614,15 @@ miss:
 `DrawAttackButton` and `DrawCharacterState` are indexed by champion number
 (`doc/CSBwin-src/Character.cpp:4820`), which never moves.
 
+**A box with no champion in it is black.** `DrawAllCharacterState` calls
+`DrawCharacterState` for `i < d.NumCharacter` only (`doc/CSBwin-src/CSBCode.cpp:6831-6834`),
+so boxes past the last champion are never drawn: no grey fill, no name strip, no hands.
+Both ways a box empties fill it with colour 0 — cancelling a Hall of Champions candidate
+(`doc/CSBwin-src/CSBCode.cpp:6641-6649`) and removing a champion
+(`doc/CSBwin-src/Character.cpp:5387-5398`). A dead champion's box is not empty: it gets
+graphic 8, the bones, and the name (`doc/CSBwin-src/Character.cpp:1296-1302`).
+`tools/dump-marching-order.ts` checks the empty fourth box.
+
 **Every click that names a champion names the box, never the corner.**
 `HandleClothingClick` resolves the champion it acts on as `d.CH16482[D7W]`
 (`doc/CSBwin-src/CSBCode.cpp:6956`), where `D7W` is `button/2` for the eight top-bar

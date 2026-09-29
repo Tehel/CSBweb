@@ -244,6 +244,14 @@ async function main(): Promise<void> {
   }
   console.log(['top view', 'square:owner/lit', squares.join(' ')].join('\t'));
 
+  // ---- The fourth box, with nobody in it, stays black: `DrawAllCharacterState` draws
+  //      boxes 0..d.NumCharacter-1 only (`CSBCode.cpp:6831-6834`), and a box emptied is
+  //      filled with colour 0 (`:6641-6649`, `Character.cpp:5387-5398`).
+  let emptyLit = 0;
+  for (let y = 0; y <= 28; y++) for (let x = 69 * 3; x <= 69 * 3 + 66; x++) if (screen.pixels[y * 320 + x] !== 0) emptyLit++;
+  console.log(['empty box 3', 'lit', emptyLit].join('\t'));
+  check(emptyLit === 0, `the box of a champion not in the party should be black (${emptyLit} pixels lit)`);
+
   // ---- `GameScreen.setPartyState` empties the hand for another game (`CSBCode.cpp:10485`)
   //      — covered by reading; it has no engine to drive here.
 

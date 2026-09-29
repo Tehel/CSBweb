@@ -311,16 +311,20 @@ export function drawPartyStatus(ui: UIState): void {
 
   for (let chIdx = 0; chIdx < 4; chIdx++) {
     const baseX = 69 * chIdx;
+    // `&d.CH16482[chIdx]` — the champion *index*, which is what indexes the four
+    // portrait boxes. Not `charPosition`: that is the corner of the cell they stand in,
+    // and it rotates when the party turns while the boxes do not.
+    const champion = party.champions[chIdx] ?? null;
+    // `DrawAllCharacterState` draws boxes 0..d.NumCharacter-1 only
+    // (`doc/CSBwin-src/CSBCode.cpp:6831-6834`), and a box emptied is filled with colour 0
+    // (`:6641-6649`, `Character.cpp:5387-5398`): a box with nobody in it stays as black as
+    // the cleared screen.
+    if (!champion) continue;
     fillRectIndex(
       ui.screenIndexBuffer,
       { x1: baseX, y1: 0, x2: baseX + 66, y2: 28 },
       12
     );
-
-    // `&d.CH16482[chIdx]` — the champion *index*, which is what indexes the four
-    // portrait boxes. Not `charPosition`: that is the corner of the cell they stand in,
-    // and it rotates when the party turns while the boxes do not.
-    const champion = party.champions[chIdx] ?? null;
 
     if (selected !== chIdx) {
       const nameRect = { x1: baseX, y1: 0, x2: baseX + 42, y2: 6 };
