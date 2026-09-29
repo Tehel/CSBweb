@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | L | ⏳ step 1 of 4 next |
+| G18 | One game's data set, chosen before the boot | L | ⚠️ step 2 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -148,41 +148,33 @@ postponed ones follow, under their own heading (see "Priority").
 
 ### G18 — One game's data set, chosen before the boot
 
-The page loads `dungeon.dat`, `graphics.dat` and `CSBgraphics.dat` from a fixed
-`/gamefiles/dm-atari` (`src/main.ts`, `GAME_DATA_DIR`), builds `GameTables` and the sound
-from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
+The page plays one data set (`src/data/DataSets.ts`: `dm-atari`, the default, and
+`csb`), chosen before anything loads by `?dungeon=<id>`, which the chooser beside the
+canvas sets by reloading the page. It loads the set's `dungeon.dat`, `graphics.dat` and
+`CSBgraphics.dat` (`src/main.ts`, `loadGameFiles`), builds `GameTables`, the sound and the
+intro from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
 `this.ctx.tables`, and a loaded save is restored into the running game's tables. CSBWin
 takes its rules from the data too. `DM_rules` aside, nothing in its code branches
 on the game, and CSB's differences are the dungeon's content and the tables in its
 `graphics.dat`. Measured against DM's: the same 563 items, 77 of them different (the
 title's, portraits, and runs at 489-526 and 556-562), and 6 of the 35 tables
 `buildGameTables` extracts (`monsterDesc`, `spells`, `skillNumber`,
-`experienceForAttacking`, `byte20046`, `textDecode`). So a CSB save loaded into today's
-page runs on DM's monsters and spells. The title animation and the credits read
-`graphics.dat` too (graphic 1, `CSBCode.cpp:9205`), so the choice has to come before the
-title. Item 0x231 is the long form in CSB's file (0x804 bytes, where DM's and Conflux's
-are 0x7d4, `CSBCode.cpp:10135-10151`): `extractUITables` then reads `d.Buttons16932` from
-it rather than `MISSING_PRISON_DOOR_BUTTONS`, and no data set has yet proven that path or
-the offsets of the tables after it. That wants a canary. `static/gamefiles/csb/` holds
-the CSB Windows package's `dungeon.dat`, `graphics.dat`, `mini.dat` and `csbgame2.dat`,
-and no `CSBgraphics.dat`, which the package lacks too and CSBWin opens only on demand
-for its extensions (`Graphics.cpp:1840-1858`, `:3201-3273`).
+`experienceForAttacking`, `byte20046`, `textDecode`), and CSB's item 0x231 is the long
+form, whose `Buttons16932` `extractUITables` reads (`doc/PROVEN_FACTS.md` → "CSB's
+`graphics.dat`…", `tools/dump-data-sets.ts`). The `csb` set is the CSB Windows package's
+`dungeon.dat`, `graphics.dat`, `mini.dat` and `csbgame2.dat`, with no `CSBgraphics.dat`,
+which the package lacks too and CSBWin opens only on demand for its extensions
+(`Graphics.cpp:1840-1858`, `:3201-3273`).
 
-What is needed: a data set per game (a folder, its files, a name), chosen before
-`loadGameFiles`, and everything built from it — the tables, the sound, the intro — with
-nothing that assumes `dm-atari`. A `dungeon.dat` that carries an Extended Features block
+What is left. A `dungeon.dat` that carries an Extended Features block
 (the DM Windows package's) sets `ctx.rules` through `readRulesOptions`, as a save does
 (`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"); `DungeonLoader` reads
 no such block today. Behind one, a compressed body is found after the block, and
 `ReadDatabases` leaves the block's size out of the body's unless `ExtendedFeaturesVersion`
 is `'@'` (`SaveGame.cpp:2365-2369`). The player's "DM Rules" toggle, which flips `ctx.rules.dmRules`
-(`CSBUI.cpp:912-914`), goes on the page with the chooser. **Where to choose (the author's decision): on the
-page**, a chooser outside the game that reloads it with, say, `?dungeon=csb`. That is where
-CSBWin makes the same choice, from the command line's `directory=` or `config.txt`'s
-`DIRECTORY` (`CSBUI.cpp:2032`, `:799`), and its launcher `_AskWhatToDo` offers no dungeon
-(`CSBCode.cpp:11338-11444`). A reload also rebuilds every boot-time structure for free,
-where an in-game switch would have to rebuild the tables, the sound and the screen's
-caches in place. Conflux (`static/gamefiles/conflux-3.5-b8/`)
+(`CSBUI.cpp:912-914`), goes on the page with the chooser. The chooser reloads the page
+(the author's decision), as CSBWin takes its directory from the command line or
+`config.txt` before its launcher, which offers no dungeon. Conflux (`static/gamefiles/conflux-3.5-b8/`)
 is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
 parse, and nothing has examined its format.
 
@@ -194,15 +186,9 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
 
-**Steps**, each a commit, in this order (none has started):
+**Steps**, each a commit, in this order. Step 1, the set chosen before the boot, is done;
+the next is step 2.
 
-1. **The set, chosen before the boot.** A list of data sets (`dm-atari`, `csb`: a folder,
-   its files, a name), the page's `?dungeon=<id>` read before `loadGameFiles` with
-   `dm-atari` the default, every path `src/main.ts` builds (both reads of `dungeon.dat`,
-   `graphics.dat`, `CSBgraphics.dat`) taken from the set, and a chooser beside the canvas
-   that reloads the page with the parameter. A tool loads every set's files, builds its
-   tables, and checks CSB's 0x231 long form with a canary: `Buttons16932` read from the
-   file, not `MISSING_PRISON_DOOR_BUTTONS`. The default set's frames do not move.
 2. **The DM Rules toggle** beside the chooser: `DM_rules = !DM_rules`
    (`CSBUI.cpp:912-914`) on `ctx.rules.dmRules`, as the menu's option does at any time.
 3. **An Extended Features block in `dungeon.dat`.** `DungeonLoader` reads the block, a

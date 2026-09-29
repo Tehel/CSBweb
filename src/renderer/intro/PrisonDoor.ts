@@ -69,8 +69,8 @@ const LATCH_TO_DOORS_VBLS = 20;
  *
  * `ReadTablesFromGraphicsFile` asserts item 0x231 is 0x804 or 0x7d4 bytes and, when it is
  * the short one, overwrites the list with these four entries
- * (`doc/CSBwin-src/CSBCode.cpp:10135-10157`). Both data sets this port ships are 0x7d4, so
- * this branch is the live one; `extractUITables` still reads the table when it is there.
+ * (`doc/CSBwin-src/CSBCode.cpp:10135-10157`). DM's is the short one, and CSB's the long one,
+ * whose four are these, word for word (`tools/dump-data-sets.ts`).
  */
 export const MISSING_PRISON_DOOR_BUTTONS: UIButton[] = [
   { word0: 0x00c8, x1: 0x00f4, x2: 0x012a, y1: 0x002d, y2: 0x003a, button: 0x0002, name: 'enter' },

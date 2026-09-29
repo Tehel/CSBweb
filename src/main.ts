@@ -5,7 +5,7 @@
 
 import { Direction } from './core';
 import { SoundManager } from './audio';
-import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader, type DungeonData } from './data';
+import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader, dataSetFor, type DungeonData } from './data';
 import { Game, buildGameTables, type GameTables } from './engine';
 import {
     applySaveBytes,
@@ -15,7 +15,7 @@ import {
 } from './engine/SaveGamePayload';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
+import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
@@ -53,7 +53,8 @@ const dev = createDevTools({
     repackOpenChest: () => screen?.repackChest(),
 });
 
-const GAME_DATA_DIR = '/gamefiles/dm-atari';
+/** The game this page plays, chosen before anything is loaded (`?dungeon=<id>`). */
+const dataSet = dataSetFor(new URLSearchParams(window.location.search).get('dungeon'));
 const CRT_SCANLINES_SRC = '/QPN59-320x200-resized.png';
 const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -183,8 +184,8 @@ interface GameFiles {
 }
 
 async function loadGameFiles(): Promise<GameFiles> {
-    updateDebug('Loading dungeon.dat...');
-    const dungeon = await new DungeonLoader().load(`${GAME_DATA_DIR}/dungeon.dat`);
+    updateDebug(`Loading ${dataSet.name}: dungeon.dat...`);
+    const dungeon = await new DungeonLoader().load(`${dataSet.dir}/dungeon.dat`);
     console.log(`✓ Loaded dungeon:`, dungeon);
     console.log(`  - Seed: ${dungeon.header.randomSeed}`);
     console.log(`  - Maps: ${dungeon.maps.length}`);
@@ -193,11 +194,11 @@ async function loadGameFiles(): Promise<GameFiles> {
 
     console.log('Loading graphics.dat...');
     const graphicsLoader = new GraphicsLoader();
-    await graphicsLoader.load(`${GAME_DATA_DIR}/graphics.dat`);
+    await graphicsLoader.load(`${dataSet.dir}/graphics.dat`);
     console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
 
     let csbGraphicsLoader: CSBGraphicsLoader | null = new CSBGraphicsLoader();
-    if (await csbGraphicsLoader.tryLoad(`${GAME_DATA_DIR}/CSBgraphics.dat`)) {
+    if (dataSet.csbGraphics && await csbGraphicsLoader.tryLoad(`${dataSet.dir}/CSBgraphics.dat`)) {
         console.log('✓ Loaded CSBgraphics.dat overlay');
     } else {
         console.log('CSBgraphics.dat not found; extended decorations disabled');
@@ -388,7 +389,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
     if (end === 'terminate') return;
     // The entrance's "enter": `_ReadEntireGame` over `dungeon.dat`, parsed afresh, since the
     // lost game wrote into the last parse (doc/CSBwin-src/SaveGame.cpp:1480-1494).
-    if (end === 'enter') game.readNewGame(await new DungeonLoader().load(`${GAME_DATA_DIR}/dungeon.dat`));
+    if (end === 'enter') game.readNewGame(await new DungeonLoader().load(`${dataSet.dir}/dungeon.dat`));
     scrollingText.restart();
     screen.initializePlayState();
     game.resumeMainLoop();
@@ -510,6 +511,7 @@ function start(game: Game): void {
 
 async function init() {
     try {
+        bindDataSetChooser(dataSet);
         updateDebug('Loading Phase 1: Core modules...');
         const files = await loadGameFiles();
         const tables = buildGameTables(files.graphicsLoader);

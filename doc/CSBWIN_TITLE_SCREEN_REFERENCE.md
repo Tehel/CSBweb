@@ -266,9 +266,11 @@ Dungeon Master's item 0x231 is 0x7d4 bytes and stops exactly 48 short, so
   if (d.GraphicDecompressedSizes[0x231] == 0x7d4) { d.Buttons16932[0] = missingButtons[0]; … };
 ```
 
-Both data sets this port ships take that branch, so the hardcoded list is the live one;
-`extractUITables` returns an empty `buttons16932` under exactly the same condition and
-`MISSING_PRISON_DOOR_BUTTONS` (`src/renderer/intro/PrisonDoor.ts`) stands in.
+DM's `graphics.dat` takes that branch: `extractUITables` returns an empty `buttons16932`
+under exactly the same condition and `MISSING_PRISON_DOOR_BUTTONS`
+(`src/renderer/intro/PrisonDoor.ts`) stands in. Chaos Strikes Back's item 0x231 is the
+0x804-byte form, and its last 48 bytes are those four buttons word for word, which
+`extractUITables` reads (`tools/dump-data-sets.ts`, `doc/PROVEN_FACTS.md`).
 
 **(from data)** — `struct btn` is `{ i16 word0; i16 xMin, xMax, yMin, yMax; i16 button; }`
 (`CSB.h:1659`), and the mask is `2 = left, 1 = right`:

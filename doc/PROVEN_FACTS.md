@@ -4592,3 +4592,16 @@ The keyboard mode's entries are 0x4444 (`doc/CSBwin-src/Code13ea4.cpp:149-153`, 
 game's is 0x3333 (`SaveGame.cpp:1515-1520`), neither of which counts. `totalMoveCount` is
 not `d.`'s, so a new game after a restart counts on. `tools/dump-mouse-queue.ts` checks the
 count, and `tools/dump-new-game.ts` the restart.
+
+## CSB's `graphics.dat`: the long 0x231, and six tables of its own
+
+`ReadTablesFromGraphicsFile` asserts item 0x231 is 0x804 or 0x7d4 bytes, and fills
+`d.Buttons16932` from its hardcoded `missingButtons` only for the short one
+(`doc/CSBwin-src/CSBCode.cpp:10135-10151`). DM's `graphics.dat` (the Atari file, and the DM
+Windows package's, which is the same file) is 0x7d4 bytes there. The CSB Windows package's
+is 0x804, and its last 48 bytes are `missingButtons` word for word: `ENTER` (0xc8, x
+244-298, y 45-58), `RESUME` (0xc9, 244-298, 76-93) and the credits (0xca, 248-293,
+187-199), each on the left button, then a zero terminator. Both files have 563 items. Of
+the 35 tables `buildGameTables` extracts, CSB's differ from DM's in six: `monsterDesc`,
+`spells`, `skillNumber`, `experienceForAttacking`, `byte20046` and `textDecode`.
+`tools/dump-data-sets.ts` checks both.
