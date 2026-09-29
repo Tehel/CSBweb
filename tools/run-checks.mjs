@@ -144,6 +144,10 @@ const CHECKS = [
   // `ExtendPortraits`, run after the read: dungeon.dat's 24 mirrors cleaned and nothing
   // else moved, and every save that carries `ExpandedPortraits` left as written.
   { tool: 'dump-extend-portraits.ts' },
+  // `CheckCelltypes` and `CheckMonsters`, the read's other two clean-ups: no change to
+  // dungeon.dat, a save's attached size-4 groups given their slot's positions and facing
+  // back by the restore, and every arm tripped on built records, through `new Game` too.
+  { tool: 'dump-check-monsters.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing

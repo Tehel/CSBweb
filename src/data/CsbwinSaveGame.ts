@@ -42,7 +42,9 @@
 import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
 import { readRulesOptions } from './CsbwinExtendedFeatures';
 import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
+import { CheckMonsters } from '../engine/CheckMonsters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
+import { DungeonState } from '../engine/DungeonState';
 import type { Game } from '../engine/Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from '../engine/RuntimeSave';
 import type { TimerRecord } from './dungeonTypes';
@@ -252,6 +254,9 @@ export function buildCsbwinRuntimeState(
 /** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
 export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
+    // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826), before
+    // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
+    CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc);
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures);
     const runtime = buildCsbwinRuntimeState(world, {
         // Keep what the running game has; see the module comment on `EXPOOL`.

@@ -2733,6 +2733,34 @@ be drawn (`Codea59a.cpp:134-137`). The port runs it at the end of `DungeonLoader
 gated on `DungeonImageOptions.expandedPortraits`, which `loadCsbwinWorld` takes from the
 save's block (`tools/dump-extend-portraits.ts`).
 
+## `CheckMonsters` overwrites a save's attached groups, and the game's start puts them back
+
+`CheckMonsters` (`doc/CSBwin-src/SaveGame.cpp:1342-1365`) walks every cell of every level
+and calls `CheckMonster` (`:1279-1340`) on each group and each group among its
+possessions. By the creature's `horizontalSize`: size 1 cuts a group of more than two to
+`numMonM1` 1 with `groupIndex` 2, and gives a pair whose positions are not opposite
+(`pos1 ^ pos2 != 2`) `groupIndex` 2; size 2 cuts a group to one, and gives any group whose
+`groupIndex` is not 255 that value. Each fix also sets `facing` 0. `numMonster` is read
+once, before the cut. The two warnings ("Too many monsters of size 2", "… of size 4") are
+shown once per process (`static bool`); the two "improperly positioned" ones are commented
+out. `CheckCelltypes` (`:1367-1400`) makes every cell of room type above 6 open floor,
+keeping the low five bits.
+
+A save holds the `ITEM16` index in `groupIndex` for every group on the party's level:
+`SaveGame` writes the file before `TAG00bd40` detaches them (`:1243`), and
+`_ReadEntireGame` reads the pool back (`:1668-1675`) before these run (`:1825-1826`). So
+`CheckMonster` reads an index as positions, and every attached size-2 group whose index is
+not 255 gets 255 and `facing` 0. The game's start undoes it: `LoadPartyLevel` begins with
+`TAG00bd40` (`CSBCode.cpp:795`), and `DetachItem16` writes `groupIndex` and `facing` back
+from the slot (`CSBCode.cpp:6127-6131`), not from the record. Only a cut `numMonM1` stays.
+
+Measured (`tools/dump-check-monsters.ts`): `dm-atari/dungeon.dat` has no room type above 6
+and no group `CheckMonsters` changes. The committed saves and CSB's `mini.dat` and
+`csbgame2.dat` need no cut either; what it touches in them is 17 attached size-2 groups
+(demons, Lord Chaos, black flames, golems, a dragon, scorpions), and in `csbgame6.dat` and
+`csbgame7.dat` their slots' facings (2 and 3) come back after the restore where the check
+wrote 0. CSB's `graphics.dat` gives the 27 monster types the same sizes as DM's.
+
 ## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block sets them
 
 `DM_rules` (`doc/CSBwin-src/data.cpp:251`) and `DMRulesDesignOption` (`CSBUI.cpp:137`) are

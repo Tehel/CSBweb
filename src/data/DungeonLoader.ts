@@ -30,7 +30,7 @@ import type {
     CloudRecord
 } from './dungeonTypes';
 import { extractPresetHeroes } from './HeroExtractor';
-import { ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
+import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -187,8 +187,11 @@ export class DungeonLoader {
                 indirectText: data.indirectText,
                 newScrolls: data.newScrolls,
             });
-            // Not part of `ReadDatabases`: `_ReadEntireGame` runs it once the whole file
-            // is read (`doc/CSBwin-src/SaveGame.cpp:1827`), a save's as a new game's.
+            // Not part of `ReadDatabases`: `_ReadEntireGame` runs these once the whole
+            // file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), a save's as a new
+            // game's. The `CheckMonsters` between them needs the tables, so `Game` and
+            // `applyCsbwinSave` run it (`src/engine/CheckMonsters.ts`).
+            CheckCelltypes(data);
             if (!this.options.expandedPortraits) ExtendPortraits(data);
         }
 

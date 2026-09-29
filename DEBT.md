@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C90 | `CheckCelltypes` and `CheckMonsters` are not run after a read | M | ⏳ |
 | G16 | A compressed `dungeon.dat` | S | ⏳ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
@@ -127,36 +126,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-A divergence found along the way goes here, with the next free ID.
-
-### C90 — `CheckCelltypes` and `CheckMonsters` are not run after a read
-
-`_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once
-the whole file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), for a new game and a
-save alike, whatever its Extended Features block says. `ExtendPortraits` is ported
-(`src/data/CsbwinDungeonConversions.ts`); the other two are not. They touch different
-data from it and from each other, so their order does not matter.
-
-- **`CheckCelltypes`** (`:1367-1400`) turns every cell whose room type is above 6 into
-  open floor, keeping the low five bits. It changes nothing in DM, which has no such cell,
-  and it can live in `DungeonLoader` beside `ExtendPortraits`.
-- **`CheckMonsters`** (`:1342-1365`) walks every cell of every level and calls
-  `CheckMonster` (`:1279-1340`) on each group, and on each group among its possessions.
-  For a creature of `horizontalSize` 1 it cuts a group of more than two to two, and puts
-  a pair whose two positions are not opposite (`pos1 ^ pos2 != 2`) at `groupIndex` 2;
-  for size 2 it cuts the group to one and sets `groupIndex` 255. Each fix also sets
-  `facing` 0. The two `UI_MessageBox` warnings are shown once per process. It needs
-  `MonsterDescriptor`'s sizes, so it runs where the tables are, not in the loader.
-  **To settle first:** it reads `groupIndex` as the packed positions, but in a save the
-  groups on the party's level may hold an `ITEM16` index there (`DB4`'s comment in
-  `src/data/dungeonTypes.ts`); check when CSBWin attaches them relative to this call before
-  porting it as a plain walk.
-
-DM's creature records come out of the DM Windows package's re-save unchanged
-(`doc/PROVEN_FACTS.md` → "DM's two `dungeon.dat` files"), which suggests both are no-ops
-on DM, but that is not a proof. The fix owes a `tools/` check that reports what each one
-changes in `dm-atari/dungeon.dat`, the committed saves and CSB's `mini.dat`, and asserts
-it on a record built to trip it.
+A divergence found along the way goes here, with the next free ID. Empty.
 
 ---
 

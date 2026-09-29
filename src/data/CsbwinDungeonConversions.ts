@@ -26,7 +26,7 @@
  * would decode the index it built last time as if it were text — so the gates are the
  * whole safety argument, and they are the same gates CSBWin uses.
  */
-import { DBType, OBJECT_ID_NULL, encodeObjectID } from '../core/types';
+import { DBType, OBJECT_ID_NULL, RoomType, encodeObjectID } from '../core/types';
 import type { ui16, ui32 } from '../core/types';
 import { getActuatorType } from './actuatorHelpers';
 import type { DungeonData } from './dungeonTypes';
@@ -231,6 +231,28 @@ export function ExtendPortraits(data: DungeonData): void {
         record.word4 &= ~0x0100;          // BlockDisables(false)
         record.word4 &= ~0x00c0;          // DisableMessage(0)
         record.word6 &= ~0x3000;          // Position(0)
+    }
+}
+
+/**
+ * `CheckCelltypes` (`doc/CSBwin-src/SaveGame.cpp:1367-1400`): turn every cell whose room
+ * type is above `roomDOOR`'s 6 into open floor, keeping the low five bits.
+ *
+ * `_ReadEntireGame` calls it once the whole file is read (`:1825`), a new game's and a
+ * save's alike, with no gate. DM's cells are all 0-6, so it changes nothing there.
+ * `CheckMonsters`, which `_ReadEntireGame` runs between this and `ExtendPortraits`, needs
+ * the monster table and runs where that is (`src/engine/CheckMonsters.ts`); the three
+ * touch different data, so the order does not matter.
+ */
+export function CheckCelltypes(data: DungeonData): void {
+    for (const map of data.maps) {
+        const { width, height } = map.descriptor;
+        for (let x = 0; x < width; x++) {
+            for (let y = 0; y < height; y++) {
+                const cell = map.cellFlags[x][y];
+                if ((cell >> 5) > RoomType.FALSEWALL) map.cellFlags[x][y] = (cell & 0x1f) | (RoomType.OPEN << 5);
+            }
+        }
     }
 }
 

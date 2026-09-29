@@ -44,6 +44,7 @@ import type { Rect } from '../renderer/csbwin/UITables';
 import { CsbRandom } from '../core/random';
 
 import { CharacterStats } from './CharacterStats';
+import { CheckMonsters } from './CheckMonsters';
 import type { GameTables } from './GameTables';
 
 /**
@@ -214,6 +215,9 @@ export class Game implements MainLoop {
      */
     constructor(dungeonData: DungeonData, tables: GameTables, host: Partial<GameHost> = {}) {
         const ctx = createGameContext(dungeonData, tables, createGameHost(host));
+        // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826), which a
+        // new game's read runs and the loader cannot: it needs the monster table.
+        CheckMonsters(ctx.dungeon, tables.monsterDesc);
         this.ctx = ctx;
         this.dungeonState = ctx.dungeon;
         this.party = ctx.party;
