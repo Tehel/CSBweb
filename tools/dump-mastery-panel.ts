@@ -64,8 +64,8 @@ import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
 const SCREEN_H = 200;
-/** `TextToViewport(108, …)`; the port's text origin sits one pixel left of CSBWin's. */
-const LINE_X = VIEWPORT_X + 107;
+/** `TextToViewport(108, …)`: the viewport sits at screen x 0, and a glyph starts at the pen. */
+const LINE_X = VIEWPORT_X + 108;
 /** `D6W = 58; … D6W += 7;` */
 const LINE_Y0 = 58;
 const LINE_DY = 7;

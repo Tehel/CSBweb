@@ -43,7 +43,7 @@ export function drawInventoryScreen(ui: UIState): void {
 
   if (ui.fontData) {
     const nameColor = ui.partyState.cursorOwner === selected ? 9 : 13;
-    const nameBaseX = VIEWPORT_X + 2;
+    const nameBaseX = VIEWPORT_X + 3;
     drawTextLineIndex(
       ui.screenIndexBuffer,
       ui.fontData,
@@ -385,7 +385,7 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
       drawTextLineIndex(
         ui.screenIndexBuffer,
         ui.fontData,
-        VIEWPORT_X + 133,
+        VIEWPORT_X + 134,
         VIEWPORT_Y + 68,
         13,
         null,

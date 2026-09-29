@@ -14,6 +14,10 @@
  *    `CastMagic` clears the runes unless `CastSpell` returned 3 (`:949-955`).
  * 4. The two deliberate divergences (`DEBT.md` → H): a fifth rune is refused, and a champion
  *    with no mana has no tab to click.
+ * 5. Where the runes and the incantation are drawn: `DrawSpellMenuCharacters` from
+ *    `D6W = 225` at `D6W += 14`, y 58 (`doc/CSBwin-src/CSBCode.cpp:8946-8960`), and
+ *    `DisplayMagicSelection` from `D6W = 232` at `D6W += 9`, y 70
+ *    (`doc/CSBwin-src/Magic.cpp:776-796`), a glyph starting at the pen.
  *
  * Run: `npx tsx tools/dump-magic-panel.ts`
  */
@@ -27,7 +31,9 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { ensureSkills } from '../src/engine/skills';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
+import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
@@ -184,6 +190,26 @@ async function main(): Promise<void> {
   party.champions[1]!.attributes.maxMana = 0;
   check(clickAt(0, tab(0, 1)[0] + 1) === 0, 'a champion with no mana cannot be picked');
   check(clickAt(0, 513) === 0, 'not by clickX 513 either');
+
+  // ---- 5. The runes and the incantation, against glyphs drawn at CSBWin's own pens.
+  const font = loadFontData(graphics);
+  ui.fontData = font;
+  const drawn = createPaletteIndexViewportBuffer(320, 200, 12);
+  const expected = createPaletteIndexViewportBuffer(320, 200, 12);
+  ui.screenIndexBuffer = drawn;
+  const incantation = [0x60, 0x67, 0x6e];
+  drawSpellMenuCharacters(ui, incantation.length);
+  drawMagicIncantation(ui, incantation);
+  for (let i = 0, x = 225; i < 6; i++) {
+    drawTextLineIndexRaw(expected, font, (x += 14), 58, 4, 0, String.fromCharCode(96 + 6 * 3 + i));
+  }
+  for (let i = 0, x = 232; i < 4; i++) {
+    drawTextLineIndexRaw(expected, font, (x += 9), 70, 4, 0, i < incantation.length ? String.fromCharCode(incantation[i]!) : ' ');
+  }
+  let off = 0;
+  for (let p = 0; p < drawn.pixels.length; p++) if (drawn.pixels[p] !== expected.pixels[p]) off++;
+  console.log(`runes at 239+14i, incantation at 241+9i: ${off} pixels off`);
+  check(off === 0, `the runes and the incantation should sit at CSBWin's pens (${off} pixels off)`);
 
   finish();
 }

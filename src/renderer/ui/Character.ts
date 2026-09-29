@@ -80,7 +80,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
     drawTextLineIndexRaw(
       ui.screenIndexBuffer,
       ui.fontData,
-      VIEWPORT_X + 107,
+      VIEWPORT_X + 108,
       VIEWPORT_Y + lineY,
       13,
       null,
@@ -111,7 +111,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
     drawTextLineIndex(
       ui.screenIndexBuffer,
       ui.fontData,
-      VIEWPORT_X + 107,
+      VIEWPORT_X + 108,
       VIEWPORT_Y + lineY,
       13,
       null,
@@ -120,7 +120,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
     drawTextLineIndex(
       ui.screenIndexBuffer,
       ui.fontData,
-      VIEWPORT_X + 173,
+      VIEWPORT_X + 174,
       VIEWPORT_Y + lineY,
       valueColor,
       null,
@@ -129,7 +129,7 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
     drawTextLineIndex(
       ui.screenIndexBuffer,
       ui.fontData,
-      VIEWPORT_X + 191,
+      VIEWPORT_X + 192,
       VIEWPORT_Y + lineY,
       13,
       null,
@@ -150,10 +150,10 @@ export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
   const mana = attrs?.mana ?? 0;
   const maxMana = attrs?.maxMana ?? 0;
 
-  const baseX = VIEWPORT_X + 54;
-  const slashX = VIEWPORT_X + 72;
-  const maxX = VIEWPORT_X + 78;
-  const labelX = VIEWPORT_X + 4;
+  const baseX = VIEWPORT_X + 55;
+  const slashX = VIEWPORT_X + 73;
+  const maxX = VIEWPORT_X + 79;
+  const labelX = VIEWPORT_X + 5;
   const lineHealth = VIEWPORT_Y + 116;
   const lineStamina = VIEWPORT_Y + 124;
   const lineMana = VIEWPORT_Y + 132;
@@ -173,7 +173,7 @@ export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
   drawTextLineIndex(
     ui.screenIndexBuffer,
     ui.fontData,
-    VIEWPORT_X + 103,
+    VIEWPORT_X + 104,
     lineMana,
     color,
     null,
@@ -182,7 +182,7 @@ export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
   drawTextLineIndex(
     ui.screenIndexBuffer,
     ui.fontData,
-    VIEWPORT_X + 147,
+    VIEWPORT_X + 148,
     lineMana,
     color,
     null,

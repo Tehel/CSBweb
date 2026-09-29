@@ -109,6 +109,10 @@ export function drawSpellPanel(ui: UIState): void {
   drawMagicIncantation(ui, caster.incantation);
 }
 
+/**
+ * `DrawSpellMenuCharacters` (`doc/CSBwin-src/CSBCode.cpp:8946-8960`): the six runes of
+ * the current step, from `D6W = 225`, each at `D6W += 14`.
+ */
 export function drawSpellMenuCharacters(ui: UIState, step: number): void {
   if (!ui.screenIndexBuffer || !ui.fontData) return;
   const y = 58;
@@ -119,11 +123,15 @@ export function drawSpellMenuCharacters(ui: UIState, step: number): void {
   }
 }
 
+/**
+ * `DisplayMagicSelection` (`doc/CSBwin-src/Magic.cpp:776-796`): the incantation so far,
+ * from `D6W = 232`, each at `D6W += 9`, blanks past its end.
+ */
 export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
   if (!ui.screenIndexBuffer || !ui.fontData) return;
   const y = 70;
   for (let i=0; i<4; i++) {
-    const x = 231 + 9 * (i + 1);
+    const x = 232 + 9 * (i + 1);
     const ch = (i >= incantation.length) ? ' ' : String.fromCharCode(incantation[i]);
     drawTextLineIndexRaw(ui.screenIndexBuffer, ui.fontData, x, y, 4, 0, ch);
   }
