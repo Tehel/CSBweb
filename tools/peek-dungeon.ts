@@ -180,7 +180,8 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
   switch (category) {
     case DBType.DOOR: {
       const d = rec as DoorRecord;
-      out.push(`${head} button=${d.hasButton} chop=${d.destructibleByChop} fireball=${d.destructibleByFireball}`);
+      // CSBWin's `DB0` accessor names (`doc/CSBwin-src/CSB.h:818-848`).
+      out.push(`${head} doorSwitch=${d.hasButton} canOpenWithAxe=${d.destructibleByChop} canOpenWithFireball=${d.destructibleByFireball}`);
       return;
     }
     case DBType.TELEPORTER: {
@@ -385,6 +386,20 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
   const lines: string[] = [];
   for (const rn of squareObjects(world, m, x, y)) describe(world, names, rn, '  ', lines);
   console.log(lines.length ? `objects:\n${lines.join('\n')}` : 'objects: none');
+  // `QueueSwitchAction` sends a remote actuator's action to its target on the level it
+  // is on (`doc/ACTUATORS.md` §4). Some types reuse word6 for other things (a
+  // generator's disable time, a launcher's energy), so a match is a lead to check
+  // against the type, not a certainty.
+  const aimed: string[] = [];
+  for (let ay = 0; ay < d.height; ay++) for (let ax = 0; ax < d.width; ax++) {
+    for (const rn of squareObjects(world, m, ax, ay)) {
+      if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
+      const a = recordOf(world.data, rn) as ActuatorRecord | null;
+      if (!a || isActuatorLocalActionOnly(a) || getActuatorTargetX(a) !== x || getActuatorTargetY(a) !== y) continue;
+      describe(world, names, rn, `  from (${ax},${ay}) ${RoomType[(flagAt(world, m, ax, ay) >> 5) & 7]} `, aimed);
+    }
+  }
+  console.log(aimed.length ? `actuators on this map aimed here:\n${aimed.join('\n')}` : 'actuators on this map aimed here: none');
   if (world.fromSave) {
     // Timers are not addressed uniformly: this lists the ones whose uByte6/uByte7 are
     // this square, which is how door, actuator and monster timers name theirs. A
