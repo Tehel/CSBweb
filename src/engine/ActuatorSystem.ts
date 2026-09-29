@@ -31,7 +31,6 @@ import {
   isActuatorLocalActionOnly,
   isActuatorNormallyClosed,
   isActuatorOnceOnly,
-  setActuatorType,
 } from '../data/actuatorHelpers';
 import { TimerQueue } from './TimerQueue';
 import { constructPredefinedMissile } from './missileHelpers';
@@ -212,22 +211,21 @@ export class ActuatorSystem {
     const party = this.ctx.party.state;
     let objectInHand = party.objectInHand;
     let emptyHanded = objectInHand === OBJECT_ID_NULL;
-    for (let rn = this.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; ) {
-      const next = this.dungeon.getDBRecordLink(rn);
+    // CSBWin's `previousListObject`, which a type 17 unlinks itself from.
+    const first = this.dungeon.findFirstObject(position);
+    for (let rn = first, previous = first; rn !== OBJECT_ID_EOF; previous = rn, rn = this.dungeon.getDBRecordLink(rn)) {
       const decoded = decodeObjectID(rn);
 
       if (decoded.category === DBType.ACTUATOR) {
         const actuatorPos = decoded.position & 0x3;
         remainingActuators[actuatorPos] = Math.max(0, remainingActuators[actuatorPos] - 1);
         if (actuatorPos !== (touchedPosition & 0x3)) {
-          rn = next;
           continue;
         }
 
         const rec = this.dungeon.getActuatorRecord(rn);
         const actuatorType = rec ? getActuatorType(rec) : 0;
         if (!rec || actuatorType === 0) {
-          rn = next;
           continue;
         }
 
@@ -260,8 +258,17 @@ export class ActuatorSystem {
             if (!switchOpen && actuatorType === 11) {
               this.performLocalAction(2, position.x, position.y, position.z, actuatorPos);
             }
+            // A type 17 takes itself off the wall (`Mouse.cpp:389-398`): unlinked and
+            // deleted, so the actuators before it no longer count it as remaining and
+            // the wall shows the ornament of the one now last. The loop goes on from
+            // `previous`, whose link is now the deleted one's. One first on the square
+            // has no `previous` and stays, still type 17. `DeleteDBEntry` only frees
+            // the link, so `rec` is still read below.
             if (!switchOpen && actuatorType === 17) {
-              setActuatorType(rec, 0);
+              if (previous === rn) break;
+              this.dungeon.setDBRecordLink(previous, this.dungeon.getDBRecordLink(rn));
+              this.dungeon.deleteDBEntry(rn);
+              rn = previous;
             }
             break;
           }
@@ -412,7 +419,6 @@ export class ActuatorSystem {
       } else if (decoded.category >= DBType.CREATURE) {
         break;
       }
-      rn = next;
     }
 
     this.rotateActuatorList();

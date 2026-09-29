@@ -69,6 +69,7 @@ const CHECKS = [
   { tool: 'dump-viewport-click.ts' },
   { tool: 'dump-queue-sound.ts' },
   { tool: 'dump-crack-switch.ts' },
+  { tool: 'dump-zokathra-wall.ts' },
   { tool: 'dump-door-ornaments.ts' },
   { tool: 'dump-status-boxes.ts' },
   { tool: 'dump-mastery-panel.ts' },
