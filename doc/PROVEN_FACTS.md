@@ -686,6 +686,15 @@ levitating monster ignores an open pit outright, fake or not. `PossibleDoubleMov
 types in the shipped data, a Fluxcage is inert against everything else — which is what makes
 it the tool for herding Lord Chaos in the fusion endgame.
 
+## A spell is launched as its own RN
+
+`LaunchMissile` stores its `object` argument as the missile's projectile as it is
+(`doc/CSBwin-src/Magic.cpp:17-70`). A monster's spell reaches it as the bare `RNFireball`
+… `RNPoisonBolt` value (`doc/CSBwin-src/Monster.cpp:1194-1203`), and so does a
+champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449-462`). No
+record is built for a spell: only a shooter's rocks, arrows and boulders are objects
+made on the spot (`constructPredefinedMissile`).
+
 ## `movementTicks06 == 255` means the monster never moves
 
 `doc/CSBwin-src/Monster.cpp:669`: `if (pmtDesc->timePerMove() == 255) return 0;` — the first

@@ -5,8 +5,9 @@ import type { ObjectID } from './types';
  *
  * These are not database references: everything from `RNFireball` up is a *reserved*
  * RN standing for a kind of missile that has no record behind it, which is why
- * `RN::IsMagicSpell()` is a bare `>= RNFireball` and `constructPredefinedMissile`
- * builds an object for one on demand.
+ * `RN::IsMagicSpell()` is a bare `>= RNFireball`. `LaunchMissile` takes one as the
+ * missile's projectile as it is (`doc/CSBwin-src/Monster.cpp:1194`,
+ * `doc/CSBwin-src/Magic.cpp:454`): no object is built for it.
  *
  * ```cpp
  * RNFireball        =0xff80,

@@ -33,7 +33,6 @@ import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 import { wakeUp } from './LoopState';
-import { constructPredefinedMissile } from './missileHelpers';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -156,26 +155,22 @@ export class MonsterAttack {
     if (amended.monsterShouldLaunchMissile) {
       if (THROWABLE.has(amended.missileType)) {
         // `LaunchMissile` as a monster calls it (`doc/CSBwin-src/Monster.cpp:1194-1203`).
-        // The projectile is a predefined spell RN (`RNFireball` and friends) rather than
-        // a real object, so it goes through `constructPredefinedMissile` first, the
-        // same path a cast spell takes.
-        const projectileObject = constructPredefinedMissile(this.dungeon, amended.missileType);
-        if (projectileObject !== null) {
-          this.ctx.systems.magic.launchMissile(
-            projectileObject,
-            amended.monsterX,
-            amended.monsterY,
-            context.level,
-            amended.missileOriginPosition,
-            amended.directionToParty,
-            // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
-            applyLimits(20, amended.missileRange, 255),
-            amended.missileDamage,
-            amended.missileDecayRate,
-            this.ctx.state.tickCount,
-            false,
-          );
-        }
+        // The projectile is the spell RN itself (`RNFireball` and friends): a spell has
+        // no record behind it, so nothing is built for it.
+        this.ctx.systems.magic.launchMissile(
+          amended.missileType,
+          amended.monsterX,
+          amended.monsterY,
+          context.level,
+          amended.missileOriginPosition,
+          amended.directionToParty,
+          // `ApplyLimits(20, range, 255)` (doc/CSBwin-src/Monster.cpp:1200).
+          applyLimits(20, amended.missileRange, 255),
+          amended.missileDamage,
+          amended.missileDecayRate,
+          this.ctx.state.tickCount,
+          false,
+        );
       }
     } else {
       let chIdx = amended.heroToDamage;

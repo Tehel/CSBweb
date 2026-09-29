@@ -21,7 +21,7 @@ import { getChampionPossession, type Champion, type PartyState } from './gameTyp
 import { setClockTick, waitForButtonFlash } from './LoopState';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import type { SpellParameters } from './magicTypes';
-import { constructPredefinedMissile, encodeMissileTimerWord8 } from './missileHelpers';
+import { encodeMissileTimerWord8 } from './missileHelpers';
 import { GetBasicObjectType } from './objectIndex';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
@@ -548,12 +548,8 @@ export class MagicSystem {
     if (!champion) return 0;
     const facing = (champion.facing ?? this.ctx.party.state.facing) & 3;
     const posInCell = ((((champion.partyPosition - facing + 1) & 2) >> 1) + facing) & 3;
-    const projectile = (object & 0xffff) >= 0xff80
-      ? constructPredefinedMissile(this.dungeon, object & 0xffff)
-      : object;
-    if (projectile === null) return 0;
     const launched = this.launchThrownMissile(
-      projectile,
+      object,
       this.ctx.party.state.position,
       posInCell,
       facing,
