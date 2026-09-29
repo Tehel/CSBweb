@@ -695,6 +695,18 @@ champion's spell attack, through `LaunchObject` (`doc/CSBwin-src/Magic.cpp:449-4
 record is built for a spell: only a shooter's rocks, arrows and boulders are objects
 made on the spot (`constructPredefinedMissile`).
 
+## A thrown weapon flies as its own missile graphic
+
+`GetGraphicClass` (`doc/CSBwin-src/Code51a4.cpp:2838-2870`) chooses how a missile's flying
+object is drawn (`:2315`). A spell gets a fixed negative class; a weapon gets
+`-BITS8_12(WEAPONDESC.word4)` when that field is non-zero; anything else gets its
+`d.ObjDesc` graphic class, and is drawn as it lies on the floor (`:2563-2590`). A negative
+class `-n` is `d.struct5688[n-1]`, drawn from graphic `316 + uByte0` plus 0, 1 or 2 for
+the view (`:2318-2320`, `:2463`). In DM's `graphics.dat` nineteen weapon types have one:
+the swords, the axes, the clubs, the dagger, the arrow (`n = 1`, so class `-1` is a real
+missile graphic), the Slayer, the poison dart and the throwing star. The torch, the bow,
+the staffs and the rest fly as their floor picture. `tools/dump-missile-draw.ts` checks it.
+
 ## `movementTicks06 == 255` means the monster never moves
 
 `doc/CSBwin-src/Monster.cpp:669`: `if (pmtDesc->timePerMove() == 255) return 0;` — the first

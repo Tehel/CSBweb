@@ -33,6 +33,38 @@ import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectI
 import { CsbRandom } from '../../core/random';
 import { applyLimits } from '../../core/intCast';
 
+/**
+ * `GetGraphicClass` (`doc/CSBwin-src/Code51a4.cpp:2838-2870`): how a flying object is
+ * drawn. A negative class `-n` is `d.struct5688[n-1]`, a missile graphic: every spell,
+ * and every weapon whose `WEAPONDESC.word4` holds one in `BITS8_12` (a dagger, an arrow,
+ * a sword…), which flies as that graphic and not as the object lying on the floor. A
+ * class of 0 or more is the object's own `d.ObjDesc` graphic class. `null` is not an
+ * object at all, which CSBWin never draws (it would read `d.ObjDesc[-1]`).
+ */
+export function GetGraphicClass(
+  dungeon: DungeonState,
+  tables: Pick<ObjectTables, 'objDescGraphicClass' | 'weaponDesc'>,
+  rn: ObjectID,
+): number | null {
+  const category = isMagicSpellRn(rn) ? DBType.CLOUD : decodeObjectID(rn).category;
+  if (category === DBType.CLOUD) {
+    if (rn === RN_FIREBALL) return -11;
+    if (rn === RN_POISON) return -13;
+    if (rn === RN_LIGHTNING) return -4;
+    if (rn === RN_POISON_BOLT) return -14;
+    if (rn === RN_POISON_CLOUD) return -14;
+    return -12;
+  }
+  if (category === DBType.WEAPON) {
+    const weapon = dungeon.getWeaponRecord(rn); // TAG0099d2
+    const missileGraphic = ((tables.weaponDesc[weapon?.weaponType ?? -1]?.word4 ?? 0) >> 8) & 0x1f;
+    if (missileGraphic !== 0) return -missileGraphic;
+  }
+  const descIndex = DescIndex(dungeon, rn);
+  if (descIndex === -1) return null;
+  return tables.objDescGraphicClass[descIndex] ?? null;
+}
+
 const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
 /**
@@ -2470,8 +2502,8 @@ export class BytecodeInterpreter {
       const missile = dungeon.getMissileRecord(rn);
       if (!missile) continue;
 
-      const graphicClass = this.getGraphicClassForObject(missile.projectileObject, dungeon, tables);
-      if (graphicClass === -1) continue;
+      const graphicClass = GetGraphicClass(dungeon, tables, missile.projectileObject);
+      if (graphicClass === null) continue;
       if (graphicClass >= 0) {
         const gc = tables.graphicClasses[graphicClass];
         if (!gc) continue;
@@ -2494,7 +2526,7 @@ export class BytecodeInterpreter {
         continue;
       }
 
-      const idx = Math.max(0, -graphicClass - 1);
+      const idx = -graphicClass - 1;
       const md = tables.missileGraphics[idx];
       if (!md) continue;
 
@@ -2539,12 +2571,17 @@ export class BytecodeInterpreter {
         }
       }
 
+      // w_112: a missile in the party's own cell is drawn at full size when its size does
+      // not follow its range, or when it has just been launched (`Code51a4.cpp:2327-2336`).
       const distanceFromUs = 2 * Math.floor(relativeCellNumber / 3) + Math.floor(relativeLocation / 2);
-      let scale = tables.missileScale[distanceFromUs] ?? 0;
-      if (!w130) {
-        const range = missile.rangeRemaining & 0xff;
-        const w192 = Math.max(96, range + 1);
-        scale = Math.floor((scale * w192) >> 8);
+      let scale = 0;
+      if (!((w130 || (missile.rangeRemaining & 0xff) === 255) && relativeCellNumber === 9)) {
+        scale = tables.missileScale[distanceFromUs] ?? 0;
+        if (!w130) {
+          const range = missile.rangeRemaining & 0xff;
+          const w192 = Math.max(96, range + 1);
+          scale = Math.floor((scale * w192) >> 8);
+        }
       }
 
       const baseGraphicNum = 316 + (md.uByte0 & 0xff) + w128;
@@ -2556,8 +2593,8 @@ export class BytecodeInterpreter {
       let src = base;
 
       if (scale > 0) {
-        widthBytes = Math.max(1, Math.floor((md.widthBytes * scale + (scale >> 1)) >> 5));
-        height = Math.max(1, Math.floor((md.height * scale + (scale >> 1)) >> 5));
+        widthBytes = Math.max(1, (md.widthBytes * scale + (scale >> 1)) >> 5);
+        height = Math.max(1, (md.height * scale + (scale >> 1)) >> 5);
         const dstWidth = widthBytes * 2;
         const colorMap = distanceFromUs >= 2 ? tables.colorMapFar : tables.colorMapMedium;
         src = this.shrinkChunky(base, dstWidth, height, colorMap);
@@ -2565,23 +2602,19 @@ export class BytecodeInterpreter {
 
       if (mirror) src = this.getMirroredBitmap(src);
       if (flip) src = this.getFlippedBitmapVertical(src);
+      // LOCAL_30, set only for a shrunk missile (`Code51a4.cpp:2470-2473`): CSBWin's rows
+      // are padded to 16 pixels and `Mirror` moves the padding to the left, so the blit
+      // skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer, as `drawClouds` does.
+      const mirrorPad = mirror && scale !== 0 ? 2 * (7 - ((widthBytes - 1) & 7)) : 0;
 
-      let x1 = centerX - widthBytes + 1;
-      let x2 = centerX + widthBytes;
-      let y2 = 47 + (height >> 1);
-      let y1 = 47 - (height >> 1);
-      if (y2 > 135) y2 = 135;
-      if (y1 < 0) y1 = 0;
+      // `Code51a4.cpp:2536-2555`.
+      const y2 = 47 + (height >> 1);
+      const y1 = 47 - (height >> 1) + ((height & 1) === 0 ? 1 : 0);
+      const x2 = Math.min(223, centerX + widthBytes);
+      const x1 = Math.max(0, centerX - widthBytes + 1);
+      const srcX = x1 !== 0 ? mirrorPad : Math.max(mirrorPad, widthBytes - centerX - 1);
 
-      let srcX = 0;
-      let srcY = 0;
-      if (x1 < 0) {
-        srcX = -x1;
-        x1 = 0;
-      }
-      if (x2 > 223) x2 = 223;
-
-      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX, srcY }, 10);
+      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
     }
   }
 
@@ -2619,7 +2652,7 @@ export class BytecodeInterpreter {
 
       if (d4 === 100) {
         // Lightning: graphic, size and position all from d.Word7246 (`:139-170`).
-        const gc = this.getGraphicClassForObject(RN_LIGHTNING, dungeon, tables);
+        const gc = GetGraphicClass(dungeon, tables, RN_LIGHTNING)!;
         const md = tables.missileGraphics[-gc - 1];
         if (!md) continue;
         base = getGraphic((md.uByte0 & 0xff) + 317);
@@ -2795,28 +2828,6 @@ export class BytecodeInterpreter {
     }
     const derived: IndexedBitmap = { width: groupsPerRow * 16, height: rows, pixels: out };
     this.blitShapeToViewportIndexWithTransparent(derived, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 10);
-  }
-
-  private getGraphicClassForObject(rn: ObjectID, dungeon: DungeonState, tables: ObjectTables): number {
-    if (isMagicSpellRn(rn)) {
-      switch (rn) {
-        case RN_FIREBALL:
-          return -11;
-        case RN_POISON:
-          return -13;
-        case RN_LIGHTNING:
-          return -4;
-        case RN_POISON_BOLT:
-        case RN_POISON_CLOUD:
-          return -14;
-        default:
-          return -12;
-      }
-    }
-
-    const descIndex = DescIndex(dungeon, rn);
-    if (descIndex === -1) return -1;
-    return tables.objDescGraphicClass[descIndex] ?? -1;
   }
 
   private getDerivedObjectBitmap(
