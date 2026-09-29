@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C88 | `DM_rules` is not modelled | S | ⏳ |
+| C88 | `DM_rules` is not modelled | M | ⏳ |
 | C89 | `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears | S | ⏳ |
 | G16 | A compressed `dungeon.dat` | S | ⏳ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
@@ -151,6 +151,26 @@ has no Extended Features block, so a CSBWin game started from it has `DM_rules` 
 until the player toggles it (`doc/PROVEN_FACTS.md` → "DM's two `dungeon.dat` files").
 Modelling it means the flag on the game, set as CSBWin sets it, read at the
 reincarnation, and written; the player's toggle belongs with the dungeon chooser (G18).
+What that takes:
+
+- **Two process-wide globals, not the world's.** `DM_rules` and `DMRulesDesignOption`
+  (`CSBUI.cpp:137`) are assigned only by `ReadExtendedFeatures`, for a file whose block is
+  present. A file without one (`dm-atari/dungeon.dat`, CSB's Atari-era saves) leaves both
+  as they were, a lost game's "enter" included. So they live on the `Game`, surviving
+  `readNewGame` and a load, not in the dungeon snapshot where `extendedWallDecorations`
+  is, which a new game resets.
+- **The forcing is the boot's alone.** `if (DMRulesDesignOption) DM_rules = true` is in
+  `_ShowPrisonDoor` (`CSBCode.cpp:10671-10676`, reached from `_StartCSB`, `:11310`). The
+  restart after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`) and
+  does not force. The port's boot is `runIntro` in `src/main.ts`.
+- **One read, one write.** Both bits go through `loadSaveGameState` (`flags` 0x40,
+  `extendedFlags` 0x08) and `buildLiveExtendedFeatures`. The port's own JSON saves carry
+  that block in `raw` (`src/engine/SaveGamePayload.ts:268`), so `applySaveGameState`'s
+  path serves both formats.
+- **The check:** a reincarnation with and without `DM_rules`, a committed save with 0xf8
+  loading it on, the boot forcing it from `DMRules` alone, and a written save carrying
+  both bits. `tools/dump-live-save-file.ts:340` asserts a live save's `flags` are 0xa9,
+  which is right while both globals are off and has to follow them.
 
 ### C89 — `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears
 
