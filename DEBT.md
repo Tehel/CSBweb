@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C91 | `ReadDatabases`' checksum word is never compared | S | ⚠️ |
+| C91 | `ReadDatabases`' checksum word is never compared | M | ⚠️ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
@@ -138,8 +138,26 @@ cannot read it: DM's `dungeon.dat` has none. The port never compares it:
 `DungeonLoader.loadDungeonDat` reads CSB's prison, which ends with the word (0x939f), and
 `loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) checks only that a save's image ends
 two bytes before the file does, where `WriteAndChecksum`'s word sits (the writer's
-`buildImageChecksum`). Needed: the comparison in both, and a failed read that does what
-`tag01efee` does (trace it first), with a tool that flips one byte of each file.
+`buildImageChecksum`). A save's other failures, a block's checksum among them, throw
+from the loader (`src/data/SaveGameLoader.ts`), and nothing catches them as CSBWin does.
+
+`tag01efee` fades to `d.Palette11978`, then branches on `d.PartyHasDied`
+(`SaveGame.cpp:1895-1908`). At the boot (0) it prints "SAVED GAME DAMAGED!" and calls
+`die(0xbad)`, which ends the program. After a lost game it shows a one-button menu,
+"SAVED GAME DAMAGED!" / "PUT THE CHAOS STRIKES BACK DISK IN ~" / "OK", waits for the
+click, and goes back to `tag01ec56` to choose again. Every `return 0` of `ReadDatabases`
+and of `_ReadEntireGame`'s own reads ends there.
+
+Needed, in two steps:
+
+1. **The comparison**, in `loadDungeonDat` and `loadCsbwinWorld`, failing the read as a
+   bad block checksum fails it today, with a tool that flips one byte of the prison and
+   of a committed save.
+2. **`tag01efee`** for every failed read: the menu after a lost game, and, at the boot,
+   whatever stands for `die` in a page (an author's decision, since a page cannot end
+   itself: H's "The game does not quit" is the nearest precedent). It touches the boot
+   sequence and the load paths, so it may belong with the save menu rework (`PLAN.md` →
+   Phase 10).
 
 ---
 
