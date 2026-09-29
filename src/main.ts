@@ -19,7 +19,7 @@ import { bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabl
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
-import { runBootSequence, runShowCredits } from './renderer/intro/BootSequence';
+import { runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { loadUISettings } from './ui/settings';
@@ -30,14 +30,17 @@ console.log('Dungeon Master Web - Initializing...');
 let game: Game | null = null;
 let screen: GameScreen | null = null;
 let crtController: CrtController | null = null;
-/** Set by `onRestoreSave`, read and cleared by the save chooser (`consumeRestored`). */
-let restoredFromSave = false;
+/**
+ * Set by `onRestoreSave` and `onRestoreFailed`, read and cleared by the boot's save
+ * chooser (`consumeSavedGameRead`).
+ */
+let savedGameRead: SavedGameRead = 'cancelled';
 
-/** Whether the chooser's last `onRestoreSave` restored anything, and forget it. */
-function consumeRestored(): boolean {
-    const restored = restoredFromSave;
-    restoredFromSave = false;
-    return restored;
+/** How the chooser's last read came out, and forget it. */
+function consumeSavedGameRead(): SavedGameRead {
+    const read = savedGameRead;
+    savedGameRead = 'cancelled';
+    return read;
 }
 
 // Dev-only harness (PLAN.md Phase 14). Reached only via isDebugFeaturesEnabled().
@@ -336,8 +339,13 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
             // The entrance screen's "Resume" needs to know whether a save actually
             // came back: CSBWin loops on `ReadEntireGame`'s result and re-shows the
             // door when it did not (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
-            restoredFromSave = true;
+            savedGameRead = 'loaded';
             renderView();
+        },
+        // The boot's chooser only: its read failed, and `tag01efee` follows.
+        onRestoreFailed: (error) => {
+            console.error('Saved game damaged:', error);
+            savedGameRead = 'damaged';
         },
         onSetPaused: (paused) => game.setPaused(paused),
         onPaletteSelected: (index) => {
@@ -365,7 +373,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
             canvas: gameCanvasEl,
             gameScreen: screen,
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-            consumeRestored,
+            consumeSavedGameRead,
         },
         {
             queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0, z),
@@ -427,7 +435,7 @@ async function runIntro(screen: GameScreen, sound: SoundManager): Promise<void> 
         canvas: gameCanvasEl,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
-        consumeRestored,
+        consumeSavedGameRead,
         skip: skipIntro,
     });
 }

@@ -471,7 +471,9 @@ icon. It calls `SelectSaveGame(_9_, 1, 1, 1)` (`:1563`), against the disk icon's
 This port reaches the same place through `openSaveMenu(ui, 'loadOnly')` — the same unbounded
 list as the disk icon, with no SAVE button — drawn on a cleared screen by
 `GameScreen.presentSaveMenuOnly`. Cancelling puts the entrance back up, as the retry
-loop does. The four fixed slots, the recency letters and this port's other divergences from
+loop does. A save that fails its read closes the chooser and goes to `tag01efee`: "SAVED
+GAME DAMAGED!", then the entrance after a lost game, or the title at the boot, where CSBWin
+ends (`doc/PROVEN_FACTS.md` → "A failed read ends at `tag01efee`"). The four fixed slots, the recency letters and this port's other divergences from
 them are in `doc/CSBWIN_MENU_REFERENCE.md`.
 
 A load ends the chooser with `STHideCursor(HC33)` (`SaveGame.cpp:1564`), and `_GameSetup`

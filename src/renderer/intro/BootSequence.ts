@@ -12,6 +12,7 @@
  *        ├ _GameSetup(1) :10589
  *        │  ├ _TAG01f746 :9459             the entrance screen
  *        │  └ _ReadEntireGame               dungeon.dat, or the chosen save
+ *        │     └ tag01efee                  a failed read
  *        └ _TAG021028    :10460            "GAME LOADED, READY TO PLAY." after a load
  * ```
  *
@@ -41,10 +42,10 @@ export interface BootSequenceDeps {
   /** `StartSound` — see `timerDataToRateIndex` for where the rate index comes from. */
   playSound?: (soundId: number, rateIdx?: number) => void;
   /**
-   * Whether the last `onRestoreSave` actually restored something. The save screen owns the
-   * decision; the entrance screen only needs to know whether to put itself back up.
+   * How the chooser's last read came out. The save screen owns the read; the entrance
+   * screen only needs to know whether to put itself back up.
    */
-  consumeRestored: () => boolean;
+  consumeSavedGameRead: () => SavedGameRead;
   /** Skip the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
 }
@@ -200,6 +201,13 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
 /* ------------------------------------------------------------------ Resume ---- */
 
 /**
+ * How `_ReadEntireGame` came out on the chooser's path: 1 once a save is in, -1 when the
+ * chooser was cancelled (`tag01ec56`, `doc/CSBwin-src/SaveGame.cpp:1556-1559`), or a
+ * failed read, which ends at `tag01efee` (`:1895`).
+ */
+export type SavedGameRead = 'loaded' | 'cancelled' | 'damaged';
+
+/**
  * Button 201: the save/load screen, with no SAVE.
  *
  * `_ReadEntireGame` goes straight to the file chooser on this path — no "READY TO SAVE
@@ -209,15 +217,18 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
  * `checkExist` 1 blanks slots with no file behind them — which is exactly what this port's
  * `loadOnly` mode already does with an unbounded list (`ui/SaveMenu.ts`).
  *
- * Cancelling returns false, and `_GameSetup`'s retry loop puts the entrance back up
- * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
+ * Anything but `'loaded'` makes `_GameSetup`'s retry loop put the entrance back up
+ * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`), `'damaged'` once `tag01efee` is done.
  *
  * A load closes the chooser once the save is read, which is after the click, so the wait
  * for input also ends when the chooser closes. What the chooser last showed stays on the
  * screen: `onRestoreSave` has drawn the adventure into the screen by then, which CSBWin
  * does not draw before `_TAG021028`.
  */
-async function openLoadMenu(host: IntroHost, deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeRestored'>): Promise<boolean> {
+async function openLoadMenu(
+  host: IntroHost,
+  deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead'>,
+): Promise<SavedGameRead> {
   const { gameScreen } = deps;
 
   await fadeToPalette(host, PALETTE_11914);
@@ -239,6 +250,8 @@ async function openLoadMenu(host: IntroHost, deps: Pick<BootSequenceDeps, 'gameS
     chooserClosed();
   };
   gameScreen.setBootFrameRenderer(draw);
+  // Forget a load made in play before the game was lost: only this chooser's read counts.
+  deps.consumeSavedGameRead();
   gameScreen.openSaveMenu('loadOnly');
   draw();
   await fadeToPalette(host, palette11978(host));
@@ -253,7 +266,59 @@ async function openLoadMenu(host: IntroHost, deps: Pick<BootSequenceDeps, 'gameS
 
   gameScreen.setBootFrameRenderer(null);
   host.setCursorVisible(false);         // `STHideCursor(HC33)` (`SaveGame.cpp:1564`)
-  return deps.consumeRestored();
+  return deps.consumeSavedGameRead();
+}
+
+/**
+ * The chooser, then `tag01efee` if the read failed. `partyHasDied` is `d.PartyHasDied`:
+ * false at the boot, true once the credits' RESTART THIS GAME has set it
+ * (`doc/CSBwin-src/Mouse.cpp:1798`). Resolves to whether a save is in.
+ */
+async function readSavedGame(
+  host: IntroHost,
+  deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead'>,
+  partyHasDied: boolean,
+): Promise<boolean> {
+  const read = await openLoadMenu(host, deps);
+  if (read === 'damaged') await tag01efee(host, deps.gameScreen, partyHasDied);
+  return read === 'loaded';
+}
+
+/**
+ * What `die(0xbad)` stands for here: the boot's damaged file, acknowledged. `runBootSequence`
+ * catches it and starts again from the title. CSBWin's `die` ends in `UI_Die`
+ * (`doc/CSBwin-src/CSBCode.cpp:86-112`), which throws too (`CSBUI.cpp:1393-1396`), out to
+ * the program's end.
+ */
+export class BadSavedGame extends Error {
+  constructor() {
+    super('SAVED GAME DAMAGED!');
+  }
+}
+
+/**
+ * `tag01efee`, where every failed read of `_ReadEntireGame` ends
+ * (`doc/CSBwin-src/SaveGame.cpp:1895-1907`): a fade to `d.Palette11978`, then, after a
+ * lost game, a one-button menu whose click goes back to `tag01ec56`, which returns -1 and
+ * so puts the entrance up again (`:1556-1559`).
+ *
+ * At the boot CSBWin prints the line and calls `die(0xbad)`, which ends the program. A
+ * page cannot end itself (`DEBT.md` H), so the line is a menu of its own with an OK to
+ * acknowledge it, and the click throws `BadSavedGame`, back to the title.
+ *
+ * The "~" is CSBWin's own: this string goes to `DoMenu` without `SubstDiskLetter`.
+ */
+export async function tag01efee(host: IntroHost, menus: MenuScreen, partyHasDied: boolean): Promise<void> {
+  await fadeToPalette(host, palette11978(host));
+  if (partyHasDied) {
+    await doMenuCentred(host, menus, 'SAVED GAME DAMAGED!', 'PUT THE CHAOS STRIKES BACK DISK IN ~', ['OK']);
+  } else {
+    await doMenuCentred(host, menus, 'SAVED GAME DAMAGED!', null, ['OK']);
+  }
+  host.setCursorVisible(true);          // `STShowCursor(HC33)` (`:1900`)
+  await waitForMenuSelect(host, menus, 1);
+  host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:1902`)
+  if (!partyHasDied) throw new BadSavedGame();
 }
 
 /**
@@ -265,6 +330,9 @@ function palette11978(host: IntroHost): readonly number[] {
 }
 
 /* ------------------------------------------------------------- the hand-off ---- */
+
+/** What the boot's menus draw through: `GameScreen`'s share of `ui/Menu.ts`. */
+export type MenuScreen = Pick<GameScreen, 'doMenu' | 'menuButtonList' | 'drawMenuPress'>;
 
 /**
  * `_TAG021028`'s menu, when the game was loaded (`doc/CSBwin-src/CSBCode.cpp:10493-10537`):
@@ -297,7 +365,7 @@ async function tag021028(host: IntroHost, gameScreen: GameScreen, choice: Prison
  */
 async function doMenuCentred(
   host: IntroHost,
-  gameScreen: GameScreen,
+  gameScreen: MenuScreen,
   title1: string | null,
   title2: string | null,
   options: string[],
@@ -311,13 +379,14 @@ async function doMenuCentred(
 /**
  * `_WaitForMenuSelect` over the centred button set (`doc/CSBwin-src/Menu.cpp:33`): wait for
  * a click on one of the menu's buttons, run the press animation, discard the input, and
- * return the 1-based choice. A one-button menu would also take Return (`:82-93`); nothing
- * here raises one, and the intro's key events do not say which key it was.
+ * return the 1-based choice. No key selects a button: CSBWin's one-button arm for Return
+ * (`:82-93`) calls `NotImplemented`, which ends the program (`doc/PROVEN_FACTS.md` → "A
+ * one-button menu takes no key").
  *
  * The press paints its two passes into the screen, the second over the first, and puts
  * back what it covered (`:100-180`).
  */
-async function waitForMenuSelect(host: IntroHost, gameScreen: GameScreen, numButton: number): Promise<number> {
+async function waitForMenuSelect(host: IntroHost, gameScreen: MenuScreen, numButton: number): Promise<number> {
   const buttons = gameScreen.menuButtonList(numButton, true);
   let choice = 0;
   while (choice === 0) {
@@ -370,10 +439,16 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   // with a fade, so the first thing the player sees is a fade up from this.
   const { host, detach } = createIntroHost(deps, PALETTE_11914);
   try {
-    await displayChaosStrikesBack(host);
-    const choice = await showPrisonDoor(host, prisonDoorButtons(host), () => openLoadMenu(host, deps));
-    await tag021028(host, deps.gameScreen, choice);
-    return choice;
+    for (;;) {
+      try {
+        await displayChaosStrikesBack(host);
+        const choice = await showPrisonDoor(host, prisonDoorButtons(host), () => readSavedGame(host, deps, false));
+        await tag021028(host, deps.gameScreen, choice);
+        return choice;
+      } catch (error) {
+        if (!(error instanceof BadSavedGame)) throw error;
+      }
+    }
   } catch (error) {
     console.error('Boot sequence failed; entering the dungeon anyway', error);
     updateDebug(`Intro failed: ${error}`);
@@ -420,7 +495,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  * `'enter'` leaves `dungeon.dat` to be read, which is the page's.
  */
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
-  const resume = (): Promise<boolean> => openLoadMenu(host, deps);
+  const resume = (): Promise<boolean> => readSavedGame(host, deps, true);
   const choice = (await resume()) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), resume);
   await tag021028(host, deps.gameScreen, choice);
   return choice;

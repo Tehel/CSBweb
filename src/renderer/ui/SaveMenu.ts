@@ -545,9 +545,31 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
     state.busy = false;
     return;
   }
-  const bytes = await currentStore(state).read(entry.id);
-  ui.onRestoreSave?.(bytes);
-  // The menu closes on a successful load: the world it was listing is gone.
+  restoreChosenSave(ui, await currentStore(state).read(entry.id));
+}
+
+/**
+ * Restore the save the player chose, and close the menu: after a load the world it was
+ * listing is gone.
+ *
+ * A read that fails in the full menu throws, and its message goes on the status line
+ * (`runPending`). The load-only chooser is `_ReadEntireGame`'s, where every failed read
+ * ends at `tag01efee` instead (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895`): it
+ * closes, and `onRestoreFailed` hands the failure to its caller
+ * (`src/renderer/intro/BootSequence.ts`).
+ */
+export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
+  const state = ui.saveMenu;
+  if (!state) return;
+  if (state.mode === 'full') {
+    ui.onRestoreSave?.(bytes);
+  } else {
+    try {
+      ui.onRestoreSave?.(bytes);
+    } catch (error) {
+      ui.onRestoreFailed?.(error);
+    }
+  }
   closeSaveMenu(ui);
   ui.renderLastFrame();
 }
@@ -582,9 +604,9 @@ function uniqueName(name: string, taken: ReadonlySet<string>): string {
 /* ------------------------------------------------------------------- keyboard ---- */
 
 /**
- * CSBWin's menus take one key, Return, and only on a one-button menu
- * (`doc/CSBwin-src/Menu.cpp:82-93`). A list needs arrows, and Esc is the cancel every
- * player will try; both are additions, recorded as such.
+ * CSBWin's menus take no key (`doc/PROVEN_FACTS.md` → "A one-button menu takes no key").
+ * A list needs arrows, and Esc is the cancel every player will try; both are additions,
+ * recorded as such.
  *
  * Returns whether the key was taken, so the host can stop it reaching the movement keys
  * exactly as it does for the Reincarnate screen.

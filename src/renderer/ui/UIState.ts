@@ -255,6 +255,11 @@ export interface UIState {
   onSaveWritten?: () => void;
   /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
   onRestoreSave?: (bytes: Uint8Array) => void;
+  /**
+   * The load-only chooser's `onRestoreSave` threw: `_ReadEntireGame`'s read failed, and
+   * its caller goes to `tag01efee` (`src/renderer/intro/BootSequence.ts`).
+   */
+  onRestoreFailed?: (error: unknown) => void;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;

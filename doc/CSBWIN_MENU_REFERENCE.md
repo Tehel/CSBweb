@@ -181,8 +181,10 @@ whole input mapping and restoring it afterwards:
 
 `d.Word11764` is written in one place only (`doc/CSBwin-src/Mouse.cpp:1792-1796`):
 `if ((D6W >= 210) && (D6W <= 213)) d.Word11764 = sw(D6W - 209);`. Everything else in the
-panel is unreachable because both lists were replaced. Keyboard: **only a one-button menu
-accepts Return** (`Menu.cpp:82-93`); all other key translation is off. On exit the two
+panel is unreachable because both lists were replaced. Keyboard: **no key selects a
+button.** Key translation is off, and the one-button arm that reads a key calls
+`NotImplemented`, which ends CSBWin (`Menu.cpp:82-93`; `doc/PROVEN_FACTS.md` → "A
+one-button menu takes no key"). On exit the two
 button lists and both `pKeyXlate`s are restored and `DiscardAllInput()` is called.
 
 ### Nothing pauses the clock
@@ -343,8 +345,8 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    The rank letter is what the date replaces; the ordering rule is the same one
    (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.
 4. **No "SAVE AND QUIT"** — there is no credits screen to quit to yet.
-5. **Esc and right-click cancel.** CSBWin's menus have no keyboard at all beyond Return on
-   a one-button menu. This is an addition, not a changed behaviour.
+5. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
+   addition, not a changed behaviour.
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
 is used unchanged for the title-only and one-button menus (`"SAVING GAME . . ."`,

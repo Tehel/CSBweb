@@ -2741,6 +2741,41 @@ mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`:1741-1742`). Th
 throws "dungeon image checksum mismatch" from `DungeonLoader`
 (`tools/dump-image-checksum.ts`).
 
+## A failed read ends at `tag01efee`
+
+Every `goto tag01efee` in `_ReadEntireGame` is a read that failed: a stream's checksum
+(`doc/CSBwin-src/SaveGame.cpp:1601`, `:1621`, `:1673-1697`), `ReadDatabases` returning 0 (`:1741-1742`), and
+the checks after it (`:1824-1831`). `tag01efee` fades to `d.Palette11978`, then branches on
+`d.PartyHasDied` (`:1895-1907`):
+
+- **0, the boot.** `PRINTLINE("SAVED GAME DAMAGED!")` and `die(0xbad)`. `die` puts up a
+  "System Error" message box and ends in `UI_Die` (`CSBCode.cpp:86-112`), which throws
+  out of the program (`CSBUI.cpp:1393-1396`).
+- **Not 0, after a lost game.** `DoMenu(_14_, "SAVED GAME DAMAGED!", "PUT THE CHAOS
+  STRIKES BACK DISK IN ~", "OK", …, 1, 1, 1)`, `WaitForMenuSelect(_6_, 1, 1, 0, 0)`
+  between `STShowCursor` and `STHideCursor`, then `goto tag01ec56`, which returns -1
+  (`:1556-1559`). The string reaches `DoMenu` without `SubstDiskLetter`, so the "~" is
+  drawn as it stands. `_GameSetup`'s loop takes the -1 as a failed read and puts the
+  entrance up again (`CSBCode.cpp:10634-10641`). `d.PartyHasDied` is set by the credits'
+  RESTART THIS GAME (`Mouse.cpp:1798`).
+
+The port's boot runs `tag01efee` in `src/renderer/intro/BootSequence.ts`, reached from
+the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`). At the boot, the
+line is a one-button menu and its click goes back to the title (`DEBT.md` H). The full
+save menu, which CSBWin does not have, keeps its status line. Evidence:
+`tools/dump-bad-saved-game.ts`.
+
+## A one-button menu takes no key
+
+`_WaitForMenuSelect` has an arm for a one-button menu that reads the keyboard
+(`doc/CSBwin-src/Menu.cpp:82-93`), but it cannot select the button. `UI_CONSTAT` returns 1
+when a key is queued and 0 otherwise (`CSBUI.cpp:1370-1374`), and the arm then calls
+`NotImplemented(0x1d25a)` in place of `DIRECT_CONIN`. `NotImplemented` puts up a message
+box and calls `UI_Die`, which ends the program (`system.cpp:177-189`). Its `D0W == 13` test
+compares `UI_CONSTAT`'s 0 or 1, so it is never true. Only a click ends such a menu. The
+port's `waitForMenuSelect` (`src/renderer/intro/BootSequence.ts`) ignores keys, where
+CSBWin would end.
+
 ## `ExtendPortraits` cleans the mirrors of every file read without `ExpandedPortraits`
 
 `_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once

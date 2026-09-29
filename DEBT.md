@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C91 | A failed read never reaches `tag01efee` | M | ⚠️ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
@@ -126,30 +125,7 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-A divergence found along the way goes here, with the next free ID.
-
-### C91 ⚠️ A failed read never reaches `tag01efee`
-
-Every `return 0` of `ReadDatabases` and of `_ReadEntireGame`'s own reads ends at
-`tag01efee` (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895`). The port's reads throw
-instead: `DungeonLoader` on the image's checksum word, `SaveGameLoader` on a block's
-checksum or a short file. Only the save menus catch them, through `applySaveBytes`
-(`src/engine/SaveGamePayload.ts`), and show the message on their status line.
-
-`tag01efee` fades to `d.Palette11978`, then branches on `d.PartyHasDied`
-(`SaveGame.cpp:1895-1908`). After a lost game it shows a one-button menu,
-"SAVED GAME DAMAGED!" / "PUT THE CHAOS STRIKES BACK DISK IN ~" / "OK", waits for the
-click, and goes back to `tag01ec56` to choose again. At the boot (0) it prints
-"SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends the program.
-
-**The author's decision for the boot:** a page cannot end itself, so a damaged file
-there shows "SAVED GAME DAMAGED!" with a button to acknowledge it, and the click goes
-back to the title. That is a deliberate divergence, recorded in H when it is built,
-beside "The game does not quit".
-
-Needed: `tag01efee` for every failed read, the menu after a lost game and the boot's
-acknowledged message, in place of the status line. It touches the boot sequence and the
-load paths, so it may belong with the save menu rework (`PLAN.md` → Phase 10).
+Empty. A divergence found along the way goes here, with the next free ID.
 
 ---
 
@@ -209,6 +185,14 @@ where an in-game switch would have to rebuild the tables, the sound and the scre
 caches in place. Conflux (`static/gamefiles/conflux-3.5-b8/`)
 is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
 parse, and nothing has examined its format.
+
+The data set's `dungeon.dat` has to be read where CSBWin reads it. The page reads it before
+the title (`loadGameFiles`), and after a lost game once ENTER is chosen (`showEndOfGame`,
+`src/main.ts`), both outside `_GameSetup`'s loop. So a file that fails its read ends the
+page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read reaches
+`tag01efee` (`doc/PROVEN_FACTS.md` → "A failed read ends at `tag01efee`"), as a save's
+does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
+checksum word and cannot fail that way. CSB's prison can.
 
 ### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
@@ -570,6 +554,12 @@ Recorded so that nobody "fixes" them.
 - 🚫 **The game does not quit.** `_ShowCredits` ends in `UI_PushMessage(UIM_TERMINATE)`
   (`doc/CSBwin-src/Code1f9e6.cpp:349`), which closes CSBWin. A page cannot close itself,
   so the credits picture stays up (`src/renderer/intro/ShowCredits.ts`).
+- 🚫 **A damaged file at the boot goes back to the title.** There `tag01efee` prints
+  "SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends CSBWin
+  (`doc/CSBwin-src/SaveGame.cpp:1905-1907`). A page cannot end itself, so the author's
+  decision is a one-button menu with the line and OK, whose click goes back to the title
+  animation (`tag01efee` and `runBootSequence`, `src/renderer/intro/BootSequence.ts`).
+  After a lost game `tag01efee` is CSBWin's own.
 - 🚫 **`?intro=0`, and Debug in the saved UI settings, skip the whole intro.** This is a
   developer affordance with no CSBWin counterpart, kept deliberately: eleven of the fourteen golden
   frames boot through it.

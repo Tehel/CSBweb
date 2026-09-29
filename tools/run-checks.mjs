@@ -154,6 +154,9 @@ const CHECKS = [
   // `ReadDatabases`' checksum word, compared with the image's byte sum: a flipped byte
   // fails the prison, DM's dungeon.dat once a word follows it, and every committed save.
   { tool: 'dump-image-checksum.ts' },
+  // And where such a failed read goes: the boot's chooser hands it to `tag01efee`, whose
+  // menu after a lost game, and acknowledged line at the boot, only a left click on OK ends.
+  { tool: 'dump-bad-saved-game.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing

@@ -120,6 +120,7 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
+  | 'onRestoreFailed'
   | 'onSetPaused'
 >> {
   /**
@@ -194,6 +195,7 @@ export class GameScreen {
     ui.onCreateSave = hooks.onCreateSave;
     ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;
+    ui.onRestoreFailed = hooks.onRestoreFailed;
     ui.onSetPaused = hooks.onSetPaused;
     this.onPaletteSelected = hooks.onPaletteSelected;
 
