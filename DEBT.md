@@ -39,12 +39,17 @@ and no session picks one up unless the author names it:
 - **CSBWin's debugging features** that are not part of the game (the ASCII dump).
 - **Comparing frames against CSBWin's own screenshots** (`PLAN.md` → Phase 15, step 5):
   staging the same scene in CSBWin, without cheats, costs more than it proves.
+- **X — Extras**: gameplay features CSBWin does not have, wanted by the author once the
+  faithful game is complete.
 
 A **Chaos Strikes Back** feature is *not* postponed: CSB is the next dungeon to try once the
 default one is satisfying, and DM is a subset of it. A feature CSB needs stays in the
 active list, even if DM never reaches it.
 
 **H** is not debt: deliberate divergences, recorded so nobody "fixes" them.
+
+**X** is not a divergence either: every extra sits behind one setting that is off by
+default, so with it off the game is CSBWin's and the golden frames do not move.
 
 ## How to work this list
 
@@ -94,6 +99,9 @@ In payoff order: the first row is the next item.
 | G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
 | G20 | The hint oracle | — | ⏸️ |
+| X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
+| X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
+| X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. The ⏸️ rows are postponed (see "Priority") and are
@@ -101,7 +109,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C89 · D11 · E8 · F12 · G21. An ID recorded and paid in one commit has no
+Next free IDs: C89 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -398,6 +406,91 @@ CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`, a 7936-line 
 reads `hcsb.hct` and `hcsb.dat`, deciphered with RC4 under the `hintKey` of a save's
 Extended Features block (`:5401-5628`, `SaveGame.cpp:382`), and answers questions about
 a CSB game in progress. It is not the game, so it waits; the author names it to start it.
+
+---
+
+## X — Extras (not in CSBWin)
+
+Features from later versions of the game or from elsewhere, which the author wants once
+the default dungeon is validated. Postponed (⏸️) like the G items below "Postponed", and
+taken only when the author names one.
+
+Rules for all of them:
+
+- **One setting, off by default**, a `UISettings` flag (`src/ui/settings.ts`) that the
+  first extra paid adds and the others share. With it off, the game is CSBWin's: every
+  tool's output and every golden frame stay the same.
+- **None of them is saved.** What an extra keeps in memory is lost on a save and a load,
+  in the port's runtime save as in a CSBWin file, and that is acceptable: no save format
+  changes.
+- **Each ships with its `tools/` check**, run with the setting on, and its entry here is
+  deleted as for any paid item.
+
+### X1 ⏸️ Drinking from a fountain with an empty hand
+
+CSBWin's fountain is a wall decoration, not an actuator: the renderer sets
+`d.FacingWaterFountain` when the decoration in front is `d.Word4040[0]`
+(`doc/CSBwin-src/CSBCode.cpp:3302-3308`), and a click on viewport button 5 with it set
+fills a waterskin or an empty flask held in the cursor, and does nothing else
+(`doc/CSBwin-src/Mouse.cpp:1194-1225`). The port has the same thing in
+`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:135`), which returns at once
+when the hand is empty.
+
+The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
+gulp from a full waterskin: `waterValue = 800` and `SOUND_GULP` (`computeFeedParameters`,
+`src/renderer/ui/Feeding.ts:57-66`), applied through `applyFeeding`, so the water cap
+and the sound are CSBWin's own. A dead or absent cursor owner drinks nothing.
+
+### X2 ⏸️ A mastery just gained shown in green
+
+A level gain raises attribute **maximums** only (`IncrMaximum`, `src/engine/skills.ts:350`
+onwards), and the current values climb to them over time. Meanwhile the attribute panel
+already prints those values in red (`drawAttributePanel`,
+`src/renderer/ui/Character.ts:104-107`). The mastery lines above them are always drawn in
+colour 13 (`:80-88`).
+
+The extra: when a role's mastery rises, remember, per champion and per role, which
+attributes that level gain raised. Draw the role's line in colour 7 (the green the panel
+already uses for an attribute above its maximum) until every one of them has reached its
+new maximum again. The panel cannot work this out on its own, because a drop below the
+maximum from a level gain looks the same as one from damage or a potion. The check can
+run when the panel is drawn. Lost on a save, the line just goes back to colour 13.
+
+### X3 ⏸️ Thrown weapons gathered back when the party walks over them
+
+An idea from *Legend of Grimrock*. Only a weapon thrown by an **attack action** is
+gathered back, never one thrown from the cursor:
+
+- **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1458`) throws the weapon-hand object,
+  slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:44`).
+- **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1550`) fires the ammunition
+  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:540`).
+  `launchObject` also launches spells, so the object is tagged in the attack, not there.
+
+A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
+on the floor where it lands, and in a monster's possessions when a hit absorbs it
+(`MissileEncounter.ts:434`), which the monster drops when it dies. So a tag table
+`ObjectID → { champion, slot }`, filled at the throw, follows it without any further
+work.
+
+Needed:
+
+- **The trigger.** When the party arrives on a cell, after that cell's actuators have
+  fired, take every tagged object lying there. Arrival covers the stairs, pits and
+  teleporters (`src/engine/WorldMove.ts`) as well as a step.
+- **Taking it the proper way.** The object comes off the floor through the same
+  remove-from-cell path as a pickup by hand, so a pressure plate under it still fires.
+- **Putting it back.** Into the slot it left if that is empty and the object's carry
+  mask allows it there (`objDescCarryMask`). Otherwise into the first free slot that
+  allows it (quiver, then pack). The load is recomputed from the possessions (H). If the
+  thrower is dead or has no room, the object stays on the floor, keeping its tag.
+- **Dropping tags.** A tag goes when the object is picked up by hand, and when its
+  record is freed (`deleteDBEntry`, `SmartDiscard`, `MakeMoreRoomInDB`). A freed record
+  handed out again must not inherit it. Every writer of `objectInHand` and every caller
+  of `deleteDBEntry` is found by grep, as for any empty value (`CLAUDE.md` → "Object IDs").
+
+A `watch-*.ts` tool proves it: throw and shoot at a wall and at a monster, kill the
+monster, walk onto the cell, and check the inventory, the floor chain and the load.
 
 ---
 
