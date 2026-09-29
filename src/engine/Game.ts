@@ -330,6 +330,16 @@ export class Game implements MainLoop {
     }
 
     /**
+     * `_ShowPrisonDoor` once `GameSetup` has read the game, new or resumed:
+     * `if (DMRulesDesignOption) DM_rules = true` (doc/CSBwin-src/CSBCode.cpp:10672-10676).
+     * The boot's alone: the restart after a lost game calls `GameSetup` straight
+     * (`Code1f9e6.cpp:310`) and does not force it.
+     */
+    forceDMRulesAtBoot(): void {
+        if (this.ctx.rules.dmRulesDesignOption) this.ctx.rules.dmRules = true;
+    }
+
+    /**
      * The tail of `_ReadEntireGame` once a saved game is in: `d.CanRestartFromSavegame = 1`
      * (doc/CSBwin-src/SaveGame.cpp:1883). `applySaveBytes` calls it.
      */

@@ -62,6 +62,7 @@ const CHECKS = [
   { tool: 'dump-room-text.ts' },
   { tool: 'dump-ninety-second-update.ts' },
   { tool: 'dump-hall-of-champions.ts' },
+  { tool: 'dump-dm-rules.ts' },
   { tool: 'dump-vi-altar.ts' },
   { tool: 'dump-viewport-click.ts' },
   { tool: 'dump-queue-sound.ts' },

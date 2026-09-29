@@ -2708,6 +2708,28 @@ The committed saves show which file each game was started from. The three with `
 zero: `dm-atari`, cleaned by today's `ExtendPortraits`. The eleven with 0xe9 keep
 `Position` on 18 mirrors and carry `DMRules`: the Windows package's file.
 
+## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block sets them
+
+`DM_rules` (`doc/CSBwin-src/data.cpp:251`) and `DMRulesDesignOption` (`CSBUI.cpp:137`) are
+plain globals, both `false` at start, outside `d.`. `DM_rules` is read in one place: the
+reincarnation in `_ResurrectReincarnateCancel` lowers attributes 1-6 and scales HP,
+stamina and mana only `if (!DM_rules)` (`CSBCode.cpp:6740`, `:6761`).
+
+They are assigned in four places:
+
+- `ReadExtendedFeatures`: `DMRulesDesignOption` from `flags & DMRules` (0x40),
+  `DM_rules` from `extendedFlags & DMRulesOption` (0x08) (`SaveGame.cpp:392-398`). A file
+  with no block never reaches it, so both keep what they held: a new game on
+  `dm-atari/dungeon.dat`, and CSB's Atari-era saves.
+- `_ShowPrisonDoor`, once `GameSetup(_1_, 1)` has read the game, new or resumed:
+  `if (DMRulesDesignOption) DM_rules = true` (`CSBCode.cpp:10672-10676`). The restart
+  after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`), without it.
+- The player's "DM Rules" menu item toggles `DM_rules` (`CSBUI.cpp:912-914`).
+- Playback of a recording (`Recording.cpp:285`, `:291`).
+
+`SaveGame` writes both back (`SaveGame.cpp:950-955`). Eleven of the fourteen committed
+saves carry both bits.
+
 ## `NumWordsInTextArray` means two different things either side of the conversion
 
 `DUNGEONDATINDEX::word6` sizes the raw text array in a `dungeon.dat` — 1749 words for DM
@@ -2778,14 +2800,15 @@ are always zero are `editingOptions`, `graphicsSignature1/2`, `csbGraphicsSignat
 
 `flags` gets four bits unconditionally — `LevelDSAInfoPresent` (`:940`), `IndirectText`,
 `ExpandedPortraits` and `BigActuators` (`:961-963`) — which is 0xa9, exactly what
-`csbgame.dat`, `csbgame2.dat` and `csbgame3.dat` carry. The five newest saves carry 0xe9,
-the same four plus `DMRules` (`DMRulesDesignOption`, a design option). `SimpleEncryption`
-and `AutoRecord` are the other two, both conditional and both off everywhere.
+`csbgame.dat`, `csbgame2.dat` and `csbgame3.dat` carry. The other eleven carry 0xe9,
+the same four plus `DMRules`, written from `DMRulesDesignOption` (`:952-953`).
+`SimpleEncryption` and `AutoRecord` are the other two, both conditional and both off
+everywhere.
 
 `extendedFlags` gets three unconditionally (`:964-966`): `SequencedTimers`,
 `ExtendedTimers` — which together select the 16-byte `TIMER` — and `DefaultDirectX`,
 which is 0xe0 and exactly what `csbgame3.dat` carries. The newest saves add
-`ExtendedWallDecorations` and `DMRulesOption` for 0xf8. `csbgame.dat` and `csbgame2.dat`
+`ExtendedWallDecorations` and `DMRulesOption`, written from `DM_rules` (`:950-951`), for 0xf8. `csbgame.dat` and `csbgame2.dat`
 carry **0**, an older CSBWin that wrote 10-byte timers, which is the case that proves the
 field is read rather than assumed.
 

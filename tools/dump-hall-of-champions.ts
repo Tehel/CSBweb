@@ -15,7 +15,8 @@
  * What to look for: the fingerprint is the party's own cell packed into a word, not a
  * counter; Cancel leaves the mirror exactly as it was, possessions included; Resurrect
  * unlinks those same objects from the room and turns the portrait actuator off; and
- * Reincarnate wipes all twenty skills before charging the hero's own penalties.
+ * Reincarnate wipes all twenty skills before charging the hero's own penalties, which
+ * `DM_rules` waives.
  *
  * Run: `npx tsx tools/dump-hall-of-champions.ts`
  */
@@ -434,6 +435,40 @@ function main(): void {
   check(wizard.attributes.maxMana === scale(before.maxMana), 'MaxMana likewise');
   check(probeMessages(game).some((m) => m.text === ' REINCARNATED'), 'REINCARNATED is printed');
   check(party.magicCasterIndex === 0, 'a second champion does not steal the magic tab');
+
+  /* ------------------------------------------- 5b. Reincarnate under DM_rules ---- */
+
+  // `if (!DM_rules)` guards both penalties (`doc/CSBwin-src/CSBCode.cpp:6740`, `:6761`):
+  // the same champion, reincarnated in a game with DM rules on, keeps every attribute
+  // and stat, and only the twelve random points and the wiped skills remain.
+  console.log('');
+  console.log('=== Reincarnate under DM_rules: no penalty ===');
+  {
+    const g = makeGame();
+    g.ctx.rules.dmRules = true;
+    standAtMirror(g, heroByName(g, 'BORIS'));
+    g.handleWallClick();
+    const zed = g.party.state.champions[0]!;
+    const start = zed.attributes.stats.map((a) => attributeCurrent(a));
+    const stats = { ...zed.attributes };
+    let opened = -1;
+    reincarnateScreen = (chIdx) => { opened = chIdx; };
+    g.resurrectReincarnateCancel(REINCARNATE);
+    g.reincarnateNamed(opened, 'ZED', 'THE RENAMED');
+    const after = zed.attributes.stats.map((a) => attributeCurrent(a));
+    console.log(`attributes ${start.join(' ')} -> ${after.join(' ')}`);
+    console.log(`maxHealth ${stats.maxHealth} -> ${zed.attributes.maxHealth}, ` +
+      `maxStamina ${stats.maxStamina} -> ${zed.attributes.maxStamina}, ` +
+      `maxMana ${stats.maxMana} -> ${zed.attributes.maxMana}`);
+    check(after.every((v, i) => v >= start[i]!), 'no attribute is lowered');
+    check(after.reduce((sum, v, i) => sum + v - start[i]!, 0) === 12,
+      'the only change is the twelve random points');
+    check(zed.attributes.health === stats.health && zed.attributes.maxHealth === stats.maxHealth &&
+      zed.attributes.stamina === stats.stamina && zed.attributes.maxStamina === stats.maxStamina &&
+      zed.attributes.mana === stats.mana && zed.attributes.maxMana === stats.maxMana,
+      'HP, stamina and mana are not scaled');
+    check(zed.skills.every((s) => s.experience === 0), 'the skills are still wiped');
+  }
 
   /* ------------------------------------------------ 6. the guards on adding ----- */
 

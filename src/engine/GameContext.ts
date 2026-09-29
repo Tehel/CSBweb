@@ -99,12 +99,29 @@ export interface GameContext {
    * the start and never saved.
    */
   readonly levelCleared: Uint8Array;
+  /** `DM_rules` and `DMRulesDesignOption`, which outlive a game (`RulesOptions`). */
+  readonly rules: RulesOptions;
   /** Every table from `graphics.dat`. */
   readonly tables: GameTables;
   /** What only the host can do: play a sample, trace, tell the UI something. */
   readonly host: GameHost;
   /** The subsystems, filled by `Game` as it builds them. */
   readonly systems: GameSystems;
+}
+
+/**
+ * Two of CSBWin's process-wide globals, not `d.`'s: `DM_rules` (`doc/CSBwin-src/data.cpp:251`)
+ * and `DMRulesDesignOption` (`CSBUI.cpp:137`), both `false` at start. Only
+ * `ReadExtendedFeatures` assigns them from a file (`SaveGame.cpp:392-398`), and only for a
+ * file whose block is present, so a file without one (`dm-atari/dungeon.dat`, CSB's
+ * Atari-era saves) leaves both as they were. A new game and a load therefore keep them:
+ * `Game.readNewGame` and the save paths never replace this object.
+ */
+export interface RulesOptions {
+  /** `DM_rules`: reincarnation costs nothing (`CSBCode.cpp:6740`, `:6761`). */
+  dmRules: boolean;
+  /** `DMRulesDesignOption`: the dungeon asks for DM rules, forced on at the boot. */
+  dmRulesDesignOption: boolean;
 }
 
 /**
@@ -181,6 +198,7 @@ export function createGameContext(
     sounds: new SoundQueue(party, tables.sound1772, host, state, timers),
     smartDiscard: createSmartDiscardState(),
     levelCleared: new Uint8Array(16),
+    rules: { dmRules: false, dmRulesDesignOption: false },
     tables,
     host,
     // Empty until `Game` fills it; a tool that stands one subsystem up fills what it needs.

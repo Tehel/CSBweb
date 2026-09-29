@@ -257,26 +257,30 @@ export class HallOfChampions {
     const attributePenalty = hero?.reincarnateAttributePenalty ?? 2;
     const statPenalty = hero?.reincarnateStatPenalty ?? 8;
 
-    // `DM_rules` is false by default (`doc/CSBwin-src/data.cpp:251`), so both
-    // penalties apply. Attributes 1..6 only — Luck (0) is left alone.
-    for (let index = 1; index <= 6; index++) {
-      const attribute = champion.attributes.stats[index];
-      if (!attribute) continue;
-      let value = attributeCurrent(attribute);
-      value -= Math.trunc((value * attributePenalty) / 16);
-      value = Math.max(value, attributeMinimum(attribute));
-      setAttributeCurrent(attribute, value);
-      setAttributeMaximum(attribute, value);
+    // Both penalties only `if (!DM_rules)` (`:6740`, `:6761`). Attributes 1..6 only — Luck
+    // (0) is left alone.
+    if (!this.ctx.rules.dmRules) {
+      for (let index = 1; index <= 6; index++) {
+        const attribute = champion.attributes.stats[index];
+        if (!attribute) continue;
+        let value = attributeCurrent(attribute);
+        value -= Math.trunc((value * attributePenalty) / 16);
+        value = Math.max(value, attributeMinimum(attribute));
+        setAttributeCurrent(attribute, value);
+        setAttributeMaximum(attribute, value);
+      }
     }
 
-    const scale = (value: number): number => Math.trunc((value * (16 - statPenalty)) / 16);
-    const stats = champion.attributes;
-    stats.health = scale(stats.health);
-    stats.maxHealth = scale(stats.maxHealth);
-    stats.stamina = scale(stats.stamina);
-    stats.maxStamina = scale(stats.maxStamina);
-    stats.mana = scale(stats.mana);
-    stats.maxMana = scale(stats.maxMana);
+    if (!this.ctx.rules.dmRules) {
+      const scale = (value: number): number => Math.trunc((value * (16 - statPenalty)) / 16);
+      const stats = champion.attributes;
+      stats.health = scale(stats.health);
+      stats.maxHealth = scale(stats.maxHealth);
+      stats.stamina = scale(stats.stamina);
+      stats.maxStamina = scale(stats.maxStamina);
+      stats.mana = scale(stats.mana);
+      stats.maxMana = scale(stats.maxMana);
+    }
 
     // Twelve random attribute points, Current and Maximum together (`:6777-6783`).
     // CSBWin parses a `randomPoints` field out of the hero text and then ignores it

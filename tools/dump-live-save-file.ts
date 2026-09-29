@@ -337,9 +337,11 @@ function writeAndReload(label: string, game: Game): Game | null {
   }
   check(parsed.save.extendedFeatures !== undefined, `${label}: it carries an Extended Features block`);
   check(parsed.save.dungeonImageOffset !== undefined, `${label}: and a dungeon image`);
-  check((parsed.save.extendedFeatures?.flags ?? 0) === 0xa9,
-    `${label}: flags declare LevelDSAInfo|IndirectText|ExpandedPortraits|BigActuators ` +
-    `(0x${(parsed.save.extendedFeatures?.flags ?? 0).toString(16)})`);
+  // Plus `DMRules` when the game holds `DMRulesDesignOption` (`SaveGame.cpp:952-953`).
+  const flagsExpected = game.ctx.rules.dmRulesDesignOption ? 0xe9 : 0xa9;
+  check((parsed.save.extendedFeatures?.flags ?? 0) === flagsExpected,
+    `${label}: flags declare LevelDSAInfo|IndirectText|ExpandedPortraits|BigActuators, and DMRules ` +
+    `with the design option (0x${(parsed.save.extendedFeatures?.flags ?? 0).toString(16)})`);
   check(parsed.save.sequencedTimers === true && parsed.save.extendedTimers === true,
     `${label}: and the 16-byte TIMER the block 5 writer used`);
   check(parsed.save.cellFlagArraySize === 12366,

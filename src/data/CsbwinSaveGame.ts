@@ -40,6 +40,7 @@
  *   carries where this reader looks.
  */
 import { loadCsbwinWorld, type CsbwinWorld } from './CsbwinDungeonImage';
+import { readRulesOptions } from './CsbwinExtendedFeatures';
 import { readCsbwinParty, readCsbwinPartyTail } from './CsbwinCharacters';
 import { captureDungeonSnapshot } from '../engine/DungeonSnapshot';
 import type { Game } from '../engine/Game';
@@ -251,6 +252,7 @@ export function buildCsbwinRuntimeState(
 /** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
 export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     const world = loadCsbwinWorld(bytes);
+    readRulesOptions(game.ctx.rules, world.save.extendedFeatures);
     const runtime = buildCsbwinRuntimeState(world, {
         // Keep what the running game has; see the module comment on `EXPOOL`.
         dsaGlobals: game.getDsaGlobalVariables(),

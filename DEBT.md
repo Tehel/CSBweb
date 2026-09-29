@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C88 | `DM_rules` is not modelled | M | ⏳ |
 | C89 | `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears | S | ⏳ |
 | G16 | A compressed `dungeon.dat` | S | ⏳ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
@@ -130,48 +129,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C88 — `DM_rules` is not modelled
-
-`DM_rules` is CSBWin's one switch between the two games' rules, and it is read in one
-place: `_ResurrectReincarnateCancel`'s reincarnation, which lowers attributes 1-6 by
-`reincarnateAttributePenalty / 16` and scales HP, stamina and mana by
-`(16 - reincarnateStatPenalty) / 16` only `if (!DM_rules)`
-(`doc/CSBwin-src/CSBCode.cpp:6740-6769`). It is `false` by default (`data.cpp:251`), set
-from a file's `extendedFlags & DMRulesOption` by every `ReadExtendedFeatures`
-(`SaveGame.cpp:396-398`), forced `true` by the designer's `flags & DMRules`
-(`DMRulesDesignOption`, `:392-393`) when `_ShowPrisonDoor` starts (`CSBCode.cpp:10672-10676`),
-toggled by the player's "DM Rules" menu item (`CSBUI.cpp:912-914`), and written back to a
-save (`SaveGame.cpp:950-955`). The port applies the penalties unconditionally
-(`HallOfChampions.ts`, "`DM_rules` is false by default") and writes both flags off
-(`buildLiveExtendedFeatures`), yet eleven of the fourteen committed DM saves carry
-`DMRulesOption` (`extendedFlags` 0xf8) and `DMRules` (`flags` 0xe9): CSBWin reincarnates
-at no cost in them, and the port does not. Those eleven were started from the DM Windows
-package's `dungeon.dat`, which declares `DMRules` (`flags` 0xeb). `dm-atari/dungeon.dat`
-has no Extended Features block, so a CSBWin game started from it has `DM_rules` false
-until the player toggles it (`doc/PROVEN_FACTS.md` → "DM's two `dungeon.dat` files").
-Modelling it means the flag on the game, set as CSBWin sets it, read at the
-reincarnation, and written; the player's toggle belongs with the dungeon chooser (G18).
-What that takes:
-
-- **Two process-wide globals, not the world's.** `DM_rules` and `DMRulesDesignOption`
-  (`CSBUI.cpp:137`) are assigned only by `ReadExtendedFeatures`, for a file whose block is
-  present. A file without one (`dm-atari/dungeon.dat`, CSB's Atari-era saves) leaves both
-  as they were, a lost game's "enter" included. So they live on the `Game`, surviving
-  `readNewGame` and a load, not in the dungeon snapshot where `extendedWallDecorations`
-  is, which a new game resets.
-- **The forcing is the boot's alone.** `if (DMRulesDesignOption) DM_rules = true` is in
-  `_ShowPrisonDoor` (`CSBCode.cpp:10671-10676`, reached from `_StartCSB`, `:11310`). The
-  restart after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`) and
-  does not force. The port's boot is `runIntro` in `src/main.ts`.
-- **One read, one write.** Both bits go through `loadSaveGameState` (`flags` 0x40,
-  `extendedFlags` 0x08) and `buildLiveExtendedFeatures`. The port's own JSON saves carry
-  that block in `raw` (`src/engine/SaveGamePayload.ts:268`), so `applySaveGameState`'s
-  path serves both formats.
-- **The check:** a reincarnation with and without `DM_rules`, a committed save with 0xf8
-  loading it on, the boot forcing it from `DMRules` alone, and a written save carrying
-  both bits. `tools/dump-live-save-file.ts:340` asserts a live save's `flags` are 0xa9,
-  which is right while both globals are off and has to follow them.
-
 ### C89 — `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears
 
 `_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once
@@ -204,7 +161,7 @@ CSBWin run, is not cleaned. Check what the port does when it loads twice in one 
 **What it costs today.** In `dm-atari/dungeon.dat` all 24 mirrors carry leftover bits in
 those fields (`word4` 0xa080, and `word6` non-zero):
 - Every mirror reads `DisableMessage` = 2 (clear). This is dormant while
-  `PortraitTranslateDisable` is unported (`src/engine/HallOfChampions.ts:341`). Once it
+  `PortraitTranslateDisable` is unported (`src/engine/HallOfChampions.ts:345`). Once it
   is, taking a champion would queue a DSA "clear" at the mirror's `Position`.
 - Mirror 286 (champion 20, level 0 at (17,10), wall 0) has `word4` 0xa880, which reads
   `State` = 4, `PORTRAIT_HideGraphic`. `SummarizeRoomInfo.ts:306` tests that bit as
@@ -280,7 +237,7 @@ The page loads `dungeon.dat`, `graphics.dat` and `CSBgraphics.dat` from a fixed
 `/gamefiles/dm-atari` (`src/main.ts`, `GAME_DATA_DIR`), builds `GameTables` and the sound
 from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
 `this.ctx.tables`, and a loaded save is restored into the running game's tables. CSBWin
-takes its rules from the data too. `DM_rules` aside (C88), nothing in its code branches
+takes its rules from the data too. `DM_rules` aside, nothing in its code branches
 on the game, and CSB's differences are the dungeon's content and the tables in its
 `graphics.dat`. Measured against DM's: the same 563 items, 77 of them different (the
 title's, portraits, and runs at 489-526 and 556-562), and 6 of the 35 tables
@@ -298,7 +255,11 @@ for its extensions (`Graphics.cpp:1840-1858`, `:3201-3273`).
 
 What is needed: a data set per game (a folder, its files, a name), chosen before
 `loadGameFiles`, and everything built from it — the tables, the sound, the intro — with
-nothing that assumes `dm-atari`. **Where to choose (the author's decision): on the
+nothing that assumes `dm-atari`. A `dungeon.dat` that carries an Extended Features block
+(the DM Windows package's) sets `ctx.rules` through `readRulesOptions`, as a save does
+(`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"); `DungeonLoader` reads
+only a plain file today. The player's "DM Rules" toggle, which flips `ctx.rules.dmRules`
+(`CSBUI.cpp:912-914`), goes on the page with the chooser. **Where to choose (the author's decision): on the
 page**, a chooser outside the game that reloads it with, say, `?dungeon=csb`. That is where
 CSBWin makes the same choice, from the command line's `directory=` or `config.txt`'s
 `DIRECTORY` (`CSBUI.cpp:2032`, `:799`), and its launcher `_AskWhatToDo` offers no dungeon
@@ -391,7 +352,7 @@ uses CSBWin's defaults.
   `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:342`).
+  (`HallOfChampions.ts:346`).
 - `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
   statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with

@@ -23,7 +23,7 @@ import { applyCsbwinSave } from '../data/CsbwinSaveGame';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
-import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
+import { buildLiveExtendedFeatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
@@ -215,6 +215,8 @@ function buildFileBlocks(
             cellFlagArraySize: cellFlagArraySize(dungeon.maps),
             extendedWallDecorations: dungeon.extendedWallDecorations,
             spellFilterLocation: dungeon.spellFilterLocation,
+            dmRules: game.ctx.rules.dmRules,
+            dmRulesDesignOption: game.ctx.rules.dmRulesDesignOption,
         }),
         dungeonImage: buildDungeonImage(dungeon, {
             indirectText: true,
@@ -421,6 +423,7 @@ export function encodeSavePayload(payload: SavePayload): Uint8Array {
  */
 export function applySavePayload(game: Game, payload: SavePayload): void {
     const saveState = loadSaveGameState(decodeBase64ToBytes(payload.raw));
+    readRulesOptions(game.ctx.rules, saveState.extendedFeatures);
     applySaveGameState(game.state.dungeon, saveState, game.party.state);
     game.applyRuntimeSaveState(payload.runtime);
 }

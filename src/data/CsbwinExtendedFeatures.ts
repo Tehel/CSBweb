@@ -284,6 +284,25 @@ export interface LiveExtendedFeatures {
     extendedWallDecorations?: boolean;
     /** `spellFilterLocation`; 0, and bit 31 clear, means "no filter". */
     spellFilterLocation?: number;
+    /** `DM_rules`, written as `DMRulesOption`. */
+    dmRules?: boolean;
+    /** `DMRulesDesignOption`, written as `DMRules`. */
+    dmRulesDesignOption?: boolean;
+}
+
+/**
+ * `ReadExtendedFeatures`' two rule flags (`doc/CSBwin-src/SaveGame.cpp:392-398`):
+ * `DMRulesDesignOption` from `flags & DMRules`, `DM_rules` from
+ * `extendedFlags & DMRulesOption`. A file with no block (`header` undefined) assigns
+ * neither, as CSBWin, which never reaches that function for it.
+ */
+export function readRulesOptions(
+    rules: { dmRules: boolean; dmRulesDesignOption: boolean },
+    header: ExtendedFeaturesBlock | undefined,
+): void {
+    if (!header) return;
+    rules.dmRulesDesignOption = (header.flags & EF_FLAGS.DMRules) !== 0;
+    rules.dmRules = (header.extendedFlags & EF_EXTENDED_FLAGS.DMRulesOption) !== 0;
 }
 
 /**
@@ -300,17 +319,17 @@ export interface LiveExtendedFeatures {
  * back when the bit is on (`:387-390`); `IndirectText`, `ExpandedPortraits` and
  * `BigActuators` (`:961-963`), which are the shapes of blocks 11-13 and of `CHARDESC`.
  * They must agree with the image actually written, which is what
- * `convertOriginalDungeon` guarantees. The other three are design options this port does
- * not model and writes off: `SimpleEncryption` (the whole file behind RC4),
- * `DMRules` (`DMRulesDesignOption`) and `AutoRecord`. Measured: the five newest saves
- * carry 0xe9 — these four plus `DMRules` — and the older ones 0xa9, which is exactly the
- * four alone.
+ * `convertOriginalDungeon` guarantees. `DMRules` is `DMRulesDesignOption` (`:952-953`).
+ * The other two are options this port does not model and writes off: `SimpleEncryption`
+ * (the whole file behind RC4) and `AutoRecord`. Measured: eleven saves carry 0xe9 — the
+ * four plus `DMRules` — and the three older ones 0xa9, which is exactly the four alone.
  *
  * **`extendedFlags`.** Three unconditional (`:964-966`): `SequencedTimers` and
  * `ExtendedTimers`, which together select the 16-byte `TIMER` this port writes, and
  * `DefaultDirectX`, which is a UI preference CSBWin sets on every save. Plus
- * `ExtendedWallDecorations` from the world. `InvisibleMonsters`, `DrawAsSize4Monsters`
- * and `DMRulesOption` are global design options with no equivalent here. Measured: 0xe0
+ * `ExtendedWallDecorations` from the world and `DMRulesOption` from `DM_rules`
+ * (`:950-951`). `InvisibleMonsters` and `DrawAsSize4Monsters` are global design options
+ * with no equivalent here. Measured: 0xe0
  * in `csbgame3.dat`, which is the three unconditional ones; 0xf8 in the newest saves,
  * adding the wall decorations and DM rules; and **0** in `csbgame.dat` and
  * `csbgame2.dat`, which an older CSBWin wrote with 10-byte timers.
@@ -332,12 +351,14 @@ export interface LiveExtendedFeatures {
  * than writing a file that silently lost them.
  */
 export function buildLiveExtendedFeatures(live: LiveExtendedFeatures): ExtendedFeaturesBlock {
-    const flags =
+    let flags =
         EF_FLAGS.LevelDSAInfoPresent | EF_FLAGS.IndirectText |
         EF_FLAGS.ExpandedPortraits | EF_FLAGS.BigActuators;
+    if (live.dmRulesDesignOption) flags |= EF_FLAGS.DMRules;
     let extendedFlags =
         EF_EXTENDED_FLAGS.SequencedTimers | EF_EXTENDED_FLAGS.ExtendedTimers |
         EF_EXTENDED_FLAGS.DefaultDirectX;
+    if (live.dmRules) extendedFlags |= EF_EXTENDED_FLAGS.DMRulesOption;
     if (live.extendedWallDecorations) extendedFlags |= EF_EXTENDED_FLAGS.ExtendedWallDecorations;
 
     return {

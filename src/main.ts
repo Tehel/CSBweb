@@ -492,6 +492,8 @@ function start(game: Game): void {
     // Dev convenience only: restore the previous session's quick-save so a reload
     // lands back where you were. With Debug off, boot into a fresh dungeon.
     if (isDebugFeaturesEnabled()) dev.quickLoad();
+    // The game is read, new or resumed: where CSBWin's boot forces DM rules.
+    game.forceDMRulesAtBoot();
 
     // Initial render
     renderView();
