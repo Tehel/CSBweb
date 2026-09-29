@@ -29,6 +29,9 @@
  *   3. **The `0x8000`** — the printed rank is the *earned* one, so a temporary adjustment
  *      from a spell or potion must not move it.
  *
+ * The last section draws the whole inventory of a Hall of Champions candidate: the held
+ * eye must put the panel over the Resurrect menu, as `_ClickOnEye` does.
+ *
  * What to look for in the output: a line for every role whose mastery exceeds 1, at
  * x=108 / y=58+7n in viewport coordinates, matching the string spelled out here
  * independently; nothing on those rows for a champion with no experience; and the rune
@@ -59,6 +62,8 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
+import { drawInventoryScreen } from '../src/renderer/ui/Inventory';
+import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
@@ -286,6 +291,51 @@ async function main(): Promise<void> {
       check(differ, `"${label}" needs the raw text path — upper-casing changes its glyphs`);
     }
   }
+
+  // ------------------------------------- the eye over a Hall of Champions candidate
+  // `TAG0189d4` puts the Resurrect / Reincarnate menu where the panel goes
+  // (`doc/CSBwin-src/Character.cpp:3856`), but the eye is button 71 and has no
+  // `PotentialCharacterOrdinal` gate (`doc/CSBwin-src/Mouse.cpp:1659-1664`): `_ClickOnEye`
+  // draws the panel over the menu (`doc/CSBwin-src/Viewport.cpp:7257`) and leaves
+  // `d.DisplayResurrectChestOrScroll` at 5; `QuitPressingEye` calls `TAG0189d4` again
+  // (`doc/CSBwin-src/CSBCode.cpp:7399`). So this needs the whole inventory drawn, with
+  // graphic 40 really there to cover the panel.
+  console.log('=== the eye held over a candidate\'s Resurrect menu ===');
+  const cache = new Map();
+  ui.getGraphicBitmap = (n, format) => getCachedGraphicBitmap(graphics, cache, n, format);
+  setRoleExperience(0, experienceForMastery(4));
+  const candidateLine = `${MASTERY_LABELS[4]} ${ROLES[0]}`;
+  function renderInventory(): Uint8Array {
+    const buffer = createPaletteIndexViewportBuffer(SCREEN_W, SCREEN_H, 0);
+    ui.screenIndexBuffer = buffer;
+    drawInventoryScreen(ui);
+    return buffer.pixels;
+  }
+  // The reference: the same champion, already in the party, eye held. The text lands on
+  // graphic 20, the panel's own background, so a line drawn on zeros would not match.
+  ui.pressingEye = true;
+  const wantLine = lineStrip(renderInventory(), 0, candidateLine.length);
+  check(/[^0]/.test(wantLine), 'the reference panel is drawn');
+  party.state.potentialChampionIndex = 0;
+  ui.pressingEye = false;
+  const menuPixels = renderInventory();
+  const menuLine = lineStrip(menuPixels, 0, candidateLine.length);
+  console.log(`eye released: menu state ${ui.displayResurrectChestOrScroll}, `
+    + `mastery line ${menuLine === wantLine ? 'drawn' : 'covered by the menu'}`);
+  check(ui.displayResurrectChestOrScroll === 5, 'a candidate\'s inventory shows the Resurrect menu');
+  check(menuLine !== wantLine, 'the menu, not the panel, is on the mastery line');
+  ui.pressingEye = true;
+  const eyePixels = renderInventory();
+  const eyeLine = lineStrip(eyePixels, 0, candidateLine.length);
+  console.log(`eye held:     menu state ${ui.displayResurrectChestOrScroll}, `
+    + `mastery line ${eyeLine === wantLine ? 'drawn' : 'covered by the menu'}`);
+  check(eyeLine === wantLine, `the held eye shows "${candidateLine}" over the menu`);
+  check(ui.displayResurrectChestOrScroll === 5, '_ClickOnEye leaves DisplayResurrectChestOrScroll at 5');
+  ui.pressingEye = false;
+  renderInventory();
+  check(ui.displayResurrectChestOrScroll === 5, 'releasing the eye brings the menu back');
+  party.state.potentialChampionIndex = -1;
+  console.log('');
 
   finish();
 }

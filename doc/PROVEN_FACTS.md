@@ -1716,6 +1716,23 @@ renderer had it right (`cloudType === 50`). The constants now live in
 once `d.Word11694` (game won) is set, so the cage around Lord Chaos stays up through the
 endgame.
 
+## The eye draws over a Hall of Champions candidate's Resurrect menu
+
+- While a candidate is on trial, `TAG0189d4` puts graphic 40, the Resurrect / Reincarnate
+  / Cancel menu, where the panel goes and sets `d.DisplayResurrectChestOrScroll = 5`
+  (`doc/CSBwin-src/Character.cpp:3836-3858`).
+- The eye is button 71, and `HandleMouseEvents` sends it to `ClickOnEye` with no
+  `PotentialCharacterOrdinal` gate (`doc/CSBwin-src/Mouse.cpp:1659-1664`), unlike the
+  buttons around it (`:1616`, `:1645`, `:1685`).
+- `_ClickOnEye` (`doc/CSBwin-src/Viewport.cpp:7257-7290`) draws the skills (`TAG019036`,
+  empty-handed) or the held object's description over whatever is there, and does not
+  write `d.DisplayResurrectChestOrScroll`, which stays 5.
+- `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399-7413`) calls `TAG0189d4`, which
+  draws the menu again.
+
+The port redraws the panel every frame, so `drawInventoryScreen` tests the held eye before
+the candidate. Evidence: `tools/dump-mastery-panel.ts`, last section.
+
 ## The mastery names are a code table, and six of them start with a rune
 
 `d.Pointer16770[17]` (`doc/CSBwin-src/CSBCode.cpp:370-384`) holds the rank names the eye

@@ -96,19 +96,27 @@ export function drawInventoryScreen(ui: UIState): void {
   // `TAG0189d4` (`doc/CSBwin-src/Character.cpp:3847`). The branch also decides what a
   // click in this area means, which is why it leaves `displayResurrectChestOrScroll`
   // behind for `tag01a6ea` exactly as CSBWin does.
-  if (ui.partyState.potentialChampionIndex >= 0) {
-    drawResurrectMenu(ui);
-  } else if (chestView) {
-    ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
-    drawChestPanel(ui, chestView);
-  } else if (ui.pressingEye) {
-    ui.displayResurrectChestOrScroll = 0;
+  //
+  // The held eye comes first. It is button 71, with no `PotentialCharacterOrdinal`
+  // gate (`doc/CSBwin-src/Mouse.cpp:1659-1664`), and `_ClickOnEye`
+  // (`doc/CSBwin-src/Viewport.cpp:7257`) draws over whatever `TAG0189d4` left there,
+  // the Resurrect menu included, without touching `d.DisplayResurrectChestOrScroll`.
+  // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399`) calls `TAG0189d4` again.
+  if (ui.pressingEye) {
     const cursorObject = ui.partyState?.objectInHand ?? OBJECT_ID_NULL;
-    if (cursorObject !== OBJECT_ID_NULL) {
+    if (chestView) {
+      // Held, only a chest on the cursor is a chest view (`getActiveChestView`).
+      drawChestPanel(ui, chestView);
+    } else if (cursorObject !== OBJECT_ID_NULL) {
       drawObjectInfoPanel(ui, cursorObject);
     } else {
       drawAttributePanel(ui, champion);
     }
+  } else if (ui.partyState.potentialChampionIndex >= 0) {
+    drawResurrectMenu(ui);
+  } else if (chestView) {
+    ui.displayResurrectChestOrScroll = chestView.source === 'hand' ? 4 : 0;
+    drawChestPanel(ui, chestView);
   } else {
     ui.displayResurrectChestOrScroll = 0;
     drawFoodWaterPanel(ui, champion);
