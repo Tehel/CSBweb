@@ -139,6 +139,21 @@ Goal: read and write a save file CSBWin itself can load. **Reading and writing a
 what is left is the rework of the save menu (step 11). What the file cannot carry for a
 dungeon with DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
+#### The rework: what is already decided
+
+The author sets the rest of its scope when it starts.
+
+- **A save is a CSBWin `.dat` file, and the JSON wrapper goes.** A `.dmweb.json`
+  (`src/engine/SaveGamePayload.ts`) pairs `runtime`, the port's own state in the shape of
+  the build that wrote it, with `raw`, the whole CSBWin file the port writes. Only `raw`'s
+  format is stable: `runtime` is refused at any other version, and `applySaveBytes` then
+  loads `raw` as a genuine save. Saving the `.dat` alone ends the version bumps that
+  strand saves. First, whatever only `runtime` carries has to be found a place in the
+  file, or shown to follow from it: `src/data/CsbwinSaveGame.ts` → "What is not
+  restored" is where to start, and `tools/dump-save-roundtrip.ts` is how to prove the file
+  alone gives the game back. Both stores already list a genuine `.dat` from its own blocks
+  (`src/data/saves/`).
+
 #### What is left, in one place
 
 `saveSaveGameState` (`src/data/SaveGameLoader.ts`) emits all sixteen blocks, and
