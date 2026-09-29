@@ -148,10 +148,8 @@ export function createDevTools(host: DevHost): DevTools {
                 updateDebug('No saved game found');
                 return;
             }
-            // Older formats are refused, not upgraded. A v1 save has no world state in it
-            // at all, so restoring one would put the party back into a dungeon reset to
-            // `dungeon.dat`; a v2 save has champions whose attributes are flat numbers
-            // with no maximum or minimum to restore.
+            // An older format's `runtime` is never restored; its `raw`, a whole CSBWin
+            // file, is loaded instead where it has one (`applySaveBytes`).
             applySaveBytes(host.game, await latest.store.read(latest.entry.id));
             host.renderView();
             updateDebug(`Quick-loaded ${latest.entry.name}`);

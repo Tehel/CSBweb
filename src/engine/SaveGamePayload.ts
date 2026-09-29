@@ -33,7 +33,10 @@ import { OBJECT_ID_NULL } from '../core/types';
 /** Marks the file as ours, so a stray `.json` in the folder is rejected rather than parsed. */
 export const SAVE_PAYLOAD_FORMAT = 'dmweb-save';
 
-/** Bumped with `RUNTIME_SAVE_VERSION`; a mismatch is refused, never half-restored. */
+/**
+ * Bumped with `RUNTIME_SAVE_VERSION`. A `runtime` of another version is never
+ * restored; `applySaveBytes` loads such a save's `raw` instead.
+ */
 export const SAVE_PAYLOAD_VERSION = RUNTIME_SAVE_VERSION;
 
 /** The suffix a DMweb save carries on disk. */
@@ -53,7 +56,7 @@ export interface SaveHeader {
 export interface SavePayload {
     header: SaveHeader;
     runtime: RuntimeSaveState;
-    /** base64 of the CSBWin block 0-6 prefix. */
+    /** base64 of the whole CSBWin file, all sixteen blocks. */
     raw: string;
 }
 
@@ -385,31 +388,37 @@ export class SavePayloadError extends Error {}
 
 /**
  * Parse a file's bytes. Throws `SavePayloadError` with a message fit for the menu's
- * status line — a save written by an older build is refused rather than half-restored,
- * for the reason `quickLoad` already refuses one: a v1 save has no world state in it at
- * all, so restoring one drops the party into a dungeon reset to `dungeon.dat`.
+ * status line. A `runtime` written by an older build is refused rather than
+ * half-restored: its shape is not this build's (a v1 save has no world state at all).
+ * `applySaveBytes` falls back on such a save's `raw`.
  */
 export function decodeSavePayload(bytes: Uint8Array): SavePayload {
+    const payload = parsePayloadJson(bytes);
+    const runtime = payload.runtime;
+    if (!runtime || typeof runtime !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
+    if (runtime.version !== SAVE_PAYLOAD_VERSION) throw staleFormat(runtime.version);
+    if (typeof payload.raw !== 'string') throw new SavePayloadError('SAVE IS MISSING ITS BLOCK DATA');
+    return {
+        // A quick-save written before the header existed is still perfectly loadable.
+        header: payload.header ?? makeSaveHeader(runtime),
+        runtime,
+        raw: payload.raw,
+    };
+}
+
+function parsePayloadJson(bytes: Uint8Array): Partial<SavePayload> {
     let parsed: unknown;
     try {
         parsed = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
         throw new SavePayloadError('NOT A DMWEB SAVE');
     }
-    const payload = parsed as Partial<SavePayload>;
-    if (!payload || typeof payload !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
-    // A quick-save written before the header existed is still perfectly loadable.
-    const runtime = payload.runtime;
-    if (!runtime || typeof runtime !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
-    if (runtime.version !== SAVE_PAYLOAD_VERSION) {
-        throw new SavePayloadError(`SAVE IS FORMAT V${runtime.version ?? '?'}, THIS BUILD READS V${SAVE_PAYLOAD_VERSION}`);
-    }
-    if (typeof payload.raw !== 'string') throw new SavePayloadError('SAVE IS MISSING ITS BLOCK DATA');
-    return {
-        header: payload.header ?? makeSaveHeader(runtime),
-        runtime,
-        raw: payload.raw,
-    };
+    if (!parsed || typeof parsed !== 'object') throw new SavePayloadError('NOT A DMWEB SAVE');
+    return parsed as Partial<SavePayload>;
+}
+
+function staleFormat(version: number | undefined): SavePayloadError {
+    return new SavePayloadError(`SAVE IS FORMAT V${version ?? '?'}, THIS BUILD READS V${SAVE_PAYLOAD_VERSION}`);
 }
 
 export function encodeSavePayload(payload: SavePayload): Uint8Array {
@@ -450,19 +459,40 @@ function looksLikeJson(bytes: Uint8Array): boolean {
  * The two menus and the quick-load all come through here so that the choice is made in
  * one place. A CSBWin file goes to `applyCsbwinSave`, whose failures are turned into
  * `SavePayloadError` because the menu's status line is the only place they can be
- * shown, and it wants a short line rather than a stack.
+ * shown, and it wants a short line rather than a stack. One of our saves from an older
+ * build loads through its `raw`, the CSBWin file it carries: what only `runtime` holds
+ * is lost with it (`src/data/CsbwinSaveGame.ts` → "What is not restored").
  */
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
-    if (looksLikeJson(bytes)) {
-        applySavePayload(game, decodeSavePayload(bytes));
+    if (!looksLikeJson(bytes)) {
+        applyCsbwinFile(game, bytes);
     } else {
-        try {
-            applyCsbwinSave(game, bytes);
-        } catch (error) {
-            throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
+        const payload = parsePayloadJson(bytes);
+        const version = payload.runtime?.version;
+        if (version !== undefined && version !== SAVE_PAYLOAD_VERSION && typeof payload.raw === 'string') {
+            // An older build's save. Its `runtime` is in a shape this build does not read,
+            // but its `raw` is a whole CSBWin file, whose format is CSBWin's and does not
+            // change, so it loads as a genuine save would. A save from before `raw` held
+            // the dungeon image cannot, and is refused by its version.
+            try {
+                applyCsbwinSave(game, decodeBase64ToBytes(payload.raw));
+            } catch {
+                throw staleFormat(version);
+            }
+        } else {
+            applySavePayload(game, decodeSavePayload(bytes));
         }
     }
     game.savedGameRead();
+}
+
+/** A genuine CSBWin file, whose failures become a short line for the menu's status. */
+function applyCsbwinFile(game: Game, bytes: Uint8Array): void {
+    try {
+        applyCsbwinSave(game, bytes);
+    } catch (error) {
+        throw new SavePayloadError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
+    }
 }
 
 /**

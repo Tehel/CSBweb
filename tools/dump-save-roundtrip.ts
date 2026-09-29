@@ -37,6 +37,8 @@
  * And a save carries its world: one of CSB's eleven levels, loaded into a game built over
  * DM's fourteen, installs the world of its `raw` file (`applySavePayload`), and the game
  * saved and the game loaded play on alike.
+ * A save from an older build, whose `runtime` this build does not read, loads through
+ * `raw` as a genuine CSBWin save of it does.
  *
  * What is deliberately **not** asserted, because CSBWin does it too: that load is a
  * no-op. `processMonstersOnLevel` really does create new timers, so their `sequence`
@@ -63,7 +65,7 @@ import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { Game } from '../src/engine/Game';
 import type { RuntimeSaveState } from '../src/engine/RuntimeSave';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes } from '../src/engine/SaveGamePayload';
+import { buildSavePayload, decodeBase64ToBytes, encodeSavePayload, applySaveBytes, SAVE_PAYLOAD_VERSION } from '../src/engine/SaveGamePayload';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
 import { CHARFLAG_ATTACK_DISABLE, readCsbwinCharacter } from '../src/data/CsbwinCharacters';
 import type { Champion } from '../src/engine/gameTypes';
@@ -539,6 +541,48 @@ function main(): void {
     }
     console.log(`played on 100 ticks side by side: ${firstDiff < 0 ? 'agree throughout' : `differ from tick ${firstDiff}`}`);
     check(!error && firstDiff < 0, 'the game saved and the game loaded from it agree for 100 ticks');
+  }
+
+  /* ---- 8. a save from an older build loads through its raw file ---- */
+
+  // `runtime` changes shape with the build and is refused at another version; `raw` is a
+  // whole CSBWin file, whose format does not change, so `applySaveBytes` loads it as a
+  // genuine save. Proved against a load of the same file straight through
+  // `applyCsbwinSave`. A `raw` that will not load leaves the version refusal.
+  console.log('\n=== a save from an older build ===');
+  {
+    const source = fromCsbwinSave('csbgame7.dat');
+    advance(source, 30);
+    const payload = buildSavePayload(source);
+    const stale = { ...payload, runtime: { ...payload.runtime, version: SAVE_PAYLOAD_VERSION - 1 } };
+    // Not a `SavePayload`, whose version is this build's: the file is written as a store writes it.
+    const encodeJson = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
+    const viaStale = loadWorld();
+    let error = '';
+    try {
+      applySaveBytes(viaStale, encodeJson(stale));
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    const direct = loadWorld();
+    applyCsbwinSave(direct, decodeBase64ToBytes(payload.raw));
+    direct.savedGameRead();
+    const state = (g: Game): string => {
+      const { party, dungeon, game } = g.getRuntimeSaveState();
+      return JSON.stringify([party, dungeon, game.tickCount, game.randomSeed, game.block1]);
+    };
+    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with a raw file: ${error || `loaded, level ${viaStale.party.state.position.z}`}`);
+    check(!error && state(viaStale) === state(direct),
+      'a save of an older format loads its raw file, as a genuine CSBWin save of it does');
+    let refused = '';
+    try {
+      applySaveBytes(loadWorld(), encodeJson({ ...stale, raw: '' }));
+    } catch (e) {
+      refused = (e as Error).message;
+    }
+    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with no usable raw file: ${refused}`);
+    check(refused === `SAVE IS FORMAT V${SAVE_PAYLOAD_VERSION - 1}, THIS BUILD READS V${SAVE_PAYLOAD_VERSION}`,
+      'one whose raw file will not load is refused by its version');
   }
 
   finish();
