@@ -7,6 +7,7 @@
  */
 
 import type { DungeonData } from '../data/dungeonTypes';
+import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
 import { Party, ensureHandOwner } from './Party';
@@ -330,7 +331,17 @@ export class Game implements MainLoop {
         const { totalMoveCount } = this.state.block1;
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
         this.state.block1.totalMoveCount = totalMoveCount;
+        this.readNewGameRules(data);
         this.canRestart = false;
+    }
+
+    /**
+     * `ReadExtendedFeatures`' rule flags for a new game, from the block its `dungeon.dat`
+     * opens with (doc/CSBwin-src/SaveGame.cpp:392-398, read at `ReadDatabases`' start,
+     * `:2347`). A file with no block leaves the rules as they were.
+     */
+    readNewGameRules(data: DungeonData): void {
+        readRulesOptions(this.ctx.rules, data.extendedFeatures);
     }
 
     /**

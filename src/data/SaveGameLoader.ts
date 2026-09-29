@@ -476,7 +476,13 @@ function readDsa(rcs: RcsReader): DsaDefinition {
   };
 }
 
-function readExtendedFeatures(data: Uint8Array): {
+/**
+ * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
+ * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
+ * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
+ * file opens with no block.
+ */
+export function readExtendedFeatures(data: Uint8Array): {
   offset: number;
   sequencedTimers: boolean;
   extendedTimers: boolean;
@@ -756,9 +762,14 @@ function parseSpecialLocationsFromSaveData(
   if (expoolCount <= 0) return null;
   const expoolStart = layout.databases[11];
   if (expoolStart + expoolCount * EXPOOL_RECORD_SIZE > data.length) return null;
+  return specialLocationsFromExpool(data.subarray(expoolStart, expoolStart + expoolCount * EXPOOL_RECORD_SIZE));
+}
 
-  const expool = new Uint32Array(expoolCount * EXPOOL_WORDS_PER_BLOCK);
-  for (let i = 0; i < expool.length; i++) expool[i] = readU32BE(data, expoolStart + i * 4);
+/** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */
+export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, number> | null {
+  const expool = new Uint32Array((bytes.length / EXPOOL_RECORD_SIZE) * EXPOOL_WORDS_PER_BLOCK);
+  if (expool.length === 0) return null;
+  for (let i = 0; i < expool.length; i++) expool[i] = readU32BE(bytes, i * 4);
 
   const locations: Record<number, number> = {};
   for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) {

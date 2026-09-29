@@ -2667,21 +2667,23 @@ every actuator's `word8`.
 
 `static/gamefiles/dm-atari/dungeon.dat` (33442 bytes) is the original Atari file: no
 Extended Features block, 8-byte actuators, 4-byte scrolls, raw text. The DM Windows
-package (`static/gamefiles/DM_Windows_x86-32_20171117/dungeon.dat`, 42025 bytes,
-untracked) is **the same dungeon re-saved by CSBWin** in the shape a save is written in.
+package's (`static/gamefiles/dm-windows/dungeon.dat`, 42025 bytes, the `dm-windows` data
+set) is **the same dungeon re-saved by CSBWin** in the shape a save is written in.
 Its `graphics.dat` is byte-identical to `dm-atari`'s.
 
-Read with the port's own parsers (the prefix by hand, the image by `DungeonLoader` with
-`bigActuators`, `newScrolls`, `indirectText`, `expool` and the file's object map as
-`resolveRN`), and compared with `dm-atari` after `convertOriginalDungeon`, the following
-are identical: the header (seed 99, start (1,3) facing 2, 14 levels), every level
+Read through its block by `DungeonLoader.loadDungeonDat` (the image with `bigActuators`,
+`newScrolls`, `indirectText`, `expool` and the file's object map as `resolveRN`), and
+compared with `dm-atari` after `convertOriginalDungeon`, the following are identical
+(`tools/dump-extended-dungeon.ts`): the header (seed 99, start (1,3) facing 2, 14 levels), every level
 descriptor, every cell flag and per-level table, the object list, all the text, and
 every record of 10 of the 13 databases. The rest differ only as follows:
 
 - **The 24 mirrors** (type-127 actuators): cleaned of the leftover bits in CSBWin's
   portrait fields, `word4` bits 0-11 and `word6` bits 0-11 and 14-15. `word6` bits 12-13
   (`Position`) keep the Atari values. Today's `ExtendPortraits` zeroes those too
-  (`doc/CSBwin-src/SaveGame.cpp:1422`), so an earlier CSBWin wrote this file.
+  (`doc/CSBwin-src/SaveGame.cpp:1422`), so an earlier CSBWin wrote this file. Against
+  `dm-atari` converted, 18 mirrors differ, in those two bits alone; the other six sit at
+  position 0.
 - **29 scrolls** carry allocation debris in `m_word4` bits 1-15 (see "A converted
   scroll's `m_word4` upper bits are allocation debris"). The free scroll, record 33,
   holds `RNnul` for its text.
@@ -2727,6 +2729,16 @@ everything `FetchDataBytes` fetched (`SaveGame.cpp:2654-2658`, `CSBCode.cpp:9081
 0x939f, which the port's expansion reproduces (`tools/dump-compressed-dungeon.ts`). A
 file without the word, as DM's `dungeon.dat` is, skips the comparison, since
 `StreamInput` fails to read it.
+
+`ReadExtendedFeatures` runs first (`:2347`), so a `dungeon.dat` may open with an Extended
+Features block, and the 8 bytes and the image come after it. A compressed body behind a
+block is read from byte 8 plus the block's size, and its length is the file's less both,
+unless the block's `ExtendedFeaturesVersion` is `'@'`: then the body is read from byte 8
+of the file and its length is the file's less 8 (`:2362-2369`). No shipped file has a
+compressed body behind a block; the port reads one built in front of CSB's as CSB's own
+(`tools/dump-extended-dungeon.ts`). The block then declares the image's shape and maps its
+object references as a save's does, and sets the rules (see "`DM_rules` and
+`DMRulesDesignOption`…").
 
 The same comparison holds for every image `ReadDatabases` reads, a save's included.
 Every section from the header to the end of the cell flags goes through
@@ -2841,7 +2853,10 @@ They are assigned in four places:
 - `ReadExtendedFeatures`: `DMRulesDesignOption` from `flags & DMRules` (0x40),
   `DM_rules` from `extendedFlags & DMRulesOption` (0x08) (`SaveGame.cpp:392-398`). A file
   with no block never reaches it, so both keep what they held: a new game on
-  `dm-atari/dungeon.dat`, and CSB's Atari-era saves.
+  `dm-atari/dungeon.dat`, and CSB's Atari-era saves. A new game on
+  `dm-windows/dungeon.dat` gets `DMRulesDesignOption` and not `DM_rules`
+  (`tools/dump-extended-dungeon.ts`). The port reads a new game's in
+  `Game.readNewGameRules`, a save's in `applyCsbwinSave`.
 - `_ShowPrisonDoor`, once `GameSetup(_1_, 1)` has read the game, new or resumed:
   `if (DMRulesDesignOption) DM_rules = true` (`CSBCode.cpp:10672-10676`). The restart
   after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`), without it.

@@ -19,7 +19,7 @@
  *   creature type 15, and with nobody at the controls they kill it in 142 and 408 ticks. That
  *   is play, not the load, so a lost game ends the run and is reported, not failed.
  *   (`tables.monsterDesc` and the rest are CSB's own here, through item 0x231's long
- *   form, which no data set has yet proven: `DEBT.md` G18.)
+ *   form, whose place `tools/dump-data-sets.ts` proves.)
  *
  * And the control: a save CSBWin wrote carries its own size in the block, which the
  * fallback must not replace.

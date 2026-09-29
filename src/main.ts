@@ -20,6 +20,7 @@ import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
 import { runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
+import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
 import { loadUISettings } from './ui/settings';
@@ -428,11 +429,11 @@ async function createCrt(): Promise<void> {
  * saved game, where an entrance screen would only be in the way. The golden-frame
  * probe passes the query parameter.
  */
-async function runIntro(screen: GameScreen, sound: SoundManager): Promise<void> {
+async function runIntro(screen: GameScreen, sound: SoundManager): Promise<PrisonDoorChoice> {
     const skipIntro =
         new URLSearchParams(window.location.search).get('intro') === '0'
         || loadUISettings().debug;
-    await runBootSequence({
+    return runBootSequence({
         canvas: gameCanvasEl,
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
@@ -534,7 +535,9 @@ async function init() {
         if (import.meta.env.DEV) {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
         }
-        await runIntro(built.screen, sound);
+        // A new game takes the rules its `dungeon.dat`'s block declares; a resumed one has
+        // taken its save's.
+        if ((await runIntro(built.screen, sound)) === 'enter') game.readNewGameRules(files.dungeon);
         wire(built.game, built.screen, files.dungeon, sound);
         start(built.game);
     } catch (error) {

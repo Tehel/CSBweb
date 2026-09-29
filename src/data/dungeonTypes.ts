@@ -13,6 +13,7 @@ import type {
     Direction,
     DBType
 } from '../core/types';
+import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 
 /**
  * Dungeon header (44 bytes at offset 0x00)
@@ -563,6 +564,12 @@ export interface DungeonData {
      */
     word22592?: number;
     spellFilterLocation?: number; // Extended-feature spell filter location
+    /**
+     * The Extended Features block a `dungeon.dat` opens with, when it has one (the DM
+     * Windows package's). A new game read from it takes its rule flags
+     * (`readRulesOptions`, `src/data/CsbwinExtendedFeatures.ts`).
+     */
+    extendedFeatures?: ExtendedFeaturesBlock;
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }
 

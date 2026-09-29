@@ -124,6 +124,9 @@ export const DUNGEON_DATA_SOURCES = {
     presetHeroes: 'loaded',
     // Read into `block1` when a new game is made (`newGameBlock1`), which a save carries.
     word22592: 'loaded',
+    // Read into `ctx.rules` when a new game is made (`Game.readNewGameRules`); a save
+    // carries the rules itself.
+    extendedFeatures: 'loaded',
 } as const satisfies SourceTable<DungeonData>;
 
 type DatabaseKey = keyof Databases;

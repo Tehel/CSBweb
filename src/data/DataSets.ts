@@ -25,6 +25,10 @@ export interface DataSet {
 
 export const DATA_SETS: readonly DataSet[] = [
     { id: 'dm-atari', name: 'Dungeon Master', dir: '/gamefiles/dm-atari', csbGraphics: true },
+    // The DM Windows package's: the same dungeon re-saved by CSBWin, behind an Extended
+    // Features block (doc/PROVEN_FACTS.md → "DM's two `dungeon.dat` files"), and the same
+    // `graphics.dat`. The package ships no `CSBgraphics.dat`.
+    { id: 'dm-windows', name: 'Dungeon Master (CSBWin)', dir: '/gamefiles/dm-windows', csbGraphics: false },
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
 ];
 

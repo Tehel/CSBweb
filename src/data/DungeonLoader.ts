@@ -32,6 +32,7 @@ import type {
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
+import { readExtendedFeatures, specialLocationsFromExpool } from './SaveGameLoader';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
@@ -117,18 +118,49 @@ export class DungeonLoader {
 
     /**
      * A new game's `dungeon.dat`, as `ReadDatabases` opens it when the game is not a
-     * resumed one (`doc/CSBwin-src/SaveGame.cpp:2346-2374`): a file whose first word is
-     * 33028 is compressed, the long at 2 is the expanded size and the word at 6 is
-     * `d.Word22592`, and the rest of the file goes through `ExpandData`. Any other file
-     * is read as it stands. A `dungeon.dat` that opens with an Extended Features block is
-     * not read here (`DEBT.md` G18).
+     * resumed one (`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `ReadExtendedFeatures` reads
+     * a block at the front, if there is one, and returns its size. Behind it, a file whose
+     * first word is 33028 is compressed: the long at 2 is the expanded size, the word at 6
+     * is `d.Word22592`, and the body goes through `ExpandData`. The body is read from byte
+     * 8 plus the block's size, unless the block's `ExtendedFeaturesVersion` is `'@'`, when
+     * it is read from byte 8 of the file (`:2362-2369`). Any other file is read as it
+     * stands, after the block.
+     *
+     * The block declares the image's shape (`bigActuators`, `indirectText`, six-byte
+     * scrolls from version `'B'`, the cell flags' length) and maps its object references,
+     * as a save's does, and the loader reads the image with them. The block itself is
+     * kept in `extendedFeatures`, whose rule flags a new game takes (`readRulesOptions`).
      */
     loadDungeonDat(bytes: Uint8Array): DungeonData {
-        if (bytes.length < 8) throw new Error('dungeon.dat is shorter than 8 bytes');
-        if (readU16BE(bytes, 0) !== DUNGEON_COMPRESSED_SIGNATURE) return this.loadFromArray(bytes);
-        const word22592 = readU16BE(bytes, 6);
-        const data = this.loadFromArray(ExpandData(bytes.subarray(8), readU32BE(bytes, 2)));
-        data.word22592 = word22592;
+        const ef = readExtendedFeatures(bytes);
+        const size = ef.offset;
+        if (bytes.length - size < 8) throw new Error('dungeon.dat is shorter than 8 bytes');
+        const options: DungeonImageOptions = ef.header ? {
+            bigActuators: ef.bigActuators,
+            newScrolls: ef.version >= 0x42, // 'B'
+            indirectText: ef.indirectText,
+            expandedPortraits: ef.expandedPortraits,
+            expool: true,
+            cellFlagArraySize: ef.cellFlagArraySize || undefined,
+            resolveRN: ef.objectIndex ? (raw) => ef.objectIndex!.resolve(raw) : undefined,
+        } : {};
+        let data: DungeonData;
+        if (readU16BE(bytes, size) !== DUNGEON_COMPRESSED_SIGNATURE) {
+            data = this.loadFromArray(bytes.subarray(size), options);
+        } else {
+            const bodyStart = 8 + (ef.version === 0x40 ? 0 : size); // '@'
+            data = this.loadFromArray(ExpandData(bytes.subarray(bodyStart), readU32BE(bytes, size + 2)), options);
+            data.word22592 = readU16BE(bytes, size + 6);
+        }
+        if (ef.header) {
+            data.extendedFeatures = ef.header;
+            data.extendedWallDecorations = ef.extendedWallDecorations;
+            data.spellFilterLocation = ef.spellFilterLocation;
+            if (ef.dsaLevelIndex) data.dsaLevelIndex = ef.dsaLevelIndex;
+            if (ef.dsaIndex) data.dsaIndex = ef.dsaIndex;
+            const specialLocations = data.expool ? specialLocationsFromExpool(data.expool) : null;
+            if (specialLocations) data.specialLocations = specialLocations;
+        }
         return data;
     }
 

@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | L | ⚠️ step 3 of 4 next |
+| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -148,8 +148,8 @@ postponed ones follow, under their own heading (see "Priority").
 
 ### G18 — One game's data set, chosen before the boot
 
-The page plays one data set (`src/data/DataSets.ts`: `dm-atari`, the default, and
-`csb`), chosen before anything loads by `?dungeon=<id>`, which the chooser beside the
+The page plays one data set (`src/data/DataSets.ts`: `dm-atari`, the default,
+`dm-windows` and `csb`), chosen before anything loads by `?dungeon=<id>`, which the chooser beside the
 canvas sets by reloading the page (the author's decision), as CSBWin takes its directory
 from the command line or `config.txt` before its launcher, which offers no dungeon. It loads the set's `dungeon.dat`, `graphics.dat` and
 `CSBgraphics.dat` (`src/main.ts`, `loadGameFiles`), builds `GameTables`, the sound and the
@@ -169,16 +169,17 @@ which the package lacks too and CSBWin opens only on demand for its extensions
 flips `ctx.rules.dmRules` at any time, as CSBWin's menu item does (`CSBUI.cpp:912-914`),
 and shows it pressed while it is set (`src/ui/events.ts`).
 
-What is left. A `dungeon.dat` that carries an Extended Features block
-(the DM Windows package's) sets `ctx.rules` through `readRulesOptions`, as a save does
-(`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"); `DungeonLoader` reads
-no such block today. Behind one, a compressed body is found after the block, and
-`ReadDatabases` leaves the block's size out of the body's unless `ExtendedFeaturesVersion`
-is `'@'` (`SaveGame.cpp:2365-2369`). Conflux (`static/gamefiles/conflux-3.5-b8/`)
-is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
-parse, and nothing has examined its format.
+A `dungeon.dat` may open with an Extended Features block, as the DM Windows package's
+(the `dm-windows` set) does. `DungeonLoader.loadDungeonDat` reads it with
+`readExtendedFeatures`, as `ReadDatabases` does (`SaveGame.cpp:2347`), then the image
+behind it in the shape it declares, compressed or not (`:2362-2369`), and keeps the block
+in `DungeonData.extendedFeatures`. A new game takes its rules through
+`Game.readNewGameRules`: at the boot when the entrance's choice is ENTER, and in
+`readNewGame` (`tools/dump-extended-dungeon.ts`). Conflux
+(`static/gamefiles/conflux-3.5-b8/`) is not a data set yet: its 620 KB `dungeon.dat` does
+not open with 33028 and does not parse, and nothing has examined its format.
 
-The data set's `dungeon.dat` has to be read where CSBWin reads it. The page reads it before
+What is left: the data set's `dungeon.dat` has to be read where CSBWin reads it. The page reads it before
 the title (`loadGameFiles`), and after a lost game once ENTER is chosen (`showEndOfGame`,
 `src/main.ts`), both outside `_GameSetup`'s loop. So a file that fails its read ends the
 page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read reaches
@@ -186,15 +187,13 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
 
-**Steps**, each a commit, in this order. Steps 1 and 2, the set chosen before the boot and
-the DM Rules toggle, are done; the next is step 3.
+**Steps**, each a commit, in this order. Steps 1 to 3, the set chosen before the boot,
+the DM Rules toggle and the block in `dungeon.dat`, are done; the next is step 4.
 
-3. **An Extended Features block in `dungeon.dat`.** `DungeonLoader` reads the block, a
-   compressed body found behind it (`SaveGame.cpp:2365-2369`), and `readRulesOptions`
-   sets `ctx.rules` from it. The DM Windows package's `dungeon.dat` becomes a set.
 4. **`dungeon.dat` read after ENTER**, where CSBWin reads it, so a failed read reaches
    `tag01efee` as a save's does, rather than ending the page's `init` or rejecting in
-   `showEndOfGame`.
+   `showEndOfGame`. The boot's `readNewGameRules` on the early parse (`init`,
+   `src/main.ts`) then goes, since the read after ENTER is `readNewGame`'s.
 
 ### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
@@ -340,10 +339,10 @@ party.
 
 No shipped DM hero touches any of these.
 
-**Two save-file matters.** `SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file behind
-RC4 with the key `{1,0}`, and CSBWin sets it only when it reads a file already enciphered
-(`doc/CSBwin-src/SaveGame.cpp:326-338`); the reader deciphers the 512-byte header and no
-more, and the writer never sets it. And `MakeBigActuators` reads each actuator's type before
+**Two file matters.** `SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file, a save or
+a `dungeon.dat`, behind RC4 with the key `{1,0}`, and CSBWin sets it only when it reads a
+file already enciphered (`doc/CSBwin-src/SaveGame.cpp:326-338`); `readExtendedFeatures`
+deciphers the 512-byte header and no more, and the writer never sets it. And `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
 (`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap");
 `tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
