@@ -25,6 +25,12 @@ export enum TimerFunction {
   TT_PIT = 9,
   TT_DOOR = 10,
   TT_11 = 11,
+  /**
+   * The end of the damage shown over a champion's name (`TAG011366`,
+   * doc/CSBwin-src/Timer.cpp:2686): `uByte5` is the champion. `DisplayCharacterDamage`
+   * arms it five ticks on (`CSBCode.cpp:7172-7202`).
+   */
+  TT_12 = 12,
   TT_VI_ALTAR = 13,
   /**
    * A delayed sound (`QueueSound` with `deltaTime > 1`, doc/CSBwin-src/CSBCode.cpp:1832-1848):

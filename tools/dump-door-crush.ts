@@ -121,6 +121,7 @@ async function main(): Promise<void> {
 
   const tick = (): void => {
     game.timerSystem.processTimers();
+    game.monsterAttack.displayCharacterDamage();
     game.state.tickCount++;
   };
 

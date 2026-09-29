@@ -290,7 +290,10 @@ independent chances to avoid a blow, for the many-stage damage formula, and for 
 wounds accumulate.
 
 The champion side is `MonsterDamagesCharacter` (`:4518`) → `DamageCharacter`
-(`doc/CSBwin-src/Character.cpp:2703`) → `KillCharacter` (`:2526`). `DamageCharacter`'s
+(`doc/CSBwin-src/Character.cpp:2703`), which only adds to `d.PendingDamage`; the tick's
+`DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`) takes it off the HP and calls
+`KillCharacter` (`Character.cpp:2526`) (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only
+adds to `d.PendingDamage`"). `DamageCharacter`'s
 `P4` selects the mitigation: 1 fire, 5 spell, 6 wisdom-scaled, 2 half armour, anything
 else full armour, 0 no mitigation and no wounds at all. Its value comes from
 `MONSTERDESC.uByte22[2]`, which is non-zero for every shipped monster except the

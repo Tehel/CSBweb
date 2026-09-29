@@ -24,6 +24,8 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         // `d.PotentialCharacterOrdinal` 0 — none (doc/CSBwin-src/Data.h:933).
         potentialChampionIndex: -1,
         gameIsLost: false,
+        pendingDamage: [0, 0, 0, 0],
+        pendingOuches: [0, 0, 0, 0],
         cursorOwner: -1,
         selectedCharacterIndex: -1,
         objectInHand: OBJECT_ID_NULL,

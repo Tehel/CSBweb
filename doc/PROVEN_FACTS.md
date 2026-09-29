@@ -1230,8 +1230,10 @@ of 0 — `AddCharacter`'s for a champion recruited at level 0, (0, 0)
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
 Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).
-Every path that can kill ends at `DamageCharacter` (`:2703`), which is what drops the
-possessions, leaves the bones, moves the cursor and the magic tab, and sets
+Every path that can kill goes through `DamageCharacter` (`:2703`), whose blow the tick's
+`DisplayCharacterDamage` then takes off the HP, calling `KillCharacter` when it would reach
+zero (see "`DamageCharacter` only adds to `d.PendingDamage`" below). `KillCharacter` drops
+the possessions, leaves the bones, moves the cursor and the magic tab, and sets
 `d.GameIsLost`. Two are easy to miss because they do not look like attacks:
 
 - `AdjustStamina` (`doc/CSBwin-src/Code11f52.cpp:4413`) clamps stamina at zero and turns
@@ -3210,6 +3212,42 @@ game is won" (`doc/CSBwin-src/Data.h:927`) and only ever set to 1 (`Attack.cpp:2
 after the win, cannot be hurt — yet the call reports non-zero, and a caller such as a
 missile's poison coin toss (`Code11f52.cpp:2046-2054`) proceeds as if damage was dealt.
 Evidence: `tools/dump-champion-death.ts` → "DamageCharacter's early guards".
+
+## `DamageCharacter` only adds to `d.PendingDamage`; the tick takes it off and shows it
+
+`DamageCharacter` (`doc/CSBwin-src/Character.cpp:2703`) does not touch the HP. Its wound
+roll ORs into `d.PendingOuches[chIdx]` (`:2803`), and its last act is
+`d.PendingDamage[chIdx] += D7W` (`:2900`); it returns `D7W`. Both arrays are `i16[4]`
+(`doc/CSBwin-src/Data.h:761-762`) and are not in the save.
+
+`DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`) runs once a main-loop tick,
+after the timers, `DrawViewport` and `StartQueuedSound` and before the `d.GameIsLost` test
+(`:638`, `:656-658`). So the frame of the tick is drawn with the HP of before the blow, and
+a champion killed in it loses the game in that same tick. For each champion
+(`:7096-7202`): `ouches |= PendingOuches`, which is cleared; then, with `PendingDamage`
+non-zero, it is cleared, and the rest is skipped for the recruit in a mirror
+(`PotentialCharacterOrdinal`) and for a champion already at 0 HP. HP minus the damage at 0
+or below is `KillCharacter` and nothing else. Otherwise the HP is set and the box shows the
+loss:
+
+- inventory closed: graphic 15 blitted masked with colour 10 into `x 69*chIdx..+47, y 0..6`
+  (over the name), the figure at `x = 69*chIdx + 19 / 16 / 13` for one / two / three or
+  more digits, `y = 5`;
+- that champion's inventory open: graphic 16 into `x 69*chIdx+7..+38, y 0..28` (over the
+  portrait), the figure at `x = 69*chIdx + 21 / 18 / 15`, `y = 16`.
+
+The figure is `TAG014af6(damage, 0, 3)` (`doc/CSBwin-src/Character.cpp:1038`): the digits
+with no leading blanks, 9999 at most, drawn by `TextOutToScreen` in colour 15 on 8. The
+graphics are 48x7 and 32x29, the rectangles' sizes.
+
+Then a `TT_12` at `d.Time + 5` on `d.partyLevel`, `timerUByte5 = chIdx`, its index in
+`CHARDESC.timerIndex`; if one is already pending, its time and level are rewritten and
+`AdjustTimerPriority` re-sorts it, so a second loss shows only the new figure and keeps it
+five more ticks. `TT_12` runs `TAG011366` (`CSBCode.cpp:6477`, `Timer.cpp:2686`):
+`timerIndex = -1`, return if HP is 0, else `CharacterPortraitToStatusBox` with the
+inventory open or `CHARFLAG_cursor` and `DrawCharacterState` (the name) with it closed.
+
+Evidence: `tools/dump-character-damage.ts`.
 
 ## A wall bump hurts the two champions on the wall side, and is silent if nobody is hurt
 

@@ -252,8 +252,12 @@ async function main(): Promise<void> {
       lastQueued = undefined;
     };
     game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    // A new party: what the earlier steps dealt the last one is not theirs to take.
+    game.party.state.pendingDamage = [0, 0, 0, 0];
     standAtWall();
     const moved = game.move(MovementAction.MOVE_FORWARD);
+    // The next tick's `DisplayCharacterDamage` takes the bump off the HP.
+    game.monsterAttack.displayCharacterDamage();
     // Corners are absolute, 0=NW 1=NE 2=SE 3=SW, so the two facing the wall are
     // `facing` and `facing + 1`.
     const frontCorners = [wall.facing & 3, (wall.facing + 1) & 3];
@@ -374,6 +378,7 @@ async function main(): Promise<void> {
     const exhaustCost = sw(Math.trunc((3 * 2000) / stats.maxLoad(champs[back])) + 1);
     standAtWall();
     game.move(MovementAction.MOVE_FORWARD);
+    game.monsterAttack.displayCharacterDamage();
     stats.characterLoad = realLoad;
     stamina = {
       bump, turn, loaded: 100 - champs[laden].attributes.stamina, loadedCost,

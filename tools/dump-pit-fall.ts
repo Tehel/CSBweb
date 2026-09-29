@@ -70,7 +70,10 @@ function makeGame(): Game {
 function fall(g: Game, pit: Position): Position {
   g.party.state.position = new Position(pit.x, pit.y, pit.z);
   g.worldMove.moveParty(-1, 0, pit.x, pit.y);
+  // The next tick: the level below loaded, then `DisplayCharacterDamage` takes the fall
+  // off the HP (doc/CSBwin-src/CSBCode.cpp:615-657).
   g.loadNewPartyLevel();
+  g.monsterAttack.displayCharacterDamage();
   return g.party.state.position;
 }
 

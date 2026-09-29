@@ -545,6 +545,10 @@ export class Game implements MainLoop {
         // the port's pass does not (`DEBT.md` H), so whether it asked for one is kept.
         waitForButtonFlash(this.ctx);
         const putBackAsked = this.ctx.loop.flashButnActive;
+        // `StartQueuedSound(); DisplayCharacterDamage();` (doc/CSBwin-src/CSBCode.cpp:656-657):
+        // what `DamageCharacter` dealt since the last tick comes off the HP, and a champion
+        // it kills can lose the game just below.
+        this.ctx.systems.monsterAttack.displayCharacterDamage();
         // `tag000730`: `if (d.GameIsLost == 0) { d.Time++; … goto tag000698; } RETURN;`
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits

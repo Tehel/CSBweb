@@ -329,6 +329,9 @@ export function drawPartyStatus(ui: UIState): void {
         const nameColor = ui.partyState.cursorOwner === chIdx ? 9 : 13;
         drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, baseX + 1, 5, nameColor, 1, champion.name);
       }
+      // Under the life bars: `DisplayCharacterDamage` calls `DrawCharacterState`, whose
+      // `DrawLifeBars` goes over graphic 15's right edge (`doc/CSBwin-src/CSBCode.cpp:7203`).
+      if (champion) drawCharacterDamage(ui, chIdx, champion, false);
     }
 
     if (champion && champion.alive === false) {
@@ -379,6 +382,7 @@ export function drawPartyStatus(ui: UIState): void {
           1
         );
       }
+      drawCharacterDamage(ui, chIdx, champion, true);
     }
 
     if (champion && champion.alive !== false) {
@@ -400,6 +404,63 @@ export function drawPartyStatus(ui: UIState): void {
   if (ui.word23144 !== 0) fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1454[ui.word23144 - 1], 0);
 
   drawTopBarHandIcons(ui);
+}
+
+/**
+ * What `DisplayCharacterDamage` blits for a champion who lost HP this tick
+ * (`doc/CSBwin-src/CSBCode.cpp:7121-7171`), for as long as it stays on CSBWin's screen.
+ * With the champion's inventory open it is graphic 16 over the portrait, at `69*chIdx+7`,
+ * and the figure at y 16; otherwise graphic 15 over the name, at `69*chIdx`, and the
+ * figure at y 5. Both are masked with colour 10, and the figure is `TAG014af6(damage, 0,
+ * 3)` — no leading blanks, at most 9999 — in colour 15 on 8, moved left by three
+ * pixels for each digit past the first.
+ *
+ * Anything that redraws the name or the portrait takes it away before its `TT_12`:
+ * death (`KillCharacter` blits graphic 8 over the box), and opening or closing the
+ * inventory, whose `CHARFLAG_portraitChanged` fills the box afresh. Those two are why a
+ * readout drawn in the other mode, or on a dead champion, is dropped here. CSBWin's other
+ * redraws of the name or the box before the `TT_12` are not modelled (`DEBT.md` C92).
+ */
+function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inventoryOpen: boolean): void {
+  const shown = ui.characterDamage[chIdx];
+  if (!shown || !ui.screenIndexBuffer || !ui.fontData) return;
+  if (champion.alive === false || shown.inventoryOpen !== inventoryOpen) {
+    ui.characterDamage[chIdx] = null;
+    return;
+  }
+  const damage = shown.damage;
+  let x = 69 * chIdx;
+  let y: number;
+  let rect: { x1: number; y1: number; x2: number; y2: number };
+  let graphicNum: number;
+  if (inventoryOpen) {
+    rect = { x1: x + 7, y1: 0, x2: x + 7 + 31, y2: 28 };
+    graphicNum = 16;
+    x += damage < 10 ? 21 : damage < 100 ? 18 : 15;
+    y = 16;
+  } else {
+    rect = { x1: x, y1: 0, x2: x + 47, y2: 6 };
+    graphicNum = 15;
+    x += damage < 10 ? 19 : damage < 100 ? 16 : 13;
+    y = 5;
+  }
+  const graphic = ui.getGraphicBitmap(graphicNum);
+  if (graphic) {
+    tag0088b2Index(
+      graphic,
+      ui.screenIndexBuffer,
+      {
+        ...rect,
+        srcX: 0,
+        srcY: 0,
+        srcStride: graphic.width,
+        srcWidth: graphic.width,
+        srcHeight: graphic.height,
+      },
+      10
+    );
+  }
+  drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, y, 15, 8, String(Math.min(damage, 9999)));
 }
 
 export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {

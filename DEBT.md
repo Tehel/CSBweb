@@ -88,9 +88,10 @@ In payoff order: the first row is the next item.
 | --- | --- | --- | --- |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
-| G2 | Ten DSA filters | — | ⏸️ |
+| G2 | Eleven DSA filters | — | ⏸️ |
 | G3 | The wings | — | ⏸️ |
 | G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
@@ -125,7 +126,22 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-Empty. A divergence found along the way goes here, with the next free ID.
+A divergence found along the way goes here, with the next free ID.
+
+### C92 ⏳ The damage figure outlives CSBWin's other redraws of the champion box
+
+`DisplayCharacterDamage` blits the loss into the screen, and it stays until something
+draws over it (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only adds to
+`d.PendingDamage`"). The port redraws every frame from state, so `UIState.characterDamage`
+says the figure is still up, and `drawCharacterDamage` (`src/renderer/ui/Character.ts`)
+draws it. It is dropped at the `TT_12` (`TAG011366`), at death, and when the inventory
+opens or closes on that champion. `DrawCharacterState`'s other redraws before the `TT_12`
+also go over it in CSBWin and do not here: the name, on `CHARFLAG_cursor`, which
+`SetHandOwner` sets on the old and new owner (`doc/CSBwin-src/CSBCode.cpp:8390-8422`); and
+the whole box, on `CHARFLAG_portraitChanged`, which a shield starting or ending sets
+(`MarkAllPortraitsChanged`, `CSBCode.cpp:6545-6570`, `Magic.cpp:1329`). There the port's
+figure stays up to five ticks longer. Paying it means modelling those flags, which the
+port does not (`Champion.charFlags`, `src/engine/gameTypes.ts`).
 
 ---
 
@@ -208,12 +224,15 @@ Not taken in order; the author names one to start it (see "Priority").
   DSA or a custom dungeon sets extended cell flags. The magic footprints are drawn
   (`src/renderer/csbwin/SummarizeRoomInfo.ts`, beside a comment naming this item).
 
-### G2 ⏸️ Ten DSA filters
+### G2 ⏸️ Eleven DSA filters
 
 No dungeon we load defines any of them, so none could be verified if written. Each place
 uses CSBWin's defaults.
 
 - `ESL_CHARDEATHFILTER` (actuator type 47, `Character.cpp:2535-2589`).
+- `ESL_DAMAGECHARFILTER` (actuator type 47, `Character.cpp:2829-2893`), which may rewrite
+  the damage `DamageCharacter` is about to add to `d.PendingDamage`
+  (`MonsterAttack.damageCharacter`).
 - `ESL_FEEDINGFILTER` (`Character.cpp:4288-4344`). Its insertion point is marked in
   `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires

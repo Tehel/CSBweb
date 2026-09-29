@@ -122,6 +122,7 @@ async function main(): Promise<void> {
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
     game.monsterAttack.damageCharacter(probeIdx, 300, 0x3f, 3);
+    game.monsterAttack.displayCharacterDamage();
     if (probe.wounds !== 0) bigWounds++;
     bigMask |= probe.wounds;
   }
@@ -129,6 +130,7 @@ async function main(): Promise<void> {
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
     game.monsterAttack.damageCharacter(probeIdx, 6, 0x3f, 3);
+    game.monsterAttack.displayCharacterDamage();
     if (probe.wounds !== 0) smallWounds++;
   }
   console.log('');

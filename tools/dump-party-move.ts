@@ -323,6 +323,11 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   stand(game, log, from, facing);
   game.party.state.champions[0]!.attributes.health = 1;
   game.move(MovementAction.MOVE_FORWARD);
+  // The fall only adds to `d.PendingDamage`. The next tick loads the level below, and
+  // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:615-657).
+  check(game.party.state.champions[0]!.alive !== false, 'the fall itself does not kill: the damage is pending');
+  game.loadNewPartyLevel();
+  game.monsterAttack.displayCharacterDamage();
   const bonesBelow = game.dungeonState.findFirstObject(below) !== OBJECT_ID_EOF;
   const bonesAbove = game.dungeonState.findFirstObject(from) !== OBJECT_ID_EOF;
   console.log(`8. a champion at 1 HP falls: alive ${game.party.state.champions[0]!.alive}, `

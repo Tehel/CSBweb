@@ -168,6 +168,7 @@ function checkTickOfDeath(): void {
   {
     const w = watchedGame([3]);
     w.game.monsterAttack.poisonCharacter(0, 128);
+    w.game.monsterAttack.displayCharacterDamage();
     check(w.game.party.state.champions[0]!.attributes.health === 1, 'poison: the first dose leaves 1 health');
     runPastDeath('poison', w, 60);
   }

@@ -138,6 +138,13 @@ export interface UIState {
   attackFlashValue: number;
   attackFlashUntilMs: number;
   /**
+   * The damage `DisplayCharacterDamage` blitted into each champion's box
+   * (`doc/CSBwin-src/CSBCode.cpp:7121-7171`), still on CSBWin's screen, or null: the HP
+   * lost, and whether it went over the portrait of an open inventory (graphic 16) or
+   * over the name (graphic 15). `TAG011366` draws over it. See `ui/Character.ts`.
+   */
+  characterDamage: ({ damage: number; inventoryOpen: boolean } | null)[];
+  /**
    * `d.DisplayResurrectChestOrScroll` (`doc/CSBwin-src/Character.cpp:3838`) — what the
    * eye panel is currently showing, which is also what a click in it means: 5 the
    * Resurrect/Reincarnate/Cancel menu, 4 an open chest, 0 anything else. Written by
@@ -273,6 +280,7 @@ type PlayState = Pick<UIState,
   | 'pressingEye' | 'word23144' | 'pointer23178' | 'pointer23182'
   | 'attackingCharacterOrdinal' | 'possibleAttackTypes' | 'byte20256' | 'word20248'
   | 'word20250' | 'word20252' | 'closedAttackMenuOrdinal' | 'attackFlashValue' | 'attackFlashUntilMs'
+  | 'characterDamage'
   | 'displayResurrectChestOrScroll' | 'openChestId' | 'openChestContents' | 'openChestIconIndex'>;
 
 /**
@@ -301,6 +309,7 @@ function initialPlayState(): PlayState {
     closedAttackMenuOrdinal: 0,
     attackFlashValue: 0,
     attackFlashUntilMs: 0,
+    characterDamage: [null, null, null, null],
     displayResurrectChestOrScroll: 0,
     openChestId: null,
     openChestContents: emptyChestContents(),

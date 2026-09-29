@@ -307,6 +307,7 @@ function main(): void {
     g.monsterSystem.loadPartyLevel(cell.z);
     armChampion(g, 0);
     g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    g.monsterAttack.displayCharacterDamage();
     report('DamageCharacter', aftermath(g, cell, 0, true));
   }
 
@@ -320,6 +321,7 @@ function main(): void {
     // Stamina 12, so a 100-point cost overshoots by 88 and `DamageCharacter` takes 44
     // — more than the 20 hit points the champion has.
     g.monsterAttack.adjustStamina(0, 100);
+    g.monsterAttack.displayCharacterDamage();
     check(g.party.state.champions[0]!.attributes.stamina === 0, 'exhaustion: stamina bottoms out at 0');
     report('AdjustStamina', aftermath(g, cell, 0, true));
   }
@@ -353,6 +355,7 @@ function main(): void {
       g.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.state.tickCount);
       for (let i = 0; i < 6 && alive(); i++) {
         g.timerSystem.processTimers();
+        g.monsterAttack.displayCharacterDamage();
         g.state.tickCount++;
       }
       console.log([shots, before, champ.attributes.health, alive()].join('\t'));
@@ -378,6 +381,7 @@ function main(): void {
     g.party.state.cursorOwner = 0;
     g.party.state.magicCasterIndex = 0;
     g.monsterAttack.adjustStamina(0, 100);
+    g.monsterAttack.displayCharacterDamage();
     const party = g.party.state;
     console.log(['', 'value'].join('\t'));
     console.log(['cursorOwner', party.cursorOwner].join('\t'));
@@ -465,6 +469,7 @@ function main(): void {
     g.gameWon = false;
 
     const big = g.monsterAttack.damageCharacter(0, 0x10000 + 5, 0, 0);
+    g.monsterAttack.displayCharacterDamage();
     console.log(`damage 0x10005: returned ${big}, health ${hero.attributes.health}`);
     check(big === 5 && hero.attributes.health === 15, 'the blow is cut to 16 bits first: 0x10005 is 5');
   }
@@ -500,6 +505,7 @@ function main(): void {
       slotOf.set(rn & 0x3fff, slot);
     }
     g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    g.monsterAttack.displayCharacterDamage();
     const dropped = chainAt(g, cell).filter((rn) => slotOf.has(rn & 0x3fff));
     const got = dropped.map((rn) => slotOf.get(rn & 0x3fff)!);
     const want = dropOrder.filter((slot) => armed.includes(slot));
@@ -518,6 +524,7 @@ function main(): void {
       const rn = newDagger(g2);
       g2.party.state.champions[0]!.possessions[1] = rn;
       g2.monsterAttack.damageCharacter(0, 999, 0, 0);
+      g2.monsterAttack.displayCharacterDamage();
       const at = whereIs(g2, rn);
       console.log(`dying over the open pit at (${pit.x},${pit.y}) level ${pit.z}: the dagger is at `
         + (at.map((p) => `(${p.x},${p.y}) level ${p.z}`).join(' ') || 'nowhere'));
@@ -579,6 +586,7 @@ function main(): void {
 
     g.monsterAttack.damageCharacter(0, 999, 0, 0);
     g.monsterAttack.damageCharacter(1, 999, 0, 0);
+    g.monsterAttack.displayCharacterDamage();
     const d = g.dungeonState;
     console.log(`brightness ${before + step} -> ${g.party.state.brightness}; torch lit ${d.getWeaponRecord(torch)?.litTorch}; `
       + `scroll open ${d.getScrollRecord(scroll)?.open}; Illumulet value ${d.getMiscRecord(illumulet)?.specialState}; `
@@ -592,9 +600,11 @@ function main(): void {
   }
 
   /* ------------------------------ the killing blow's tick draws before it ends ---- */
-  // A monster's blow lands inside `ProcessTimers`. The tick then draws the viewport
-  // (`doc/CSBwin-src/CSBCode.cpp:638`) before it finds the game lost and returns
-  // (`:658`, `:778`), so the last frame shows the blow, not the moment before it.
+  // A monster's blow lands inside `ProcessTimers`, but only as `d.PendingDamage`. The
+  // tick draws the viewport (`doc/CSBwin-src/CSBCode.cpp:638`), then
+  // `DisplayCharacterDamage` (`:657`) takes the blow off the HP and kills, and the tick
+  // finds the game lost and returns (`:658`, `:778`). So the frame is drawn with the
+  // champion still standing; the dead box is `KillCharacter`'s own blit.
   {
     console.log('');
     const g = makeGame(1);
@@ -607,8 +617,9 @@ function main(): void {
     g.onTick(() => drawn.push(`gameIsLost ${g.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
     (g as unknown as { gameTick(): void }).gameTick();
     console.log(`the killing blow's tick draws: ${drawn.join('; ') || 'nothing'}; then main loop returned ${g.mainLoopHasReturned()}`);
-    check(drawn.length === 1 && drawn[0] === 'gameIsLost true, main loop returned false',
-      "the tick of the killing blow draws the frame, after the blow and before the game ends");
+    check(drawn.length === 1 && drawn[0] === 'gameIsLost false, main loop returned false',
+      "the tick of the killing blow draws the frame before DisplayCharacterDamage kills");
+    check(g.party.state.gameIsLost, 'and the same tick loses the game');
     check(g.mainLoopHasReturned(), 'and then the main loop returns');
   }
 

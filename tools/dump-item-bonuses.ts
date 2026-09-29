@@ -317,6 +317,7 @@ async function main(): Promise<void> {
     AdjustStatsForItemCarried(c, 2, 1, helm, g.dungeonState, gNameIndex);
     const worn = `${c.attributes.maxMana} ${c.attributes.stats[AttributeIndex.Wisdom]!.current}`;
     g.monsterAttack.damageCharacter(0, 999, 0, 0);
+    g.monsterAttack.displayCharacterDamage();
     const after = `${c.attributes.maxMana} ${c.attributes.stats[AttributeIndex.Wisdom]!.current}`;
     console.log(`dying with a Serpent Staff and the Crown of Nerra: maxMana/Wisdom ${worn} -> ${after}`);
     check(worn === '36 53' && after === '20 43', 'a death takes each bonus off as the object drops');

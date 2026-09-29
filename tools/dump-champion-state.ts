@@ -98,6 +98,7 @@ function main(): void {
     const champ = game.party.state.champions[0]!;
     champ.attributes.stamina = stamina;
     game.monsterAttack.adjustStamina(0, decrement);
+    game.monsterAttack.displayCharacterDamage();
     const after = { stamina: champ.attributes.stamina, health: champ.attributes.health };
     console.log([stamina, decrement, after.stamina, after.health, note].join('\t'));
     return after;
@@ -140,6 +141,7 @@ function main(): void {
   // Strength 200: the first dose is Larger(1, 200/64) = 3, and 199 ticks are left.
   (game as unknown as { state: { tickCount: number } }).state.tickCount = 0;
   game.monsterAttack.poisonCharacter(0, 200);
+  game.monsterAttack.displayCharacterDamage();
   console.log([0, victim.poisonCount, victim.attributes.health, poisonTimersFor(game, 0), 'poisoned, strength 200'].join('\t'));
 
   check(victim.attributes.health === startHealth - 3, `the first dose was 3 (got ${startHealth - victim.attributes.health})`);
@@ -179,6 +181,7 @@ function main(): void {
     const g = withParty(1);
     const ch = g.party.state.champions[0]!;
     g.monsterAttack.poisonCharacter(0, 1);
+    g.monsterAttack.displayCharacterDamage();
     check(ch.attributes.health === 199, 'a one-tick dose still deals the minimum 1 damage');
     check(poisonTimersFor(g, 0) === 0, 'a one-tick dose arms no timer');
     check(ch.poisonCount === 0, 'and leaves the champion unpoisoned');
@@ -190,6 +193,7 @@ function main(): void {
     g.party.state.potentialChampionIndex = 1;
     const ch = g.party.state.champions[1]!;
     g.monsterAttack.poisonCharacter(1, 200);
+    g.monsterAttack.displayCharacterDamage();
     check(ch.attributes.health === 200, 'an unconfirmed champion cannot be poisoned');
     check(poisonTimersFor(g, 1) === 0, 'and no timer is armed for them');
   }

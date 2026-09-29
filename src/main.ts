@@ -274,6 +274,9 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         drawViewport: () => renderView(),
         // `TAG01b29a`, after the tick's `d.Time++`: the flinch and the attack panel.
         tag01b29a: () => screen?.attackPanelTick(),
+        // `DisplayCharacterDamage`'s splat and figure, and `TAG011366` drawing over them.
+        displayCharacterDamage: (chIdx, damage) => screen?.displayCharacterDamage(chIdx, damage),
+        tag011366: (chIdx) => screen?.tag011366(chIdx),
     });
 
     screen = new GameScreen(gameCanvasEl, {

@@ -127,8 +127,8 @@ export interface Champion {
     charFlags: i16;
     /**
      * `CHARDESC.timerIndex` — the timer that erases the damage readout over the
-     * champion's portrait (`doc/CSBwin-src/CSBCode.cpp:7176-7190`), or -1. This port
-     * draws that readout without a timer; the field is carried for the save writer.
+     * champion's name or portrait (`doc/CSBwin-src/CSBCode.cpp:7172-7202`), a `TT_12`,
+     * or -1. `MonsterAttack.displayCharacterDamage` arms it, `tag011366` clears it.
      */
     timerIndex: i16;
     /** `CHARDESC.talents` — a `ui32` `AddCharacter` zeroes (`Character.cpp:510`). */
@@ -216,6 +216,18 @@ export interface PartyState {
      * (`Game.gameTick`).
      */
     gameIsLost: boolean;
+    /**
+     * `d.PendingDamage[4]` (`doc/CSBwin-src/Data.h:762`): what `DamageCharacter` has dealt
+     * each champion since the tick's `DisplayCharacterDamage`, which takes it off the HP.
+     * Not in a CSBWin save.
+     */
+    pendingDamage: number[];
+    /**
+     * `d.PendingOuches[4]` (`doc/CSBwin-src/Data.h:761`): the wounds `DamageCharacter`
+     * has marked, OR-ed into `ouches` by the tick's `DisplayCharacterDamage`. Not in a CSBWin
+     * save.
+     */
+    pendingOuches: number[];
     /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */
     objectInHand: ObjectID;
     partyShield: ui16;          // d.PartyShield

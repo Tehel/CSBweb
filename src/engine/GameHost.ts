@@ -84,6 +84,17 @@ export interface GameHost {
    * `d.Time++` (`:685`): the champions' flinch and the attack panel, both the UI's.
    */
   tag01b29a(): void;
+  /**
+   * `DisplayCharacterDamage`'s blit (`doc/CSBwin-src/CSBCode.cpp:7121-7171`): the
+   * champion lost `damage` HP this tick, shown in red over their name — or over their
+   * portrait, their inventory being open — until `tag011366`. The screen is the UI's.
+   */
+  displayCharacterDamage(chIdx: number, damage: number): void;
+  /**
+   * `TAG011366`'s redraw (`doc/CSBwin-src/Timer.cpp:2692-2703`): the `TT_12` has come due,
+   * and the champion's name or portrait goes back over the damage shown.
+   */
+  tag011366(chIdx: number): void;
 }
 
 /**
@@ -115,5 +126,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     showCredits: host.showCredits ?? (() => {}),
     drawViewport: host.drawViewport ?? (() => {}),
     tag01b29a: host.tag01b29a ?? (() => {}),
+    displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
+    tag011366: host.tag011366 ?? (() => {}),
   };
 }

@@ -33,6 +33,7 @@ import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
 import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
 import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
 import { wakeUp } from './LoopState';
+import { TimerFunction } from './TimerQueue';
 
 /**
  * The missile "projectile" RNs a monster can throw (`doc/CSBwin-src/CSBTypes.h`, used
@@ -563,7 +564,9 @@ export class MonsterAttack {
       if (dealt > threshold) {
         do {
           const bit = 1 << this.random.below(8);
-          champ.wounds = (champ.wounds | (bit & woundMask)) & 0xffff;
+          // `d.PendingOuches[chIdx] |= D1W` (`:2803`): the tick's
+          // `DisplayCharacterDamage` hands them on to `ouches`.
+          party.pendingOuches[chIdx] = (party.pendingOuches[chIdx]! | (bit & woundMask)) & 0xffff;
           threshold <<= 1;
           if (dealt <= threshold) break;
         } while (threshold !== 0);
@@ -573,14 +576,72 @@ export class MonsterAttack {
 
     if (dealt <= 0) return 0;
 
-    const health = champ.attributes.health | 0;
-    if (dealt >= health) {
-      champ.attributes.health = 0;
-      this.killCharacter(chIdx);
-    } else {
-      champ.attributes.health = health - dealt;
-    }
+    // `d.PendingDamage[chIdx] += D7W` (`doc/CSBwin-src/Character.cpp:2900`): the HP
+    // stay as they are until the tick's `DisplayCharacterDamage`, which takes the sum
+    // off, kills, and shows it over the portrait. CSBWin's damage filter DSA before it
+    // (`:2829-2893`) is not ported, as no DSA filter is (`DEBT.md` G2).
+    party.pendingDamage[chIdx] = sw(party.pendingDamage[chIdx]! + dealt);
     return dealt;
+  }
+
+  /**
+   * `DisplayCharacterDamage` (`doc/CSBwin-src/CSBCode.cpp:7084`), once a main-loop tick
+   * after `StartQueuedSound` (`:657`): each champion's pending wounds join `ouches`, and
+   * the pending damage comes off the HP, killing a champion it would take to 0 or below.
+   * A champion who survives has the loss shown over their name, or over their portrait
+   * when their inventory is open, until a `TT_12` five ticks on takes it away
+   * (`TAG011366`). A second loss before then moves that timer rather than adding one.
+   */
+  displayCharacterDamage(): void {
+    const party = this.ctx.party.state;
+    for (let chIdx = 0; chIdx < party.champions.length; chIdx++) {
+      const champ = party.champions[chIdx];
+      if (!champ) continue;
+      const ouches = party.pendingOuches[chIdx]! & 0xffff;
+      champ.wounds = (champ.wounds | ouches) & 0xffff;
+      party.pendingOuches[chIdx] = 0;
+      const damage = sw(party.pendingDamage[chIdx]!);
+      if (damage === 0) continue;
+      party.pendingDamage[chIdx] = 0;
+      if (party.potentialChampionIndex === chIdx) continue;
+      const hp = champ.attributes.health | 0;
+      if (hp === 0) continue;
+      const left = sw(hp - damage);
+      if (left <= 0) {
+        this.killCharacter(chIdx);
+        continue;
+      }
+      champ.attributes.health = left;
+      // `CHARFLAG_statsChanged` / `CHARFLAG_ouches` and the blits of graphic 15 or 16
+      // with `TAG014af6(damage, 0, 3)` on it (`:7121-7171`) are the screen's.
+      this.ctx.host.displayCharacterDamage(chIdx, damage);
+      // The timer that erases it (`:7172-7202`), on `d.partyLevel`.
+      const time = (this.ctx.state.tickCount + 5) >>> 0;
+      const existing = champ.timerIndex === -1 ? null : this.ctx.timers.getTimer(champ.timerIndex);
+      if (existing === null) {
+        const entry = this.ctx.timers.createTimerWithUByte5(
+          TimerFunction.TT_12, 0, 0, 0, 0, time, party.position.z, chIdx,
+        );
+        champ.timerIndex = entry.index;
+      } else {
+        existing.time = time;
+        existing.level = party.position.z & 0xff;
+        this.ctx.timers.reprioritizeTimer(champ.timerIndex);
+      }
+    }
+  }
+
+  /**
+   * `TAG011366` (`doc/CSBwin-src/Timer.cpp:2686`), a `TT_12` coming due: the damage a
+   * champion took is no longer shown. The name, or the portrait of an open inventory, is
+   * drawn again over it — unless the champion has died since, whose box is the dead one.
+   */
+  tag011366(chIdx: number): void {
+    const champ = getPartyChampion(this.ctx.party.state, chIdx);
+    if (!champ) return;
+    champ.timerIndex = -1;
+    if ((champ.attributes.health | 0) === 0) return;
+    this.ctx.host.tag011366(chIdx);
   }
 
   /**

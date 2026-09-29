@@ -171,6 +171,10 @@ export class TimerSystem {
       case TimerFunction.TT_11:
         this.processActionDisableTimer(timer);
         break;
+      // `case TT_12: TAG011366(timeEnt.timerUByte5()); break;` (doc/CSBwin-src/CSBCode.cpp:6477).
+      case TimerFunction.TT_12:
+        this.ctx.systems.monsterAttack.tag011366(timer.uByte5 & 0xff);
+        break;
       case TimerFunction.TT_24:
         this.processExpireObject(timer);
         break;

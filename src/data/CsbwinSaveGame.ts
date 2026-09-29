@@ -100,6 +100,9 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         // `initialPartyState`'s values, as they did before they were required.
         potentialChampionIndex: -1,
         gameIsLost: false,
+        // `d.PendingDamage` and `d.PendingOuches` are not in the file either.
+        pendingDamage: [0, 0, 0, 0],
+        pendingOuches: [0, 0, 0, 0],
         sleeping: false,
         objectInHand,
         partyShield: tail.partyShield,

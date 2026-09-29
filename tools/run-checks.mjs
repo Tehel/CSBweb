@@ -50,6 +50,7 @@ const CHECKS = [
   { tool: 'dump-magic-panel.ts' },
   { tool: 'dump-champion-state.ts' },
   { tool: 'dump-champion-death.ts' },
+  { tool: 'dump-character-damage.ts' },
   { tool: 'dump-show-credits.ts' },
   { tool: 'dump-loop-script.ts' },
   { tool: 'dump-new-game.ts' },

@@ -235,6 +235,11 @@ holding the character just typed.
 
 ## 4. Death — `KillCharacter` (`Character.cpp:2526`)
 
+A blow does not kill where it lands: `DamageCharacter` adds to `d.PendingDamage`, and the
+tick's `DisplayCharacterDamage` (`CSBCode.cpp:7084`, called at `:657`) calls
+`KillCharacter` when the sum takes the HP to 0 or below (`doc/PROVEN_FACTS.md` →
+"`DamageCharacter` only adds to `d.PendingDamage`").
+
 1. Run the **character-death filter** DSA if one exists: the `ESL_CHARDEATHFILTER`
    special location, actuator type 47, with `pDSAparameters[1] = chIdx` (`:2535-2589`).
 2. `HP(0)`, mark the portrait changed.

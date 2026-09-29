@@ -437,6 +437,17 @@ export class GameScreen {
     attackPanelTick(this.ui);
   }
 
+  /** `DisplayCharacterDamage`'s blit — the host's `displayCharacterDamage`. */
+  displayCharacterDamage(chIdx: number, damage: number): void {
+    const inventoryOpen = this.ui.partyState?.selectedCharacterIndex === chIdx;
+    this.ui.characterDamage[chIdx] = { damage, inventoryOpen };
+  }
+
+  /** `TAG011366`'s redraw — the host's `tag011366`: the damage shown is drawn over. */
+  tag011366(chIdx: number): void {
+    this.ui.characterDamage[chIdx] = null;
+  }
+
   /** Buttons 147 to 148: `gameFrozen`, the screen's side of it. */
   isFrozen(): boolean {
     return this.ui.uiMode === UIMode.Frozen;
