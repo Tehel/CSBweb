@@ -293,13 +293,13 @@ the offsets of the tables after it. That wants a canary. The CSB folder has no
 
 What is needed: a data set per game (a folder, its files, a name), chosen before
 `loadGameFiles`, and everything built from it — the tables, the sound, the intro — with
-nothing that assumes `dm-atari`. **Where to choose, the author's decision.** The
-recommended answer is outside the game, on the page (a menu that reloads it with, say,
-`?dungeon=csb`): that is where CSBWin makes the same choice, from the command line's
-`directory=` or `config.txt`'s `DIRECTORY` (`CSBUI.cpp:2032`, `:799`), and its launcher
-`_AskWhatToDo` offers no dungeon (`CSBCode.cpp:11338-11444`). A reload also rebuilds every
-boot-time structure for free, where an in-game switch would have to rebuild the tables,
-the sound and the screen's caches in place. Conflux (`static/gamefiles/conflux-3.5-b8/`)
+nothing that assumes `dm-atari`. **Where to choose (the author's decision): on the
+page**, a chooser outside the game that reloads it with, say, `?dungeon=csb`. That is where
+CSBWin makes the same choice, from the command line's `directory=` or `config.txt`'s
+`DIRECTORY` (`CSBUI.cpp:2032`, `:799`), and its launcher `_AskWhatToDo` offers no dungeon
+(`CSBCode.cpp:11338-11444`). A reload also rebuilds every boot-time structure for free,
+where an in-game switch would have to rebuild the tables, the sound and the screen's
+caches in place. Conflux (`static/gamefiles/conflux-3.5-b8/`)
 is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
 parse, and nothing has examined its format.
 
@@ -327,11 +327,10 @@ CSBWin makes a CSB game in three steps (the utility's own header,
 3. **DUNGEON → Resume** loads that save, which needs C87.
 
 A DM party can therefore be carried into CSB, which is the classic way to play it.
-**The author's decision:** how the port offers step 2. The options: (a) port the
-utility's screen as CSBWin has it, a separate mode of the program; (b) port only its
-engine (the checks and `TAG002724`'s copy) and run it from the page or the save menu on a
-chosen source save, writing a new save; (c) run step 2 automatically when the prison's
-party is saved. (b) keeps the rules faithful and leaves the screen out.
+**How the port offers step 2 (the author's decision): its engine only.** Port the
+checks and `TAG002724`'s copy, and run them from the page or the save menu on a chosen
+source save, writing a new save. The utility's screen is not ported, and step 2 is not
+run automatically when the prison's party is saved.
 
 ### G19 — Saves that know their dungeon
 
