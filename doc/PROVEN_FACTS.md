@@ -4184,7 +4184,8 @@ from `d.Pointer23190` (`:2290-2308`, `:2319-2388`). So, over the dungeon view, a
 goes through the viewport palette. That palette is `Palette552[light]`
 (`WinScreen.cpp:1493-1496`), whose colours 9 and 10 `ModifyPalettes` sets from the level's
 monsters (`Code390e.cpp:323-343`, `CSBCode.cpp:2839`). Colour 4 is `066` at every light
-level. Evidence: `tools/dump-object-cursor.ts`.
+level. The port shows the icon itself there by default, an extra recorded in `DEBT.md` H.
+Evidence: `tools/dump-object-cursor.ts`.
 
 ## A load keeps the message area
 

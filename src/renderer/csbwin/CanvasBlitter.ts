@@ -433,6 +433,38 @@ export function updateImageDataFromIndexWithViewportPalette(
 }
 
 /**
+ * Converts again, through `palette`, the pixels of `src` that `bitmap` covers at (`x`, `y`)
+ * where it is not colour `transparentColor`: a cursor drawn over the viewport, shown in
+ * the palette it was drawn for rather than the viewport's.
+ */
+export function reconvertThroughPalette(
+  imageData: ImageData,
+  src: PaletteIndexViewportBuffer,
+  footprint: { x: number; y: number; bitmap: IndexedBitmap },
+  transparentColor: number,
+  palette: number[]
+): void {
+  const out = imageData.data;
+  const { x, y, bitmap } = footprint;
+  for (let row = 0; row < bitmap.height; row++) {
+    const sy = y + row;
+    if (sy < 0 || sy >= src.height) continue;
+    for (let col = 0; col < bitmap.width; col++) {
+      const sx = x + col;
+      if (sx < 0 || sx >= src.width) continue;
+      if ((bitmap.pixels[row * bitmap.width + col] & 0x0f) === transparentColor) continue;
+      const idx = sy * src.width + sx;
+      const color = palette[src.pixels[idx] & 0x0f] ?? 0;
+      const o = idx * 4;
+      out[o + 0] = ((color >> 8) & 0x7) * 36;
+      out[o + 1] = ((color >> 4) & 0x7) * 36;
+      out[o + 2] = (color & 0x7) * 36;
+      out[o + 3] = 255;
+    }
+  }
+}
+
+/**
  * `TAG0088b2` port for RGBA `ImageData` sources.
  *
  * In CSBWin:

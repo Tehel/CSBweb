@@ -10,9 +10,13 @@
  * the level's monsters change (`ModifyPalettes`, `Code390e.cpp:323-343`), never shows.
  * Outside the viewport and the portraits the cursor is the arrow.
  *
+ * The port's extra (`DEBT.md` H), on by default, shows the icon itself over the dungeon
+ * view, through the interface palette. The checks of CSBWin's cursor run with it off.
+ *
  * What to look for: the copper coin's icon is mostly colour 9. Over the viewport it is a
  * colour-4 shape, over the portraits it is itself, and over the right-hand panel and the
- * message area it is the arrow.
+ * message area it is the arrow. With the extra, it is itself over the viewport too, in
+ * the interface palette's colour 9 however the viewport palette changed it.
  *
  * Run: `npx tsx tools/dump-object-cursor.ts`
  */
@@ -24,7 +28,12 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
-import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
+import {
+  createPaletteIndexViewportBuffer,
+  reconvertThroughPalette,
+  updateImageDataFromIndexWithViewportPalette,
+  type IndexedBitmap,
+} from '../src/renderer/csbwin/CanvasBlitter';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractUITables } from '../src/renderer/csbwin/UITables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
@@ -127,6 +136,10 @@ async function main(): Promise<void> {
     console.log([`${what} (${x},${y})`, dps, colourCount(9), colourCount(4)].join('\t'));
   };
 
+  // ---- CSBWin's cursor, the extra off.
+  check(ui.colouredObjectCursor, 'the coloured object cursor should be on by default');
+  ui.colouredObjectCursor = false;
+
   // ---- Over the viewport, the dungeon view shown: the silhouette throughout.
   row('viewport', 100, 100, true);
   check(offBy(100, 100, want23190) === 0, 'over the viewport the cursor should be d.Pointer23190, the colour-4 silhouette');
@@ -164,6 +177,53 @@ async function main(): Promise<void> {
   check(wantArrow(250, 100) === 0, 'over the right-hand panel the cursor should be the arrow');
   row('message area', 100, 180, true);
   check(wantArrow(100, 180) === 0, 'over the message area the cursor should be the arrow');
+  check(ui.objectCursorFootprint === null, 'with the extra off the screen should be told of no footprint');
+
+  // ---- The extra: the icon over the viewport, converted through the interface palette.
+  ui.colouredObjectCursor = true;
+  row('extra, viewport', 100, 100, true);
+  check(offBy(100, 100, want23186) === 0, 'with the extra, over the viewport the cursor should be d.Pointer23186, the icon');
+  const footprint = ui.objectCursorFootprint as { x: number; y: number; bitmap: IndexedBitmap } | null;
+  check(footprint !== null && footprint.x === 92 && footprint.y === 92, 'the footprint should be the cursor, 8 pixels up and left of the pointer');
+  row('extra, right panel', 250, 100, true);
+  check(wantArrow(250, 100) === 0 && ui.objectCursorFootprint === null, 'with the extra, the right-hand panel keeps the arrow');
+  row('extra, inventory', 100, 100, false);
+  check(offBy(100, 100, want23186) === 0 && ui.objectCursorFootprint === null,
+    'with the inventory open the extra has nothing to do');
+
+  // A level whose monsters give colour 9 another scheme (`ModifyPalettes(9, 0)`): the
+  // coin's colour-9 pixels must come out as the interface palette's colour 9.
+  draw(100, 100, true);
+  const uiPalette = uiTables.graphic232.palette552[0];
+  const viewportPalette = uiPalette.slice();
+  viewportPalette[9] = objectTables.specialColors[0].paletteEntries[0];
+  check(viewportPalette[9] !== uiPalette[9], 'the test palette should change colour 9');
+  const rgb = (c: number): number[] => [((c >> 8) & 7) * 36, ((c >> 4) & 7) * 36, (c & 7) * 36];
+  const image = { width: 320, height: 200, data: new Uint8ClampedArray(320 * 200 * 4) } as unknown as ImageData;
+  const viewportRect = { x1: 0, y1: 33, x2: 223, y2: 168 };
+  const colour9Rgb = (): { ui: number; viewport: number } => {
+    const counts = { ui: 0, viewport: 0 };
+    const [ur, ug, ub] = rgb(uiPalette[9]);
+    const [vr, vg, vb] = rgb(viewportPalette[9]);
+    for (let i = 0; i < 320 * 200; i++) {
+      if (screen.pixels[i] !== 9) continue;
+      const [r, g, b] = [image.data[i * 4], image.data[i * 4 + 1], image.data[i * 4 + 2]];
+      if (r === ur && g === ug && b === ub) counts.ui++;
+      if (r === vr && g === vg && b === vb) counts.viewport++;
+    }
+    return counts;
+  };
+  updateImageDataFromIndexWithViewportPalette(image, screen, viewportRect, viewportPalette, uiPalette);
+  const before = colour9Rgb();
+  reconvertThroughPalette(image, screen, footprint!, 12, uiPalette);
+  const after = colour9Rgb();
+  console.log(`coin colour 9 over the viewport: ${before.viewport} in the level's colour, then ${after.ui} in the interface's`);
+  check(before.viewport === colour9 && after.ui === colour9 && after.viewport === 0,
+    `with the extra, the coin's ${colour9} colour-9 pixels should show the interface palette's colour 9`);
+  const [br, bg, bb] = rgb(viewportPalette[1]);
+  const background = (70 * 320 + 40) * 4; // (40, 70): viewport, clear of the cursor
+  check(image.data[background] === br && image.data[background + 1] === bg && image.data[background + 2] === bb,
+    'the viewport around the cursor should keep the viewport palette');
 
   finish();
 }

@@ -24,6 +24,7 @@ import {
   createPaletteIndexViewportBuffer,
   updateImageDataFromIndex,
   updateImageDataFromIndexWithViewportPalette,
+  reconvertThroughPalette,
 } from './csbwin/CanvasBlitter';
 import { extractUITables, type UIButton, type UITables } from './csbwin/UITables';
 import { loadFontData, type FontData } from './csbwin/TextRenderer';
@@ -582,6 +583,9 @@ export class GameScreen {
         viewportPalette,
         uiPalette,
       );
+      if (this.ui.objectCursorFootprint) {
+        reconvertThroughPalette(this.screenImageData, this.screen, this.ui.objectCursorFootprint, 12, uiPalette);
+      }
     } else {
       updateImageDataFromIndex(this.screenImageData, this.screen, uiPalette);
     }

@@ -524,6 +524,7 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
 }
 
 export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): void {
+  ui.objectCursorFootprint = null;
   if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
   if (ui.word23144 !== 0) {
     // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2234`).
@@ -551,7 +552,15 @@ export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): v
     return;
   }
   const cursor = createObjectCursor(ui, resolveObjectNameIndex(ui, objectId));
-  if (cursor) drawObjectCursor(ui, cursor, x, y, dynamicPaletteSwitching);
+  if (!cursor) return;
+  if (ui.colouredObjectCursor && dynamicPaletteSwitching) {
+    // The extra (`DEBT.md` H): the icon throughout, which the screen shows through the
+    // interface palette, so the viewport's light and monster colours do not reach it.
+    drawObjectCursor(ui, cursor, x, y, false);
+    ui.objectCursorFootprint = { x: x - 8, y: y - 8, bitmap: cursor.pointer23186 };
+    return;
+  }
+  drawObjectCursor(ui, cursor, x, y, dynamicPaletteSwitching);
 }
 
 /** `d.Byte23202` (`doc/CSBwin-src/CSBCode.cpp:441-444`): the object's shadow, two pixels down and right. */

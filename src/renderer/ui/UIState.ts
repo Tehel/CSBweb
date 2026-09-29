@@ -114,6 +114,17 @@ export interface UIState {
    */
   pointer23178: IndexedBitmap | null;
   pointer23182: IndexedBitmap | null;
+  /**
+   * The extra of `DEBT.md` H: an object in hand shown in its own colours over the dungeon
+   * view, where CSBWin shows its colour-4 silhouette. On by default; a `UISettings` toggle
+   * once the port has a settings menu.
+   */
+  colouredObjectCursor: boolean;
+  /**
+   * Where that extra drew the object this frame, for the screen to show through the
+   * interface palette rather than the viewport's; `null` when it drew none.
+   */
+  objectCursorFootprint: { x: number; y: number; bitmap: IndexedBitmap } | null;
 
   /* ---- the attack menu (doc/CSBwin-src/Character.cpp) ---- */
   /** `d.AttackingCharacterOrdinal` — 1-based champion with the menu open, 0 for none. */
@@ -353,6 +364,8 @@ export function createUIState(
     keyXlate1: null,
 
     graphicCache: new Map(),
+    colouredObjectCursor: true,
+    objectCursorFootprint: null,
     cursorArrowBitmap: null,
     cursorHandBitmap: null,
     portraitSheet: undefined,
