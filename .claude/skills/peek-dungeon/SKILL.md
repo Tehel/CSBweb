@@ -44,6 +44,15 @@ before answering.
   actuator types reuse `word4`/`word6` for other things, so the target is only a reading.
   Check the type against `doc/ACTUATORS.md` before trusting it. The raw words are printed
   too.
+- When the type compares its `value` with an object, the line names that object in
+  brackets after the value: the key a lock wants, the coin or gem a slot takes, the
+  mirror an eye wants, what a torch holder holds, what the party must carry over a pad.
+  This depends on the square: the same type means one thing on a floor and another in
+  a wall. It is read from `PressurePadOrAlcove` and `TouchWall`, so it can be trusted.
+  A wall line cannot tell whether the wall is an alcove, so it gives both readings. A
+  "normally closed" flag on the line inverts it: the actuator then fires when the
+  object does not match.
+  `find GOLD KEY` lists every lock the key opens as well as the keys.
 - `cell` lists the timers whose `uByte6`/`uByte7` are the square. Door, actuator,
   monster and abeyance (`TT_60`/`TT_61`) timers use that convention. A missile's position
   is in `timerWord8`, so missile timers do not match here.

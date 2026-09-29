@@ -28,7 +28,7 @@ import type { ObjectID } from '../src/core/types';
 import {
   ActuatorAction, getActuatorAction, getActuatorDelay, getActuatorLocalActionType, getActuatorTargetPos,
   getActuatorTargetX, getActuatorTargetY, getActuatorType, getActuatorValue, isActuatorAudible,
-  isActuatorLocalActionOnly, isActuatorOnceOnly,
+  isActuatorLocalActionOnly, isActuatorNormallyClosed, isActuatorOnceOnly,
 } from '../src/data/actuatorHelpers';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { DungeonLoader } from '../src/data/DungeonLoader';
@@ -125,6 +125,11 @@ class Namer {
     return index >= 0 ? this.objectNames[index] ?? `name#${index}` : null;
   }
 
+  /** An object type (`OBJ_NAME_INDEX`, what `GetBasicObjectType` returns) by its name. */
+  objectType(objNI: number): string {
+    return this.objectNames[objNI] ?? `name#${objNI}`;
+  }
+
   monster(type: number): string {
     return (MonsterType[type] ?? `type ${type}`).replace(/^mon_/, '');
   }
@@ -171,8 +176,43 @@ const hex = (v: number, w = 4): string => '0x' + v.toString(16).padStart(w, '0')
 const SCOPE = ['items', 'monsters', 'items+party', 'everything'];
 const ACTION = { [ActuatorAction.SET]: 'set', [ActuatorAction.CLEAR]: 'clear', [ActuatorAction.TOGGLE]: 'toggle', [ActuatorAction.CONSTPRESSURE]: 'hold' };
 
-/** One object in words, with what it holds indented below it. */
-function describe(world: World, names: Namer, rn: ObjectID, indent: string, out: string[]): void {
+/**
+ * The object an actuator compares its `value` with, as `GetBasicObjectType` of that
+ * object, or null for a type whose value is something else. The same type means different
+ * things on a floor and in a wall: a pad is judged by `PressurePadOrAlcove`
+ * (`doc/CSBwin-src/Code11f52.cpp:3785-3804`), a wall by `TouchWall` when clicked
+ * (`doc/CSBwin-src/Mouse.cpp:378-480`) and by `PressurePadOrAlcove` when something is put
+ * in its alcove (`doc/CSBwin-src/Code11f52.cpp:3826-3838`). A normally closed actuator
+ * fires on the opposite outcome.
+ */
+function actuatorNeeds(a: ActuatorRecord, room: number | undefined, names: Namer): string | null {
+  const name = names.objectType(getActuatorValue(a));
+  if (room === RoomType.OPEN) {
+    switch (getActuatorType(a)) {
+      case 4: return `needs ${name} put on the pad`;
+      case 8: return `needs the party to carry ${name}`;
+      default: return null;
+    }
+  }
+  if (room === RoomType.STONE) {
+    switch (getActuatorType(a)) {
+      case 2: return `clicked with anything in hand; if an alcove, needs ${name} put in it`;
+      case 3: return `clicked with ${name}, which stays in hand; if an alcove, needs anything but ${name} put in it`;
+      case 4: case 11: return `clicked with ${name}, which it takes`;
+      case 17: return `clicked with ${name}, which it takes, then gone`;
+      case 13: return `holds ${name}`;
+      case 16: return `swaps ${name} in hand for the first object here`;
+      default: return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * One object in words, with what it holds indented below it. `room` is the room type of
+ * the square it lies on, which an actuator's meaning depends on.
+ */
+function describe(world: World, names: Namer, rn: ObjectID, indent: string, out: string[], room?: number): void {
   const { category, index, position } = decodeObjectID(rn);
   const head = `${indent}${DBType[category]} #${index} corner ${TilePosition[position] ?? position}:`;
   const rec = recordOf(world.data, rn);
@@ -198,11 +238,13 @@ function describe(world: World, names: Namer, rn: ObjectID, indent: string, out:
     case DBType.ACTUATOR: {
       const a = rec as ActuatorRecord;
       const words = `word2=${hex(a.word2)} word4=${hex(a.word4)} word6=${hex(a.word6)}${a.word8 !== undefined ? ` word8=${hex(a.word8)}` : ''}`;
-      const flags = [isActuatorOnceOnly(a) && 'once', isActuatorAudible(a) && 'audible'].filter(Boolean).join(' ');
+      const flags = [isActuatorOnceOnly(a) && 'once', isActuatorAudible(a) && 'audible', isActuatorNormallyClosed(a) && 'normally closed']
+        .filter(Boolean).join(' ');
+      const needs = actuatorNeeds(a, room, names);
       const effect = isActuatorLocalActionOnly(a)
         ? `local action ${getActuatorLocalActionType(a)}`
         : `${ACTION[getActuatorAction(a)]} (${getActuatorTargetX(a)},${getActuatorTargetY(a)}) corner ${getActuatorTargetPos(a)} after ${getActuatorDelay(a)}`;
-      out.push(`${head} type ${getActuatorType(a)} value ${getActuatorValue(a)}; if read as a target: ${effect}${flags ? `; ${flags}` : ''} [${words}]`);
+      out.push(`${head} type ${getActuatorType(a)} value ${getActuatorValue(a)}${needs ? ` (${needs})` : ''}; if read as a target: ${effect}${flags ? `; ${flags}` : ''} [${words}]`);
       return;
     }
     case DBType.CREATURE: {
@@ -384,7 +426,7 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
     console.log(`  ${side} (${nx},${ny}): ${inside ? describeFlag(flagAt(world, m, nx, ny)) : 'off the map'}`);
   }
   const lines: string[] = [];
-  for (const rn of squareObjects(world, m, x, y)) describe(world, names, rn, '  ', lines);
+  for (const rn of squareObjects(world, m, x, y)) describe(world, names, rn, '  ', lines, (flag >> 5) & 7);
   console.log(lines.length ? `objects:\n${lines.join('\n')}` : 'objects: none');
   // `QueueSwitchAction` sends a remote actuator's action to its target on the level it
   // is on (`doc/ACTUATORS.md` §4). Some types reuse word6 for other things (a
@@ -396,7 +438,8 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
       if (decodeObjectID(rn).category !== DBType.ACTUATOR) continue;
       const a = recordOf(world.data, rn) as ActuatorRecord | null;
       if (!a || isActuatorLocalActionOnly(a) || getActuatorTargetX(a) !== x || getActuatorTargetY(a) !== y) continue;
-      describe(world, names, rn, `  from (${ax},${ay}) ${RoomType[(flagAt(world, m, ax, ay) >> 5) & 7]} `, aimed);
+      const room = (flagAt(world, m, ax, ay) >> 5) & 7;
+      describe(world, names, rn, `  from (${ax},${ay}) ${RoomType[room]} `, aimed, room);
     }
   }
   console.log(aimed.length ? `actuators on this map aimed here:\n${aimed.join('\n')}` : 'actuators on this map aimed here: none');
@@ -424,7 +467,7 @@ function cmdFind(world: World, names: Namer, text: string): void {
     for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
       for (const rn of squareObjects(world, m, x, y)) {
         const lines: string[] = [];
-        describe(world, names, rn, `map ${m} (${x},${y}) `, lines);
+        describe(world, names, rn, `map ${m} (${x},${y}) `, lines, (flagAt(world, m, x, y) >> 5) & 7);
         // A group or a chest matches on what it holds as well as on itself.
         if (lines.some((l) => l.toLowerCase().includes(needle))) {
           console.log(lines.join('\n'));
