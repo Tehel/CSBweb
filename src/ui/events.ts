@@ -19,6 +19,7 @@ const smoothButton = document.getElementById('btn-smooth') as HTMLButtonElement 
 const crtButton = document.getElementById('btn-crt') as HTMLButtonElement | null;
 const soundButton = document.getElementById('btn-sound') as HTMLButtonElement | null;
 const soundVolume = document.getElementById('sound-volume') as HTMLInputElement | null;
+const dmRulesButton = document.getElementById('btn-dm-rules') as HTMLButtonElement | null;
 
 function bindCanvasEvents(canvas: HTMLCanvasElement | null, ctx: UIContext): void {
     if (!canvas) return;
@@ -216,6 +217,22 @@ export function bindUIEvents(): void {
             updateChampionPanel();
             saveUISettings(readUISettings());
         });
+
+        // CSBWin's "DM Rules" menu item: `DM_rules = !DM_rules`, at any time
+        // (doc/CSBwin-src/CSBUI.cpp:912-914). It is the game's, not the page's: a save
+        // carries it and a read game or the boot may set it, so it is not a UI setting. The
+        // menu reads its check mark afresh each time it opens (`WM_INITMENUPOPUP`,
+        // doc/CSBwin-src/CSBwin.cpp:1116, :1162-1166); the button is always in view, so it
+        // reads it every tick.
+        const showDMRules = (): void => {
+            dmRulesButton?.classList.toggle('is-pressed', ctx.game.ctx.rules.dmRules);
+        };
+        dmRulesButton?.addEventListener('click', () => {
+            ctx.game.ctx.rules.dmRules = !ctx.game.ctx.rules.dmRules;
+            showDMRules();
+            updateDebug(ctx.game.ctx.rules.dmRules ? 'DM Rules on' : 'DM Rules off');
+        });
+        ctx.game.onTick(showDMRules);
 
         // Once per game tick, which is when skills and attributes can change. The panel
         // does nothing while it is hidden.

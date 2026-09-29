@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | L | ⚠️ step 2 of 4 next |
+| G18 | One game's data set, chosen before the boot | L | ⚠️ step 3 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -150,7 +150,8 @@ postponed ones follow, under their own heading (see "Priority").
 
 The page plays one data set (`src/data/DataSets.ts`: `dm-atari`, the default, and
 `csb`), chosen before anything loads by `?dungeon=<id>`, which the chooser beside the
-canvas sets by reloading the page. It loads the set's `dungeon.dat`, `graphics.dat` and
+canvas sets by reloading the page (the author's decision), as CSBWin takes its directory
+from the command line or `config.txt` before its launcher, which offers no dungeon. It loads the set's `dungeon.dat`, `graphics.dat` and
 `CSBgraphics.dat` (`src/main.ts`, `loadGameFiles`), builds `GameTables`, the sound and the
 intro from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
 `this.ctx.tables`, and a loaded save is restored into the running game's tables. CSBWin
@@ -164,17 +165,16 @@ form, whose `Buttons16932` `extractUITables` reads (`doc/PROVEN_FACTS.md` → "C
 `graphics.dat`…", `tools/dump-data-sets.ts`). The `csb` set is the CSB Windows package's
 `dungeon.dat`, `graphics.dat`, `mini.dat` and `csbgame2.dat`, with no `CSBgraphics.dat`,
 which the package lacks too and CSBWin opens only on demand for its extensions
-(`Graphics.cpp:1840-1858`, `:3201-3273`).
+(`Graphics.cpp:1840-1858`, `:3201-3273`). Beside the chooser, the "DM Rules" button
+flips `ctx.rules.dmRules` at any time, as CSBWin's menu item does (`CSBUI.cpp:912-914`),
+and shows it pressed while it is set (`src/ui/events.ts`).
 
 What is left. A `dungeon.dat` that carries an Extended Features block
 (the DM Windows package's) sets `ctx.rules` through `readRulesOptions`, as a save does
 (`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"); `DungeonLoader` reads
 no such block today. Behind one, a compressed body is found after the block, and
 `ReadDatabases` leaves the block's size out of the body's unless `ExtendedFeaturesVersion`
-is `'@'` (`SaveGame.cpp:2365-2369`). The player's "DM Rules" toggle, which flips `ctx.rules.dmRules`
-(`CSBUI.cpp:912-914`), goes on the page with the chooser. The chooser reloads the page
-(the author's decision), as CSBWin takes its directory from the command line or
-`config.txt` before its launcher, which offers no dungeon. Conflux (`static/gamefiles/conflux-3.5-b8/`)
+is `'@'` (`SaveGame.cpp:2365-2369`). Conflux (`static/gamefiles/conflux-3.5-b8/`)
 is not a data set yet: its 620 KB `dungeon.dat` does not open with 33028 and does not
 parse, and nothing has examined its format.
 
@@ -186,11 +186,9 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
 
-**Steps**, each a commit, in this order. Step 1, the set chosen before the boot, is done;
-the next is step 2.
+**Steps**, each a commit, in this order. Steps 1 and 2, the set chosen before the boot and
+the DM Rules toggle, are done; the next is step 3.
 
-2. **The DM Rules toggle** beside the chooser: `DM_rules = !DM_rules`
-   (`CSBUI.cpp:912-914`) on `ctx.rules.dmRules`, as the menu's option does at any time.
 3. **An Extended Features block in `dungeon.dat`.** `DungeonLoader` reads the block, a
    compressed body found behind it (`SaveGame.cpp:2365-2369`), and `readRulesOptions`
    sets `ctx.rules` from it. The DM Windows package's `dungeon.dat` becomes a set.

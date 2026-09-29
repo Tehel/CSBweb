@@ -2845,7 +2845,9 @@ They are assigned in four places:
 - `_ShowPrisonDoor`, once `GameSetup(_1_, 1)` has read the game, new or resumed:
   `if (DMRulesDesignOption) DM_rules = true` (`CSBCode.cpp:10672-10676`). The restart
   after a lost game calls `GameSetup(_25_, 0)` straight (`Code1f9e6.cpp:310`), without it.
-- The player's "DM Rules" menu item toggles `DM_rules` (`CSBUI.cpp:912-914`).
+- The player's "DM Rules" menu item toggles `DM_rules` (`CSBUI.cpp:912-914`), at any
+  time. The menu's check mark is set from `DM_rules` each time the menu opens
+  (`WM_INITMENUPOPUP`, `CSBwin.cpp:1116`, `:1162-1166`).
 - Playback of a recording (`Recording.cpp:285`, `:291`).
 
 `SaveGame` writes both back (`SaveGame.cpp:950-955`). Eleven of the fourteen committed
