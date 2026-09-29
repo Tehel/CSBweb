@@ -4168,6 +4168,24 @@ it records is for a replay only (`Mouse.cpp:1800-1805`).
 `CharacterAtPosition`'s -1, and `TAG0025a6` writes their facing and position to
 `d.CH16482[-1]` (`CSBCode.cpp:2120-2122`, `:2147`). Evidence: `tools/dump-marching-order.ts`.
 
+## An object in hand is a colour-4 silhouette over the dungeon view
+
+`CreateObjectCursor` builds two 32x18 cursors from the object's icon
+(`doc/CSBwin-src/CSBCode.cpp:1976-2027`). `d.Pointer23186` is the icon at `d.Byte23206`
+(0-15) over its shadow at `d.Byte23202` (2-17), recoloured through `d.Byte1382` to colour 0
+(`CSBCode.cpp:441-448`). `d.Pointer23190` has the same shadow under the icon's silhouette,
+recoloured through `d.Byte1366` to colour 4. `CreateCursorBitmap` reaches the object cursor
+only at `tag0029e0`, which is the viewport, and the portraits less the selected champion's
+and the name strip (`y <= 6`). Everywhere else, from `y >= 169`, `x >= 274` or `x >= 224`
+below the portraits, the cursor is the arrow, object in hand or not (`:2233-2252`). The
+object cursor is drawn 8 pixels left of and 8 above the pointer (`d.Word23156`,
+`d.Word23158`). With `d.DynamicPaletteSwitching`, the rows on screen row 29 and below come
+from `d.Pointer23190` (`:2290-2308`, `:2319-2388`). So, over the dungeon view, an icon never
+goes through the viewport palette. That palette is `Palette552[light]`
+(`WinScreen.cpp:1493-1496`), whose colours 9 and 10 `ModifyPalettes` sets from the level's
+monsters (`Code390e.cpp:323-343`, `CSBCode.cpp:2839`). Colour 4 is `066` at every light
+level. Evidence: `tools/dump-object-cursor.ts`.
+
 ## A load keeps the message area
 
 CSBWin saves no message state: `SCROLLING_TEXT::Serialize` is declared

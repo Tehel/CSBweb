@@ -10,7 +10,7 @@
 import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { decodeCursorBitmap } from '../csbwin/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
-import { drawObjectIconAt } from './Draw';
+import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';
 import { pointInRect, searchButtonList } from './HitTest';
 import { getActiveChestView, getEyeRect, repackOpenChest, syncOpenChest } from './Inventory';
@@ -542,15 +542,75 @@ export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): v
     drawEmptyCursor(ui);
     return;
   }
+  const x = Math.floor(ui.hoverPoint.x);
+  const y = Math.floor(ui.hoverPoint.y);
+  if (!inCursorShapeZone(ui, x, y)) {
+    // Outside the zone the cursor is the arrow, object in hand or not (`tag0029f8`).
+    const arrow = getCursorArrowBitmap(ui);
+    if (arrow) drawCursorBitmap(ui, arrow, x, y, 12);
+    return;
+  }
+  const cursor = createObjectCursor(ui, resolveObjectNameIndex(ui, objectId));
+  if (cursor) drawObjectCursor(ui, cursor, x, y, dynamicPaletteSwitching);
+}
 
-  const word612 = ui.uiTables.graphic232.word612;
-  const objectNameIndex = resolveObjectNameIndex(ui, objectId);
-  if (objectNameIndex < 0) return;
+/** `d.Byte23202` (`doc/CSBwin-src/CSBCode.cpp:441-444`): the object's shadow, two pixels down and right. */
+const BYTE_23202 = { x1: 2, x2: 17, y1: 2, y2: 17 };
+/** `d.Byte23206` (`doc/CSBwin-src/CSBCode.cpp:445-448`): the object itself. */
+const BYTE_23206 = { x1: 0, x2: 15, y1: 0, y2: 15 };
 
-  const baseX = Math.floor(ui.hoverPoint.x) - 8;
-  const baseY = Math.floor(ui.hoverPoint.y) - 8;
-  drawObjectIconAt(ui, baseX + 2, baseY + 2, objectNameIndex, word612, 12, 0);
-  drawObjectIconAt(ui, baseX, baseY, objectNameIndex, word612, 12);
+interface ObjectCursor {
+  pointer23186: IndexedBitmap;
+  pointer23190: IndexedBitmap;
+}
+
+/**
+ * `CreateObjectCursor` (`doc/CSBwin-src/CSBCode.cpp:1976-2027`): the two 32x18 cursors of an
+ * object in hand. `d.Pointer23186` is the icon over its shadow, recoloured through
+ * `d.Byte1382` to colour 0. `d.Pointer23190` has the same shadow under the icon's
+ * silhouette, recoloured through `d.Byte1366` to colour 4, the one colour every light
+ * level's viewport palette keeps: it is the cursor over the rows that palette shows.
+ */
+function createObjectCursor(ui: UIState, objectNameIndex: number): ObjectCursor | null {
+  if (!ui.uiTables) return null;
+  const g232 = ui.uiTables.graphic232;
+  const icon = objectIconBitmap(ui, objectNameIndex, g232.word612);
+  if (!icon) return null;
+  const a2 = createPaletteIndexViewportBuffer(32, 18, 12);
+  const saved = { width: 16, height: 16, pixels: icon.pixels.slice() };
+  recolourRows(saved, 16, g232.cursorColorMapLight);
+  tag0088b2Index(saved, a2, BYTE_23202, -1);
+  const pointer23186 = { width: 32, height: 18, pixels: a2.pixels.slice() };
+  saved.pixels.set(icon.pixels);
+  recolourRows(saved, 16, g232.cursorColorMapDark);
+  tag0088b2Index(saved, a2, BYTE_23206, 12);
+  tag0088b2Index(icon, pointer23186, BYTE_23206, 12);
+  return { pointer23186, pointer23190: a2 };
+}
+
+/**
+ * `CreateCursorBitmap`'s arm for an object in hand (`doc/CSBwin-src/CSBCode.cpp:2290-2308`,
+ * `:2319-2388`): 18 rows of `d.Pointer23186`, drawn with the pointer 8 pixels in and 8 down
+ * (`d.Word23156`, `d.Word23158`). With `d.DynamicPaletteSwitching` the rows that fall on
+ * screen row 29 or below come from `d.Pointer23190` instead.
+ */
+function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: number, dynamicPaletteSwitching: boolean): void {
+  if (!ui.screenIndexBuffer) return;
+  const d6 = y - 19;
+  const split = dynamicPaletteSwitching && d6 > 0 ? 18 - d6 : 18;
+  const dst = ui.screenIndexBuffer;
+  for (let row = 0; row < 18; row++) {
+    const dy = y - 8 + row;
+    if (dy < 0 || dy >= dst.height) continue;
+    const src = row < split ? cursor.pointer23186 : cursor.pointer23190;
+    for (let col = 0; col < 32; col++) {
+      const dx = x - 8 + col;
+      if (dx < 0 || dx >= dst.width) continue;
+      const pixel = src.pixels[row * src.width + col];
+      if (pixel === 12) continue;
+      dst.pixels[dy * dst.width + dx] = pixel;
+    }
+  }
 }
 
 export function drawEmptyCursor(ui: UIState): void {
@@ -567,7 +627,15 @@ export function drawEmptyCursor(ui: UIState): void {
 export function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {
   const cursorOwner = ui.partyState?.cursorOwner ?? -1;
   if (cursorOwner < 0) return false;
+  return inCursorShapeZone(ui, x, y);
+}
 
+/**
+ * Whether `CreateCursorBitmap` reaches `tag0029e0`, where the cursor is the object in hand
+ * or the hand (`doc/CSBwin-src/CSBCode.cpp:2233-2252`): the viewport and the portraits,
+ * less the name strip and the selected champion's portrait. Everywhere else it is the arrow.
+ */
+function inCursorShapeZone(ui: UIState, x: number, y: number): boolean {
   if (y >= 169) return false;
   if (x >= 274) return false;
 

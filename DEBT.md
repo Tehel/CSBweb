@@ -89,6 +89,7 @@ In payoff order: the first row is the next item.
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
+| C93 | The right-hand panel is shown through the interface palette, not the viewport's | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Eleven DSA filters | — | ⏸️ |
@@ -107,7 +108,7 @@ postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C92 · D12 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
+Next free IDs: C94 · D12 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -142,6 +143,17 @@ the whole box, on `CHARFLAG_portraitChanged`, which a shield starting or ending 
 (`MarkAllPortraitsChanged`, `CSBCode.cpp:6545-6570`, `Magic.cpp:1329`). There the port's
 figure stays up to five ticks longer. Paying it means modelling those flags, which the
 port does not (`Champion.charFlags`, `src/engine/gameTypes.ts`).
+
+### C93 ⏳ The right-hand panel is shown through the interface palette, not the viewport's
+
+With `d.DynamicPaletteSwitching`, CSBWin converts two screen areas through
+`d.Palette11946`, the light level's `Palette552` with the level's monster colours. One is
+the viewport, and the other is the spell, weapon and movement panel, x 224-319 by rows
+33-168 (`doc/CSBwin-src/WinScreen.cpp:1493-1496`, `:1510-1566`). `GameScreen.presentViewport`
+(`src/renderer/GameScreen.ts`) gives the viewport palette to the viewport rectangle only, so
+the panel keeps its colours in the dark and on a level whose monsters change colours 9
+and 10. Paying it means widening that rectangle to the whole band and checking the golden
+frames, which will move wherever the light is not full.
 
 ---
 

@@ -5,7 +5,7 @@
  * RGBA happens once at present time, as in CSBWin.
  */
 import { Rect } from '../csbwin/UITables';
-import { drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { IndexedBitmap, createPaletteIndexViewportBuffer, drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { scrollingText } from '../csbwin/ScrollingText';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -137,6 +137,23 @@ export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: 
     },
     -1
   );
+}
+
+/** Icon `objectNameIndex` as a 16x16 bitmap of its own, as `CreateObjectCursor` is handed it. */
+export function objectIconBitmap(ui: UIState, objectNameIndex: number, word612: number[]): IndexedBitmap | null {
+  if (objectNameIndex < 0 || word612.length === 0) return null;
+  let group = 0;
+  while (group < word612.length && objectNameIndex >= word612[group]) {
+    group++;
+  }
+  group -= 1;
+  if (group < 0) return null;
+  const graphic = ui.getGraphicBitmap(42 + group);
+  if (!graphic) return null;
+  const offset = objectNameIndex - word612[group];
+  const icon = createPaletteIndexViewportBuffer(16, 16, 12);
+  tag0088b2Index(graphic, icon, { x1: 0, x2: 15, y1: 0, y2: 15, srcX: (offset & 15) << 4, srcY: offset & 0xff0 }, -1);
+  return icon;
 }
 
 export function drawObjectIconMask(ui: UIState, 

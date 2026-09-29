@@ -44,6 +44,7 @@ const CHECKS = [
   { tool: 'dump-adjust-skills.ts' },
   { tool: 'dump-hand-owner.ts' },
   { tool: 'dump-marching-order.ts' },
+  { tool: 'dump-object-cursor.ts' },
   { tool: 'dump-inventory-routing.ts' },
   { tool: 'dump-key-bindings.ts' },
   { tool: 'dump-attack-panel.ts' },
