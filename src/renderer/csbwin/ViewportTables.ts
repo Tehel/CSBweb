@@ -33,6 +33,9 @@ export interface ViewportTables {
   // See-through door edge helpers (Viewport.cpp:2576+)
   seeThruWallsRect: RectPos; // `d.SeeThruWallsRect`
   seeThruWallsRect2: RectPos; // `(RectPos *)&d.SeeThruWallsRect.b.uByte4`
+  /** `d.SeeThruWallsRect.b.uByte4` / `.uByte6`: where in the viewport the F1 wall's hole starts (`Viewport.cpp:2961-2962`). */
+  seeThruWallsRectUByte4: number;
+  seeThruWallsRectUByte6: number;
   seeThruDoorEdgeRect: RectPos; // `(RectPos *)d.uByte2542`
   /**
    * `(RectPos *)d.Byte2546` — where the Hall of Champions portrait goes in the
@@ -441,6 +444,8 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
 
   const seeThruWallsRect = toRectPos(raw, tail.seeThruWallsRectOffset);
   const seeThruWallsRect2 = toRectPos(raw, tail.seeThruWallsRectOffset + 4);
+  const seeThruWallsRectUByte4 = raw[tail.seeThruWallsRectOffset + 4];
+  const seeThruWallsRectUByte6 = raw[tail.seeThruWallsRectOffset + 6];
   const seeThruDoorEdgeRect = toRectPos(raw, tail.uByte2542Offset);
   const championPortraitRect = readRectPosByte4(raw, tail.byte2546Offset);
 
@@ -460,6 +465,8 @@ export function extractViewportTables(graphics: GraphicsLoader): ViewportTables 
     stairFacingUpRect,
     seeThruWallsRect,
     seeThruWallsRect2,
+    seeThruWallsRectUByte4,
+    seeThruWallsRectUByte6,
     seeThruDoorEdgeRect,
     championPortraitRect,
   };

@@ -118,6 +118,8 @@ export class ViewportRenderer {
       doorRects: viewportTables.doorRects,
       seeThruWallsRect: viewportTables.seeThruWallsRect,
       seeThruWallsRect2: viewportTables.seeThruWallsRect2,
+      seeThruWallsRectUByte4: viewportTables.seeThruWallsRectUByte4,
+      seeThruWallsRectUByte6: viewportTables.seeThruWallsRectUByte6,
       seeThruDoorEdgeRect: viewportTables.seeThruDoorEdgeRect,
       championPortraitRect: viewportTables.championPortraitRect,
       wallGraphicSet: 0,

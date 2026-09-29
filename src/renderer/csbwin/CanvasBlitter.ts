@@ -243,6 +243,43 @@ export function tag0088b2Index(
   }
 }
 
+/**
+ * CSBWin `TAG0088b2` with its own argument list (`doc/CSBwin-src/Graphics.cpp:559`), for the
+ * callers that pass explicit offsets and line widths instead of a `RectPos`'s source bytes.
+ * Widths are CSBWin's bytes per line (two pixels a byte). The source is addressed as CSBWin
+ * addresses it, `src + srcY*srcByteWidth + srcX/2`, so an `srcX` past a line's end reads on
+ * into the lines below. A read past the end of `src` writes nothing.
+ */
+export function tag0088b2Explicit(
+  src: Uint8Array,
+  dst: Uint8Array,
+  dstRect: Rect,
+  srcOffsetX: number,
+  srcOffsetY: number,
+  srcByteWidth: number,
+  destByteWidth: number,
+  transparentColor: number
+): void {
+  const srcStride = srcByteWidth * 2;
+  const dstStride = destByteWidth * 2;
+  const width = dstRect.x2 - dstRect.x1 + 1;
+  const height = dstRect.y2 - dstRect.y1 + 1;
+  const useTransparency = transparentColor >= 0;
+  const tc = transparentColor & 0xff;
+  for (let y = 0; y < height; y++) {
+    const srcRow = (srcOffsetY + y) * srcStride + srcOffsetX;
+    const dstRow = (dstRect.y1 + y) * dstStride + dstRect.x1;
+    for (let x = 0; x < width; x++) {
+      const si = srcRow + x;
+      const di = dstRow + x;
+      if (si >= src.length || di >= dst.length) continue;
+      const v = src[si];
+      if (useTransparency && v === tc) continue;
+      dst[di] = v;
+    }
+  }
+}
+
 export function bltShapeToViewportIndex(
   src: IndexedBitmap,
   dst: PaletteIndexViewportBuffer,

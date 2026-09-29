@@ -342,56 +342,44 @@ export const StdDrawF0R1DoorFacing: number[] = [
 // =============================================================================
 
 export const StdDrawF1Stone: number[] = [
-  Opcode.SeeThroughWalls,
-  Opcode.JumpZ,
-  11,
-  Opcode.Literal,
-  1,
-  Opcode.StdAllocateDerivedGraphic,
-  Opcode.StdBitmapViewport,
-  1,
-  112,
-  48,
-  1,
-  48,
-  48,
-  10,
-  Opcode.StdWallBitmapF1,
-  Opcode.StdWallRectangleF1,
-  Opcode.StdBltShape,
-  Opcode.F1,
-  Opcode.wallDecorationFront,
-  Opcode.WallF1Front,
-  Opcode.StdDrawWallDecoration,
-  Opcode.F1,
-  Opcode.wallDecorationFront,
-  Opcode.HasDecoration,
-  Opcode.JumpZ,
-  1,
-  Opcode.LeaveMortarJoint,
-  Opcode.F1,
-  Opcode.wallDecorationFront,
-  Opcode.WallF1Front,
-  Opcode.StdDrawWallText,
+  Opcode.SeeThroughWalls, Opcode.JumpZ, 28,
+    Opcode.Literal, 1, Opcode.StdAllocateDerivedGraphic,
+    Opcode.StdBitmapViewport,                  // source
+    Opcode.Literal, 1,                         // destination = derived graphic 1
+    Opcode.StdSeeThruWallsRect,                // destination rectangle
+    Opcode.StdSeeThruWallsRectUByte4,          // Source X
+    Opcode.StdSeeThruWallsRectUByte6,          // Source Y
+    Opcode.Literal, 112,                       // Source Width
+    Opcode.Literal, 48,                        // destination width
+    Opcode.MinusOne,                           // Transparent color
+      Opcode.StdBltToDerivedGraphic,
+    Opcode.StdHoleInWallBitmap,                // source
+    Opcode.Literal, 1,                         // destination = derived graphic 1
+    Opcode.StdSeeThruWallsRect,                // destination rectangle
+    Opcode.Zero,                               // Source X
+    Opcode.Zero,                               // Source Y
+    Opcode.Literal, 48,                        // Source Width
+    Opcode.Literal, 48,                        // Destination width
+    Opcode.Literal, 10,                        // Transparent color
+      Opcode.StdBltToDerivedGraphic,
+  Opcode.StdWallBitmapF1, Opcode.StdWallRectangleF1, Opcode.StdBltShape,
+  Opcode.F1, Opcode.wallDecorationFront, Opcode.WallF1Front, Opcode.StdDrawWallDecoration,
+  Opcode.F1, Opcode.wallDecorationFront, Opcode.HasDecoration, Opcode.JumpZ, 1, Opcode.LeaveMortarJoint,
+  Opcode.F1, Opcode.wallDecorationFront, Opcode.WallF1Front, Opcode.StdDrawWallText,
   Opcode.Alcove,
-  Opcode.JumpZ,
-  5,
-  Opcode.F1Contents,
-  Opcode.F1xy,
-  Opcode.F1,
-  Opcode.DrawOrder00,
-  Opcode.StdDrawRoomObjects,
-  Opcode.SeeThroughWalls,
-  Opcode.JumpZ,
-  16,
-  Opcode.Literal,
-  1,
-  48,
-  112,
-  9,
-  Opcode.Literal,
-  1,
-  Opcode.StdDeleteDerivedGraphic,
+    Opcode.JumpZ, 5,
+      Opcode.F1Contents, Opcode.F1xy, Opcode.F1, Opcode.DrawOrder00, Opcode.StdDrawRoomObjects,
+  Opcode.SeeThroughWalls, Opcode.JumpZ, 16,
+    Opcode.Literal, 1,                         // Source
+    Opcode.StdBitmapViewport,                  // Destination
+    Opcode.StdSeeThruWallsRect2,               // Destination Rectangle
+    Opcode.Zero,                               // Source X
+    Opcode.Zero,                               // Source Y
+    Opcode.Literal, 48,                        // Source Width
+    Opcode.Literal, 112,                       // Destination Width
+    Opcode.Literal, 9,                         // Transparent color
+      Opcode.StdBltFromDerivedGraphic,
+    Opcode.Literal, 1, Opcode.StdDeleteDerivedGraphic,
   Opcode.Return,
 ];
 

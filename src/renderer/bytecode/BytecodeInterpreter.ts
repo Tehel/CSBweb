@@ -13,6 +13,7 @@ import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
 import {
   bltShapeToViewportIndex,
+  tag0088b2Explicit,
   tag0088b2Index,
   tag008c98Index,
   type IndexedBitmap,
@@ -100,6 +101,8 @@ export interface InterpreterContext {
   };
   seeThruWallsRect?: RectPos;
   seeThruWallsRect2?: RectPos;
+  seeThruWallsRectUByte4?: number; // d.SeeThruWallsRect.b.uByte4
+  seeThruWallsRectUByte6?: number; // d.SeeThruWallsRect.b.uByte6
   seeThruDoorEdgeRect?: RectPos;
   /** `(RectPos *)d.Byte2546` — where a Hall of Champions portrait lands in the viewport. */
   championPortraitRect?: RectPos;
@@ -337,6 +340,8 @@ export class BytecodeInterpreter {
   private flipCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
   private removeMortarJoint = true;
   private hasAlcove = 0;
+  /** The derived graphics a program allocates, by number (CSBWin `AllocateDerivedGraphic`). */
+  private derivedGraphics = new Map<number, Uint8Array>();
 
   constructor(context: InterpreterContext) {
     this.context = context;
@@ -501,7 +506,45 @@ export class BytecodeInterpreter {
       case Opcode.StdDrawCeilingPit:
         return this.opStdDrawCeilingPit();
       case Opcode.StdDrawSeeThruDoorEdge:
-        return this.opDrawAction(opcode);
+        return this.opStdDrawSeeThruDoorEdge();
+
+      // See-Thru-Walls through the F1 wall (Viewport.cpp:2957-3016).
+      case Opcode.StdAllocateDerivedGraphic:
+        this.allocateDerivedGraphic(this.stack.pop() ?? 0);
+        return true;
+      case Opcode.StdBitmapViewport:
+        this.stack.push(StdBitmapPtr.BMP_StdBitmapViewport);
+        return true;
+      case Opcode.StdSeeThruWallsRect:
+        this.stack.push(StdRectPtr.RECT_StdSeeThruWallsRect);
+        return true;
+      case Opcode.StdSeeThruWallsRect2:
+        this.stack.push(StdRectPtr.RECT_StdSeeThruWallsRect2);
+        return true;
+      case Opcode.StdSeeThruWallsRectUByte4:
+        this.stack.push(this.context.seeThruWallsRectUByte4 ?? 0);
+        return true;
+      case Opcode.StdSeeThruWallsRectUByte6:
+        this.stack.push(this.context.seeThruWallsRectUByte6 ?? 0);
+        return true;
+      case Opcode.MinusOne:
+        this.stack.push(-1);
+        return true;
+      case Opcode.Zero:
+        this.stack.push(0);
+        return true;
+      case Opcode.StdBltToDerivedGraphic:
+        return this.opStdBltDerivedGraphic(true);
+      case Opcode.StdBltFromDerivedGraphic:
+        return this.opStdBltDerivedGraphic(false);
+      case Opcode.StdDeleteDerivedGraphic:
+        this.derivedGraphics.delete(this.stack.pop() ?? 0);
+        // CSBWin's case has no `break` and falls into `StdHoleInWallBitmap` (Viewport.cpp:3015-3016).
+        this.stack.push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+        return true;
+      case Opcode.StdHoleInWallBitmap:
+        this.stack.push(StdBitmapPtr.BMP_StdHoleInWallBitmap);
+        return true;
 
       case Opcode.StdDrawDoorSwitch:
         return this.opStdDrawDoorSwitch();
@@ -1096,15 +1139,60 @@ export class BytecodeInterpreter {
     return true;
   }
 
-  private opDrawAction(opcode: number): boolean {
-    void opcode;
-    // Pop arguments (varies by opcode)
-    // For prototype, just log the call
-    // ${opcodeName}(stack size: ${this.stack.length})
+  /**
+   * CSBWin `AllocateDerivedGraphic` (`doc/CSBwin-src/CSBCode.cpp:11211`): a buffer of
+   * `GetDerivedGraphicSize(n)` bytes, kept if it already exists. Graphic 1, the only one a
+   * program allocates, is 4560 bytes (`CSBCode.cpp:10248`), 96x95 pixels.
+   */
+  private allocateDerivedGraphic(graphicNum: number): void {
+    if (this.derivedGraphics.has(graphicNum)) return;
+    const bytes = graphicNum === 1 ? 4560 : 0;
+    this.derivedGraphics.set(graphicNum, new Uint8Array(bytes * 2));
+  }
 
-    // Clear stack for this drawing operation
-    this.stack = [];
+  /**
+   * CSBWin `StdBltToDerivedGraphic` / `StdBltFromDerivedGraphic` (Viewport.cpp:2965-3014):
+   * `TAG0088b2` between a standard bitmap and a derived graphic, every argument off the stack.
+   */
+  private opStdBltDerivedGraphic(toDerived: boolean): boolean {
+    const xparentColor = this.stack.pop() ?? 0;
+    const dstWidth = this.stack.pop() ?? 0;
+    const srcWidth = this.stack.pop() ?? 0;
+    const srcY = this.stack.pop() ?? 0;
+    const srcX = this.stack.pop() ?? 0;
+    const pDstRect = this.resolveStdRectanglePointer(this.stack.pop() ?? 0);
+    const dstPtr = this.stack.pop() ?? 0;
+    const srcPtr = this.stack.pop() ?? 0;
+    const dst = toDerived ? this.derivedGraphics.get(dstPtr) : this.resolveStdBitmapPointer(dstPtr)?.pixels;
+    const src = toDerived ? this.resolveStdBitmapPointer(srcPtr)?.pixels : this.derivedGraphics.get(srcPtr);
+    if (!src || !dst || !pDstRect || Array.isArray(pDstRect)) return true;
+    tag0088b2Explicit(src, dst, pDstRect, srcX, srcY, srcWidth, dstWidth, xparentColor);
+    return true;
+  }
 
+  /**
+   * CSBWin `StdDrawSeeThruDoorEdge` (`doc/CSBwin-src/Viewport.cpp:2576-2587`): the door edge
+   * the party stands in, with the hole of graphic 41 cut through it. CSBWin's own comment
+   * says the source X offset "isn't right"; it is ported as it stands.
+   */
+  private opStdDrawSeeThruDoorEdge(): boolean {
+    const doorEdge = this.context.doorBitmaps?.[1];
+    const hole = this.context.getGraphicBitmap?.(41);
+    const rect = this.context.seeThruDoorEdgeRect;
+    const trackTop = this.context.doorTrackTopRectangles;
+    if (!doorEdge || !hole || !rect || !trackTop?.[0] || !trackTop[6]) return true;
+    const tempBitmap: IndexedBitmap = { width: doorEdge.width, height: doorEdge.height, pixels: doorEdge.pixels.slice(0, 1968 * 2) };
+    tag0088b2Explicit(
+      hole.pixels,
+      tempBitmap.pixels,
+      rect,
+      trackTop[0].x1 - (this.context.seeThruWallsRectUByte4 ?? 0),
+      0,
+      48,
+      16,
+      9,
+    );
+    this.blitShapeBitmapToViewport(tempBitmap, trackTop[6], false);
     return true;
   }
 
@@ -3185,6 +3273,11 @@ export class BytecodeInterpreter {
         return door[2] ?? null;
       case StdBitmapPtr.BMP_StdDoorFacingFrameRightBitmapF1:
         return door[0] ?? null;
+
+      case StdBitmapPtr.BMP_StdBitmapViewport:
+        return this.context.viewportIndexBuffer ?? null;
+      case StdBitmapPtr.BMP_StdHoleInWallBitmap:
+        return this.context.getGraphicBitmap?.(41) ?? null;
 
       default:
         return null;

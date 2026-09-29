@@ -430,8 +430,29 @@ case SeeThroughWalls: push(d.SeeThruWalls?1:0);   // Viewport.cpp:2638
 So overlapping casts stack their durations rather than their effect, and the renderer must
 consult the counter per frame rather than latch a flag.
 
-One related effect is **not** ported: while the counter is non-zero, CSBWin recolours a
-door in the nearest rank via `TAG004b26(17, 2)` (`doc/CSBwin-src/CSBCode.cpp:4171-4174`).
+It opens three things in the viewport, and no other:
+
+- **The wall straight ahead, one square away.** Only `StdDrawF1Stone` tests it
+  (`doc/CSBwin-src/Viewport.cpp:1048-1087`); every other wall program draws as without the
+  spell. Before the wall is drawn, the viewport at (`SeeThruWallsRect.b.uByte4`,
+  `.uByte6`) = (64, 19), where the cells behind have already drawn, is copied into derived
+  graphic 1 (4560 bytes, 96x95, `CSBCode.cpp:10248`) with no transparent colour. The hole
+  mask, graphic 41 (96x95, `BMP_StdHoleInWallBitmap`, `Viewport.cpp:2292`), is laid over it
+  with colour 10 transparent. After the wall, its decoration, text and alcove contents,
+  the derived graphic goes back into the viewport at `SeeThruWallsRect2` (64..159, 19..113)
+  with colour 9 transparent. So where the mask is 10 the view behind shows, where it is 9
+  the wall does, and the mask's other colours draw the hole's rim. Whatever behind the wall
+  is itself colour 9 shows as wall.
+- **The edge of a door the party stands in.** `StdDrawF0DoorEdge` draws its frame with
+  `StdDrawSeeThruDoorEdge` instead (`Viewport.cpp:1791-1800`, `:2576-2587`): door bitmap 1
+  (1968 bytes) is copied, graphic 41 laid over it at `(RectPos *)d.uByte2542` with colour 9
+  transparent, and the copy drawn at `DoorTrackTopRect[6]`. The source X offset is
+  `DoorTrackTopRect[0].b.x1 - SeeThruWallsRect.b.uByte4` = 192 - 64 = 128, which CSBWin's
+  comment says "isn't right": in a 96-pixel-wide graphic that is row 1, pixel 32, so the
+  95 rows read run one row past graphic 41's end. The port writes nothing for the pixels
+  past the end, and that last row keeps the door edge's own.
+- **A door in the nearest rank** is recoloured with door ornament 17
+  (`TAG004b26(17, 2)`, `doc/CSBwin-src/CSBCode.cpp:4168-4174`).
 
 ## Every `AdjustSkills` runs the filter, and every level gained is announced
 

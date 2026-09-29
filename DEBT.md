@@ -549,6 +549,11 @@ Recorded so that nobody "fixes" them.
 - 🚫 **Crack Switch (In) placement.** `Byte4100[55]` is read as 2, not `graphics.dat`'s 0,
   so a pressed crack switch stays low on the wall as in the Atari ST original:
   `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
+- 🚫 **The see-through door edge's last row.** `StdDrawSeeThruDoorEdge` reads graphic 41
+  from pixel 128, so its last row runs 32 pixels past the graphic's end, into whatever
+  CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)
+  writes nothing for them: `doc/PROVEN_FACTS.md` → "See-Thru-Walls is a counter read as
+  a boolean".
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

@@ -29,6 +29,8 @@
  * the one `Any` program in each slot of F4L1, F4R1 and F4, no program reaches an
  * unimplemented opcode, and every program draws exactly what it drew when
  * `tools/reference/render-probe.tsv` was written, every pixel of it one of the 16 colours.
+ * Under See-Thru-Walls, every program runs without an unimplemented opcode, and the F1
+ * wall shows what is behind it through graphic 41's hole, pixel for pixel (`seeThruWalls`).
  * That file is the baseline: each row is a program's pass, cell and type, the pixels it
  * drew, and a hash of the whole
  * viewport. A deliberate renderer change rewrites it with `--update`, after looking at
@@ -177,6 +179,7 @@ function main(): void {
     }
     if (png) writeSheet(`${OUTPUT}/render-probe-${pass}.png`, tiles, renderer.viewportPalettes?.[0] ?? palette552[0]);
   }
+  seeThruWalls(renderer, start, facing, doorIndex, warnings);
   console.warn = warn;
   console.log(`${rows.length} programs run, ${fallbacks} through a cell's _Any program`);
 
@@ -200,6 +203,77 @@ function main(): void {
   });
   console.log(`${same} of ${rows.length} programs draw as the baseline does`);
   check(same === rows.length, 'every program draws what the baseline recorded (look with --png, then --update)');
+}
+
+/**
+ * See-Thru-Walls (`d.SeeThruWalls`, `doc/CSBwin-src/Viewport.cpp:2639`). Every program runs
+ * with it set and reaches no unimplemented opcode. Then F1 Stone, the one wall it opens
+ * (`StdDrawF1Stone`, `Viewport.cpp:1048-1087`), is drawn over a patterned viewport, the
+ * pattern standing for what the cells behind it drew. Inside `SeeThruWallsRect2`, the hole
+ * mask (graphic 41) decides each pixel: colour 10 shows the pattern (but for the pattern's
+ * own colour 9), colour 9 the wall as it is drawn without the spell, and any other colour is
+ * the mask's own. Outside, nothing
+ * changes. F0 DoorEdge, whose frame is drawn by `StdDrawSeeThruDoorEdge` under the spell,
+ * still draws one.
+ */
+function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: number, doorIndex: number, warnings: string[]): void {
+  renderer.selectLevel(start.z);
+  renderer.draw(start, facing, true, false);
+  const ctx = renderer.context;
+  for (let cell = 0; cell < 21; cell++) {
+    for (let type = 0; type < 8; type++) {
+      const program = getBytecodeProgram(cell, type);
+      if (!program) continue;
+      const before = warnings.length;
+      renderer.buffer.pixels.fill(UNDRAWN);
+      ctx.roomData = roomDataFor(start, facing, cell, type as GraphicRoomType, doorIndex);
+      new BytecodeInterpreter(ctx).interpret(program, cell);
+      check(warnings.length === before, `see-thru ${cellNames[cell]}_${roomTypeNames[type]} runs without a warning: ${warnings.slice(before).join('; ')}`);
+    }
+  }
+
+  const f1 = cellNames.indexOf('F1');
+  const pattern = Uint8Array.from({ length: 224 * 136 }, (_, i) => (i % 224 + Math.floor(i / 224)) % 16);
+  const drawF1Stone = (seeThru: boolean): Uint8Array => {
+    ctx.seeThroughWalls = seeThru;
+    renderer.buffer.pixels.set(pattern);
+    ctx.roomData = roomDataFor(start, facing, f1, GraphicRoomType.STONE, doorIndex);
+    new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f1, GraphicRoomType.STONE)!, f1);
+    return Uint8Array.from(renderer.buffer.pixels);
+  };
+  const wall = drawF1Stone(false);
+  const seen = drawF1Stone(true);
+  const hole = ctx.getGraphicBitmap?.(41);
+  const r = ctx.seeThruWallsRect2;
+  check(hole?.width === 96 && hole.height === 95, `graphic 41, the hole in the wall, is 96x95 (${hole?.width}x${hole?.height})`);
+  check(r?.x1 === 64 && r.x2 === 159 && r.y1 === 19 && r.y2 === 113, `SeeThruWallsRect2 is (64..159, 19..113): ${JSON.stringify(r)}`);
+  if (!hole || !r) return;
+  let wrong = 0, holes = 0, rim = 0;
+  for (let y = 0; y < 136; y++) {
+    for (let x = 0; x < 224; x++) {
+      const i = y * 224 + x;
+      let expected = wall[i];
+      if (x >= r.x1 && x <= r.x2 && y >= r.y1 && y <= r.y2) {
+        const h = hole.pixels[(y - r.y1) * 96 + (x - r.x1)];
+        // What is behind in colour 9 is lost: the last blit's transparent colour is 9.
+        if (h === 10) { if (pattern[i] !== 9) expected = pattern[i]; holes++; }
+        else if (h !== 9) { expected = h; rim++; }
+      }
+      if (seen[i] !== expected) wrong++;
+    }
+  }
+  console.log(`see-thru F1 Stone: ${holes} pixels through the hole, ${rim} of its rim`);
+  check(holes > 0 && holes < 96 * 95, 'the hole shows what is behind the F1 wall');
+  check(wall.some((p, i) => p !== pattern[i]), 'without the spell the F1 wall covers what is behind it');
+  check(wrong === 0, `under See-Thru-Walls every F1 Stone pixel is the wall, the hole's or what is behind (${wrong} wrong)`);
+
+  const f0 = cellNames.indexOf('F0');
+  renderer.buffer.pixels.fill(UNDRAWN);
+  ctx.roomData = roomDataFor(start, facing, f0, GraphicRoomType.DOOR_EDGE, doorIndex);
+  new BytecodeInterpreter(ctx).interpret(getBytecodeProgram(f0, GraphicRoomType.DOOR_EDGE)!, f0);
+  const edge = renderer.buffer.pixels.filter((p) => p !== UNDRAWN).length;
+  check(edge > 0, `under See-Thru-Walls F0 DoorEdge still draws its frame (${edge} pixels)`);
+  ctx.seeThroughWalls = false;
 }
 
 /** The index of the first door on level `z`, scanning x then y. */
