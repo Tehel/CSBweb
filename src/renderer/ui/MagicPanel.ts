@@ -113,7 +113,7 @@ export function drawSpellMenuCharacters(ui: UIState, step: number): void {
   if (!ui.screenIndexBuffer || !ui.fontData) return;
   const y = 58;
   for (let i=0; i<6; i++) {
-    const x = 224 + 14 * (i + 1);
+    const x = 225 + 14 * (i + 1);
     const ch = String.fromCharCode(96 + 6 * Math.min(step, 3) + i);
     drawTextLineIndexRaw(ui.screenIndexBuffer, ui.fontData, x, y, 4, 0, ch);
   }

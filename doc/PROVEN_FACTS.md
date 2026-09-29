@@ -3614,6 +3614,47 @@ All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21
 
 Evidence: `tools/dump-cloud-draw.ts` sections 4-7 and 9.
 
+## A two-corner monster is drawn in the cell's halves and middles, not at its corners
+
+`ProcessOnePosition` (`doc/CSBwin-src/Code51a4.cpp:2106`) calls `DrawMonster`
+(`:352-961`) once per nibble of the drawing order, with the relative position as
+`positionWithinCell`, the list *after* the shift, and `PositionListIndex` counting from 1
+(`:2186-2189`). `DrawMonster` then chooses the entry of the monster's `d.s6982` set
+(`MonsterXYonScreen`, set `ITEM12.uByte10 >> 4`) it draws at (`:410-561`):
+
+- `OrdinalOfMonsterAtPosition` picks the member at `CurAbsPos`; none is a return, except
+  for a two-corner monster (`horizontalSize() == 1`), which carries on with index -1.
+- Positions `255` (centred): drawn only at the list's end and not on a door's far side, at
+  entry 4, or 3 for a two-corner monster seen from the side (`:485-498`).
+- A cell-filler (`horizontalSize() == 2`) whose positions are not 255 is not drawn at all:
+  Stevens' "people have taken advantage of this ... uh .. feature" (`:471-484`).
+- A one-corner monster is drawn at its relative position.
+- A two-corner monster is drawn only when `LOCAL_96` (`positionWithinCell <= 1` or the first
+  nibble, and the list ending or its next nibble ≥ 3: the last far position) or at the list's
+  end. At `LOCAL_96` (not a door's near side) it is drawn at entry 2 when seen from the side, a
+  member being there. At the end (not a door's far side), seen from the side, at entry 4.
+  Seen from the front or back, at entry 0 or 1 by the member's corner (0 when it is
+  `facing` or `facing-1`), and then, with `w_94 = numMonM1`, the other member's status
+  again at the other of 0 and 1 (`:946-958`), with the first member's view.
+- In set 1 (the rat, the worm, the ruster and the cell-fillers) entries 0/1 are the
+  left/right half, 2 the far middle, 3 the middle and 4 the near middle.
+- Cells 10 and 11, beside the party, draw monsters (only objects, missiles stop at 9,
+  `:2223-2224`, `:2301-2302`), from the set's cells 9 and 10 (`:562-566`), 100 pixels to
+  the side.
+
+The mirror (`:592-864`): near (cells 6+), a side view facing right, an attack view with the
+member's mirror bit, or a front view with `NonAttackingMirrorOK()` and the mirror bit. Two
+rows ahead (cells 3-5): a side view facing right, an attack view with the mirror bit, or a
+front view when word4 bits 7 and 8 are both set (`b_102`, `:797-800`), whatever the mirror
+bit. The fourth term, `frontViewMirror_106 && !NonAttackingMirrorOK()` (`:864`), can never
+hold, since `frontViewMirror_106` needs `NonAttackingMirrorOK()` (`:693`); the 68000 code in
+the comment above it tests the bit the other way round. Three rows ahead,
+`frontViewMirror_106 = false` (`:810`) and `b_102` is false. The rat has bits 7 and 8, so its
+front view two rows ahead is always mirrored. The sprite's rectangle is
+`y2 = Smaller(y, 135)`, `y1 = Larger(0, y - height + 1)`, read from source row 0
+(`TAG0088b2(..., srcOffsetX, 0, ...)`), so a sprite cut at the top loses its bottom rows.
+Evidence: `tools/dump-monster-draw.ts`.
+
 ## A skill-increaser actuator credits the cursor's owner, and an alcove passes it no position
 
 `PerformLocalAction` (`doc/CSBwin-src/Mouse.cpp:238-256`) runs local action 10 at once as

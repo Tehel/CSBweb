@@ -203,6 +203,7 @@ const CHECKS = [
   { tool: 'dump-door-lightning.ts' },
   { tool: 'dump-cloud-draw.ts' },
   { tool: 'dump-missile-draw.ts' },
+  { tool: 'dump-monster-draw.ts' },
   { tool: 'dump-render-probe.ts' },
   // Level 2 has an Ant Man with a free open neighbour to be bumped into.
   { tool: 'dump-button-flash.ts' },

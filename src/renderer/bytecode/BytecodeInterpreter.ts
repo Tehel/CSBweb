@@ -27,8 +27,12 @@ import {
   monsterHasAttackGraphic,
   monsterHasBackGraphic,
   monsterHasSideGraphic,
+  monsterHorizontalSize,
   monsterNonAttackingMirrorOK,
+  monsterWord4Bit7,
+  monsterWord4Bit8,
 } from '../csbwin/ObjectTables';
+import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 import { CsbRandom } from '../../core/random';
@@ -2139,8 +2143,12 @@ export class BytecodeInterpreter {
       return;
     }
 
-    // Non-floor-relative cells do not draw generic objects (CSBWin ProcessOnePosition default-case checks 0..9).
-    if (relativeCellNumber < 0 || relativeCellNumber > 9) return;
+    // Only the cells 0..9 draw objects, and missiles and clouds are left there too; but a
+    // monster is drawn in cells 10 and 11 as well, beside the party
+    // (`ProcessOnePosition`, `doc/CSBwin-src/Code51a4.cpp:2223-2224`, `:2254-2258`).
+    // CSBWin draws the clouds of cells -3..-1, 10 and 11 as well (`:2769`): `DEBT.md` C94.
+    if (relativeCellNumber < 0 || relativeCellNumber > 11) return;
+    const objectsDrawn = relativeCellNumber <= 9;
 
     // CSBWin encodes door-side metadata in bit 3 (DrawRoomObjects, Code51a4.cpp:2655-2670).
     let positionList = drawingOrder & 0xffff;
@@ -2159,10 +2167,14 @@ export class BytecodeInterpreter {
 
     for (let rn = firstObject; rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
       const { category } = decodeObjectID(rn);
-      if (category === DBType.CREATURE && !monsterRecord) {
-        monsterRecord = dungeon.getCreatureRecord(rn);
-        if (monsterRecord) {
-          monsterState = dungeon.getMonsterRenderState(monsterRecord);
+      // The last creature in the chain (`objMonster_54`, `Code51a4.cpp:2204-2210`).
+      // `invisible()` is gated on `invisibleMonsters`, false in DM (`DEBT.md`, "The
+      // monster design options"), so every creature is drawn.
+      if (category === DBType.CREATURE) {
+        const record = dungeon.getCreatureRecord(rn);
+        if (record) {
+          monsterRecord = record;
+          monsterState = dungeon.getMonsterRenderState(record);
         }
       } else if (category === DBType.MISSILE) {
         missilePresent = true;
@@ -2177,37 +2189,39 @@ export class BytecodeInterpreter {
       const curAbsPos = (facing + 2) & 3;
       lastAbsPos = curAbsPos;
       let currentSmallOffset = 2 + ((curAbsPos & 1) << 3);
-      this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, true);
+      if (objectsDrawn) {
+        this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, true);
+      }
       // No return: an alcove's clouds are drawn too, at `CurAbsPos = (facing+2)&3`
       // (`doc/CSBwin-src/Code51a4.cpp:2180`, `:2768-2773`). The Vi altar's lightning and
       // explosion (cloud types 100 and 101) are a cloud in the altar's alcove.
     }
 
-    let centeredMonsterDrawn = false;
+    // `PositionListIndex`: which nibble is being processed, 1 for the first
+    // (`Code51a4.cpp:2189`).
+    let positionListIndex = 0;
     while (positionList !== 0) {
       const nibble = positionList & 0xf;
       positionList >>>= 4;
+      positionListIndex++;
       if (nibble === 0) continue;
 
       const relLoc = (nibble - 1) & 0xf; // 0..3
       const curAbsPos = (relLoc + facing) & 3;
       lastAbsPos = curAbsPos;
       let currentSmallOffset = ((curAbsPos & 1) << 3) & 0xf;
-      this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, false);
-
-      if (monsterRecord && monsterState) {
-        const monsterCount = (monsterRecord.numMonM1 & 0x3) + 1;
-        if (this.isCenteredPositions(monsterState.positions)) {
-          if (!centeredMonsterDrawn && positionList === 0 && sideOfDoor !== SideOfDoor.FarSide) {
-            this.drawMonster(monsterRecord, monsterState, facing, relativeCellNumber, 4, middleLeftRight, curAbsPos);
-            centeredMonsterDrawn = true;
-          }
-        } else if (this.monsterOccupiesPosition(monsterState.positions, curAbsPos, monsterCount)) {
-          this.drawMonster(monsterRecord, monsterState, facing, relativeCellNumber, relLoc, middleLeftRight, curAbsPos);
-        }
+      if (objectsDrawn) {
+        this.drawObjectsAtPosition(dungeon, tables, firstObject, relativeCellNumber, middleLeftRight, relLoc, curAbsPos, currentSmallOffset, false);
       }
 
-      if (missilePresent && relativeCellNumber <= 9) {
+      if (monsterRecord && monsterState) {
+        this.drawMonster(
+          monsterRecord, monsterState, facing, relativeCellNumber, curAbsPos, relLoc, sideOfDoor,
+          middleLeftRight, positionList, positionListIndex,
+        );
+      }
+
+      if (missilePresent && objectsDrawn) {
         this.drawMissilesAtPosition(
           dungeon,
           tables,
@@ -2223,7 +2237,7 @@ export class BytecodeInterpreter {
       }
     }
 
-    if (cloudPresent) {
+    if (cloudPresent && objectsDrawn) {
       const fluxcage = this.drawClouds(relativeCellNumber, firstObject, facing, lastAbsPos);
       // `if ((pdb_150!=NULL) && (sideOfDoor!=SOD_FarSideOfDoor) && (d.Word1868==0))`
       // (`doc/CSBwin-src/Code51a4.cpp:2774`).
@@ -2420,22 +2434,6 @@ export class BytecodeInterpreter {
     return { nextSmallOffset: currentSmallOffset };
   }
 
-  private isCenteredPositions(positions: number): boolean {
-    return (positions & 0xff) === 0xff;
-  }
-
-  private monsterIndexAtPosition(positions: number, curAbsPos: number, count: number): number {
-    if (this.isCenteredPositions(positions)) return 0;
-    for (let i = 0; i < count; i++) {
-      if (((positions >> (2 * i)) & 0x3) === curAbsPos) return i;
-    }
-    return -1;
-  }
-
-  private monsterOccupiesPosition(positions: number, curAbsPos: number, count: number): boolean {
-    return this.monsterIndexAtPosition(positions, curAbsPos, count) >= 0;
-  }
-
   private decodeMonsterStatus(status: number): { attacking: boolean; mirror: boolean; nibble0: number; nibble3: number } {
     return {
       attacking: (status & 0x80) !== 0,
@@ -2445,126 +2443,226 @@ export class BytecodeInterpreter {
     };
   }
 
+  /**
+   * `DrawMonster` (`doc/CSBwin-src/Code51a4.cpp:352-961`), called once per position of the
+   * drawing order by `ProcessOnePosition` (`:2259-2295`).
+   *
+   * The first half decides *where* in the cell the group is drawn — `positionWithinCell`,
+   * an index into the monster's `d.s6982` set (`MonsterXYonScreen`) — and it is not the
+   * corner a member stands on. For a two-corner monster (`horizontalSize() == 1`, a rat
+   * or a worm) the set is 0/1 = the cell's left/right half, 2 = the far middle (seen from
+   * the side), 3 = the middle (a lone one seen from the side), 4 = the near middle. Such
+   * a monster is drawn only at the position list's last far position or its end, and
+   * a pair seen from the front or back is drawn both at once, the second sprite in the
+   * other half (`w_94`, `:946-958`).
+   *
+   * `drawAsSize4()` is gated on `drawAsSize4Monsters`, false in DM (`DEBT.md`, "The
+   * monster design options"), so `DrawSize4Index` is never reached.
+   */
   private drawMonster(
     monster: CreatureRecord,
     monsterState: { positions: number; facings: number; statuses: Uint8Array },
     facing: number,
     relativeCellNumber: number,
+    curAbsPos: number,
     positionWithinCell: number,
+    sideOfDoor: SideOfDoor,
     middleLeftRight: number,
-    curAbsPos: number
+    positionList: number,
+    positionListIndex: number,
   ): void {
     const tables = this.context.objectTables;
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!tables || !viewport || !getGraphic) return;
+    if (!tables) return;
 
-    const mt = monster.creatureType | 0;
-    const desc = tables.monsterDesc[mt];
-    const graphic = tables.monsterGraphics[mt];
-    if (!desc || !graphic) return;
+    // "LOCAL_96 means working on last of far positions."
+    const local96 =
+      (positionWithinCell <= 1 || positionListIndex === 1) &&
+      (positionList === 0 || (positionList & 15) >= 3);
 
-    const hasSide = monsterHasSideGraphic(desc);
-    const hasBack = monsterHasBackGraphic(desc);
-    const hasAttack = monsterHasAttackGraphic(desc);
-    const monsterCount = (monster.numMonM1 & 0x3) + 1;
-    const indexWithinGroup = this.monsterIndexAtPosition(monsterState.positions, curAbsPos, monsterCount);
-    if (indexWithinGroup < 0) return;
+    const pmtDesc = tables.monsterDesc[monster.creatureType];
+    if (!pmtDesc) return;
+    const monsterSize = monsterHorizontalSize(pmtDesc);
 
-    const absFacing = (monsterState.facings >> (2 * indexWithinGroup)) & 0x3;
-    const relFacing = (facing - absFacing) & 0x3;
-    const status = monsterState.statuses[indexWithinGroup] ?? 0;
-    const sms = this.decodeMonsterStatus(status);
-
-    const showSide = hasSide && (relFacing & 1) !== 0;
-    const showBack = hasBack && relFacing === 0;
-    // The attacking flag is set by the AI, in `NextMonsterUpdateTime`; the renderer
-    // only reads it. It used to be the *renderer* that noticed an attack starting and
-    // played the sound, which meant a monster off screen attacked silently — the
-    // sound now comes from `MonsterAttacks` where the attack actually happens.
-    const showAttack = hasAttack && !showBack && sms.attacking;
-
-    let graphicNum = 446 + (graphic.word0 | 0);
-    let widthBytes = graphic.frontRearByteWidth;
-    let height = graphic.frontRearHeight;
-    let mirror = false;
-
-    if (showSide) {
-      graphicNum += 1;
-      widthBytes = graphic.sideByteWidth;
-      height = graphic.sideHeight;
-      mirror = relFacing === 1;
-    } else if (showBack) {
-      graphicNum += hasSide ? 2 : 1;
-      mirror = false;
-    } else if (showAttack) {
-      graphicNum += 1;
-      if (hasSide) graphicNum += 1;
-      if (hasBack) graphicNum += 1;
-      widthBytes = graphic.attackByteWidth;
-      height = graphic.attackHeight;
-      mirror = sms.mirror;
-    } else if (monsterNonAttackingMirrorOK(desc) && sms.mirror) {
-      mirror = true;
+    let rootIndexOfMonsterInGroup = ordinalAtPositionBytes({
+      positions: monsterState.positions,
+      facings: monsterState.facings,
+      numMonM1: monster.numMonM1,
+      horizontalSize: monsterSize,
+      position: curAbsPos,
+    });
+    let indexWithinGroup: number;
+    if (rootIndexOfMonsterInGroup !== 0) {
+      // At least part of a monster is here!
+      rootIndexOfMonsterInGroup--;
+      indexWithinGroup = rootIndexOfMonsterInGroup;
+    } else if (monsterSize === 1) {
+      indexWithinGroup = -1;
+    } else {
+      return;
     }
 
-    const base = getGraphic(graphicNum);
+    const monsterAbsFacing = (monsterState.facings >> (2 * rootIndexOfMonsterInGroup)) & 3;
+    const monsterRelFacing = (facing - monsterAbsFacing) & 3; // 0=away, 1=right, 2=toward, 3=left
+    let w94 = 0;
+    let d4 = monsterState.positions & 0xff;
+    // Several monsters that each fill the cell are invisible: "People have taken
+    // advantage of this ... uh .. feature." (`:471-484`).
+    if (monsterSize === 2 && d4 !== 255) return;
+    if (d4 === 255) {
+      // Wait until the last minute to draw a centred monster.
+      if (positionList !== 0 || sideOfDoor === SideOfDoor.FarSide) return;
+      positionWithinCell = monsterSize === 1 && (monsterRelFacing & 1) !== 0 ? 3 : 4;
+    } else if (monsterSize === 1 && (local96 || positionList === 0 || indexWithinGroup < 0)) {
+      if (local96 && sideOfDoor !== SideOfDoor.NearSide) {
+        if (indexWithinGroup >= 0 && (monsterRelFacing & 1) !== 0) positionWithinCell = 2;
+        else return;
+      } else if (sideOfDoor !== SideOfDoor.FarSide && positionList === 0) {
+        if ((monsterRelFacing & 1) !== 0) {
+          if (indexWithinGroup >= 0) positionWithinCell = 4;
+          else return;
+        } else {
+          if (indexWithinGroup < 0) indexWithinGroup = 0;
+          w94 = monster.numMonM1 & 3;
+          d4 = (d4 >> (2 * rootIndexOfMonsterInGroup)) & 3; // position of this monster
+          positionWithinCell = d4 === facing || d4 === ((facing - 1) & 3) ? 0 : 1;
+        }
+      } else {
+        return;
+      }
+    } else if (monsterSize !== 0) {
+      return;
+    }
+
+    let sms = this.decodeMonsterStatus(monsterState.statuses[indexWithinGroup] ?? 0);
+    // To our immediate left or right: our right becomes our left, our left our current cell.
+    if (relativeCellNumber > 9) relativeCellNumber--;
+
+    for (;;) {
+      this.drawMonsterAt(pmtDesc, sms, monsterRelFacing, relativeCellNumber, positionWithinCell, middleLeftRight);
+      if (w94 === 0) break;
+      w94 = 0;
+      sms = this.decodeMonsterStatus(monsterState.statuses[indexWithinGroup === 0 ? 1 : 0] ?? 0);
+      positionWithinCell = positionWithinCell === 1 ? 0 : 1;
+    }
+  }
+
+  /** The body of `DrawMonster`'s drawing loop (`Code51a4.cpp:569-945`): one sprite. */
+  private drawMonsterAt(
+    pmtDesc: ObjectTables['monsterDesc'][number],
+    sms: { attacking: boolean; mirror: boolean; nibble0: number; nibble3: number },
+    monsterRelFacing: number,
+    relativeCellNumber: number,
+    positionWithinCell: number,
+    middleLeftRight: number,
+  ): void {
+    const tables = this.context.objectTables;
+    const getGraphic = this.context.getGraphicBitmap;
+    if (!tables || !this.context.viewportIndexBuffer || !getGraphic) return;
+
+    const pI12 = tables.monsterGraphics[pmtDesc.type];
+    if (!pI12) return;
+    const monsterXYonScreen = tables.monsterPositions[(pI12.uByte10 >> 4) & 15]?.[relativeCellNumber]?.[positionWithinCell];
+    if (!monsterXYonScreen || monsterXYonScreen.y === 0) return;
+
+    const hasSide = monsterHasSideGraphic(pmtDesc);
+    const hasBack = monsterHasBackGraphic(pmtDesc);
+    const hasAttack = monsterHasAttackGraphic(pmtDesc);
+
+    let graphicNum0 = 446 + (pI12.word0 | 0);
+    let showBackView = false;
+    let showAttackView = false;
+    let frontViewMirror = false;
+    let srcByteWidth: number;
+    let srcHeight: number;
+    const showSideView = hasSide && (monsterRelFacing & 1) !== 0;
+    if (showSideView) {
+      graphicNum0++;
+      srcByteWidth = pI12.sideByteWidth;
+      srcHeight = pI12.sideHeight;
+    } else {
+      showBackView = hasBack && monsterRelFacing === 0;
+      // The attacking flag is set by the AI, in `NextMonsterUpdateTime`; the renderer
+      // only reads it.
+      showAttackView = !showBackView && sms.attacking && hasAttack;
+      if (showAttackView) {
+        srcByteWidth = pI12.attackByteWidth;
+        srcHeight = pI12.attackHeight;
+        graphicNum0++;
+        if (hasSide) graphicNum0++;
+        if (hasBack) graphicNum0++;
+      } else {
+        srcByteWidth = pI12.frontRearByteWidth;
+        srcHeight = pI12.frontRearHeight;
+        if (showBackView) graphicNum0 += hasSide ? 2 : 1;
+        else frontViewMirror = monsterNonAttackingMirrorOK(pmtDesc) && sms.mirror;
+      }
+    }
+
+    const base = getGraphic(graphicNum0);
     if (!base) return;
 
-    const positionGroup = (graphic.uByte10 >> 4) & 0x7;
-    const posSet = tables.monsterPositions[positionGroup]?.[relativeCellNumber]?.[positionWithinCell];
-    if (!posSet || posSet.y === 0) return;
-
-    let xCenter = posSet.x;
-    let y2 = posSet.y;
-    if (middleLeftRight === 1) xCenter -= 100;
-    else if (middleLeftRight === 2) xCenter += 100;
-
-    const distanceFromUs = relativeCellNumber >= 6 ? 0 : relativeCellNumber >= 3 ? 1 : 2;
-    const baseTransparent = graphic.uByte10 & 0x0f;
-
     let src = base;
-    let transparentColor = baseTransparent;
-    let scaledWidthBytes = widthBytes;
-    let scaledHeight = height;
-
-    if (distanceFromUs > 0) {
-      const scale = distanceFromUs === 1 ? 20 : 16;
-      scaledWidthBytes = Math.floor((widthBytes * scale + (scale >> 1)) >> 5);
-      scaledHeight = Math.floor((height * scale + (scale >> 1)) >> 5);
-      const dstWidth = Math.max(1, scaledWidthBytes * 2);
-      const dstHeight = Math.max(1, scaledHeight);
-      const colorMap = distanceFromUs === 1 ? tables.monsterColorMapMedium : tables.monsterColorMapFar;
-      src = this.shrinkChunky(base, dstWidth, dstHeight, colorMap);
-      transparentColor = this.mapColorValue(colorMap, baseTransparent);
+    let dstByteWidth = srcByteWidth;
+    let dstHeight = srcHeight;
+    let distanceFromUs: number;
+    let transparentColor: number;
+    let mirror: boolean;
+    if (relativeCellNumber >= 6) {
+      // Within one cell of us.
+      distanceFromUs = 0;
+      transparentColor = pI12.uByte10 & 15;
+      mirror =
+        (showSideView && monsterRelFacing === 1) ||
+        (showAttackView && sms.mirror) ||
+        (!showSideView && !showBackView && !showAttackView && frontViewMirror);
+    } else {
+      let b102: boolean;
+      let scaleFactor: number;
+      let distancePalette: Uint8Array;
+      if (relativeCellNumber >= 3) {
+        // Exactly two rows ahead.
+        distanceFromUs = 1;
+        b102 = monsterWord4Bit7(pmtDesc) && !showSideView && !showBackView && !showAttackView;
+        distancePalette = tables.monsterColorMapMedium;
+        scaleFactor = 20; // 20/32 = 0.625
+      } else {
+        // Three or more rows ahead.
+        b102 = false;
+        distanceFromUs = 2;
+        frontViewMirror = false;
+        distancePalette = tables.monsterColorMapFar;
+        scaleFactor = 16; // 16/32 = 0.5
+      }
+      dstByteWidth = (srcByteWidth * scaleFactor + (scaleFactor >> 1)) >> 5;
+      dstHeight = (srcHeight * scaleFactor + (scaleFactor >> 1)) >> 5;
+      transparentColor = this.mapColorValue(distancePalette, pI12.uByte10 & 15);
+      src = this.shrinkChunky(base, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
+      // The last term can never hold, since `frontViewMirror` needs
+      // `NonAttackingMirrorOK()`: a front view is not mirrored beyond the first row
+      // (`:859-864`). The 68000 code in the comment above it tests `(word4 & 4) != 0`.
+      mirror =
+        (showSideView && monsterRelFacing === 1) ||
+        (showAttackView && sms.mirror) ||
+        (b102 && monsterWord4Bit8(pmtDesc)) ||
+        (frontViewMirror && !monsterNonAttackingMirrorOK(pmtDesc));
     }
-
+    // CSBWin's `Mirror` moves the row padding to the left and reads past it (`w_90`); the
+    // port's bitmaps are unpadded, so there is nothing to skip.
     if (mirror) src = this.getMirroredBitmap(src);
 
-    const xOffset = tables.smallOffsets[(distanceFromUs << 3) + sms.nibble0] ?? 0;
-    const yOffset = tables.smallOffsets[sms.nibble3] ?? 0;
-    xCenter += xOffset;
-    y2 += yOffset;
-
-    let x1 = xCenter - scaledWidthBytes + 1;
-    let x2 = xCenter + scaledWidthBytes;
-    let y1 = y2 - (scaledHeight - 1);
-    if (y2 > 135) y2 = 135;
-
-    let srcX = 0;
-    let srcY = 0;
-    if (x1 < 0) {
-      srcX = -x1;
-      x1 = 0;
-    }
-    if (y1 < 0) {
-      srcY = -y1;
-      y1 = 0;
-    }
-    if (x2 > 223) x2 = 223;
-    if (y2 > 135) y2 = 135;
-
-    this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX, srcY }, transparentColor);
+    let d4 = monsterXYonScreen.y + (tables.smallOffsets[sms.nibble3] ?? 0);
+    const y2 = Math.min(d4, 135);
+    const y1 = Math.max(0, d4 - dstHeight + 1);
+    d4 = monsterXYonScreen.x + (tables.smallOffsets[(distanceFromUs << 3) + sms.nibble0] ?? 0);
+    if (middleLeftRight === 1) d4 -= 100; // Left side
+    else if (middleLeftRight !== 0) d4 += 100; // Right side
+    const x2 = applyLimits(0, d4 + dstByteWidth, 223);
+    if (x2 === 0) return;
+    const x1 = applyLimits(0, d4 - dstByteWidth + 1, 223);
+    if (x1 === 223) return;
+    const srcX = x1 !== 0 ? 0 : dstByteWidth - d4 - 1;
+    // `TAG0088b2(..., srcOffsetX, 0, ...)`: a sprite cut at the top loses its bottom rows.
+    this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX, srcY: 0 }, transparentColor);
   }
 
   private drawMissilesAtPosition(

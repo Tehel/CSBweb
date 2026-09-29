@@ -89,6 +89,7 @@ In payoff order: the first row is the next item.
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
+| C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Eleven DSA filters | — | ⏸️ |
@@ -107,7 +108,7 @@ postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C94 · D12 · E8 · F12 · G21 · X5. An ID recorded and paid in one commit has no
+Next free IDs: C95 · D12 · E8 · F12 · G21 · X5. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -142,6 +143,16 @@ the whole box, on `CHARFLAG_portraitChanged`, which a shield starting or ending 
 (`MarkAllPortraitsChanged`, `CSBCode.cpp:6545-6570`, `Magic.cpp:1329`). There the port's
 figure stays up to five ticks longer. Paying it means modelling those flags, which the
 port does not (`Champion.charFlags`, `src/engine/gameTypes.ts`).
+
+### C94 ⏳ Clouds in the cells beside and four rows ahead of the party are not drawn
+
+`DrawRoomObjects` calls `DrawClouds` for every cell it is given
+(`doc/CSBwin-src/Code51a4.cpp:2768-2769`), which reads it as `RelativeCellNumber + 3`: 0-2
+for the row four ahead (cells -3..-1), 13 and 14 for the cells beside the party (10, 11).
+The port's `drawRoomObjects` (`src/renderer/bytecode/BytecodeInterpreter.ts`) returns for
+cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it means checking
+that every table `drawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
+cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
 
 ---
 
@@ -310,7 +321,8 @@ reading, and DM has none.
 `drawAsSize4()`, `Unique()` and `Poisoned()` on `drawAsSize4Monsters`
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
-holds the raw bits, and `monster.drawAsSize4` is read ungated in
+holds the raw bits, the renderer's `drawRoomObjects` / `drawMonster` take both options as
+false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
 `MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:371`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
