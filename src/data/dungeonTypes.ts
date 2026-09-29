@@ -556,6 +556,12 @@ export interface DungeonData {
     indirectText?: boolean;
     /** SCROLL records are six bytes with an RN (`ExtendedFeaturesVersion >= 'B'`). */
     newScrolls?: boolean;
+    /**
+     * `d.Word22592` as a compressed `dungeon.dat` gives it, its word 6
+     * (`doc/CSBwin-src/SaveGame.cpp:2358`); unset for a plain one, whose new game keeps
+     * the 13 `_ReadEntireGame` sets (`newGameBlock1`, `src/engine/GameContext.ts`).
+     */
+    word22592?: number;
     spellFilterLocation?: number; // Extended-feature spell filter location
     presetHeroes?: PresetHero[]; // Preset champions extracted from dungeon data
 }

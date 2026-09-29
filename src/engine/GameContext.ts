@@ -143,16 +143,16 @@ function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQ
 
 /**
  * `_ReadEntireGame`'s `d.` for a new game: the four words it sets first
- * (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), `Word22592` staying 13 for a `dungeon.dat`
- * that is not compressed (`:2350-2358`), and `d.RandomGameID`, the product of the low
- * words of two draws (`:1523-1532`).
+ * (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), `Word22592` then taken from a compressed
+ * `dungeon.dat` and staying 13 for a plain one (`:2350-2358`, `DungeonData.word22592`),
+ * and `d.RandomGameID`, the product of the low words of two draws (`:1523-1532`).
  */
-function newGameBlock1(random: CsbRandom): Block1State {
+function newGameBlock1(random: CsbRandom, dungeonData: DungeonData): Block1State {
     const d0 = random.next() & 0xffff;
     const d1 = random.next() & 0xffff;
     return {
         randomGameID: (d0 * d1) >>> 0,
-        word22592: 13,
+        word22592: dungeonData.word22592 ?? 13,
         word22594: 1,
         word22596: 2,
         word22598: 1,
@@ -183,7 +183,7 @@ export function createGameContext(
     gameWon: false,
     word1868: false,
     currentPalette: 0,
-    block1: newGameBlock1(random),
+    block1: newGameBlock1(random, dungeonData),
   };
   const timers = newGameTimerQueue(dungeonData, tables);
   return {

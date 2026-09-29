@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G16 | A compressed `dungeon.dat` | S | ⏳ |
+| C91 | `ReadDatabases`' checksum word is never compared | S | ⚠️ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
@@ -107,7 +107,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C91 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
+Next free IDs: C92 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -126,7 +126,20 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 ## C — Known divergences from CSBWin
 
-A divergence found along the way goes here, with the next free ID. Empty.
+A divergence found along the way goes here, with the next free ID.
+
+### C91 ⚠️ `ReadDatabases`' checksum word is never compared
+
+`ReadDatabases` adds up every byte `FetchDataBytes` fetches, then reads the word after the
+cell flags and returns 0 when it differs from the sum (`doc/CSBwin-src/SaveGame.cpp:2654-2658`,
+`CSBCode.cpp:9081-9106`). `_ReadEntireGame` then takes its failure path (`:1741-1742`, to
+`tag01efee` at `:1895`). A file with no such word skips the comparison, since `StreamInput`
+cannot read it: DM's `dungeon.dat` has none. The port never compares it:
+`DungeonLoader.loadDungeonDat` reads CSB's prison, which ends with the word (0x939f), and
+`loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) checks only that a save's image ends
+two bytes before the file does, where `WriteAndChecksum`'s word sits (the writer's
+`buildImageChecksum`). Needed: the comparison in both, and a failed read that does what
+`tag01efee` does (trace it first), with a tool that flips one byte of each file.
 
 ---
 
@@ -146,18 +159,6 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 Things CSBWin does that the port has not built. These are not defects in existing code;
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
-
-### G16 — A compressed `dungeon.dat`
-
-`ReadDatabases` reads a new game's `dungeon.dat` through `ExpandData` when its first word
-is 33028, and then takes `d.Word22592` from its word 3
-(`doc/CSBwin-src/SaveGame.cpp:2346-2374`). `ExpandData` is about 66 lines with its
-`getBits` helper (`CSBCode.cpp:9846-9929`): a 20-byte table of 4 and 16 entries, then
-2-bit, 6-bit and 10-bit codes. Chaos Strikes Back's `dungeon.dat` is compressed: 2098
-bytes opening `81 04`, the expanded size 2622, `Word22592` 12. It is the prison, two
-levels with sentinel 8, where a CSB game begins (G17). `DungeonLoader` reads only a plain
-file, and `newGameBlock1` (`src/engine/GameContext.ts`) keeps the 13 `_ReadEntireGame`
-sets (`:1470`), where it should take the file's word. DM's `dungeon.dat` is plain.
 
 ### G18 — One game's data set, chosen before the boot
 
@@ -186,7 +187,9 @@ What is needed: a data set per game (a folder, its files, a name), chosen before
 nothing that assumes `dm-atari`. A `dungeon.dat` that carries an Extended Features block
 (the DM Windows package's) sets `ctx.rules` through `readRulesOptions`, as a save does
 (`doc/PROVEN_FACTS.md` → "`DM_rules` and `DMRulesDesignOption`…"); `DungeonLoader` reads
-only a plain file today. The player's "DM Rules" toggle, which flips `ctx.rules.dmRules`
+no such block today. Behind one, a compressed body is found after the block, and
+`ReadDatabases` leaves the block's size out of the body's unless `ExtendedFeaturesVersion`
+is `'@'` (`SaveGame.cpp:2365-2369`). The player's "DM Rules" toggle, which flips `ctx.rules.dmRules`
 (`CSBUI.cpp:912-914`), goes on the page with the chooser. **Where to choose (the author's decision): on the
 page**, a chooser outside the game that reloads it with, say, `?dungeon=csb`. That is where
 CSBWin makes the same choice, from the command line's `directory=` or `config.txt`'s
@@ -202,9 +205,10 @@ parse, and nothing has examined its format.
 CSBWin makes a CSB game in three steps (the utility's own header,
 `doc/CSBwin-src/Chaos.cpp:1-5`):
 
-1. **DUNGEON → Enter** reads `dungeon.dat`, the prison (G16), and the party is saved from
+1. **DUNGEON → Enter** reads `dungeon.dat`, the prison, and the party is saved from
    it as `CSBGAMEn.DAT` (`SaveGame.cpp:902-908`). Where the champions are chosen in it is
-   not yet traced; the prison has to be decompressed first.
+   not yet traced. The port reads the compressed prison (`DungeonLoader.loadDungeonDat`,
+   `doc/PROVEN_FACTS.md` → "A compressed `dungeon.dat`: CSB's prison").
 2. **UTILITY → "MAKE NEW ADVENTURE"** (`_StartChaos`, `Chaos.cpp:2686`; the editor screen
    `_DrawCharacterEditorScreen`, `:3755-3789`, and its dispatcher `_TAG004518`,
    `:3874-4022`, where only button 13 does real work). It loads the source save

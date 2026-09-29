@@ -37,7 +37,7 @@ Complete technical specification for Dungeon Master / Chaos Strikes Back dungeon
 Must detect and convert accordingly.
 
 ### Compression
-Optional compression with signature `0x8104` at file start.
+Optional compression with signature `0x8104` (33028) at file start. See [Compression](#compression).
 
 ### Checksum
 Optional 16-bit checksum at end of file (sum of all previous data).
@@ -811,60 +811,44 @@ M\r
 
 ## Compression
 
-### Compression Detection
+A new game's `dungeon.dat` may be compressed. `ReadDatabases` reads the first 8 bytes and
+takes the file as compressed when their first word is 33028; otherwise it rewinds and
+reads it plain (`doc/CSBwin-src/SaveGame.cpp:2346-2374`). A saved game is never read this
+way. The port: `DungeonLoader.loadDungeonDat` and `ExpandData`
+(`src/core/compression.ts`), checked by `tools/dump-compressed-dungeon.ts`.
 
-**Signature**: First word = `0x8104` indicates compression.
+### The 8-byte header
 
-### Compression Header (28 bytes)
+| Offset | Type | Meaning |
+|--------|------|---------|
+| +0x00 | word | 33028 (`0x8104`) |
+| +0x02 | long | The expanded size in bytes |
+| +0x06 | word | `d.Word22592`, which a plain file leaves at `_ReadEntireGame`'s 13 (`SaveGame.cpp:1470`) |
 
-| Offset | Type | Name | Description |
-|--------|------|------|-------------|
-| +0x00 | word | Signature | Always 0x8104 |
-| +0x02 | dword | Uncompressed Size | Size after decompression |
-| +0x06 | word | Unknown | Usually 0x000C or 0x0008 |
-| +0x08 | byte[4] | Common Bytes | 4 most frequent byte values |
-| +0x0C | byte[16] | Rare Bytes | 16 less common byte values |
+All three big-endian. The rest of the file is the compressed body, expanded by
+`ExpandData` into a buffer that `FetchDataBytes` then reads as it would the plain file.
 
-### Compression Algorithm
+### The body (`ExpandData`, `CSBCode.cpp:9846-9929`)
 
-Bit-based encoding:
+The first 20 bytes are two tables: 4 bytes, then 16. The codes follow as big-endian
+words, read one bit at a time from bit 15 down, a code running on into the next word
+when the current one is used up. One code makes one byte:
 
-**Code Formats**:
-- `0xx` (3 bits): Index into common bytes table (0-3)
-- `10xxxx` (6 bits): Index into rare bytes table (0-15)
-- `11xxxxxxxx` (10 bits): Literal byte value (0-255)
+| Code | Bits | Byte |
+|------|------|------|
+| `0xx` | 3 | entry `xx` of the 4-byte table |
+| `10yyyy` | 6 | entry `yyyy` of the 16-byte table |
+| `11zzzzzzzz` | 10 | `zzzzzzzz` itself |
 
-**Bit Reading**: MSB to LSB within each byte.
+The count of bytes to make is a word (`D7W`), so a size over 65535 expands only its low
+word's worth.
 
-**Decompression Pseudocode**:
-```typescript
-function decompress(data: Uint8Array): Uint8Array {
-    let output = new Uint8Array(uncompressedSize);
-    let bitPos = 0;
-    let outPos = 0;
+### Chaos Strikes Back's prison
 
-    while (outPos < uncompressedSize) {
-        // Read code type (first 2 bits)
-        const code = readBits(2);
-
-        if (code === 0) {
-            // 0xx: Common byte
-            const index = readBits(1);
-            output[outPos++] = commonBytes[index];
-        } else if (code === 2) {
-            // 10xxxx: Rare byte
-            const index = readBits(4);
-            output[outPos++] = rareBytes[index];
-        } else {
-            // 11xxxxxxxx: Literal
-            const value = readBits(8);
-            output[outPos++] = value;
-        }
-    }
-
-    return output;
-}
-```
+CSB's `dungeon.dat` is the one compressed file known: 2098 bytes, expanding to 2622, with
+`Word22592` 12. The expanded image ends with the checksum word `ReadDatabases` compares
+with the byte sum of everything it fetched (`SaveGame.cpp:2654-2658`), 0x939f, and the
+port's expansion matches it. DM's `dungeon.dat` is plain, and has no checksum word.
 
 ---
 

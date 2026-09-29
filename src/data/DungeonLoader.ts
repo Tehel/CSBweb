@@ -29,6 +29,8 @@ import type {
     MissileRecord,
     CloudRecord
 } from './dungeonTypes';
+import { ExpandData } from '../core/compression';
+import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
@@ -47,6 +49,9 @@ import {
  * genuine saves (`doc/PROVEN_FACTS.md` → "The dungeon image layout in a save file").
  * Defaults are `dungeon.dat`, so existing callers are unaffected.
  */
+/** The first word of a compressed `dungeon.dat` (`doc/CSBwin-src/SaveGame.cpp:2351`). */
+const DUNGEON_COMPRESSED_SIGNATURE = 33028;
+
 /** `EXPOOL` blocks are 256 bytes each (`doc/CSBwin-src/SaveGame.cpp`, EXPOOL records). */
 const EXPOOL_RECORD_SIZE = 256;
 
@@ -97,11 +102,28 @@ export class DungeonLoader {
     }
 
     /**
-     * Load dungeon from URL
+     * Load a `dungeon.dat` from URL, through `loadDungeonDat`.
      */
     async load(url: string): Promise<DungeonData> {
         await this.file.load(url);
-        return this.parse();
+        return this.loadDungeonDat(this.file.read(0, this.file.length()));
+    }
+
+    /**
+     * A new game's `dungeon.dat`, as `ReadDatabases` opens it when the game is not a
+     * resumed one (`doc/CSBwin-src/SaveGame.cpp:2346-2374`): a file whose first word is
+     * 33028 is compressed, the long at 2 is the expanded size and the word at 6 is
+     * `d.Word22592`, and the rest of the file goes through `ExpandData`. Any other file
+     * is read as it stands. A `dungeon.dat` that opens with an Extended Features block is
+     * not read here (`DEBT.md` G18).
+     */
+    loadDungeonDat(bytes: Uint8Array): DungeonData {
+        if (bytes.length < 8) throw new Error('dungeon.dat is shorter than 8 bytes');
+        if (readU16BE(bytes, 0) !== DUNGEON_COMPRESSED_SIGNATURE) return this.loadFromArray(bytes);
+        const word22592 = readU16BE(bytes, 6);
+        const data = this.loadFromArray(ExpandData(bytes.subarray(8), readU32BE(bytes, 2)));
+        data.word22592 = word22592;
+        return data;
     }
 
     /**

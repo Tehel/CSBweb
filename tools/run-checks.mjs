@@ -148,6 +148,9 @@ const CHECKS = [
   // dungeon.dat, a save's attached size-4 groups given their slot's positions and facing
   // back by the restore, and every arm tripped on built records, through `new Game` too.
   { tool: 'dump-check-monsters.ts' },
+  // A compressed dungeon.dat, CSB's prison: `ExpandData` proven byte for byte by the
+  // image's own checksum word, and `Word22592` taken from the file for the new game.
+  { tool: 'dump-compressed-dungeon.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing

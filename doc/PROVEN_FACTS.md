@@ -2708,6 +2708,26 @@ The committed saves show which file each game was started from. The three with `
 zero: `dm-atari`, cleaned by today's `ExtendPortraits`. The eleven with 0xe9 keep
 `Position` on 18 mirrors and carry `DMRules`: the Windows package's file.
 
+## A compressed `dungeon.dat`: CSB's prison
+
+When the game is not a resumed one, `ReadDatabases` reads 8 bytes and, if their first word
+is 33028, takes the long at 2 as the expanded size and the word at 6 as `d.Word22592`,
+then expands the rest of the file with `ExpandData` and fetches the image from that buffer
+(`doc/CSBwin-src/SaveGame.cpp:2346-2374`). Otherwise it rewinds and `Word22592` keeps the
+13 `_ReadEntireGame` set (`:1470`). `ExpandData` (`CSBCode.cpp:9864-9929`, with `getBits`
+at `:9846`) reads two tables of 4 and 16 bytes, then big-endian words bit by bit from the
+top: `0xx` is the first table's entry, `10yyyy` the second's, `11zzzzzzzz` a literal
+byte. Its count is the word `D7W`.
+
+CSB's `dungeon.dat` (`static/gamefiles/csb/`) is compressed: 2098 bytes, 2622 expanded,
+`Word22592` 12. The image is two levels (20x16 and 21x16), sentinel 8, start (9,0) facing
+2, with 4 doors, 26 texts, 30 actuators and 12 groups. Its sections end two bytes short of
+2622, and those two bytes are the checksum `ReadDatabases` compares with the byte sum of
+everything `FetchDataBytes` fetched (`SaveGame.cpp:2654-2658`, `CSBCode.cpp:9081-9106`):
+0x939f, which the port's expansion reproduces (`tools/dump-compressed-dungeon.ts`). A
+file without the word, as DM's `dungeon.dat` is, skips the comparison, since
+`StreamInput` fails to read it.
+
 ## `ExtendPortraits` cleans the mirrors of every file read without `ExpandedPortraits`
 
 `_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once

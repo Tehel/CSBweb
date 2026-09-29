@@ -122,6 +122,8 @@ export const DUNGEON_DATA_SOURCES = {
     indirectText: 'loaded',
     newScrolls: 'loaded',
     presetHeroes: 'loaded',
+    // Read into `block1` when a new game is made (`newGameBlock1`), which a save carries.
+    word22592: 'loaded',
 } as const satisfies SourceTable<DungeonData>;
 
 type DatabaseKey = keyof Databases;

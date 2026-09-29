@@ -295,3 +295,73 @@ export function decompressGraphics(
 
     return rleExpanded;
 }
+
+/**
+ * `ExpandData` (`TAG0206f8`, doc/CSBwin-src/CSBCode.cpp:9864-9929), with its `getBits`
+ * (`:9846-9862`): a compressed `dungeon.dat`'s body, the file past its 8-byte header,
+ * expanded into `dstSize` bytes.
+ *
+ * The body opens with two tables, 4 bytes then 16, and goes on as big-endian words read
+ * a bit at a time from the top. Each output byte is one code: `0xx` takes the first
+ * table's entry `xx`, `10yyyy` the second's entry `yyyy`, and `11zzzzzzzz` is the byte
+ * `zzzzzzzz` itself. CSBWin collects a code's bits in the high word of `D1` and keeps the
+ * input word in its low word; `acc` and `input` are those two halves. The count is
+ * `D7W`, a word, so a `dstSize` over 65535 expands only `dstSize & 0xffff` bytes (65536
+ * when that is 0), as it does in CSBWin. A word past the end of `src` reads as 0 here,
+ * where CSBWin would read beyond its buffer.
+ */
+export function ExpandData(src: Uint8Array, dstSize: number): Uint8Array {
+    const dst = new Uint8Array(dstSize);
+    let a3 = 20;
+    let a2 = 0;
+    let d7 = dstSize & 0xffff;
+    let acc = 0;
+    let input = 0;
+    let bitsLeft = 0; // D0W: the bits still in `input`
+    const nextWord = (): number => {
+        const w = a3 + 1 < src.length ? (src[a3] << 8) | src[a3 + 1] : 0;
+        a3 += 2;
+        return w;
+    };
+    const shiftIn = (n: number): void => {
+        acc = ((acc << n) | (input >>> (16 - n))) & 0xffff;
+        input = (input << n) & 0xffff;
+    };
+    const getBits = (numbits: number): void => {
+        if (bitsLeft < numbits) {
+            numbits -= bitsLeft;
+            shiftIn(bitsLeft);
+            input = nextWord();
+            bitsLeft = 16;
+        }
+        bitsLeft -= numbits;
+        shiftIn(numbits);
+    };
+    input = nextWord(); // tag020714
+    bitsLeft = 16;
+    for (;;) {
+        if ((input & 0x8000) === 0) { // tag02073c
+            getBits(3);
+            if (a2 < dstSize) dst[a2] = src[acc];
+        } else {
+            getBits(2);
+            acc = (acc - 2) & 0xffff;
+            if (acc === 0) {
+                getBits(4);
+                if (a2 < dstSize) dst[a2] = src[acc + 4];
+            } else { // tag020732
+                getBits(8);
+                if (a2 < dstSize) dst[a2] = acc & 0xff;
+            }
+        }
+        a2++;
+        d7 = (d7 - 1) & 0xffff; // tag020744
+        if (d7 === 0) break;
+        acc = 0;
+        if (bitsLeft === 0) {
+            input = nextWord(); // tag020714
+            bitsLeft = 16;
+        }
+    }
+    return dst;
+}
