@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | M | ⏳ |
+| G18 | One game's data set, chosen before the boot | L | ⏳ step 1 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -193,6 +193,24 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 `tag01efee` (`doc/PROVEN_FACTS.md` → "A failed read ends at `tag01efee`"), as a save's
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
+
+**Steps**, each a commit, in this order (none has started):
+
+1. **The set, chosen before the boot.** A list of data sets (`dm-atari`, `csb`: a folder,
+   its files, a name), the page's `?dungeon=<id>` read before `loadGameFiles` with
+   `dm-atari` the default, every path `src/main.ts` builds (both reads of `dungeon.dat`,
+   `graphics.dat`, `CSBgraphics.dat`) taken from the set, and a chooser beside the canvas
+   that reloads the page with the parameter. A tool loads every set's files, builds its
+   tables, and checks CSB's 0x231 long form with a canary: `Buttons16932` read from the
+   file, not `MISSING_PRISON_DOOR_BUTTONS`. The default set's frames do not move.
+2. **The DM Rules toggle** beside the chooser: `DM_rules = !DM_rules`
+   (`CSBUI.cpp:912-914`) on `ctx.rules.dmRules`, as the menu's option does at any time.
+3. **An Extended Features block in `dungeon.dat`.** `DungeonLoader` reads the block, a
+   compressed body found behind it (`SaveGame.cpp:2365-2369`), and `readRulesOptions`
+   sets `ctx.rules` from it. The DM Windows package's `dungeon.dat` becomes a set.
+4. **`dungeon.dat` read after ENTER**, where CSBWin reads it, so a failed read reaches
+   `tag01efee` as a save's does, rather than ending the page's `init` or rejecting in
+   `showEndOfGame`.
 
 ### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
