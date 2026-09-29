@@ -320,19 +320,35 @@ export class Game implements MainLoop {
     /**
      * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game, through
      * the path a save takes (doc/CSBwin-src/SaveGame.cpp:1480-1494). `data` must be a
-     * fresh parse of the file, since play writes into the `DungeonData` it runs on. A
-     * scratch `Game` stands the new world up, and a load restores it here, so every
-     * system keeps its object and the page its wiring.
+     * fresh parse of the file, since play writes into the `DungeonData` it runs on. The
+     * running game takes it as its world (`installWorld`), and a scratch `Game` over it
+     * gives the rest of a new game, the party at the start, the clock and the timers,
+     * which a load restores here, so every system keeps its object and the page its
+     * wiring.
      */
     readNewGame(data: DungeonData): void {
         const fresh = new Game(data, this.ctx.tables);
         // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:253`), so
         // `d.Initialize()` leaves it and the new game counts on from the last one.
         const { totalMoveCount } = this.state.block1;
+        this.installWorld(data);
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
         this.state.block1.totalMoveCount = totalMoveCount;
         this.readNewGameRules(data);
         this.canRestart = false;
+    }
+
+    /**
+     * Take `data` as the world, whole: `_ReadEntireGame` reads the structure with the rest,
+     * the header, every level's descriptor and tables, from the file it opens
+     * (`ReadDatabases`, doc/CSBwin-src/SaveGame.cpp:2324). `DungeonState` keeps its object,
+     * which every system and the renderer hold, and takes the new data; `state.dungeon`
+     * follows. A read installs its world before it restores the state that goes with it
+     * (`applyRuntimeSaveState`), whose snapshot must then fit.
+     */
+    installWorld(data: DungeonData): void {
+        this.state.dungeon = data;
+        this.dungeonState.install(data);
     }
 
     /**

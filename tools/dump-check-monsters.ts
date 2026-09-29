@@ -117,9 +117,9 @@ for (const { file, changed } of withChanges) {
   const bytes = new Uint8Array(readFileSync(file));
   const saved = loadCsbwinWorld(bytes);
   const savedSlots = new Map(saved.save.item16.filter((s) => s.word0 >= 0).map((s) => [s.word0, s]));
-  // A running game on the save's own world, as `dump-atari-saves` builds one: CSB's
-  // eleven levels do not restore into DM's fourteen.
-  const game = newGame(loadCsbwinWorld(bytes).dungeon, stockGraphics());
+  // A running game over DM's `dungeon.dat`, as the page builds one: the load installs
+  // the save's world, CSB's eleven levels as well as DM's fourteen.
+  const game = newGame(new DungeonLoader().loadDungeonDat(new Uint8Array(readFileSync(DUNGEON))), stockGraphics());
   applyCsbwinSave(game, bytes);
   const records = game.ctx.dungeon.getData().databases.creatures.records;
   const pool = game.ctx.dungeon.getItem16Pool();

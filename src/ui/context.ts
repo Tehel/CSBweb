@@ -1,11 +1,9 @@
-import type { DungeonData } from '../data';
 import type { Game } from '../engine';
 import type { GameScreen } from '../renderer/GameScreen';
 
 export interface UIContext {
     screen: GameScreen;
     game: Game;
-    dungeonData: DungeonData;
     renderView: () => void;
     onQuickSave: () => void;
     onQuickLoad: () => void;

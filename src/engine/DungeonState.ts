@@ -74,6 +74,15 @@ export class DungeonState {
     }
 
     /**
+     * Take `data` as the world, as `_ReadEntireGame` reads a whole one, structure included
+     * (`Game.installWorld`). The bones records were the old world's.
+     */
+    install(data: DungeonData): void {
+        this.data = data;
+        this.championBonesRecords.clear();
+    }
+
+    /**
      * Get dungeon data
      */
     getData(): Readonly<DungeonData> {

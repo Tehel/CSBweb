@@ -443,11 +443,10 @@ async function runIntro(screen: GameScreen, sound: SoundManager): Promise<Prison
 }
 
 /** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
-function wire(game: Game, screen: GameScreen, dungeon: DungeonData, sound: SoundManager): void {
+function wire(game: Game, screen: GameScreen, sound: SoundManager): void {
     bindUIContext({
         screen,
         game,
-        dungeonData: dungeon,
         renderView,
         onQuickSave: dev.quickSave,
         onQuickLoad: dev.quickLoad,
@@ -538,7 +537,7 @@ async function init() {
         // A new game takes the rules its `dungeon.dat`'s block declares; a resumed one has
         // taken its save's.
         if ((await runIntro(built.screen, sound)) === 'enter') game.readNewGameRules(files.dungeon);
-        wire(built.game, built.screen, files.dungeon, sound);
+        wire(built.game, built.screen, sound);
         start(built.game);
     } catch (error) {
         console.error('Initialization error:', error);

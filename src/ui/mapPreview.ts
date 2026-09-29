@@ -12,7 +12,7 @@ export function drawMapPreview(levelIndex: number): void {
     const canvasCtx: CanvasRenderingContext2D = mapCanvasEl.getContext('2d')!;
     canvasCtx.imageSmoothingEnabled = true;
 
-    const map = ctx.dungeonData.maps[levelIndex];
+    const map = ctx.game.state.dungeon.maps[levelIndex];
     const { cellSize, offsetX, offsetY } = getMapPreviewLayout(mapCanvasEl, map);
     canvasCtx.fillStyle = '#000';
     canvasCtx.fillRect(0, 0, mapCanvasEl.width, mapCanvasEl.height);
@@ -50,7 +50,7 @@ export function handleMapCanvasClick(e: MouseEvent): void {
     // A script holding the loop (the fusion) runs on the party where it stands.
     if (!ctx || ctx.game.isRunningScript()) return;
 
-    const map = ctx.dungeonData.maps[ctx.game.party.state.position.z];
+    const map = ctx.game.state.dungeon.maps[ctx.game.party.state.position.z];
     const { cellSize, offsetX, offsetY } = getMapPreviewLayout(mapCanvasEl, map);
     const { x, y } = getEventPosition(mapCanvasEl, e);
     if (x < offsetX || y < offsetY) return;

@@ -6,8 +6,8 @@
  * the pair the quick-save has carried since format v2:
  *
  * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
- *   (`src/engine/DungeonSnapshot.ts`), restored into the running world's shape
- *   (`DEBT.md` D11);
+ *   (`src/engine/DungeonSnapshot.ts`), restored into the running world, whose shape
+ *   it must have (`DEBT.md` D11);
  * - `raw` — the scrambled, checksummed CSBWin file `saveSaveGameState` writes, all
  *   sixteen blocks, base64'd. A load parses it and takes only what `applySaveGameState`
  *   takes (the ITEM16s, the timers' `timerWord8`, the missiles, the cursor owner and

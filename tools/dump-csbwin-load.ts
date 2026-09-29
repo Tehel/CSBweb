@@ -7,10 +7,10 @@
  * takes the last step: it stands a **real `Game`** up on `dungeon.dat`, restores the
  * save into it through `applyCsbwinSave`, and then interrogates the running engine.
  *
- * The distinction matters because the restore goes through `RuntimeSaveState` and
- * `applyDungeonSnapshot`, which re-seat a world that the renderer, `DungeonState` and
- * every subsystem already hold by reference. A save that parses perfectly and lands in
- * a game that still holds `dungeon.dat`'s world would pass all three other tools.
+ * The distinction matters because the load installs the save's world in a game that
+ * the renderer and every subsystem reach through `DungeonState` (`Game.installWorld`).
+ * A save that parses perfectly and lands in a game that still holds `dungeon.dat`'s
+ * world would pass all three other tools.
  *
  * So every check here is asked of the live game, and answered against the file:
  *
@@ -23,8 +23,10 @@
  *   holds, and every possession names a live record **in the live dungeon**, which is
  *   what proves the world and the party were restored into the same place;
  * - the random stream continues from `gb2.ranseed` rather than the host clock;
- * - a quick-save of the loaded world gives back every field `DUNGEON_DATA_SOURCES`
- *   places, but the `runtimeSave` ones, which a load re-derives.
+ * - the live world is the save's own, `state.dungeon` and `DungeonState` both;
+ * - a quick-save of the loaded world, restored into a game built over `dungeon.dat`,
+ *   gives back every field `DUNGEON_DATA_SOURCES` marks `snapshot`. The `loaded` ones
+ *   are the file's a world was read from, and a quick-save carries none of them.
  *
  * And the vacuity guard: for a played save, the loaded world must **differ** from the
  * `dungeon.dat` the game started on. A load that quietly did nothing would otherwise
@@ -83,7 +85,7 @@ function json(value: unknown): string {
 function differingFields(table: SourceTable, a: any, b: any, path = ''): string[] {
   const out: string[] = [];
   for (const [field, source] of Object.entries(table)) {
-    if (source === 'runtimeSave') continue;
+    if (source === 'runtimeSave' || source === 'loaded') continue;
     const at = `${path}${field}`;
     const [x, y] = [a?.[field], b?.[field]];
     if (typeof source === 'string') {
@@ -313,17 +315,23 @@ function main(): void {
       );
     }
 
+    // The world the game runs is the one the save holds, `loaded` fields and all.
+    check(
+      live === world.dungeon && game.dungeonState.getData() === world.dungeon,
+      `${name}: the save's world is the running one, in state and DungeonState both`,
+    );
+
     // And the round trip that a player actually performs: load a CSBWin save, then
     // quick-save and reload. The quick-save carries only the fields `DungeonSnapshot`'s
     // `DUNGEON_DATA_SOURCES` marks `snapshot` — so a CSBWin load that put something into
     // a field it does not carry would be lost at the next F5/F9. The walk asks that of
-    // every field the table places, the checks after it of the party.
+    // every such field, the checks after it of the party.
     const second = loadWorld();
     second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));
     const lost = differingFields(SOURCES, live, second.state.dungeon);
     check(
       lost.length === 0,
-      `${name}: every field of the loaded world but the runtimeSave ones survives a quick-save round trip` +
+      `${name}: every snapshot field of the loaded world survives a quick-save round trip` +
         (lost.length ? ` (lost: ${lost.slice(0, 6).join(', ')}${lost.length > 6 ? ', ...' : ''})` : ''),
     );
     check(

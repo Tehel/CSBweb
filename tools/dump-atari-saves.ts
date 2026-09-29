@@ -13,7 +13,9 @@
  * - it has no Extended Features block, so the fallback is what is being tested;
  * - the size is the header's word 2, and the layout closes on the file's last word with it;
  * - the world is CSB's: eleven maps, the header's object list, every chain walks to `RNeof`;
- * - a `Game` on CSB's own `graphics.dat` takes the save: the party stands where
+ * - a `Game` on CSB's own `graphics.dat`, built over `dm-atari`'s fourteen-level
+ *   `dungeon.dat`, takes the save: the save's world replaces the one the game was built
+ *   over, as `_ReadEntireGame` reads it whole (`Game.installWorld`), the party stands where
  *   `GAMEBLOCK2` says with its champions, and the game runs for 600 ticks, or until the
  *   game is lost. Both files put the party at (22,18) on level 4 between two groups of
  *   creature type 15, and with nobody at the controls they kill it in 142 and 408 ticks. That
@@ -34,6 +36,7 @@ import { decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL } from '../src/core/types
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
 import { cellFlagArraySize } from '../src/data/CsbwinDungeonImageWriter';
 import { applyCsbwinSave } from '../src/data/CsbwinSaveGame';
+import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
@@ -41,6 +44,8 @@ import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 const CSB = 'static/gamefiles/csb';
+/** DM's `dungeon.dat`, fourteen levels: the world each game is built over before its load. */
+const DM_DUNGEON = new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat')));
 const ATARI_SAVES = ['mini.dat', 'csbgame2.dat'];
 /** A save CSBWin wrote of DM, with an Extended Features block. */
 const CONTROL = 'static/gamefiles/saves/csbgame7.dat';
@@ -102,9 +107,26 @@ for (const name of ATARI_SAVES) {
   console.log(`  chains: ${objects} objects${problems.length ? `, ${problems.length} problems: ${problems.slice(0, 3).join('; ')}` : ''}`);
   check(objects > 0 && problems.length === 0, `${name}: every object chain walks to RNeof`);
 
-  // A running game on the save's own data.
-  const game = newGame(d, csbGraphics);
-  applyCsbwinSave(game, bytes);
+  // A running game built over DM's world, which the save's replaces.
+  const game = newGame(new DungeonLoader().loadDungeonDat(DM_DUNGEON), csbGraphics);
+  const builtOver = game.dungeonState.getMapCount();
+  try {
+    applyCsbwinSave(game, bytes);
+  } catch (error) {
+    check(false, `${name}: a game built over DM's world should take the save — ${(error as Error).message}`);
+    continue;
+  }
+  const installed = game.state.dungeon;
+  console.log(`  game built over ${builtOver} maps, now ${game.dungeonState.getMapCount()} maps, ` +
+    `start (${installed.header.startPosition?.x},${installed.header.startPosition?.y}), ` +
+    `level 0 ${installed.maps[0].descriptor.width}x${installed.maps[0].descriptor.height}`);
+  check(builtOver === 14 && installed === game.dungeonState.getData() && game.dungeonState.getMapCount() === 11,
+    `${name}: the save's eleven-level world replaces DM's fourteen, in state and DungeonState both`);
+  check(installed.maps.every((map, i) => map.descriptor.width === d.maps[i].descriptor.width
+      && map.descriptor.height === d.maps[i].descriptor.height && map.descriptor.level === d.maps[i].descriptor.level)
+    && installed.levelIndex.join() === d.levelIndex.join()
+    && installed.header.randomSeed === d.header.randomSeed,
+    `${name}: the levels' descriptors, levelIndex and the header are the save's`);
   const gb2 = world.save.block2!;
   const party = game.party.state;
   console.log(`  party at (${party.position.x},${party.position.y}) level ${party.position.z}, ` +

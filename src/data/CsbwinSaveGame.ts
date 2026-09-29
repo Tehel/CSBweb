@@ -7,12 +7,11 @@
  * What was missing is this — turning the three into the `RuntimeSaveState` the engine
  * already knows how to restore.
  *
- * Going through `RuntimeSaveState` rather than replacing `Game.state.dungeon` outright
- * is deliberate. The live `DungeonData` is held by reference all over the engine — the
- * renderer, `DungeonState`, every subsystem — so swapping the object would leave half
- * the game looking at the old world. `applyRuntimeSaveState` already re-seats all of it
- * from a snapshot, and has been doing so for the quick-save; a CSBWin save is simply
- * another source for the same snapshot.
+ * The save's world becomes the running game's (`Game.installWorld`), structure and all,
+ * as `_ReadEntireGame` reads it (`doc/CSBwin-src/SaveGame.cpp:2324`), so a save of any
+ * dungeon loads into any running game. The rest goes through `RuntimeSaveState`, the
+ * shape the quick-save restores, whose snapshot then puts back what the world already
+ * holds.
  *
  * What is restored, and from where:
  *
@@ -21,7 +20,7 @@
  * | Party position, facing, level, clock, `d.RandomNumber`, hand owner, magic caster, object in hand | `GAMEBLOCK2` (`doc/CSBwin-src/SaveGame.cpp:1617-1650`) |
  * | The four champions | block 4's `CHARDESC[4]` |
  * | Brightness, the three shields, the footprint ring, `freezeLifeTimer`, invisibility | block 4's 128-byte party tail (`doc/CSBwin-src/Data.h:766-782`) |
- * | Cell flags, object chains, column index, every database record, the text arrays | the dungeon image, through `captureDungeonSnapshot` |
+ * | The header, every level's descriptor and tables, cell flags, object chains, column index, every database record, the text arrays | the dungeon image, installed |
  * | `dsaLevelIndex`, `dsaIndex`, `specialLocations`, the extended-feature flags | the Extended Features block and `EXPOOL`, added to the same snapshot |
  * | `ITEM16`, missiles | blocks 3 and the image, through `applySaveGameState` |
  * | The timer table and the queue that orders it | blocks 5 and 6, through `Game.restoreTimerQueue` |
@@ -262,10 +261,19 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
         // Keep what the running game has; see the module comment on `EXPOOL`.
         dsaGlobals: game.getDsaGlobalVariables(),
     });
+    // The save's world, structure and all, with the five the save carries beside the
+    // image, which the snapshot below then restores as they already stand.
+    game.installWorld(Object.assign(world.dungeon, {
+        dsaLevelIndex: world.save.dsaLevelIndex,
+        dsaIndex: world.save.dsaIndex,
+        specialLocations: world.save.specialLocations,
+        extendedWallDecorations: world.save.extendedWallDecorations,
+        spellFilterLocation: world.save.spellFilterLocation,
+    }));
     game.applyRuntimeSaveState(runtime);
-    // The records restored by the snapshot are already big-actuator records. Set by hand
-    // rather than through `applySaveGameState`, which would call `applyBigActuators` and
-    // re-derive the word-8 of every type-47 actuator from records that already carry it.
+    // The image's records are already big-actuator records. Set by hand rather than
+    // through `applySaveGameState`, which would call `applyBigActuators` and re-derive
+    // the word-8 of every type-47 actuator from records that already carry it.
     if (world.save.bigActuators) game.state.dungeon.bigActuators = true;
     return world;
 }
