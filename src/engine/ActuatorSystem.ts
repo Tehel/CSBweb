@@ -122,12 +122,6 @@ export class ActuatorSystem {
     return this.championMessageColors[chIdx] ?? 13;
   }
 
-  queueSwitchActionForActuator(actuator: ActuatorRecord, action: ActuatorAction, level: number, mapPos?: number): void {
-    const source = new Position(getActuatorTargetX(actuator), getActuatorTargetY(actuator), level);
-    const pos = mapPos ?? getActuatorTargetPos(actuator);
-    this.queueSwitchAction(actuator, action, source, pos);
-  }
-
   triggerPressurePads(position: Position, facing: number, pressed: boolean, unchangedRoom = false): boolean {
     return this.triggerObjectMove(position, OBJECT_ID_NULL, pressed, unchangedRoom, facing);
   }
@@ -531,7 +525,12 @@ export class ActuatorSystem {
     return true;
   }
 
-  private queueSwitchAction(
+  /**
+   * `QueueSwitchAction` (doc/CSBwin-src/Code11f52.cpp:3566-3605). `source` and `mapPos` are
+   * where the switch is, and a local action is all they are read for: `PerformLocalAction`
+   * gets them, and `RotateActuatorList` then rotates that square's actuators.
+   */
+  queueSwitchAction(
     actuator: ActuatorRecord,
     action: ActuatorAction,
     source: Position,
@@ -729,7 +728,13 @@ export class ActuatorSystem {
     return typeof globalThis !== 'undefined' && (globalThis as { __DM_DEBUG_TIMERS?: boolean }).__DM_DEBUG_TIMERS === true;
   }
 
-  private rotateActuatorList(): void {
+  /**
+   * `RotateActuatorList` (doc/CSBwin-src/Code11f52.cpp:3465-3525): the local action 1 or 2
+   * that `PerformLocalAction` put off moves the first actuator at its square (and
+   * position) behind the last. Called where CSBWin calls it: the end of
+   * `PlaceOrRemoveObjectInRoom`, `TouchWall` and `ProcessTT_STONEROOM`.
+   */
+  rotateActuatorList(): void {
     if (this.delayedAction === -1) return;
     const action = this.delayedAction;
     const posFilter = this.delayedActionPos;

@@ -3702,6 +3702,27 @@ by hand pass their wall position (`Mouse.cpp:402`, `:411`, `:462`, `:593-595`), 
 `PressurePadOrAlcove` always passes `-1` (`Code11f52.cpp:3875`), for an alcove as much as for
 a floor pad. Evidence: `tools/dump-local-action.ts`.
 
+## A wall face shows its last actuator's ornament, none included, and a type 5 rotates its own square
+
+`SummarizeStoneRoom` first fills the three faces with random decorations
+(`TAG00a4a2`, `doc/CSBwin-src/Codea59a.cpp:76`). Then every actuator on a face, except a
+type 127 with `PORTRAIT_HideGraphic`, writes its `wallGraphicOrdinal()` there **whatever
+it is, 0 included**, and marks the face real; an ordinal above `d.NumWallDecoration` is
+written as 0 (`:134-153`). So the last actuator on a face decides its ornament. One with no
+ornament hides an alcove before it, and any actuator hides the random decoration.
+
+Level 5's hidden alcove is built on this. The west face of (13,19) on map 5 holds #550
+(type 0, the alcove ornament) and then #549 (type 5, no ornament, local action 1), so it is
+bare stone. A type 5 under a stone-room timer stores its new value (`doc/CSBwin-src/Timer.cpp:2278`)
+before the `andOrEdge()` filter can skip the action (`:2297-2327`). It then calls
+`QueueSwitchAction` with the **timer's** square and its own position (`:2331-2346`), and a
+local action records those for `RotateActuatorList`. A counter instead passes its own
+target (`:1610-1612`, `:1657`, `:1672`). `ProcessTT_STONEROOM` ends with
+`RotateActuatorList()` (`:2382`). Its other two callers are `PlaceOrRemoveObjectInRoom`
+(`doc/CSBwin-src/Code11f52.cpp:4039`) and `TouchWall` (`doc/CSBwin-src/Mouse.cpp:603`).
+When the fourth of the room's objects brings counter #616 to zero, #549 fires and
+#550 moves behind it, and the alcove shows. Evidence: `tools/dump-hidden-alcove.ts`.
+
 ## A DSA can move a cloud out of a cell, and the cloud's timer goes with it
 
 `MoveObject` (`doc/CSBwin-src/MoveObject.cpp:721-790`) runs `CheckSource` / `CheckDestination`

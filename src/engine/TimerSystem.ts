@@ -41,6 +41,8 @@ import {
   getActuatorToggleResponses,
   getActuatorState,
   getActuatorTargetPos,
+  getActuatorTargetX,
+  getActuatorTargetY,
   getActuatorType,
   getActuatorValue,
   isActuatorNormallyClosed,
@@ -481,13 +483,14 @@ export class TimerSystem {
     }
   }
 
+  /** `ProcessTT_STONEROOM` (doc/CSBwin-src/Timer.cpp:2165-2384). */
   private processStoneRoom(timer: TimerEntry): boolean {
     const action = this.getTimerAction(timer);
-    if (action === 3) return false;
     const target = new Position(timer.uByte6, timer.uByte7, timer.level);
     const targetPos = timer.uByte8 & 3;
 
     for (let rn = this.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = this.dungeon.getDBRecordLink(rn)) {
+      if (action === 3) return false;
       const decoded = decodeObjectID(rn);
       if (decoded.category === DBType.TEXT && decoded.position === targetPos) {
         const rec = this.dungeon.getTextRecord(rn);
@@ -527,6 +530,8 @@ export class TimerSystem {
         return true;
       }
     }
+    // A type 5 whose local action rotates this square's actuators does it here (doc/CSBwin-src/Timer.cpp:2382).
+    this.ctx.systems.actuators.rotateActuatorList();
     return false;
   }
 
@@ -783,22 +788,20 @@ export class TimerSystem {
 
     setActuatorValue(actuator, counter);
 
+    // The counter hands `QueueSwitchAction` its own target as the switch's square
+    // (doc/CSBwin-src/Timer.cpp:1610-1612, :1657, :1672).
+    const source = new Position(getActuatorTargetX(actuator), getActuatorTargetY(actuator), target.z);
     if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
       const pressed = counter === 0;
       const closed = pressed !== isActuatorNormallyClosed(actuator);
-      this.ctx.systems.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchAction(
         actuator,
         closed ? ActuatorAction.SET : ActuatorAction.CLEAR,
-        target.z,
+        source,
         getActuatorTargetPos(actuator),
       );
     } else if (counter === 0) {
-      this.ctx.systems.actuators.queueSwitchActionForActuator(
-        actuator,
-        getActuatorAction(actuator),
-        target.z,
-        getActuatorTargetPos(actuator),
-      );
+      this.ctx.systems.actuators.queueSwitchAction(actuator, getActuatorAction(actuator), source, getActuatorTargetPos(actuator));
     }
   }
 
@@ -822,12 +825,15 @@ export class TimerSystem {
       newValue |= bitmask;
     }
 
+    // The new value is stored before the edge test can skip the action (doc/CSBwin-src/Timer.cpp:2278).
+    setActuatorValue(actuator, newValue);
     const oldState = oldValue & 0xf;
-    const oldTarget = (oldValue >> 4) & 0xf;
     const newState = newValue & 0xf;
-    const newTarget = (newValue >> 4) & 0xf;
-    const oldMatch = oldState === oldTarget;
-    const newMatch = newState === newTarget;
+    const targetState = (newValue >> 4) & 0xf;
+    const oldMatch = oldState === targetState;
+    const newMatch = newState === targetState;
+    const pressed = newMatch;
+    const closed = pressed !== isActuatorNormallyClosed(actuator);
 
     const edge = getActuatorAndOrEdge(actuator);
     switch (edge) {
@@ -859,24 +865,17 @@ export class TimerSystem {
         break;
     }
 
-    setActuatorValue(actuator, newValue);
-
-    const pressed = newState === newTarget;
-    const closed = pressed !== isActuatorNormallyClosed(actuator);
+    // The switch's square is the timer's, the actuator's own (doc/CSBwin-src/Timer.cpp:2331-2346), which
+    // is what a local action rotates.
     if (getActuatorAction(actuator) === ActuatorAction.CONSTPRESSURE) {
-      this.ctx.systems.actuators.queueSwitchActionForActuator(
+      this.ctx.systems.actuators.queueSwitchAction(
         actuator,
         closed ? ActuatorAction.SET : ActuatorAction.CLEAR,
-        target.z,
+        target,
         actuatorPos & 3,
       );
     } else if (closed) {
-      this.ctx.systems.actuators.queueSwitchActionForActuator(
-        actuator,
-        getActuatorAction(actuator),
-        target.z,
-        actuatorPos & 3,
-      );
+      this.ctx.systems.actuators.queueSwitchAction(actuator, getActuatorAction(actuator), target, actuatorPos & 3);
     }
   }
 

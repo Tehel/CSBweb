@@ -304,11 +304,13 @@ function summarizeStoneRoom(
               realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
             }
           } else if (getActuatorType(rec) !== 127 || (getActuatorState(rec) & PORTRAIT_HIDE_GRAPHIC) === 0) {
+            // Every actuator on the face writes its ordinal, 0 included, so the last one
+            // wins: an ornament-less actuator after an alcove hides it until
+            // `RotateActuatorList` moves the alcove behind it. One past the level's wall
+            // decorations is written as 0 (doc/CSBwin-src/Codea59a.cpp:134-153).
             const ord = getActuatorWallGraphicOrdinal(rec) | 0;
-            if (ord > 0 && ord <= numWallDecoration) {
-              rslt.decorations[(relativePosition - 1) as 0 | 1 | 2] = ord;
-              realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
-            }
+            rslt.decorations[(relativePosition - 1) as 0 | 1 | 2] = ord > numWallDecoration ? 0 : ord;
+            realDecoration[(relativePosition - 1) as 0 | 1 | 2] = true;
           }
           if (getActuatorType(rec) === 127 && relativePosition === 2) {
             if ((getActuatorState(rec) & PORTRAIT_HIDE_PORTRAIT) === 0) {
