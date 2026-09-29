@@ -103,6 +103,9 @@ the "canary" technique for proving an extracted table sits at the right offset.
 app over CDP to read live state, click the canvas and take screenshots, for bugs that only
 show up on screen. Use it to find out what is wrong, then prove it in a `dump-*.ts`. The
 `playtest-bug` and `probe-app` skills cover the debugging loop those two serve.
+`tools/peek-dungeon.ts` is the other thing that is not evidence: it prints what the data
+holds. That can be a level as an ASCII map, one square's flags and objects, or where an
+item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill covers it.
 
 ## Code layout (`src/`, ~30k LOC)
 
