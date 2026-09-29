@@ -26,7 +26,7 @@ export interface CsbwinWorld {
  * Parse a whole CSBWin save: blocks 0-6 through `loadSaveGameState`, then the dungeon
  * image through `DungeonLoader`.
  *
- * Throws if any block fails its checksum or the image layout does not close, so a
+ * Throws if any block or the image fails its checksum or the layout does not close, so a
  * caller that gets a result has a world it can trust rather than a half-parsed one.
  */
 export function loadCsbwinWorld(bytes: Uint8Array): CsbwinWorld {
@@ -58,6 +58,7 @@ export function loadCsbwinWorld(bytes: Uint8Array): CsbwinWorld {
         indirectText: save.indirectText ?? false,
         expandedPortraits: save.expandedPortraits ?? false,
         expool: true,
+        cellFlagArraySize,
         // Every RN in a save's image is a slot number in the object indirect index, not
         // the packed RN `dungeon.dat` stores. Without this the chains parse into
         // plausible nonsense — see `src/data/CsbwinObjectIndex.ts`.

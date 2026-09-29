@@ -151,6 +151,9 @@ const CHECKS = [
   // A compressed dungeon.dat, CSB's prison: `ExpandData` proven byte for byte by the
   // image's own checksum word, and `Word22592` taken from the file for the new game.
   { tool: 'dump-compressed-dungeon.ts' },
+  // `ReadDatabases`' checksum word, compared with the image's byte sum: a flipped byte
+  // fails the prison, DM's dungeon.dat once a word follows it, and every committed save.
+  { tool: 'dump-image-checksum.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing

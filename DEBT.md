@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C91 | `ReadDatabases`' checksum word is never compared | M | ⚠️ |
+| C91 | A failed read never reaches `tag01efee` | M | ⚠️ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
@@ -128,36 +128,28 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C91 ⚠️ `ReadDatabases`' checksum word is never compared
+### C91 ⚠️ A failed read never reaches `tag01efee`
 
-`ReadDatabases` adds up every byte `FetchDataBytes` fetches, then reads the word after the
-cell flags and returns 0 when it differs from the sum (`doc/CSBwin-src/SaveGame.cpp:2654-2658`,
-`CSBCode.cpp:9081-9106`). `_ReadEntireGame` then takes its failure path (`:1741-1742`, to
-`tag01efee` at `:1895`). A file with no such word skips the comparison, since `StreamInput`
-cannot read it: DM's `dungeon.dat` has none. The port never compares it:
-`DungeonLoader.loadDungeonDat` reads CSB's prison, which ends with the word (0x939f), and
-`loadCsbwinWorld` (`src/data/CsbwinDungeonImage.ts`) checks only that a save's image ends
-two bytes before the file does, where `WriteAndChecksum`'s word sits (the writer's
-`buildImageChecksum`). A save's other failures, a block's checksum among them, throw
-from the loader (`src/data/SaveGameLoader.ts`), and nothing catches them as CSBWin does.
+Every `return 0` of `ReadDatabases` and of `_ReadEntireGame`'s own reads ends at
+`tag01efee` (`doc/CSBwin-src/SaveGame.cpp:1741-1742`, `:1895`). The port's reads throw
+instead: `DungeonLoader` on the image's checksum word, `SaveGameLoader` on a block's
+checksum or a short file. Only the save menus catch them, through `applySaveBytes`
+(`src/engine/SaveGamePayload.ts`), and show the message on their status line.
 
 `tag01efee` fades to `d.Palette11978`, then branches on `d.PartyHasDied`
-(`SaveGame.cpp:1895-1908`). At the boot (0) it prints "SAVED GAME DAMAGED!" and calls
-`die(0xbad)`, which ends the program. After a lost game it shows a one-button menu,
+(`SaveGame.cpp:1895-1908`). After a lost game it shows a one-button menu,
 "SAVED GAME DAMAGED!" / "PUT THE CHAOS STRIKES BACK DISK IN ~" / "OK", waits for the
-click, and goes back to `tag01ec56` to choose again. Every `return 0` of `ReadDatabases`
-and of `_ReadEntireGame`'s own reads ends there.
+click, and goes back to `tag01ec56` to choose again. At the boot (0) it prints
+"SAVED GAME DAMAGED!" and calls `die(0xbad)`, which ends the program.
 
-Needed, in two steps:
+**The author's decision for the boot:** a page cannot end itself, so a damaged file
+there shows "SAVED GAME DAMAGED!" with a button to acknowledge it, and the click goes
+back to the title. That is a deliberate divergence, recorded in H when it is built,
+beside "The game does not quit".
 
-1. **The comparison**, in `loadDungeonDat` and `loadCsbwinWorld`, failing the read as a
-   bad block checksum fails it today, with a tool that flips one byte of the prison and
-   of a committed save.
-2. **`tag01efee`** for every failed read: the menu after a lost game, and, at the boot,
-   whatever stands for `die` in a page (an author's decision, since a page cannot end
-   itself: H's "The game does not quit" is the nearest precedent). It touches the boot
-   sequence and the load paths, so it may belong with the save menu rework (`PLAN.md` →
-   Phase 10).
+Needed: `tag01efee` for every failed read, the menu after a lost game and the boot's
+acknowledged message, in place of the status line. It touches the boot sequence and the
+load paths, so it may belong with the save menu rework (`PLAN.md` → Phase 10).
 
 ---
 

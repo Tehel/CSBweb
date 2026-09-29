@@ -2728,6 +2728,19 @@ everything `FetchDataBytes` fetched (`SaveGame.cpp:2654-2658`, `CSBCode.cpp:9081
 file without the word, as DM's `dungeon.dat` is, skips the comparison, since
 `StreamInput` fails to read it.
 
+The same comparison holds for every image `ReadDatabases` reads, a save's included.
+Every section from the header to the end of the cell flags goes through
+`FetchDataBytes`, the scroll database's too (`readOldScrollDatabase` and
+`readNewScrollDatabase`, `SaveGame.cpp:2073-2188`), so the sum covers each byte of that
+range once. The cell flags' length is the Extended Features block's `cellFlagArraySize`,
+or the header's word 2 when that is 0 (`:2412-2419`). The word goes through `LE16`, a
+byte swap on the little-endian build, so it is big-endian, as `WriteAndChecksum` writes
+it (`:1222`). `StreamInput` fails when fewer bytes remain than it is asked for
+(`CSBCode.cpp:9027-9043`), so one stray byte after the cell flags is no word either. A
+mismatch returns 0, and `_ReadEntireGame` goes to `tag01efee` (`:1741-1742`). The port
+throws "dungeon image checksum mismatch" from `DungeonLoader`
+(`tools/dump-image-checksum.ts`).
+
 ## `ExtendPortraits` cleans the mirrors of every file read without `ExpandedPortraits`
 
 `_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once

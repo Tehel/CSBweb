@@ -81,6 +81,12 @@ export interface DungeonImageOptions {
      */
     expandedPortraits?: boolean;
     /**
+     * The length of the cell flags, the image's last section: the Extended Features
+     * block's when it declares one, else the header's word 2, `LegacyCellFlagArraySize`
+     * (`doc/CSBwin-src/SaveGame.cpp:2412-2419`). Defaults to the header's.
+     */
+    cellFlagArraySize?: number;
+    /**
      * Translate one stored object reference into a packed RN.
      *
      * A `dungeon.dat` stores RNs as `[position:2][category:4][index:10]` and needs no
@@ -151,6 +157,7 @@ export class DungeonLoader {
 
         // Calculate offsets for all sections
         const offsets = this.calculateOffsets(header, mapDescriptors);
+        this.compareChecksum(offsets.mapData + (this.options.cellFlagArraySize ?? header.mapDataSize));
 
         // Parse column index
         const columnIndex = this.parseColumnIndex(offsets.columnIndex, offsets.totalColumns);
@@ -342,6 +349,26 @@ export class DungeonLoader {
         }
 
         return descriptors;
+    }
+
+    /**
+     * `ReadDatabases`' checksum. Every section it reads goes through `FetchDataBytes`,
+     * which adds each byte into a `ui16` (`doc/CSBwin-src/CSBCode.cpp:9081-9106`), from
+     * the header to the end of the cell flags; then it reads the word after them and
+     * fails the read when it differs from the sum (`SaveGame.cpp:2654-2658`). The word
+     * goes through `LE16`, a byte swap on the little-endian build, so it is big-endian
+     * like the rest of the image. When fewer than two bytes follow, `StreamInput` fails
+     * (`CSBCode.cpp:9027-9043`) and nothing is compared: DM's `dungeon.dat` has no word.
+     *
+     * CSBWin compares once every section is read; comparing before the parsers run
+     * fails the same reads, without handing a damaged image to them.
+     */
+    private compareChecksum(end: number): void {
+        const bytes = this.file.read(0, this.file.length());
+        if (end + 2 > bytes.length) return;
+        let sum = 0;
+        for (let i = 0; i < end; i++) sum = (sum + bytes[i]) & 0xffff;
+        if (readU16BE(bytes, end) !== sum) throw new Error('dungeon image checksum mismatch');
     }
 
     /**
