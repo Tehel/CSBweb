@@ -5,6 +5,13 @@ const FONT_GRAPHIC_INDEX = 0x22d;
 const FONT_ROW_COUNT = 6;
 const FONT_ROW_STRIDE = 128;
 const FONT_CHAR_ADVANCE = 6;
+/**
+ * A glyph is five pixels wide, font bits 4..0, and starts at the pen: `BltOneChar` shifts
+ * the byte by `11-D3W` so bit 4 lands on pixel `x` (`doc/CSBwin-src/Graphics.cpp:218`),
+ * and `TextOut_OneLine`'s mask `0x07ff07ff >> D3W` (`Graphics.cpp:341`) clears those five
+ * pixels only, leaving the sixth, the gap to the next character, as it was.
+ */
+const FONT_GLYPH_WIDTH = 5;
 
 export interface FontData {
   bytes: Uint8Array;
@@ -68,7 +75,7 @@ function drawTextLineIndexInternal(
         const py = startY + row;
         if (py < 0 || py >= height) continue;
         const rowOff = py * width;
-        for (let col = 0; col < FONT_CHAR_ADVANCE; col++) {
+        for (let col = 0; col < FONT_GLYPH_WIDTH; col++) {
           const px = cursorX + col;
           if (px < 0 || px >= width) continue;
           dst.pixels[rowOff + px] = bg;
@@ -81,8 +88,8 @@ function drawTextLineIndexInternal(
       const py = startY + row;
       if (py < 0 || py >= height) continue;
       const rowOff = py * width;
-      for (let col = 0; col < FONT_CHAR_ADVANCE; col++) {
-        const bitIndex = FONT_CHAR_ADVANCE - 1 - col;
+      for (let col = 0; col < FONT_GLYPH_WIDTH; col++) {
+        const bitIndex = FONT_GLYPH_WIDTH - 1 - col;
         if (((rowByte >> bitIndex) & 0x1) === 0) continue;
         const px = cursorX + col;
         if (px < 0 || px >= width) continue;

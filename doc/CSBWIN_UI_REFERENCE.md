@@ -60,6 +60,7 @@ This document lists UI rendering facts that are directly visible in the CSBWin C
 - `TextOutToScreen` renders through `TextOut_OneLine` into `d.LogicalScreenBase` with a width of 160 bytes (320 pixels) (`doc/CSBwin-src/CSBCode.cpp:1757`).
 - The font data is loaded from graphic `0x822d` into `d.Pointer12926` (`doc/CSBwin-src/CSBCode.cpp:1776`).
 - `TextOut_OneLine` advances characters in 6-pixel steps and uses `x` modulo 16-bit alignment logic (`doc/CSBwin-src/Graphics.cpp:321`, `doc/CSBwin-src/Graphics.cpp:346`).
+- A glyph is 5 pixels wide, the font's bits 4..0, and starts at the pen: `BltOneChar` shifts the byte left by `11-D3W`, so bit 4 lands on pixel `x` and bit 0 on `x+4` (`doc/CSBwin-src/Graphics.cpp:218`). The font never sets bit 5. The mask `0x07ff07ff >> D3W` clears the same five pixels only (`doc/CSBwin-src/Graphics.cpp:341`), so a background colour fills `x..x+4` and the sixth pixel of the cell, the gap before the next character, keeps what was under it.
 - The scrolling text system places lines at `x = PrintColumn * 6`, `y = PrintRow * 7 + 177` (commented but still authoritative for spacing) (`doc/CSBwin-src/CSBCode.cpp:1622`).
 
 ## Icon grid (hands, backpack, chest)

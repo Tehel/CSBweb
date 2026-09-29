@@ -479,10 +479,10 @@ async function checkRestart(): Promise<void> {
 /* ------------------------------------------------------ 4. the won game ---- */
 
 /** Pixels of `color` in the text box whose baseline is `y`, `length` glyphs from `x`. */
-function inkIn(pixels: Uint8Array, x: number, y: number, length: number, color: number): number {
+function inkIn(pixels: Uint8Array, x: number, y: number, length: number, color: number, width = 6 * length): number {
   let n = 0;
   for (let py = y - 4; py < y + 2; py++) {
-    for (let px = x; px < x + 6 * length; px++) if (pixels[py * SCREEN_WIDTH + px] === color) n++;
+    for (let px = x; px < x + width; px++) if (pixels[py * SCREEN_WIDTH + px] === color) n++;
   }
   return n;
 }
@@ -585,7 +585,7 @@ async function checkWon(): Promise<void> {
     check(n > 0, `${text} is printed at (${x},${y}) in colour ${color}`);
   }
   check(inkIn(pixels, 105, 47, 17, 13) === 0 && inkIn(pixels, 105, 79, 17, 13) === 0, 'and no fourth mastery line: mastery 1 is left out');
-  check(inkIn(pixels, 87 + 24, 14, 1, 9) === 0, 'nor anything in the 5 pixels after ALEX');
+  check(inkIn(pixels, 87 + 24, 14, 1, 9, 5) === 0, 'nor anything in the 5 pixels after ALEX');
 }
 
 /* ------------------------------------------------------- 5. the CSB win ---- */
