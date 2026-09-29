@@ -46,6 +46,12 @@ export interface BootSequenceDeps {
    * screen only needs to know whether to put itself back up.
    */
   consumeSavedGameRead: () => SavedGameRead;
+  /**
+   * `_ReadEntireGame` for a new game: `dungeon.dat` read into the running game. False when
+   * `ReadDatabases` fails (`doc/CSBwin-src/SaveGame.cpp:1740-1742`), which ends at
+   * `tag01efee`; a file that will not open throws `Die` (`:1480-1486`).
+   */
+  readNewGame: () => Promise<boolean>;
   /** Skip the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
 }
@@ -285,6 +291,29 @@ async function readSavedGame(
 }
 
 /**
+ * `_ReadEntireGame` once the entrance's doors have opened on a new game: `dungeon.dat`,
+ * then `tag01efee` if the read failed, as a save's does. Resolves to whether the game is in.
+ */
+export async function readNewGame(
+  host: IntroHost,
+  deps: Pick<BootSequenceDeps, 'readNewGame'> & { gameScreen: MenuScreen },
+  partyHasDied: boolean,
+): Promise<boolean> {
+  if (await deps.readNewGame()) return true;
+  await tag01efee(host, deps.gameScreen, partyHasDied);
+  return false;
+}
+
+/** `_GameSetup`'s `ReadEntireGame` for the entrance's choice: `dungeon.dat` or a save. */
+function readEntireGame(
+  host: IntroHost,
+  deps: Pick<BootSequenceDeps, 'gameScreen' | 'consumeSavedGameRead' | 'readNewGame'>,
+  partyHasDied: boolean,
+): (choice: PrisonDoorChoice) => Promise<boolean> {
+  return (choice) => (choice === 'enter' ? readNewGame(host, deps, partyHasDied) : readSavedGame(host, deps, partyHasDied));
+}
+
+/**
  * What `die(0xbad)` stands for here: the boot's damaged file, acknowledged. `runBootSequence`
  * catches it and starts again from the title. CSBWin's `die` ends in `UI_Die`
  * (`doc/CSBwin-src/CSBCode.cpp:86-112`), which throws too (`CSBUI.cpp:1393-1396`), out to
@@ -293,6 +322,17 @@ async function readSavedGame(
 export class BadSavedGame extends Error {
   constructor() {
     super('SAVED GAME DAMAGED!');
+  }
+}
+
+/**
+ * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`): CSBWin's message box, then
+ * the program's end. Nothing in the boot catches it; the page reports it where `init`
+ * reports any error.
+ */
+export class Die extends Error {
+  constructor(readonly errorNum: number, msg: string) {
+    super(`System Error  0x${(errorNum >>> 0).toString(16).padStart(8, '0')}\n${msg}`);
   }
 }
 
@@ -430,19 +470,27 @@ function prisonDoorButtons(host: IntroHost): UIButton[] {
  * Play the title, show the entrance, and return how the player got in.
  *
  * With `skip` set there is no animation and no entrance — the dungeon starts fresh, which
- * is what every `tools/` script and the golden-frame probe want.
+ * is what every `tools/` script and the golden-frame probe want. Its read has no screen to
+ * report a failure on, so a failed one throws.
  */
 export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoorChoice> {
-  if (deps.skip) return 'enter';
+  if (deps.skip) return enterAnyway(deps);
 
   // The ST's colour registers as the boot ROM leaves them: black. Every screen here opens
   // with a fade, so the first thing the player sees is a fade up from this.
   const { host, detach } = createIntroHost(deps, PALETTE_11914);
+  // What the boot has read so far, for the fallback below.
+  let read: PrisonDoorChoice | null = null;
+  const readGame = readEntireGame(host, deps, false);
   try {
     for (;;) {
       try {
         await displayChaosStrikesBack(host);
-        const choice = await showPrisonDoor(host, prisonDoorButtons(host), () => readSavedGame(host, deps, false));
+        const choice = await showPrisonDoor(host, prisonDoorButtons(host), async (c) => {
+          if (!(await readGame(c))) return false;
+          read = c;
+          return true;
+        });
         await tag021028(host, deps.gameScreen, choice);
         return choice;
       } catch (error) {
@@ -450,12 +498,19 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
       }
     }
   } catch (error) {
+    if (error instanceof Die) throw error;
     console.error('Boot sequence failed; entering the dungeon anyway', error);
     updateDebug(`Intro failed: ${error}`);
-    return 'enter';
+    return read ?? enterAnyway(deps);
   } finally {
     detach();
   }
+}
+
+/** A new game read with no entrance to go back to: a failed read throws. */
+async function enterAnyway(deps: Pick<BootSequenceDeps, 'readNewGame'>): Promise<PrisonDoorChoice> {
+  if (!(await deps.readNewGame())) throw new Error('dungeon.dat: SAVED GAME DAMAGED!');
+  return 'enter';
 }
 
 /* ------------------------------------------------------------- the end ---- */
@@ -491,12 +546,13 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  * `GameSetup(_25_, 0)` (`doc/CSBwin-src/Code1f9e6.cpp:310`, `CSBCode.cpp:10589`): no
  * entrance first. `d.Initialize()` has just left `d.gameState` at 0,
  * `GAMESTATE_ResumeSavedGame`, so its `ReadEntireGame` is the save chooser; a cancel puts
- * the entrance up, and the loop goes on from there as it does at boot (`:10634-10641`).
- * `'enter'` leaves `dungeon.dat` to be read, which is the page's.
+ * the entrance up, and the loop goes on from there as it does at boot (`:10634-10641`),
+ * with `d.PartyHasDied` set, so a failed read of `dungeon.dat` or a save goes back to the
+ * entrance too.
  */
 async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
-  const resume = (): Promise<boolean> => readSavedGame(host, deps, true);
-  const choice = (await resume()) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), resume);
+  const readGame = readEntireGame(host, deps, true);
+  const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame);
   await tag021028(host, deps.gameScreen, choice);
   return choice;
 }

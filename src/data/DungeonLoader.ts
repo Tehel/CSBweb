@@ -99,6 +99,39 @@ export interface DungeonImageOptions {
     resolveRN?: (raw: ui16) => ObjectID;
 }
 
+/**
+ * The world before anything is read: no level, no record, no text. What `d.Initialize()`
+ * leaves CSBWin's `d` with until `_ReadEntireGame` reads `dungeon.dat` or a save
+ * (`doc/CSBwin-src/Code1f9e6.cpp:309`, `CSBCode.cpp:10634`). The page builds its `Game`
+ * over it, and the boot's read installs the real one (`Game.installWorld`).
+ */
+export function emptyDungeonData(): DungeonData {
+    const database = () => ({ records: [], count: 0 });
+    return {
+        header: {
+            randomSeed: 0,
+            mapDataSize: 0,
+            numMaps: 0,
+            word4Low: 0,
+            textDataSize: 0,
+            startPosition: new Position(0, 0, 0),
+            facing: Direction.NORTH,
+            objectListSize: 0,
+            objectCounts: new Array<ui16>(16).fill(0),
+        },
+        maps: [],
+        databases: {
+            doors: database(), teleporters: database(), texts: database(), actuators: database(),
+            creatures: database(), weapons: database(), clothing: database(), scrolls: database(),
+            potions: database(), containers: database(), misc: database(), missiles: database(),
+            clouds: database(),
+        },
+        objectList: [],
+        columnIndex: [],
+        levelIndex: [],
+    };
+}
+
 export class DungeonLoader {
     private file: BinaryFile;
     private data: DungeonData | null = null;

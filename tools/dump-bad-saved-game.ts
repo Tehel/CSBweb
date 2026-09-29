@@ -15,13 +15,20 @@
  * 3. **At the boot** (0): CSBWin's `die(0xbad)`. The author's divergence (`DEBT.md` H): the
  *    same menu with the one line and OK, and the click throws `BadSavedGame`, which
  *    `runBootSequence` catches to start again from the title.
+ * 4. **A new game's read** ends there too (`SaveGame.cpp:1740-1742`). The page builds its
+ *    `Game` over an empty world and reads `dungeon.dat` once the entrance's doors have
+ *    opened (`Game.readDungeonDat`, `readNewGame` in `BootSequence.ts`). CSB's prison with a
+ *    byte of its compressed image flipped fails the checksum, and a file cut short of its
+ *    first eight bytes fails `ReadDatabases`' first `READ`; either leaves the empty world as
+ *    it was. The failure reaches `tag01efee`, whose menu or `BadSavedGame` follows as for a
+ *    save, and a read that succeeds puts up no menu.
  *
  * Run: `npx tsx tools/dump-bad-saved-game.ts`
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
@@ -36,6 +43,7 @@ import { newGame, stockGraphics } from './lib/game';
 
 const SAVE = 'static/gamefiles/saves/csbgame.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
+const PRISON = 'static/gamefiles/csb/dungeon.dat';
 
 /**
  * As in `tools/dump-save-menu.ts`: `ui/SaveMenu` reaches `ui/Mouse`, and `ui/Mouse` and the
@@ -253,10 +261,61 @@ async function checkTag01efee(): Promise<void> {
   check(caught instanceof Boot.BadSavedGame, 'and the click throws BadSavedGame, die(0xbad)\'s stand-in, back to the title');
 }
 
+/* ------------------------------------------------------- 4. a new game's read ---- */
+
+async function checkNewGameRead(): Promise<void> {
+  console.log('');
+  console.log('=== a new game: dungeon.dat read after ENTER ===');
+  const prison = new Uint8Array(readFileSync(resolve(PRISON)));
+  const damaged = prison.slice();
+  damaged[damaged.length - 3] ^= 0x01;     // inside the compressed image: the checksum word sees it
+  const short = new Uint8Array(readFileSync(resolve(DUNGEON))).subarray(0, 4);
+
+  const game = newGame(emptyDungeonData(), graphics);
+  const levels = () => game.dungeonState.getData().maps.length;
+  const readDamaged = game.readDungeonDat(damaged);
+  const readShort = game.readDungeonDat(short);
+  console.log(`  damaged prison: ${readDamaged}, 4-byte file: ${readShort}, levels after both: ${levels()}`);
+  check(!readDamaged && !readShort, 'a checksum mismatch and a short file both fail the read');
+  check(levels() === 0, 'and the empty world the page boots over is left as it was');
+  const readIntact = game.readDungeonDat(prison);
+  console.log(`  intact prison: ${readIntact}, levels ${levels()}, start ${JSON.stringify(game.party.state.position)}`);
+  check(readIntact && levels() === 2, 'the intact prison reads, its two levels installed');
+
+  const run = async (read: boolean, partyHasDied: boolean) => {
+    const s = scriptedHost(read ? [] : [{ kind: 'click', ...okCentre(), buttons: 2 }]);
+    const menus: string[] = [];
+    let result: unknown;
+    try {
+      result = await Boot.readNewGame(s.host, { gameScreen: menuScreen(s.host, menus), readNewGame: () => Promise.resolve(read) }, partyHasDied);
+    } catch (error) {
+      result = error;
+    }
+    return { result, menus, log: s.log };
+  };
+  const good = await run(true, false);
+  console.log(`  read: ${good.result}, menus ${good.menus.length}, host calls ${good.log.length}`);
+  check(good.result === true && good.menus.length === 0 && good.log.length === 0, 'a read that succeeds goes straight on');
+  const lost = await run(false, true);
+  console.log(`  failed after a lost game: ${lost.result}; ${lost.menus.join(' | ')}`);
+  check(lost.result === false && lost.menus.length === 1 && lost.menus[0]!.startsWith('"SAVED GAME DAMAGED!" / "PUT THE'),
+    'a failed read after a lost game is tag01efee\'s menu, then false: the entrance again');
+  const boot = await run(false, false);
+  console.log(`  failed at the boot: ${boot.result instanceof Error ? boot.result.constructor.name : boot.result}`);
+  check(boot.result instanceof Boot.BadSavedGame, 'and at the boot BadSavedGame, back to the title');
+}
+
+/** The centre of the centred one-button set's OK. */
+function okCentre(): { x: number; y: number } {
+  const ok = menuButtonList({ uiTables: extractUITables(graphics) } as unknown as UIState, 1, true)[0]!;
+  return { x: (ok.x1 + ok.x2) >> 1, y: (ok.y1 + ok.y2) >> 1 };
+}
+
 async function main(): Promise<void> {
   [SaveMenu, UIStateModule, Boot] = await importUI();
   checkChooser();
   await checkTag01efee();
+  await checkNewGameRead();
   finish();
 }
 

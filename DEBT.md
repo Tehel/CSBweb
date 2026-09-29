@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -146,58 +145,6 @@ Things CSBWin does that the port has not built. These are not defects in existin
 they are listed so nothing is lost. The active ones come in the index's order; the
 postponed ones follow, under their own heading (see "Priority").
 
-### G18 — One game's data set, chosen before the boot
-
-The page plays one data set (`src/data/DataSets.ts`: `dm-atari`, the default,
-`dm-windows` and `csb`), chosen before anything loads by `?dungeon=<id>`, which the chooser beside the
-canvas sets by reloading the page (the author's decision), as CSBWin takes its directory
-from the command line or `config.txt` before its launcher, which offers no dungeon. It loads the set's `dungeon.dat`, `graphics.dat` and
-`CSBgraphics.dat` (`src/main.ts`, `loadGameFiles`), builds `GameTables`, the sound and the
-intro from that `graphics.dat` once, and every `Game` keeps them: `readNewGame` reuses
-`this.ctx.tables`, and a loaded save is restored into the running game's tables. CSBWin
-takes its rules from the data too. `DM_rules` aside, nothing in its code branches
-on the game, and CSB's differences are the dungeon's content and the tables in its
-`graphics.dat`. Measured against DM's: the same 563 items, 77 of them different (the
-title's, portraits, and runs at 489-526 and 556-562), and 6 of the 35 tables
-`buildGameTables` extracts (`monsterDesc`, `spells`, `skillNumber`,
-`experienceForAttacking`, `byte20046`, `textDecode`), and CSB's item 0x231 is the long
-form, whose `Buttons16932` `extractUITables` reads (`doc/PROVEN_FACTS.md` → "CSB's
-`graphics.dat`…", `tools/dump-data-sets.ts`). The `csb` set is the CSB Windows package's
-`dungeon.dat`, `graphics.dat`, `mini.dat` and `csbgame2.dat`, with no `CSBgraphics.dat`,
-which the package lacks too and CSBWin opens only on demand for its extensions
-(`Graphics.cpp:1840-1858`, `:3201-3273`). Beside the chooser, the "DM Rules" button
-flips `ctx.rules.dmRules` at any time, as CSBWin's menu item does (`CSBUI.cpp:912-914`),
-and shows it pressed while it is set (`src/ui/events.ts`).
-
-A `dungeon.dat` may open with an Extended Features block, as the DM Windows package's
-(the `dm-windows` set) does. `DungeonLoader.loadDungeonDat` reads it with
-`readExtendedFeatures`, as `ReadDatabases` does (`SaveGame.cpp:2347`), then the image
-behind it in the shape it declares, compressed or not (`:2362-2369`), and keeps the block
-in `DungeonData.extendedFeatures`. A new game takes its rules through
-`Game.readNewGameRules`: at the boot when the entrance's choice is ENTER, and in
-`readNewGame` (`tools/dump-extended-dungeon.ts`). Conflux
-(`static/gamefiles/conflux-3.5-b8/`) is not a data set yet: its 620 KB `dungeon.dat` does
-not open with 33028 and does not parse, and nothing has examined its format.
-
-What is left: the data set's `dungeon.dat` has to be read where CSBWin reads it. The page reads it before
-the title (`loadGameFiles`), and after a lost game once ENTER is chosen (`showEndOfGame`,
-`src/main.ts`), both outside `_GameSetup`'s loop. So a file that fails its read ends the
-page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read reaches
-`tag01efee` (`doc/PROVEN_FACTS.md` → "A failed read ends at `tag01efee`"), as a save's
-does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
-checksum word and cannot fail that way. CSB's prison can.
-
-**Steps**, each a commit, in this order. Steps 1 to 3, the set chosen before the boot,
-the DM Rules toggle and the block in `dungeon.dat`, are done. Step 4 is next.
-
-4. **`dungeon.dat` read after ENTER**, where CSBWin reads it, so a failed read reaches
-   `tag01efee` as a save's does, rather than ending the page's `init` or rejecting in
-   `showEndOfGame`. The boot builds its `Game` over an empty world, as `d.Initialize()`
-   leaves CSBWin's, and a new game's failed read comes from `ReadDatabases`
-   (`doc/CSBwin-src/SaveGame.cpp:1740-1742`); a file that will not open is `die(50)`
-   (`:1480-1486`), not `tag01efee`. The boot's `readNewGameRules` on the early parse
-   (`init`, `src/main.ts`) goes too, since the read after ENTER is `readNewGame`'s.
-
 ### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
 CSBWin makes a CSB game in three steps (the utility's own header,
@@ -239,7 +186,7 @@ saves in that game's directory (`CSBGAME.DAT` to `CSBGAME4.DAT`, `CSBCode.cpp:97
 and it guards against the wrong graphics with the signatures an Extended Features block
 may carry (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
 `Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves stored
-and listed per data set (G18), a genuine `.dat` accepted in the set whose files it was
+and listed per data set (`src/data/DataSets.ts`), a genuine `.dat` accepted in the set whose files it was
 made from, and G17's source save picked across sets (a DM save feeds a CSB game). It
 belongs with the save menu rework (`PLAN.md` → Phase 10, step 11).
 

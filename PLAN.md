@@ -69,7 +69,9 @@ Back** are not postponed: it is the next dungeon to try.
 - The champion lifecycle: the Hall of Champions mirrors, the Reincarnate screen, feeding,
   poison, pit falls, death and bones, the Altar of Vi; sleep.
 - The pre-game sequence: the title animation, the dungeon entrance, the door animation and
-  the credits scroll.
+  the credits scroll. The game's `dungeon.dat` is read after ENTER, as CSBWin reads it.
+- Three data sets (`src/data/DataSets.ts`: `dm-atari`, the default, `dm-windows` and
+  `csb`), one chosen before the boot by `?dungeon=<id>`, and the DM Rules toggle.
 - Debug scaffolding is confined to `src/dev.ts`, reached only through
   `isDebugFeaturesEnabled()`.
 

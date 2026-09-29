@@ -30,6 +30,8 @@ export const DATA_SETS: readonly DataSet[] = [
     // `graphics.dat`. The package ships no `CSBgraphics.dat`.
     { id: 'dm-windows', name: 'Dungeon Master (CSBWin)', dir: '/gamefiles/dm-windows', csbGraphics: false },
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
+    // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its 620 KB `dungeon.dat`
+    // does not open with 33028 and does not parse, and nothing has examined its format.
 ];
 
 export const DEFAULT_DATA_SET = DATA_SETS[0]!;

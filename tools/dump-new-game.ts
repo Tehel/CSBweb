@@ -25,6 +25,10 @@
  * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and `totalMoveCount`, a global outside `d`
  * (`data.cpp:253`), counts on from the lost game.
  *
+ * And the page's boot, which builds its `Game` over the empty world and reads `dungeon.dat`
+ * into it once ENTER is chosen: the empty world draws nothing from the random stream, so
+ * the booted game is the one a `Game` built straight over the file would be.
+ *
  * Run: `npx tsx tools/dump-new-game.ts`
  */
 import { createHash } from 'node:crypto';
@@ -32,7 +36,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { Position } from '../src/core/types';
-import { DungeonLoader } from '../src/data/DungeonLoader';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import type { DungeonData } from '../src/data/dungeonTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -178,6 +182,33 @@ function main(): void {
   console.log(['fresh', stateHash(fresh), 'rebuilt', stateHash(played), 'differ', diff.join(',') || '-'].join('\t'));
   check(stateHash(fresh) === stateHash(played), 'the rebuilt game is a new game: the whole runtime state matches');
   check(!played.mainLoopHasReturned(), 'and its MainLoop runs again');
+
+  // The page's boot: a `Game` over the empty world, `d.Initialize()`'s, which draws
+  // nothing from the stream, and `dungeon.dat` read into it after ENTER. With the host's
+  // `rand()` pinned, as `tools/probe-frames.mjs` pins it, its first draw is the one a
+  // `Game` built straight over the file takes.
+  console.log('');
+  console.log('=== the boot: the empty world, then dungeon.dat ===');
+  const random = Math.random;
+  let draws = 0;
+  Math.random = () => (++draws, 0.6180339887);
+  const direct = newGame(parse(), stockGraphics());
+  const directDraws = draws;
+  draws = 0;
+  const booted = newGame(emptyDungeonData(), stockGraphics());
+  const emptyDraws = draws;
+  const emptyID = booted.state.block1.randomGameID;
+  booted.readNewGame(parse());
+  const bootDraws = draws;
+  Math.random = random;
+  const bootDiff = differingParts(direct, booted);
+  console.log(['host rand() draws', 'direct', directDraws, 'empty world', emptyDraws, 'then read', bootDraws,
+    'RandomGameID', direct.state.block1.randomGameID.toString(16), booted.state.block1.randomGameID.toString(16),
+    'differ', bootDiff.join(',') || '-'].join('\t'));
+  check(emptyDraws === 0 && emptyID === 0, 'the empty world draws nothing: no RandomGameID before a read');
+  check(directDraws === 1 && bootDraws === 1, 'the read seeds the stream once, as a Game built over the file does');
+  check(booted.state.block1.randomGameID === direct.state.block1.randomGameID && stateHash(booted) === stateHash(direct),
+    'and the booted game is that game, RandomGameID and the whole runtime state');
 
   // Later than any frame the played game ran, so both take a tick on every frame.
   const t1 = Date.now() + 1_000_000_000;

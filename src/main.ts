@@ -3,9 +3,8 @@
  * engine and the screen, runs the intro, wires the page to both, and starts the loop.
  */
 
-import { Direction } from './core';
 import { SoundManager } from './audio';
-import { CSBGraphicsLoader, DungeonLoader, GraphicsLoader, dataSetFor, type DungeonData } from './data';
+import { CSBGraphicsLoader, GraphicsLoader, dataSetFor, emptyDungeonData } from './data';
 import { Game, buildGameTables, type GameTables } from './engine';
 import {
     applySaveBytes,
@@ -19,7 +18,7 @@ import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, 
 import { scrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
-import { runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
+import { Die, runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
 import type { PrisonDoorChoice } from './renderer/intro/PrisonDoor';
 import { SOUND_DYING, type WonChampion } from './renderer/intro/ShowCredits';
 import { determineMastery } from './engine/skills';
@@ -176,24 +175,18 @@ function renderView() {
     screen.render(pos, facing, game.state.word1868);
 }
 
-/** What `init` reads from the server before anything is built. */
+/**
+ * What `init` reads from the server before anything is built. Not `dungeon.dat`: the boot
+ * reads it once ENTER is chosen, as CSBWin does (`readNewGame`).
+ */
 interface GameFiles {
-    dungeon: DungeonData;
     graphicsLoader: GraphicsLoader;
     /** The optional CSBgraphics.dat overlay (extended decorations, portraits, etc.). */
     csbGraphicsLoader: CSBGraphicsLoader | null;
 }
 
 async function loadGameFiles(): Promise<GameFiles> {
-    updateDebug(`Loading ${dataSet.name}: dungeon.dat...`);
-    const dungeon = await new DungeonLoader().load(`${dataSet.dir}/dungeon.dat`);
-    console.log(`✓ Loaded dungeon:`, dungeon);
-    console.log(`  - Seed: ${dungeon.header.randomSeed}`);
-    console.log(`  - Maps: ${dungeon.maps.length}`);
-    console.log(`  - Total objects: ${dungeon.header.objectCounts.reduce((a, b) => a + b, 0)}`);
-    console.log(`  - Start: (${dungeon.header.startPosition.x}, ${dungeon.header.startPosition.y}) facing ${Direction[dungeon.header.facing]}`);
-
-    console.log('Loading graphics.dat...');
+    updateDebug(`Loading ${dataSet.name}: graphics.dat...`);
     const graphicsLoader = new GraphicsLoader();
     await graphicsLoader.load(`${dataSet.dir}/graphics.dat`);
     console.log(`✓ Loaded graphics: ${graphicsLoader.getItemCount()} items`);
@@ -205,7 +198,21 @@ async function loadGameFiles(): Promise<GameFiles> {
         console.log('CSBgraphics.dat not found; extended decorations disabled');
         csbGraphicsLoader = null;
     }
-    return { dungeon, graphicsLoader, csbGraphicsLoader };
+    return { graphicsLoader, csbGraphicsLoader };
+}
+
+/**
+ * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1480-1494): the data set's
+ * `dungeon.dat`, read into the running game. A file that will not open is `die(50)`
+ * (`:1480-1486`); one that fails its read is `false`, for the boot's `tag01efee`.
+ */
+async function readNewGame(game: Game): Promise<boolean> {
+    const name = `${dataSet.dir}/dungeon.dat`;
+    const response = await fetch(name).catch(() => null);
+    if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
+    const read = game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
+    if (read) console.log(`✓ Read ${name}: ${game.dungeonState.getData().maps.length} levels`);
+    return read;
 }
 
 /** The sound manager, unlocked by the first click or key: browsers keep audio locked until then. */
@@ -232,7 +239,8 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.
     let screen: GameScreen | null = null;
-    const game = new Game(files.dungeon, tables, {
+    // Over an empty world, as `d.Initialize()` leaves CSBWin's: the boot reads the game.
+    const game = new Game(emptyDungeonData(), tables, {
         cursorFilter: handleCursorFilter,
         messages: scrollingText,
         playSound,
@@ -259,7 +267,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         // `ShowCredits(1)`: `MainLoop` has returned on a lost game
         // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
         showCredits: (word11694) => {
-            if (screen) void showEndOfGame(game, screen, sound, word11694);
+            if (screen) showEndOfGame(game, screen, sound, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself;
         // the main loop's tick paints what `TAG01b29a` drew with it.
@@ -376,6 +384,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
             gameScreen: screen,
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
             consumeSavedGameRead,
+            readNewGame: () => readNewGame(game),
         },
         {
             queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0, z),
@@ -388,9 +397,6 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
         },
     );
     if (end === 'terminate') return;
-    // The entrance's "enter": `_ReadEntireGame` over `dungeon.dat`, parsed afresh, since the
-    // lost game wrote into the last parse (doc/CSBwin-src/SaveGame.cpp:1480-1494).
-    if (end === 'enter') game.readNewGame(await new DungeonLoader().load(`${dataSet.dir}/dungeon.dat`));
     scrollingText.restart();
     screen.initializePlayState();
     game.resumeMainLoop();
@@ -429,7 +435,7 @@ async function createCrt(): Promise<void> {
  * saved game, where an entrance screen would only be in the way. The golden-frame
  * probe passes the query parameter.
  */
-async function runIntro(screen: GameScreen, sound: SoundManager): Promise<PrisonDoorChoice> {
+async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Promise<PrisonDoorChoice> {
     const skipIntro =
         new URLSearchParams(window.location.search).get('intro') === '0'
         || loadUISettings().debug;
@@ -438,6 +444,7 @@ async function runIntro(screen: GameScreen, sound: SoundManager): Promise<Prison
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead,
+        readNewGame: () => readNewGame(game),
         skip: skipIntro,
     });
 }
@@ -534,15 +541,18 @@ async function init() {
         if (import.meta.env.DEV) {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
         }
-        // A new game takes the rules its `dungeon.dat`'s block declares; a resumed one has
-        // taken its save's.
-        if ((await runIntro(built.screen, sound)) === 'enter') game.readNewGameRules(files.dungeon);
+        await runIntro(built.game, built.screen, sound);
         wire(built.game, built.screen, sound);
         start(built.game);
     } catch (error) {
-        console.error('Initialization error:', error);
-        updateDebug(`Error: ${error}`);
+        reportError(error);
     }
+}
+
+/** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */
+function reportError(error: unknown): void {
+    console.error('Initialization error:', error);
+    updateDebug(`Error: ${error}`);
 }
 
 

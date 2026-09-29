@@ -2771,11 +2771,23 @@ the checks after it (`:1824-1831`). `tag01efee` fades to `d.Palette11978`, then 
   entrance up again (`CSBCode.cpp:10634-10641`). `d.PartyHasDied` is set by the credits'
   RESTART THIS GAME (`Mouse.cpp:1798`).
 
+A new game's read is the same `_ReadEntireGame`, made once the entrance's doors have
+opened on ENTER: it opens `dungeon.dat` (`SaveGame.cpp:1480-1486`), where a file that will
+not open is `die(50)` with "Cannot open dungeon file", not `tag01efee`, and then
+`ReadDatabases` (`:1740-1742`), whose failure is. Before any read, `d` is as
+`d.Initialize()` leaves it, and `d.Initialize()` seeds `d.RandomNumber` from the host's
+`rand()` and draws nothing (`CSBCode.cpp:350-351`); `d.RandomGameID`'s two draws are the
+read's (`SaveGame.cpp:1523-1532`).
+
 The port's boot runs `tag01efee` in `src/renderer/intro/BootSequence.ts`, reached from
-the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`). At the boot, the
-line is a one-button menu and its click goes back to the title (`DEBT.md` H). The full
-save menu, which CSBWin does not have, keeps its status line. Evidence:
-`tools/dump-bad-saved-game.ts`.
+the load-only chooser (`restoreChosenSave`, `src/renderer/ui/SaveMenu.ts`) and from a new
+game's read (`readNewGame` there, over `Game.readDungeonDat`). The page builds its `Game`
+over the empty world (`emptyDungeonData`) and reads `dungeon.dat` into it after ENTER. At
+the boot, the line is a one-button menu and its click goes back to the title (`DEBT.md`
+H); a `dungeon.dat` that will not open throws `Die`, which the page reports as it reports
+any error that ends `init`. The full save menu, which CSBWin does not have, keeps its
+status line. Evidence: `tools/dump-bad-saved-game.ts`, and `tools/dump-new-game.ts` for the
+empty world's random stream.
 
 ## A one-button menu takes no key
 

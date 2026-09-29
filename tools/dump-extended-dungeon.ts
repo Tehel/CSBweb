@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { DungeonLoader } from '../src/data/DungeonLoader';
+import { DungeonLoader, emptyDungeonData } from '../src/data/DungeonLoader';
 import { buildExtendedFeaturesPrefix, EF_FLAGS, type ExtendedFeaturesBlock } from '../src/data/CsbwinExtendedFeatures';
 import type { Databases, DungeonData } from '../src/data/dungeonTypes';
 import { check, finish } from './lib/check';
@@ -103,8 +103,9 @@ function main(): void {
 
   console.log('== the rules ==');
   const graphics = stockGraphics();
-  const boot = newGame(windows, graphics);
-  boot.readNewGameRules(windows);
+  // The page's boot: a `Game` over the empty world, and `dungeon.dat` read after ENTER.
+  const boot = newGame(emptyDungeonData(), graphics);
+  check(boot.readDungeonDat(read('static/gamefiles/dm-windows/dungeon.dat')), 'the boot reads dm-windows');
   console.log(`  a new game on dm-windows: dmRulesDesignOption ${boot.ctx.rules.dmRulesDesignOption}, dmRules ${boot.ctx.rules.dmRules}`);
   check(boot.ctx.rules.dmRulesDesignOption && !boot.ctx.rules.dmRules,
     'DMRules sets DMRulesDesignOption, and DM_rules stays off without DMRulesOption');

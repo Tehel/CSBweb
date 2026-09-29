@@ -7,6 +7,7 @@
  */
 
 import type { DungeonData } from '../data/dungeonTypes';
+import { DungeonLoader } from '../data/DungeonLoader';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
 import { GAME_TIMING, MovementAction } from './gameTypes';
@@ -339,6 +340,24 @@ export class Game implements MainLoop {
     }
 
     /**
+     * `_ReadEntireGame` for a new game from the bytes of `dungeon.dat`: false when
+     * `ReadDatabases` fails (doc/CSBwin-src/SaveGame.cpp:1740-1742), and the read then ends
+     * at `tag01efee`, the boot's (`src/renderer/intro/BootSequence.ts`). The parse fails
+     * before anything is installed, so the running game is left as it was.
+     */
+    readDungeonDat(bytes: Uint8Array): boolean {
+        let data: DungeonData;
+        try {
+            data = new DungeonLoader().loadDungeonDat(bytes);
+        } catch (error) {
+            console.error(`dungeon.dat failed its read: ${error}`);
+            return false;
+        }
+        this.readNewGame(data);
+        return true;
+    }
+
+    /**
      * Take `data` as the world, whole: `_ReadEntireGame` reads the structure with the rest,
      * the header, every level's descriptor and tables, from the file it opens
      * (`ReadDatabases`, doc/CSBwin-src/SaveGame.cpp:2324). `DungeonState` keeps its object,
@@ -356,7 +375,7 @@ export class Game implements MainLoop {
      * opens with (doc/CSBwin-src/SaveGame.cpp:392-398, read at `ReadDatabases`' start,
      * `:2347`). A file with no block leaves the rules as they were.
      */
-    readNewGameRules(data: DungeonData): void {
+    private readNewGameRules(data: DungeonData): void {
         readRulesOptions(this.ctx.rules, data.extendedFeatures);
     }
 

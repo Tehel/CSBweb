@@ -239,7 +239,8 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
 /* ----------------------------------------------------------------- the screen ---- */
 
 /**
- * Run the entrance screen until the player enters or resumes.
+ * Run the entrance screen until the player enters or resumes, and `readEntireGame` has
+ * read the game that choice names.
  *
  * `_TAG01f746`'s two nested loops: the inner one polls the mouse while `d.gameState` is
  * `GAMESTATE_AtPrisonDoor`, the outer one redraws the whole screen whenever the credits
@@ -254,7 +255,7 @@ export async function openPrisonDoors(host: IntroHost, assets: PrisonDoorAssets)
 export async function showPrisonDoor(
   host: IntroHost,
   buttons: UIButton[],
-  onResume: () => Promise<boolean>,
+  readEntireGame: (choice: PrisonDoorChoice) => Promise<boolean>,
 ): Promise<PrisonDoorChoice> {
   const assets = loadAssets(host);
   let gameState = GAMESTATE_AT_PRISON_DOOR;
@@ -283,14 +284,12 @@ export async function showPrisonDoor(
   await host.vbl(LATCH_TO_DOORS_VBLS);
   host.setCursorVisible(false);         // `STHideCursor(HC33)` (`:9538`)
 
-  if (gameState !== GAMESTATE_RESUME_SAVED_GAME) {
-    await openPrisonDoors(host, assets);
-    return 'enter';
-  }
+  const choice: PrisonDoorChoice = gameState === GAMESTATE_RESUME_SAVED_GAME ? 'resume' : 'enter';
+  if (choice === 'enter') await openPrisonDoors(host, assets);
 
   // `_GameSetup`'s `for (;;) { ReadEntireGame(); if (i16Result == 1) break; TAG01f746(); }`
-  // (`:10634-10641`): a load that fails or is cancelled puts the entrance back up.
-  const loaded = await onResume();
-  if (loaded) return 'resume';
-  return showPrisonDoor(host, buttons, onResume);
+  // (`:10634-10641`): `dungeon.dat` or the chosen save. A read that fails, or a load
+  // that is cancelled, puts the entrance back up.
+  if (await readEntireGame(choice)) return choice;
+  return showPrisonDoor(host, buttons, readEntireGame);
 }
