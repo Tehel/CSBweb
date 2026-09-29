@@ -24,11 +24,13 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 
 The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
-1. **`DEBT.md`'s active rows**: the unported CSBWin features the default dungeon and
+1. **Rework the save menu** (Phase 10, step 11), and with it saves that know their
+   dungeon. The author sets the rest of its scope when it starts. `DEBT.md`'s index lists
+   it as `P10`, ahead of the G rows.
+2. **`DEBT.md`'s other active rows**: the unported CSBWin features the default dungeon and
    Chaos Strikes Back reach. `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
    the live status; its first row is the next item.
-2. **Rework the save menu** (Phase 10, step 11). The author sets its scope when it starts.
 3. Phase 15 step 4 interleaves anywhere.
 
 ⏸️ **Postponed until the default dungeon is validated**: DSA extensibility and CSBWin's
@@ -155,6 +157,17 @@ The author sets the rest of its scope when it starts.
   restored" is where to start, and `tools/dump-save-roundtrip.ts` is how to prove the file
   alone gives the game back. Both stores already list a genuine `.dat` from its own blocks
   (`src/data/saves/`).
+- **A save knows its dungeon.** A save's header names its date, level and party, not its
+  game (`SaveHeader`, `src/engine/SaveGamePayload.ts`), and both stores list every save
+  together, so a DM save could be offered to a CSB game and restored into the wrong
+  tables. CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT` to
+  `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the wrong
+  graphics with the signatures an Extended Features block may carry
+  (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
+  `Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves
+  stored and listed per data set (`src/data/DataSets.ts`), a genuine `.dat` accepted in
+  the set whose files it was made from, and `DEBT.md` G17's source save picked across sets
+  (a DM save feeds a CSB game).
 
 #### What is left, in one place
 

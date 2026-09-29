@@ -23,9 +23,9 @@ The order, then:
 1. **D and E.** New structural debt still goes into D or E and jumps the queue.
 2. **C — Known divergences from CSBWin.** A divergence found along the way goes here and is
    taken before the G items: a known bug outranks a missing feature.
-3. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
-4. **The save menu rework** (`PLAN.md` → "Current priority"), once the active G rows are
-   paid.
+3. **The save menu rework** (`PLAN.md` → Phase 10, the index's `P10` row), saves that
+   know their dungeon with it. The author's order puts it before the G rows.
+4. **G — Unported CSBWin features the default dungeon reaches**, in the index's order.
 5. **F — Verification debt** is independent of the rest. Interleave it anywhere.
 
 **Postponed (⏸️) until the default dungeon is validated.** These are not taken in order,
@@ -86,8 +86,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
+| P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
-| G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Ten DSA filters | — | ⏸️ |
@@ -100,8 +100,9 @@ In payoff order: the first row is the next item.
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
-The rows above G1 are the active list. The ⏸️ rows are postponed (see "Priority") and are
-never "the first row".
+The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
+`PLAN.md`'s; a session that takes `P10` works there, one step at a time. The ⏸️ rows are
+postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
@@ -176,19 +177,6 @@ A DM party can therefore be carried into CSB, which is the classic way to play i
 checks and `TAG002724`'s copy, and run them from the page or the save menu on a chosen
 source save, writing a new save. The utility's screen is not ported, and step 2 is not
 run automatically when the prison's party is saved.
-
-### G19 — Saves that know their dungeon
-
-A save's header names its date, level and party, not its game (`SaveHeader`,
-`src/engine/SaveGamePayload.ts`), and both stores list every save together, so a DM save
-could be offered to a CSB game and restored into the wrong tables. CSBWin keeps a game's
-saves in that game's directory (`CSBGAME.DAT` to `CSBGAME4.DAT`, `CSBCode.cpp:9747-9756`),
-and it guards against the wrong graphics with the signatures an Extended Features block
-may carry (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
-`Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves stored
-and listed per data set (`src/data/DataSets.ts`), a genuine `.dat` accepted in the set whose files it was
-made from, and G17's source save picked across sets (a DM save feeds a CSB game). It
-belongs with the save menu rework (`PLAN.md` → Phase 10, step 11).
 
 ### Postponed until the default dungeon is validated
 

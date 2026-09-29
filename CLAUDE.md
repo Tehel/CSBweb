@@ -211,8 +211,9 @@ magic casting, light levels, worn-object bonuses, sound, the message area, monst
 Champions, death, bones, resurrection), sleep, the pre-game screens (title, dungeon
 entrance, doors, credits) and most of the DM UI. Genuine CSBWin save files load, and the
 port writes them as CSBWin does, all sixteen blocks. **The current priority is a complete
-game on the default dungeon**: `DEBT.md`'s active rows, one item per commit (the unported
-features the retail dungeon reaches), then a rework of the save menu (Phase 10). DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
+game on the default dungeon**: the rework of the save menu first (Phase 10, `DEBT.md`'s
+`P10` row), then `DEBT.md`'s other active rows, one item per commit (the unported
+features the retail dungeon reaches). DSA extensibility, CSBWin's custom-dungeon and debugging extras, and comparing
 frames with CSBWin's are postponed until the default dungeon is validated; Chaos Strikes
 Back's own features are not. The first row of `DEBT.md`'s index is the next item, and
 `/pay-debt` starts a session on it.
