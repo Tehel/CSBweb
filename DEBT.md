@@ -14,7 +14,7 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tier E is empty, and D holds D11, which G18's last step waits on. **The goal now is a
+Tiers D and E are empty. **The goal now is a
 complete, faithful game on the default dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
@@ -86,8 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D11 | A read installs its own world | L | ⚠️ step 2 of 2 next |
-| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4, after D11 |
+| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4 next |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -114,41 +113,7 @@ entry here, only its commit, so take the next ID from this line and move it on.
 
 ## D — State representation
 
-New state-representation debt goes here, and jumps the queue.
-
-### D11 — A read installs its own world
-
-CSBWin's `_ReadEntireGame` reads the whole world, structure included, from the file it
-opens, `dungeon.dat` or the save (`ReadDatabases`, `doc/CSBwin-src/SaveGame.cpp:2324`).
-A new game (`Game.readNewGame`) and a CSBWin save (`applyCsbwinSave`,
-`src/data/CsbwinSaveGame.ts`) do the same: each installs the `DungeonData` it read with
-`Game.installWorld`, which gives it to `DungeonState` (the one object every system and
-the renderer hold) and to `state.dungeon`, where the page's map preview reads it. Then
-`applyRuntimeSaveState` restores the rest over it. So a CSBWin save of any dungeon loads
-into any running game (`tools/dump-atari-saves.ts`: CSB's eleven-level saves into a game
-built over DM's fourteen).
-
-A port save does not yet. `applySavePayload` (`src/engine/SaveGamePayload.ts`) restores
-its `runtime` into the running world, whose `applyDungeonSnapshot` copies the snapshot at
-the running maps' sizes and refuses one whose map count differs
-(`src/engine/DungeonSnapshot.ts:328-333`). The fields `DUNGEON_DATA_SOURCES` marks
-`loaded` stay the running world's: the header, every level's descriptor, monster types and
-decoration tables, `levelIndex`, the shape flags, `presetHeroes`. Yet a port save carries
-a whole world: its `raw` is the complete CSBWin file `buildSavePayload` writes, all
-sixteen blocks, of which a load takes no more than `applySaveGameState` does. The
-quick-save's `RuntimeSaveState` alone carries no `loaded` field, so it can only restore
-into the world it was taken in.
-
-**Steps**, each a commit. Step 1, a new game and a CSBWin save install their worlds, is
-done.
-
-2. **A port save installs the world of its `raw` file**, as a CSBWin save does, then
-   applies its `runtime` over it. Check: a port save of CSB's world loads into a game
-   built over DM's. The author's five saves in `static/gamefiles/saves/` cannot serve as
-   the second check (they hash the same after load and after 600 ticks): they are format
-   v10, which `decodeSavePayload` has refused since `RUNTIME_SAVE_VERSION` became 11.
-
-G18 step 4 comes after step 2.
+Empty. New state-representation debt goes here, and jumps the queue.
 
 ---
 
@@ -222,11 +187,8 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
 
-The boot's parse cannot go yet: it is the world a port save restores into (D11, step 2).
-
 **Steps**, each a commit, in this order. Steps 1 to 3, the set chosen before the boot,
-the DM Rules toggle and the block in `dungeon.dat`, are done. Step 4 is next, once D11
-is paid.
+the DM Rules toggle and the block in `dungeon.dat`, are done. Step 4 is next.
 
 4. **`dungeon.dat` read after ENTER**, where CSBWin reads it, so a failed read reaches
    `tag01efee` as a save's does, rather than ending the page's `init` or rejecting in

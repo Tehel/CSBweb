@@ -34,6 +34,10 @@
  *     3b. A table filled to `SetTimer`'s jump (`Timer.cpp:999-1008`) is written with its
  *     new size and its cursor, and read back with both.
  *
+ * And a save carries its world: one of CSB's eleven levels, loaded into a game built over
+ * DM's fourteen, installs the world of its `raw` file (`applySavePayload`), and the game
+ * saved and the game loaded play on alike.
+ *
  * What is deliberately **not** asserted, because CSBWin does it too: that load is a
  * no-op. `processMonstersOnLevel` really does create new timers, so their `sequence`
  * numbers advance and the random stream moves on; `NextMonsterUpdateTime` really does
@@ -69,6 +73,7 @@ import { check, finish } from './lib/check';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const SAVES = 'static/gamefiles/saves';
+const CSB = 'static/gamefiles/csb';
 
 /** `CHARDESC.portrait` unpacked: 32x29 palette indices, one byte each. */
 const PORTRAIT_PIXELS = 32 * 29;
@@ -488,6 +493,52 @@ function main(): void {
     } else {
       check(firstDiff === 0, 'without it, they differ from the moment of the save');
     }
+  }
+
+  /* ---- 7. a save of another dungeon's world, into a game built over DM's ---- */
+
+  // `raw` carries the whole world, structure and all, and a load installs it in place of
+  // the one the game was running (`applySavePayload`), as `_ReadEntireGame` reads a
+  // save's (`doc/CSBwin-src/SaveGame.cpp:2324`). CSB's `mini.dat`, eleven levels, is
+  // played 30 ticks in a game built over DM's fourteen, saved, and loaded into another
+  // game built over DM's; then the two play on side by side.
+  console.log('\n=== a save of CSB\'s world, into a game built over DM\'s ===');
+  {
+    const csbGraphics = new GraphicsLoader();
+    csbGraphics.loadFromArray(new Uint8Array(readFileSync(resolve(CSB, 'graphics.dat'))));
+    const overDm = (): Game => newGame(new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON)))), csbGraphics);
+    const live = overDm();
+    applyCsbwinSave(live, new Uint8Array(readFileSync(resolve(CSB, 'mini.dat'))));
+    advance(live, 30);
+    const bytes = encodeSavePayload(buildSavePayload(live));
+    live.saveWritten();
+    const loaded = overDm();
+    const builtOver = loaded.dungeonState.getMapCount();
+    let error = '';
+    try {
+      applySaveBytes(loaded, bytes);
+    } catch (e) {
+      error = (e as Error).message;
+    }
+    const world = loaded.state.dungeon;
+    console.log(`built over ${builtOver} maps, now ${loaded.dungeonState.getMapCount()}${error ? `, refused: ${error}` : ''}`);
+    check(!error && builtOver === 14 && loaded.dungeonState.getMapCount() === 11 && world === loaded.dungeonState.getData(),
+      'the save\'s eleven-level world replaces DM\'s fourteen, in state and DungeonState both');
+    const from = live.state.dungeon;
+    check(!error && same(world.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]),
+        from.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]))
+      && same(world.levelIndex, from.levelIndex) && same(world.header, from.header) && same(world.presetHeroes, from.presetHeroes),
+      'the levels\' descriptors and tables, levelIndex, the header and the preset heroes are the saved world\'s');
+    let firstDiff = -1;
+    if (!error) {
+      for (let tick = 0; tick <= 100; tick++) {
+        if (tick > 0) { advance(live, 1); advance(loaded, 1); }
+        const agree = monstersOf(live) === monstersOf(loaded) && same(live.party.state, loaded.party.state);
+        if (!agree && firstDiff < 0) firstDiff = tick;
+      }
+    }
+    console.log(`played on 100 ticks side by side: ${firstDiff < 0 ? 'agree throughout' : `differ from tick ${firstDiff}`}`);
+    check(!error && firstDiff < 0, 'the game saved and the game loaded from it agree for 100 ticks');
   }
 
   finish();

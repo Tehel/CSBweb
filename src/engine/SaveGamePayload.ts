@@ -5,25 +5,25 @@
  * through `applySaveBytes` below, and `raw` is a whole CSBWin file. What it carries is
  * the pair the quick-save has carried since format v2:
  *
- * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
- *   (`src/engine/DungeonSnapshot.ts`), restored into the running world, whose shape
- *   it must have (`DEBT.md` D11);
  * - `raw` — the scrambled, checksummed CSBWin file `saveSaveGameState` writes, all
- *   sixteen blocks, base64'd. A load parses it and takes only what `applySaveGameState`
- *   takes (the ITEM16s, the timers' `timerWord8`, the missiles, the cursor owner and
- *   the caster), then applies `runtime` over it; its dungeon image is not used.
+ *   sixteen blocks, base64'd. A load reads its world as a CSBWin save's, structure and
+ *   all, and installs it in place of the running one (`applySavePayload`), so a save of
+ *   any dungeon loads into any running game;
+ * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
+ *   (`src/engine/DungeonSnapshot.ts`), restored over the world `raw` installed.
  *
  * The `header` is the addition. Listing a directory of saves has to show a date, a level
  * and the party without parsing megabytes of `runtime`, so the three are lifted to the
  * front of the file. They are **derived**, never authoritative: `applySavePayload`
  * ignores the header entirely and restores from `runtime`.
  */
-import { loadSaveGameState, applySaveGameState, saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
-import { applyCsbwinSave } from '../data/CsbwinSaveGame';
+import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
+import { applyCsbwinSave, installCsbwinWorld } from '../data/CsbwinSaveGame';
+import { loadCsbwinWorld } from '../data/CsbwinDungeonImage';
 import { buildCsbwinCharacterBlock } from '../data/CsbwinCharacters';
 import { buildObjectIndirectIndex } from '../data/CsbwinObjectIndex';
 import { buildDungeonImage, cellFlagArraySize } from '../data/CsbwinDungeonImageWriter';
-import { buildLiveExtendedFeatures, readRulesOptions } from '../data/CsbwinExtendedFeatures';
+import { buildLiveExtendedFeatures } from '../data/CsbwinExtendedFeatures';
 import type { DungeonData, TimerRecord } from '../data/dungeonTypes';
 import type { Game } from './Game';
 import { RUNTIME_SAVE_VERSION, type RuntimeSaveState } from './RuntimeSave';
@@ -417,14 +417,13 @@ export function encodeSavePayload(payload: SavePayload): Uint8Array {
 }
 
 /**
- * Restore a parsed payload into the running game. The order is `LoadGame`'s: the
- * `SaveGameState` blocks first, then the runtime world
- * (`doc/CSBwin-src/SaveGame.cpp:1617-1745`).
+ * Restore a parsed payload into the running game. `raw` is read as a CSBWin save's world
+ * is, and installed whole whatever world the game was running (`installCsbwinWorld`,
+ * `_ReadEntireGame`'s read, doc/CSBwin-src/SaveGame.cpp:2324); then `runtime`, the
+ * whole mutable state, is restored over it.
  */
 export function applySavePayload(game: Game, payload: SavePayload): void {
-    const saveState = loadSaveGameState(decodeBase64ToBytes(payload.raw));
-    readRulesOptions(game.ctx.rules, saveState.extendedFeatures);
-    applySaveGameState(game.state.dungeon, saveState, game.party.state);
+    installCsbwinWorld(game, loadCsbwinWorld(decodeBase64ToBytes(payload.raw)));
     game.applyRuntimeSaveState(payload.runtime);
 }
 

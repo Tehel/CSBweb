@@ -250,19 +250,17 @@ export function buildCsbwinRuntimeState(
     };
 }
 
-/** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
-export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
-    const world = loadCsbwinWorld(bytes);
-    // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826), before
-    // `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
+/**
+ * `_ReadEntireGame`'s read of a save's world, installed as the running game's
+ * (`Game.installWorld`): the image, structure and all, with the five the save carries
+ * beside it, its rules, and `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826). A CSBWin
+ * save restores its state over it (`applyCsbwinSave`), and a port save its `runtime`
+ * (`applySavePayload`), whose `raw` is such a file.
+ */
+export function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
+    // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
     CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc);
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures);
-    const runtime = buildCsbwinRuntimeState(world, {
-        // Keep what the running game has; see the module comment on `EXPOOL`.
-        dsaGlobals: game.getDsaGlobalVariables(),
-    });
-    // The save's world, structure and all, with the five the save carries beside the
-    // image, which the snapshot below then restores as they already stand.
     game.installWorld(Object.assign(world.dungeon, {
         dsaLevelIndex: world.save.dsaLevelIndex,
         dsaIndex: world.save.dsaIndex,
@@ -270,7 +268,17 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
         extendedWallDecorations: world.save.extendedWallDecorations,
         spellFilterLocation: world.save.spellFilterLocation,
     }));
-    game.applyRuntimeSaveState(runtime);
+}
+
+/** Parse a CSBWin save and restore it into the running game. Throws on a bad file. */
+export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
+    const world = loadCsbwinWorld(bytes);
+    installCsbwinWorld(game, world);
+    // The snapshot puts back what the installed world already holds.
+    game.applyRuntimeSaveState(buildCsbwinRuntimeState(world, {
+        // Keep what the running game has; see the module comment on `EXPOOL`.
+        dsaGlobals: game.getDsaGlobalVariables(),
+    }));
     // The image's records are already big-actuator records. Set by hand rather than
     // through `applySaveGameState`, which would call `applyBigActuators` and re-derive
     // the word-8 of every type-47 actuator from records that already carry it.
