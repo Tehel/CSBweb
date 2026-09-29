@@ -30,7 +30,7 @@ import type {
     CloudRecord
 } from './dungeonTypes';
 import { extractPresetHeroes } from './HeroExtractor';
-import { convertOriginalDungeon } from './CsbwinDungeonConversions';
+import { ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
     MAP_DESCRIPTOR_SIZE
@@ -69,6 +69,12 @@ export interface DungeonImageOptions {
      * the file's shape rather than in the shape a save is written in.
      */
     noConvert?: boolean;
+    /**
+     * The image's Extended Features block carried `ExpandedPortraits`, so its mirrors are
+     * already in CSBWin's form and `ExtendPortraits` leaves them alone. False for a plain
+     * `dungeon.dat` and for a save with no block. `noConvert` skips it as well.
+     */
+    expandedPortraits?: boolean;
     /**
      * Translate one stored object reference into a packed RN.
      *
@@ -181,6 +187,9 @@ export class DungeonLoader {
                 indirectText: data.indirectText,
                 newScrolls: data.newScrolls,
             });
+            // Not part of `ReadDatabases`: `_ReadEntireGame` runs it once the whole file
+            // is read (`doc/CSBwin-src/SaveGame.cpp:1827`), a save's as a new game's.
+            if (!this.options.expandedPortraits) ExtendPortraits(data);
         }
 
         // After the conversion, so a preset hero's text is looked up the same way every

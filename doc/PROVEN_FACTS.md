@@ -2708,6 +2708,31 @@ The committed saves show which file each game was started from. The three with `
 zero: `dm-atari`, cleaned by today's `ExtendPortraits`. The eleven with 0xe9 keep
 `Position` on 18 mirrors and carry `DMRules`: the Windows package's file.
 
+## `ExtendPortraits` cleans the mirrors of every file read without `ExpandedPortraits`
+
+`_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once
+the whole file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), for a new game and a
+save alike. `ExtendPortraits` (`:1402-1426`) returns at once if `extendedPortraits` is set.
+Otherwise, for every actuator whose link is not `RNnul` and whose type is 127 (a Hall of
+Champions mirror), it zeroes `ClearResponses`, `SetResponses`, `ToggleResponses`, the
+unused bits, `State`, `BlockDisables`, `DisableMessage` and `Position`
+(`CSB.h:1055-1069`): `word4` bits 0-11 and the whole of `word6`. The wall graphic ordinal
+and the type/value word are kept. Then it sets `extendedPortraits`.
+
+The flag does not outlive a read: `_ReadEntireGame` sets it `false` before anything else
+(`:1462`, marked 20150806), and only `ReadExtendedFeatures` assigns it, from
+`flags & ExpandedPortraits` (0x20, `:403`). So every file with no Extended Features block
+is cleaned (DM's `dm-atari/dungeon.dat`, CSB's prison and its Atari-era saves), and so is
+a block without the flag. `SaveGame` always sets it (`:963`), so a file CSBWin writes is
+never cleaned again.
+
+In `dm-atari/dungeon.dat` all 24 mirrors carry leftover bits there (`word4` 0xa080, and
+`word6` non-zero on 23 of them). Mirror 286 (champion 20, level 0 at (17,10)) has `word4`
+0xa880, which reads `State` = 4, `PORTRAIT_HideGraphic`: uncleaned, its frame would not
+be drawn (`Codea59a.cpp:134-137`). The port runs it at the end of `DungeonLoader`'s parse,
+gated on `DungeonImageOptions.expandedPortraits`, which `loadCsbwinWorld` takes from the
+save's block (`tools/dump-extend-portraits.ts`).
+
 ## `DM_rules` and `DMRulesDesignOption` are process-wide, and only a block sets them
 
 `DM_rules` (`doc/CSBwin-src/data.cpp:251`) and `DMRulesDesignOption` (`CSBUI.cpp:137`) are

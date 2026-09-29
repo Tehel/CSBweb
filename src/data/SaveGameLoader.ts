@@ -37,6 +37,11 @@ export interface SaveGameState {
   sequencedTimers: boolean;
   extendedTimers: boolean;
   bigActuators?: boolean;
+  /**
+   * `EXTENDEDFEATURESBLOCK.flags & ExpandedPortraits`. False for a file with no block,
+   * whose mirrors `ExtendPortraits` then cleans (`src/data/CsbwinDungeonConversions.ts`).
+   */
+  expandedPortraits?: boolean;
   /** `EXTENDEDFEATURESBLOCK.flags & IndirectText` — the text section's shape. */
   indirectText?: boolean;
   /** `EXTENDEDFEATURESBLOCK.version` (offset 36); `'B'` (0x42) and up use new scrolls. */
@@ -477,6 +482,7 @@ function readExtendedFeatures(data: Uint8Array): {
   extendedTimers: boolean;
   extendedWallDecorations: boolean;
   bigActuators: boolean;
+  expandedPortraits: boolean;
   indirectText: boolean;
   /** `EXTENDEDFEATURESBLOCK.version` (offset 36). `'B'` and up store new-style scrolls. */
   version: number;
@@ -498,7 +504,7 @@ function readExtendedFeatures(data: Uint8Array): {
   dsaBlock?: Uint8Array;
 } {
   if (data.length < EXTENDED_FEATURES_SIZE) {
-    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
+    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
   }
 
   let block = data.subarray(0, EXTENDED_FEATURES_SIZE);
@@ -509,7 +515,7 @@ function readExtendedFeatures(data: Uint8Array): {
     if (hasExtendedSentinel(decoded)) {
       parsed = decoded;
     } else {
-      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
+      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
     }
   }
 
@@ -542,6 +548,7 @@ function readExtendedFeatures(data: Uint8Array): {
   const extendedTimers = (extendedFlags & 0x80) !== 0;
   const extendedWallDecorations = (extendedFlags & 0x10) !== 0;
   const bigActuators = (flags & 0x80) !== 0;
+  const expandedPortraits = (flags & 0x20) !== 0;
   const indirectText = (flags & 0x08) !== 0;
 
   // `ReadExtendedFeatures` verifies the block against its own checksum before it
@@ -621,6 +628,7 @@ function readExtendedFeatures(data: Uint8Array): {
     extendedTimers,
     extendedWallDecorations,
     bigActuators,
+    expandedPortraits,
     indirectText,
     version,
     cellFlagArraySize,
@@ -1133,6 +1141,7 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     sequencedTimers,
     extendedTimers,
     bigActuators: extended.bigActuators,
+    expandedPortraits: extended.expandedPortraits,
     indirectText: extended.indirectText,
     version: extended.version,
     dsaLevelIndex: extended.dsaLevelIndex,

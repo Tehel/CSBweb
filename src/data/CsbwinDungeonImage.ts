@@ -56,6 +56,7 @@ export function loadCsbwinWorld(bytes: Uint8Array): CsbwinWorld {
         bigActuators: save.bigActuators ?? false,
         newScrolls: (save.version ?? 0) >= 0x42, // extended features version 'B'
         indirectText: save.indirectText ?? false,
+        expandedPortraits: save.expandedPortraits ?? false,
         expool: true,
         // Every RN in a save's image is a slot number in the object indirect index, not
         // the packed RN `dungeon.dat` stores. Without this the chains parse into

@@ -204,6 +204,37 @@ export function convertOriginalDungeon(data: DungeonData, shape: Partial<Dungeon
 }
 
 /**
+ * `ExtendPortraits` (`doc/CSBwin-src/SaveGame.cpp:1402-1426`): give every Hall of
+ * Champions mirror CSBWin's own portrait fields.
+ *
+ * Not one of `ReadDatabases`' three. `_ReadEntireGame` calls it once the whole file is
+ * read (`:1827`), for a new game and a save alike, and it does nothing when the file's
+ * Extended Features block carried `ExpandedPortraits` (`:403`). The flag is reset at the
+ * start of every read (`:1462`), so a file with no block is always cleaned: DM's
+ * `dungeon.dat`, whose 24 mirrors carry leftover bits in these fields, and CSB's
+ * Atari-era saves. A file either program writes carries the flag.
+ *
+ * For every live actuator of type 127 it zeroes `ClearResponses`, `SetResponses`,
+ * `ToggleResponses`, the two unused bits, `State`, `BlockDisables`, `DisableMessage` and
+ * `Position` (`CSB.h:1055-1069`): `word4` bits 0-11 and the whole of `word6`. The
+ * wall graphic ordinal and the type/value word are kept.
+ */
+export function ExtendPortraits(data: DungeonData): void {
+    for (const record of data.databases.actuators.records) {
+        if (record.nextObject === OBJECT_ID_NULL) continue;
+        if (getActuatorType(record) !== 127) continue;
+        record.word6 &= ~0x003f;          // ClearResponses(0)
+        record.word6 &= ~0x0fc0;          // SetResponses(0)
+        record.word4 &= ~0x003f;          // ToggleResponses(0)
+        record.word6 &= ~0xc000;          // ClearUnusedPor()
+        record.word4 &= ~0x0e00;          // State(0)
+        record.word4 &= ~0x0100;          // BlockDisables(false)
+        record.word4 &= ~0x00c0;          // DisableMessage(0)
+        record.word6 &= ~0x3000;          // Position(0)
+    }
+}
+
+/**
  * Where one text record's words start, and in which array.
  *
  * The same question a converted world and an unconverted one answer differently, asked

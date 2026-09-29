@@ -86,7 +86,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C89 | `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears | S | ⏳ |
+| C90 | `CheckCelltypes` and `CheckMonsters` are not run after a read | M | ⏳ |
 | G16 | A compressed `dungeon.dat` | S | ⏳ |
 | G18 | One game's data set, chosen before the boot | M | ⏳ |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
@@ -108,7 +108,7 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C90 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
+Next free IDs: C91 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -129,76 +129,34 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C89 — `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears
+### C90 — `CheckCelltypes` and `CheckMonsters` are not run after a read
 
 `_ReadEntireGame` calls `CheckCelltypes()`, `CheckMonsters()` and `ExtendPortraits()` once
 the whole file is read (`doc/CSBwin-src/SaveGame.cpp:1825-1827`), for a new game and a
-save alike. None of the three is ported.
+save alike, whatever its Extended Features block says. `ExtendPortraits` is ported
+(`src/data/CsbwinDungeonConversions.ts`); the other two are not. They touch different
+data from it and from each other, so their order does not matter.
 
-**`ExtendPortraits`** (`:1402-1426`) gives the Hall of Champions mirrors (type-127
-actuators) CSBWin's own portrait fields. It returns at once if `extendedPortraits` is set.
-Otherwise, for every actuator whose link is not `RNnul` and whose type is 127, it zeroes
-`ClearResponses`, `SetResponses`, `ToggleResponses`, `ClearUnusedPor`, `State`,
-`BlockDisables`, `DisableMessage` and `Position` (`CSB.h:1055-1069`): `word4` bits 0-11
-and all of `word6`. `wallGraphicOrdinal` and the type/value word are kept. Then it sets
-`extendedPortraits = true`.
+- **`CheckCelltypes`** (`:1367-1400`) turns every cell whose room type is above 6 into
+  open floor, keeping the low five bits. It changes nothing in DM, which has no such cell,
+  and it can live in `DungeonLoader` beside `ExtendPortraits`.
+- **`CheckMonsters`** (`:1342-1365`) walks every cell of every level and calls
+  `CheckMonster` (`:1279-1340`) on each group, and on each group among its possessions.
+  For a creature of `horizontalSize` 1 it cuts a group of more than two to two, and puts
+  a pair whose two positions are not opposite (`pos1 ^ pos2 != 2`) at `groupIndex` 2;
+  for size 2 it cuts the group to one and sets `groupIndex` 255. Each fix also sets
+  `facing` 0. The two `UI_MessageBox` warnings are shown once per process. It needs
+  `MonsterDescriptor`'s sizes, so it runs where the tables are, not in the loader.
+  **To settle first:** it reads `groupIndex` as the packed positions, but in a save the
+  groups on the party's level may hold an `ITEM16` index there (`DB4`'s comment in
+  `src/data/dungeonTypes.ts`); check when CSBWin attaches them relative to this call before
+  porting it as a plain walk.
 
-**The gate.** `extendedPortraits` starts `false` (`CSBUI.cpp:140`). Only
-`ReadExtendedFeatures` assigns it, from `flags & ExpandedPortraits` (`SaveGame.cpp:403`),
-and only for a file whose Extended Features block passed its checksum: a file with no
-block leaves it as it was. So it runs on every file without the block, whichever game it
-belongs to:
-- DM's `dm-atari/dungeon.dat`;
-- Chaos Strikes Back's compressed `dungeon.dat` (the prison, G16);
-- CSB's Atari-format saves `mini.dat` and `csbgame2.dat`.
-
-It also runs on a file whose block lacks the flag. It never runs on a file either program
-writes: `SaveGame` always sets the flag (`:961-963`), `buildLiveExtendedFeatures` does too,
-and all fourteen committed saves carry it. The flag lives for the whole process and
-`ExtendPortraits` leaves it `true`, so a second file without a block, loaded in the same
-CSBWin run, is not cleaned. Check what the port does when it loads twice in one page.
-
-**What it costs today.** In `dm-atari/dungeon.dat` all 24 mirrors carry leftover bits in
-those fields (`word4` 0xa080, and `word6` non-zero):
-- Every mirror reads `DisableMessage` = 2 (clear). This is dormant while
-  `PortraitTranslateDisable` is unported (`src/engine/HallOfChampions.ts:345`). Once it
-  is, taking a champion would queue a DSA "clear" at the mirror's `Position`.
-- Mirror 286 (champion 20, level 0 at (17,10), wall 0) has `word4` 0xa880, which reads
-  `State` = 4, `PORTRAIT_HideGraphic`. `SummarizeRoomInfo.ts:306` tests that bit as
-  CSBWin does (`Codea59a.cpp:134-137`), so going by the code the port does not draw that
-  mirror's frame, where CSBWin, having cleaned it, does. Not yet seen on screen.
-
-The committed saves confirm the cleaned form: the three with `flags` 0xa9, started from
-`dm-atari/dungeon.dat`, hold all 24 mirrors with `word4 & 0xfff` and `word6` zero.
-
-**Where it goes.** It is not part of `ReadDatabases`, so it is not a fourth
-`convertOriginalDungeon` conversion. It runs after the read, on a save as on a new game,
-gated on the file's flag. A `DungeonImageOptions.expandedPortraits` works for both paths:
-- `DungeonLoader` on a plain `dungeon.dat` leaves it false;
-- `loadCsbwinWorld` passes the save's `flags & 0x20`;
-- `noConvert` (`tools/dump-dungeon-image-blocks.ts`) skips it, like the other three.
-
-Nothing in it depends on the game, so the same code serves DM and CSB data. Only the flag
-decides.
-
-**Its two neighbours**, for the same commit or recorded apart:
-- `CheckCelltypes` (`:1367-1400`) turns any room type above 6 into open floor. It changes
-  nothing in DM, which has no such cell.
-- `CheckMonsters` (`:1342-1365`, `CheckMonster` above it) rewrites groups of size-2 and
-  size-4 monsters that are too many or badly placed, and needs `MonsterDescriptor`'s
-  sizes, so it cannot live in the loader. DM's creature records come out of the DM
-  Windows package's re-save unchanged, which suggests a no-op there too, but that is not
-  a proof.
-
-All three touch different data, so their order among themselves does not matter. CSB's
-prison cannot be checked for mirrors until G16 expands it. Its two saves load
-(`tools/dump-atari-saves.ts`) and have not been checked for mirrors.
-
-The fix owes a `tools/` check: load `dm-atari/dungeon.dat` and assert the 24 mirrors are
-cleaned, mirror 286's `State` is 0, and every other record is untouched; then load a
-committed save and assert its mirrors come through byte for byte. Run the golden frames:
-none is known to show (17,10), and a frame that changes must be explained, not
-re-captured blindly.
+DM's creature records come out of the DM Windows package's re-save unchanged
+(`doc/PROVEN_FACTS.md` → "DM's two `dungeon.dat` files"), which suggests both are no-ops
+on DM, but that is not a proof. The fix owes a `tools/` check that reports what each one
+changes in `dm-atari/dungeon.dat`, the committed saves and CSB's `mini.dat`, and asserts
+it on a record built to trip it.
 
 ---
 

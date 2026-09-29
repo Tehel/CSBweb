@@ -141,6 +141,9 @@ const CHECKS = [
   // same dungeon.dat, so its converted form is sitting in fourteen files. Without them a
   // game started from dungeon.dat holds a world no save file can express.
   { tool: 'dump-dungeon-conversions.ts' },
+  // `ExtendPortraits`, run after the read: dungeon.dat's 24 mirrors cleaned and nothing
+  // else moved, and every save that carries `ExpandedPortraits` left as written.
+  { tool: 'dump-extend-portraits.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing
