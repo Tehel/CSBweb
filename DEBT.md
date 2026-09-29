@@ -14,8 +14,8 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers D and E are empty. **The goal now is a complete, faithful game on the default
-dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
+Tier E is empty, and D holds D11, which G18's last step waits on. **The goal now is a
+complete, faithful game on the default dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
 not need waits.
 
 The order, then:
@@ -86,7 +86,8 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4 next |
+| D11 | A read installs its own world | L | ⏳ step 1 of 2 next |
+| G18 | One game's data set, chosen before the boot | L | ⚠️ step 4 of 4, after D11 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
 | G19 | Saves that know their dungeon | M | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
@@ -106,14 +107,55 @@ never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C92 · D11 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
+Next free IDs: C92 · D12 · E8 · F12 · G21 · X4. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
 
 ## D — State representation
 
-Empty. New state-representation debt goes here, and jumps the queue.
+New state-representation debt goes here, and jumps the queue.
+
+### D11 — A read installs its own world
+
+`Game` is built once, over the boot's parse of the data set's `dungeon.dat` (`init`,
+`src/main.ts`), and every read after that restores into that world. A new game
+(`Game.readNewGame`, through a scratch `Game`), a port save (`applySavePayload`) and a
+CSBWin save (`applyCsbwinSave`, `src/data/CsbwinSaveGame.ts`) all go through
+`applyRuntimeSaveState`, whose `applyDungeonSnapshot` copies the snapshot into the
+running maps at the running maps' sizes, and refuses a snapshot whose map count differs
+(`src/engine/DungeonSnapshot.ts:328-343`). The fields that `DUNGEON_DATA_SOURCES` marks
+`loaded` stay the boot parse's: the header's seed and start, every level's descriptor,
+monster types and decoration tables, `levelIndex`, and the shape flags. CSBWin's
+`_ReadEntireGame` reads the whole world, structure included, from the file it opens,
+`dungeon.dat` or the save (`ReadDatabases`, `doc/CSBwin-src/SaveGame.cpp:2324`).
+
+So a save of any other dungeon cannot be resumed. The Atari CSB saves, which have eleven
+levels, load only into a `Game` built over their own world (`tools/dump-atari-saves.ts`).
+In the `csb` set, whose `dungeon.dat` is the prison, a CSB adventure's save could never
+load (G17, step 3). A dungeon with the same number of levels but other sizes would load
+wrong, its cells decoded at the running maps' sizes. And the boot cannot drop its parse
+(G18 step 4), because a save needs a world of the right shape to restore into.
+
+A port save already carries a whole world. Its `raw` is the complete CSBWin file that
+`buildSavePayload` writes, all sixteen blocks, and each of the author's saves in
+`static/gamefiles/saves/` carries one (47-57 KB). A load uses no more of it than
+`applySaveGameState` takes.
+
+**Steps**, each a commit:
+
+1. **A read installs the world it read.** `readNewGame` installs its fresh parse, and
+   `applyCsbwinSave` installs its `world.dungeon`, `loaded` fields and all, instead of
+   restoring a snapshot into the boot's world. Whatever holds the old `DungeonData`, or
+   something built from it, takes the new one: `ctx.state.dungeon`, `DungeonState`,
+   what `GameContext` derives, the renderer, and the page's map preview through
+   `bindUIContext`. Check: the Atari CSB saves load into a `Game` built over `dm-atari`'s
+   `dungeon.dat`, which `applyDungeonSnapshot` refuses today.
+2. **A port save installs the world of its `raw` file**, as a CSBWin save does, then
+   applies its `runtime` over it. Check: the author's saves hash the same after load and
+   after 600 ticks.
+
+G18 step 4 comes after both.
 
 ---
 
@@ -187,13 +229,20 @@ page's `init`, or rejects there. CSBWin reads it after ENTER, and a failed read 
 does in the port (`src/renderer/intro/BootSequence.ts`). DM's `dungeon.dat` carries no
 checksum word and cannot fail that way. CSB's prison can.
 
+The boot's parse cannot go yet: it is the world every later read restores into, a save
+included (D11).
+
 **Steps**, each a commit, in this order. Steps 1 to 3, the set chosen before the boot,
-the DM Rules toggle and the block in `dungeon.dat`, are done; the next is step 4.
+the DM Rules toggle and the block in `dungeon.dat`, are done. Step 4 is next, once D11
+is paid.
 
 4. **`dungeon.dat` read after ENTER**, where CSBWin reads it, so a failed read reaches
    `tag01efee` as a save's does, rather than ending the page's `init` or rejecting in
-   `showEndOfGame`. The boot's `readNewGameRules` on the early parse (`init`,
-   `src/main.ts`) then goes, since the read after ENTER is `readNewGame`'s.
+   `showEndOfGame`. The boot builds its `Game` over an empty world, as `d.Initialize()`
+   leaves CSBWin's, and a new game's failed read comes from `ReadDatabases`
+   (`doc/CSBwin-src/SaveGame.cpp:1740-1742`); a file that will not open is `die(50)`
+   (`:1480-1486`), not `tag01efee`. The boot's `readNewGameRules` on the early parse
+   (`init`, `src/main.ts`) goes too, since the read after ENTER is `readNewGame`'s.
 
 ### G17 — A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE"
 
@@ -218,7 +267,8 @@ CSBWin makes a CSB game in three steps (the utility's own header,
    possession slot empty, `RandomGameID + 1`, and `Word22594`. It writes the result as a
    new save (`_TAG000fc4`, `:1643-1898`).
 3. **DUNGEON → Resume** loads that save. An Atari-era save, with no Extended Features
-   block, loads (`tools/dump-atari-saves.ts`).
+   block, loads into a `Game` built over its own world (`tools/dump-atari-saves.ts`); the
+   page has none such until D11 is paid.
 
 A DM party can therefore be carried into CSB, which is the classic way to play it.
 **How the port offers step 2 (the author's decision): its engine only.** Port the

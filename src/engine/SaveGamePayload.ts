@@ -1,17 +1,17 @@
 /**
  * What a DMweb save file contains, and how to build one from a live game.
  *
- * This is **not** the CSBWin binary format. Reading one of those is done — a genuine
- * save loads through `applySaveBytes` below — but *writing* one is what is left of
- * Phase 10. What this carries is the pair the quick-save has carried since format v2:
+ * This is **not** the CSBWin binary format, though it carries one: a genuine save loads
+ * through `applySaveBytes` below, and `raw` is a whole CSBWin file. What it carries is
+ * the pair the quick-save has carried since format v2:
  *
  * - `runtime` — `getRuntimeSaveState` (`RuntimeSave.ts`), the whole mutable world
- *   (`src/engine/DungeonSnapshot.ts`), which is what actually restores a game;
- * - `raw` — the real, scrambled, checksummed CSBWin file *prefix* that
- *   `saveSaveGameState` can already write (blocks 0-6), base64'd. Nothing needs it to
- *   load, and it is kept because writing it is what keeps the two halves honest with
- *   each other: the day the binary writer is finished, these files already carry the
- *   fields it emits.
+ *   (`src/engine/DungeonSnapshot.ts`), restored into the running world's shape
+ *   (`DEBT.md` D11);
+ * - `raw` — the scrambled, checksummed CSBWin file `saveSaveGameState` writes, all
+ *   sixteen blocks, base64'd. A load parses it and takes only what `applySaveGameState`
+ *   takes (the ITEM16s, the timers' `timerWord8`, the missiles, the cursor owner and
+ *   the caster), then applies `runtime` over it; its dungeon image is not used.
  *
  * The `header` is the addition. Listing a directory of saves has to show a date, a level
  * and the party without parsing megabytes of `runtime`, so the three are lifted to the
