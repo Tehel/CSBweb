@@ -29,8 +29,12 @@
  *   3. **The `0x8000`** — the printed rank is the *earned* one, so a temporary adjustment
  *      from a spell or potion must not move it.
  *
- * The last section draws the whole inventory of a Hall of Champions candidate: the held
+ * A later section draws the whole inventory of a Hall of Champions candidate: the held
  * eye must put the panel over the Resurrect menu, as `_ClickOnEye` does.
+ *
+ * The last section is the object panel, where the same rune glyphs prefix a potion's name
+ * with its power once the champion is past mastery 1 as a priest
+ * (`doc/CSBwin-src/Character.cpp:3599-3615`), and must reach the font raw as well.
  *
  * What to look for in the output: a line for every role whose mastery exceeds 1, at
  * x=108 / y=58+7n in viewport coordinates, matching the string spelled out here
@@ -42,7 +46,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Direction, Position } from '../src/core/types';
+import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, encodeObjectID, type ObjectID } from '../src/core/types';
 import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -62,7 +66,9 @@ import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
-import { drawInventoryScreen } from '../src/renderer/ui/Inventory';
+import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
+import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
+import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
@@ -335,6 +341,91 @@ async function main(): Promise<void> {
   renderInventory();
   check(ui.displayResurrectChestOrScroll === 5, 'releasing the eye brings the menu back');
   party.state.potentialChampionIndex = -1;
+  console.log('');
+
+  // ------------------------------------------ a potion's power, as a rune before its name
+  // `doc/CSBwin-src/Character.cpp:3599-3615`: once the selected champion is past mastery 1
+  // as a priest, the object panel prefixes a potion's name with the character
+  // `95 + strength()/40` — `` ` `` and `a`..`e`, the six power-rune glyphs — and prints
+  // the lot with `TextToViewport(134, 68, COLOR_13, …)`. The same raw-text trap as the
+  // rune ranks above: upper-cased, UM and ON come out as 'A' and 'B'.
+  console.log('=== a potion\'s power rune on the object panel ===');
+  const NAME_X = VIEWPORT_X + 134;
+  const NAME_Y = VIEWPORT_Y + 68;
+  const PRIEST = 2;
+  /** Each character cell of the name line, as the five-bit rows lit in colour 13. */
+  function nameCells(pixels: Uint8Array, count: number): string[] {
+    const cells: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const rows: number[] = [];
+      for (let row = 0; row < GLYPH_ROWS; row++) {
+        let bits = 0;
+        for (let col = 0; col < 5; col++) {
+          const px = pixels[(NAME_Y + GLYPH_TOP + row) * SCREEN_W + NAME_X + GLYPH_W * i + col];
+          if (px === 13) bits |= 0x10 >> col;
+        }
+        rows.push(bits);
+      }
+      cells.push(rows.join(','));
+    }
+    return cells;
+  }
+  /** The same rows, straight out of the font for `code`. */
+  function fontCell(code: number): string {
+    const rows: number[] = [];
+    for (let row = 0; row < GLYPH_ROWS; row++) rows.push((font.bytes[code + row * 128] ?? 0) & 0x1f);
+    return rows.join(',');
+  }
+
+  let potionId: ObjectID = OBJECT_ID_NULL;
+  let potionNameIndex = -1;
+  const potionRecords = data.databases.potions.records;
+  for (let i = 0; i < potionRecords.length; i++) {
+    const id = encodeObjectID(TilePosition.NORTH, DBType.POTION, i);
+    const nameIndex = resolveObjectNameIndex(ui, id);
+    if (nameIndex >= 0 && nameIndex !== OBJNI_WATER_FLASK && nameIndex !== OBJNI_EMPTY_FLASK) {
+      potionId = id;
+      potionNameIndex = nameIndex;
+      break;
+    }
+  }
+  check(potionNameIndex >= 0, 'dungeon.dat holds a potion that is neither water nor an empty flask');
+  const potion = ui.dungeonState.getPotionRecord(potionId);
+  if (!potion) throw new Error('no potion record');
+  const savedPower = potion.power;
+  const potionName = getObjectName(ui, potionNameIndex);
+  function renderObjectPanel(): Uint8Array {
+    const buffer = createPaletteIndexViewportBuffer(SCREEN_W, SCREEN_H, 0);
+    ui.screenIndexBuffer = buffer;
+    drawObjectInfoPanel(ui, potionId);
+    return buffer.pixels;
+  }
+
+  // Mastery 1 as a priest: the plain name.
+  setRoleExperience(PRIEST, 0);
+  potion.power = 120;
+  check(getObjectDisplayName(ui, potionId, potionNameIndex) === potionName,
+    'a champion at priest mastery 1 sees no power rune');
+  // A neophyte priest (mastery 2) sees it.
+  setRoleExperience(PRIEST, experienceForMastery(2));
+  check(determineMastery(champion, PRIEST) === 2, 'the champion is a neophyte priest');
+
+  console.log(['power', 'code', 'rune drawn', 'name drawn', 'upper-cased would differ'].join('\t'));
+  for (const power of [20, 60, 100, 140, 180, 220, 250]) {
+    potion.power = power;
+    const code = 95 + Math.floor(power / 40);
+    const expected = `${String.fromCharCode(code)} ${potionName}`;
+    check(getObjectDisplayName(ui, potionId, potionNameIndex) === expected,
+      `power ${power} names the potion "${expected}"`);
+    const cells = nameCells(renderObjectPanel(), expected.length);
+    const runeOk = cells[0] === fontCell(code);
+    const nameOk = [...expected].every((ch, i) => cells[i] === fontCell(ch.charCodeAt(0) & 0x7f));
+    const upperDiffers = fontCell(String.fromCharCode(code).toUpperCase().charCodeAt(0)) !== fontCell(code);
+    console.log([power, code, runeOk ? 'yes' : 'NO', nameOk ? 'yes' : 'NO', upperDiffers ? 'yes' : 'no'].join('\t'));
+    check(runeOk, `power ${power} draws glyph 0x${code.toString(16)}, not its upper-cased self`);
+    check(nameOk, `power ${power} draws "${expected}" glyph for glyph at (134, 68)`);
+  }
+  potion.power = savedPower;
   console.log('');
 
   finish();

@@ -1762,6 +1762,15 @@ Two things about it are unusual:
   and never changes case, so these lines must go through `drawTextLineIndexRaw`; the
   upper-casing `drawTextLineIndex` turns the rune into an 'A'.
 
+The object panel uses the same six glyphs for a potion's power
+(`doc/CSBwin-src/Character.cpp:3599-3615`). When the selected champion's priest mastery,
+`DetermineMastery(d.SelectedCharacterOrdinal-1, 2)`, is above 1 (neophyte or better),
+the name of any potion but the water flask and the empty flask is prefixed with the
+character `95 + strength()/40` and a space. Without the `0x8000` flag, a temporary
+adjustment counts. The line is printed with `TextToViewport(134, 68, COLOR_13, …, false)`,
+so it too goes through `drawTextLineIndexRaw`. `tools/dump-mastery-panel.ts` renders the
+panel at every power step.
+
 The rank is read with the `0x8000` flag — `DetermineMastery(chIdx, role|0x8000)`
 (`doc/CSBwin-src/Character.cpp:4593`) — so the panel shows the **earned** rank and a
 temporary adjustment from a spell or potion does not move it.

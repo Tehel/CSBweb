@@ -388,9 +388,11 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
       y2: VIEWPORT_Y + 74,
     };
     drawObjectIcon(ui, iconRect, objectNameIndex, g232.word612);
+    // `TextToViewport(134, 68, COLOR_13, A3, false)` (`doc/CSBwin-src/Character.cpp:3615`).
+    // Raw: a potion's power rune is `` ` `` or `a`..`e`, which upper-casing would lose.
     const name = getObjectDisplayName(ui, objectId, objectNameIndex);
     if (name) {
-      drawTextLineIndex(
+      drawTextLineIndexRaw(
         ui.screenIndexBuffer,
         ui.fontData,
         VIEWPORT_X + 134,
