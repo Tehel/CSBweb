@@ -141,6 +141,35 @@ async function main(): Promise<void> {
   check(render('PASS, and the tick') === buttons, 'and its PASS brings the buttons back at the tick');
 
   console.log('');
+  console.log('=== the three bursts (Attack.cpp:985-1025) ===');
+  // Graphic 14 is the 96x45 burst, drawn off-centre in it so that it centres on x=274,
+  // where the digits are (`D5W = 274`, Attack.cpp:1027). The two smaller ones are it
+  // shrunk to 64x37 and 42x37, so they centre there too and their rectangle's edge cuts
+  // none of them; a crop of the big one instead would sit right of 274 and be cut.
+  const g230 = uiTables.graphic230;
+  for (const [value, rect, name] of [
+    [50, g230.wRectPos20202, 'wRectPos20202'],
+    [20, g230.wRectPos20226, 'wRectPos20226'],
+    [9, g230.wRectPos20234, 'wRectPos20234'],
+  ] as const) {
+    const screen = createPaletteIndexViewportBuffer(320, 200, 7);
+    ui.screenIndexBuffer = screen;
+    ui.attackingCharacterOrdinal = 0;
+    ui.attackFlashValue = value;
+    drawAttackPanel(ui);
+    let x1 = 320, x2 = -1;
+    for (let y = panel.y1; y <= panel.y2; y++) {
+      for (let x = panel.x1; x <= panel.x2; x++) {
+        if (screen.pixels[y * 320 + x] !== 0) { x1 = Math.min(x1, x); x2 = Math.max(x2, x); }
+      }
+    }
+    console.log(`damage ${value}\t${name} x ${rect.x1}-${rect.x2}\tburst x ${x1}-${x2}`);
+    check(x1 > rect.x1 && x2 < rect.x2 && Math.abs((x1 + x2) / 2 - 274) <= 1.5,
+      `damage ${value}: the burst is whole inside ${name} and centred on the digits`);
+  }
+  ui.attackFlashValue = 0;
+
+  console.log('');
   console.log('=== the flinch, with a candidate at the mirror (CSBCode.cpp:8808-8837) ===');
   const champ = party.state.champions[0]!;
   party.state.cursorOwner = -1;

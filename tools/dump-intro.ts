@@ -42,6 +42,7 @@ import { SoundIndex } from '../src/core/constants';
 import { cellHasObjects, getRoomType } from '../src/core/types';
 import {
   createPaletteIndexViewportBuffer,
+  shrinkBlt,
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
@@ -74,7 +75,6 @@ import {
   ZOOM_FRAMES,
   ZOOM_HEIGHT_STEP,
   ZOOM_WIDTH_STEP,
-  shrinkBlt,
 } from '../src/renderer/intro/TitleSequence';
 import {
   PRISON_LEVEL_INDEX,

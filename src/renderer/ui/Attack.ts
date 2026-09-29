@@ -35,7 +35,7 @@ import { getPartyChampion } from '../../engine/Party';
 import { getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { CHARFLAG_ATTACK_DISABLE } from '../../data/CsbwinCharacters';
 import { determineMastery } from '../../engine/skills';
-import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { Rect } from '../csbwin/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
@@ -453,12 +453,15 @@ function drawAttackDamageFlash(ui: UIState): void {
     return;
   }
 
-  const graphic = ui.getGraphicBitmap(14);
-  const rect = damage > 40
-    ? ui.uiTables.graphic230.wRectPos20202
+  // The big burst is graphic 14 as it is; the two smaller ones are it shrunk to 64x37
+  // and 42x37 (`ShrinkBLT(A2, A3, 96, 45, D5W, 37, …)`, `:1011`), each blitted whole
+  // into a rectangle of its own width.
+  const source = ui.getGraphicBitmap(14);
+  const [rect, graphic] = damage > 40
+    ? [ui.uiTables.graphic230.wRectPos20202, source]
     : damage > 15
-      ? ui.uiTables.graphic230.wRectPos20226
-      : ui.uiTables.graphic230.wRectPos20234;
+      ? [ui.uiTables.graphic230.wRectPos20226, source && shrinkBlt(source, 96, 45, 64, 37)]
+      : [ui.uiTables.graphic230.wRectPos20234, source && shrinkBlt(source, 96, 45, 42, 37)];
   if (graphic) {
     tag0088b2Index(
       graphic,

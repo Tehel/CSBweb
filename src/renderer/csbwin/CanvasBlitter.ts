@@ -140,6 +140,45 @@ export interface IndexedBitmap {
   pixels: Uint8Array;
 }
 
+/**
+ * `ShrinkBLT` (`doc/CSBwin-src/Graphics.cpp:380`) for chunky pixels.
+ *
+ * The 68000 version walks the source with a 16.16 fixed-point accumulator and picks the
+ * nearest source pixel — it is a nearest-neighbour minifier, with the colour map applied
+ * per pixel (`d.IdentityColorMap` here, so a no-op). The step and the starting value are
+ * transcribed exactly, including the truncation to sixteen bits before the shift, because
+ * which source column each destination column lands on is visible on a 48-pixel frame:
+ *
+ * ```c
+ *   D1L = srcWidth<<10;  D1L = (D1UL/D3UW) & 0xffff;  D1L <<= 6;  A2 = D1L;  // the step
+ *   D1UL >>= 1;  D1L += 0x7fff;  LOCAL_8 = D1L;                              // the start
+ * ```
+ */
+export function shrinkBlt(
+  src: IndexedBitmap,
+  srcWidth: number,
+  srcHeight: number,
+  dstWidth: number,
+  dstHeight: number,
+): IndexedBitmap {
+  const dst: IndexedBitmap = { width: dstWidth, height: dstHeight, pixels: new Uint8Array(dstWidth * dstHeight) };
+  const stepX = (Math.trunc((srcWidth * 1024) / dstWidth) & 0xffff) * 64;
+  const stepY = (Math.trunc((srcHeight * 1024) / dstHeight) & 0xffff) * 64;
+  const startX = (stepX >>> 1) + 0x7fff;
+  const startY = (stepY >>> 1) + 0x7fff;
+
+  for (let dy = 0; dy < dstHeight; dy++) {
+    const sy = Math.min(((startY + dy * stepY) / 0x10000) | 0, srcHeight - 1);
+    const srcRow = sy * src.width;
+    const dstRow = dy * dstWidth;
+    for (let dx = 0; dx < dstWidth; dx++) {
+      const sx = Math.min(((startX + dx * stepX) / 0x10000) | 0, srcWidth - 1);
+      dst.pixels[dstRow + dx] = src.pixels[srcRow + sx];
+    }
+  }
+  return dst;
+}
+
 function normalizeRectInclusive(rect: RectPos, dstWidth: number, dstHeight: number): RectPos | null {
   const x1 = clampInt(rect.x1, 0, dstWidth - 1);
   const y1 = clampInt(rect.y1, 0, dstHeight - 1);

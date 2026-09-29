@@ -143,7 +143,11 @@ live.
 
 `_FlashAttackDamage` (`Attack.cpp:949`) draws one of three starburst sizes — over 40, over
 15, the rest — with the number written right-to-left from x=274 in 3-pixel steps, so it
-centres itself whatever its width. Two negative values are messages instead: -1
+centres itself whatever its width. The big burst is graphic 14 (96x45) blitted as it is
+into `d.wRectPos20202`; the other two are graphic 14 passed through `ShrinkBLT` to 64x37
+and 42x37 (`Attack.cpp:1011`) and blitted into `d.wRectPos20226` and `d.wRectPos20234`,
+rectangles of those widths. The burst is drawn off-centre in graphic 14 so that all three
+centre on x=274, under the digits. Two negative values are messages instead: -1
 "CAN'T REACH", -2 "NEED AMMO".
 
 ## Deliberately not ported
