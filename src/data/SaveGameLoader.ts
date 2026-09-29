@@ -95,7 +95,10 @@ export interface SaveGameState {
   dungeonImageOffset?: number;
   /** Where every section of the dungeon image sits. Absent if the header did not parse. */
   imageLayout?: DungeonImageLayout;
-  /** `EXTENDEDFEATURESBLOCK.cellFlagArraySize` — the last section's length. */
+  /**
+   * `ReadDatabases`' `cellflagArraySize` — the last section's length: the Extended
+   * Features block's, or, when that is 0, the image header's word 2.
+   */
   cellFlagArraySize?: number;
   /**
    * The object indirect index. Every RN in this file — the object list, every record's
@@ -1148,7 +1151,10 @@ export function loadSaveGameState(saveData: Uint8Array): SaveGameState {
     extendedFeaturesSize: extended.offset,
     dungeonImageOffset: afterTimerQueue,
     imageLayout: layout ?? undefined,
-    cellFlagArraySize: extended.cellFlagArraySize,
+    // A file with no Extended Features block declares no size, and `ReadDatabases` then
+    // takes the image header's `LegacyCellFlagArraySize`, its word 2
+    // (`doc/CSBwin-src/SaveGame.cpp:2412-2415`, `CSB.h:2072`): the Atari-era saves.
+    cellFlagArraySize: extended.cellFlagArraySize || readU16BE(saveData, afterTimerQueue + 2),
     objectIndex: extended.objectIndex,
     timerQueue,
     timerSequence: block2.timerSequence,

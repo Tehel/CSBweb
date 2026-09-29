@@ -19,8 +19,8 @@
  * block offset and size are all right. A single wrong byte anywhere in a block fails
  * its checksum and throws.
  *
- * The files live in `static/gamefiles/saves/` and are read-only inputs — the tool
- * never writes to them.
+ * The files live in `static/gamefiles/saves/`, with Chaos Strikes Back's two in its own
+ * folder, and are read-only inputs — the tool never writes to them.
  *
  * Run: `npx tsx tools/dump-csbwin-save.ts [path-or-directory]`
  */
@@ -40,11 +40,17 @@ import {
 } from '../src/data/CsbwinSaveInfo';
 import { check, finish } from './lib/check';
 import { readU16BE } from '../src/core/bytes';
+import { OBJECT_ID_NULL } from '../src/core/types';
 
 const DB_NAMES = ['door', 'telep', 'text', 'actuator', 'creature', 'weapon', 'clothing',
   'scroll', 'potion', 'container', 'misc', 'EXPOOL', 'db12', 'db13', 'missile', 'cloud'];
 
 const DEFAULT_DIR = 'static/gamefiles/saves';
+/**
+ * Chaos Strikes Back's own files, read beside DM's by default: Atari-era saves with no
+ * Extended Features block (`tools/dump-atari-saves.ts`).
+ */
+const CSB_SAVES = ['mini.dat', 'csbgame2.dat'].map((n) => `static/gamefiles/csb/${n}`);
 
 /** The `:Zone.Identifier` files are Windows alternate-data-stream droppings, not saves. */
 function isSaveFile(name: string): boolean {
@@ -64,7 +70,9 @@ function collectSaves(target: string): string[] {
 }
 
 function main(): void {
-  const saves = collectSaves(process.argv[2] ?? DEFAULT_DIR);
+  const saves = process.argv[2]
+    ? collectSaves(process.argv[2])
+    : [...collectSaves(DEFAULT_DIR), ...CSB_SAVES.flatMap(collectSaves)];
   if (saves.length === 0) {
     // The fixtures are committed, so this should not happen; if someone strips the
     // game files it must say so rather than pass silently on nothing.
@@ -81,7 +89,9 @@ function main(): void {
 
   for (const path of saves) {
     const bytes = new Uint8Array(readFileSync(path));
-    const name = path.split('/').pop() ?? path;
+    // CSB's `csbgame2.dat` shares a name with DM's, and the rosters are keyed by name.
+    const base = path.split('/').pop() ?? path;
+    const name = CSB_SAVES.some((p) => resolve(p) === path) ? `CSB ${base}` : base;
     console.log(`\n=== ${name} — ${bytes.length} bytes ===`);
 
     let state;
@@ -200,10 +210,11 @@ function main(): void {
 
     check(state.missiles !== undefined, `${name}: the missile database should parse`);
     if (state.missiles) {
-      // A record is only in flight if a timer is driving it. `timerIndex == 0xffff`
-      // marks a free slot in the pool, and the pool is always allocated at full size —
-      // all twelve sample saves carry 60 records whatever is happening on screen.
-      const live = state.missiles.filter((m) => m.timerIndex !== 0xffff);
+      // A record is free when its link is `RNnul`, CSBWin's own test
+      // (`doc/CSBwin-src/data.cpp:946`, `:960`). The pool is always allocated at full
+      // size, 60 records whatever is happening on screen, and a free record's other
+      // words are whatever was left in them, so they say nothing about it.
+      const live = state.missiles.filter((m) => m.nextObject !== OBJECT_ID_NULL);
       console.log(`    missiles in flight: ${live.length} of ${state.missiles.length} pool slots`);
       for (const m of live) {
         console.log(`      projectile=0x${m.projectileObject.toString(16)} range=${m.rangeRemaining} ` +

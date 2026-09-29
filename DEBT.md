@@ -86,7 +86,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C87 | A save with no Extended Features does not load | S | ⏳ |
 | C88 | `DM_rules` is not modelled | S | ⏳ |
 | C89 | `ExtendPortraits` is not ported: DM's mirrors keep bits CSBWin clears | S | ⏳ |
 | G16 | A compressed `dungeon.dat` | S | ⏳ |
@@ -131,21 +130,6 @@ Empty. New architecture debt goes here, and jumps the queue.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C87 — A save with no Extended Features does not load
-
-A save written without the Extended Features prefix (the Atari-era format, which is what
-Chaos Strikes Back ships: `mini.dat` and `csbgame2.dat` in
-`static/gamefiles/CSB_Windows_x86-32_20151213/`) carries no `cellFlagArraySize`, and
-`ReadDatabases` then takes the image header's `word2`, `LegacyCellFlagArraySize()`
-(`doc/CSBwin-src/SaveGame.cpp:2412-2415`, `CSB.h:2072`). `loadCsbwinWorld`
-(`src/data/CsbwinDungeonImage.ts`) takes 0 instead, so both files fail its closure check
-("cell flags end at 34050, file ends at 42813"). The port reads the word as
-`DungeonHeader.mapDataSize`. It is 8763 in both files, which closes the layout on the
-file's last word exactly. With that fallback (tried in a scratch script) both load:
-11 levels, blocks 1-6 passing their checksums, the conversions giving a save-shaped world,
-and a `Game` on CSB's `graphics.dat` running 600 ticks from either. The fix owes a check
-over both files in a `tools/` script, the CSB folder's saves beside DM's.
-
 ### C88 — `DM_rules` is not modelled
 
 `DM_rules` is CSBWin's one switch between the two games' rules, and it is read in one
@@ -189,7 +173,7 @@ block leaves it as it was. So it runs on every file without the block, whichever
 belongs to:
 - DM's `dm-atari/dungeon.dat`;
 - Chaos Strikes Back's compressed `dungeon.dat` (the prison, G16);
-- CSB's Atari-format saves `mini.dat` and `csbgame2.dat` (C87).
+- CSB's Atari-format saves `mini.dat` and `csbgame2.dat`.
 
 It also runs on a file whose block lacks the flag. It never runs on a file either program
 writes: `SaveGame` always sets the flag (`:961-963`), `buildLiveExtendedFeatures` does too,
@@ -230,8 +214,8 @@ decides.
   a proof.
 
 All three touch different data, so their order among themselves does not matter. CSB's
-prison cannot be checked for mirrors until G16 expands it, nor its saves until C87 loads
-them.
+prison cannot be checked for mirrors until G16 expands it. Its two saves load
+(`tools/dump-atari-saves.ts`) and have not been checked for mirrors.
 
 The fix owes a `tools/` check: load `dm-atari/dungeon.dat` and assert the 24 mirrors are
 cleaned, mirror 286's `State` is 0, and every other record is untouched; then load a
@@ -287,9 +271,10 @@ page runs on DM's monsters and spells. The title animation and the credits read
 title. Item 0x231 is the long form in CSB's file (0x804 bytes, where DM's and Conflux's
 are 0x7d4, `CSBCode.cpp:10135-10151`): `extractUITables` then reads `d.Buttons16932` from
 it rather than `MISSING_PRISON_DOOR_BUTTONS`, and no data set has yet proven that path or
-the offsets of the tables after it. That wants a canary. The CSB folder has no
-`CSBgraphics.dat`, which CSBWin opens only on demand for its extensions
-(`Graphics.cpp:1840-1858`, `:3201-3273`).
+the offsets of the tables after it. That wants a canary. `static/gamefiles/csb/` holds
+the CSB Windows package's `dungeon.dat`, `graphics.dat`, `mini.dat` and `csbgame2.dat`,
+and no `CSBgraphics.dat`, which the package lacks too and CSBWin opens only on demand
+for its extensions (`Graphics.cpp:1840-1858`, `:3201-3273`).
 
 What is needed: a data set per game (a folder, its files, a name), chosen before
 `loadGameFiles`, and everything built from it — the tables, the sound, the intro — with
@@ -324,7 +309,8 @@ CSBWin makes a CSB game in three steps (the utility's own header,
    maximum with minimum 30 (Luck 10), skills' `tempAdjust` 0 but experience kept, every
    possession slot empty, `RandomGameID + 1`, and `Word22594`. It writes the result as a
    new save (`_TAG000fc4`, `:1643-1898`).
-3. **DUNGEON → Resume** loads that save, which needs C87.
+3. **DUNGEON → Resume** loads that save. An Atari-era save, with no Extended Features
+   block, loads (`tools/dump-atari-saves.ts`).
 
 A DM party can therefore be carried into CSB, which is the classic way to play it.
 **How the port offers step 2 (the author's decision): its engine only.** Port the

@@ -1844,7 +1844,8 @@ how those older files were produced. Do not "fix" the reader for it.
 ## The dungeon image layout in a save file, and the two record sizes that change
 
 Blocks 7-14 of a save (the dungeon image) are plain and uncompressed. This is the
-layout, all of it now verified: for **twelve genuine save files** the sum of every
+layout, all of it now verified: for **sixteen genuine save files** (fourteen of DM, and
+Chaos Strikes Back's `mini.dat` and `csbgame2.dat`) the sum of every
 section length from the 44-byte header to the end of the cell flags lands exactly on
 `EOF - 2`, the byte before `WriteAndChecksum`'s final word
 (`doc/CSBwin-src/SaveGame.cpp:1222`). One wrong record size anywhere and it misses.
@@ -1856,7 +1857,7 @@ section length from the 44-byte header to the end of the cell flags lands exactl
 2  * objectListSize          objectList
    … text section, below …
 Σ  count[db] * size[db]      the 16 databases, in order
-cellFlagArraySize            cell flags        (from EXTENDEDFEATURESBLOCK+48)
+cellFlagArraySize            cell flags        (EXTENDEDFEATURESBLOCK+48, else header word 2)
 2                            final checksum
 ```
 
@@ -1892,6 +1893,14 @@ Two traps in three lines:
   big-endian image. `SwapIndirectTextIndex` guards the write the same way
   `SwapExtendedFeaturesBlock` does, so on the shipping little-endian build it is a
   no-op and the block keeps native order.
+
+**A save with no Extended Features block declares no cell flag size.** `ReadDatabases`
+then takes the image header's `LegacyCellFlagArraySize`, its word 2
+(`doc/CSBwin-src/SaveGame.cpp:2412-2415`, `CSB.h:2072`), and does so too when the block
+declares 0. Chaos Strikes Back ships its saves in that Atari-era form: `mini.dat` and
+`csbgame2.dat` (`static/gamefiles/csb/`) carry no block, their word 2 is 8763, and with it the layout closes on the
+final word. 8763 is also the extent of the eleven levels' cell flags and tables as their
+descriptors place them. Covered by `tools/dump-atari-saves.ts`.
 
 Two independent confirmations beyond the closure sum: a 48-byte window lifted from
 `dungeon.dat`'s map-data section is found in an early save exactly at the computed cell
