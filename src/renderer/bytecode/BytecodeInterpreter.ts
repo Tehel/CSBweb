@@ -12,14 +12,13 @@ import {
 import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
 import { ViewportDraw, viewportRandom } from './ViewportDraw';
+import { DrawFloorDecorations, DrawWallDecoration, drawWallText } from './DrawDecorations';
+import { DrawDoor, DrawDoorSwitch, DrawTeleporter } from './DrawDoor';
 import {
   bltShapeToViewportIndex,
-  cropBitmap,
   IDENTITY_COLOR_MAP,
   shrinkBlt,
   tag0088b2Explicit,
-  tag0088b2Index,
-  tag008c98Index,
   type IndexedBitmap,
   type PaletteIndexViewportBuffer
 } from '../csbwin/CanvasBlitter';
@@ -38,7 +37,7 @@ import {
   monsterWord4Bit8,
 } from '../../data/tables/MonsterDesc';
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
-import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
+import type { CSBGraphicsLoader } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
 import { applyLimits } from '../../core/intCast';
 
@@ -1081,7 +1080,7 @@ export class BytecodeInterpreter {
     }
 
     const floorCell = BytecodeInterpreter.floorDrawingLocations[relativeCell | 0] ?? 0;
-    this.drawFloorDecorations(floorGraphicOrdinal | 0, floorCell | 0);
+    DrawFloorDecorations(this.draw, floorGraphicOrdinal | 0, floorCell | 0);
     return true;
   }
 
@@ -1188,7 +1187,7 @@ export class BytecodeInterpreter {
   }
 
   private opStdDrawDoorSwitch(): boolean {
-    // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2886-2889, CSBCode.cpp:4065+)
+    // CSBWin `StdDrawDoorSwitch` (Viewport.cpp:2886-2889)
     const distance = this.stack.pop();
     const switchId = this.stack.pop();
 
@@ -1197,47 +1196,7 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    const doorSwitchId = switchId | 0;
-    if (doorSwitchId === 0) return true;
-
-    const tables = this.context.objectTables;
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!tables || !viewport || !getGraphic) return true;
-
-    const setIndex = tables.doorSwitchRectIndex[doorSwitchId - 1] ?? 0;
-    const rectSet = tables.doorSwitchRectSets[setIndex];
-    const srcSet = tables.doorSwitchSourceDescSets[setIndex];
-    const distanceIndex = distance | 0;
-    if (distanceIndex < 0 || distanceIndex > 3) return true;
-    const desc = rectSet?.[distanceIndex];
-    if (!desc) return true;
-
-    const graphicNum = 315 + (doorSwitchId - 1);
-    const base = getGraphic(graphicNum);
-    if (!base) return true;
-
-    const srcDesc = srcSet?.[0] ?? desc;
-    const srcWidthBytes = srcDesc.widthBytes | 0;
-    const srcWidth = srcWidthBytes > 0 ? srcWidthBytes * 2 : base.width;
-    const srcHeight = (srcDesc.height | 0) > 0 ? (srcDesc.height | 0) : base.height;
-    const destWidth = (desc.x2 | 0) - (desc.x1 | 0) + 1;
-    const rawDestHeight = desc.height | 0;
-    const destHeight = rawDestHeight > 0 ? rawDestHeight : (desc.y2 | 0) - (desc.y1 | 0) + 1;
-    if (destWidth <= 0 || destHeight <= 0) return true;
-
-    let bitmap = cropBitmap(base, srcWidth, srcHeight);
-    if (distanceIndex !== 3) {
-      const colorMap = distanceIndex === 2 ? tables.colorMapMedium : tables.colorMapFar;
-      bitmap = this.draw.scaleIndexedBitmap(bitmap, destWidth, destHeight, colorMap);
-    }
-
-    bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
-
-    if (distanceIndex === 3 && this.context.doorSwitchRects) {
-      this.context.doorSwitchRects.push({ x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
-    }
-
+    DrawDoorSwitch(this.draw, switchId | 0, distance | 0);
     return true;
   }
 
@@ -1295,7 +1254,7 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    this.drawTeleporter(teleporterRect, wallRect);
+    DrawTeleporter(this.draw, teleporterRect, wallRect);
     return true;
   }
 
@@ -1322,145 +1281,10 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    const doorGraphics = this.context.doorGraphics;
-    const dungeon = this.context.dungeonState;
-    if (!doorGraphics || !dungeon) {
-      // (skip) StdDrawDoor missing doorGraphics/dungeonState
-      return true;
-    }
-
-    const record = dungeon.getDoorRecordByIndex(doorRecordIndex | 0);
-    if (!record) {
-      // (skip) StdDrawDoor invalid doorRecordIndex=${doorRecordIndex}
-      return true;
-    }
-
-    const doorType = record.doorType & 1;
-    const dg = doorGraphics[doorGraphicIndex | 0];
-    const doorGraphicNum = dg?.[doorType] ?? -1;
-    if (doorGraphicNum < 0) {
-      // (skip) StdDrawDoor invalid doorGraphicIndex=${doorGraphicIndex}
-      return true;
-    }
-
-    const getGraphic = this.context.getGraphicBitmap;
-    const viewport = this.context.viewportIndexBuffer;
-    if (!getGraphic || !viewport) return true;
-
-    const graphic = getGraphic(doorGraphicNum);
-    if (!graphic) {
-      // (skip) StdDrawDoor could not load door graphic ${doorGraphicNum}
-      return true;
-    }
-
-    const s = doorState | 0;
-    if (s === 0) return true; // fully open
-
-    // `StdDrawDoor`: door graphic index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2594-2598`).
-    const nearness = 2 - (doorGraphicIndex | 0);
-
-    // `DrawDoor` copies the door's graphic into `tempBitmap` and draws on the copy
-    // (`doc/CSBwin-src/CSBCode.cpp:4151-4154`). The port copies only when an ornament is
-    // drawn, and again after a mirror or a flip, whose result is cached and shared.
-    let bitmap: IndexedBitmap = graphic;
-    let ownBitmap = false;
-    const drawOrnament = (ornament: number, near: number) => {
-      if (ornament === 0) return; // `TAG004b26` returns at once (`:4002`)
-      if (!ownBitmap) {
-        bitmap = { width: bitmap.width, height: bitmap.height, pixels: bitmap.pixels.slice() };
-        ownBitmap = true;
-      }
-      this.drawDoorOrnament(bitmap, ornament, near);
-    };
-
-    drawOrnament(record.ornateNumber, nearness); // `:4155`
-
-    // A "lightning door" (`d.DoorTOC[doorType] & 0x400`) redraws with a random
-    // mirror and a random vertical flip every frame it isn't bashed
-    // (`doc/CSBwin-src/CSBCode.cpp:4156-4166`) — CSBWin's cheap energy-field
-    // shimmer. `STRandomBool()` there reads whatever stream is currently swapped
-    // into `d.RandomNumber`, which `DrawViewport` sets to a viewport-only stream for
-    // exactly this reason (`doc/CSBwin-src/Viewport.cpp:6706-6707`) — rendering must
-    // never perturb the game's own RNG, so this draws from a dedicated instance.
-    const isLightningDoor = ((this.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
-    if (isLightningDoor && s !== 5) {
-      if (viewportRandom.bool()) {
-        bitmap = this.draw.getMirroredBitmap(bitmap);
-        ownBitmap = false;
-      }
-      if (viewportRandom.bool()) {
-        bitmap = this.draw.getFlippedBitmapVertical(bitmap);
-        ownBitmap = false;
-      }
-    }
-
-    // The near door under See-Thru-Walls (`:4168-4174`).
-    if ((rectPtr | 0) === StdRectPtr.RECT_StdDoorRectsF1 && this.context.seeThroughWalls) drawOrnament(17, 2);
-
-    const blit = (r: RectPos | undefined) => {
-      if (!r) return;
-      bltShapeToViewportIndex(bitmap, viewport, r);
-    };
-
-    if (s === 4 || s === 5) {
-      if (s === 5) drawOrnament(16, nearness); // bashed (`:4184`)
-      blit(rectRef[0]);
-      return true;
-    }
-
-    // 1..3: opening/closing
-    const modeUp = record.vertical; // CSBWin DB0.mode(): 1=up, 0=sideways
-    if (modeUp) {
-      blit(rectRef[s]);
-    } else {
-      blit(rectRef[3 + s]); // left half
-      blit(rectRef[6 + s]); // right half
-    }
-
+    // `d.DoorGraphic[doorGraphicIndex]`; index 0 is F1, nearness 2 (`doc/CSBwin-src/Viewport.cpp:2591-2598`).
+    const graphicIndex = doorGraphicIndex | 0;
+    DrawDoor(this.draw, doorRecordIndex | 0, doorState | 0, this.context.doorGraphics?.[graphicIndex], 2 - graphicIndex, rectRef);
     return true;
-  }
-
-  /**
-   * `TAG004b26` (`doc/CSBwin-src/CSBCode.cpp:3993-4059`): draws door ornament `ornament`,
-   * slot `ornament - 1` of `d.Word2514`, onto `door`, a copy of the door's graphic at
-   * `nearness` (0 F3, 1 F2, 2 F1), with colour 9 transparent. At F1 the ornament is its
-   * graphic; nearer than that it is shrunk from its F1 size to the rectangle's through
-   * `d.Byte4172` (F3) or `d.Byte4188` (F2), the derived graphic `68 + 2*slot + nearness`.
-   */
-  private drawDoorOrnament(door: IndexedBitmap, ornament: number, nearness: number): void {
-    const tables = this.context.objectTables;
-    const getGraphic = this.context.getGraphicBitmap;
-    const slot = this.context.doorOrnaments?.[ornament - 1];
-    if (!tables || !getGraphic || !slot) return;
-    const [graphicNum, set] = slot;
-    const rect = tables.doorOrnamentRectSets[set][nearness];
-    const graphic = getGraphic(graphicNum);
-    if (!graphic) return;
-
-    let ornamentBitmap = graphic;
-    if (nearness !== 2) {
-      const cache = this.context.graphicCache;
-      const key = `doorOrnament:${graphicNum}:${set}:${nearness}`;
-      const cached = cache?.get(key);
-      if (cached) {
-        ornamentBitmap = cached;
-      } else {
-        const size = tables.doorOrnamentRectSets[set][2]; // `Byte5058[18*set]`
-        const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
-        const cropped = cropBitmap(graphic, 2 * size.widthBytes, size.height);
-        ornamentBitmap = shrinkBlt(
-          cropped,
-          cropped.width,
-          cropped.height,
-          rect.x2 - rect.x1 + 1,
-          rect.height,
-          colorMap
-        );
-        cache?.set(key, ornamentBitmap);
-      }
-    }
-
-    tag0088b2Index(ornamentBitmap, door, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 9);
   }
 
   private opStdDrawWallDecoration(): boolean {
@@ -1479,7 +1303,8 @@ export class BytecodeInterpreter {
     // CSBWin passes the cell's `championPortraitOrdinal` as the fourth argument
     // (`doc/CSBwin-src/Viewport.cpp:2946-2950`); `SummarizeRoomInfo` set it from the
     // type-127 actuator on the wall the party is facing.
-    this.hasAlcove = this.drawWallDecoration(
+    this.hasAlcove = DrawWallDecoration(
+      this.draw,
       graphicOrdinal | 0,
       wallDecorationDrawLocation | 0,
       (rd?.championPortraitOrdinal ?? 0) | 0,
@@ -1500,574 +1325,9 @@ export class BytecodeInterpreter {
 
     const rd = this.context.roomData[relativeCell | 0];
     const textRN = rd?.text[(wallDecorationPos as 0 | 1 | 2) ?? 0] ?? OBJECT_ID_EOF;
-    this.drawWallText(textRN as ObjectID, wallDecorationDrawLocation | 0, this.removeMortarJoint);
+    drawWallText(this.draw, textRN as ObjectID, wallDecorationDrawLocation | 0, this.removeMortarJoint);
     this.removeMortarJoint = true;
     return true;
-  }
-
-  /**
-   * `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3133`) — the picture frame, and
-   * then the champion portrait inside it.
-   *
-   * The two halves are independent: `PORTRAIT_HideGraphic` leaves `graphicOrdinal` at 0
-   * with a portrait still to draw, and every other decoration has no portrait, so
-   * CSBWin bails only when *both* are absent (`:3191`) and draws the frame only when
-   * `graphicIndex >= 0` (`:3673`).
-   */
-  private drawWallDecoration(
-    graphicOrdinal: number,
-    relativePosition: number,
-    championPortraitOrdinal = 0,
-  ): boolean {
-    if (graphicOrdinal === 0 && championPortraitOrdinal === 0) return false;
-
-    const isAlcove = graphicOrdinal !== 0
-      ? this.drawWallDecorationGraphic(graphicOrdinal, relativePosition)
-      : false;
-
-    // `if (relativePosition == 12)` (`:3685`) — only the wall the party stands against
-    // is close enough to show a face.
-    if (relativePosition === 12) {
-      this.drawChampionPortrait(championPortraitOrdinal);
-    }
-    return isAlcove;
-  }
-
-  /**
-   * The frame half of `DrawWallDecoration`: everything under CSBWin's
-   * `if (graphicIndex >= 0)`.
-   */
-  private drawWallDecorationGraphic(graphicOrdinal: number, relativePosition: number): boolean {
-    const tables = this.context.objectTables;
-    const dungeon = this.context.dungeonState;
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    const csbGraphics = this.context.csbGraphics;
-    if (!tables || !dungeon || !viewport || !getGraphic) return false;
-
-    if ((graphicOrdinal & 0x10000) !== 0) {
-      if (!csbGraphics) return false;
-      this.drawExtendedWallDecoration(csbGraphics, graphicOrdinal, relativePosition);
-      return false;
-    }
-
-    const map = dungeon.getMap(this.context.frameMapIndex ?? 0);
-    if (!map?.wallDecorationTOC) return false;
-
-    // CSBWin: `graphicIndex = graphicOrdinal-1` (CSBCode.cpp:3179-3183)
-    const graphicIndex = (graphicOrdinal - 1) | 0;
-    const numWallDecoration = this.context.numWallDecoration ?? 0;
-    if (graphicIndex < 0 || graphicIndex > numWallDecoration) return false;
-
-    const decorationIndex = graphicIndex === numWallDecoration ? 0 : (map.wallDecorationTOC[graphicIndex] ?? 0);
-    const isAlcove = this.isAlcoveDecorationIndex(decorationIndex, tables);
-    const rectSetId = tables.wallDecorationRectSetIndex[decorationIndex] ?? 0;
-    const rectSetIndex = rectSetId & 0xff;
-    if (rectSetIndex >= tables.wallDecorationRectSets.length) return isAlcove;
-
-    const rectSet = tables.wallDecorationRectSets[rectSetIndex];
-    const desc = rectSet?.[relativePosition];
-    if (!desc) return isAlcove;
-
-    const x1 = desc.x1 | 0;
-    const y1 = desc.y1 | 0;
-    const x2 = desc.x2 | 0;
-    const y2 = desc.y2 | 0;
-    const dstW = x2 - x1 + 1;
-    const dstH = y2 - y1 + 1;
-    if (dstW <= 0 || dstH <= 0) return isAlcove;
-
-    // CSBWin: `relativePosition % 5 > 1` selects front view; otherwise side view (CSBCode.cpp:3171-3176).
-    const frontView = (relativePosition % 5) > 1;
-    const graphicNum = 121 + 2 * decorationIndex + (frontView ? 1 : 0);
-
-    const src = getGraphic(graphicNum);
-    if (!src) return isAlcove;
-
-    const distanceBand = Math.floor(relativePosition / 5); // 0=F3, 1=F2, 2=F1
-    const mirror = relativePosition === 11 || relativePosition === 6 || relativePosition === 1;
-    if (relativePosition === 12) {
-      if (this.context.viewportObjectButtons?.[5]) {
-        const button = this.context.viewportObjectButtons[5];
-        button.x1 = x1;
-        button.x2 = x2;
-        button.y1 = y1;
-        button.y2 = y2;
-      }
-      if (this.context.facingAlcove !== undefined) this.context.facingAlcove = isAlcove;
-      if (this.context.facingViAltar !== undefined) this.context.facingViAltar = decorationIndex === 2;
-      if (this.context.facingWaterFountain !== undefined) {
-        const fountainIdx = tables.fountainDecorationIndex;
-        this.context.facingWaterFountain = decorationIndex === (fountainIdx | 0);
-      }
-    }
-
-    if (relativePosition >= 10) {
-      const bitmap = mirror ? this.draw.getMirroredBitmap(src) : src;
-      bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2 });
-      return isAlcove;
-    }
-
-    const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
-    let pWidthDescriptor = desc;
-    let pSrcSizeDescriptor = rectSet?.[12];
-    if (relativePosition === 6 || relativePosition === 1) {
-      pSrcSizeDescriptor = rectSet?.[11];
-    } else if (relativePosition === 5 || relativePosition === 0) {
-      pSrcSizeDescriptor = rectSet?.[10];
-    }
-    if (relativePosition === 7 || relativePosition === 9) {
-      pWidthDescriptor = rectSet?.[8] ?? desc;
-    }
-    const finalBitmapWidth = (pWidthDescriptor.x2 | 0) - (pWidthDescriptor.x1 | 0);
-    let widthPixels = src.width | 0;
-    let heightPixels = src.height | 0;
-    widthPixels = (widthPixels + 15) & ~15;
-    let widthBytes = widthPixels >> 1;
-    if (pSrcSizeDescriptor) {
-      if (widthBytes > (pSrcSizeDescriptor.widthBytes | 0)) widthBytes = pSrcSizeDescriptor.widthBytes | 0;
-      if (heightPixels > (pSrcSizeDescriptor.height | 0)) heightPixels = pSrcSizeDescriptor.height | 0;
-    }
-    widthPixels = widthBytes * 2;
-    const cropped = cropBitmap(src, widthPixels, heightPixels);
-
-    const scaled = this.draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
-
-    // `srcOffsetX` (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). Positions 7 and 9 scale the
-    // decoration to the width of the F2 *centre* rectangle (`rectSet[8]`, chosen above),
-    // which is wider than the slot they are drawn into, because a decoration at the edge
-    // of the screen is only partly visible. Which part depends on the side:
-    //
-    //   - position 9 (F2 front-right) runs off the *right* edge, so it shows its left
-    //     end and the offset is 0;
-    //   - position 7 (F2 front-left) runs off the *left* edge, so it must show its
-    //     **right** end — CSBWin's "Jst ahead to the left. Truncate graphic" (`:3551`).
-    //
-    // Without this, position 7 drew its left end into a slot flush against the left
-    // border: cropped on the wrong side, and with the transparent margin that should
-    // have been off-screen left as a visible gap.
-    let srcOffsetX = 0;
-    if (relativePosition === 7) {
-      srcOffsetX = finalBitmapWidth - ((desc.x2 | 0) - (desc.x1 | 0));
-    }
-    // CSBWin also sets `srcOffsetX = 15 - (finalBitmapWidth & 15)` for the mirrored
-    // far-right sidewalls (positions 1 and 6, `:3536`). That is **not** ported, and
-    // deliberately: it compensates for `MakeMirror` reversing a byte-aligned buffer of
-    // `pWDP->width` bytes, which leaves the image `ceil16(w) - w` pixels from the left.
-    // `getMirroredBitmap` reverses the exact `finalBitmapWidth + 1` bitmap, so ours is
-    // already flush at 0 and the same offset would shift it wrongly.
-
-    bltShapeToViewportIndex(scaled, viewport, { x1, y1, x2, y2, srcX: srcOffsetX });
-    return isAlcove;
-  }
-
-  /**
-   * The portrait half of `DrawWallDecoration` (`doc/CSBwin-src/CSBCode.cpp:3686-3716`).
-   *
-   * `championPortraitOrdinal` is 1-based, so 0 means "no portrait" and the ordinal is
-   * decremented to CSBWin's `charID` before use. Graphic 26 is a 256x87 sheet of 32x29
-   * cells, 8 per row: `srcX = (charID & 7) << 5`, `srcY = 29 * (charID >> 3)`. The
-   * transparent colour is **1**, not the 10 that `BltShapeToViewport` uses, so the
-   * mirror's glass shows around the head.
-   */
-  private drawChampionPortrait(championPortraitOrdinal: number): void {
-    if (championPortraitOrdinal === 0) return;
-    const charID = (championPortraitOrdinal - 1) | 0;
-
-    const viewport = this.context.viewportIndexBuffer;
-    const rect = this.context.championPortraitRect;
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!viewport || !rect || !getGraphic) return;
-
-    if (charID > 23) {
-      // `GetExternalPortraitAddress` (`:3706`) — a CSB dungeon may ship its own
-      // portraits outside graphic 26. ⏳ Not supported; the shipped DM dungeon uses
-      // charIDs 0..23 only.
-      return;
-    }
-
-    const sheet = getGraphic(26);
-    if (!sheet) return;
-
-    tag0088b2Index(
-      sheet,
-      viewport,
-      {
-        x1: rect.x1 | 0,
-        y1: rect.y1 | 0,
-        x2: rect.x2 | 0,
-        y2: rect.y2 | 0,
-        srcX: (charID & 7) << 5,
-        srcY: 29 * (charID >> 3),
-        srcStride: sheet.width,
-      },
-      1,
-    );
-  }
-
-  private isAlcoveDecorationIndex(decorationIndex: number, tables: ObjectTables): boolean {
-    const alcoves = tables.alcoveDecorationIndices;
-    for (let i = 0; i < alcoves.length; i++) {
-      if ((alcoves[i] ?? 0xff) === decorationIndex) return true;
-    }
-    return false;
-  }
-
-  private drawExtendedWallDecoration(
-    csbGraphics: CSBGraphicsLoader,
-    graphicOrdinal: number,
-    relativePosition: number
-  ): void {
-    const tables = this.context.objectTables;
-    const viewport = this.context.viewportIndexBuffer;
-    if (!tables || !viewport) return;
-
-    const id = graphicOrdinal & 0xffff;
-    if (id === 0) return;
-
-    const ext = csbGraphics.getWallDecoration(id);
-    if (!ext) return;
-
-    const desc = ext.desc[relativePosition];
-    if (!desc) return;
-
-    const dstW = (desc.x2 | 0) - (desc.x1 | 0) + 1;
-    const dstH = (desc.y2 | 0) - (desc.y1 | 0) + 1;
-    if (dstW <= 0 || dstH <= 0) return;
-
-    const frontView = (relativePosition % 5) > 1;
-    const srcBitmap = frontView ? ext.frontBitmap : ext.sideBitmap;
-
-    if (relativePosition >= 10) {
-      const mirror = relativePosition === 11;
-      const bitmap = mirror ? this.draw.getMirroredBitmap(srcBitmap) : srcBitmap;
-      bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
-      return;
-    }
-
-    const farRightSidewall = relativePosition === 6 || relativePosition === 1;
-    const pWDP = desc;
-    let pWidthDescriptor = pWDP;
-    let pSrcSizeDescriptor = ext.desc[12];
-    if (farRightSidewall) {
-      pSrcSizeDescriptor = ext.desc[11];
-    } else if (relativePosition === 5 || relativePosition === 0) {
-      pSrcSizeDescriptor = ext.desc[10];
-    }
-    if (relativePosition === 7 || relativePosition === 9) {
-      pWidthDescriptor = ext.desc[8];
-    }
-
-    const finalBitmapWidth = (pWidthDescriptor.x2 | 0) - (pWidthDescriptor.x1 | 0);
-    const sourceRect = frontView ? ext.desc[12] : ext.desc[11];
-    let widthPixels = (sourceRect.x2 | 0) - (sourceRect.x1 | 0) + 1;
-    let heightPixels = sourceRect.height | 0;
-    widthPixels = (widthPixels + 15) & ~15;
-    let widthBytes = widthPixels >> 1;
-    if (widthBytes > (pSrcSizeDescriptor.widthBytes | 0)) widthBytes = pSrcSizeDescriptor.widthBytes | 0;
-    if (heightPixels > (pSrcSizeDescriptor.height | 0)) heightPixels = pSrcSizeDescriptor.height | 0;
-    widthPixels = widthBytes * 2;
-
-    const cropped = cropBitmap(srcBitmap, widthPixels, heightPixels);
-    const distanceBand = relativePosition <= 4 ? 0 : 1;
-    const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
-    let derived = this.draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
-
-    let srcOffsetX = 0;
-    if (farRightSidewall) {
-      derived = this.draw.getMirroredBitmap(derived);
-      srcOffsetX = 15 - (finalBitmapWidth & 15);
-    } else if (relativePosition === 7) {
-      const w = (pWDP.x2 | 0) - (pWDP.x1 | 0);
-      srcOffsetX = finalBitmapWidth - w;
-    }
-
-    const rect: RectPos = {
-      x1: pWDP.x1,
-      y1: pWDP.y1,
-      x2: pWDP.x2,
-      y2: pWDP.y2,
-      srcX: srcOffsetX,
-      srcY: 0,
-    };
-    bltShapeToViewportIndex(derived, viewport, rect);
-  }
-
-  private drawWallText(textRN: ObjectID, relativePosition: number, removeMortarJoint: boolean): void {
-    if (textRN === OBJECT_ID_EOF) return;
-
-    const tables = this.context.objectTables;
-    const dungeon = this.context.dungeonState;
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!tables || !dungeon || !viewport || !getGraphic) return;
-
-    // CSBWin draws real text only on the front wall immediately in front of the party (relativePosition==12).
-    if (relativePosition !== 12) {
-      const numWallDecoration = this.context.numWallDecoration ?? 0;
-      this.drawWallDecoration(numWallDecoration + 1, relativePosition);
-      return;
-    }
-
-    const rec = dungeon.getTextRecord(textRN);
-    if (!rec) return;
-
-    const textBytes = dungeon.decodeWallTextBytes(rec, tables.textDecode);
-    if (!textBytes) return;
-
-    const font = getGraphic(120);
-    if (!font) return;
-
-    if (removeMortarJoint) {
-      const wall = this.context.wallBitmaps?.[2];
-      const wallRect = this.context.wallRectangles?.[6];
-      const wallTextRect = tables.wallTextRect;
-      if (wall && wallRect && wallTextRect) {
-        const rect: RectPos = {
-          x1: wallTextRect.x1,
-          x2: wallTextRect.x2,
-          y1: wallTextRect.y1,
-          y2: wallTextRect.y2,
-          srcX: 94,
-          srcY: 28,
-          srcStride: wallRect.srcStride,
-          srcWidth: wallRect.srcWidth,
-          srcHeight: wallRect.srcHeight,
-        };
-        tag0088b2Index(wall, viewport, rect, -1);
-      }
-    }
-
-    let idx = 0;
-    let lineIdx = 0;
-    while (idx < textBytes.length && lineIdx < tables.wallTextLineY2.length) {
-      let lineStart = idx;
-      let lineLen = 0;
-      while (idx < textBytes.length && textBytes[idx] < 0x80) {
-        lineLen++;
-        idx++;
-      }
-      if (lineLen === 0) {
-        const term = textBytes[idx] ?? 0x81;
-        idx++;
-        lineIdx++;
-        if (term === 0x81) break;
-        continue;
-      }
-
-      if (lineLen > 18) lineLen = 18;
-      const y2 = tables.wallTextLineY2[lineIdx] ?? 60;
-      let x = 112 - 4 * lineLen;
-
-      for (let i = 0; i < lineLen; i++) {
-        const code = textBytes[lineStart + i] ?? 0;
-        const rect = { x1: x, y1: y2 - 7, x2: x + 7, y2, srcX: 8 * code, srcY: 0, srcWidth: 8, srcHeight: 8 };
-        bltShapeToViewportIndex(font, viewport, rect);
-        x += 8;
-      }
-
-      const term = textBytes[idx] ?? 0x81;
-      idx++;
-      lineIdx++;
-      if (term === 0x81) break;
-    }
-  }
-
-  private drawFloorDecorations(graphicOrdinal: number, relativeCell: number): void {
-    const tables = this.context.objectTables;
-    const dungeon = this.context.dungeonState;
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    const csbGraphics = this.context.csbGraphics;
-    if (!tables || !dungeon || !viewport || !getGraphic) return;
-
-    const map = dungeon.getMap(this.context.frameMapIndex ?? 0);
-    if (!map?.floorDecorationTOC) return;
-
-    const drawFootprints = (graphicOrdinal & 0x8000) !== 0;
-    const extFloorDecoration = (graphicOrdinal & 0x4000) !== 0;
-    let ordinal = graphicOrdinal & 0x7fff;
-
-    if (extFloorDecoration) {
-      if (csbGraphics) {
-        const ext = csbGraphics.getFloorDecoration(ordinal & 0x7fff);
-        if (ext) {
-          this.drawExtendedFloorDecoration(ext, relativeCell);
-          if (drawFootprints) this.drawFloorDecorations(16, relativeCell);
-          return;
-        }
-      }
-      ordinal = 0;
-    }
-
-    if (ordinal === 0 && !drawFootprints) return;
-
-    const drawSingle = (ord: number) => {
-      if (ord === 0) return;
-      const graphicIndex = (ord - 1) | 0;
-      if (graphicIndex < 0 || graphicIndex >= map.floorDecorationTOC!.length) return;
-      if (relativeCell < 0 || relativeCell >= tables.floorDecorationDescSets[0].length) return;
-
-      const tocValue = map.floorDecorationTOC![graphicIndex] ?? 0;
-      const rectSetIndex = tables.floorDecorationRectSetIndex[tocValue] ?? 0;
-      const rectSet = tables.floorDecorationDescSets[rectSetIndex];
-      const desc = rectSet?.[relativeCell];
-      if (!desc) return;
-
-      const baseGraphic = 247 + 6 * tocValue;
-      const cellIncrement = tables.relativeCellGraphicIncrement[relativeCell] ?? 0;
-      const graphicNum = baseGraphic + cellIncrement;
-      const bitmap = getGraphic(graphicNum);
-      if (!bitmap) return;
-
-      const srcWidth = (desc.widthBytes | 0) * 2;
-      const srcHeight = desc.height | 0;
-      if (srcWidth <= 0 || srcHeight <= 0) return;
-
-      let mirror = relativeCell === 8 || relativeCell === 5 || relativeCell === 2;
-      if (
-        graphicIndex === 15 &&
-        (this.context.useMirrorImages ?? false) &&
-        (relativeCell === 7 || relativeCell === 4 || relativeCell !== 1)
-      ) {
-        mirror = true;
-      }
-
-      const rect: RectPos = {
-        x1: desc.x1,
-        y1: desc.y1,
-        x2: desc.x2,
-        y2: desc.y2,
-        srcX: 0,
-        srcY: 0,
-        srcWidth,
-        srcHeight,
-      };
-      this.draw.blitShapeBitmapToViewport(bitmap, rect, mirror);
-    };
-
-    if (ordinal !== 0) drawSingle(ordinal);
-    if (drawFootprints) drawSingle(16);
-  }
-
-  private drawExtendedFloorDecoration(ext: ExtendedFloorDecoration, relativeCell: number): void {
-    const tables = this.context.objectTables;
-    const viewport = this.context.viewportIndexBuffer;
-    if (!tables || !viewport) return;
-
-    if (relativeCell < 0 || relativeCell >= ext.desc.length) return;
-
-    const desc = ext.desc;
-    const displayDesc = desc[relativeCell];
-    if (!displayDesc) return;
-
-    const baseBitmap = ext.bitmap;
-    let bitmap = baseBitmap;
-    const map = relativeCell < 3 ? tables.floorColorMapFar : tables.floorColorMapMedium;
-
-    if (relativeCell < 6) {
-      if (relativeCell < 3) {
-        const target = displayDesc;
-        const targetWidth = (target.x2 | 0) - (target.x1 | 0) + 1;
-        bitmap = this.draw.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
-      } else {
-        const target = desc[4];
-        const targetWidth = (target.x2 | 0) - (target.x1 | 0) + 1;
-        bitmap = this.draw.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
-      }
-    }
-
-    const facing = this.context.frameFacing ?? 0;
-    const mirrorFlags = ext.mirrorFlags & 0xffff;
-    const useMirror = (((mirrorFlags >>> (facing + 9)) ^ (mirrorFlags >>> relativeCell)) & 1) !== 0;
-    if (useMirror) bitmap = this.draw.getMirroredBitmap(bitmap);
-
-    let srcOffsetX = 0;
-    if (relativeCell === 6) {
-      const fullWidth = (desc[7].x2 | 0) - (desc[7].x1 | 0) + 1;
-      const partialWidth = (displayDesc.x2 | 0) - (displayDesc.x1 | 0) + 1;
-      srcOffsetX = fullWidth - partialWidth;
-    } else if (relativeCell === 3) {
-      const fullWidth = (desc[4].x2 | 0) - (desc[4].x1 | 0) + 1;
-      const partialWidth = (desc[3].x2 | 0) - (desc[3].x1 | 0) + 1;
-      srcOffsetX = fullWidth - partialWidth;
-    }
-
-    const rect: RectPos = {
-      x1: displayDesc.x1,
-      y1: displayDesc.y1,
-      x2: displayDesc.x2,
-      y2: displayDesc.y2,
-      srcX: srcOffsetX,
-      srcY: 0,
-    };
-    bltShapeToViewportIndex(bitmap, viewport, rect);
-  }
-
-  /**
-   * `GraphicRandom` (`doc/CSBwin-src/CSBCode.cpp:564`) keeps its state in a C
-   * function-static, which lives for the whole process rather than one call — the
-   * source of the teleporter/energy-effect shimmer is this counter advancing frame
-   * over frame, not the caller re-seeding it. `DrawViewport` builds a fresh
-   * `BytecodeInterpreter` every redraw, so this has to be a class-static, not an
-   * instance field, or every frame would replay the same jitter and the effect
-   * would render as a frozen pattern instead of animating.
-   */
-  private static graphicRandomState = 12345;
-
-  /**
-   * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
-   * JS's `*` operator is not: `state` and `0xbb40e62d` are each up to ~2^32, so their
-   * exact product needs up to 64 bits, and a float64 mantissa only holds 53. The
-   * plain multiply silently rounds away exactly the low bits `>>> 7 % n` reads,
-   * which is why this returned the same value on every call — every state ever
-   * reached was a multiple of 4096 after the previous rounding, canceling the
-   * `% 32` and `% 2` of the teleporter/energy shimmer's jitter. `Math.imul`
-   * truncates to 32 bits *before* rounding, matching the C `ui32` multiply exactly.
-   * `DrawTeleporter` is its only caller in CSBWin; clouds use `viewportRandom`.
-   */
-  private graphicRandom(maxExclusive: number): number {
-    if (maxExclusive <= 0) return 0;
-    BytecodeInterpreter.graphicRandomState = (Math.imul(BytecodeInterpreter.graphicRandomState, 0xbb40e62d) + 11) >>> 0;
-    return ((BytecodeInterpreter.graphicRandomState >>> 7) % maxExclusive) >>> 0;
-  }
-
-  private drawTeleporter(teleporterRect: RectPos, wallRect: RectPos): void {
-    const viewport = this.context.viewportIndexBuffer;
-    const getGraphic = this.context.getGraphicBitmap;
-    if (!viewport || !getGraphic) return;
-
-    const overlayGraphic = getGraphic((teleporterRect.x1 | 0) + 73);
-    if (!overlayGraphic) return;
-
-    let mask: IndexedBitmap | null = null;
-    if (teleporterRect.y2 !== 0xff) {
-      const maskGraphic = getGraphic(((teleporterRect.y2 | 0) & 0x7f) + 69);
-      if (maskGraphic) {
-        const widthBytes = Math.max(0, Math.floor((teleporterRect.srcWidth ?? 0) / 2));
-        const height = teleporterRect.srcHeight ?? maskGraphic.height;
-        const width = widthBytes * 2;
-        const cropped = cropBitmap(maskGraphic, width, height);
-        mask = (teleporterRect.y2 & 0x80) !== 0 ? this.draw.getMirroredBitmap(cropped) : cropped;
-      }
-    }
-
-    const jitterX = (teleporterRect.x2 | 0) + this.graphicRandom(2);
-    const jitterY = this.graphicRandom(32);
-    const srcOffsetX = teleporterRect.srcX ?? 0;
-    const srcOffsetY = teleporterRect.srcY ?? 0;
-
-    tag008c98Index(
-      overlayGraphic,
-      viewport,
-      mask,
-      wallRect,
-      jitterX,
-      jitterY,
-      teleporterRect.y1 | 0,
-      srcOffsetX,
-      srcOffsetY
-    );
   }
 
   private mapColorValue(colorMap: Uint8Array, index: number): number {
@@ -2196,7 +1456,7 @@ export class BytecodeInterpreter {
         const wallRect = this.context.wallRectangles[relativeCellNumber];
         if (teleporter && wallRect) {
           const shifted: RectPos = { ...teleporter, x1: (teleporter.x1 | 0) + 1 };
-          this.drawTeleporter(shifted, wallRect);
+          DrawTeleporter(this.draw, shifted, wallRect);
         }
       }
     }

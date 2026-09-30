@@ -11,7 +11,7 @@
  *
  * `ViewportRenderer.drawViewportFrame` now resolves `context.doorTOC` from the
  * level's door characteristics the same way it already resolved `doorGraphics`, and
- * `opStdDrawDoor` rolls two `viewportRandom.bool()` draws (`ViewportDraw.ts`) — a
+ * `DrawDoor` (`DrawDoor.ts`) rolls two `viewportRandom.bool()` draws (`ViewportDraw.ts`) — a
  * dedicated `CsbRandom` instance, never the game's own, exactly as CSBWin swaps in a
  * viewport-only stream for `DrawViewport` so rendering can't perturb monster AI or
  * combat — when the resolved `DoorTOC` entry has bit 0x400 set.

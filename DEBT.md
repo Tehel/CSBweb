@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 2 of 3 next |
+| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 3 of 3 next |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
@@ -163,53 +163,42 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
-`src/renderer/bytecode/BytecodeInterpreter.ts` is 3776 lines. The stack machine and its
+`src/renderer/bytecode/BytecodeInterpreter.ts` is 3035 lines. The stack machine and its
 opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
-the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
+the C++'s (the switch stays: H, "Not debt"). `CSBCode.cpp`'s drawing is out of it, in
+`DrawDecorations.ts` (`DrawWallDecoration` with the wall text and the champion portrait,
+`DrawFloorDecorations`) and `DrawDoor.ts` (`DrawDoor` with its ornament `TAG004b26`,
+`DrawDoorSwitch`, `DrawTeleporter` and `GraphicRandom`). What is left that is not the
+interpreter is **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects`
+(`drawRoomObjects`, `:1338`), `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster`
+(`drawMonster`, `:1671`, `drawMonsterAt`, `:1759`), the missiles
+(`drawMissilesAtPosition`, `:1877`), `DrawClouds` (`:2023`), `drawCloudUnderParty`,
+`TAG005088` (`:2144`). About 1000 lines.
 
-- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2079`),
-  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2412`,
-  `drawMonsterAt`, `:2500`), the missiles (`drawMissilesAtPosition`, `:2618`),
-  `DrawClouds` (`:2764`), `drawCloudUnderParty`, `TAG005088` (`:2885`). About 1000
-  lines.
-- **`CSBCode.cpp`**'s drawing: `DrawWallDecoration` (`drawWallDecorationGraphic`,
-  `:1540`), the extended wall and floor decorations, the wall text (`:1796`),
-  `DrawFloorDecorations` (`:1876`), `DrawDoor` and its ornament (`opStdDrawDoor`,
-  `:1302`, `drawDoorOrnament`), `DrawTeleporter` (`:2035`), the champion portrait. About
-  700 lines.
-
-Paying it moves each group into a module of its own, as `E2` split `Game.ts`, each
+Paying it moves that group into a module of its own, as `E2` split `Game.ts`, the
 module's header naming its CSBWin file; the interpreter keeps the machine: `interpret`,
 `executeOpcode`, every `op*` handler (a `Std*` handler pops its arguments and calls the
 moved function, as CSBWin's `case` calls `DrawDoor`), the `RECT_POINTERS` /
 `BITMAP_POINTERS` resolution and the derived graphics. `C94` and `C99` both land in the
-code that moves: pay them first or after, not during.
+code that moves or has moved: pay them first or after, not during.
 
-The moved functions are free functions over one shared object, as the `ui/` modules are
-over `UIState`, and reach state through it, not through `this`. That object is in place:
-`ViewportDraw` (`src/renderer/bytecode/ViewportDraw.ts`) holds the `InterpreterContext`,
-the mirror and flip caches, the three blit helpers, and `viewportRandom` beside it. The
+The moved functions are free functions over `ViewportDraw`
+(`src/renderer/bytecode/ViewportDraw.ts`), as the `ui/` modules are over `UIState`, and
+reach state through it, not through `this`: it holds the `InterpreterContext`, the mirror
+and flip caches and the three blit helpers, with `viewportRandom` beside it. The
 interpreter builds one per redraw and exposes it as `draw`, where a tool replaces a blit
 helper (`tools/dump-monster-draw.ts:187`).
 
-Two steps remain, one commit each, each byte-identical in every tool's output and in the
-frames:
+One step remains, one commit, byte-identical in every tool's output and in the frames:
 
-2. **`CSBCode.cpp`'s drawing**, into two modules. `DrawDecorations.ts`:
-   `DrawWallDecoration` with the wall text, the champion portrait and the extended wall
-   decorations it draws, `isAlcoveDecorationIndex`, and `DrawFloorDecorations` with the
-   extended floor decorations. `DrawDoor.ts`: `DrawDoor` (the body of `opStdDrawDoor`
-   below its pops), its ornament (`TAG004b26`), `DrawDoorSwitch`, `DrawTeleporter` and
-   `GraphicRandom` with its state (`tools/dump-graphic-random.ts` retargeted). This goes
-   before step 3 because `DrawRoomObjects` calls `DrawTeleporter` (the Fluxcage).
 3. **`Code51a4.cpp`'s drawing**, into `DrawRoomObjects.ts`: `DrawRoomObjects` and
    everything under it (`drawObjectsAtPosition`, `drawSingleObject`,
    `getDerivedObjectBitmap`, `DrawMonster`, the missiles, `DrawClouds`,
    `drawCloudUnderParty`, `TAG005088`, `mapColorValue`, `decodeMonsterStatus`), the two
    drawing-location tables, and `GetGraphicClass`. `dump-cloud-draw`, `dump-missile-draw`
-   and `dump-monster-draw` import the functions they now reach through `as any`. The last
-   step closes `E9`: `CLAUDE.md`'s layout line and `doc/PROVEN_FACTS.md`'s pointers name
-   the new modules.
+   and `dump-monster-draw` import the functions they now reach through `as any`. It
+   closes `E9`: `CLAUDE.md`'s layout line and `doc/PROVEN_FACTS.md`'s pointers name the
+   new module.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
@@ -449,7 +438,7 @@ click and button-up the mouse queue hands the UI, every Reincarnate and save-men
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
 strip scrolled or a flashed button changed (`main.ts:502-507`). Two things follow:
 
-- **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`drawTeleporter`)
+- **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
   of VBLs, it changes at 60 Hz instead of 4 — the very symptom `ui/events.ts`'s mousemove
   handler avoids by calling `refreshOverlay` instead.
@@ -493,7 +482,7 @@ source's start after `P6` groups, with the mask read one word per group, masked-
 pixels given colour `P9`; then it blits that bitmap with `P9` transparent. `DrawTeleporter`
 passes `P6 = x2 + GraphicRandom(2)` and `P7 = GraphicRandom(32)` (`CSBCode.cpp:4292-4302`).
 The port reads the source and the mask as 2-D images wrapped in x and y separately, and
-takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2047-2083`),
+takes `P6`/`P7` for pixel offsets (`DrawTeleporter`, `DrawDoor.ts:233-269`),
 so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
 indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
 teleporter's pixels with the stream the C++ reads.

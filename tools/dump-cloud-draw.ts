@@ -50,7 +50,8 @@ import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
-import { viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
+import { DrawTeleporter, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
+import { ViewportDraw, viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
@@ -143,14 +144,14 @@ check(viewportRandom.getSeed() === 0x34175432,
 // 1. The stream. Two draws from the viewport's own stream, none from GraphicRandom.
 {
   const seed = 0x1234567;
-  const graphicRandomBefore = (BytecodeInterpreter as any).graphicRandomState;
+  const graphicRandomBefore = graphicRandomState.r;
   drawCloudAt(100, 60, seed);
   const oracle = new CsbRandom(seed);
   oracle.bool();
   oracle.bool();
   check(viewportRandom.getSeed() === oracle.getSeed(),
     'one cloud consumes exactly two STRandomBool() draws from the viewport stream');
-  check((BytecodeInterpreter as any).graphicRandomState === graphicRandomBefore,
+  check(graphicRandomState.r === graphicRandomBefore,
     'a cloud draws nothing from GraphicRandom (only DrawTeleporter calls it)');
 }
 
@@ -385,7 +386,6 @@ console.log('\nthe Fluxcage\'s shimmer (Code51a4.cpp:2769-2782):');
 for (const word1868 of [false, true]) {
   for (const relativeCell of [0, 1, 4]) {
     const rec = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 50, bit7: false };
-    const shimmers: Array<{ x1: number; wall: unknown }> = [];
     const context: any = {
       viewportIndexBuffer: createPaletteIndexViewportBuffer(224, 136, 0),
       objectTables: realTables,
@@ -395,16 +395,26 @@ for (const word1868 of [false, true]) {
       dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
       word1868,
     };
-    const interp = new BytecodeInterpreter(context) as any;
-    interp.drawTeleporter = (teleporter: { x1: number }, wall: unknown) => shimmers.push({ x1: teleporter.x1, wall });
+    const seed = 0x2468ace;
+    graphicRandomState.r = seed;
     // Position list 1: the cell's first position, at the cloud's (0) with facing 0.
-    interp.drawRoomObjects(cloudRn, 0, 0, 0, relativeCell, 0x1);
+    (new BytecodeInterpreter(context) as any).drawRoomObjects(cloudRn, 0, 0, 0, relativeCell, 0x1);
+    const after = graphicRandomState.r;
+    // The one shimmer the cell owes, drawn directly from the same `GraphicRandom` state:
+    // the cell's drawing must match it pixel for pixel, or be nothing at all.
     const teleporter = viewportTables.teleporterRectangles[relativeCell]!;
-    const drawn = shimmers.length === 1 && shimmers[0]!.x1 === teleporter.x1 + 1
-      && shimmers[0]!.wall === viewportTables.wallRectangles[relativeCell];
+    const wall = viewportTables.wallRectangles[relativeCell]!;
+    const expected = createPaletteIndexViewportBuffer(224, 136, 0);
+    graphicRandomState.r = seed;
+    DrawTeleporter(new ViewportDraw({ ...context, viewportIndexBuffer: expected }), { ...teleporter, x1: teleporter.x1 + 1 }, wall);
+    const pixels: Uint8Array = context.viewportIndexBuffer.pixels;
+    const untouched = after === seed && pixels.every((p) => p === 0);
+    const drawn = after === graphicRandomState.r && expected.pixels.some((p) => p !== 0)
+      && Buffer.compare(pixels, expected.pixels) === 0;
+    const shimmers = drawn ? 1 : untouched ? 0 : -1;
     const what = `cell ${relativeCell + 3}, d.Word1868 ${word1868 ? 1 : 0}`;
-    console.log(`  ${what}: ${shimmers.length} shimmer(s)`);
-    check(word1868 || relativeCell === 0 ? shimmers.length === 0 : drawn,
+    console.log(`  ${what}: ${shimmers} shimmer(s)`);
+    check(word1868 || relativeCell === 0 ? untouched : drawn,
       word1868 ? `${what}: no shimmer` : relativeCell === 0 ? `${what}: no shimmer, the cell is 3`
         : `${what}: the shimmer, with teleporterRectangles[${relativeCell}] one pixel on`);
   }
