@@ -31,7 +31,7 @@ export const DATA_SETS: readonly DataSet[] = [
     { id: 'dm-windows', name: 'Dungeon Master (CSBWin)', dir: '/gamefiles/dm-windows', csbGraphics: false },
     { id: 'dm-atari-1.2', name: 'Dungeon Master ST 1.2', dir: '/gamefiles/dm-atari-1.2', csbGraphics: false },
     { id: 'dm-atari-1.3-fr', name: 'Dungeon Master ST 1.3 French', dir: '/gamefiles/dm-atari-1.3-fr', csbGraphics: false },
-    { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/Kid\'s-Dungeon-24', csbGraphics: false },
+    { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/kids-dungeon-24', csbGraphics: false },
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
     // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its 620 KB `dungeon.dat`
     // does not open with 33028 and does not parse, and nothing has examined its format.
