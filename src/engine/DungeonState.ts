@@ -104,10 +104,6 @@ export class DungeonState {
         this.timerWord8Lookup = getWord8;
     }
 
-    setTimerWord8Table(table: ui16[] | null): void {
-        this.data.timerWord8Table = table ?? undefined;
-    }
-
     addChampionBonesRecord(bones: ObjectID, fingerprint: number): void {
         const key = this.getBonesRecordKey(bones);
         if (key === null) return;

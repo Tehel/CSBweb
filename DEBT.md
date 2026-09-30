@@ -89,7 +89,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E17 | Dead code | S | ⏳ |
 | D13 | State fields nothing reads | S | ⏳ |
 | D12 | `Champion.alive` shadows `HP() != 0` | S | ⏳ |
 | D14 | `timerWord8Table`, a load-time copy behind the live timers | S | ⏳ |
@@ -194,13 +193,13 @@ waits for `P10` to drop the JSON wrapper or goes with a `RUNTIME_SAVE_VERSION` b
 
 A missile's flight direction is its timer's word 8, which CSBWin reads from the slot as it
 stands, `d.Timers[missile.timerIndex]`. `DungeonState.getTimerWord8`
-(`src/engine/DungeonState.ts:865`) asks the live `TimerQueue` first, through a lookup
+(`src/engine/DungeonState.ts:861`) asks the live `TimerQueue` first, through a lookup
 `TimerSystem` installs (`TimerSystem.ts:80`), and falls back on
 `DungeonData.timerWord8Table` (`src/data/dungeonTypes.ts:531`), a copy of every timer's
 word 8 that `applySaveGameState` takes when a save is restored
 (`src/data/SaveGameLoader.ts:1202`) and nothing updates. For a timer index the queue does
 not hold, the renderer's missile (`BytecodeInterpreter.ts:2728`) is drawn from the value
-at load time. `DungeonState.setTimerWord8Table` has no caller. Paying it means one
+at load time. Paying it means one
 source, the queue's slot as CSBWin reads it (`TimerQueue.getTimer` answers `null` for an
 empty slot where CSBWin reads whatever the slot kept), and removing the table from
 `DungeonData`, `DUNGEON_DATA_SOURCES` and the restore.
@@ -463,39 +462,6 @@ and showing the error on the page as `reportError` does for `init`. The handle i
 schedules is a `setTimeout`'s, kept in a field named `animationFrameId` and cast through
 `unknown` because `tsconfig.json` gives the browser code Node's `types`.
 
-### E17 ⏳ Dead code
-
-61 exported declarations have a name that appears in no other file of `src/` or `tools/`.
-A few are a transcription's completeness (an accessor beside its siblings,
-`SLOT_SHIELD_HAND`) and may stay. These are dead, some with their whole module:
-
-- **`src/core/constants.ts`**: `DISPLAY_WIDTH`/`HEIGHT`, `TICK_INTERVAL_MS`, `MAX_MAPS`,
-  `MAX_WIDTH`, `MAX_HEIGHT`, `MAX_CHAMPIONS`, `GraphicIndex`, `DB_RECORD_SIZE`,
-  `OBJECT_COUNTS_*`, `TEXT_CHAR_*`, and two guessed enums, `CreatureType` (its first
-  member is commented "Giggler") and `WeaponType` ("partial list").
-- **A second palette read**: `GraphicsLoader.extractPalettes` reads graphic 562 at a
-  hardcoded 0x4FE, with the hardcoded `DEFAULT_PALETTE` as fallback, beside
-  `UITables`' `graphic232.palette552`; its only readers are `GameScreen`'s
-  `?? getPalette(0)` and `tools/extract-graphics.ts`.
-- **Image helpers in pairs**: `GraphicsLoader.createImageData`/`drawImage` and
-  `core/imageDecoder.imageToRGBA`/`drawImageToCanvas`, each the other's twin; only the
-  dead `ImageData` path below calls the first.
-- **The RGBA "legacy path"** of `src/renderer/csbwin/CanvasBlitter.ts`
-  (`RGBAViewportBuffer`, `createRGBAViewportBuffer`, `clearRGBA`, `flushRGBA`,
-  `tag0088b2ImageData`, `blt2Screen`, `bltRectangleToViewportIndex`) and the `ImageData`
-  path of `src/renderer/ViewportGraphics.ts` (`initializeWallBitmaps`,
-  `initializeFloorCeiling`, `bltShapeToViewport`, `mirrorBitmap`).
-- `Menu.ts`'s eight `MENU_PANEL_*` constants and `MENU_CHAR_WIDTH`; `ScrollingText`'s
-  module functions `quePrintLines` and `printLinefeed`; `DungeonState.setTimerWord8Table`;
-  `src/engine/roomTimers.ts`, a module whose one function returns `table[roomType]`.
-- **Leftover files**: `src/renderer/index.ts` (a barrel nothing imports),
-  `src/vite-env.d.ts` beside `src/types/vite-env.d.ts`, `tools/extract-graphics.ts`
-  (it reads `static/js/mediaindex.js`, which is gone) and `tools/check-graphic-22e.mjs`
-  (a heuristic scan the extraction has replaced).
-
-The 0x22e pattern search goes with `E8`, `dev.ts`'s migration with `E13`. Paying it
-deletes the rest; `tsc` finds anything that was not dead.
-
 ### E18 ⏳ Hygiene and documentation drift
 
 - **Three import styles**: five files import `@/core` or `@/ui`, the rest by relative
@@ -581,7 +547,7 @@ that darkens a level and checks a monster's sight shrink.
 CSBWin save carries the pairs, and the Vi Altar (`Timer.cpp:2750`, and `DropObject`'s
 test, `Mouse.cpp:903`) and the bones' name (`DescribeObject`, `Character.cpp:3563`;
 `DrawNameOfHeldObject`, `Code11f52.cpp:49`) read them back. The port keeps them in
-`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:111-160`),
+`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:107-162`),
 which only the port's runtime snapshot carries (`DungeonSnapshot.championBones`).
 `DungeonData.expool` travels as raw bytes and never sees them. So:
 
@@ -643,7 +609,7 @@ many VBLs as the elapsed time holds, capped. Tools then step VBLs and need no ca
 
 ### C99 ⏳ `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported
 
-`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:346-395`) says so itself: "a
+`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:309-349`) says so itself: "a
 behavioural approximation, not a transcription … reconstructed from observed output". The
 C++ (`doc/CSBwin-src/Graphics.cpp:1169-1316`) builds a temporary bitmap from the source
 read as a **linear stream of 16-pixel groups**, starting at group `P7` and wrapping to the
@@ -758,8 +724,8 @@ Not taken in order; the author names one to start it (see "Priority").
 ### G1 ⏸️ DSA gaps
 
 - **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are reported once each through
-  `warnedOps` (`src/engine/DsaSystem.ts:1261`, `:1865`). Those warnings are the list.
-  Slave DSAs are not implemented (`findMaster`, `:1909-1917`).
+  `warnedOps` (`src/engine/DsaSystem.ts:1257`, `:1864`). Those warnings are the list.
+  Slave DSAs are not implemented (`findMaster`, `:1896-1905`).
 - **`STKOP_Throw`** (`DSA.cpp:4558`) is one of the missing opcodes, so
   `TimerSystem.throwMissile` (`ThrowMissile`, `Timer.cpp:2016`) has no caller. When the
   opcode is ported, re-port the function's missile-type switch first. CSBWin throws a spell

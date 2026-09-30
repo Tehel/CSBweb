@@ -219,7 +219,7 @@ const CHECKS = [
 
 // Tools with no assertions: they exist to be read, not to pass. They are still run,
 // because a loader or table change that throws should not wait to be noticed by hand.
-// Only a crash fails them. `extract-graphics.ts` is left out — it writes to static/.
+// Only a crash fails them.
 const SMOKE = [
   { tool: 'dump-defined-items.ts' },
   { tool: 'dump-level-items.ts' },

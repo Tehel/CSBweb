@@ -1,10 +1,9 @@
 /**
  * CSBWin-style low-level blitting to an HTML canvas backbuffer.
  *
- * This ports the intent of CSBWin's `TAG0088b2` / `BltShapeToViewport` /
- * `BLT2Screen` to a browser-friendly representation:
- * - Primary path: operate on a palette-index viewport buffer (`0..15`) and present to RGBA only at the end.
- * - Legacy path: operate on RGBA `ImageData` sources and an RGBA viewport buffer.
+ * This ports the intent of CSBWin's `TAG0088b2` / `BltShapeToViewport` to a
+ * browser-friendly representation: operate on a palette-index buffer (`0..15`) and
+ * convert to RGBA only at the end.
  *
  * NOTE: CSBWin operates on Atari ST planar buffers with "bytes per scanline".
  * Here we operate on pixel indices (0..15) for faithful transparency (index 10).
@@ -18,13 +17,6 @@ export interface RectPos extends Rect {
   srcStride?: number;
   srcWidth?: number;
   srcHeight?: number;
-}
-
-export interface RGBAViewportBuffer {
-  width: number;
-  height: number;
-  imageData: ImageData;
-  pixels: Uint8ClampedArray;
 }
 
 export interface PaletteIndexViewportBuffer {
@@ -97,35 +89,6 @@ export function vblFlashButn(buffer: PaletteIndexViewportBuffer, rect: Rect): vo
       buffer.pixels[row + x] ^= 4;
     }
   }
-}
-
-export function createRGBAViewportBuffer(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number
-): RGBAViewportBuffer {
-  const imageData = ctx.createImageData(width, height);
-  return { width, height, imageData, pixels: imageData.data };
-}
-
-export function clearRGBA(
-  buffer: RGBAViewportBuffer,
-  r: number = 0,
-  g: number = 0,
-  b: number = 0,
-  a: number = 255
-): void {
-  const { pixels } = buffer;
-  for (let i = 0; i < pixels.length; i += 4) {
-    pixels[i + 0] = r;
-    pixels[i + 1] = g;
-    pixels[i + 2] = b;
-    pixels[i + 3] = a;
-  }
-}
-
-export function flushRGBA(ctx: CanvasRenderingContext2D, buffer: RGBAViewportBuffer): void {
-  ctx.putImageData(buffer.imageData, 0, 0);
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -328,15 +291,6 @@ export function bltShapeToViewportIndex(
   tag0088b2Index(src, dst, rect, 10);
 }
 
-export function bltRectangleToViewportIndex(
-  src: IndexedBitmap,
-  dst: PaletteIndexViewportBuffer,
-  rect: RectPos
-): void {
-  // CSBWin `BltRectangleToViewport()` (CSBCode.cpp:2951) uses transparentColor=-1 (no transparency).
-  tag0088b2Index(src, dst, rect, -1);
-}
-
 function modPositive(value: number, modulo: number): number {
   const v = value % modulo;
   return v < 0 ? v + modulo : v;
@@ -501,85 +455,4 @@ export function reconvertThroughPalette(
       out[o + 3] = 255;
     }
   }
-}
-
-/**
- * `TAG0088b2` port for RGBA `ImageData` sources.
- *
- * In CSBWin:
- *   TAG0088b2(src, dst, dstRect, srcX, srcY, srcBytesPerLine, dstBytesPerLine, transparentColor)
- *
- * Here:
- * - `srcX/srcY` select the top-left within `src`.
- * - Width/height are derived from `dstRect` unless overridden by `srcWidth/srcHeight`.
- * - If `transparent=true`, pixels with alpha==0 are skipped (CSBWin uses transparentColor=10).
- */
-export function tag0088b2ImageData(
-  src: ImageData,
-  dst: RGBAViewportBuffer,
-  dstRect: RectPos,
-  transparent: boolean = true
-): void {
-  const rect = normalizeRectInclusive(dstRect, dst.width, dst.height);
-  if (!rect) return;
-
-  const srcData = src.data;
-  const dstData = dst.pixels;
-  const srcWidth = src.width;
-  const srcHeight = src.height;
-
-  const copyWidth = Math.min(
-    rect.x2 - rect.x1 + 1,
-    rect.srcWidth ?? Number.POSITIVE_INFINITY,
-    srcWidth - (rect.srcX ?? 0)
-  );
-  const copyHeight = Math.min(
-    rect.y2 - rect.y1 + 1,
-    rect.srcHeight ?? Number.POSITIVE_INFINITY,
-    srcHeight - (rect.srcY ?? 0)
-  );
-
-  const srcX0 = rect.srcX ?? 0;
-  const srcY0 = rect.srcY ?? 0;
-
-  for (let y = 0; y < copyHeight; y++) {
-    const sy = srcY0 + y;
-    const dy = rect.y1 + y;
-    if (sy < 0 || sy >= srcHeight) continue;
-    if (dy < 0 || dy >= dst.height) continue;
-
-    const srcRow = sy * srcWidth;
-    const dstRow = dy * dst.width;
-
-    for (let x = 0; x < copyWidth; x++) {
-      const sx = srcX0 + x;
-      const dx = rect.x1 + x;
-      if (sx < 0 || sx >= srcWidth) continue;
-      if (dx < 0 || dx >= dst.width) continue;
-
-      const srcIndex = (srcRow + sx) * 4;
-      const a = srcData[srcIndex + 3];
-      if (transparent && a === 0) continue;
-
-      const dstIndex = (dstRow + dx) * 4;
-      dstData[dstIndex + 0] = srcData[srcIndex + 0];
-      dstData[dstIndex + 1] = srcData[srcIndex + 1];
-      dstData[dstIndex + 2] = srcData[srcIndex + 2];
-      dstData[dstIndex + 3] = a;
-    }
-  }
-}
-
-/**
- * `BLT2Screen` port: copy a viewport backbuffer to a screen canvas at an offset.
- *
- * In CSBWin this goes to `d.LogicalScreenBase`. Here we use `putImageData()`.
- */
-export function blt2Screen(
-  screenCtx: CanvasRenderingContext2D,
-  viewport: RGBAViewportBuffer,
-  dstX: number,
-  dstY: number
-): void {
-  screenCtx.putImageData(viewport.imageData, dstX, dstY);
 }

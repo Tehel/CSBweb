@@ -218,7 +218,7 @@ export class GameScreen {
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
     });
     ui.objectTables = this.viewport.objectTables;
-    this.uiPalette = palette552[0]?.slice() ?? graphicsLoader.getPalette(0);
+    this.uiPalette = palette552[0].slice();
     ui.fontData = loadFontData(graphicsLoader);
 
     this.screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);

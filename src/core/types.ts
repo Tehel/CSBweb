@@ -240,13 +240,6 @@ export interface RGBColor {
 }
 
 /**
- * RGBA color (8-bit per channel)
- */
-export interface RGBAColor extends RGBColor {
-    a: ui8;
-}
-
-/**
  * Convert Atari ST color to RGB (0-255 range)
  * Each component 0-7 is multiplied by 36 to get 0-252 range
  */
@@ -257,19 +250,6 @@ export function atariToRGB(color: AtariColor): RGBColor {
         b: (color & 0x7) * 36
     };
 }
-
-/**
- * Convert Atari ST color to RGBA
- */
-export function atariToRGBA(color: AtariColor, alpha: ui8 = 255): RGBAColor {
-    const rgb = atariToRGB(color);
-    return { ...rgb, a: alpha };
-}
-
-/**
- * Palette (16 colors)
- */
-export type Palette = AtariColor[];
 
 /**
  * Image dimensions

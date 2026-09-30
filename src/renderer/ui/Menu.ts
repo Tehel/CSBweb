@@ -43,9 +43,6 @@ export const MENU_HEIGHT = 136;
 /** `BLT2Screen` puts the centred menu at screen (47,33) (`Menu.cpp:450-458`). */
 export const MENU_CENTRED_X = 47;
 
-/** `CenteredText` and the title lines use a fixed six-pixel cell (`Menu.cpp:192`). */
-export const MENU_CHAR_WIDTH = 6;
-
 /** `CenteredText`: fg 9 on bg 5 (`Menu.cpp:200-208`). */
 export const MENU_OPTION_COLOR = 9;
 export const MENU_PANEL_COLOR = 5;
@@ -59,16 +56,6 @@ const TITLE_Y_SPLIT = 21;
 const TITLE_LINE_STEP = 8;
 /** Titles centre on 113, one pixel right of where the option labels centre. */
 const TITLE_CENTRE_X = 113;
-
-/** `d.compressedGraphic0`'s title panel, measured: border (10,10)-(213,51), interior 12..212 x 12..50. */
-export const MENU_PANEL_X1 = 10;
-export const MENU_PANEL_X2 = 213;
-export const MENU_PANEL_Y1 = 10;
-export const MENU_PANEL_Y2 = 51;
-export const MENU_PANEL_INNER_X1 = 12;
-export const MENU_PANEL_INNER_X2 = 212;
-export const MENU_PANEL_INNER_Y1 = 12;
-export const MENU_PANEL_INNER_Y2 = 50;
 
 /** The option label positions, per layout, in menu coordinates (`Menu.cpp:302-346`). */
 const OPTION_POSITIONS: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [

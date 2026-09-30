@@ -4,8 +4,7 @@
  * IMG1 and IMG2 name the two byte orders the 4-byte header can come in, nothing more.
  */
 
-import type { ui8, ImageDimensions, Palette } from './types';
-import { atariToRGBA } from './types';
+import type { ui8, ImageDimensions } from './types';
 
 /**
  * IMG1 and IMG2 differ only in endianness of width/height
@@ -146,56 +145,4 @@ export function decodeIMG(data: Uint8Array, format: ImageFormat = ImageFormat.IM
         })();
 
     return { width, height, pixels };
-}
-
-/**
- * Convert decoded image to RGBA ImageData for canvas
- */
-export function imageToRGBA(image: DecodedImage, palette: Palette): ImageData {
-    const rgba = new Uint8ClampedArray(image.width * image.height * 4);
-
-    for (let i = 0; i < image.pixels.length; i++) {
-        const colorIndex = image.pixels[i];
-        const color = atariToRGBA(palette[colorIndex]);
-
-        rgba[i * 4 + 0] = color.r;
-        rgba[i * 4 + 1] = color.g;
-        rgba[i * 4 + 2] = color.b;
-        rgba[i * 4 + 3] = color.a;
-    }
-
-    return new ImageData(rgba, image.width, image.height);
-}
-
-/**
- * Draw decoded image to canvas
- */
-export function drawImageToCanvas(
-    ctx: CanvasRenderingContext2D,
-    image: DecodedImage,
-    palette: Palette,
-    x: number = 0,
-    y: number = 0,
-    scale: number = 1
-): void {
-    const imageData = imageToRGBA(image, palette);
-
-    if (scale === 1) {
-        ctx.putImageData(imageData, x, y);
-    } else {
-        // Create temporary canvas for scaling
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = image.width;
-        tempCanvas.height = image.height;
-        const tempCtx = tempCanvas.getContext('2d')!;
-        tempCtx.putImageData(imageData, 0, 0);
-
-        // Disable smoothing for pixel-perfect scaling
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            tempCanvas,
-            0, 0, image.width, image.height,
-            x, y, image.width * scale, image.height * scale
-        );
-    }
 }

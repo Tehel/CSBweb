@@ -8,8 +8,7 @@
 import { BinaryFile, Endianness } from '../core/BinaryFile';
 import { decompressGraphics } from '../core/compression';
 import { decodeIMG, ImageFormat, type DecodedImage } from '../core/imageDecoder';
-import type { ui16, Palette } from '../core/types';
-import { DEFAULT_PALETTE } from '../core/constants';
+import type { ui16 } from '../core/types';
 
 /**
  * Cached graphic entry
@@ -28,7 +27,6 @@ interface GraphicEntry {
 export interface GraphicsData {
     itemCount: ui16;
     entries: GraphicEntry[];
-    palettes: Palette[];        // Extracted from palette graphic
 }
 
 /**
@@ -107,19 +105,8 @@ export class GraphicsLoader {
 
         this.data = {
             itemCount,
-            entries,
-            palettes: []
+            entries
         };
-
-        // Extract palettes (typically at index 562 in DM)
-        try {
-            this.extractPalettes();
-            console.log(`Extracted ${this.data.palettes.length} palettes`);
-        } catch (error) {
-            console.warn('Could not extract palettes:', error);
-            // Use default palette
-            this.data.palettes = [DEFAULT_PALETTE];
-        }
 
         return this.data;
     }
@@ -166,67 +153,6 @@ export class GraphicsLoader {
             this.imageCache.set(index, image);
         }
         return image;
-    }
-
-    /**
-     * Extract palettes from graphics file
-     *
-     * In Dungeon Master, palettes are stored at index 562.
-     * The file contains 8 palettes of 16 colors each (256 bytes total).
-     * Palette data starts at offset 0x4FE in the raw graphic data.
-     */
-    private extractPalettes(): void {
-        if (!this.data) {
-            throw new Error('Graphics not loaded');
-        }
-
-        // Try to get palette graphic (index 562 in DM)
-        const paletteIndex = 562;
-        if (paletteIndex >= this.data.itemCount) {
-            throw new Error('Palette graphic not found');
-        }
-
-        const rawData = this.getRawGraphic(paletteIndex);
-
-        // Palettes are at offset 0x4FE (1278 bytes) in the raw data
-        const paletteOffset = 0x4FE;
-        if (rawData.length < paletteOffset + 256) {
-            throw new Error('Palette data not found in graphic');
-        }
-
-        const palettes: Palette[] = [];
-
-        // Read 8 palettes
-        for (let p = 0; p < 8; p++) {
-            const palette: ui16[] = [];
-            const baseOffset = paletteOffset + p * 32; // 16 colors × 2 bytes
-
-            for (let c = 0; c < 16; c++) {
-                const offset = baseOffset + c * 2;
-                const color = (rawData[offset] << 8) | rawData[offset + 1];
-                palette.push(color);
-            }
-
-            palettes.push(palette);
-        }
-
-        this.data.palettes = palettes;
-    }
-
-    /**
-     * Get a palette by index (0-7)
-     */
-    getPalette(index: number): Palette {
-        if (!this.data) {
-            throw new Error('Graphics not loaded');
-        }
-
-        if (index < 0 || index >= this.data.palettes.length) {
-            // Return default palette if index out of range
-            return DEFAULT_PALETTE;
-        }
-
-        return this.data.palettes[index];
     }
 
     /**
@@ -278,66 +204,5 @@ export class GraphicsLoader {
             cachedImages: this.imageCache.size,
             cachedRaw
         };
-    }
-}
-
-/**
- * Helper: Create ImageData for canvas rendering
- */
-export function createImageData(
-    image: DecodedImage,
-    palette: Palette
-): ImageData {
-    const rgba = new Uint8ClampedArray(image.width * image.height * 4);
-
-    for (let i = 0; i < image.pixels.length; i++) {
-        const colorIndex = image.pixels[i];
-        const color = palette[colorIndex];
-
-        // Convert Atari ST color (0RGB, 4 bits per channel) to RGBA
-        const r = ((color >> 8) & 0x7) * 36;
-        const g = ((color >> 4) & 0x7) * 36;
-        const b = (color & 0x7) * 36;
-
-        rgba[i * 4 + 0] = r;
-        rgba[i * 4 + 1] = g;
-        rgba[i * 4 + 2] = b;
-        // Color index 10 is transparent (from CSBWin BltShapeToViewport line 2947)
-        rgba[i * 4 + 3] = (colorIndex === 10) ? 0 : 255;
-    }
-
-    return new ImageData(rgba, image.width, image.height);
-}
-
-/**
- * Helper: Draw image to canvas with optional scaling
- */
-export function drawImage(
-    ctx: CanvasRenderingContext2D,
-    image: DecodedImage,
-    palette: Palette,
-    x: number,
-    y: number,
-    scale: number = 1
-): void {
-    const imageData = createImageData(image, palette);
-
-    if (scale === 1) {
-        ctx.putImageData(imageData, x, y);
-    } else {
-        // Create temporary canvas for scaling
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = image.width;
-        tempCanvas.height = image.height;
-        const tempCtx = tempCanvas.getContext('2d')!;
-        tempCtx.putImageData(imageData, 0, 0);
-
-        // Disable smoothing for pixel-perfect scaling
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-            tempCanvas,
-            0, 0, image.width, image.height,
-            x, y, image.width * scale, image.height * scale
-        );
     }
 }

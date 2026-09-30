@@ -455,17 +455,8 @@ export class ScrollingText {
 }
 
 /**
- * CSBWin keeps a single global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`) with
- * free functions wrapping it. We mirror that so any layer can emit a message.
+ * CSBWin keeps a single global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`). The
+ * engine reaches this one through its host's `messages`.
  */
 export const scrollingText = new ScrollingText();
 
-/** CSBWin `QuePrintLines()`. */
-export function quePrintLines(color: number, text: string): void {
-  scrollingText.quePrintLines(color, text);
-}
-
-/** CSBWin `PrintLinefeed()`. */
-export function printLinefeed(): void {
-  scrollingText.printLinefeed();
-}

@@ -34,7 +34,6 @@ import {
 } from '../data/actuatorHelpers';
 import { TimerQueue } from './TimerQueue';
 import { constructPredefinedMissile } from './missileHelpers';
-import { roomTimerFunction } from './roomTimers';
 import {
     OBJNI_CHEST,
     OBJNI_NOT_AN_OBJECT,
@@ -566,7 +565,7 @@ export class ActuatorSystem {
       ? getActuatorTargetPos(actuator)
       : 0;
 
-    const timerFunction = roomTimerFunction(this.roomTimerFunctions, targetRoomType);
+    const timerFunction = this.roomTimerFunctions[targetRoomType];
     if (timerFunction === 0) {
       console.warn('Illegal actuator timer target', {
         source,

@@ -34,7 +34,6 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import type { PartyState, Champion } from './gameTypes';
 import { TimerFunction } from './TimerQueue';
-import { roomTimerFunction } from './roomTimers';
 import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
 import type { WorldMove } from './WorldMove';
@@ -1990,7 +1989,7 @@ export class DsaSystem {
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
-      const mapping = roomTimerFunction(this.roomTimerFunctions, roomType);
+      const mapping = this.roomTimerFunctions[roomType];
       if (mapping === 0) {
         console.warn('Illegal DSA timer target', { level: locr.l, x: locr.x, y: locr.y });
         return;
