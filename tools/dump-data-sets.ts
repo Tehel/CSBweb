@@ -59,6 +59,17 @@ function main(): void {
       check(same, `${set.id}: the long form's Buttons16932 are CSBWin's four, word for word (the canary)`);
     }
 
+    // The food/water words are read at their own width (`drawFoodWaterPanel`), which is
+    // right only if each fills its rectangle: 48, 48 and 96 in English, NOURRITURE 96.
+    const g232 = graphicsTablesOf(graphics).ui.graphic232;
+    const words: [number, { x1: number; x2: number }][] = [[30, g232.wRectPos950], [31, g232.wRectPos958], [32, g232.wRectPos966]];
+    for (const [index, rect] of words) {
+      const raw = graphics.getRawGraphic(index);
+      const width = (raw[0]! << 8) | raw[1]!;
+      check(rect.x2 - rect.x1 + 1 <= width,
+        `${set.id}: graphic ${index} (${width} wide) covers its rectangle (x ${rect.x1}-${rect.x2})`);
+    }
+
     const game = newGame(dungeon, graphics);
     check(game.ctx.tables === tables, `${set.id}: a Game over the set runs on the set's tables`);
     check(game.ctx.dungeon.getMapCount() === dungeon.maps.length, `${set.id}: and on its dungeon`);
@@ -73,6 +84,19 @@ function main(): void {
   const expected = ['monsterDesc', 'textDecode', 'experienceForAttacking', 'skillNumber', 'byte20046', 'spells'];
   check(differing.length === expected.length && expected.every((k) => differing.includes(k)),
     'csb builds its own monsters, spells, skill tables and text decoding, and every other table as DM does');
+
+  // The French 1.3 file is 1.2's translated: its 0x230 is 100 bytes longer, all of it
+  // attack names, so its spells and legal attacks, read after them, must be 1.2's (the
+  // canary for the names' length), and only the words differ.
+  const en = tablesOf.get('dm-atari-1.2') as unknown as Record<string, unknown>;
+  const fr = tablesOf.get('dm-atari-1.3-fr') as unknown as Record<string, unknown>;
+  const translated = Object.keys(en).filter((k) => JSON.stringify(en[k]) !== JSON.stringify(fr[k]));
+  console.log(`== tables that differ between dm-atari-1.2 and dm-atari-1.3-fr: ${translated.join(', ')} ==`);
+  check(translated.length === 2 && translated.includes('attackNames') && translated.includes('textDecode'),
+    'dm-atari-1.3-fr differs from 1.2 in its attack names and text decoding only: its spells are 1.2\'s');
+  const names = fr['attackNames'] as string[];
+  check(names[1] === 'FENDRE' && names[43] === 'FUSIONNER' && names.length === 44 + 20,
+    'dm-atari-1.3-fr: 44 attack names, FENDRE to FUSIONNER, then the padding');
 
   finish();
 }

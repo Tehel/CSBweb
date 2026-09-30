@@ -52,10 +52,16 @@ const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-M
 export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
-  blitBasicGraphicToViewport(ui, 30, g232.wRectPos950, 48, 12);
-  blitBasicGraphicToViewport(ui, 31, g232.wRectPos958, 48, 12);
+  // CSBWin's widths, 24, 24 and 48 bytes (doc/CSBwin-src/Viewport.cpp:7243-7247), are
+  // the English words' 48, 48 and 96 pixels. The French 1.3 "NOURRITURE" is 96 wide, as
+  // its `wRectPos950` is, so each word is read at its own width
+  // (doc/PROVEN_FACTS.md → "The French 1.3 `graphics.dat`: longer words").
+  const blitWord = (index: number, rect: Rect): void =>
+    blitBasicGraphicToViewport(ui, index, rect, ui.getGraphicBitmap(index)?.width ?? 0, 12);
+  blitWord(30, g232.wRectPos950);
+  blitWord(31, g232.wRectPos958);
   if (champion.poisonCount !== 0) {
-    blitBasicGraphicToViewport(ui, 32, g232.wRectPos966, 96, 12);
+    blitWord(32, g232.wRectPos966);
   }
 
   drawFoodWaterBar(ui, champion.food ?? 0, 69, 5);

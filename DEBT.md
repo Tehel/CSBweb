@@ -808,6 +808,13 @@ Recorded so that nobody "fixes" them.
   key selects one (`drawSpellControls` and `handleMagicClick`,
   `src/renderer/ui/MagicPanel.ts`; `selectCaster`, `src/renderer/ui/Keyboard.ts`). The tab
   appears once the champion's maximum mana rises above zero.
+- 🚫 **Word sizes from the file.** Two of CSBWin's constants are the English words'
+  sizes: `AttackNames[300]` in graphic `0x230` and the source widths `DisplayFoodWater`
+  blits the food, water and poisoned labels with. The French 1.3 `graphics.dat` has
+  longer words in both places, so `parseGraphic230` sizes the names from the graphic's
+  length and `drawFoodWaterPanel` reads each label at its own width. Every other set gets
+  CSBWin's numbers (`doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer
+  words").
 - 🚫 **The vertical-move guard** in `MoveParty` (`CSBCode.cpp:8200-8204`) is not ported,
   because CSBWin cannot reach it either. Move Up / Down (`0x1124` / `0x1125`) come only from
   the 3DMaze extension's `ThreeDMovements` keys and `GravityMove`, whose flags are

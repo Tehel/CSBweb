@@ -393,9 +393,15 @@ function parseGraphic230(raw: Uint8Array): UITables['graphic230'] {
 
   // NUL-separated, indexed by attack type — CSBWin walks the list counting
   // terminators (`GetAttackTypeName`, doc/CSBwin-src/CSBCode.cpp:8609).
-  requireSize(raw, off, 300, '0x230 AttackNames');
-  const attackNames = readNulSeparatedNames(raw.subarray(off, off + 300));
-  off += 300;
+  // `AttackNames[300]` in CSBWin's struct, which asserts the graphic is 0x4e8 bytes
+  // (doc/CSBwin-src/CSBCode.cpp:10153). The French 1.3 file's names take 400 and its
+  // graphic is 100 bytes longer; what follows them is the same 584 bytes in both, so
+  // the names are whatever lies between the attack tables and that tail
+  // (doc/PROVEN_FACTS.md → "The French 1.3 `graphics.dat`: longer words").
+  const attackNamesLength = raw.length - off - (44 * 8 + 2 + 25 * 8 + 30);
+  requireSize(raw, off, Math.max(attackNamesLength, 300), '0x230 AttackNames');
+  const attackNames = readNulSeparatedNames(raw.subarray(off, off + attackNamesLength));
+  off += attackNamesLength;
 
   // LEGALATTACKS.byte0[8] (doc/CSBwin-src/Data.h:225). Byte 0 is the always-legal
   // attack; bytes 1-2 are the two optional attacks (255 = absent) and bytes 4-5 the

@@ -4912,3 +4912,31 @@ is 0x804, and its last 48 bytes are `missingButtons` word for word: `ENTER` (0xc
 the 35 tables `buildGameTables` holds, CSB's differ from DM's in six: `monsterDesc`,
 `spells`, `skillNumber`, `experienceForAttacking`, `byte20046` and `textDecode`.
 `tools/dump-data-sets.ts` checks both.
+
+## The French 1.3 `graphics.dat`: longer words
+
+CSBWin was written for the English files, and two of its constants are the English words'
+sizes. The French 1.3 file (`static/gamefiles/dm-atari-1.3-fr/`) breaks both, so the port
+reads each size from the file (`DEBT.md` H, "Word sizes from the file").
+
+- **Item `0x230` is 1356 bytes.** `ReadTablesFromGraphicsFile` asserts 0x4e8 (1256)
+  (`doc/CSBwin-src/CSBCode.cpp:10153`) and reads it into a struct with `AttackNames[300]`
+  (`doc/CSBwin-src/Data.h:649`). The French names (`FENDRE` … `FUSIONNER`, 44 of them and
+  their padding) take 400 bytes; the attack tables before them and the 584 bytes after
+  them (`legalAttacks[44]`, `Unused19218`, `Spells[25]`, `Byte19016`, `Byte19010`) are 1.2's
+  byte for byte. Read at CSBWin's fixed offsets, the spell table starts 100 bytes early,
+  in the names' tail, and no incantation matches a spell. `parseGraphic230`
+  (`src/data/tables/UITables.ts`) takes the names' length as what lies between the attack
+  tables and that tail: 300 in every other set.
+- **Graphic 30, the food label, is 96 pixels wide** ("NOURRITURE"; "FOOD" is 48).
+  `DisplayFoodWater` blits graphics 30, 31 and 32 with a source width of 24, 24 and 48
+  bytes (`doc/CSBwin-src/Viewport.cpp:7243-7247`): 48, 48 and 96 pixels. The French
+  `0x232` widens `wRectPos950` to x 112-207 to match (the word at byte 882, `x2`, 159 in
+  1.2) and narrows `wRectPos958` to x 112-143 for "EAU" (byte 874, 159 in 1.2), which is
+  still 48 wide. At CSBWin's stride, each row of the food label reads two of the graphic's
+  rows. `drawFoodWaterPanel` (`src/renderer/ui/Character.ts`) reads each word at its own
+  width, the same pixels in every other set.
+
+`tools/dump-data-sets.ts` checks both: the French set's tables differ from 1.2's in
+`attackNames` and `textDecode` only, and in every set graphics 30-32 cover their
+rectangles.

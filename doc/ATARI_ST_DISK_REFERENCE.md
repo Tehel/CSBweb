@@ -276,13 +276,13 @@ are French ("JE SUIS DUR JE SUIS AZUR ET JE FULGURE" is `TEXT #70` on map 5).
 | 1 | The title: "Presents" becomes "Présente" |
 | 4 | The entrance: ENTER / RESUME become ENTRER / RECOMMENCER |
 | 6 | "The End" becomes "Fin" |
-| 10, 27, 30, 31, 32, 40 | Interface pictures with words in them: the save panel's PASS, CORRECTION for BACKSPACE, EAU, VENENEUX, RESSUSCITER / RÉINCARNER / ANNULER |
+| 10, 27, 30, 31, 32, 40 | Interface pictures with words in them: the save panel's PASS, CORRECTION for BACKSPACE, NOURRITURE (graphic 30, 96 pixels wide where FOOD is 48), EAU, VENENEUX, RESSUSCITER / RÉINCARNER / ANNULER. Graphic 27 is 144x78, where 1.2's is 144x73 |
 | 120 (`0x78`) | The wall-text font, 288x8 |
 | `0x22c` | The object names, in French (`BOUSSOLE`, `TORCHE`, …) |
 | `0x22d` | The font |
 | `0x22f` | `Byte10336` and `Byte10016`, `DecodeText`'s strings after code 30 (below) |
-| `0x230` | The attack names, in French (`FENDRE`, `ENTAILLER`, …) |
-| `0x232` | Six x coordinates, bytes 875, 883, 1707, 1709, 1715 and 1717, not identified individually. 1707–1717 are in the last 136 bytes, where the entrance's rectangles are. |
+| `0x230` | The attack names, in French (`FENDRE`, `ENTAILLER`, …), 400 bytes where 1.2's are 300: the item is 1356 bytes, not the 1256 CSBWin asserts (`doc/PROVEN_FACTS.md` → "The French 1.3 `graphics.dat`: longer words") |
+| `0x232` | Six x coordinates. Bytes 875 and 883 are the low bytes of `wRectPos958.x2` (159 → 143, EAU) and `wRectPos950.x2` (159 → 207, NOURRITURE). 1707, 1709, 1715 and 1717, not identified individually, are in the last 136 bytes, where the entrance's rectangles are. |
 
 `DecodeText` looks up code 30's next code in `d.Byte10336` for wall text and in
 `d.Byte10016` for any other text (`doc/CSBwin-src/CSBCode.cpp:5559-5574`; the port's
