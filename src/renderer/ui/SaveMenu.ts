@@ -31,7 +31,9 @@
  * to the main loop, so `d.Time` stops. Here the click comes **straight from the DOM
  * event** rather than through the game's mouse queue — which is the same exclusivity,
  * and is also what keeps the browser's transient user activation alive for
- * `showDirectoryPicker`. The clock is stopped explicitly with `onSetPaused`.
+ * `showDirectoryPicker`. This port's loop keeps running, so the clock is stopped
+ * explicitly, with `ctx.state.paused` (`d.Time++` is the main loop's,
+ * `doc/CSBwin-src/CSBCode.cpp:660`).
  */
 import type { SaveEntry, SaveEntryMeta, SaveStore, SaveStoreKind } from '../../data/saves';
 import {
@@ -160,7 +162,7 @@ export function isSaveMenuOpen(ui: UIState): boolean {
 export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   if (ui.saveMenu) return;
   if (mode === 'full') tag02076e(ui);
-  ui.onSetPaused?.(true);
+  ui.ctx.state.paused = true;
   ui.saveMenu = {
     mode,
     // Whichever source was last chosen, here or by a quick-save.
@@ -182,7 +184,7 @@ export function closeSaveMenu(ui: UIState): void {
   const { mode } = ui.saveMenu;
   if (ui.saveMenu.frameHandle !== null) cancelFrame(ui.saveMenu.frameHandle);
   ui.saveMenu = null;
-  ui.onSetPaused?.(false);
+  ui.ctx.state.paused = false;
   if (mode === 'full') tag0207cc(ui);
 }
 

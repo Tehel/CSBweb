@@ -9,10 +9,9 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
-import type { LoopScript } from '../../engine/LoopState';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
-import type { KeyXlate, Rect, UIButton, UITables } from '../../data/tables/UITables';
+import type { KeyXlate, UIButton, UITables } from '../../data/tables/UITables';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
@@ -179,22 +178,6 @@ export interface UIState {
   onSpellCast?: (chIdx: number) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
   onChampionAttack?: (chIdx: number, attackType: number) => number;
-  /**
-   * Whether a script holds the loop (`Game.isRunningScript`): the pass that started it is
-   * suspended inside it, as CSBWin's is inside a `RESTARTABLE` sequence.
-   */
-  isRunningScript?: () => boolean;
-  /**
-   * Hold the loop in a `RESTARTABLE` sequence (`Game.runScript`): the pass that called it
-   * returns at once, and the script runs on, a VBL at a time.
-   */
-  runScript?: (script: LoopScript) => void;
-  /** `_FlashButton` from the main loop's pass, which inverts at once (`Game.flashButton`). */
-  flashButton?: (x1: number, x2: number, y1: number, y2: number) => void;
-  /** `_FlashButton` for a script, which waits its VBLs (`flashButtonScript`). */
-  flashButtonScript?: (x1: number, x2: number, y1: number, y2: number) => LoopScript;
-  /** `WaitForButtonFlash` for a script, which waits its VBL (`waitForButtonFlashScript`). */
-  waitForButtonFlashScript?: () => LoopScript;
   /** `d.attackDamageToDisplay`, read and cleared. */
   onConsumeAttackDamage?: () => number;
   /**
@@ -210,25 +193,6 @@ export interface UIState {
    * belongs to the engine.
    */
   onReincarnateNamed?: (chIdx: number, name: string, title: string) => void;
-  /**
-   * Stop and restart the clock around a modal menu. CSBWin needs no such hook: its menu
-   * loop simply never returns to the main loop, and `d.Time++` lives there
-   * (`doc/CSBwin-src/CSBCode.cpp:660`). This port's loop keeps running, so the pause is
-   * explicit.
-   */
-  onSetPaused?: (paused: boolean) => void;
-  /** Button 145 — `Game.sleep`, after the inventory has been hidden. */
-  onSleep?: () => void;
-  /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
-  onWakeUp?: () => void;
-  /** `WaitForButtonFlash` (`doc/CSBwin-src/CSBCode.cpp:8561`) — the engine's `waitForButtonFlash`. */
-  waitForButtonFlash?: () => void;
-  /** The button rectangle a flash has inverted, or `null` — `Game.flashedButton`. */
-  flashedButton?: () => Rect | null;
-  /** Button 147, the engine's half of the freeze — `Game.freeze`. */
-  onFreeze?: () => void;
-  /** Button 148, the engine's half of the thaw — `Game.thaw`. */
-  onThaw?: () => void;
   /**
    * Build the bytes of a new save and the row it will be listed as
    * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the

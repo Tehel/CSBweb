@@ -82,6 +82,9 @@ async function main(): Promise<void> {
     const b = uiTables.graphic231.buttons.buttons18060.find((entry) => entry.word0 === id);
     if (!b) throw new Error(`no magic button ${id}`);
     handleMagicClick(ui, (b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1);
+    // `_MagicSelection` holds the loop for its flashes (`magicSelectionScript`): its VBLs
+    // go by, as they would before the player's next click.
+    while (game.isRunningScript()) game.runFrame(0);
   };
   const runes = (): string => party.champions[party.magicCasterIndex]!.incantation.map((c) => c.toString(16)).join(',');
 

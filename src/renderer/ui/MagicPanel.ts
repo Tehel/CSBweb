@@ -12,7 +12,7 @@ import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer'
 import { searchButtonList } from './HitTest';
 import { UIState } from './UIState';
 import { selectMagicCaster } from '../../engine/Party';
-import type { LoopScript } from '../../engine/LoopState';
+import { flashButtonScript, waitForButtonFlashScript, type LoopScript } from '../../engine/LoopState';
 
 /**
  * The caster tabs `DrawSpellControls` inverts, as CSBWin writes them
@@ -143,7 +143,7 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
  * `CastMagic` is the engine's (`ui.onSpellCast`), which sets `d.clockTick` and clears
  * the incantation. The function is `RESTARTABLE` and waits for VBLs around its flashes, so
  * the port runs it as a script (`magicSelectionScript`), which holds the loop as CSBWin's
- * pass is held inside it. With no loop to hold (a tool's bare `UIState`), it runs through.
+ * pass is held inside it.
  */
 export function magicSelection(ui: UIState, button: number): void {
   if (!ui.partyState || !ui.uiTables) return;
@@ -153,12 +153,8 @@ export function magicSelection(ui: UIState, button: number): void {
     if (!pcA0 || (pcA0.incantation[0] ?? 0) === 0) return;
   }
   const script = magicSelectionScript(ui, button);
-  if (ui.runScript) ui.runScript(script);
-  else while (!script.next().done) { /* every wait at once */ }
+  ui.ctx.systems.mainLoop.runScript(script);
 }
-
-/** A wait with no loop to wait in. */
-function* noWait(): LoopScript {}
 
 /**
  * `_MagicSelection` from its first flash on. The cast flashes its button
@@ -170,18 +166,18 @@ function* noWait(): LoopScript {}
 function* magicSelectionScript(ui: UIState, button: number): LoopScript {
   const party = ui.partyState!;
   if (button === 108) {
-    yield* ui.flashButtonScript?.(0xea, 0x12f, 0x3f, 0x49) ?? noWait();
+    yield* flashButtonScript(ui.ctx, 0xea, 0x12f, 0x3f, 0x49);
     // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:939`), which is waited
     // out here, where a VBL can pass. The engine's own call then finds the button put back.
-    yield* ui.waitForButtonFlashScript?.() ?? noWait();
+    yield* waitForButtonFlashScript(ui.ctx);
     ui.onSpellCast?.(party.magicCasterIndex);
   } else {
     const D7 = button - 101;
     const pwA3 = ui.uiTables!.graphic231.word18552[D7]!;
-    yield* ui.flashButtonScript?.(pwA3.x1, pwA3.x2, pwA3.y1, pwA3.y2) ?? noWait();
+    yield* flashButtonScript(ui.ctx, pwA3.x1, pwA3.x2, pwA3.y1, pwA3.y2);
     // `wvbl(_3_);`
     yield 1;
-    yield* ui.waitForButtonFlashScript?.() ?? noWait();
+    yield* waitForButtonFlashScript(ui.ctx);
     if (D7 < 6) {
       tag01b990(ui, D7);
     } else {

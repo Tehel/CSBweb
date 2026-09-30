@@ -125,10 +125,6 @@ async function main(): Promise<void> {
   ui.partyState = party;
   ui.fontData = loadFontData(graphics);
   Mouse.updateButtonLists(ui);
-  ui.onSleep = () => game.sleep();
-  ui.onWakeUp = () => game.wakeUp();
-  ui.onFreeze = () => game.freeze();
-  ui.onThaw = () => game.thaw();
   const handled: number[] = [];
   game.setMouseEventHandlers({
     button: (num, x, y) => { handled.push(num); Mouse.handleMouseButton(ui, num, x, y); },

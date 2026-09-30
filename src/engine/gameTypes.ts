@@ -303,7 +303,7 @@ export interface MovementResult {
 export interface GameState {
     dungeon: DungeonData;       // Dungeon data (maps, objects, etc.)
 
-    paused: boolean;            // The save menu holds the clock (`UIState.onSetPaused`)
+    paused: boolean;            // The save menu holds the clock (`openSaveMenu`)
     tickCount: ui16;            // Number of game ticks elapsed
 
     /**

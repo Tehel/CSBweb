@@ -285,9 +285,6 @@ async function main(): Promise<void> {
   let castAt = -1;
   let frameNo = 0;
   ui.onSpellCast = (chIdx) => { castAt = frameNo; return game.castSpellFromUi(chIdx); };
-  ui.runScript = (script) => game.runScript(script);
-  ui.flashButtonScript = (x1, x2, y1, y2) => game.flashButtonScript(x1, x2, y1, y2);
-  ui.waitForButtonFlashScript = () => game.waitForButtonFlashScript();
   party.magicCasterIndex = 0;
   const word18552 = ui.uiTables.graphic231.word18552;
   const buttons18060 = ui.uiTables.graphic231.buttons.buttons18060;
@@ -355,9 +352,7 @@ async function main(): Promise<void> {
   const partner: Champion = { ...caster, name: 'TWO', possessions: emptyPossessions(), partyPosition: 1, incantation: [] };
   party.champions = [caster, partner];
   party.magicCasterIndex = -1;
-  ui.flashButton = (x1, x2, y1, y2) => game.flashButton(x1, x2, y1, y2);
   ui.onChampionAttack = (chIdx, attackType) => game.championAttack(chIdx, attackType);
-  ui.isRunningScript = () => game.isRunningScript();
   ui.onConsumeAttackDamage = () => game.consumeAttackDamageToDisplay();
   game.setMouseEventHandlers({ button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });
   const clickAt = (r: Rect) => () => { game.onMouseClick(111, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1); };

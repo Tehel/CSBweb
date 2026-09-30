@@ -19,19 +19,16 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { Direction, Position } from '../src/core/types';
-import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
-import { CharacterStats } from '../src/engine/CharacterStats';
-import { Party, setHandOwner } from '../src/engine/Party';
+import { setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion, PartyState } from '../src/engine/gameTypes';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
-import { graphicsTablesOf, newContext } from './lib/game';
+import type { LoopScript } from '../src/engine/LoopState';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 /**
@@ -98,14 +95,14 @@ async function main(): Promise<void> {
       assignPresetHeroPossessions(heroes[heroIndex].inventory, addTables),
     );
 
-  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  const game = newGame(data, graphics);
+  game.setRandomSeed(0x12345678);
+  const ctx = game.ctx;
+  const party = ctx.party;
   party.addChampion(makeChampion(casters[0].index, 0));
   party.addChampion(makeChampion(casters[1].index, 1));
   setHandOwner(party.state, 0);
 
-  const dungeon = new DungeonState(data);
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
-  ctx.systems.characterStats = new CharacterStats(ctx);
   const ui: UIState = createUIState(graphics, ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
@@ -134,8 +131,13 @@ async function main(): Promise<void> {
 
   const { handleUIKey } = await importKeyboard();
   const { attackPanelTick, closeAttackMenu, handleAttackAreaClick } = await import('../src/renderer/ui/Attack');
+  let held = false;
+  // A rune key's `_MagicSelection` holds the loop for its flashes (`magicSelectionScript`):
+  // the VBLs go by, as a player's next key would wait for them, before the row is read.
+  // Not the script `hold` below, which only `held` lets go.
   const press = (key: string): boolean => {
     const taken = handleUIKey(ui, key);
+    while (game.isRunningScript() && !held) game.runFrame(0);
     row(ui, key, taken);
     return taken;
   };
@@ -300,13 +302,17 @@ async function main(): Promise<void> {
   //         to its caller (`doc/CSBwin-src/Character.cpp:4972`): `TAG01b1c0` leaves the
   //         menu up, and `d.clockTick = intResult` (`:4717`) is not set. While the script
   //         holds the loop every panel key is claimed and dead: CSBWin's UI only queues.
-  let held = false;
+  // The attack holds the loop in a script of its own, as `_FusionSequence` does, until
+  // `held` lets it go and a VBL ends it.
+  function* hold(): LoopScript {
+    while (held) yield 1;
+  }
   ctx.loop.clockTickSet = false;
   ctx.loop.clockTickCleared = false;
-  ui.isRunningScript = () => held;
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     held = true;
+    game.runScript(hold());
     return 1;
   };
   const option = ui.uiTables.graphic231.buttons.buttons17892.find((b) => b.word0 === 113);
@@ -315,7 +321,7 @@ async function main(): Promise<void> {
   press('q');
   if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
   row(ui, 'option', true);
-  check(attacks.length === 1 && held, 'the click attacks, and the attack holds the loop');
+  check(attacks.length === 1 && game.isRunningScript(), 'the click attacks, and the attack holds the loop');
   check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
   check(clockTick() === 'untouched', 'd.clockTick is not set');
   const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', 'Tab'].map((key) => press(key));
@@ -325,6 +331,8 @@ async function main(): Promise<void> {
   'and none acts: no attack, the same menu, no inventory, the same caster, no rune');
   check(!press('k'), 'a key that is not the panel\'s is still passed on');
   held = false;
+  game.runFrame(0);
+  check(!game.isRunningScript(), 'a VBL ends the script, and the loop is free');
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     return 1;

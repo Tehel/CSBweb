@@ -130,6 +130,14 @@ export function flashButton(ctx: GameContext, x1: number, x2: number, y1: number
 }
 
 /**
+ * The rectangle `vblFlashButn` has inverted while `d.Word11776` says it stands inverted, or
+ * `null`: the screen inverts it after composing a frame.
+ */
+export function flashedButton(ctx: GameContext): Rect | null {
+  return ctx.loop.word11776 ? ctx.loop.flashButn : null;
+}
+
+/**
  * `_FlashButton` inside a `LoopScript`, which can wait: each wait is a VBL of the held
  * loop (`Game.runFrame`), whose `vblFlashButton` inverts the rectangle.
  */

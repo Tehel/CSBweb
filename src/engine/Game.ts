@@ -32,7 +32,7 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
-import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, waitForButtonFlashScript, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { createLoopFlags, flashButton, flashedButton, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, wakeUp, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
@@ -317,8 +317,8 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Stop and restart the clock around the save menu (`UIState.onSetPaused`). The game's
-     * own stop is the freeze, buttons 147 and 148.
+     * Stop and restart the clock, as the save menu does (`openSaveMenu`). The game's own
+     * stop is the freeze, buttons 147 and 148.
      */
     setPaused(paused: boolean): void {
         this.ctx.state.paused = paused;
@@ -842,32 +842,9 @@ export class Game implements MainLoop {
         this.onTickCallbacks.push(callback);
     }
 
-    /**
-     * The rectangle `vblFlashButn` has inverted while `d.Word11776` says it stands
-     * inverted, or `null`: the screen inverts it after composing a frame.
-     */
+    /** The rectangle the screen inverts (`LoopState.flashedButton`). */
     flashedButton(): Rect | null {
-        return this.ctx.loop.word11776 ? this.ctx.loop.flashButn : null;
-    }
-
-    /** `WaitForButtonFlash` (`LoopState.waitForButtonFlash`), for the UI's `TAG02076e`. */
-    waitForButtonFlash(): void {
-        waitForButtonFlash(this.ctx);
-    }
-
-    /** `_FlashButton` (`LoopState.flashButton`), for the UI's attack menu. */
-    flashButton(x1: number, x2: number, y1: number, y2: number): void {
-        flashButton(this.ctx, x1, x2, y1, y2);
-    }
-
-    /** `_FlashButton` for a script (`LoopState.flashButtonScript`), for the UI's. */
-    flashButtonScript(x1: number, x2: number, y1: number, y2: number): LoopScript {
-        return flashButtonScript(this.ctx, x1, x2, y1, y2);
-    }
-
-    /** `WaitForButtonFlash` for a script (`LoopState.waitForButtonFlashScript`), for the UI's. */
-    waitForButtonFlashScript(): LoopScript {
-        return waitForButtonFlashScript(this.ctx);
+        return flashedButton(this.ctx);
     }
 
     /** Whether a VBL inverted the flashed rectangle since the last call: a redraw is due. */

@@ -35,7 +35,7 @@ import { getPartyChampion } from '../../engine/Party';
 import { getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { CHARFLAG_ATTACK_DISABLE } from '../../data/CsbwinCharacters';
 import { determineMastery } from '../../engine/skills';
-import { setClockTick } from '../../engine/LoopState';
+import { flashButton, setClockTick } from '../../engine/LoopState';
 import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { Rect } from '../../data/tables/UITables';
@@ -196,7 +196,7 @@ export function executeAttack(ui: UIState, option: number): number {
     // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): `_FusionSequence`
     // ends in `ShowCredits` (`Attack.cpp:2429`), so `TAG01b1c0` does not run and the menu
     // stays on the panel to the end of the game.
-    if (ui.isRunningScript?.()) return result;
+    if (ui.ctx.systems.mainLoop.isRunningScript()) return result;
   }
   closeAttackMenu(ui);
   return result;
@@ -210,7 +210,7 @@ export function executeAttack(ui: UIState, option: number): number {
  */
 export function takeAttackOption(ui: UIState, option: number): void {
   const result = executeAttack(ui, option);
-  if (!ui.isRunningScript?.()) setClockTick(ui.ctx, result);
+  if (!ui.ctx.systems.mainLoop.isRunningScript()) setClockTick(ui.ctx, result);
 }
 
 /**
@@ -220,16 +220,16 @@ export function takeAttackOption(ui: UIState, option: number): void {
  */
 export function attackMenuButton(ui: UIState, id: number): void {
   if (id === 112) {
-    ui.flashButton?.(0x11d, 0x13f, 0x4d, 0x53);
+    flashButton(ui.ctx, 0x11d, 0x13f, 0x4d, 0x53);
     executeAttack(ui, -1); // PASS, which leaves `d.clockTick` alone
     return;
   }
   // Only the options actually offered are live; the rows below `word20248` are dead
   // even though the button list covers them.
   if (id - 112 > ui.word20248) return;
-  if (id === 113) ui.flashButton?.(0xea, 0x13e, 0x56, 0x60);
-  else if (id === 114) ui.flashButton?.(0xea, 0x13e, 0x62, 0x6c);
-  else ui.flashButton?.(0xea, 0x13e, 0x6e, 0x78);
+  if (id === 113) flashButton(ui.ctx, 0xea, 0x13e, 0x56, 0x60);
+  else if (id === 114) flashButton(ui.ctx, 0xea, 0x13e, 0x62, 0x6c);
+  else flashButton(ui.ctx, 0xea, 0x13e, 0x6e, 0x78);
   takeAttackOption(ui, id - 113);
 }
 

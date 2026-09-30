@@ -22,7 +22,7 @@ import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
-import { setClockTick } from '../../engine/LoopState';
+import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
 import { updateHover } from '@/ui';
 
 export { decodeCursorBitmap };
@@ -117,14 +117,14 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     if (!potential) {
       if ((ui.partyState?.selectedCharacterIndex ?? -1) >= 0) handleInventoryToggle(ui, 4);
       tag02076e(ui);
-      ui.onSleep?.();
+      ui.ctx.systems.mouse.sleep();
     }
     return;
   }
   if (id === 146) {
     // `WakeUp()` (`doc/CSBwin-src/Mouse.cpp:1709-1714`): `Buttons17796`, a click anywhere
     // in the viewport while the party sleeps.
-    ui.onWakeUp?.();
+    wakeUp(ui.ctx);
     return;
   }
   if (id === 140) {
@@ -141,7 +141,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // `gameFrozen = true` and `DiscardAllInput()` are the engine's; `TAG02076e`, the
     // lists and key tables saved and replaced by `Buttons17832` and `Byte18448`, and
     // "GAME FROZEN" in the viewport (`GameScreen.render`) are the screen's.
-    ui.onFreeze?.();
+    freeze(ui.ctx);
     tag02076e(ui);
     ui.modeBeforeFreeze = ui.uiMode;
     ui.uiMode = UIMode.Frozen;
@@ -151,7 +151,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   if (id === 148) {
     // The thaw (`doc/CSBwin-src/Mouse.cpp:1760-1773`): a click anywhere, or Esc.
     // `TAG0207cc`, then the saved lists and key tables back.
-    ui.onThaw?.();
+    thaw(ui.ctx);
     ui.uiMode = ui.modeBeforeFreeze;
     tag0207cc(ui);
     updateButtonLists(ui);
@@ -272,7 +272,7 @@ export function tag02076e(ui: UIState): void {
   const party = ui.partyState;
   if (!party || party.sleeping) return;
   // `WaitForButtonFlash(); //If any are active` (`:5113`).
-  ui.waitForButtonFlash?.();
+  waitForButtonFlash(ui.ctx);
   if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
   ui.shadedByTag02076e = true;
 }

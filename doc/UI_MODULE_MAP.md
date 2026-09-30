@@ -17,10 +17,10 @@ each other.
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out** (`GameScreenHooks`): the loop's (`isRunningScript`, `runScript`, the
-  button flashes, sleep and freeze), the panels' (`onSpellCast`, `onChampionAttack`,
+- **hooks out** (`GameScreenHooks`): the panels' (`onSpellCast`, `onChampionAttack`,
   `onResurrectReincarnateCancel`, `onReincarnateNamed`) and the save stores'. The object
-  and inventory calls go to the engine through `ctx` (`DEBT.md` E11)
+  and inventory calls, and the loop's (a script holding it, the button flashes, sleep and
+  freeze), go to the engine through `ctx` (`DEBT.md` E11)
 - **hooks back into the renderer**: `getGraphicBitmap`, `renderLastFrame`
 
 A function that turns out not to need the state does not take it — the pure helpers

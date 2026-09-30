@@ -294,13 +294,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onSpellCast: (chIdx) => game.castSpellFromUi(chIdx),
         // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
-        isRunningScript: () => game.isRunningScript(),
-        // `_TAG019fac`'s flash of the attack option taken.
-        flashButton: (x1, x2, y1, y2) => game.flashButton(x1, x2, y1, y2),
-        // `_MagicSelection`, which the spell panel runs as a script for its flashes.
-        runScript: (script) => game.runScript(script),
-        flashButtonScript: (x1, x2, y1, y2) => game.flashButtonScript(x1, x2, y1, y2),
-        waitForButtonFlashScript: () => game.waitForButtonFlashScript(),
         onConsumeAttackDamage: () => game.consumeAttackDamageToDisplay(),
         onResurrectReincarnateCancel: (button) => {
             game.resurrectReincarnateCancel(button);
@@ -311,16 +304,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             game.reincarnateNamed(chIdx, name, title);
             renderView();
         },
-        // Buttons 145 and 146 (the host's `sleepChanged` is the engine's answer).
-        onSleep: () => game.sleep(),
-        onWakeUp: () => game.wakeUp(),
-        // Buttons 147 and 148 (the screen's halves are `handleMouseButton`'s).
-        onFreeze: () => game.freeze(),
-        // The button flash: `TAG02076e`'s `WaitForButtonFlash`, and the rectangle the
-        // screen inverts.
-        waitForButtonFlash: () => game.waitForButtonFlash(),
-        flashedButton: () => game.flashedButton(),
-        onThaw: () => game.thaw(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
         // back through these three.
@@ -355,7 +338,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             console.error('Saved game damaged:', error);
             savedGameRead = 'damaged';
         },
-        onSetPaused: (paused) => game.setPaused(paused),
         onPaletteSelected: (index) => {
             game.currentPalette = index;
         },

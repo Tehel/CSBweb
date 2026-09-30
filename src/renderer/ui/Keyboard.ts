@@ -142,7 +142,7 @@ export function handleUIKey(ui: UIState, key: string): boolean {
   // `buttons18060` gives, so `handleMagicClick` answers it in its pass), or hold the keys
   // that arrive during a script in a small queue of their own and replay them, in order,
   // once `isRunningScript` turns false.
-  if (ui.isRunningScript?.()) return isUIKey(k);
+  if (ui.ctx.systems.mainLoop.isRunningScript()) return isUIKey(k);
 
   for (let chIdx = 0; chIdx < ATTACK_KEYS.length; chIdx++) {
     const option = ATTACK_KEYS[chIdx].indexOf(k);

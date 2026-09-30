@@ -27,6 +27,7 @@ import {
 } from './csbwin/CanvasBlitter';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
 import type { UIButton, UITables } from '../data/tables/UITables';
+import { flashedButton } from '../engine/LoopState';
 import { loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
@@ -97,25 +98,13 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
 export interface GameScreenHooks extends Required<Pick<UIState,
   | 'onSpellCast'
   | 'onChampionAttack'
-  | 'isRunningScript'
-  | 'runScript'
-  | 'flashButton'
-  | 'flashButtonScript'
-  | 'waitForButtonFlashScript'
   | 'onConsumeAttackDamage'
   | 'onResurrectReincarnateCancel'
   | 'onReincarnateNamed'
-  | 'onSleep'
-  | 'onWakeUp'
-  | 'onFreeze'
-  | 'onThaw'
-  | 'waitForButtonFlash'
-  | 'flashedButton'
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
   | 'onRestoreFailed'
-  | 'onSetPaused'
 >> {
   /**
    * The palette the light level picked, published as CSBWin's `d.CurrentPalette`: the
@@ -170,25 +159,13 @@ export class GameScreen {
     this.ui = ui;
     ui.onSpellCast = hooks.onSpellCast;
     ui.onChampionAttack = hooks.onChampionAttack;
-    ui.isRunningScript = hooks.isRunningScript;
-    ui.runScript = hooks.runScript;
-    ui.flashButton = hooks.flashButton;
-    ui.flashButtonScript = hooks.flashButtonScript;
-    ui.waitForButtonFlashScript = hooks.waitForButtonFlashScript;
     ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
     ui.onResurrectReincarnateCancel = hooks.onResurrectReincarnateCancel;
     ui.onReincarnateNamed = hooks.onReincarnateNamed;
-    ui.onSleep = hooks.onSleep;
-    ui.onWakeUp = hooks.onWakeUp;
-    ui.onFreeze = hooks.onFreeze;
-    ui.onThaw = hooks.onThaw;
-    ui.waitForButtonFlash = hooks.waitForButtonFlash;
-    ui.flashedButton = hooks.flashedButton;
     ui.onCreateSave = hooks.onCreateSave;
     ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;
     ui.onRestoreFailed = hooks.onRestoreFailed;
-    ui.onSetPaused = hooks.onSetPaused;
     this.onPaletteSelected = hooks.onPaletteSelected;
     this.messages = deps.messages;
 
@@ -558,7 +535,7 @@ export class GameScreen {
     // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
     // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:883-884),
     // and draws it back after (`:1039-1042`).
-    const flashed = this.ui.flashedButton?.() ?? null;
+    const flashed = flashedButton(this.ui.ctx);
     if (flashed) vblFlashButn(this.screen, flashed);
     drawCursorItem(this.ui, !inventoryOpen);
 

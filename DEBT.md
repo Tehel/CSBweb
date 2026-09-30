@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 4 of 5 next |
+| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 5 of 5 next |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
@@ -99,6 +99,7 @@ In payoff order: the first row is the next item.
 | C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
 | C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
 | C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
+| C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
@@ -132,7 +133,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C101 · D16 · E20 · F14 · G21 · X7. An ID recorded and paid in one commit has no
+Next free IDs: C102 · D16 · E20 · F14 · G21 · X7. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -146,9 +147,9 @@ New state-representation debt goes here, and jumps the queue.
 `createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
 sources `null` — `uiTables`, `objectTables`, `fontData`, `screenIndexBuffer`,
 `context` — and `GameScreen`'s constructor fills them in straight after
-(`src/renderer/GameScreen.ts:164-222`). None is ever `null` again, but every reader
-must ask: 165 `!ui.x` guards and 54 `ui.x?.` reads in `src/renderer/`. The 21 hooks out are
-optional fields too, so 29 calls are `ui.onX?.()`, and a hook left unwired is a click
+(`src/renderer/GameScreen.ts:153-199`). None is ever `null` again, but every reader
+must ask: 172 `!ui.x` guards and 64 `ui.x?.` reads in `src/renderer/`. The 9 hooks out are
+optional fields too, so 10 calls are `ui.onX?.()`, and a hook left unwired is a click
 that silently does nothing. D3 made the engine's state required for the same reason. Paying
 it means a `UIState` built whole, from the tables (`GraphicsTables`, which the screen
 is already handed) and whatever replaces the hooks (`E11`), which is why it comes after
@@ -165,8 +166,8 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 
 What CSBWin's interface code does to the game, it does by calling the engine's functions
 on `d.`. Where a hook is left, the port's goes: a `UIState` hook (`ui.onSpellCast?.(…)`),
-which `GameScreen` copies one by one out of 21 `GameScreenHooks` (`GameScreen.ts:171-191`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:239-364`) onto a one-line `Game`
+which `GameScreen` copies one by one out of 10 `GameScreenHooks` (`GameScreen.ts:163-172`),
+each a lambda in `main.ts`'s `construct` (`src/main.ts:239-346`) onto a one-line `Game`
 facade, onto the system. Adding an engine call that way touches four files. And
 the hooks are not a boundary: the UI modules import from 11 engine modules, and write engine
 state directly where no hook exists — the object in hand
@@ -183,21 +184,19 @@ over the `Game` it already has. Under A the direct writes listed above are the C
 shape (CSBWin's interface writes `d.` too), so they stay, reached through `ui.ctx`. (The
 shape not taken, B, kept the hooks and built them all from a `Game` in one function.)
 
-Two steps remain, one commit each. Steps 1 to 3 are in place: one `ScrollingText`
-the page hands to both sides, the host's contract types in `GameHost.ts`, and `UIState`
-holding the `GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it;
-`ui.partyState` stays as it is, `D15`). The object and inventory calls go straight to the
-engine: `ui.ctx.systems.character`'s possession pair, `mouse.triggerObjectMove`,
+One step remains. Steps 1 to 4 are in place: one `ScrollingText` the page hands to
+both sides, the host's contract types in `GameHost.ts`, and `UIState` holding the
+`GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it; `ui.partyState`
+stays as it is, `D15`). The object and inventory calls go straight to the engine:
+`ui.ctx.systems.character`'s possession pair, `mouse.triggerObjectMove`,
 `dsa.processViewingFilter`, `applyFeedParameters(ui.ctx, …)`, `ui.ctx.sounds.queueSound`
-and `LoopState.setClockTick(ui.ctx, …)`. Every tool's UI stands over a `newGame`'s context
-but `dump-key-bindings`'s, over a bare `newContext` with its `CharacterStats` in
-`ctx.systems`: the UI it drives reaches no other system until step 4 takes its
-`isRunningScript` stub away.
+and `LoopState.setClockTick(ui.ctx, …)`. So do the loop's: `ctx.systems.mainLoop`'s
+`isRunningScript` and `runScript`, `mouse.sleep`, and `LoopState`'s `flashButton`,
+`flashButtonScript`, `waitForButtonFlash`, `waitForButtonFlashScript`, `flashedButton`,
+`wakeUp`, `freeze` and `thaw`; the save menu writes `ctx.state.paused`. Every tool's UI
+stands over a `newGame`'s context, so a rune or cast holds the loop in a tool as it does
+in the game, and the tool lets its VBLs go by.
 
-4. ⏳ **The loop's hooks go**: `isRunningScript`, `runScript`, `flashButton`,
-   `flashButtonScript`, `waitForButtonFlashScript`, `waitForButtonFlash`,
-   `flashedButton`, `onSleep`, `onWakeUp`, `onFreeze`, `onThaw`, `onSetPaused`, through
-   `ctx.systems.mainLoop` and `LoopState`'s functions.
 5. ⏳ **The panels' hooks go, and what is left is the page's**: `onSpellCast`,
    `onChampionAttack`, `onConsumeAttackDamage`, `onResurrectReincarnateCancel`,
    `onReincarnateNamed` (whose `renderView()` after the engine's call is the page's, and
@@ -205,7 +204,7 @@ but `dump-key-bindings`'s, over a bare `newContext` with its `CharacterStats` in
    (`onCreateSave`, `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`, whose owner is
    `E13`'s), `onPaletteSelected` (`C95`'s), and whatever step 5 leaves of Reincarnate;
    the `Game` facades whose only callers left are tools go, the tools calling the system
-   as the UI does. E11 closes; `D15` makes the remaining fields required.
+   as the UI does (among them `sleep`, `wakeUp`, `freeze`, `thaw` and `setPaused`). E11 closes; `D15` makes the remaining fields required.
 
 Each step is a refactor: every tool's whole output byte-identical, and
 `npm test -- --frames`, since each moves code under `src/renderer/`.
@@ -408,7 +407,7 @@ door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:167`
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:492-497`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:474-479`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -458,6 +457,24 @@ takes `P6`/`P7` for pixel offsets (`DrawTeleporter`, `DrawDoor.ts:233-269`),
 so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
 indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
 teleporter's pixels with the stream the C++ reads.
+
+### C101 ⏳ The pass a returning script held finishes a VBL after the script
+
+`_MagicSelection` is `RESTARTABLE` (`doc/CSBwin-src/Magic.cpp:545-581`): the pass that
+calls it waits inside `HandleMouseEvents` through its flash, and in the VBL the sequence
+returns, the pass goes on where it stopped. The next queue entries follow while
+`intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
+(`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
+is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
+resumes it and returns (`src/engine/Game.ts:368-376`), and the rest of the pass waits for
+the next VBL's, which opens with `clockTickCleared = false` (`:384`). So the tick a cast or
+a rune makes due runs a VBL late, the next queued click waits a VBL, and a cast that returns
+0 (a failed cast, or `CastSpell`'s 3) no longer puts off a tick that was due: the next pass
+has cleared the put-off before it reads it. The fusion and the CSB win's wait are spared,
+since they never return. `tools/dump-mouse-queue.ts` reads `d.clockTick` as the cast's
+script leaves it and stops there. Paying it means `runFrame` finishing the held pass when
+the script ends (the rest of the `handleMouseEvents` loop, then the tick), with a check in
+`dump-mouse-queue` that the cast's tick runs, or is put off, in the script's last VBL.
 
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
@@ -910,9 +927,11 @@ Recorded so that nobody "fixes" them.
   make this a default rather than a divergence.
 - 🚫 **A script's caller finishes at once.** `Game.runScript` returns as soon as the script
   reaches its first `VBLDelay`, so what CSBWin's suspended caller would do after the script
-  ends, the port's does before it. Both scripts end the game, and the callers' tails that
-  anything could still see are skipped (`executeAttack` and `handleAttackAreaClick`,
-  `src/renderer/ui/Attack.ts`). What is left is `HandleMouseEvents`' `lastTime = d.Time`
+  ends, the port's does before it. The fusion and the CSB win's wait end the game, and the
+  callers' tails that anything could still see are skipped (`executeAttack` and
+  `handleAttackAreaClick`, `src/renderer/ui/Attack.ts`). `_MagicSelection`'s callers
+  (`handleMagicClick`, `handleUIKey`) do nothing after it, and the rest of the pass it
+  holds is `C101`'s. What is left is `HandleMouseEvents`' `lastTime = d.Time`
   (`doc/CSBwin-src/Mouse.cpp:1647-1649`), stamped at the click, which nothing reads after
   the credits.
 - 🚫 **A champion who dies in hand is put down on nobody.** `KillCharacter` does not end a

@@ -610,28 +610,37 @@ async function main(): Promise<void> {
 
   // The cast button (108), by a champion with every skill mastered, so no cast fails on
   // the dice: a lone power rune names no spell (0), LO FUL is the torch (1), and LO VI is
-  // a potion, which with no flask in hand is `CastSpell`'s 3.
+  // a potion, which with no flask in hand is `CastSpell`'s 3. `_MagicSelection` holds the
+  // loop through its flash (`magicSelectionScript`), so `d.clockTick` is read as the
+  // script leaves it, not from the next tick: what that tick does with it is `DEBT.md`
+  // C101's (the port finishes the held pass a VBL after the script, where CSBWin finishes
+  // it in the same VBL).
   const [castX, castY] = centreOf(buttons.buttons18060, 108);
-  const castOnce = (measure: 'frames' | 'due', runes: number[]): number | boolean => {
+  const castOnce = (runes: number[]): { frames: number; clockTick: string } => {
     soloParty();
     const caster = party.champions[0]!;
     caster.skills = ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 }));
     caster.incantation = [...runes];
     castResult = -99;
-    const click = (): void => handleMouseButton(ui, 100, castX, castY);
-    return measure === 'frames' ? framesToTick(click) : dueTickRuns(click);
+    onClick = () => handleMouseButton(ui, 100, castX, castY);
+    frame(true);
+    game.onMouseClick(80, 100, 100);
+    let frames = 0;
+    do { vbl(); frames++; } while (game.isRunningScript() && frames < 30);
+    const loop = game.ctx.loop;
+    return { frames, clockTick: loop.clockTickSet ? 'set' : loop.clockTickCleared ? 'cleared' : 'untouched' };
   };
   const castResults = new Set<number>();
   for (const [name, runes] of [['LO', [0x60]], ['LO FUL', [0x60, 0x69]], ['LO VI', [0x60, 0x67]]] as const) {
-    const frames = castOnce('frames', [...runes]) as number;
+    const { frames, clockTick } = castOnce([...runes]);
     const result = castResult;
-    const runs = castOnce('due', [...runes]) as boolean;
     const tick = result === 3 ? 0 : result;
     castResults.add(result);
-    row(`CastMagic (${name})`, String(result), frames, runs, tick !== 0 ? 'set' : 'cleared');
+    row(`CastMagic (${name})`, String(result), frames, '-', clockTick);
     check(result !== -99, `the cast button cast ${name}`);
-    if (tick !== 0) check(frames === 1, `a cast of ${name} that returns ${result} makes a tick due`);
-    else check(!runs, `a cast of ${name} that returns ${result} puts off a tick that was due`);
+    check(frames === 3, `the cast of ${name} holds the loop for its flash, three VBLs`);
+    if (tick !== 0) check(clockTick === 'set', `a cast of ${name} that returns ${result} makes a tick due`);
+    else check(clockTick === 'cleared', `a cast of ${name} that returns ${result} puts off a tick that was due`);
   }
   check(castResults.has(0) && castResults.has(1) && castResults.has(3), 'the casts return 0, 1 and 3');
 
