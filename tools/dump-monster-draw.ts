@@ -85,8 +85,8 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
     },
   };
   const interp = new BytecodeInterpreter(context) as any;
-  const blit = interp.blitShapeToViewportIndexWithTransparent.bind(interp);
-  interp.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
+  const blit = interp.draw.blitShapeToViewportIndexWithTransparent.bind(interp.draw);
+  interp.draw.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
     blits.push({ x1: rect.x1, x2: rect.x2, y2: rect.y2, w: src.width >> 1, graphic: lastGraphic });
     blit(src, rect, t);
   };
@@ -184,7 +184,7 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
   };
   const interp = new BytecodeInterpreter(context) as any;
   const unmirroredFirst = (map: Uint8Array | null) => (map ? interp.mapColorValue(map, left) : left);
-  interp.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
+  interp.draw.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
   interp.drawRoomObjects(DBType.CREATURE << 10, 0, 0, 0, relativeCell, ORDER_3421);
   if (first === null) return null;
   const map = relativeCell >= 6 ? null : relativeCell >= 3 ? tables.monsterColorMapMedium : tables.monsterColorMapFar;

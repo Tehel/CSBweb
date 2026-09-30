@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 1 of 3 next |
+| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 2 of 3 next |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
@@ -163,19 +163,19 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
-`src/renderer/bytecode/BytecodeInterpreter.ts` is 3847 lines. The stack machine and its
+`src/renderer/bytecode/BytecodeInterpreter.ts` is 3776 lines. The stack machine and its
 opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
 the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
 
-- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2102`),
-  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2435`,
-  `drawMonsterAt`, `:2523`), the missiles (`drawMissilesAtPosition`, `:2641`),
-  `DrawClouds` (`:2787`), `drawCloudUnderParty`, `TAG005088` (`:2908`). About 1000
+- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2079`),
+  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2412`,
+  `drawMonsterAt`, `:2500`), the missiles (`drawMissilesAtPosition`, `:2618`),
+  `DrawClouds` (`:2764`), `drawCloudUnderParty`, `TAG005088` (`:2885`). About 1000
   lines.
 - **`CSBCode.cpp`**'s drawing: `DrawWallDecoration` (`drawWallDecorationGraphic`,
   `:1540`), the extended wall and floor decorations, the wall text (`:1796`),
   `DrawFloorDecorations` (`:1876`), `DrawDoor` and its ornament (`opStdDrawDoor`,
-  `:1302`, `drawDoorOrnament`), `DrawTeleporter` (`:2047`), the champion portrait. About
+  `:1302`, `drawDoorOrnament`), `DrawTeleporter` (`:2035`), the champion portrait. About
   700 lines.
 
 Paying it moves each group into a module of its own, as `E2` split `Game.ts`, each
@@ -186,21 +186,15 @@ moved function, as CSBWin's `case` calls `DrawDoor`), the `RECT_POINTERS` /
 code that moves: pay them first or after, not during.
 
 The moved functions are free functions over one shared object, as the `ui/` modules are
-over `UIState`. They reach state through it, not through `this`:
+over `UIState`, and reach state through it, not through `this`. That object is in place:
+`ViewportDraw` (`src/renderer/bytecode/ViewportDraw.ts`) holds the `InterpreterContext`,
+the mirror and flip caches, the three blit helpers, and `viewportRandom` beside it. The
+interpreter builds one per redraw and exposes it as `draw`, where a tool replaces a blit
+helper (`tools/dump-monster-draw.ts:187`).
 
-- **`ViewportDraw`** (`src/renderer/bytecode/ViewportDraw.ts`): the `InterpreterContext`,
-  the mirror and flip caches (`getMirroredBitmap`, `getFlippedBitmapVertical`), the three
-  blit helpers (`blitShapeToViewportIndexWithTransparent`, `blitShapeBitmapToViewport`,
-  `scaleIndexedBitmap`), and `viewportRandom` (`Viewport.cpp:6697`, a module-level value
-  as the class-static is now). It is a class the interpreter builds and exposes as a
-  public readonly `draw`, so a tool that replaces a blit helper on one instance
-  (`tools/dump-monster-draw.ts:187`) replaces it on `interp.draw` instead.
+Two steps remain, one commit each, each byte-identical in every tool's output and in the
+frames:
 
-The steps, one commit each, each byte-identical in every tool's output and in the frames:
-
-1. **`ViewportDraw`.** Extract the shared object; the interpreter's methods call it.
-   `tools/dump-cloud-draw.ts` and `dump-door-lightning.ts` reach `viewportRandom` through
-   its new home.
 2. **`CSBCode.cpp`'s drawing**, into two modules. `DrawDecorations.ts`:
    `DrawWallDecoration` with the wall text, the champion portrait and the extended wall
    decorations it draws, `isAlcoveDecorationIndex`, and `DrawFloorDecorations` with the
@@ -463,7 +457,7 @@ strip scrolled or a flashed button changed (`main.ts:502-507`). Two things follo
   would show it: one VBL early for a pick-up, which brings the tick on at once
   (`d.clockTick = 1`), up to a tick early for a click that does not.
 
-`BytecodeInterpreter.viewportRandom` (`:2028`) is also a `static`, shared by every
+`viewportRandom` (`src/renderer/bytecode/ViewportDraw.ts:32`) is also module-level state, shared by every
 interpreter, the prison interior's and every tool's included. Paying it means `renderView`
 recomposes (`refreshOverlay`) everywhere but the three sites, the tick's draw becoming the
 only way `DrawViewport` runs in play, and `npm test -- --frames` telling whether a golden

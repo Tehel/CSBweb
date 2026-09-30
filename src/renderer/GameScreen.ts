@@ -425,7 +425,7 @@ export class GameScreen {
    * is a hardware/software sprite tracked independently of it. This is the
    * equivalent for mousemove: it exists so the custom-drawn cursor can follow the
    * pointer at input rate without also re-running the bytecode interpreter — and
-   * with it `BytecodeInterpreter.graphicRandom`/`viewportRandom` — on every pixel of
+   * with it `GraphicRandom` and `viewportRandom` — on every pixel of
    * mouse travel, which turned a teleporter's or a lightning door's shimmer into
    * something that changed only when the mouse moved and far too fast otherwise.
    */

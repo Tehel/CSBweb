@@ -132,7 +132,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
-  bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
+  bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
+            BytecodePrograms (168 cell programs), Opcodes
   csbwin/   SummarizeRoomInfo, CanvasBlitter, TextRenderer, ScrollingText
   intro/    Everything before the party is in the dungeon: the title animation, the
             dungeon entrance, the door animation, the credits scroll. And the end of

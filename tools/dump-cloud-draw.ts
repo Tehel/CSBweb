@@ -50,6 +50,7 @@ import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
@@ -106,7 +107,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
       getCloudRecord: () => cloud,
     },
   };
-  (BytecodeInterpreter as any).viewportRandom.setSeed(viewportSeed);
+  viewportRandom.setSeed(viewportSeed);
   (new BytecodeInterpreter(context) as any).drawClouds(RELATIVE_CELL, cloudRn, 0, 0);
 
   const { width, pixels } = viewportIndexBuffer;
@@ -136,7 +137,7 @@ const mirrored = (rows: number[][]) => rows.map((r) => [...r].reverse());
 const flipped = (rows: number[][]) => [...rows].reverse();
 
 // 0. The stream's seed is CSBWin's static initialiser, not a host random value.
-check((BytecodeInterpreter as any).viewportRandom.getSeed() === 0x34175432,
+check(viewportRandom.getSeed() === 0x34175432,
   'viewportRandom starts at 0x34175432 (Viewport.cpp:6697)');
 
 // 1. The stream. Two draws from the viewport's own stream, none from GraphicRandom.
@@ -147,7 +148,7 @@ check((BytecodeInterpreter as any).viewportRandom.getSeed() === 0x34175432,
   const oracle = new CsbRandom(seed);
   oracle.bool();
   oracle.bool();
-  check((BytecodeInterpreter as any).viewportRandom.getSeed() === oracle.getSeed(),
+  check(viewportRandom.getSeed() === oracle.getSeed(),
     'one cloud consumes exactly two STRandomBool() draws from the viewport stream');
   check((BytecodeInterpreter as any).graphicRandomState === graphicRandomBefore,
     'a cloud draws nothing from GraphicRandom (only DrawTeleporter calls it)');
@@ -272,7 +273,7 @@ function drawScene(sc: Scene): SceneResult {
     getGraphicBitmap: (n: number) => { requested.push(n); return fakeGraphic(n); },
     dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
   };
-  (BytecodeInterpreter as any).viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
+  viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
   (new BytecodeInterpreter(context) as any).drawClouds(sc.relCell - 3, cloudRn, 0, 0);
   const { width, pixels } = viewportIndexBuffer;
   let x1 = 999, y1 = 999, x2 = -1, y2 = -1;
@@ -288,7 +289,7 @@ function drawScene(sc: Scene): SceneResult {
   return {
     requested, pixels, width,
     drawn: x2 < 0 ? null : { x1, y1, x2, y2, rows },
-    seedAfter: (BytecodeInterpreter as any).viewportRandom.getSeed(),
+    seedAfter: viewportRandom.getSeed(),
   };
 }
 const toRows = (b: { width: number; height: number; pixels: Uint8Array }) =>

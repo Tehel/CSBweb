@@ -11,11 +11,11 @@ import {
 } from '../../core/spellRn';
 import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
+import { ViewportDraw, viewportRandom } from './ViewportDraw';
 import {
   bltShapeToViewportIndex,
   cropBitmap,
   IDENTITY_COLOR_MAP,
-  mirrorBitmap,
   shrinkBlt,
   tag0088b2Explicit,
   tag0088b2Index,
@@ -40,7 +40,6 @@ import {
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';
-import { CsbRandom } from '../../core/random';
 import { applyLimits } from '../../core/intCast';
 
 /**
@@ -327,8 +326,8 @@ export class BytecodeInterpreter {
   private pc: number = 0;  // Program counter
   private program: number[] = [];
   private stack: number[] = [];
-  private mirrorCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
-  private flipCache = new WeakMap<IndexedBitmap, IndexedBitmap>();
+  /** The context, bitmap caches and blits the drawing functions share with the machine. */
+  readonly draw: ViewportDraw;
   private removeMortarJoint = true;
   private hasAlcove = 0;
   /** The derived graphics a program allocates, by number (CSBWin `AllocateDerivedGraphic`). */
@@ -336,6 +335,7 @@ export class BytecodeInterpreter {
 
   constructor(context: InterpreterContext) {
     this.context = context;
+    this.draw = new ViewportDraw(context);
   }
 
   /**
@@ -851,7 +851,7 @@ export class BytecodeInterpreter {
       return true;
     }
 
-    this.blitShapeBitmapToViewport(bitmap, rectRef, false);
+    this.draw.blitShapeBitmapToViewport(bitmap, rectRef, false);
 
     return true;
   }
@@ -952,7 +952,7 @@ export class BytecodeInterpreter {
     }
 
     // ${mirror ? 'StdMirrorShapeToViewport' : 'StdBltShapeToViewport'}(bitmapPtr=${bitmapPtr}, rectPtr=${rectanglePtr})
-    this.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
+    this.draw.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
 
@@ -984,7 +984,7 @@ export class BytecodeInterpreter {
     }
 
     // ${mirror ? 'StdMirrorGraphicToViewport' : 'StdGraphicToViewport'}(graphic=${graphicNum}, rectPtr=${rectanglePtr})
-    this.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
+    this.draw.blitShapeBitmapToViewport(bitmap, rectRef, mirror);
     return true;
   }
 
@@ -1126,7 +1126,7 @@ export class BytecodeInterpreter {
     if (!bitmap) return true;
 
     const mirror = (cell2mirror[relativeCell] ?? 0) !== 0;
-    this.blitShapeBitmapToViewport(bitmap, rect, mirror);
+    this.draw.blitShapeBitmapToViewport(bitmap, rect, mirror);
     return true;
   }
 
@@ -1183,7 +1183,7 @@ export class BytecodeInterpreter {
       16,
       9,
     );
-    this.blitShapeBitmapToViewport(tempBitmap, trackTop[6], false);
+    this.draw.blitShapeBitmapToViewport(tempBitmap, trackTop[6], false);
     return true;
   }
 
@@ -1229,7 +1229,7 @@ export class BytecodeInterpreter {
     let bitmap = cropBitmap(base, srcWidth, srcHeight);
     if (distanceIndex !== 3) {
       const colorMap = distanceIndex === 2 ? tables.colorMapMedium : tables.colorMapFar;
-      bitmap = this.scaleIndexedBitmap(bitmap, destWidth, destHeight, colorMap);
+      bitmap = this.draw.scaleIndexedBitmap(bitmap, destWidth, destHeight, colorMap);
     }
 
     bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
@@ -1384,12 +1384,12 @@ export class BytecodeInterpreter {
     // never perturb the game's own RNG, so this draws from a dedicated instance.
     const isLightningDoor = ((this.context.doorTOC?.[doorType] ?? 0) & 0x400) !== 0;
     if (isLightningDoor && s !== 5) {
-      if (BytecodeInterpreter.viewportRandom.bool()) {
-        bitmap = this.getMirroredBitmap(bitmap);
+      if (viewportRandom.bool()) {
+        bitmap = this.draw.getMirroredBitmap(bitmap);
         ownBitmap = false;
       }
-      if (BytecodeInterpreter.viewportRandom.bool()) {
-        bitmap = this.getFlippedBitmapVertical(bitmap);
+      if (viewportRandom.bool()) {
+        bitmap = this.draw.getFlippedBitmapVertical(bitmap);
         ownBitmap = false;
       }
     }
@@ -1603,7 +1603,7 @@ export class BytecodeInterpreter {
     }
 
     if (relativePosition >= 10) {
-      const bitmap = mirror ? this.getMirroredBitmap(src) : src;
+      const bitmap = mirror ? this.draw.getMirroredBitmap(src) : src;
       bltShapeToViewportIndex(bitmap, viewport, { x1, y1, x2, y2 });
       return isAlcove;
     }
@@ -1631,7 +1631,7 @@ export class BytecodeInterpreter {
     widthPixels = widthBytes * 2;
     const cropped = cropBitmap(src, widthPixels, heightPixels);
 
-    const scaled = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
+    const scaled = this.draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
 
     // `srcOffsetX` (`doc/CSBwin-src/CSBCode.cpp:3538-3562`). Positions 7 and 9 scale the
     // decoration to the width of the F2 *centre* rectangle (`rectSet[8]`, chosen above),
@@ -1740,7 +1740,7 @@ export class BytecodeInterpreter {
 
     if (relativePosition >= 10) {
       const mirror = relativePosition === 11;
-      const bitmap = mirror ? this.getMirroredBitmap(srcBitmap) : srcBitmap;
+      const bitmap = mirror ? this.draw.getMirroredBitmap(srcBitmap) : srcBitmap;
       bltShapeToViewportIndex(bitmap, viewport, { x1: desc.x1, y1: desc.y1, x2: desc.x2, y2: desc.y2 });
       return;
     }
@@ -1771,11 +1771,11 @@ export class BytecodeInterpreter {
     const cropped = cropBitmap(srcBitmap, widthPixels, heightPixels);
     const distanceBand = relativePosition <= 4 ? 0 : 1;
     const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
-    let derived = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
+    let derived = this.draw.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
 
     let srcOffsetX = 0;
     if (farRightSidewall) {
-      derived = this.getMirroredBitmap(derived);
+      derived = this.draw.getMirroredBitmap(derived);
       srcOffsetX = 15 - (finalBitmapWidth & 15);
     } else if (relativePosition === 7) {
       const w = (pWDP.x2 | 0) - (pWDP.x1 | 0);
@@ -1943,7 +1943,7 @@ export class BytecodeInterpreter {
         srcWidth,
         srcHeight,
       };
-      this.blitShapeBitmapToViewport(bitmap, rect, mirror);
+      this.draw.blitShapeBitmapToViewport(bitmap, rect, mirror);
     };
 
     if (ordinal !== 0) drawSingle(ordinal);
@@ -1969,18 +1969,18 @@ export class BytecodeInterpreter {
       if (relativeCell < 3) {
         const target = displayDesc;
         const targetWidth = (target.x2 | 0) - (target.x1 | 0) + 1;
-        bitmap = this.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
+        bitmap = this.draw.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
       } else {
         const target = desc[4];
         const targetWidth = (target.x2 | 0) - (target.x1 | 0) + 1;
-        bitmap = this.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
+        bitmap = this.draw.scaleIndexedBitmap(baseBitmap, targetWidth, target.height | 0, map);
       }
     }
 
     const facing = this.context.frameFacing ?? 0;
     const mirrorFlags = ext.mirrorFlags & 0xffff;
     const useMirror = (((mirrorFlags >>> (facing + 9)) ^ (mirrorFlags >>> relativeCell)) & 1) !== 0;
-    if (useMirror) bitmap = this.getMirroredBitmap(bitmap);
+    if (useMirror) bitmap = this.draw.getMirroredBitmap(bitmap);
 
     let srcOffsetX = 0;
     if (relativeCell === 6) {
@@ -2016,18 +2016,6 @@ export class BytecodeInterpreter {
   private static graphicRandomState = 12345;
 
   /**
-   * `viewportRandom` (`doc/CSBwin-src/Viewport.cpp:6706-6707`): CSBWin saves
-   * `d.RandomNumber`, swaps this stream in for the duration of `DrawViewport`, and
-   * restores the game's own value afterward, so every `STRandomBool()` a drawing
-   * function calls — the lightning door's mirror/flip, for one — reads this and
-   * never the sequence monster AI and combat depend on. A class-static for the same
-   * reason `graphicRandomState` is: it has to survive past the one
-   * `BytecodeInterpreter` that calls it, or every frame would reroll from the same
-   * point and the effect would never move.
-   */
-  private static viewportRandom = new CsbRandom(0x34175432); // `Viewport.cpp:6697`
-
-  /**
    * `r = r * ui32(0xbb40e62d) + 11;` is a 32-bit-wraparound multiply in C — free.
    * JS's `*` operator is not: `state` and `0xbb40e62d` are each up to ~2^32, so their
    * exact product needs up to 64 bits, and a float64 mantissa only holds 53. The
@@ -2060,7 +2048,7 @@ export class BytecodeInterpreter {
         const height = teleporterRect.srcHeight ?? maskGraphic.height;
         const width = widthBytes * 2;
         const cropped = cropBitmap(maskGraphic, width, height);
-        mask = (teleporterRect.y2 & 0x80) !== 0 ? this.getMirroredBitmap(cropped) : cropped;
+        mask = (teleporterRect.y2 & 0x80) !== 0 ? this.draw.getMirroredBitmap(cropped) : cropped;
       }
     }
 
@@ -2080,17 +2068,6 @@ export class BytecodeInterpreter {
       srcOffsetX,
       srcOffsetY
     );
-  }
-
-  private scaleIndexedBitmap(
-    src: IndexedBitmap,
-    dstWidth: number,
-    dstHeight: number,
-    colorMap?: Uint8Array,
-    mirror?: boolean
-  ): IndexedBitmap {
-    const scaled = shrinkBlt(src, src.width, src.height, dstWidth, dstHeight, colorMap);
-    return mirror ? this.getMirroredBitmap(scaled) : scaled;
   }
 
   private mapColorValue(colorMap: Uint8Array, index: number): number {
@@ -2621,7 +2598,7 @@ export class BytecodeInterpreter {
     }
     // CSBWin's `Mirror` moves the row padding to the left and reads past it (`w_90`); the
     // port's bitmaps are unpadded, so there is nothing to skip.
-    if (mirror) src = this.getMirroredBitmap(src);
+    if (mirror) src = this.draw.getMirroredBitmap(src);
 
     let d4 = monsterXYonScreen.y + (tables.smallOffsets[sms.nibble3] ?? 0);
     const y2 = Math.min(d4, 135);
@@ -2635,7 +2612,7 @@ export class BytecodeInterpreter {
     if (x1 === 223) return;
     const srcX = x1 !== 0 ? 0 : dstByteWidth - d4 - 1;
     // `TAG0088b2(..., srcOffsetX, 0, ...)`: a sprite cut at the top loses its bottom rows.
-    this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX, srcY: 0 }, transparentColor);
+    this.draw.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX, srcY: 0 }, transparentColor);
   }
 
   private drawMissilesAtPosition(
@@ -2762,8 +2739,8 @@ export class BytecodeInterpreter {
         src = shrinkBlt(base, base.width, base.height, dstWidth, height, colorMap);
       }
 
-      if (mirror) src = this.getMirroredBitmap(src);
-      if (flip) src = this.getFlippedBitmapVertical(src);
+      if (mirror) src = this.draw.getMirroredBitmap(src);
+      if (flip) src = this.draw.getFlippedBitmapVertical(src);
       // LOCAL_30, set only for a shrunk missile (`Code51a4.cpp:2470-2473`): CSBWin's rows
       // are padded to 16 pixels and `Mirror` moves the padding to the left, so the blit
       // skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer, as `drawClouds` does.
@@ -2776,7 +2753,7 @@ export class BytecodeInterpreter {
       const x1 = Math.max(0, centerX - widthBytes + 1);
       const srcX = x1 !== 0 ? mirrorPad : Math.max(mirrorPad, widthBytes - centerX - 1);
 
-      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
+      this.draw.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
     }
   }
 
@@ -2875,8 +2852,8 @@ export class BytecodeInterpreter {
 
       // tag006932 (`doc/CSBwin-src/Code51a4.cpp:257-313`). Both coin flips come from
       // the viewport's stream, the flip first; `GraphicRandom` is DrawTeleporter's alone.
-      const flip = BytecodeInterpreter.viewportRandom.bool() !== 0; // w_142 → TAG008840
-      const mirror = BytecodeInterpreter.viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
+      const flip = viewportRandom.bool() !== 0; // w_142 → TAG008840
+      const mirror = viewportRandom.bool() !== 0; // LOCAL_36 → Mirror
       // LOCAL_30: CSBWin's rows are padded to 16 pixels and `Mirror` moves the padding to
       // the left, so the blit skips it. Our bitmaps are unpadded: we read LOCAL_30 fewer.
       const mirrorPad = mirror ? 2 * (7 - ((halfWidth - 1) & 7)) : 0;
@@ -2891,9 +2868,9 @@ export class BytecodeInterpreter {
       if (!(x2 > x1)) continue;
 
       let src = base;
-      if (mirror) src = this.getMirroredBitmap(src);
-      if (flip) src = this.getFlippedBitmapVertical(src);
-      this.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
+      if (mirror) src = this.draw.getMirroredBitmap(src);
+      if (flip) src = this.draw.getFlippedBitmapVertical(src);
+      this.draw.blitShapeToViewportIndexWithTransparent(src, { x1, y1, x2, y2, srcX: srcX - mirrorPad }, 10);
     }
 
     return fluxcage;
@@ -2969,8 +2946,8 @@ export class BytecodeInterpreter {
     // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
     if (poison) src = shrinkBlt(src, src.width, src.height, src.width, src.height, tables.cloudColorMap);
 
-    const start = BytecodeInterpreter.viewportRandom.next() & 63; // P7
-    const wrap = BytecodeInterpreter.viewportRandom.zeroTo3() + 87; // P6
+    const start = viewportRandom.next() & 63; // P7
+    const wrap = viewportRandom.zeroTo3() + 87; // P6
 
     const rect = tables.cloudUnderPartyRect; // d.Word2530
     const groupsPerRow = Math.trunc((rect.x2 - rect.x1) / 16) + 1; // w_2
@@ -2989,7 +2966,7 @@ export class BytecodeInterpreter {
       if (++group === wrap) group = 0;
     }
     const derived: IndexedBitmap = { width: groupsPerRow * 16, height: rows, pixels: out };
-    this.blitShapeToViewportIndexWithTransparent(derived, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 10);
+    this.draw.blitShapeToViewportIndexWithTransparent(derived, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 10);
   }
 
   private getDerivedObjectBitmap(
@@ -3009,14 +2986,14 @@ export class BytecodeInterpreter {
 
     let out: IndexedBitmap;
     if (distanceFromUs === 0) {
-      out = mirror ? this.getMirroredBitmap(src) : src;
+      out = mirror ? this.draw.getMirroredBitmap(src) : src;
     } else {
       const dstWidthBytes = distanceFromUs === 1 ? ((gc.widthBytes * 20 + 10) >> 5) : ((gc.widthBytes * 16 + 8) >> 5);
       const dstHeight = distanceFromUs === 1 ? ((gc.height * 20 + 10) >> 5) : ((gc.height * 16 + 8) >> 5);
       const dstWidth = dstWidthBytes * 2;
       const colorMap = distanceFromUs === 1 ? tables.colorMapMedium : tables.colorMapFar;
       const scaled = shrinkBlt(src, src.width, src.height, dstWidth, dstHeight, colorMap);
-      out = mirror ? this.getMirroredBitmap(scaled) : scaled;
+      out = mirror ? this.draw.getMirroredBitmap(scaled) : scaled;
     }
 
     cache?.set(key, out);
@@ -3310,54 +3287,6 @@ export class BytecodeInterpreter {
       default:
         return null;
     }
-  }
-
-  private getMirroredBitmap(src: IndexedBitmap): IndexedBitmap {
-    const cached = this.mirrorCache.get(src);
-    if (cached) return cached;
-
-    const mirrored = mirrorBitmap(src);
-    this.mirrorCache.set(src, mirrored);
-    return mirrored;
-  }
-
-  private getFlippedBitmapVertical(src: IndexedBitmap): IndexedBitmap {
-    const cached = this.flipCache.get(src);
-    if (cached) return cached;
-
-    const { width, height, pixels } = src;
-    const out = new Uint8Array(width * height);
-    for (let y = 0; y < height; y++) {
-      const srcRow = y * width;
-      const dstRow = (height - 1 - y) * width;
-      out.set(pixels.subarray(srcRow, srcRow + width), dstRow);
-    }
-    const flipped = { width, height, pixels: out };
-    this.flipCache.set(src, flipped);
-    return flipped;
-  }
-
-  private blitShapeToViewportIndexWithTransparent(
-    bitmap: IndexedBitmap,
-    rect: RectPos,
-    transparentColor: number,
-    mirror: boolean = false
-  ): void {
-    if (!this.context.viewportIndexBuffer) return;
-    const src = mirror ? this.getMirroredBitmap(bitmap) : bitmap;
-    tag0088b2Index(src, this.context.viewportIndexBuffer, rect, transparentColor);
-  }
-
-  private blitShapeBitmapToViewport(bitmap: IndexedBitmap, rect: RectPos, mirror: boolean): void {
-    // -> Blitting ${mirror ? 'mirrored ' : ''}bitmap ${bitmap.width}x${bitmap.height} to rect (${rect.x1}, ${rect.y1}, ${rect.x2}, ${rect.y2}
-
-    if (!this.context.viewportIndexBuffer) {
-      // ERROR: Missing viewportIndexBuffer
-      return;
-    }
-
-    const src = mirror ? this.getMirroredBitmap(bitmap) : bitmap;
-    bltShapeToViewportIndex(src, this.context.viewportIndexBuffer, rect);
   }
 
   private opFloorPitRectangle(opcode: number): boolean {
