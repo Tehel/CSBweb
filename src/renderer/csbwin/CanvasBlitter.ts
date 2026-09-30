@@ -334,61 +334,67 @@ export function bltShapeToViewportIndex(
   tag0088b2Index(src, dst, rect, 10);
 }
 
-function modPositive(value: number, modulo: number): number {
-  const v = value % modulo;
-  return v < 0 ? v + modulo : v;
-}
-
 /**
- * Approximate CSBWin `TAG008c98` for chunky 4bpp sources.
+ * CSBWin `TAG008c98` (`doc/CSBwin-src/Graphics.cpp:1169-1316`). It fills a temporary bitmap
+ * as wide as `rect` in whole 16-pixel groups, `w_2 = (x2 - x1) / 16 + 1`, and as tall, then
+ * blits it into `rect` through `TAG0088b2` with `P10`/`P11` as the source offsets and `P9` as
+ * the transparent colour. `P8` is the destination's bytes per line.
  *
- * This fills `rect` from `src` using jitter offsets and an optional mask.
- * Pixels outside the mask are set to `transparentColor` (then skipped on write).
+ * - **The source is one stream of groups.** The fill starts at group `P7` of `src` and goes
+ *   back to group 0 when the count reaches `P6` (`tag008dd6`), whatever `src`'s width.
+ * - **The mask** is read when `P9`'s low byte has bit 7 clear: one group of `mask` per group
+ *   written, as a stream of its own that never wraps. CSBWin's bitmaps are interleaved
+ *   bitplanes, and it reads the group's first word, plane 0, so a source pixel is kept where
+ *   the mask pixel's bit 0 is set. Every other pixel becomes colour `P9`: CSBWin implements
+ *   0 (`tag008dc8`, the planes cleared) and 10 (`tag008da4`, planes 1 and 3 set), and stops in
+ *   `NotImplemented` on any other value, where this draws nothing. So does a missing mask,
+ *   CSBWin's `ASSERT`.
+ * - **With bit 7 set** no mask is read, and `P9 &= 0x7f` unless the byte is -1.
  *
- * TODO: this is a behavioural approximation, not a transcription — the jitter and mask
- * handling were reconstructed from observed output rather than read off `TAG008c98`.
- * Verify it line-by-line against the C++ before relying on it for new callers.
+ * A group is 16 pixels of a row, rows padded to whole groups as CSBWin's bitmaps are; the
+ * padding reads as colour 0. No caller's graphic has any: the teleporter's are 32 wide and
+ * its masks multiples of 16 (`tools/dump-teleporter-shimmer.ts`).
  */
-export function tag008c98Index(
+export function tag008c98(
   src: IndexedBitmap,
   dst: PaletteIndexViewportBuffer,
   mask: IndexedBitmap | null,
-  rect: RectPos,
-  jitterX: number,
-  jitterY: number,
-  transparentColor: number,
-  srcOffsetX: number,
-  srcOffsetY: number
+  rect: Rect,
+  P6: number,
+  P7: number,
+  P8: number,
+  P9: number,
+  P10: number,
+  P11: number
 ): void {
-  const normalized = normalizeRectInclusive(rect, dst.width, dst.height);
-  if (!normalized) return;
-
-  const tcRaw = transparentColor & 0xff;
-  const tc = tcRaw & 0x7f;
-  const useMask = mask !== null && (tcRaw & 0x80) === 0;
-
-  const srcW = src.width;
-  const srcH = src.height;
-  const maskW = mask?.width ?? 0;
-  const maskH = mask?.height ?? 0;
-
-  for (let y = normalized.y1; y <= normalized.y2; y++) {
-    const sy = modPositive(srcOffsetY + jitterY + (y - normalized.y1), srcH);
-    const dstRow = y * dst.width;
-    const srcRow = sy * srcW;
-    for (let x = normalized.x1; x <= normalized.x2; x++) {
-      const sx = modPositive(srcOffsetX + jitterX + (x - normalized.x1), srcW);
-      let v = src.pixels[srcRow + sx];
-      if (useMask) {
-        const mx = modPositive(x - normalized.x1, maskW);
-        const my = modPositive(y - normalized.y1, maskH);
-        const mv = mask!.pixels[my * maskW + mx];
-        if (mv === 0) v = tc;
-      }
-      if (v === tc) continue;
-      dst.pixels[dstRow + x] = v;
-    }
+  let useMask = true;
+  if ((P9 & 0xff) === 0xff) useMask = false;
+  else if ((P9 & 0x80) !== 0) {
+    P9 &= 0x7f;
+    useMask = false;
   }
+  if (useMask && (mask === null || (P9 !== 0 && P9 !== 10))) return;
+
+  const w2 = Math.trunc((rect.x2 - rect.x1) / 16) + 1;
+  const groups = (rect.y2 - rect.y1 + 1) * w2;
+  const temp = new Uint8Array(groups * 16);
+  let group = P7;
+  for (let k = 0; k < groups; k++) {
+    const out = k * 16;
+    for (let i = 0; i < 16; i++) {
+      temp[out + i] = useMask && (groupPixel(mask!, k, i) & 1) === 0 ? P9 : groupPixel(src, group, i);
+    }
+    if (++group === P6) group = 0;
+  }
+  tag0088b2Explicit(temp, dst.pixels, rect, P10, P11, 8 * w2, P8, P9);
+}
+
+/** Pixel `i` of 16-pixel group `group` of `bitmap`, its rows padded to whole groups. */
+function groupPixel(bitmap: IndexedBitmap, group: number, i: number): number {
+  const groupsPerRow = (bitmap.width + 15) >> 4;
+  const y = Math.floor(group / groupsPerRow);
+  const x = (group % groupsPerRow) * 16 + i;
+  return x < bitmap.width && y < bitmap.height ? bitmap.pixels[y * bitmap.width + x] : 0;
 }
 
 export function updateImageDataFromIndex(

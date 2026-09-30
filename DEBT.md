@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
 | C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
 | C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
 | C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
@@ -268,21 +267,6 @@ the raw blocks, including `enlarge`, the bones records kept there with the key's
 through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
 save and a load. It must be paid before `P10` drops `runtime`.
 
-### C99 ⏳ `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported
-
-`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:307-347`) says so itself: "a
-behavioural approximation, not a transcription … reconstructed from observed output". The
-C++ (`doc/CSBwin-src/Graphics.cpp:1169-1316`) builds a temporary bitmap from the source
-read as a **linear stream of 16-pixel groups**, starting at group `P7` and wrapping to the
-source's start after `P6` groups, with the mask read one word per group, masked-out
-pixels given colour `P9`; then it blits that bitmap with `P9` transparent. `DrawTeleporter`
-passes `P6 = x2 + GraphicRandom(2)` and `P7 = GraphicRandom(32)` (`CSBCode.cpp:4292-4302`).
-The port reads the source and the mask as 2-D images wrapped in x and y separately, and
-takes `P6`/`P7` for pixel offsets (`DrawTeleporter`, `DrawDoor.ts:233-269`),
-so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
-indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
-teleporter's pixels with the stream the C++ reads.
-
 ### C101 ⏳ The pass a returning script held finishes a VBL after the script
 
 `_MagicSelection` is `RESTARTABLE` (`doc/CSBwin-src/Magic.cpp:545-581`): the pass that
@@ -365,7 +349,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 124 checks sequentially (`spawnSync`, `:240`), each a
+`tools/run-checks.mjs` spawns its 129 checks sequentially (`spawnSync`, `:244`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and

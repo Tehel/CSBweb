@@ -10,9 +10,10 @@ import type { RectPos } from '../../data/tables/UITables';
 import {
   bltShapeToViewportIndex,
   cropBitmap,
+  mirrorBitmap,
   shrinkBlt,
   tag0088b2Index,
-  tag008c98Index,
+  tag008c98,
   type IndexedBitmap,
 } from '../csbwin/CanvasBlitter';
 import { viewportRandom, type ViewportDraw } from './ViewportDraw';
@@ -227,43 +228,34 @@ export function GraphicRandom(maxExclusive: number): number {
 }
 
 /**
- * `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4266`): the shimmer over `wallRect`, from
- * the overlay and mask `teleporterRect` names, jittered by `GraphicRandom`.
+ * `DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4266-4302`): the shimmer over `wallRect`,
+ * `TAG008c98` from graphic `73 + x1` of `teleporterRect`, masked by graphic
+ * `69 + (y2 & 0x7f)` (mirrored with bit 7 set) unless `y2` is 0xff, with `y1` as `P9` and
+ * `uByte6` as the source's x offset. The mask is the graphic's first `uByte4 * uByte5`
+ * bytes, `MemMove`d into `tempBitmap`: `uByte5` rows of `uByte4` bytes.
+ *
+ * The stream wraps at group `x2 + GraphicRandom(2)` and starts at group `GraphicRandom(32)`.
+ * C++ leaves the order of the two draws unspecified; the port evaluates the arguments right
+ * to left, as for the cloud under the party (`drawCloudUnderParty`), so `P7` is drawn first.
  */
 export function DrawTeleporter(draw: ViewportDraw, teleporterRect: RectPos, wallRect: RectPos): void {
   const viewport = draw.context.viewportIndexBuffer;
   const getGraphic = draw.context.getGraphicBitmap;
   if (!viewport || !getGraphic) return;
 
-  const overlayGraphic = getGraphic((teleporterRect.x1 | 0) + 73);
-  if (!overlayGraphic) return;
-
   let mask: IndexedBitmap | null = null;
   if (teleporterRect.y2 !== 0xff) {
-    const maskGraphic = getGraphic(((teleporterRect.y2 | 0) & 0x7f) + 69);
-    if (maskGraphic) {
-      const widthBytes = Math.max(0, Math.floor((teleporterRect.srcWidth ?? 0) / 2));
-      const height = teleporterRect.srcHeight ?? maskGraphic.height;
-      const width = widthBytes * 2;
-      const cropped = cropBitmap(maskGraphic, width, height);
-      mask = (teleporterRect.y2 & 0x80) !== 0 ? draw.getMirroredBitmap(cropped) : cropped;
-    }
+    const maskGraphic = getGraphic((teleporterRect.y2 & 0x7f) + 69);
+    if (!maskGraphic) return;
+    const width = teleporterRect.srcWidth ?? 0; // uByte4 * 2
+    const height = teleporterRect.srcHeight ?? 0; // uByte5
+    const copied: IndexedBitmap = { width, height, pixels: maskGraphic.pixels.subarray(0, width * height) };
+    mask = (teleporterRect.y2 & 0x80) !== 0 ? mirrorBitmap(copied) : copied;
   }
 
-  const jitterX = (teleporterRect.x2 | 0) + GraphicRandom(2);
-  const jitterY = GraphicRandom(32);
-  const srcOffsetX = teleporterRect.srcX ?? 0;
-  const srcOffsetY = teleporterRect.srcY ?? 0;
-
-  tag008c98Index(
-    overlayGraphic,
-    viewport,
-    mask,
-    wallRect,
-    jitterX,
-    jitterY,
-    teleporterRect.y1 | 0,
-    srcOffsetX,
-    srcOffsetY
-  );
+  const source = getGraphic(teleporterRect.x1 + 73);
+  if (!source) return;
+  const P7 = GraphicRandom(32);
+  const P6 = teleporterRect.x2 + GraphicRandom(2);
+  tag008c98(source, viewport, mask, wallRect, P6, P7, 112, teleporterRect.y1, teleporterRect.srcX ?? 0, 0);
 }

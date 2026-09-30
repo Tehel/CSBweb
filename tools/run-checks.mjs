@@ -205,6 +205,7 @@ const CHECKS = [
   // and only one image in the data used them, so nothing else could have caught it.
   { tool: 'dump-image-codec.ts' },
   { tool: 'dump-graphic-random.ts' },
+  { tool: 'dump-teleporter-shimmer.ts' },
   { tool: 'dump-door-lightning.ts' },
   { tool: 'dump-cloud-draw.ts' },
   { tool: 'dump-missile-draw.ts' },

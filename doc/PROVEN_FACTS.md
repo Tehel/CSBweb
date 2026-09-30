@@ -3690,6 +3690,36 @@ All in `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:76-321`) and `TAG005088` (`:21
 
 Evidence: `tools/dump-cloud-draw.ts` sections 4-7 and 9.
 
+## The teleporter's shimmer is `TAG008c98` over a stream of 16-pixel groups
+
+`DrawTeleporter` (`doc/CSBwin-src/CSBCode.cpp:4266-4302`) calls `TAG008c98`
+(`doc/CSBwin-src/Graphics.cpp:1169-1316`) with the source graphic `73 + x1` of the cell's
+`d.teleporterRectangles` entry (the Fluxcage's `x1 + 1` makes it 74), the wall rectangle
+as the destination, `P6 = x2 + GraphicRandom(2)`, `P7 = GraphicRandom(32)`, `P8 = 112`,
+`P9 = y1`, `P10 = uByte6`, `P11 = 0`.
+
+- **The fill.** A temporary bitmap `w_2 = (x2 - x1) / 16 + 1` groups wide, as tall as the
+  wall rectangle, is filled group by group from the source read as one run of 16-pixel
+  groups: from group `P7`, back to group 0 when the count reaches `P6`. Then `TAG0088b2`
+  blits it with `P10`, `P11` as source offsets and `P9` transparent.
+- **The mask.** When `P9`'s low byte has bit 7 clear, the mask is `tempBitmap`, which holds
+  the first `uByte4 * uByte5` bytes of graphic `69 + (y2 & 0x7f)`, `Mirror`ed when bit 7 of
+  `y2` is set. It is read one group per group filled, never wrapping, and only its first
+  word, plane 0: the source planes are ANDed with it (`:1276-1282`). The pixels it clears
+  are then given colour `P9`: for 10, planes 1 and 3 are ORed with its complement
+  (`tag008da4`). 0 leaves them 0. Every other value stops in `NotImplemented`. With bit 7
+  set, no mask is read and `P9 &= 0x7f` (unless the byte is -1).
+- **The data.** Graphics 73 and 74 are 32×32, 64 groups; `x2` is 59-63, so the run wraps
+  before the source ends and after any `P7`. The six masked rectangles have `y1 = 10` and
+  masks 69-72 (96×51, 80×71, 64×111, 32×136, all 0 or 15), each exactly as many groups as
+  its fill. The other six have `y1 = 138`, no mask, and `y2 = 0xff`.
+- C++ leaves the order of the two `GraphicRandom` draws unspecified. The port takes them
+  right to left (`P7` first), as for the cloud under the party. That order is an
+  assumption, not a verified fact.
+
+`tools/dump-teleporter-shimmer.ts` checks the data and compares the port's drawing with the
+C++ loop run over bitplane words.
+
 ## A two-corner monster is drawn in the cell's halves and middles, not at its corners
 
 `ProcessOnePosition` (`doc/CSBwin-src/Code51a4.cpp:2106`) calls `DrawMonster`

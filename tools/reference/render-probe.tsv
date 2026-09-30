@@ -28,7 +28,7 @@ normal	F4	StairFacing	0	5bc9e8b7a71c67ef
 normal	F3L1	Stone	4230	3f3b7dc37cdea943
 normal	F3L1	Open	0	5bc9e8b7a71c67ef
 normal	F3L1	Pit	466	4a0049785c49aa14
-normal	F3L1	Teleporter	395	31c89303a8c8221f
+normal	F3L1	Teleporter	384	4ca9f6d1946730e0
 normal	F3L1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F3L1	DoorFacing	2393	905fd498fc4c15ae
 normal	F3L1	StairEdge	0	5bc9e8b7a71c67ef
@@ -36,7 +36,7 @@ normal	F3L1	StairFacing	2397	0a8a5da50e90fcdf
 normal	F3R1	Stone	4272	4d3ad95d1b3b865e
 normal	F3R1	Open	0	5bc9e8b7a71c67ef
 normal	F3R1	Pit	466	5e0337ce7ab477a4
-normal	F3R1	Teleporter	385	0a5f5f29e1f9654e
+normal	F3R1	Teleporter	390	9c489d889e0a6504
 normal	F3R1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F3R1	DoorFacing	2473	6ef144a212b08cb2
 normal	F3R1	StairEdge	0	5bc9e8b7a71c67ef
@@ -44,7 +44,7 @@ normal	F3R1	StairFacing	2397	20397349a05d582a
 normal	F3	Stone	3876	80b1dd9284ba6296
 normal	F3	Open	0	5bc9e8b7a71c67ef
 normal	F3	Pit	456	ad15f166fa8835ae
-normal	F3	Teleporter	358	75c855df0a4c56ec
+normal	F3	Teleporter	357	5ce33822671e1ca3
 normal	F3	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F3	DoorFacing	2886	075abfa83bc584b2
 normal	F3	StairEdge	0	5bc9e8b7a71c67ef
@@ -52,7 +52,7 @@ normal	F3	StairFacing	2810	452a35265263ece4
 normal	F2L1	Stone	5185	4ad39da6fb506269
 normal	F2L1	Open	0	5bc9e8b7a71c67ef
 normal	F2L1	Pit	762	095b594738c3567f
-normal	F2L1	Teleporter	482	ddf35a8547eac9c6
+normal	F2L1	Teleporter	479	96faa024a862669a
 normal	F2L1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F2L1	DoorFacing	3896	0cc4599efd0c2a8f
 normal	F2L1	StairEdge	39	09fcdee4e75ea2e8
@@ -60,7 +60,7 @@ normal	F2L1	StairFacing	3723	3d7650a183ba7ffe
 normal	F2R1	Stone	5183	ff4005c777fb5f5b
 normal	F2R1	Open	0	5bc9e8b7a71c67ef
 normal	F2R1	Pit	762	ad117ab75d831917
-normal	F2R1	Teleporter	485	1d8fbd72598c0680
+normal	F2R1	Teleporter	477	e4571cf5375a3968
 normal	F2R1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F2R1	DoorFacing	3896	8e27e01cd807b6d3
 normal	F2R1	StairEdge	39	25a17d00104bd6c0
@@ -68,7 +68,7 @@ normal	F2R1	StairFacing	3723	ba1150879b0310fc
 normal	F2	Stone	7384	2802041f90307831
 normal	F2	Open	0	5bc9e8b7a71c67ef
 normal	F2	Pit	956	8f47d014986d4e82
-normal	F2	Teleporter	679	8eef7211c395554f
+normal	F2	Teleporter	676	20c262948dc82263
 normal	F2	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F2	DoorFacing	6360	04d6a0120d085d8d
 normal	F2	StairEdge	0	5bc9e8b7a71c67ef
@@ -76,7 +76,7 @@ normal	F2	StairFacing	4953	c5e1692aa902b806
 normal	F1L1	Stone	6098	c7716433819e01e1
 normal	F1L1	Open	0	5bc9e8b7a71c67ef
 normal	F1L1	Pit	930	9e5266fbee909fe4
-normal	F1L1	Teleporter	561	3bc4aa789750b171
+normal	F1L1	Teleporter	565	c9b927dda4255a46
 normal	F1L1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F1L1	DoorFacing	2848	da7f38855c0226ee
 normal	F1L1	StairEdge	246	74b9febf4ba5f458
@@ -84,7 +84,7 @@ normal	F1L1	StairFacing	2912	8ec98f6d2ebe07b3
 normal	F1R1	Stone	6100	4c8c27740e985033
 normal	F1R1	Open	0	5bc9e8b7a71c67ef
 normal	F1R1	Pit	930	eb7f22695013ab46
-normal	F1R1	Teleporter	558	3debf6ecbb929e9b
+normal	F1R1	Teleporter	563	51d0b31b068c54db
 normal	F1R1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F1R1	DoorFacing	2848	d45e3f7e6393b559
 normal	F1R1	StairEdge	246	7e20600ff1e08a5d
@@ -92,7 +92,7 @@ normal	F1R1	StairFacing	2912	588edaacc9d29014
 normal	F1	Stone	17760	323e50cd86dee374
 normal	F1	Open	0	5bc9e8b7a71c67ef
 normal	F1	Pit	2840	1ad9e02c945613a7
-normal	F1	Teleporter	1630	fe8e93b2de8e1fa9
+normal	F1	Teleporter	1618	35b172150258fc9a
 normal	F1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F1	DoorFacing	12476	e047fc96af90e475
 normal	F1	StairEdge	0	5bc9e8b7a71c67ef
@@ -100,7 +100,7 @@ normal	F1	StairFacing	10720	e9c8cd726ac5e406
 normal	F0L1	Stone	4102	01a03deb772f1b57
 normal	F0L1	Open	0	5bc9e8b7a71c67ef
 normal	F0L1	Pit	129	415cb8a009c0aa2e
-normal	F0L1	Teleporter	372	2b5550aa0162f44a
+normal	F0L1	Teleporter	381	df6f12a03b8937a9
 normal	F0L1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F0L1	DoorFacing	0	5bc9e8b7a71c67ef
 normal	F0L1	StairEdge	207	b037898777b1fca5
@@ -108,7 +108,7 @@ normal	F0L1	StairFacing	0	5bc9e8b7a71c67ef
 normal	F0R1	Stone	4092	2e2485a878a6b226
 normal	F0R1	Open	0	5bc9e8b7a71c67ef
 normal	F0R1	Pit	129	9cdaa8e265619f5f
-normal	F0R1	Teleporter	379	ae2db2f7737b91bb
+normal	F0R1	Teleporter	377	07971cad8c08be6f
 normal	F0R1	DoorEdge	0	5bc9e8b7a71c67ef
 normal	F0R1	DoorFacing	0	5bc9e8b7a71c67ef
 normal	F0R1	StairEdge	207	2022f8edf5f6773e
@@ -116,7 +116,7 @@ normal	F0R1	StairFacing	0	5bc9e8b7a71c67ef
 normal	F0	Stone	0	5bc9e8b7a71c67ef
 normal	F0	Open	0	5bc9e8b7a71c67ef
 normal	F0	Pit	1946	c09877d6d830743f
-normal	F0	Teleporter	2807	c988a79e5a3dd304
+normal	F0	Teleporter	2840	216ffcbf5e2ca26d
 normal	F0	DoorEdge	3792	49e007468bbaaee2
 normal	F0	DoorFacing	0	5bc9e8b7a71c67ef
 normal	F0	StairEdge	0	5bc9e8b7a71c67ef
@@ -150,7 +150,7 @@ mirrored	F4	StairFacing	0	5bc9e8b7a71c67ef
 mirrored	F3L1	Stone	4233	45ada9381fbcb063
 mirrored	F3L1	Open	0	5bc9e8b7a71c67ef
 mirrored	F3L1	Pit	466	4a0049785c49aa14
-mirrored	F3L1	Teleporter	391	30372fe06dca44a1
+mirrored	F3L1	Teleporter	391	84fb251335325b08
 mirrored	F3L1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F3L1	DoorFacing	2393	905fd498fc4c15ae
 mirrored	F3L1	StairEdge	0	5bc9e8b7a71c67ef
@@ -158,7 +158,7 @@ mirrored	F3L1	StairFacing	2397	0a8a5da50e90fcdf
 mirrored	F3R1	Stone	4268	93dc015e444f62c6
 mirrored	F3R1	Open	0	5bc9e8b7a71c67ef
 mirrored	F3R1	Pit	466	5e0337ce7ab477a4
-mirrored	F3R1	Teleporter	384	0667218faade5d33
+mirrored	F3R1	Teleporter	394	dbb91948540ae329
 mirrored	F3R1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F3R1	DoorFacing	2473	6ef144a212b08cb2
 mirrored	F3R1	StairEdge	0	5bc9e8b7a71c67ef
@@ -166,7 +166,7 @@ mirrored	F3R1	StairFacing	2397	20397349a05d582a
 mirrored	F3	Stone	3876	1b91eed9eae48ce4
 mirrored	F3	Open	0	5bc9e8b7a71c67ef
 mirrored	F3	Pit	456	ad15f166fa8835ae
-mirrored	F3	Teleporter	358	3d94b9d7c1fe47d3
+mirrored	F3	Teleporter	359	b6c9455921bdb2c0
 mirrored	F3	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F3	DoorFacing	2886	075abfa83bc584b2
 mirrored	F3	StairEdge	0	5bc9e8b7a71c67ef
@@ -174,7 +174,7 @@ mirrored	F3	StairFacing	2810	452a35265263ece4
 mirrored	F2L1	Stone	5183	f812c93455cca464
 mirrored	F2L1	Open	0	5bc9e8b7a71c67ef
 mirrored	F2L1	Pit	762	095b594738c3567f
-mirrored	F2L1	Teleporter	474	78b046f3907b1054
+mirrored	F2L1	Teleporter	481	83e25a7dcb4c5fd0
 mirrored	F2L1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F2L1	DoorFacing	3896	0cc4599efd0c2a8f
 mirrored	F2L1	StairEdge	39	09fcdee4e75ea2e8
@@ -182,7 +182,7 @@ mirrored	F2L1	StairFacing	3723	3d7650a183ba7ffe
 mirrored	F2R1	Stone	5185	8cd2582b50f7090e
 mirrored	F2R1	Open	0	5bc9e8b7a71c67ef
 mirrored	F2R1	Pit	762	ad117ab75d831917
-mirrored	F2R1	Teleporter	481	675efeec32f98085
+mirrored	F2R1	Teleporter	482	89ed78988bae34ee
 mirrored	F2R1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F2R1	DoorFacing	3896	8e27e01cd807b6d3
 mirrored	F2R1	StairEdge	39	25a17d00104bd6c0
@@ -190,7 +190,7 @@ mirrored	F2R1	StairFacing	3723	ba1150879b0310fc
 mirrored	F2	Stone	7384	fc720e7831a9470a
 mirrored	F2	Open	0	5bc9e8b7a71c67ef
 mirrored	F2	Pit	956	8f47d014986d4e82
-mirrored	F2	Teleporter	668	3fbe59b5de717af1
+mirrored	F2	Teleporter	682	fff7f89678d5dcc1
 mirrored	F2	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F2	DoorFacing	6360	04d6a0120d085d8d
 mirrored	F2	StairEdge	0	5bc9e8b7a71c67ef
@@ -198,7 +198,7 @@ mirrored	F2	StairFacing	4953	c5e1692aa902b806
 mirrored	F1L1	Stone	6100	f6ad490041155d2e
 mirrored	F1L1	Open	0	5bc9e8b7a71c67ef
 mirrored	F1L1	Pit	930	9e5266fbee909fe4
-mirrored	F1L1	Teleporter	556	ea05b89f89235f87
+mirrored	F1L1	Teleporter	574	07fff9c3bcd0bed2
 mirrored	F1L1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F1L1	DoorFacing	2848	da7f38855c0226ee
 mirrored	F1L1	StairEdge	246	74b9febf4ba5f458
@@ -206,7 +206,7 @@ mirrored	F1L1	StairFacing	2912	8ec98f6d2ebe07b3
 mirrored	F1R1	Stone	6098	1565b082f3cbbc25
 mirrored	F1R1	Open	0	5bc9e8b7a71c67ef
 mirrored	F1R1	Pit	930	eb7f22695013ab46
-mirrored	F1R1	Teleporter	558	d3a6617bba393914
+mirrored	F1R1	Teleporter	558	ade83528edd21563
 mirrored	F1R1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F1R1	DoorFacing	2848	d45e3f7e6393b559
 mirrored	F1R1	StairEdge	246	7e20600ff1e08a5d
@@ -214,7 +214,7 @@ mirrored	F1R1	StairFacing	2912	588edaacc9d29014
 mirrored	F1	Stone	17760	d481cf9cc664f54a
 mirrored	F1	Open	0	5bc9e8b7a71c67ef
 mirrored	F1	Pit	2840	1ad9e02c945613a7
-mirrored	F1	Teleporter	1630	5210b1854ab52ffe
+mirrored	F1	Teleporter	1619	36c2bb39aa42dc5e
 mirrored	F1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F1	DoorFacing	12476	e047fc96af90e475
 mirrored	F1	StairEdge	0	5bc9e8b7a71c67ef
@@ -222,7 +222,7 @@ mirrored	F1	StairFacing	10720	e9c8cd726ac5e406
 mirrored	F0L1	Stone	4092	fabfd4d622bf89fa
 mirrored	F0L1	Open	0	5bc9e8b7a71c67ef
 mirrored	F0L1	Pit	129	415cb8a009c0aa2e
-mirrored	F0L1	Teleporter	373	6454ba8472ec4a1f
+mirrored	F0L1	Teleporter	373	a89f29f4a55d5c64
 mirrored	F0L1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F0L1	DoorFacing	0	5bc9e8b7a71c67ef
 mirrored	F0L1	StairEdge	207	b037898777b1fca5
@@ -230,7 +230,7 @@ mirrored	F0L1	StairFacing	0	5bc9e8b7a71c67ef
 mirrored	F0R1	Stone	4102	856c821b3a8309b6
 mirrored	F0R1	Open	0	5bc9e8b7a71c67ef
 mirrored	F0R1	Pit	129	9cdaa8e265619f5f
-mirrored	F0R1	Teleporter	380	41040b2084812412
+mirrored	F0R1	Teleporter	378	7fc87f16c4189d56
 mirrored	F0R1	DoorEdge	0	5bc9e8b7a71c67ef
 mirrored	F0R1	DoorFacing	0	5bc9e8b7a71c67ef
 mirrored	F0R1	StairEdge	207	2022f8edf5f6773e
@@ -238,7 +238,7 @@ mirrored	F0R1	StairFacing	0	5bc9e8b7a71c67ef
 mirrored	F0	Stone	0	5bc9e8b7a71c67ef
 mirrored	F0	Open	0	5bc9e8b7a71c67ef
 mirrored	F0	Pit	1946	c09877d6d830743f
-mirrored	F0	Teleporter	2758	e6cc473411d8aa92
+mirrored	F0	Teleporter	2792	d32f477cf9bba350
 mirrored	F0	DoorEdge	3792	49e007468bbaaee2
 mirrored	F0	DoorFacing	0	5bc9e8b7a71c67ef
 mirrored	F0	StairEdge	0	5bc9e8b7a71c67ef
