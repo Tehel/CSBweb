@@ -290,4 +290,19 @@ are French ("JE SUIS DUR JE SUIS AZUR ET JE FULGURE" is `TEXT #70` on map 5).
 strings 2 and 3 (THE, YOU, in wall glyphs) and `Byte10016` strings 0–3 (`?`, `!`, `THE `,
 `YOU `). 1.3 makes strings 0, 1 and 4–9 single glyphs past the 1.2 character sets: 28, 29
 and 30–35 in wall text, 120, 121 and 122–127 in the rest, replacing `Byte10016`'s `?` and
-`!`. Which letters those glyphs draw was not checked.
+`!`. The glyphs they draw:
+
+- **The main font (`0x22d`)**: 120 is `?` and 125 an apostrophe. 121–124, 126 and 127 are
+  blank, so the French `!` (string 1) prints as a space. The font changes glyphs 4, 12, 15,
+  20, 29, 120 and 125 against 1.2's.
+- **The wall font (graphic 120)**: 33 is an apostrophe. 28–32, 34 and 35 are blank, where
+  1.2's 28 and 29 are `?` and `!`.
+
+The texts use string 7 (the apostrophe, 31 texts) and string 1 (`!`, in `TEXT #118`). Two
+texts are wrong in the file. `TEXT #44` ("… LE JOYAU·ET SEUL …") and `TEXT #118` ("… JE
+L'AI·JE N'AI …") put escape 29/26 where a comma is meant: `Byte10080[26]`, which every
+text type shares, is 50, a `2` in the main font and past the wall font's 36 glyphs
+(`DEBT.md` C103). `TEXT #118` is the wall text at map 0 (9,1) that ends the game when the
+Firestaff comes back unfused. Its lines run to 27 glyphs, and `DrawWallDecoration` draws 18
+of a line at most (`doc/CSBwin-src/CSBCode.cpp:3271`); no other text in either file has a
+wall line over 18.

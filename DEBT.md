@@ -95,6 +95,7 @@ In payoff order: the first row is the next item.
 | C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
+| C103 | A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -109,6 +110,7 @@ In payoff order: the first row is the next item.
 | G4 | Custom-dungeon extensions: `talents`, malformed heroes, external portraits, the monster design options | — | ⏸️ |
 | G14 | `AsciiDump`: the resumed game's "ASCII DUMP" | — | ⏸️ |
 | G20 | The hint oracle | — | ⏸️ |
+| G21 | `Translation.txt`: the messages the executable prints, translated | — | ⏸️ |
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
@@ -127,7 +129,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C103 · D16 · E21 · F14 · G21 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C104 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -242,6 +244,16 @@ The port's `DrawRoomObjects` (`src/renderer/bytecode/DrawRoomObjects.ts`) return
 cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it means checking
 that every table `DrawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
 cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
+
+### C103 ⏳ A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows
+
+`DrawWallDecoration` blits each wall-text byte from graphic 120 at source x `8*code`, with
+144 bytes a line and no range check (`doc/CSBwin-src/CSBCode.cpp:3276-3285`). The font is
+288 pixels wide, 36 glyphs, so a code of 36 or more reads on into the rows below.
+`tag0088b2Index` clips the copy to the bitmap's width, so the port draws nothing there. Only
+the French 1.3 data reaches this: `TEXT #44` and `#118` hold escape 29/26, which is 50
+(`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk"). Paying it means drawing the glyph
+with `tag0088b2Explicit`, which addresses the source as CSBWin does.
 
 ### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
 
@@ -551,6 +563,20 @@ Its data is read: `parseHintOracle` (`src/data/HintOracleLoader.ts`) decodes
 left is the Oracle's own screen: `hcsb.dat`'s three items, the title menu, the pages,
 and the save chosen from CSBWin's menu. An `hcsb.hct` enciphered under a save's
 `hintKey` (RC4, `:5401-5405`) is not read; no save here has a key.
+
+### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
+
+The messages the executable prints are string literals in CSBWin: " MUMBLES A MEANINGLESS
+SPELL.", " RESURRECTED", "READY TO SAVE GAME" and so on. `ReadTranslationFile` reads
+pairs of quoted strings, English then translation, from the game directory's
+`Translation.txt` (`doc/CSBwin-src/Translation.cpp:14-58`, called at `CSBUI.cpp:906`), and
+`TranslateLanguage` swaps a literal for its pair at 24 call sites (`Magic.cpp:1016-1033`,
+`CSBCode.cpp:6806`, `Character.cpp:3249`, `SaveGame.cpp:871-875`, `Graphics.cpp:309`, `:1546`, …).
+Not every message goes through it: " JUST GAINED A " (`Magic.cpp:175`) does not. The port
+prints the English literals. A translated `graphics.dat` and `dungeon.dat` (the French 1.3
+set) therefore play with English messages. Paying it means porting the two functions and
+reading the file from the data set's folder; the French set would still need a
+`Translation.txt`, which no file here provides.
 
 ---
 
