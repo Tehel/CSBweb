@@ -4,8 +4,8 @@
  * area and the renderer behind it; a tool hands the parts it listens to, or nothing.
  *
  * Every member is present: `createGameHost` fills what the host left out with a
- * null object that does nothing (a cursor filter that lets everything through), so no
- * caller asks whether anybody is listening. Headless, nobody is, and the game plays the
+ * null object that does nothing (a cursor filter that lets everything through; a `die`
+ * that throws again), so no caller asks whether anybody is listening. Headless, nobody is, and the game plays the
  * same.
  */
 import type { CursorFilterHook, MessageSink } from './ActuatorSystem';
@@ -95,6 +95,13 @@ export interface GameHost {
    * and the champion's name or portrait goes back over the damage shown.
    */
   tag011366(chIdx: number): void;
+  /**
+   * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`) in play: a frame threw —
+   * the engine throws where CSBWin calls `die` — and the loop has stopped
+   * (`Game.gameLoop`). CSBWin shows the message and quits; the page reports it. Left out,
+   * the error is thrown again, so nothing swallows it.
+   */
+  die(error: unknown): void;
 }
 
 /**
@@ -128,5 +135,6 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag01b29a: host.tag01b29a ?? (() => {}),
     displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
     tag011366: host.tag011366 ?? (() => {}),
+    die: host.die ?? ((error) => { throw error; }),
   };
 }

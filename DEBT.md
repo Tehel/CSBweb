@@ -89,7 +89,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E16 | A `die()` in play stops the loop without a word | S | ⏳ |
 | E12 | `Game` names each system a second time | M | ⏳ |
 | E10 | Code written twice | M | ⏳ |
 | E8 | One table set, extracted once, outside the renderer | L | ⏳ |
@@ -263,7 +262,7 @@ renderer's primitives); the save ones may wait for `E13`.
 What CSBWin's interface code does to the game, it does by calling the engine's functions
 on `d.`. The port's goes: a `UIState` hook (`ui.onAddCharacterPossession?.(…)`), which
 `GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:173-200`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:237-370`) onto a one-line `Game`
+each a lambda in `main.ts`'s `construct` (`src/main.ts:237-372`) onto a one-line `Game`
 facade, onto the system. Adding an engine call from the UI touches four files. And
 the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
 state directly where no hook exists — the object in hand
@@ -389,19 +388,6 @@ What the redesign will replace, and what it should not carry across:
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
 
-### E16 ⏳ A `die()` in play stops the loop without a word
-
-`Game.gameLoop` runs a frame and then schedules the next (`src/engine/Game.ts:442-451`),
-so an exception in the frame ends the game for good, with one line in the console. The
-engine throws where CSBWin calls `die()` — the timer table full (`TimerQueue.ts:270`,
-`die(45)`), `MissileTimer`'s placement, `_FusionSequence` with no monster ahead — and 57
-`throw`s in `src/engine/` and `src/renderer/` can end a frame. CSBWin's `die` shows its code
-and quits; the boot has `Die` and `tag01efee` for that (`src/renderer/intro/BootSequence.ts`),
-play has nothing. Paying it means catching a frame's exception at the loop, stopping it,
-and showing the error on the page as `reportError` does for `init`. The handle it
-schedules is a `setTimeout`'s, kept in a field named `animationFrameId` and cast through
-`unknown` because `tsconfig.json` gives the browser code Node's `types`.
-
 ### E18 ⏳ Hygiene and documentation drift
 
 - **Three import styles**: five files import `@/core` or `@/ui`, the rest by relative
@@ -511,7 +497,7 @@ door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:166`
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:498-503`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:500-505`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`drawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -533,7 +519,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:483-503`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:491-511`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds

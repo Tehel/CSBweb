@@ -55,6 +55,7 @@ const CHECKS = [
   { tool: 'dump-show-credits.ts' },
   { tool: 'dump-loop-script.ts' },
   { tool: 'dump-new-game.ts' },
+  { tool: 'dump-loop-die.ts' },
   { tool: 'dump-item-bonuses.ts' },
   { tool: 'dump-feeding.ts' },
   { tool: 'dump-ten-second-update.ts' },

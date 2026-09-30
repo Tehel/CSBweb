@@ -191,7 +191,7 @@ export class Game implements MainLoop {
     // Game loop
     private running: boolean = false;
     private lastTickTime: number = 0;
-    private animationFrameId: number | null = null;
+    private loopTimer: ReturnType<typeof setTimeout> | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
     /** The `LoopScript` the loop is held in, or `null` (`runScript`). */
@@ -303,9 +303,9 @@ export class Game implements MainLoop {
     stop(): void {
         this.running = false;
 
-        if (this.animationFrameId !== null) {
-            clearTimeout(this.animationFrameId);
-            this.animationFrameId = null;
+        if (this.loopTimer !== null) {
+            clearTimeout(this.loopTimer);
+            this.loopTimer = null;
         }
 
         console.log('Game stopped');
@@ -438,16 +438,24 @@ export class Game implements MainLoop {
      * completely idle exactly when a real VBL wouldn't, and only catches up again on
      * the next thing that nudges the browser into repainting — a mouse move, a click.
      * That was the whole story behind "the animation only changes on mouse events."
+     *
+     * A frame that throws is CSBWin's `die`: the loop stops, and the host reports it.
      */
     private gameLoop = (): void => {
         if (!this.running) {
             return;
         }
 
-        this.runFrame(Date.now());
+        try {
+            this.runFrame(Date.now());
+        } catch (error) {
+            this.stop();
+            this.ctx.host.die(error);
+            return;
+        }
 
         // Schedule next frame (60 FPS)
-        this.animationFrameId = setTimeout(this.gameLoop, 1000 / 60) as unknown as number;
+        this.loopTimer = setTimeout(this.gameLoop, 1000 / 60);
     };
 
     /**

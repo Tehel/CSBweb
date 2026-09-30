@@ -266,6 +266,8 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         tag0207cc: () => screen?.tag0207cc(),
         // `ShowCredits(1)`: `MainLoop` has returned on a lost game
         // (doc/CSBwin-src/CSBCode.cpp:11325), or has won it (`:631`).
+        // A frame threw: CSBWin's `die`, the loop stopped.
+        die: reportError,
         showCredits: (word11694) => {
             if (screen) showEndOfGame(game, screen, sound, word11694).catch(reportError);
         },
@@ -554,7 +556,7 @@ async function init() {
 
 /** An error that ends the page's game: `init`'s, or `die`'s (`Die`) wherever it comes from. */
 function reportError(error: unknown): void {
-    console.error('Initialization error:', error);
+    console.error(error);
     updateDebug(`Error: ${error}`);
 }
 
