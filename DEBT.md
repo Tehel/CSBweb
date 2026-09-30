@@ -229,9 +229,6 @@ them first or after, not during.
 
 Each of these is one CSBWin routine, or one format detail, with two or three bodies:
 
-- **The object icon's lookup** (graphic `42 + group` over `word612`, the source cell from
-  the offset): three copies in `src/renderer/ui/Draw.ts` (`drawObjectIcon`, `:104`,
-  `drawObjectIconMask`, `:159`, `drawObjectIconAt`, `:205`).
 - **The 6-byte decoration descriptor reader**: `readDecorationDescTable22e`,
   `readDecorationDescSets` and `readFloorDecorationDescTable22e`
   (`src/renderer/csbwin/ObjectTables.ts:745-812`), where the second serves all three.
@@ -247,8 +244,7 @@ Each of these is one CSBWin routine, or one format detail, with two or three bod
   (`src/engine/SaveGamePayload.ts:503`) and `SaveMenu.uniqueName` (`:594`), with different
   suffix rules.
 
-One commit per bullet. The first moves under `src/renderer/csbwin/` (the renderer's
-primitives, where `shrinkBlt`, `mirrorBitmap` and `cropBitmap` already are); the save ones may wait for `E13`.
+One commit per bullet; the save ones may wait for `E13`.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 

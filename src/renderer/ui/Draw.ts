@@ -96,30 +96,34 @@ export function shadeRectIndex(ui: UIState, rect: Rect, color: number): void {
 }
 
 /**
- * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
- * `ScrollingText`; the renderer only paints its current rows.
+ * Where icon `objectNameIndex` is drawn from, found as `DrawItem`
+ * (`doc/CSBwin-src/Character.cpp:31`) and `GetIconGraphic` (`Code11f52.cpp:82`) find it:
+ * the last group of `d.Word612` that starts at or below it picks graphic `42 + group`, and
+ * the offset into the group picks a 16x16 cell, sixteen to a row.
  */
-
-
-export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
-  if (!ui.screenIndexBuffer) return;
-  if (objectNameIndex < 0) return;
-  if (word612.length === 0) return;
-
+function objectIconSource(
+  ui: UIState,
+  objectNameIndex: number,
+  word612: number[],
+): { graphic: IndexedBitmap; srcX: number; srcY: number } | null {
+  if (objectNameIndex < 0 || word612.length === 0) return null;
   let group = 0;
   while (group < word612.length && objectNameIndex >= word612[group]) {
     group++;
   }
   group -= 1;
-  if (group < 0) return;
-
-  const graphicIndex = 42 + group;
-  const graphic = ui.getGraphicBitmap(graphicIndex);
-  if (!graphic) return;
-
+  if (group < 0) return null;
+  const graphic = ui.getGraphicBitmap(42 + group);
+  if (!graphic) return null;
   const offset = objectNameIndex - word612[group];
-  const srcX = (offset & 15) << 4;
-  const srcY = offset & 0xff0;
+  return { graphic, srcX: (offset & 15) << 4, srcY: offset & 0xff0 };
+}
+
+export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
+  if (!ui.screenIndexBuffer) return;
+  const source = objectIconSource(ui, objectNameIndex, word612);
+  if (!source) return;
+  const { graphic, srcX, srcY } = source;
 
   tag0088b2Index(
     graphic,
@@ -141,18 +145,10 @@ export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: 
 
 /** Icon `objectNameIndex` as a 16x16 bitmap of its own, as `CreateObjectCursor` is handed it. */
 export function objectIconBitmap(ui: UIState, objectNameIndex: number, word612: number[]): IndexedBitmap | null {
-  if (objectNameIndex < 0 || word612.length === 0) return null;
-  let group = 0;
-  while (group < word612.length && objectNameIndex >= word612[group]) {
-    group++;
-  }
-  group -= 1;
-  if (group < 0) return null;
-  const graphic = ui.getGraphicBitmap(42 + group);
-  if (!graphic) return null;
-  const offset = objectNameIndex - word612[group];
+  const source = objectIconSource(ui, objectNameIndex, word612);
+  if (!source) return null;
   const icon = createPaletteIndexViewportBuffer(16, 16, 12);
-  tag0088b2Index(graphic, icon, { x1: 0, x2: 15, y1: 0, y2: 15, srcX: (offset & 15) << 4, srcY: offset & 0xff0 }, -1);
+  tag0088b2Index(source.graphic, icon, { x1: 0, x2: 15, y1: 0, y2: 15, srcX: source.srcX, srcY: source.srcY }, -1);
   return icon;
 }
 
@@ -163,23 +159,10 @@ export function drawObjectIconMask(ui: UIState,
   colorMap: number[]
 ): void {
   if (!ui.screenIndexBuffer) return;
-  if (objectNameIndex < 0) return;
-  if (word612.length === 0 || colorMap.length === 0) return;
-
-  let group = 0;
-  while (group < word612.length && objectNameIndex >= word612[group]) {
-    group++;
-  }
-  group -= 1;
-  if (group < 0) return;
-
-  const graphicIndex = 42 + group;
-  const graphic = ui.getGraphicBitmap(graphicIndex);
-  if (!graphic) return;
-
-  const offset = objectNameIndex - word612[group];
-  const srcX = (offset & 15) << 4;
-  const srcY = offset & 0xff0;
+  if (colorMap.length === 0) return;
+  const source = objectIconSource(ui, objectNameIndex, word612);
+  if (!source) return;
+  const { graphic, srcX, srcY } = source;
 
   const dst = ui.screenIndexBuffer;
   const dstStride = dst.width;
@@ -211,23 +194,9 @@ export function drawObjectIconAt(ui: UIState,
   overrideColor?: number
 ): void {
   if (!ui.screenIndexBuffer) return;
-  if (objectNameIndex < 0) return;
-  if (word612.length === 0) return;
-
-  let group = 0;
-  while (group < word612.length && objectNameIndex >= word612[group]) {
-    group++;
-  }
-  group -= 1;
-  if (group < 0) return;
-
-  const graphicIndex = 42 + group;
-  const graphic = ui.getGraphicBitmap(graphicIndex);
-  if (!graphic) return;
-
-  const offset = objectNameIndex - word612[group];
-  const srcX = (offset & 15) << 4;
-  const srcY = offset & 0xff0;
+  const source = objectIconSource(ui, objectNameIndex, word612);
+  if (!source) return;
+  const { graphic, srcX, srcY } = source;
 
   const dst = ui.screenIndexBuffer;
   const dstStride = dst.width;
@@ -253,6 +222,10 @@ export function drawObjectIconAt(ui: UIState,
   }
 }
 
+/**
+ * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
+ * `ScrollingText`; the renderer only paints its current rows.
+ */
 export function drawMessageLines(ui: UIState): void {
   if (!ui.fontData || !ui.screenIndexBuffer) return;
   scrollingText.draw(ui.screenIndexBuffer, ui.fontData);
