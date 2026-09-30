@@ -18,6 +18,7 @@ import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
+import { selectPaletteForLightLevel } from './LightLevel';
 import { setClockTick, waitForButtonFlash } from './LoopState';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import type { SpellParameters } from './magicTypes';
@@ -110,9 +111,11 @@ export class MagicSystem {
     return index === null ? null : encodeObjectID(position & 0x3, DBType.MISSILE, index);
   }
 
+  /** `SetBrightnessTimer` (`doc/CSBwin-src/Magic.cpp:827-840`). */
   setBrightnessTimer(deltaSteps: number, delayTicks: number): void {
     const time = (this.ctx.state.tickCount + delayTicks) >>> 0;
     this.ctx.systems.timer.queueBrightnessTimer(deltaSteps, time);
+    selectPaletteForLightLevel(this.ctx);
   }
 
   private castMagic(casterIdx: number): number {

@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`no level ${level}`);
 
-  const party = { position: { x: 0, y: 0, z: level } } as PartyState;
+  const party = { position: { x: 0, y: 0, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
   const random = new CsbRandom(0x12345678);
   const timers = new TimerQueue();
   const footprints = new PartyFootprints();

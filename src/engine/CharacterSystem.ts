@@ -27,6 +27,7 @@ import { characterAtPosition } from './AddCharacter';
 import { AdjustStatsForItemCarried } from './AdjustStatsForItemCarried';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
+import { selectPaletteForLightLevel } from './LightLevel';
 
 export class CharacterSystem {
   constructor(private readonly ctx: GameContext) {}
@@ -43,9 +44,9 @@ export class CharacterSystem {
    * any of `Torch_a`-`Torch_d` and a worn Illumulet `_b`. The attack menu and the open
    * chest are the UI's, so those two go out as `GameHost` notices.
    *
-   * No counterpart here: `SelectPaletteForLightLevel`, `DrawEightHands`,
-   * `DisplayBackpackItem` and the `charFlags` redraw bits (the light and the panels are
-   * derived from live state every frame); `load` (`CharacterStats.characterLoad`
+   * The light changes are followed by `SelectPaletteForLightLevel`. No counterpart here:
+   * `DrawEightHands`, `DisplayBackpackItem` and the `charFlags` redraw bits (the panels
+   * are derived from live state every frame); `load` (`CharacterStats.characterLoad`
    * re-sums it). The chest slots (30 and up) are `d.rnChestContents`, the open
    * inventory's, and nothing but the stat call reads them here, which does nothing past
    * slot 29; so the inventory click writes them itself and no caller passes one.
@@ -63,6 +64,7 @@ export class CharacterSystem {
         this.ctx.dungeon.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
         const party = this.ctx.party.state;
         party.brightness = sw(party.brightness - this.ctx.tables.word1074[2]!);
+        selectPaletteForLightLevel(this.ctx);
       } else if (objNID5 >= OBJNI_JEWEL_SYMAL_A && objNID5 <= OBJNI_JEWEL_SYMAL_B) {
         this.ctx.dungeon.getMiscRecord(objRemoved)!.specialState = 0; // Of no use anymore.
       }
@@ -77,6 +79,7 @@ export class CharacterSystem {
       }
       if (objNID5 >= OBJNI_TORCH_A && objNID5 <= OBJNI_TORCH_D) {
         this.ctx.dungeon.getWeaponRecord(objRemoved)!.litTorch = false;
+        selectPaletteForLightLevel(this.ctx);
       }
       // `LOCAL_2`, `chIdx+1 == d.SelectedCharacterOrdinal` (`:1856`, `:1906-1914`).
       if (chIdx === this.ctx.party.state.selectedCharacterIndex && slot === 1 && objNID5 === OBJNI_CHEST) {
@@ -93,8 +96,9 @@ export class CharacterSystem {
    * Into the weapon hand, the attack menu closes if it is this champion's and a scroll
    * opens; into either hand an unlit torch (`NameIndex == Torch_a`, `:1988`) is lit.
    * Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to
-   * `d.Brightness`, a Jewel Symal gets `value(1)`. The rest has no counterpart here, as
-   * in `removeCharacterPossession`. A chest slot (30 and up) is the inventory click's.
+   * `d.Brightness`, a Jewel Symal gets `value(1)`. A light change is followed by
+   * `SelectPaletteForLightLevel`. The rest has no counterpart here, as in
+   * `removeCharacterPossession`. A chest slot (30 and up) is the inventory click's.
    */
   addCharacterPossession(chIdx: number, object: ObjectID, place: number): void {
     if (object === OBJECT_ID_NULL) return;
@@ -113,12 +117,14 @@ export class CharacterSystem {
       }
       if (objNID4 === OBJNI_TORCH_A) {
         this.ctx.dungeon.getWeaponRecord(object)!.litTorch = true;
+        selectPaletteForLightLevel(this.ctx);
       }
     } else if (place === 10) {
       if (objNID4 >= OBJNI_ILLUMULET_A && objNID4 <= OBJNI_ILLUMULET_B) {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
         const party = this.ctx.party.state;
         party.brightness = sw(party.brightness + this.ctx.tables.word1074[2]!);
+        selectPaletteForLightLevel(this.ctx);
       } else if (objNID4 >= OBJNI_JEWEL_SYMAL_A && objNID4 <= OBJNI_JEWEL_SYMAL_B) {
         this.ctx.dungeon.getMiscRecord(object)!.specialState = 1;
       }

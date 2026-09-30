@@ -43,7 +43,6 @@ import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
 import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';
-import { selectPaletteIndexForLightLevel } from './ui/Light';
 import {
   drawCursorItem,
   marchingOrderPointerMoved,
@@ -84,7 +83,7 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
 
 /**
  * What the interface asks of the page. Each is one of `UIState`'s hooks out, documented
- * there, except `onPaletteSelected`. The engine the interface reaches through `ui.ctx`.
+ * there, except `reportHover`. The engine the interface reaches through `ui.ctx`.
  */
 export interface GameScreenHooks extends Pick<UIState,
   | 'onReincarnated'
@@ -93,12 +92,6 @@ export interface GameScreenHooks extends Pick<UIState,
   | 'onRestoreSave'
   | 'onRestoreFailed'
 > {
-  /**
-   * The palette the light level picked, published as CSBWin's `d.CurrentPalette`: the
-   * monster AI reads it to shorten how far a monster can see
-   * (`doc/CSBwin-src/Monster.cpp:577-581`).
-   */
-  onPaletteSelected(index: number): void;
   /**
    * The debug chrome's hover report, once per frame the pointer is over the screen: the
    * buttons under it (`describeHoveredButtons`).
@@ -135,7 +128,6 @@ export class GameScreen {
   /** `d.LogicalScreenBase`, the whole screen as palette indices. */
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
-  private readonly onPaletteSelected: (index: number) => void;
   private readonly reportHover: (html: string) => void;
   private readonly messages: ScrollingText;
   private lastRenderPosition: Position | null = null;
@@ -145,7 +137,6 @@ export class GameScreen {
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
-    this.onPaletteSelected = hooks.onPaletteSelected;
     this.reportHover = hooks.reportHover;
     this.messages = deps.messages;
 
@@ -546,12 +537,11 @@ export class GameScreen {
     return this.getViewportPalette()?.slice() ?? null;
   }
 
+  /** `d.Palette552[d.CurrentPalette]`, as the VBL handler loads it (`doc/CSBwin-src/CSBCode.cpp:1011-1014`). */
   private getViewportPalette(): number[] | null {
     const palettes = this.viewport.viewportPalettes;
     if (!palettes || palettes.length === 0) return null;
-    const index = Math.min(selectPaletteIndexForLightLevel(this.ui), palettes.length - 1);
-    this.onPaletteSelected(index);
-    return palettes[index] ?? palettes[0] ?? null;
+    return palettes[this.ui.ctx.state.currentPalette] ?? null;
   }
 
   private renderLastFrame(): void {

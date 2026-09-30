@@ -52,7 +52,7 @@ async function main(): Promise<void> {
 
   const dungeon = new DungeonState(data);
   const level = Number(process.argv[2] ?? 3);
-  const party = { position: { x: 0, y: 0, z: level } } as PartyState;
+  const party = { position: { x: 0, y: 0, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
   const timers = new TimerQueue();
   const random = new CsbRandom(0xc0ffee);
   const time = 100;

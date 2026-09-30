@@ -334,9 +334,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             console.error('Saved game damaged:', error);
             savedGameRead = 'damaged';
         },
-        onPaletteSelected: (index) => {
-            game.currentPalette = index;
-        },
         reportHover: updateHover,
     });
     return { game, screen, messages };

@@ -32,6 +32,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomTy
 import { div, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
+import { selectPaletteForLightLevel } from './LightLevel';
 import { getPartyChampion } from './Party';
 import { MonsterDamageResult } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
@@ -972,8 +973,7 @@ export class AttackSystem {
     if (party.selectedCharacterIndex >= 0) this.ctx.host.showHideInventory(4);
     yield* waitForButtonFlashScript(this.ctx);
     party.brightness = 200;
-    // `SelectPaletteForLightLevel()`: the screen picks the palette from `d.Brightness`
-    // whenever it draws (`selectPaletteIndexForLightLevel`).
+    selectPaletteForLightLevel(this.ctx);
     party.partyShield = 100;
     party.spellShield = 100;
     party.fireShield = 100;

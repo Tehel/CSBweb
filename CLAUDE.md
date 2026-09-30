@@ -129,7 +129,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             ActuatorSystem, DsaSystem, MagicSystem, CharacterSystem, AttackSystem,
             MouseSystem (Mouse.cpp's engine half), HallOfChampions, the Monster* systems,
             MouseQueue and LoopState (the loop's `d.` state, at `ctx.mouseQueue` /
-            `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates),
+            `ctx.loop`), PeriodicUpdates (the ninety- and ten-second updates), LightLevel
+            (`SelectPaletteForLightLevel`: `d.CurrentPalette`),
             SmartDiscard (thinning a filling database), MakeMoreRoomInDB (making
             room in a full one),
             RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
@@ -147,7 +148,7 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             the game (`ShowCredits`), on the same host. See
             doc/CSBWIN_TITLE_SCREEN_REFERENCE.md.
   ui/       The DM interface, one module per CSBWin file — Mouse, Inventory, Character,
-            MagicPanel, Feeding, Objects, Light, Draw, HitTest, ViewportPicking, all over
+            MagicPanel, Feeding, Objects, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
 ui/         DOM-side debug chrome (settings, map preview, log)
 lib/        glfx (the CRT effect's WebGL) and its loader

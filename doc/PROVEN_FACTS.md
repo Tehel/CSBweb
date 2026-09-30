@@ -646,6 +646,32 @@ if (d.OrthogonalDistance2Party > w_18) return 0; //Cannot see the party then zer
 the effect of darkness on monster perception is derived from the same value that dims the
 screen. Even in total darkness a monster still sees one cell.
 
+## `d.CurrentPalette` is set where the light changes, by `SelectPaletteForLightLevel`
+
+`SelectPaletteForLightLevel` (`doc/CSBwin-src/CSBCode.cpp:7242-7336`) is the only writer
+of `d.CurrentPalette`. The VBL handler only reads it, to load `d.Palette552[d.CurrentPalette]`
+once `d.Word11778` says it changed (`:1011-1016`), and so does `Blocked` (above). Its
+callers are the places the light changes: a torch into or out of a hand and an Illumulet
+on or off the neck (`Character.cpp:1867`, `:1903`, `:1992`, `:2017`), a `TT_LIGHT` timer
+(`CSBCode.cpp:6517`), `LoadPartyLevel` (`:819`), `NinetySecondUpdate` (`:7384`),
+`SetBrightnessTimer` (`Magic.cpp:839`) and the fusion (`Attack.cpp:2275`).
+
+- A level whose `experienceMultiplier()` is 0 is palette 0, whatever the light (`:7254-7258`).
+- `LOCAL_26[8]` takes each champion's hand 1, then hand 0: a torch's `charges()` if its
+  `GetBasicObjectType` is `Torch_a`-`Torch_d`, else 0 (`:7261-7280`). The loop runs to
+  `d.NumCharacter`, so a Hall of Champions recruit's torch counts, unlike in
+  `NinetySecondUpdate`.
+- A selection sort brings the four brightest to the front; the fifth entry, which is also
+  summed, is whatever the swaps left there (`:7281-7294`).
+- Each of the first five non-zero charges adds `(Word1074[charges] << shift) >> 6 & 0x3ff`,
+  with `shift` 6 for the brightest and one less for each torch after it, down to 0
+  (`:7295-7307`). Then `d.Brightness` is added (`:7308`).
+- A total above 0 is palette `i` for the first `d.PaletteBrightness[i]` not above it
+  (`:7309-7317`); the Atari DM table is `99 75 50 25 1 0`, so the search stops by 5. A
+  total of 0 or less is palette 5 (`:7318-7321`).
+
+Evidence: `tools/dump-light-level.ts`.
+
 ## `Blocked()` de-duplicates the group's facings before testing
 
 `doc/CSBwin-src/Monster.cpp:542-563` builds a list of the group's *distinct* facings and tests

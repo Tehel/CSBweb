@@ -41,7 +41,7 @@ async function main(): Promise<void> {
   // so the no-argument run used to activate nothing and check nothing.
   const level = process.argv[2] !== undefined ? Number(process.argv[2]) : 3;
 
-  const party = { position: { x: start.x, y: start.y, z: level } } as PartyState;
+  const party = { position: { x: start.x, y: start.y, z: level }, champions: [], brightness: 0 } as unknown as PartyState;
   const timers = new TimerQueue();
   // A fixed seed: the point is a repeatable listing, not a realistic game.
   const ctx = newContext(data, graphics, { dungeon, timers, random: new CsbRandom(0x12345678) });

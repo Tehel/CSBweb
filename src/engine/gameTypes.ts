@@ -321,9 +321,9 @@ export interface GameState {
     word1868: boolean;
     /**
      * `d.CurrentPalette` — the viewport light-level palette index, 0 (brightest) to 5.
-     * The renderer computes it and writes it each frame; the monster AI reads it to
-     * shorten sight distance in the dark (`doc/CSBwin-src/Monster.cpp:577-581`), the same
-     * direction of flow as CSBWin, where the renderer sets the global and `Blocked` reads it.
+     * `SelectPaletteForLightLevel` sets it where the light changes
+     * (`src/engine/LightLevel.ts`); the screen draws the view with that palette, and the
+     * monster AI shortens a monster's sight by half of it (`doc/CSBwin-src/Monster.cpp:577-581`).
      */
     currentPalette: number;
     /** The `d.` fields `GAMEBLOCK1` carries, and `totalMoveCount`. */

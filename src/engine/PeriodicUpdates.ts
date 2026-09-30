@@ -18,6 +18,7 @@ import {
 } from './attributes';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession } from './gameTypes';
+import { selectPaletteForLightLevel } from './LightLevel';
 import { GetBasicObjectType } from './objectIndex';
 import { determineMastery, ensureSkills } from './skills';
 
@@ -45,9 +46,9 @@ export function isTenSecondTick(time: number, sleeping: boolean): boolean {
  * champion, and their torch does not burn. The dead are not skipped (their hands are
  * empty anyway).
  *
- * CSBWin then calls `SelectPaletteForLightLevel` and `DrawEightHands` whether or not
- * a torch changed. Both have no counterpart here: the light palette and the hands
- * are derived from live state every frame (`src/renderer/ui/Light.ts`).
+ * Then `SelectPaletteForLightLevel` and `DrawEightHands`, whether or not a torch
+ * changed (`:7384-7385`). `DrawEightHands` has no counterpart here: the hands are drawn
+ * from live state every frame.
  */
 export function ninetySecondUpdate(ctx: GameContext): void {
     const party = ctx.party.state;
@@ -71,6 +72,7 @@ export function ninetySecondUpdate(ctx: GameContext): void {
             if (next === 0) weapon.important = false;
         }
     }
+    selectPaletteForLightLevel(ctx);
 }
 
 /**

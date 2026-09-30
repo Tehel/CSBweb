@@ -20,6 +20,7 @@ import type { CreatureRecord, Item16Record } from '../data/dungeonTypes';
 import { ITEM16_FREE, SMS_ATTACKING, SMS_MIRROR } from '../data/dungeonTypes';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
+import { selectPaletteForLightLevel } from './LightLevel';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import type { MonsterDesc } from '../data/tables/MonsterDesc';
@@ -229,9 +230,9 @@ export class MonsterSystem {
   /* ------------------------------------------------------------ level load ---- */
 
   /**
-   * `LoadPartyLevel` (`doc/CSBwin-src/CSBCode.cpp:785`), minus the graphics and
-   * palette work this port does elsewhere: detach everything, then re-attach the new
-   * level's monsters.
+   * `LoadPartyLevel` (`doc/CSBwin-src/CSBCode.cpp:785`), minus the graphics: detach
+   * everything, re-attach the new level's monsters, then `SelectPaletteForLightLevel`
+   * (`:818-819`).
    *
    * CSBWin reaches this from the main loop via `d.newPartyLevel`, which `MoveObject`
    * sets when the party lands on a different level — and it runs *before*
@@ -242,6 +243,7 @@ export class MonsterSystem {
     this.detachAllItem16();
     this.loadedLevel = level | 0;
     this.processMonstersOnLevel();
+    selectPaletteForLightLevel(this.ctx);
   }
 
   /**

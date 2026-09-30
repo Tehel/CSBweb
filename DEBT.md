@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C95 | `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers | S | ⏳ |
 | C97 | `DrawViewport` runs outside CSBWin's three call sites | M | ⏳ |
 | C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
 | C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
@@ -245,29 +244,6 @@ cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it mea
 that every table `DrawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
 cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
 
-### C95 ⏳ `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers
-
-CSBWin's engine sets `d.CurrentPalette` in `SelectPaletteForLightLevel`
-(`doc/CSBwin-src/CSBCode.cpp:7242-7322`), which it calls where the light changes: a hand
-possession added or removed (`Character.cpp:1867`, `:1903`, `:1992`, `:2017`), a
-`TT_LIGHT` timer (`ProcessTimers`, `CSBCode.cpp:6517`), a level loaded (`LoadPartyLevel`,
-`:819`), the torches burning down (`NinetySecondUpdate`, `:7384`), a light timer set
-(`SetBrightnessTimer`, `Magic.cpp:839`) and the fusion (`Attack.cpp:2275`). The VBL handler
-and the monster AI read it (`CSBCode.cpp:1014`, `Monster.cpp:580`). The port computes the
-index in the renderer, `selectPaletteIndexForLightLevel` (`src/renderer/ui/Light.ts`), on
-every frame the screen presents, and hands it back to the engine as a side effect of
-choosing the palette (`GameScreen.getViewportPalette`, `:604-610`, the
-`onPaletteSelected` hook). So the monster AI (`MonsterAI.ts:1148`) sees the value of the
-last frame presented, not of the last light change, and headless it is always 0: no tool
-has ever run a monster's dark-level sight. `GameState.currentPalette`'s comment
-(`gameTypes.ts:322-327`) says the renderer sets it in CSBWin too, which it does not. The
-port's copy also clamps the index to the palette count, which CSBWin does not.
-
-Paying it means porting `SelectPaletteForLightLevel` into the engine over the party's
-possessions and `d.Brightness`, calling it at the call sites above (the `AttackSystem`
-comment at `:975` marks one), having the screen read `state.currentPalette`, and a tool
-that darkens a level and checks a monster's sight shrink.
-
 ### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
 
 `KillCharacter` pairs the bones it drops with the champion's fingerprint through
@@ -301,7 +277,7 @@ door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:173`
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:467-472`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:464-469`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -323,7 +299,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:380-399`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:376-395`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds
@@ -360,8 +336,8 @@ returns, the pass goes on where it stopped. The next queue entries follow while
 `intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
 (`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
 is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
-resumes it and returns (`src/engine/Game.ts:354-362`), and the rest of the pass waits for
-the next VBL's, which opens with `clockTickCleared = false` (`:370`). So the tick a cast or
+resumes it and returns (`src/engine/Game.ts:350-358`), and the rest of the pass waits for
+the next VBL's, which opens with `clockTickCleared = false` (`:366`). So the tick a cast or
 a rune makes due runs a VBL late, the next queued click waits a VBL, and a cast that returns
 0 (a failed cast, or `CastSpell`'s 3) no longer puts off a tick that was due: the next pass
 has cleared the put-off before it reads it. The fusion and the CSB win's wait are spared,
@@ -517,7 +493,7 @@ uses CSBWin's defaults.
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with
   `DMW_Damage` (`Code11f52.cpp:1112`, `:1122`) and from `MoveObject`'s two deletions with
   `DMW_Movement1` / `DMW_Movement2` (`:3151`, `:3304`). The port's matching places are
-  `MonsterDamage.ts:463` and `MonsterSystem.ts:546`.
+  `MonsterDamage.ts:463` and `MonsterSystem.ts:548`.
 - `MonsterAttackFilter`, which may rewrite a monster attack's whole parameter block
   (`MonsterAttack.ts:146`). CSBWin's block is a file-scope global
   (`doc/CSBwin-src/Monster.cpp:917-938`), and `MonsterAttacks` never writes its
@@ -587,7 +563,7 @@ reading, and DM has none.
 holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both options as
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
 `MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
-(`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
+(`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:70`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
 `SaveGameLoader` and gating every accessor.
@@ -672,7 +648,7 @@ gathered back, never one thrown from the cursor:
 - **THROW** (`atk_THROW`, `src/engine/AttackSystem.ts:1458`) throws the weapon-hand object,
   slot 1, through `MouseSystem.throwFromWeaponHand` (`src/engine/MouseSystem.ts:44`).
 - **SHOOT** (`attackWithShoot`, `src/engine/AttackSystem.ts:1550`) fires the ammunition
-  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:540`).
+  held in slot 0 through `MagicSystem.launchObject` (`src/engine/MagicSystem.ts:543`).
   `launchObject` also launches spells, so the object is tagged in the attack, not there.
 
 A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
@@ -894,7 +870,7 @@ Recorded so that nobody "fixes" them.
   backgrounds. Revisit only if we ever load a third-party CSBWin dungeon.
 - 🚫 **The `d.Word11750` countdown** in `TenSecondUpdate` is not ported. It is a
   cursor-redraw counter set only by `CSBCode.cpp:959-965`, which has no counterpart here, so
-  the branch is dead (`src/engine/PeriodicUpdates.ts:88`).
+  the branch is dead (`src/engine/PeriodicUpdates.ts:90`).
 - 🚫 **Databases stop at 1024 records.** The port's `ObjectID` is the original's packed
   word, `[corner:2][database:4][index:10]`, so a record past 1023 cannot be named, and
   `DungeonState.findEmptyDBEntry` treats 1024 as `db.Max`: a full database falls back on

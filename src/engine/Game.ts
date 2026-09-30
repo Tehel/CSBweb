@@ -109,10 +109,6 @@ export class Game implements MainLoop {
     get gameWon(): boolean { return this.ctx.state.gameWon; }
     set gameWon(won: boolean) { this.ctx.state.gameWon = won; }
 
-    /** `d.CurrentPalette`, which lives in `state` (`GameState.currentPalette`). */
-    get currentPalette(): number { return this.ctx.state.currentPalette; }
-    set currentPalette(index: number) { this.ctx.state.currentPalette = index; }
-
     // Game loop
     private running: boolean = false;
     private lastTickTime: number = 0;

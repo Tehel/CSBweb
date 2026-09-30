@@ -67,6 +67,8 @@ export interface GameTables {
   readonly byte7302: ArrayLike<number>;
   /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
   readonly word1074: number[];
+  /** `d.PaletteBrightness[6]` — the least light each viewport palette needs, brightest first (`Data.h:1422`). */
+  readonly paletteBrightness: ArrayLike<number>;
   /** `d.Byte10080`, `d.Byte10336` and `d.Byte10016`, `DecodeText`'s escape strings. */
   readonly textDecode: TextDecodeTables;
 
@@ -146,6 +148,7 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     byte1596: g232.byte1596,
     byte7302: objects.byte7302,
     word1074: g232.word1074,
+    paletteBrightness: g232.paletteBrightness,
     textDecode: objects.textDecode,
 
     uByte590: g232.uByte590,
