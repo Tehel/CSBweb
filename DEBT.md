@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
+| C100 | With the CRT effect on, the end-of-game screens take no click | M | ⏳ |
 | C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
 | C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
@@ -307,6 +307,16 @@ entrance see no click, only keys. The boot is spared by accident: the saved sett
 included, are applied in `wire`, after the intro. Paying it means one input surface for
 both canvases (the WebGL canvas over the game one with `pointer-events: none`, or every
 listener on their container), and the intro drawn with the effect when it is on.
+
+The fix is small (the first way is CSS on `#game` and the GL canvas, and
+`bindCanvasEvents(glCanvasEl, …)` going); the check that fails before it is the work. The
+frames harness cannot see the bug: `canvasClick` (`tools/probe-frames.mjs`) dispatches its
+events on `#game-canvas` itself, past hit-testing. A check needs a real hit-test with the
+effect on: `document.elementFromPoint` over the canvas, or CDP's `Input.dispatchMouseEvent`.
+And the effect exists only when glfx gets a WebGL context (`createCrtController`), which
+headless Chrome on the author's machine is not known to give: its GPU process fails
+("GPU state invalid after WaitForGetOffsetInRange"), and whether `--use-angle=swiftshader
+--enable-unsafe-swiftshader` helps is untried in the harness. Settle that first.
 
 ---
 
