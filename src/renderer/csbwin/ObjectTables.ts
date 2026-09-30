@@ -742,60 +742,17 @@ export function correctCrackSwitchInPlacement(rectSetIndex: Uint8Array): boolean
   return true;
 }
 
-function readDecorationDescTable22e(raw: Uint8Array, off: number): DecorationDesc[][] {
-  const sets = 8;
-  const entries = 13;
+/** `sets` x `entries` 6-byte decoration descriptors (`x1 x2 y1 y2 widthBytes height`) at `off`. */
+function readDecorationDescSets(
+  raw: Uint8Array,
+  off: number,
+  sets: number,
+  entries: number,
+  name = 'decoration desc sets',
+): DecorationDesc[][] {
   const stride = 6;
   const end = off + sets * entries * stride;
-  if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for wallDecorationPosition[8][13]');
-
-  const out: DecorationDesc[][] = new Array(sets);
-  for (let s = 0; s < sets; s++) {
-    out[s] = new Array(entries);
-    for (let i = 0; i < entries; i++) {
-      const base = off + (s * entries + i) * stride;
-      out[s][i] = {
-        x1: raw[base + 0] ?? 0,
-        x2: raw[base + 1] ?? 0,
-        y1: raw[base + 2] ?? 0,
-        y2: raw[base + 3] ?? 0,
-        widthBytes: raw[base + 4] ?? 0,
-        height: raw[base + 5] ?? 0,
-      };
-    }
-  }
-  return out;
-}
-
-function readDecorationDescSets(raw: Uint8Array, off: number, sets: number, entries: number): DecorationDesc[][] {
-  const stride = 6;
-  const end = off + sets * entries * stride;
-  if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for decoration desc sets');
-
-  const out: DecorationDesc[][] = new Array(sets);
-  for (let s = 0; s < sets; s++) {
-    out[s] = new Array(entries);
-    for (let i = 0; i < entries; i++) {
-      const base = off + (s * entries + i) * stride;
-      out[s][i] = {
-        x1: raw[base + 0] ?? 0,
-        x2: raw[base + 1] ?? 0,
-        y1: raw[base + 2] ?? 0,
-        y2: raw[base + 3] ?? 0,
-        widthBytes: raw[base + 4] ?? 0,
-        height: raw[base + 5] ?? 0,
-      };
-    }
-  }
-  return out;
-}
-
-function readFloorDecorationDescTable22e(raw: Uint8Array, off: number): DecorationDesc[][] {
-  const sets = 3;
-  const entries = 9;
-  const stride = 6;
-  const end = off + sets * entries * stride;
-  if (off < 0 || end > raw.length) throw new Error('graphics.dat item 0x22e too small for floorDecorDesc[3][9]');
+  if (off < 0 || end > raw.length) throw new Error(`graphics.dat item 0x22e too small for ${name}`);
 
   const out: DecorationDesc[][] = new Array(sets);
   for (let s = 0; s < sets; s++) {
@@ -945,7 +902,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const foodValue = readFoodValue22f(raw22f);
   const miscWeights = readMiscWeights22f(raw22f);
   const weaponDesc = readWeaponDesc22f(raw22f);
-  const wallDecorationRectSets = readDecorationDescTable22e(raw22e, wallDecorationPositionOffset);
+  const wallDecorationRectSets = readDecorationDescSets(raw22e, wallDecorationPositionOffset, 8, 13, 'wallDecorationPosition[8][13]');
   const wallDecorationRectSetIndex = readWallDecorationRectSetIndex(raw22e, wallRectanglesOffset);
   correctCrackSwitchInPlacement(wallDecorationRectSetIndex);
   const wallTextRect = readRectPosByte4(raw22e, wallTextRectOffset);
@@ -965,7 +922,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const doorOrnamentRectSetIndex = raw22e.slice(doorOrnamentRectSetIndexOffset, doorOrnamentRectSetIndexOffset + 12);
   const doorOrnamentColorMapF3 = raw22e.slice(doorOrnamentColorMapF3Offset, doorOrnamentColorMapF3Offset + 16);
   const doorOrnamentColorMapF2 = raw22e.slice(doorOrnamentColorMapF2Offset, doorOrnamentColorMapF2Offset + 16);
-  const floorDecorationDescSets = readFloorDecorationDescTable22e(raw22e, floorDecorationDescOffset);
+  const floorDecorationDescSets = readDecorationDescSets(raw22e, floorDecorationDescOffset, 3, 9, 'floorDecorDesc[3][9]');
   const floorDecorationRectSetIndex = raw22e.slice(
     floorDecorationRectSetIndexOffset,
     floorDecorationRectSetIndexOffset + 10

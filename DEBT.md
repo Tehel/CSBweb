@@ -229,9 +229,6 @@ them first or after, not during.
 
 Each of these is one CSBWin routine, or one format detail, with two or three bodies:
 
-- **The 6-byte decoration descriptor reader**: `readDecorationDescTable22e`,
-  `readDecorationDescSets` and `readFloorDecorationDescTable22e`
-  (`src/renderer/csbwin/ObjectTables.ts:745-812`), where the second serves all three.
 - **The byte writers**: `writeU16BE`, `writeU16LE`, `writeU32LE`, `writeU32BE` are private
   functions in `SaveGameLoader.ts`, `CsbwinExtendedFeatures.ts` and
   `CsbwinDungeonImageWriter.ts`; `src/core/bytes.ts` has only the readers.
