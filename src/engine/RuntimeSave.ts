@@ -69,10 +69,13 @@ import type { TimerEntry } from './TimerQueue';
  * start, the party's `moving` and `turning`, and each champion's `experience` and four
  * role levels, which CSBWin keeps as the twenty `skills92` records alone.
  *
+ * Version 13 drops `Champion.alive`: a champion is dead when their health is 0, the
+ * only test CSBWin has.
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 12;
+export const RUNTIME_SAVE_VERSION = 13;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;

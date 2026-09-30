@@ -82,7 +82,7 @@ export function updateChampionPanel(): void {
         const header = headerCells[chIdx];
         header.textContent = champion ? champion.name || `#${chIdx}` : '—';
         header.title = champion ? `chIdx ${chIdx}: ${champion.name} ${champion.title}`.trim() : 'empty slot';
-        header.classList.toggle('dead', !!champion && !champion.alive);
+        header.classList.toggle('dead', !!champion && champion.attributes.health === 0);
 
         for (const row of rows) {
             const cell = row.cells[chIdx];
@@ -101,7 +101,7 @@ export function updateChampionPanel(): void {
             }
             cell.value = value;
             cell.el.classList.toggle('changed', now - cell.changedAt < FLASH_TICKS);
-            cell.el.classList.toggle('dead', !champion.alive);
+            cell.el.classList.toggle('dead', champion.attributes.health === 0);
             if (cell.lastDelta !== 0) {
                 const sign = cell.lastDelta > 0 ? '+' : '';
                 cell.el.title += `\nLast change: ${sign}${cell.lastDelta} at tick ${cell.changedAt}`;

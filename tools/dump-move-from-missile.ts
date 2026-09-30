@@ -50,7 +50,7 @@ function champion(i: number): Champion {
       health: 500, maxHealth: 500, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -216,6 +216,6 @@ const show = (label: string, c: FilterCall | undefined): void =>
 }
 
 console.log(`health after the three blows: ${game.party.state.champions.map((c) => c.attributes.health).join(', ')}`);
-check(game.party.state.champions.every((c) => c.alive), 'the party outlives the three fireballs, so each case finds the champion in its corner');
+check(game.party.state.champions.every((c) => c.attributes.health !== 0), 'the party outlives the three fireballs, so each case finds the champion in its corner');
 
 finish();

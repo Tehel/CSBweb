@@ -101,7 +101,7 @@ export function handleMouthPress(ui: UIState): void {
   const selected = ui.partyState.selectedCharacterIndex ?? -1;
   if (selected < 0) return;
   const champ = ui.partyState.champions[selected] ?? null;
-  if (!champ || champ.alive === false) return;
+  if (!champ || (champ.attributes.health | 0) === 0) return;
 
   const objectId = ui.partyState.objectInHand;
   if (objectId === OBJECT_ID_NULL) return;

@@ -71,7 +71,6 @@ export interface Champion {
     name: string;
     title: string;
     attributes: ChampionAttributes;
-    alive: boolean;
     portraitGraphic?: ui16;     // Optional portrait index in graphic 26
     /**
      * `CHARDESC.portrait` (`doc/CSBwin-src/CSB.h:2593`) — the champion's own copy of

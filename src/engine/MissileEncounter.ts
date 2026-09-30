@@ -94,7 +94,9 @@ export class MissileEncounter {
 
     if (movedObject === null) {
       for (const champion of party.champions) {
-        if (!champion.alive) continue;
+        // `CharacterAtPosition`, which skips a champion whose `HP()` is 0
+        // (`doc/CSBwin-src/Code11f52.cpp:2566`, `:4064`).
+        if ((champion.attributes.health | 0) === 0) continue;
         const pos = champion.partyPosition & 0x3;
         whoLeavesCell[pos] = (pos + 1) & 0xff;
       }

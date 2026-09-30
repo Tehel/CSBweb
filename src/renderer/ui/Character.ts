@@ -338,7 +338,8 @@ export function drawPartyStatus(ui: UIState): void {
       if (champion) drawCharacterDamage(ui, chIdx, champion, false);
     }
 
-    if (champion && champion.alive === false) {
+    // `if (pcA3->HP() != 0)`, and graphic 8 otherwise (`doc/CSBwin-src/Character.cpp:1261`).
+    if (champion && (champion.attributes.health | 0) === 0) {
       const deadGraphic = ui.getGraphicBitmap(8);
       if (deadGraphic) {
         tag0088b2Index(
@@ -389,7 +390,7 @@ export function drawPartyStatus(ui: UIState): void {
       drawCharacterDamage(ui, chIdx, champion, true);
     }
 
-    if (champion && champion.alive !== false) {
+    if (champion && (champion.attributes.health | 0) !== 0) {
       drawShieldDots(ui, baseX, champion);
     }
 
@@ -428,7 +429,7 @@ export function drawPartyStatus(ui: UIState): void {
 function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inventoryOpen: boolean): void {
   const shown = ui.characterDamage[chIdx];
   if (!shown || !ui.screenIndexBuffer || !ui.fontData) return;
-  if (champion.alive === false || shown.inventoryOpen !== inventoryOpen) {
+  if ((champion.attributes.health | 0) === 0 || shown.inventoryOpen !== inventoryOpen) {
     ui.characterDamage[chIdx] = null;
     return;
   }
@@ -587,8 +588,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
 
   for (let chIdx = 0; chIdx < 4; chIdx++) {
     const champion = ui.partyState.champions[chIdx] ?? null;
-    const alive = champion ? champion.alive !== false : false;
-    if (!alive) continue;
+    if (!champion || (champion.attributes.health | 0) === 0) continue;
     if (selected === chIdx) continue;
 
     for (let hand = 0; hand <= 1; hand++) {
@@ -629,7 +629,8 @@ export function drawTopBarHandIcons(ui: UIState): void {
 }
 
 export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !champion.alive) return;
+  // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:920`).
+  if (!ui.uiTables || !ui.screenIndexBuffer || (champion.attributes.health | 0) <= 0) return;
   const offsets = ui.uiTables.graphic232.word1526[chIdx];
   const masks = ui.uiTables.graphic232.word1502[chIdx];
   if (!offsets || !masks) return;

@@ -206,7 +206,6 @@ async function main(): Promise<void> {
   const dying = state.champions[1];
   check(dying.partyPosition === 1, 'champion 1 should be the one on square 1');
   dying.attributes.health = 0;
-  dying.alive = false;
   click('dead, put down on square 0', 0);
   check(ui.word23144 === 0, 'putting down a dead champion should still empty the hand');
   check(dying.partyPosition === 1, 'the dead champion should stay where they died');

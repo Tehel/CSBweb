@@ -213,7 +213,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
     const selected = ui.partyState.selectedCharacterIndex ?? -1;
     if (selected < 0) return;
     const champ = getPartyChampion(ui.partyState, selected);
-    if (!champ || champ.alive === false) return;
+    if (!champ || (champ.attributes.health | 0) === 0) return;
     const chestView = getActiveChestView(ui, champ);
     if (!chestView || chestView.source !== 'hand') return;
     const button = searchButtonList(buttons.buttons18324, clickX, clickY, 2);
@@ -234,7 +234,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   if (button !== 4) {
     if (button < 0 || button > 3) return;
     const champ = getPartyChampion(ui.partyState, button);
-    if (!champ || champ.alive === false) return;
+    if (!champ || (champ.attributes.health | 0) === 0) return;
   }
   // `if (d.PressingMouth != 0) return; if (d.PressingEye != 0) return; d.clockTick = 1;`
   // (`doc/CSBwin-src/CSBCode.cpp:7439-7441`). The port has no pressed mouth:
@@ -323,7 +323,8 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (chIdx >= ui.partyState.champions.length) return;
     if (ui.partyState.selectedCharacterIndex === chIdx) return;
     const champ = getPartyChampion(ui.partyState, chIdx);
-    if (!champ || champ.alive === false) return;
+    // `if (d.CH16482[D7W].HP() == 0) return;` (`doc/CSBwin-src/CSBCode.cpp:6940`).
+    if (!champ || (champ.attributes.health | 0) === 0) return;
     slot = button & 1;
   } else {
     chIdx = ui.partyState.selectedCharacterIndex ?? -1;
@@ -333,7 +334,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
 
   if (slot < 0 || slot >= 38) return;
   const champ = getPartyChampion(ui.partyState, chIdx);
-  if (!champ || champ.alive === false) return;
+  if (!champ || (champ.attributes.health | 0) === 0) return;
 
   const chestView = getActiveChestView(ui, champ);
   const isChestSlot = slot >= 30;

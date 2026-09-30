@@ -57,7 +57,7 @@ function champion(name: string): Champion {
       health: 100, maxHealth: 200, stamina: 40, maxStamina: 100, mana: 20, maxMana: 60,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1000, water: 1000,
+    incantation: [], food: 1000, water: 1000,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: 0,
@@ -295,8 +295,8 @@ function main(): void {
     fp.performFeeding = true;
     fp.hitpointAdjust = -10;
     g.applyFeeding(0, fp);
-    console.log(`health 5 with a -10 adjustment: alive=${champ.alive}, health=${champ.attributes.health}`);
-    check(champ.alive === false, 'the champion died');
+    console.log(`health 5 with a -10 adjustment: alive=${champ.attributes.health !== 0}, health=${champ.attributes.health}`);
+    check(champ.attributes.health === 0, 'the champion died');
     check(champ.attributes.health === 0, 'and is at zero health');
   }
 
@@ -313,7 +313,7 @@ function main(): void {
     fp.manaAdjust = 10;
     fp.foodValue = 500;
     g.applyFeeding(0, fp);
-    check(champ.alive !== false, 'a champion still in a mirror cannot be killed by a potion');
+    check(champ.attributes.health !== 0, 'a champion still in a mirror cannot be killed by a potion');
     check(champ.attributes.mana === 20, 'and takes no mana from it');
     check(champ.food === 1500, 'but food and water still apply');
   }

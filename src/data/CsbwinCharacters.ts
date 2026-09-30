@@ -198,9 +198,6 @@ export function readCsbwinCharacter(
       maxMana: readI16BE(block, base + 62),
       stats: readAttributes(block, base),
     },
-    // CSBWin has no "alive" flag: a champion is dead when their health is gone
-    // (`KillCharacter` zeroes it), and `causeOfDamage` at 282 says how.
-    alive: readI16BE(block, base + 52) > 0,
     facing: readU8(block, base + 28) as 0 | 1 | 2 | 3,
     partyPosition: readU8(block, base + 29) as ui8,
     attackType: readI8(block, base + 32),

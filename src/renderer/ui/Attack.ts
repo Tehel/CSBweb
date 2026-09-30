@@ -132,7 +132,7 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   if (!champ) return;
   if ((champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0) return;
-  if (champ.alive === false || (champ.attributes.health | 0) === 0) return;
+  if ((champ.attributes.health | 0) === 0) return;
 
   const weapon = getChampionPossession(champ, SLOT_WEAPON_HAND);
   let attackClass: number;
@@ -325,7 +325,7 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
   if (!ui.screenIndexBuffer || !ui.uiTables) return;
   const rect = attackButtonRect(chIdx);
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
-  const alive = !!champ && champ.alive !== false && (champ.attributes.health | 0) !== 0;
+  const alive = !!champ && (champ.attributes.health | 0) !== 0;
 
   if (!alive) {
     fillRectIndex(ui.screenIndexBuffer, rect, 0);

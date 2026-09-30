@@ -89,7 +89,6 @@ export function characterAtPosition(champions: Champion[], position: number): nu
     const champ = champions[i];
     if (!champ) continue;
     if ((champ.partyPosition | 0) !== position) continue;
-    if (champ.alive === false) continue;
     if ((champ.attributes?.health | 0) !== 0) return i;
   }
   return -1;
@@ -283,7 +282,6 @@ export function createChampionFromPreset(
         hero.antiFire,
       ]),
     },
-    alive: true,
     // `if (D0W == 'M') pcA3->charFlags |= CHARFLAG_male;` — and a hero whose gender
     // letter is neither M nor F is rejected outright (`Character.cpp:591-600`).
     charFlags: hero.gender === 'M' ? CHARFLAG_MALE : 0,

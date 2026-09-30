@@ -34,7 +34,7 @@ export function drawInventoryScreen(ui: UIState): void {
   if (selected < 0) return;
 
   const champion = ui.partyState.champions[selected] ?? null;
-  if (!champion || champion.alive === false) return;
+  if (!champion || (champion.attributes.health | 0) === 0) return;
 
   const iconSlots = ui.uiTables.graphic232.iconDisplay;
   const word612 = ui.uiTables.graphic232.word612;

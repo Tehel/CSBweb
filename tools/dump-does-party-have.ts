@@ -5,8 +5,6 @@
  * the 30 possessions is compared by `GetBasicObjectType` with the actuator's value, and a
  * possession that is a chest (`objNI_Chest`, 0x90) has its `contents()` chain compared too.
  * Then a `goto` back into the loop does the same for `d.objectInHand`, whoever holds it.
- * The port never opened a chest, never looked at the cursor, and filtered on the `alive`
- * flag rather than on hit points.
  *
  * Run: `npx tsx tools/dump-does-party-have.ts`
  */
@@ -116,7 +114,7 @@ async function main(): Promise<void> {
   party.state.objectInHand = item;
   check(has(value), 'an object on the cursor counts');
 
-  // A champion with no hit points does not, whatever the alive flag says.
+  // A champion with no hit points does not.
   party.state.objectInHand = OBJECT_ID_NULL;
   pack[13] = item;
   champ0.attributes.health = 0;

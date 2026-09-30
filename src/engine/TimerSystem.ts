@@ -1062,9 +1062,7 @@ export class TimerSystem {
   }
 
   private isChampionDead(champ: PartyState['champions'][number]): boolean {
-    const health = champ.attributes?.health ?? 0;
-    if (health <= 0) return true;
-    return champ.alive === false;
+    return (champ.attributes?.health ?? 0) <= 0;
   }
 
   private setCellFlag(map: MapData, x: number, y: number, cellFlag: number): void {

@@ -658,7 +658,6 @@ export class MonsterAttack {
     const champ = getPartyChampion(this.ctx.party.state, chIdx);
     if (!champ) return;
 
-    champ.alive = false;
     champ.attributes.health = 0;
     champ.incantation = [];
 
@@ -693,7 +692,7 @@ export class MonsterAttack {
       const other = party.champions[i];
       if (!other) continue;
       if (potential === i) continue;
-      if ((other.attributes?.health ?? 0) === 0 || other.alive === false) continue;
+      if ((other.attributes?.health ?? 0) === 0) continue;
       living = i;
       break;
     }
@@ -867,7 +866,7 @@ export class MonsterAttack {
     );
     for (const pos of order) {
       const champ = party.champions.find((ch) => ch.partyPosition === pos);
-      if (champ && champ.alive !== false && champ.attributes.health > 0) {
+      if (champ && champ.attributes.health > 0) {
         return party.champions.indexOf(champ);
       }
     }

@@ -54,7 +54,7 @@ function champion(i: number): Champion {
       health: 500, maxHealth: 500, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -324,14 +324,14 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   game.move(MovementAction.MOVE_FORWARD);
   // The fall only adds to `d.PendingDamage`. The next tick loads the level below, and
   // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:615-657).
-  check(game.party.state.champions[0]!.alive !== false, 'the fall itself does not kill: the damage is pending');
+  check(game.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
   game.loadNewPartyLevel();
   game.monsterAttack.displayCharacterDamage();
   const bonesBelow = game.dungeonState.findFirstObject(below) !== OBJECT_ID_EOF;
   const bonesAbove = game.dungeonState.findFirstObject(from) !== OBJECT_ID_EOF;
-  console.log(`8. a champion at 1 HP falls: alive ${game.party.state.champions[0]!.alive}, `
+  console.log(`8. a champion at 1 HP falls: alive ${game.party.state.champions[0]!.attributes.health !== 0}, `
     + `something at ${at(below)} ${bonesBelow}, at ${at(from)} ${bonesAbove}`);
-  check(!game.party.state.champions[0]!.alive, 'the fall kills the champion');
+  check(game.party.state.champions[0]!.attributes.health === 0, 'the fall kills the champion');
   check(bonesBelow && !bonesAbove, 'and their bones lie on the square below, where the party landed');
 }
 

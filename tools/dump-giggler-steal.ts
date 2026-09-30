@@ -42,7 +42,7 @@ function champion(i: number): Champion {
       // Low dexterity and luck, so the steal gets its tries.
       stats: makeAddCharacterAttributes([10, 60, 10, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -139,7 +139,7 @@ function main(): void {
   check(gone.every((rn) => held.get(rn)!.slot === 0), 'every stolen object came out of a ready hand (d.uByte13126 is all zeroes)');
   check(chain.join() === gone.join(),
     'the chain is the stolen objects, once each, in the order they were taken, and nothing else');
-  check(game.party.state.champions.every((c) => c.alive), 'nothing else touched the party in the meantime');
+  check(game.party.state.champions.every((c) => c.attributes.health !== 0), 'nothing else touched the party in the meantime');
   finish();
 }
 

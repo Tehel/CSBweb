@@ -107,7 +107,7 @@ function champion(i: number): Champion {
       health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 7, maxMana: 20,
       stats: makeAddCharacterAttributes([40, 41, 42, 43, 44, 45, 46]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,

@@ -224,7 +224,6 @@ export class CharacterSystem {
     const reducedMax = Math.max(25, (maxHealth - Math.floor(maxHealth / 64) - 1) | 0);
     champ.attributes.maxHealth = reducedMax;
     champ.attributes.health = Math.floor(reducedMax / 2);
-    champ.alive = true;
     // `pcA3->facing = (ui8)d.partyFacing` (`:823`) — a champion who comes back looks
     // the way the party is looking, not the way they died.
     champ.facing = party.facing;

@@ -162,7 +162,7 @@ async function main(): Promise<void> {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([50, 50, 50, 50, 50, 0, 0]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: 0,

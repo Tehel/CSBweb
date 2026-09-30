@@ -103,7 +103,7 @@ export function drawSpellPanel(ui: UIState): void {
   }
 
   const caster = ui.partyState.champions[ui.partyState.magicCasterIndex];
-  if (!caster || caster.alive === false) return;
+  if (!caster || (caster.attributes.health | 0) === 0) return;
 
   drawSpellMenuCharacters(ui, caster.incantation.length);
   drawMagicIncantation(ui, caster.incantation);

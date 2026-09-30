@@ -107,7 +107,6 @@ async function main(): Promise<void> {
   // ---- 2. The guards: a dead champion cannot own it, -1 clears it.
   //         (doc/CSBwin-src/CSBCode.cpp:8395-8397 and :8409-8413)
   const second = party.state.champions[1];
-  second.alive = false;
   second.attributes.health = 0;
   setHandOwner(party.state, 1);
   row('give to a corpse', party.state);
@@ -122,7 +121,7 @@ async function main(): Promise<void> {
   ensureHandOwner(party.state);
   row('restore repair', party.state);
   check(owner(party.state) === 0, 'a restored party with champions must end up with an owner');
-  check(party.state.champions[1].alive === false, 'the repair must skip the dead champion');
+  check(party.state.champions[1].attributes.health === 0, 'the repair must skip the dead champion');
 
   const empty = new Party(new Position(1, 1, 0), Direction.NORTH);
   ensureHandOwner(empty.state);
@@ -130,15 +129,13 @@ async function main(): Promise<void> {
 
   // ---- 4. The cursor leaves a dying owner for a living champion.
   //         (doc/CSBwin-src/Character.cpp:2670-2686)
-  second.alive = true;
   second.attributes.health = 40;
   setHandOwner(party.state, 1);
   check(owner(party.state) === 1, 'the second champion should now own the cursor');
   const dying = party.state.champions[1];
-  dying.alive = false;
   dying.attributes.health = 0;
   if (owner(party.state) === 1) {
-    const living = party.state.champions.findIndex((c) => c.alive !== false);
+    const living = party.state.champions.findIndex((c) => c.attributes.health !== 0);
     setHandOwner(party.state, living >= 0 ? party.state.champions[living].partyPosition : -1);
   }
   row('owner died', party.state);

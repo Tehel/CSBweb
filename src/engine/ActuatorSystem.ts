@@ -698,7 +698,8 @@ export class ActuatorSystem {
       adjustment = Math.trunc(adjustment / (party.champions.length || 1));
       for (let i = 0; i < party.champions.length; i++) {
         const champ = party.champions[i];
-        if (!champ.alive) continue;
+        // `if (d.CH16482[D7W].HP() != 0)` (`doc/CSBwin-src/Mouse.cpp:225`).
+        if ((champ.attributes.health | 0) === 0) continue;
         this.applySkillIncrease(champ, i, 8, adjustment, experienceMultiplier, AdjustSkillsWhy.SkillIncreaser2);
       }
       return;

@@ -29,7 +29,7 @@ function champion(i: number, name: string): Champion {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -68,7 +68,7 @@ async function main(): Promise<void> {
     processTimersAt(game, t);
     const hurt = game.party.state.champions.some((c, i) => c.attributes.health < start[i]!);
     if (hurt && firstHitTick < 0) firstHitTick = t;
-    const dead = game.party.state.champions.some((c) => c.alive === false);
+    const dead = game.party.state.champions.some((c) => c.attributes.health === 0);
     if (dead && firstDeathTick < 0) firstDeathTick = t;
   }
 
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
     console.log([
       c.name, c.attributes.health, lost,
       '0x' + c.wounds.toString(16), c.poisonCount,
-      c.alive === false ? 'DEAD' : 'yes',
+      c.attributes.health === 0 ? 'DEAD' : 'yes',
     ].join('\t'));
   });
 

@@ -186,19 +186,6 @@ export class Party {
         return this.state.champions.find(c => c.partyPosition === position) || null;
     }
 
-    /**
-     * Check if any champion is alive
-     */
-    hasLivingChampions(): boolean {
-        return this.state.champions.some(c => c.alive);
-    }
-
-    /**
-     * Get count of living champions
-     */
-    getLivingCount(): number {
-        return this.state.champions.filter(c => c.alive).length;
-    }
 }
 
 /**
@@ -223,9 +210,9 @@ export function setHandOwner(party: PartyState, chIdx: number): void {
     if (chIdx === current) return;
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
-        // CSBWin tests `HP()==0`; this port also carries an explicit `alive` flag.
         if (!champion) return;
-        if (champion.alive === false || (champion.attributes?.health ?? 0) === 0) return;
+        // `if ( (chIdx != -1) && (d.CH16482[chIdx].HP()==0) ) return;` (`doc/CSBwin-src/CSBCode.cpp:8397`).
+        if ((champion.attributes?.health ?? 0) === 0) return;
     }
     party.cursorOwner = -1;
     if (chIdx === -1) return;
@@ -248,7 +235,7 @@ export function ensureHandOwner(party: PartyState): void {
     if (party.champions.length === 0) return;
     for (let chIdx = 0; chIdx < 4; chIdx++) {
         const champion = getPartyChampion(party, chIdx);
-        if (!champion || champion.alive === false) continue;
+        if (!champion || (champion.attributes?.health ?? 0) === 0) continue;
         setHandOwner(party, chIdx);
         if ((party.cursorOwner ?? -1) >= 0) return;
     }
@@ -307,7 +294,7 @@ export function selectMagicCaster(party: PartyState, chIdx: number): void {
     if (chIdx !== -1) {
         const champion = getPartyChampion(party, chIdx);
         if (!champion) return;
-        if (champion.alive === false || (champion.attributes?.health ?? 0) === 0) return;
+        if ((champion.attributes?.health ?? 0) === 0) return;
     }
     party.magicCasterIndex = chIdx;
 }

@@ -69,7 +69,7 @@ function champion(i: number, name: string): Champion {
       health: 20, maxHealth: 20, stamina: 12, maxStamina: 12, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions,
     partyPosition: i,
@@ -272,7 +272,7 @@ function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean
   const rn = bones[0];
   const record = rn === undefined ? null : game.dungeonState.getMiscRecord(rn);
   return {
-    dead: champ.alive === false && champ.attributes.health === 0,
+    dead: champ.attributes.health === 0,
     bones: bones.length === 1,
     bonesValue2: (record?.specialState ?? 0) === 2,
     expoolRecord: rn !== undefined && game.dungeonState.copyChampionBonesRecord(rn) !== null,
@@ -344,9 +344,7 @@ function main(): void {
     console.log('');
     console.log(['shot', 'health before', 'health after', 'alive'].join('\t'));
 
-    // Read the flag through a call: written inline, TypeScript narrows `alive` to
-    // `true` inside the loop and rejects the checks that follow.
-    const alive = (): boolean => g.party.state.champions[0]!.alive !== false;
+    const alive = (): boolean => g.party.state.champions[0]!.attributes.health !== 0;
     let shots = 0;
     while (alive() && shots < 12) {
       shots++;
@@ -386,7 +384,7 @@ function main(): void {
     console.log(['cursorOwner', party.cursorOwner].join('\t'));
     console.log(['magicCasterIndex', party.magicCasterIndex].join('\t'));
     console.log(['gameIsLost', String(party.gameIsLost)].join('\t'));
-    check(party.champions[0]!.alive !== true, 'the exhausted champion still dies');
+    check(party.champions[0]!.attributes.health === 0, 'the exhausted champion still dies');
     check(party.cursorOwner === 1, 'and hands the cursor to the survivor');
     check(party.magicCasterIndex === 1, 'and the magic tab with it');
     check(party.gameIsLost !== true, 'but the game is not lost while one champion stands');
@@ -454,7 +452,7 @@ function main(): void {
     g.party.state.potentialChampionIndex = 1;
     const r = g.monsterAttack.damageCharacter(1, 999, 0, 0);
     console.log(`recruit: returned ${r}, health ${recruit.attributes.health}`);
-    check(recruit.attributes.health === 20 && recruit.alive !== false,
+    check(recruit.attributes.health === 20,
       'a recruit still in the mirror cannot be hurt');
     check(r === 2, 'and DamageCharacter says chIdx+1');
     g.party.state.potentialChampionIndex = -1;
@@ -463,7 +461,7 @@ function main(): void {
     g.gameWon = true;
     const w = g.monsterAttack.damageCharacter(0, 999, 0, 0);
     console.log(`game won: returned ${w}, health ${hero.attributes.health}`);
-    check(hero.attributes.health === 20 && hero.alive !== false, 'once the game is won nobody can be hurt');
+    check(hero.attributes.health === 20, 'once the game is won nobody can be hurt');
     check(w === 1, 'and DamageCharacter returns d.Word11694, 1');
     g.gameWon = false;
 

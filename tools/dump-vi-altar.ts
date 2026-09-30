@@ -68,7 +68,7 @@ function champion(i: number, name: string): Champion {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -259,7 +259,7 @@ function main(): void {
     console.log(['tick', 'clouds in cell', 'bones in cell', `HERO${victim} alive`, 'health', 'maxHealth'].join('\t'));
     const snapshot = (t: number): void => {
       const c = g.party.state.champions[victim]!;
-      console.log([t, cloudsAt(g, cell), bonesAt(g, cell).length, c.alive !== false, c.attributes.health, c.attributes.maxHealth].join('\t'));
+      console.log([t, cloudsAt(g, cell), bonesAt(g, cell).length, c.attributes.health !== 0, c.attributes.health, c.attributes.maxHealth].join('\t'));
     };
     snapshot(0);
 
@@ -268,7 +268,7 @@ function main(): void {
     snapshot(1);
     check(cloudsAt(g, cell) === 1, 'state 2 should put a cloud over the bones — CreateCloud(RNffe4)');
     check(bonesAt(g, cell).length === 1, 'and leave the bones alone for now');
-    check(g.party.state.champions[victim]!.alive === false, 'and not yet revive anyone');
+    check(g.party.state.champions[victim]!.attributes.health === 0, 'and not yet revive anyone');
 
     // `Time += 5`: state 1 lands five ticks after that one, and consumes the bones
     // without yet reviving anyone — the two halves are a tick apart and must stay so, or
@@ -276,13 +276,13 @@ function main(): void {
     runTicks(g, 5);
     snapshot(6);
     check(bonesAt(g, cell).length === 0, 'state 1 should consume the bones');
-    check(g.party.state.champions[victim]!.alive === false, 'and still not revive anyone');
+    check(g.party.state.champions[victim]!.attributes.health === 0, 'and still not revive anyone');
 
     // `Time += 1`: state 0 on the tick after.
     runTicks(g, 1);
     snapshot(7);
     const revived = g.party.state.champions[victim]!;
-    check(revived.alive !== false, 'state 0 should bring the champion back');
+    check(revived.attributes.health !== 0, 'state 0 should bring the champion back');
 
     // `MaxHP = Larger(25, MaxHP - MaxHP/64 - 1)`, then `HP = MaxHP/2`.
     const expectedMax = Math.max(25, maxHpBefore - Math.floor(maxHpBefore / 64) - 1);
@@ -325,7 +325,7 @@ function main(): void {
     if (rn !== undefined) {
       g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
       runTicks(g, 7);
-      check(g.party.state.champions[victim]!.alive !== false, 'and the altar raises the champion');
+      check(g.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
     }
   }
 
@@ -355,8 +355,8 @@ function main(): void {
     runTicks(g, 8);
 
     const c = g.party.state.champions[target]!;
-    console.log([target, `HERO${target}`, true, c.alive !== false].join('\t'));
-    check(c.alive !== false, `bones with value ${target} should revive champion ${target}`);
+    console.log([target, `HERO${target}`, true, c.attributes.health !== 0].join('\t'));
+    check(c.attributes.health !== 0, `bones with value ${target} should revive champion ${target}`);
     check(bonesAt(g, cell).length === 0, 'and consume themselves doing it');
   }
 
@@ -406,11 +406,11 @@ function main(): void {
     runTicks(g, 8);
 
     const c = g.party.state.champions[target]!;
-    console.log([`HERO${target}`, cornerBefore, c.partyPosition, c.alive !== false].join('\t'));
-    check(c.alive !== false, 'the champion still comes back');
+    console.log([`HERO${target}`, cornerBefore, c.partyPosition, c.attributes.health !== 0].join('\t'));
+    check(c.attributes.health !== 0, 'the champion still comes back');
     check(c.partyPosition !== cornerBefore, 'but not into the corner the squatter took');
     const occupants = g.party.state.champions.filter(
-      (o) => o.alive !== false && o.partyPosition === c.partyPosition,
+      (o) => o.attributes.health !== 0 && o.partyPosition === c.partyPosition,
     ).length;
     check(occupants === 1, 'and the corner they land in holds nobody else living');
   }
@@ -474,14 +474,14 @@ function main(): void {
         console.log(['tick', 'bones in alcove', `HERO${victim} alive`, 'health'].join('\t'));
         const row = (t: number): void => {
           const c = g.party.state.champions[victim]!;
-          console.log([t, bonesAt(g, altar.alcove).length, c.alive !== false, c.attributes.health].join('\t'));
+          console.log([t, bonesAt(g, altar.alcove).length, c.attributes.health !== 0, c.attributes.health].join('\t'));
         };
         row(0);
         runTicks(g, 8);
         row(8);
 
         const revived = g.party.state.champions[victim]!;
-        check(revived.alive !== false, 'and six ticks later the champion is back');
+        check(revived.attributes.health !== 0, 'and six ticks later the champion is back');
         check(bonesAt(g, altar.alcove).length === 0, 'with the bones consumed');
       }
     }
@@ -513,8 +513,8 @@ function main(): void {
       check(dropped, 'inert bones still drop into the alcove like any other object');
       runTicks(g, 8);
       const c = g.party.state.champions[1]!;
-      console.log(`HERO1 alive after 8 ticks: ${c.alive !== false}, bones in alcove: ${bonesAt(g, altar.alcove).length}`);
-      check(c.alive === false, 'but they raise nobody');
+      console.log(`HERO1 alive after 8 ticks: ${c.attributes.health !== 0}, bones in alcove: ${bonesAt(g, altar.alcove).length}`);
+      check(c.attributes.health === 0, 'but they raise nobody');
       check(bonesAt(g, altar.alcove).length === 1, 'and they stay in the alcove');
     }
   }

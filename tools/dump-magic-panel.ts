@@ -46,7 +46,7 @@ function champion(name: string): Champion {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 90, maxMana: 90,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     // Every skill mastered, so no cast fails on the dice.
     skills: ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 })),
     possessions: emptyPossessions(),

@@ -231,7 +231,8 @@ function selectCaster(ui: UIState, chIdx: number): void {
   const party = ui.partyState;
   if (!party || championPending(ui)) return;
   const champion = party.champions[chIdx];
-  if (!champion || !champion.alive) return;
+  // `SelectMagicCaster` refuses a champion whose `HP()` is 0 (`doc/CSBwin-src/Magic.cpp:724`).
+  if (!champion || (champion.attributes.health | 0) === 0) return;
   if (champion.attributes.maxMana === 0) return;
   selectMagicCaster(party, chIdx);
 }

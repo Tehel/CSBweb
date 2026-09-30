@@ -94,7 +94,6 @@ async function main(): Promise<void> {
   let split = 0;
   {
     const { party, actuators } = makeParty(0);
-    party.state.champions[2].alive = false;
     party.state.champions[2].attributes.health = 0;
     const before = exp(party);
     (actuators as any).performLocalAction(10, 5, 5, 0, -1);

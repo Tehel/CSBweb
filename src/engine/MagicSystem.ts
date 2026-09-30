@@ -172,7 +172,7 @@ export class MagicSystem {
       return 0;
     }
     // `if (chIdx >= d.NumCharacter) return 0;` and `if (pcA3->HP() == 0) return 0;` (`:1150-1153`).
-    if (!champion || champion.alive === false) return 0;
+    if (!champion) return 0;
     if ((champion.attributes.health | 0) <= 0) return 0;
 
     let facing = this.ctx.party.state.facing;

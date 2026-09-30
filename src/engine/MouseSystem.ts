@@ -141,7 +141,7 @@ export class MouseSystem {
     }
     const champion = party.champions[chIdx];
     if (!champion) return;
-    if (champion.alive !== false && (champion.attributes?.health ?? 0) !== 0) return;
+    if ((champion.attributes?.health ?? 0) !== 0) return;
 
     this.ctx.systems.timer.scheduleViAltar(obj, location, posInCell, this.ctx.state.tickCount);
   }

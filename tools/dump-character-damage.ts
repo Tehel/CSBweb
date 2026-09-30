@@ -49,7 +49,7 @@ function champion(i: number): Champion {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
     },
-    alive: true, incantation: [], food: 1500, water: 1500,
+    incantation: [], food: 1500, water: 1500,
     skills: [],
     possessions: emptyPossessions(),
     partyPosition: i,
@@ -144,11 +144,11 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   // A blow that kills: no figure, no timer.
   calls.length = 0;
   g.monsterAttack.damageCharacter(1, 250, 0, 0);
-  check(g.party.state.champions[1]!.alive !== false, 'a killing blow does not kill yet');
+  check(g.party.state.champions[1]!.attributes.health !== 0, 'a killing blow does not kill yet');
   g.monsterAttack.displayCharacterDamage();
-  console.log(`a blow of 250 on champion 1: alive ${g.party.state.champions[1]!.alive}, calls [${calls.join('; ')}], `
+  console.log(`a blow of 250 on champion 1: alive ${g.party.state.champions[1]!.attributes.health !== 0}, calls [${calls.join('; ')}], `
     + `TT_12 ${tt12s(g).length}`);
-  check(g.party.state.champions[1]!.alive === false, 'DisplayCharacterDamage kills (CSBCode.cpp:7110-7114)');
+  check(g.party.state.champions[1]!.attributes.health === 0, 'DisplayCharacterDamage kills (CSBCode.cpp:7110-7114)');
   check(calls.length === 0 && tt12s(g).length === 0, 'and shows nothing and arms nothing for the dead');
 
   // A TT_12 that falls due after its champion died redraws nothing (Timer.cpp:2692).
@@ -277,7 +277,6 @@ console.log('=== drawPartyStatus ===');
   // Death: `KillCharacter` blits graphic 8 over the box.
   party.state.selectedCharacterIndex = -1;
   const dead = party.state.champions[1]!;
-  dead.alive = false;
   dead.attributes.health = 0;
   const deadPlain = render();
   ui.characterDamage[1] = { damage: 3, inventoryOpen: false };

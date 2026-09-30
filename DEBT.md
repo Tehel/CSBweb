@@ -89,7 +89,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D12 | `Champion.alive` shadows `HP() != 0` | S | ⏳ |
 | E16 | A `die()` in play stops the loop without a word | S | ⏳ |
 | E12 | `Game` names each system a second time | M | ⏳ |
 | E10 | Code written twice | M | ⏳ |
@@ -144,23 +143,6 @@ entry here, only its commit, so take the next ID from this line and move it on.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
-
-### D12 ⏳ `Champion.alive` shadows `HP() != 0`
-
-CSBWin has no "alive" flag: a champion is dead when `HP()` is 0, and every search for a
-living champion tests that. The port carries `Champion.alive` (`src/engine/gameTypes.ts:74`)
-beside the HP. Two writers keep it in step, `KillCharacter`
-(`src/engine/MonsterAttack.ts:661`) and `BringCharacterToLife`
-(`src/engine/CharacterSystem.ts:227`); a CSBWin load derives it from the HP
-(`src/data/CsbwinCharacters.ts:203`), and `AddCharacter` sets it
-(`src/engine/AddCharacter.ts:286`).
-32 places in `src/` and 41 in `tools/` read it, some together with the HP, as if either
-could be wrong: `champ.alive !== false && (champ.attributes.health | 0) !== 0`
-(`src/renderer/ui/Attack.ts:328`). No CHARDESC byte holds it, so it cannot be saved as it
-is; it can only drift. Paying it means reading `health !== 0` everywhere, as CSBWin's
-code does at each site (cite it where the port's reader is not a transcription), and
-removing the field. `tools/dump-champion-death.ts` and `dump-vi-altar.ts` cover the two
-writers.
 
 ### D15 ⏳ `UIState` is built in two phases
 
@@ -285,7 +267,7 @@ each a lambda in `main.ts`'s `construct` (`src/main.ts:237-370`) onto a one-line
 facade, onto the system. Adding an engine call from the UI touches four files. And
 the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
 state directly where no hook exists — the object in hand
-(`ViewportPicking.ts:88`, `Mouse.ts:360`, `:368`, `Feeding.ts:133`), the floor chain
+(`ViewportPicking.ts:88`, `Mouse.ts:361`, `:369`, `Feeding.ts:133`), the floor chain
 (`ViewportPicking.ts:85`), a record freed (`Feeding.ts:134`), a potion emptied and a
 waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:310-338`).
 19 tools stand the UI up with the subset of hooks they think they need, "wired as
@@ -488,7 +470,7 @@ choosing the palette (`GameScreen.getViewportPalette`, `:604-610`, the
 `onPaletteSelected` hook). So the monster AI (`MonsterAI.ts:1148`) sees the value of the
 last frame presented, not of the last light change, and headless it is always 0: no tool
 has ever run a monster's dark-level sight. `GameState.currentPalette`'s comment
-(`gameTypes.ts:323-328`) says the renderer sets it in CSBWin too, which it does not. The
+(`gameTypes.ts:322-327`) says the renderer sets it in CSBWin too, which it does not. The
 port's copy also clamps the index to the palette count, which CSBWin does not.
 
 Paying it means porting `SelectPaletteForLightLevel` into the engine over the party's
@@ -793,7 +775,7 @@ reading, and DM has none.
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
 holds the raw bits, the renderer's `drawRoomObjects` / `drawMonster` take both options as
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
-`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:371`) and in `MonsterDamage`
+`MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
 constant `false`. Harmless for now, because no creature in `dm-atari/dungeon.dat` sets any
 of bits 11-14. Modelling it means reading `extendedFlags & 0x02` / `& 0x04` in
@@ -878,7 +860,7 @@ gathered back, never one thrown from the cursor:
 
 A thrown object keeps its `ObjectID` all the way: in the missile's `projectileObject`,
 on the floor where it lands, and in a monster's possessions when a hit absorbs it
-(`MissileEncounter.ts:434`), which the monster drops when it dies. So a tag table
+(`MissileEncounter.ts:436`), which the monster drops when it dies. So a tag table
 `ObjectID → { champion, slot }`, filled at the throw, follows it without any further
 work.
 
