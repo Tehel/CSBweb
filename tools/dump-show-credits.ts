@@ -43,7 +43,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
-import type { MessageSink } from '../src/engine/ActuatorSystem';
+import type { MessageSink } from '../src/engine/GameHost';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';

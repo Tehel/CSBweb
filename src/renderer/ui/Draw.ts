@@ -6,7 +6,7 @@
  */
 import { Rect } from '../../data/tables/UITables';
 import { IndexedBitmap, createPaletteIndexViewportBuffer, drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
-import { scrollingText } from '../csbwin/ScrollingText';
+import type { ScrollingText } from '../csbwin/ScrollingText';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import type { UIState } from './UIState';
@@ -226,9 +226,9 @@ export function drawObjectIconAt(ui: UIState,
  * Draw the CSBWin scrolling message area. All row/timeout/wrap logic lives in
  * `ScrollingText`; the renderer only paints its current rows.
  */
-export function drawMessageLines(ui: UIState): void {
+export function drawMessageLines(ui: UIState, messages: ScrollingText): void {
   if (!ui.fontData || !ui.screenIndexBuffer) return;
-  scrollingText.draw(ui.screenIndexBuffer, ui.fontData);
+  messages.draw(ui.screenIndexBuffer, ui.fontData);
 }
 
 export function drawFoodWaterBar(ui: UIState, value: number, y: number, color: number): void {

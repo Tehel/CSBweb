@@ -16,7 +16,7 @@ import {
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
 import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
-import { scrollingText } from './renderer/csbwin/ScrollingText';
+import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
 import { Die, runBootSequence, runShowCredits, type SavedGameRead } from './renderer/intro/BootSequence';
@@ -233,9 +233,11 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
 
 /**
  * The engine and the screen, each handed what it asks of the other: the engine its
- * `GameHost`, the screen its `GameScreenHooks`.
+ * `GameHost`, the screen its `GameScreenHooks`. Both are handed the one message area,
+ * which the engine writes and the screen draws.
  */
-function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen } {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen; messages: ScrollingText } {
+    const messages = new ScrollingText();
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.
@@ -243,7 +245,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     // Over an empty world, as `d.Initialize()` leaves CSBWin's: the boot reads the game.
     const game = new Game(emptyDungeonData(), tables, {
         cursorFilter: handleCursorFilter,
-        messages: scrollingText,
+        messages,
         playSound,
         // `d.PartySleeping`: button 145 puts the party to sleep, 146 or a blow
         // wakes it. The UI follows with `Buttons17796` (`doc/CSBwin-src/Mouse.cpp:1698`)
@@ -251,7 +253,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // area with its tenfold timeout (`CSBCode.cpp:1546-1553`).
         sleepChanged: (sleeping) => {
             screen?.setUIMode(sleeping ? UIMode.Sleeping : UIMode.Adventure);
-            scrollingText.setPartySleeping(sleeping);
+            messages.setPartySleeping(sleeping);
         },
         // The first half of Reincarnate: the engine raises the name-entry screen
         // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`); the
@@ -270,7 +272,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // A frame threw: CSBWin's `die`, the loop stopped.
         die: reportError,
         showCredits: (word11694) => {
-            if (screen) showEndOfGame(game, screen, sound, word11694).catch(reportError);
+            if (screen) showEndOfGame(game, screen, sound, messages, word11694).catch(reportError);
         },
         // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself;
         // the main loop's tick paints what `TAG01b29a` drew with it.
@@ -289,6 +291,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         footprints: game.ctx.footprints,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         characterStats: game.systems.characterStats,
+        messages,
     }, {
         queueSound: (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z),
         viewingFilter: (options) => game.processViewingFilter(options),
@@ -369,7 +372,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             game.currentPalette = index;
         },
     });
-    return { game, screen };
+    return { game, screen, messages };
 }
 
 /**
@@ -381,7 +384,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
  * entrance has set up the next game, and `_StartCSB` runs `MainLoop` again
  * (doc/CSBwin-src/CSBCode.cpp:11320-11327), on the same `Game` and the same screen.
  */
-async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, word11694: boolean): Promise<void> {
+async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, messages: ScrollingText, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
     const { x, y, z } = game.ctx.party.state.position;
@@ -404,7 +407,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
         },
     );
     if (end === 'terminate') return;
-    scrollingText.restart();
+    messages.restart();
     screen.initializePlayState();
     game.resumeMainLoop();
     game.start();
@@ -457,7 +460,7 @@ async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Pr
 }
 
 /** The page's side of play: its input and debug chrome, and a redraw per move and per tick. */
-function wire(game: Game, screen: GameScreen, sound: SoundManager): void {
+function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: ScrollingText): void {
     bindUIContext({
         screen,
         game,
@@ -501,7 +504,7 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager): void {
     // unless its tick holds the paint until the put-back (`Game.paintHeld`).
     game.onFrame(() => {
         if (game.paintHeld()) return;
-        const scrolled = scrollingText.takeChanged();
+        const scrolled = messages.takeChanged();
         const flashed = game.takeFlashChanged();
         if (scrolled || flashed) renderView();
     });
@@ -552,7 +555,7 @@ async function init() {
             (window as unknown as Record<string, unknown>).__probe = { game, screen, renderView };
         }
         await runIntro(built.game, built.screen, sound);
-        wire(built.game, built.screen, sound);
+        wire(built.game, built.screen, sound, built.messages);
         start(built.game);
     } catch (error) {
         reportError(error);

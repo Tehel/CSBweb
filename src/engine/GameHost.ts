@@ -8,7 +8,54 @@
  * that throws again), so no caller asks whether anybody is listening. Headless, nobody is, and the game plays the
  * same.
  */
-import type { CursorFilterHook, MessageSink } from './ActuatorSystem';
+import type { ObjectID } from '../core/types';
+
+export enum CursorFilterType {
+  TakeKey = 'TakeKey',
+  TakeFromTorchHolder = 'TakeFromTorchHolder',
+  PlaceInTorchHolder = 'PlaceInTorchHolder',
+  SwapRemove = 'SwapRemove',
+  SwapReplace = 'SwapReplace',
+  GiftFromGod = 'GiftFromGod',
+}
+
+export interface CursorFilterPacket {
+  type: CursorFilterType;
+  object: ObjectID;
+  level: number;
+  x: number;
+  y: number;
+  pos: number;
+}
+
+export type CursorFilterHook = (packet: CursorFilterPacket) => boolean;
+
+/**
+ * Fragment-based message emitter, mirroring CSBWin's global `PrintLinefeed()` /
+ * `QuePrintLines(color, text)` pair (`doc/CSBwin-src/CSBCode.cpp:1654`, `:1744`).
+ *
+ * Messages are composed from FRAGMENTS that flow onto one logical line and get word-wrapped
+ * by the message area — never from pre-split strings containing newlines.
+ * See `doc/CSBWIN_MESSAGES_REFERENCE.md`.
+ *
+ * Injected rather than imported as a global so the engine stays independent of the renderer.
+ */
+export interface MessageSink {
+  printLinefeed(): void;
+  quePrintLines(color: number, text: string): void;
+  /** `PrintLines`, straight onto the strip rather than through `printQueue`, with `d.Time`. */
+  printLines(color: number, text: string, time: number): void;
+  /** `scrollingText.SetNewSpeed(oldSpeed, newSpeed)`, with `d.Time`. */
+  setNewSpeed(oldSpeed: number, newSpeed: number, time: number): void;
+  /** `scrollingText.ResetTime(newTime)`, with `d.Time`. */
+  resetTime(newTime: number, time: number): void;
+  /** `scrollingText.ClockTick()`, the tick's own, with `d.Time`. */
+  clockTick(time: number): void;
+  /** `tag0007c8`: the main loop's one `printQueue` entry a pass, with `d.Time`. */
+  printNextQueued(time: number): void;
+  /** The message strip's share of `vblInterrupt`: a scroll under way moves on a scanline. */
+  vblInterrupt(): void;
+}
 
 export interface GameHost {
   /**

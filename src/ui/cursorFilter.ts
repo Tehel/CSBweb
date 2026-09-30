@@ -1,6 +1,5 @@
 import { DBType, decodeObjectID } from '../core/types';
-import type { CursorFilterPacket } from '../engine';
-import { CursorFilterType } from '../engine';
+import { CursorFilterType, type CursorFilterPacket } from '../engine/GameHost';
 import { isDebugFeaturesEnabled } from './context';
 import { updateDebug } from './messages';
 

@@ -168,7 +168,11 @@ an entry still queued when `MainLoop` returned is printed in the new game's firs
 
 `src/renderer/csbwin/ScrollingText.ts` ports the queue, the tokenizer, the four rows and
 their timeouts with `SetNewSpeed`, the scroll and its guards, and draws into the 320×200
-index buffer at the geometry above. The engine reaches it through `GameHost.messages`:
+index buffer at the geometry above. CSBWin's one global is, in the port, one instance
+the page builds (`construct`, `src/main.ts`) and hands to both sides: the engine writes it
+through `GameHost.messages`, and the screen draws the one in its `GameScreenDeps`.
+
+What the engine does with it:
 
 - `Game.runFrame` is one VBL: `vblInterrupt()` first, then the loop's pass, which ends
   with `printNextQueued()`, one entry, unless the save menu has the clock stopped.

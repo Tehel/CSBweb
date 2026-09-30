@@ -454,9 +454,3 @@ export class ScrollingText {
   }
 }
 
-/**
- * CSBWin keeps a single global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`). The
- * engine reaches this one through its host's `messages`.
- */
-export const scrollingText = new ScrollingText();
-

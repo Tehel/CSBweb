@@ -15,6 +15,7 @@ import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { Champion, PartyState } from '../engine/gameTypes';
 import type { CharacterStats } from '../engine/CharacterStats';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
+import type { ScrollingText } from './csbwin/ScrollingText';
 import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
@@ -147,6 +148,11 @@ export interface GameScreenDeps {
    * come out of the same code the engine acts on.
    */
   characterStats: CharacterStats;
+  /**
+   * The message area, CSBWin's global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`):
+   * the one the engine writes through its host's `messages`.
+   */
+  messages: ScrollingText;
 }
 
 export class GameScreen {
@@ -160,6 +166,7 @@ export class GameScreen {
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
   private readonly onPaletteSelected: (index: number) => void;
+  private readonly messages: ScrollingText;
   private lastRenderPosition: Position | null = null;
   private lastRenderFacing: number = 0;
   private lastRenderWord1868 = false;
@@ -202,6 +209,7 @@ export class GameScreen {
     ui.onRestoreFailed = hooks.onRestoreFailed;
     ui.onSetPaused = hooks.onSetPaused;
     this.onPaletteSelected = hooks.onPaletteSelected;
+    this.messages = deps.messages;
 
     this.canvas = canvas;
     const screenCtx = canvas.getContext('2d');
@@ -549,7 +557,7 @@ export class GameScreen {
     drawSpellPanel(this.ui);
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
-    drawMessageLines(this.ui);
+    drawMessageLines(this.ui, this.messages);
     if ((this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) && this.ui.uiTables) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
       // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), until
