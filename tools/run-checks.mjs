@@ -60,6 +60,7 @@ const CHECKS = [
   { tool: 'dump-sleep.ts' },
   { tool: 'dump-freeze.ts' },
   { tool: 'dump-messages.ts' },
+  { tool: 'dump-vbl-clock.ts' },
   { tool: 'dump-room-text.ts' },
   { tool: 'dump-ninety-second-update.ts' },
   { tool: 'dump-light-level.ts' },

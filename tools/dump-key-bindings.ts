@@ -102,9 +102,8 @@ async function main(): Promise<void> {
     attacks.push({ chIdx, attackType });
     return 1;
   };
-  // `d.clockTick` as the handlers leave it (`LoopState.setClockTick`): a tick made due,
-  // one put off, or neither.
-  const clockTick = (): string => (ctx.loop.clockTickSet ? 'due' : ctx.loop.clockTickCleared ? 'put off' : 'untouched');
+  // `d.clockTick` as the handlers leave it (`LoopState.setClockTick`).
+  const clockTick = (): string => (ctx.loop.clockTick ? 'due' : 'not due');
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
   // Stands in for `CastMagic`, which clears the runes of a cast it does not refuse;
   // `tools/dump-magic-panel.ts` drives the real one.
@@ -121,7 +120,7 @@ async function main(): Promise<void> {
   // Not the script `hold` below, which only `held` lets go.
   const press = (key: string): boolean => {
     const taken = handleUIKey(ui, key);
-    while (game.isRunningScript() && !held) game.runFrame(0);
+    while (game.isRunningScript() && !held) game.runFrame();
     row(ui, key, taken);
     return taken;
   };
@@ -291,8 +290,7 @@ async function main(): Promise<void> {
   function* hold(): LoopScript {
     while (held) yield 1;
   }
-  ctx.loop.clockTickSet = false;
-  ctx.loop.clockTickCleared = false;
+  ctx.loop.clockTick = false;
   game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     held = true;
@@ -307,7 +305,7 @@ async function main(): Promise<void> {
   row(ui, 'option', true);
   check(attacks.length === 1 && game.isRunningScript(), 'the click attacks, and the attack holds the loop');
   check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
-  check(clockTick() === 'untouched', 'd.clockTick is not set');
+  check(clockTick() === 'not due', 'd.clockTick is not set');
   const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', 'Tab'].map((key) => press(key));
   check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
   check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
@@ -315,7 +313,7 @@ async function main(): Promise<void> {
   'and none acts: no attack, the same menu, no inventory, the same caster, no rune');
   check(!press('k'), 'a key that is not the panel\'s is still passed on');
   held = false;
-  game.runFrame(0);
+  game.runFrame();
   check(!game.isRunningScript(), 'a VBL ends the script, and the loop is free');
   game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });

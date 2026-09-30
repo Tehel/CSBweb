@@ -29,7 +29,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { newGame } from './lib/game';
+import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { freeze, thaw } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
@@ -52,9 +52,6 @@ function main(): void {
   game.ctx.party.state.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
 
-  type Internals = { lastTickTime: number };
-  const internals = game as unknown as Internals;
-  let t = Date.now() + 60_000;
   let vbl = 0;
 
   /** The strip's pixels as `draw` leaves them in a cleared screen. */
@@ -77,11 +74,9 @@ function main(): void {
     return `t=${game.ctx.state.tickCount} push=${pushTextUp} count=${String(textScanlineScrollCount).padStart(2)} ` +
       `queue=${printQueue} future=${futureLines} ${ink(strip())} ${JSON.stringify(messages.snapshot())}`;
   };
-  /** One VBL, 17 ms on, with a tick due or not. */
+  /** One VBL, with a tick due or not. */
   const frame = (tick = false): void => {
-    t += 17;
-    internals.lastTickTime = tick ? t - 1000 : t;
-    game.runFrame(t);
+    runVbl(game, tick ? TICK_DUE : 1);
     vbl++;
     console.log(`vbl ${String(vbl).padStart(2)}${tick ? ' tick' : '     '} ${state()}`);
   };

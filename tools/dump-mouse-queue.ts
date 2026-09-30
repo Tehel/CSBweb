@@ -49,7 +49,7 @@ import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../src/engine/Party';
 import { ensureSkills } from '../src/engine/skills';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -122,15 +122,12 @@ async function main(): Promise<void> {
     unclick: () => { unclicks++; },
   });
 
-  type Internals = { lastTickTime: number; lastInputTime: number };
+  type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
-  let t = Date.now() + 60_000;
   /** One VBL; `tickDue` makes a game tick run in it, after the queue. */
   const frame = (tickDue = false): void => {
-    t += 17;
     frameNo++;
-    internals.lastTickTime = tickDue ? t - 1000 : t;
-    game.runFrame(t);
+    runVbl(game, tickDue ? TICK_DUE : 1);
   };
   const reset = (): void => {
     game.discardAllInput();
@@ -373,11 +370,10 @@ async function main(): Promise<void> {
     },
     unclick: () => {},
   });
-  /** One VBL on the real clock: a tick runs once 250 ms have passed, or `d.clockTick` says so. */
+  /** One VBL, the count running on: a tick runs once `d.vblCount` reaches `d.Speed`, or `d.clockTick` says so. */
   const vbl = (): void => {
-    t += 17;
     frameNo++;
-    game.runFrame(t);
+    runVbl(game);
   };
   /**
    * Stand at `at`, facing `dir`, just after a tick, and click the viewport: the frames from
@@ -473,8 +469,7 @@ async function main(): Promise<void> {
     ui.pressingEye = false;
     ui.attackingCharacterOrdinal = 0;
     ui.word20252 = 1;
-    game.ctx.loop.clockTickSet = false;
-    game.ctx.loop.clockTickCleared = false;
+    game.ctx.loop.clockTick = false;
   };
   /**
    * Just after a tick, queue button `num`, which the UI's `handler` answers unless it is an
@@ -614,7 +609,8 @@ async function main(): Promise<void> {
   // C101's (the port finishes the held pass a VBL after the script, where CSBWin finishes
   // it in the same VBL).
   const [castX, castY] = centreOf(buttons.buttons18060, 108);
-  const castOnce = (runes: number[]): { frames: number; clockTick: string } => {
+  /** One cast, `d.clockTick` standing at `before` when the click is handled: the frames it holds the loop, and `d.clockTick` after. */
+  const castFrom = (runes: number[], before: boolean): { frames: number; after: boolean } => {
     soloParty();
     const caster = party.champions[0]!;
     caster.skills = ensureSkills([]).map((skill) => ({ ...skill, experience: 1 << 24 }));
@@ -623,10 +619,22 @@ async function main(): Promise<void> {
     onClick = () => handleMouseButton(ui, 100, castX, castY);
     frame(true);
     game.onMouseClick(80, 100, 100);
+    game.ctx.loop.clockTick = before;
     let frames = 0;
     do { vbl(); frames++; } while (game.isRunningScript() && frames < 30);
-    const loop = game.ctx.loop;
-    return { frames, clockTick: loop.clockTickSet ? 'set' : loop.clockTickCleared ? 'cleared' : 'untouched' };
+    return { frames, after: game.ctx.loop.clockTick };
+  };
+  /**
+   * The cast from both values of `d.clockTick`: `set` if it ends 1 from both, `cleared` if
+   * 0 from both, `untouched` if as it stood.
+   */
+  const castOnce = (runes: number[]): { frames: number; clockTick: string } => {
+    const fromClear = castFrom(runes, false);
+    const fromSet = castFrom(runes, true);
+    const clockTick = fromClear.after && fromSet.after ? 'set'
+      : !fromClear.after && !fromSet.after ? 'cleared'
+        : !fromClear.after && fromSet.after ? 'untouched' : 'inverted';
+    return { frames: fromSet.frames, clockTick };
   };
   const castResults = new Set<number>();
   for (const [name, runes] of [['LO', [0x60]], ['LO FUL', [0x60, 0x69]], ['LO VI', [0x60, 0x67]]] as const) {

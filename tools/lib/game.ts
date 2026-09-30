@@ -16,6 +16,7 @@ import { Game } from '../../src/engine/Game';
 import { createGameContext, type GameContext } from '../../src/engine/GameContext';
 import type { GameHost } from '../../src/engine/GameHost';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
+import { VBL_PER_TICK } from '../../src/engine/LoopState';
 import { extractGraphicsTables, type GraphicsTables } from '../../src/data/tables/GraphicsTables';
 
 const extracted = new WeakMap<GraphicsLoader, GraphicsTables>();
@@ -65,6 +66,20 @@ export function newGame(data: DungeonData, graphics: GraphicsLoader, host?: Part
 export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: Partial<GameContext> = {}): GameContext {
   return { ...createGameContext(data, gameTablesOf(graphics)), ...parts };
 }
+
+/**
+ * One VBL of the loop (`Game.runFrame`). `sinceTick`, when given, is the VBLs since the
+ * last tick's top, this one included: `d.vblCount` is set to the count before it, so at
+ * `TICK_DUE` or more this VBL's `vblInterrupt` raises `d.clockTick` and the pass ticks.
+ * Left out, the count runs on from the VBLs the tool has stepped.
+ */
+export function runVbl(game: Game, sinceTick?: number): void {
+  if (sinceTick !== undefined) game.ctx.loop.vblCount = sinceTick - 1;
+  game.runFrame();
+}
+
+/** `runVbl`'s `sinceTick` that makes a tick due: `d.Speed` awake, `VBL_PER_TICK`. */
+export const TICK_DUE = VBL_PER_TICK;
 
 /**
  * A timer pass at `time`: the clock set to it, then `ProcessTimers`, which reads `d.Time`

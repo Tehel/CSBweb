@@ -41,7 +41,7 @@ import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, runVbl } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -114,14 +114,14 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastTickTime: number; lastInputTime: number };
+  type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
-  let t = Date.now() + 60_000;
-  /** One VBL, 17 ms on; the last tick was `sinceTick` ms ago. */
-  const frame = (sinceTick = 0): void => {
-    t += 17;
-    if (sinceTick >= 0) internals.lastTickTime = t - sinceTick;
-    game.runFrame(t);
+  /**
+   * One VBL, the last tick's top `sinceTick` VBLs ago, this one included (`runVbl`);
+   * -1 lets the count run on.
+   */
+  const frame = (sinceTick = 1): void => {
+    runVbl(game, sinceTick >= 0 ? sinceTick : undefined);
   };
   const click = (x: number, y: number, buttons = 2): number => {
     const num = Mouse.searchMouseButtons(ui, x, y, buttons);
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   console.log('=== d.Speed = 0: a tick every VBL ===');
   {
     const before = game.ctx.state.tickCount;
-    for (let i = 0; i < 10; i++) frame(17);
+    for (let i = 0; i < 10; i++) frame(1);
     const asleep = game.ctx.state.tickCount - before;
     console.log(`asleep: ${asleep} ticks in 10 frames`);
     check(asleep === 10, 'asleep, every frame is a tick');
@@ -180,7 +180,7 @@ async function main(): Promise<void> {
     internals.lastInputTime = 0;
     click(100, 100);
     const before = game.ctx.state.tickCount;
-    frame(17); // 17 ms since the last tick: only clockTick = 1 lets this one through
+    frame(1); // a VBL since the last tick: only clockTick = 1 lets this one through
     console.log(`sleeping=${game.isPartySleeping()} ticks=${game.ctx.state.tickCount - before}`);
     check(!game.isPartySleeping(), 'a click in the viewport wakes the party');
     check(notified.join() === 'false', 'the listeners heard it');
@@ -213,7 +213,7 @@ async function main(): Promise<void> {
     const placed = messages.timeouts()[0]!;
     game.systems.mouse.sleep();
     const asleep = messages.timeouts()[0]!;
-    for (let i = 0; i < 100; i++) frame(17);
+    for (let i = 0; i < 100; i++) frame(1);
     const t1 = game.ctx.state.tickCount;
     wakeUp(game.ctx);
     const awake = messages.timeouts()[0]!;
@@ -253,7 +253,7 @@ async function main(): Promise<void> {
       game.onTick(() => { if (game.isPartySleeping()) wakeUp(game.ctx); });
       internalsTick.gameTick();
       const before = game.ctx.state.tickCount;
-      frame(17);
+      frame(1);
       check(game.ctx.state.tickCount === before, 'woken inside a tick, the next frame is not a tick');
     }
   }

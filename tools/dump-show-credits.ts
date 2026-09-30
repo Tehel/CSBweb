@@ -67,7 +67,7 @@ import { setActuatorType } from '../src/data/actuatorHelpers';
 import { WON_GAME_VBLS } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
 /** The hooks of a lost game: `_StartCSB` has turned palette switching off. */
 const LOST = { word11694: false, champions: [], palette11946: null };
@@ -121,10 +121,10 @@ function watchedGame(healths: number[]): Watched {
   return w;
 }
 
-/** The next `runFrame`, a game tick after the last, and what it did. */
+/** The next VBL, with a tick due, and what it did. */
 function frame(w: Watched): { tick: number; lost: boolean; credits: number; clockTicks: number } {
   w.frames++;
-  w.game.runFrame(1_000_000 + w.frames * 250);
+  runVbl(w.game, TICK_DUE);
   return {
     tick: w.game.ctx.state.tickCount,
     lost: w.game.ctx.party.state.gameIsLost,

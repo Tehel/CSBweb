@@ -30,7 +30,7 @@ import type { MessageSink } from '../src/engine/GameHost';
 import { WON_GAME_VBLS, type Game } from '../src/engine/Game';
 import type { LoopScript } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
 interface Watched {
   game: Game;
@@ -79,10 +79,10 @@ function watchedGame(): Watched {
   return w;
 }
 
-/** The next `runFrame`, 250 ms after the last: a tick is due in every one. */
+/** The next VBL, with a tick due in every one. */
 function frame(w: Watched): void {
   w.frames++;
-  w.game.runFrame(1_000_000 + w.frames * 250);
+  runVbl(w.game, TICK_DUE);
 }
 
 /* ------------------------------------------------------------ 1. the waits ---- */

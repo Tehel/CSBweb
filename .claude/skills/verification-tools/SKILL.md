@@ -174,7 +174,7 @@ tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
 varies on its own.
 The other half is the saves: for every file in `static/gamefiles/saves`, a seeded
 `newGame` with `applyCsbwinSave`, then `getRuntimeSaveState()` hashed as JSON after the load
-and again after 600 `runFrame`s 250 ms apart, on both trees. Zero `savedAt` in the hash
+and again after 600 VBLs of `runVbl(game, TICK_DUE)`, a tick each, on both trees. Zero `savedAt` in the hash
 (a `JSON.stringify` replacer): it is wall-clock, and with it two runs of the same tree
 never agree. A change that drops a field from the runtime save's shape drops it from the
 old tree's hash too, with the same replacer.
@@ -201,15 +201,19 @@ schedules from "now" (a cloud, poison, a door bash). A tool that steps the timer
 own clock sets that clock first: `processTimersAt(game, t)` (`tools/lib/game.ts`), or
 `tickCount++` after each `processTimers()`, as the tick does.
 
-**Stepping frames.** `game.runFrame(t)` is one VBL at a time you choose: the mouse queue
-(`HandleMouseEvents`), then a tick if `t - lastTickTime` reaches the tick interval. Queue
-input with `enqueueMovement` (a key) or `onMouseClick(num, x, y)` / `onMouseUnClick()`,
-catch the non-movement buttons with `setMouseEventHandlers`, empty the queue with
-`discardAllInput()`, and reach `lastTickTime` / `lastInputTime` through a cast
-(`dump-mouse-queue.ts`, `dump-party-collision.ts` case 6). `lastInputTime == 0` disables
-the one-per-tick gate, as `lastTime == 0` does in CSBWin, so start the clock first. Every
-tick runs the monsters too, so do anything that needs a monster where you found it
-before the frames that tick, or set `lastTickTime = t` so none is due.
+**Stepping VBLs.** `game.runFrame()` is one VBL: `vblInterrupt` (the strip's scroll, the
+button flash, and `d.vblCount`, which raises `d.clockTick` once it reaches `d.Speed`),
+then the mouse queue (`HandleMouseEvents`), then a tick if `d.clockTick` is set.
+`runVbl(game, sinceTick)` (`tools/lib/game.ts`) sets the count first: `runVbl(game,
+TICK_DUE)` makes a tick due in that VBL, `runVbl(game, 1)` makes none due by the count, and
+`runVbl(game)` lets it run on, a tick every fifteenth VBL. Queue input with
+`enqueueMovement` (a key) or `onMouseClick(num, x, y)` / `onMouseUnClick()`, catch the
+non-movement buttons with `setMouseEventHandlers`, empty the queue with
+`discardAllInput()`, and reach `lastInputTime` through a cast (`dump-mouse-queue.ts`,
+`dump-party-collision.ts` case 6). `lastInputTime == 0` disables the one-per-tick gate, as
+`lastTime == 0` does in CSBWin, so start the clock first. Every tick runs the monsters
+too, so do anything that needs a monster where you found it before the VBLs that tick,
+or step with `runVbl(game, 1)` so none is due.
 
 **Spy on the real call, don't re-derive it.** When a formula consumes random numbers,
 wrap the instance method (`game.systems.missileEncounter.determineMagicDamage = …`) to record its

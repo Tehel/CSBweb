@@ -9,22 +9,26 @@ import type { GameContext } from './GameContext';
 
 export interface LoopFlags {
   /**
-   * `d.clockTick = 1` from `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7050), a door button
-   * (`Mouse.cpp:1078`), a wall switch that fired (`TouchWallF1`, `:788`), a pick-up
-   * (`:840`), a drop (`:964`), `ShowHideInventory` (`CSBCode.cpp:7441`), a turn or a step
-   * (`:7866-7869`, `:8084-8087`), or an attack or a cast that went through
-   * (`setClockTick`): a tick is due at once, whatever the VBL count. The tick itself clears it again (`CSBCode.cpp:704`),
-   * so a party woken by a blow during `ProcessTimers` gets no extra tick.
+   * `d.clockTick`: a tick is due, and the main loop's pass that finds it set runs one
+   * (doc/CSBwin-src/CSBCode.cpp:763-765). The VBL sets it on every VBL once
+   * `vblCount >= d.Speed` (`vblInterrupt`, `:1066-1077`). Handlers set it too: to 1 in
+   * `WakeUp` (`:7050`), a door button (`Mouse.cpp:1078`), a wall switch that fired
+   * (`TouchWallF1`, `:788`), a pick-up (`:840`), a drop (`:964`), `ShowHideInventory`
+   * (`CSBCode.cpp:7441`), a turn or a step (`:7866-7869`, `:8084-8087`), or an attack or
+   * a cast that went through (`setClockTick`), so a tick is due at once, whatever the VBL
+   * count; to 0 on an inhibited move (`:8313`), a touch of the wall that fired nothing
+   * (`Mouse.cpp:788`), or an attack or a cast that returned 0, which puts off a tick that
+   * was due until the next VBL sets it again. The tick itself clears it at its end
+   * (`CSBCode.cpp:704`), so a party woken by a blow during `ProcessTimers` gets no extra
+   * tick.
    */
-  clockTickSet: boolean;
+  clockTick: boolean;
   /**
-   * `d.clockTick = 0` from an inhibited move (doc/CSBwin-src/CSBCode.cpp:8313), a touch
-   * of the wall that fired nothing (`TouchWallF1`, `Mouse.cpp:788`), or an attack or a
-   * cast that returned 0 (`setClockTick`). The VBL sets
-   * `clockTick` again on every VBL once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`),
-   * so a tick that was due waits one frame.
+   * `d.vblCount`, the VBLs since the top of the last tick: each VBL adds one
+   * (`vblInterrupt`, doc/CSBwin-src/CSBCode.cpp:1065), and the top of every tick zeroes it
+   * (`:617`).
    */
-  clockTickCleared: boolean;
+  vblCount: number;
   /**
    * `d.newPartyLevel`: -1, or the level the party has just reached, which the top of the
    * next tick loads (`Game.loadNewPartyLevel`). A `MoveObject` of the party that ends on
@@ -94,7 +98,7 @@ export function createLoopFlags(): LoopFlags {
   // `d.FlashButnActive = 0; d.Word11776 = 0;` at the game start
   // (doc/CSBwin-src/CSBCode.cpp:10477-10478).
   return {
-    clockTickSet: false, clockTickCleared: false, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
+    clockTick: false, vblCount: 0, newPartyLevel: -1, clockRunning: true, gameFrozen: false,
     flashButnActive: false, flashButn: { x1: 0, x2: 0, y1: 0, y2: 0 }, word11776: false, flashChanged: false,
   };
 }
@@ -177,12 +181,11 @@ export function waitForButtonFlash(ctx: GameContext): void {
 }
 
 /**
- * `d.clockTick = value` from a handler the mouse queue runs: non-zero makes a tick due at
- * once, and 0 puts off a tick that was due by a VBL.
+ * `d.clockTick = value` from a handler: non-zero makes a tick due at once, and 0 puts off
+ * a tick that was due until the next VBL.
  */
 export function setClockTick(ctx: GameContext, value: number): void {
-  ctx.loop.clockTickSet = value !== 0;
-  ctx.loop.clockTickCleared = value === 0;
+  ctx.loop.clockTick = value !== 0;
 }
 
 /**
@@ -201,6 +204,19 @@ export function speed(ctx: GameContext): number {
 }
 
 /**
+ * The tick's share of the VBL handler (doc/CSBwin-src/CSBCode.cpp:1065-1077), after the
+ * message strip's scroll and the button flash: `d.vblCount += 1`, and once it has reached
+ * `d.Speed`, `d.clockTick = 1`. It runs on every VBL, while a script holds the loop and
+ * while the game is frozen. `NoSpeedLimit` and the "Player Clock" arm (`:1067-1087`) are
+ * the speed menu's, which is not ported.
+ */
+export function vblInterrupt(ctx: GameContext): void {
+  const loop = ctx.loop;
+  loop.vblCount += 1;
+  if (loop.vblCount >= speed(ctx)) loop.clockTick = true;
+}
+
+/**
  * `WakeUp` (doc/CSBwin-src/CSBCode.cpp:7047) — button 146, or any blow that lands on a
  * sleeping party (`Monster.cpp:4531`, `Character.cpp:2809-2812`). `d.clockTick = 1`,
  * `d.PartySleeping = 0`, the message timeouts rescaled to the game speed
@@ -209,8 +225,7 @@ export function speed(ctx: GameContext): number {
  */
 export function wakeUp(ctx: GameContext): void {
   const oldSpeed = speed(ctx);
-  ctx.loop.clockTickSet = true;
-  ctx.loop.clockTickCleared = false;
+  ctx.loop.clockTick = true;
   ctx.party.state.sleeping = false;
   ctx.host.messages.setNewSpeed(oldSpeed, VBL_PER_TICK, ctx.state.tickCount);
   ctx.host.sleepChanged(false);

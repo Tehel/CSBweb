@@ -267,7 +267,7 @@ function main(): void {
 
   console.log('');
   console.log('=== Cancel (button 162) ===');
-  game.ctx.loop.clockTickSet = false;
+  game.ctx.loop.clockTick = false;
   pairCalls.length = 0;
   game.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
@@ -278,7 +278,7 @@ function main(): void {
   check(party.potentialChampionIndex === -1, 'and clears the provisional marker');
   check(party.cursorOwner === -1, 'SetHandOwner(-1), because that was the only champion');
   check(party.selectedCharacterIndex === -1, 'the inventory is hidden again');
-  check(game.ctx.loop.clockTickSet, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6634, :7441)");
+  check(game.ctx.loop.clockTick, "and ShowHideInventory(4)'s d.clockTick = 1 makes a tick due (CSBCode.cpp:6634, :7441)");
 
   const mirrorAfterCancel = cellObjects(game, mirror);
   check(mirrorAfterCancel.length === mirrorBefore.length
@@ -298,10 +298,10 @@ function main(): void {
   const possessionsBeforeResurrect = possessionList(game, 0).map(({ rn }) => rn);
   const skillsBefore = party.champions[0]!.skills.map((s) => s.experience);
   const strengthBefore = attributeCurrent(party.champions[0]!.attributes.stats[1]!);
-  game.ctx.loop.clockTickSet = false;
+  game.ctx.loop.clockTick = false;
   pairCalls.length = 0;
   game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
-  const tickDueAfterResurrect = game.ctx.loop.clockTickSet;
+  const tickDueAfterResurrect = game.ctx.loop.clockTick;
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 1',
     'TAG0207cc once the inventory is hidden (CSBCode.cpp:6807-6808)');

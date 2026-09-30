@@ -15,7 +15,6 @@ export const VIEWPORT_HEIGHT = 136;
  * Game timing constants (from CSBWin)
  */
 export const VBL_FREQUENCY = 60; // Vertical blank interrupts per second
-export const TICKS_PER_SECOND = 4; // Normal game speed: 15 VBL per tick = 4 ticks/sec
 
 /**
  * Sound indices (graphics.dat SND1 items)

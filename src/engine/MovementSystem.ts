@@ -65,8 +65,7 @@ export class MovementSystem {
         if (result.inhibited) {
             // `DiscardAllInput(); d.clockTick = 0;` (doc/CSBwin-src/CSBCode.cpp:8310-8314).
             this.ctx.mouseQueue.discardAllInput();
-            this.ctx.loop.clockTickCleared = true;
-            this.ctx.loop.clockTickSet = false;
+            setClockTick(this.ctx, 0);
         }
         return result;
     }

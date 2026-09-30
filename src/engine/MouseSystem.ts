@@ -291,8 +291,7 @@ export class MouseSystem {
     if (touched.x < 0 || touched.x >= map.descriptor.width) return false;
     if (touched.y < 0 || touched.y >= map.descriptor.height) return false;
     const fired = this.ctx.systems.actuators.touchWall(touched, (facing + 2) & 0x3);
-    this.ctx.loop.clockTickSet = fired;
-    this.ctx.loop.clockTickCleared = !fired;
+    setClockTick(this.ctx, fired ? 1 : 0);
     return fired;
   }
 
@@ -335,8 +334,7 @@ export class MouseSystem {
     const door = this.ctx.dungeon.getDoorRecordByIndex(index);
     if (!door || !door.hasButton) return false;
 
-    this.ctx.loop.clockTickSet = true;
-    this.ctx.loop.clockTickCleared = false;
+    setClockTick(this.ctx, 1);
     this.ctx.sounds.queueSound(1, pos.x, pos.y, 1, pos.z);
     this.ctx.timers.createTimer(
       TimerFunction.TT_DOOR,
@@ -354,7 +352,7 @@ export class MouseSystem {
    * The engine half of button 145, the sleep icon (doc/CSBwin-src/Mouse.cpp:1683-1708).
    * The UI has already hidden the inventory and asked (`ShowHideInventory(4)`,
    * `TAG02076e`); this is `d.PartySleeping = 1`, `scrollingText.SetNewSpeed(d.Speed, 0)`
-   * and `d.Speed = 0` — which `Game.runFrame` reads as a tick on every frame — and
+   * and `d.Speed = 0` — which makes a tick due on every VBL (`vblInterrupt`) — and
    * `DiscardAllInput()`. The sleep-mode button list, `Buttons17796`, and
    * `DisplaySleepScreen` are the host's listeners' business.
    *

@@ -39,7 +39,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
 import { sw } from '../src/core/intCast';
-import { newGame } from './lib/game';
+import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -289,11 +289,10 @@ async function main(): Promise<void> {
   // one input queue is `Game`'s mouse queue. `d.clockTick = 0` cancels a tick that was due:
   // the VBL sets it again on the next VBL, since `vblCount` is still `>= d.Speed`
   // (`:1066-1077`), so the tick runs one frame later.
-  type Internals = { lastTickTime: number; lastInputTime: number };
+  type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
   /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
   const loadedLevel = (): number | null => (game.systems.monsters as unknown as { loadedLevel: number | null }).loadedLevel;
-  const T0 = Date.now() + 60_000;
   let discard: {
     wallQueue: number; tickHeld: boolean; tickNextFrame: boolean; facingKept: boolean;
     monsterQueue: number; turnQueue: number;
@@ -312,25 +311,23 @@ async function main(): Promise<void> {
 
     // The monster first, with no tick due, so that it is still where the scene found it.
     queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
-    internals.lastTickTime = T0 - 20_000;
-    game.runFrame(T0 - 20_000);
+    runVbl(game, 1);
     const monsterQueue = game.ctx.mouseQueue.count();
 
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
-    internals.lastTickTime = T0 - 1000; // a tick is due this frame
     const ticks0 = game.ctx.state.tickCount;
-    game.runFrame(T0);
+    runVbl(game, TICK_DUE); // a tick is due this VBL
     const wallQueue = game.ctx.mouseQueue.count();
     const tickHeld = game.ctx.state.tickCount === ticks0;
-    game.runFrame(T0 + 17);
+    runVbl(game);
     const tickNextFrame = game.ctx.state.tickCount === ticks0 + 1;
-    game.runFrame(T0 + 5_000);
-    game.runFrame(T0 + 10_000);
+    runVbl(game, TICK_DUE);
+    runVbl(game, TICK_DUE);
     const facingKept = game.ctx.party.state.facing === wall.facing;
 
     // Control: a move that is not inhibited leaves the rest of the queue alone.
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
-    game.runFrame(T0 + 30_000);
+    runVbl(game, TICK_DUE);
     const turnQueue = game.ctx.mouseQueue.count();
 
     discard = { wallQueue, tickHeld, tickNextFrame, facingKept, monsterQueue, turnQueue };
@@ -434,11 +431,8 @@ async function main(): Promise<void> {
       party.word11712 = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
-      let t = T0 + 100_000;
       const frame = (tickDue: boolean): void => {
-        t += 17;
-        internals.lastTickTime = tickDue ? t - 1000 : t;
-        game.runFrame(t);
+        runVbl(game, tickDue ? TICK_DUE : 1);
       };
       const stepsFrom = (): number => Math.abs(party.position.x - run!.x) + Math.abs(party.position.y - run!.y);
 
@@ -584,11 +578,8 @@ async function main(): Promise<void> {
       game.discardAllInput();
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       game.enqueueMovement(MovementAction.TURN_LEFT);
-      let t = T0 + 200_000;
       const frame = (tickDue: boolean): void => {
-        t += 17;
-        internals.lastTickTime = tickDue ? t - 1000 : t;
-        game.runFrame(t);
+        runVbl(game, tickDue ? TICK_DUE : 1);
       };
       const ticksBeforeStairs = game.ctx.state.tickCount;
       frame(false);
@@ -735,11 +726,8 @@ async function main(): Promise<void> {
         }
         dispatch.call(this, timer);
       };
-      let t = T0 + 400_000;
       const frame = (tickDue: boolean): void => {
-        t += 17;
-        internals.lastTickTime = tickDue ? t - 1000 : t;
-        game.runFrame(t);
+        runVbl(game, tickDue ? TICK_DUE : 1);
       };
       frame(true);
       timerSystem.dispatch = dispatch;

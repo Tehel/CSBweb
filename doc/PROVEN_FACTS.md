@@ -3418,6 +3418,21 @@ set (`doc/CSBwin-src/CSBCode.cpp:8224-8261`); `roomSTAIRS` is handled before it
 `dungeon.dat` nor any save in `static/gamefiles/saves/` has a type-7 cell. Evidence:
 `tools/dump-party-collision.ts` case 11.
 
+## A tick falls due every `d.Speed` VBLs, counted on every VBL
+
+`checkVBL` calls `vblInterrupt` on every VBL while `verticalIntEnabled`
+(`doc/CSBwin-src/system.cpp:619-630`), whatever the main loop is doing: a pass, a
+`RESTARTABLE` sequence's `wvbl`, a frozen game. After the message strip's scroll
+(`CSBCode.cpp:971-1004`) and the button flash (`:1028-1038`), the handler adds one to
+`d.vblCount` and sets `d.clockTick = 1` once `d.vblCount >= d.Speed` (`:1065-1077`). The top
+of every tick sets `d.Speed` to `speedTable[gameSpeed].vblPerTick` while awake and zeroes
+`d.vblCount` (`:612-617`); `SPEED_NORMAL`'s is 15 (`CSBwin.cpp:180`), so a tick every 15
+VBLs. `d.clockTick` is cleared only by the end of a tick (`:704`) or by a handler, so a tick
+that falls due while the loop cannot run it (frozen, `:765`, or held in a sequence) stays
+due and runs in the first pass that can. The port counts VBLs the same way
+(`vblInterrupt`, `src/engine/LoopState.ts`), and the page runs as many VBLs as the wall
+clock holds (`Game.gameLoop`). Evidence: `tools/dump-vbl-clock.ts`.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the

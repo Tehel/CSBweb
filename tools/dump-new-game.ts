@@ -45,7 +45,7 @@ import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { MovementAction } from '../src/engine/gameTypes';
 import { applySaveBytes, buildSavePayload, encodeSavePayload } from '../src/engine/SaveGamePayload';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
 const DUNGEON = readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'));
 const SEED = 0x2468ace0;
@@ -109,8 +109,9 @@ function expectedGameID(seed: number): number {
   return ((((s1 >>> 8) & 0xffff)) * ((s2 >>> 8) & 0xffff)) >>> 0;
 }
 
-function runFrames(game: Game, from: number, count: number): void {
-  for (let n = 1; n <= count; n++) game.runFrame(from + n * 250);
+/** `count` VBLs, a tick due in each. */
+function runFrames(game: Game, count: number): void {
+  for (let n = 1; n <= count; n++) runVbl(game, TICK_DUE);
 }
 
 function main(): void {
@@ -122,10 +123,9 @@ function main(): void {
   played.systems.hallOfChampions.addChampion(champion(0));
   played.systems.hallOfChampions.addChampion(champion(1));
   played.ctx.party.state.position = new Position(6, 14, 2);
-  const t0 = 1_000_000;
   for (let n = 0; n < 40; n++) {
     if (n % 8 === 0) played.enqueueMovement(n % 16 === 0 ? MovementAction.TURN_LEFT : MovementAction.MOVE_FORWARD);
-    played.runFrame(t0 + n * 250);
+    runVbl(played, TICK_DUE);
   }
 
   // `d.CanRestartFromSavegame`: cleared by a new game, set by a save and by a load
@@ -146,7 +146,7 @@ function main(): void {
 
   played.systems.monsterAttack.killCharacter(0);
   played.systems.monsterAttack.killCharacter(1);
-  runFrames(played, t0 + 40 * 250, 4);
+  runFrames(played, 4);
 
   console.log('=== the game that was played ===');
   console.log(['tick', played.ctx.state.tickCount, 'returned', played.mainLoopHasReturned(), 'hash', stateHash(played)].join('\t'));
@@ -210,9 +210,8 @@ function main(): void {
     'and the booted game is that game, RandomGameID and the whole runtime state');
 
   // Later than any frame the played game ran, so both take a tick on every frame.
-  const t1 = Date.now() + 1_000_000_000;
-  runFrames(fresh, t1, 600);
-  runFrames(played, t1, 600);
+  runFrames(fresh, 600);
+  runFrames(played, 600);
   const later = differingParts(fresh, played);
   console.log(['600 ticks on', 'fresh', stateHash(fresh), 'rebuilt', stateHash(played), 'differ', later.join(',') || '-'].join('\t'));
   check(fresh.ctx.state.tickCount === 600 && played.ctx.state.tickCount === 600, `both ran 600 ticks (${fresh.ctx.state.tickCount}, ${played.ctx.state.tickCount})`);

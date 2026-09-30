@@ -31,13 +31,13 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
-import { createLoopFlags, flashButton, vblFlashButton, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
+import { createLoopFlags, flashButton, vblFlashButton, vblInterrupt, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
 import { Position } from '../core/types';
-import { TICKS_PER_SECOND } from '../core/constants';
+import { VBL_FREQUENCY } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
 import { CheckMonsters } from './CheckMonsters';
@@ -59,6 +59,13 @@ export interface MouseEventHandlers {
 
 /** `VBLDelay(_1_, 300);  //about 5 seconds` after the CSB win (doc/CSBwin-src/CSBCode.cpp:630). */
 export const WON_GAME_VBLS = 300;
+
+/**
+ * The most VBLs one call of `Game.gameLoop` runs to catch up with the wall clock: a
+ * second's worth, which a background tab's timer, held to a call a second, still keeps up
+ * with. A longer gap (a tab held longer, a machine asleep) is not made up.
+ */
+const MAX_VBLS_PER_CALL = VBL_FREQUENCY;
 
 /**
  * The movement buttons, as `MoveParty` numbers them (doc/CSBwin-src/CSBCode.cpp:7946-7951):
@@ -111,7 +118,9 @@ export class Game implements MainLoop {
 
     // Game loop
     private running: boolean = false;
-    private lastTickTime: number = 0;
+    /** The wall-clock time `gameLoop` counts VBLs from, and the VBLs it has run since. */
+    private vblClockStart = 0;
+    private vblsPaced = 0;
     private loopTimer: ReturnType<typeof setTimeout> | null = null;
     /** `MainLoop` has returned, on the tick of a lost game (see `gameTick`), or won. */
     private mainLoopReturned = false;
@@ -181,7 +190,8 @@ export class Game implements MainLoop {
         }
 
         this.running = true;
-        this.lastTickTime = Date.now();
+        this.vblClockStart = Date.now();
+        this.vblsPaced = 0;
 
         // Start game loop
         this.gameLoop();
@@ -307,7 +317,11 @@ export class Game implements MainLoop {
     }
 
     /**
-     * Main game loop (VBL-style at 60Hz).
+     * The page's VBL clock: as many VBLs (`runFrame`) as the wall clock has let pass since
+     * the last call, at most `MAX_VBLS_PER_CALL`, then a call again when the next is due.
+     * Everything in the game counts VBLs, the ticks (`vblInterrupt`) as the message
+     * strip's scroll and a script's `VBLDelay`, so a timer that fires late or seldom slows
+     * the game down and never puts one clock out of step with another.
      *
      * Paced with `setTimeout` rather than `requestAnimationFrame`. CSBWin's VBL timer
      * keeps advancing `d.Time` — and with it the teleporter/energy shimmer's
@@ -315,79 +329,78 @@ export class Game implements MainLoop {
      * whether or not the window has focus; `requestAnimationFrame` callbacks are
      * fully suspended by the browser the moment the tab is backgrounded or occluded
      * (unlike `setTimeout`, which is only throttled), so an rAF-driven loop goes
-     * completely idle exactly when a real VBL wouldn't, and only catches up again on
-     * the next thing that nudges the browser into repainting — a mouse move, a click.
-     * That was the whole story behind "the animation only changes on mouse events."
+     * completely idle exactly when a real VBL wouldn't.
      *
-     * A frame that throws is CSBWin's `die`: the loop stops, and the host reports it.
+     * A VBL that throws is CSBWin's `die`: the loop stops, and the host reports it.
      */
     private gameLoop = (): void => {
         if (!this.running) {
             return;
         }
 
+        const now = Date.now();
+        let due = Math.floor((now - this.vblClockStart) * VBL_FREQUENCY / 1000) - this.vblsPaced;
+        if (due > MAX_VBLS_PER_CALL) {
+            due = MAX_VBLS_PER_CALL;
+            this.vblClockStart = now;
+            this.vblsPaced = 0;
+        } else {
+            this.vblsPaced += due;
+        }
         try {
-            this.runFrame(Date.now());
+            for (let n = 0; n < due && this.running; n++) this.runFrame();
         } catch (error) {
             this.stop();
             this.ctx.host.die(error);
             return;
         }
+        if (!this.running) return;
 
-        // Schedule next frame (60 FPS)
-        this.loopTimer = setTimeout(this.gameLoop, 1000 / 60);
+        const nextVbl = this.vblClockStart + (this.vblsPaced + 1) * 1000 / VBL_FREQUENCY;
+        this.loopTimer = setTimeout(this.gameLoop, Math.max(0, nextVbl - Date.now()));
     };
 
     /**
      * One VBL of the loop: `vblInterrupt`, then the main loop's pass it wakes — the mouse
-     * queue, a game tick if one is due, and a message off the print queue.
-     * Public so that `tools/` can step frames at chosen times.
+     * queue, a game tick if `d.clockTick` is set, and a message off the print queue.
+     * Public so that `tools/` can step VBLs.
      */
-    runFrame(currentTime: number): void {
+    runFrame(): void {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
         this.paintIsHeld = false;
+        // The VBL handler runs on every VBL, held in a script or not (`vblInterrupt`,
+        // doc/CSBwin-src/CSBCode.cpp:1003-1077): the message strip's scroll moves on
+        // first, then the button flash (`:1028-1038`), then `d.vblCount`, which raises
+        // `d.clockTick` once it reaches `d.Speed`. It runs frozen or not, and under the
+        // save menu.
+        this.ctx.host.messages.vblInterrupt();
+        vblFlashButton(this.ctx.loop);
+        vblInterrupt(this.ctx);
         if (this.script !== null) {
             // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1137-1147): the VBLs
-            // go by, with their `vblInterrupt`, and the loop makes no pass. The last one
-            // resumes the script, up to its next delay.
-            this.ctx.host.messages.vblInterrupt();
-            vblFlashButton(this.ctx.loop);
+            // go by, and the loop makes no pass. The last one resumes the script, up to its
+            // next delay.
             for (const callback of this.onFrameCallbacks) callback(this);
             if (--this.scriptDelay === 0) this.resumeScript();
             return;
         }
-        // `checkVBL` runs `vblInterrupt`, then hands the loop its `UIM_VBL`
-        // (doc/CSBwin-src/system.cpp:624-630, CSBUI.cpp:1253-1272): the message strip's
-        // scroll moves on first, then the button flash (`:1028-1038`). It runs frozen or
-        // not, and under the save menu.
-        this.ctx.host.messages.vblInterrupt();
-        vblFlashButton(this.ctx.loop);
-        this.ctx.loop.clockTickCleared = false;
+        // `checkVBL` hands the loop its `UIM_VBL` (doc/CSBwin-src/system.cpp:624-630,
+        // CSBUI.cpp:1253-1272), and the pass runs:
         // `do { HandleMouseEvents(_7_, 1); ... } while (intResult & 1);`
         // (doc/CSBwin-src/CSBCode.cpp:746-761): again while an entry lets the next follow.
         while (this.handleMouseEvents(1) & 1 && this.script === null) { /* the next entry, in the same pass */ }
         // A handler has started a script (the fusion): the pass is held inside it.
         if (this.script !== null) return;
 
-        // Calculate time since last tick
-        const timeSinceLastTick = currentTime - this.lastTickTime;
-        // `d.Speed = 0` while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697), and the
-        // VBL raises `clockTick` once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`) —
-        // so asleep, a tick is due on every VBL.
-        const tickInterval = this.ctx.party.state.sleeping ? 0 : 1000 / TICKS_PER_SECOND;
-
-        // Process game ticks
-        // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
-        // frozen, the due tick waits, and runs in the frame that thaws.
-        const tickDue = this.ctx.loop.clockTickSet || (timeSinceLastTick >= tickInterval && !this.ctx.loop.clockTickCleared);
         // `if (d.clockTick == 0) WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:763).
-        if (!tickDue) waitForButtonFlash(this.ctx);
-        if (tickDue && this.ctx.loop.clockRunning) {
-            if (!this.ctx.state.paused) {
-                this.gameTick();
-            }
-            this.lastTickTime = currentTime;
+        if (!this.ctx.loop.clockTick) waitForButtonFlash(this.ctx);
+        // `if (d.clockTick == 0) goto tag0007b4; if (d.ClockRunning == 0) goto tag0007b4;`
+        // (doc/CSBwin-src/CSBCode.cpp:764-765): frozen, the due tick waits, and runs in the
+        // pass that thaws. The save menu holds the pass in `DisplayDiskMenu` (`:762`), so
+        // a tick that falls due under it runs in the first pass after it.
+        if (this.ctx.loop.clockTick && this.ctx.loop.clockRunning && !this.ctx.state.paused) {
+            this.gameTick();
             // Won: `MainLoop` is in its `VBLDelay`, and this pass goes no further.
             if (this.script !== null) return;
         }
@@ -404,6 +417,10 @@ export class Game implements MainLoop {
      * Process one game tick (~4 times per second)
      */
     private gameTick(): void {
+        // `d.vblCount = 0;` (doc/CSBwin-src/CSBCode.cpp:617): the next tick falls due
+        // `d.Speed` VBLs from here. `d.Speed` itself is `speed()`, which the one game speed
+        // makes the same value the top of the tick sets (`:612-616`).
+        this.ctx.loop.vblCount = 0;
         // The top of a tick, then `ProcessTimers()` and `if (d.newPartyLevel != -1) goto
         // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:615-635): a timer that moved the party
         // to another level has it loaded, input discarded and the timers run again, all
@@ -467,7 +484,7 @@ export class Game implements MainLoop {
         if (this.ctx.party.state.partyMoveDisableTimer !== 0) this.ctx.party.state.partyMoveDisableTimer--;
         if (this.ctx.party.state.word11712 !== 0) this.ctx.party.state.word11712--;
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
-        this.ctx.loop.clockTickSet = false;
+        this.ctx.loop.clockTick = false;
     }
 
     /**

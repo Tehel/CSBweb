@@ -90,11 +90,10 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
 | C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
 | C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
 | C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
-| C102 | `MainLoop` opens with a tick; the port's first comes 250 ms later | S | ⏳ |
+| C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
@@ -269,26 +268,6 @@ the raw blocks, including `enlarge`, the bones records kept there with the key's
 through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
 save and a load. It must be paid before `P10` drops `runtime`.
 
-### C98 ⏳ The tick comes from the wall clock, not from `d.vblCount`
-
-CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.Speed`
-(`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
-`d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
-`Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:376-395`), while everything else in a pass counts VBLs: the
-message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
-magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
-a tick, and part company when the tab is in the background: the browser holds
-`setTimeout` to one call a second or fewer, and each call is then one VBL and one tick,
-so the game runs at a quarter of its pace and every VBL-counted thing at a sixtieth,
-fifteen times slower than the ticks around it. `tools/`
-reach the private `lastTickTime` through a cast (16 places) to make a tick due.
-
-Paying it means counting VBLs, `vblCount` and `speed` in `LoopState` (`d.Speed`'s 0 while
-asleep is already modelled), and pacing VBLs from the wall clock instead of ticks: run as
-many VBLs as the elapsed time holds, capped. Tools then step VBLs and need no cast.
-`d.Speed` stays at `SPEED_NORMAL`'s 15; CSBWin's speed menu is not ported.
-
 ### C99 ⏳ `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported
 
 `tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:307-347`) says so itself: "a
@@ -312,26 +291,26 @@ returns, the pass goes on where it stopped. The next queue entries follow while
 `intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
 (`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
 is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
-resumes it and returns (`src/engine/Game.ts:350-358`), and the rest of the pass waits for
-the next VBL's, which opens with `clockTickCleared = false` (`:366`). So the tick a cast or
-a rune makes due runs a VBL late, the next queued click waits a VBL, and a cast that returns
-0 (a failed cast, or `CastSpell`'s 3) no longer puts off a tick that was due: the next pass
-has cleared the put-off before it reads it. The fusion and the CSB win's wait are spared,
-since they never return. `tools/dump-mouse-queue.ts` reads `d.clockTick` as the cast's
-script leaves it and stops there. Paying it means `runFrame` finishing the held pass when
-the script ends (the rest of the `handleMouseEvents` loop, then the tick), with a check in
-`dump-mouse-queue` that the cast's tick runs, or is put off, in the script's last VBL.
+resumes it and returns (`src/engine/Game.ts:380-386`), and the rest of the pass waits for
+the next VBL's. So a tick due when the script returns, made due by a cast or by the VBL
+count, runs a VBL late, and the next queued click waits a VBL. A cast that returns 0 (a
+failed cast, or `CastSpell`'s 3) is spared: CSBWin's pass skips the tick too, and the next
+VBL sets `d.clockTick` again in both. So are the fusion and the CSB win's wait, which never
+return. `tools/dump-mouse-queue.ts` reads `d.clockTick` as the cast's script leaves it and
+stops there. Paying it means `runFrame` finishing the held pass when the script ends (the
+rest of the `handleMouseEvents` loop, then the tick), with a check in `dump-mouse-queue`
+that the cast's tick runs in the script's last VBL.
 
-### C102 ⏳ `MainLoop` opens with a tick; the port's first comes 250 ms later
+### C102 ⏳ `MainLoop` opens with a tick; the port's first comes 15 VBLs later
 
 `_MainLoop` goes straight to `tag000698` (`doc/CSBwin-src/CSBCode.cpp:586-601`), so the
 first thing a started, restarted or resumed game does is a tick: `ProcessTimers`,
-`DrawViewport`, `d.Time++`. `Game.start` sets `lastTickTime` to the wall clock
-(`src/engine/Game.ts:184`), so the port's first tick is due a quarter of a second later,
-and the page draws the game's first view itself instead (`renderView` in `start`,
-`showEndOfGame` and the loads, `src/main.ts`). Paying it means the loop's first pass
-ticking, as `d.clockTick = 1` makes one, and those three first views going; with `C98`
-it is the first VBL's tick rather than a clock reading.
+`DrawViewport`, `d.Time++`. The port's loop starts with `d.clockTick` clear
+(`createLoopFlags`, `src/engine/LoopState.ts`), so its first tick falls due when the VBL
+count reaches `d.Speed`, a quarter of a second later, and the page draws the game's first
+view itself instead (`renderView` in `start`, `showEndOfGame` and the loads,
+`src/main.ts`). Paying it means `d.clockTick` set when the loop starts (`Game.start`,
+`resumeMainLoop`), so that its first pass ticks, and those three first views going.
 
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
@@ -369,18 +348,19 @@ builds around them is its own:
   types as a stand-in or puts back; 28 extract the UI tables again
   (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them
   into; `dump-save-menu` stubs `document` and `window` to import `src/dev.ts` (`E13`).
-- 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
-  and `lastInputTime`, 16; `gameTick`, 6), into other systems' (`DsaSystem`'s
+- 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastInputTime`,
+  5; `gameTick`, 6), into other systems' (`DsaSystem`'s
   `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,
   `climbDownIntoPit`, …), and to pass partial `UIState` literals (17); three more reach
   `DsaSystem`'s privates through `as any` (`moveObjectDsa`, `executeAmpersand`). `tsc`
   checks none of them. A renamed member leaves the tool compiling, and a write to it then
-  sets a new property: a tool that pins `lastTickTime` would go on passing while testing
+  sets a new property: a tool that pins `lastInputTime` would go on passing while testing
   nothing.
 
 Paying it: `tools/lib` helpers for the stock dungeon and a test champion, beside
 `newUIState` (`tools/lib/ui.ts`), which the 17 partial `UIState` literals move to; a narrow public seam for what the tools
-legitimately drive, a tick and the clock, which `C98` mostly supplies; then the casts go,
+legitimately drive, the input gate's clock (`lastInputTime`) and a tick (a VBL is
+`runFrame`, and `runVbl` sets its count); then the casts go,
 one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time

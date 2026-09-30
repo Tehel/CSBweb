@@ -47,7 +47,7 @@ import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
-import { newGame, stockGraphics } from './lib/game';
+import { newGame, stockGraphics, runVbl, TICK_DUE } from './lib/game';
 
 const LEVEL = 12;
 /** The only centres on level 12 with no object within three squares: (5-6, 13-14). */
@@ -362,7 +362,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   const wantCredits = SEQUENCE_VBLS + letters.length * TEXT_VBLS;
   for (let n = 1; n <= wantCredits + 20; n++) {
     a.frames++;
-    game.runFrame(1_000_000 + a.frames * 250);
+    runVbl(game, TICK_DUE);
     if (a.credits.length > 0 && creditsAt === 0) creditsAt = n;
   }
   const want = expectedTypes(letters.length);

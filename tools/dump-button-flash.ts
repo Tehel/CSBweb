@@ -47,7 +47,7 @@ import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import type { Rect } from '../src/data/tables/UITables';
-import { newGame } from './lib/game';
+import { newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { handleUIKey } from '../src/renderer/ui/Keyboard';
@@ -124,14 +124,11 @@ async function main(): Promise<void> {
   party.champions = [];
   game.setMouseEventHandlers({ button: () => {}, unclick: () => {} });
 
-  type Internals = { lastTickTime: number; lastInputTime: number };
+  type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
-  let t = Date.now() + 60_000;
   /** One VBL; `tickDue` makes a game tick run in it, after the queue. */
   const frame = (tickDue = false): void => {
-    t += 17;
-    internals.lastTickTime = tickDue ? t - 1000 : t;
-    game.runFrame(t);
+    runVbl(game, tickDue ? TICK_DUE : 1);
   };
   let drawnInTick: Rect | null | undefined;
   game.onTick(() => { drawnInTick = flashedButton(game.ctx); });

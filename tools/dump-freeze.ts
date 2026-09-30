@@ -30,7 +30,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { graphicsTablesOf, newGame, runVbl, TICK_DUE } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
@@ -111,14 +111,14 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastTickTime: number; lastInputTime: number };
+  type Internals = { lastInputTime: number };
   const internals = game as unknown as Internals;
-  let t = Date.now() + 60_000;
-  /** One VBL, 17 ms on; the last tick was `sinceTick` ms ago (-1 leaves it alone). */
-  const frame = (sinceTick = 0): void => {
-    t += 17;
-    if (sinceTick >= 0) internals.lastTickTime = t - sinceTick;
-    game.runFrame(t);
+  /**
+   * One VBL, the last tick's top `sinceTick` VBLs ago, this one included (`runVbl`);
+   * -1 lets the count run on.
+   */
+  const frame = (sinceTick = 1): void => {
+    runVbl(game, sinceTick >= 0 ? sinceTick : undefined);
   };
   const click = (x: number, y: number, buttons = 2): number => {
     const num = Mouse.searchMouseButtons(ui, x, y, buttons);
@@ -161,7 +161,7 @@ async function main(): Promise<void> {
   console.log('=== frozen: no tick, and every entry but 148 thrown away ===');
   {
     const before = game.ctx.state.tickCount;
-    for (let i = 0; i < 10; i++) frame(300);
+    for (let i = 0; i < 10; i++) frame(TICK_DUE);
     console.log(`${game.ctx.state.tickCount - before} ticks in 10 frames, each 300 ms after the last tick`);
     check(game.ctx.state.tickCount === before, 'd.ClockRunning == 0: no tick runs');
     handled.length = 0;
@@ -228,7 +228,7 @@ async function main(): Promise<void> {
     check(game.isFrozen() && game.isPartySleeping(), 'frozen, and still asleep');
     check(!ui.shadedByTag02076e, 'TAG02076e does nothing asleep (Character.cpp:5111)');
     const before = game.ctx.state.tickCount;
-    for (let i = 0; i < 5; i++) frame(17);
+    for (let i = 0; i < 5; i++) frame(1);
     check(game.ctx.state.tickCount === before, 'asleep, every frame is a tick, but frozen none is');
     press('Escape');
     frame(-1);
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
     check(ui.primaryButtons === lists.buttons17796 && ui.keyXlate2 === keys.byte18440,
       'the sleep list and key table are back');
     const asleep = game.ctx.state.tickCount;
-    for (let i = 0; i < 5; i++) frame(17);
+    for (let i = 0; i < 5; i++) frame(1);
     check(game.ctx.state.tickCount - asleep === 5, 'and a tick runs every frame again');
     wakeUp(game.ctx);
   }
