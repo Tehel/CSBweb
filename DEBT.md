@@ -100,6 +100,7 @@ In payoff order: the first row is the next item.
 | X1 | Extra: drinking from a fountain with an empty hand | S | ⏸️ |
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
+| X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
@@ -108,7 +109,7 @@ postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C95 · D12 · E8 · F12 · G21 · X5. An ID recorded and paid in one commit has no
+Next free IDs: C95 · D12 · E8 · F12 · G21 · X6. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -430,6 +431,44 @@ Needed:
 
 A `watch-*.ts` tool proves it: throw and shoot at a wall and at a monster, kill the
 monster, walk onto the cell, and check the inventory, the floor chain and the load.
+
+### X5 ⏸️ 3D2D1D's vertical moves and gravity
+
+`doc/3D2D1D.md` has the whole account. The 3D2D1D dungeon (data set `3d2d1d`) loads but
+cannot be played as designed. It needs two features that `doc/CSBwin-src/` contains but
+hardwires off: `ThreeDMovements` and `GravityGame` are `false` and never assigned
+(`doc/CSBwin-src/data.cpp:239-240`).
+
+The 2019 `CSBwin.exe` shipped with the dungeon sets them from `efb.extendedFlags` bits
+`0x400` and `0x200`, bits our `EXTENDEDFLAGS` enum does not have. That is known only from
+the exe's disassembly, so porting it means citing the exe for those two bits. It becomes
+a new exception to "CSBWin source wins", to be recorded under H when this is paid.
+Everything else is in our source.
+
+The gate is the dungeon, not a setting. This is the one departure from the X rules above:
+no other dungeon here sets either bit, so DM and CSB are unchanged, and the keys cannot
+be used to cheat there.
+
+Two steps:
+
+1. **Vertical moves** (M). Read the two bits into the rules, next to
+   `readRulesOptions` (`src/data/CsbwinExtendedFeatures.ts`). Bind the PC keys `-` and
+   `=` (`KeyboardEvent.code` `Minus` and `Equal`, scancodes `0x0c`/`0x0d` in
+   `config.txt`) to keyscans `0x4900`/`0x4a00`. Queue them as buttons
+   `0x1124`/`0x1125` when `ThreeDMovements` is set (`TAG0196da`,
+   `doc/CSBwin-src/CSBCode.cpp:8476-8490`). Hand those two buttons to the move in
+   `Game.handleMouseEvents` (`Mouse.cpp:1556-1570`). Then port `MoveParty`'s
+   `direction > 3` arm (`CSBCode.cpp:8168-8290`) into `MovementSystem`: the pit rule,
+   `TraverseStairway(direction-4, false)`, and the wall bump.
+2. **Gravity** (M). `moveHistory`, `gravityMove` and `nextGravityMoveTime`, updated in
+   `MoveParty` (`CSBCode.cpp:8041-8083`). `GravityMove` (`Mouse.cpp:1258-1342`) and its
+   hook at the head of `_HandleMouseEvents` (`:1381-1390`), which empties the queue while
+   gravity runs. CSBWin does not save the three variables, so neither does the port.
+
+A `watch-*.ts` proves each step on the real 3D2D1D files: up and down through map 1's
+fake pits, a refused move into stone with its damage, and a gravity slide ending where
+`GravityMove` finds no axis. Whether 3D2D1D's six DSAs reach a gap in G1 or G2 is
+unchecked, and should be found out before step 1.
 
 ---
 

@@ -821,7 +821,8 @@ export class Game implements MainLoop {
      * (`:1433-1444`). `CauseFakeMouseClick`, which follows every take, replays a click
      * the port never defers.
      *
-     * Not ported: the stairs buttons `0x1124`/`0x1125`, for want of them in the port.
+     * Not ported: the vertical-move buttons `0x1124`/`0x1125` and the gravity hook
+     * (`DEBT.md` X5).
      */
     private handleMouseEvents(delta: number): number {
         const result = 0;
