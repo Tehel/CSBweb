@@ -1,8 +1,10 @@
-# Atari ST Disk Reference: Dungeon Master 1.2 (English)
+# Atari ST Disk Reference: Dungeon Master 1.2 (English) and 1.3 (French)
 
 What the original Atari ST game disk holds that CSBWin does not: the boot chain, the FTL
 logo animation (`SWOOSH.IMG`) that ran before the title, and how the disk's data files
-differ from the `graphics.dat` and `dungeon.dat` this port ships in `dm-atari/`.
+differ from the `graphics.dat` and `dungeon.dat` this port ships in `dm-atari/`. The
+English 1.2 disk is the reference throughout; the French 1.3 disk, the same but
+translated, has its own section at the end.
 
 This is not CSBWin-sourced. The authority is the disk itself. A citation `swoosh.img:$0070`
 is a byte offset into that file, and a citation `boot:$003a` is an offset into the boot
@@ -243,3 +245,49 @@ property of the `graphics.dat` CSBWin ships, not of the original game.
 bytes: bit 7 of `word2`, which CSBWin calls `important` (`doc/CSBwin-src/CSB.h:1148`), is
 set in the 1.2 file and clear in ours for four weapons: a sling (weapon #54, map 0 (16,7))
 and three rocks (weapons #104, #105, #106, map 1).
+
+## The French 1.3 disk
+
+`static/gamefiles/DungeonMaster1v3Fr.stx` (md5 `933955a6a596081b4bc62655efeafde5`,
+untracked) has the 1.2 disk's geometry, copy protection, boot sector and six files.
+`SWOOSH.IMG` and `START.PRG` are byte-identical to 1.2's; `BOOTER` (`e9db80a6…`), `START.PAK`
+(95208 bytes, `6131be44…`), `GRAPHICS.DAT` and `DUNGEON.DAT` are not. The two data files are
+in `static/gamefiles/dm-atari-1.3-fr/`, and both load:
+
+| File | Size | Date | md5 |
+| --- | --- | --- | --- |
+| `graphics.dat` | 271995 | 1988-05-20 | `0d7af44dd14f383464288abdcec76afc` |
+| `dungeon.dat` | 33774 | 1988-05-20 | `dfd82fb7d44e4b5cc81add257655c966` |
+
+**Nothing but the language changes.** Every difference from 1.2 is text, in words or in
+pixels. What 1.2 changed against `dm-atari/` stays as 1.2 has it: `Byte4100[55]` is 2, and
+the credits scroll, graphic 232, graphic 396, the monster and object bytes, the attack
+values and the four `important` weapons are 1.2's.
+
+`dungeon.dat` differs from 1.2's only in its text: 1915 words against 1749, and the text
+records (database 2) that point into it. The header's other fields, the maps, the column
+index, the object list, every other database and the cell flags are identical. The texts
+are French ("JE SUIS DUR JE SUIS AZUR ET JE FULGURE" is `TEXT #70` on map 5).
+
+`graphics.dat` differs from 1.2's in:
+
+| Item | What changes |
+| --- | --- |
+| 1 | The title: "Presents" becomes "Présente" |
+| 4 | The entrance: ENTER / RESUME become ENTRER / RECOMMENCER |
+| 6 | "The End" becomes "Fin" |
+| 10, 27, 30, 31, 32, 40 | Interface pictures with words in them: the save panel's PASS, CORRECTION for BACKSPACE, EAU, VENENEUX, RESSUSCITER / RÉINCARNER / ANNULER |
+| 120 (`0x78`) | The wall-text font, 288x8 |
+| `0x22c` | The object names, in French (`BOUSSOLE`, `TORCHE`, …) |
+| `0x22d` | The font |
+| `0x22f` | `Byte10336` and `Byte10016`, `DecodeText`'s strings after code 30 (below) |
+| `0x230` | The attack names, in French (`FENDRE`, `ENTAILLER`, …) |
+| `0x232` | Six x coordinates, bytes 875, 883, 1707, 1709, 1715 and 1717, not identified individually. 1707–1717 are in the last 136 bytes, where the entrance's rectangles are. |
+
+`DecodeText` looks up code 30's next code in `d.Byte10336` for wall text and in
+`d.Byte10016` for any other text (`doc/CSBwin-src/CSBCode.cpp:5559-5574`; the port's
+`DungeonState.ts`, reading `textDecode`), 8 bytes a string. In 1.2, `Byte10336` holds
+strings 2 and 3 (THE, YOU, in wall glyphs) and `Byte10016` strings 0–3 (`?`, `!`, `THE `,
+`YOU `). 1.3 makes strings 0, 1 and 4–9 single glyphs past the 1.2 character sets: 28, 29
+and 30–35 in wall text, 120, 121 and 122–127 in the rest, replacing `Byte10016`'s `?` and
+`!`. Which letters those glyphs draw was not checked.
