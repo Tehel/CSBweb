@@ -76,14 +76,14 @@ function makeGame(): Game {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.addChampion(champion('DRINKER'));
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
 
 /** The strength of every potion of a given type actually present in `dungeon.dat`. */
 function realPotionStrengths(game: Game): Map<number, number[]> {
   const byType = new Map<number, number[]>();
-  const records = game.dungeonState.getData().databases.potions.records;
+  const records = game.ctx.dungeon.getData().databases.potions.records;
   for (const rec of records) {
     const type = rec.potionType | 0;
     if (!byType.has(type)) byType.set(type, []);
@@ -109,7 +109,7 @@ function main(): void {
     if (!list || list.length === 0) continue;
     const strength = list[Math.floor(list.length / 2)]!;
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const fp = clearFeedParameters();
     derivePotionFeeding(fp, champ, potionType, strength);
 
@@ -140,7 +140,7 @@ function main(): void {
   console.log(['potion', 'strength', 'effect'].join('\t'));
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const mon = clearFeedParameters();
     derivePotionFeeding(mon, champ, PotionType.MON_POTION_B, 150);
     console.log(['MON (stamina)', 150, `stamina +${mon.staminaAdjust}`].join('\t'));
@@ -159,7 +159,7 @@ function main(): void {
   // champion, but the mouth still accepts and empties it.
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const fp = clearFeedParameters();
     derivePotionFeeding(fp, champ, PotionType.EMPTY_FLASK, 0);
     check(!fp.performFeeding, 'an empty flask does nothing on its own');
@@ -173,7 +173,7 @@ function main(): void {
 
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const attr = champ.attributes.stats[AttributeIndex.Strength]!;
     const before = { cur: attributeCurrent(attr), max: attributeMaximum(attr) };
     const fp = clearFeedParameters();
@@ -198,7 +198,7 @@ function main(): void {
 
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     champ.wounds = 0xffff;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
@@ -215,7 +215,7 @@ function main(): void {
   {
     // Mana already at the ceiling: only half the excess is kept.
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     champ.attributes.mana = champ.attributes.maxMana;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
@@ -236,13 +236,13 @@ function main(): void {
 
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.YA_POTION, 150);
     g.applyFeeding(0, fp);
     const raised = champ.shieldStrength;
-    const timers = g.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_72);
+    const timers = g.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_72);
     console.log(`shield ${raised}, expires in ${fp.shieldDuration} ticks, ${timers.length} TT_72 queued`);
 
     check(raised === fp.shieldStrengthAdjust, 'the shield went up by the derived amount');
@@ -250,7 +250,7 @@ function main(): void {
     check(fp.shieldDuration > 0, 'with a real duration');
 
     for (let t = 0; t <= fp.shieldDuration + 1; t++) {
-      (g as unknown as { state: { tickCount: number } }).state.tickCount = t;
+      g.ctx.state.tickCount = t;
       processTimersAt(g, t);
     }
     console.log(`after ${fp.shieldDuration + 1} ticks: shield ${champ.shieldStrength}`);
@@ -264,15 +264,15 @@ function main(): void {
 
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     g.systems.monsterAttack.poisonCharacter(0, 200);
     const poisonedHealth = champ.attributes.health;
-    const before = g.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
+    const before = g.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.ANTI_VENIN, 100);
     g.applyFeeding(0, fp);
-    const after = g.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
+    const after = g.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
     console.log(`TT_75 timers ${before} -> ${after}, poisonCount ${champ.poisonCount}`);
     check(before === 1, 'the champion was poisoned first');
     check(after === 0, 'anti-venin deleted the pending poison timer');
@@ -288,7 +288,7 @@ function main(): void {
   {
     const g = makeGame();
     g.addChampion(champion('SPARE'));
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     champ.attributes.health = 5;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
@@ -303,8 +303,8 @@ function main(): void {
   {
     // An unconfirmed champion in a mirror takes none of it.
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
-    g.party.state.potentialChampionIndex = 0;
+    const champ = g.ctx.party.state.champions[0]!;
+    g.ctx.party.state.potentialChampionIndex = 0;
     champ.attributes.health = 5;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
@@ -326,7 +326,7 @@ function main(): void {
 
   {
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     fp.performFeeding = true;

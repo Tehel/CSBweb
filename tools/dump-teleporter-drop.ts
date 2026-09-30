@@ -64,7 +64,7 @@ function makeGame(): Game {
 
 /** An active teleporter, open to plain items, whose destination is a different cell. */
 function findItemTeleporter(game: Game): { at: Position; dest: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -96,7 +96,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
 
 /** Any plain item already sitting on the dungeon floor, lifted off it. */
 function findFloorItem(game: Game, avoid: Position): { rn: ObjectID; at: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -134,9 +134,9 @@ function main(): void {
   }
   console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
 
-  game.dungeonState.removeObjectFromCell(item.at, item.rn);
+  game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
 
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = teleporter.at.south; // so "in front, facing north" is the teleporter cell
   party.facing = 0;
   party.cursorOwner = 0;
@@ -147,14 +147,14 @@ function main(): void {
   check(party.objectInHand === OBJECT_ID_NULL, 'the cursor is empty afterwards');
 
   let atTeleporter = false;
-  for (let rn = game.dungeonState.findFirstObject(teleporter.at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(teleporter.at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).index === decodeObjectID(item.rn).index &&
         decodeObjectID(rn).category === decodeObjectID(item.rn).category) atTeleporter = true;
   }
   check(!atTeleporter, 'the object does not stay sitting on the teleporter cell');
 
   let atDestination = false;
-  for (let rn = game.dungeonState.findFirstObject(teleporter.dest); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(teleporter.dest); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).index === decodeObjectID(item.rn).index &&
         decodeObjectID(rn).category === decodeObjectID(item.rn).category) atDestination = true;
   }

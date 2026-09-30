@@ -109,18 +109,18 @@ for (const name of ATARI_SAVES) {
 
   // A running game built over DM's world, which the save's replaces.
   const game = newGame(new DungeonLoader().loadDungeonDat(DM_DUNGEON), csbGraphics);
-  const builtOver = game.dungeonState.getMapCount();
+  const builtOver = game.ctx.dungeon.getMapCount();
   try {
     applyCsbwinSave(game, bytes);
   } catch (error) {
     check(false, `${name}: a game built over DM's world should take the save — ${(error as Error).message}`);
     continue;
   }
-  const installed = game.state.dungeon;
-  console.log(`  game built over ${builtOver} maps, now ${game.dungeonState.getMapCount()} maps, ` +
+  const installed = game.ctx.state.dungeon;
+  console.log(`  game built over ${builtOver} maps, now ${game.ctx.dungeon.getMapCount()} maps, ` +
     `start (${installed.header.startPosition?.x},${installed.header.startPosition?.y}), ` +
     `level 0 ${installed.maps[0].descriptor.width}x${installed.maps[0].descriptor.height}`);
-  check(builtOver === 14 && installed === game.dungeonState.getData() && game.dungeonState.getMapCount() === 11,
+  check(builtOver === 14 && installed === game.ctx.dungeon.getData() && game.ctx.dungeon.getMapCount() === 11,
     `${name}: the save's eleven-level world replaces DM's fourteen, in state and DungeonState both`);
   check(installed.maps.every((map, i) => map.descriptor.width === d.maps[i].descriptor.width
       && map.descriptor.height === d.maps[i].descriptor.height && map.descriptor.level === d.maps[i].descriptor.level)
@@ -128,7 +128,7 @@ for (const name of ATARI_SAVES) {
     && installed.header.randomSeed === d.header.randomSeed,
     `${name}: the levels' descriptors, levelIndex and the header are the save's`);
   const gb2 = world.save.block2!;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   console.log(`  party at (${party.position.x},${party.position.y}) level ${party.position.z}, ` +
     `${party.champions.map((c) => c.name).join(', ')}`);
   check(party.position.x === gb2.partyX && party.position.y === gb2.partyY && party.position.z === gb2.partyLevel,

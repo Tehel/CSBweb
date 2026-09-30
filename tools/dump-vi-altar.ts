@@ -102,8 +102,8 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
  */
 function makeUI(g: Game, objectTables: ObjectTables, uiTables: UITables): UIState {
   return {
-    dungeonState: g.dungeonState,
-    partyState: g.party.state,
+    dungeonState: g.ctx.dungeon,
+    partyState: g.ctx.party.state,
     objectTables,
     uiTables,
   } as unknown as UIState;
@@ -111,7 +111,7 @@ function makeUI(g: Game, objectTables: ObjectTables, uiTables: UITables): UIStat
 
 /** Any ordinary walkable cell — the altar itself is a wall decoration, not a room type. */
 function findOpenCell(game: Game): Position {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -130,7 +130,7 @@ function findOpenCell(game: Game): Position {
 
 /** A bones object the dungeon might have authored: no expool record, `value` = chIdx. */
 function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectID {
-  const db = game.dungeonState.getData().databases.misc;
+  const db = game.ctx.dungeon.getData().databases.misc;
   db.records.push({
     nextObject: OBJECT_ID_EOF,
     specialState: chIdx & 0x3,
@@ -157,7 +157,7 @@ function makeDungeonBones(game: Game, chIdx: number, posInCell: number): ObjectI
 function findViAltars(game: Game): Array<{ alcove: Position; party: Position; facing: number }> {
   const DELTA = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const;
   const out: Array<{ alcove: Position; party: Position; facing: number }> = [];
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map?.wallDecorationTOC) continue;
@@ -191,12 +191,12 @@ function findViAltars(game: Game): Array<{ alcove: Position; party: Position; fa
 function bonesAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     if (decodeObjectID(rn).category !== DBType.MISC) continue;
-    if (game.dungeonState.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
+    if (game.ctx.dungeon.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
     if (out.length > 32) break;
   }
   return out;
@@ -205,9 +205,9 @@ function bonesAt(game: Game, cell: Position): ObjectID[] {
 function cloudsAt(game: Game, cell: Position): number {
   let n = 0;
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     if (decodeObjectID(rn).category === DBType.CLOUD) n++;
     if (n > 32) break;
@@ -219,7 +219,7 @@ function cloudsAt(game: Game, cell: Position): number {
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
     game.systems.timer.processTimers();
-    game.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
@@ -230,11 +230,11 @@ function main(): void {
   {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
 
     const victim = 1;
-    const maxHpBefore = g.party.state.champions[victim]!.attributes.maxHealth;
+    const maxHpBefore = g.ctx.party.state.champions[victim]!.attributes.maxHealth;
     g.systems.monsterAttack.killCharacter(victim);
 
     const bones = bonesAt(g, cell);
@@ -245,20 +245,20 @@ function main(): void {
       return;
     }
     const rn = bones[0]!;
-    const record = g.dungeonState.getMiscRecord(rn);
+    const record = g.ctx.dungeon.getMiscRecord(rn);
     check((record?.specialState ?? 0) === 2, "a death's bones carry value 2, the kind marker");
     check(
-      g.dungeonState.copyChampionBonesRecord(rn) === g.party.state.champions[victim]!.fingerprint,
+      g.ctx.dungeon.copyChampionBonesRecord(rn) === g.ctx.party.state.champions[victim]!.fingerprint,
       "and an expool record holding the champion's fingerprint",
     );
 
     // Schedule the altar the way a drop into the alcove does.
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
 
     console.log('');
     console.log(['tick', 'clouds in cell', 'bones in cell', `HERO${victim} alive`, 'health', 'maxHealth'].join('\t'));
     const snapshot = (t: number): void => {
-      const c = g.party.state.champions[victim]!;
+      const c = g.ctx.party.state.champions[victim]!;
       console.log([t, cloudsAt(g, cell), bonesAt(g, cell).length, c.attributes.health !== 0, c.attributes.health, c.attributes.maxHealth].join('\t'));
     };
     snapshot(0);
@@ -268,7 +268,7 @@ function main(): void {
     snapshot(1);
     check(cloudsAt(g, cell) === 1, 'state 2 should put a cloud over the bones — CreateCloud(RNffe4)');
     check(bonesAt(g, cell).length === 1, 'and leave the bones alone for now');
-    check(g.party.state.champions[victim]!.attributes.health === 0, 'and not yet revive anyone');
+    check(g.ctx.party.state.champions[victim]!.attributes.health === 0, 'and not yet revive anyone');
 
     // `Time += 5`: state 1 lands five ticks after that one, and consumes the bones
     // without yet reviving anyone — the two halves are a tick apart and must stay so, or
@@ -276,12 +276,12 @@ function main(): void {
     runTicks(g, 5);
     snapshot(6);
     check(bonesAt(g, cell).length === 0, 'state 1 should consume the bones');
-    check(g.party.state.champions[victim]!.attributes.health === 0, 'and still not revive anyone');
+    check(g.ctx.party.state.champions[victim]!.attributes.health === 0, 'and still not revive anyone');
 
     // `Time += 1`: state 0 on the tick after.
     runTicks(g, 1);
     snapshot(7);
-    const revived = g.party.state.champions[victim]!;
+    const revived = g.ctx.party.state.champions[victim]!;
     check(revived.attributes.health !== 0, 'state 0 should bring the champion back');
 
     // `MaxHP = Larger(25, MaxHP - MaxHP/64 - 1)`, then `HP = MaxHP/2`.
@@ -292,9 +292,9 @@ function main(): void {
     console.log(['health', Math.floor(expectedMax / 2), revived.attributes.health].join('\t'));
     check(revived.attributes.maxHealth === expectedMax, 'the maximum takes a permanent MaxHP/64 + 1 cut');
     check(revived.attributes.health === Math.floor(expectedMax / 2), 'and the champion comes back at half of it');
-    check(revived.facing === g.party.state.facing, 'facing the way the party faces');
+    check(revived.facing === g.ctx.party.state.facing, 'facing the way the party faces');
     check(
-      g.dungeonState.copyChampionBonesRecord(rn) === null,
+      g.ctx.dungeon.copyChampionBonesRecord(rn) === null,
       'the expool bones record should be consumed with the bones',
     );
   }
@@ -309,23 +309,23 @@ function main(): void {
   {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
 
     // Not champion 2: a death's bones carry value 2, which unpaired bones would read
     // as a champion index.
     const victim = 1;
-    g.party.state.champions[victim]!.fingerprint = 0;
+    g.ctx.party.state.champions[victim]!.fingerprint = 0;
     g.systems.monsterAttack.killCharacter(victim);
     const bones = bonesAt(g, cell);
     const rn = bones[0];
-    const record = rn === undefined ? null : g.dungeonState.copyChampionBonesRecord(rn);
+    const record = rn === undefined ? null : g.ctx.dungeon.copyChampionBonesRecord(rn);
     console.log(`bones: ${bones.length}, expool record: ${record}`);
     check(bones.length === 1 && record === 0, 'the death records fingerprint 0 in the expool');
     if (rn !== undefined) {
-      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
       runTicks(g, 7);
-      check(g.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
+      check(g.ctx.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
     }
   }
 
@@ -339,22 +339,22 @@ function main(): void {
     const target = 3;
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     g.systems.monsterAttack.killCharacter(target);
     // Clear away the bones the death itself left, so only the authored ones are here.
     for (const rn of bonesAt(g, cell)) {
-      g.dungeonState.removeObjectFromCell(cell, rn);
+      g.ctx.dungeon.removeObjectFromCell(cell, rn);
     }
 
     const rn = makeDungeonBones(g, target, 0);
-    g.dungeonState.addObjectToCell(cell, rn);
-    check(g.dungeonState.copyChampionBonesRecord(rn) === null, 'authored bones have no expool record');
+    g.ctx.dungeon.addObjectToCell(cell, rn);
+    check(g.ctx.dungeon.copyChampionBonesRecord(rn) === null, 'authored bones have no expool record');
 
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
-    const c = g.party.state.champions[target]!;
+    const c = g.ctx.party.state.champions[target]!;
     console.log([target, `HERO${target}`, true, c.attributes.health !== 0].join('\t'));
     check(c.attributes.health !== 0, `bones with value ${target} should revive champion ${target}`);
     check(bonesAt(g, cell).length === 0, 'and consume themselves doing it');
@@ -368,15 +368,15 @@ function main(): void {
     const target = 3;
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
 
     const rn = makeDungeonBones(g, target, 0);
-    g.dungeonState.addObjectToCell(cell, rn);
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.ctx.dungeon.addObjectToCell(cell, rn);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
-    const c = g.party.state.champions[target]!;
+    const c = g.ctx.party.state.champions[target]!;
     console.log(`HERO${target} health ${c.attributes.health}, bones still on the floor: ${bonesAt(g, cell).length === 1}`);
     check(c.attributes.health === 200, 'a living champion is untouched');
     check(bonesAt(g, cell).length === 1, 'and the bones stay on the floor');
@@ -391,25 +391,25 @@ function main(): void {
     const target = 1;
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     g.systems.monsterAttack.killCharacter(target);
 
     // While the champion lies dead, a living one takes their corner. CSBWin allows
     // this precisely because `CharacterAtPosition` ignores the dead.
     const squatter = 2;
-    g.party.state.champions[squatter]!.partyPosition = g.party.state.champions[target]!.partyPosition;
-    const cornerBefore = g.party.state.champions[target]!.partyPosition;
+    g.ctx.party.state.champions[squatter]!.partyPosition = g.ctx.party.state.champions[target]!.partyPosition;
+    const cornerBefore = g.ctx.party.state.champions[target]!.partyPosition;
 
     const rn = bonesAt(g, cell)[0]!;
-    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.ctx.state.tickCount);
     runTicks(g, 8);
 
-    const c = g.party.state.champions[target]!;
+    const c = g.ctx.party.state.champions[target]!;
     console.log([`HERO${target}`, cornerBefore, c.partyPosition, c.attributes.health !== 0].join('\t'));
     check(c.attributes.health !== 0, 'the champion still comes back');
     check(c.partyPosition !== cornerBefore, 'but not into the corner the squatter took');
-    const occupants = g.party.state.champions.filter(
+    const occupants = g.ctx.party.state.champions.filter(
       (o) => o.attributes.health !== 0 && o.partyPosition === c.partyPosition,
     ).length;
     check(occupants === 1, 'and the corner they land in holds nobody else living');
@@ -434,8 +434,8 @@ function main(): void {
       fail('no Altar of Vi to test against');
     } else {
       const victim = 2;
-      g.party.state.position = altar.party;
-      g.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.ctx.party.state.position = altar.party;
+      g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
       g.systems.monsterAttack.killCharacter(victim);
 
@@ -463,9 +463,9 @@ function main(): void {
         check(shown === `HERO${victim} BONES`, "and they are named for their owner, not just 'BONES'");
 
         // Pick them up and drop them in, the way the viewport click does.
-        g.dungeonState.removeObjectFromCell(altar.party, bones);
-        g.party.state.objectInHand = bones;
-        g.party.state.cursorOwner = 0;
+        g.ctx.dungeon.removeObjectFromCell(altar.party, bones);
+        g.ctx.party.state.objectInHand = bones;
+        g.ctx.party.state.cursorOwner = 0;
         const dropped = g.dropObjectFromCursor(4, { viAltar: true });
         check(dropped, 'the bones go into the alcove');
         check(bonesAt(g, altar.alcove).length === 1, 'and land in the alcove cell, not the party cell');
@@ -473,14 +473,14 @@ function main(): void {
         console.log('');
         console.log(['tick', 'bones in alcove', `HERO${victim} alive`, 'health'].join('\t'));
         const row = (t: number): void => {
-          const c = g.party.state.champions[victim]!;
+          const c = g.ctx.party.state.champions[victim]!;
           console.log([t, bonesAt(g, altar.alcove).length, c.attributes.health !== 0, c.attributes.health].join('\t'));
         };
         row(0);
         runTicks(g, 8);
         row(8);
 
-        const revived = g.party.state.champions[victim]!;
+        const revived = g.ctx.party.state.champions[victim]!;
         check(revived.attributes.health !== 0, 'and six ticks later the champion is back');
         check(bonesAt(g, altar.alcove).length === 0, 'with the bones consumed');
       }
@@ -497,8 +497,8 @@ function main(): void {
     if (!altar) {
       fail('no Altar of Vi on level 0');
     } else {
-      g.party.state.position = altar.party;
-      g.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.ctx.party.state.position = altar.party;
+      g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
       g.systems.monsters.loadPartyLevel(altar.party.z);
       g.systems.monsterAttack.killCharacter(1);
 
@@ -506,13 +506,13 @@ function main(): void {
       // (`doc/CSBwin-src/Code11f52.cpp:44`, `doc/CSBwin-src/CSB.h:1258-1264`). The
       // altar's `value`-as-index arm must not read that 0 as "champion 0".
       const inert = makeDungeonBones(g, 0, 0);
-      g.dungeonState.getMiscRecord(inert)!.specialState = 0;
-      g.party.state.objectInHand = inert;
-      g.party.state.cursorOwner = 0;
+      g.ctx.dungeon.getMiscRecord(inert)!.specialState = 0;
+      g.ctx.party.state.objectInHand = inert;
+      g.ctx.party.state.cursorOwner = 0;
       const dropped = g.dropObjectFromCursor(4, { viAltar: true });
       check(dropped, 'inert bones still drop into the alcove like any other object');
       runTicks(g, 8);
-      const c = g.party.state.champions[1]!;
+      const c = g.ctx.party.state.champions[1]!;
       console.log(`HERO1 alive after 8 ticks: ${c.attributes.health !== 0}, bones in alcove: ${bonesAt(g, altar.alcove).length}`);
       check(c.attributes.health === 0, 'but they raise nobody');
       check(bonesAt(g, altar.alcove).length === 1, 'and they stay in the alcove');

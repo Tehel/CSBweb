@@ -84,7 +84,7 @@ function checkChooser(): void {
 
   const run = (mode: 'full' | 'loadOnly', bytes: Uint8Array) => {
     const game = freshGame();
-    const ui = UIStateModule.createUIState(graphics, game.dungeonState, {
+    const ui = UIStateModule.createUIState(graphics, game.ctx.dungeon, {
       getGraphicBitmap: () => null,
       renderLastFrame: () => {},
     });
@@ -103,15 +103,15 @@ function checkChooser(): void {
 
   const bad = run('loadOnly', damaged);
   const message = bad.failures.length === 1 ? (bad.failures[0] as Error).message : null;
-  console.log(`  load-only, damaged: failures ${bad.failures.length} (${message}), thrown ${bad.thrown}, open ${bad.open}, champions ${bad.game.party.state.champions.length}`);
+  console.log(`  load-only, damaged: failures ${bad.failures.length} (${message}), thrown ${bad.thrown}, open ${bad.open}, champions ${bad.game.ctx.party.state.champions.length}`);
   check(bad.failures.length === 1 && /CHECKSUM MISMATCH/.test(message ?? ''), 'onRestoreFailed hears of the checksum');
   check(bad.thrown === null, 'and nothing reaches the status line');
   check(!bad.open, 'the chooser closes, for tag01efee to take the screen');
-  check(bad.game.party.state.champions.length === 0, 'and the running game is untouched: the read fails before it applies');
+  check(bad.game.ctx.party.state.champions.length === 0, 'and the running game is untouched: the read fails before it applies');
 
   const good = run('loadOnly', intact);
-  console.log(`  load-only, intact: failures ${good.failures.length}, open ${good.open}, champions ${good.game.party.state.champions.length}`);
-  check(good.failures.length === 0 && !good.open && good.game.party.state.champions.length > 0,
+  console.log(`  load-only, intact: failures ${good.failures.length}, open ${good.open}, champions ${good.game.ctx.party.state.champions.length}`);
+  check(good.failures.length === 0 && !good.open && good.game.ctx.party.state.champions.length > 0,
     'an intact save loads, and the chooser closes as before');
 
   const full = run('full', damaged);
@@ -272,14 +272,14 @@ async function checkNewGameRead(): Promise<void> {
   const short = new Uint8Array(readFileSync(resolve(DUNGEON))).subarray(0, 4);
 
   const game = newGame(emptyDungeonData(), graphics);
-  const levels = () => game.dungeonState.getData().maps.length;
+  const levels = () => game.ctx.dungeon.getData().maps.length;
   const readDamaged = game.readDungeonDat(damaged);
   const readShort = game.readDungeonDat(short);
   console.log(`  damaged prison: ${readDamaged}, 4-byte file: ${readShort}, levels after both: ${levels()}`);
   check(!readDamaged && !readShort, 'a checksum mismatch and a short file both fail the read');
   check(levels() === 0, 'and the empty world the page boots over is left as it was');
   const readIntact = game.readDungeonDat(prison);
-  console.log(`  intact prison: ${readIntact}, levels ${levels()}, start ${JSON.stringify(game.party.state.position)}`);
+  console.log(`  intact prison: ${readIntact}, levels ${levels()}, start ${JSON.stringify(game.ctx.party.state.position)}`);
   check(readIntact && levels() === 2, 'the intact prison reads, its two levels installed');
 
   const run = async (read: boolean, partyHasDied: boolean) => {

@@ -56,7 +56,7 @@ const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y &
 
 /** A square satisfying `pred`, scanning level by level. */
 function findSquare(game: Game, pred: (p: Position) => boolean): Position | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -72,7 +72,7 @@ function findSquare(game: Game, pred: (p: Position) => boolean): Position | null
 
 /** An active teleporter open to objects whose destination is another square. */
 function findItemTeleporter(game: Game): { at: Position; dest: Position } {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   let found: { at: Position; dest: Position } | null = null;
   findSquare(game, (at) => {
     const flag = dungeon.getCellFlag(at);
@@ -97,7 +97,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } {
 }
 
 function inCell(game: Game, at: Position, category: DBType, index: number): ObjectID | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const decoded = decodeObjectID(rn);
     if (decoded.category === category && decoded.index === index) return rn;
@@ -119,10 +119,10 @@ function spy(game: Game): PadCall[] {
 
 /** Switch `at` off, let `stand` put something on it, then run the timer that switches it on. */
 function switchOn(game: Game, at: Position, tt: TimerFunction, stand: () => void): void {
-  const map = game.dungeonState.getMap(at.z)!;
+  const map = game.ctx.dungeon.getMap(at.z)!;
   map.cellFlags[at.x]![at.y]! &= ~0x08;
   stand();
-  game.timerQueue.createTimer(tt, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
+  game.ctx.timers.createTimer(tt, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
   processTimersAt(game, 1);
 }
 
@@ -130,11 +130,11 @@ function main(): void {
   /* ------------------------------------------------ 1. a cloud down an opening pit ---- */
   {
     const game = makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const pit = findSquare(game, (p) => {
       const flag = dungeon.getCellFlag(p);
       return ((flag >> 5) & 7) === RoomType.PIT && (flag & 0x08) !== 0 && (flag & 0x01) === 0
-        && dungeon.incrementLevel(p, 1) !== null && !same(p, game.party.state.position);
+        && dungeon.incrementLevel(p, 1) !== null && !same(p, game.ctx.party.state.position);
     });
     if (!pit) throw new Error('no open pit');
     const below = dungeon.incrementLevel(pit, 1)!;
@@ -146,7 +146,7 @@ function main(): void {
       }
     });
     const landed = inCell(game, below, DBType.CLOUD, index);
-    const timer = game.timerQueue.getTimers().find((t) => t.function === TimerFunction.TT_25
+    const timer = game.ctx.timers.getTimers().find((t) => t.function === TimerFunction.TT_25
       && t.object !== undefined && decodeObjectID(t.object).index === index);
     console.log(`1. cloud ${index} on pit (${pit.x},${pit.y}) L${pit.z} as it opens: on the pit ${inCell(game, pit, DBType.CLOUD, index) !== null}, `
       + `below (${below.x},${below.y}) L${below.z} ${landed !== null}; TT_25 at (${timer?.uByte6},${timer?.uByte7}) L${timer?.level}`);
@@ -159,7 +159,7 @@ function main(): void {
   /* ------------------------------------------- 2. a missile through a teleporter ---- */
   {
     const game = makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const { at, dest } = findItemTeleporter(game);
     const calls = spy(game);
     let index = -1;
@@ -171,7 +171,7 @@ function main(): void {
     });
     const landed = inCell(game, dest, DBType.MISSILE, index);
     const missile = landed !== null ? dungeon.getMissileRecord(landed) : null;
-    const timer = missile ? game.timerQueue.getTimer(missile.timerIndex) : null;
+    const timer = missile ? game.ctx.timers.getTimer(missile.timerIndex) : null;
     const word8 = timer?.timerWord8 ?? 0;
     const missileCalls = calls.filter((c) => c.category === DBType.MISSILE);
     console.log(`2. missile ${index} on teleporter (${at.x},${at.y}) L${at.z} -> (${dest.x},${dest.y}) L${dest.z}: `
@@ -186,9 +186,9 @@ function main(): void {
   /* ------------------------------ 3. an item teleported to where the party stands ---- */
   {
     const game = makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const { at, dest } = findItemTeleporter(game);
-    game.party.state.position = dest;
+    game.ctx.party.state.position = dest;
     const calls = spy(game);
     // Any weapon record, lifted from wherever it lies.
     const weapons = dungeon.getData().databases.weapons.records.length;

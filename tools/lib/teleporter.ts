@@ -7,7 +7,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomTy
 import type { Game } from '../../src/engine/Game';
 
 export function rigTeleporter(game: Game, at: Position, to: Position): void {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const records = dungeon.getData().databases.teleporters.records;
   const index = records.findIndex((r) => r.nextObject !== OBJECT_ID_NULL);
   const rn = ((DBType.TELEPORTER << 10) | index) as ObjectID;

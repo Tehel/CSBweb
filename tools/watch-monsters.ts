@@ -37,10 +37,10 @@ async function main(): Promise<void> {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(px, py, level);
+  game.ctx.party.state.position = new Position(px, py, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const pool = dungeon.getItem16Pool();
   // Where a group stands. Not its ITEM16's uByte10/11: only AttachItem16ToMonster sets
   // those (doc/CSBwin-src/CSBCode.cpp:6088-6090), and MoveObject leaves them behind.
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   const path: string[] = [];
 
   for (let t = 0; t < ticks; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
     if (followed >= 0) {
       const s = pool[followed]!;

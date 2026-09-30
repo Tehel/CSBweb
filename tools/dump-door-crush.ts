@@ -70,10 +70,10 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 2);
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
   const { width, height } = map.descriptor;
@@ -102,10 +102,10 @@ async function main(): Promise<void> {
   // `uByte9 = 1` (CLEAR, the door comes down). `processDoorStep` re-queues it each
   // step, so it is seeded once, due in the next tick, and then the clock is turned.
   const startClosing = (): void => {
-    game.timerQueue.addTimer({
+    game.ctx.timers.addTimer({
       index: 0,
       function: TimerFunction.TT_DOOR_STEP,
-      time: game.state.tickCount,
+      time: game.ctx.state.tickCount,
       level,
       uByte5: 0,
       uByte6: door!.x,
@@ -121,15 +121,15 @@ async function main(): Promise<void> {
   const tick = (): void => {
     game.systems.timer.processTimers();
     game.systems.monsterAttack.displayCharacterDamage();
-    game.state.tickCount++;
+    game.ctx.state.tickCount++;
   };
 
   const rows: string[][] = [];
 
   // ---- Case 1: the door closes on nothing, and reaches shut ---------------
   setDoorStateAt(door.x, door.y, 0);
-  game.party.state.champions = [];
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.champions = [];
+  game.ctx.party.state.position = new Position(0, 0, level);
   startClosing();
   for (let i = 0; i < 8; i++) tick();
   const emptyClose = doorStateAt(door.x, door.y);
@@ -137,13 +137,13 @@ async function main(): Promise<void> {
 
   // ---- Case 2: the door closes on the party -------------------------------
   setDoorStateAt(door.x, door.y, 0);
-  game.party.state.champions = [champion(0), champion(1)];
-  game.party.state.position = new Position(door.x, door.y, level);
-  const hpBefore = game.party.state.champions.map((c) => c.attributes.health);
+  game.ctx.party.state.champions = [champion(0), champion(1)];
+  game.ctx.party.state.position = new Position(door.x, door.y, level);
+  const hpBefore = game.ctx.party.state.champions.map((c) => c.attributes.health);
   startClosing();
   for (let i = 0; i < 8; i++) tick();
   const partyClose = doorStateAt(door.x, door.y);
-  const hpAfter = game.party.state.champions.map((c) => c.attributes.health);
+  const hpAfter = game.ctx.party.state.champions.map((c) => c.attributes.health);
   const hpLost = hpBefore.reduce((a, h, i) => a + (h - hpAfter[i]), 0);
   rows.push(['party under it', String(hpLost), String(partyClose)]);
 
@@ -154,14 +154,14 @@ async function main(): Promise<void> {
   // ---- Case 3: the door closes on a monster -------------------------------
   // Take a real group and put it under the door, which is what a monster walking
   // into a doorway does.
-  game.party.state.champions = [];
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.champions = [];
+  game.ctx.party.state.position = new Position(0, 0, level);
   setDoorStateAt(door.x, door.y, 0);
 
   let moved: { rn: number; type: number } | null = null;
   for (let x = 0; x < width && !moved; x++) {
     for (let y = 0; y < height && !moved; y++) {
-      const rn = game.dungeonState.findFirstMonster(new Position(x, y, level));
+      const rn = game.ctx.dungeon.findFirstMonster(new Position(x, y, level));
       if (rn === OBJECT_ID_EOF) continue;
       const rec = dungeon.getCreatureRecord(rn);
       if (!rec) continue;
@@ -175,7 +175,7 @@ async function main(): Promise<void> {
   if (!moved) throw new Error(`could not move a material monster onto the door on level ${level}`);
 
   const creature = dungeon.getCreatureRecord(
-    game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)),
+    game.ctx.dungeon.findFirstMonster(new Position(door.x, door.y, level)),
   );
   const desc = objectTables.monsterDesc[moved.type];
   const vSize = monsterVerticalSize(desc);
@@ -193,11 +193,11 @@ async function main(): Promise<void> {
     tick();
     states.push(doorStateAt(door.x, door.y));
     hpTrace.push(hpTotal());
-    if (game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)) === OBJECT_ID_EOF) break;
+    if (game.ctx.dungeon.findFirstMonster(new Position(door.x, door.y, level)) === OBJECT_ID_EOF) break;
   }
   console.log(`  door state per tick: ${states.join(' ')}`);
   console.log(`  group HP per tick:   ${hpTrace.join(' ')}`);
-  const stillThere = game.dungeonState.findFirstMonster(new Position(door.x, door.y, level)) !== OBJECT_ID_EOF;
+  const stillThere = game.ctx.dungeon.findFirstMonster(new Position(door.x, door.y, level)) !== OBJECT_ID_EOF;
   console.log(`  monster still under the door: ${stillThere}`);
   console.log('');
 

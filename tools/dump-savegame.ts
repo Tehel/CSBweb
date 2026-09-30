@@ -55,17 +55,17 @@ async function loadWorld(): Promise<Game> {
 }
 
 function roomTypeAt(game: Game, x: number, y: number, level: number): number {
-  return (game.dungeonState.getCellFlag(new Position(x, y, level)) >> 5) & 0x7;
+  return (game.ctx.dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7;
 }
 
 function doorStateAt(game: Game, x: number, y: number, level: number): number {
-  return game.dungeonState.getCellFlag(new Position(x, y, level)) & 0x7;
+  return game.ctx.dungeon.getCellFlag(new Position(x, y, level)) & 0x7;
 }
 
 function objectsAt(game: Game, x: number, y: number, level: number): ObjectID[] {
   const out: ObjectID[] = [];
   const pos = new Position(x, y, level);
-  for (let rn = game.dungeonState.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     out.push(rn);
     if (out.length > 64) break; // a corrupted chain must not hang the tool
   }
@@ -135,11 +135,11 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 1);
 
   const played = await loadWorld();
-  played.party.state.position = new Position(0, 0, level);
+  played.ctx.party.state.position = new Position(0, 0, level);
   played.systems.monsters.loadPartyLevel(level);
-  const playedData = played.dungeonState.getData() as DungeonData;
+  const playedData = played.ctx.dungeon.getData() as DungeonData;
 
-  const map = played.dungeonState.getMap(level);
+  const map = played.ctx.dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
   const { width, height } = map.descriptor;
 
@@ -194,7 +194,7 @@ async function main(): Promise<void> {
     if (x === carry.fromX || x === carry.toX) continue;
     for (let y = 0; y < height && !emptyCell; y++) {
       if (roomTypeAt(played, x, y, level) !== RoomType.OPEN) continue;
-      if (played.dungeonState.hasObjects(new Position(x, y, level))) continue;
+      if (played.ctx.dungeon.hasObjects(new Position(x, y, level))) continue;
       emptyCell = { x, y };
     }
   }
@@ -210,11 +210,11 @@ async function main(): Promise<void> {
 
   // ---- Mutate the played world -------------------------------------------
 
-  played.dungeonState.applyDoorActionAtPosition(level, door.x, door.y, 2);
+  played.ctx.dungeon.applyDoorActionAtPosition(level, door.x, door.y, 2);
   const doorOpened = doorStateAt(played, door.x, door.y, level);
 
-  played.dungeonState.removeObjectFromCell(new Position(carry.fromX, carry.fromY, level), carry.rn);
-  played.dungeonState.addObjectToCell(new Position(carry.toX, carry.toY, level), carry.rn);
+  played.ctx.dungeon.removeObjectFromCell(new Position(carry.fromX, carry.fromY, level), carry.rn);
+  played.ctx.dungeon.addObjectToCell(new Position(carry.toX, carry.toY, level), carry.rn);
 
   const actuatorBefore = getActuatorValue(actuator);
   setActuatorValue(actuator, (actuatorBefore + 7) & 0x1ff);
@@ -240,7 +240,7 @@ async function main(): Promise<void> {
   playedData.databases.misc.count++;
   playedData.header.objectCounts[DBType.MISC] = playedData.databases.misc.records.length;
   const droppedRn = encodeObjectID(0, DBType.MISC, miscCountBefore);
-  played.dungeonState.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
+  played.ctx.dungeon.addObjectToCell(new Position(carry.toX, carry.toY, level), droppedRn);
 
   // The column-index mutation. A second appended record, dropped into a cell that had
   // nothing in it, so `addObjectToCell` takes its insert branch: it splices a new entry
@@ -256,7 +256,7 @@ async function main(): Promise<void> {
   playedData.databases.misc.count++;
   const loneRn = encodeObjectID(0, DBType.MISC, loneCountBefore);
   const columnIndexBefore = [...playedData.columnIndex];
-  played.dungeonState.addObjectToCell(new Position(emptyCell.x, emptyCell.y, level), loneRn);
+  played.ctx.dungeon.addObjectToCell(new Position(emptyCell.x, emptyCell.y, level), loneRn);
   const columnIndexAfter = [...playedData.columnIndex];
   const columnIndexMoved = columnIndexBefore.some((v, i) => v !== columnIndexAfter[i]);
   const miscCountAfter = playedData.databases.misc.records.length;
@@ -289,9 +289,9 @@ async function main(): Promise<void> {
   const serialized = JSON.stringify(save);
 
   const reloaded = await loadWorld();
-  reloaded.party.state.position = new Position(0, 0, level);
+  reloaded.ctx.party.state.position = new Position(0, 0, level);
   reloaded.systems.monsters.loadPartyLevel(level);
-  const reloadedData = reloaded.dungeonState.getData() as DungeonData;
+  const reloadedData = reloaded.ctx.dungeon.getData() as DungeonData;
 
   // What the old code produced: a fresh dungeon with the party pasted back in.
   const freshDoor = doorStateAt(reloaded, door.x, door.y, level);
@@ -370,7 +370,7 @@ async function main(): Promise<void> {
   check(!restoredAtOld, 'the restored object should have left its original cell');
   check(restoredAtNew, 'the restored object should be at the cell it was moved to');
   check(
-    !reloaded.dungeonState.hasObjects(new Position(carry.fromX, carry.fromY, level)) ||
+    !reloaded.ctx.dungeon.hasObjects(new Position(carry.fromX, carry.fromY, level)) ||
       objectsAt(reloaded, carry.fromX, carry.fromY, level).length > 0,
     "the has-objects bit should agree with the restored cell's chain",
   );
@@ -426,7 +426,7 @@ async function main(): Promise<void> {
   for (let x = 0; x < width && !secondEmpty; x++) {
     for (let y = 0; y < height && !secondEmpty; y++) {
       if (roomTypeAt(reloaded, x, y, level) !== RoomType.OPEN) continue;
-      if (reloaded.dungeonState.hasObjects(new Position(x, y, level))) continue;
+      if (reloaded.ctx.dungeon.hasObjects(new Position(x, y, level))) continue;
       secondEmpty = { x, y };
     }
   }
@@ -441,7 +441,7 @@ async function main(): Promise<void> {
     });
     reloadedData.databases.misc.count++;
     reloadedData.header.objectCounts[DBType.MISC] = (reloadedData.header.objectCounts[DBType.MISC] + 1) & 0xffff;
-    reloaded.dungeonState.addObjectToCell(
+    reloaded.ctx.dungeon.addObjectToCell(
       new Position(secondEmpty.x, secondEmpty.y, level),
       encodeObjectID(0, DBType.MISC, idx),
     );

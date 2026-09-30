@@ -105,7 +105,7 @@ function makeGame(championCount: number): Game {
 
 /** An open cell with an open neighbour to the west, so a missile has somewhere to fly from. */
 function findCellWithWestNeighbour(game: Game): Position | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -126,7 +126,7 @@ function findCellWithWestNeighbour(game: Game): Position | null {
 
 /** Give the champion something to carry, so `DropAllPossessions` has work to do. */
 function armChampion(game: Game, chIdx: number): void {
-  const data = game.dungeonState.getData();
+  const data = game.ctx.dungeon.getData();
   const db = data.databases.weapons;
   const dagger = (): ObjectID => {
     db.records.push({
@@ -137,7 +137,7 @@ function armChampion(game: Game, chIdx: number): void {
     db.count++;
     return encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
   };
-  const champ = game.party.state.champions[chIdx]!;
+  const champ = game.ctx.party.state.champions[chIdx]!;
   const rn = dagger();
   champ.possessions![1] = rn;
   // Slot 8 as well: the port used to mirror it in a `quiver` field, and the drop forgot
@@ -148,7 +148,7 @@ function armChampion(game: Game, chIdx: number): void {
 
 /** A fresh dagger record, as `armChampion` makes them. */
 function newDagger(game: Game): ObjectID {
-  const db = game.dungeonState.getData().databases.weapons;
+  const db = game.ctx.dungeon.getData().databases.weapons;
   db.records.push({
     nextObject: OBJECT_ID_EOF,
     broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
@@ -169,7 +169,7 @@ function typeNamed(category: DBType.WEAPON | DBType.MISC, objNI: number): number
 }
 
 function newRecord(game: Game, category: DBType.WEAPON | DBType.MISC | DBType.SCROLL, record: object): ObjectID {
-  const databases = game.dungeonState.getData().databases;
+  const databases = game.ctx.dungeon.getData().databases;
   const db = category === DBType.WEAPON ? databases.weapons
     : category === DBType.MISC ? databases.misc : databases.scrolls;
   (db.records as object[]).push({ nextObject: OBJECT_ID_EOF, ...record });
@@ -181,9 +181,9 @@ function newRecord(game: Game, category: DBType.WEAPON | DBType.MISC | DBType.SC
 function chainAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF && out.length < 64;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) out.push(rn);
   return out;
 }
@@ -191,7 +191,7 @@ function chainAt(game: Game, cell: Position): ObjectID[] {
 /** Every cell holding `rn` (any corner), across the whole dungeon. */
 function whereIs(game: Game, rn: ObjectID): Position[] {
   const found: Position[] = [];
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -208,7 +208,7 @@ function whereIs(game: Game, rn: ObjectID): Position[] {
 
 /** An open pit (`0x08` set, not imaginary) — the test `WorldMove.isActivePitAt` makes. */
 function findOpenPit(game: Game): Position | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount() - 1; z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -226,7 +226,7 @@ function findOpenPit(game: Game): Position | null {
 
 /** Every bones object in the dungeon, with the cell it lies in. */
 function everyBones(game: Game): { rn: ObjectID; cell: Position }[] {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const found: { rn: ObjectID; cell: Position }[] = [];
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
@@ -245,12 +245,12 @@ function everyBones(game: Game): { rn: ObjectID; cell: Position }[] {
 function bonesAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     if (decodeObjectID(rn).category !== DBType.MISC) continue;
-    if (game.dungeonState.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
+    if (game.ctx.dungeon.getMiscRecord(rn)?.miscType === MISC_BONES_OF_HERO) out.push(rn);
     if (out.length > 32) break;
   }
   return out;
@@ -267,18 +267,18 @@ type Aftermath = {
 };
 
 function aftermath(game: Game, cell: Position, chIdx: number, lastAlive: boolean): Aftermath {
-  const champ = game.party.state.champions[chIdx]!;
+  const champ = game.ctx.party.state.champions[chIdx]!;
   const bones = bonesAt(game, cell);
   const rn = bones[0];
-  const record = rn === undefined ? null : game.dungeonState.getMiscRecord(rn);
+  const record = rn === undefined ? null : game.ctx.dungeon.getMiscRecord(rn);
   return {
     dead: champ.attributes.health === 0,
     bones: bones.length === 1,
     bonesValue2: (record?.specialState ?? 0) === 2,
-    expoolRecord: rn !== undefined && game.dungeonState.copyChampionBonesRecord(rn) !== null,
+    expoolRecord: rn !== undefined && game.ctx.dungeon.copyChampionBonesRecord(rn) !== null,
     dropped: Array.from({ length: 30 }, (_, slot) => getChampionPossession(champ, slot)).every((v) => v === OBJECT_ID_NULL),
     // Only meaningful when the victim was the last one standing.
-    gameIsLost: lastAlive ? game.party.state.gameIsLost : true,
+    gameIsLost: lastAlive ? game.ctx.party.state.gameIsLost : true,
   };
 }
 
@@ -302,7 +302,7 @@ function main(): void {
     const g = makeGame(1);
     const cell = findCellWithWestNeighbour(g);
     if (!cell) { fail('no open cell with an open neighbour'); finish(); return; }
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     armChampion(g, 0);
     g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
@@ -314,14 +314,14 @@ function main(): void {
   {
     const g = makeGame(1);
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     armChampion(g, 0);
     // Stamina 12, so a 100-point cost overshoots by 88 and `DamageCharacter` takes 44
     // — more than the 20 hit points the champion has.
     g.systems.monsterAttack.adjustStamina(0, 100);
     g.systems.monsterAttack.displayCharacterDamage();
-    check(g.party.state.champions[0]!.attributes.stamina === 0, 'exhaustion: stamina bottoms out at 0');
+    check(g.ctx.party.state.champions[0]!.attributes.stamina === 0, 'exhaustion: stamina bottoms out at 0');
     report('AdjustStamina', aftermath(g, cell, 0, true));
   }
 
@@ -331,10 +331,10 @@ function main(): void {
   {
     const g = makeGame(1);
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     armChampion(g, 0);
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     // The missile resolves the *corner it arrives at* through `CharacterAtPosition`,
     // so the champion has to be standing in the one the missile carries.
     champ.partyPosition = 0;
@@ -344,16 +344,16 @@ function main(): void {
     console.log('');
     console.log(['shot', 'health before', 'health after', 'alive'].join('\t'));
 
-    const alive = (): boolean => g.party.state.champions[0]!.attributes.health !== 0;
+    const alive = (): boolean => g.ctx.party.state.champions[0]!.attributes.health !== 0;
     let shots = 0;
     while (alive() && shots < 12) {
       shots++;
       const before = champ.attributes.health;
-      g.systems.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.state.tickCount);
+      g.systems.magic.launchThrownMissile(RN_FIREBALL, launch, 0, 1 /* east */, 255, 255, 0, g.ctx.state.tickCount);
       for (let i = 0; i < 6 && alive(); i++) {
         g.systems.timer.processTimers();
         g.systems.monsterAttack.displayCharacterDamage();
-        g.state.tickCount++;
+        g.ctx.state.tickCount++;
       }
       console.log([shots, before, champ.attributes.health, alive()].join('\t'));
       if (champ.attributes.health === before && alive()) {
@@ -373,13 +373,13 @@ function main(): void {
   {
     const g = makeGame(2);
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    g.party.state.cursorOwner = 0;
-    g.party.state.magicCasterIndex = 0;
+    g.ctx.party.state.cursorOwner = 0;
+    g.ctx.party.state.magicCasterIndex = 0;
     g.systems.monsterAttack.adjustStamina(0, 100);
     g.systems.monsterAttack.displayCharacterDamage();
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     console.log(['', 'value'].join('\t'));
     console.log(['cursorOwner', party.cursorOwner].join('\t'));
     console.log(['magicCasterIndex', party.magicCasterIndex].join('\t'));
@@ -446,18 +446,18 @@ function main(): void {
   {
     const g = makeGame(2);
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    const recruit = g.party.state.champions[1]!;
-    g.party.state.potentialChampionIndex = 1;
+    const recruit = g.ctx.party.state.champions[1]!;
+    g.ctx.party.state.potentialChampionIndex = 1;
     const r = g.systems.monsterAttack.damageCharacter(1, 999, 0, 0);
     console.log(`recruit: returned ${r}, health ${recruit.attributes.health}`);
     check(recruit.attributes.health === 20,
       'a recruit still in the mirror cannot be hurt');
     check(r === 2, 'and DamageCharacter says chIdx+1');
-    g.party.state.potentialChampionIndex = -1;
+    g.ctx.party.state.potentialChampionIndex = -1;
 
-    const hero = g.party.state.champions[0]!;
+    const hero = g.ctx.party.state.champions[0]!;
     g.gameWon = true;
     const w = g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
     console.log(`game won: returned ${w}, health ${hero.attributes.health}`);
@@ -490,9 +490,9 @@ function main(): void {
       'DropOrder is a permutation of the thirty slots');
 
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     champ.partyPosition = 2;
     const armed = [0, 1, 5, 10, 13];
     const slotOf = new Map<number, number>();
@@ -516,10 +516,10 @@ function main(): void {
     if (!pit) {
       fail('no open pit in the dungeon');
     } else {
-      g2.party.state.position = pit;
+      g2.ctx.party.state.position = pit;
       g2.systems.monsters.loadPartyLevel(pit.z);
       const rn = newDagger(g2);
-      g2.party.state.champions[0]!.possessions[1] = rn;
+      g2.ctx.party.state.champions[0]!.possessions[1] = rn;
       g2.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
       g2.systems.monsterAttack.displayCharacterDamage();
       const at = whereIs(g2, rn);
@@ -535,9 +535,9 @@ function main(): void {
         + (bones.map(({ rn, cell }) => `(${cell.x},${cell.y}) level ${cell.z} as 0x${rn.toString(16)}`).join(' ') || 'nowhere'));
       check(bonesAt(g2, pit).length === 0, 'no bones are left lying on the open pit');
       check(bones.length === 1 && bones[0]!.cell.z > pit.z, 'the bones fall through the pit like the possessions');
-      check(bones.length === 1 && g2.dungeonState.copyChampionBonesRecord(bones[0]!.rn) !== null,
+      check(bones.length === 1 && g2.ctx.dungeon.copyChampionBonesRecord(bones[0]!.rn) !== null,
         'the fallen bones are still paired in the expool');
-      check(bones.length === 1 && decodeObjectID(bones[0]!.rn).position === (g2.party.state.champions[0]!.partyPosition & 3),
+      check(bones.length === 1 && decodeObjectID(bones[0]!.rn).position === (g2.ctx.party.state.champions[0]!.partyPosition & 3),
         'and lie in the dead champion\'s corner');
     }
   }
@@ -554,7 +554,7 @@ function main(): void {
   {
     const g = makeGame(2);
     const cell = findCellWithWestNeighbour(g)!;
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     const torchType = typeNamed(DBType.WEAPON, OBJNI_TORCH_A);
     const illumuletType = typeNamed(DBType.MISC, OBJNI_ILLUMULET_A);
@@ -573,22 +573,22 @@ function main(): void {
     const symal = newRecord(g, DBType.MISC, { specialState: 1, important: false, miscType: symalType });
     // What `AddCharacterPossession` would have left (`:2006-2022`): worn, so `value(1)`,
     // and the Illumulet's step added to the party's light.
-    const before = g.party.state.brightness;
-    g.party.state.brightness = before + step;
-    const a = g.party.state.champions[0]!;
+    const before = g.ctx.party.state.brightness;
+    g.ctx.party.state.brightness = before + step;
+    const a = g.ctx.party.state.champions[0]!;
     a.possessions[0] = torch;
     a.possessions[1] = scroll;
     a.possessions[10] = illumulet;
-    g.party.state.champions[1]!.possessions[10] = symal;
+    g.ctx.party.state.champions[1]!.possessions[10] = symal;
 
     g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
     g.systems.monsterAttack.damageCharacter(1, 999, 0, 0);
     g.systems.monsterAttack.displayCharacterDamage();
-    const d = g.dungeonState;
-    console.log(`brightness ${before + step} -> ${g.party.state.brightness}; torch lit ${d.getWeaponRecord(torch)?.litTorch}; `
+    const d = g.ctx.dungeon;
+    console.log(`brightness ${before + step} -> ${g.ctx.party.state.brightness}; torch lit ${d.getWeaponRecord(torch)?.litTorch}; `
       + `scroll open ${d.getScrollRecord(scroll)?.open}; Illumulet value ${d.getMiscRecord(illumulet)?.specialState}; `
       + `Jewel Symal value ${d.getMiscRecord(symal)?.specialState}`);
-    check(g.party.state.brightness === before, 'the dead champion\'s Illumulet takes its light off the party');
+    check(g.ctx.party.state.brightness === before, 'the dead champion\'s Illumulet takes its light off the party');
     check(d.getMiscRecord(illumulet)?.specialState === 0, 'the dropped Illumulet is of no use any more, value(0)');
     check(d.getMiscRecord(symal)?.specialState === 0, 'the dropped Jewel Symal is of no use any more, value(0)');
     check(d.getWeaponRecord(torch)?.litTorch === false, 'the dropped torch goes out');
@@ -607,16 +607,16 @@ function main(): void {
     const g = makeGame(1);
     const cell = findCellWithWestNeighbour(g);
     if (!cell) { fail('no open cell with an open neighbour'); finish(); return; }
-    g.party.state.position = cell;
+    g.ctx.party.state.position = cell;
     g.systems.monsters.loadPartyLevel(cell.z);
     g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 999, 0, 0); return false; };
     const drawn: string[] = [];
-    g.onTick(() => drawn.push(`gameIsLost ${g.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
+    g.onTick(() => drawn.push(`gameIsLost ${g.ctx.party.state.gameIsLost}, main loop returned ${g.mainLoopHasReturned()}`));
     (g as unknown as { gameTick(): void }).gameTick();
     console.log(`the killing blow's tick draws: ${drawn.join('; ') || 'nothing'}; then main loop returned ${g.mainLoopHasReturned()}`);
     check(drawn.length === 1 && drawn[0] === 'gameIsLost false, main loop returned false',
       "the tick of the killing blow draws the frame before DisplayCharacterDamage kills");
-    check(g.party.state.gameIsLost, 'and the same tick loses the game');
+    check(g.ctx.party.state.gameIsLost, 'and the same tick loses the game');
     check(g.mainLoopHasReturned(), 'and then the main loop returns');
   }
 

@@ -71,11 +71,11 @@ async function main(): Promise<void> {
   // The tick's `TAG01b29a` and the paint after it, as the host sees them.
   const hostLog: string[] = [];
   const game = newGame(data, graphics, {
-    tag01b29a: () => hostLog.push(`TAG01b29a d.Time ${game.state.tickCount} freezeLifeTimer ${game.party.state.freezeLifeTimer}`),
+    tag01b29a: () => hostLog.push(`TAG01b29a d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${game.ctx.party.state.freezeLifeTimer}`),
     drawViewport: () => hostLog.push('paint'),
   });
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
   const loop = game.ctx.loop;
 
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
 
   // An open cell with an open, monster-free cell in front. The party is empty, so a step
   // costs no stamina and sets no delay.
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
   const { width, height } = map.descriptor;
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     }
   }
   if (!scene) throw new Error(`level ${level} has no open cell with an open neighbour`);
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.champions = [];
   game.setMouseEventHandlers({ button: () => {}, unclick: () => {} });
 
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
   const reset = (): void => {
     game.discardAllInput();
     party.position = new Position(scene!.x, scene!.y, level);
-    game.party.setFacing(scene!.dir);
+    game.ctx.party.setFacing(scene!.dir);
     party.partyMoveDisableTimer = 0;
     party.word11712 = 0;
     internals.lastInputTime = 0;
@@ -214,12 +214,12 @@ async function main(): Promise<void> {
   // `DrawViewport` (:638), `WaitForButtonFlash` (:655), `d.Time++` (:660),
   // `d.freezeLifeTimer--` (:684), `TAG01b29a` (:685). CSBWin's `WaitForButtonFlash` holds
   // the pass until the put-back, so what `TAG01b29a` draws is on screen only after it.
-  game.onTick(() => hostLog.push(`DrawViewport d.Time ${game.state.tickCount} freezeLifeTimer ${party.freezeLifeTimer}`));
+  game.onTick(() => hostLog.push(`DrawViewport d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${party.freezeLifeTimer}`));
   const tickOrder = (flash: boolean): { time: number; log: string[]; held: boolean; next: { inverted: Rect | null; changed: boolean; held: boolean } } => {
     reset();
     party.freezeLifeTimer = 5;
     hostLog.length = 0;
-    const time = game.state.tickCount;
+    const time = game.ctx.state.tickCount;
     if (flash) {
       flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
       game.setClockTick(1);
@@ -280,7 +280,7 @@ async function main(): Promise<void> {
 
   // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
   let redraws = 0;
-  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
+  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
   ui.uiTables = extractUITables(graphics);
   ui.partyState = party;
   let castAt = -1;

@@ -55,15 +55,15 @@ function makeGame(): Game {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
 
 /** Run `TenSecondUpdate`'s gate at every tick in `[from, to]`, as the game tick does. */
 function runTicks(game: Game, from: number, to: number): void {
   for (let t = from; t <= to; t++) {
-    game.state.tickCount = t;
-    if (isTenSecondTick(t, game.party.state.sleeping)) tenSecondUpdate(game.ctx);
+    game.ctx.state.tickCount = t;
+    if (isTenSecondTick(t, game.ctx.party.state.sleeping)) tenSecondUpdate(game.ctx);
   }
 }
 
@@ -71,7 +71,7 @@ function main(): void {
   console.log('=== cadence (CSBCode.cpp:686-688) ===');
   {
     const game = makeGame();
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
     runTicks(game, 1, 63);
     console.log(`after ticks 1..63: food=${champ.food} water=${champ.water}`);
     check(champ.food === 1500 && champ.water === 1500, 'nothing happens before tick 64');
@@ -83,8 +83,8 @@ function main(): void {
   }
   {
     const game = makeGame();
-    game.party.state.sleeping = true;
-    const champ = game.party.state.champions[0]!;
+    game.ctx.party.state.sleeping = true;
+    const champ = game.ctx.party.state.champions[0]!;
     runTicks(game, 1, 64);
     console.log(`asleep, after ticks 1..64: food=${champ.food}`);
     check(champ.food === 1500 - 4 * 2, 'asleep, the update runs every 16 ticks');
@@ -94,7 +94,7 @@ function main(): void {
   console.log('=== attributes return to Maximum (Code17818.cpp:384-414) ===');
   {
     const game = makeGame();
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
     const str = champ.attributes.stats[AttributeIndex.Strength];
     incrAttributeMaximum(str, 3); // what LevelUp does (Magic.cpp:98-148)
     const trace: string[] = [];
@@ -104,7 +104,7 @@ function main(): void {
     }
     console.log(trace.join(' '));
     const g = makeGame();
-    const s = g.party.state.champions[0]!.attributes.stats[AttributeIndex.Strength];
+    const s = g.ctx.party.state.champions[0]!.attributes.stats[AttributeIndex.Strength];
     incrAttributeMaximum(s, 3);
     runTicks(g, 1, 255);
     check(s.current === 60, 'no recovery before tick 256');
@@ -119,15 +119,15 @@ function main(): void {
   }
   {
     const game = makeGame();
-    game.party.state.sleeping = true;
-    const s = game.party.state.champions[0]!.attributes.stats[AttributeIndex.Wisdom];
+    game.ctx.party.state.sleeping = true;
+    const s = game.ctx.party.state.champions[0]!.attributes.stats[AttributeIndex.Wisdom];
     incrAttributeMaximum(s, 2);
     runTicks(game, 1, 128);
     check(s.current === 52, 'asleep, one point per 64 ticks');
   }
   {
     const game = makeGame();
-    const s = game.party.state.champions[0]!.attributes.stats[AttributeIndex.Dexterity];
+    const s = game.ctx.party.state.champions[0]!.attributes.stats[AttributeIndex.Dexterity];
     s.current = 120; // maximum 50, e.g. after a potion
     runTicks(game, 1, 256);
     console.log(`over-max Dexterity 120/50 after tick 256: ${s.current}`);
@@ -138,7 +138,7 @@ function main(): void {
   console.log('=== HP regeneration (Code17818.cpp:350-372) ===');
   {
     const game = makeGame();
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
     champ.attributes.health = 100;
     runTicks(game, 64, 64);
     // random112 at 64 is 0x40 = 64, not below Vitality 50 + 12.
@@ -160,14 +160,14 @@ function main(): void {
   console.log('=== skipped champions ===');
   {
     const game = makeGame();
-    game.party.state.potentialChampionIndex = 0;
-    const champ = game.party.state.champions[0]!;
+    game.ctx.party.state.potentialChampionIndex = 0;
+    const champ = game.ctx.party.state.champions[0]!;
     runTicks(game, 64, 64);
     check(champ.food === 1500, 'a provisional recruit (PotentialCharacterOrdinal) is skipped');
   }
   {
     const game = makeGame();
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
     champ.attributes.health = 0;
     runTicks(game, 64, 64);
     check(champ.food === 1500, 'a dead champion is skipped');

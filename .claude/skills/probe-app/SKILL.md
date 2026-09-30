@@ -10,7 +10,7 @@ wrong *on screen*. `tools/probe-ui.mjs` drives the real page over the Chrome Dev
 Protocol instead, through the `window.__probe` handle `src/main.ts` exposes.
 
 ```bash
-node tools/probe-ui.mjs 'game.party.state.champions.map(c => c && c.name)'
+node tools/probe-ui.mjs 'game.ctx.party.state.champions.map(c => c && c.name)'
 node tools/probe-ui.mjs --boot --shot /tmp/boot.png
 node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
 node tools/probe-ui.mjs --stop
@@ -34,11 +34,11 @@ Every later probe is about **one second**. So:
 ## Discovering the shape
 
 The engine's API is not what you would guess — champions are at
-`game.party.state.champions`, not `game.party.champions`. Don't guess twice; ask:
+`game.ctx.party.state.champions`, not `game.ctx.party.champions`. Don't guess twice; ask:
 
 ```bash
 node tools/probe-ui.mjs 'Object.keys(game)'
-node tools/probe-ui.mjs 'Object.keys(game.party.state)'
+node tools/probe-ui.mjs 'Object.keys(game.ctx.party.state)'
 ```
 
 The expression is serialised with `JSON.stringify`, so `Map`s are converted and `bigint`s

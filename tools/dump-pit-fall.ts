@@ -67,18 +67,18 @@ function makeGame(): Game {
  * (`d.newPartyLevel`), and say where it landed.
  */
 function fall(g: Game, pit: Position): Position {
-  g.party.state.position = new Position(pit.x, pit.y, pit.z);
+  g.ctx.party.state.position = new Position(pit.x, pit.y, pit.z);
   g.systems.worldMove.moveParty(-1, 0, pit.x, pit.y);
   // The next tick: the level below loaded, then `DisplayCharacterDamage` takes the fall
   // off the HP (doc/CSBwin-src/CSBCode.cpp:615-657).
   g.loadNewPartyLevel();
   g.systems.monsterAttack.displayCharacterDamage();
-  return g.party.state.position;
+  return g.ctx.party.state.position;
 }
 
 /** An open, active pit in the shipped dungeon that actually leads somewhere. */
 function findOpenPit(game: Game): Position | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -99,11 +99,11 @@ function findOpenPit(game: Game): Position | null {
 }
 
 function healths(game: Game): number[] {
-  return game.party.state.champions.map((c) => c.attributes.health);
+  return game.ctx.party.state.champions.map((c) => c.attributes.health);
 }
 
 function staminas(game: Game): number[] {
-  return game.party.state.champions.map((c) => c.attributes.stamina);
+  return game.ctx.party.state.champions.map((c) => c.attributes.stamina);
 }
 
 function main(): void {
@@ -114,7 +114,7 @@ function main(): void {
     finish();
     return;
   }
-  const below = probe.dungeonState.incrementLevel(pit, 1)!;
+  const below = probe.ctx.dungeon.incrementLevel(pit, 1)!;
   console.log(`=== the pit at level ${pit.z} (${pit.x},${pit.y}), which drops to level ${below.z} ===`);
 
   /* ------------------------------------------------- 1. an ordinary fall -------- */
@@ -173,7 +173,7 @@ function main(): void {
     // A loaded champion pays more. `25 * load / MaxLoad + 1` with load at half MaxLoad
     // is 13; the tool sets the load by hand rather than filling a backpack.
     const g = makeGame();
-    const champ = g.party.state.champions[0]!;
+    const champ = g.ctx.party.state.champions[0]!;
     const maxLoad = g.systems.characterStats.maxLoad(champ);
     const before = champ.attributes.stamina;
     g.systems.monsterAttack.adjustStamina(0, Math.trunc(((25 * Math.trunc(maxLoad / 2)) & 0xffff) / maxLoad) + 1);
@@ -204,7 +204,7 @@ function main(): void {
 
   {
     const g = makeGame();
-    const dead = g.party.state.champions[1]!;
+    const dead = g.ctx.party.state.champions[1]!;
     dead.attributes.health = 0;
     const staminaBefore = dead.attributes.stamina;
     g.systems.worldMove.withSupressedPitDamage(() => fall(g, pit));

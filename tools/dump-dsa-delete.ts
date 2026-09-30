@@ -64,7 +64,7 @@ async function main(): Promise<void> {
 
   /** An empty open square on the start level that is not the start square. */
   const emptySquare = (game: Game): Position => {
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const start = dungeon.getStartPosition();
     const map = dungeon.getMap(start.z);
     if (!map) throw new Error('no start level');
@@ -82,25 +82,25 @@ async function main(): Promise<void> {
 
   /** A new type-47 actuator whose DSA is `selector`, in corner 0 of `at`. */
   const addDsaActuator = (game: Game, at: Position, selector: number): ObjectID => {
-    const data: DungeonData = game.dungeonState.getData();
+    const data: DungeonData = game.ctx.dungeon.getData();
     data.databases.actuators.records.push({ nextObject: OBJECT_ID_EOF, word2: 47 | (selector << 7), word4: 0, word6: 0 });
     const rn = encodeObjectID(0, DBType.ACTUATOR, data.databases.actuators.records.length - 1);
-    game.dungeonState.addObjectToCell(at, rn);
+    game.ctx.dungeon.addObjectToCell(at, rn);
     return rn;
   };
 
   /** A copy of weapon 0, in corner 1 of `at`. */
   const addWeapon = (game: Game, at: Position): ObjectID => {
-    const data: DungeonData = game.dungeonState.getData();
+    const data: DungeonData = game.ctx.dungeon.getData();
     data.databases.weapons.records.push({ ...data.databases.weapons.records[0], nextObject: OBJECT_ID_EOF });
     const rn = encodeObjectID(1, DBType.WEAPON, data.databases.weapons.records.length - 1);
-    game.dungeonState.addObjectToCell(at, rn);
+    game.ctx.dungeon.addObjectToCell(at, rn);
     return rn;
   };
 
   /** Install DSA 0 on `at`'s level, selector 0, running `programs` in turn as one state. */
   const installDsa = (game: Game, at: Position, program: Uint16Array): void => {
-    const data: DungeonData = game.dungeonState.getData();
+    const data: DungeonData = game.ctx.dungeon.getData();
     data.dsaIndex = { entries: [{
       description: 'test', state: 0, localState: 1, groupId: 0, numStates: 1, firstDisplayedState: 0,
       states: [{ actions: [{ column: 0, program }] }],
@@ -109,10 +109,10 @@ async function main(): Promise<void> {
     data.dsaLevelIndex[at.z] = [0];
   };
 
-  const link = (game: Game, rn: ObjectID): number => game.dungeonState.getDBRecordLink(rn);
+  const link = (game: Game, rn: ObjectID): number => game.ctx.dungeon.getDBRecordLink(rn);
   const inCell = (game: Game, at: Position): ObjectID[] => {
     const out: ObjectID[] = [];
-    for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) out.push(rn);
+    for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) out.push(rn);
     return out;
   };
 

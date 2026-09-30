@@ -65,7 +65,7 @@ async function main(): Promise<void> {
   /** Every object of `category` in a cell. */
   const inCell = (game: Game, pos: Position, category: DBType): ObjectID[] => {
     const out: ObjectID[] = [];
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category === category) out.push(rn);
     }
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 
   /** An empty open square on the start level that is not the start square. */
   const emptySquare = (game: Game, start: Position): Position => {
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const map = dungeon.getMap(start.z);
     if (!map) throw new Error('no start level');
     for (let x = 0; x < map.descriptor.width; x++) {
@@ -98,13 +98,13 @@ async function main(): Promise<void> {
   /* ---------------------------------------------- 1-2. a poison cloud moved ------ */
   {
     const game = await makeGame();
-    const start = game.dungeonState.getStartPosition();
+    const start = game.ctx.dungeon.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
     game.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
     const result = move(game, DBType.CLOUD, from, to, 2);
     const moved = inCell(game, to, DBType.CLOUD);
-    const timer = game.timerQueue.getTimers().find((t) => t.function === TimerFunction.TT_25);
+    const timer = game.ctx.timers.getTimers().find((t) => t.function === TimerFunction.TT_25);
     console.log(`1. poison cloud (${from.x},${from.y}) -> (${to.x},${to.y}): result ${result}, `
       + `now ${moved.map((r) => r.toString(16)).join(',') || 'nowhere'}, timer at (${timer?.uByte6},${timer?.uByte7}) L${timer?.level} obj ${timer?.object?.toString(16)}`);
     check(result === 0, 'a cell source hands a cloud over (result 0, not SER_NoCloudsPlease)');
@@ -127,12 +127,12 @@ async function main(): Promise<void> {
   /* -------------------------------------------- a cloud with no timer ----------- */
   {
     const game = await makeGame();
-    const start = game.dungeonState.getStartPosition();
+    const start = game.ctx.dungeon.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
     game.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 60, from, 255);
-    const tt25 = game.timerQueue.getTimers().find((t) => t.function === TimerFunction.TT_25);
-    if (tt25) game.timerQueue.deleteTimer(tt25.index);
+    const tt25 = game.ctx.timers.getTimers().find((t) => t.function === TimerFunction.TT_25);
+    if (tt25) game.ctx.timers.deleteTimer(tt25.index);
     const result = move(game, DBType.CLOUD, from, to, 2);
     console.log(`1b. a cloud without its timer: result ${result}`);
     check(result === SER_BadCloudTimer, 'a cloud with no TT_24/TT_25 is SER_BadCloudTimer (16)');
@@ -142,14 +142,14 @@ async function main(): Promise<void> {
   /* ---------------------------------------------- 3. a missile moved ------------ */
   {
     const game = await makeGame();
-    const start = game.dungeonState.getStartPosition();
+    const start = game.ctx.dungeon.getStartPosition();
     const from = new Position(start.x, start.y, start.z);
     const to = emptySquare(game, from);
     // A poison bolt in flight, heading west with decay 1, not due for a while.
     game.systems.magic.launchThrownMissile(RN_POISON_BOLT, from, 1, 3, 100, 100, 1, 1000);
     const missile = inCell(game, from, DBType.MISSILE)[0];
-    const record = missile !== undefined ? game.dungeonState.getMissileRecord(missile) : null;
-    const timer = record ? game.timerQueue.getTimer(record.timerIndex) : null;
+    const record = missile !== undefined ? game.ctx.dungeon.getMissileRecord(missile) : null;
+    const timer = record ? game.ctx.timers.getTimer(record.timerIndex) : null;
     const before = timer?.timerWord8 ?? 0;
     const result = move(game, DBType.MISSILE, from, to, 1);
     const after = timer?.timerWord8 ?? 0;
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
 
   /** The first square on any level that `pred` accepts. */
   const findSquare = (game: Game, pred: (p: Position) => boolean): Position | null => {
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     for (let z = 0; z < dungeon.getMapCount(); z++) {
       const map = dungeon.getMap(z);
       if (!map) continue;
@@ -176,9 +176,9 @@ async function main(): Promise<void> {
     }
     return null;
   };
-  const roomType = (game: Game, p: Position): number => (game.dungeonState.getCellFlag(p) >> 5) & 7;
+  const roomType = (game: Game, p: Position): number => (game.ctx.dungeon.getCellFlag(p) >> 5) & 7;
   const emptyOpen = (game: Game, p: Position): boolean =>
-    roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+    roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
   const holding = (game: Game, p: Position, rn: ObjectID): boolean =>
     inCell(game, p, decodeObjectID(rn).category).some((r) => (r & 0x3fff) === (rn & 0x3fff));
   /** An item lying on a floor somewhere: the thing the DSA moves. */
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
   /* ------------------------------------- 4. an item onto an active teleporter ---- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const { at, rn } = anItem(game);
     let dest: Position | null = null;
     const tele = findSquare(game, (p) => {
@@ -224,7 +224,7 @@ async function main(): Promise<void> {
   /* ------------------------------------------- 5. an item and a cloud down a pit ---- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const { at, rn } = anItem(game);
     const pit = findSquare(game, (p) => {
       const flag = dungeon.getCellFlag(p);
@@ -258,7 +258,7 @@ async function main(): Promise<void> {
       game: Game; party: number; other: number; rn: ObjectID; where: Position;
     }> => {
       const game = await makeGame();
-      const dungeon = game.dungeonState;
+      const dungeon = game.ctx.dungeon;
       let pick: [number, number, number] | null = null;
       for (let a = 0; a < dungeon.getMapCount() && !pick; a++) {
         for (let b = a + 1; b < dungeon.getMapCount() && !pick; b++) {
@@ -270,7 +270,7 @@ async function main(): Promise<void> {
       if (!pick) throw new Error('no monster type is allowed on two levels');
       const [a, b, type] = pick;
       const partySquare = findSquare(game, (p) => p.z === a && emptyOpen(game, p))!;
-      game.party.state.position = partySquare;
+      game.ctx.party.state.position = partySquare;
       game.systems.monsters.loadPartyLevel(a);
       const z = level === 0 ? a : b;
       const where = at(game, z);
@@ -281,16 +281,16 @@ async function main(): Promise<void> {
       if (rn === null) throw new Error('createMonster failed');
       return { game, party: a, other: b, rn, where };
     };
-    const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
+    const aiTimersAt = (game: Game, p: Position): number => game.ctx.timers.getTimers().filter((t) =>
       t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
       && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;
     const openOn = (game: Game, z: number, not: Position[]): Position => findSquare(game, (p) =>
       p.z === z && emptyOpen(game, p) && !not.some((q) => q.x === p.x && q.y === p.y && q.z === p.z)
-      && !(game.party.state.position.x === p.x && game.party.state.position.y === p.y && game.party.state.position.z === p.z))!;
+      && !(game.ctx.party.state.position.x === p.x && game.ctx.party.state.position.y === p.y && game.ctx.party.state.position.z === p.z))!;
 
     {
       const { game, rn, where, party } = await withMonster(0, (g, z) => openOn(g, z, []));
-      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const group = game.ctx.dungeon.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const timersBefore = aiTimersAt(game, where);
       const to = openOn(game, party, [where]);
@@ -304,7 +304,7 @@ async function main(): Promise<void> {
     }
     {
       const { game, rn, where, other } = await withMonster(0, (g, z) => openOn(g, z, []));
-      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const group = game.ctx.dungeon.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const to = openOn(game, other, []);
       const result = move(game, DBType.CREATURE, where, to, 0);
@@ -314,7 +314,7 @@ async function main(): Promise<void> {
     }
     {
       const { game, rn, where, party } = await withMonster(1, (g, z) => openOn(g, z, []));
-      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const group = game.ctx.dungeon.getCreatureRecord(rn)!;
       const before = group.groupIndex;
       const to = openOn(game, party, []);
       const result = move(game, DBType.CREATURE, where, to, 0);

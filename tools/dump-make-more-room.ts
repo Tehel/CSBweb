@@ -185,7 +185,7 @@ const where = (p: Position): string => `${p.z}:${p.x},${p.y}`;
   const dungeon = ctx.dungeon;
   const from = emptyFloor(game, 2);
   const thrown = encodeObjectID(0, DBType.MISC, dungeon.findEmptyDBEntry('misc', rockRecord())!);
-  check(game.systems.magic.launchMissile(thrown, from.x, from.y, from.z, 0, 0, 40, 10, 1, game.state.tickCount, true),
+  check(game.systems.magic.launchMissile(thrown, from.x, from.y, from.z, 0, 0, 40, 10, 1, game.ctx.state.tickCount, true),
     'a rock is thrown on level 2');
   let missile: ObjectID = OBJECT_ID_EOF;
   for (let o = dungeon.findFirstObject(from); o !== OBJECT_ID_EOF; o = dungeon.getDBRecordLink(o)) {

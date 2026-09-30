@@ -12,7 +12,7 @@ export function drawMapPreview(levelIndex: number): void {
     const canvasCtx: CanvasRenderingContext2D = mapCanvasEl.getContext('2d')!;
     canvasCtx.imageSmoothingEnabled = true;
 
-    const map = ctx.game.state.dungeon.maps[levelIndex];
+    const map = ctx.game.ctx.state.dungeon.maps[levelIndex];
     const { cellSize, offsetX, offsetY } = getMapPreviewLayout(mapCanvasEl, map);
     canvasCtx.fillStyle = '#000';
     canvasCtx.fillRect(0, 0, mapCanvasEl.width, mapCanvasEl.height);
@@ -27,7 +27,7 @@ export function drawMapPreview(levelIndex: number): void {
         [RoomType.FALSEWALL, '#a66'],
     ]);
 
-    const current = ctx.game.party.state.position;
+    const current = ctx.game.ctx.party.state.position;
     for (let x = 0; x < map.descriptor.width; x++) {
         for (let y = 0; y < map.descriptor.height; y++) {
             const roomType = getRoomType(map.cellFlags[x][y]);
@@ -50,7 +50,7 @@ export function handleMapCanvasClick(e: MouseEvent): void {
     // A script holding the loop (the fusion) runs on the party where it stands.
     if (!ctx || ctx.game.isRunningScript()) return;
 
-    const map = ctx.game.state.dungeon.maps[ctx.game.party.state.position.z];
+    const map = ctx.game.ctx.state.dungeon.maps[ctx.game.ctx.party.state.position.z];
     const { cellSize, offsetX, offsetY } = getMapPreviewLayout(mapCanvasEl, map);
     const { x, y } = getEventPosition(mapCanvasEl, e);
     if (x < offsetX || y < offsetY) return;
@@ -62,7 +62,7 @@ export function handleMapCanvasClick(e: MouseEvent): void {
     const gy = Math.floor((y - offsetY) / cellSize);
     if (gx < 0 || gy < 0 || gx >= map.descriptor.width || gy >= map.descriptor.height) return;
 
-    const state = ctx.game.party.state;
+    const state = ctx.game.ctx.party.state;
     ctx.game.setPartyState({
         ...state,
         position: new Position(gx, gy, state.position.z),

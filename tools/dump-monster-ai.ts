@@ -46,12 +46,12 @@ async function main(): Promise<void> {
     },
   });
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(10, 10, level);
+  game.ctx.party.state.position = new Position(10, 10, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const pool = game.dungeonState.getItem16Pool();
+  const pool = game.ctx.dungeon.getItem16Pool();
   const active = () => pool.filter((s) => s.word0 >= 0).length;
-  const aiTimers = () => game.timerQueue.getTimers().filter(
+  const aiTimers = () => game.ctx.timers.getTimers().filter(
     t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI).length;
 
   console.log(`level ${level}: ${active()} group(s), ${aiTimers()} AI timer(s)\n`);
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   const startTimers = aiTimers();
   turnsStarted = 0; turnsPassedGate = 0;
   for (let t = 0; t < ticks; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
   }
   const fired = turnsStarted;
@@ -80,10 +80,10 @@ async function main(): Promise<void> {
   // ---- Gate: FREEZE LIFE holds everything ---------------------------------
   // The window has to be long enough for something to actually be due: the slowest
   // monsters here have a `timePerMove` of 185 ticks, so 60 would see nothing at all.
-  game.party.state.freezeLifeTimer = 2000;
+  game.ctx.party.state.freezeLifeTimer = 2000;
   turnsStarted = 0; turnsPassedGate = 0;
   for (let t = ticks; t < ticks + 400; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
   }
   const firedFrozen = turnsStarted;
@@ -91,22 +91,22 @@ async function main(): Promise<void> {
   console.log(`FREEZE LIFE active: ${firedFrozen} timer(s) fired, ${passedFrozen} reached the AI`);
   check(firedFrozen > 0, 'timers should still fire while frozen');
   check(passedFrozen === 0, 'no monster should pass InitialChecks while life is frozen');
-  game.party.state.freezeLifeTimer = 0;
+  game.ctx.party.state.freezeLifeTimer = 0;
   console.log('');
 
   // ---- Gate: a member at zero HP is cleared out --------------------------
   const groupSlot = pool.find((s) => {
     if (s.word0 < 0) return false;
-    const r = game.dungeonState.getCreatureRecordByIndex(s.word0);
+    const r = game.ctx.dungeon.getCreatureRecordByIndex(s.word0);
     return r ? (r.numMonM1 & 3) >= 1 : false;
   });
   if (groupSlot) {
-    const rec = game.dungeonState.getCreatureRecordByIndex(groupSlot.word0)!;
+    const rec = game.ctx.dungeon.getCreatureRecordByIndex(groupSlot.word0)!;
     const n0 = rec.numMonM1;
     rec.hp[0] = 0; // kill member 0 without going through DamageMonster
     console.log(`Zero-HP gate — ${MonsterType[rec.creatureType]} at (${groupSlot.uByte10},${groupSlot.uByte11}), numMonM1 ${n0}`);
     for (let t = ticks + 400; t < ticks + 900; t++) {
-      (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+      game.ctx.state.tickCount = t;
       processTimersAt(game, t);
     }
     console.log(`  numMonM1 now ${rec.numMonM1}, member 0 hp ${rec.hp[0]}`);

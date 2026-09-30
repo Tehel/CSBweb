@@ -9,22 +9,18 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
+import type { Champion, PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
-import { Party, ensureHandOwner } from './Party';
+import { ensureHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
-import { DungeonState } from './DungeonState';
 import { MovementSystem } from './MovementSystem';
 import { ActuatorSystem } from './ActuatorSystem';
-import { TimerQueue } from './TimerQueue';
 import { TimerSystem } from './TimerSystem';
 import { WorldMove } from './WorldMove';
 import { MissileEncounter } from './MissileEncounter';
 import { MonsterSystem } from './MonsterSystem';
-import type { SoundQueue } from './SoundQueue';
 import { createGameContext, type GameContext, type GameSystems } from './GameContext';
 import { createGameHost, type GameHost } from './GameHost';
-import { PartyFootprints } from './PartyFootprints';
 import { applyRuntimeSaveState, getRuntimeSaveState, type RuntimeSaveState } from './RuntimeSave';
 import { MonsterPerception } from './MonsterPerception';
 import { MonsterDamage } from './MonsterDamage';
@@ -43,7 +39,6 @@ import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdat
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
 import type { Rect } from '../renderer/csbwin/UITables';
-import { CsbRandom } from '../core/random';
 import { TICKS_PER_SECOND } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
@@ -89,9 +84,6 @@ const BUTTON_MOVEMENT: Record<number, MovementAction> = Object.fromEntries(
  * Game class - main game controller
  */
 export class Game implements MainLoop {
-    state: GameState;
-    party: Party;
-    dungeonState: DungeonState;
     /**
      * Where `HandleMouseEvents` sends every button that is not its own (the turns and the
      * steps): the UI's dispatcher, and the button-up. Headless, nobody is listening and
@@ -104,43 +96,24 @@ export class Game implements MainLoop {
      * initialise call, which a game load makes (`SaveGame.cpp:1661`).
      */
     private lastInputTime = 0;
-    /** The timer queue. Public like the other subsystems; `tools/` drives it. */
-    readonly timerQueue: TimerQueue;
     /**
-     * The game's random stream, CSBWin's `d.RandomNumber`
-     * (`doc/CSBwin-src/CSBCode.cpp:351`). Everything with a game-visible outcome draws
-     * from this one instance, in CSBWin's order, so a seeded run is reproducible and an
-     * AI trace is comparable with CSBWin's. Rendering must never draw from it — CSBWin
-     * keeps a separate `viewportRandom` precisely so drawing "doesn't upset the game"
-     * (doc/CSBwin-src/Viewport.cpp:6706).
-     *
-     * Seeded from the host on first draw; `setRandomSeed` exists so a verification tool
-     * can pin the stream, which is what makes a run repeatable.
+     * What every subsystem shares (`GameContext`), created first. The game's state,
+     * party, dungeon, timer queue, footprints, sound queue and random stream are its
+     * members, and have no other name here: `game.ctx.party`, `game.ctx.timers`.
      */
-    private readonly random: CsbRandom;
-    /** What every subsystem shares (`GameContext`), created first. */
     readonly ctx: GameContext;
     /**
      * Every subsystem, by the one name each has: the context's (`GameContext.systems`).
      * `tools/` drives and spies on them through it.
      */
     readonly systems: GameSystems;
-    /**
-     * The party's footprint trail — `d.PartyFootprints` (doc/CSBwin-src/Data.h:781).
-     * Monsters smell it when they cannot see the party, and the Magic Footprints
-     * spell draws from it.
-     */
-    readonly footprints: PartyFootprints;
     /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
-    get gameWon(): boolean { return this.state.gameWon; }
-    set gameWon(won: boolean) { this.state.gameWon = won; }
+    get gameWon(): boolean { return this.ctx.state.gameWon; }
+    set gameWon(won: boolean) { this.ctx.state.gameWon = won; }
 
     /** `d.CurrentPalette`, which lives in `state` (`GameState.currentPalette`). */
-    get currentPalette(): number { return this.state.currentPalette; }
-    set currentPalette(index: number) { this.state.currentPalette = index; }
-
-    /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
-    readonly sounds: SoundQueue;
+    get currentPalette(): number { return this.ctx.state.currentPalette; }
+    set currentPalette(index: number) { this.ctx.state.currentPalette = index; }
 
     // Game loop
     private running: boolean = false;
@@ -176,13 +149,6 @@ export class Game implements MainLoop {
         // new game's read runs and the loader cannot: it needs the monster table.
         CheckMonsters(ctx.dungeon, tables.monsterDesc);
         this.ctx = ctx;
-        this.dungeonState = ctx.dungeon;
-        this.party = ctx.party;
-        this.state = ctx.state;
-        this.random = ctx.random;
-        this.footprints = ctx.footprints;
-        this.timerQueue = ctx.timers;
-        this.sounds = ctx.sounds;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
         Object.assign(ctx.systems, {
             actuators: new ActuatorSystem(ctx),
@@ -213,7 +179,7 @@ export class Game implements MainLoop {
 
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
     setRandomSeed(seed: number): void {
-        this.random.setSeed(seed);
+        this.ctx.random.setSeed(seed);
     }
 
     /**
@@ -265,10 +231,10 @@ export class Game implements MainLoop {
         const fresh = new Game(data, this.ctx.tables);
         // `totalMoveCount` is a global, not `d.`'s (`doc/CSBwin-src/data.cpp:253`), so
         // `d.Initialize()` leaves it and the new game counts on from the last one.
-        const { totalMoveCount } = this.state.block1;
+        const { totalMoveCount } = this.ctx.state.block1;
         this.installWorld(data);
         this.applyRuntimeSaveState(fresh.getRuntimeSaveState());
-        this.state.block1.totalMoveCount = totalMoveCount;
+        this.ctx.state.block1.totalMoveCount = totalMoveCount;
         this.readNewGameRules(data);
         this.canRestart = false;
     }
@@ -300,8 +266,8 @@ export class Game implements MainLoop {
      * (`applyRuntimeSaveState`), whose snapshot must then fit.
      */
     installWorld(data: DungeonData): void {
-        this.state.dungeon = data;
-        this.dungeonState.install(data);
+        this.ctx.state.dungeon = data;
+        this.ctx.dungeon.install(data);
     }
 
     /**
@@ -359,7 +325,7 @@ export class Game implements MainLoop {
      * own stop is the freeze, buttons 147 and 148.
      */
     setPaused(paused: boolean): void {
-        this.state.paused = paused;
+        this.ctx.state.paused = paused;
     }
 
     /**
@@ -431,7 +397,7 @@ export class Game implements MainLoop {
         // `d.Speed = 0` while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697), and the
         // VBL raises `clockTick` once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`) —
         // so asleep, a tick is due on every VBL.
-        const tickInterval = this.party.state.sleeping ? 0 : 1000 / TICKS_PER_SECOND;
+        const tickInterval = this.ctx.party.state.sleeping ? 0 : 1000 / TICKS_PER_SECOND;
 
         // Process game ticks
         // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
@@ -440,7 +406,7 @@ export class Game implements MainLoop {
         // `if (d.clockTick == 0) WaitForButtonFlash();` (doc/CSBwin-src/CSBCode.cpp:763).
         if (!tickDue) waitForButtonFlash(this.ctx);
         if (tickDue && this.ctx.loop.clockRunning) {
-            if (!this.state.paused) {
+            if (!this.ctx.state.paused) {
                 this.gameTick();
             }
             this.lastTickTime = currentTime;
@@ -450,7 +416,7 @@ export class Game implements MainLoop {
         // `tag0007c8` (doc/CSBwin-src/CSBCode.cpp:714-721): one print-queue entry a pass,
         // ticked or not, frozen or not. The save menu holds the loop in `DisplayDiskMenu`
         // (`:762`), so it takes none.
-        if (!this.state.paused) this.ctx.host.messages.printNextQueued(this.state.tickCount);
+        if (!this.ctx.state.paused) this.ctx.host.messages.printNextQueued(this.ctx.state.tickCount);
         for (const callback of this.onFrameCallbacks) {
             callback(this);
         }
@@ -491,24 +457,24 @@ export class Game implements MainLoop {
         // (doc/CSBwin-src/CSBCode.cpp:658-778). With nobody left alive the rest of the tick
         // does not run, and `MainLoop` returns to `_StartCSB`, which shows the credits
         // (`:11322-11326`).
-        if (this.party.state.gameIsLost) {
+        if (this.ctx.party.state.gameIsLost) {
             this.mainLoopReturned = true;
             this.stop();
-            this.ctx.host.showCredits(this.state.gameWon);
+            this.ctx.host.showCredits(this.ctx.state.gameWon);
             return;
         }
         // `d.Time++; ... scrollingText.ClockTick();` (doc/CSBwin-src/CSBCode.cpp:660-677):
         // after the timers, so they ran on the `d.Time` the mouse handlers saw since the
         // last tick, and what they printed is placed in this tick.
         this.advanceTime();
-        this.ctx.host.messages.clockTick(this.state.tickCount);
+        this.ctx.host.messages.clockTick(this.ctx.state.tickCount);
         // `SmartDiscard(false);` (doc/CSBwin-src/CSBCode.cpp:678).
         smartDiscard(this.ctx, false);
         // `if ((d.Time&511)==0) NinetySecondUpdate();` (doc/CSBwin-src/CSBCode.cpp:680-683).
-        if (isNinetySecondTick(this.state.tickCount)) ninetySecondUpdate(this.ctx);
+        if (isNinetySecondTick(this.ctx.state.tickCount)) ninetySecondUpdate(this.ctx);
         // `if (d.freezeLifeTimer != 0) d.freezeLifeTimer--;` — one per game tick
         // (doc/CSBwin-src/CSBCode.cpp:684).
-        if (this.party.state.freezeLifeTimer !== 0) this.party.state.freezeLifeTimer--;
+        if (this.ctx.party.state.freezeLifeTimer !== 0) this.ctx.party.state.freezeLifeTimer--;
         // `TAG01b29a(_4_);` (doc/CSBwin-src/CSBCode.cpp:685). What it draws is painted in
         // this tick, unless a put-back was asked above: CSBWin draws it only after that
         // VBL, so the port paints it at the put-back's redraw, and the frame shows the
@@ -517,11 +483,11 @@ export class Game implements MainLoop {
         if (putBackAsked) this.paintIsHeld = true;
         else this.ctx.host.drawViewport();
         // `if ((d.Time & (d.PartySleeping ? 15 : 63)) == 0) TenSecondUpdate();` (`:686-688`).
-        if (isTenSecondTick(this.state.tickCount, this.party.state.sleeping)) tenSecondUpdate(this.ctx);
+        if (isTenSecondTick(this.ctx.state.tickCount, this.ctx.party.state.sleeping)) tenSecondUpdate(this.ctx);
         // `if (d.partyMoveDisableTimer != 0) d.partyMoveDisableTimer--;` and the same for
         // `d.Word11712` (doc/CSBwin-src/CSBCode.cpp:689-695).
-        if (this.party.state.partyMoveDisableTimer !== 0) this.party.state.partyMoveDisableTimer--;
-        if (this.party.state.word11712 !== 0) this.party.state.word11712--;
+        if (this.ctx.party.state.partyMoveDisableTimer !== 0) this.ctx.party.state.partyMoveDisableTimer--;
+        if (this.ctx.party.state.word11712 !== 0) this.ctx.party.state.word11712--;
         // `d.clockTick=0;` (doc/CSBwin-src/CSBCode.cpp:704).
         this.ctx.loop.clockTickSet = false;
     }
@@ -547,7 +513,7 @@ export class Game implements MainLoop {
     *showCreditsAndEnd(): LoopScript {
         this.mainLoopReturned = true;
         this.stop();
-        this.ctx.host.showCredits(this.state.gameWon);
+        this.ctx.host.showCredits(this.ctx.state.gameWon);
         yield Infinity;
     }
 
@@ -598,7 +564,7 @@ export class Game implements MainLoop {
         }
         this.ctx.host.drawViewport();
         this.advanceTime();
-        this.ctx.host.messages.clockTick(this.state.tickCount);
+        this.ctx.host.messages.clockTick(this.ctx.state.tickCount);
     }
 
     /**
@@ -606,7 +572,7 @@ export class Game implements MainLoop {
      * and in `_ProcessTimersViewportAndSound` (`Attack.cpp:2208`).
      */
     private advanceTime(): void {
-        this.state.tickCount++;
+        this.ctx.state.tickCount++;
     }
 
     /**
@@ -707,7 +673,7 @@ export class Game implements MainLoop {
     }
 
     isPartySleeping(): boolean {
-        return this.party.state.sleeping;
+        return this.ctx.party.state.sleeping;
     }
 
     /**
@@ -725,7 +691,7 @@ export class Game implements MainLoop {
         if (level === -1) {
             if (!this.systems.monsters.loadPartyLevelIfChanged()) return false;
         } else {
-            const party = this.party.state;
+            const party = this.ctx.party.state;
             party.position = new Position(party.position.x, party.position.y, level);
             this.systems.monsters.loadPartyLevel(level);
             this.ctx.systems.worldMove.moveParty(-1, 0, party.position.x, party.position.y);
@@ -771,12 +737,12 @@ export class Game implements MainLoop {
             queue.take();
             return result;
         }
-        const time = this.state.tickCount;
+        const time = this.ctx.state.tickCount;
         const thawCommand = frozen && queue.head().num === 148;
         if (this.lastInputTime !== 0 && time < this.lastInputTime + delta && !thawCommand) return result;
         const entry = queue.head();
         const num = entry.num;
-        const party = this.party.state;
+        const party = this.ctx.party.state;
         if (num >= 3 && num <= 6 && (
             party.partyMoveDisableTimer !== 0 ||
             (party.word11712 !== 0 && ((party.facing + num - 3) & 3) === party.word11714)
@@ -818,7 +784,7 @@ export class Game implements MainLoop {
      */
     private recordFileRecord(entry: MouseQueueEntry): void {
         if (entry.num === 0x64 && entry.x === 0x114 && entry.y === 0x2f) return;
-        if (entry.num < 0x2000) this.state.block1.totalMoveCount++;
+        if (entry.num < 0x2000) this.ctx.state.block1.totalMoveCount++;
     }
 
     /** A pre-built champion joins, as the tools' do (`HallOfChampions.addChampion`). */
@@ -855,8 +821,8 @@ export class Game implements MainLoop {
      * Replace the current party state (debug/testing).
      */
     setPartyState(state: PartyState): void {
-        this.party.setState(state);
-        ensureHandOwner(this.party.state);
+        this.ctx.party.setState(state);
+        ensureHandOwner(this.ctx.party.state);
     }
 
 
@@ -972,7 +938,7 @@ export class Game implements MainLoop {
     getPositionInfo = () => this.systems.movement.getPositionInfo();
 
     // Get tick count
-    getTickCount = () => this.state.tickCount;
+    getTickCount = () => this.ctx.state.tickCount;
 
     /**
      * The DSA global variables, where a dungeon keeps its puzzle progress. Public so a

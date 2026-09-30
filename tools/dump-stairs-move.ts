@@ -78,11 +78,11 @@ function makeGame(): Game {
 const DX = [0, 1, 0, -1];
 const DY = [-1, 0, 1, 0];
 const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y && a.z === b.z;
-const roomType = (game: Game, p: Position): number => (game.dungeonState.getCellFlag(p) >> 5) & 7;
+const roomType = (game: Game, p: Position): number => (game.ctx.dungeon.getCellFlag(p) >> 5) & 7;
 const emptyOpen = (game: Game, p: Position): boolean => {
-  const map = game.dungeonState.getMap(p.z);
+  const map = game.ctx.dungeon.getMap(p.z);
   if (!map || p.x < 0 || p.y < 0 || p.x >= map.descriptor.width || p.y >= map.descriptor.height) return false;
-  return roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+  return roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
 };
 
 type Stairs = { at: Position; exitLevel: Position; dir: number; exit: Position; beside: Position | null };
@@ -91,7 +91,7 @@ type Stairs = { at: Position; exitLevel: Position; dir: number; exit: Position; 
  * exit square is open and empty, and an open empty square beside the stairs if there is one.
  */
 function findStairs(game: Game, down: boolean, accept: (s: Stairs) => boolean = () => true): Stairs {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 1; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
     for (let x = 0; x < map.descriptor.width; x++) {
@@ -100,8 +100,8 @@ function findStairs(game: Game, down: boolean, accept: (s: Stairs) => boolean = 
         const flag = dungeon.getCellFlag(at);
         if (((flag >> 5) & 7) !== RoomType.STAIRS || ((flag & 4) === 0) !== down) continue;
         const exitLevel = down ? dungeon.incrementLevel(at, 1) : at;
-        if (!exitLevel || exitLevel.z === game.party.state.position.z) continue;
-        const dir = dungeon.getExitStairsDirection(exitLevel, game.party.state.facing);
+        if (!exitLevel || exitLevel.z === game.ctx.party.state.position.z) continue;
+        const dir = dungeon.getExitStairsDirection(exitLevel, game.ctx.party.state.facing);
         const exit = new Position(exitLevel.x + DX[dir]!, exitLevel.y + DY[dir]!, exitLevel.z);
         if (!emptyOpen(game, exit)) continue;
         let beside: Position | null = null;
@@ -125,7 +125,7 @@ function turnedCorner(corner: number, dir: number): number {
 
 /** The last weapon record, lifted from wherever it lies. */
 function takeWeapon(game: Game, corner: number): ObjectID {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const index = dungeon.getData().databases.weapons.records.length - 1;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
@@ -141,7 +141,7 @@ function takeWeapon(game: Game, corner: number): ObjectID {
 }
 
 function findWeapon(game: Game, at: Position, index: number): ObjectID | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const decoded = decodeObjectID(rn);
     if (decoded.category === DBType.WEAPON && decoded.index === index) return rn;
@@ -175,7 +175,7 @@ function main(): void {
    */
   const monsterBesideStairs = (): { game: Game; stairs: Stairs; rn: ObjectID; corner: number; type: number } => {
     const game = makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     let type = -1;
     const stairs = findStairs(game, true, (s) => {
       if (!s.beside) return false;
@@ -199,7 +199,7 @@ function main(): void {
 
   {
     const { game, stairs, rn, corner, type } = monsterBesideStairs();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const beside = stairs.beside!;
     const result = game.systems.monsters.moveMonster(rn, beside.x, beside.y, stairs.at.x, stairs.at.y, stairs.at.z);
     const there = dungeon.findFirstMonster(stairs.exit);
@@ -218,7 +218,7 @@ function main(): void {
   }
   {
     const { game, stairs, rn, type } = monsterBesideStairs();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const beside = stairs.beside!;
     const turned = turnedCorner(decodeObjectID(rn).position, stairs.dir);
     const p = (turned + 2) & 3;
@@ -238,9 +238,9 @@ function main(): void {
   {
     const game = makeGame();
     const stairs = findStairs(game, true);
-    game.party.state.position = stairs.at;
+    game.ctx.party.state.position = stairs.at;
     game.systems.worldMove.moveParty(-1, 0, stairs.at.x, stairs.at.y);
-    const landed = game.party.state.position;
+    const landed = game.ctx.party.state.position;
     console.log(`5. the party set down on the stairs: at level ${landed.z} (${landed.x},${landed.y})`);
     check(same(landed, stairs.at), 'the stairs arm breaks for the party');
   }
@@ -251,14 +251,14 @@ function main(): void {
     const stairs = findStairs(game, true, (s) => s.beside !== null);
     const beside = stairs.beside!;
     const towards = [0, 1, 2, 3].find((d) => beside.x + DX[d]! === stairs.at.x && beside.y + DY[d]! === stairs.at.y)!;
-    game.party.state.position = beside;
+    game.ctx.party.state.position = beside;
     game.systems.monsters.loadPartyLevelIfChanged();
-    game.party.setFacing(towards);
+    game.ctx.party.setFacing(towards);
     const moved = game.move(MovementAction.MOVE_FORWARD);
-    const between = game.party.state.position;
+    const between = game.ctx.party.state.position;
     const drawn: string[] = [];
     game.onTick(() => {
-      const p = game.party.state.position;
+      const p = game.ctx.party.state.position;
       drawn.push(`(${p.x},${p.y}) L${p.z}${game.ctx.loop.newPartyLevel !== -1 ? ' pending' : ''}`);
     });
     (game as unknown as { gameTick(): void }).gameTick();

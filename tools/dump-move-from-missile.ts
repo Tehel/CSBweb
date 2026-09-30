@@ -70,8 +70,8 @@ function makeGame(): Game {
 
 /** An empty floor cell on the party's level, away from the party, with stone to its east. */
 function findCellBeforeEastWall(game: Game): Position {
-  const dungeon = game.dungeonState;
-  const party = game.party.state.position;
+  const dungeon = game.ctx.dungeon;
+  const party = game.ctx.party.state.position;
   const map = dungeon.getMap(party.z)!;
   for (let x = 0; x + 1 < map.descriptor.width; x++) {
     for (let y = 0; y < map.descriptor.height; y++) {
@@ -93,18 +93,18 @@ function findCellBeforeEastWall(game: Game): Position {
  */
 function launch(game: Game, at: Position, corner: number, direction: Direction, delay: number, firstTick = false): ObjectID {
   const before = new Set<ObjectID>();
-  for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.systems.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.state.tickCount + delay - 1, !firstTick)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) before.add(rn);
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.ctx.state.tickCount + delay - 1, !firstTick)) {
     throw new Error('missile not launched');
   }
-  for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (!before.has(rn) && decodeObjectID(rn).category === DBType.MISSILE) return rn;
   }
   throw new Error('missile not placed');
 }
 
 function inCell(game: Game, at: Position, rn: ObjectID): boolean {
-  for (let r = game.dungeonState.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.dungeonState.getDBRecordLink(r)) {
+  for (let r = game.ctx.dungeon.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.ctx.dungeon.getDBRecordLink(r)) {
     if (r === rn) return true;
   }
   return false;
@@ -112,8 +112,8 @@ function inCell(game: Game, at: Position, rn: ObjectID): boolean {
 
 /** A direction in which the party's square has stone beside it. */
 function wallBesideParty(game: Game): Direction {
-  const party = game.party.state.position;
-  const map = game.dungeonState.getMap(party.z)!;
+  const party = game.ctx.party.state.position;
+  const map = game.ctx.dungeon.getMap(party.z)!;
   const delta = [[0, -1], [1, 0], [0, 1], [-1, 0]];
   for (let d = 0; d < 4; d++) {
     const x = party.x + delta[d][0];
@@ -127,8 +127,8 @@ function wallBesideParty(game: Game): Direction {
 interface FilterCall { type: number; missile: number; direction: number; filterObjectSet: boolean }
 
 const game = makeGame();
-const tq = game.timerQueue;
-const party = game.party.state.position;
+const tq = game.ctx.timers;
+const party = game.ctx.party.state.position;
 const north = new Position(party.x, party.y - 1, party.z);
 const wallSide = findCellBeforeEastWall(game);
 console.log(`party at (${party.x},${party.y}) L${party.z}; the eastbound missile flies from (${wallSide.x},${wallSide.y})`);
@@ -156,7 +156,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   const flying = launch(game, wallSide, 1, Direction.EAST, 1);
   onWall = () => game.systems.missileEncounter.checkPartyMoveFromMissile(party, north);
 
-  processTimersAt(game, game.state.tickCount + 1);
+  processTimersAt(game, game.ctx.state.tickCount + 1);
 
   const wall = calls.find((c) => c.type === 4 && c.missile === flying);
   const met = calls.find((c) => c.type === 7 && c.missile === struck);
@@ -189,7 +189,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   // towards stone. `TT_MISSILE0` skips the party, so the first thing it meets is the wall.
   const wall = wallBesideParty(game);
   const flying = launch(game, party, wall, wall, 1, true);
-  const record = game.dungeonState.getMissileRecord(flying)!;
+  const record = game.ctx.dungeon.getMissileRecord(flying)!;
   const firstTimer = record.timerIndex;
   let indexInside = -1;
   let squatter = -1;
@@ -197,12 +197,12 @@ const show = (label: string, c: FilterCall | undefined): void =>
     indexInside = record.timerIndex;
     // A timer queued by the filter takes the lowest free slot, the one the fireball's
     // timer left.
-    squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, game.state.tickCount + 1000, party.z).index;
+    squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, game.ctx.state.tickCount + 1000, party.z).index;
     game.systems.missileEncounter.checkPartyMoveFromMissile(party, null);
   };
   calls.length = 0;
 
-  processTimersAt(game, game.state.tickCount + 1);
+  processTimersAt(game, game.ctx.state.tickCount + 1);
 
   const met = calls.find((c) => c.type === 7 && c.missile === flying);
   console.log(`3. the fireball's timer was ${firstTimer}; inside it the record names ${indexInside}, and the filter's timer took slot ${squatter}`);
@@ -215,7 +215,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   tq.deleteTimer(squatter);
 }
 
-console.log(`health after the three blows: ${game.party.state.champions.map((c) => c.attributes.health).join(', ')}`);
-check(game.party.state.champions.every((c) => c.attributes.health !== 0), 'the party outlives the three fireballs, so each case finds the champion in its corner');
+console.log(`health after the three blows: ${game.ctx.party.state.champions.map((c) => c.attributes.health).join(', ')}`);
+check(game.ctx.party.state.champions.every((c) => c.attributes.health !== 0), 'the party outlives the three fireballs, so each case finds the champion in its corner');
 
 finish();

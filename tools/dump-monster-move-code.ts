@@ -65,16 +65,16 @@ async function main(): Promise<void> {
   };
 
   const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y && a.z === b.z;
-  const roomType = (game: Game, p: Position): number => (game.dungeonState.getCellFlag(p) >> 5) & 7;
+  const roomType = (game: Game, p: Position): number => (game.ctx.dungeon.getCellFlag(p) >> 5) & 7;
   const inBounds = (game: Game, p: Position): boolean => {
-    const map = game.dungeonState.getMap(p.z);
+    const map = game.ctx.dungeon.getMap(p.z);
     return !!map && p.x >= 0 && p.y >= 0 && p.x < map.descriptor.width && p.y < map.descriptor.height;
   };
   const emptyOpen = (game: Game, p: Position): boolean =>
-    inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+    inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
   /** Empty open squares of level `z`, in scan order, none of them in `not`. */
   const opens = (game: Game, z: number, not: Position[] = []): Position[] => {
-    const map = game.dungeonState.getMap(z)!;
+    const map = game.ctx.dungeon.getMap(z)!;
     const out: Position[] = [];
     for (let x = 0; x < map.descriptor.width; x++) {
       for (let y = 0; y < map.descriptor.height; y++) {
@@ -96,18 +96,18 @@ async function main(): Promise<void> {
   };
   const typeOn = (game: Game, ...levels: number[]): number => {
     for (let t = 0; t < 27; t++) {
-      if (walks(t) && levels.every((z) => game.dungeonState.monsterAllowedOnLevel(t, z))) return t;
+      if (walks(t) && levels.every((z) => game.ctx.dungeon.monsterAllowedOnLevel(t, z))) return t;
     }
     return -1;
   };
   const partyOn = (game: Game, z: number, not: Position[]): void => {
     const far = opens(game, z, not).find((p) => not.every((q) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 4));
     if (!far) throw new Error(`nowhere to stand the party on level ${z}`);
-    game.party.state.position = far;
+    game.ctx.party.state.position = far;
     game.systems.monsters.loadPartyLevel(z);
   };
   const teleporter = rigTeleporter;
-  const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
+  const aiTimersAt = (game: Game, p: Position): number => game.ctx.timers.getTimers().filter((t) =>
     t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
     && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;
   const make = (game: Game, type: number, at: Position, members = 1): ObjectID => {
@@ -119,10 +119,10 @@ async function main(): Promise<void> {
     return rn;
   };
   const levelWith = (game: Game, ok: (z: number) => boolean): number => {
-    for (let z = 0; z < game.dungeonState.getMapCount(); z++) if (ok(z)) return z;
+    for (let z = 0; z < game.ctx.dungeon.getMapCount(); z++) if (ok(z)) return z;
     throw new Error('no level fits');
   };
-  const anyGroupAt = (game: Game, p: Position): boolean => game.dungeonState.findFirstMonster(p) !== OBJECT_ID_EOF;
+  const anyGroupAt = (game: Game, p: Position): boolean => game.ctx.dungeon.findFirstMonster(p) !== OBJECT_ID_EOF;
 
   /* ------------------------------------ 1-2. a teleport, and the AI step onto it ---- */
   {
@@ -148,8 +148,8 @@ async function main(): Promise<void> {
     partyOn(game2, z, [tp, from, dest]);
     teleporter(game2, tp, dest);
     const rn2 = make(game2, typeOn(game2, z), from);
-    const monster = game2.dungeonState.getCreatureRecord(rn2)!;
-    const slot = game2.dungeonState.getAttachedItem16(monster)!;
+    const monster = game2.ctx.dungeon.getCreatureRecord(rn2)!;
+    const slot = game2.ctx.dungeon.getAttachedItem16(monster)!;
     slot.ubPrevX = 77;
     slot.ubPrevY = 77;
     const timer = { uByte6: from.x, uByte7: from.y, level: z } as AiFrame['timer'];
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   /* ------------------------------ 3. a teleport onto the party's level: slot 0 ---- */
   {
     const game = await makeGame();
-    const count = game.dungeonState.getMapCount();
+    const count = game.ctx.dungeon.getMapCount();
     let a = -1;
     let b = -1;
     for (let i = 0; i < count && a < 0; i++) {
@@ -179,11 +179,11 @@ async function main(): Promise<void> {
     const [tp, from] = pairOn(game, b);
     teleporter(game, tp, dest);
     const rn = make(game, type, from);
-    const slot0 = game.dungeonState.getItem16Pool()[0]!;
+    const slot0 = game.ctx.dungeon.getItem16Pool()[0]!;
     const owner = slot0.word0;
     for (let i = 0; i < 4; i++) slot0.singleMonsterStatus[i] = (slot0.singleMonsterStatus[i] ?? 0) | SMS_ATTACKING;
     const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, b);
-    const mine = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
+    const mine = game.ctx.dungeon.getCreatureRecord(rn)!.groupIndex;
     const attacking = slot0.singleMonsterStatus.filter((s) => (s & SMS_ATTACKING) !== 0).length;
     console.log(`3. L${b} teleporter -> party's L${a}: code ${moved.code}, the group took slot ${mine}; `
       + `slot 0 (group ${owner}) members still attacking: ${attacking}`);
@@ -195,7 +195,7 @@ async function main(): Promise<void> {
   /* -------------------------------------------- 4. a pit that kills the group ---- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     let found: { pit: Position; from: Position; below: Position; type: number } | null = null;
     for (let z = 0; z < dungeon.getMapCount() && !found; z++) {
       const map = dungeon.getMap(z)!;
@@ -235,13 +235,13 @@ async function main(): Promise<void> {
   /* ------------------------------ 5. a teleporter to a level it may not live on ---- */
   {
     const game = await makeGame();
-    const count = game.dungeonState.getMapCount();
+    const count = game.ctx.dungeon.getMapCount();
     let z = -1;
     let bad = -1;
     for (let i = 0; i < count && z < 0; i++) {
       const t = typeOn(game, i);
       if (t < 0) continue;
-      for (let j = 0; j < count; j++) if (!game.dungeonState.monsterAllowedOnLevel(t, j)) { z = i; bad = j; break; }
+      for (let j = 0; j < count; j++) if (!game.ctx.dungeon.monsterAllowedOnLevel(t, j)) { z = i; bad = j; break; }
     }
     const type = typeOn(game, z);
     const [tp, from] = pairOn(game, z);
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
     partyOn(game, z, [tp, from]);
     teleporter(game, tp, dest);
     const rn = make(game, type, from);
-    const monster = game.dungeonState.getCreatureRecord(rn)!;
+    const monster = game.ctx.dungeon.getCreatureRecord(rn)!;
     const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, z);
     console.log(`5. type ${type} (${from.x},${from.y}) L${z} -> teleporter -> (${dest.x},${dest.y}) L${bad}, where it is not allowed: `
       + `code ${moved.code}, on the teleporter ${anyGroupAt(game, tp)}, beside it ${anyGroupAt(game, from)}, `
@@ -266,8 +266,8 @@ async function main(): Promise<void> {
     const at = opens(game, z)[0]!;
     partyOn(game, z, [at]);
     const sounds: number[] = [];
-    const queue = game.sounds.queueSound.bind(game.sounds);
-    game.sounds.queueSound = (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); };
+    const queue = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
+    game.ctx.sounds.queueSound = (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); };
     const made = game.systems.monsters.createMonster({
       value: typeOn(game, z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,

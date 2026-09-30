@@ -282,6 +282,6 @@ export function applyCsbwinSave(game: Game, bytes: Uint8Array): CsbwinWorld {
     // The image's records are already big-actuator records. Set by hand rather than
     // through `applySaveGameState`, which would call `applyBigActuators` and re-derive
     // the word-8 of every type-47 actuator from records that already carry it.
-    if (world.save.bigActuators) game.state.dungeon.bigActuators = true;
+    if (world.save.bigActuators) game.ctx.state.dungeon.bigActuators = true;
     return world;
 }

@@ -133,10 +133,10 @@ function scene(): Scene {
     playSound: (soundId, rateIdx, highVolume) => played.push([soundId, rateIdx ?? 0, highVolume ?? -1]),
   });
   game.setRandomSeed(0x12345678);
-  game.party.state.champions = [champion(0)];
+  game.ctx.party.state.champions = [champion(0)];
   const queued: number[][] = [];
-  const queueSound = game.sounds.queueSound.bind(game.sounds);
-  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
+  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
+  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
     queued.push([ordinal, mapX, mapY, deltaTime, level]);
     queueSound(ordinal, mapX, mapY, deltaTime, level);
   };
@@ -144,22 +144,22 @@ function scene(): Scene {
 }
 
 function inBounds(game: Game, p: Position): boolean {
-  const map = game.dungeonState.getMap(p.z);
+  const map = game.ctx.dungeon.getMap(p.z);
   return !!map && p.x >= 0 && p.y >= 0 && p.x < map.descriptor.width && p.y < map.descriptor.height;
 }
 
 function roomType(game: Game, p: Position): number {
-  return (game.dungeonState.getCellFlag(p) >> 5) & 7;
+  return (game.ctx.dungeon.getCellFlag(p) >> 5) & 7;
 }
 
 function emptyOpen(game: Game, p: Position): boolean {
-  return inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+  return inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
 }
 
 /** Every square of the dungeon, level by level, in scan order. */
 function* squares(game: Game): Generator<Position> {
-  for (let z = 0; z < game.dungeonState.getMapCount(); z++) {
-    const map = game.dungeonState.getMap(z)!;
+  for (let z = 0; z < game.ctx.dungeon.getMapCount(); z++) {
+    const map = game.ctx.dungeon.getMap(z)!;
     for (let x = 0; x < map.descriptor.width; x++) {
       for (let y = 0; y < map.descriptor.height; y++) yield new Position(x, y, z);
     }
@@ -169,7 +169,7 @@ function* squares(game: Game): Generator<Position> {
 /** The objects of `category` on a square, with their positions in the cell. */
 function objectsAt(game: Game, p: Position, category: number): ObjectID[] {
   const out: ObjectID[] = [];
-  for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category === category) out.push(rn);
   }
   return out;
@@ -187,8 +187,8 @@ function clear(s: Scene): void {
 }
 
 function stand(game: Game, at: Position, facing: number): void {
-  game.party.state.position = at;
-  game.party.setFacing(facing);
+  game.ctx.party.state.position = at;
+  game.ctx.party.setFacing(facing);
 }
 
 function main(): void {
@@ -202,10 +202,10 @@ function main(): void {
     for (const p of squares(game)) {
       if (at) break;
       if (roomType(game, p) !== RoomType.DOOR) continue;
-      const door = game.dungeonState.findFirstDoor(p);
-      if (door === OBJECT_ID_EOF || !game.dungeonState.getDoorRecordByIndex(decodeObjectID(door).index)?.hasButton) continue;
+      const door = game.ctx.dungeon.findFirstDoor(p);
+      if (door === OBJECT_ID_EOF || !game.ctx.dungeon.getDoorRecordByIndex(decodeObjectID(door).index)?.hasButton) continue;
       // `nsDoor != (facing & 1)` (`Mouse.cpp:1063-1066`): an east-west door is faced from the south.
-      const facing = (game.dungeonState.getCellFlag(p) & 0x8) !== 0 ? 0 : 1;
+      const facing = (game.ctx.dungeon.getCellFlag(p) & 0x8) !== 0 ? 0 : 1;
       const party = new Position(p.x - DELTAS[facing][0], p.y - DELTAS[facing][1], p.z);
       if (inBounds(game, party)) at = { party, facing };
     }
@@ -227,7 +227,7 @@ function main(): void {
       if (at) break;
       if (roomType(game, p) !== RoomType.STONE) continue;
       for (const rn of objectsAt(game, p, DBType.ACTUATOR)) {
-        const rec = game.dungeonState.getActuatorRecord(rn)!;
+        const rec = game.ctx.dungeon.getActuatorRecord(rn)!;
         if (getActuatorType(rec) !== 1 || getActuatorAction(rec) === ActuatorAction.CONSTPRESSURE || !isActuatorAudible(rec)) continue;
         // The switch is on side `side` of the wall; the party stands on that side, facing it.
         const side = decodeObjectID(rn).position & 3;
@@ -255,7 +255,7 @@ function main(): void {
       if (pad) break;
       if (roomType(game, p) !== RoomType.OPEN) continue;
       for (const rn of objectsAt(game, p, DBType.ACTUATOR)) {
-        const rec = game.dungeonState.getActuatorRecord(rn)!;
+        const rec = game.ctx.dungeon.getActuatorRecord(rn)!;
         // Type 3, the party's own pad (`Code11f52.cpp:3796-3812`), pressed facing any way
         // when its value is 0, and pressed again as often as the party steps on it.
         if (getActuatorType(rec) !== 3 || getActuatorValue(rec) !== 0 || isActuatorOnceOnly(rec) || !isActuatorAudible(rec)) continue;
@@ -276,7 +276,7 @@ function main(): void {
     // pad there would be: `d.LoadedLevel != d.partyLevel`, so `QueueSound` returns.
     clear(s);
     const elsewhere = at.z === 0 ? 1 : 0;
-    game.party.state.position = new Position(at.x, at.y, elsewhere);
+    game.ctx.party.state.position = new Position(at.x, at.y, elsewhere);
     game.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
     row(`3b. pad (${at.x},${at.y}) L${at.z}, the party on L${elsewhere}`, s);
     check(json(s.queued) === json([[1, at.x, at.y, 1, at.z]]), 'queued on the pad\'s level');
@@ -288,12 +288,12 @@ function main(): void {
   // of its own level, with an empty open square beside it to step from.
   const findTeleporter = (game: Game): { tp: Position; from: Position; dest: Position } => {
     for (const p of squares(game)) {
-      if (roomType(game, p) !== RoomType.TELEPORTER || (game.dungeonState.getCellFlag(p) & 0x8) === 0) continue;
+      if (roomType(game, p) !== RoomType.TELEPORTER || (game.ctx.dungeon.getCellFlag(p) & 0x8) === 0) continue;
       const rec: TeleporterRecord | null = objectsAt(game, p, DBType.TELEPORTER)
-        .map((rn) => game.dungeonState.getTeleporterRecord(rn)).find((r) => r !== null) ?? null;
+        .map((rn) => game.ctx.dungeon.getTeleporterRecord(rn)).find((r) => r !== null) ?? null;
       if (!rec || !rec.sound || (rec.scope & 3) !== 3) continue;
       const dest = new Position(rec.destX, rec.destY, p.z);
-      if (game.dungeonState.getMap(p.z)!.descriptor.level !== rec.destMap || !emptyOpen(game, dest)) continue;
+      if (game.ctx.dungeon.getMap(p.z)!.descriptor.level !== rec.destMap || !emptyOpen(game, dest)) continue;
       for (const [dx, dy] of DELTAS) {
         const from = new Position(p.x + dx, p.y + dy, p.z);
         if (emptyOpen(game, from) && !(from.x === dest.x && from.y === dest.y)) return { tp: p, from, dest };
@@ -308,7 +308,7 @@ function main(): void {
     const { tp, from, dest } = findTeleporter(game);
     stand(game, from, 0);
     game.systems.worldMove.moveParty(from.x, from.y, tp.x, tp.y);
-    const now = game.party.state.position;
+    const now = game.ctx.party.state.position;
     row(`4. party (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${tp.z}`, s);
     check(now.x === dest.x && now.y === dest.y && now.z === dest.z, 'the party is at the destination');
     check(json(s.queued) === json([[17, dest.x, dest.y, 0, dest.z]]), 'the buzz is QueueSound(soundTELEPORT, d.partyX, d.partyY, 0) at the destination');
@@ -331,7 +331,7 @@ function main(): void {
     stand(game, party, 0);
     game.systems.monsters.loadPartyLevel(tp.z);
     let type = -1;
-    for (let t = 0; t < 27 && type < 0; t++) if (game.dungeonState.monsterAllowedOnLevel(t, tp.z)) type = t;
+    for (let t = 0; t < 27 && type < 0; t++) if (game.ctx.dungeon.monsterAllowedOnLevel(t, tp.z)) type = t;
     const rn = createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: from.x, mapY: from.y, level: from.z, invisible: false, drawAsSize4: false,
@@ -351,22 +351,22 @@ function main(): void {
     const { game } = s;
     let door: Position | null = null;
     for (const p of squares(game)) {
-      if (roomType(game, p) === RoomType.DOOR && (game.dungeonState.getCellFlag(p) & 7) === 4) { door = p; break; }
+      if (roomType(game, p) === RoomType.DOOR && (game.ctx.dungeon.getCellFlag(p) & 7) === 4) { door = p; break; }
     }
     if (!door) throw new Error('no shut door in dungeon.dat');
     const d = door;
     // Opening, `uByte9 = 0` (SET): one step a tick, re-queued after each.
-    game.timerQueue.addTimer({
-      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount, level: d.z,
+    game.ctx.timers.addTimer({
+      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.ctx.state.tickCount, level: d.z,
       uByte5: 0, uByte6: d.x, uByte7: d.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
       timerWord8: 0, timerWord6: 0,
     });
     const step = (party: Position, label: string): void => {
-      game.party.state.position = party;
+      game.ctx.party.state.position = party;
       clear(s);
       game.systems.timer.processTimers();
-      game.state.tickCount++;
-      row(`6${label}. door (${d.x},${d.y}) L${d.z} to state ${game.dungeonState.getCellFlag(d) & 7}, party (${party.x},${party.y}) L${party.z}`, s);
+      game.ctx.state.tickCount++;
+      row(`6${label}. door (${d.x},${d.y}) L${d.z} to state ${game.ctx.dungeon.getCellFlag(d) & 7}, party (${party.x},${party.y}) L${party.z}`, s);
     };
     const doorSteps = (): number[][] => s.queued.filter((q) => q[0] === 2);
     const heard = (): number[][] => s.played.filter((p) => p[0] === 535);
@@ -389,19 +389,19 @@ function main(): void {
   {
     const s = scene();
     const { game } = s;
-    const potions = game.dungeonState.getData().databases.potions.records;
+    const potions = game.ctx.dungeon.getData().databases.potions.records;
     const index = potions.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.potionType !== PotionType.EMPTY_FLASK);
     const potion = ((DBType.POTION << 10) | index) as ObjectID;
-    const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+    const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
     ui.objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
-    ui.partyState = game.party.state;
+    ui.partyState = game.ctx.party.state;
     ui.applyFeeding = (chIdx, fp) => game.applyFeeding(chIdx, fp);
-    ui.queueSound = (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.party.state.position.z);
+    ui.queueSound = (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z);
     const at = new Position(3, 3, 1);
     stand(game, at, 0);
-    game.party.state.selectedCharacterIndex = 0;
-    game.party.state.cursorOwner = 0;
-    game.party.state.objectInHand = potion;
+    game.ctx.party.state.selectedCharacterIndex = 0;
+    game.ctx.party.state.cursorOwner = 0;
+    game.ctx.party.state.objectInHand = potion;
     handleMouthPress(ui);
     row(`7. champion 0 drinks potion ${index}, party (${at.x},${at.y}) L${at.z}`, s);
     check(json(s.queued) === json([[8, at.x, at.y, 0, at.z]]), 'the gulp queues QueueSound(8, d.partyX, d.partyY, 0)');
@@ -422,10 +422,10 @@ function main(): void {
       check(s.played.length === s.queued.length - delayed, `${label}: none with a deltaTime is heard from another level`);
     };
     const partyAt = (game: Game, x: number, y: number): void => {
-      game.party.state.position = new Position(x, y, P);
+      game.ctx.party.state.position = new Position(x, y, P);
     };
     const firstType = (game: Game): number => {
-      for (let t = 0; t < 27; t++) if (game.dungeonState.monsterAllowedOnLevel(t, L)) return t;
+      for (let t = 0; t < 27; t++) if (game.ctx.dungeon.monsterAllowedOnLevel(t, L)) return t;
       throw new Error(`no monster type allowed on L${L}`);
     };
     const firstOpen = (game: Game, skip = 0): Position => {
@@ -456,24 +456,24 @@ function main(): void {
       const { game } = s;
       let door: Position | null = null;
       for (const p of squares(game)) {
-        if (p.z === L && roomType(game, p) === RoomType.DOOR && (game.dungeonState.getCellFlag(p) & 7) === 0
-          && game.dungeonState.findFirstObject(p) !== OBJECT_ID_EOF
+        if (p.z === L && roomType(game, p) === RoomType.DOOR && (game.ctx.dungeon.getCellFlag(p) & 7) === 0
+          && game.ctx.dungeon.findFirstObject(p) !== OBJECT_ID_EOF
           && objectsAt(game, p, DBType.CREATURE).length === 0) { door = p; break; }
       }
       if (!door) throw new Error(`no open door on L${L}`);
       partyAt(game, door.x, door.y);
       makeGroup(game, door);
       // The group's own timer, due in the same tick, would walk it out of the door first.
-      game.timerQueue.deleteMonsterMovementTimers(door.x, door.y, L, () => {});
-      game.dungeonState.getMap(L)!.cellFlags[door.x][door.y] = (game.dungeonState.getCellFlag(door) & ~7) | 3;
-      game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount, level: L,
+      game.ctx.timers.deleteMonsterMovementTimers(door.x, door.y, L, () => {});
+      game.ctx.dungeon.getMap(L)!.cellFlags[door.x][door.y] = (game.ctx.dungeon.getCellFlag(door) & ~7) | 3;
+      game.ctx.timers.addTimer({
+        index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.ctx.state.tickCount, level: L,
         uByte5: 0, uByte6: door.x, uByte7: door.y, uByte8: 0, uByte9: ActuatorAction.CLEAR, sequence: 0,
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
       game.systems.timer.processTimers();
-      game.state.tickCount++;
+      game.ctx.state.tickCount++;
       heardNothing(s, `8b. door (${door.x},${door.y}) L${L} shuts on a group`, [4]);
     }
 
@@ -485,21 +485,21 @@ function main(): void {
       for (const p of squares(game)) {
         if (roomType(game, p) === RoomType.STONE) continue;
         if (objectsAt(game, p, DBType.ACTUATOR).some((rn) => {
-          const rec = game.dungeonState.getActuatorRecord(rn)!;
+          const rec = game.ctx.dungeon.getActuatorRecord(rn)!;
           return getActuatorType(rec) === 6 && isActuatorAudible(rec);
         })) { gen = p; break; }
       }
       if (!gen) throw new Error('no audible generator on an open square');
-      game.party.state.position = new Position(gen.x, gen.y, gen.z === P ? L : P);
-      game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_OPENROOM, time: game.state.tickCount, level: gen.z,
+      game.ctx.party.state.position = new Position(gen.x, gen.y, gen.z === P ? L : P);
+      game.ctx.timers.addTimer({
+        index: 0, function: TimerFunction.TT_OPENROOM, time: game.ctx.state.tickCount, level: gen.z,
         uByte5: 0, uByte6: gen.x, uByte7: gen.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
       game.systems.timer.processTimers();
-      game.state.tickCount++;
-      heardNothing(s, `8c. generator (${gen.x},${gen.y}) L${gen.z}, the party on L${game.party.state.position.z}`, [17], gen.z);
+      game.ctx.state.tickCount++;
+      heardNothing(s, `8c. generator (${gen.x},${gen.y}) L${gen.z}, the party on L${game.ctx.party.state.position.z}`, [17], gen.z);
     }
 
     // d. A group out of abeyance, `TT_61`, onto a free square.
@@ -509,10 +509,10 @@ function main(): void {
       const at = firstOpen(game);
       partyAt(game, at.x, at.y);
       const rn = makeGroup(game, at);
-      game.dungeonState.removeObjectFromCell(at, rn);
+      game.ctx.dungeon.removeObjectFromCell(at, rn);
       clear(s);
       game.systems.monsters.processAbeyanceTimer({
-        index: 0, function: TimerFunction.TT_61, time: game.state.tickCount, level: L,
+        index: 0, function: TimerFunction.TT_61, time: game.ctx.state.tickCount, level: L,
         uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, sequence: 0,
         timerWord8: 0, timerWord6: 0, object: rn,
       });
@@ -527,7 +527,7 @@ function main(): void {
       partyAt(game, at.x, at.y);
       const rn = makeGroup(game, at);
       clear(s);
-      game.systems.monsterDamage.damageMonsterGroup(game.dungeonState.getCreatureRecord(rn)!, L, at.x, at.y, 5000, true, false);
+      game.systems.monsterDamage.damageMonsterGroup(game.ctx.dungeon.getCreatureRecord(rn)!, L, at.x, at.y, 5000, true, false);
       heardNothing(s, `8e. a group dies at (${at.x},${at.y}) L${L}`, [4]);
     }
 
@@ -537,7 +537,7 @@ function main(): void {
       const { game } = s;
       let door: Position | null = null;
       for (const p of squares(game)) {
-        if (p.z !== L || p.y === 0 || roomType(game, p) !== RoomType.DOOR || (game.dungeonState.getCellFlag(p) & 7) !== 4) continue;
+        if (p.z !== L || p.y === 0 || roomType(game, p) !== RoomType.DOOR || (game.ctx.dungeon.getCellFlag(p) & 7) !== 4) continue;
         if (emptyOpen(game, new Position(p.x, p.y + 1, L))) { door = p; break; }
       }
       if (!door) throw new Error(`no shut door on L${L} with an empty square south of it`);
@@ -548,14 +548,14 @@ function main(): void {
         if (found.length > 0) { weapon = found[0]; from = p; break; }
       }
       if (weapon === null || from === null) throw new Error('no weapon on the floor');
-      game.dungeonState.removeObjectFromCell(from, weapon);
+      game.ctx.dungeon.removeObjectFromCell(from, weapon);
       const south = new Position(door.x, door.y + 1, L);
       partyAt(game, door.x, door.y);
       clear(s);
-      game.systems.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.state.tickCount);
+      game.systems.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.ctx.state.tickCount);
       for (let t = 0; t < 20; t++) {
         game.systems.timer.processTimers();
-        game.state.tickCount++;
+        game.ctx.state.tickCount++;
       }
       heardNothing(s, `8f. a weapon thrown north from (${south.x},${south.y}) L${L}`, [0]);
     }
@@ -577,7 +577,7 @@ function main(): void {
       clear(s);
       for (let t = 0; t < 6; t++) {
         game.systems.timer.processTimers();
-        game.state.tickCount++;
+        game.ctx.state.tickCount++;
       }
       heardNothing(s, `8g. its timer, at (${at.x},${at.y}) L${L}`, [5]);
     }
@@ -590,7 +590,7 @@ function main(): void {
     stand(game, new Position(0, 0, 0), 0);
     const at = (ordinal: number, distance: number): number[][] => {
       clear(s);
-      game.sounds.queueSound(ordinal, distance, 0, 0, 0);
+      game.ctx.sounds.queueSound(ordinal, distance, 0, 0, 0);
       row(`9. ordinal ${ordinal}, ${distance} squares away`, s);
       return s.played;
     };
@@ -609,17 +609,17 @@ function main(): void {
     const { game } = s;
     const p = new Position(5, 5, 0);
     stand(game, p, 0);
-    const tt20 = (): TimerEntry[] => game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_20);
+    const tt20 = (): TimerEntry[] => game.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_20);
     const tick = (): void => {
       game.systems.timer.processTimers();
-      game.state.tickCount++;
+      game.ctx.state.tickCount++;
     };
     // Queued inside a timer pass, as the wound is: the pass ends with `d.Time++`.
     const inPass = (deltaTime: number, level: number): void => {
-      game.sounds.queueSound(9, p.x, p.y, deltaTime, level);
-      game.state.tickCount++;
+      game.ctx.sounds.queueSound(9, p.x, p.y, deltaTime, level);
+      game.ctx.state.tickCount++;
     };
-    const t0 = game.state.tickCount;
+    const t0 = game.ctx.state.tickCount;
     inPass(2, p.z);
     const [timer] = tt20();
     console.log(['10. a wound, deltaTime 2', json(s.queued), json(s.played),

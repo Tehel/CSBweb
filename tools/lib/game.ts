@@ -60,7 +60,7 @@ export function newContext(data: DungeonData, graphics: GraphicsLoader, parts: P
  * comes off the HP as it would in play.
  */
 export function processTimersAt(game: Game, time: number): boolean {
-  game.state.tickCount = time;
+  game.ctx.state.tickCount = time;
   const won = game.systems.timer.processTimers();
   game.systems.monsterAttack.displayCharacterDamage();
   return won;

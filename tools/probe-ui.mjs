@@ -9,7 +9,7 @@
 // It starts a dev server and a headless Chrome if they are not already up, and leaves them
 // running, so the second probe of a session costs one call instead of five.
 //
-//   node tools/probe-ui.mjs 'game.party.champions[0].name'
+//   node tools/probe-ui.mjs 'game.ctx.party.champions[0].name'
 //   node tools/probe-ui.mjs --boot --shot /tmp/panel.png
 //   node tools/probe-ui.mjs --click 15,15,right --shot /tmp/inv.png 'screen.ui.uiMode'
 //   node tools/probe-ui.mjs --stop
@@ -62,7 +62,7 @@ Actions, applied in the order given:
   --stop              kill the dev server and chrome, then exit
 
 The bare argument is evaluated last with game, screen and renderView in scope, and
-printed as JSON:  node tools/probe-ui.mjs 'game.party.champions.map(c => c.name)'
+printed as JSON:  node tools/probe-ui.mjs 'game.ctx.party.champions.map(c => c.name)'
 
 Ports: DEV_PORT (9000), CDP_PORT (9222). Both daemons are started if absent and left up.`);
   process.exit(0);

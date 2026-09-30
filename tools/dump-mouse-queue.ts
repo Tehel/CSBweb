@@ -93,12 +93,12 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 1);
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
 
   // An open cell with an open, monster-free cell in front: the arrow step needs
   // somewhere to go. The party is empty, so the step costs no stamina and sets no delay.
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
   const { width, height } = map.descriptor;
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     }
   }
   if (!scene) throw new Error(`level ${level} has no open cell with an open neighbour`);
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.champions = [];
 
   // What the UI's dispatcher would have been handed, and when.
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
   const reset = (): void => {
     game.discardAllInput();
     party.position = new Position(scene!.x, scene!.y, level);
-    game.party.setFacing(scene!.dir);
+    game.ctx.party.setFacing(scene!.dir);
     party.partyMoveDisableTimer = 0;
     party.word11712 = 0;
     internals.lastInputTime = 0;
@@ -256,7 +256,7 @@ async function main(): Promise<void> {
   // test (doc/CSBwin-src/Mouse.cpp:1506), counted when below 0x2000 and not the no-op
   // (`Recording.cpp:1011-1019`). A held step and a frozen game's discard come first.
   reset();
-  const moves = (): number => game.state.block1.totalMoveCount;
+  const moves = (): number => game.ctx.state.block1.totalMoveCount;
   const m0 = moves();
   party.partyMoveDisableTimer = 2;
   game.enqueueMovement(MovementAction.MOVE_FORWARD);
@@ -399,7 +399,7 @@ async function main(): Promise<void> {
   const framesUntil = (at: { x: number; y: number; dir: number }, arm: 'door' | 'wall', done = (): boolean => true): number => {
     reset();
     party.position = new Position(at.x, at.y, level);
-    game.party.setFacing(at.dir);
+    game.ctx.party.setFacing(at.dir);
     viewportArm = arm;
     frame(true);
     const ticksAtClick = game.ctx.state.tickCount;
@@ -430,7 +430,7 @@ async function main(): Promise<void> {
   const tickDueRunsAfterTouch = (at: { x: number; y: number; dir: number }): boolean => {
     reset();
     party.position = new Position(at.x, at.y, level);
-    game.party.setFacing(at.dir);
+    game.ctx.party.setFacing(at.dir);
     viewportArm = 'wall';
     frame(true);
     game.onMouseClick(80, 100, 100);
@@ -653,7 +653,7 @@ async function main(): Promise<void> {
   check(steppedOnce && stepFrames === 1, 'a step makes a tick due (extraTicks)');
   soloParty();
   party.position = new Position(bareScene.x, bareScene.y, level);
-  game.party.setFacing(bareScene.dir);
+  game.ctx.party.setFacing(bareScene.dir);
   const bumpRuns = dueTickRuns(() => {}, 3);
   const bumped = party.position.x === bareScene.x && party.position.y === bareScene.y;
   console.log(['MoveParty into stone', bumped ? 'refused' : 'stepped', '-', bumpRuns, 'cleared'].join('\t'));

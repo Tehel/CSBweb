@@ -72,15 +72,14 @@ function loadWorld(): Game {
  * 03 = almost closed, 04 = closed, 05 = bashed open"). Both saves start at 2.
  */
 function doorState(game: Game): number {
-  return game.dungeonState.getCellFlag(new Position(DOOR.x, DOOR.y, DOOR.level)) & 0x7;
+  return game.ctx.dungeon.getCellFlag(new Position(DOOR.x, DOOR.y, DOOR.level)) & 0x7;
 }
 
 /** Turn the clock one tick at a time, the way `Game.update` does. */
 function advance(game: Game, ticks: number): void {
-  const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
     game.systems.timer.processTimers();
-    state.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
@@ -152,14 +151,14 @@ function main(): void {
     const game = loadWorld();
     applyCsbwinSave(game, bytes);
 
-    const restored = game.timerQueue.getTimers();
+    const restored = game.ctx.timers.getTimers();
     check(restored.length === queue.length, `${file}: the live queue holds ${queue.length} timers`);
     check(
       restored.map((e) => e.index).join(',') === queue.join(','),
       `${file}: in the file's own order, with the file's own indices`,
     );
     check(
-      game.timerQueue.getNextSequence() === gb2.timerSequence,
+      game.ctx.timers.getNextSequence() === gb2.timerSequence,
       `${file}: the sequence counter continues from gb2.TimerSequence`,
     );
 
@@ -207,13 +206,13 @@ function main(): void {
   // cloud's first turn (`Code11f52.cpp:1428`, one tick on).
   const loaded = loadWorld();
   applyCsbwinSave(loaded, new Uint8Array(readFileSync(resolve(SAVES, cases[0].file))));
-  const clock = loaded.state.tickCount;
+  const clock = loaded.ctx.state.tickCount;
   const at = new Position(DOOR.x, DOOR.y + 1, DOOR.level);
   loaded.systems.timer.schedulePoison(0, 3, at.z);
   loaded.systems.timer.scheduleChampionShieldExpiry(0, 10, 50, at.z);
   loaded.systems.missileEncounter.createCloud(RN_POISON_CLOUD, 100, at.x, at.y, at, 0);
   const setAt = (fn: number): number | undefined =>
-    loaded.timerQueue.getTimers().find((t) => t.function === fn)?.time;
+    loaded.ctx.timers.getTimers().find((t) => t.function === fn)?.time;
   console.log(`  after the load, d.Time ${clock}: poison due ${setAt(TimerFunction.TT_75)}, ` +
     `shield ${setAt(TimerFunction.TT_72)}, cloud ${setAt(TimerFunction.TT_25)}`);
   check(clock > 0, `the save sets the clock (d.Time ${clock})`);

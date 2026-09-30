@@ -67,9 +67,9 @@ function makeGame(): Game {
 
 const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y && a.z === b.z;
 const isOpen = (game: Game, p: Position): boolean => {
-  const map = game.dungeonState.getMap(p.z);
+  const map = game.ctx.dungeon.getMap(p.z);
   if (!map || p.x < 0 || p.y < 0 || p.x >= map.descriptor.width || p.y >= map.descriptor.height) return false;
-  return ((game.dungeonState.getCellFlag(p) >> 5) & 7) === RoomType.OPEN;
+  return ((game.ctx.dungeon.getCellFlag(p) >> 5) & 7) === RoomType.OPEN;
 };
 
 /**
@@ -77,7 +77,7 @@ const isOpen = (game: Game, p: Position): boolean => {
  * north one becomes a teleporter to the far one, turning objects by `rotation`.
  */
 function stage(game: Game, rotation: number): { party: Position; front: Position; dest: Position } {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(0)!;
   for (let x = 0; x < map.descriptor.width; x++) {
     for (let y = 1; y < map.descriptor.height; y++) {
@@ -93,8 +93,8 @@ function stage(game: Game, rotation: number): { party: Position; front: Position
           for (let rn = dungeon.findFirstObject(front); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
             if (decodeObjectID(rn).category === DBType.TELEPORTER) records[decodeObjectID(rn).index]!.rotation = rotation;
           }
-          game.party.state.position = party;
-          game.party.state.facing = 0;
+          game.ctx.party.state.position = party;
+          game.ctx.party.state.facing = 0;
           return { party, front, dest };
         }
       }
@@ -105,7 +105,7 @@ function stage(game: Game, rotation: number): { party: Position; front: Position
 
 /** The last weapon record, lifted from wherever it lies, at corner 0. */
 function takeWeapon(game: Game): ObjectID {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const index = dungeon.getData().databases.weapons.records.length - 1;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
@@ -120,7 +120,7 @@ function takeWeapon(game: Game): ObjectID {
 }
 
 function find(game: Game, at: Position, index: number): ObjectID | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const decoded = decodeObjectID(rn);
     if (decoded.category === DBType.WEAPON && decoded.index === index) return rn;
@@ -151,8 +151,8 @@ function main(): void {
     const { party } = stage(game, 0);
     const rn = takeWeapon(game);
     const calls = spy(game);
-    game.party.state.cursorOwner = 0;
-    game.party.state.objectInHand = rn;
+    game.ctx.party.state.cursorOwner = 0;
+    game.ctx.party.state.objectInHand = rn;
     const dropped = game.dropObjectFromCursor(1);
     const landed = find(game, party, decodeObjectID(rn).index);
     console.log(`1. cursor drop at (${party.x},${party.y}) where the party stands: accepted ${dropped}, `
@@ -168,8 +168,8 @@ function main(): void {
     const { front, dest } = stage(game, 1);
     const rn = takeWeapon(game);
     const calls = spy(game);
-    game.party.state.cursorOwner = 0;
-    game.party.state.objectInHand = rn;
+    game.ctx.party.state.cursorOwner = 0;
+    game.ctx.party.state.objectInHand = rn;
     game.dropObjectFromCursor(2);
     const landed = find(game, dest, decodeObjectID(rn).index);
     console.log(`2. cursor drop onto the teleporter at (${front.x},${front.y}), rotation 1: at (${dest.x},${dest.y}) `
@@ -220,32 +220,32 @@ function main(): void {
     const game = makeGame();
     const { party, front } = stage(game, 0);
     const rn = takeWeapon(game);
-    const queue = game.timerQueue;
+    const queue = game.ctx.timers;
     const actuators = game.systems.actuators;
     const real = actuators.triggerObjectMove.bind(actuators);
     let padTimer = -1;
     actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
-      padTimer = queue.createTimer(TimerFunction.TT_DOOR, position.x, position.y, 0, 0, game.state.tickCount, position.z).index;
+      padTimer = queue.createTimer(TimerFunction.TT_DOOR, position.x, position.y, 0, 0, game.ctx.state.tickCount, position.z).index;
       return real(position, object, place, unchangedRoom, facing);
     };
     const queued = (): boolean => padTimer >= 0 && queue.getTimers().some((t) => t.index === padTimer);
 
-    game.party.state.cursorOwner = 0;
-    game.party.state.objectInHand = rn;
+    game.ctx.party.state.cursorOwner = 0;
+    game.ctx.party.state.objectInHand = rn;
     game.dropObjectFromCursor(2);
     const afterDrop = queued();
 
     padTimer = -1;
     const lying = find(game, front, decodeObjectID(rn).index)!;
-    game.dungeonState.removeObjectFromCell(front, lying);
+    game.ctx.dungeon.removeObjectFromCell(front, lying);
     game.ctx.systems.mouse.triggerObjectMove(front, lying, false, false, 0);
     const afterPickUp = queued();
 
-    padTimer = queue.createTimer(TimerFunction.TT_DOOR, party.x, party.y, 0, 0, game.state.tickCount, party.z).index;
+    padTimer = queue.createTimer(TimerFunction.TT_DOOR, party.x, party.y, 0, 0, game.ctx.state.tickCount, party.z).index;
     const turned = game.ctx.systems.movement.moveParty(MovementAction.TURN_RIGHT).success;
     const afterTurn = queued();
 
-    console.log(`5. a timer due at d.Time ${game.state.tickCount} still queued after the drop ${afterDrop}, `
+    console.log(`5. a timer due at d.Time ${game.ctx.state.tickCount} still queued after the drop ${afterDrop}, `
       + `the pick-up ${afterPickUp}, a turn ${afterTurn} (turned ${turned})`);
     check(afterDrop, 'a drop runs no timer pass: the pad\'s timer waits for the tick');
     check(afterPickUp, 'a pick-up runs no timer pass');

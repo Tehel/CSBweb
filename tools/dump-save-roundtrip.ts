@@ -106,15 +106,14 @@ function roundTrip(game: Game): { next: Game; bytes: Uint8Array } {
 
 /** Turn the clock one tick at a time, the way `Game.update` does. */
 function advance(game: Game, ticks: number): void {
-  const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
     game.systems.timer.processTimers();
-    state.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
 function doorState(game: Game): number {
-  return game.dungeonState.getCellFlag(new Position(DOOR.x, DOOR.y, DOOR.level)) & 0x7;
+  return game.ctx.dungeon.getCellFlag(new Position(DOOR.x, DOOR.y, DOOR.level)) & 0x7;
 }
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -188,9 +187,9 @@ function compareChampions(label: string, before: Champion[], after: Champion[]):
  * dungeon whose text has been edited or a save from another dungeon entirely.
  */
 function compareConvertedImage(label: string, source: Game, restored: Game): void {
-  const from = source.state.dungeon;
-  const to = restored.state.dungeon;
-  const fresh = loadWorld().state.dungeon;
+  const from = source.ctx.state.dungeon;
+  const to = restored.ctx.state.dungeon;
+  const fresh = loadWorld().ctx.state.dungeon;
 
   check((from.expool?.length ?? 0) > 0,
     `${label}: the save carries an EXPOOL to lose (${from.expool?.length ?? 0} bytes)`);
@@ -219,7 +218,7 @@ function main(): void {
   for (const file of ['csbgame4-door-opening.dat', 'csbgame4-door-closing.dat', 'csbgame7.dat']) {
     const direct = fromCsbwinSave(file);
     const before = direct.getRuntimeSaveState();
-    const championsBefore = direct.party.state.champions.map((c) => ({ ...c }));
+    const championsBefore = direct.ctx.party.state.champions.map((c) => ({ ...c }));
 
     const { next, bytes } = roundTrip(direct);
     const after = next.getRuntimeSaveState();
@@ -227,7 +226,7 @@ function main(): void {
     console.log(`${file}: ${bytes.length} bytes, ${before.dungeon.timers?.length ?? 0} timer slots, ` +
       `${before.dungeon.timerQueue?.length ?? 0} live, ${championsBefore.length} champions`);
     compareStates(file, before, after);
-    compareChampions(file, championsBefore, next.party.state.champions);
+    compareChampions(file, championsBefore, next.ctx.party.state.champions);
     compareConvertedImage(file, direct, next);
   }
 
@@ -288,11 +287,11 @@ function main(): void {
   console.log('\n=== csbgame7.dat filled to the jump, then saved and loaded ===');
   {
     const filled = fromCsbwinSave('csbgame7.dat');
-    const q = filled.timerQueue;
+    const q = filled.ctx.timers;
     const firstMax = q.getMaxTimers();
     let t = 0;
     while (q.getMaxTimers() === firstMax) {
-      q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, filled.state.tickCount + 1000 + t++, 0);
+      q.createTimer(TimerFunction.TT_11, 0, 0, 0, 0, filled.ctx.state.tickCount + 1000 + t++, 0);
     }
     // The timer that found the table within five of full took slot `firstMax`, and left
     // the five below it empty.
@@ -309,14 +308,14 @@ function main(): void {
     fresh.applyRuntimeSaveState(fromFile);
     console.log(`max ${firstMax} -> ${max}, cursor ${cursor}; written MaxTimers ${block2.maxTimers} ` +
       `FirstAvailTimer ${block2.firstAvailTimer}; read back ${fromFile.dungeon.timers?.length} / ` +
-      `${fromFile.dungeon.firstAvailTimer}; restored ${fresh.timerQueue.getMaxTimers()} / ${fresh.timerQueue.getFirstAvailTimer()}`);
+      `${fromFile.dungeon.firstAvailTimer}; restored ${fresh.ctx.timers.getMaxTimers()} / ${fresh.ctx.timers.getFirstAvailTimer()}`);
     check(max === Math.trunc((firstMax + 10) * 5 / 4), `the full table grows to (${firstMax}+10)*5/4 = ${max}`);
     check(skipped.every((timer) => timer === null) && q.getTimer(firstMax) !== null && cursor === firstMax + 1,
       `the timer that filled it took slot ${firstMax}, the five below it stay empty, and the cursor is ${firstMax + 1}`);
     check(block2.maxTimers === max && block2.firstAvailTimer === cursor, 'a save writes the new size and the cursor');
     check(fromFile.dungeon.timers?.length === max && fromFile.dungeon.firstAvailTimer === cursor,
       'and reading the file back gives both');
-    check(fresh.timerQueue.getMaxTimers() === max, `and a game restored from it has ${max} slots`);
+    check(fresh.ctx.timers.getMaxTimers() === max, `and a game restored from it has ${max} slots`);
   }
 
   /* ---- 4. GAMEBLOCK2, built from the live game ---- */
@@ -349,10 +348,10 @@ function main(): void {
     check(block2.partyFacing === party.facing, `${file}: gb2.partyfacing is the party's facing`);
     check(block2.maxItem16 === (state.dungeon.item16?.length ?? 0), `${file}: gb2.MaxITEM16 is the pool size`);
     check(block2.maxTimers === (state.dungeon.timers?.length ?? 0), `${file}: gb2.MaxTimers is the table size`);
-    check(block2.maxTimers === live.timerQueue.getMaxTimers(),
+    check(block2.maxTimers === live.ctx.timers.getMaxTimers(),
       `${file}: gb2.MaxTimers is m_maxTimers, ${block2.maxTimers}`);
     check(block2.numTimer === (state.dungeon.timerQueue?.length ?? 0), `${file}: gb2.NumTimer is the queue length`);
-    check(block2.firstAvailTimer === live.timerQueue.getFirstAvailTimer(),
+    check(block2.firstAvailTimer === live.ctx.timers.getFirstAvailTimer(),
       `${file}: gb2.FirstAvailTimer is the free cursor`);
     check(block2.item16QueLen === live.systems.monsters.getItem16QueLen(),
       `${file}: gb2.ITEM16QueLen is the number of slots in use`);
@@ -377,7 +376,7 @@ function main(): void {
   console.log('\n=== CHARFLAG_attackDisable, busy and freed ===');
   {
     const game = fromCsbwinSave('csbgame7.dat');
-    const champion = (g: Game): Champion => g.party.state.champions[0]!;
+    const champion = (g: Game): Champion => g.ctx.party.state.champions[0]!;
     /** Champion 0 as the block 4 of a save written now has them. */
     const written = (g: Game): Champion => readCsbwinCharacter(
       loadSaveGameState(decodeBase64ToBytes(buildSavePayload(g).raw)).characterBlock!, 0).champion;
@@ -385,7 +384,7 @@ function main(): void {
     const hex = (n: number): string => `0x${(n & 0xffff).toString(16).padStart(4, '0')}`;
     const report = (label: string, g: Game): void => {
       const w = written(g);
-      console.log(`${label}: tick ${g.state.tickCount} charFlags ${hex(champion(g).charFlags)} ` +
+      console.log(`${label}: tick ${g.ctx.state.tickCount} charFlags ${hex(champion(g).charFlags)} ` +
         `busyTimer ${champion(g).busyTimerIndex}, written ${hex(w.charFlags)} / ${w.busyTimerIndex}`);
     };
     const others = champion(game).charFlags & ~CHARFLAG_ATTACK_DISABLE;
@@ -464,7 +463,7 @@ function main(): void {
   /** The monster AI timers (29-41) of the party's level, the ones the tail re-creates. */
   const monsterTimers = (g: Game): number => (g.getRuntimeSaveState().dungeon.timerQueue ?? [])
     .map((i) => g.ctx.timers.getTimer(i))
-    .filter((t) => t && t.function >= 29 && t.function <= 41 && t.level === g.party.state.position.z).length;
+    .filter((t) => t && t.function >= 29 && t.function <= 41 && t.level === g.ctx.party.state.position.z).length;
   const monstersOf = (g: Game): string => {
     const { dungeon, game } = g.getRuntimeSaveState();
     return JSON.stringify([dungeon.item16, dungeon.timers, dungeon.timerQueue, dungeon.timerSequence,
@@ -483,7 +482,7 @@ function main(): void {
       const same = monstersOf(live) === monstersOf(loaded);
       if (!same && firstDiff < 0) firstDiff = tick;
       if (tick % 100 === 0 || (!same && firstDiff === tick)) {
-        console.log([withTail ? 'yes' : 'no', live.state.tickCount, live.systems.monsters.getItem16QueLen(),
+        console.log([withTail ? 'yes' : 'no', live.ctx.state.tickCount, live.systems.monsters.getItem16QueLen(),
           monsterTimers(live), live.ctx.random.getSeed() >>> 0, same].join('\t'));
       }
     }
@@ -515,18 +514,18 @@ function main(): void {
     const bytes = encodeSavePayload(buildSavePayload(live));
     live.saveWritten();
     const loaded = overDm();
-    const builtOver = loaded.dungeonState.getMapCount();
+    const builtOver = loaded.ctx.dungeon.getMapCount();
     let error = '';
     try {
       applySaveBytes(loaded, bytes);
     } catch (e) {
       error = (e as Error).message;
     }
-    const world = loaded.state.dungeon;
-    console.log(`built over ${builtOver} maps, now ${loaded.dungeonState.getMapCount()}${error ? `, refused: ${error}` : ''}`);
-    check(!error && builtOver === 14 && loaded.dungeonState.getMapCount() === 11 && world === loaded.dungeonState.getData(),
+    const world = loaded.ctx.state.dungeon;
+    console.log(`built over ${builtOver} maps, now ${loaded.ctx.dungeon.getMapCount()}${error ? `, refused: ${error}` : ''}`);
+    check(!error && builtOver === 14 && loaded.ctx.dungeon.getMapCount() === 11 && world === loaded.ctx.dungeon.getData(),
       'the save\'s eleven-level world replaces DM\'s fourteen, in state and DungeonState both');
-    const from = live.state.dungeon;
+    const from = live.ctx.state.dungeon;
     check(!error && same(world.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]),
         from.maps.map((m) => [m.descriptor, m.monsterTypes, m.wallDecorationTOC, m.floorDecorationTOC, m.doorDecorationTOC]))
       && same(world.levelIndex, from.levelIndex) && same(world.header, from.header) && same(world.presetHeroes, from.presetHeroes),
@@ -535,7 +534,7 @@ function main(): void {
     if (!error) {
       for (let tick = 0; tick <= 100; tick++) {
         if (tick > 0) { advance(live, 1); advance(loaded, 1); }
-        const agree = monstersOf(live) === monstersOf(loaded) && same(live.party.state, loaded.party.state);
+        const agree = monstersOf(live) === monstersOf(loaded) && same(live.ctx.party.state, loaded.ctx.party.state);
         if (!agree && firstDiff < 0) firstDiff = tick;
       }
     }
@@ -571,7 +570,7 @@ function main(): void {
       const { party, dungeon, game } = g.getRuntimeSaveState();
       return JSON.stringify([party, dungeon, game.tickCount, game.randomSeed, game.block1]);
     };
-    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with a raw file: ${error || `loaded, level ${viaStale.party.state.position.z}`}`);
+    console.log(`v${SAVE_PAYLOAD_VERSION - 1} with a raw file: ${error || `loaded, level ${viaStale.ctx.party.state.position.z}`}`);
     check(!error && state(viaStale) === state(direct),
       'a save of an older format loads its raw file, as a genuine CSBWin save of it does');
     let refused = '';

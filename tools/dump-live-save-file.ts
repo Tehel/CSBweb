@@ -104,19 +104,18 @@ function makeGame(): Game {
 
 /** Turn the clock one tick at a time, the way `Game.update` does. */
 function advance(game: Game, ticks: number): void {
-  const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
     game.systems.timer.processTimers();
-    state.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
 function cellObjects(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     out.push(rn);
     if (out.length > 64) break;
@@ -125,7 +124,7 @@ function cellObjects(game: Game, cell: Position): ObjectID[] {
 }
 
 function heroByName(game: Game, name: string): PresetHero | null {
-  return (game.dungeonState.getData().presetHeroes ?? []).find((h) => h.name === name) ?? null;
+  return (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name) ?? null;
 }
 
 /** Walk up to a mirror, click it and confirm — a player recruiting a champion. */
@@ -133,7 +132,7 @@ function recruit(game: Game, name: string): boolean {
   const hero = heroByName(game, name);
   if (!hero) return false;
   const facing = (hero.location.wall + 2) & 3;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = new Position(
     hero.location.x - DELTA_X[facing], hero.location.y - DELTA_Y[facing], hero.location.map,
   );
@@ -157,8 +156,8 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
  * still names the right record is a statement about both.
  */
 function compareGames(label: string, before: Game, after: Game, monsters: boolean): void {
-  const b = before.party.state;
-  const a = after.party.state;
+  const b = before.ctx.party.state;
+  const a = after.ctx.party.state;
 
   check(b.position.x === a.position.x && b.position.y === a.position.y &&
     b.position.z === a.position.z,
@@ -171,8 +170,8 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     `(${b.objectInHand} vs ${a.objectInHand})`);
   check(before.getTickCount() === after.getTickCount(), `${label}: the clock`);
   // `GAMEBLOCK1` (SaveGame.cpp:1058-1072, :1603-1611, :1859-1881).
-  const g1 = before.state.block1;
-  const g2 = after.state.block1;
+  const g1 = before.ctx.state.block1;
+  const g2 = after.ctx.state.block1;
   check(g1.randomGameID === g2.randomGameID && g1.totalMoveCount === g2.totalMoveCount,
     `${label}: d.RandomGameID 0x${g2.randomGameID.toString(16)} and totalMoveCount ${g2.totalMoveCount}`);
   check(g1.word22592 === g2.word22592 && g1.word22594 === g2.word22594 &&
@@ -202,8 +201,8 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
     check(same(was.skills, now.skills), `${who}: the skills`);
   }
 
-  const wasWorld = before.state.dungeon;
-  const nowWorld = after.state.dungeon;
+  const wasWorld = before.ctx.state.dungeon;
+  const nowWorld = after.ctx.state.dungeon;
 
   let flags = 0;
   let differing = 0;
@@ -290,10 +289,10 @@ function compareGames(label: string, before: Game, after: Game, monsters: boolea
  * anything, so there is always a non-empty chain in the run.
  */
 function compareChains(label: string, before: Game, after: Game): void {
-  const at = before.party.state.position;
+  const at = before.ctx.party.state.position;
   const cells: Position[] = [new Position(at.x, at.y, at.z)];
 
-  const map = before.state.dungeon.maps[at.z];
+  const map = before.ctx.state.dungeon.maps[at.z];
   outer: for (let x = 0; x < (map?.descriptor.width ?? 0); x++) {
     for (let y = 0; y < (map?.descriptor.height ?? 0); y++) {
       const cell = new Position(x, y, at.z);
@@ -355,7 +354,7 @@ function writeAndReload(label: string, game: Game): Game | null {
   // empty cursor is `RNnul`, as in every committed save that has one. `RNempty` (0)
   // would load in CSBWin as an object in hand (`:1649`, `:2753`).
   check(parsed.save.block1?.saveOption === 1, `${label}: SaveOption is SAVE AND PLAY's 1`);
-  const inHand = game.party.state.objectInHand;
+  const inHand = game.ctx.party.state.objectInHand;
   if (inHand === OBJECT_ID_NULL) {
     const word = parsed.save.block2?.objectInHand;
     check(word === 0xffff, `${label}: the empty cursor is written as RNnul (0x${(word ?? 0).toString(16)})`);
@@ -386,7 +385,7 @@ function playFromDungeonDat(): Game {
 
   // Away from the mirror it is facing — forward is a wall — and then a few steps that
   // fire whatever pressure plates the corridor has.
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   const from = new Position(party.position.x, party.position.y, party.position.z);
   const walk = [
     MovementAction.TURN_RIGHT, MovementAction.TURN_RIGHT, MovementAction.MOVE_FORWARD,
@@ -472,7 +471,7 @@ function countRecords(world: DungeonData): number {
 function main(): void {
   console.log('=== 1. a game that started from dungeon.dat ===');
   const fresh = playFromDungeonDat();
-  const missiles = fresh.state.dungeon.databases.missiles.records.length;
+  const missiles = fresh.ctx.state.dungeon.databases.missiles.records.length;
   const carrying = carriedObjects(fresh);
   console.log(`  ${missiles} MISSILE records, ${carrying} live timer(s) carrying an object`);
   check(carrying > 0,
@@ -482,10 +481,10 @@ function main(): void {
   // nothing a fresh load does not already have. The walk above goes round the mouse
   // queue, which is where moves are counted (`tools/dump-mouse-queue.ts`), so the count
   // is set here to one that has to travel.
-  fresh.state.block1.totalMoveCount = 0x12345;
-  check(fresh.state.block1.randomGameID !== 0 && fresh.state.block1.totalMoveCount > 0,
+  fresh.ctx.state.block1.totalMoveCount = 0x12345;
+  check(fresh.ctx.state.block1.randomGameID !== 0 && fresh.ctx.state.block1.totalMoveCount > 0,
     `dungeon.dat: the game drew a RandomGameID and counted its moves ` +
-    `(0x${fresh.state.block1.randomGameID.toString(16)}, ${fresh.state.block1.totalMoveCount})`);
+    `(0x${fresh.ctx.state.block1.randomGameID.toString(16)}, ${fresh.ctx.state.block1.totalMoveCount})`);
   const freshBack = writeAndReload('dungeon.dat', fresh);
   if (freshBack) {
     compareGames('dungeon.dat', fresh, freshBack, true);
@@ -494,23 +493,23 @@ function main(): void {
       `dungeon.dat: the thrown object is still in flight (${carrying} carrying timer(s))`);
     // The vacuity guard. A file that wrote `dungeon.dat` back unchanged would pass every
     // comparison above, because the fresh game it loads into *is* dungeon.dat.
-    const pristine = makeGame().state.dungeon;
-    check(countRecords(freshBack.state.dungeon) !== countRecords(pristine) ||
-      !same(freshBack.state.dungeon.objectList, pristine.objectList),
+    const pristine = makeGame().ctx.state.dungeon;
+    check(countRecords(freshBack.ctx.state.dungeon) !== countRecords(pristine) ||
+      !same(freshBack.ctx.state.dungeon.objectList, pristine.objectList),
       'dungeon.dat: the world that came back is the played one, not the file the game booted on');
   }
 
   console.log('\n=== 2. a game restored from csbgame7.dat and played on ===');
   const played = playFromCsbwinSave('csbgame7.dat');
-  const creatures = played.state.dungeon.databases.creatures.records.length;
-  check(creatures > 0 && (played.state.dungeon.item16?.length ?? 0) > 0,
+  const creatures = played.ctx.state.dungeon.databases.creatures.records.length;
+  check(creatures > 0 && (played.ctx.state.dungeon.item16?.length ?? 0) > 0,
     `csbgame7.dat: it really does carry monsters (${creatures} creature records, ` +
-    `${played.state.dungeon.item16?.length ?? 0} ITEM16 slots)`);
-  check((played.state.dungeon.expool?.length ?? 0) > 0,
+    `${played.ctx.state.dungeon.item16?.length ?? 0} ITEM16 slots)`);
+  check((played.ctx.state.dungeon.expool?.length ?? 0) > 0,
     'csbgame7.dat: and an EXPOOL that dungeon.dat does not have');
-  check(played.state.block1.randomGameID === 0x261fdc50 && played.state.block1.totalMoveCount === 69897,
+  check(played.ctx.state.block1.randomGameID === 0x261fdc50 && played.ctx.state.block1.totalMoveCount === 69897,
     `csbgame7.dat: the loaded game has the file's RandomGameID and totalMoveCount ` +
-    `(0x${played.state.block1.randomGameID.toString(16)}, ${played.state.block1.totalMoveCount})`);
+    `(0x${played.ctx.state.block1.randomGameID.toString(16)}, ${played.ctx.state.block1.totalMoveCount})`);
 
   // **A load is not a no-op, and CSBWin's is not either.** `reloadAfterSaveGame` deletes
   // and re-creates the movement timers of every monster group on the party's level, and

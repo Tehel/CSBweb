@@ -60,7 +60,7 @@ function makeGame(): Game {
 
 function main(): void {
   const game = makeGame();
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
 
   // A floor cell with two more floor cells straight north of it, on level 0.
   const map = dungeon.getMap(0)!;
@@ -75,7 +75,7 @@ function main(): void {
   }
   if (at === null) { check(false, 'level 0 has a three-cell corridor'); finish(); return; }
 
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = at;
   party.facing = 0;
   const before = party.lastMonsterAttackTime;

@@ -139,12 +139,12 @@ async function main(): Promise<void> {
     const level = 3;
     standParty(game, level, 3, 2, 0); // facing north, into (3,1)
 
-    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
+    const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
     if (monsterRn === OBJECT_ID_EOF) {
       console.log('(no monster at (3,1) on level 3 — skipping)');
     } else {
-      const monster = game.dungeonState.getCreatureRecord(monsterRn)!;
-      const render = game.dungeonState.getMonsterRenderState(monster);
+      const monster = game.ctx.dungeon.getCreatureRecord(monsterRn)!;
+      const render = game.ctx.dungeon.getMonsterRenderState(monster);
       console.log(
         `group: ${MonsterType[monster.creatureType] ?? monster.creatureType}, ` +
         `${(monster.numMonM1 & 3) + 1} members, positions 0x${(render.positions & 0xff).toString(16)}`,
@@ -184,10 +184,10 @@ async function main(): Promise<void> {
       const level = 3;
       standParty(game, level, 3, 2, 0);
       giveSword(game, 0);
-      const champ = game.party.state.champions[0]!;
+      const champ = game.ctx.party.state.champions[0]!;
 
-      const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
-      const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
+      const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
+      const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
       if (!monster) { console.log('(no monster at (3,1) — skipping)'); break; }
 
       let hits = 0;
@@ -221,17 +221,17 @@ async function main(): Promise<void> {
     const level = 3;
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
-    const champ = game.party.state.champions[0]!;
-    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
-    const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
+    const champ = game.ctx.party.state.champions[0]!;
+    const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
+    const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
     const hpBefore = monster ? [...monster.hp] : [];
     let swings = 0;
     for (; swings < 3000; swings++) {
       champ.attributes.stamina = champ.attributes.maxStamina;
       swingOnce(game, 0, AttackType.atk_SWING);
-      if (game.dungeonState.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF) break;
+      if (game.ctx.dungeon.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF) break;
     }
-    const cleared = game.dungeonState.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF;
+    const cleared = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level)) === OBJECT_ID_EOF;
     console.log(`\ngroup hp [${hpBefore.join(',')}] wiped after ${cleared ? swings + 1 : '(never)'} swings`);
     check(cleared, 'sustained melee eventually kills the group');
   }
@@ -286,8 +286,8 @@ async function main(): Promise<void> {
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
 
-    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
-    const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
+    const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
+    const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) {
       console.log('(no monster to convert — skipping)');
     } else {
@@ -319,8 +319,8 @@ async function main(): Promise<void> {
     const level = 3;
     standParty(game, level, 3, 2, 0);
 
-    const monsterRn = game.dungeonState.findFirstMonster(new Position(3, 1, level));
-    const monster = monsterRn === OBJECT_ID_EOF ? null : game.dungeonState.getCreatureRecord(monsterRn);
+    const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(3, 1, level));
+    const monster = monsterRn === OBJECT_ID_EOF ? null : game.ctx.dungeon.getCreatureRecord(monsterRn);
     if (!monster) {
       console.log('(no monster at (3,1) — skipping)');
     } else {
@@ -353,7 +353,7 @@ async function main(): Promise<void> {
           game.championAttack(0, attackType);
           if ((monster.fear & 0xf) === StateOfFear.StateOfFear5) {
             frightened++;
-            pause = game.dungeonState.getItem16Record(monster.groupIndex & 0xff)?.uByte5 ?? 0;
+            pause = game.ctx.dungeon.getItem16Record(monster.groupIndex & 0xff)?.uByte5 ?? 0;
           }
         }
         if (frightened > 0) sawSuccess = true;
@@ -371,7 +371,7 @@ async function main(): Promise<void> {
     const game = await makeGame();
     for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 8000));
     standParty(game, 3, 3, 2, 0);
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
 
     champ.attributes.health = 40;
     const manaBefore = champ.attributes.mana;
@@ -382,11 +382,11 @@ async function main(): Promise<void> {
     check(champ.attributes.health <= champ.attributes.maxHealth, 'HEAL does not overshoot maxHP');
 
     // FREEZE LIFE with nothing special in hand is worth 70, capped at 200 in total.
-    game.party.state.freezeLifeTimer = 0;
+    game.ctx.party.state.freezeLifeTimer = 0;
     const steps: number[] = [];
     for (let i = 0; i < 4; i++) {
       game.championAttack(0, AttackType.atk_FREEZELIFE);
-      steps.push(game.party.state.freezeLifeTimer);
+      steps.push(game.ctx.party.state.freezeLifeTimer);
     }
     console.log(`FREEZE LIFE from 0, four casts: ${steps.join(' -> ')}`);
     check(steps[0] === 70, `one FREEZE LIFE is worth 70 (got ${steps[0]})`);
@@ -411,16 +411,16 @@ async function main(): Promise<void> {
     const doorY = 0;
     standParty(game, level, 10, 0, 1);
     giveSword(game, 0);
-    const champ = game.party.state.champions[0]!;
-    const map = game.dungeonState.getMap(level)!;
+    const champ = game.ctx.party.state.champions[0]!;
+    const map = game.ctx.dungeon.getMap(level)!;
     const doorState = (): number => map.cellFlags[doorX]![doorY]! & 7;
-    const onDoor = (fn: number) => game.timerQueue.getTimers().filter((t) =>
+    const onDoor = (fn: number) => game.ctx.timers.getTimers().filter((t) =>
       t.function === fn && t.level === level && t.uByte6 === doorX && t.uByte7 === doorY);
     check(doorState() === 4, `the door starts shut (state ${doorState()})`);
 
     // A door-step timer due long after the blow: the bash must cancel it.
-    game.timerQueue.addTimer({
-      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.state.tickCount + 50, level,
+    game.ctx.timers.addTimer({
+      index: 0, function: TimerFunction.TT_DOOR_STEP, time: game.ctx.state.tickCount + 50, level,
       uByte5: 0, uByte6: doorX, uByte7: doorY, uByte8: 0, uByte9: 0,
       sequence: 0, timerWord8: 0, timerWord6: 0,
     });
@@ -431,7 +431,7 @@ async function main(): Promise<void> {
       champ.attributes.stamina = champ.attributes.maxStamina;
       game.championAttack(0, AttackType.atk_CHOP);
       if (doorState() !== 4 || onDoor(TimerFunction.TT_BASH_DOOR).length > 0) {
-        blowTick = game.state.tickCount;
+        blowTick = game.ctx.state.tickCount;
         stateOnBlowTick = doorState();
         break;
       }
@@ -445,7 +445,7 @@ async function main(): Promise<void> {
 
     const tick = (): void => {
       game.systems.timer.processTimers();
-      game.state.tickCount++;
+      game.ctx.state.tickCount++;
     };
     // The blow is a click, between ticks: the first tick runs its timers on the d.Time of
     // the blow (CSBCode.cpp:626, :660), so d.Time + 2 is the third.
@@ -467,7 +467,7 @@ async function main(): Promise<void> {
     const game = await makeGame();
     const level = 1;
     const door = new Position(11, 0, level);
-    const map = game.dungeonState.getMap(level)!;
+    const map = game.ctx.dungeon.getMap(level)!;
     const characteristics = objectTables.doorCharacteristics;
     console.log(`DoorCharacteristics force: ${Array.from(characteristics, (v) => v & 0xff).join(', ')}; level 1 maps type 1 to entry ${map.descriptor.doorType1Index}`);
     map.descriptor.doorType1Index = 3;
@@ -490,15 +490,15 @@ async function main(): Promise<void> {
  * the way they were when they joined — and `_Attack` aims by `pChar->facing`.
  */
 function standParty(game: Game, level: number, x: number, y: number, facing: number): void {
-  game.party.state.position = new Position(x, y, level);
-  game.party.state.facing = facing as typeof game.party.state.facing;
-  for (const champ of game.party.state.champions) champ.facing = facing as typeof champ.facing;
+  game.ctx.party.state.position = new Position(x, y, level);
+  game.ctx.party.state.facing = facing as typeof game.ctx.party.state.facing;
+  for (const champ of game.ctx.party.state.champions) champ.facing = facing as typeof champ.facing;
   game.systems.monsters.loadPartyLevel(level);
 }
 
 /** Put a real sword into a champion's fighting hand. */
 function giveSword(game: Game, chIdx: number): ObjectID {
-  const data = game.dungeonState.getData();
+  const data = game.ctx.dungeon.getData();
   data.databases.weapons.records.push({
     nextObject: OBJECT_ID_EOF,
     broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
@@ -506,14 +506,14 @@ function giveSword(game: Game, chIdx: number): ObjectID {
   });
   data.databases.weapons.count++;
   const rn = encodeObjectID(0, DBType.WEAPON, data.databases.weapons.records.length - 1);
-  const champ = game.party.state.champions[chIdx]!;
+  const champ = game.ctx.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
   return rn as ObjectID;
 }
 
 /** `DetermineMastery(chIdx, skill)`, for the printed tables. */
 function masteryOf(game: Game, chIdx: number, skill: number): number {
-  return determineMastery(game.party.state.champions[chIdx]!, skill, {});
+  return determineMastery(game.ctx.party.state.champions[chIdx]!, skill, {});
 }
 
 /** One blow, returning the damage the panel would have flashed (0 for a miss). */

@@ -75,10 +75,10 @@ async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')>
 
 /** The interface over `g`, with the inventory click wired to the engine's pair as `main.ts` does. */
 function uiOver(g: Game): UIState {
-  const ui = createUIState(graphics, g.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, g.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  ui.partyState = g.party.state;
+  ui.partyState = g.ctx.party.state;
   ui.onRemoveCharacterPossession = (chIdx, slot) => g.removeCharacterPossession(chIdx, slot);
   ui.onAddCharacterPossession = (chIdx, object, slot) => g.addCharacterPossession(chIdx, object, slot);
   return ui;
@@ -86,7 +86,7 @@ function uiOver(g: Game): UIState {
 
 /** The first record of `category` in the dungeon, as an object ID. */
 function firstRecord(g: Game, category: DBType.SCROLL | DBType.CHEST): ObjectID {
-  const databases = g.dungeonState.getData().databases;
+  const databases = g.ctx.dungeon.getData().databases;
   const db = category === DBType.SCROLL ? databases.scrolls : databases.containers;
   if (db.records.length === 0) throw new Error(`dungeon.dat has no ${DBType[category]} record`);
   return encodeObjectID(0, category, 0);
@@ -139,7 +139,7 @@ function typeNamed(objNI: number): { category: Kind; type: number } | null {
 function newObject(game: Game, objNI: number, extra: { cursed?: boolean; charges?: number } = {}): ObjectID {
   const found = typeNamed(objNI);
   if (!found) throw new Error(`no object is named ${objNI}`);
-  const databases = game.dungeonState.getData().databases;
+  const databases = game.ctx.dungeon.getData().databases;
   const common = { nextObject: OBJECT_ID_EOF, important: false, cursed: extra.cursed ?? false };
   let db: { records: object[]; count: number };
   if (found.category === DBType.WEAPON) {
@@ -198,7 +198,7 @@ const table: Row[] = [
 async function main(): Promise<void> {
   const { handleClothingClick } = await importMouse();
   const game = makeGame();
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const nameIndex = (rn: ObjectID): number => NameIndex(
     dungeon,
     { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 },
@@ -303,17 +303,17 @@ async function main(): Promise<void> {
     const g = makeGame();
     g.addChampion(champion(0));
     g.addChampion(champion(1));
-    const c = g.party.state.champions[0]!;
+    const c = g.ctx.party.state.champions[0]!;
     const staff = newObject(g, NI.OBJNI_SERPENT_STAFF);
     const helm = newObject(g, NI.OBJNI_CROWN_OF_NERRA);
     c.possessions[1] = staff;
     c.possessions[2] = helm;
     const gNameIndex = (rn: ObjectID): number => NameIndex(
-      g.dungeonState,
+      g.ctx.dungeon,
       { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 }, 0, rn,
     );
-    AdjustStatsForItemCarried(c, 1, 1, staff, g.dungeonState, gNameIndex);
-    AdjustStatsForItemCarried(c, 2, 1, helm, g.dungeonState, gNameIndex);
+    AdjustStatsForItemCarried(c, 1, 1, staff, g.ctx.dungeon, gNameIndex);
+    AdjustStatsForItemCarried(c, 2, 1, helm, g.ctx.dungeon, gNameIndex);
     const worn = `${c.attributes.maxMana} ${c.attributes.stats[AttributeIndex.Wisdom]!.current}`;
     g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
     g.systems.monsterAttack.displayCharacterDamage();
@@ -324,16 +324,16 @@ async function main(): Promise<void> {
     // The inventory click: champion 1's inventory is open, so a button of 8 and up is a
     // slot of theirs (`slot = button - 8`, `doc/CSBwin-src/CSBCode.cpp:6944`).
     const ui = uiOver(g);
-    g.party.state.selectedCharacterIndex = 1;
-    const b = g.party.state.champions[1]!;
+    g.ctx.party.state.selectedCharacterIndex = 1;
+    const b = g.ctx.party.state.champions[1]!;
     const dexhelm = newObject(g, NI.OBJNI_DEXHELM);
     const dex = b.attributes.stats[AttributeIndex.Dexterity]!;
-    g.party.state.objectInHand = dexhelm;
+    g.ctx.party.state.objectInHand = dexhelm;
     handleClothingClick(ui, 8 + 2);
     const on = dex.current;
     handleClothingClick(ui, 8 + 2);
     console.log(`the inventory click: Dexterity 42 -> ${on} with the Dexhelm on -> ${dex.current} off`);
-    check(on === 52 && dex.current === 42 && dex.minimum === 30 && g.party.state.objectInHand === dexhelm,
+    check(on === 52 && dex.current === 42 && dex.minimum === 30 && g.ctx.party.state.objectInHand === dexhelm,
       'the inventory click puts the bonus on and takes it off');
 
     // The DSA's `&MOVE` to and from a character (`MoveObject.cpp:435`, `:160`).
@@ -351,7 +351,7 @@ async function main(): Promise<void> {
     // each object with `AddCharacterPossession` (`Character.cpp:789`), so the recruit
     // arrives with the bonuses. BORIS's mirror holds a Rabbit's Foot, +10 Luck anywhere.
     const g = makeGame();
-    const data = g.dungeonState.getData();
+    const data = g.ctx.dungeon.getData();
     for (const hero of data.presetHeroes ?? []) {
       const carried = (hero.inventory ?? []).map((item) => nameIndex(item.rn as ObjectID))
         .filter((objNI) => table.some((row) => row.objNI === objNI));
@@ -360,7 +360,7 @@ async function main(): Promise<void> {
     const boris = (data.presetHeroes ?? []).find((h) => h.name === 'BORIS');
     if (!boris) throw new Error('no BORIS in dungeon.dat');
     const facing = (boris.location.wall + 2) & 3;
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     party.position = new Position(
       boris.location.x - [0, 1, 0, -1][facing]!, boris.location.y - [-1, 0, 1, 0][facing]!, boris.location.map,
     );
@@ -387,11 +387,11 @@ async function main(): Promise<void> {
     g.addChampion(champion(0));
     g.addChampion(champion(1));
     const ui = uiOver(g);
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     party.selectedCharacterIndex = 1;
-    const weapons = g.dungeonState.getData().databases.weapons.records;
+    const weapons = g.ctx.dungeon.getData().databases.weapons.records;
     const gNameIndex = (rn: ObjectID): number => NameIndex(
-      g.dungeonState,
+      g.ctx.dungeon,
       { objDescObjectType: objectTables.objDescObjectType, byte640: uiTables.graphic232.byte640 }, 0, rn,
     );
 
@@ -413,7 +413,7 @@ async function main(): Promise<void> {
 
     // A scroll opens in the weapon hand and closes out of it (`:1981-1986`, `:1892-1896`).
     const scroll = firstRecord(g, DBType.SCROLL);
-    const scrolls = g.dungeonState.getData().databases.scrolls.records;
+    const scrolls = g.ctx.dungeon.getData().databases.scrolls.records;
     scrolls[0]!.open = false;
     party.objectInHand = scroll;
     handleClothingClick(ui, 8 + 1);
@@ -427,7 +427,7 @@ async function main(): Promise<void> {
 
     // Round the neck an Illumulet gets `value(1)` and adds `d.Word1074[2]` to the party's
     // light (`:2011-2019`); a Jewel Symal gets `value(1)` (`:2022-2028`).
-    const misc = g.dungeonState.getData().databases.misc.records;
+    const misc = g.ctx.dungeon.getData().databases.misc.records;
     const step = uiTables.graphic232.word1074[2]!;
     const brightness = party.brightness;
     const illumulet = newObject(g, NI.OBJNI_ILLUMULET_A);
@@ -480,11 +480,11 @@ async function main(): Promise<void> {
     // ZED's mirror hands out a torch, and `AddCharacter` puts it in with
     // `AddCharacterPossession` (`Character.cpp:789`), so if it lands in a hand it is lit.
     const g = makeGame();
-    const data = g.dungeonState.getData();
+    const data = g.ctx.dungeon.getData();
     const zed = (data.presetHeroes ?? []).find((h) => h.name === 'ZED');
     if (!zed) throw new Error('no ZED in dungeon.dat');
     const facing = (zed.location.wall + 2) & 3;
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     party.position = new Position(
       zed.location.x - [0, 1, 0, -1][facing]!, zed.location.y - [-1, 0, 1, 0][facing]!, zed.location.map,
     );

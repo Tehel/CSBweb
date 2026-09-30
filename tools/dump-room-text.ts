@@ -67,8 +67,8 @@ check(visible.length === 1 && visible[0]!.z === 0 && visible[0]!.x === 9 && visi
 
 // The party enters that square: its pads decode the text and queue it.
 const square = new Position(9, 1, 0);
-game.party.state.position = square;
-game.ctx.systems.actuators.triggerObjectMove(square, OBJECT_ID_NULL, true, false, game.party.state.facing);
+game.ctx.party.state.position = square;
+game.ctx.systems.actuators.triggerObjectMove(square, OBJECT_ID_NULL, true, false, game.ctx.party.state.facing);
 for (const { color, text } of queued) console.log(`queued (colour ${color}): ${JSON.stringify(text)}`);
 check(queued.length === 1 && queued[0]!.color === 15, 'entering it queues one text, in colour 15');
 check(queued[0]?.text === '\nIT IS TOO BAD YOU DID NOT DISCOVER THE TRUE SECRET OF THE FIRESTAFF. ' +

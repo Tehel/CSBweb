@@ -242,24 +242,24 @@ function checkLoadedGames(files: string[]): void {
   for (const file of files) {
     const game = newGame(data, graphics);
     applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, file))));
-    const saved = game.state.tickCount;
-    const before = game.timerQueue.getTimers().slice();
+    const saved = game.ctx.state.tickCount;
+    const before = game.ctx.timers.getTimers().slice();
     const iaido = file === 'csbgame6.dat'
       ? before.find((t) => t.function === TimerFunction.TT_11 && t.time === saved)
       : undefined;
     // The first tick runs its timers on the saved `d.Time`, then turns the clock
     // (`LoadGame`, SaveGame.cpp:1624; CSBCode.cpp:626, :660).
-    const now = game.state.tickCount;
+    const now = game.ctx.state.tickCount;
     game.systems.timer.processTimers();
-    game.state.tickCount++;
+    game.ctx.state.tickCount++;
     const due = before.filter((t) => t.time <= now).length;
-    const left = game.timerQueue.getTimers().filter((t) => t.time <= now);
+    const left = game.ctx.timers.getTimers().filter((t) => t.time <= now);
     if (due > 0) firedSome++;
     console.log(`  ${file}: ${before.length} timers, ${due} due by tick ${now}, ${left.length} of them left`);
     check(left.length === 0, `${file}: no timer due by the first tick is left after it`);
     if (file === 'csbgame6.dat') {
       check(iaido !== undefined, 'csbgame6.dat: a TT_11 is due at the saved d.Time');
-      check(iaido !== undefined && !game.timerQueue.getTimers().includes(iaido),
+      check(iaido !== undefined && !game.ctx.timers.getTimers().includes(iaido),
         'csbgame6.dat: and the first tick runs it');
     }
   }
@@ -269,7 +269,7 @@ function checkLoadedGames(files: string[]): void {
 function checkTableSize(files: string[]): void {
   console.log('\n=== 5. the table\'s size ===');
   const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
-  const size = newGame(data, stockGraphics()).timerQueue.getMaxTimers();
+  const size = newGame(data, stockGraphics()).ctx.timers.getMaxTimers();
   const saved = files.map((file) => loadSaveGameState(new Uint8Array(readFileSync(resolve(SAVES, file)))).maxTimers);
   console.log(`  a new game: ${size} slots; the saves: ${[...new Set(saved)].join(', ')}`);
   check(size === 467, `a new game's table is 100 + (182 + 75) + (0 + 60) + (0 + 50) = 467 slots, not ${size}`);

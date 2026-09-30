@@ -54,28 +54,28 @@ async function main(): Promise<void> {
   // Fixed seed, so the numbers below repeat run to run.
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
-  game.party.state.position = new Position(px, py, level);
+  game.ctx.party.state.position = new Position(px, py, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const dungeon = game.dungeonState;
-  const start = game.party.state.champions.map((c) => c.attributes.health);
+  const dungeon = game.ctx.dungeon;
+  const start = game.ctx.party.state.champions.map((c) => c.attributes.health);
   const missilesBefore = data.databases.missiles.records.length;
 
   let firstHitTick = -1;
   let firstDeathTick = -1;
   for (let t = 0; t < ticks; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
-    const hurt = game.party.state.champions.some((c, i) => c.attributes.health < start[i]!);
+    const hurt = game.ctx.party.state.champions.some((c, i) => c.attributes.health < start[i]!);
     if (hurt && firstHitTick < 0) firstHitTick = t;
-    const dead = game.party.state.champions.some((c) => c.attributes.health === 0);
+    const dead = game.ctx.party.state.champions.some((c) => c.attributes.health === 0);
     if (dead && firstDeathTick < 0) firstDeathTick = t;
   }
 
   console.log(`level ${level}, party at (${px},${py}), ${ticks} ticks\n`);
   console.log(['champion', 'hp', 'lost', 'wounds', 'poison', 'alive'].join('\t'));
   let totalLost = 0;
-  game.party.state.champions.forEach((c, i) => {
+  game.ctx.party.state.champions.forEach((c, i) => {
     const lost = start[i]! - c.attributes.health;
     totalLost += lost;
     console.log([
@@ -112,8 +112,8 @@ async function main(): Promise<void> {
   const probe = champion(0, 'PROBE');
   probe.attributes.health = 100000;
   probe.attributes.maxHealth = 100000;
-  game.party.state.champions.push(probe);
-  const probeIdx = game.party.state.champions.length - 1;
+  game.ctx.party.state.champions.push(probe);
+  const probeIdx = game.ctx.party.state.champions.length - 1;
   // Reset between hits, or the count just measures how long it takes all six body
   // parts to saturate rather than how often a hit wounds.
   let bigWounds = 0;
@@ -143,8 +143,8 @@ async function main(): Promise<void> {
   const armoured = champion(0, 'ARMOURED');
   armoured.attributes.health = 1000000;
   armoured.attributes.maxHealth = 1000000;
-  game.party.state.champions.push(armoured);
-  const armIdx = game.party.state.champions.length - 1;
+  game.ctx.party.state.champions.push(armoured);
+  const armIdx = game.ctx.party.state.champions.length - 1;
 
   const measure = (): number => {
     armoured.attributes.health = 1000000;

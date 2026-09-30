@@ -117,7 +117,7 @@ function watchedGame(healths: number[]): Watched {
   w.game = newGame(data, stockGraphics(), { messages, showCredits: (word11694) => w.credits.push(word11694) });
   w.game.setRandomSeed(0x12345678);
   healths.forEach((health, i) => w.game.addChampion(champion(i, health)));
-  w.game.party.state.position = new Position(6, 14, 2);
+  w.game.ctx.party.state.position = new Position(6, 14, 2);
   return w;
 }
 
@@ -126,8 +126,8 @@ function frame(w: Watched): { tick: number; lost: boolean; credits: number; cloc
   w.frames++;
   w.game.runFrame(1_000_000 + w.frames * 250);
   return {
-    tick: w.game.state.tickCount,
-    lost: w.game.party.state.gameIsLost,
+    tick: w.game.ctx.state.tickCount,
+    lost: w.game.ctx.party.state.gameIsLost,
     credits: w.credits.length,
     clockTicks: w.clockTicks,
   };
@@ -147,13 +147,13 @@ function runPastDeath(label: string, w: Watched, limit: number): number {
     check(w.game.mainLoopHasReturned(), `${label}: MainLoop has returned`);
   }
   check(lostAt > 0, `${label}: the party died within ${limit} frames`);
-  const tick = w.game.state.tickCount;
-  const timers = w.game.timerQueue.getTimers().length;
+  const tick = w.game.ctx.state.tickCount;
+  const timers = w.game.ctx.timers.getTimers().length;
   const { clockTicks, vbls } = w;
   for (let n = 1; n <= 20; n++) frame(w);
-  console.log([label, 'twenty frames on', `tick ${w.game.state.tickCount}`, `timers ${w.game.timerQueue.getTimers().length}`, `credits ${w.credits.length}`].join('\t'));
-  check(w.game.state.tickCount === tick, `${label}: no tick runs after it`);
-  check(w.game.timerQueue.getTimers().length === timers, `${label}: and no timer fires`);
+  console.log([label, 'twenty frames on', `tick ${w.game.ctx.state.tickCount}`, `timers ${w.game.ctx.timers.getTimers().length}`, `credits ${w.credits.length}`].join('\t'));
+  check(w.game.ctx.state.tickCount === tick, `${label}: no tick runs after it`);
+  check(w.game.ctx.timers.getTimers().length === timers, `${label}: and no timer fires`);
   check(w.clockTicks === clockTicks && w.vbls === vbls, `${label}: and the loop's VBL half is gone too`);
   check(w.credits.length === 1, `${label}: ShowCredits is asked for only once`);
   return lostAt;
@@ -168,7 +168,7 @@ function checkTickOfDeath(): void {
     const w = watchedGame([3]);
     w.game.systems.monsterAttack.poisonCharacter(0, 128);
     w.game.systems.monsterAttack.displayCharacterDamage();
-    check(w.game.party.state.champions[0]!.attributes.health === 1, 'poison: the first dose leaves 1 health');
+    check(w.game.ctx.party.state.champions[0]!.attributes.health === 1, 'poison: the first dose leaves 1 health');
     runPastDeath('poison', w, 60);
   }
 
@@ -177,11 +177,11 @@ function checkTickOfDeath(): void {
   {
     const w = watchedGame([200]);
     for (let n = 1; n <= 3; n++) frame(w);
-    const tick = w.game.state.tickCount;
+    const tick = w.game.ctx.state.tickCount;
     w.game.systems.monsterAttack.killCharacter(0);
     check(w.credits.length === 0, 'between ticks: nothing ends until the next tick');
     runPastDeath('between ticks', w, 1);
-    check(w.game.state.tickCount === tick, 'between ticks: the next tick is the last, and leaves d.Time where it was');
+    check(w.game.ctx.state.tickCount === tick, 'between ticks: the next tick is the last, and leaves d.Time where it was');
   }
 
   // One of two dies: the game goes on.
@@ -594,7 +594,7 @@ function checkCsbWin(): void {
   console.log('=== the CSB win: actuator type 18 (Timer.cpp:2366-2372, CSBCode.cpp:627-633) ===');
   const w = watchedGame([200]);
   const game = w.game;
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   // The first actuator on a wall of the real dungeon, made type 18.
   let found: { rn: ObjectID; x: number; y: number; z: number } | null = null;
   for (let z = 0; z < dungeon.getMapCount() && !found; z++) {
@@ -614,19 +614,19 @@ function checkCsbWin(): void {
   // A position other than the actuator's: type 18 ignores it. And a timer due with it,
   // behind it in the queue, both due in the next tick, which runs its timers on the
   // `d.Time` of now (CSBCode.cpp:626, :660).
-  const due = game.state.tickCount;
+  const due = game.ctx.state.tickCount;
   const otherPos = (decodeObjectID(rn).position + 1) & 3;
-  game.timerQueue.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);
-  game.timerQueue.createTimer(TimerFunction.TT_OPENROOM, 0, 0, 0, 0, due, z);
+  game.ctx.timers.createTimer(TimerFunction.TT_STONEROOM, x, y, otherPos, 0, due, z);
+  game.ctx.timers.createTimer(TimerFunction.TT_OPENROOM, 0, 0, 0, 0, due, z);
   game.savedGameRead();
   console.log(`actuator ${rn.toString(16)} at (${x},${y}) level ${z}, position ${decodeObjectID(rn).position}; the timer's ${otherPos}`);
 
   const clockTicks = w.clockTicks;
   const f = frame(w);
-  const queued = game.timerQueue.getTimers().length;
+  const queued = game.ctx.timers.getTimers().length;
   console.log(`the tick of the win: tick ${f.tick}, timers ${queued}, credits ${f.credits}`);
   check(f.tick === due && f.credits === 0 && !game.mainLoopHasReturned(), 'the tick of the win asks for nothing yet');
-  check(game.timerQueue.getTimers().some((t) => t.function === TimerFunction.TT_OPENROOM && t.time === due),
+  check(game.ctx.timers.getTimers().some((t) => t.function === TimerFunction.TT_OPENROOM && t.time === due),
     'ProcessTimers returned at once: the timer behind it is still queued');
   check(w.clockTicks === clockTicks, 'and the rest of the tick did not run: no scrollingText.ClockTick()');
   check(!game.canRestartFromSavegame(), 'd.CanRestartFromSavegame is cleared');
@@ -637,10 +637,10 @@ function checkCsbWin(): void {
     const g = frame(w);
     if (g.credits > 0 && creditsAt === 0) creditsAt = n;
   }
-  console.log(`credits ${creditsAt} VBLs after the tick; tick ${game.state.tickCount}; vblInterrupts ${w.vbls - vbls}; asked ${JSON.stringify(w.credits)}`);
+  console.log(`credits ${creditsAt} VBLs after the tick; tick ${game.ctx.state.tickCount}; vblInterrupts ${w.vbls - vbls}; asked ${JSON.stringify(w.credits)}`);
   check(creditsAt === WON_GAME_VBLS, 'ShowCredits(1) is asked for 300 VBLs after the tick of the win');
   check(w.credits.length === 1 && w.credits[0] === true, 'once, with d.Word11694 set');
-  check(game.state.tickCount === due, 'no tick runs meanwhile, nor after');
+  check(game.ctx.state.tickCount === due, 'no tick runs meanwhile, nor after');
   check(w.vbls - vbls === WON_GAME_VBLS, 'and the 300 VBLs run their vblInterrupt, and no more after');
   check(game.mainLoopHasReturned(), 'MainLoop is over');
 }

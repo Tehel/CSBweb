@@ -52,8 +52,8 @@ function loadWorld(): Game {
 
 /** The first open square beside the party, to walk back and forth to. */
 function openNeighbour(game: Game): { x: number; y: number } {
-  const { x, y, z } = game.party.state.position;
-  const map = game.dungeonState.getMap(z)!;
+  const { x, y, z } = game.ctx.party.state.position;
+  const map = game.ctx.dungeon.getMap(z)!;
   for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
     const nx = x + dx;
     const ny = y + dy;
@@ -67,8 +67,8 @@ function scenario(save: string, power: number): void {
   const label = `${save}, power ${power}`;
   const game = loadWorld();
   applyCsbwinSave(game, new Uint8Array(readFileSync(resolve(SAVES, save))));
-  const prints = game.footprints;
-  const party = game.party.state;
+  const prints = game.ctx.footprints;
+  const party = game.ctx.party.state;
 
   // A caster who masters the spell at any power: no fizzle, no random draw.
   const caster = party.champions[0]!;
@@ -90,7 +90,7 @@ function scenario(save: string, power: number): void {
   const route = [away, home, away, home];
   let from = home;
   for (const to of route) {
-    game.state.tickCount += 8;
+    game.ctx.state.tickCount += 8;
     game.systems.worldMove.moveParty(from.x, from.y, to.x, to.y);
     from = to;
   }
@@ -110,8 +110,8 @@ function scenario(save: string, power: number): void {
 
   const loaded = loadWorld();
   applySaveBytes(loaded, encodeSavePayload(payload));
-  check(loaded.footprints.getIndexOfFirstMagicFootprint() === first
-    && loaded.footprints.getIndexOfLastMagicFootprint() === last,
+  check(loaded.ctx.footprints.getIndexOfFirstMagicFootprint() === first
+    && loaded.ctx.footprints.getIndexOfLastMagicFootprint() === last,
   `${label}: a game loaded from the save reads the range back`);
 }
 

@@ -61,16 +61,16 @@ async function main(): Promise<void> {
     return game;
   };
 
-  const roomType = (game: Game, p: Position): number => (game.dungeonState.getCellFlag(p) >> 5) & 7;
+  const roomType = (game: Game, p: Position): number => (game.ctx.dungeon.getCellFlag(p) >> 5) & 7;
   const inBounds = (game: Game, p: Position): boolean => {
-    const map = game.dungeonState.getMap(p.z);
+    const map = game.ctx.dungeon.getMap(p.z);
     return !!map && p.x >= 0 && p.y >= 0 && p.x < map.descriptor.width && p.y < map.descriptor.height;
   };
   const emptyOpen = (game: Game, p: Position): boolean =>
-    inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+    inBounds(game, p) && roomType(game, p) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
   /** A type-1 floor pad alone in its cell, with two empty open squares in a line beside it. */
   const findPad = (game: Game): { pad: Position; beside: Position; beyond: Position } => {
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     for (let z = 0; z < dungeon.getMapCount(); z++) {
       if (![...Array(27).keys()].some((t) => dungeon.monsterAllowedOnLevel(t, z))) continue;
       const map = dungeon.getMap(z)!;
@@ -111,16 +111,16 @@ async function main(): Promise<void> {
   const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y && a.z === b.z;
   const called = (calls: PadCall[], at: Position, place: boolean): boolean =>
     calls.some((c) => same(c.at, at) && c.place === place && !c.unchangedRoom);
-  const actionTimers = (game: Game): number => game.timerQueue.getTimers().filter((t) =>
+  const actionTimers = (game: Game): number => game.ctx.timers.getTimers().filter((t) =>
     t.function < TimerFunction.TT_FIRST_MONSTER_AI || t.function > TimerFunction.TT_LAST_MONSTER_AI).length;
-  const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
+  const aiTimersAt = (game: Game, p: Position): number => game.ctx.timers.getTimers().filter((t) =>
     t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
     && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;
 
   /** A game with the party on the pad's level, far from it, and a group at `at`. */
   const setUp = async (at: (s: { pad: Position; beside: Position; beyond: Position }) => Position) => {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const squares = findPad(game);
     const { pad } = squares;
     const map = dungeon.getMap(pad.z)!;
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
       }
     }
     if (!partyAt) throw new Error('nowhere to stand the party');
-    game.party.state.position = partyAt;
+    game.ctx.party.state.position = partyAt;
     game.systems.monsters.loadPartyLevel(pad.z);
     let type = 0;
     while (!dungeon.monsterAllowedOnLevel(type, pad.z)) type++;
@@ -148,14 +148,14 @@ async function main(): Promise<void> {
   /* ---------------------------------------------------- 1-2. onto and off the pad ---- */
   {
     const { game, pad, beside, rn, calls } = await setUp((s) => s.beside);
-    const levitating = monsterLevitating(objectTables.monsterDesc[game.dungeonState.getCreatureRecord(rn)!.creatureType]!);
+    const levitating = monsterLevitating(objectTables.monsterDesc[game.ctx.dungeon.getCreatureRecord(rn)!.creatureType]!);
     const before = actionTimers(game);
     const onto = game.systems.monsters.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
     const after = actionTimers(game);
     console.log(`1. group (${beside.x},${beside.y}) -> pad (${pad.x},${pad.y}) L${pad.z}: removed ${onto.code !== 0}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}, action timers ${before} -> ${after}`);
     check(!levitating, 'the test group walks');
-    check(onto.code === 0 && game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF, 'the group stands on the pad');
+    check(onto.code === 0 && game.ctx.dungeon.findFirstMonster(pad) !== OBJECT_ID_EOF, 'the group stands on the pad');
     check(called(calls, beside, false), 'it leaves its square through PlaceOrRemoveObjectInRoom (remove, room changed)');
     check(called(calls, pad, true), 'it arrives through PlaceOrRemoveObjectInRoom (place, room changed)');
     check(after > before, "the pad's action is queued");
@@ -170,7 +170,7 @@ async function main(): Promise<void> {
   {
     const { game, pad, beside, rn, calls } = await setUp((s) => s.pad);
     let type = 0;
-    while (!game.dungeonState.monsterAllowedOnLevel(type, pad.z)) type++;
+    while (!game.ctx.dungeon.monsterAllowedOnLevel(type, pad.z)) type++;
     createMonsterAt(game, {
       value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: beside.x, mapY: beside.y, level: beside.z, invisible: false, drawAsSize4: false,
@@ -187,7 +187,7 @@ async function main(): Promise<void> {
   {
     const { game, pad, beside, rn, calls } = await setUp((s) => s.beside);
     const flyer = objectTables.monsterDesc.findIndex((d) => monsterLevitating(d));
-    game.dungeonState.getCreatureRecord(rn)!.creatureType = flyer;
+    game.ctx.dungeon.getCreatureRecord(rn)!.creatureType = flyer;
     const before = actionTimers(game);
     game.systems.monsters.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
     console.log(`4. levitating type ${flyer} -> pad: pad calls ${calls.length}, action timers ${before} -> ${actionTimers(game)}`);
@@ -210,13 +210,13 @@ async function main(): Promise<void> {
   /* ------------------------------------------------- 6. a group deleted on the pad ---- */
   {
     const { game, pad, rn, calls } = await setUp((s) => s.pad);
-    const groupIndex = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
+    const groupIndex = game.ctx.dungeon.getCreatureRecord(rn)!.groupIndex;
     game.systems.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
-    const slot = game.dungeonState.getItem16Record(groupIndex);
+    const slot = game.ctx.dungeon.getItem16Record(groupIndex);
     console.log(`6. group deleted on the pad (${pad.x},${pad.y}) L${pad.z}: still there `
-      + `${game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF}, ITEM16 ${groupIndex} word0 ${slot?.word0}, `
+      + `${game.ctx.dungeon.findFirstMonster(pad) !== OBJECT_ID_EOF}, ITEM16 ${groupIndex} word0 ${slot?.word0}, `
       + `AI timers ${aiTimersAt(game, pad)}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
-    check(game.dungeonState.findFirstMonster(pad) === OBJECT_ID_EOF && aiTimersAt(game, pad) === 0,
+    check(game.ctx.dungeon.findFirstMonster(pad) === OBJECT_ID_EOF && aiTimersAt(game, pad) === 0,
       'the group is gone, and so are its AI timers');
     check(slot?.word0 === -1, 'its ITEM16 is given back');
     check(calls.length === 1 && called(calls, pad, false),
@@ -224,10 +224,10 @@ async function main(): Promise<void> {
 
     const flying = await setUp((s) => s.pad);
     const flyer = objectTables.monsterDesc.findIndex((d) => monsterLevitating(d));
-    flying.game.dungeonState.getCreatureRecord(flying.rn)!.creatureType = flyer;
+    flying.game.ctx.dungeon.getCreatureRecord(flying.rn)!.creatureType = flyer;
     flying.game.systems.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
     console.log(`   levitating type ${flyer} deleted on the pad: pad calls ${flying.calls.length}`);
-    check(flying.game.dungeonState.findFirstMonster(pad) === OBJECT_ID_EOF && flying.calls.length === 0,
+    check(flying.game.ctx.dungeon.findFirstMonster(pad) === OBJECT_ID_EOF && flying.calls.length === 0,
       'a levitating group is lifted with RemoveObjectFromRoom: no pad sees it go');
   }
 

@@ -64,7 +64,7 @@ function makeGame(): Game {
 
 /** An active teleporter, open to plain items, whose destination is a different cell. */
 function findItemTeleporter(game: Game): { at: Position; dest: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -99,7 +99,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
 
 /** The cloud in a cell with this record index, or null. */
 function cloudIn(game: Game, at: Position, index: number): ObjectID | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     const decoded = decodeObjectID(rn);
     if (decoded.category === DBType.CLOUD && decoded.index === index) return rn;
@@ -109,7 +109,7 @@ function cloudIn(game: Game, at: Position, index: number): ObjectID | null {
 
 function main(): void {
   const game = makeGame();
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const teleporter = findItemTeleporter(game);
   if (!teleporter) {
     check(false, 'dungeon.dat has an active, item-capable teleporter');
@@ -118,8 +118,8 @@ function main(): void {
   }
   const { at, dest } = teleporter;
   console.log(`teleporter at level ${at.z} (${at.x},${at.y}) -> level ${dest.z} (${dest.x},${dest.y})`);
-  check(!(game.party.state.position.x === at.x && game.party.state.position.y === at.y
-    && game.party.state.position.z === at.z), 'the party is not standing on it');
+  check(!(game.ctx.party.state.position.x === at.x && game.ctx.party.state.position.y === at.y
+    && game.ctx.party.state.position.z === at.z), 'the party is not standing on it');
 
   // Switch it off, stand a poison cloud on it, and queue the timer that switches it on.
   const map = dungeon.getMap(at.z)!;
@@ -132,7 +132,7 @@ function main(): void {
   check(born !== null, 'the cloud stands on the switched-off teleporter');
   if (born === null) { finish(); return; }
   const index = decodeObjectID(born).index;
-  game.timerQueue.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
+  game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 1, at.z);
 
   processTimersAt(game, 1);
   check((map.cellFlags[at.x]![at.y]! & 0x08) !== 0, 'the teleporter switched on');
@@ -142,7 +142,7 @@ function main(): void {
   if (landed === null) { finish(); return; }
 
   // Timer.cpp:2491-2510 — its TT_25 follows: square, level, and the placed ID.
-  const timers = game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_25
+  const timers = game.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_25
     && t.object !== undefined && decodeObjectID(t.object).category === DBType.CLOUD
     && decodeObjectID(t.object).index === index);
   console.log(`TT_25 timers naming it: ${timers.map((t) =>
@@ -162,7 +162,7 @@ function main(): void {
   check(value1 === value0 - 3, `the cloud shrinks at the destination (${value0} -> ${value1})`);
   for (let t = 3; t <= 200; t++) processTimersAt(game, t);
   check(cloudIn(game, dest, index) === null, 'the cloud has gone from the destination by the end of its life');
-  check(game.timerQueue.getTimers().every((t) => t.function !== TimerFunction.TT_25),
+  check(game.ctx.timers.getTimers().every((t) => t.function !== TimerFunction.TT_25),
     'no TT_25 outlives it');
 
   finish();

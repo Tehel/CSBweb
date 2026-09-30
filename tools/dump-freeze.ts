@@ -113,12 +113,12 @@ async function main(): Promise<void> {
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
   game.addChampion(champion(1));
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
-  const ui: UIState = createUIState(graphics, game.dungeonState, {
+  const ui: UIState = createUIState(graphics, game.ctx.dungeon, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastTickTime: number; lastInputTime: number; state: { tickCount: number } };
+  type Internals = { lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
   let t = Date.now() + 60_000;
   /** One VBL, 17 ms on; the last tick was `sinceTick` ms ago (-1 leaves it alone). */
@@ -185,10 +185,10 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== frozen: no tick, and every entry but 148 thrown away ===');
   {
-    const before = internals.state.tickCount;
+    const before = game.ctx.state.tickCount;
     for (let i = 0; i < 10; i++) frame(300);
-    console.log(`${internals.state.tickCount - before} ticks in 10 frames, each 300 ms after the last tick`);
-    check(internals.state.tickCount === before, 'd.ClockRunning == 0: no tick runs');
+    console.log(`${game.ctx.state.tickCount - before} ticks in 10 frames, each 300 ms after the last tick`);
+    check(game.ctx.state.tickCount === before, 'd.ClockRunning == 0: no tick runs');
     handled.length = 0;
     internals.lastInputTime = 0;
     game.enqueueKeyButton(1);
@@ -207,14 +207,14 @@ async function main(): Promise<void> {
   {
     handled.length = 0;
     // An entry was handled this tick, and no tick can come: only `thawCommand` lets it in.
-    internals.lastInputTime = internals.state.tickCount;
+    internals.lastInputTime = game.ctx.state.tickCount;
     check(click(160, 100, 1) === 148, 'a right click in the middle of the screen is 148');
-    const before = internals.state.tickCount;
+    const before = game.ctx.state.tickCount;
     frame(-1);
-    console.log(`handled=${JSON.stringify(handled)} ${state()} ticks=${internals.state.tickCount - before}`);
+    console.log(`handled=${JSON.stringify(handled)} ${state()} ticks=${game.ctx.state.tickCount - before}`);
     check(!game.isFrozen() && ui.uiMode === UIMode.Adventure, 'thawed');
     check(handled.join() === '148', 'the thaw did not wait for a tick');
-    check(internals.state.tickCount - before === 1, 'the tick that fell due while frozen runs in the thawing frame');
+    check(game.ctx.state.tickCount - before === 1, 'the tick that fell due while frozen runs in the thawing frame');
     check(ui.primaryButtons === lists.buttons17196 && ui.secondaryButtons === lists.buttons17304,
       'the adventure lists are back');
     check(ui.keyXlate2 === keys.byte18400 && ui.keyXlate1 === keys.byte18428, 'and the adventure key tables');
@@ -252,18 +252,18 @@ async function main(): Promise<void> {
     console.log(`${state()} before=${ui.modeBeforeFreeze}`);
     check(game.isFrozen() && game.isPartySleeping(), 'frozen, and still asleep');
     check(!ui.shadedByTag02076e, 'TAG02076e does nothing asleep (Character.cpp:5111)');
-    const before = internals.state.tickCount;
+    const before = game.ctx.state.tickCount;
     for (let i = 0; i < 5; i++) frame(17);
-    check(internals.state.tickCount === before, 'asleep, every frame is a tick, but frozen none is');
+    check(game.ctx.state.tickCount === before, 'asleep, every frame is a tick, but frozen none is');
     press('Escape');
     frame(-1);
-    console.log(`${state()} ticks=${internals.state.tickCount - before}`);
+    console.log(`${state()} ticks=${game.ctx.state.tickCount - before}`);
     check(!game.isFrozen() && game.isPartySleeping() && ui.uiMode === UIMode.Sleeping, 'thawed, still asleep');
     check(ui.primaryButtons === lists.buttons17796 && ui.keyXlate2 === keys.byte18440,
       'the sleep list and key table are back');
-    const asleep = internals.state.tickCount;
+    const asleep = game.ctx.state.tickCount;
     for (let i = 0; i < 5; i++) frame(17);
-    check(internals.state.tickCount - asleep === 5, 'and a tick runs every frame again');
+    check(game.ctx.state.tickCount - asleep === 5, 'and a tick runs every frame again');
     game.wakeUp();
   }
 

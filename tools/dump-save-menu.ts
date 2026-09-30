@@ -495,8 +495,8 @@ async function checkPayload(): Promise<void> {
   console.log('=== a real save, and the header a directory listing reads back ===');
 
   const game = await loadGame();
-  game.party.state.position = new Position(7, 11, 9);
-  game.party.state.champions = [healthyChampion('DAROO'), healthyChampion('LEYLA')];
+  game.ctx.party.state.position = new Position(7, 11, 9);
+  game.ctx.party.state.champions = [healthyChampion('DAROO'), healthyChampion('LEYLA')];
 
   const payload = buildSavePayload(game);
   const bytes = encodeSavePayload(payload);
@@ -589,21 +589,21 @@ function checkCsbwinListing(): void {
 
 /** The objects in a chest's own chain, as a save writes them. */
 function chestContents(game: Game, chest: ObjectID): number {
-  const record = game.dungeonState.getContainerRecord(chest);
+  const record = game.ctx.dungeon.getContainerRecord(chest);
   let n = 0;
-  for (let rn = record?.containedObject ?? OBJECT_ID_EOF; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.dungeonState.getDBRecordLink(rn)) n++;
+  for (let rn = record?.containedObject ?? OBJECT_ID_EOF; rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.ctx.dungeon.getDBRecordLink(rn)) n++;
   return n;
 }
 
 /** The first chest lying in a cell of `dungeon.dat` with at least two objects in it. */
 function findChest(game: Game): { chest: ObjectID; cell: Position } | null {
-  for (let level = 0; level < game.dungeonState.getMapCount(); level++) {
-    const map = game.dungeonState.getMap(level);
+  for (let level = 0; level < game.ctx.dungeon.getMapCount(); level++) {
+    const map = game.ctx.dungeon.getMap(level);
     if (!map) continue;
     for (let x = 0; x < map.descriptor.width; x++) {
       for (let y = 0; y < map.descriptor.height; y++) {
         const cell = new Position(x, y, level);
-        for (let rn = game.dungeonState.findFirstObject(cell); rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.dungeonState.getDBRecordLink(rn)) {
+        for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
           if (decodeObjectID(rn).category === DBType.CHEST && chestContents(game, rn) >= 2) return { chest: rn, cell };
         }
       }
@@ -621,17 +621,17 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   console.log('=== the disk menu over an open chest: TAG02076e in, TAG0207cc out ===');
   const game = await loadGame();
   game.addChampion(healthyChampion('DAROO'));
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   const found = findChest(game);
   if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
   const { chest, cell } = found;
   const packed = chestContents(game, chest);
-  game.dungeonState.removeObjectFromCell(cell, chest);
+  game.ctx.dungeon.removeObjectFromCell(cell, chest);
   party.champions[0]!.possessions[1] = chest;
   party.magicCasterIndex = 0;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = extractUITables(graphics);
   ui.partyState = party;
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
@@ -689,16 +689,16 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   const { buildQuickSavePayload } = await import('../src/dev');
   const game = await loadGame();
   game.addChampion(healthyChampion('DAROO'));
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   const found = findChest(game);
   if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
   const { chest, cell } = found;
   const packed = chestContents(game, chest);
-  game.dungeonState.removeObjectFromCell(cell, chest);
+  game.ctx.dungeon.removeObjectFromCell(cell, chest);
   party.champions[0]!.possessions[1] = chest;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = extractUITables(graphics);
   ui.partyState = party;
   const draw = (): void => {

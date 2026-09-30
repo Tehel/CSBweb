@@ -77,9 +77,16 @@ export interface GameContext {
   readonly dungeon: DungeonState;
   /** The party; `party.state` is always the current one. */
   readonly party: Party;
-  /** The object `Game.state` is: `state.tickCount` is `d.Time`. */
+  /** The game's own state: `state.tickCount` is `d.Time`. */
   readonly state: GameState;
-  /** `d.RandomNumber`, the one game-visible random stream. */
+  /**
+   * `d.RandomNumber` (`doc/CSBwin-src/CSBCode.cpp:351`), the one game-visible random
+   * stream. Everything with a game-visible outcome draws from it, in CSBWin's order, so a
+   * seeded run is reproducible and an AI trace is comparable with CSBWin's. Rendering must
+   * never draw from it: CSBWin keeps a separate `viewportRandom` precisely so drawing
+   * "doesn't upset the game" (`doc/CSBwin-src/Viewport.cpp:6706`). Seeded from the host
+   * on first draw; `Game.setRandomSeed` pins it for a tool.
+   */
   readonly random: CsbRandom;
   /** `d.PartyFootprints` + `d.Byte13220` — the scent trail monsters follow. */
   readonly footprints: PartyFootprints;

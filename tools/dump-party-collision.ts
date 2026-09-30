@@ -72,10 +72,10 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 2);
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(level);
   if (!map) throw new Error(`level ${level} does not exist`);
   const { width, height } = map.descriptor;
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
   const roomTypeAt = (x: number, y: number): number =>
     (dungeon.getCellFlag(new Position(x, y, level)) >> 5) & 0x7;
   const monsterAt = (x: number, y: number): boolean =>
-    game.dungeonState.findFirstMonster(new Position(x, y, level)) !== OBJECT_ID_EOF;
+    game.ctx.dungeon.findFirstMonster(new Position(x, y, level)) !== OBJECT_ID_EOF;
 
   // Find a monster with an open, monster-free neighbour: the party stands on the
   // neighbour and walks into the monster. Real dungeon geometry throughout.
@@ -109,7 +109,7 @@ async function main(): Promise<void> {
   const dx = scene.mx - scene.px;
   const dy = scene.my - scene.py;
   const facing = dy === -1 ? 0 : dx === 1 ? 1 : dy === 1 ? 2 : 3;
-  const monsterRn = game.dungeonState.findFirstMonster(new Position(scene.mx, scene.my, level));
+  const monsterRn = game.ctx.dungeon.findFirstMonster(new Position(scene.mx, scene.my, level));
   const creature = dungeon.getCreatureRecord(monsterRn)!;
 
   console.log(
@@ -119,16 +119,16 @@ async function main(): Promise<void> {
 
   // The bump's sound is the ordinal it queues, `QueueSound(18, d.partyX, d.partyY, 0)`.
   let lastQueued: number | undefined;
-  const queueSound = game.sounds.queueSound.bind(game.sounds);
-  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, soundLevel) => {
+  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
+  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, soundLevel) => {
     lastQueued = ordinal;
     queueSound(ordinal, mapX, mapY, deltaTime, soundLevel);
   };
   const soundOfLastMove = (): number | undefined => lastQueued;
 
   const stand = (): void => {
-    game.party.state.position = new Position(scene!.px, scene!.py, level);
-    game.party.setFacing(facing);
+    game.ctx.party.state.position = new Position(scene!.px, scene!.py, level);
+    game.ctx.party.setFacing(facing);
   };
 
   const rows: string[][] = [];
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     stand();
     lastQueued = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
-    const pos = game.party.state.position;
+    const pos = game.ctx.party.state.position;
     const soundId = soundOfLastMove();
     rows.push([label, moved ? 'moved' : 'blocked', `(${pos.x},${pos.y})`, String(soundId ?? 'none')]);
     return { moved, soundId };
@@ -144,7 +144,7 @@ async function main(): Promise<void> {
 
   // ---- Case 2: a real party walks into the monster ------------------------
   // (Case 1, the empty party, is last: it deletes the monster.)
-  game.party.state.champions = [champion(0)];
+  game.ctx.party.state.champions = [champion(0)];
   const blocked = attempt('party vs monster');
 
   // ---- Case 3: the same party walks into a wall, for contrast -------------
@@ -167,11 +167,11 @@ async function main(): Promise<void> {
   }
   let wallResult: { moved: boolean; soundId: number | undefined } = { moved: true, soundId: undefined };
   if (wall) {
-    game.party.state.position = new Position(wall.px, wall.py, level);
-    game.party.setFacing(wall.facing);
+    game.ctx.party.state.position = new Position(wall.px, wall.py, level);
+    game.ctx.party.setFacing(wall.facing);
     lastQueued = undefined;
     const moved = game.move(MovementAction.MOVE_FORWARD);
-    const pos = game.party.state.position;
+    const pos = game.ctx.party.state.position;
     wallResult = { moved, soundId: soundOfLastMove() };
     rows.push(['party vs wall', moved ? 'moved' : 'blocked', `(${pos.x},${pos.y})`, String(wallResult.soundId ?? 'none')]);
   }
@@ -190,12 +190,12 @@ async function main(): Promise<void> {
   // only covers `TT_MAP_FIRST..TT_MAP_LAST` (5..10) plus `TT_1`/`TT_DOOR`/
   // `TT_BASH_DOOR` (`doc/CSBwin-src/Timer.cpp:1011-1052`), and 31 is outside it. The
   // clock is frozen here so they pile up visibly; in play each fires on the next tick.
-  game.party.state.champions = [champion(0)];
+  game.ctx.party.state.champions = [champion(0)];
   const untouchedRn = (() => {
     for (let x = 0; x < width; x++) {
       for (let y = 0; y < height; y++) {
         if (x === scene.mx && y === scene.my) continue;
-        const rn = game.dungeonState.findFirstMonster(new Position(x, y, level));
+        const rn = game.ctx.dungeon.findFirstMonster(new Position(x, y, level));
         if (rn !== OBJECT_ID_EOF) return rn;
       }
     }
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
   })();
 
   const aiTimersFor = (x: number, y: number): string =>
-    game.timerQueue
+    game.ctx.timers
       .getTimers()
       .filter(
         (t) =>
@@ -246,13 +246,13 @@ async function main(): Promise<void> {
   let emptyWall: { moved: boolean; soundId: number | undefined } | null = null;
   if (wall) {
     const standAtWall = (): void => {
-      game.party.state.position = new Position(wall!.px, wall!.py, level);
-      game.party.setFacing(wall!.facing);
+      game.ctx.party.state.position = new Position(wall!.px, wall!.py, level);
+      game.ctx.party.setFacing(wall!.facing);
       lastQueued = undefined;
     };
-    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
     // A new party: what the earlier steps dealt the last one is not theirs to take.
-    game.party.state.pendingDamage = [0, 0, 0, 0];
+    game.ctx.party.state.pendingDamage = [0, 0, 0, 0];
     standAtWall();
     const moved = game.move(MovementAction.MOVE_FORWARD);
     // The next tick's `DisplayCharacterDamage` takes the bump off the HP.
@@ -261,7 +261,7 @@ async function main(): Promise<void> {
     // `facing` and `facing + 1`.
     const frontCorners = [wall.facing & 3, (wall.facing + 1) & 3];
     const lost = (c: Champion): number => 200 - c.attributes.health;
-    const champs = game.party.state.champions;
+    const champs = game.ctx.party.state.champions;
     wallHurt = {
       front: champs.filter((c) => frontCorners.includes(c.partyPosition)).map(lost),
       back: champs.filter((c) => !frontCorners.includes(c.partyPosition)).map(lost),
@@ -275,7 +275,7 @@ async function main(): Promise<void> {
 
     // The sound is `if (k != 0)` — nobody hurt, no sound. An empty party is the
     // simplest way there: `d.NumCharacter == 0` skips the damage entirely.
-    game.party.state.champions = [];
+    game.ctx.party.state.champions = [];
     standAtWall();
     emptyWall = { moved: game.move(MovementAction.MOVE_FORWARD), soundId: soundOfLastMove() };
     console.log(`wall bump, no champions: ${emptyWall.moved ? 'moved' : 'blocked'}, sound ${emptyWall.soundId ?? 'none'}`);
@@ -300,15 +300,15 @@ async function main(): Promise<void> {
   } | null = null;
   if (wall) {
     const queueAt = (px: number, py: number, dir: number, actions: MovementAction[]): void => {
-      game.party.state.position = new Position(px, py, level);
-      game.party.setFacing(dir);
+      game.ctx.party.state.position = new Position(px, py, level);
+      game.ctx.party.setFacing(dir);
       // The headless equivalent of waiting out the last step's delay (case 8).
-      game.party.state.partyMoveDisableTimer = 0;
+      game.ctx.party.state.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
       for (const a of actions) game.enqueueMovement(a);
     };
-    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
 
     // The monster first, with no tick due, so that it is still where the scene found it.
     queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
@@ -318,15 +318,15 @@ async function main(): Promise<void> {
 
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 1000; // a tick is due this frame
-    const ticks0 = game.state.tickCount;
+    const ticks0 = game.ctx.state.tickCount;
     game.runFrame(T0);
     const wallQueue = game.queuedInputCount();
-    const tickHeld = game.state.tickCount === ticks0;
+    const tickHeld = game.ctx.state.tickCount === ticks0;
     game.runFrame(T0 + 17);
-    const tickNextFrame = game.state.tickCount === ticks0 + 1;
+    const tickNextFrame = game.ctx.state.tickCount === ticks0 + 1;
     game.runFrame(T0 + 5_000);
     game.runFrame(T0 + 10_000);
-    const facingKept = game.party.state.facing === wall.facing;
+    const facingKept = game.ctx.party.state.facing === wall.facing;
 
     // Control: a move that is not inhibited leaves the rest of the queue alone.
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
@@ -351,11 +351,11 @@ async function main(): Promise<void> {
   } | null = null;
   if (wall) {
     const standAtWall = (): void => {
-      game.party.state.position = new Position(wall!.px, wall!.py, level);
-      game.party.setFacing(wall!.facing);
+      game.ctx.party.state.position = new Position(wall!.px, wall!.py, level);
+      game.ctx.party.setFacing(wall!.facing);
     };
-    game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
-    const champs = game.party.state.champions;
+    game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+    const champs = game.ctx.party.state.champions;
     const st = (): number[] => champs.map((c) => c.attributes.stamina);
     standAtWall();
     game.move(MovementAction.MOVE_FORWARD);
@@ -426,10 +426,10 @@ async function main(): Promise<void> {
     }
     check(run !== null, 'the level should have three open, empty cells in a row');
     if (run) {
-      const party = game.party.state;
+      const party = game.ctx.party.state;
       party.champions = [champion(0), champion(1), champion(2), champion(3)];
       party.position = new Position(run.x, run.y, level);
-      game.party.setFacing(run.dir);
+      game.ctx.party.setFacing(run.dir);
       party.partyMoveDisableTimer = 0;
       party.word11712 = 0;
       internals.lastInputTime = 0;
@@ -444,12 +444,12 @@ async function main(): Promise<void> {
 
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
-      const ticksBeforeStep = game.state.tickCount;
+      const ticksBeforeStep = game.ctx.state.tickCount;
       frame(false);
       const firstStep = stepsFrom();
-      const stepTicked = game.state.tickCount !== ticksBeforeStep;
+      const stepTicked = game.ctx.state.tickCount !== ticksBeforeStep;
       const delayAfterStep = party.partyMoveDisableTimer;
-      const ticks0 = game.state.tickCount;
+      const ticks0 = game.ctx.state.tickCount;
       frame(false);
       const heldSameTick = stepsFrom();
       let frames = 0;
@@ -457,7 +457,7 @@ async function main(): Promise<void> {
         frame(frames % 2 === 1);
         frames++;
       }
-      const ticksToSecond = game.state.tickCount - ticks0;
+      const ticksToSecond = game.ctx.state.tickCount - ticks0;
 
       // A turn does not wait for the move delay. It waits for `d.Time` to pass the second
       // step's, which the step's own tick has already moved on, so it goes in the next VBL.
@@ -505,7 +505,7 @@ async function main(): Promise<void> {
         c === party.champions[1] ? Math.trunc((max * 6) / 8) : c === party.champions[2] ? max * 2 : 0;
       party.champions[2].attributes.health = 0;
       party.position = new Position(run.x, run.y, level);
-      game.party.setFacing(run.dir);
+      game.ctx.party.setFacing(run.dir);
       game.move(MovementAction.MOVE_FORWARD);
       const slowestLiving = party.partyMoveDisableTimer;
       stats.characterLoad = realLoad;
@@ -574,10 +574,10 @@ async function main(): Promise<void> {
     }
     check(stairs !== null, 'the level should have an open cell beside a stairway');
     if (stairs) {
-      const party = game.party.state;
+      const party = game.ctx.party.state;
       party.champions = [champion(0), champion(1), champion(2), champion(3)];
       party.position = new Position(stairs.px, stairs.py, level);
-      game.party.setFacing(stairs.dir);
+      game.ctx.party.setFacing(stairs.dir);
       game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
@@ -590,10 +590,10 @@ async function main(): Promise<void> {
         internals.lastTickTime = tickDue ? t - 1000 : t;
         game.runFrame(t);
       };
-      const ticksBeforeStairs = game.state.tickCount;
+      const ticksBeforeStairs = game.ctx.state.tickCount;
       frame(false);
       const newLevel = party.position.z;
-      const stairsTicked = game.state.tickCount !== ticksBeforeStairs;
+      const stairsTicked = game.ctx.state.tickCount !== ticksBeforeStairs;
       const queuedAfterStairs = game.queuedInputCount();
       const facingAfter = party.facing;
       for (let i = 0; i < 6; i++) frame(i % 2 === 0);
@@ -609,7 +609,7 @@ async function main(): Promise<void> {
 
       // The step alone, with no tick after it.
       party.position = new Position(stairs.px, stairs.py, level);
-      game.party.setFacing(stairs.dir);
+      game.ctx.party.setFacing(stairs.dir);
       game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       game.move(MovementAction.MOVE_FORWARD);
@@ -629,7 +629,7 @@ async function main(): Promise<void> {
         after.level === newLevel && after.pending === -1 && after.loaded === newLevel,
         'the top of the tick loads the new level and moves d.partyLevel on (LoadPartyLevel)',
       );
-      game.party.state.position = new Position(scene.px, scene.py, level);
+      game.ctx.party.state.position = new Position(scene.px, scene.py, level);
       game.systems.monsters.loadPartyLevel(level);
     }
   }
@@ -659,9 +659,9 @@ async function main(): Promise<void> {
       const cells = map.cellFlags;
       const saved = cells[tx][ty];
       cells[tx][ty] = (RoomType.EMPTY << 5) | (saved & 0x1f);
-      game.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
-      game.party.state.position = new Position(spot.px, spot.py, level);
-      game.party.setFacing(spot.dir);
+      game.ctx.party.state.champions = [champion(0), champion(1), champion(2), champion(3)];
+      game.ctx.party.state.position = new Position(spot.px, spot.py, level);
+      game.ctx.party.setFacing(spot.dir);
       const entered = game.move(MovementAction.MOVE_FORWARD);
       cells[tx][ty] = saved;
       console.log(`room type 7: ${entered ? 'entered' : 'refused'}`);
@@ -695,7 +695,7 @@ async function main(): Promise<void> {
         cells[pit.x][pit.y] = v;
       };
       setCell(saved & 0xf7); // closed: the party stands on it
-      const party = game.party.state;
+      const party = game.ctx.party.state;
       party.champions = [champion(0), champion(1), champion(2), champion(3)];
       party.position = new Position(pit.x, pit.y, level);
       game.systems.monsters.loadPartyLevel(level);
@@ -705,21 +705,21 @@ async function main(): Promise<void> {
       game.ctx.loop.newPartyLevel = -1;
       // An event was handled this tick, so the turn waits for the next one
       // (`Mouse.cpp:1468-1476`) — past the tick in which the pit opens.
-      internals.lastInputTime = game.state.tickCount;
+      internals.lastInputTime = game.ctx.state.tickCount;
       game.enqueueMovement(MovementAction.TURN_LEFT);
       const facingBefore = party.facing;
       // `TT_PIT` with `uByte9 = 0` (set: open), due at the next tick: it runs its timers on
       // the `d.Time` the handlers see now (`CSBCode.cpp:626`, `:660`).
-      game.timerQueue.addTimer({
-        index: 0, function: TimerFunction.TT_PIT, time: game.state.tickCount, level,
+      game.ctx.timers.addTimer({
+        index: 0, function: TimerFunction.TT_PIT, time: game.ctx.state.tickCount, level,
         uByte5: 0, uByte6: pit.x, uByte7: pit.y, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
       // A probe due at the same time, whose function (1) is lower than `TT_PIT`'s (9), so it
       // comes after it in the pass (`timerLess`). The hook records what it sees and runs
       // nothing.
-      const probeTime = game.state.tickCount;
-      game.timerQueue.addTimer({
+      const probeTime = game.ctx.state.tickCount;
+      game.ctx.timers.addTimer({
         index: 0, function: TimerFunction.TT_DOOR_STEP, time: probeTime, level,
         uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
@@ -772,7 +772,7 @@ async function main(): Promise<void> {
       check(queuedAfterTick === 0, 'the queued turn should be discarded in that same tick');
       check(!turned, 'the queued turn should never run on the new level');
       setCell(saved);
-      game.party.state.position = new Position(scene.px, scene.py, level);
+      game.ctx.party.state.position = new Position(scene.px, scene.py, level);
       game.systems.monsters.loadPartyLevel(level);
     }
   }
@@ -780,11 +780,11 @@ async function main(): Promise<void> {
   // ---- Case 1: no champions — CSBWin's `d.NumCharacter != 0` gate is off ----
   // The empty party walks onto the monster, and `MoveObject` deletes a monster where the
   // party lands (`doc/CSBwin-src/Code11f52.cpp:3298-3308`).
-  const champions = game.party.state.champions;
-  game.party.state.champions = [];
+  const champions = game.ctx.party.state.champions;
+  game.ctx.party.state.champions = [];
   const thereBefore = monsterAt(scene.mx, scene.my);
   const empty = attempt('no champions (gate off)');
-  game.party.state.champions = champions;
+  game.ctx.party.state.champions = champions;
   const crushed = !monsterAt(scene.mx, scene.my);
   console.log(`\n${rows[rows.length - 1]!.join('\t')}; the monster is ${crushed ? 'gone' : 'still there'}`);
 

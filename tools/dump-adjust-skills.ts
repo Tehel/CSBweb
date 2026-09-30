@@ -92,7 +92,7 @@ for (let t = 0; t < ctx.tables.monsterDesc.length; t++) {
   if (monsterWord16_8_11(ctx.tables.monsterDesc[t]) > 0) { blowType = t; break; }
 }
 check(blowType >= 0, 'a creature type whose blow trains defence (MONSTERDESC word16 bits 8-11)');
-const monster = game.dungeonState.getCreatureRecordByIndex(0);
+const monster = game.ctx.dungeon.getCreatureRecordByIndex(0);
 check(monster !== null, 'a creature record to strike with');
 if (monster && blowType >= 0) {
   monster.creatureType = blowType;

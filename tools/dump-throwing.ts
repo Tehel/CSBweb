@@ -298,7 +298,7 @@ async function main(): Promise<void> {
   const game = newGame(data2, graphics);
   game.setRandomSeed(0x12345678);
 
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.champions = [champion()];
   party.cursorOwner = 0;
 

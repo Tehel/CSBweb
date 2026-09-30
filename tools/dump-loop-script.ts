@@ -68,12 +68,12 @@ function watchedGame(): Watched {
   };
   w.game = newGame(data, stockGraphics(), { messages, showCredits: (word11694) => w.credits.push(word11694) });
   w.game.setRandomSeed(0x12345678);
-  w.game.party.state.position = new Position(6, 14, 2);
+  w.game.ctx.party.state.position = new Position(6, 14, 2);
   w.game.onFrame(() => { w.frameCallbacks++; });
   const timers = w.game.systems.timer;
   const processTimers = timers.processTimers.bind(timers);
   timers.processTimers = (): boolean => {
-    w.timerPasses.push(w.game.state.tickCount);
+    w.timerPasses.push(w.game.ctx.state.tickCount);
     return processTimers() || w.win;
   };
   return w;
@@ -92,7 +92,7 @@ function checkWaits(): void {
   const w = watchedGame();
   const game = w.game;
   for (let n = 0; n < 3; n++) frame(w);
-  const tick = game.state.tickCount;
+  const tick = game.ctx.state.tickCount;
   const printed = w.printed;
   check(tick > 0 && printed > 0, 'before the script, every frame is a pass with a tick and a print-queue entry');
 
@@ -115,16 +115,16 @@ function checkWaits(): void {
   game.setMouseEventHandlers({ button: (num) => handled.push(num), unclick: () => {} });
   for (let n = 0; n < 33; n++) frame(w);
   console.log(`  log ${w.log.join(' ')}; vblInterrupts ${w.vbls - vbls}; frame callbacks ${w.frameCallbacks - callbacks}`);
-  console.log(`  tick ${tick} -> ${game.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.queuedInputCount()}`);
+  console.log(`  tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.queuedInputCount()}`);
   check(w.log.join(' ') === `a@${start} b@${start + 31} c@${start + 31} d@${start + 33}`,
     'it resumes on the 31st VBL, goes through VBLDelay(0) without one, and ends on the 2nd after');
   check(!game.isRunningScript(), 'and holds the loop no longer');
   check(w.vbls - vbls === 33 && w.frameCallbacks - callbacks === 33, 'each of its 33 VBLs runs vblInterrupt and the frame callbacks');
-  check(game.state.tickCount === tick && w.printed === printed, 'no tick runs meanwhile, late as it is, and no print-queue entry is taken');
+  check(game.ctx.state.tickCount === tick && w.printed === printed, 'no tick runs meanwhile, late as it is, and no print-queue entry is taken');
   check(handled.length === 0 && game.queuedInputCount() === 1, 'nor is the click queued meanwhile taken');
   frame(w);
-  console.log(`  the frame after: tick ${game.state.tickCount}; handled ${JSON.stringify(handled)}`);
-  check(game.state.tickCount === tick + 1 && w.printed === printed + 1 && handled.join() === '20',
+  console.log(`  the frame after: tick ${game.ctx.state.tickCount}; handled ${JSON.stringify(handled)}`);
+  check(game.ctx.state.tickCount === tick + 1 && w.printed === printed + 1 && handled.join() === '20',
     'the frame after is a pass: the click is taken, a tick runs and a print-queue entry is taken');
 }
 
@@ -151,18 +151,18 @@ function checkFromHandler(): void {
   game.onMouseClick(20, 100, 100);
   game.onMouseUnClick();
   game.onMouseClick(21, 100, 100);
-  const tick = game.state.tickCount;
+  const tick = game.ctx.state.tickCount;
   const printed = w.printed;
   frame(w);
   const held = w.frames;
-  console.log(`  handled ${JSON.stringify(handled)}; queued ${game.queuedInputCount()}; tick ${tick} -> ${game.state.tickCount}`);
+  console.log(`  handled ${JSON.stringify(handled)}; queued ${game.queuedInputCount()}; tick ${tick} -> ${game.ctx.state.tickCount}`);
   check(handled.join() === '20' && game.isRunningScript(), 'the click starts the script');
   check(game.queuedInputCount() === 2, 'and the button-up and the click behind it stay queued');
-  check(game.state.tickCount === tick && w.printed === printed, 'that pass runs no tick and takes no print-queue entry');
+  check(game.ctx.state.tickCount === tick && w.printed === printed, 'that pass runs no tick and takes no print-queue entry');
   for (let n = 0; n < 6; n++) frame(w);
-  console.log(`  log ${w.log.join(' ')}; handled ${JSON.stringify(handled)}; tick ${game.state.tickCount}`);
+  console.log(`  log ${w.log.join(' ')}; handled ${JSON.stringify(handled)}; tick ${game.ctx.state.tickCount}`);
   check(w.log.join(' ') === `resumed@${held + 5}`, 'it resumes 5 VBLs later');
-  check(game.state.tickCount === tick + 1 && handled.join() === '20',
+  check(game.ctx.state.tickCount === tick + 1 && handled.join() === '20',
     'the pass after it runs a tick, and the entries behind the click wait for d.Time to move (Mouse.cpp:1468-1476)');
   frame(w);
   console.log(`  the frame after: handled ${JSON.stringify(handled)}`);
@@ -181,14 +181,14 @@ function checkProcessTimersViewportAndSound(): void {
   function* script(): LoopScript {
     for (let n = 0; n < 3; n++) {
       yield* game.processTimersViewportAndSound();
-      w.log.push(`t${game.state.tickCount}@${w.frames}`);
+      w.log.push(`t${game.ctx.state.tickCount}@${w.frames}`);
     }
     yield 31;
     w.win = true;
     yield* game.processTimersViewportAndSound();
     w.log.push('after the win');
   }
-  const tick = game.state.tickCount;
+  const tick = game.ctx.state.tickCount;
   const passes = w.timerPasses.length;
   const clockTicks = w.clockTicks;
   const vbls = w.vbls;

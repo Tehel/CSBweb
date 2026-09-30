@@ -55,14 +55,14 @@ function makeGame(): Game {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
 
 /** Run `NinetySecondUpdate`'s gate at every tick in `[from, to]`, as the game tick does. */
 function runTicks(game: Game, from: number, to: number, onTick?: (t: number) => void): void {
   for (let t = from; t <= to; t++) {
-    game.state.tickCount = t;
+    game.ctx.state.tickCount = t;
     if (isNinetySecondTick(t)) ninetySecondUpdate(game.ctx);
     onTick?.(t);
   }
@@ -70,7 +70,7 @@ function runTicks(game: Game, from: number, to: number, onTick?: (t: number) => 
 
 /** A lit torch with `charges` left, put in the champion's action hand. */
 function giveTorch(game: Game, chIdx: number, charges: number): WeaponRecord {
-  const db = game.dungeonState.getData().databases.weapons;
+  const db = game.ctx.dungeon.getData().databases.weapons;
   const torch: WeaponRecord = {
     nextObject: OBJECT_ID_EOF, broken: false, charges, litTorch: true, poisoned: false,
     cursed: false, important: true, weaponType: WEAPON_TORCH,
@@ -78,7 +78,7 @@ function giveTorch(game: Game, chIdx: number, charges: number): WeaponRecord {
   db.records.push(torch);
   db.count++;
   const rn = encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
-  const champ = game.party.state.champions[chIdx]!;
+  const champ = game.ctx.party.state.champions[chIdx]!;
   champ.possessions![1] = rn;
   return torch;
 }
@@ -119,7 +119,7 @@ function main(): void {
     game.addChampion(champion(1));
     const own = giveTorch(game, 0, 8);
     const recruits = giveTorch(game, 1, 8);
-    game.party.state.potentialChampionIndex = 1;
+    game.ctx.party.state.potentialChampionIndex = 1;
     runTicks(game, 512, 512);
     console.log(`party torch ${own.charges}, recruit's torch ${recruits.charges}`);
     check(own.charges === 7, "the party's torch burns");

@@ -75,7 +75,7 @@ export function updateChampionPanel(): void {
 
     const game = ctx.game;
     const now = game.getTickCount();
-    const champions = game.party.state.champions;
+    const champions = game.ctx.party.state.champions;
 
     for (let chIdx = 0; chIdx < PARTY_SIZE; chIdx++) {
         const champion = champions[chIdx];
@@ -239,8 +239,8 @@ function describeTrainingContext(): string {
     if (!ctx) return '';
     const game = ctx.game;
     const now = game.getTickCount();
-    const party = game.party.state;
-    const map = game.dungeonState.getMap(party.position.z);
+    const party = game.ctx.party.state;
+    const map = game.ctx.dungeon.getMap(party.position.z);
     const multiplier = map?.descriptor.difficulty ?? 0;
     const sinceAttack = now - party.lastMonsterAttackTime;
     const fighterNinja = party.lastMonsterAttackTime < now - 150 ? '×½' : '×1';

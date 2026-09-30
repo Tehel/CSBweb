@@ -34,10 +34,10 @@ async function main(): Promise<void> {
   const level = Number(process.argv[2] ?? 2);
   const game = newGame(data, graphics);
   // Stand the party somewhere on the target level so it becomes the loaded level.
-  game.party.state.position = new Position(0, 0, level);
+  game.ctx.party.state.position = new Position(0, 0, level);
   game.systems.monsters.loadPartyLevel(level);
 
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const pool = dungeon.getItem16Pool();
   const active = pool.map((slot, i) => ({ slot, i })).filter((e) => e.slot.word0 >= 0);
   console.log(`level ${level}: ${active.length} group(s)\n`);
@@ -67,10 +67,10 @@ async function main(): Promise<void> {
     const [dx, dy] = [[0,-1],[1,0],[0,1],[-1,0]].find(([ddx, ddy]) =>
       isOpen(mx + ddx!, my + ddy!) && !monsterAt(mx + ddx!, my + ddy!))!;
     const nx = mx + dx!, ny = my + dy!;
-    const rn = game.dungeonState.findFirstMonster(new Position(mx, my, level));
+    const rn = game.ctx.dungeon.findFirstMonster(new Position(mx, my, level));
     const [prevX, prevY] = [mover.slot.ubPrevX, mover.slot.ubPrevY];
 
-    const timersBefore = game.timerQueue.getTimers()
+    const timersBefore = game.ctx.timers.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
         && t.uByte6 === mx && t.uByte7 === my).length;
 
@@ -78,10 +78,10 @@ async function main(): Promise<void> {
     const result = game.systems.monsters.moveMonster(rn, mx, my, nx, ny, level);
     console.log(`  code=${result.code}`);
 
-    const timersAtOld = game.timerQueue.getTimers()
+    const timersAtOld = game.ctx.timers.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
         && t.uByte6 === mx && t.uByte7 === my).length;
-    const timersAtNew = game.timerQueue.getTimers()
+    const timersAtNew = game.ctx.timers.getTimers()
       .filter(t => t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
         && t.uByte6 === nx && t.uByte7 === ny).length;
     console.log(`  AI timers: (${mx},${my})=${timersAtOld} (${nx},${ny})=${timersAtNew} (was ${timersBefore})`);
@@ -105,11 +105,11 @@ async function main(): Promise<void> {
     const a = pair[0]!, b = pair[1]!;
     const ax = a.slot.uByte10, ay = a.slot.uByte11;
     const bx = b.slot.uByte10, by = b.slot.uByte11;
-    const rn = game.dungeonState.findFirstMonster(new Position(ax, ay, level));
+    const rn = game.ctx.dungeon.findFirstMonster(new Position(ax, ay, level));
     if (rn !== OBJECT_ID_EOF && !(ax === bx && ay === by)) {
       console.log(`Case 2 — move a group from (${ax},${ay}) onto the occupied (${bx},${by})`);
       const result = game.systems.monsters.moveMonster(rn, ax, ay, bx, by, level);
-      const abeyance = game.timerQueue.getTimers()
+      const abeyance = game.ctx.timers.getTimers()
         .filter(t => t.function === TimerFunction.TT_60 || t.function === TimerFunction.TT_61);
       console.log(`  code=${result.code}, abeyance timers: ${abeyance.length}`);
       check(result.code === 1, 'the group should have been removed to abeyance');
@@ -121,20 +121,20 @@ async function main(): Promise<void> {
       // ---- Case 3: the abeyance timer retries and eventually places it ----
       // Its target is still occupied, so the first retry must reschedule, not place.
       const t = abeyance[0]!;
-      game.timerQueue.deleteTimer(t.index);
+      game.ctx.timers.deleteTimer(t.index);
       game.systems.monsters.processAbeyanceTimer(t);
-      const still = game.timerQueue.getTimers()
+      const still = game.ctx.timers.getTimers()
         .filter(x => x.function === TimerFunction.TT_60 || x.function === TimerFunction.TT_61);
       console.log(`Case 3 — retry while still blocked: abeyance timers ${still.length}, t=${still[0]?.time}`);
       check(still.length === 1, 'the group should still be waiting');
 
       // Now clear the destination and retry: it should be placed.
-      const bRn = game.dungeonState.findFirstMonster(new Position(bx, by, level));
+      const bRn = game.ctx.dungeon.findFirstMonster(new Position(bx, by, level));
       dungeon.removeObjectFromCell(new Position(bx, by, level), bRn);
       const t2 = still[0]!;
-      game.timerQueue.deleteTimer(t2.index);
+      game.ctx.timers.deleteTimer(t2.index);
       game.systems.monsters.processAbeyanceTimer(t2);
-      const after = game.timerQueue.getTimers()
+      const after = game.ctx.timers.getTimers()
         .filter(x => x.function === TimerFunction.TT_60 || x.function === TimerFunction.TT_61);
       console.log(`  after clearing (${bx},${by}): abeyance timers ${after.length}, monster there = ${monsterAt(bx, by)}`);
       check(after.length === 0, 'the abeyance timer should be gone');
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
   // bit 13 must not save a group.
   {
     const dest = new Position(1, 1, level);
-    const parked = (): number => game.timerQueue.getTimers()
+    const parked = (): number => game.ctx.timers.getTimers()
       .filter(t => t.function === TimerFunction.TT_60 && t.uByte6 === dest.x && t.uByte7 === dest.y
         && t.level === dest.z).length;
     const creatures = data.databases.creatures.records;

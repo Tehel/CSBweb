@@ -64,20 +64,20 @@ function makeGame(): Game {
 function withParty(count: number): Game {
   const game = makeGame();
   for (let i = 0; i < count; i++) game.addChampion(champion(i, `HERO${i}`));
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
 
 /** Advance the clock to `t` and let the timer queue run, as the VBL loop does. */
 function tickTo(game: Game, from: number, to: number): void {
   for (let t = from; t <= to; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
   }
 }
 
 function poisonTimersFor(game: Game, chIdx: number): number {
-  return game.timerQueue
+  return game.ctx.timers
     .getTimers()
     .filter((t) => t.function === TimerFunction.TT_75 && (t.uByte5 & 0xff) === chIdx).length;
 }
@@ -94,7 +94,7 @@ function main(): void {
     note: string,
   ): { stamina: number; health: number } => {
     const game = withParty(1);
-    const champ = game.party.state.champions[0]!;
+    const champ = game.ctx.party.state.champions[0]!;
     champ.attributes.stamina = stamina;
     game.systems.monsterAttack.adjustStamina(0, decrement);
     game.systems.monsterAttack.displayCharacterDamage();
@@ -122,9 +122,9 @@ function main(): void {
 
   {
     const game = withParty(1);
-    game.party.state.champions[0]!.attributes.stamina = 40;
+    game.ctx.party.state.champions[0]!.attributes.stamina = 40;
     game.systems.monsterAttack.adjustStamina(-1, 20);
-    check(game.party.state.champions[0]!.attributes.stamina === 40, 'chIdx -1 is a no-op');
+    check(game.ctx.party.state.champions[0]!.attributes.stamina === 40, 'chIdx -1 is a no-op');
   }
 
   /* --------------------------------------------------- 2. poison ---------------- */
@@ -134,11 +134,11 @@ function main(): void {
   console.log(['tick', 'poisonCount', 'health', 'TT_75 queued', 'event'].join('\t'));
 
   const game = withParty(2);
-  const victim = game.party.state.champions[0]!;
+  const victim = game.ctx.party.state.champions[0]!;
   const startHealth = victim.attributes.health;
 
   // Strength 200: the first dose is Larger(1, 200/64) = 3, and 199 ticks are left.
-  (game as unknown as { state: { tickCount: number } }).state.tickCount = 0;
+  game.ctx.state.tickCount = 0;
   game.systems.monsterAttack.poisonCharacter(0, 200);
   game.systems.monsterAttack.displayCharacterDamage();
   console.log([0, victim.poisonCount, victim.attributes.health, poisonTimersFor(game, 0), 'poisoned, strength 200'].join('\t'));
@@ -178,7 +178,7 @@ function main(): void {
   // A single-tick dose deals its damage and arms nothing.
   {
     const g = withParty(1);
-    const ch = g.party.state.champions[0]!;
+    const ch = g.ctx.party.state.champions[0]!;
     g.systems.monsterAttack.poisonCharacter(0, 1);
     g.systems.monsterAttack.displayCharacterDamage();
     check(ch.attributes.health === 199, 'a one-tick dose still deals the minimum 1 damage');
@@ -189,8 +189,8 @@ function main(): void {
   // The potential champion — the one in a Hall of Champions mirror — is immune.
   {
     const g = withParty(2);
-    g.party.state.potentialChampionIndex = 1;
-    const ch = g.party.state.champions[1]!;
+    g.ctx.party.state.potentialChampionIndex = 1;
+    const ch = g.ctx.party.state.champions[1]!;
     g.systems.monsterAttack.poisonCharacter(1, 200);
     g.systems.monsterAttack.displayCharacterDamage();
     check(ch.attributes.health === 200, 'an unconfirmed champion cannot be poisoned');
@@ -205,7 +205,7 @@ function main(): void {
 
   {
     const g = withParty(3);
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     setHandOwner(party, 1);
     selectMagicCaster(party, 1);
     check(party.cursorOwner === 1 && party.magicCasterIndex === 1, 'champion 1 holds both');
@@ -220,7 +220,7 @@ function main(): void {
   {
     // Champion 0 dies while champion 2 holds the cursor: nothing should move.
     const g = withParty(3);
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     setHandOwner(party, 2);
     selectMagicCaster(party, 2);
     g.systems.monsterAttack.killCharacter(0);
@@ -231,7 +231,7 @@ function main(): void {
 
   {
     const g = withParty(1);
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     setHandOwner(party, 0);
     selectMagicCaster(party, 0);
     g.systems.monsterAttack.killCharacter(0);
@@ -243,7 +243,7 @@ function main(): void {
   {
     // The unconfirmed champion does not count as a survivor.
     const g = withParty(2);
-    const party = g.party.state;
+    const party = g.ctx.party.state;
     party.potentialChampionIndex = 1;
     setHandOwner(party, 0);
     g.systems.monsterAttack.killCharacter(0);

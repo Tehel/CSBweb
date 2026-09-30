@@ -76,7 +76,7 @@ async function main(): Promise<void> {
       vblInterrupt: () => {},
     },
   });
-  game.party.state.position = new Position(2, 2, 0);
+  game.ctx.party.state.position = new Position(2, 2, 0);
 
   type Internals = {
     castSpell(chIdx: number, p: SpellParameters): number;
@@ -87,19 +87,19 @@ async function main(): Promise<void> {
   /** One cast from a fresh party with the same seed, under `overrides`. */
   const cast = (overrides: Partial<SpellParameters>, setup?: (c: Champion) => void) => {
     game.setRandomSeed(0x12345678);
-    game.party.state.champions = [champion(0)];
-    game.party.state.seeThruWalls = 0;
-    const c = game.party.state.champions[0];
+    game.ctx.party.state.champions = [champion(0)];
+    game.ctx.party.state.seeThruWalls = 0;
+    const c = game.ctx.party.state.champions[0];
     c.incantation = [POWER_RUNE, SPELL_RUNE];
     setup?.(c);
     printed.length = 0;
-    const params = { ...internals.fillSpellParameters(0, c.incantation, game.party.state), ...overrides };
+    const params = { ...internals.fillSpellParameters(0, c.incantation, game.ctx.party.state), ...overrides };
     const result = internals.castSpell(0, params);
     const skills = c.skills as unknown as Array<{ experience: number }>;
     return {
       result,
       experience: skills[16].experience - 2000,
-      seeThruWalls: game.party.state.seeThruWalls,
+      seeThruWalls: game.ctx.party.state.seeThruWalls,
       printed: printed.join(' '),
     };
   };
@@ -122,10 +122,10 @@ async function main(): Promise<void> {
     }
     return realTrigger(position, object, place, unchangedRoom, facing);
   };
-  const party = game.party.state.position;
+  const party = game.ctx.party.state.position;
   const miscAtParty = (): number[] => {
     const found: number[] = [];
-    for (let rn = game.dungeonState.findFirstObject(party); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+    for (let rn = game.ctx.dungeon.findFirstObject(party); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category === DBType.MISC) found.push(rn);
     }
     return found;
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     const r = cast({ missileType: 7 }, (c) => {
       for (let slot = 0; slot < hands; slot++) c.possessions[slot] = encodeObjectID(0, DBType.WEAPON, slot);
     });
-    const [hand0, hand1] = game.party.state.champions[0].possessions;
+    const [hand0, hand1] = game.ctx.party.state.champions[0].possessions;
     const inCell = miscAtParty();
     return { result: r.result, hand0, hand1, dropped: inCell.length - before, last: inCell[inCell.length - 1], pads: [...padCalls] };
   };

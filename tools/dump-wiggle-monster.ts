@@ -52,13 +52,13 @@ const same = (a: Position, b: Position): boolean => a.x === b.x && a.y === b.y &
 const walks = (type: number): boolean => !monsterLevitating(objectTables.monsterDesc[type]!);
 const typeOn = (game: Game, ...levels: number[]): number => {
   for (let t = 0; t < 27; t++) {
-    if (walks(t) && levels.every((z) => game.dungeonState.monsterAllowedOnLevel(t, z))) return t;
+    if (walks(t) && levels.every((z) => game.ctx.dungeon.monsterAllowedOnLevel(t, z))) return t;
   }
   return -1;
 };
 /** Empty open squares of level `z`, none of them in `not`. */
 const opens = (game: Game, z: number, not: Position[] = []): Position[] => {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const map = dungeon.getMap(z)!;
   const out: Position[] = [];
   for (let x = 0; x < map.descriptor.width; x++) {
@@ -71,10 +71,10 @@ const opens = (game: Game, z: number, not: Position[] = []): Position[] => {
   }
   return out;
 };
-const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
+const aiTimersAt = (game: Game, p: Position): number => game.ctx.timers.getTimers().filter((t) =>
   t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
   && t.uByte6 === p.x && t.uByte7 === p.y && t.level === p.z).length;
-const groupAt = (game: Game, p: Position): boolean => game.dungeonState.findFirstMonster(p) !== OBJECT_ID_EOF;
+const groupAt = (game: Game, p: Position): boolean => game.ctx.dungeon.findFirstMonster(p) !== OBJECT_ID_EOF;
 
 /**
  * A game with the party on `z`, a teleporter on an open square of `z` aimed at `to(game)`,
@@ -87,18 +87,18 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
   const [at, partyAt] = opens(game, z).filter((p, _, all) => all.some((q) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 4));
   if (!at || !partyAt) throw new Error(`no room on level ${z}`);
   const far = opens(game, z, [at]).find((p) => Math.abs(p.x - at.x) + Math.abs(p.y - at.y) > 4)!;
-  game.party.state.position = far;
+  game.ctx.party.state.position = far;
   game.systems.monsters.loadPartyLevel(z);
   const dest = to(game, at);
   rigTeleporter(game, at, dest);
-  const map = game.dungeonState.getMap(z)!;
+  const map = game.ctx.dungeon.getMap(z)!;
   map.cellFlags[at.x]![at.y]! &= ~0x08;
   const rn = createMonsterAt(game, {
     value: type, hitPointMultiplier: 1, numMonM1: 0, facing: 0,
     mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,
   });
   if (rn === null) throw new Error(`could not make a type-${type} group on (${at.x},${at.y}) L${z}`);
-  const slot = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
+  const slot = game.ctx.dungeon.getCreatureRecord(rn)!.groupIndex;
   const timersBefore = aiTimersAt(game, at);
 
   let calls = 0;
@@ -109,21 +109,21 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
     return real(position, object, place, unchangedRoom, facing);
   };
   // At tick 0: the group's first AI timer is due at tick 1, and must not move it first.
-  game.timerQueue.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
+  game.ctx.timers.createTimer(TimerFunction.TT_TELEPORTER, at.x, at.y, 0, ActuatorAction.SET, 0, z);
   processTimersAt(game, 0);
   return { game, at, dest, rn, slot, calls, timersBefore };
 }
 
 function main(): void {
   const probe = makeGame();
-  const count = probe.dungeonState.getMapCount();
+  const count = probe.ctx.dungeon.getMapCount();
 
   /* ------------------------------------ 1. teleported along the party's level ---- */
   {
     let z = 0;
     while (typeOn(probe, z) < 0) z++;
     const { game, at, dest, timersBefore } = wiggle(z, typeOn(probe, z), (g, from) =>
-      opens(g, z, [from, g.party.state.position]).find((p) => Math.abs(p.x - from.x) + Math.abs(p.y - from.y) > 2)!);
+      opens(g, z, [from, g.ctx.party.state.position]).find((p) => Math.abs(p.x - from.x) + Math.abs(p.y - from.y) > 2)!);
     console.log(`1. a group on (${at.x},${at.y}) L${z} as the teleporter to (${dest.x},${dest.y}) switches on: `
       + `there ${groupAt(game, dest)}, AI timers ${timersBefore} at the teleporter -> ${aiTimersAt(game, at)}, `
       + `${aiTimersAt(game, dest)} where it landed`);
@@ -140,8 +140,8 @@ function main(): void {
       for (let j = 0; j < count && a < 0; j++) if (i !== j && typeOn(probe, i, j) >= 0) { a = i; b = j; }
     }
     const { game, dest, rn, slot } = wiggle(a, typeOn(probe, a, b), (g) => opens(g, b)[0]!);
-    const pool = game.dungeonState.getItem16Pool();
-    const group = game.dungeonState.getCreatureRecord(rn)!;
+    const pool = game.ctx.dungeon.getItem16Pool();
+    const group = game.ctx.dungeon.getCreatureRecord(rn)!;
     console.log(`2. a group with ITEM16 ${slot} teleported from L${a} to (${dest.x},${dest.y}) L${b}: there ${groupAt(game, dest)}, `
       + `slot ${slot} word0 ${pool[slot]!.word0}, groupIndex now ${group.groupIndex}`);
     check(groupAt(game, dest), 'the group is carried to the other level');
@@ -155,10 +155,10 @@ function main(): void {
     for (let i = 0; i < count && z < 0; i++) {
       const t = typeOn(probe, i);
       if (t < 0) continue;
-      for (let j = 0; j < count; j++) if (!probe.dungeonState.monsterAllowedOnLevel(t, j)) { z = i; bad = j; break; }
+      for (let j = 0; j < count; j++) if (!probe.ctx.dungeon.monsterAllowedOnLevel(t, j)) { z = i; bad = j; break; }
     }
     const { game, at, dest, rn } = wiggle(z, typeOn(probe, z), (g) => opens(g, bad)[0]!);
-    const record = game.dungeonState.getCreatureRecord(rn)!;
+    const record = game.ctx.dungeon.getCreatureRecord(rn)!;
     console.log(`3. a group teleported from L${z} to L${bad}, where its type may not live: on the teleporter `
       + `${groupAt(game, at)}, at the destination ${groupAt(game, dest)}, record freed ${record.nextObject === OBJECT_ID_NULL}`);
     check(!groupAt(game, at) && !groupAt(game, dest), 'the group is nowhere');

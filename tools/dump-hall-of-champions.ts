@@ -91,7 +91,7 @@ function makeGame(): Game {
 }
 
 function pairCall(game: Game, name: string): string {
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   return `${name} inventory ${party.selectedCharacterIndex} champions ${party.champions.length}`;
 }
 
@@ -102,7 +102,7 @@ function probeMessages(game: Game): Array<{ color: number; text: string }> {
 /** Stand the party in front of a mirror, facing it, as a player walking up would. */
 function standAtMirror(game: Game, hero: PresetHero): { facing: number; mirror: Position } {
   const facing = (hero.location.wall + 2) & 3;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = new Position(
     hero.location.x - DELTA_X[facing],
     hero.location.y - DELTA_Y[facing],
@@ -119,9 +119,9 @@ function standAtMirror(game: Game, hero: PresetHero): { facing: number; mirror: 
 function cellObjects(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(cell);
+    let rn = game.ctx.dungeon.findFirstObject(cell);
     rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     out.push(rn);
   }
@@ -129,7 +129,7 @@ function cellObjects(game: Game, cell: Position): ObjectID[] {
 }
 
 function possessionList(game: Game, chIdx: number): Array<{ slot: number; rn: ObjectID }> {
-  const champ = game.party.state.champions[chIdx];
+  const champ = game.ctx.party.state.champions[chIdx];
   const out: Array<{ slot: number; rn: ObjectID }> = [];
   for (let slot = 0; slot < (champ?.possessions?.length ?? 0); slot++) {
     const value = champ!.possessions[slot]!;
@@ -145,7 +145,7 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
     const decoded = decodeObjectID(rn);
     if (decoded.category !== DBType.ACTUATOR) continue;
     if (decoded.position !== wall) continue;
-    const rec = game.dungeonState.getActuatorRecord(rn);
+    const rec = game.ctx.dungeon.getActuatorRecord(rn);
     if (rec) out.push(getActuatorType(rec));
   }
   return out;
@@ -158,10 +158,10 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
  */
 function attackHandShaded(game: Game, chIdx: number): boolean {
   const graphics = sharedGraphics!;
-  const ui = createUIState(graphics, game.dungeonState, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = extractUITables(graphics);
   ui.objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
-  ui.partyState = game.party.state;
+  ui.partyState = game.ctx.party.state;
   ui.screenIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
   drawAttackButton(ui, chIdx);
   const { pixels, width } = ui.screenIndexBuffer;
@@ -175,7 +175,7 @@ function attackHandShaded(game: Game, chIdx: number): boolean {
 }
 
 function heroByName(game: Game, name: string): PresetHero {
-  const hero = (game.dungeonState.getData().presetHeroes ?? []).find((h) => h.name === name);
+  const hero = (game.ctx.dungeon.getData().presetHeroes ?? []).find((h) => h.name === name);
   if (!hero) throw new Error(`no preset hero named ${name}`);
   return hero;
 }
@@ -187,7 +187,7 @@ function main(): void {
   const halk = heroByName(game, 'HALK');
   const { facing, mirror } = standAtMirror(game, halk);
   const wall = halk.location.wall;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   const mirrorBefore = cellObjects(game, mirror);
 
   console.log('=== AddCharacter at the level-0 mirror of HALK THE BARBARIAN ===');
@@ -446,7 +446,7 @@ function main(): void {
     g.ctx.rules.dmRules = true;
     standAtMirror(g, heroByName(g, 'BORIS'));
     g.handleWallClick();
-    const zed = g.party.state.champions[0]!;
+    const zed = g.ctx.party.state.champions[0]!;
     const start = zed.attributes.stats.map((a) => attributeCurrent(a));
     const stats = { ...zed.attributes };
     let opened = -1;
@@ -621,7 +621,7 @@ function portraitSection(): void {
   console.log('=== championPortraitOrdinal, per relative cell, at HALK\'s mirror ===');
   const halk = heroByName(probe, 'HALK');
   const { facing, mirror } = standAtMirror(probe, halk);
-  const party = probe.party.state;
+  const party = probe.ctx.party.state;
 
   // `summarizeRoomInfoCsbwin` reads the cell to summarize out of `rslt.x`/`rslt.y` and
   // takes the **party's** position and facing separately — the same convention
@@ -639,7 +639,7 @@ function portraitSection(): void {
       decorations: [0, 0, 0],
       text: [0xfffe, 0xfffe, 0xfffe],
     };
-    summarizeRoomInfoCsbwin(rslt, probe.dungeonState, party.position, partyFacing, objectTables);
+    summarizeRoomInfoCsbwin(rslt, probe.ctx.dungeon, party.position, partyFacing, objectTables);
     return rslt;
   };
 
@@ -672,7 +672,7 @@ function portraitSection(): void {
   check(decorationAfter !== 0, 'but the picture frame is still drawn — it comes from wallGraphicOrdinal');
 
   // Every shipped hero must be addressable inside the sheet.
-  const heroes = probe.dungeonState.getData().presetHeroes ?? [];
+  const heroes = probe.ctx.dungeon.getData().presetHeroes ?? [];
   const outOfRange = heroes.filter((h) => h.portraitIndex > 23);
   console.log(`shipped heroes: ${heroes.length}, portrait indices ${Math.min(...heroes.map((h) => h.portraitIndex))}..${Math.max(...heroes.map((h) => h.portraitIndex))}`);
   check(outOfRange.length === 0,
@@ -691,7 +691,7 @@ function portraitSection(): void {
     const g = makeGame();
     const at = standAtMirror(g, turned);
     g.handleWallClick();
-    const added = g.party.state.champions[0];
+    const added = g.ctx.party.state.champions[0];
     console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
     check(added !== undefined && added.damageFromDirection === at.facing,
       `${turned.name}'s facing3 starts as the party's facing, ${at.facing} (Character.cpp:531)`);

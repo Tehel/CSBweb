@@ -95,7 +95,7 @@ function makeGame(): Game {
 
 /** An active teleporter, open to plain items, whose destination is a different cell. */
 function findItemTeleporter(game: Game): { at: Position; dest: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -132,7 +132,7 @@ function findItemTeleporter(game: Game): { at: Position; dest: Position } | null
 
 /** A floor actuator (pressure plate / wall switch style) with an open cell south of it to throw from. */
 function findFloorActuator(game: Game): Position | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -161,7 +161,7 @@ function findFloorActuator(game: Game): Position | null {
 
 /** Any plain item already sitting on the dungeon floor, lifted off it. */
 function findFloorItem(game: Game, avoid: Position[]): { rn: ObjectID; at: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -182,7 +182,7 @@ function findFloorItem(game: Game, avoid: Position[]): { rn: ObjectID; at: Posit
 
 /** A closed (state 2-4) door with an open cell south of it to throw from, straight north. */
 function findClosedDoor(game: Game): { at: Position; south: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -207,7 +207,7 @@ function findClosedDoor(game: Game): { at: Position; south: Position } | null {
 
 /** Any floor item of a specific DB category, lifted off it. */
 function findFloorItemOfCategory(game: Game, category: DBType, avoid: Position[]): { rn: ObjectID; at: Position } | null {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -230,7 +230,7 @@ function sameObject(a: ObjectID, b: ObjectID): boolean {
 }
 
 function findsObjectAt(game: Game, position: Position, target: ObjectID): boolean {
-  for (let rn = game.dungeonState.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(position); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (sameObject(rn as ObjectID, target)) return true;
   }
   return false;
@@ -252,9 +252,9 @@ function main(): void {
         console.log('No spare floor item found — skipping.');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
-        game.dungeonState.removeObjectFromCell(item.at, item.rn);
+        game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
 
-        const party = game.party.state;
+        const party = game.ctx.party.state;
         party.position = teleporter.at.south;
         party.facing = 0; // north, straight at the teleporter
 
@@ -286,9 +286,9 @@ function main(): void {
         console.log('No spare floor item found — skipping.');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
-        game.dungeonState.removeObjectFromCell(item.at, item.rn);
+        game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
 
-        const party = game.party.state;
+        const party = game.ctx.party.state;
         party.position = plate.south;
         party.facing = 0;
 
@@ -326,9 +326,9 @@ function main(): void {
         console.log('No spare floor item found — skipping.');
       } else {
         console.log(`item ${item.rn.toString(16)} lifted from level ${item.at.z} (${item.at.x},${item.at.y})`);
-        game.dungeonState.removeObjectFromCell(item.at, item.rn);
+        game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
 
-        const party = game.party.state;
+        const party = game.ctx.party.state;
         party.position = door.south;
         party.facing = 0; // north, straight at the door
 
@@ -341,7 +341,7 @@ function main(): void {
         // missile is still present at the door, right before it becomes the dropped item.
         let restingCorner: number | null = null;
         for (let t = 1; t <= 20; t++) {
-          for (let rn = game.dungeonState.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+          for (let rn = game.ctx.dungeon.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
             if (decodeObjectID(rn as ObjectID).category === DBType.MISSILE) restingCorner = decodeObjectID(rn as ObjectID).position;
           }
           processTimersAt(game, t);
@@ -351,7 +351,7 @@ function main(): void {
         check(findsObjectAt(game, door.at, item.rn), 'the thrown object lands on the door cell, not past it');
 
         let landedCorner: number | null = null;
-        for (let rn = game.dungeonState.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+        for (let rn = game.ctx.dungeon.findFirstObject(door.at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
           if (sameObject(rn as ObjectID, item.rn)) landedCorner = decodeObjectID(rn as ObjectID).position;
         }
         check(
@@ -370,9 +370,9 @@ function main(): void {
       if (!door) return null;
       const item = findFloorItemOfCategory(game, category, [door.at, door.south]);
       if (!item) return null;
-      game.dungeonState.removeObjectFromCell(item.at, item.rn);
+      game.ctx.dungeon.removeObjectFromCell(item.at, item.rn);
 
-      const party = game.party.state;
+      const party = game.ctx.party.state;
       party.position = door.south;
       party.facing = 0;
 

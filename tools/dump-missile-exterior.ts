@@ -35,7 +35,7 @@ function makeGame(): Game {
 
 /** An empty open square on a map's border, and the direction that leaves the map from it. */
 function findBorderSquare(game: Game): { at: Position; direction: number } {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
     const { width, height } = map.descriptor;
@@ -55,7 +55,7 @@ function findBorderSquare(game: Game): { at: Position; direction: number } {
 
 function categoriesAt(game: Game, p: Position): DBType[] {
   const found: DBType[] = [];
-  for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     found.push(decodeObjectID(rn).category);
   }
   return found;

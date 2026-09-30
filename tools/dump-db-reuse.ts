@@ -50,7 +50,7 @@ async function main(): Promise<void> {
   /* --------------------------------------------- 1. the file's free records ---- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const weapons = dungeon.getData().databases.weapons;
     const misc = dungeon.getData().databases.misc;
     const freeWeapons = weapons.records.flatMap((r, i) => (r.nextObject === OBJECT_ID_NULL ? [i] : []));
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
   /* ------------------------------------------- 2. record 0 is never reused ---- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     const start = dungeon.getStartPosition();
     const at = new Position(start.x, start.y, start.z);
     const missilesHere = (): ObjectID[] => {
@@ -116,7 +116,7 @@ async function main(): Promise<void> {
   /* --------------------------------------------- 3. the header counts ---------- */
   {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     let level = -1;
     let type = -1;
     for (let z = 0; z < dungeon.getMapCount() && level < 0; z++) {

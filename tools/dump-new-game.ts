@@ -121,7 +121,7 @@ function main(): void {
   played.setRandomSeed(0x13579bdf);
   played.addChampion(champion(0));
   played.addChampion(champion(1));
-  played.party.state.position = new Position(6, 14, 2);
+  played.ctx.party.state.position = new Position(6, 14, 2);
   const t0 = 1_000_000;
   for (let n = 0; n < 40; n++) {
     if (n % 8 === 0) played.enqueueMovement(n % 16 === 0 ? MovementAction.TURN_LEFT : MovementAction.MOVE_FORWARD);
@@ -149,11 +149,11 @@ function main(): void {
   runFrames(played, t0 + 40 * 250, 4);
 
   console.log('=== the game that was played ===');
-  console.log(['tick', played.state.tickCount, 'returned', played.mainLoopHasReturned(), 'hash', stateHash(played)].join('\t'));
+  console.log(['tick', played.ctx.state.tickCount, 'returned', played.mainLoopHasReturned(), 'hash', stateHash(played)].join('\t'));
   check(played.mainLoopHasReturned(), 'the played game is lost, and its MainLoop has returned');
   check(stateHash(played) !== stateHash(fresh), 'and its world is not a new one');
 
-  const lostBlock1 = { ...played.state.block1 };
+  const lostBlock1 = { ...played.ctx.state.block1 };
   // The stream the rebuilt game's `d.RandomGameID` came from: the fresh parse's own
   // `Game`, whose seed `readNewGame` restores along with the rest.
   played.readNewGame(parse());
@@ -163,7 +163,7 @@ function main(): void {
 
   console.log('');
   console.log('=== GAMEBLOCK1, lost game and rebuilt ===');
-  const rebuilt = played.state.block1;
+  const rebuilt = played.ctx.state.block1;
   console.log(['lost', `id ${lostBlock1.randomGameID.toString(16)}`, `moves ${lostBlock1.totalMoveCount}`,
     'rebuilt', `id ${rebuilt.randomGameID.toString(16)}`, `moves ${rebuilt.totalMoveCount}`].join('\t'));
   check(lostBlock1.totalMoveCount === 5,
@@ -196,17 +196,17 @@ function main(): void {
   draws = 0;
   const booted = newGame(emptyDungeonData(), stockGraphics());
   const emptyDraws = draws;
-  const emptyID = booted.state.block1.randomGameID;
+  const emptyID = booted.ctx.state.block1.randomGameID;
   booted.readNewGame(parse());
   const bootDraws = draws;
   Math.random = random;
   const bootDiff = differingParts(direct, booted);
   console.log(['host rand() draws', 'direct', directDraws, 'empty world', emptyDraws, 'then read', bootDraws,
-    'RandomGameID', direct.state.block1.randomGameID.toString(16), booted.state.block1.randomGameID.toString(16),
+    'RandomGameID', direct.ctx.state.block1.randomGameID.toString(16), booted.ctx.state.block1.randomGameID.toString(16),
     'differ', bootDiff.join(',') || '-'].join('\t'));
   check(emptyDraws === 0 && emptyID === 0, 'the empty world draws nothing: no RandomGameID before a read');
   check(directDraws === 1 && bootDraws === 1, 'the read seeds the stream once, as a Game built over the file does');
-  check(booted.state.block1.randomGameID === direct.state.block1.randomGameID && stateHash(booted) === stateHash(direct),
+  check(booted.ctx.state.block1.randomGameID === direct.ctx.state.block1.randomGameID && stateHash(booted) === stateHash(direct),
     'and the booted game is that game, RandomGameID and the whole runtime state');
 
   // Later than any frame the played game ran, so both take a tick on every frame.
@@ -215,7 +215,7 @@ function main(): void {
   runFrames(played, t1, 600);
   const later = differingParts(fresh, played);
   console.log(['600 ticks on', 'fresh', stateHash(fresh), 'rebuilt', stateHash(played), 'differ', later.join(',') || '-'].join('\t'));
-  check(fresh.state.tickCount === 600 && played.state.tickCount === 600, `both ran 600 ticks (${fresh.state.tickCount}, ${played.state.tickCount})`);
+  check(fresh.ctx.state.tickCount === 600 && played.ctx.state.tickCount === 600, `both ran 600 ticks (${fresh.ctx.state.tickCount}, ${played.ctx.state.tickCount})`);
   check(stateHash(fresh) === stateHash(played), 'and are still the same game');
 
   finish();

@@ -193,7 +193,7 @@ await wait(3500);
 await evaluate(BUILD_PARTY);
 await evaluate(`(()=>{
   const { game, renderView } = window.__probe;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position.x = 14; party.position.y = 29; party.position.z = 4;
   party.facing = 3;
   party.brightness = 1000;   // level 4 is dark, and no one holds a torch: full magic light
@@ -211,7 +211,7 @@ console.log('state: crack switch');      await shot('09-crack-switch');
 // plate, ornament 5 in position set 2, is shrunk to its F2 size through `d.Byte4188`.
 const FACE = (x, y, z, facing) => `(()=>{
   const { game, renderView } = window.__probe;
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position.x = ${x}; party.position.y = ${y}; party.position.z = ${z};
   party.facing = ${facing};
   party.brightness = 1000;

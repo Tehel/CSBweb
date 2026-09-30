@@ -70,7 +70,7 @@ function main(): void {
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
-  const dungeon = newGame(data, graphics).dungeonState;
+  const dungeon = newGame(data, graphics).ctx.dungeon;
   let past = 0;
   let ornate = 0;
   data.maps.forEach((map, z) => {

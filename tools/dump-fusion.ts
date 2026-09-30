@@ -88,7 +88,7 @@ interface Arena {
 }
 
 function setRoom(game: Game, x: number, y: number, roomType: RoomType): void {
-  const map = game.dungeonState.getMap(LEVEL)!;
+  const map = game.ctx.dungeon.getMap(LEVEL)!;
   map.cellFlags[x]![y] = (roomType << 5) | (map.cellFlags[x]![y]! & 0x10);
 }
 
@@ -114,14 +114,14 @@ function arena(withLordChaos: boolean): Arena {
   game.addChampion(champion());
   for (let x = CX - 3; x <= CX + 3; x++) {
     for (let y = CY - 3; y <= CY + 3; y++) {
-      if (game.dungeonState.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) {
+      if (game.ctx.dungeon.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) {
         throw new Error(`the arena holds a monster at (${x},${y})`);
       }
       setRoom(game, x, y, RoomType.OPEN);
     }
   }
-  game.party.state.position = new Position(CX, CY + 1, LEVEL);
-  game.party.state.facing = 0;
+  game.ctx.party.state.position = new Position(CX, CY + 1, LEVEL);
+  game.ctx.party.state.facing = 0;
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
   const a: Arena = {
@@ -142,18 +142,18 @@ function placeMonster(game: Game, type: number, x: number, y: number): ObjectID 
     invisible: false, drawAsSize4: false,
   });
   if (rn === null) throw new Error(`no ${MonsterType[type]} at (${x},${y})`);
-  game.timerQueue.deleteMonsterMovementTimers(x, y, LEVEL);
+  game.ctx.timers.deleteMonsterMovementTimers(x, y, LEVEL);
   return rn;
 }
 
 function cage(game: Game, x: number, y: number): void {
-  if (game.systems.missileEncounter.createFluxcage(new Position(x, y, LEVEL), game.state.tickCount) === null) {
+  if (game.systems.missileEncounter.createFluxcage(new Position(x, y, LEVEL), game.ctx.state.tickCount) === null) {
     throw new Error(`no Fluxcage at (${x},${y})`);
   }
 }
 
 function dispellClouds(game: Game, x: number, y: number): number {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   let n = 0;
   for (let rn = dungeon.findFirstObject(new Position(x, y, LEVEL)); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category !== DBType.CLOUD) continue;
@@ -166,16 +166,16 @@ function dispellClouds(game: Game, x: number, y: number): number {
 function lordChaosAt(game: Game): { x: number; y: number } | null {
   for (let x = CX - 3; x <= CX + 3; x++) {
     for (let y = CY - 3; y <= CY + 3; y++) {
-      const rn = game.dungeonState.findFirstMonster(new Position(x, y, LEVEL));
+      const rn = game.ctx.dungeon.findFirstMonster(new Position(x, y, LEVEL));
       if (rn === OBJECT_ID_EOF) continue;
-      if (game.dungeonState.getCreatureRecord(rn)?.creatureType === MonsterType.mon_LordChaos) return { x, y };
+      if (game.ctx.dungeon.getCreatureRecord(rn)?.creatureType === MonsterType.mon_LordChaos) return { x, y };
     }
   }
   return null;
 }
 
 function movementTimerAt(game: Game, x: number, y: number): boolean {
-  return game.timerQueue.getTimers().some((t) =>
+  return game.ctx.timers.getTimers().some((t) =>
     t.function >= TimerFunction.TT_FIRST_MONSTER_AI && t.function <= TimerFunction.TT_LAST_MONSTER_AI
     && t.level === LEVEL && t.uByte6 === x && t.uByte7 === y);
 }
@@ -198,7 +198,7 @@ function checkOffTheMap(): void {
   console.log('');
   console.log('=== 2. the square in front is off the map (Attack.cpp:150-157) ===');
   const a = arena(false);
-  a.game.party.state.position = new Position(CX, 0, LEVEL);
+  a.game.ctx.party.state.position = new Position(CX, 0, LEVEL);
   a.game.systems.attack.attack(0, AttackType.atk_FUSE);
   console.log(`  createCloud called: ${a.seedAfterCloud !== null}`);
   check(a.seedAfterCloud === null, 'no cloud at all');
@@ -252,7 +252,7 @@ function checkOverAMonster(): void {
   const a = arena(true);
   cage(a.game, CX, CY - 1);
   cage(a.game, CX + 1, CY);
-  const other = [...Array(27).keys()].find((t) => t !== MonsterType.mon_LordChaos && a.game.dungeonState.monsterAllowedOnLevel(t, LEVEL))!;
+  const other = [...Array(27).keys()].find((t) => t !== MonsterType.mon_LordChaos && a.game.ctx.dungeon.monsterAllowedOnLevel(t, LEVEL))!;
   placeMonster(a.game, other, CX - 1, CY);
   console.log(`  a ${MonsterType[other] ?? other} on (${CX - 1},${CY})`);
   setRoom(a.game, CX, CY + 2, RoomType.STONE);
@@ -304,7 +304,7 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
     + ` ${inventoryOpen ? 'the inventory open' : 'no inventory open'}${withoutB ? ', the "B" text taken off cell (0, 0)' : ''} ===`);
   const a = arena(true);
   const game = a.game;
-  if (withoutB) game.dungeonState.removeObjectFromCell(new Position(0, 0, LEVEL), ENDING_TEXTS.B!.rn);
+  if (withoutB) game.ctx.dungeon.removeObjectFromCell(new Position(0, 0, LEVEL), ENDING_TEXTS.B!.rn);
   const letters = withoutB ? ['A'] : ['A', 'B', 'C', 'D'];
   cage(game, CX, CY - 1);
   cage(game, CX + 1, CY);
@@ -314,13 +314,13 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   setRoom(game, CX, CY + 2, RoomType.STONE);
   game.savedGameRead();
   const types: number[] = [];
-  const lordChaos = game.dungeonState.getCreatureRecord(game.dungeonState.findFirstMonster(new Position(CX, CY, LEVEL)))!;
+  const lordChaos = game.ctx.dungeon.getCreatureRecord(game.ctx.dungeon.findFirstMonster(new Position(CX, CY, LEVEL)))!;
   const word1868: boolean[] = [];
   a.drawn = () => {
     types.push(lordChaos.creatureType);
-    word1868.push(game.state.word1868);
+    word1868.push(game.ctx.state.word1868);
   };
-  if (inventoryOpen) game.party.state.selectedCharacterIndex = 0;
+  if (inventoryOpen) game.ctx.party.state.selectedCharacterIndex = 0;
   const sounds: number[] = [];
   const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
   game.ctx.sounds.queueSound = (ordinal, x, y, delta, level) => {
@@ -328,19 +328,19 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
     queueSound(ordinal, x, y, delta, level);
   };
   const others = monstersOnLevel(game) - 1;
-  const champion = game.party.state.champions[0]!;
+  const champion = game.ctx.party.state.champions[0]!;
   const stamina = champion.attributes.stamina;
   const attackType = champion.attackType;
-  const tick = game.state.tickCount;
+  const tick = game.ctx.state.tickCount;
 
   game.ctx.systems.character.executeAttack(0, AttackType.atk_FUSE);
   const at = lordChaosAt(game);
-  console.log(`  Lord Chaos ${at ? `at (${at.x},${at.y})` : 'nowhere'}; hit points ${lordChaos.hp[0]}; ticks ${game.state.tickCount - tick}`);
+  console.log(`  Lord Chaos ${at ? `at (${at.x},${at.y})` : 'nowhere'}; hit points ${lordChaos.hp[0]}; ticks ${game.ctx.state.tickCount - tick}`);
   check(at !== null && at.x === CX && at.y === CY, 'he stays where he is');
   check(!movementTimerAt(game, CX, CY), 'and no movement timer starts for him');
   check(game.isRunningScript(), '_FusionSequence holds the loop');
-  check(game.state.gameWon, 'd.Word11694 is set');
-  const party = game.party.state;
+  check(game.ctx.state.gameWon, 'd.Word11694 is set');
+  const party = game.ctx.party.state;
   check(party.brightness === 200 && party.partyShield === 100 && party.spellShield === 100 && party.fireShield === 100,
     'd.Brightness is 200, and the three shields 100');
   check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
@@ -367,14 +367,14 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   }
   const want = expectedTypes(letters.length);
   console.log(`  types ${types.join(' ')}`);
-  console.log(`  credits ${creditsAt} VBLs after the attack (expected ${wantCredits}); asked ${JSON.stringify(a.credits)}; ticks ${game.state.tickCount - tick}`);
+  console.log(`  credits ${creditsAt} VBLs after the attack (expected ${wantCredits}); asked ${JSON.stringify(a.credits)}; ticks ${game.ctx.state.tickCount - tick}`);
   console.log(`  sound 17 ${sounds.filter((n) => n === 17).length} times; monsters on the level ${monstersOnLevel(game)} (other than him before: ${others})`);
   check(types.join() === want.join(), `${want.length} views, each with the type the sequence gives him then`);
   console.log(`  d.Word1868 ${word1868.map((w) => (w ? 1 : 0)).join('')}`);
   const unset = want.length - 2 - letters.length;
   check(word1868.length === want.length && word1868.every((w, i) => w === (i >= unset)),
     'd.Word1868 is set for the views after the Grey Lord\'s first, and the texts\' (Attack.cpp:2364-2369)');
-  check(game.state.tickCount - tick === want.length, 'each view is a turn of the clock');
+  check(game.ctx.state.tickCount - tick === want.length, 'each view is a turn of the clock');
   check(sounds.filter((n) => n === 17).length === 13, 'sound 17 once before the dispells and once for each of the twelve flickers');
   check(others > 0 && monstersOnLevel(game) === 1 && greyLordAt(game, CX, CY), 'every other monster on the level is deleted');
   for (const p of a.printed) console.log(`  printed at VBL ${p.frame}, colour ${p.color}: ${JSON.stringify(p.text)}`);
@@ -397,19 +397,19 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
 }
 
 function monstersOnLevel(game: Game): number {
-  const map = game.dungeonState.getMap(LEVEL)!;
+  const map = game.ctx.dungeon.getMap(LEVEL)!;
   let n = 0;
   for (let x = 0; x < map.descriptor.width; x++) {
     for (let y = 0; y < map.descriptor.height; y++) {
-      if (game.dungeonState.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) n++;
+      if (game.ctx.dungeon.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) n++;
     }
   }
   return n;
 }
 
 function greyLordAt(game: Game, x: number, y: number): boolean {
-  const rn = game.dungeonState.findFirstMonster(new Position(x, y, LEVEL));
-  return rn !== OBJECT_ID_EOF && game.dungeonState.getCreatureRecord(rn)?.creatureType === MonsterType.mon_GreyLord;
+  const rn = game.ctx.dungeon.findFirstMonster(new Position(x, y, LEVEL));
+  return rn !== OBJECT_ID_EOF && game.ctx.dungeon.getCreatureRecord(rn)?.creatureType === MonsterType.mon_GreyLord;
 }
 
 function checkWall(): void {

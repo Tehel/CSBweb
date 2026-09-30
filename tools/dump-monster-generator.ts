@@ -44,7 +44,7 @@ function scene(): Game {
 
 function objectsAt(game: Game, p: Position, category: number): ObjectID[] {
   const out: ObjectID[] = [];
-  for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category === category) out.push(rn);
   }
   return out;
@@ -53,7 +53,7 @@ function objectsAt(game: Game, p: Position, category: number): ObjectID[] {
 /** Fire the generator at `gen` with the party at `party`, and check where its group went. */
 function fire(label: string, gen: Position, party: Position, multiplier: number): void {
   const game = scene();
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const actuator = objectsAt(game, gen, DBType.ACTUATOR)
     .map((rn) => dungeon.getActuatorRecord(rn)!)
     .find((rec) => getActuatorType(rec) === 6);
@@ -64,13 +64,13 @@ function fire(label: string, gen: Position, party: Position, multiplier: number)
   check((own || levelMultiplier) === multiplier,
     `${label}: the multiplier is ${multiplier} (the actuator's ${own}, the level's ${levelMultiplier})`);
 
-  game.party.state.position = party;
+  game.ctx.party.state.position = party;
   game.systems.monsters.loadPartyLevel(party.z);
   const onPartyLevel = new Position(gen.x, gen.y, party.z);
   const beforeHere = objectsAt(game, gen, DBType.CREATURE).length;
   const beforeThere = party.z === gen.z ? 0 : objectsAt(game, onPartyLevel, DBType.CREATURE).length;
-  game.timerQueue.addTimer({
-    index: 0, function: TimerFunction.TT_OPENROOM, time: game.state.tickCount, level: gen.z,
+  game.ctx.timers.addTimer({
+    index: 0, function: TimerFunction.TT_OPENROOM, time: game.ctx.state.tickCount, level: gen.z,
     uByte5: 0, uByte6: gen.x, uByte7: gen.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
     timerWord8: 0, timerWord6: 0,
   });

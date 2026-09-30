@@ -58,20 +58,20 @@ function makeGame(): Game {
   const data = loader.getData();
   if (!data) throw new Error('dungeon.dat did not load');
   const game = newGame(data, stockGraphics());
-  game.party.state.position = new Position(12, 19, MAP);
-  game.party.state.facing = Direction.EAST;
-  game.party.state.cursorOwner = 0;
-  game.party.state.objectInHand = OBJECT_ID_NULL;
+  game.ctx.party.state.position = new Position(12, 19, MAP);
+  game.ctx.party.state.facing = Direction.EAST;
+  game.ctx.party.state.cursorOwner = 0;
+  game.ctx.party.state.objectInHand = OBJECT_ID_NULL;
   return game;
 }
 
 const basicType = (game: Game, rn: ObjectID): number =>
-  GetBasicObjectType(game.dungeonState, game.ctx.tables.objDescObjectType, rn);
+  GetBasicObjectType(game.ctx.dungeon, game.ctx.tables.objDescObjectType, rn);
 
 /** Everything on a square, first to last. */
 function square(game: Game, at: Position): ObjectID[] {
   const out: ObjectID[] = [];
-  for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) out.push(rn);
+  for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) out.push(rn);
   return out;
 }
 
@@ -84,24 +84,24 @@ function ordinalAhead(game: Game): number {
     x: HIDDEN.x, y: HIDDEN.y, relativeCellNumber: 17, skinNumber: 0, roomType: 0, championPortraitOrdinal: 0,
     graphicRoomType: 0, rn2: 0xfffe, decorations: [0, 0, 0], text: [0xfffe, 0xfffe, 0xfffe],
   };
-  summarizeRoomInfoCsbwin(rslt, game.dungeonState, new Position(12, 19, MAP), Direction.EAST, objectTables);
+  summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, new Position(12, 19, MAP), Direction.EAST, objectTables);
   return rslt.decorations[1] | 0;
 }
 
 const ordinalOf = (game: Game, at: number, index: number): number =>
-  (game.dungeonState.getActuatorRecord(encodeObjectID(at, DBType.ACTUATOR, index))!.word4 >> 12) & 0xf;
+  (game.ctx.dungeon.getActuatorRecord(encodeObjectID(at, DBType.ACTUATOR, index))!.word4 >> 12) & 0xf;
 
 /** The first object lying anywhere in the dungeon whose basic type is `wanted`, taken off its square. */
 function takeObject(game: Game, wanted: number): ObjectID {
-  const data = game.dungeonState.getData();
+  const data = game.ctx.dungeon.getData();
   for (let z = 0; z < data.maps.length; z++) {
     const { width, height } = data.maps[z]!.descriptor;
     for (let x = 0; x < width; x++) for (let y = 0; y < height; y++) {
       const at = new Position(x, y, z);
-      for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+      for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category <= DBType.ACTUATOR) continue;
         if (basicType(game, rn) !== wanted) continue;
-        game.dungeonState.removeObjectFromCell(at, rn);
+        game.ctx.dungeon.removeObjectFromCell(at, rn);
         return rn;
       }
     }
@@ -111,12 +111,12 @@ function takeObject(game: Game, wanted: number): ObjectID {
 
 /** The two counters on (13,23): #616 opens the alcove at zero, #135 aims at the door on (13,20). */
 const counters = (game: Game): string =>
-  [616, 135].map((i) => getActuatorValue(game.dungeonState.getActuatorRecord(encodeObjectID(WEST_FACE, DBType.ACTUATOR, i))!)).join(',');
+  [616, 135].map((i) => getActuatorValue(game.ctx.dungeon.getActuatorRecord(encodeObjectID(WEST_FACE, DBType.ACTUATOR, i))!)).join(',');
 
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
     game.systems.timer.processTimers();
-    game.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
@@ -131,17 +131,17 @@ function main(): void {
   check(actuatorIndices(game).join(',') === '550,549', 'the face holds #550 then #549');
   check(alcove !== 0 && ordinalOf(game, WEST_FACE, 549) === 0, '#550 carries an ornament and #549 none');
   check(ALCOVES.every((a) => ordinalOf(game, (a.facing + 2) & 3, a.actuator) === alcove), 'canary: the four alcoves carry #550\'s ornament');
-  check(key !== undefined && game.dungeonState.getDBRecordLink(encodeObjectID(WEST_FACE, DBType.ACTUATOR, 549)) === key, 'the key lies in the wall after #549');
+  check(key !== undefined && game.ctx.dungeon.getDBRecordLink(encodeObjectID(WEST_FACE, DBType.ACTUATOR, 549)) === key, 'the key lies in the wall after #549');
   check(ordinalAhead(game) === 0, 'on arrival the face is bare stone: the last actuator, #549, has no ornament');
 
   // --- 2: the four objects open it ----------------------------------------------------
   console.log('');
   console.log(['alcove', 'wants', 'counters #616,#135', 'actuators on (13,19)', 'ornament ahead of (12,19)'].join('\t'));
   for (const a of ALCOVES) {
-    const wanted = getActuatorValue(game.dungeonState.getActuatorRecord(encodeObjectID((a.facing + 2) & 3, DBType.ACTUATOR, a.actuator))!);
-    game.party.state.position = a.party;
-    game.party.state.facing = a.facing;
-    game.party.state.objectInHand = takeObject(game, wanted);
+    const wanted = getActuatorValue(game.ctx.dungeon.getActuatorRecord(encodeObjectID((a.facing + 2) & 3, DBType.ACTUATOR, a.actuator))!);
+    game.ctx.party.state.position = a.party;
+    game.ctx.party.state.facing = a.facing;
+    game.ctx.party.state.objectInHand = takeObject(game, wanted);
     check(game.dropObjectFromCursor(4), `the object goes into the alcove at (${a.wall.x},${a.wall.y})`);
     runTicks(game, 4);
     console.log([`(${a.wall.x},${a.wall.y})`, wanted, counters(game), actuatorIndices(game).join(','), ordinalAhead(game)].join('\t'));

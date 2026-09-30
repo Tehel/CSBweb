@@ -162,7 +162,7 @@ function buildFileBlocks(
     objectInHand: number;
     timers: TimerRecord[];
 } {
-    const dungeon: DungeonData = game.state.dungeon;
+    const dungeon: DungeonData = game.ctx.state.dungeon;
 
     // The world has to be save-shaped, which `DungeonLoader` guarantees by converting on
     // load (`src/data/CsbwinDungeonConversions.ts`). Refuse rather than write a file
@@ -264,7 +264,7 @@ export function buildSavePayload(game: Game, options: SavePayloadOptions = {}): 
         characterBlock: file.characterBlock,
         extendedFeatures: file.extendedFeatures,
         objectIndex: file.objectIndex,
-        dsaLevelIndex: game.state.dungeon.dsaLevelIndex,
+        dsaLevelIndex: game.ctx.state.dungeon.dsaLevelIndex,
         dungeonImage: file.dungeonImage,
     };
     return {
@@ -324,7 +324,7 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
         handChar: party.cursorOwner ?? -1,
         magicCaster: party.magicCasterIndex ?? -1,
         numTimer: runtime.dungeon.timerQueue?.length ?? 0,
-        firstAvailTimer: game.timerQueue.getFirstAvailTimer(),
+        firstAvailTimer: game.ctx.timers.getFirstAvailTimer(),
         maxTimers: runtime.dungeon.timers?.length ?? 0,
         item16QueLen: game.systems.monsters.getItem16QueLen(),
         lastMonsterAttackTime: party.lastMonsterAttackTime >>> 0,

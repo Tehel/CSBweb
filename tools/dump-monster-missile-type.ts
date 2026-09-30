@@ -61,7 +61,7 @@ const hex = (v: number): string => '0x' + (v >>> 0).toString(16).padStart(4, '0'
 
 /** The missiles in a cell, each by its projectile. */
 function missilesIn(game: ReturnType<typeof newGame>, at: Position): Map<ObjectID, ObjectID> {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   const found = new Map<ObjectID, ObjectID>();
   for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category !== DBType.MISSILE) continue;
@@ -83,14 +83,14 @@ function main(): void {
   // A fixed seed, so the throwers' picks repeat run to run.
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i));
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
 
   console.log(['level', 'type', 'name', 'at', 'launch', 'missileType'].join('\t'));
   const seen = new Set<number>();
   let throwers = 0;
   let others = 0;
   for (let level = 0; level < data.maps.length; level++) {
-    game.party.state.position = new Position(0, 0, level);
+    game.ctx.party.state.position = new Position(0, 0, level);
     game.systems.monsters.loadPartyLevel(level);
     for (const slot of dungeon.getItem16Pool()) {
       if (slot.word0 < 0) continue;
@@ -136,7 +136,7 @@ function main(): void {
 
   // A champion's spell attack (`CharacterThrowsSpell` -> `LaunchObject`) launches the
   // spell RN from the party's own cell.
-  const partyCell = new Position(game.party.state.position.x, game.party.state.position.y, game.party.state.position.z);
+  const partyCell = new Position(game.ctx.party.state.position.x, game.ctx.party.state.position.y, game.ctx.party.state.position.z);
   const before = missilesIn(game, partyCell);
   const ok = game.ctx.systems.magic.launchObject(0, RN_FIREBALL, 20, 90, 8);
   const launched = [...missilesIn(game, partyCell)].filter(([m]) => !before.has(m)).map(([, o]) => o);

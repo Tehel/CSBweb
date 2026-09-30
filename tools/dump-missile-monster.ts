@@ -108,7 +108,7 @@ const roomType = (flags: number): number => (flags >> 5) & 0x7;
  * cell on another row for the party to stand in, out of the missile's way.
  */
 function findRange(game: Game, level: number): { target: Position; party: Position } | null {
-  const map = game.dungeonState.getMap(level);
+  const map = game.ctx.dungeon.getMap(level);
   if (!map) return null;
   let target: Position | null = null;
   for (let x = 2; x < map.descriptor.width - 1 && !target; x++) {
@@ -152,25 +152,25 @@ type Arena = {
 /** A two-member group of a plain monster type the level allows, in the target cell. */
 function makeArena(members: number): Arena | null {
   const game = makeGame();
-  for (let level = 0; level < game.dungeonState.getMapCount(); level++) {
+  for (let level = 0; level < game.ctx.dungeon.getMapCount(); level++) {
     for (let type = 0; type < objectTables.monsterDesc.length; type++) {
       const desc = objectTables.monsterDesc[type];
       if (!plainMonster(desc, type)) continue;
-      if (!game.dungeonState.monsterAllowedOnLevel(type, level)) continue;
+      if (!game.ctx.dungeon.monsterAllowedOnLevel(type, level)) continue;
       const range = findRange(game, level);
       if (!range) continue;
-      game.party.state.position = range.party;
+      game.ctx.party.state.position = range.party;
       game.systems.monsters.loadPartyLevel(level);
       const rn = createMonsterAt(game, {
         value: type, hitPointMultiplier: 1, numMonM1: members - 1, facing: 0,
         mapX: range.target.x, mapY: range.target.y, level, invisible: false, drawAsSize4: false,
       });
       if (rn === null) continue;
-      const group = game.dungeonState.getCreatureRecord(rn)!;
+      const group = game.ctx.dungeon.getCreatureRecord(rn)!;
       for (let i = 0; i < members; i++) group.hp[i] = 900;
       // Keep the target where it is: without its movement timers the group cannot walk
       // out of the cell before the missile arrives.
-      game.timerQueue.deleteMonsterMovementTimers(range.target.x, range.target.y, level);
+      game.ctx.timers.deleteMonsterMovementTimers(range.target.x, range.target.y, level);
       return {
         game, target: range.target, desc: desc!,
         launch: new Position(range.target.x - 1, range.target.y, level), group,
@@ -209,10 +209,10 @@ function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
 }
 
 function fly(game: Game, projectile: ObjectID, launch: Position): void {
-  game.systems.magic.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
+  game.systems.magic.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.ctx.state.tickCount);
   for (let i = 0; i < 4; i++) {
     game.systems.timer.processTimers();
-    game.state.tickCount++;
+    game.ctx.state.tickCount++;
   }
 }
 
@@ -222,7 +222,7 @@ function monsterBlow(magic: number, defense08: number): number {
 }
 
 function newRecord<T>(game: Game, db: 'weapons' | 'potions', category: number, record: T): ObjectID {
-  const database = game.dungeonState.getData().databases[db] as unknown as { records: T[]; count: number };
+  const database = game.ctx.dungeon.getData().databases[db] as unknown as { records: T[]; count: number };
   database.records.push(record);
   database.count++;
   return encodeObjectID(0, category, database.records.length - 1);
@@ -230,7 +230,7 @@ function newRecord<T>(game: Game, db: 'weapons' | 'potions', category: number, r
 
 function cloudsIn(game: Game, cell: Position): number {
   let n = 0;
-  for (let rn = game.dungeonState.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category === DBType.CLOUD) n++;
   }
   return n;
@@ -245,7 +245,7 @@ function main(): void {
     const { game, group, desc, launch, target } = arena;
     // Member 0 in the south-west corner, member 1 in the north-west one — where a missile
     // flying east along the north row arrives.
-    game.dungeonState.getAttachedItem16(group)!.positions = 3 | (0 << 2);
+    game.ctx.dungeon.getAttachedItem16(group)!.positions = 3 | (0 << 2);
     const log = spy(game);
     const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
@@ -273,7 +273,7 @@ function main(): void {
     const arena = makeArena(2)!;
     const { game, group, launch } = arena;
     // Both members on the south row: the north row is empty.
-    game.dungeonState.getAttachedItem16(group)!.positions = 3 | (2 << 2);
+    game.ctx.dungeon.getAttachedItem16(group)!.positions = 3 | (2 << 2);
     const log = spy(game);
     const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
@@ -325,9 +325,9 @@ function main(): void {
   {
     const game = makeGame();
     const range = findRange(game, 0)!;
-    game.party.state.position = range.target;
+    game.ctx.party.state.position = range.target;
     game.systems.monsters.loadPartyLevel(range.target.z);
-    game.party.state.champions[0]!.partyPosition = 0;
+    game.ctx.party.state.champions[0]!.partyPosition = 0;
     const bomb = newRecord(game, 'potions', DBType.POTION, {
       nextObject: OBJECT_ID_EOF, important: false, potionType: PotionType.FUL_BOMB, power: 40,
     });
@@ -343,7 +343,7 @@ function main(): void {
   {
     const arena = makeArena(2)!;
     const { game, group, desc, target } = arena;
-    const slot = game.dungeonState.getAttachedItem16(group)!;
+    const slot = game.ctx.dungeon.getAttachedItem16(group)!;
     // Member 0 in corner 2, member 1 in corner 0: the whole byte is 2, which is what the
     // scan compares a missile's corner with (scenario 6).
     slot.positions = 2 | (0 << 2);
@@ -352,7 +352,7 @@ function main(): void {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
-    game.systems.magic.launchThrownMissile(falchion, target, 2, EAST, 255, 255, 0, game.state.tickCount);
+    game.systems.magic.launchThrownMissile(falchion, target, 2, EAST, 255, 255, 0, game.ctx.state.tickCount);
     check(!monsterWord2Bit3(desc) || !monsterWord2Bit4(desc),
       `${MonsterType[group.creatureType]} always passes the sidestep's die test, so no roll decides the scenario`);
 
@@ -369,14 +369,14 @@ function main(): void {
     // (Monster.cpp:3940-3958).
     const frame: AiFrame = {
       timer: {
-        index: -1, time: game.state.tickCount, level: target.z, function: TimerFunction.TT_MONSTER_B0,
+        index: -1, time: game.ctx.state.tickCount, level: target.z, function: TimerFunction.TT_MONSTER_B0,
         uByte5: 0, uByte6: target.x, uByte7: target.y, uByte8: 0, uByte9: 0, sequence: 0,
         timerWord8: 0, timerWord6: 0,
       },
       i60: 0, sinceLastUpdate: 0, timePerMove: 0, bool36: false, d5: 0, secondaryDirection: 0,
     };
     const c: AiConst = {
-      monsterRn: game.dungeonState.findFirstMonster(target), monster: group, slot,
+      monsterRn: game.ctx.dungeon.findFirstMonster(target), monster: group, slot,
       slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
       timeUntilAlternateUpdate: 0, indexOfLastMonster: 1, horizSize: 0, invincible: false,
       xDistance: 0, yDistance: 1, attackDistance: 1, timerFunction: TimerFunction.TT_MONSTER_B0,
@@ -402,15 +402,15 @@ function main(): void {
   {
     const arena = makeArena(1)!;
     const { game, group, desc, target } = arena;
-    const slot = game.dungeonState.getAttachedItem16(group)!;
+    const slot = game.ctx.dungeon.getAttachedItem16(group)!;
     const falchion = newRecord(game, 'weapons', DBType.WEAPON, {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
-    game.systems.magic.launchThrownMissile(falchion, target, 3, EAST, 255, 255, 0, game.state.tickCount);
+    game.systems.magic.launchThrownMissile(falchion, target, 3, EAST, 255, 255, 0, game.ctx.state.tickCount);
     const missilesIn = (): number => {
       let n = 0;
-      for (let rn = game.dungeonState.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+      for (let rn = game.ctx.dungeon.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category === DBType.MISSILE && decodeObjectID(rn).position === 3) n++;
       }
       return n;
@@ -418,7 +418,7 @@ function main(): void {
     check(missilesIn() === 1, 'the missile is parked in corner 3 of the group\'s cell');
 
     const c: AiConst = {
-      monsterRn: game.dungeonState.findFirstMonster(target), monster: group, slot,
+      monsterRn: game.ctx.dungeon.findFirstMonster(target), monster: group, slot,
       slotIndex: group.groupIndex, desc, mapX: target.x, mapY: target.y, level: target.z,
       timeUntilAlternateUpdate: 0, indexOfLastMonster: 0, horizSize: 0, invincible: false,
       xDistance: 0, yDistance: 1, attackDistance: 0, timerFunction: TimerFunction.TT_MONSTER_B0,

@@ -48,10 +48,10 @@ function main(): void {
   const messages = new ScrollingText();
   const game = newGame(data, graphics, { messages });
   game.setRandomSeed(0x12345678);
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
 
-  type Internals = { lastTickTime: number; state: { tickCount: number } };
+  type Internals = { lastTickTime: number };
   const internals = game as unknown as Internals;
   let t = Date.now() + 60_000;
   let vbl = 0;
@@ -73,7 +73,7 @@ function main(): void {
   const state = (): string => {
     const { pushTextUp, textScanlineScrollCount } = messages.scrollState();
     const { printQueue, futureLines } = messages.backlog();
-    return `t=${internals.state.tickCount} push=${pushTextUp} count=${String(textScanlineScrollCount).padStart(2)} ` +
+    return `t=${game.ctx.state.tickCount} push=${pushTextUp} count=${String(textScanlineScrollCount).padStart(2)} ` +
       `queue=${printQueue} future=${futureLines} ${ink(strip())} ${JSON.stringify(messages.snapshot())}`;
   };
   /** One VBL, 17 ms on, with a tick due or not. */
@@ -91,7 +91,7 @@ function main(): void {
   const rows = (): string[] => messages.snapshot().map((line) => line.trim());
 
   console.log('=== one entry a pass, no tick (CSBCode.cpp:714-721) ===');
-  const t0 = internals.state.tickCount;
+  const t0 = game.ctx.state.tickCount;
   for (const text of ['ONE', 'TWO', 'THREE', 'FOUR']) say(text);
   const placedAt: number[] = [];
   for (let i = 0; i < 8; i++) {
@@ -99,7 +99,7 @@ function main(): void {
     const row = rows().findIndex((line, r) => line !== '' && placedAt[r] === undefined);
     if (row >= 0) placedAt[row] = vbl;
   }
-  check(internals.state.tickCount === t0, 'no tick ran');
+  check(game.ctx.state.tickCount === t0, 'no tick ran');
   check(placedAt.join() === '2,4,6,8', 'a row lands every second VBL: its linefeed, then its text');
   check(messages.timeouts().every((timeout) => timeout === t0 + 70),
     'each row is stamped with the d.Time it was printed at, + 70');
@@ -137,14 +137,14 @@ function main(): void {
   check(rows()[3] === '' && messages.backlog().futureLines === 1,
     'with the print queue empty, nothing calls ClockTick: FIVE still waits');
   frame(true);
-  check(rows()[3] === 'FIVE' && messages.timeouts()[3] === internals.state.tickCount + 70,
+  check(rows()[3] === 'FIVE' && messages.timeouts()[3] === game.ctx.state.tickCount + 70,
     'the tick\'s own ClockTick places it, stamped with the new d.Time');
 
   console.log('');
   console.log('=== RemoveTimedOutText waits for the scroll (CSBCode.cpp:1505-1508) ===');
   say('SIX');
   frame();
-  const late = internals.state.tickCount + 500;
+  const late = game.ctx.state.tickCount + 500;
   messages.clockTick(late);
   check(rows().join() === 'THREE,FOUR,FIVE,', 'every row is due, and the scroll keeps them all');
   for (let i = 0; i < 9; i++) frame();
@@ -155,10 +155,10 @@ function main(): void {
   console.log('=== frozen, the loop still prints; under the save menu it does not ===');
   game.freeze();
   say('FROZEN');
-  const frozenAt = internals.state.tickCount;
+  const frozenAt = game.ctx.state.tickCount;
   frame(true);
   frame(true);
-  check(internals.state.tickCount === frozenAt && messages.backlog().printQueue === 0,
+  check(game.ctx.state.tickCount === frozenAt && messages.backlog().printQueue === 0,
     'frozen, no tick runs, and the loop still takes both entries (CSBCode.cpp:765)');
   game.thaw();
   for (let i = 0; i < 7; i++) frame();
@@ -205,7 +205,7 @@ function main(): void {
     messages.timeouts().every((timeout) => timeout === -1), 'd.Initialize and TAG001c6e: no scroll, no timeout');
   check(messages.backlog().printQueue === 1, 'printQueue is left as it is');
   frame();
-  check(rows()[0] === 'KEPT' && messages.timeouts()[0] === internals.state.tickCount + 70,
+  check(rows()[0] === 'KEPT' && messages.timeouts()[0] === game.ctx.state.tickCount + 70,
     'the next pass prints it at (0, 0), awake: SetPrintPosition(0, 0), d.PartySleeping 0');
 
   finish();

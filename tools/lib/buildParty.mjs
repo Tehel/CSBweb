@@ -14,13 +14,13 @@
 export const BUILD_PARTY = `(()=>{
   const { game, renderView } = window.__probe;
   const DELTA_X = [0, 1, 0, -1], DELTA_Y = [-1, 0, 1, 0];
-  const all = game.dungeonState.getData().presetHeroes ?? [];
+  const all = game.ctx.dungeon.getData().presetHeroes ?? [];
   const halk = all.find(h => h.name === 'HALK');
   const heroes = [halk, ...all.filter(h => h !== halk)].filter(Boolean).slice(0, 4);
   for (const hero of heroes) {
     // Face the mirror from the cell in front of it, as a player walking up would.
     const facing = (hero.location.wall + 2) & 3;
-    const party = game.party.state;
+    const party = game.ctx.party.state;
     party.position.x = hero.location.x - DELTA_X[facing];
     party.position.y = hero.location.y - DELTA_Y[facing];
     party.position.z = hero.location.map;
@@ -29,5 +29,5 @@ export const BUILD_PARTY = `(()=>{
     game.resurrectReincarnateCancel(160);
   }
   renderView();
-  return game.party.state.champions.map(c => c.name).join(',');
+  return game.ctx.party.state.champions.map(c => c.name).join(',');
 })()`;

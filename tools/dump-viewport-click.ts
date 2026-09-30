@@ -72,7 +72,7 @@ function makeGame(): Game {
 /** The items (not actuators, not text) in a cell, first to last. */
 function itemsAt(game: Game, cell: Position): ObjectID[] {
   const out: ObjectID[] = [];
-  for (let rn = game.dungeonState.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(cell); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (decodeObjectID(rn).category >= DBType.WEAPON) out.push(rn);
   }
   return out;
@@ -80,8 +80,8 @@ function itemsAt(game: Game, cell: Position): ObjectID[] {
 
 function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
   return {
-    dungeonState: game.dungeonState,
-    partyState: game.party.state,
+    dungeonState: game.ctx.dungeon,
+    partyState: game.ctx.party.state,
     context: {
       facingAlcove,
       doorSwitchRects: [],
@@ -93,7 +93,7 @@ function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
 
 /** `roomData[17]`, the cell ahead, as `DrawViewport` summarises it. */
 function summaryAhead(game: Game): SummarizeRoomData {
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   const ahead = [party.position.north, party.position.east, party.position.south, party.position.west][party.facing & 3];
   const rslt: SummarizeRoomData = {
     x: ahead.x,
@@ -107,7 +107,7 @@ function summaryAhead(game: Game): SummarizeRoomData {
     decorations: [0, 0, 0],
     text: [0xfffe, 0xfffe, 0xfffe],
   };
-  summarizeRoomInfoCsbwin(rslt, game.dungeonState, party.position, party.facing & 3);
+  summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, party.position, party.facing & 3);
   return rslt;
 }
 
@@ -116,8 +116,8 @@ function bareUI(game: Game, facingAlcove: boolean): UIState {
   const roomData: SummarizeRoomData[] = [];
   roomData[17] = summaryAhead(game);
   return {
-    dungeonState: game.dungeonState,
-    partyState: game.party.state,
+    dungeonState: game.ctx.dungeon,
+    partyState: game.ctx.party.state,
     context: {
       facingAlcove,
       doorSwitchRects: [],
@@ -135,10 +135,10 @@ function centre(r: RectPos): [number, number] {
 
 function main(): void {
   const game = makeGame();
-  game.party.state.position = PARTY;
-  game.party.state.facing = FACING_EAST;
-  game.party.state.cursorOwner = 0;
-  game.party.state.objectInHand = OBJECT_ID_NULL;
+  game.ctx.party.state.position = PARTY;
+  game.ctx.party.state.facing = FACING_EAST;
+  game.ctx.party.state.cursorOwner = 0;
+  game.ctx.party.state.objectInHand = OBJECT_ID_NULL;
 
   // The canary: the alcove holds one item, on the face the party looks at.
   const items = itemsAt(game, ALCOVE);
@@ -179,20 +179,20 @@ function main(): void {
   const picked = tryPickViewportObject(ui, objX, objY);
   console.log('');
   console.log(['picked', 'in hand', 'left in alcove'].join('\t'));
-  console.log([picked, game.party.state.objectInHand, itemsAt(game, ALCOVE).length].join('\t'));
+  console.log([picked, game.ctx.party.state.objectInHand, itemsAt(game, ALCOVE).length].join('\t'));
   check(picked, 'the click picks the object up');
-  check(game.party.state.objectInHand === rn, 'into the hand');
+  check(game.ctx.party.state.objectInHand === rn, 'into the hand');
   check(itemsAt(game, ALCOVE).length === items.length - 1, 'and out of the alcove');
 
   // The bare stone.
   console.log('');
   console.log(['party', 'facing', 'ahead', 'cf', 'cellTypeJustAhead', 'alcove', 'click', 'touches'].join('\t'));
   const stone = (party: Position, facing: number, alcove: boolean, x: number, y: number): string | null => {
-    game.party.state.position = party;
-    game.party.state.facing = facing;
+    game.ctx.party.state.position = party;
+    game.ctx.party.state.facing = facing;
     const ui = bareUI(game, alcove);
     const ahead = ui.context!.roomData[17];
-    const cf = game.dungeonState.getMap(party.z)?.cellFlags[ahead.x]?.[ahead.y] ?? -1;
+    const cf = game.ctx.dungeon.getMap(party.z)?.cellFlags[ahead.x]?.[ahead.y] ?? -1;
     const got = resolveEmptyHandedViewportClick(ui, x, y);
     console.log([`(${party.x},${party.y},${party.z})`, facing, `(${ahead.x},${ahead.y})`, `0x${cf.toString(16)}`, ahead.roomType, alcove, `${x},${y}`, String(got)].join('\t'));
     return got;
@@ -208,8 +208,8 @@ function main(): void {
   check(stone(PARTY, FACING_NORTH, false, 111, 97) === null, 'open floor ahead is silent (d.CellTypeJustAhead)');
   check(stone(new Position(7, 24, 2), FACING_NORTH, false, 111, 97) === 'stone', 'a closed solid false wall is stone');
   const imaginary = new Position(7, 10, 2);
-  game.party.state.position = imaginary;
-  game.party.state.facing = FACING_NORTH;
+  game.ctx.party.state.position = imaginary;
+  game.ctx.party.state.facing = FACING_NORTH;
   check(summaryAhead(game).roomType === RoomType.STONE, 'a closed imaginary false wall summarises as stone');
   check(stone(imaginary, FACING_NORTH, false, 111, 97) === null, 'but is silent: (cf & 5) != 0');
 
@@ -223,8 +223,8 @@ function main(): void {
   console.log('');
   console.log(['party', 'facing', 'ahead', 'cellTypeJustAhead', 'click', 'in hand does'].join('\t'));
   const inHand = (party: Position, facing: number, x: number, y: number): string => {
-    game.party.state.position = party;
-    game.party.state.facing = facing;
+    game.ctx.party.state.position = party;
+    game.ctx.party.state.facing = facing;
     const ui = { ...bareUI(game, false), uiTables: { graphic231: { dropAreas } } } as unknown as UIState;
     const ahead = ui.context!.roomData[17];
     const got = resolveViewportCursorAction(ui, x, y);
@@ -234,7 +234,7 @@ function main(): void {
   };
   // A point in `testThrow`'s left half (y 47-102) that is in no drop area.
   const [throwX, throwY] = [80, 75];
-  check(game.party.state.objectInHand === rn, 'the alcove\'s object is still in hand');
+  check(game.ctx.party.state.objectInHand === rn, 'the alcove\'s object is still in hand');
   check(testThrow(throwX, throwY, false) === 0 && findDropAreaHit({ uiTables: { graphic231: { dropAreas } } } as unknown as UIState,
     throwX, throwY, 4) === null, `(${throwX},${throwY}) throws left and is in no drop area`);
   check(inHand(PARTY, FACING_NORTH, throwX, throwY) === 'throw 0', 'open floor ahead: the point throws');
@@ -249,10 +249,10 @@ function main(): void {
   check(inHand(imaginary, FACING_NORTH, nearX, nearY) === 'drop 0', 'but its near drop area drops');
 
   // And the sound: ordinal 4, at the party, with no delay.
-  game.party.state.position = PARTY;
+  game.ctx.party.state.position = PARTY;
   const queued: number[][] = [];
-  const queueSound = game.sounds.queueSound.bind(game.sounds);
-  game.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
+  const queueSound = game.ctx.sounds.queueSound.bind(game.ctx.sounds);
+  game.ctx.sounds.queueSound = (ordinal, mapX, mapY, deltaTime, level) => {
     queued.push([ordinal, mapX, mapY, deltaTime]);
     queueSound(ordinal, mapX, mapY, deltaTime, level);
   };

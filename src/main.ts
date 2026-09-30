@@ -167,12 +167,12 @@ function renderView() {
     // Once `MainLoop` has returned the screen is `_ShowCredits`'s.
     if (!game || !screen || game.mainLoopHasReturned()) return;
 
-    const party = game.party;
+    const party = game.ctx.party;
     const pos = party.state.position;
     const facing = party.state.facing;
 
     screen.setPartyState(party.state);
-    screen.render(pos, facing, game.state.word1868);
+    screen.render(pos, facing, game.ctx.state.word1868);
 }
 
 /**
@@ -211,7 +211,7 @@ async function readNewGame(game: Game): Promise<boolean> {
     const response = await fetch(name).catch(() => null);
     if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
     const read = game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
-    if (read) console.log(`✓ Read ${name}: ${game.dungeonState.getData().maps.length} levels`);
+    if (read) console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
     return read;
 }
 
@@ -283,12 +283,12 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
 
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
-        dungeonState: game.dungeonState,
-        footprints: game.footprints,
+        dungeonState: game.ctx.dungeon,
+        footprints: game.ctx.footprints,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         characterStats: game.systems.characterStats,
     }, {
-        queueSound: (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.party.state.position.z),
+        queueSound: (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z),
         viewingFilter: (options) => game.processViewingFilter(options),
         onObjectMove: (position, object, place, unchangedRoom, facing) => {
             game.triggerObjectMove(position, object, place, unchangedRoom, facing);
@@ -382,7 +382,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
 async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager, word11694: boolean): Promise<void> {
     screen.setHoverPoint(null);
     screen.refreshOverlay();
-    const { x, y, z } = game.party.state.position;
+    const { x, y, z } = game.ctx.party.state.position;
     const end = await runShowCredits(
         {
             canvas: gameCanvasEl,
@@ -392,7 +392,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
             readNewGame: () => readNewGame(game),
         },
         {
-            queueDyingSound: () => game.sounds.queueSound(SOUND_DYING, x, y, 0, z),
+            queueDyingSound: () => game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z),
             canRestartFromSavegame: game.canRestartFromSavegame(),
             word11694,
             champions: word11694 ? wonChampions(game, screen) : [],
@@ -407,13 +407,13 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
     game.resumeMainLoop();
     game.start();
     renderView();
-    drawMapPreview(game.party.state.position.z);
+    drawMapPreview(game.ctx.party.state.position.z);
 }
 
 /** `d.CH16482[0 … d.NumCharacter - 1]` as the won screen shows them (`Code1f9e6.cpp:176-215`). */
 function wonChampions(game: Game, screen: GameScreen): WonChampion[] {
-    const partySleeping = game.party.state.sleeping;
-    return game.party.state.champions.map((champion) => ({
+    const partySleeping = game.ctx.party.state.sleeping;
+    return game.ctx.party.state.champions.map((champion) => ({
         name: champion.name,
         title: champion.title,
         // `*(name + 9)`: the title's second byte, its raw field's where there is one.
@@ -486,7 +486,7 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager): void {
     let mapPreviewAt = '';
     game.onTick(() => {
         renderView();
-        const { x, y, z } = game.party.state.position;
+        const { x, y, z } = game.ctx.party.state.position;
         if (`${x},${y},${z}` !== mapPreviewAt) {
             mapPreviewAt = `${x},${y},${z}`;
             drawMapPreview(z);
@@ -518,7 +518,7 @@ function start(game: Game): void {
 
     // Initial render
     renderView();
-    drawMapPreview(game.party.state.position.z);
+    drawMapPreview(game.ctx.party.state.position.z);
 }
 
 async function init() {

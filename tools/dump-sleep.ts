@@ -107,12 +107,12 @@ async function main(): Promise<void> {
   game.setRandomSeed(0x12345678);
   game.addChampion(champion(0));
   game.addChampion(champion(1));
-  const party = game.party.state;
+  const party = game.ctx.party.state;
   party.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
-  const ui: UIState = createUIState(graphics, game.dungeonState, {
+  const ui: UIState = createUIState(graphics, game.ctx.dungeon, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
     unclick: () => Mouse.handleMouseUnclick(ui),
   });
 
-  type Internals = { lastTickTime: number; lastInputTime: number; state: { tickCount: number } };
+  type Internals = { lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
   let t = Date.now() + 60_000;
   /** One VBL, 17 ms on; the last tick was `sinceTick` ms ago. */
@@ -180,9 +180,9 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== d.Speed = 0: a tick every VBL ===');
   {
-    const before = internals.state.tickCount;
+    const before = game.ctx.state.tickCount;
     for (let i = 0; i < 10; i++) frame(17);
-    const asleep = internals.state.tickCount - before;
+    const asleep = game.ctx.state.tickCount - before;
     console.log(`asleep: ${asleep} ticks in 10 frames`);
     check(asleep === 10, 'asleep, every frame is a tick');
   }
@@ -193,19 +193,19 @@ async function main(): Promise<void> {
     notified.length = 0;
     internals.lastInputTime = 0;
     click(100, 100);
-    const before = internals.state.tickCount;
+    const before = game.ctx.state.tickCount;
     frame(17); // 17 ms since the last tick: only clockTick = 1 lets this one through
-    console.log(`sleeping=${game.isPartySleeping()} ticks=${internals.state.tickCount - before}`);
+    console.log(`sleeping=${game.isPartySleeping()} ticks=${game.ctx.state.tickCount - before}`);
     check(!game.isPartySleeping(), 'a click in the viewport wakes the party');
     check(notified.join() === 'false', 'the listeners heard it');
     check(ui.primaryButtons === lists.buttons17196 && ui.secondaryButtons === lists.buttons17304,
       'the adventure lists are back');
     check(!ui.shadedByTag02076e, 'TAG0207cc last (CSBCode.cpp:7061): the interface and cursor restored');
-    check(internals.state.tickCount - before === 1, 'd.clockTick = 1: the tick runs in the same frame');
-    const awake = internals.state.tickCount;
+    check(game.ctx.state.tickCount - before === 1, 'd.clockTick = 1: the tick runs in the same frame');
+    const awake = game.ctx.state.tickCount;
     for (let i = 0; i < 10; i++) frame(-1);
-    console.log(`awake: ${internals.state.tickCount - awake} ticks in 10 frames (170 ms)`);
-    check(internals.state.tickCount === awake, 'awake, 170 ms is not a tick (one per 250 ms)');
+    console.log(`awake: ${game.ctx.state.tickCount - awake} ticks in 10 frames (170 ms)`);
+    check(game.ctx.state.tickCount === awake, 'awake, 170 ms is not a tick (one per 250 ms)');
   }
 
   console.log('');
@@ -221,14 +221,14 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== SetNewSpeed (CSBCode.cpp:1598): a message row across a sleep ===');
   {
-    const t0 = internals.state.tickCount;
+    const t0 = game.ctx.state.tickCount;
     messages.quePrintLines(15, 'HELLO');
     messages.printNextQueued(t0);
     const placed = messages.timeouts()[0]!;
     game.sleep();
     const asleep = messages.timeouts()[0]!;
     for (let i = 0; i < 100; i++) frame(17);
-    const t1 = internals.state.tickCount;
+    const t1 = game.ctx.state.tickCount;
     game.wakeUp();
     const awake = messages.timeouts()[0]!;
     game.wakeUp();
@@ -255,7 +255,7 @@ async function main(): Promise<void> {
   }
   {
     // Any creature of the dungeon: the wake-up comes before anything reads the record.
-    const monster = game.dungeonState.getCreatureRecordByIndex(0);
+    const monster = game.ctx.dungeon.getCreatureRecordByIndex(0);
     check(monster !== null, 'a monster to strike with');
     if (monster) {
       game.sleep();
@@ -266,9 +266,9 @@ async function main(): Promise<void> {
       const internalsTick = game as unknown as { gameTick(): void };
       game.onTick(() => { if (game.isPartySleeping()) game.wakeUp(); });
       internalsTick.gameTick();
-      const before = internals.state.tickCount;
+      const before = game.ctx.state.tickCount;
       frame(17);
-      check(internals.state.tickCount === before, 'woken inside a tick, the next frame is not a tick');
+      check(game.ctx.state.tickCount === before, 'woken inside a tick, the next frame is not a tick');
     }
   }
 
@@ -307,7 +307,7 @@ async function main(): Promise<void> {
     // SYRA: Wisdom 43 and Wizard + Priest mastery 7 awake. Asleep the roll is
     // `random112 < 1 + 1 + 43`, so the r = 48 step (Time 0x180) gives no mana; with her
     // real levels it would (48 < 50). That step is the canary.
-    const syraHero = game.dungeonState.getData().presetHeroes?.find((h) => h.name === 'SYRA');
+    const syraHero = game.ctx.dungeon.getData().presetHeroes?.find((h) => h.name === 'SYRA');
     check(syraHero !== undefined, 'SYRA is a preset hero');
     if (syraHero) {
       game.wakeUp();
@@ -320,17 +320,17 @@ async function main(): Promise<void> {
       check(awake + wisdom > 48 && 2 + wisdom <= 48, 'the canary: r = 48 separates the two thresholds');
       game.sleep();
       syra.attributes.mana = 0;
-      internals.state.tickCount = 0x180; // random112 = 48
+      game.ctx.state.tickCount = 0x180; // random112 = 48
       tenSecondUpdate(game.ctx);
       console.log(`r=48 asleep: mana ${syra.attributes.mana}`);
       check(syra.attributes.mana === 0, 'asleep, r = 48 is not below Wisdom + 2: no mana');
-      internals.state.tickCount = 0x200; // random112 = 0
+      game.ctx.state.tickCount = 0x200; // random112 = 0
       syra.attributes.stamina = 200;
       tenSecondUpdate(game.ctx);
       check(syra.attributes.mana === 1, 'r = 0 is: MaxMana 15 / 40 * 2 + 1 = one point');
       game.wakeUp();
       syra.attributes.mana = 0;
-      internals.state.tickCount = 0x380; // random112 = 48 again (bit 9 is not read), awake
+      game.ctx.state.tickCount = 0x380; // random112 = 48 again (bit 9 is not read), awake
       tenSecondUpdate(game.ctx);
       check(syra.attributes.mana === 1, 'awake, her levels count: r = 48 < 50 gives mana');
     }
@@ -354,11 +354,11 @@ async function main(): Promise<void> {
   {
     const save = game.getRuntimeSaveState();
     const saved = save.game.tickCount;
-    internals.state.tickCount = saved + 500;
+    game.ctx.state.tickCount = saved + 500;
     messages.printLinefeed();
     messages.quePrintLines(15, 'LOADED');
-    messages.printNextQueued(internals.state.tickCount);
-    messages.printNextQueued(internals.state.tickCount);
+    messages.printNextQueued(game.ctx.state.tickCount);
+    messages.printNextQueued(game.ctx.state.tickCount);
     const row = messages.snapshot().findIndex((line) => line.includes('LOADED'));
     const before = messages.timeouts()[row]!;
     game.applyRuntimeSaveState(save);

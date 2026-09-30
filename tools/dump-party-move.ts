@@ -76,7 +76,7 @@ function makeGame(): { game: Game; log: string[] } {
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i));
   const log: string[] = [];
-  const party = game.party.state;
+  const party = game.ctx.party.state;
 
   const missiles = game.systems.missileEncounter;
   const check = missiles.checkPartyMoveFromMissile.bind(missiles);
@@ -90,7 +90,7 @@ function makeGame(): { game: Game; log: string[] } {
     log.push(`fall at ${at(party.position)}`);
     fall();
   };
-  const prints = game.footprints;
+  const prints = game.ctx.footprints;
   const record = prints.recordPartyMove.bind(prints);
   prints.recordPartyMove = (time, level, x, y, magic) => {
     log.push(`footprint ${at(new Position(x, y, level))}`);
@@ -112,9 +112,9 @@ function makeGame(): { game: Game; log: string[] } {
 }
 
 function isEmptyOpen(game: Game, p: Position): boolean {
-  const map = game.dungeonState.getMap(p.z);
+  const map = game.ctx.dungeon.getMap(p.z);
   if (!map || p.x < 0 || p.y < 0 || p.x >= map.descriptor.width || p.y >= map.descriptor.height) return false;
-  return ((map.cellFlags[p.x]![p.y]! >> 5) & 7) === RoomType.OPEN && game.dungeonState.findFirstObject(p) === OBJECT_ID_EOF;
+  return ((map.cellFlags[p.x]![p.y]! >> 5) & 7) === RoomType.OPEN && game.ctx.dungeon.findFirstObject(p) === OBJECT_ID_EOF;
 }
 
 /**
@@ -122,7 +122,7 @@ function isEmptyOpen(game: Game, p: Position): boolean {
  * facing `facing`, steps into it, and an empty floor square below.
  */
 function findPit(game: Game): { pit: Position; from: Position; facing: Direction; below: Position } {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 1; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
     for (let x = 0; x < map.descriptor.width; x++) {
@@ -149,7 +149,7 @@ function findPit(game: Game): { pit: Position; from: Position; facing: Direction
  * `CSBCode.cpp:7776-7777`).
  */
 function findStairs(game: Game): { stairs: Position; from: Position; facing: Direction; next: Position } {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 1; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
     for (let x = 0; x < map.descriptor.width; x++) {
@@ -171,8 +171,8 @@ function findStairs(game: Game): { stairs: Position; from: Position; facing: Dir
 
 /** Stand the party on `p`, facing `facing`, with its level loaded and the log cleared. */
 function stand(game: Game, log: string[], p: Position, facing: Direction): void {
-  game.party.state.position = p;
-  game.party.setFacing(facing);
+  game.ctx.party.state.position = p;
+  game.ctx.party.setFacing(facing);
   game.systems.monsters.loadPartyLevel(p.z);
   log.length = 0;
 }
@@ -180,18 +180,18 @@ function stand(game: Game, log: string[], p: Position, facing: Direction): void 
 /** A fireball in flight in `p`, corner `corner`, its timer not yet due. */
 function launch(game: Game, p: Position, corner: number): ObjectID {
   const before = new Set<ObjectID>();
-  for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.systems.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.state.tickCount + 9, true)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) before.add(rn);
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.ctx.state.tickCount + 9, true)) {
     throw new Error('missile not launched');
   }
-  for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (!before.has(rn) && decodeObjectID(rn).category === DBType.MISSILE) return rn;
   }
   throw new Error('missile not placed');
 }
 
 function inCell(game: Game, p: Position, rn: ObjectID): boolean {
-  for (let r = game.dungeonState.findFirstObject(p); r !== OBJECT_ID_EOF; r = game.dungeonState.getDBRecordLink(r)) {
+  for (let r = game.ctx.dungeon.findFirstObject(p); r !== OBJECT_ID_EOF; r = game.ctx.dungeon.getDBRecordLink(r)) {
     if (r === rn) return true;
   }
   return false;
@@ -250,7 +250,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const { game, log } = makeGame();
   stand(game, log, from, facing);
   const dsa = game.systems.dsa as unknown as { teleportParty(locr: LocationRel): void };
-  dsa.teleportParty({ l: game.dungeonState.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
+  dsa.teleportParty({ l: game.ctx.dungeon.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
   tick(game, log);
   compare('3. the DSA teleport onto the pit', log, [`missile ${at(from)}->${at(from)}`, ...fallTail(from, below)]);
 }
@@ -282,7 +282,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   const s = findStairs(game);
   stand(game, log, s.from, s.facing);
   game.move(MovementAction.MOVE_FORWARD);
-  const held = game.party.state.position;
+  const held = game.ctx.party.state.position;
   tick(game, log);
   compare(`6. the step into the stairs at ${at(s.stairs)}`, log, [
     `missile ${at(s.from)}->none`, `remove ${at(s.from)} moved`,
@@ -293,7 +293,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
     at(held) === at(new Position(s.next.x, s.next.y, s.from.z)),
     'until the tick, the party is on the new square with its old level (TraverseStairway, CSBCode.cpp:7775-7781)',
   );
-  check(at(game.party.state.position) === at(s.next), `the party stands on the stairs below, ${at(s.next)}`);
+  check(at(game.ctx.party.state.position) === at(s.next), `the party stands on the stairs below, ${at(s.next)}`);
 }
 
 /* ------------------------------------------------ 7. a turn --------------------- */
@@ -320,18 +320,18 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, from, facing);
-  game.party.state.champions[0]!.attributes.health = 1;
+  game.ctx.party.state.champions[0]!.attributes.health = 1;
   game.move(MovementAction.MOVE_FORWARD);
   // The fall only adds to `d.PendingDamage`. The next tick loads the level below, and
   // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:615-657).
-  check(game.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
+  check(game.ctx.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
   game.loadNewPartyLevel();
   game.systems.monsterAttack.displayCharacterDamage();
-  const bonesBelow = game.dungeonState.findFirstObject(below) !== OBJECT_ID_EOF;
-  const bonesAbove = game.dungeonState.findFirstObject(from) !== OBJECT_ID_EOF;
-  console.log(`8. a champion at 1 HP falls: alive ${game.party.state.champions[0]!.attributes.health !== 0}, `
+  const bonesBelow = game.ctx.dungeon.findFirstObject(below) !== OBJECT_ID_EOF;
+  const bonesAbove = game.ctx.dungeon.findFirstObject(from) !== OBJECT_ID_EOF;
+  console.log(`8. a champion at 1 HP falls: alive ${game.ctx.party.state.champions[0]!.attributes.health !== 0}, `
     + `something at ${at(below)} ${bonesBelow}, at ${at(from)} ${bonesAbove}`);
-  check(game.party.state.champions[0]!.attributes.health === 0, 'the fall kills the champion');
+  check(game.ctx.party.state.champions[0]!.attributes.health === 0, 'the fall kills the champion');
   check(bonesBelow && !bonesAbove, 'and their bones lie on the square below, where the party landed');
 }
 

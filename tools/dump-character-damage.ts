@@ -71,12 +71,12 @@ function makeGame(count: number, calls: string[]): Game {
   });
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < count; i++) game.addChampion(champion(i));
-  game.party.state.position = new Position(6, 14, 2);
+  game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
 
 function tt12s(game: Game): { index: number; time: number; chIdx: number }[] {
-  return game.timerQueue.getTimers()
+  return game.ctx.timers.getTimers()
     .filter((t) => t.function === TimerFunction.TT_12)
     .map((t) => ({ index: t.index, time: t.time, chIdx: t.uByte5 & 0xff }));
 }
@@ -86,36 +86,36 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
 {
   const calls: string[] = [];
   const g = makeGame(2, calls);
-  const hero = g.party.state.champions[0]!;
-  g.state.tickCount = 100;
+  const hero = g.ctx.party.state.champions[0]!;
+  g.ctx.state.tickCount = 100;
 
   // Two blows in one tick. Kind 0: no armour, no wounds, the damage as it is given.
   const a = g.systems.monsterAttack.damageCharacter(0, 7, 0, 0);
   const b = g.systems.monsterAttack.damageCharacter(0, 5, 0, 0);
   console.log(`two blows of 7 and 5: returned ${a} and ${b}, HP ${hero.attributes.health}, `
-    + `pending ${g.party.state.pendingDamage.join(',')}`);
+    + `pending ${g.ctx.party.state.pendingDamage.join(',')}`);
   check(a === 7 && b === 5, 'DamageCharacter returns what it dealt');
   check(hero.attributes.health === 200, 'and takes nothing off the HP (Character.cpp:2900)');
-  check(g.party.state.pendingDamage[0] === 12, 'the blows add up in d.PendingDamage');
+  check(g.ctx.party.state.pendingDamage[0] === 12, 'the blows add up in d.PendingDamage');
 
   // Wounds wait too. A 300-point blow over mask 0x3f wounds on this seed.
   const probe = makeGame(1, []);
   probe.systems.monsterAttack.damageCharacter(0, 300, 0x3f, 3);
-  const pendingOuches = probe.party.state.pendingOuches[0]!;
-  const woundsBefore = probe.party.state.champions[0]!.wounds;
+  const pendingOuches = probe.ctx.party.state.pendingOuches[0]!;
+  const woundsBefore = probe.ctx.party.state.champions[0]!.wounds;
   probe.systems.monsterAttack.displayCharacterDamage();
-  const woundsAfter = probe.party.state.champions[0]!.wounds;
+  const woundsAfter = probe.ctx.party.state.champions[0]!.wounds;
   console.log(`a 300-point blow: pending ouches 0x${pendingOuches.toString(16)}, `
     + `wounds 0x${woundsBefore.toString(16)} -> 0x${woundsAfter.toString(16)}`);
   check(pendingOuches !== 0 && woundsBefore === 0, 'wounds wait in d.PendingOuches (Character.cpp:2803)');
-  check(woundsAfter === pendingOuches && probe.party.state.pendingOuches[0] === 0,
+  check(woundsAfter === pendingOuches && probe.ctx.party.state.pendingOuches[0] === 0,
     'DisplayCharacterDamage ORs them into ouches and clears them (CSBCode.cpp:7098-7100)');
 
   g.systems.monsterAttack.displayCharacterDamage();
   const timers = tt12s(g);
   console.log(`DisplayCharacterDamage: HP ${hero.attributes.health}, calls [${calls.join('; ')}], `
     + `TT_12 ${JSON.stringify(timers)}, timerIndex ${hero.timerIndex}`);
-  check(hero.attributes.health === 188 && g.party.state.pendingDamage[0] === 0,
+  check(hero.attributes.health === 188 && g.ctx.party.state.pendingDamage[0] === 0,
     'the sum comes off the HP once, and the pending damage is cleared');
   check(calls.join(';') === 'display 0 12', 'the screen is asked to show 12 over champion 0');
   check(timers.length === 1 && timers[0]!.time === 105 && timers[0]!.chIdx === 0,
@@ -123,7 +123,7 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   check(hero.timerIndex === timers[0]!.index, "and it is the champion's timerIndex");
 
   // Another blow two ticks later moves the same timer rather than adding one.
-  g.state.tickCount = 102;
+  g.ctx.state.tickCount = 102;
   g.systems.monsterAttack.damageCharacter(0, 3, 0, 0);
   g.systems.monsterAttack.displayCharacterDamage();
   const moved = tt12s(g);
@@ -144,11 +144,11 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   // A blow that kills: no figure, no timer.
   calls.length = 0;
   g.systems.monsterAttack.damageCharacter(1, 250, 0, 0);
-  check(g.party.state.champions[1]!.attributes.health !== 0, 'a killing blow does not kill yet');
+  check(g.ctx.party.state.champions[1]!.attributes.health !== 0, 'a killing blow does not kill yet');
   g.systems.monsterAttack.displayCharacterDamage();
-  console.log(`a blow of 250 on champion 1: alive ${g.party.state.champions[1]!.attributes.health !== 0}, calls [${calls.join('; ')}], `
+  console.log(`a blow of 250 on champion 1: alive ${g.ctx.party.state.champions[1]!.attributes.health !== 0}, calls [${calls.join('; ')}], `
     + `TT_12 ${tt12s(g).length}`);
-  check(g.party.state.champions[1]!.attributes.health === 0, 'DisplayCharacterDamage kills (CSBCode.cpp:7110-7114)');
+  check(g.ctx.party.state.champions[1]!.attributes.health === 0, 'DisplayCharacterDamage kills (CSBCode.cpp:7110-7114)');
   check(calls.length === 0 && tt12s(g).length === 0, 'and shows nothing and arms nothing for the dead');
 
   // A TT_12 that falls due after its champion died redraws nothing (Timer.cpp:2692).
@@ -158,19 +158,19 @@ console.log('=== DamageCharacter and DisplayCharacterDamage ===');
   late.systems.monsterAttack.displayCharacterDamage();
   late.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
   late.systems.monsterAttack.displayCharacterDamage();
-  processTimersAt(late, late.state.tickCount + 5);
+  processTimersAt(late, late.ctx.state.tickCount + 5);
   console.log(`shown, then killed before the TT_12: calls [${calls.join('; ')}]`);
   check(calls.join(';') === 'display 0 10', "a dead champion's TT_12 draws nothing back");
-  check(late.party.state.champions[0]!.timerIndex === -1, 'but still clears timerIndex');
+  check(late.ctx.party.state.champions[0]!.timerIndex === -1, 'but still clears timerIndex');
 
   // The recruit in a Hall of Champions mirror: `DamageCharacter` refuses them, and a
   // pending sum is dropped, not taken (CSBCode.cpp:7101-7104).
   const hall = makeGame(2, calls);
   calls.length = 0;
-  hall.party.state.pendingDamage[1] = 30;
-  hall.party.state.potentialChampionIndex = 1;
+  hall.ctx.party.state.pendingDamage[1] = 30;
+  hall.ctx.party.state.potentialChampionIndex = 1;
   hall.systems.monsterAttack.displayCharacterDamage();
-  check(hall.party.state.champions[1]!.attributes.health === 200 && hall.party.state.pendingDamage[1] === 0
+  check(hall.ctx.party.state.champions[1]!.attributes.health === 200 && hall.ctx.party.state.pendingDamage[1] === 0
     && calls.length === 0, "the recruit's pending damage is cleared and not taken");
 }
 
@@ -184,9 +184,9 @@ console.log("=== Game's tick ===");
   const g = makeGame(1, calls);
   g.systems.timer.processTimers = () => { g.systems.monsterAttack.damageCharacter(0, 9, 0, 0); return false; };
   const seen: number[] = [];
-  g.onTick(() => seen.push(g.party.state.champions[0]!.attributes.health));
+  g.onTick(() => seen.push(g.ctx.party.state.champions[0]!.attributes.health));
   (g as unknown as { gameTick(): void }).gameTick();
-  const hp = g.party.state.champions[0]!.attributes.health;
+  const hp = g.ctx.party.state.champions[0]!.attributes.health;
   console.log(`the tick draws at HP ${seen.join(',')}, and ends at HP ${hp}; calls [${calls.join('; ')}]`);
   check(seen.join(',') === '200' && hp === 191, 'the tick draws first, then takes the damage off');
   check(calls.join(';') === 'display 0 9', 'and the same tick shows it');

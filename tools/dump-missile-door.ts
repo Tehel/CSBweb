@@ -52,7 +52,7 @@ function makeGame(doorToc: number): Game {
 
 /** A closed door (state 4) somewhere in the dungeon. */
 function findClosedDoor(game: Game): Position {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -68,7 +68,7 @@ function findClosedDoor(game: Game): Position {
 
 /** A floor object matching `want`, lifted off the floor. */
 function liftFloorObject(game: Game, want: (rn: ObjectID) => boolean): ObjectID {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z);
     if (!map) continue;
@@ -87,11 +87,11 @@ function liftFloorObject(game: Game, want: (rn: ObjectID) => boolean): ObjectID 
 }
 
 const objectType = (game: Game, rn: ObjectID): number => {
-  const di = DescIndex(game.dungeonState, rn);
+  const di = DescIndex(game.ctx.dungeon, rn);
   return di === -1 ? -1 : objectTables.objDescObjectType[di];
 };
 const fitsPouch = (game: Game, rn: ObjectID): boolean => {
-  const di = DescIndex(game.dungeonState, rn);
+  const di = DescIndex(game.ctx.dungeon, rn);
   return di !== -1 && (objectTables.objDescCarryMask[di] & 0x100) !== 0;
 };
 const isKey = (game: Game, rn: ObjectID): boolean =>
@@ -117,23 +117,23 @@ function encounter(
   const game = makeGame(door.toc);
   const me = game.systems.missileEncounter as any;
   const at = findClosedDoor(game);
-  const map = game.dungeonState.getMap(at.z)!;
+  const map = game.ctx.dungeon.getMap(at.z)!;
   map.cellFlags[at.x][at.y] = (map.cellFlags[at.x][at.y] & 0xf8) | door.state;
-  const rn = game.dungeonState.findFirstDoor(at);
-  const record = game.dungeonState.getDoorRecordByIndex(decodeObjectID(rn).index)!;
+  const rn = game.ctx.dungeon.findFirstDoor(at);
+  const record = game.ctx.dungeon.getDoorRecordByIndex(decodeObjectID(rn).index)!;
   record.hasButton = door.button ?? false;
   record.destructibleByChop = door.chop ?? true;
 
   const thrown = pick ? pick(game) : projectile;
-  game.state.tickCount = 100;
+  game.ctx.state.tickCount = 100;
   game.systems.magic.launchThrownMissile(thrown, at, 0, 0, range, 100, 1, 99);
   let missileRn: ObjectID | null = null;
-  for (let r = game.dungeonState.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.dungeonState.getDBRecordLink(r)) {
+  for (let r = game.ctx.dungeon.findFirstObject(at); r !== OBJECT_ID_EOF; r = game.ctx.dungeon.getDBRecordLink(r)) {
     if (decodeObjectID(r).category === DBType.MISSILE) missileRn = r;
   }
   if (missileRn === null) throw new Error('missile not placed');
-  const missile = game.dungeonState.getMissileRecord(missileRn)!;
-  game.timerQueue.missileFilterTimer = game.timerQueue.getTimer(missile.timerIndex);
+  const missile = game.ctx.dungeon.getMissileRecord(missileRn)!;
+  game.ctx.timers.missileFilterTimer = game.ctx.timers.getTimer(missile.timerIndex);
 
   const hits: Outcome['hits'] = [];
   const hitDoor = me.hitDoor.bind(me);
@@ -141,9 +141,9 @@ function encounter(
     hits.push({ force, explosion, delay });
     return hitDoor(p, force, explosion, delay, time);
   };
-  const before = new Set(game.timerQueue.getTimers().map((t) => t.index));
+  const before = new Set(game.ctx.timers.getTimers().map((t) => t.index));
   const spent = me.processMissileEncounter(RoomType.DOOR, at.x, at.y, at.x, at.y, at.z, 0, missileRn);
-  const doorTimers = game.timerQueue.getTimers()
+  const doorTimers = game.ctx.timers.getTimers()
     .filter((t) => !before.has(t.index) && t.function === TimerFunction.TT_DOOR)
     .map((t) => ({ time: t.time, action: t.uByte9 }));
   return { spent, hits, doorState: map.cellFlags[at.x][at.y] & 7, doorTimers };

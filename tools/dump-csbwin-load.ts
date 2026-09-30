@@ -164,9 +164,9 @@ function countFlagDifferences(a: number[][], b: number[][]): number {
 function objectsAt(game: Game, position: Position): ObjectID[] {
   const out: ObjectID[] = [];
   for (
-    let rn = game.dungeonState.findFirstObject(position);
+    let rn = game.ctx.dungeon.findFirstObject(position);
     rn !== OBJECT_ID_EOF && rn !== OBJECT_ID_NULL;
-    rn = game.dungeonState.getDBRecordLink(rn)
+    rn = game.ctx.dungeon.getDBRecordLink(rn)
   ) {
     out.push(rn);
     if (out.length > 64) break; // a corrupted chain must not hang the tool
@@ -196,7 +196,7 @@ function main(): void {
   for (const path of saves) {
     const name = path.split('/').pop() ?? path;
     const game = loadWorld();
-    const pristineFlags = snapshotCellFlags(game.state.dungeon);
+    const pristineFlags = snapshotCellFlags(game.ctx.state.dungeon);
 
     let world;
     try {
@@ -209,10 +209,10 @@ function main(): void {
     const gb2 = world.save.block2;
     if (!gb2) { check(false, `${name}: GAMEBLOCK2 should be present`); continue; }
 
-    const party = game.party.state;
+    const party = game.ctx.party.state;
     const cell = new Position(party.position.x, party.position.y, party.position.z);
     const chain = objectsAt(game, cell);
-    const loadedFlags = snapshotCellFlags(game.state.dungeon);
+    const loadedFlags = snapshotCellFlags(game.ctx.state.dungeon);
     const moved = countFlagDifferences(pristineFlags, loadedFlags);
 
     console.log(`\n${name}`);
@@ -256,14 +256,14 @@ function main(): void {
       const { category, index } = decodeObjectID(rn);
       const key = DB_OF_CATEGORY[category];
       check(
-        key !== undefined && index < game.state.dungeon.databases[key].records.length,
+        key !== undefined && index < game.ctx.state.dungeon.databases[key].records.length,
         `${name}: the object under the party is a real record (cat ${category} index ${index})`,
       );
     }
 
     // The party and the world agree: every possession names a live carryable record in
     // the dungeon the game is now running, not the one the save was parsed into.
-    const live = game.state.dungeon;
+    const live = game.ctx.state.dungeon;
     let carried = 0;
     for (const champion of party.champions) {
       for (const rn of champion.possessions) {
@@ -317,7 +317,7 @@ function main(): void {
 
     // The world the game runs is the one the save holds, `loaded` fields and all.
     check(
-      live === world.dungeon && game.dungeonState.getData() === world.dungeon,
+      live === world.dungeon && game.ctx.dungeon.getData() === world.dungeon,
       `${name}: the save's world is the running one, in state and DungeonState both`,
     );
 
@@ -328,23 +328,23 @@ function main(): void {
     // every such field, the checks after it of the party.
     const second = loadWorld();
     second.applyRuntimeSaveState(JSON.parse(JSON.stringify(game.getRuntimeSaveState())));
-    const lost = differingFields(SOURCES, live, second.state.dungeon);
+    const lost = differingFields(SOURCES, live, second.ctx.state.dungeon);
     check(
       lost.length === 0,
       `${name}: every snapshot field of the loaded world survives a quick-save round trip` +
         (lost.length ? ` (lost: ${lost.slice(0, 6).join(', ')}${lost.length > 6 ? ', ...' : ''})` : ''),
     );
     check(
-      countFlagDifferences(snapshotCellFlags(second.state.dungeon), loadedFlags) === 0,
+      countFlagDifferences(snapshotCellFlags(second.ctx.state.dungeon), loadedFlags) === 0,
       `${name}: the loaded world survives a quick-save round trip`,
     );
     check(
-      second.party.state.champions.map((c) => c.name).join('|') ===
+      second.ctx.party.state.champions.map((c) => c.name).join('|') ===
         party.champions.map((c) => c.name).join('|'),
       `${name}: and so does the party`,
     );
     check(
-      second.party.state.champions.every((c, i) =>
+      second.ctx.party.state.champions.every((c, i) =>
         (c.portrait ?? []).join(',') === (party.champions[i]?.portrait ?? []).join(',')),
       `${name}: and their portraits`,
     );

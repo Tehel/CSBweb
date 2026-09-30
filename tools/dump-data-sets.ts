@@ -62,7 +62,7 @@ function main(): void {
 
     const game = newGame(dungeon, graphics);
     check(game.ctx.tables === tables, `${set.id}: a Game over the set runs on the set's tables`);
-    check(game.dungeonState.getMapCount() === dungeon.maps.length, `${set.id}: and on its dungeon`);
+    check(game.ctx.dungeon.getMapCount() === dungeon.maps.length, `${set.id}: and on its dungeon`);
   }
 
   // Each set's tables are its own file's: CSB's differ from DM's in the six tables its

@@ -16,6 +16,6 @@ export function createMonsterAt(
 ): ObjectID | null {
   const made = game.systems.monsters.createMonster(options);
   if (made !== null) return made;
-  const rn = game.dungeonState.findFirstMonster(new Position(options.mapX, options.mapY, options.level));
+  const rn = game.ctx.dungeon.findFirstMonster(new Position(options.mapX, options.mapY, options.level));
   return rn === OBJECT_ID_EOF ? null : rn;
 }

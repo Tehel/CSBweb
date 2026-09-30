@@ -110,7 +110,7 @@ function main(): void {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = stockGraphics();
   const game = newGame(data, graphics);
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
 
   const graphicCache = new Map<string, IndexedBitmap>();
   const palette552 = extractUITables(graphics).graphic232.palette552;
@@ -122,8 +122,8 @@ function main(): void {
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
   });
 
-  const start = game.party.state.position;
-  const facing = game.party.state.facing & 3;
+  const start = game.ctx.party.state.position;
+  const facing = game.ctx.party.state.facing & 3;
   const doorIndex = firstDoorIndex(dungeon, start.z);
   const door = dungeon.getDoorRecordByIndex(doorIndex);
   console.log(`level ${start.z}, start (${start.x},${start.y}) facing ${facing}; door ${doorIndex}: type ${door?.doorType} ornament ${door?.ornateNumber} button ${door?.hasButton}`);
@@ -277,7 +277,7 @@ function seeThruWalls(renderer: ViewportRenderer, start: Position, facing: numbe
 }
 
 /** The index of the first door on level `z`, scanning x then y. */
-function firstDoorIndex(dungeon: ReturnType<typeof newGame>['dungeonState'], z: number): number {
+function firstDoorIndex(dungeon: ReturnType<typeof newGame>['ctx']['dungeon'], z: number): number {
   const map = dungeon.getMap(z);
   if (!map) throw new Error(`no level ${z}`);
   for (let x = 0; x < map.descriptor.width; x++) {

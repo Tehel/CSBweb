@@ -62,7 +62,7 @@ async function main(): Promise<void> {
 
   /** The first cloud sitting in a cell, or null. */
   const cloudIn = (game: Game, pos: Position): ObjectID | null => {
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     for (let rn = dungeon.findFirstObject(pos); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
       if (decodeObjectID(rn).category === DBType.CLOUD) return rn;
     }
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     at: Position,
   ): Promise<{ values: number[]; ticks: number }> => {
     const game = await makeGame();
-    const dungeon = game.dungeonState;
+    const dungeon = game.ctx.dungeon;
     game.systems.missileEncounter.createDeathCloud(projectile, size, at, 255);
 
     const values: number[] = [];
@@ -97,7 +97,7 @@ async function main(): Promise<void> {
   /* ------------------------------------------------- 1. the monster-death cloud --- */
 
   const game0 = await makeGame();
-  const start = game0.dungeonState.getStartPosition();
+  const start = game0.ctx.dungeon.getStartPosition();
   const at = new Position(start.x, start.y, start.z);
 
   console.log('=== a monster-death cloud, tick by tick ===');
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
 
   // The record must leave the cell *and* be freed, or the DB fills up with dead clouds.
   const gameD = await makeGame();
-  const cloudsBefore = gameD.dungeonState.getData().databases.clouds.records.length;
+  const cloudsBefore = gameD.ctx.dungeon.getData().databases.clouds.records.length;
   gameD.systems.missileEncounter.createDeathCloud(RN_MONSTER_DEATH, 255, at, 255);
   const born = cloudIn(gameD, at);
   check(born !== null, 'the cloud is in the cell to begin with');
@@ -120,15 +120,15 @@ async function main(): Promise<void> {
   check(cloudIn(gameD, at) === null, 'the cloud has left the cell');
   if (born !== null) {
     // `DeleteDBEntry` marks a DB15 free by setting its link to RNnul.
-    const rec = gameD.dungeonState.getCloudRecord(born);
+    const rec = gameD.ctx.dungeon.getCloudRecord(born);
     check(rec !== null && rec.nextObject === OBJECT_ID_NULL,
       `the record was released by DeleteDBEntry (link is 0x${(rec?.nextObject ?? -1).toString(16)})`);
   }
   console.log(`cloud records: ${cloudsBefore} before, ` +
-    `${gameD.dungeonState.getData().databases.clouds.records.length} after`);
+    `${gameD.ctx.dungeon.getData().databases.clouds.records.length} after`);
 
   // And no timer is left behind pointing at a cloud that no longer exists.
-  const leftovers = gameD.timerQueue.getTimers().filter((t) => t.function === 25);
+  const leftovers = gameD.ctx.timers.getTimers().filter((t) => t.function === 25);
   check(leftovers.length === 0, `no TT_25 timer outlives its cloud (${leftovers.length} left)`);
 
   /* -------------------------------------------------------- 2. a poison cloud ----- */
@@ -154,7 +154,7 @@ async function main(): Promise<void> {
 
   console.log('');
   const gameP = await makeGame();
-  const party = gameP.party.state;
+  const party = gameP.ctx.party.state;
   party.champions = [{
     ...addCharacterDefaults(),
     name: 'VICTIM',
@@ -179,7 +179,7 @@ async function main(): Promise<void> {
 
   console.log('');
   const gameF = await makeGame();
-  const dungeonF = gameF.dungeonState;
+  const dungeonF = gameF.ctx.dungeon;
 
   // Find a door that a fireball is allowed to blow open.
   let doorAt: Position | null = null;
@@ -251,16 +251,16 @@ async function main(): Promise<void> {
   console.log('=== killing a real monster on level 2 ===');
   const gameK = await makeGame();
   const level = 2;
-  gameK.party.state.position = new Position(6, 14, level);
+  gameK.ctx.party.state.position = new Position(6, 14, level);
   gameK.systems.monsters.loadPartyLevelIfChanged();
   processTimersAt(gameK, 0);
 
   // Find any activated group and kill it outright.
-  const pool = gameK.dungeonState.getItem16Pool().filter((s) => s.word0 >= 0);
+  const pool = gameK.ctx.dungeon.getItem16Pool().filter((s) => s.word0 >= 0);
   check(pool.length > 0, `level ${level} activated a monster group to kill (${pool.length})`);
   const victim = pool[0];
   if (victim) {
-    const rec = gameK.dungeonState.getCreatureRecordByIndex(victim.word0);
+    const rec = gameK.ctx.dungeon.getCreatureRecordByIndex(victim.word0);
     const where = new Position(victim.uByte10, victim.uByte11, level);
     if (!rec) {
       check(false, 'the group has a DB4 record');
@@ -268,7 +268,7 @@ async function main(): Promise<void> {
       gameK.systems.monsterDamage.damageMonsterGroup(rec, level, where.x, where.y, 10000, true, false);
       const puff = cloudIn(gameK, where);
       console.log(`a dead monster at (${where.x},${where.y}) left ` +
-        `${puff === null ? 'no cloud' : `a cloud of value ${gameK.dungeonState.getCloudRecord(puff)?.value}`}`);
+        `${puff === null ? 'no cloud' : `a cloud of value ${gameK.ctx.dungeon.getCloudRecord(puff)?.value}`}`);
       check(puff !== null, 'killing a monster leaves a death cloud');
 
       let lived = 0;
@@ -291,7 +291,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== a Fluxcage runs out ===');
   const gameX = await makeGame();
-  const dungeonX = gameX.dungeonState;
+  const dungeonX = gameX.ctx.dungeon;
   const door0 = dungeonX.getDoorRecordByIndex(0);
   const door0Link = door0?.nextObject;
   const cage = gameX.systems.missileEncounter.createFluxcage(at, 0);

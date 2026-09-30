@@ -58,7 +58,7 @@ function makeGame(): Game {
 /** The actuators on the east face of the wall, first to last. */
 function faceActuators(game: Game): ObjectID[] {
   const out: ObjectID[] = [];
-  for (let rn = game.dungeonState.findFirstObject(WALL); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(WALL); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     const d = decodeObjectID(rn);
     if (d.category === DBType.ACTUATOR && d.position === EAST_FACE) out.push(rn);
   }
@@ -79,10 +79,10 @@ function ornamentAhead(game: Game): number {
     decorations: [0, 0, 0],
     text: [0xfffe, 0xfffe, 0xfffe],
   };
-  summarizeRoomInfoCsbwin(rslt, game.dungeonState, game.party.state.position, FACING_WEST, objectTables);
+  summarizeRoomInfoCsbwin(rslt, game.ctx.dungeon, game.ctx.party.state.position, FACING_WEST, objectTables);
   // decorations[1] is relative position 2, the face turned toward the party.
   const ordinal = rslt.decorations[1] | 0;
-  const toc = game.dungeonState.getMap(WALL.z)?.wallDecorationTOC ?? [];
+  const toc = game.ctx.dungeon.getMap(WALL.z)?.wallDecorationTOC ?? [];
   return ordinal > 0 ? (toc[ordinal - 1] ?? -1) : -1;
 }
 
@@ -115,10 +115,10 @@ function main(): void {
 
   // --- the wall, before and after the click ----------------------------------------
   const game = makeGame();
-  game.party.state.position = PARTY;
-  game.party.state.facing = FACING_WEST;
-  game.party.state.cursorOwner = 0;
-  game.party.state.objectInHand = OBJECT_ID_NULL;
+  game.ctx.party.state.position = PARTY;
+  game.ctx.party.state.facing = FACING_WEST;
+  game.ctx.party.state.cursorOwner = 0;
+  game.ctx.party.state.objectInHand = OBJECT_ID_NULL;
 
   const before = faceActuators(game);
   const seenBefore = ornamentAhead(game);

@@ -48,7 +48,7 @@ interface Site { teleporter: TeleporterRecord; at: Position; from: Position; dir
  * floor cell beside it to fly from, towards it.
  */
 function findSite(game: Game): Site {
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
   for (let z = 0; z < dungeon.getMapCount(); z++) {
     const map = dungeon.getMap(z)!;
     for (let x = 0; x < map.descriptor.width; x++) {
@@ -82,7 +82,7 @@ function findSite(game: Game): Site {
 }
 
 function missileIn(game: Game, at: Position, index: number): ObjectID | null {
-  for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     const d = decodeObjectID(rn);
     if (d.category === DBType.MISSILE && d.index === index) return rn;
   }
@@ -90,7 +90,7 @@ function missileIn(game: Game, at: Position, index: number): ObjectID | null {
 }
 
 const game = makeGame();
-const tq = game.timerQueue;
+const tq = game.ctx.timers;
 const site = findSite(game);
 const at = (p: Position): string => `L${p.z}(${p.x},${p.y})`;
 console.log(`teleporter at ${at(site.at)} to ${at(site.dest)}, scope ${site.teleporter.scope}; the fireball flies from ${at(site.from)}, direction ${site.direction}`);
@@ -105,18 +105,18 @@ for (const c of cases) {
   site.teleporter.absoluteRotation = c.absolute;
   site.teleporter.rotation = c.rotation;
   const before = new Set<number>();
-  for (let rn = game.dungeonState.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.systems.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, game.state.tickCount, true)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) before.add(rn);
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, game.ctx.state.tickCount, true)) {
     throw new Error('missile not launched');
   }
   let launched: ObjectID | null = null;
-  for (let rn = game.dungeonState.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
+  for (let rn = game.ctx.dungeon.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.ctx.dungeon.getDBRecordLink(rn)) {
     if (!before.has(rn) && decodeObjectID(rn).category === DBType.MISSILE) launched = rn;
   }
   if (launched === null) throw new Error('missile not placed');
   const index = decodeObjectID(launched).index;
 
-  processTimersAt(game, game.state.tickCount + 1);
+  processTimersAt(game, game.ctx.state.tickCount + 1);
 
   // `MissileTimer`: the corner it enters the next cell by (`Timer.cpp:370-377`), then
   // `TeleportMissile` (`Code11f52.cpp:2392-2411`).
@@ -125,7 +125,7 @@ for (const c of cases) {
   const wantDir = c.absolute ? c.rotation : (site.direction + c.rotation) & 3;
 
   const rn = missileIn(game, site.dest, index);
-  const record = game.dungeonState.getMissileRecord(launched)!;
+  const record = game.ctx.dungeon.getMissileRecord(launched)!;
   const timer = tq.getTimer(record.timerIndex);
   const word8 = timer ? decodeMissileTimerWord8(timer.timerWord8) : null;
   const corner = rn === null ? -1 : decodeObjectID(rn).position;
@@ -140,7 +140,7 @@ for (const c of cases) {
     `${c.label}: the timer holds d.NewX, d.NewY and d.NewLevel`);
   check(word8?.dir === wantDir, `${c.label}: and d.NewDir, ${wantDir}`);
 
-  if (rn !== null) game.dungeonState.removeObjectFromCell(site.dest, rn);
+  if (rn !== null) game.ctx.dungeon.removeObjectFromCell(site.dest, rn);
   if (timer) tq.deleteTimer(record.timerIndex);
 }
 

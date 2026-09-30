@@ -50,7 +50,7 @@ function champion(i: number): Champion {
 }
 
 function newDagger(game: Game): ObjectID {
-  const db = game.dungeonState.getData().databases.weapons;
+  const db = game.ctx.dungeon.getData().databases.weapons;
   db.records.push({
     nextObject: OBJECT_ID_EOF,
     broken: false, charges: 0, litTorch: false, poisoned: false, cursed: false,
@@ -71,7 +71,7 @@ function main(): void {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  const dungeon = game.dungeonState;
+  const dungeon = game.ctx.dungeon;
 
   // The first giggler group in the dungeon, and an open cell beside it.
   let giggler: ObjectID | null = null;
@@ -113,17 +113,17 @@ function main(): void {
     }
     game.addChampion(champ);
   }
-  game.party.state.position = at;
+  game.ctx.party.state.position = at;
   game.systems.monsters.loadPartyLevel(at.z);
 
   // Each object in the order it left its champion.
   const gone: ObjectID[] = [];
   let afraid = false;
   for (let t = 0; t < ticks; t++) {
-    (game as unknown as { state: { tickCount: number } }).state.tickCount = t;
+    game.ctx.state.tickCount = t;
     processTimersAt(game, t);
     for (const [rn, { chIdx, slot }] of held) {
-      if (gone.includes(rn) || game.party.state.champions[chIdx]!.possessions[slot] === rn) continue;
+      if (gone.includes(rn) || game.ctx.party.state.champions[chIdx]!.possessions[slot] === rn) continue;
       gone.push(rn);
       console.log(`tick ${t}: ${rn.toString(16)} taken from champion ${chIdx}, slot ${slot}; fear ${monster.fear}`);
     }
@@ -139,7 +139,7 @@ function main(): void {
   check(gone.every((rn) => held.get(rn)!.slot === 0), 'every stolen object came out of a ready hand (d.uByte13126 is all zeroes)');
   check(chain.join() === gone.join(),
     'the chain is the stolen objects, once each, in the order they were taken, and nothing else');
-  check(game.party.state.champions.every((c) => c.attributes.health !== 0), 'nothing else touched the party in the meantime');
+  check(game.ctx.party.state.champions.every((c) => c.attributes.health !== 0), 'nothing else touched the party in the meantime');
   finish();
 }
 

@@ -183,7 +183,7 @@ window legitimately observes nothing. Size the window from the slowest thing inv
 
 **A target that walks away.** `createMonster` arms the group's AI, so a few ticks of
 `processTimers` can move it out of the cell before your missile arrives — the scenario
-then silently tests nothing. Call `game.timerQueue.deleteMonsterMovementTimers(x, y, level)`
+then silently tests nothing. Call `game.ctx.timers.deleteMonsterMovementTimers(x, y, level)`
 after placing it (`dump-missile-monster.ts`).
 
 **A timer pass runs on the game's clock.** `processTimers()` takes no time: it is
