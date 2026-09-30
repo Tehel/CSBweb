@@ -24,7 +24,6 @@ import { OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from
 import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { extractObjectTables, monsterLevitating } from '../src/renderer/csbwin/ObjectTables';
@@ -89,7 +88,7 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
   if (!at || !partyAt) throw new Error(`no room on level ${z}`);
   const far = opens(game, z, [at]).find((p) => Math.abs(p.x - at.x) + Math.abs(p.y - at.y) > 4)!;
   game.party.state.position = far;
-  game.monsterSystem.loadPartyLevel(z);
+  game.systems.monsters.loadPartyLevel(z);
   const dest = to(game, at);
   rigTeleporter(game, at, dest);
   const map = game.dungeonState.getMap(z)!;
@@ -103,7 +102,7 @@ function wiggle(z: number, type: number, to: (game: Game, at: Position) => Posit
   const timersBefore = aiTimersAt(game, at);
 
   let calls = 0;
-  const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+  const actuators = game.systems.actuators;
   const real = actuators.triggerObjectMove.bind(actuators);
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
     calls++;

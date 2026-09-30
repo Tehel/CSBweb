@@ -155,7 +155,7 @@ function main(): void {
     const game = makeGame();
     const stairs = findStairs(game, down);
     const rn = takeWeapon(game, 1);
-    const moved = game.worldMove.moveObject(rn, -1, 0, stairs.at.x, stairs.at.y, stairs.at.z);
+    const moved = game.systems.worldMove.moveObject(rn, -1, 0, stairs.at.x, stairs.at.y, stairs.at.z);
     const landed = findWeapon(game, stairs.exit, decodeObjectID(rn).index);
     const want = turnedCorner(1, stairs.dir);
     const n = down ? 1 : 2;
@@ -201,7 +201,7 @@ function main(): void {
     const { game, stairs, rn, corner, type } = monsterBesideStairs();
     const dungeon = game.dungeonState;
     const beside = stairs.beside!;
-    const result = game.monsterSystem.moveMonster(rn, beside.x, beside.y, stairs.at.x, stairs.at.y, stairs.at.z);
+    const result = game.systems.monsters.moveMonster(rn, beside.x, beside.y, stairs.at.x, stairs.at.y, stairs.at.z);
     const there = dungeon.findFirstMonster(stairs.exit);
     const want = turnedCorner(corner, stairs.dir);
     console.log(`3. type ${type} group (${beside.x},${beside.y}) corner ${corner} -> stairs (${stairs.at.x},${stairs.at.y}) `
@@ -211,7 +211,7 @@ function main(): void {
     check(same(result.position, stairs.exit) && there !== OBJECT_ID_EOF
       && dungeon.findFirstMonster(stairs.at) === OBJECT_ID_EOF, 'the group goes down the stairs and out');
     check(there !== OBJECT_ID_EOF && decodeObjectID(there).position === want, 'its corner turns to face the stairs');
-    const lifted = game.monsterSystem.moveMonster(rn, stairs.exit.x, stairs.exit.y, -1, 0, stairs.exit.z);
+    const lifted = game.systems.monsters.moveMonster(rn, stairs.exit.x, stairs.exit.y, -1, 0, stairs.exit.z);
     console.log(`   lifted with the ID it came with (corner ${corner}): code ${lifted.code}, `
       + `at the exit ${dungeon.findFirstMonster(stairs.exit) !== OBJECT_ID_EOF}`);
     check(dungeon.findFirstMonster(stairs.exit) === OBJECT_ID_EOF, 'the ID it came with still lifts it');
@@ -222,7 +222,7 @@ function main(): void {
     const beside = stairs.beside!;
     const turned = turnedCorner(decodeObjectID(rn).position, stairs.dir);
     const p = (turned + 2) & 3;
-    const error = (game as any).dsaSystem.moveObjectDsa(
+    const error = (game.systems.dsa as any).moveObjectDsa(
       1, 1 << DBType.CREATURE, 0xf, locationRelToInteger({ l: beside.z, x: beside.x, y: beside.y, p: 0 }), 0,
       1, 0, 1 << p, locationRelToInteger({ l: stairs.at.z, x: stairs.at.x, y: stairs.at.y, p: 0 }), 0,
     );
@@ -239,7 +239,7 @@ function main(): void {
     const game = makeGame();
     const stairs = findStairs(game, true);
     game.party.state.position = stairs.at;
-    game.worldMove.moveParty(-1, 0, stairs.at.x, stairs.at.y);
+    game.systems.worldMove.moveParty(-1, 0, stairs.at.x, stairs.at.y);
     const landed = game.party.state.position;
     console.log(`5. the party set down on the stairs: at level ${landed.z} (${landed.x},${landed.y})`);
     check(same(landed, stairs.at), 'the stairs arm breaks for the party');
@@ -252,7 +252,7 @@ function main(): void {
     const beside = stairs.beside!;
     const towards = [0, 1, 2, 3].find((d) => beside.x + DX[d]! === stairs.at.x && beside.y + DY[d]! === stairs.at.y)!;
     game.party.state.position = beside;
-    game.monsterSystem.loadPartyLevelIfChanged();
+    game.systems.monsters.loadPartyLevelIfChanged();
     game.party.setFacing(towards);
     const moved = game.move(MovementAction.MOVE_FORWARD);
     const between = game.party.state.position;

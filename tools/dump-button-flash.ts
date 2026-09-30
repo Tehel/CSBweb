@@ -76,7 +76,7 @@ async function main(): Promise<void> {
   });
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
   const loop = game.ctx.loop;
 
   // ---- vblFlashButn: plane 2, corners included ------------------------------------

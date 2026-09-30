@@ -309,9 +309,9 @@ function main(): void {
     // in the repository knows what a real party weighs.
     for (const champion of party.champions) {
       check(
-        game.characterStats.characterLoad(champion) === champion.load,
+        game.systems.characterStats.characterLoad(champion) === champion.load,
         `${name}/${champion.name}: the load this port re-sums is the one CSBWin stored ` +
-          `(${game.characterStats.characterLoad(champion)} vs ${champion.load})`,
+          `(${game.systems.characterStats.characterLoad(champion)} vs ${champion.load})`,
       );
     }
 

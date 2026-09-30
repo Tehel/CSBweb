@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     /** Launch a poison bolt from the start square; the index of its missile record. */
     const launch = (): ObjectID => {
       const before = new Set(missilesHere().map(index));
-      game.magic.launchThrownMissile(RN_POISON_BOLT, at, 1, 3, 100, 100, 1, 1000);
+      game.systems.magic.launchThrownMissile(RN_POISON_BOLT, at, 1, 3, 100, 100, 1, 1000);
       const rn = missilesHere().find((r) => !before.has(index(r)));
       if (rn === undefined) throw new Error('no missile launched');
       return rn;

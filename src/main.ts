@@ -286,7 +286,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
         dungeonState: game.dungeonState,
         footprints: game.footprints,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
-        characterStats: game.characterStats,
+        characterStats: game.systems.characterStats,
     }, {
         queueSound: (ordinal, mapX, mapY, deltaTime) => game.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.party.state.position.z),
         viewingFilter: (options) => game.processViewingFilter(options),

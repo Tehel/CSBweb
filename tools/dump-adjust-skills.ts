@@ -99,7 +99,7 @@ if (monster && blowType >= 0) {
   primeFighter();
   party.lastMonsterAttackTime = ctx.state.tickCount; // within 25 ticks: doubled, not halved
   check(fighter() === 1, 'Fighter mastery 1 before the blow');
-  game.monsterAttack.monsterDamagesCharacter(monster, 0, true);
+  game.systems.monsterAttack.monsterDamagesCharacter(monster, 0, true);
   console.log(`=== a blow from creature type ${blowType} ===`);
   console.log(`  Fighter mastery ${fighter()}, filter calls [${filtered.join(',')}], printed ${JSON.stringify(announced())}`);
   check(fighter() === 2, 'the blow trains defence past the first Fighter threshold');

@@ -89,7 +89,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E12 | `Game` names each system a second time | M | ⏳ |
+| E19 | `Game` names the context's members a second time | M | ⏳ waits for the author |
 | E10 | Code written twice | M | ⏳ |
 | E8 | One table set, extracted once, outside the renderer | L | ⏳ |
 | E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
@@ -130,11 +130,12 @@ out of their tier's place on purpose: `E13` and `C96` just above `P10`, because 
 builds on both, and `E15` below `G17`, because it waits for the page redesign to start: a
 session that reaches it first asks the author, and takes the next row meanwhile. The F
 rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
-The ⏸️ rows are postponed (see "Priority") and are never "the first row".
+`E19` waits for the author's choice between the options in its entry; until the
+notes carry it, a session takes the next row. The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C101 · D16 · E19 · F14 · G21 · X6. An ID recorded and paid in one commit has no
+Next free IDs: C101 · D16 · E20 · F14 · G21 · X6. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -295,22 +296,6 @@ code moves:
 Either way the strip moves into the context or the screen, not a module global, and the
 `GameHost` types move to `GameHost.ts`.
 
-### E12 ⏳ `Game` names each system a second time
-
-`GameContext.systems` holds every subsystem (`E1c`), and `Game` keeps a field for each
-too, often under another name: `game.timerSystem` is `ctx.systems.timer`,
-`monsterSystem` is `monsters`, `attackSystem` is `attack`, `timerQueue` is
-`ctx.timers`, `dungeonState` is `ctx.dungeon` (`src/engine/Game.ts:91-189`). Five public
-fields are read by nothing (`monsterPerception`, `monsterAI`, `character`, `mouse`,
-`hallOfChampions`), and two are private, which tools cast to reach (`actuators`, 6 casts;
-`dsaSystem`, 2), as they do the private `gameTick` (6). A grep for `ctx.systems.timer`
-misses 31 callers of `game.timerSystem`. Paying it means one name per system,
-`ctx.systems`'s, in `src/` and `tools/` (mechanical, about 200 references); `Game` keeps
-the loop, the construction and the facades the page calls. Its aliases of the context's
-other members (`party`, `dungeonState`, `timerQueue`, `footprints`, `sounds`) are a
-separate question for the author: `party` and `dungeonState` have about 400 readers
-each, and may stay as documented aliases. `F12` takes the casts.
-
 ### E13 ⏳ The save pipeline straddles `data/` and `engine/`, and nothing owns it
 
 `P10` rebuilds the save menu and turns a save into a CSBWin `.dat` that knows its dungeon.
@@ -387,6 +372,26 @@ What the redesign will replace, and what it should not carry across:
 
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
+
+### E19 ⏳ `Game` names the context's members a second time
+
+`Game` reaches its subsystems only through `game.systems`, the context's own object, but
+it still keeps a field for six of the context's other members: `state` (`ctx.state`),
+`party` (`ctx.party`), `dungeonState` (`ctx.dungeon`), `timerQueue` (`ctx.timers`),
+`footprints` and `sounds` (`src/engine/Game.ts:92-143`). So a grep for `ctx.timers`
+misses `game.timerQueue`'s readers, and `dungeonState` and `dungeon` are one object under
+two names. The readers, roughly (a grep of `<game>.<field>` in `src/` and `tools/`):
+`party` about 440, `dungeonState` about 410, `state` about 170, `timerQueue` 70, `sounds`
+18, `footprints` 14.
+
+**Waiting on the author.** The options:
+
+- **(a)** Every alias goes, and readers use `game.ctx.<member>`: one name everywhere, about
+  1,100 references moved (mechanical, by `tsc`'s error positions, as the systems were).
+- **(b)** `state`, `party` and `dungeonState` stay as documented aliases for their many
+  readers; `timerQueue`, `footprints` and `sounds` go (about 100 references).
+- **(c)** All six stay, each documented as the context's member under another name, and
+  the item closes with that comment.
 
 ### E18 ⏳ Hygiene and documentation drift
 
@@ -519,7 +524,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:491-511`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:427-447`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds
@@ -582,13 +587,15 @@ builds around them is its own:
 - 19 tools build a `UIState` by hand and wire the hooks they expect to need, "as
   `main.ts` wires it" (`E11`); 33 extract the UI tables again; 12 stub `document` and
   `window` before importing a UI module (`E14`).
-- 45 tools make 90 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
-  and `lastInputTime`, 16; `gameTick`, 6; `actuators`, 6; `dsaSystem`, 2), into other
-  systems' (`wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, …), to pass partial
-  `UIState` literals (17), and onto `game.state` (12), which is public. `tsc` checks none
-  of them. A renamed private leaves the tool compiling, and a write to it then sets a new
-  property: a tool that pins `lastTickTime` would go on passing while testing nothing.
-  Some casts are stale: `game.state` is public, and `ctx.systems.actuators` exists.
+- 42 tools make 84 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
+  and `lastInputTime`, 16; `gameTick`, 6), into other systems' (`DsaSystem`'s
+  `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,
+  `climbDownIntoPit`, …), to pass partial `UIState` literals (17), and onto `game.state`
+  (12), which is public; three more reach `DsaSystem`'s privates through `as any`
+  (`moveObjectDsa`, `executeAmpersand`). `tsc` checks none of them. A renamed private
+  leaves the tool compiling, and a write to it then sets a new property: a tool that pins
+  `lastTickTime` would go on passing while testing nothing. Some casts are stale:
+  `game.state` is public.
 
 Paying it: `tools/lib` helpers for the stock dungeon, a test champion and a wired
 `UIState` (built however `E11` leaves the UI's construction); a narrow public seam for what the tools

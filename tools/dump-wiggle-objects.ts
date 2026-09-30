@@ -31,7 +31,6 @@ import type { ObjectID } from '../src/core/types';
 import { ActuatorAction } from '../src/data/actuatorHelpers';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { newGame, processTimersAt } from './lib/game';
@@ -109,7 +108,7 @@ function inCell(game: Game, at: Position, category: DBType, index: number): Obje
 type PadCall = { at: Position; category: number; place: boolean; unchangedRoom: boolean };
 function spy(game: Game): PadCall[] {
   const calls: PadCall[] = [];
-  const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+  const actuators = game.systems.actuators;
   const real = actuators.triggerObjectMove.bind(actuators);
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
     calls.push({ at: position, category: decodeObjectID(object).category, place, unchangedRoom });
@@ -141,7 +140,7 @@ function main(): void {
     const below = dungeon.incrementLevel(pit, 1)!;
     let index = -1;
     switchOn(game, pit, TimerFunction.TT_PIT, () => {
-      game.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, pit, 0);
+      game.systems.missileEncounter.createDeathCloud(RN_POISON_CLOUD, 255, pit, 0);
       for (let rn = dungeon.findFirstObject(pit); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category === DBType.CLOUD) index = decodeObjectID(rn).index;
       }
@@ -165,7 +164,7 @@ function main(): void {
     const calls = spy(game);
     let index = -1;
     switchOn(game, at, TimerFunction.TT_TELEPORTER, () => {
-      game.magic.launchThrownMissile(RN_FIREBALL, at, 0, 1, 100, 100, 1, 50);
+      game.systems.magic.launchThrownMissile(RN_FIREBALL, at, 0, 1, 100, 100, 1, 50);
       for (let rn = dungeon.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = dungeon.getDBRecordLink(rn)) {
         if (decodeObjectID(rn).category === DBType.MISSILE) index = decodeObjectID(rn).index;
       }

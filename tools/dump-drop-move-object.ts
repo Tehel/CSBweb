@@ -25,7 +25,6 @@ import { DBType, OBJECT_ID_EOF, Position, RoomType, decodeObjectID, encodeObject
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
@@ -132,7 +131,7 @@ function find(game: Game, at: Position, index: number): ObjectID | null {
 type PadCall = { at: Position; place: boolean; unchangedRoom: boolean };
 function spy(game: Game): PadCall[] {
   const calls: PadCall[] = [];
-  const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+  const actuators = game.systems.actuators;
   const real = actuators.triggerObjectMove.bind(actuators);
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
     if (decodeObjectID(object).category === DBType.WEAPON) calls.push({ at: position, place, unchangedRoom });
@@ -143,7 +142,7 @@ function spy(game: Game): PadCall[] {
 
 type Dropper = { dropMissileObject(projectile: number, position: Position, posInCell: number): void };
 const throwLands = (game: Game, rn: ObjectID, at: Position, corner: number): void =>
-  (game.timerSystem as unknown as Dropper).dropMissileObject(rn, at, corner);
+  (game.systems.timer as unknown as Dropper).dropMissileObject(rn, at, corner);
 
 function main(): void {
   /* ------------------------------------- 1. a drop onto the party's own square ---- */
@@ -222,7 +221,7 @@ function main(): void {
     const { party, front } = stage(game, 0);
     const rn = takeWeapon(game);
     const queue = game.timerQueue;
-    const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+    const actuators = game.systems.actuators;
     const real = actuators.triggerObjectMove.bind(actuators);
     let padTimer = -1;
     actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {

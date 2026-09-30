@@ -79,7 +79,7 @@ function doorState(game: Game): number {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     state.state.tickCount++;
   }
 }
@@ -209,9 +209,9 @@ function main(): void {
   applyCsbwinSave(loaded, new Uint8Array(readFileSync(resolve(SAVES, cases[0].file))));
   const clock = loaded.state.tickCount;
   const at = new Position(DOOR.x, DOOR.y + 1, DOOR.level);
-  loaded.timerSystem.schedulePoison(0, 3, at.z);
-  loaded.timerSystem.scheduleChampionShieldExpiry(0, 10, 50, at.z);
-  loaded.missileEncounter.createCloud(RN_POISON_CLOUD, 100, at.x, at.y, at, 0);
+  loaded.systems.timer.schedulePoison(0, 3, at.z);
+  loaded.systems.timer.scheduleChampionShieldExpiry(0, 10, 50, at.z);
+  loaded.systems.missileEncounter.createCloud(RN_POISON_CLOUD, 100, at.x, at.y, at, 0);
   const setAt = (fn: number): number | undefined =>
     loaded.timerQueue.getTimers().find((t) => t.function === fn)?.time;
   console.log(`  after the load, d.Time ${clock}: poison due ${setAt(TimerFunction.TT_75)}, ` +

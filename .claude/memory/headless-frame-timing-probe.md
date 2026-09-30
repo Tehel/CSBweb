@@ -12,7 +12,7 @@ golden frame is one still screen state, not the order of things inside a tick.
   `ctx.loop.newPartyLevel`, `party.state.gameIsLost`, `mainLoopHasReturned()`).
 - Run one tick with `(game as unknown as { gameTick(): void }).gameTick()`.
 - To make something happen *inside the timers* (a monster's blow, a pit opening), replace
-  `game.timerSystem.processTimers` with a stub that does it and returns `false`.
+  `game.systems.timer.processTimers` with a stub that does it and returns `false`.
 
 Examples: `tools/dump-stairs-move.ts` case 6 (the level change) and the last case of
 `tools/dump-champion-death.ts` (the killing blow is drawn before the game ends).

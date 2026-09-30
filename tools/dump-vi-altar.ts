@@ -218,7 +218,7 @@ function cloudsAt(game: Game, cell: Position): number {
 /** Run the clock forward, letting the altar's self-rescheduling timer advance. */
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     game.state.tickCount++;
   }
 }
@@ -231,11 +231,11 @@ function main(): void {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
-    g.monsterSystem.loadPartyLevel(cell.z);
+    g.systems.monsters.loadPartyLevel(cell.z);
 
     const victim = 1;
     const maxHpBefore = g.party.state.champions[victim]!.attributes.maxHealth;
-    g.monsterAttack.killCharacter(victim);
+    g.systems.monsterAttack.killCharacter(victim);
 
     const bones = bonesAt(g, cell);
     console.log(`HERO${victim} died, leaving ${bones.length} bones object(s) at (${cell.x},${cell.y}) level ${cell.z}`);
@@ -253,7 +253,7 @@ function main(): void {
     );
 
     // Schedule the altar the way a drop into the alcove does.
-    g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
 
     console.log('');
     console.log(['tick', 'clouds in cell', 'bones in cell', `HERO${victim} alive`, 'health', 'maxHealth'].join('\t'));
@@ -310,20 +310,20 @@ function main(): void {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
-    g.monsterSystem.loadPartyLevel(cell.z);
+    g.systems.monsters.loadPartyLevel(cell.z);
 
     // Not champion 2: a death's bones carry value 2, which unpaired bones would read
     // as a champion index.
     const victim = 1;
     g.party.state.champions[victim]!.fingerprint = 0;
-    g.monsterAttack.killCharacter(victim);
+    g.systems.monsterAttack.killCharacter(victim);
     const bones = bonesAt(g, cell);
     const rn = bones[0];
     const record = rn === undefined ? null : g.dungeonState.copyChampionBonesRecord(rn);
     console.log(`bones: ${bones.length}, expool record: ${record}`);
     check(bones.length === 1 && record === 0, 'the death records fingerprint 0 in the expool');
     if (rn !== undefined) {
-      g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+      g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
       runTicks(g, 7);
       check(g.party.state.champions[victim]!.attributes.health !== 0, 'and the altar raises the champion');
     }
@@ -340,8 +340,8 @@ function main(): void {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
-    g.monsterSystem.loadPartyLevel(cell.z);
-    g.monsterAttack.killCharacter(target);
+    g.systems.monsters.loadPartyLevel(cell.z);
+    g.systems.monsterAttack.killCharacter(target);
     // Clear away the bones the death itself left, so only the authored ones are here.
     for (const rn of bonesAt(g, cell)) {
       g.dungeonState.removeObjectFromCell(cell, rn);
@@ -351,7 +351,7 @@ function main(): void {
     g.dungeonState.addObjectToCell(cell, rn);
     check(g.dungeonState.copyChampionBonesRecord(rn) === null, 'authored bones have no expool record');
 
-    g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
     runTicks(g, 8);
 
     const c = g.party.state.champions[target]!;
@@ -369,11 +369,11 @@ function main(): void {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
-    g.monsterSystem.loadPartyLevel(cell.z);
+    g.systems.monsters.loadPartyLevel(cell.z);
 
     const rn = makeDungeonBones(g, target, 0);
     g.dungeonState.addObjectToCell(cell, rn);
-    g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
     runTicks(g, 8);
 
     const c = g.party.state.champions[target]!;
@@ -392,8 +392,8 @@ function main(): void {
     const { game: g } = makeGame();
     const cell = findOpenCell(g);
     g.party.state.position = cell;
-    g.monsterSystem.loadPartyLevel(cell.z);
-    g.monsterAttack.killCharacter(target);
+    g.systems.monsters.loadPartyLevel(cell.z);
+    g.systems.monsterAttack.killCharacter(target);
 
     // While the champion lies dead, a living one takes their corner. CSBWin allows
     // this precisely because `CharacterAtPosition` ignores the dead.
@@ -402,7 +402,7 @@ function main(): void {
     const cornerBefore = g.party.state.champions[target]!.partyPosition;
 
     const rn = bonesAt(g, cell)[0]!;
-    g.timerSystem.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
+    g.systems.timer.scheduleViAltar(rn, cell, decodeObjectID(rn).position & 0x3, g.state.tickCount);
     runTicks(g, 8);
 
     const c = g.party.state.champions[target]!;
@@ -436,8 +436,8 @@ function main(): void {
       const victim = 2;
       g.party.state.position = altar.party;
       g.party.state.facing = altar.facing as Champion['facing'] & number;
-      g.monsterSystem.loadPartyLevel(altar.party.z);
-      g.monsterAttack.killCharacter(victim);
+      g.systems.monsters.loadPartyLevel(altar.party.z);
+      g.systems.monsterAttack.killCharacter(victim);
 
       const bones = bonesAt(g, altar.party)[0];
       if (bones === undefined) {
@@ -499,8 +499,8 @@ function main(): void {
     } else {
       g.party.state.position = altar.party;
       g.party.state.facing = altar.facing as Champion['facing'] & number;
-      g.monsterSystem.loadPartyLevel(altar.party.z);
-      g.monsterAttack.killCharacter(1);
+      g.systems.monsters.loadPartyLevel(altar.party.z);
+      g.systems.monsterAttack.killCharacter(1);
 
       // `if (value != 0)` — bones whose value is 0 are scenery, not anybody's remains
       // (`doc/CSBwin-src/Code11f52.cpp:44`, `doc/CSBwin-src/CSB.h:1258-1264`). The

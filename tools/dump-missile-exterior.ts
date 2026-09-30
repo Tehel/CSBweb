@@ -66,7 +66,7 @@ const { at, direction } = findBorderSquare(game);
 console.log(`an open square on the border at ${at.z}(${at.x},${at.y}), leaving the map heading ${direction}`);
 
 const filters: number[] = [];
-const encounter = game.missileEncounter;
+const encounter = game.systems.missileEncounter;
 const filter = encounter.missileEncounterFilter.bind(encounter);
 encounter.missileEncounterFilter = (type, ...rest) => {
   filters.push(type);
@@ -75,7 +75,7 @@ encounter.missileEncounterFilter = (type, ...rest) => {
 
 // The corner facing the edge (`leavingThisCell`, `Timer.cpp:306-308`), so the first move
 // leaves the square.
-const launched = game.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, direction, direction, 40, 10, 1, 1, false);
+const launched = game.systems.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, direction, direction, 40, 10, 1, 1, false);
 check(launched, 'the fireball launches');
 // Stop at the tick the missile meets the wall: the cloud has a timer of its own, due the
 // tick after.

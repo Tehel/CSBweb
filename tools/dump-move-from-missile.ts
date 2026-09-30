@@ -94,7 +94,7 @@ function findCellBeforeEastWall(game: Game): Position {
 function launch(game: Game, at: Position, corner: number, direction: Direction, delay: number, firstTick = false): ObjectID {
   const before = new Set<ObjectID>();
   for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.state.tickCount + delay - 1, !firstTick)) {
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, at.x, at.y, at.z, corner, direction, 40, 10, 1, game.state.tickCount + delay - 1, !firstTick)) {
     throw new Error('missile not launched');
   }
   for (let rn = game.dungeonState.findFirstObject(at); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
@@ -135,7 +135,7 @@ console.log(`party at (${party.x},${party.y}) L${party.z}; the eastbound missile
 
 const calls: FilterCall[] = [];
 let onWall: (() => void) | null = null;
-(game as any).dsaSystem.processMissileEncounterFilter = (o: { type: number; missile: number; direction: number }): number => {
+game.systems.dsa.processMissileEncounterFilter = (o: { type: number; missile: number; direction: number }): number => {
   calls.push({ type: o.type, missile: o.missile, direction: o.direction, filterObjectSet: tq.missileFilterObject !== OBJECT_ID_NULL });
   if (o.type === 4 && onWall) {
     const move = onWall;
@@ -154,7 +154,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
   const struck = launch(game, party, 2, Direction.WEST, 10);
   // The fireball whose timer runs: eastbound, in corner 1, so it leaves the cell into stone.
   const flying = launch(game, wallSide, 1, Direction.EAST, 1);
-  onWall = () => game.missileEncounter.checkPartyMoveFromMissile(party, north);
+  onWall = () => game.systems.missileEncounter.checkPartyMoveFromMissile(party, north);
 
   processTimersAt(game, game.state.tickCount + 1);
 
@@ -173,7 +173,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
 {
   const struck = launch(game, party, 2, Direction.WEST, 10);
   calls.length = 0;
-  game.missileEncounter.checkPartyMoveFromMissile(party, north);
+  game.systems.missileEncounter.checkPartyMoveFromMissile(party, north);
   const met = calls.find((c) => c.type === 7 && c.missile === struck);
   show('2. a move after the timer, from a westbound fireball', met);
   check(met !== undefined && !met.filterObjectSet, 'the move meets it, outside any missile timer');
@@ -198,7 +198,7 @@ const show = (label: string, c: FilterCall | undefined): void =>
     // A timer queued by the filter takes the lowest free slot, the one the fireball's
     // timer left.
     squatter = tq.createTimer(TimerFunction.TT_DOOR, 0, 0, 0, 0, game.state.tickCount + 1000, party.z).index;
-    game.missileEncounter.checkPartyMoveFromMissile(party, null);
+    game.systems.missileEncounter.checkPartyMoveFromMissile(party, null);
   };
   calls.length = 0;
 

@@ -121,7 +121,7 @@ async function main(): Promise<void> {
    * record's link as `&DEL` leaves it — still inside the run.
    */
   const run = (game: Game, slave: ObjectID, at: Position, watch: ObjectID[]): { result: boolean; midRun: number[] } => {
-    const dsa = (game as any).dsaSystem;
+    const dsa = game.systems.dsa as any;
     const midRun: number[] = [];
     const original = dsa.executeAmpersand.bind(dsa);
     dsa.executeAmpersand = (subcode: number, bank: unknown): void => {

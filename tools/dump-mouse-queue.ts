@@ -94,7 +94,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   // An open cell with an open, monster-free cell in front: the arrow step needs
   // somewhere to go. The party is empty, so the step costs no stamina and sets no delay.

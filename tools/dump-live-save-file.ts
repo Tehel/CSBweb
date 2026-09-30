@@ -106,7 +106,7 @@ function makeGame(): Game {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     state.state.tickCount++;
   }
 }

@@ -109,7 +109,7 @@ async function main(): Promise<void> {
   game.addChampion(champion(1));
   const party = game.party.state;
   party.position = new Position(6, 14, 2);
-  game.monsterSystem.loadPartyLevel(2);
+  game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
   const ui: UIState = createUIState(graphics, game.dungeonState, {
@@ -246,10 +246,10 @@ async function main(): Promise<void> {
   console.log('=== WakeUp by a blow ===');
   {
     game.sleep();
-    game.monsterAttack.damageCharacter(0, 40, 0, 0);
+    game.systems.monsterAttack.damageCharacter(0, 40, 0, 0);
     check(game.isPartySleeping(), 'DamageCharacter with P4 == 0 does not wake (Character.cpp:2809 is on the armour branch)');
     const hp = party.champions[0]!.attributes.health;
-    game.monsterAttack.damageCharacter(0, 40, 1, 2);
+    game.systems.monsterAttack.damageCharacter(0, 40, 1, 2);
     console.log(`P4 == 2: health ${hp} -> ${party.champions[0]!.attributes.health}, sleeping=${game.isPartySleeping()}`);
     check(!game.isPartySleeping(), 'DamageCharacter with P4 == 2 (a pit, a cloud) wakes');
   }
@@ -259,7 +259,7 @@ async function main(): Promise<void> {
     check(monster !== null, 'a monster to strike with');
     if (monster) {
       game.sleep();
-      game.monsterAttack.monsterDamagesCharacter(monster, 0, true);
+      game.systems.monsterAttack.monsterDamagesCharacter(monster, 0, true);
       check(!game.isPartySleeping(), 'MonsterDamagesCharacter wakes the party whatever the outcome');
       // In a tick: the blow's clockTick = 1 is cleared by the tick's own clockTick = 0.
       game.sleep();

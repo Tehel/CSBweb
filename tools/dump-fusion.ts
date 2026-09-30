@@ -147,7 +147,7 @@ function placeMonster(game: Game, type: number, x: number, y: number): ObjectID 
 }
 
 function cage(game: Game, x: number, y: number): void {
-  if (game.missileEncounter.createFluxcage(new Position(x, y, LEVEL), game.state.tickCount) === null) {
+  if (game.systems.missileEncounter.createFluxcage(new Position(x, y, LEVEL), game.state.tickCount) === null) {
     throw new Error(`no Fluxcage at (${x},${y})`);
   }
 }
@@ -181,7 +181,7 @@ function movementTimerAt(game: Game, x: number, y: number): boolean {
 }
 
 function fuse(a: Arena): { x: number; y: number } | null {
-  a.game.attackSystem.attack(0, AttackType.atk_FUSE);
+  a.game.systems.attack.attack(0, AttackType.atk_FUSE);
   const at = lordChaosAt(a.game);
   console.log(`  Lord Chaos ${at ? `at (${at.x},${at.y})` : 'nowhere'}; dispell clouds on (${CX},${CY}): ${dispellClouds(a.game, CX, CY)}`);
   return at;
@@ -199,7 +199,7 @@ function checkOffTheMap(): void {
   console.log('=== 2. the square in front is off the map (Attack.cpp:150-157) ===');
   const a = arena(false);
   a.game.party.state.position = new Position(CX, 0, LEVEL);
-  a.game.attackSystem.attack(0, AttackType.atk_FUSE);
+  a.game.systems.attack.attack(0, AttackType.atk_FUSE);
   console.log(`  createCloud called: ${a.seedAfterCloud !== null}`);
   check(a.seedAfterCloud === null, 'no cloud at all');
 }
@@ -344,9 +344,9 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   check(party.brightness === 200 && party.partyShield === 100 && party.spellShield === 100 && party.fireShield === 100,
     'd.Brightness is 200, and the three shields 100');
   check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
-  check(!game.attackSystem.isCellFluxcage(CX, CY) && !game.attackSystem.isCellFluxcage(CX, CY + 1),
+  check(!game.systems.attack.isCellFluxcage(CX, CY) && !game.systems.attack.isCellFluxcage(CX, CY + 1),
     'the Fluxcages on his square and the party\'s are gone');
-  check(game.attackSystem.isCellFluxcage(CX, CY - 1) && game.attackSystem.isCellFluxcage(CX + 1, CY),
+  check(game.systems.attack.isCellFluxcage(CX, CY - 1) && game.systems.attack.isCellFluxcage(CX + 1, CY),
     'and the ones around him stay');
   check(champion.attributes.stamina === stamina && champion.attackType === attackType,
     'the attack\'s tail does not run: no stamina spent, no attack type recorded');

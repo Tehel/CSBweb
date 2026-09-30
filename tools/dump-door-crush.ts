@@ -71,7 +71,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const dungeon = game.dungeonState;
   const map = dungeon.getMap(level);
@@ -119,8 +119,8 @@ async function main(): Promise<void> {
   };
 
   const tick = (): void => {
-    game.timerSystem.processTimers();
-    game.monsterAttack.displayCharacterDamage();
+    game.systems.timer.processTimers();
+    game.systems.monsterAttack.displayCharacterDamage();
     game.state.tickCount++;
   };
 
@@ -167,7 +167,7 @@ async function main(): Promise<void> {
       if (!rec) continue;
       const desc = objectTables.monsterDesc[rec.creatureType];
       if (!desc || monsterNonMaterial(desc)) continue;
-      const result = game.monsterSystem.moveMonster(rn, x, y, door.x, door.y, level);
+      const result = game.systems.monsters.moveMonster(rn, x, y, door.x, door.y, level);
       if (result.code !== 0) continue;
       moved = { rn, type: rec.creatureType };
     }

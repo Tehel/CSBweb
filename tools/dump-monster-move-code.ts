@@ -104,7 +104,7 @@ async function main(): Promise<void> {
     const far = opens(game, z, not).find((p) => not.every((q) => Math.abs(p.x - q.x) + Math.abs(p.y - q.y) > 4));
     if (!far) throw new Error(`nowhere to stand the party on level ${z}`);
     game.party.state.position = far;
-    game.monsterSystem.loadPartyLevel(z);
+    game.systems.monsters.loadPartyLevel(z);
   };
   const teleporter = rigTeleporter;
   const aiTimersAt = (game: Game, p: Position): number => game.timerQueue.getTimers().filter((t) =>
@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     teleporter(game, tp, dest);
     const rn = make(game, typeOn(game, z), from);
     const before = aiTimersAt(game, from);
-    const moved = game.monsterSystem.moveMonster(rn, from.x, from.y, tp.x, tp.y, z);
+    const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, z);
     console.log(`1. (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${z}: code ${moved.code}, `
       + `at (${moved.position.x},${moved.position.y}), AI timers ${before} at the old square -> ${aiTimersAt(game, from)}, `
       + `${aiTimersAt(game, dest)} where it landed`);
@@ -155,7 +155,7 @@ async function main(): Promise<void> {
     const timer = { uByte6: from.x, uByte7: from.y, level: z } as AiFrame['timer'];
     const frame = { timer, timePerMove: 0, sinceLastUpdate: 0, bool36: false } as unknown as AiFrame;
     const c = { monsterRn: rn2, monster, slot, mapX: from.x, mapY: from.y, level: z } as unknown as AiConst;
-    const ai = game2.monsterAI as unknown as { stepOrDefer(f: AiFrame, c: AiConst, x: number, y: number): boolean };
+    const ai = game2.systems.monsterAI as unknown as { stepOrDefer(f: AiFrame, c: AiConst, x: number, y: number): boolean };
     const goOn = ai.stepOrDefer(frame, c, tp.x, tp.y);
     console.log(`2. the AI steps onto it: goes on ${goOn}, timer_70 at (${timer.uByte6},${timer.uByte7}), `
       + `ubPrev (${slot.ubPrevX},${slot.ubPrevY})`);
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
     const slot0 = game.dungeonState.getItem16Pool()[0]!;
     const owner = slot0.word0;
     for (let i = 0; i < 4; i++) slot0.singleMonsterStatus[i] = (slot0.singleMonsterStatus[i] ?? 0) | SMS_ATTACKING;
-    const moved = game.monsterSystem.moveMonster(rn, from.x, from.y, tp.x, tp.y, b);
+    const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, b);
     const mine = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
     const attacking = slot0.singleMonsterStatus.filter((s) => (s & SMS_ATTACKING) !== 0).length;
     console.log(`3. L${b} teleporter -> party's L${a}: code ${moved.code}, the group took slot ${mine}; `
@@ -222,7 +222,7 @@ async function main(): Promise<void> {
     const monster = dungeon.getCreatureRecord(rn)!;
     const slot = monster.groupIndex;
     monster.hp[0] = 1;
-    const moved = game.monsterSystem.moveMonster(rn, from.x, from.y, pit.x, pit.y, pit.z);
+    const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, pit.x, pit.y, pit.z);
     const freed = dungeon.getItem16Pool()[slot]!.word0 < 0;
     console.log(`4. a 1-HP group (${from.x},${from.y}) -> pit (${pit.x},${pit.y}) L${pit.z} -> (${below.x},${below.y}) L${below.z}: `
       + `code ${moved.code}, a group below ${anyGroupAt(game, below)}, beside ${anyGroupAt(game, from)}, `
@@ -250,7 +250,7 @@ async function main(): Promise<void> {
     teleporter(game, tp, dest);
     const rn = make(game, type, from);
     const monster = game.dungeonState.getCreatureRecord(rn)!;
-    const moved = game.monsterSystem.moveMonster(rn, from.x, from.y, tp.x, tp.y, z);
+    const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, z);
     console.log(`5. type ${type} (${from.x},${from.y}) L${z} -> teleporter -> (${dest.x},${dest.y}) L${bad}, where it is not allowed: `
       + `code ${moved.code}, on the teleporter ${anyGroupAt(game, tp)}, beside it ${anyGroupAt(game, from)}, `
       + `at the destination ${anyGroupAt(game, dest)}, record freed ${monster.nextObject === OBJECT_ID_NULL}`);
@@ -268,7 +268,7 @@ async function main(): Promise<void> {
     const sounds: number[] = [];
     const queue = game.sounds.queueSound.bind(game.sounds);
     game.sounds.queueSound = (ordinal, x, y, dt, level) => { sounds.push(ordinal); queue(ordinal, x, y, dt, level); };
-    const made = game.monsterSystem.createMonster({
+    const made = game.systems.monsters.createMonster({
       value: typeOn(game, z), hitPointMultiplier: 1, numMonM1: 0, facing: 0,
       mapX: at.x, mapY: at.y, level: z, invisible: false, drawAsSize4: false,
     });

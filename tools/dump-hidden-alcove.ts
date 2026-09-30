@@ -115,7 +115,7 @@ const counters = (game: Game): string =>
 
 function runTicks(game: Game, ticks: number): void {
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     game.state.tickCount++;
   }
 }

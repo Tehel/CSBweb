@@ -12,9 +12,9 @@ import type { Game } from '../../src/engine/Game';
 
 export function createMonsterAt(
   game: Game,
-  options: Parameters<Game['monsterSystem']['createMonster']>[0],
+  options: Parameters<Game['systems']['monsters']['createMonster']>[0],
 ): ObjectID | null {
-  const made = game.monsterSystem.createMonster(options);
+  const made = game.systems.monsters.createMonster(options);
   if (made !== null) return made;
   const rn = game.dungeonState.findFirstMonster(new Position(options.mapX, options.mapY, options.level));
   return rn === OBJECT_ID_EOF ? null : rn;

@@ -166,8 +166,8 @@ function checkTickOfDeath(): void {
   // inside `ProcessTimers`.
   {
     const w = watchedGame([3]);
-    w.game.monsterAttack.poisonCharacter(0, 128);
-    w.game.monsterAttack.displayCharacterDamage();
+    w.game.systems.monsterAttack.poisonCharacter(0, 128);
+    w.game.systems.monsterAttack.displayCharacterDamage();
     check(w.game.party.state.champions[0]!.attributes.health === 1, 'poison: the first dose leaves 1 health');
     runPastDeath('poison', w, 60);
   }
@@ -178,7 +178,7 @@ function checkTickOfDeath(): void {
     const w = watchedGame([200]);
     for (let n = 1; n <= 3; n++) frame(w);
     const tick = w.game.state.tickCount;
-    w.game.monsterAttack.killCharacter(0);
+    w.game.systems.monsterAttack.killCharacter(0);
     check(w.credits.length === 0, 'between ticks: nothing ends until the next tick');
     runPastDeath('between ticks', w, 1);
     check(w.game.state.tickCount === tick, 'between ticks: the next tick is the last, and leaves d.Time where it was');
@@ -187,7 +187,7 @@ function checkTickOfDeath(): void {
   // One of two dies: the game goes on.
   {
     const w = watchedGame([200, 200]);
-    w.game.monsterAttack.killCharacter(1);
+    w.game.systems.monsterAttack.killCharacter(1);
     let tick = 0;
     for (let n = 1; n <= 10; n++) tick = frame(w).tick;
     console.log(['one of two dies', `tick ${tick}`, `credits ${w.credits.length}`].join('\t'));

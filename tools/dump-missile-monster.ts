@@ -160,7 +160,7 @@ function makeArena(members: number): Arena | null {
       const range = findRange(game, level);
       if (!range) continue;
       game.party.state.position = range.party;
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
       const rn = createMonsterAt(game, {
         value: type, hitPointMultiplier: 1, numMonM1: members - 1, facing: 0,
         mapX: range.target.x, mapY: range.target.y, level, invisible: false, drawAsSize4: false,
@@ -186,14 +186,14 @@ type Hit = { index: number; damage: number };
 /** Record what the encounter asks for, as the real engine asks it. */
 function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
   const log = { magic: [] as Magic[], poison: [] as number[], hits: [] as Hit[] };
-  const me = game.missileEncounter;
+  const me = game.systems.missileEncounter;
   const magic = me.determineMagicDamage.bind(me);
   me.determineMagicDamage = (missile, projectile) => {
     const r = magic(missile, projectile);
     log.magic.push({ projectile, damage: r.damage, poisonStrength: r.poisonStrength });
     return r;
   };
-  const md = game.monsterDamage;
+  const md = game.systems.monsterDamage;
   const poison = md.determinePoisonDamage.bind(md);
   md.determinePoisonDamage = (type, strength) => {
     const r = poison(type, strength);
@@ -209,9 +209,9 @@ function spy(game: Game): { magic: Magic[]; poison: number[]; hits: Hit[] } {
 }
 
 function fly(game: Game, projectile: ObjectID, launch: Position): void {
-  game.magic.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
+  game.systems.magic.launchThrownMissile(projectile, launch, 0, EAST, 255, 255, 0, game.state.tickCount);
   for (let i = 0; i < 4; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     game.state.tickCount++;
   }
 }
@@ -326,7 +326,7 @@ function main(): void {
     const game = makeGame();
     const range = findRange(game, 0)!;
     game.party.state.position = range.target;
-    game.monsterSystem.loadPartyLevel(range.target.z);
+    game.systems.monsters.loadPartyLevel(range.target.z);
     game.party.state.champions[0]!.partyPosition = 0;
     const bomb = newRecord(game, 'potions', DBType.POTION, {
       nextObject: OBJECT_ID_EOF, important: false, potionType: PotionType.FUL_BOMB, power: 40,
@@ -352,11 +352,11 @@ function main(): void {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
-    game.magic.launchThrownMissile(falchion, target, 2, EAST, 255, 255, 0, game.state.tickCount);
+    game.systems.magic.launchThrownMissile(falchion, target, 2, EAST, 255, 255, 0, game.state.tickCount);
     check(!monsterWord2Bit3(desc) || !monsterWord2Bit4(desc),
       `${MonsterType[group.creatureType]} always passes the sidestep's die test, so no roll decides the scenario`);
 
-    const encounter = game.missileEncounter;
+    const encounter = game.systems.missileEncounter;
     const process = encounter.processMissileEncounter.bind(encounter);
     let leftByEncounter = -1;
     encounter.processMissileEncounter = (...args) => {
@@ -407,7 +407,7 @@ function main(): void {
       nextObject: OBJECT_ID_EOF, broken: false, charges: 0, litTorch: false, poisoned: false,
       cursed: false, important: false, weaponType: WEAPON_FALCHION,
     });
-    game.magic.launchThrownMissile(falchion, target, 3, EAST, 255, 255, 0, game.state.tickCount);
+    game.systems.magic.launchThrownMissile(falchion, target, 3, EAST, 255, 255, 0, game.state.tickCount);
     const missilesIn = (): number => {
       let n = 0;
       for (let rn = game.dungeonState.findFirstObject(target); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {

@@ -92,7 +92,6 @@ export class Game implements MainLoop {
     state: GameState;
     party: Party;
     dungeonState: DungeonState;
-    private movementSystem: MovementSystem;
     /**
      * Where `HandleMouseEvents` sends every button that is not its own (the turns and the
      * steps): the UI's dispatcher, and the button-up. Headless, nobody is listening and
@@ -121,55 +120,17 @@ export class Game implements MainLoop {
     private readonly random: CsbRandom;
     /** What every subsystem shares (`GameContext`), created first. */
     readonly ctx: GameContext;
-    private actuators: ActuatorSystem;
     /**
-     * The timer system. Public like the other subsystems — `tools/` drives
-     * `processTimers` directly to turn the clock without a browser.
+     * Every subsystem, by the one name each has: the context's (`GameContext.systems`).
+     * `tools/` drives and spies on them through it.
      */
-    readonly timerSystem: TimerSystem;
-    /**
-     * The world `MoveObject`: teleporters, pits and stairs for the party, a monster and
-     * any object. Public because `tools/` moves things through it directly.
-     */
-    readonly worldMove: WorldMove;
-    /**
-     * A missile meeting the party, a monster, a wall or a door, and the clouds and door
-     * blows it sets off. Public because `tools/` spies on and calls it directly.
-     */
-    readonly missileEncounter: MissileEncounter;
-    /** Monster group lifecycle and movement. Public for the same reason. */
-    readonly monsterSystem: MonsterSystem;
+    readonly systems: GameSystems;
     /**
      * The party's footprint trail — `d.PartyFootprints` (doc/CSBwin-src/Data.h:781).
      * Monsters smell it when they cannot see the party, and the Magic Footprints
      * spell draws from it.
      */
     readonly footprints: PartyFootprints;
-    /**
-     * Monster sight, smell and step probing (`doc/CSBwin-src/Monster.cpp`).
-     * Public because the AI state machine and `tools/dump-monster-perception.ts`
-     * both drive it directly.
-     */
-    readonly monsterPerception: MonsterPerception;
-    /**
-     * `DamageMonster` and friends. Public because the missile system, the monster AI
-     * and (later) champion melee all reach it, and `tools/` drives it directly.
-     */
-    readonly monsterDamage: MonsterDamage;
-    /** The monster AI state machine (`doc/CSBwin-src/Monster.cpp`). */
-    readonly monsterAI: MonsterAI;
-    /** Monsters hitting the party (`doc/CSBwin-src/Monster.cpp:944`). */
-    readonly monsterAttack: MonsterAttack;
-    /** The champions' own attacks (`doc/CSBwin-src/Attack.cpp`). */
-    readonly attackSystem: AttackSystem;
-    /** `Magic.cpp`'s engine half: casting, `LaunchObject`, `DisableCharacterAction`. */
-    readonly magic: MagicSystem;
-    /** `Character.cpp`'s possession writers: `RemoveCharacterPossession`, `DropAllPossessions`. */
-    readonly character: CharacterSystem;
-    /** `Mouse.cpp`'s engine half: the cursor's drop and throw, `ThrowByCharacter`. */
-    readonly mouse: MouseSystem;
-    /** `AddCharacter`, `_ResurrectReincarnateCancel`, `ReIncarnate`'s tail. */
-    readonly hallOfChampions: HallOfChampions;
     /** `d.Word11694`, which lives in `state` (`GameState.gameWon`). */
     get gameWon(): boolean { return this.state.gameWon; }
     set gameWon(won: boolean) { this.state.gameWon = won; }
@@ -180,13 +141,6 @@ export class Game implements MainLoop {
 
     /** `QueueSound` — sounds named by ordinal, attenuated by distance from the party. */
     readonly sounds: SoundQueue;
-    private dsaSystem: DsaSystem;
-    /**
-     * `GetObjectWeight` / `MaxLoad` / `DetermineThrowingDistance` / `Quickness`
-     * (`src/engine/CharacterStats.ts`). Public because the throw path, the armour
-     * calculation and `tools/` all reach it.
-     */
-    readonly characterStats: CharacterStats;
 
     // Game loop
     private running: boolean = false;
@@ -229,50 +183,32 @@ export class Game implements MainLoop {
         this.footprints = ctx.footprints;
         this.timerQueue = ctx.timers;
         this.sounds = ctx.sounds;
-        this.actuators = new ActuatorSystem(ctx);
-        this.dsaSystem = new DsaSystem(ctx);
-        this.timerSystem = new TimerSystem(ctx);
-        this.worldMove = new WorldMove(ctx);
-        this.missileEncounter = new MissileEncounter(ctx);
-        this.monsterSystem = new MonsterSystem(ctx);
-        this.monsterDamage = new MonsterDamage(ctx);
-        this.monsterPerception = new MonsterPerception(ctx);
-        this.monsterAttack = new MonsterAttack(ctx);
-        this.monsterAI = new MonsterAI(ctx);
-        this.characterStats = new CharacterStats(ctx);
-
-        this.attackSystem = new AttackSystem(ctx);
-        this.movementSystem = new MovementSystem(ctx);
-        this.magic = new MagicSystem(ctx);
-        this.character = new CharacterSystem(ctx);
-        this.mouse = new MouseSystem(ctx);
-        this.hallOfChampions = new HallOfChampions(ctx);
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
-
         Object.assign(ctx.systems, {
-            actuators: this.actuators,
-            dsa: this.dsaSystem,
-            timer: this.timerSystem,
-            worldMove: this.worldMove,
-            missileEncounter: this.missileEncounter,
-            monsters: this.monsterSystem,
-            monsterDamage: this.monsterDamage,
-            monsterPerception: this.monsterPerception,
-            monsterAttack: this.monsterAttack,
-            monsterAI: this.monsterAI,
-            characterStats: this.characterStats,
-            attack: this.attackSystem,
-            movement: this.movementSystem,
-            magic: this.magic,
-            character: this.character,
-            mouse: this.mouse,
-            hallOfChampions: this.hallOfChampions,
+            actuators: new ActuatorSystem(ctx),
+            dsa: new DsaSystem(ctx),
+            timer: new TimerSystem(ctx),
+            worldMove: new WorldMove(ctx),
+            missileEncounter: new MissileEncounter(ctx),
+            monsters: new MonsterSystem(ctx),
+            monsterDamage: new MonsterDamage(ctx),
+            monsterPerception: new MonsterPerception(ctx),
+            monsterAttack: new MonsterAttack(ctx),
+            monsterAI: new MonsterAI(ctx),
+            characterStats: new CharacterStats(ctx),
+            attack: new AttackSystem(ctx),
+            movement: new MovementSystem(ctx),
+            magic: new MagicSystem(ctx),
+            character: new CharacterSystem(ctx),
+            mouse: new MouseSystem(ctx),
+            hallOfChampions: new HallOfChampions(ctx),
             mainLoop: this,
         } satisfies GameSystems);
+        this.systems = ctx.systems;
     }
 
     processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
-        return this.dsaSystem.processViewingFilter(options);
+        return this.systems.dsa.processViewingFilter(options);
     }
 
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
@@ -530,7 +466,7 @@ export class Game implements MainLoop {
         // in this tick.
         this.loadNewPartyLevel();
         do {
-            if (this.timerSystem.processTimers()) {
+            if (this.systems.timer.processTimers()) {
                 // "Game has been won." (doc/CSBwin-src/CSBCode.cpp:627-633)
                 this.runScript(this.wonByTimers());
                 return;
@@ -657,7 +593,7 @@ export class Game implements MainLoop {
      * itself. Nor have the overlay's timeout and `parameterMessageSequence`, which the port does not model.
      */
     *processTimersViewportAndSound(): LoopScript {
-        if (this.timerSystem.processTimers()) {
+        if (this.systems.timer.processTimers()) {
             yield* this.wonByTimers();
         }
         this.ctx.host.drawViewport();
@@ -723,7 +659,7 @@ export class Game implements MainLoop {
 
     /** `MoveParty` (`MovementSystem.moveParty`), then the move listeners (`onMove`). */
     move(action: MovementAction): boolean {
-        const result = this.movementSystem.moveParty(action);
+        const result = this.systems.movement.moveParty(action);
         for (const callback of this.onMoveCallbacks) {
             callback(result.success, result);
         }
@@ -732,7 +668,7 @@ export class Game implements MainLoop {
 
     /** The UI's object move, the floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`). */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
-        this.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
+        this.systems.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
     }
 
     /** `DiscardAllInput` (`MouseQueue.discardAllInput`). */
@@ -742,7 +678,7 @@ export class Game implements MainLoop {
 
     /** Button 145, the sleep icon (`MouseSystem.sleep`). */
     sleep(): boolean {
-        return this.mouse.sleep();
+        return this.systems.mouse.sleep();
     }
 
     /** `WakeUp` for button 146 (`LoopState.wakeUp`). */
@@ -787,11 +723,11 @@ export class Game implements MainLoop {
     loadNewPartyLevel(): boolean {
         const level = this.ctx.loop.newPartyLevel;
         if (level === -1) {
-            if (!this.monsterSystem.loadPartyLevelIfChanged()) return false;
+            if (!this.systems.monsters.loadPartyLevelIfChanged()) return false;
         } else {
             const party = this.party.state;
             party.position = new Position(party.position.x, party.position.y, level);
-            this.monsterSystem.loadPartyLevel(level);
+            this.systems.monsters.loadPartyLevel(level);
             this.ctx.systems.worldMove.moveParty(-1, 0, party.position.x, party.position.y);
             this.ctx.loop.newPartyLevel = -1;
         }
@@ -887,17 +823,17 @@ export class Game implements MainLoop {
 
     /** A pre-built champion joins, as the tools' do (`HallOfChampions.addChampion`). */
     addChampion(champion: Champion): boolean {
-        return this.hallOfChampions.addChampion(champion);
+        return this.systems.hallOfChampions.addChampion(champion);
     }
 
     /** Button 160-162 on the potential champion's eye panel (`HallOfChampions`). */
     resurrectReincarnateCancel(button: number): boolean {
-        return this.hallOfChampions.resurrectReincarnateCancel(button);
+        return this.systems.hallOfChampions.resurrectReincarnateCancel(button);
     }
 
     /** The name-entry screen answered (`HallOfChampions.reincarnateNamed`). */
     reincarnateNamed(chIdx: number, name: string, title: string): void {
-        this.hallOfChampions.reincarnateNamed(chIdx, name, title);
+        this.systems.hallOfChampions.reincarnateNamed(chIdx, name, title);
     }
 
     /** `RemoveCharacterPossession` (`CharacterSystem`), for the inventory click and `tools/`. */
@@ -928,12 +864,12 @@ export class Game implements MainLoop {
 
     /** `_ExecuteAttack`'s engine half (`CharacterSystem.executeAttack`), for the UI and `tools/`. */
     championAttack(chIdx: number, attackType: number): number {
-        return this.character.executeAttack(chIdx, attackType);
+        return this.systems.character.executeAttack(chIdx, attackType);
     }
 
     /** `d.attackDamageToDisplay`, read and cleared (`AttackSystem.consumeAttackDamageToDisplay`). */
     consumeAttackDamageToDisplay(): number {
-        return this.attackSystem.consumeAttackDamageToDisplay();
+        return this.systems.attack.consumeAttackDamageToDisplay();
     }
 
     /**
@@ -1002,38 +938,38 @@ export class Game implements MainLoop {
 
     /** A click on the wall ahead, `TouchWallF1` (`MouseSystem.handleWallClick`). */
     handleWallClick(): boolean {
-        return this.mouse.handleWallClick();
+        return this.systems.mouse.handleWallClick();
     }
 
     /** An empty-handed click on the bare stone ahead (`MouseSystem.handleStoneClick`). */
     handleStoneClick(): void {
-        this.mouse.handleStoneClick();
+        this.systems.mouse.handleStoneClick();
     }
 
     /** A click on a door's button (`MouseSystem.handleDoorSwitchClick`). */
     handleDoorSwitchClick(): boolean {
-        return this.mouse.handleDoorSwitchClick();
+        return this.systems.mouse.handleDoorSwitchClick();
     }
 
     /** `DropObject` (`MouseSystem.dropObjectFromCursor`), for the UI and `tools/`. */
     dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
-        return this.mouse.dropObjectFromCursor(relativePos, options);
+        return this.systems.mouse.dropObjectFromCursor(relativePos, options);
     }
 
     /** `ThrowObjectInHand` (`MouseSystem.throwObjectFromCursor`), for the UI and `tools/`. */
     throwObjectFromCursor(leftOrRight: number): boolean {
-        return this.mouse.throwObjectFromCursor(leftOrRight);
+        return this.systems.mouse.throwObjectFromCursor(leftOrRight);
     }
 
 
     /** The magic panel's cast button (`MagicSystem.castSpellFromUi`). */
     castSpellFromUi(chIdx: number): number {
-        return this.magic.castSpellFromUi(chIdx);
+        return this.systems.magic.castSpellFromUi(chIdx);
     }
 
 
     // Get position info for debugging
-    getPositionInfo = () => this.movementSystem.getPositionInfo();
+    getPositionInfo = () => this.systems.movement.getPositionInfo();
 
     // Get tick count
     getTickCount = () => this.state.tickCount;
@@ -1044,7 +980,7 @@ export class Game implements MainLoop {
      * rather than clear them (`src/data/CsbwinSaveGame.ts`).
      */
     getDsaGlobalVariables(): number[] {
-        return this.dsaSystem.getGlobalVariables();
+        return this.systems.dsa.getGlobalVariables();
     }
 
     /** The quick-save's snapshot (`RuntimeSave.getRuntimeSaveState`). */
@@ -1060,7 +996,7 @@ export class Game implements MainLoop {
      * (`:1260`).
      */
     saveWritten(): void {
-        this.monsterSystem.reattachAfterSave();
+        this.systems.monsters.reattachAfterSave();
         smartDiscard(this.ctx, true);
         this.canRestart = true;
     }

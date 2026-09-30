@@ -65,7 +65,7 @@ function fire(label: string, gen: Position, party: Position, multiplier: number)
     `${label}: the multiplier is ${multiplier} (the actuator's ${own}, the level's ${levelMultiplier})`);
 
   game.party.state.position = party;
-  game.monsterSystem.loadPartyLevel(party.z);
+  game.systems.monsters.loadPartyLevel(party.z);
   const onPartyLevel = new Position(gen.x, gen.y, party.z);
   const beforeHere = objectsAt(game, gen, DBType.CREATURE).length;
   const beforeThere = party.z === gen.z ? 0 : objectsAt(game, onPartyLevel, DBType.CREATURE).length;
@@ -74,7 +74,7 @@ function fire(label: string, gen: Position, party: Position, multiplier: number)
     uByte5: 0, uByte6: gen.x, uByte7: gen.y, uByte8: 0, uByte9: ActuatorAction.SET, sequence: 0,
     timerWord8: 0, timerWord6: 0,
   });
-  game.timerSystem.processTimers();
+  game.systems.timer.processTimers();
 
   const groups = objectsAt(game, gen, DBType.CREATURE);
   const group = groups.length > beforeHere ? dungeon.getCreatureRecord(groups[groups.length - 1]!)! : null;

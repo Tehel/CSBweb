@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
   game.party.state.position = new Position(px, py, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const dungeon = game.dungeonState;
   const start = game.party.state.champions.map((c) => c.attributes.health);
@@ -120,16 +120,16 @@ async function main(): Promise<void> {
   let bigMask = 0;
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
-    game.monsterAttack.damageCharacter(probeIdx, 300, 0x3f, 3);
-    game.monsterAttack.displayCharacterDamage();
+    game.systems.monsterAttack.damageCharacter(probeIdx, 300, 0x3f, 3);
+    game.systems.monsterAttack.displayCharacterDamage();
     if (probe.wounds !== 0) bigWounds++;
     bigMask |= probe.wounds;
   }
   let smallWounds = 0;
   for (let i = 0; i < 200; i++) {
     probe.wounds = 0;
-    game.monsterAttack.damageCharacter(probeIdx, 6, 0x3f, 3);
-    game.monsterAttack.displayCharacterDamage();
+    game.systems.monsterAttack.damageCharacter(probeIdx, 6, 0x3f, 3);
+    game.systems.monsterAttack.displayCharacterDamage();
     if (probe.wounds !== 0) smallWounds++;
   }
   console.log('');
@@ -149,7 +149,7 @@ async function main(): Promise<void> {
   const measure = (): number => {
     armoured.attributes.health = 1000000;
     let total = 0;
-    for (let i = 0; i < 400; i++) total += game.monsterAttack.damageCharacter(armIdx, 100, 0x3f, 3);
+    for (let i = 0; i < 400; i++) total += game.systems.monsterAttack.damageCharacter(armIdx, 100, 0x3f, 3);
     return total;
   };
   const bare = measure();

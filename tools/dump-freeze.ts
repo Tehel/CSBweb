@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   game.addChampion(champion(1));
   const party = game.party.state;
   party.position = new Position(6, 14, 2);
-  game.monsterSystem.loadPartyLevel(2);
+  game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
   const ui: UIState = createUIState(graphics, game.dungeonState, {

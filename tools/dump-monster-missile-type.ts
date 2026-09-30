@@ -91,7 +91,7 @@ function main(): void {
   let others = 0;
   for (let level = 0; level < data.maps.length; level++) {
     game.party.state.position = new Position(0, 0, level);
-    game.monsterSystem.loadPartyLevel(level);
+    game.systems.monsters.loadPartyLevel(level);
     for (const slot of dungeon.getItem16Pool()) {
       if (slot.word0 < 0) continue;
       const rec = dungeon.getCreatureRecordByIndex(slot.word0);
@@ -101,10 +101,10 @@ function main(): void {
       const rn = encodeObjectID(0, DBType.CREATURE, slot.word0);
       const cell = new Position(slot.uByte10, slot.uByte11, level);
       const before = missilesIn(game, cell);
-      game.monsterAttack.monsterAttacks(rn, rec, slot.uByte10, slot.uByte11, 0, {
+      game.systems.monsterAttack.monsterAttacks(rn, rec, slot.uByte10, slot.uByte11, 0, {
         level, primaryDirectionToParty: 0, orthogonalDistanceToParty: 2,
       });
-      const p = game.monsterAttack.attackParameters;
+      const p = game.systems.monsterAttack.attackParameters;
       const name = MonsterType[rec.creatureType] ?? String(rec.creatureType);
       if (!p) { check(false, `${name} attacked and left a parameter block`); continue; }
       console.log([

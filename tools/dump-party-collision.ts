@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(0, 0, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const dungeon = game.dungeonState;
   const map = dungeon.getMap(level);
@@ -256,7 +256,7 @@ async function main(): Promise<void> {
     standAtWall();
     const moved = game.move(MovementAction.MOVE_FORWARD);
     // The next tick's `DisplayCharacterDamage` takes the bump off the HP.
-    game.monsterAttack.displayCharacterDamage();
+    game.systems.monsterAttack.displayCharacterDamage();
     // Corners are absolute, 0=NW 1=NE 2=SE 3=SW, so the two facing the wall are
     // `facing` and `facing + 1`.
     const frontCorners = [wall.facing & 3, (wall.facing + 1) & 3];
@@ -292,7 +292,7 @@ async function main(): Promise<void> {
   type Internals = { lastTickTime: number; lastInputTime: number };
   const internals = game as unknown as Internals;
   /** `d.LoadedLevel`'s party half: the level whose groups `LoadPartyLevel` attached. */
-  const loadedLevel = (): number | null => (game.monsterSystem as unknown as { loadedLevel: number | null }).loadedLevel;
+  const loadedLevel = (): number | null => (game.systems.monsters as unknown as { loadedLevel: number | null }).loadedLevel;
   const T0 = Date.now() + 60_000;
   let discard: {
     wallQueue: number; tickHeld: boolean; tickNextFrame: boolean; facingKept: boolean;
@@ -365,7 +365,7 @@ async function main(): Promise<void> {
     const turn = st().map((s, i) => beforeTurn[i] - s);
 
     // A load makes the formula non-trivial: 3 * 400 / MaxLoad + 1.
-    const stats = game.characterStats;
+    const stats = game.systems.characterStats;
     const realLoad = stats.characterLoad.bind(stats);
     const back = champs.findIndex((c) => ![wall!.facing & 3, (wall!.facing + 1) & 3].includes(c.partyPosition));
     const laden = champs.findIndex((_c, i) => i !== back);
@@ -377,7 +377,7 @@ async function main(): Promise<void> {
     const exhaustCost = sw(Math.trunc((3 * 2000) / stats.maxLoad(champs[back])) + 1);
     standAtWall();
     game.move(MovementAction.MOVE_FORWARD);
-    game.monsterAttack.displayCharacterDamage();
+    game.systems.monsterAttack.displayCharacterDamage();
     stats.characterLoad = realLoad;
     stamina = {
       bump, turn, loaded: 100 - champs[laden].attributes.stamina, loadedCost,
@@ -484,7 +484,7 @@ async function main(): Promise<void> {
       game.discardAllInput();
 
       // `TimeToMove` (CSBCode.cpp:7003) and the slowest-living rule.
-      const stats = game.characterStats;
+      const stats = game.systems.characterStats;
       const realLoad = stats.characterLoad.bind(stats);
       const c0 = party.champions[0];
       const max = stats.maxLoad(c0);
@@ -578,7 +578,7 @@ async function main(): Promise<void> {
       party.champions = [champion(0), champion(1), champion(2), champion(3)];
       party.position = new Position(stairs.px, stairs.py, level);
       game.party.setFacing(stairs.dir);
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
@@ -610,7 +610,7 @@ async function main(): Promise<void> {
       // The step alone, with no tick after it.
       party.position = new Position(stairs.px, stairs.py, level);
       game.party.setFacing(stairs.dir);
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       game.move(MovementAction.MOVE_FORWARD);
       const held = { level: party.position.z, pending: game.ctx.loop.newPartyLevel, loaded: loadedLevel() };
@@ -630,7 +630,7 @@ async function main(): Promise<void> {
         'the top of the tick loads the new level and moves d.partyLevel on (LoadPartyLevel)',
       );
       game.party.state.position = new Position(scene.px, scene.py, level);
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
     }
   }
 
@@ -698,7 +698,7 @@ async function main(): Promise<void> {
       const party = game.party.state;
       party.champions = [champion(0), champion(1), champion(2), champion(3)];
       party.position = new Position(pit.x, pit.y, level);
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
       party.partyMoveDisableTimer = 0;
       internals.lastInputTime = 0;
       game.discardAllInput();
@@ -724,7 +724,7 @@ async function main(): Promise<void> {
         uByte5: 0xab, uByte6: 0, uByte7: 0, uByte8: 0, uByte9: 0,
         sequence: 0, timerWord8: 0, timerWord6: 0,
       });
-      const timerSystem = game.timerSystem as unknown as { dispatch(timer: TimerEntry): void };
+      const timerSystem = game.systems.timer as unknown as { dispatch(timer: TimerEntry): void };
       const dispatch = timerSystem.dispatch;
       let probeSaw: { x: number; y: number; level: number; pending: number; loaded: number | null } | null = null;
       timerSystem.dispatch = function (this: unknown, timer: TimerEntry): void {
@@ -746,7 +746,7 @@ async function main(): Promise<void> {
       const newLevel = party.position.z;
       const below = dungeon.incrementLevel(new Position(pit.x, pit.y, level), 1)!;
       const queuedAfterTick = game.queuedInputCount();
-      const loadedAfterTick = game.monsterSystem.needsLevelReload() ? 'not yet' : 'loaded';
+      const loadedAfterTick = game.systems.monsters.needsLevelReload() ? 'not yet' : 'loaded';
       const owedAfterTick = game.ctx.loop.newPartyLevel;
       const saw = probeSaw as { x: number; y: number; level: number; pending: number; loaded: number | null } | null;
       console.log(
@@ -773,7 +773,7 @@ async function main(): Promise<void> {
       check(!turned, 'the queued turn should never run on the new level');
       setCell(saved);
       game.party.state.position = new Position(scene.px, scene.py, level);
-      game.monsterSystem.loadPartyLevel(level);
+      game.systems.monsters.loadPartyLevel(level);
     }
   }
 

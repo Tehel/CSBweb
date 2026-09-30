@@ -49,7 +49,7 @@ function main(): void {
   const game = newGame(data, graphics, { messages });
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(6, 14, 2);
-  game.monsterSystem.loadPartyLevel(2);
+  game.systems.monsters.loadPartyLevel(2);
 
   type Internals = { lastTickTime: number; state: { tickCount: number } };
   const internals = game as unknown as Internals;

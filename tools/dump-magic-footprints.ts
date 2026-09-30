@@ -75,7 +75,7 @@ function scenario(save: string, power: number): void {
   for (const skill of caster.skills as unknown as Array<{ experience: number }>) skill.experience = 500000;
   caster.incantation = [0x5f + power, ...YA_BRO_ROS];
   const atCast = prints.getCount();
-  const cast = (game.magic as unknown as { castMagic(i: number): number }).castMagic(0);
+  const cast = (game.systems.magic as unknown as { castMagic(i: number): number }).castMagic(0);
   const first = prints.getIndexOfFirstMagicFootprint();
   const lastAtCast = prints.getIndexOfLastMagicFootprint();
   console.log(`${label}: cast=${cast} active=${party.magicFootprintsActive} count=${atCast} ` +
@@ -91,7 +91,7 @@ function scenario(save: string, power: number): void {
   let from = home;
   for (const to of route) {
     game.state.tickCount += 8;
-    game.worldMove.moveParty(from.x, from.y, to.x, to.y);
+    game.systems.worldMove.moveParty(from.x, from.y, to.x, to.y);
     from = to;
   }
   const count = prints.getCount();

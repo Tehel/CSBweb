@@ -143,7 +143,7 @@ what the path under test reaches, with the real system or a cast stand-in
 (`ctx.systems.missileEncounter = { createDeathCloud: () => { clouds++; } } as unknown as MissileEncounter`,
 `dump-monster-damage.ts`). A missing one fails loudly on `undefined`, never silently.
 To intercept a call inside a whole `Game`, replace the method on the instance
-(`game.monsterDamage.damageMonster = …`, `dump-missile-monster.ts`): every caller goes
+(`game.systems.monsterDamage.damageMonster = …`, `dump-missile-monster.ts`): every caller goes
 through the instance at call time. Before E1a each
 tool hand-built the subset of tables it thought it needed, and two tests silently
 measured nothing because of it (the armour test without the clothing tables;
@@ -203,7 +203,7 @@ tick runs the monsters too, so do anything that needs a monster where you found 
 before the frames that tick, or set `lastTickTime = t` so none is due.
 
 **Spy on the real call, don't re-derive it.** When a formula consumes random numbers,
-wrap the instance method (`game.missileEncounter.determineMagicDamage = …`) to record its
+wrap the instance method (`game.systems.missileEncounter.determineMagicDamage = …`) to record its
 inputs and outputs, then check the arithmetic the engine did with them. Recomputing the
 draws in the tool would need the RNG state and proves less.
 

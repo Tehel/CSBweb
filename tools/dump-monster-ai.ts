@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   });
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(10, 10, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const pool = game.dungeonState.getItem16Pool();
   const active = () => pool.filter((s) => s.word0 >= 0).length;

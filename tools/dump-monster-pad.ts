@@ -33,7 +33,6 @@ import { resolve } from 'node:path';
 
 import { DBType, decodeObjectID, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../src/core/types';
 import { getActuatorType } from '../src/data/actuatorHelpers';
-import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -101,7 +100,7 @@ async function main(): Promise<void> {
   /** Record every `PlaceOrRemoveObjectInRoom` (`ActuatorSystem.triggerObjectMove`) call. */
   const spy = (game: Game): PadCall[] => {
     const calls: PadCall[] = [];
-    const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+    const actuators = game.systems.actuators;
     const real = actuators.triggerObjectMove.bind(actuators);
     actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {
       calls.push({ at: position, place, unchangedRoom });
@@ -134,7 +133,7 @@ async function main(): Promise<void> {
     }
     if (!partyAt) throw new Error('nowhere to stand the party');
     game.party.state.position = partyAt;
-    game.monsterSystem.loadPartyLevel(pad.z);
+    game.systems.monsters.loadPartyLevel(pad.z);
     let type = 0;
     while (!dungeon.monsterAllowedOnLevel(type, pad.z)) type++;
     const where = at(squares);
@@ -151,7 +150,7 @@ async function main(): Promise<void> {
     const { game, pad, beside, rn, calls } = await setUp((s) => s.beside);
     const levitating = monsterLevitating(objectTables.monsterDesc[game.dungeonState.getCreatureRecord(rn)!.creatureType]!);
     const before = actionTimers(game);
-    const onto = game.monsterSystem.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
+    const onto = game.systems.monsters.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
     const after = actionTimers(game);
     console.log(`1. group (${beside.x},${beside.y}) -> pad (${pad.x},${pad.y}) L${pad.z}: removed ${onto.code !== 0}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}, action timers ${before} -> ${after}`);
@@ -162,7 +161,7 @@ async function main(): Promise<void> {
     check(after > before, "the pad's action is queued");
 
     calls.length = 0;
-    game.monsterSystem.moveMonster(rn, pad.x, pad.y, beside.x, beside.y, pad.z);
+    game.systems.monsters.moveMonster(rn, pad.x, pad.y, beside.x, beside.y, pad.z);
     console.log(`2. group back off the pad: pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place]))}`);
     check(called(calls, pad, false), 'walking off releases the pad');
   }
@@ -177,7 +176,7 @@ async function main(): Promise<void> {
       mapX: beside.x, mapY: beside.y, level: beside.z, invisible: false, drawAsSize4: false,
     });
     calls.length = 0;
-    const result = game.monsterSystem.moveMonster(rn, pad.x, pad.y, beside.x, beside.y, pad.z);
+    const result = game.systems.monsters.moveMonster(rn, pad.x, pad.y, beside.x, beside.y, pad.z);
     console.log(`3. group on the pad -> occupied (${beside.x},${beside.y}): removed ${result.code !== 0}, `
       + `pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place]))}`);
     check(result.code !== 0, 'the group goes into abeyance');
@@ -190,7 +189,7 @@ async function main(): Promise<void> {
     const flyer = objectTables.monsterDesc.findIndex((d) => monsterLevitating(d));
     game.dungeonState.getCreatureRecord(rn)!.creatureType = flyer;
     const before = actionTimers(game);
-    game.monsterSystem.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
+    game.systems.monsters.moveMonster(rn, beside.x, beside.y, pad.x, pad.y, pad.z);
     console.log(`4. levitating type ${flyer} -> pad: pad calls ${calls.length}, action timers ${before} -> ${actionTimers(game)}`);
     check(flyer >= 0 && calls.length === 0, 'a levitating group neither presses nor releases a pad');
     check(actionTimers(game) === before, 'and queues nothing');
@@ -200,7 +199,7 @@ async function main(): Promise<void> {
   {
     const { game, beside, beyond, rn } = await setUp((s) => s.beside);
     const before = aiTimersAt(game, beside);
-    const result = game.monsterSystem.moveMonster(rn, beside.x, beside.y, beyond.x, beyond.y, beside.z);
+    const result = game.systems.monsters.moveMonster(rn, beside.x, beside.y, beyond.x, beyond.y, beside.z);
     console.log(`5. group (${beside.x},${beside.y}) -> (${beyond.x},${beyond.y}): code ${result.code}, AI timers `
       + `${before} at the old square -> ${aiTimersAt(game, beside)}, ${aiTimersAt(game, beyond)} at the new`);
     check(result.code === 0, 'an ordinary step changes no ITEM16');
@@ -212,7 +211,7 @@ async function main(): Promise<void> {
   {
     const { game, pad, rn, calls } = await setUp((s) => s.pad);
     const groupIndex = game.dungeonState.getCreatureRecord(rn)!.groupIndex;
-    game.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
+    game.systems.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
     const slot = game.dungeonState.getItem16Record(groupIndex);
     console.log(`6. group deleted on the pad (${pad.x},${pad.y}) L${pad.z}: still there `
       + `${game.dungeonState.findFirstMonster(pad) !== OBJECT_ID_EOF}, ITEM16 ${groupIndex} word0 ${slot?.word0}, `
@@ -226,7 +225,7 @@ async function main(): Promise<void> {
     const flying = await setUp((s) => s.pad);
     const flyer = objectTables.monsterDesc.findIndex((d) => monsterLevitating(d));
     flying.game.dungeonState.getCreatureRecord(flying.rn)!.creatureType = flyer;
-    flying.game.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
+    flying.game.systems.monsterDamage.deleteMonster(pad.z, pad.x, pad.y);
     console.log(`   levitating type ${flyer} deleted on the pad: pad calls ${flying.calls.length}`);
     check(flying.game.dungeonState.findFirstMonster(pad) === OBJECT_ID_EOF && flying.calls.length === 0,
       'a levitating group is lifted with RemoveObjectFromRoom: no pad sees it go');

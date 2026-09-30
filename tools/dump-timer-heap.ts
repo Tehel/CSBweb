@@ -250,7 +250,7 @@ function checkLoadedGames(files: string[]): void {
     // The first tick runs its timers on the saved `d.Time`, then turns the clock
     // (`LoadGame`, SaveGame.cpp:1624; CSBCode.cpp:626, :660).
     const now = game.state.tickCount;
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     game.state.tickCount++;
     const due = before.filter((t) => t.time <= now).length;
     const left = game.timerQueue.getTimers().filter((t) => t.time <= now);

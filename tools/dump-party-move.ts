@@ -78,13 +78,13 @@ function makeGame(): { game: Game; log: string[] } {
   const log: string[] = [];
   const party = game.party.state;
 
-  const missiles = game.missileEncounter;
+  const missiles = game.systems.missileEncounter;
   const check = missiles.checkPartyMoveFromMissile.bind(missiles);
   missiles.checkPartyMoveFromMissile = (from, to) => {
     log.push(`missile ${at(from)}->${to ? at(to) : 'none'}`);
     return check(from, to);
   };
-  const wm = game.worldMove as unknown as { partyFallsIntoPit(): void };
+  const wm = game.systems.worldMove as unknown as { partyFallsIntoPit(): void };
   const fall = wm.partyFallsIntoPit.bind(wm);
   wm.partyFallsIntoPit = () => {
     log.push(`fall at ${at(party.position)}`);
@@ -102,7 +102,7 @@ function makeGame(): { game: Game; log: string[] } {
     if (object === OBJECT_ID_NULL) log.push(`${place ? 'place' : 'remove'} ${at(position)} ${unchangedRoom ? 'same' : 'moved'}`);
     return pads(position, object, place, unchangedRoom, facing);
   };
-  const monsters = game.monsterSystem;
+  const monsters = game.systems.monsters;
   const load = monsters.loadPartyLevel.bind(monsters);
   monsters.loadPartyLevel = (level) => {
     log.push(`load ${level}`);
@@ -173,7 +173,7 @@ function findStairs(game: Game): { stairs: Position; from: Position; facing: Dir
 function stand(game: Game, log: string[], p: Position, facing: Direction): void {
   game.party.state.position = p;
   game.party.setFacing(facing);
-  game.monsterSystem.loadPartyLevel(p.z);
+  game.systems.monsters.loadPartyLevel(p.z);
   log.length = 0;
 }
 
@@ -181,7 +181,7 @@ function stand(game: Game, log: string[], p: Position, facing: Direction): void 
 function launch(game: Game, p: Position, corner: number): ObjectID {
   const before = new Set<ObjectID>();
   for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.state.tickCount + 9, true)) {
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, p.x, p.y, p.z, corner, Direction.NORTH, 40, 10, 1, game.state.tickCount + 9, true)) {
     throw new Error('missile not launched');
   }
   for (let rn = game.dungeonState.findFirstObject(p); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) {
@@ -238,7 +238,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   // `whoLeavesNewCell[tailPosLeft]` (`Code11f52.cpp:2640-2660`).
   const fireball = launch(game, pit, (facing + 3) & 3);
   log.length = 0;
-  const climb = game.attackSystem as unknown as { climbDownIntoPit(target: Position): void };
+  const climb = game.systems.attack as unknown as { climbDownIntoPit(target: Position): void };
   climb.climbDownIntoPit(pit);
   tick(game, log);
   compare('2. the climb down', log, [`missile ${at(from)}->${at(pit)}`, ...fallTail(from, below)]);
@@ -249,7 +249,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, from, facing);
-  const dsa = (game as unknown as { dsaSystem: { teleportParty(locr: LocationRel): void } }).dsaSystem;
+  const dsa = game.systems.dsa as unknown as { teleportParty(locr: LocationRel): void };
   dsa.teleportParty({ l: game.dungeonState.getMap(pit.z)!.descriptor.level, x: pit.x, y: pit.y, p: 0 });
   tick(game, log);
   compare('3. the DSA teleport onto the pit', log, [`missile ${at(from)}->${at(from)}`, ...fallTail(from, below)]);
@@ -259,7 +259,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
 {
   const { game, log } = makeGame();
   stand(game, log, pit, facing);
-  const wiggle = game.timerSystem as unknown as { wiggleEverything(x: number, y: number, level: number): void };
+  const wiggle = game.systems.timer as unknown as { wiggleEverything(x: number, y: number, level: number): void };
   wiggle.wiggleEverything(pit.x, pit.y, pit.z);
   tick(game, log);
   compare('4. the wiggle of the party\'s square as its pit opens', log, [`missile ${at(pit)}->${at(pit)}`, ...fallTail(pit, below)]);
@@ -269,7 +269,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   stand(game, log, from, facing);
   const fireball = launch(game, from, 1);
   log.length = 0;
-  const wiggle = game.timerSystem as unknown as { wiggleEverything(x: number, y: number, level: number): void };
+  const wiggle = game.systems.timer as unknown as { wiggleEverything(x: number, y: number, level: number): void };
   wiggle.wiggleEverything(from.x, from.y, from.z);
   tick(game, log);
   compare('5. the wiggle of the party\'s square as nothing happens', log, [`missile ${at(from)}->${at(from)}`, 'tick']);
@@ -326,7 +326,7 @@ console.log(`the pit at ${at(pit)}, stepped into facing ${facing} from ${at(from
   // its `DisplayCharacterDamage` kills there (doc/CSBwin-src/CSBCode.cpp:615-657).
   check(game.party.state.champions[0]!.attributes.health !== 0, 'the fall itself does not kill: the damage is pending');
   game.loadNewPartyLevel();
-  game.monsterAttack.displayCharacterDamage();
+  game.systems.monsterAttack.displayCharacterDamage();
   const bonesBelow = game.dungeonState.findFirstObject(below) !== OBJECT_ID_EOF;
   const bonesAbove = game.dungeonState.findFirstObject(from) !== OBJECT_ID_EOF;
   console.log(`8. a champion at 1 HP falls: alive ${game.party.state.champions[0]!.attributes.health !== 0}, `

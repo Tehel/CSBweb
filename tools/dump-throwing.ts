@@ -430,7 +430,7 @@ async function main(): Promise<void> {
   const runUntilFree = (): number => {
     let ticks = 0;
     while (archer.busyTimerIndex >= 0 && ticks < 1000) {
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       clock.tickCount++;
       ticks++;
     }

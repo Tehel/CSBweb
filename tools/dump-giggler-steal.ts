@@ -114,7 +114,7 @@ function main(): void {
     game.addChampion(champ);
   }
   game.party.state.position = at;
-  game.monsterSystem.loadPartyLevel(at.z);
+  game.systems.monsters.loadPartyLevel(at.z);
 
   // Each object in the order it left its champion.
   const gone: ObjectID[] = [];

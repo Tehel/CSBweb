@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   // Stand the party somewhere on the target level so it becomes the loaded level.
   game.party.state.position = new Position(0, 0, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const dungeon = game.dungeonState;
   const pool = dungeon.getItem16Pool();
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
         && t.uByte6 === mx && t.uByte7 === my).length;
 
     console.log(`Case 1 — move a ${MonsterType[rec.creatureType]} from (${mx},${my}) to (${nx},${ny})`);
-    const result = game.monsterSystem.moveMonster(rn, mx, my, nx, ny, level);
+    const result = game.systems.monsters.moveMonster(rn, mx, my, nx, ny, level);
     console.log(`  code=${result.code}`);
 
     const timersAtOld = game.timerQueue.getTimers()
@@ -108,7 +108,7 @@ async function main(): Promise<void> {
     const rn = game.dungeonState.findFirstMonster(new Position(ax, ay, level));
     if (rn !== OBJECT_ID_EOF && !(ax === bx && ay === by)) {
       console.log(`Case 2 — move a group from (${ax},${ay}) onto the occupied (${bx},${by})`);
-      const result = game.monsterSystem.moveMonster(rn, ax, ay, bx, by, level);
+      const result = game.systems.monsters.moveMonster(rn, ax, ay, bx, by, level);
       const abeyance = game.timerQueue.getTimers()
         .filter(t => t.function === TimerFunction.TT_60 || t.function === TimerFunction.TT_61);
       console.log(`  code=${result.code}, abeyance timers: ${abeyance.length}`);
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
       // Its target is still occupied, so the first retry must reschedule, not place.
       const t = abeyance[0]!;
       game.timerQueue.deleteTimer(t.index);
-      game.monsterSystem.processAbeyanceTimer(t);
+      game.systems.monsters.processAbeyanceTimer(t);
       const still = game.timerQueue.getTimers()
         .filter(x => x.function === TimerFunction.TT_60 || x.function === TimerFunction.TT_61);
       console.log(`Case 3 — retry while still blocked: abeyance timers ${still.length}, t=${still[0]?.time}`);
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
       dungeon.removeObjectFromCell(new Position(bx, by, level), bRn);
       const t2 = still[0]!;
       game.timerQueue.deleteTimer(t2.index);
-      game.monsterSystem.processAbeyanceTimer(t2);
+      game.systems.monsters.processAbeyanceTimer(t2);
       const after = game.timerQueue.getTimers()
         .filter(x => x.function === TimerFunction.TT_60 || x.function === TimerFunction.TT_61);
       console.log(`  after clearing (${bx},${by}): abeyance timers ${after.length}, monster there = ${monsterAt(bx, by)}`);
@@ -170,12 +170,12 @@ async function main(): Promise<void> {
     carrier.rec.unique = false;
 
     const before = parked();
-    for (let i = 0; i < 31; i++) game.monsterSystem.createMovementTimer(filler.rn, dest, false);
+    for (let i = 0; i < 31; i++) game.systems.monsters.createMovementTimer(filler.rn, dest, false);
     const full = parked() - before;
-    game.monsterSystem.createMovementTimer(plain.rn, dest, false);
+    game.systems.monsters.createMovementTimer(plain.rn, dest, false);
     const afterPlain = parked() - before;
     const plainDeleted = plain.rec.nextObject === OBJECT_ID_NULL;
-    game.monsterSystem.createMovementTimer(carrier.rn, dest, false);
+    game.systems.monsters.createMovementTimer(carrier.rn, dest, false);
     const afterCarrier = parked() - before;
     const carrierDeleted = carrier.rec.nextObject === OBJECT_ID_NULL;
     console.log(

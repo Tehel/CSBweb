@@ -68,11 +68,11 @@ function makeGame(): Game {
  */
 function fall(g: Game, pit: Position): Position {
   g.party.state.position = new Position(pit.x, pit.y, pit.z);
-  g.worldMove.moveParty(-1, 0, pit.x, pit.y);
+  g.systems.worldMove.moveParty(-1, 0, pit.x, pit.y);
   // The next tick: the level below loaded, then `DisplayCharacterDamage` takes the fall
   // off the HP (doc/CSBwin-src/CSBCode.cpp:615-657).
   g.loadNewPartyLevel();
-  g.monsterAttack.displayCharacterDamage();
+  g.systems.monsterAttack.displayCharacterDamage();
   return g.party.state.position;
 }
 
@@ -154,7 +154,7 @@ function main(): void {
     const g = makeGame();
     const healthBefore = healths(g);
     const staminaBefore = staminas(g);
-    const resolved = g.worldMove.withSupressedPitDamage(() => fall(g, pit));
+    const resolved = g.systems.worldMove.withSupressedPitDamage(() => fall(g, pit));
     const staminaAfter = staminas(g);
     const healthAfter = healths(g);
     for (let i = 0; i < staminaAfter.length; i++) {
@@ -174,9 +174,9 @@ function main(): void {
     // is 13; the tool sets the load by hand rather than filling a backpack.
     const g = makeGame();
     const champ = g.party.state.champions[0]!;
-    const maxLoad = g.characterStats.maxLoad(champ);
+    const maxLoad = g.systems.characterStats.maxLoad(champ);
     const before = champ.attributes.stamina;
-    g.monsterAttack.adjustStamina(0, Math.trunc(((25 * Math.trunc(maxLoad / 2)) & 0xffff) / maxLoad) + 1);
+    g.systems.monsterAttack.adjustStamina(0, Math.trunc(((25 * Math.trunc(maxLoad / 2)) & 0xffff) / maxLoad) + 1);
     const paid = before - champ.attributes.stamina;
     console.log(`a champion at half MaxLoad (${maxLoad}) would pay ${paid} stamina`);
     check(paid === 13, `half-loaded costs 13 stamina (got ${paid})`);
@@ -189,7 +189,7 @@ function main(): void {
 
   {
     const g = makeGame();
-    g.worldMove.withSupressedPitDamage(() => fall(g, pit));
+    g.systems.worldMove.withSupressedPitDamage(() => fall(g, pit));
     const healthBefore = healths(g);
     // Put the party back at the pit and fall again, this time without a rope.
     fall(g, pit);
@@ -207,7 +207,7 @@ function main(): void {
     const dead = g.party.state.champions[1]!;
     dead.attributes.health = 0;
     const staminaBefore = dead.attributes.stamina;
-    g.worldMove.withSupressedPitDamage(() => fall(g, pit));
+    g.systems.worldMove.withSupressedPitDamage(() => fall(g, pit));
     check(dead.attributes.stamina === staminaBefore, 'a dead champion is skipped by the climb cost');
   }
 

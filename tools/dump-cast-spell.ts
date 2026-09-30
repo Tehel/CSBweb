@@ -23,7 +23,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DBType, OBJECT_ID_EOF, Position, decodeObjectID, encodeObjectID } from '../src/core/types';
-import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
@@ -83,7 +82,7 @@ async function main(): Promise<void> {
     castSpell(chIdx: number, p: SpellParameters): number;
     fillSpellParameters(chIdx: number, incantation: number[], party: unknown): SpellParameters;
   };
-  const internals = game.magic as unknown as Internals;
+  const internals = game.systems.magic as unknown as Internals;
 
   /** One cast from a fresh party with the same seed, under `overrides`. */
   const cast = (overrides: Partial<SpellParameters>, setup?: (c: Champion) => void) => {
@@ -114,7 +113,7 @@ async function main(): Promise<void> {
 
   // Zokathra, through a filter's missile type 7, with the hands full or not. Every pad call
   // for a misc object is recorded.
-  const actuators = (game as unknown as { actuators: ActuatorSystem }).actuators;
+  const actuators = game.systems.actuators;
   const realTrigger = actuators.triggerObjectMove.bind(actuators);
   const padCalls: string[] = [];
   actuators.triggerObjectMove = (position, object, place, unchangedRoom, facing) => {

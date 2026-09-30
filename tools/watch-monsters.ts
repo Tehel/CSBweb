@@ -38,7 +38,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   game.party.state.position = new Position(px, py, level);
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 
   const dungeon = game.dungeonState;
   const pool = dungeon.getItem16Pool();

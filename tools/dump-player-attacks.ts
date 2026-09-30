@@ -152,7 +152,7 @@ async function main(): Promise<void> {
       console.log(['champion corner', 'ordinal reached'].join('\t'));
       const reached = new Set<number>();
       for (let corner = 0; corner < 4; corner++) {
-        const ordinal = game.attackSystem.determineAttackOrdinal(3, 1, 3, 2, corner);
+        const ordinal = game.systems.attack.determineAttackOrdinal(3, 1, 3, 2, corner);
         reached.add(ordinal);
         console.log([corner, ordinal].join('\t'));
       }
@@ -206,7 +206,7 @@ async function main(): Promise<void> {
       console.log([
         label,
         masteryOf(game, 0, g230.skillNumber[AttackType.atk_SWING]! & 0xff),
-        game.monsterAttack.quickness(champ),
+        game.systems.monsterAttack.quickness(champ),
         hits, total, hardest,
       ].join('\t'));
     }
@@ -444,7 +444,7 @@ async function main(): Promise<void> {
     check(onDoor(TimerFunction.TT_DOOR_STEP).length === 0, 'queueing it cancelled the door-step timer');
 
     const tick = (): void => {
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       game.state.tickCount++;
     };
     // The blow is a click, between ticks: the first tick runs its timers on the d.Time of
@@ -471,10 +471,10 @@ async function main(): Promise<void> {
     const characteristics = objectTables.doorCharacteristics;
     console.log(`DoorCharacteristics force: ${Array.from(characteristics, (v) => v & 0xff).join(', ')}; level 1 maps type 1 to entry ${map.descriptor.doorType1Index}`);
     map.descriptor.doorType1Index = 3;
-    const held = !game.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 4;
+    const held = !game.systems.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 4;
     check(held, 'force 100 does not break a door the level maps to entry 3 (force 255)');
     map.descriptor.doorType1Index = 1;
-    const broke = game.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
+    const broke = game.systems.missileEncounter.hitDoor(door, 100, false) && (map.cellFlags[11]![0]! & 7) === 5;
     check(broke, 'and does break it through entry 1 (force 42)');
   }
 
@@ -493,7 +493,7 @@ function standParty(game: Game, level: number, x: number, y: number, facing: num
   game.party.state.position = new Position(x, y, level);
   game.party.state.facing = facing as typeof game.party.state.facing;
   for (const champ of game.party.state.champions) champ.facing = facing as typeof champ.facing;
-  game.monsterSystem.loadPartyLevel(level);
+  game.systems.monsters.loadPartyLevel(level);
 }
 
 /** Put a real sword into a champion's fighting hand. */

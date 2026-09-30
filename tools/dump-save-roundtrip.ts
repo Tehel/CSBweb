@@ -108,7 +108,7 @@ function roundTrip(game: Game): { next: Game; bytes: Uint8Array } {
 function advance(game: Game, ticks: number): void {
   const state = game as unknown as { state: { tickCount: number } };
   for (let i = 0; i < ticks; i++) {
-    game.timerSystem.processTimers();
+    game.systems.timer.processTimers();
     state.state.tickCount++;
   }
 }
@@ -354,7 +354,7 @@ function main(): void {
     check(block2.numTimer === (state.dungeon.timerQueue?.length ?? 0), `${file}: gb2.NumTimer is the queue length`);
     check(block2.firstAvailTimer === live.timerQueue.getFirstAvailTimer(),
       `${file}: gb2.FirstAvailTimer is the free cursor`);
-    check(block2.item16QueLen === live.monsterSystem.getItem16QueLen(),
+    check(block2.item16QueLen === live.systems.monsters.getItem16QueLen(),
       `${file}: gb2.ITEM16QueLen is the number of slots in use`);
     check(block2.lastMonsterAttackTime === (party.lastMonsterAttackTime >>> 0),
       `${file}: gb2.LastMonsterAttackTime is d.LastMonsterAttackTime`);
@@ -483,12 +483,12 @@ function main(): void {
       const same = monstersOf(live) === monstersOf(loaded);
       if (!same && firstDiff < 0) firstDiff = tick;
       if (tick % 100 === 0 || (!same && firstDiff === tick)) {
-        console.log([withTail ? 'yes' : 'no', live.state.tickCount, live.monsterSystem.getItem16QueLen(),
+        console.log([withTail ? 'yes' : 'no', live.state.tickCount, live.systems.monsters.getItem16QueLen(),
           monsterTimers(live), live.ctx.random.getSeed() >>> 0, same].join('\t'));
       }
     }
     if (withTail) {
-      check(live.monsterSystem.getItem16QueLen() > 0 && monsterTimers(live) > 0,
+      check(live.systems.monsters.getItem16QueLen() > 0 && monsterTimers(live) > 0,
         'csbgame7.dat: the party level still has attached groups with movement timers');
       check(firstDiff < 0, 'with the save\'s tail, the game played on and a load of its save agree ' +
         `on every tick for 300 ticks${firstDiff < 0 ? '' : `, not from tick ${firstDiff}`}`);

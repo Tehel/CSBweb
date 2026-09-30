@@ -106,7 +106,7 @@ for (const c of cases) {
   site.teleporter.rotation = c.rotation;
   const before = new Set<number>();
   for (let rn = game.dungeonState.findFirstObject(site.from); rn !== OBJECT_ID_EOF; rn = game.dungeonState.getDBRecordLink(rn)) before.add(rn);
-  if (!game.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, game.state.tickCount, true)) {
+  if (!game.systems.magic.launchMissile(RN_FIREBALL, site.from.x, site.from.y, site.from.z, c.corner, site.direction, 40, 10, 1, game.state.tickCount, true)) {
     throw new Error('missile not launched');
   }
   let launched: ObjectID | null = null;

@@ -97,7 +97,7 @@ type DsaCharacterMoves = {
   findCharacterDestination(chIdx: number, carryLoc: number, object: ObjectID, doit: boolean): number;
 };
 /** The DSA's `&MOVE` arms for a character (`doc/CSBwin-src/MoveObject.cpp:146`, `:420`). */
-const dsaOf = (g: Game): DsaCharacterMoves => (g as unknown as { dsaSystem: DsaCharacterMoves }).dsaSystem;
+const dsaOf = (g: Game): DsaCharacterMoves => g.systems.dsa as unknown as DsaCharacterMoves;
 
 function champion(i: number): Champion {
   return {
@@ -315,8 +315,8 @@ async function main(): Promise<void> {
     AdjustStatsForItemCarried(c, 1, 1, staff, g.dungeonState, gNameIndex);
     AdjustStatsForItemCarried(c, 2, 1, helm, g.dungeonState, gNameIndex);
     const worn = `${c.attributes.maxMana} ${c.attributes.stats[AttributeIndex.Wisdom]!.current}`;
-    g.monsterAttack.damageCharacter(0, 999, 0, 0);
-    g.monsterAttack.displayCharacterDamage();
+    g.systems.monsterAttack.damageCharacter(0, 999, 0, 0);
+    g.systems.monsterAttack.displayCharacterDamage();
     const after = `${c.attributes.maxMana} ${c.attributes.stats[AttributeIndex.Wisdom]!.current}`;
     console.log(`dying with a Serpent Staff and the Crown of Nerra: maxMana/Wisdom ${worn} -> ${after}`);
     check(worn === '36 53' && after === '20 43', 'a death takes each bonus off as the object drops');

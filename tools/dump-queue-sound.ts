@@ -307,7 +307,7 @@ function main(): void {
     const { game } = s;
     const { tp, from, dest } = findTeleporter(game);
     stand(game, from, 0);
-    game.worldMove.moveParty(from.x, from.y, tp.x, tp.y);
+    game.systems.worldMove.moveParty(from.x, from.y, tp.x, tp.y);
     const now = game.party.state.position;
     row(`4. party (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${tp.z}`, s);
     check(now.x === dest.x && now.y === dest.y && now.z === dest.z, 'the party is at the destination');
@@ -329,7 +329,7 @@ function main(): void {
     }
     if (!party) throw new Error('no square two from the teleporter\'s destination');
     stand(game, party, 0);
-    game.monsterSystem.loadPartyLevel(tp.z);
+    game.systems.monsters.loadPartyLevel(tp.z);
     let type = -1;
     for (let t = 0; t < 27 && type < 0; t++) if (game.dungeonState.monsterAllowedOnLevel(t, tp.z)) type = t;
     const rn = createMonsterAt(game, {
@@ -338,7 +338,7 @@ function main(): void {
     });
     if (rn === null) throw new Error('could not make a group beside the teleporter');
     clear(s);
-    const moved = game.monsterSystem.moveMonster(rn, from.x, from.y, tp.x, tp.y, tp.z);
+    const moved = game.systems.monsters.moveMonster(rn, from.x, from.y, tp.x, tp.y, tp.z);
     row(`5. type-${type} group (${from.x},${from.y}) -> teleporter (${tp.x},${tp.y}) -> (${dest.x},${dest.y}) L${tp.z}, party (${party.x},${party.y})`, s);
     check(moved.position.x === dest.x && moved.position.y === dest.y, 'the group is at the destination');
     check(json(s.queued) === json([[17, dest.x, dest.y, 1, dest.z]]), 'the buzz is QueueSound(17, newX, newY, 1) on the destination level');
@@ -364,7 +364,7 @@ function main(): void {
     const step = (party: Position, label: string): void => {
       game.party.state.position = party;
       clear(s);
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       game.state.tickCount++;
       row(`6${label}. door (${d.x},${d.y}) L${d.z} to state ${game.dungeonState.getCellFlag(d) & 7}, party (${party.x},${party.y}) L${party.z}`, s);
     };
@@ -472,7 +472,7 @@ function main(): void {
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       game.state.tickCount++;
       heardNothing(s, `8b. door (${door.x},${door.y}) L${L} shuts on a group`, [4]);
     }
@@ -497,7 +497,7 @@ function main(): void {
         timerWord8: 0, timerWord6: 0,
       });
       clear(s);
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       game.state.tickCount++;
       heardNothing(s, `8c. generator (${gen.x},${gen.y}) L${gen.z}, the party on L${game.party.state.position.z}`, [17], gen.z);
     }
@@ -511,7 +511,7 @@ function main(): void {
       const rn = makeGroup(game, at);
       game.dungeonState.removeObjectFromCell(at, rn);
       clear(s);
-      game.monsterSystem.processAbeyanceTimer({
+      game.systems.monsters.processAbeyanceTimer({
         index: 0, function: TimerFunction.TT_61, time: game.state.tickCount, level: L,
         uByte5: 0, uByte6: at.x, uByte7: at.y, uByte8: 0, uByte9: 0, sequence: 0,
         timerWord8: 0, timerWord6: 0, object: rn,
@@ -527,7 +527,7 @@ function main(): void {
       partyAt(game, at.x, at.y);
       const rn = makeGroup(game, at);
       clear(s);
-      game.monsterDamage.damageMonsterGroup(game.dungeonState.getCreatureRecord(rn)!, L, at.x, at.y, 5000, true, false);
+      game.systems.monsterDamage.damageMonsterGroup(game.dungeonState.getCreatureRecord(rn)!, L, at.x, at.y, 5000, true, false);
       heardNothing(s, `8e. a group dies at (${at.x},${at.y}) L${L}`, [4]);
     }
 
@@ -552,9 +552,9 @@ function main(): void {
       const south = new Position(door.x, door.y + 1, L);
       partyAt(game, door.x, door.y);
       clear(s);
-      game.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.state.tickCount);
+      game.systems.magic.launchThrownMissile(weapon, south, 0, 0, 40, 100, 5, game.state.tickCount);
       for (let t = 0; t < 20; t++) {
-        game.timerSystem.processTimers();
+        game.systems.timer.processTimers();
         game.state.tickCount++;
       }
       heardNothing(s, `8f. a weapon thrown north from (${south.x},${south.y}) L${L}`, [0]);
@@ -566,17 +566,17 @@ function main(): void {
       const { game } = s;
       const at = firstOpen(game);
       partyAt(game, at.x, at.y);
-      game.missileEncounter.createDeathCloud(RN_FIREBALL, 200, at, 255);
+      game.systems.missileEncounter.createDeathCloud(RN_FIREBALL, 200, at, 255);
       heardNothing(s, `8g. a big fireball's cloud at (${at.x},${at.y}) L${L}`, [5]);
       clear(s);
-      game.missileEncounter.createDeathCloud(RN_FIREBALL, 50, at, 255);
+      game.systems.missileEncounter.createDeathCloud(RN_FIREBALL, 50, at, 255);
       heardNothing(s, `8g. a small fireball's cloud at (${at.x},${at.y}) L${L}`, [20]);
       clear(s);
-      game.missileEncounter.createCloud(RN_FFE4, 0, at.x, at.y, at, 255);
+      game.systems.missileEncounter.createCloud(RN_FFE4, 0, at.x, at.y, at, 255);
       heardNothing(s, `8g. an RNffe4 cloud at (${at.x},${at.y}) L${L}`, [13]);
       clear(s);
       for (let t = 0; t < 6; t++) {
-        game.timerSystem.processTimers();
+        game.systems.timer.processTimers();
         game.state.tickCount++;
       }
       heardNothing(s, `8g. its timer, at (${at.x},${at.y}) L${L}`, [5]);
@@ -611,7 +611,7 @@ function main(): void {
     stand(game, p, 0);
     const tt20 = (): TimerEntry[] => game.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_20);
     const tick = (): void => {
-      game.timerSystem.processTimers();
+      game.systems.timer.processTimers();
       game.state.tickCount++;
     };
     // Queued inside a timer pass, as the wound is: the pass ends with `d.Time++`.

@@ -265,7 +265,7 @@ function main(): void {
   {
     const g = makeGame();
     const champ = g.party.state.champions[0]!;
-    g.monsterAttack.poisonCharacter(0, 200);
+    g.systems.monsterAttack.poisonCharacter(0, 200);
     const poisonedHealth = champ.attributes.health;
     const before = g.timerQueue.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
     const fp = clearFeedParameters();

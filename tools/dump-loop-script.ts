@@ -70,7 +70,7 @@ function watchedGame(): Watched {
   w.game.setRandomSeed(0x12345678);
   w.game.party.state.position = new Position(6, 14, 2);
   w.game.onFrame(() => { w.frameCallbacks++; });
-  const timers = w.game.timerSystem;
+  const timers = w.game.systems.timer;
   const processTimers = timers.processTimers.bind(timers);
   timers.processTimers = (): boolean => {
     w.timerPasses.push(w.game.state.tickCount);

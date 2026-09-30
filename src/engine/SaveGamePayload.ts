@@ -326,7 +326,7 @@ function buildBlock2FromGame(game: Game, runtime: RuntimeSaveState): Block2 {
         numTimer: runtime.dungeon.timerQueue?.length ?? 0,
         firstAvailTimer: game.timerQueue.getFirstAvailTimer(),
         maxTimers: runtime.dungeon.timers?.length ?? 0,
-        item16QueLen: game.monsterSystem.getItem16QueLen(),
+        item16QueLen: game.systems.monsters.getItem16QueLen(),
         lastMonsterAttackTime: party.lastMonsterAttackTime >>> 0,
         lastPartyMoveTime: runtime.game.footprints.lastPartyMoveTime >>> 0,
         partyMoveDisableTimer: (party.partyMoveDisableTimer ?? 0) & 0xffff,
@@ -375,7 +375,7 @@ function buildCharacterBlock(
             invisible: party.invisible,
         },
         {
-            load: (champion) => game.characterStats?.characterLoad(champion) ?? champion.load,
+            load: (champion) => game.systems.characterStats?.characterLoad(champion) ?? champion.load,
             portraitOf: (champion) => options.portraitOf?.(champion),
             // The thirty possession slots are RNs like any other and go out as slot
             // numbers in the same index the image uses.

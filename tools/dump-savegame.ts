@@ -136,7 +136,7 @@ async function main(): Promise<void> {
 
   const played = await loadWorld();
   played.party.state.position = new Position(0, 0, level);
-  played.monsterSystem.loadPartyLevel(level);
+  played.systems.monsters.loadPartyLevel(level);
   const playedData = played.dungeonState.getData() as DungeonData;
 
   const map = played.dungeonState.getMap(level);
@@ -290,7 +290,7 @@ async function main(): Promise<void> {
 
   const reloaded = await loadWorld();
   reloaded.party.state.position = new Position(0, 0, level);
-  reloaded.monsterSystem.loadPartyLevel(level);
+  reloaded.systems.monsters.loadPartyLevel(level);
   const reloadedData = reloaded.dungeonState.getData() as DungeonData;
 
   // What the old code produced: a fresh dungeon with the party pasted back in.
