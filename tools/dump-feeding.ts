@@ -28,7 +28,7 @@ import {
   attributeMaximum,
   makeAddCharacterAttributes,
 } from '../src/engine/attributes';
-import { clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
+import { applyFeedParameters, clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame, processTimersAt } from './lib/game';
@@ -75,7 +75,7 @@ function makeGame(): Game {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion('DRINKER'));
+  game.systems.hallOfChampions.addChampion(champion('DRINKER'));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
@@ -179,7 +179,7 @@ function main(): void {
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.KU_POTION, 140);
-    const applied = g.applyFeeding(0, fp);
+    const applied = applyFeedParameters(g.ctx, 0, fp);
     const after = { cur: attributeCurrent(attr), max: attributeMaximum(attr) };
     console.log(`strength ${before.cur}/${before.max} -> ${after.cur}/${after.max}`);
 
@@ -204,7 +204,7 @@ function main(): void {
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.VI_POTION, 200);
     const before = champ.attributes.health;
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     console.log(['VI (healing)', `${before} hp, wounds ffff`,
       `${champ.attributes.health} hp, wounds ${champ.wounds.toString(16)}`].join('\t'));
     check(champ.attributes.health > before, 'a Vi potion restores health');
@@ -221,7 +221,7 @@ function main(): void {
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.EE_POTION, 200);
     const before = champ.attributes.mana;
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     console.log(['EE (mana), full', `${before} mana`, `${champ.attributes.mana} mana`].join('\t'));
     const w12 = Math.trunc(200 / 25) + 8;
     const raw = before + w12 + w12 - 8;
@@ -240,7 +240,7 @@ function main(): void {
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.YA_POTION, 150);
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     const raised = champ.shieldStrength;
     const timers = g.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_72);
     console.log(`shield ${raised}, expires in ${fp.shieldDuration} ticks, ${timers.length} TT_72 queued`);
@@ -271,7 +271,7 @@ function main(): void {
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     derivePotionFeeding(fp, champ, PotionType.ANTI_VENIN, 100);
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     const after = g.ctx.timers.getTimers().filter((t) => t.function === TimerFunction.TT_75).length;
     console.log(`TT_75 timers ${before} -> ${after}, poisonCount ${champ.poisonCount}`);
     check(before === 1, 'the champion was poisoned first');
@@ -287,14 +287,14 @@ function main(): void {
 
   {
     const g = makeGame();
-    g.addChampion(champion('SPARE'));
+    g.systems.hallOfChampions.addChampion(champion('SPARE'));
     const champ = g.ctx.party.state.champions[0]!;
     champ.attributes.health = 5;
     const fp = clearFeedParameters();
     fp.characterIndex = 0;
     fp.performFeeding = true;
     fp.hitpointAdjust = -10;
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     console.log(`health 5 with a -10 adjustment: alive=${champ.attributes.health !== 0}, health=${champ.attributes.health}`);
     check(champ.attributes.health === 0, 'the champion died');
     check(champ.attributes.health === 0, 'and is at zero health');
@@ -312,7 +312,7 @@ function main(): void {
     fp.hitpointAdjust = -10;
     fp.manaAdjust = 10;
     fp.foodValue = 500;
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     check(champ.attributes.health !== 0, 'a champion still in a mirror cannot be killed by a potion');
     check(champ.attributes.mana === 20, 'and takes no mana from it');
     check(champ.food === 1500, 'but food and water still apply');
@@ -332,7 +332,7 @@ function main(): void {
     fp.performFeeding = true;
     fp.foodValue = 5000;
     fp.waterValue = 5000;
-    g.applyFeeding(0, fp);
+    applyFeedParameters(g.ctx, 0, fp);
     console.log([1000, 5000, `food ${champ.food}, water ${champ.water}`].join('\t'));
     check(champ.food === 2048, 'food tops out at 2048');
     check(champ.water === 2048, 'water tops out at 2048');

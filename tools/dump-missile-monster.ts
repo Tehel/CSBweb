@@ -100,7 +100,7 @@ function makeGame(): Game {
   if (!data) throw new Error('dungeon.dat did not load');
   const game = newGame(data, graphics);
   game.setRandomSeed(0x2468ace0);
-  game.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(champion(0));
   return game;
 }
 

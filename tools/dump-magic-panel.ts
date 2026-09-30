@@ -70,8 +70,11 @@ async function main(): Promise<void> {
   const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = uiTables;
   ui.partyState = party;
+  // The engine's `CastMagic`, the UI's call, wrapped to read its result.
+  const magic = game.systems.magic;
   let castResult = -99;
-  ui.onSpellCast = (chIdx) => (castResult = game.castSpellFromUi(chIdx));
+  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
+  magic.castSpellFromUi = (chIdx) => (castResult = castSpellFromUi(chIdx));
 
   const reset = (count: number): void => {
     party.champions = ['ALEX', 'BORIS', 'CHANI', 'DARIA'].slice(0, count).map(champion);

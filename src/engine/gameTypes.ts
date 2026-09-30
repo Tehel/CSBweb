@@ -234,7 +234,7 @@ export interface PartyState {
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
     /**
      * `d.PartySleeping` — set by the sleep icon, button 145, and cleared by `WakeUp`
-     * (`Game.sleep` / `Game.wakeUp`, doc/CSBwin-src/Mouse.cpp:1683-1714). While it is
+     * (`MouseSystem.sleep` / `LoopState.wakeUp`, doc/CSBwin-src/Mouse.cpp:1683-1714). While it is
      * set a tick runs every VBL, masteries read 1, quickness halves and the regeneration
      * doubles; a monster's blow wakes the party (`Monster.cpp:4531`). Never saved.
      */

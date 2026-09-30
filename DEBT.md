@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 5 of 5 next |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
@@ -147,13 +146,14 @@ New state-representation debt goes here, and jumps the queue.
 `createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
 sources `null` — `uiTables`, `objectTables`, `fontData`, `screenIndexBuffer`,
 `context` — and `GameScreen`'s constructor fills them in straight after
-(`src/renderer/GameScreen.ts:153-199`). None is ever `null` again, but every reader
-must ask: 172 `!ui.x` guards and 64 `ui.x?.` reads in `src/renderer/`. The 9 hooks out are
-optional fields too, so 10 calls are `ui.onX?.()`, and a hook left unwired is a click
-that silently does nothing. D3 made the engine's state required for the same reason. Paying
-it means a `UIState` built whole, from the tables (`GraphicsTables`, which the screen
-is already handed) and whatever replaces the hooks (`E11`), which is why it comes after
-`E11`; `partyState` stays nullable only if the screen must exist before a party does.
+(`src/renderer/GameScreen.ts:149-191`). None is ever `null` again, but every reader
+must ask: 172 `!ui.x` guards and 60 `ui.x?.` reads in `src/renderer/`. The 5 hooks out to
+the page (the save stores' four and `onReincarnated`) are optional fields too, so 6 calls
+are `ui.onX?.()`, and a hook left unwired is a click that silently does nothing. D3 made
+the engine's state required for the same reason. Paying it means a `UIState` built whole,
+from the tables (`GraphicsTables`, which the screen is already handed), `ui.ctx` and the
+page's hooks; `partyState` stays nullable only if the screen must exist before a party
+does.
 
 ---
 
@@ -161,53 +161,6 @@ is already handed) and whatever replaces the hooks (`E11`), which is why it come
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included.
-
-### E11 ⏳ The interface reaches the engine through three layers of forwarding
-
-What CSBWin's interface code does to the game, it does by calling the engine's functions
-on `d.`. Where a hook is left, the port's goes: a `UIState` hook (`ui.onSpellCast?.(…)`),
-which `GameScreen` copies one by one out of 10 `GameScreenHooks` (`GameScreen.ts:163-172`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:239-346`) onto a one-line `Game`
-facade, onto the system. Adding an engine call that way touches four files. And
-the hooks are not a boundary: the UI modules import from 11 engine modules, and write engine
-state directly where no hook exists — the object in hand
-(`ViewportPicking.ts:89`, `Mouse.ts:360`, `:368`, `Feeding.ts:132`), the floor chain
-(`ViewportPicking.ts:86`), a record freed (`Feeding.ts:133`), a potion emptied and a
-waterskin drunk (`Feeding.ts:119-128`), a chest's links (`Inventory.ts:305-340`).
-19 tools stand the UI up with `createUIState` and the subset of hooks they think they
-need, "wired as `main.ts` wires it", which nothing checks.
-
-**The author chose shape A**: `UIState` holds the `GameContext`, and a UI module calls the
-system as the C++ calls the engine. `GameScreenHooks`, the `main.ts` lambdas and the
-facades only the UI used go; the hooks that stay are the page's. A tool stands the UI up
-over the `Game` it already has. Under A the direct writes listed above are the C++'s own
-shape (CSBWin's interface writes `d.` too), so they stay, reached through `ui.ctx`. (The
-shape not taken, B, kept the hooks and built them all from a `Game` in one function.)
-
-One step remains. Steps 1 to 4 are in place: one `ScrollingText` the page hands to
-both sides, the host's contract types in `GameHost.ts`, and `UIState` holding the
-`GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it; `ui.partyState`
-stays as it is, `D15`). The object and inventory calls go straight to the engine:
-`ui.ctx.systems.character`'s possession pair, `mouse.triggerObjectMove`,
-`dsa.processViewingFilter`, `applyFeedParameters(ui.ctx, …)`, `ui.ctx.sounds.queueSound`
-and `LoopState.setClockTick(ui.ctx, …)`. So do the loop's: `ctx.systems.mainLoop`'s
-`isRunningScript` and `runScript`, `mouse.sleep`, and `LoopState`'s `flashButton`,
-`flashButtonScript`, `waitForButtonFlash`, `waitForButtonFlashScript`, `flashedButton`,
-`wakeUp`, `freeze` and `thaw`; the save menu writes `ctx.state.paused`. Every tool's UI
-stands over a `newGame`'s context, so a rune or cast holds the loop in a tool as it does
-in the game, and the tool lets its VBLs go by.
-
-5. ⏳ **The panels' hooks go, and what is left is the page's**: `onSpellCast`,
-   `onChampionAttack`, `onConsumeAttackDamage`, `onResurrectReincarnateCancel`,
-   `onReincarnateNamed` (whose `renderView()` after the engine's call is the page's, and
-   stays a page hook). `GameScreenHooks` is then the save stores' four
-   (`onCreateSave`, `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`, whose owner is
-   `E13`'s), `onPaletteSelected` (`C95`'s), and whatever step 5 leaves of Reincarnate;
-   the `Game` facades whose only callers left are tools go, the tools calling the system
-   as the UI does (among them `sleep`, `wakeUp`, `freeze`, `thaw` and `setPaused`). E11 closes; `D15` makes the remaining fields required.
-
-Each step is a refactor: every tool's whole output byte-identical, and
-`npm test -- --frames`, since each moves code under `src/renderer/`.
 
 ### E13 ⏳ The save pipeline straddles `data/` and `engine/`, and nothing owns it
 
@@ -223,7 +176,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:327`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:300`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -407,7 +360,7 @@ door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:167`
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:474-479`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:464-469`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -429,7 +382,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:393-413`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:384-403`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds
@@ -466,8 +419,8 @@ returns, the pass goes on where it stopped. The next queue entries follow while
 `intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
 (`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
 is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
-resumes it and returns (`src/engine/Game.ts:368-376`), and the rest of the pass waits for
-the next VBL's, which opens with `clockTickCleared = false` (`:384`). So the tick a cast or
+resumes it and returns (`src/engine/Game.ts:358-366`), and the rest of the pass waits for
+the next VBL's, which opens with `clockTickCleared = false` (`:374`). So the tick a cast or
 a rune makes due runs a VBL late, the next queued click waits a VBL, and a cast that returns
 0 (a failed cast, or `CastSpell`'s 3) no longer puts off a tick that was due: the next pass
 has cleared the put-off before it reads it. The fusion and the CSB win's wait are spared,
@@ -507,8 +460,10 @@ builds around them is its own:
 - 35 tools define a champion-building function of their own, and 38 spell out
   `addCharacterDefaults()`; 106 construct a `DungeonLoader` and 85 read
   `dm-atari/dungeon.dat` themselves.
-- 19 tools build a `UIState` by hand and wire the hooks they expect to need, "as
-  `main.ts` wires it" (`E11`); 33 extract the UI tables again; 12 stub `document` and
+- 19 tools build a `UIState` by hand, filling in the fields `GameScreen` fills (`D15`),
+  and 5 stand in for an engine call the UI makes by assigning over the system's method
+  (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
+  types as a stand-in or puts back; 33 extract the UI tables again; 12 stub `document` and
   `window` before importing a UI module (`E14`).
 - 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
   and `lastInputTime`, 16; `gameTick`, 6), into other systems' (`DsaSystem`'s
@@ -520,7 +475,7 @@ builds around them is its own:
   nothing.
 
 Paying it: `tools/lib` helpers for the stock dungeon, a test champion and a wired
-`UIState` (built however `E11` leaves the UI's construction); a narrow public seam for what the tools
+`UIState` (built however `D15` leaves the UI's construction); a narrow public seam for what the tools
 legitimately drive, a tick and the clock, which `C98` mostly supplies; then the casts go,
 one tool per commit, each tool's output byte-identical.
 

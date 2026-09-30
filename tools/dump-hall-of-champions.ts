@@ -273,7 +273,7 @@ function main(): void {
   console.log('=== Cancel (button 162) ===');
   game.ctx.loop.clockTickSet = false;
   pairCalls.length = 0;
-  game.resurrectReincarnateCancel(CANCEL);
+  game.systems.hallOfChampions.resurrectReincarnateCancel(CANCEL);
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 0',
     'TAG0207cc once the inventory is hidden and the champion gone (CSBCode.cpp:6657)');
@@ -304,7 +304,7 @@ function main(): void {
   const strengthBefore = attributeCurrent(party.champions[0]!.attributes.stats[1]!);
   game.ctx.loop.clockTickSet = false;
   pairCalls.length = 0;
-  game.resurrectReincarnateCancel(RESURRECT);
+  game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   const tickDueAfterResurrect = game.ctx.loop.clockTickSet;
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 1',
@@ -376,14 +376,14 @@ function main(): void {
   let screenOpenedFor = -1;
   reincarnateScreen = (chIdx) => { screenOpenedFor = chIdx; };
   pairCalls.length = 0;
-  game.resurrectReincarnateCancel(REINCARNATE);
+  game.systems.hallOfChampions.resurrectReincarnateCancel(REINCARNATE);
   check(screenOpenedFor === 1, 'Reincarnate raises the name-entry screen for the new champion');
   check(pairCalls.length === 0, 'and no TAG0207cc while the name is being typed');
   check(
     wizard.skills.every((skill, i) => skill.experience === before.skills[i]),
     'and charges nothing at all until it is answered — CSBWin calls ReIncarnate first',
   );
-  game.reincarnateNamed(screenOpenedFor, 'ZED', 'THE RENAMED');
+  game.systems.hallOfChampions.reincarnateNamed(screenOpenedFor, 'ZED', 'THE RENAMED');
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG0207cc inventory -1 champions 2',
     'TAG0207cc once the answered menu is hidden (CSBCode.cpp:6807-6808)');
@@ -448,8 +448,8 @@ function main(): void {
     const stats = { ...zed.attributes };
     let opened = -1;
     reincarnateScreen = (chIdx) => { opened = chIdx; };
-    g.resurrectReincarnateCancel(REINCARNATE);
-    g.reincarnateNamed(opened, 'ZED', 'THE RENAMED');
+    g.systems.hallOfChampions.resurrectReincarnateCancel(REINCARNATE);
+    g.systems.hallOfChampions.reincarnateNamed(opened, 'ZED', 'THE RENAMED');
     const after = zed.attributes.stats.map((a) => attributeCurrent(a));
     console.log(`attributes ${start.join(' ')} -> ${after.join(' ')}`);
     console.log(`maxHealth ${stats.maxHealth} -> ${zed.attributes.maxHealth}, ` +
@@ -483,12 +483,12 @@ function main(): void {
   // reaches the last one.
   check(game.handleWallClick() === false && party.champions.length === 3,
     'a mirror is refused while a menu is still unanswered');
-  game.resurrectReincarnateCancel(RESURRECT);
+  game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
 
   const azizi = heroByName(game, 'AZIZI');
   standAtMirror(game, azizi);
   check(game.handleWallClick() === false && party.champions.length === 4, 'the fourth champion joins');
-  game.resurrectReincarnateCancel(RESURRECT);
+  game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   const daroou = heroByName(game, 'DAROOU');
   standAtMirror(game, daroou);
   check(game.handleWallClick() === false && party.champions.length === 4,
@@ -659,7 +659,7 @@ function portraitSection(): void {
   // Taking the champion sets the actuator to type 0, which stops the ordinal but leaves
   // the decoration's `wallGraphicOrdinal` alone — the frame stays, the face goes.
   probe.handleWallClick();
-  probe.resurrectReincarnateCancel(RESURRECT);
+  probe.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   const after = summarize(mirror.x, mirror.y, facing);
   const afterTaken = after.championPortraitOrdinal | 0;
   const decorationAfter = after.decorations[1] | 0;

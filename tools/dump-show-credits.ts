@@ -116,7 +116,7 @@ function watchedGame(healths: number[]): Watched {
   };
   w.game = newGame(data, stockGraphics(), { messages, showCredits: (word11694) => w.credits.push(word11694) });
   w.game.setRandomSeed(0x12345678);
-  healths.forEach((health, i) => w.game.addChampion(champion(i, health)));
+  healths.forEach((health, i) => w.game.systems.hallOfChampions.addChampion(champion(i, health)));
   w.game.ctx.party.state.position = new Position(6, 14, 2);
   return w;
 }

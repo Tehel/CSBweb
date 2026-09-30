@@ -66,7 +66,7 @@ function makeGame(count: number, calls: string[]): Game {
     tag011366: (chIdx) => calls.push(`tag011366 ${chIdx}`),
   });
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < count; i++) game.addChampion(champion(i));
+  for (let i = 0; i < count; i++) game.systems.hallOfChampions.addChampion(champion(i));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }

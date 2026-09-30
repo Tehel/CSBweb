@@ -92,15 +92,11 @@ import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/C
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**
- * What the interface asks of the engine and the page. Each is one of `UIState`'s hooks out,
- * documented there, except `onPaletteSelected`.
+ * What the interface asks of the page. Each is one of `UIState`'s hooks out, documented
+ * there, except `onPaletteSelected`. The engine the interface reaches through `ui.ctx`.
  */
 export interface GameScreenHooks extends Required<Pick<UIState,
-  | 'onSpellCast'
-  | 'onChampionAttack'
-  | 'onConsumeAttackDamage'
-  | 'onResurrectReincarnateCancel'
-  | 'onReincarnateNamed'
+  | 'onReincarnated'
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
@@ -157,11 +153,7 @@ export class GameScreen {
       renderLastFrame: () => this.renderLastFrame(),
     });
     this.ui = ui;
-    ui.onSpellCast = hooks.onSpellCast;
-    ui.onChampionAttack = hooks.onChampionAttack;
-    ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
-    ui.onResurrectReincarnateCancel = hooks.onResurrectReincarnateCancel;
-    ui.onReincarnateNamed = hooks.onReincarnateNamed;
+    ui.onReincarnated = hooks.onReincarnated;
     ui.onCreateSave = hooks.onCreateSave;
     ui.onSaveWritten = hooks.onSaveWritten;
     ui.onRestoreSave = hooks.onRestoreSave;

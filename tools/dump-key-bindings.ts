@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   ui.partyState = party.state;
 
   let attacks: Array<{ chIdx: number; attackType: number }> = [];
-  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     return 1;
   };
@@ -122,7 +122,7 @@ async function main(): Promise<void> {
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
   // Stands in for `CastMagic`, which clears the runes of a cast it does not refuse;
   // `tools/dump-magic-panel.ts` drives the real one.
-  ui.onSpellCast = (chIdx: number) => {
+  game.systems.magic.castSpellFromUi = (chIdx: number) => {
     const champion = party.state.champions[chIdx]!;
     casts.push({ chIdx, incantation: [...champion.incantation] });
     champion.incantation = [];
@@ -271,7 +271,7 @@ async function main(): Promise<void> {
   //         `PrepareAttack` returns on `CHARFLAG_attackDisable`
   //         (`doc/CSBwin-src/Character.cpp:4916`). The stub attack busies the attacker, as
   //         the real one's `DisableCharacterAction` does.
-  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     party.state.champions[chIdx].charFlags |= CHARFLAG_ATTACK_DISABLE;
     return 1;
@@ -309,7 +309,7 @@ async function main(): Promise<void> {
   }
   ctx.loop.clockTickSet = false;
   ctx.loop.clockTickCleared = false;
-  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     held = true;
     game.runScript(hold());
@@ -333,7 +333,7 @@ async function main(): Promise<void> {
   held = false;
   game.runFrame(0);
   check(!game.isRunningScript(), 'a VBL ends the script, and the loop is free');
-  ui.onChampionAttack = (chIdx: number, attackType: number) => {
+  game.systems.character.executeAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
     return 1;
   };

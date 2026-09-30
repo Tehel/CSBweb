@@ -64,7 +64,7 @@ const messages: MessageSink = {
 };
 const game = newGame(data, graphics, { messages });
 game.setRandomSeed(0x12345678);
-game.addChampion(champion(0));
+game.systems.hallOfChampions.addChampion(champion(0));
 const ctx = game.ctx;
 const party = ctx.party.state;
 party.position = new Position(6, 14, 2);
@@ -132,7 +132,7 @@ for (const sleeping of [false, true]) {
 
 // --- a filter that retargets: the experience stays where `psA3` and `pcA2` point ---
 // (`Magic.cpp:233-250` before the filter, `:304-305` its answer, `:332`/`:341`/`:354` after.)
-game.addChampion(champion(1));
+game.systems.hallOfChampions.addChampion(champion(1));
 const skillsOf = (i: number): number[] => party.champions[i].skills.map((s) => s.experience);
 const retarget = (answer: { chIdx: number; skillNumber: number }, champ1Fighter: number): ReturnType<typeof adjustSkills> => {
   primeFighter();

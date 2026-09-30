@@ -78,7 +78,7 @@ export interface GameHost {
   /**
    * Reincarnate raises the name-entry screen, which the engine does not own
    * (`doc/CSBwin-src/CSBCode.cpp:6738`). The screen answers through
-   * `Game.reincarnateNamed`; with no screen, Reincarnate stops where CSBWin would be
+   * `HallOfChampions.reincarnateNamed`; with no screen, Reincarnate stops where CSBWin would be
    * waiting for a name.
    */
   openReincarnateScreen(chIdx: number): void;

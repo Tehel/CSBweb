@@ -119,8 +119,8 @@ function main(): void {
 
   const played = newGame(parse(), stockGraphics());
   played.setRandomSeed(0x13579bdf);
-  played.addChampion(champion(0));
-  played.addChampion(champion(1));
+  played.systems.hallOfChampions.addChampion(champion(0));
+  played.systems.hallOfChampions.addChampion(champion(1));
   played.ctx.party.state.position = new Position(6, 14, 2);
   const t0 = 1_000_000;
   for (let n = 0; n < 40; n++) {

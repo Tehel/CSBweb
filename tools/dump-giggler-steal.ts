@@ -111,7 +111,7 @@ function main(): void {
       champ.possessions[slot] = rn;
       held.set(rn, { chIdx: i, slot });
     }
-    game.addChampion(champ);
+    game.systems.hallOfChampions.addChampion(champ);
   }
   game.ctx.party.state.position = at;
   game.systems.monsters.loadPartyLevel(at.z);

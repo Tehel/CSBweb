@@ -265,7 +265,7 @@ function main(): void {
     if (!pad) throw new Error('no audible party pad in dungeon.dat');
     const { at } = pad;
     stand(game, at, pad.facing);
-    game.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
+    game.systems.mouse.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
     row(`3a. pad (${at.x},${at.y}) L${at.z}, the party on it`, s);
     check(json(s.queued) === json([[1, at.x, at.y, 1, at.z]]), "the pad queues QueueSound(soundPRESSUREPAD, mapX, mapY, 1) on its own level");
     check(json(s.played) === json([[534, 0, 1]]), 'and the party on it hears item 534, loud');
@@ -275,7 +275,7 @@ function main(): void {
     clear(s);
     const elsewhere = at.z === 0 ? 1 : 0;
     game.ctx.party.state.position = new Position(at.x, at.y, elsewhere);
-    game.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
+    game.systems.mouse.triggerObjectMove(at, OBJECT_ID_NULL, true, false, pad.facing);
     row(`3b. pad (${at.x},${at.y}) L${at.z}, the party on L${elsewhere}`, s);
     check(json(s.queued) === json([[1, at.x, at.y, 1, at.z]]), 'queued on the pad\'s level');
     check(s.played.length === 0, 'and not heard from another level');

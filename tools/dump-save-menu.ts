@@ -619,7 +619,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   console.log('');
   console.log('=== the disk menu over an open chest: TAG02076e in, TAG0207cc out ===');
   const game = await loadGame();
-  game.addChampion(healthyChampion('DAROO'));
+  game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
   const party = game.ctx.party.state;
   const found = findChest(game);
   if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }
@@ -687,7 +687,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   console.log('=== the quick-save over an open chest ===');
   const { buildQuickSavePayload } = await import('../src/dev');
   const game = await loadGame();
-  game.addChampion(healthyChampion('DAROO'));
+  game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
   const party = game.ctx.party.state;
   const found = findChest(game);
   if (!found) { check(false, 'dungeon.dat has a chest with two objects in it'); return; }

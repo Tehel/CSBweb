@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   // Fixed seed, so the numbers below repeat run to run.
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
+  for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
   game.ctx.party.state.position = new Position(px, py, level);
   game.systems.monsters.loadPartyLevel(level);
 

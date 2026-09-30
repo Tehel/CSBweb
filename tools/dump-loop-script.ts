@@ -115,13 +115,13 @@ function checkWaits(): void {
   game.setMouseEventHandlers({ button: (num) => handled.push(num), unclick: () => {} });
   for (let n = 0; n < 33; n++) frame(w);
   console.log(`  log ${w.log.join(' ')}; vblInterrupts ${w.vbls - vbls}; frame callbacks ${w.frameCallbacks - callbacks}`);
-  console.log(`  tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.queuedInputCount()}`);
+  console.log(`  tick ${tick} -> ${game.ctx.state.tickCount}; print-queue entries ${w.printed - printed}; queued ${game.ctx.mouseQueue.count()}`);
   check(w.log.join(' ') === `a@${start} b@${start + 31} c@${start + 31} d@${start + 33}`,
     'it resumes on the 31st VBL, goes through VBLDelay(0) without one, and ends on the 2nd after');
   check(!game.isRunningScript(), 'and holds the loop no longer');
   check(w.vbls - vbls === 33 && w.frameCallbacks - callbacks === 33, 'each of its 33 VBLs runs vblInterrupt and the frame callbacks');
   check(game.ctx.state.tickCount === tick && w.printed === printed, 'no tick runs meanwhile, late as it is, and no print-queue entry is taken');
-  check(handled.length === 0 && game.queuedInputCount() === 1, 'nor is the click queued meanwhile taken');
+  check(handled.length === 0 && game.ctx.mouseQueue.count() === 1, 'nor is the click queued meanwhile taken');
   frame(w);
   console.log(`  the frame after: tick ${game.ctx.state.tickCount}; handled ${JSON.stringify(handled)}`);
   check(game.ctx.state.tickCount === tick + 1 && w.printed === printed + 1 && handled.join() === '20',
@@ -155,9 +155,9 @@ function checkFromHandler(): void {
   const printed = w.printed;
   frame(w);
   const held = w.frames;
-  console.log(`  handled ${JSON.stringify(handled)}; queued ${game.queuedInputCount()}; tick ${tick} -> ${game.ctx.state.tickCount}`);
+  console.log(`  handled ${JSON.stringify(handled)}; queued ${game.ctx.mouseQueue.count()}; tick ${tick} -> ${game.ctx.state.tickCount}`);
   check(handled.join() === '20' && game.isRunningScript(), 'the click starts the script');
-  check(game.queuedInputCount() === 2, 'and the button-up and the click behind it stay queued');
+  check(game.ctx.mouseQueue.count() === 2, 'and the button-up and the click behind it stay queued');
   check(game.ctx.state.tickCount === tick && w.printed === printed, 'that pass runs no tick and takes no print-queue entry');
   for (let n = 0; n < 6; n++) frame(w);
   console.log(`  log ${w.log.join(' ')}; handled ${JSON.stringify(handled)}; tick ${game.ctx.state.tickCount}`);

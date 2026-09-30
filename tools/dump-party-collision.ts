@@ -314,13 +314,13 @@ async function main(): Promise<void> {
     queueAt(scene.px, scene.py, facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 20_000;
     game.runFrame(T0 - 20_000);
-    const monsterQueue = game.queuedInputCount();
+    const monsterQueue = game.ctx.mouseQueue.count();
 
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.MOVE_FORWARD, MovementAction.TURN_LEFT]);
     internals.lastTickTime = T0 - 1000; // a tick is due this frame
     const ticks0 = game.ctx.state.tickCount;
     game.runFrame(T0);
-    const wallQueue = game.queuedInputCount();
+    const wallQueue = game.ctx.mouseQueue.count();
     const tickHeld = game.ctx.state.tickCount === ticks0;
     game.runFrame(T0 + 17);
     const tickNextFrame = game.ctx.state.tickCount === ticks0 + 1;
@@ -331,7 +331,7 @@ async function main(): Promise<void> {
     // Control: a move that is not inhibited leaves the rest of the queue alone.
     queueAt(wall.px, wall.py, wall.facing, [MovementAction.TURN_LEFT, MovementAction.TURN_LEFT]);
     game.runFrame(T0 + 30_000);
-    const turnQueue = game.queuedInputCount();
+    const turnQueue = game.ctx.mouseQueue.count();
 
     discard = { wallQueue, tickHeld, tickNextFrame, facingKept, monsterQueue, turnQueue };
     console.log(
@@ -474,12 +474,12 @@ async function main(): Promise<void> {
       game.enqueueMovement(MovementAction.MOVE_FORWARD);
       frame(true);
       frame(false);
-      const lockHeld = game.queuedInputCount() === 1;
+      const lockHeld = game.ctx.mouseQueue.count() === 1;
       game.discardAllInput();
       game.enqueueMovement(MovementAction.MOVE_BACKWARD);
       frame(true);
       frame(false);
-      const otherWayPassed = game.queuedInputCount() === 0;
+      const otherWayPassed = game.ctx.mouseQueue.count() === 0;
       party.word11712 = 0;
       game.discardAllInput();
 
@@ -594,7 +594,7 @@ async function main(): Promise<void> {
       frame(false);
       const newLevel = party.position.z;
       const stairsTicked = game.ctx.state.tickCount !== ticksBeforeStairs;
-      const queuedAfterStairs = game.queuedInputCount();
+      const queuedAfterStairs = game.ctx.mouseQueue.count();
       const facingAfter = party.facing;
       for (let i = 0; i < 6; i++) frame(i % 2 === 0);
       const turned = party.facing !== facingAfter;
@@ -745,7 +745,7 @@ async function main(): Promise<void> {
       timerSystem.dispatch = dispatch;
       const newLevel = party.position.z;
       const below = dungeon.incrementLevel(new Position(pit.x, pit.y, level), 1)!;
-      const queuedAfterTick = game.queuedInputCount();
+      const queuedAfterTick = game.ctx.mouseQueue.count();
       const loadedAfterTick = game.systems.monsters.needsLevelReload() ? 'not yet' : 'loaded';
       const owedAfterTick = game.ctx.loop.newPartyLevel;
       const saw = probeSaw as { x: number; y: number; level: number; pending: number; loaded: number | null } | null;

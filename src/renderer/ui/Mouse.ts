@@ -226,7 +226,7 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
     // The Hall of Champions menu, and only with an empty cursor (`d.EmptyHanded`).
     if (ui.partyState.objectInHand !== OBJECT_ID_NULL) return;
     const button = searchButtonList(buttons.buttons18372, clickX, clickY, 2);
-    if (button !== 0) ui.onResurrectReincarnateCancel?.(button);
+    if (button !== 0) ui.ctx.systems.hallOfChampions.resurrectReincarnateCancel(button);
   }
 }
 

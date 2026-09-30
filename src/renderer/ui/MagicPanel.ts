@@ -3,7 +3,7 @@
  *
  * The UI half of CSBWin `doc/CSBwin-src/Magic.cpp`: the rune keypad, the incantation being
  * assembled, and its running mana cost. Casting itself lives in the engine: `CastMagic`
- * is `ui.onSpellCast`.
+ * is `MagicSystem.castSpellFromUi`.
  * The attack buttons and the attack menu live in `ui/Attack.ts`, beside the rest of the
  * `Character.cpp` port.
  */
@@ -140,7 +140,7 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
 /**
  * `_MagicSelection` (`doc/CSBwin-src/Magic.cpp:545-575`): buttons 101-106 are the runes,
  * 107 takes the last one back and 108 casts. The cast needs only a first rune, and
- * `CastMagic` is the engine's (`ui.onSpellCast`), which sets `d.clockTick` and clears
+ * `CastMagic` is the engine's (`MagicSystem.castSpellFromUi`), which sets `d.clockTick` and clears
  * the incantation. The function is `RESTARTABLE` and waits for VBLs around its flashes, so
  * the port runs it as a script (`magicSelectionScript`), which holds the loop as CSBWin's
  * pass is held inside it.
@@ -170,7 +170,7 @@ function* magicSelectionScript(ui: UIState, button: number): LoopScript {
     // `CastMagic`'s first act is `WaitForButtonFlash()` (`Magic.cpp:939`), which is waited
     // out here, where a VBL can pass. The engine's own call then finds the button put back.
     yield* waitForButtonFlashScript(ui.ctx);
-    ui.onSpellCast?.(party.magicCasterIndex);
+    ui.ctx.systems.magic.castSpellFromUi(party.magicCasterIndex);
   } else {
     const D7 = button - 101;
     const pwA3 = ui.uiTables!.graphic231.word18552[D7]!;

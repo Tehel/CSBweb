@@ -292,5 +292,6 @@ function confirm(ui: UIState, state: ReincarnateState): void {
     if ((champions[i]?.name ?? '') === trimmed) return;
   }
   ui.reincarnate = null;
-  ui.onReincarnateNamed?.(state.chIdx, trimmed, state.title);
+  ui.ctx.systems.hallOfChampions.reincarnateNamed(state.chIdx, trimmed, state.title);
+  ui.onReincarnated?.();
 }

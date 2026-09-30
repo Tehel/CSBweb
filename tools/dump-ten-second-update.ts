@@ -54,7 +54,7 @@ function makeGame(): Game {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(champion(0));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }

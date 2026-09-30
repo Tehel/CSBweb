@@ -95,7 +95,7 @@ function makeGame(championCount: number): Game {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < championCount; i++) game.addChampion(champion(i, `HERO${i}`));
+  for (let i = 0; i < championCount; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
   return game;
 }
 

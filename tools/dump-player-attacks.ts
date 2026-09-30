@@ -131,7 +131,7 @@ async function main(): Promise<void> {
   console.log('\n=== 2. DetermineAttackOrdinal: which group member each corner reaches ===');
   {
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`, 8000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`, 8000));
     // Level 3's worm corridor: a known multi-member group beside a known open cell.
     const level = 3;
     standParty(game, level, 3, 2, 0); // facing north, into (3,1)
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
     const totals: number[] = [];
     for (const [label, experience] of [['novice', 300], ['veteran', 40000]] as const) {
       const game = await makeGame();
-      for (let i = 0; i < 4; i++) game.addChampion(champion(i, label.toUpperCase(), experience));
+      for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, label.toUpperCase(), experience));
       const level = 3;
       standParty(game, level, 3, 2, 0);
       giveSword(game, 0);
@@ -214,7 +214,7 @@ async function main(): Promise<void> {
 
     // And the payoff: with stamina to spare, the group dies.
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 40000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, 'HERO', 40000));
     const level = 3;
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
@@ -237,7 +237,7 @@ async function main(): Promise<void> {
   console.log("\n=== 4. The back rank cannot reach past the front rank ===");
   {
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`, 8000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`, 8000));
     const level = 3;
     // Facing north, corners 2 and 3 are the back rank: the `charPosition - facing`
     // term is what isolates them.
@@ -250,8 +250,8 @@ async function main(): Promise<void> {
       // flash 0 — only -1 is the "can't reach" answer, and it is deterministic.
       let cantReach = 0;
       for (let i = 0; i < 20; i++) {
-        game.championAttack(corner, AttackType.atk_SWING);
-        if (game.consumeAttackDamageToDisplay() === -1) cantReach++;
+        game.systems.character.executeAttack(corner, AttackType.atk_SWING);
+        if (game.systems.attack.consumeAttackDamageToDisplay() === -1) cantReach++;
       }
       if (cantReach === 20) blocked++;
       console.log([corner, cantReach, cantReach === 20 ? "CAN'T REACH, always" : 'can reach'].join('\t'));
@@ -278,7 +278,7 @@ async function main(): Promise<void> {
     check(vulnerable.length > 0, 'and at least one of them can be damaged');
 
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 8000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, 'HERO', 8000));
     const level = 3;
     standParty(game, level, 3, 2, 0);
     giveSword(game, 0);
@@ -312,7 +312,7 @@ async function main(): Promise<void> {
   console.log('=== 6. WarCryEtc: a shout frightens the group ===');
   {
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 40000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, 'HERO', 40000));
     const level = 3;
     standParty(game, level, 3, 2, 0);
 
@@ -347,7 +347,7 @@ async function main(): Promise<void> {
         let pause = 0;
         for (let i = 0; i < 40; i++) {
           monster.fear = (monster.fear & ~0xf) | StateOfFear.StateOfFear0;
-          game.championAttack(0, attackType);
+          game.systems.character.executeAttack(0, attackType);
           if ((monster.fear & 0xf) === StateOfFear.StateOfFear5) {
             frightened++;
             pause = game.ctx.dungeon.getItem16Record(monster.groupIndex & 0xff)?.uByte5 ?? 0;
@@ -366,13 +366,13 @@ async function main(): Promise<void> {
   console.log('\n=== 7. HEAL and FREEZE LIFE ===');
   {
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 8000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, 'HERO', 8000));
     standParty(game, 3, 3, 2, 0);
     const champ = game.ctx.party.state.champions[0]!;
 
     champ.attributes.health = 40;
     const manaBefore = champ.attributes.mana;
-    game.championAttack(0, AttackType.atk_HEAL);
+    game.systems.character.executeAttack(0, AttackType.atk_HEAL);
     console.log(`HEAL: hp 40 -> ${champ.attributes.health}, mana ${manaBefore} -> ${champ.attributes.mana}`);
     check(champ.attributes.health > 40, 'HEAL restores health');
     check(champ.attributes.mana < manaBefore, 'HEAL spends mana');
@@ -382,7 +382,7 @@ async function main(): Promise<void> {
     game.ctx.party.state.freezeLifeTimer = 0;
     const steps: number[] = [];
     for (let i = 0; i < 4; i++) {
-      game.championAttack(0, AttackType.atk_FREEZELIFE);
+      game.systems.character.executeAttack(0, AttackType.atk_FREEZELIFE);
       steps.push(game.ctx.party.state.freezeLifeTimer);
     }
     console.log(`FREEZE LIFE from 0, four casts: ${steps.join(' -> ')}`);
@@ -400,7 +400,7 @@ async function main(): Promise<void> {
   console.log('\n=== 8. Door bash: HitDoor\'s two-tick delay ===');
   {
     const game = await makeGame();
-    for (let i = 0; i < 4; i++) game.addChampion(champion(i, 'HERO', 40000));
+    for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, 'HERO', 40000));
     // Level 1's (11,0): a shut door of type 1 (DoorTOC 42, breakable by a blow) in an
     // east-west corridor. The party stands west of it, facing east.
     const level = 1;
@@ -426,7 +426,7 @@ async function main(): Promise<void> {
     let stateOnBlowTick = -1;
     for (let blow = 0; blow < 100; blow++) {
       champ.attributes.stamina = champ.attributes.maxStamina;
-      game.championAttack(0, AttackType.atk_CHOP);
+      game.systems.character.executeAttack(0, AttackType.atk_CHOP);
       if (doorState() !== 4 || onDoor(TimerFunction.TT_BASH_DOOR).length > 0) {
         blowTick = game.ctx.state.tickCount;
         stateOnBlowTick = doorState();
@@ -515,8 +515,8 @@ function masteryOf(game: Game, chIdx: number, skill: number): number {
 
 /** One blow, returning the damage the panel would have flashed (0 for a miss). */
 function swingOnce(game: Game, chIdx: number, attackType: number): number {
-  game.championAttack(chIdx, attackType);
-  const flashed = game.consumeAttackDamageToDisplay();
+  game.systems.character.executeAttack(chIdx, attackType);
+  const flashed = game.systems.attack.consumeAttackDamageToDisplay();
   return flashed > 0 ? flashed : 0;
 }
 

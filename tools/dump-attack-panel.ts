@@ -57,7 +57,8 @@ async function main(): Promise<void> {
   }
 
   const cache = new Map();
-  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
+  const game = newGame(data, graphics);
+  const ui: UIState = createUIState(graphics, game.ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
     renderLastFrame: () => {},
   });
@@ -66,12 +67,12 @@ async function main(): Promise<void> {
   ui.fontData = loadFontData(graphics);
   ui.partyState = party.state;
   let damageToDisplay = 0;
-  ui.onConsumeAttackDamage = () => {
+  game.systems.attack.consumeAttackDamageToDisplay = () => {
     const damage = damageToDisplay;
     damageToDisplay = 0;
     return damage;
   };
-  ui.onChampionAttack = () => {
+  game.systems.character.executeAttack = () => {
     damageToDisplay = 20;
     return 1;
   };

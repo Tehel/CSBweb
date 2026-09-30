@@ -205,7 +205,7 @@ side-effect of the loop structure.
 Since nothing in this port can block, the loop is turned inside out exactly as
 `ReIncarnate.ts` turns `_ReIncarnate` inside out: the state lives on `UIState`, the draw
 runs every frame from that state, and the click handler is one iteration of the loop
-body. The clock is then stopped explicitly with `Game.setPaused(true)`, which is the
+body. The clock is then stopped explicitly by setting `ctx.state.paused`, which is the
 honest equivalent of "the main loop is not running".
 
 ### The press animation

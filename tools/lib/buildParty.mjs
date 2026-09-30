@@ -2,7 +2,7 @@
 //
 // Stand at each of the first four preset heroes' mirrors, click the portrait
 // (`AddCharacter`) and press Resurrect (button 160). Driving the real Hall of Champions
-// needs no scaffolding in the app, only the public game API that
+// needs no scaffolding in the app, only the calls that
 // `tools/dump-hall-of-champions.ts` drives headlessly.
 //
 // HALK first: champion 0 is the one the golden frames open an inventory and an attack
@@ -26,7 +26,7 @@ export const BUILD_PARTY = `(()=>{
     party.position.z = hero.location.map;
     party.facing = facing;
     game.handleWallClick();
-    game.resurrectReincarnateCancel(160);
+    game.systems.hallOfChampions.resurrectReincarnateCancel(160);
   }
   renderView();
   return game.ctx.party.state.champions.map(c => c.name).join(',');

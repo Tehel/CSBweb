@@ -174,25 +174,13 @@ export interface UIState {
    */
   championPortraitCache: WeakMap<object, IndexedBitmap>;
 
-  /* ---- hooks out to the engine / host ---- */
-  onSpellCast?: (chIdx: number) => number | void;
-  /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
-  onChampionAttack?: (chIdx: number, attackType: number) => number;
-  /** `d.attackDamageToDisplay`, read and cleared. */
-  onConsumeAttackDamage?: () => number;
+  /* ---- hooks out to the page ---- */
   /**
-   * `_ResurrectReincarnateCancel(button)` (`doc/CSBwin-src/CSBCode.cpp:6615`) — a
-   * button on the Hall of Champions menu. A hook because confirming reaches the
-   * dungeon's object chains and the mirror's actuators, none of which the UI owns.
+   * The name-entry screen has been answered and the engine has finished Reincarnate
+   * (`HallOfChampions.reincarnateNamed`, `doc/CSBwin-src/Code13ea4.cpp:155-160`): the
+   * page redraws the view the screen covered.
    */
-  onResurrectReincarnateCancel?: (button: number) => void;
-  /**
-   * The name-entry screen has been answered (`doc/CSBwin-src/Code13ea4.cpp:155-160`).
-   * A hook because everything `_ResurrectReincarnateCancel` does *after* `ReIncarnate`
-   * returns — the skill wipe, the penalties, the twelve random points, the message —
-   * belongs to the engine.
-   */
-  onReincarnateNamed?: (chIdx: number, name: string, title: string) => void;
+  onReincarnated?: () => void;
   /**
    * Build the bytes of a new save and the row it will be listed as
    * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the

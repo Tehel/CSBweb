@@ -82,7 +82,7 @@ function main(): void {
   const game = newGame(data, graphics);
   // A fixed seed, so the throwers' picks repeat run to run.
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < 4; i++) game.addChampion(champion(i));
+  for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i));
   const dungeon = game.ctx.dungeon;
 
   console.log(['level', 'type', 'name', 'at', 'launch', 'missileType'].join('\t'));

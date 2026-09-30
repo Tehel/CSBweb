@@ -74,7 +74,7 @@ function makeGame(): { game: Game; log: string[] } {
   if (!data) throw new Error('dungeon.dat did not load');
   const game = newGame(data, stockGraphics());
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < 4; i++) game.addChampion(champion(i));
+  for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i));
   const log: string[] = [];
   const party = game.ctx.party.state;
 

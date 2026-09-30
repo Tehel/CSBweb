@@ -9,10 +9,9 @@
 import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
-import type { Champion, PartyState, MovementResult } from './gameTypes';
+import type { PartyState, MovementResult } from './gameTypes';
 import { MovementAction } from './gameTypes';
 import { ensureHandOwner } from './Party';
-import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { MovementSystem } from './MovementSystem';
 import { ActuatorSystem } from './ActuatorSystem';
 import { TimerSystem } from './TimerSystem';
@@ -32,13 +31,12 @@ import { CharacterSystem } from './CharacterSystem';
 import { MouseSystem, type DropCursorOptions } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
-import { createLoopFlags, flashButton, flashedButton, freeze, setClockTick, thaw, vblFlashButton, waitForButtonFlash, wakeUp, type LoopScript, type MainLoop } from './LoopState';
+import { createLoopFlags, flashButton, vblFlashButton, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem } from './DsaSystem';
-import { Position, type ObjectID } from '../core/types';
-import type { Rect } from '../data/tables/UITables';
+import { Position } from '../core/types';
 import { TICKS_PER_SECOND } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
@@ -314,14 +312,6 @@ export class Game implements MainLoop {
         this.script = null;
         this.ctx.mouseQueue.discardAllInput();
         this.mainLoopReturned = false;
-    }
-
-    /**
-     * Stop and restart the clock, as the save menu does (`openSaveMenu`). The game's own
-     * stop is the freeze, buttons 147 and 148.
-     */
-    setPaused(paused: boolean): void {
-        this.ctx.state.paused = paused;
     }
 
     /**
@@ -609,11 +599,6 @@ export class Game implements MainLoop {
         this.ctx.mouseQueue.enqueueUnClick();
     }
 
-    /** `numEnt`: how many entries wait in the mouse queue (doc/CSBwin-src/CSBCode.cpp:7589-7590). */
-    queuedInputCount(): number {
-        return this.ctx.mouseQueue.count();
-    }
-
     /** Who handles the buttons that are not movement (see `MouseEventHandlers`). */
     setMouseEventHandlers(handlers: MouseEventHandlers | null): void {
         this.mouseEventHandlers = handlers;
@@ -628,39 +613,9 @@ export class Game implements MainLoop {
         return result.success;
     }
 
-    /** The floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`), for `tools/`. */
-    triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
-        this.systems.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
-    }
-
     /** `DiscardAllInput` (`MouseQueue.discardAllInput`). */
     discardAllInput(): void {
         this.ctx.mouseQueue.discardAllInput();
-    }
-
-    /** Button 145, the sleep icon (`MouseSystem.sleep`). */
-    sleep(): boolean {
-        return this.systems.mouse.sleep();
-    }
-
-    /** `WakeUp` for button 146 (`LoopState.wakeUp`). */
-    wakeUp(): void {
-        wakeUp(this.ctx);
-    }
-
-    /** Button 147, the engine's half (`LoopState.freeze`). */
-    freeze(): void {
-        freeze(this.ctx);
-    }
-
-    /** Button 148, the engine's half (`LoopState.thaw`). */
-    thaw(): void {
-        thaw(this.ctx);
-    }
-
-    /** `d.clockTick = value` (`LoopState.setClockTick`), for `tools/`. */
-    setClockTick(value: number): void {
-        setClockTick(this.ctx, value);
     }
 
     /** `gameFrozen`: between buttons 147 and 148. */
@@ -783,36 +738,6 @@ export class Game implements MainLoop {
         if (entry.num < 0x2000) this.ctx.state.block1.totalMoveCount++;
     }
 
-    /** A pre-built champion joins, as the tools' do (`HallOfChampions.addChampion`). */
-    addChampion(champion: Champion): boolean {
-        return this.systems.hallOfChampions.addChampion(champion);
-    }
-
-    /** Button 160-162 on the potential champion's eye panel (`HallOfChampions`). */
-    resurrectReincarnateCancel(button: number): boolean {
-        return this.systems.hallOfChampions.resurrectReincarnateCancel(button);
-    }
-
-    /** The name-entry screen answered (`HallOfChampions.reincarnateNamed`). */
-    reincarnateNamed(chIdx: number, name: string, title: string): void {
-        this.systems.hallOfChampions.reincarnateNamed(chIdx, name, title);
-    }
-
-    /** `RemoveCharacterPossession` (`CharacterSystem`), for `tools/`. */
-    removeCharacterPossession(chIdx: number, slot: number): ObjectID {
-        return this.ctx.systems.character.removeCharacterPossession(chIdx, slot);
-    }
-
-    /** `AddCharacterPossession` (`CharacterSystem`), for `tools/`. */
-    addCharacterPossession(chIdx: number, object: ObjectID, slot: number): void {
-        this.ctx.systems.character.addCharacterPossession(chIdx, object, slot);
-    }
-
-    /** The apply half of `_FeedCharacter` (`Feeding.applyFeedParameters`), for `tools/`. */
-    applyFeeding(chIdx: number, fp: FeedParameters): boolean {
-        return applyFeedParameters(this.ctx, chIdx, fp);
-    }
-
     /**
      * Replace the current party state (debug/testing).
      */
@@ -821,30 +746,12 @@ export class Game implements MainLoop {
         ensureHandOwner(this.ctx.party.state);
     }
 
-
-
-
-    /** `_ExecuteAttack`'s engine half (`CharacterSystem.executeAttack`), for the UI and `tools/`. */
-    championAttack(chIdx: number, attackType: number): number {
-        return this.systems.character.executeAttack(chIdx, attackType);
-    }
-
-    /** `d.attackDamageToDisplay`, read and cleared (`AttackSystem.consumeAttackDamageToDisplay`). */
-    consumeAttackDamageToDisplay(): number {
-        return this.systems.attack.consumeAttackDamageToDisplay();
-    }
-
     /**
      * Register a callback for each game tick, run where CSBWin's tick draws the viewport:
      * after the timers and any new party level (doc/CSBwin-src/CSBCode.cpp:615-638).
      */
     onTick(callback: GameEventCallback): void {
         this.onTickCallbacks.push(callback);
-    }
-
-    /** The rectangle the screen inverts (`LoopState.flashedButton`). */
-    flashedButton(): Rect | null {
-        return flashedButton(this.ctx);
     }
 
     /** Whether a VBL inverted the flashed rectangle since the last call: a redraw is due. */
@@ -899,13 +806,6 @@ export class Game implements MainLoop {
     throwObjectFromCursor(leftOrRight: number): boolean {
         return this.systems.mouse.throwObjectFromCursor(leftOrRight);
     }
-
-
-    /** The magic panel's cast button (`MagicSystem.castSpellFromUi`). */
-    castSpellFromUi(chIdx: number): number {
-        return this.systems.magic.castSpellFromUi(chIdx);
-    }
-
 
     // Get position info for debugging
     getPositionInfo = () => this.systems.movement.getPositionInfo();

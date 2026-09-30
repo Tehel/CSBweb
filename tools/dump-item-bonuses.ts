@@ -295,8 +295,8 @@ async function main(): Promise<void> {
   {
     // `RemoveCharacterPossession`, through a death's `DropAllPossessions`.
     const g = makeGame();
-    g.addChampion(champion(0));
-    g.addChampion(champion(1));
+    g.systems.hallOfChampions.addChampion(champion(0));
+    g.systems.hallOfChampions.addChampion(champion(1));
     const c = g.ctx.party.state.champions[0]!;
     const staff = newObject(g, NI.OBJNI_SERPENT_STAFF);
     const helm = newObject(g, NI.OBJNI_CROWN_OF_NERRA);
@@ -378,8 +378,8 @@ async function main(): Promise<void> {
       closeAttackMenuOf: (chIdx) => notices.push(`closeAttackMenuOf(${chIdx})`),
       repackChest: () => notices.push('repackChest'),
     });
-    g.addChampion(champion(0));
-    g.addChampion(champion(1));
+    g.systems.hallOfChampions.addChampion(champion(0));
+    g.systems.hallOfChampions.addChampion(champion(1));
     const ui = uiOver(g);
     const party = g.ctx.party.state;
     party.selectedCharacterIndex = 1;
@@ -456,12 +456,12 @@ async function main(): Promise<void> {
     const chestOut = notices.join(' ');
     party.objectInHand = OBJECT_ID_NULL;
     notices.length = 0;
-    g.addCharacterPossession(0, chest, 1);
-    g.removeCharacterPossession(0, 1);
+    g.systems.character.addCharacterPossession(0, chest, 1);
+    g.systems.character.removeCharacterPossession(0, 1);
     const otherChest = notices.join(' ');
     notices.length = 0;
-    g.addCharacterPossession(1, chest, 0);
-    g.removeCharacterPossession(1, 0);
+    g.systems.character.addCharacterPossession(1, chest, 0);
+    g.systems.character.removeCharacterPossession(1, 0);
     const shieldHand = notices.join(' ') || 'none';
     console.log(`a chest into champion 1's weapon hand: ${chestIn}; out: ${chestOut}`);
     console.log(`into and out of champion 0's (inventory closed): ${otherChest}; champion 1's shield hand: ${shieldHand}`);

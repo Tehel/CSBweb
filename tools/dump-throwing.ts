@@ -381,7 +381,7 @@ async function main(): Promise<void> {
   equip(thrower2, 1, club);
 
   const missilesBeforeThrow = data2.databases.missiles.records.length;
-  const threw = game.championAttack(0, AttackType.atk_THROW);
+  const threw = game.systems.character.executeAttack(0, AttackType.atk_THROW);
   const missilesAfterThrow = data2.databases.missiles.records.length;
   const handAfterThrow = getChampionPossession(thrower2, 1);
   console.log(`THROW: result ${threw}, missiles ${missilesBeforeThrow} -> ${missilesAfterThrow}, ` +
@@ -401,7 +401,7 @@ async function main(): Promise<void> {
   equip(archer, 0, arrow);
 
   const missilesBeforeShot = data2.databases.missiles.records.length;
-  const shot = game.championAttack(0, AttackType.atk_SHOOT);
+  const shot = game.systems.character.executeAttack(0, AttackType.atk_SHOOT);
   const missilesAfterShot = data2.databases.missiles.records.length;
   const ammoAfterShot = getChampionPossession(archer, 0);
   const bowAfterShot = getChampionPossession(archer, 1);

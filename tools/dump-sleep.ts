@@ -43,6 +43,7 @@ import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState'
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
@@ -104,8 +105,8 @@ async function main(): Promise<void> {
     tag0207cc: () => Mouse.tag0207cc(ui),
   });
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion(0));
-  game.addChampion(champion(1));
+  game.systems.hallOfChampions.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(champion(1));
   const party = game.ctx.party.state;
   party.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
@@ -168,7 +169,7 @@ async function main(): Promise<void> {
     check(ui.shadedByTag02076e, 'TAG02076e (Mouse.cpp:1691): the interface shaded, the arrow cursor');
     check(ui.primaryButtons === lists.buttons17796 && ui.secondaryButtons === null,
       'PrimaryButtonList = Buttons17796, SecondaryButtonList = NULL');
-    check(game.queuedInputCount() === 0 && !handled.includes(1), 'DiscardAllInput(): the turn behind it is gone');
+    check(game.ctx.mouseQueue.count() === 0 && !handled.includes(1), 'DiscardAllInput(): the turn behind it is gone');
     check(Mouse.searchMouseButtons(ui, 20, 10, 2) === 0, 'a portrait is not a button while asleep');
     check(Mouse.searchMouseButtons(ui, 300, 150, 2) === 0, 'nor is a movement arrow');
     check(Mouse.searchMouseButtons(ui, 100, 100, 1) === 146, 'a right click in the viewport is 146');
@@ -208,7 +209,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== WakeUp by Return (Byte18440) ===');
   {
-    game.sleep();
+    game.systems.mouse.sleep();
     internals.lastInputTime = 0;
     check(game.enqueueKeyButton(146), 'Return is queued as 146');
     frame();
@@ -222,13 +223,13 @@ async function main(): Promise<void> {
     messages.quePrintLines(15, 'HELLO');
     messages.printNextQueued(t0);
     const placed = messages.timeouts()[0]!;
-    game.sleep();
+    game.systems.mouse.sleep();
     const asleep = messages.timeouts()[0]!;
     for (let i = 0; i < 100; i++) frame(17);
     const t1 = game.ctx.state.tickCount;
-    game.wakeUp();
+    wakeUp(game.ctx);
     const awake = messages.timeouts()[0]!;
-    game.wakeUp();
+    wakeUp(game.ctx);
     const again = messages.timeouts()[0]!;
     console.log(`placed at ${t0}: ${placed}; asleep: ${asleep}; woken at ${t1}: ${awake}; again: ${again}; row 1: ${messages.timeouts()[1]}`);
     check(placed === t0 + 70, 'awake, a row lasts 70 ticks (CSBCode.cpp:1552)');
@@ -242,7 +243,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== WakeUp by a blow ===');
   {
-    game.sleep();
+    game.systems.mouse.sleep();
     game.systems.monsterAttack.damageCharacter(0, 40, 0, 0);
     check(game.isPartySleeping(), 'DamageCharacter with P4 == 0 does not wake (Character.cpp:2809 is on the armour branch)');
     const hp = party.champions[0]!.attributes.health;
@@ -255,13 +256,13 @@ async function main(): Promise<void> {
     const monster = game.ctx.dungeon.getCreatureRecordByIndex(0);
     check(monster !== null, 'a monster to strike with');
     if (monster) {
-      game.sleep();
+      game.systems.mouse.sleep();
       game.systems.monsterAttack.monsterDamagesCharacter(monster, 0, true);
       check(!game.isPartySleeping(), 'MonsterDamagesCharacter wakes the party whatever the outcome');
       // In a tick: the blow's clockTick = 1 is cleared by the tick's own clockTick = 0.
-      game.sleep();
+      game.systems.mouse.sleep();
       const internalsTick = game as unknown as { gameTick(): void };
-      game.onTick(() => { if (game.isPartySleeping()) game.wakeUp(); });
+      game.onTick(() => { if (game.isPartySleeping()) wakeUp(game.ctx); });
       internalsTick.gameTick();
       const before = game.ctx.state.tickCount;
       frame(17);
@@ -307,15 +308,15 @@ async function main(): Promise<void> {
     const syraHero = game.ctx.dungeon.getData().presetHeroes?.find((h) => h.name === 'SYRA');
     check(syraHero !== undefined, 'SYRA is a preset hero');
     if (syraHero) {
-      game.wakeUp();
+      wakeUp(game.ctx);
       party.champions.length = 0;
-      game.addChampion(createChampionFromPreset(syraHero, 0));
+      game.systems.hallOfChampions.addChampion(createChampionFromPreset(syraHero, 0));
       const syra = party.champions[0]!;
       const awake = determineMastery(syra, 3) + determineMastery(syra, 2);
       const wisdom = syra.attributes.stats[AttributeIndex.Wisdom]!.current;
       console.log(`SYRA: Wisdom ${wisdom}, Wizard + Priest mastery ${awake} awake`);
       check(awake + wisdom > 48 && 2 + wisdom <= 48, 'the canary: r = 48 separates the two thresholds');
-      game.sleep();
+      game.systems.mouse.sleep();
       syra.attributes.mana = 0;
       game.ctx.state.tickCount = 0x180; // random112 = 48
       tenSecondUpdate(game.ctx);
@@ -325,7 +326,7 @@ async function main(): Promise<void> {
       syra.attributes.stamina = 200;
       tenSecondUpdate(game.ctx);
       check(syra.attributes.mana === 1, 'r = 0 is: MaxMana 15 / 40 * 2 + 1 = one point');
-      game.wakeUp();
+      wakeUp(game.ctx);
       syra.attributes.mana = 0;
       game.ctx.state.tickCount = 0x380; // random112 = 48 again (bit 9 is not read), awake
       tenSecondUpdate(game.ctx);
@@ -336,10 +337,10 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== never restored asleep (CSBCode.cpp:10479) ===');
   {
-    game.sleep();
+    game.systems.mouse.sleep();
     const save = game.getRuntimeSaveState();
-    game.wakeUp();
-    game.sleep();
+    wakeUp(game.ctx);
+    game.systems.mouse.sleep();
     notified.length = 0;
     game.applyRuntimeSaveState(save);
     check(!game.isPartySleeping(), 'a save taken asleep loads awake');
@@ -365,7 +366,7 @@ async function main(): Promise<void> {
     check(after === saved + 70, 'ResetTime: its 70 ticks left count from the loaded clock');
 
     // Loaded over a sleeping party, the next tick's SetNewSpeed(0, 15) (CSBCode.cpp:612-616).
-    game.sleep();
+    game.systems.mouse.sleep();
     const stretched = messages.timeouts()[row]!;
     game.applyRuntimeSaveState(save);
     const loaded = messages.timeouts()[row]!;

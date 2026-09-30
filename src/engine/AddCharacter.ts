@@ -242,7 +242,7 @@ export function addCharacterDefaults(): ChampionDefaults {
     // `HallOfChampions.addCharacter`.
     facing: 0,
     // Cleared here. `AddCharacter` computes it (`:513-516`), and so do
-    // `HallOfChampions.addCharacter` and `Game.addChampion`.
+    // `HallOfChampions.addCharacter` and `HallOfChampions.addChampion`.
     fingerprint: 0,
   };
 }

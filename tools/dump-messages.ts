@@ -30,6 +30,7 @@ import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { newGame } from './lib/game';
+import { freeze, thaw } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
 const STRIP_TOP = 172;
@@ -153,25 +154,25 @@ function main(): void {
 
   console.log('');
   console.log('=== frozen, the loop still prints; under the save menu it does not ===');
-  game.freeze();
+  freeze(game.ctx);
   say('FROZEN');
   const frozenAt = game.ctx.state.tickCount;
   frame(true);
   frame(true);
   check(game.ctx.state.tickCount === frozenAt && messages.backlog().printQueue === 0,
     'frozen, no tick runs, and the loop still takes both entries (CSBCode.cpp:765)');
-  game.thaw();
+  thaw(game.ctx);
   for (let i = 0; i < 7; i++) frame();
   frame(true);
   check(rows()[3] === 'FROZEN', 'thawed, once the scroll its linefeed started is over, a tick places it');
   say('SAVED');
   frame();
   check(messages.scrollState().textScanlineScrollCount === 0, 'a linefeed starts a scroll');
-  game.setPaused(true);
+  game.ctx.state.paused = true;
   for (let i = 0; i < 3; i++) frame();
   check(messages.scrollState().textScanlineScrollCount === 3 && messages.backlog().printQueue === 1,
     'paused, the scroll goes on and the entry waits (CSBCode.cpp:762)');
-  game.setPaused(false);
+  game.ctx.state.paused = false;
   frame();
   check(messages.backlog().printQueue === 0, 'unpaused, the next pass takes it');
 

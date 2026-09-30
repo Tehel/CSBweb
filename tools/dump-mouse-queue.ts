@@ -54,6 +54,7 @@ import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { freeze, thaw } from '../src/engine/LoopState';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -165,12 +166,12 @@ async function main(): Promise<void> {
   reset();
   for (let i = 0; i < 5; i++) game.enqueueMovement(MovementAction.TURN_LEFT);
   const clickWithFive = game.onMouseClick(NUM_INVENTORY, 10, 50);
-  const countAfterFirst = game.queuedInputCount();
+  const countAfterFirst = game.ctx.mouseQueue.count();
   const clickWithSix = game.onMouseClick(NUM_INVENTORY, 10, 50);
   game.onMouseUnClick();
-  const countAfterUp = game.queuedInputCount();
+  const countAfterUp = game.ctx.mouseQueue.count();
   game.onMouseUnClick();
-  const countAfterSecondUp = game.queuedInputCount();
+  const countAfterSecondUp = game.ctx.mouseQueue.count();
   console.log(`click with 5 waiting: ${clickWithFive}, with 6: ${clickWithSix}; ` +
     `button-ups take the queue ${countAfterFirst} -> ${countAfterUp} -> ${countAfterSecondUp}`);
   check(clickWithFive && countAfterFirst === 6, 'a click should queue while five entries wait');
@@ -229,7 +230,7 @@ async function main(): Promise<void> {
   game.enqueueMovement(MovementAction.MOVE_FORWARD);
   game.onMouseClick(NUM_INVENTORY, 10, 50);
   frame();
-  const blockedCount = game.queuedInputCount();
+  const blockedCount = game.ctx.mouseQueue.count();
   const blockedHandled = handled.length;
   frame(true);
   frame(true); // the delay has run out after two ticks
@@ -247,8 +248,8 @@ async function main(): Promise<void> {
   game.onMouseClick(NUM_INVENTORY, 10, 50);
   game.discardAllInput();
   frame();
-  console.log(`click then DiscardAllInput: handled ${handled.length}, queue ${game.queuedInputCount()}`);
-  check(handled.length === 0 && game.queuedInputCount() === 0, 'DiscardAllInput should drop a queued click');
+  console.log(`click then DiscardAllInput: handled ${handled.length}, queue ${game.ctx.mouseQueue.count()}`);
+  check(handled.length === 0 && game.ctx.mouseQueue.count() === 0, 'DiscardAllInput should drop a queued click');
 
   // ---- 7b: totalMoveCount counts what HandleMouseEvents records -------------------
   // `RecordFile_Record(&pMouseQueue[d.MouseQStart])` once an entry is past the held-step
@@ -279,12 +280,12 @@ async function main(): Promise<void> {
   game.enqueueKeyButton(0x2000);
   frame();
   const afterIgnored = moves() - m0;
-  game.freeze();
+  freeze(game.ctx);
   frame(true);
   game.onMouseClick(NUM_INVENTORY, 10, 50);
   frame();
   const whileFrozen = moves() - m0;
-  game.thaw();
+  thaw(game.ctx);
   console.log(`totalMoveCount: held step +${whileHeld}, once it went +${afterStep}, ` +
     `click and button-up +${afterClick}, the no-op and 0x2000 +${afterIgnored}, frozen click +${whileFrozen}`);
   check(whileHeld === 0 && afterStep === 1, 'a held step is counted when it goes, not while it waits');
@@ -453,10 +454,15 @@ async function main(): Promise<void> {
   // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
   // handler: the UI's dispatcher, or for the viewport the call `src/ui/events.ts` makes.
   ui.uiTables = uiTables;
+  // The engine's `CastMagic` and `Attack`, the UI's calls, wrapped to read their results.
+  const { magic, character } = game.systems;
   let castResult = -99;
-  ui.onSpellCast = (chIdx) => (castResult = game.castSpellFromUi(chIdx));
+  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
+  magic.castSpellFromUi = (chIdx) => (castResult = castSpellFromUi(chIdx));
   let attackResult = -99;
-  ui.onChampionAttack = (chIdx, attackType) => (attackResult = game.championAttack(chIdx, attackType));
+  const executeAttack = character.executeAttack.bind(character);
+  const recordAttack = (chIdx: number, attackType: number): number => (attackResult = executeAttack(chIdx, attackType));
+  character.executeAttack = recordAttack;
   const centreOf = (list: Array<{ word0: number; x1: number; y1: number; x2: number; y2: number }> | null, id: number): [number, number] => {
     const b = list?.find((entry) => entry.word0 === id);
     if (!b) throw new Error(`no button ${id} in the list`);
@@ -597,11 +603,11 @@ async function main(): Promise<void> {
   check(offered.has(0), 'an empty hand at an empty square has an attack that returns 0');
   // Every real attack there returns 0, so the engine's `Attack` is stood in for once by
   // one that lands: the handler hands on what it gets.
-  ui.onChampionAttack = () => (attackResult = 1);
+  character.executeAttack = () => (attackResult = 1);
   const landedFrames = attackOnce('frames', centreOf(buttons.buttons17892, 113)) as number;
   row('ExecuteAttack (Attack stood in, 1)', String(attackResult), landedFrames, '-', 'set');
   check(attackResult === 1 && landedFrames === 1, 'an attack that returns 1 makes a tick due');
-  ui.onChampionAttack = (chIdx, attackType) => (attackResult = game.championAttack(chIdx, attackType));
+  character.executeAttack = recordAttack;
   const passFrames = attackOnce('frames', [passX, passY]) as number;
   const passDueRuns = attackOnce('due', [passX, passY]) as boolean;
   row('PASS', String(attackResult), passFrames, passDueRuns, 'untouched');

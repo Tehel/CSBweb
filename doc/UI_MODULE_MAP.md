@@ -17,10 +17,12 @@ each other.
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out** (`GameScreenHooks`): the panels' (`onSpellCast`, `onChampionAttack`,
-  `onResurrectReincarnateCancel`, `onReincarnateNamed`) and the save stores'. The object
-  and inventory calls, and the loop's (a script holding it, the button flashes, sleep and
-  freeze), go to the engine through `ctx` (`DEBT.md` E11)
+- **hooks out to the page** (`GameScreenHooks`): the save stores' four (`onCreateSave`,
+  `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`) and `onReincarnated`, the page's
+  redraw once the name-entry screen is answered. Everything the interface does to the
+  game it does as CSBWin's does to `d.`, through `ctx`: the systems (casting, attacking,
+  the Hall of Champions, the possessions), `LoopState` (a script holding the loop, the
+  button flashes, sleep and freeze) and the dungeon's records
 - **hooks back into the renderer**: `getGraphicBitmap`, `renderLastFrame`
 
 A function that turns out not to need the state does not take it — the pure helpers

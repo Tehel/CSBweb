@@ -63,7 +63,7 @@ function makeGame(): Game {
 
 function withParty(count: number): Game {
   const game = makeGame();
-  for (let i = 0; i < count; i++) game.addChampion(champion(i, `HERO${i}`));
+  for (let i = 0; i < count; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }

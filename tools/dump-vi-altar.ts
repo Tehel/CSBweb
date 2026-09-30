@@ -85,7 +85,7 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  for (let i = 0; i < 4; i++) game.addChampion(champion(i, `HERO${i}`));
+  for (let i = 0; i < 4; i++) game.systems.hallOfChampions.addChampion(champion(i, `HERO${i}`));
   return { game, objectTables, uiTables };
 }
 

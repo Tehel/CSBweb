@@ -54,7 +54,7 @@ function makeGame(): Game {
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(champion(0));
   game.ctx.party.state.position = new Position(6, 14, 2);
   return game;
 }
@@ -116,7 +116,7 @@ function main(): void {
   console.log('=== 3. a Hall of Champions recruit ===');
   {
     const game = makeGame();
-    game.addChampion(champion(1));
+    game.systems.hallOfChampions.addChampion(champion(1));
     const own = giveTorch(game, 0, 8);
     const recruits = giveTorch(game, 1, 8);
     game.ctx.party.state.potentialChampionIndex = 1;

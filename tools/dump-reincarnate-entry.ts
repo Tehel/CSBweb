@@ -41,7 +41,7 @@ import { graphicsTablesOf } from './lib/game';
 
 /**
  * Just enough `UIState` for the module: it reads `reincarnate`, `uiTables`,
- * `partyState` and the one hook. Standing up the whole renderer would prove nothing
+ * `partyState` and the engine's `HallOfChampions.reincarnateNamed`. Standing up the whole renderer would prove nothing
  * extra and would need a browser.
  */
 interface Harness {
@@ -56,8 +56,14 @@ function makeHarness(uiTables: UITables, championNames: string[]): Harness {
     uiTables,
     partyState: { champions },
     reincarnate: null,
-    onReincarnateNamed: (chIdx: number, name: string, title: string) => {
-      harness.named = { chIdx, name, title };
+    ctx: {
+      systems: {
+        hallOfChampions: {
+          reincarnateNamed: (chIdx: number, name: string, title: string) => {
+            harness.named = { chIdx, name, title };
+          },
+        },
+      },
     },
   } as unknown as UIState;
   return harness;

@@ -192,7 +192,7 @@ export function executeAttack(ui: UIState, option: number): number {
   } else {
     const attackType = ui.possibleAttackTypes[option] & 0xff;
     if (attackType === ATTACK_TYPE_NONE) return 0;
-    result = ui.onChampionAttack?.(chIdx, attackType) ?? 0;
+    result = ui.ctx.systems.character.executeAttack(chIdx, attackType);
     // The fusion's `Attack(_1_, …)` never returns (`Character.cpp:4972`): `_FusionSequence`
     // ends in `ShowCredits` (`Attack.cpp:2429`), so `TAG01b1c0` does not run and the menu
     // stays on the panel to the end of the game.
@@ -297,7 +297,7 @@ export function attackPanelTick(ui: UIState): void {
     // The flash is a timed overlay rather than CSBWin's blocking delay; the panel stays
     // owed a redraw until it has run its course.
     if (ui.attackFlashUntilMs > nowMs()) return;
-    const damage = ui.onConsumeAttackDamage?.() ?? 0;
+    const damage = ui.ctx.systems.attack.consumeAttackDamageToDisplay();
     if (damage !== 0) {
       ui.attackFlashValue = damage;
       ui.attackFlashUntilMs = nowMs() + FLASH_MS;

@@ -42,7 +42,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
-import { flashButton, waitForButtonFlash } from '../src/engine/LoopState';
+import { flashButton, flashedButton, setClockTick, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
     game.runFrame(t);
   };
   let drawnInTick: Rect | null | undefined;
-  game.onTick(() => { drawnInTick = game.flashedButton(); });
+  game.onTick(() => { drawnInTick = flashedButton(game.ctx); });
   const reset = (): void => {
     game.discardAllInput();
     party.position = new Position(scene!.x, scene!.y, level);
@@ -155,11 +155,11 @@ async function main(): Promise<void> {
     enqueue();
     frame();
     const active = loop.flashButnActive;
-    const after = [game.flashedButton()];
+    const after = [flashedButton(game.ctx)];
     const changed = [game.takeFlashChanged()];
     for (let i = 0; i < 2; i++) {
       frame();
-      after.push(game.flashedButton());
+      after.push(flashedButton(game.ctx));
       changed.push(game.takeFlashChanged());
     }
     console.log(`${what}: the tick drew ${show(drawnInTick ?? null)}; inverted after each VBL ` +
@@ -200,11 +200,11 @@ async function main(): Promise<void> {
   // ---- a pass without a tick puts it back too (:763) -----------------------------
   reset();
   flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
-  const standing = same(game.flashedButton(), TURN_RIGHT) && !loop.flashButnActive;
+  const standing = same(flashedButton(game.ctx), TURN_RIGHT) && !loop.flashButnActive;
   frame();
-  const askedWithoutTick = loop.flashButnActive && same(game.flashedButton(), TURN_RIGHT);
+  const askedWithoutTick = loop.flashButnActive && same(flashedButton(game.ctx), TURN_RIGHT);
   frame();
-  const backWithoutTick = game.flashedButton() === null;
+  const backWithoutTick = flashedButton(game.ctx) === null;
   console.log(`flash, then passes without a tick: standing ${standing}, put-back asked ${askedWithoutTick}, back ${backWithoutTick}`);
   check(standing, 'FlashButton should invert its rectangle before it returns, with nothing left pending');
   check(askedWithoutTick && backWithoutTick, 'a pass without a tick should ask for the put-back, and the next VBL make it');
@@ -221,14 +221,14 @@ async function main(): Promise<void> {
     const time = game.ctx.state.tickCount;
     if (flash) {
       flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
-      game.setClockTick(1);
+      setClockTick(game.ctx, 1);
     }
     frame(!flash);
     const log = [...hostLog];
     const held = game.paintHeld();
     game.takeFlashChanged();
     frame();
-    return { time, log, held, next: { inverted: game.flashedButton(), changed: game.takeFlashChanged(), held: game.paintHeld() } };
+    return { time, log, held, next: { inverted: flashedButton(game.ctx), changed: game.takeFlashChanged(), held: game.paintHeld() } };
   };
   const plain = tickOrder(false);
   console.log(`a tick: ${plain.log.join(' | ')}; paint held ${plain.held}`);
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
   flashButton(game.ctx, TURN_LEFT.x1, TURN_LEFT.x2, TURN_LEFT.y1, TURN_LEFT.y2);
   waitForButtonFlash(game.ctx);
   flashButton(game.ctx, TURN_RIGHT.x1, TURN_RIGHT.x2, TURN_RIGHT.y1, TURN_RIGHT.y2);
-  const second = game.flashedButton();
+  const second = flashedButton(game.ctx);
   console.log(`flash, wait, flash again: inverted ${show(second)}, pending ${loop.flashButnActive}`);
   check(same(second, TURN_RIGHT) && !loop.flashButnActive,
     'a flash after a put-back was asked should wait it out, then invert its own rectangle');
@@ -272,7 +272,7 @@ async function main(): Promise<void> {
   };
   party.champions = [caster];
   flashButton(game.ctx, TURN_LEFT.x1, TURN_LEFT.x2, TURN_LEFT.y1, TURN_LEFT.y2);
-  game.castSpellFromUi(0);
+  game.systems.magic.castSpellFromUi(0);
   console.log(`CastMagic with a flash standing: put-back asked ${loop.flashButnActive}`);
   check(loop.flashButnActive, 'CastMagic should ask for the put-back of a standing flash (Magic.cpp:939)');
   frame();
@@ -284,7 +284,9 @@ async function main(): Promise<void> {
   ui.partyState = party;
   let castAt = -1;
   let frameNo = 0;
-  ui.onSpellCast = (chIdx) => { castAt = frameNo; return game.castSpellFromUi(chIdx); };
+  const magic = game.systems.magic;
+  const castSpellFromUi = magic.castSpellFromUi.bind(magic);
+  magic.castSpellFromUi = (chIdx) => { castAt = frameNo; return castSpellFromUi(chIdx); };
   party.magicCasterIndex = 0;
   const word18552 = ui.uiTables.graphic231.word18552;
   const buttons18060 = ui.uiTables.graphic231.buttons.buttons18060;
@@ -302,11 +304,11 @@ async function main(): Promise<void> {
     const b = clickRect(id);
     handleMagicClick(ui, (b.x1 + b.x2) >> 1, (b.y1 + b.y2) >> 1);
     frameNo = 0;
-    const seen = [{ flashed: game.flashedButton(), runes: caster.incantation.length, running: game.isRunningScript() }];
+    const seen = [{ flashed: flashedButton(game.ctx), runes: caster.incantation.length, running: game.isRunningScript() }];
     for (let i = 0; i < 4; i++) {
       frameNo++;
       frame();
-      seen.push({ flashed: game.flashedButton(), runes: caster.incantation.length, running: game.isRunningScript() });
+      seen.push({ flashed: flashedButton(game.ctx), runes: caster.incantation.length, running: game.isRunningScript() });
     }
     return seen;
   };
@@ -352,8 +354,6 @@ async function main(): Promise<void> {
   const partner: Champion = { ...caster, name: 'TWO', possessions: emptyPossessions(), partyPosition: 1, incantation: [] };
   party.champions = [caster, partner];
   party.magicCasterIndex = -1;
-  ui.onChampionAttack = (chIdx, attackType) => game.championAttack(chIdx, attackType);
-  ui.onConsumeAttackDamage = () => game.consumeAttackDamageToDisplay();
   game.setMouseEventHandlers({ button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });
   const clickAt = (r: Rect) => () => { game.onMouseClick(111, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1); };
 
@@ -369,8 +369,8 @@ async function main(): Promise<void> {
   check(air.tick === undefined && same(air.after[0]!, OPTIONS[0]!) && air.after[1] === null,
     'a blow at the air (0, d.clockTick = 0) should flash the option with no tick, and the next VBL put it back (:763)');
   // A blow that lands returns 1, which makes a tick due. Whether one lands is the attack
-  // tools' business: here the hook stands for it.
-  ui.onChampionAttack = () => 1;
+  // tools' business: here a stand-in for the engine's `Attack` decides it.
+  game.systems.character.executeAttack = () => 1;
   prepareAttack(ui, 0);
   const first = flashOf('option 113, a blow that lands', clickAt(attackRect(113)));
   check(same(first.tick ?? null, OPTIONS[0]!) && same(first.after[0]!, OPTIONS[0]!) && first.after[1] === null,
@@ -385,7 +385,7 @@ async function main(): Promise<void> {
   reset();
   const keyRow = (key: string): { inverted: Rect | null; ordinal: number } => {
     handleUIKey(ui, key);
-    const result = { inverted: game.flashedButton(), ordinal: ui.attackingCharacterOrdinal };
+    const result = { inverted: flashedButton(game.ctx), ordinal: ui.attackingCharacterOrdinal };
     frame();
     frame();
     return result;
@@ -395,7 +395,7 @@ async function main(): Promise<void> {
   console.log(`attack keys: W opens (menu ${opened.ordinal}, inverted ${show(opened.inverted)}); ` +
     `X, row 3 of ${offered}, inverted ${show(third.inverted)}, menu ${third.ordinal}`);
   check(opened.ordinal === 2 && opened.inverted === null, "W should open champion 1's menu and flash nothing");
-  check(offered === 3 && same(third.inverted, OPTIONS[2]!) && third.ordinal === 0 && game.flashedButton() === null,
+  check(offered === 3 && same(third.inverted, OPTIONS[2]!) && third.ordinal === 0 && flashedButton(game.ctx) === null,
     'X should flash the third row, as its click does, the attack close the menu, and the next VBLs put it back');
 
   finish();

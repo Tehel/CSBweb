@@ -257,7 +257,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         },
         // The first half of Reincarnate: the engine raises the name-entry screen
         // (`doc/CSBwin-src/CSBCode.cpp:6738` around `Code13ea4.cpp:20`); the
-        // screen's answer comes back through `onReincarnateNamed` below.
+        // screen hands its answer to `HallOfChampions.reincarnateNamed`.
         openReincarnateScreen: (chIdx) => screen?.openReincarnateScreen(chIdx),
         // A weapon hand changed, or a chest left the open inventory's weapon hand:
         // the attack menu, the inventory and the open chest are the screen's.
@@ -291,19 +291,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         messages,
     }, {
-        onSpellCast: (chIdx) => game.castSpellFromUi(chIdx),
-        // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
-        onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
-        onConsumeAttackDamage: () => game.consumeAttackDamageToDisplay(),
-        onResurrectReincarnateCancel: (button) => {
-            game.resurrectReincarnateCancel(button);
-        },
-        // The second half of Reincarnate: the screen hands the typed name back so the
-        // engine can finish (the first half is the host's `openReincarnateScreen`).
-        onReincarnateNamed: (chIdx, name, title) => {
-            game.reincarnateNamed(chIdx, name, title);
-            renderView();
-        },
+        // The second half of Reincarnate is done: the screen has handed the typed name
+        // to the engine (the first half is the host's `openReincarnateScreen`).
+        onReincarnated: () => renderView(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
         // back through these three.

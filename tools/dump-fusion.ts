@@ -111,7 +111,7 @@ function arena(withLordChaos: boolean): Arena {
     },
   });
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion());
+  game.systems.hallOfChampions.addChampion(champion());
   for (let x = CX - 3; x <= CX + 3; x++) {
     for (let y = CY - 3; y <= CY + 3; y++) {
       if (game.ctx.dungeon.findFirstMonster(new Position(x, y, LEVEL)) !== OBJECT_ID_EOF) {

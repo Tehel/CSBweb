@@ -32,6 +32,7 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
 type UIModules = [
@@ -110,8 +111,8 @@ async function main(): Promise<void> {
     },
   });
   game.setRandomSeed(0x12345678);
-  game.addChampion(champion(0));
-  game.addChampion(champion(1));
+  game.systems.hallOfChampions.addChampion(champion(0));
+  game.systems.hallOfChampions.addChampion(champion(1));
   const party = game.ctx.party.state;
   party.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
@@ -167,7 +168,7 @@ async function main(): Promise<void> {
     frame();
     console.log(`handled=${JSON.stringify(handled)} ${state()}`);
     check(game.isFrozen() && ui.uiMode === UIMode.Frozen, 'the game is frozen');
-    check(handled.join() === '147' && party.facing === facing && game.queuedInputCount() === 0,
+    check(handled.join() === '147' && party.facing === facing && game.ctx.mouseQueue.count() === 0,
       'DiscardAllInput(): the turn behind it is gone');
     check(ui.primaryButtons === lists.buttons17832 && ui.secondaryButtons === null,
       'PrimaryButtonList = Buttons17832, SecondaryButtonList = NULL');
@@ -190,10 +191,10 @@ async function main(): Promise<void> {
     game.enqueueKeyButton(3);
     const facing = party.facing;
     frame(-1);
-    const afterOne = game.queuedInputCount();
+    const afterOne = game.ctx.mouseQueue.count();
     frame(-1);
-    console.log(`queued 2: ${afterOne} left after one frame, ${game.queuedInputCount()} after two; handled=${JSON.stringify(handled)}`);
-    check(afterOne === 1 && game.queuedInputCount() === 0, 'one entry thrown away per call');
+    console.log(`queued 2: ${afterOne} left after one frame, ${game.ctx.mouseQueue.count()} after two; handled=${JSON.stringify(handled)}`);
+    check(afterOne === 1 && game.ctx.mouseQueue.count() === 0, 'one entry thrown away per call');
     check(handled.length === 0 && party.facing === facing, 'and none of them handled');
   }
 
@@ -239,7 +240,7 @@ async function main(): Promise<void> {
   console.log('');
   console.log('=== asleep: Esc freezes, and the thaw goes back to sleep ===');
   {
-    game.sleep();
+    game.systems.mouse.sleep();
     check(Keyboard.translateKey(ui, Keyboard.keyScanOf('Enter')) === 146, 'asleep, Return is 146');
     internals.lastInputTime = 0;
     check(press('Escape') === 147, 'and Esc 147');
@@ -259,7 +260,7 @@ async function main(): Promise<void> {
     const asleep = game.ctx.state.tickCount;
     for (let i = 0; i < 5; i++) frame(17);
     check(game.ctx.state.tickCount - asleep === 5, 'and a tick runs every frame again');
-    game.wakeUp();
+    wakeUp(game.ctx);
   }
 
   console.log('');
