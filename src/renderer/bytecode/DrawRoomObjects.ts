@@ -15,6 +15,7 @@ import {
   bltShapeToViewportIndex,
   IDENTITY_COLOR_MAP,
   shrinkBlt,
+  tag008c98,
   type IndexedBitmap,
 } from '../csbwin/CanvasBlitter';
 import type { DungeonState } from '../../engine/DungeonState';
@@ -928,13 +929,10 @@ function TAG005088(
 /**
  * `DrawClouds`' cell under the party (`doc/CSBwin-src/Code51a4.cpp:178-218`): one of
  * graphics 351-359 (48×31), picked by type and `value >> 5`, the poison one recoloured
- * through `d.Byte5712`, laid over `d.Word2530` by `TAG008c98`
- * (`doc/CSBwin-src/Graphics.cpp:1169`), transparent colour 10.
- *
- * `TAG008c98` fills the rectangle 16 pixels at a time, row by row, from the graphic
- * read as one run of 16-pixel groups: it starts at group `STRandom() & 63` and wraps
- * back to group 0 on reaching group `STRandom0_3() + 87`. Both draws are from the
- * viewport's stream. C++ leaves argument evaluation order unspecified; the port takes
+ * through `d.Byte5712`, laid over `d.Word2530` by `TAG008c98` with `P9` 138: no mask,
+ * transparent colour 10. Its run of groups starts at group `STRandom() & 63` and wraps
+ * back to group 0 on reaching group `STRandom0_3() + 87`, both draws from the viewport's
+ * stream. C++ leaves argument evaluation order unspecified; the port takes
  * right to left, the 68000 original's and the x86 compilers' order, so `STRandom()`
  * is drawn first.
  */
@@ -961,27 +959,11 @@ function drawCloudUnderParty(
   // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
   if (poison) src = shrinkBlt(src, src.width, src.height, src.width, src.height, tables.cloudColorMap);
 
-  const start = viewportRandom.next() & 63; // P7
-  const wrap = viewportRandom.zeroTo3() + 87; // P6
-
-  const rect = tables.cloudUnderPartyRect; // d.Word2530
-  const groupsPerRow = Math.trunc((rect.x2 - rect.x1) / 16) + 1; // w_2
-  const rows = rect.y2 - rect.y1 + 1;
-  const srcGroupsPerRow = (src.width + 15) >> 4;
-  const out = new Uint8Array(groupsPerRow * 16 * rows);
-  let group = start;
-  for (let k = 0; k < groupsPerRow * rows; k++) {
-    const srcRow = Math.floor(group / srcGroupsPerRow);
-    const srcCol = (group % srcGroupsPerRow) * 16;
-    const dstOff = Math.floor(k / groupsPerRow) * groupsPerRow * 16 + (k % groupsPerRow) * 16;
-    for (let i = 0; i < 16; i++) {
-      const x = srcCol + i;
-      out[dstOff + i] = x < src.width && srcRow < src.height ? src.pixels[srcRow * src.width + x] : 0;
-    }
-    if (++group === wrap) group = 0;
-  }
-  const derived: IndexedBitmap = { width: groupsPerRow * 16, height: rows, pixels: out };
-  draw.blitShapeToViewportIndexWithTransparent(derived, { x1: rect.x1, y1: rect.y1, x2: rect.x2, y2: rect.y2 }, 10);
+  const P7 = viewportRandom.next() & 63;
+  const P6 = viewportRandom.zeroTo3() + 87;
+  const viewport = draw.context.viewportIndexBuffer;
+  if (!viewport) return;
+  tag008c98(src, viewport, null, tables.cloudUnderPartyRect, P6, P7, 112, 138, 0, 0); // d.Word2530
 }
 
 function getDerivedObjectBitmap(
