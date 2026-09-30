@@ -14,9 +14,12 @@ Markers are `PLAN.md`'s: ⚠️ knowingly divergent or incomplete · ⏳ not sta
 
 ## Priority: a working game on the default dungeon
 
-Tiers D and E are empty. **The goal now is a
-complete, faithful game on the default dungeon** (`dm-atari`), so the unported features it needs come next, and whatever it does
-not need waits.
+**The goal now is a complete, faithful game on the default dungeon** (`dm-atari`), so the
+unported features it needs come next, and whatever it does not need waits. Three pieces
+of work follow it, the author's next challenges: a redesigned page, the save menu rework
+(`P10`), and a second dungeon (Chaos Strikes Back first). Tiers D and E hold what the
+code needs before them: a base solid enough to build them on. `E13` is `P10`'s first step,
+and `E15` the page redesign's.
 
 The order, then:
 
@@ -57,9 +60,9 @@ default, so with it off the game is CSBWin's and the golden frames do not move.
    (`CLAUDE.md` → "Working economically"). `/pay-debt` (`.claude/commands/pay-debt.md`)
    starts such a session and ends it with the command for the next one. Stop before a size-M item would overrun the
    session. Split an L item into steps and record the split in its entry.
-2. **Re-verify first.** Every pointer below was checked against the code on 2026-09-26, but
-   line numbers drift. If an item turns out to be already paid, delete it and say how you
-   know in the commit message.
+2. **Re-verify first.** Every pointer below was checked against the code when its entry
+   was written, but line numbers drift. If an item turns out to be already paid, delete it
+   and say how you know in the commit message.
 3. **Refactors change no behaviour.** Tiers D and E are refactors: `npm test` before and
    after, and `npm test -- --frames` whenever anything under `src/renderer/` or `src/ui/`
    moves. Better still, and expected for any split of a module: every tool's full output is
@@ -86,10 +89,33 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
-| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| E17 | Dead code | S | ⏳ |
+| D13 | State fields nothing reads | S | ⏳ |
+| D12 | `Champion.alive` shadows `HP() != 0` | S | ⏳ |
+| D14 | `timerWord8Table`, a load-time copy behind the live timers | S | ⏳ |
+| E16 | A `die()` in play stops the loop without a word | S | ⏳ |
+| E12 | `Game` names each system a second time | M | ⏳ |
+| E10 | Code written twice | M | ⏳ |
+| E8 | One table set, extracted once, outside the renderer | L | ⏳ |
+| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
+| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
+| D15 | `UIState` is built in two phases | M | ⏳ |
+| E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
+| E18 | Hygiene and documentation drift | S | ⏳ |
+| C95 | `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers | S | ⏳ |
+| C97 | `DrawViewport` runs outside CSBWin's three call sites | M | ⏳ |
+| C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
+| C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
+| C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
+| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
+| C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
+| P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
+| G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
+| E15 | The page shell | L | ⏳ with the page redesign |
+| F12 | The tools' scaffolding is copied, and reaches privates through unchecked casts | M | ⏳ |
+| F13 | `npm test` runs its tools one at a time | S | ⏳ |
 | F3 | Phase 15 step 4 | — | in `PLAN.md` |
 | G1 | DSA gaps | — | ⏸️ |
 | G2 | Eleven DSA filters | — | ⏸️ |
@@ -104,25 +130,393 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
-`PLAN.md`'s; a session that takes `P10` works there, one step at a time. The ⏸️ rows are
-postponed (see "Priority") and are never "the first row".
+`PLAN.md`'s; a session that takes `P10` works there, one step at a time. Two rows sit
+out of their tier's place on purpose: `E13` and `C96` just above `P10`, because `P10`
+builds on both, and `E15` below `G17`, because it waits for the page redesign to start: a
+session that reaches it first asks the author, and takes the next row meanwhile. The F
+rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
+The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C95 · D12 · E8 · F12 · G21 · X6. An ID recorded and paid in one commit has no
+Next free IDs: C101 · D16 · E19 · F14 · G21 · X6. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
 
 ## D — State representation
 
-Empty. New state-representation debt goes here, and jumps the queue.
+New state-representation debt goes here, and jumps the queue.
+
+### D12 ⏳ `Champion.alive` shadows `HP() != 0`
+
+CSBWin has no "alive" flag: a champion is dead when `HP()` is 0, and every search for a
+living champion tests that. The port carries `Champion.alive` (`src/engine/gameTypes.ts:83`)
+beside the HP. Two writers keep it in step, `KillCharacter`
+(`src/engine/MonsterAttack.ts:661`) and `BringCharacterToLife`
+(`src/engine/CharacterSystem.ts:227`); a CSBWin load derives it from the HP
+(`src/data/CsbwinCharacters.ts:211`), and `AddCharacter` sets it
+(`src/engine/AddCharacter.ts:295`).
+32 places in `src/` and 41 in `tools/` read it, some together with the HP, as if either
+could be wrong: `champ.alive !== false && (champ.attributes.health | 0) !== 0`
+(`src/renderer/ui/Attack.ts:328`). No CHARDESC byte holds it, so it cannot be saved as it
+is; it can only drift. Paying it means reading `health !== 0` everywhere, as CSBWin's
+code does at each site (cite it where the port's reader is not a transcription), and
+removing the field. `tools/dump-champion-death.ts` and `dump-vi-altar.ts` cover the two
+writers.
+
+### D13 ⏳ State fields nothing reads
+
+Fields the port's types still carry from before the transcription, written but never
+read, or never written at all:
+
+- `ChampionAttributes.experience`, `fighter`, `ninja`, `priest`, `wizard`
+  (`src/engine/gameTypes.ts:61-68`, "simplified for MVP"). `AddCharacter` sets the four
+  levels from the hero text (`src/engine/AddCharacter.ts:289-293`), the CSBWin reader
+  sets all five to 0 (`src/data/CsbwinCharacters.ts:203-207`), Reincarnate zeroes them
+  (`src/engine/HallOfChampions.ts:246-254`, whose comment says nothing reads them), and
+  nothing does. The skills are `Champion.skills`, as `CHARDESC.skills92` holds them.
+- `PartyState.moving` and `turning` (`gameTypes.ts:277-278`). Nothing sets either to
+  true. `Party.resetMovementFlags` clears both at every tick (`Game.ts:523`), and every
+  place that builds a `PartyState` has to spell them out as `false`.
+- `GameState.running`, `startTime` and `currentTime` (`gameTypes.ts:329-334`), the
+  wall clock inside the engine's state. `running` repeats `Game.running`; the other two
+  feed `Game.getElapsedTime`, which nothing calls, and `RuntimeSaveState.game.elapsedTimeMs`
+  (`src/engine/RuntimeSave.ts:132`), which a restore reads only to set `startTime` again
+  (`:178`).
+- `GAME_TIMING` (`gameTypes.ts:284`) repeats `VBL_FREQUENCY` and `TICKS_PER_SECOND`
+  from `src/core/constants.ts`.
+
+Paying it removes them. `elapsedTimeMs` is in the runtime save's shape, so its removal
+waits for `P10` to drop the JSON wrapper or goes with a `RUNTIME_SAVE_VERSION` bump.
+
+### D14 ⏳ `timerWord8Table`, a load-time copy behind the live timers
+
+A missile's flight direction is its timer's word 8, which CSBWin reads from the slot as it
+stands, `d.Timers[missile.timerIndex]`. `DungeonState.getTimerWord8`
+(`src/engine/DungeonState.ts:865`) asks the live `TimerQueue` first, through a lookup
+`TimerSystem` installs (`TimerSystem.ts:80`), and falls back on
+`DungeonData.timerWord8Table` (`src/data/dungeonTypes.ts:531`), a copy of every timer's
+word 8 that `applySaveGameState` takes when a save is restored
+(`src/data/SaveGameLoader.ts:1202`) and nothing updates. For a timer index the queue does
+not hold, the renderer's missile (`BytecodeInterpreter.ts:2728`) is drawn from the value
+at load time. `DungeonState.setTimerWord8Table` has no caller. Paying it means one
+source, the queue's slot as CSBWin reads it (`TimerQueue.getTimer` answers `null` for an
+empty slot where CSBWin reads whatever the slot kept), and removing the table from
+`DungeonData`, `DUNGEON_DATA_SOURCES` and the restore.
+
+### D15 ⏳ `UIState` is built in two phases
+
+`createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
+sources `null` — `uiTables`, `objectTables`, `characterStats`, `fontData`,
+`screenIndexBuffer`, `context` — and `GameScreen`'s constructor fills them in straight
+after (`src/renderer/GameScreen.ts:168-230`). None is ever `null` again, but every reader
+must ask: 165 `!ui.x` guards and 57 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
+optional fields too, so 35 calls are `ui.onX?.()`, and a hook left unwired is a click
+that silently does nothing. D3 made the engine's state required for the same reason. Paying
+it means a `UIState` built whole, from the tables (`E8`) and whatever replaces the hooks
+(`E11`), which is why it comes after both; `partyState` stays nullable only if the screen
+must exist before a party does.
 
 ---
 
 ## E — Architecture
 
-Empty. New architecture debt goes here, and jumps the queue.
+New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
+of "How to work this list", point 3, apply, byte-identical tool output included.
+
+### E8 ⏳ One table set, extracted once, outside the renderer
+
+The rule tables (monster, weapon and clothing descriptors, `d.ObjDesc`, the droppings,
+`d.Byte7302`, the door characteristics) are extracted by `src/renderer/csbwin/ObjectTables.ts`
+and `UITables.ts`, beside the rectangles and the palettes. So:
+
+- **The engine imports its rules from the renderer.** 14 engine modules import
+  `renderer/csbwin/ObjectTables` for `MonsterDesc` and its bit accessors
+  (`monsterHorizontalSize`, `monsterNonMaterial`, …), and `Game`, `LoopState` and
+  `SoundQueue` import `Rect` or `SoundTableEntry` from `UITables`. `GameTables.ts` builds
+  the engine's set by calling the renderer's extractors.
+- **Every table is extracted three times.** `buildGameTables` runs `extractUITables`,
+  `extractViewportTables` and `extractObjectTables`; `ViewportRenderer`'s constructor runs
+  the last two again (`src/renderer/ViewportRenderer.ts:92-94`), and `GameScreen`'s runs
+  `extractUITables` again (`GameScreen.ts:209`). 33 tools call `extractUITables` too.
+- **A table has two names.** The renderer's set keeps the port's names and the engine's
+  CSBWin's: `objDescCarryMask` / `objDescWord4`, `facingReplication` / `byte10340`,
+  `miscWeights` / `byte8946`, `monsterAttackSounds` / `uByte9672`. Two systems rename
+  again on the way in (`roomTimerFunctions` for `byte1596` in `ActuatorSystem` and
+  `DsaSystem`, `championMessageColors` for `byte1386`). A grep for one name misses the
+  readers of the other, and the UI adapts between the two, building a partial
+  `GameTables` to call the engine's `NameIndex` (`resolveObjectNameIndex`,
+  `src/renderer/ui/Objects.ts:23`).
+- **0x22e has a second layout path that never runs.** `extractViewportTables` reads the
+  offsets from the item's packed tail and, when the wall rectangles are not where the
+  tail says, searches the item for them by pattern (`findWallRectanglesOffset`) and
+  derives the rest from where it finds them (`ViewportTables.ts:111`, `:308`, chosen at
+  `:395-420`). The tail gives 0x104c for the graphics of all four data
+  sets, two distinct files (DM's, and CSB's that 3D2D1D shares), so the search is dead,
+  and a search is a guess in all but name.
+
+Paying it, in steps: (1) move the extractors to `src/data/` (`data/tables/`), with
+`MonsterDesc` and its accessors beside the engine's monster types; (2) extract once, where
+`main.ts` and `tools/lib/game.ts` build `GameTables`, and hand the same object to the
+screen, which stops extracting; (3) one name per table, CSBWin's, with the port's in the
+comment as `GameTables` already does; (4) delete the pattern search. A second dungeon's
+`graphics.dat` then has one place where it can differ.
+
+### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
+
+`src/renderer/bytecode/BytecodeInterpreter.ts` is 3926 lines. The stack machine and its
+opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
+the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
+
+- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2129`),
+  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2462`,
+  `drawMonsterAt`, `:2550`), the missiles (`drawMissilesAtPosition`, `:2668`),
+  `DrawClouds` (`:2814`), `drawCloudUnderParty`, `TAG005088` (`:2935`). About 1000
+  lines.
+- **`CSBCode.cpp`**'s drawing: `DrawWallDecoration` (`drawWallDecorationGraphic`,
+  `:1550`), the extended wall and floor decorations, the wall text (`:1806`),
+  `DrawFloorDecorations` (`:1890`), `DrawDoor` and its ornament (`opStdDrawDoor`,
+  `:1315`, `drawDoorOrnament`), `DrawTeleporter` (`:2073`), the champion portrait. About
+  700 lines.
+- **`Graphics.cpp`**'s `ShrinkBLT` (`shrinkBltIndexedBitmap`, `:3058`) and the mirror and
+  crop helpers, which `E10` merges with their twins.
+
+Paying it moves each group into a module named for its CSBWin file, as `E2` split
+`Game.ts`, over the `InterpreterContext` the interpreter already passes around; the
+interpreter keeps the machine. `C94` and `C99` both land in the code that moves: pay
+them first or after, not during.
+
+### E10 ⏳ Code written twice
+
+Each of these is one CSBWin routine, or one format detail, with two or three bodies:
+
+- **`ShrinkBLT`** (`doc/CSBwin-src/Graphics.cpp:380`): `CanvasBlitter.shrinkBlt` for the
+  interface and the title, and `BytecodeInterpreter.shrinkBltIndexedBitmap` with the
+  colour map, the same stepping written twice with different integer idioms.
+- **`Mirror`**: `ViewportRenderer.mirrorIndexedBitmap` (`:349`),
+  `ViewportGraphics.mirrorIndexedBitmap` (`:207`) and
+  `BytecodeInterpreter.getMirroredBitmap` (`:3388`); crop, twice (`ViewportRenderer.ts:394`,
+  `BytecodeInterpreter.ts:2061`).
+- **The object icon's lookup** (graphic `42 + group` over `word612`, the source cell from
+  the offset): three copies in `src/renderer/ui/Draw.ts` (`drawObjectIcon`, `:104`,
+  `drawObjectIconMask`, `:159`, `drawObjectIconAt`, `:205`).
+- **The 6-byte decoration descriptor reader**: `readDecorationDescTable22e`,
+  `readDecorationDescSets` and `readFloorDecorationDescTable22e`
+  (`src/renderer/csbwin/ObjectTables.ts:745-812`), where the second serves all three.
+- **The byte writers**: `writeU16BE`, `writeU16LE`, `writeU32LE`, `writeU32BE` are private
+  functions in `SaveGameLoader.ts`, `CsbwinExtendedFeatures.ts` and
+  `CsbwinDungeonImageWriter.ts`; `src/core/bytes.ts` has only the readers.
+- **`EXTENDEDFEATURESBLOCK`, read twice**: `SaveGameLoader.readExtendedFeatures` reads the
+  fields at bare offsets with bare masks (`extendedFlags & 0x20`, `flags & 0x80`), and
+  `CsbwinExtendedFeatures.parseExtendedFeaturesBlock` reads the same struct with
+  `EF_FLAGS` and `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` and `EXPOOL_RECORD_SIZE` are
+  each declared twice.
+- **A save's name made unique**: `makeSaveFileName(savedAt, taken)`
+  (`src/engine/SaveGamePayload.ts:503`) and `SaveMenu.uniqueName` (`:594`), with different
+  suffix rules.
+
+One commit per bullet. The first three move under `src/renderer/csbwin/` (the
+renderer's primitives); the save ones may wait for `E13`.
+
+### E11 ⏳ The interface reaches the engine through three layers of forwarding
+
+What CSBWin's interface code does to the game, it does by calling the engine's functions
+on `d.`. The port's goes: a `UIState` hook (`ui.onAddCharacterPossession?.(…)`), which
+`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:173-200`),
+each a lambda in `main.ts`'s `construct` (`src/main.ts:237-370`) onto a one-line `Game`
+facade, onto the system. Adding an engine call from the UI touches four files. And
+the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
+state directly where no hook exists — the object in hand
+(`ViewportPicking.ts:88`, `Mouse.ts:360`, `:368`, `Feeding.ts:133`), the floor chain
+(`ViewportPicking.ts:85`), a record freed (`Feeding.ts:134`), a potion emptied and a
+waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:310-338`).
+19 tools stand the UI up with the subset of hooks they think they need, "wired as
+`main.ts` wires it", which nothing checks.
+
+Two smaller seams go with it:
+
+- **The message area is a singleton the screen reads behind the engine's back.** The
+  engine is handed its `MessageSink` (`GameHost.messages`), but `drawMessageLines` draws
+  the module-level `scrollingText` (`src/renderer/ui/Draw.ts:258`,
+  `ScrollingText.ts:461`): a tool or a second game that hands the engine another strip
+  still sees the global drawn.
+- **`GameHost`'s contract types live in `ActuatorSystem.ts`** (`MessageSink`,
+  `CursorFilterHook`, `:74`), because their first user was there.
+
+Paying it is the author's choice between two shapes, written into this entry before any
+code moves:
+
+- **A (recommended).** `UIState` holds the `GameContext`, and a UI module calls the system
+  as the C++ calls the engine. `GameScreenHooks`, the `main.ts` lambdas and the facades
+  only the UI used go; the hooks that stay are the page's (sound, the save stores, the
+  pause). A tool stands the UI up over the `Game` it already has.
+- **B.** The hooks stay, but one `src/` function builds them all from a `Game`, `main.ts`
+  and every tool use it, and the fields become required (`D15`).
+
+Either way the strip moves into the context or the screen, not a module global, and the
+`GameHost` types move to `GameHost.ts`.
+
+### E12 ⏳ `Game` names each system a second time
+
+`GameContext.systems` holds every subsystem (`E1c`), and `Game` keeps a field for each
+too, often under another name: `game.timerSystem` is `ctx.systems.timer`,
+`monsterSystem` is `monsters`, `attackSystem` is `attack`, `timerQueue` is
+`ctx.timers`, `dungeonState` is `ctx.dungeon` (`src/engine/Game.ts:90-188`). Five public
+fields are read by nothing (`monsterPerception`, `monsterAI`, `character`, `mouse`,
+`hallOfChampions`), and two are private, which tools cast to reach (`actuators`, 6 casts;
+`dsaSystem`, 2), as they do the private `gameTick` (6). A grep for `ctx.systems.timer`
+misses 31 callers of `game.timerSystem`. Paying it means one name per system,
+`ctx.systems`'s, in `src/` and `tools/` (mechanical, about 200 references); `Game` keeps
+the loop, the construction and the facades the page calls. Its aliases of the context's
+other members (`party`, `dungeonState`, `timerQueue`, `footprints`, `sounds`) are a
+separate question for the author: `party` and `dungeonState` have about 400 readers
+each, and may stay as documented aliases. `F12` takes the casts.
+
+### E13 ⏳ The save pipeline straddles `data/` and `engine/`, and nothing owns it
+
+`P10` rebuilds the save menu and turns a save into a CSBWin `.dat` that knows its dungeon.
+The code it will stand on is spread and knotted:
+
+- **The layers import each other both ways.** `src/data/CsbwinSaveGame.ts` imports
+  `engine/Game`, `RuntimeSave`, `DungeonSnapshot`, `DungeonState` and `CheckMonsters` to
+  install a world into a running game; `src/engine/SaveGamePayload.ts` imports six
+  `data/Csbwin*` codecs; `src/data/saves/FileSaveStore.ts` imports `engine/SaveGamePayload`.
+- **`SaveGameLoader.ts` is four modules.** 1498 lines whose header still says "Minimal
+  save-game loader focused on Item16 and timer tables": the scramble, checksum and RC4
+  stream, the Extended Features prefix reader (whose writer and struct parser are in
+  `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
+  blocks, reader and writer.
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:332`) and `dev.ts`'s
+  quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
+  the save's tail (`saveWritten`) runs before the write in one and after it in the other.
+  `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
+  migration from a `localStorage` key no build writes.
+- **Nothing below the page knows which game it runs.** The data set is a `main.ts`
+  module variable (`:57`), so neither a save nor the stores can say "DM" or "CSB", which is
+  `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
+  through another `main.ts` global, `savedGameRead` (`:37`).
+- **CHARDESC's flag constants** (`CHARFLAG_ATTACK_DISABLE`, `CHARFLAG_MALE`) live in the
+  save codec (`src/data/CsbwinCharacters.ts:37-40`), and the engine and the UI import them
+  from there.
+
+Paying it, as `P10`'s first step: `data/` holds pure codecs, bytes to plain records and
+back (`SaveGameLoader` split into the stream, the blocks, and the prefix joined to
+`CsbwinExtendedFeatures`; an `EXPOOL` module, which `C96` needs); one owner builds a save
+from a game and applies one to it, knows the data set, and is what the menu and F5/F9
+call; the flag constants go beside `Champion.charFlags`.
+
+### E14 ⏳ CSBWin's input path lives in the page's debug-chrome module
+
+`src/ui/events.ts` binds the debug buttons beside the canvas, and also holds the game's
+input path: `handleClickInViewport` (`:99`), which is `HandleClickInViewport`'s dispatch
+for button 80 (`Mouse.cpp:1031`); the `MouseEventHandlers` that `Game.handleMouseEvents`
+hands every other button to (`:131`); the modal routing for the save menu and
+Reincarnate; the consult of `TAG0196da`'s key tables; and the port's own movement keys
+(K , J L M . and F5 F9, `:241-335`), while the port's panel keys are in
+`src/renderer/ui/Keyboard.ts`. The page redesign would have to carry all of it across.
+
+The dependency also runs the other way: the renderer imports the DOM module.
+`src/renderer/ui/Mouse.ts` imports `updateHover` from `@/ui` for `drawHoverHighlights`,
+which `GameScreen.presentViewport` runs on every frame to write the hover report's HTML;
+`src/renderer/intro/BootSequence.ts` imports `updateDebug`. The `ui/` modules look their
+elements up when they are imported, so 12 tools stub `document` and `window` before
+importing a UI module.
+
+Paying it: the input path moves to `src/renderer/ui/` (button 80 beside `Mouse.ts`, one
+keymap for the port's own keys beside `Keyboard.ts`), `events.ts` keeps only DOM
+listeners that call it, and the renderer reports debug text through a hook the page
+installs, so nothing under `src/renderer/` imports `src/ui/`.
+
+### E15 ⏳ The page shell
+
+What the redesign will replace, and what it should not carry across:
+
+- **Settings live in the DOM.** `readUISettings` reads each panel's `style.display` back
+  to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
+  (`events.ts:12-22`, `settings.ts:63-75`). A `UIContext` module singleton
+  (`src/ui/context.ts`) is how the panels reach the game.
+- **`main.ts` holds the page's features**: the 100-line CRT controller (`:62-164`), the
+  end-of-game flow, and the save wiring (`E13`).
+- **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
+  `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
+  backstory, and assets the page does not load (`static/glfx.js`,
+  `static/glfx-latest-minified.js` — the page loads `src/lib/`'s copy —,
+  `QPN59-1400x1000.png`, `QPN59-320x200-cropped.png`).
+- **`server.js`** is an Express static server from before Vite, on port 9010, with an
+  unauthenticated `/stopserver` that exits the process; `package.json` keeps its two
+  runtime dependencies, `"main": "server.js"` and the name `dmjs`.
+
+Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
+module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
+
+### E16 ⏳ A `die()` in play stops the loop without a word
+
+`Game.gameLoop` runs a frame and then schedules the next (`src/engine/Game.ts:444-453`),
+so an exception in the frame ends the game for good, with one line in the console. The
+engine throws where CSBWin calls `die()` — the timer table full (`TimerQueue.ts:270`,
+`die(45)`), `MissileTimer`'s placement, `_FusionSequence` with no monster ahead — and 57
+`throw`s in `src/engine/` and `src/renderer/` can end a frame. CSBWin's `die` shows its code
+and quits; the boot has `Die` and `tag01efee` for that (`src/renderer/intro/BootSequence.ts`),
+play has nothing. Paying it means catching a frame's exception at the loop, stopping it,
+and showing the error on the page as `reportError` does for `init`. The handle it
+schedules is a `setTimeout`'s, kept in a field named `animationFrameId` and cast through
+`unknown` because `tsconfig.json` gives the browser code Node's `types`.
+
+### E17 ⏳ Dead code
+
+61 exported declarations have a name that appears in no other file of `src/` or `tools/`.
+A few are a transcription's completeness (an accessor beside its siblings,
+`SLOT_SHIELD_HAND`) and may stay. These are dead, some with their whole module:
+
+- **`src/core/constants.ts`**: `DISPLAY_WIDTH`/`HEIGHT`, `TICK_INTERVAL_MS`, `MAX_MAPS`,
+  `MAX_WIDTH`, `MAX_HEIGHT`, `MAX_CHAMPIONS`, `GraphicIndex`, `DB_RECORD_SIZE`,
+  `OBJECT_COUNTS_*`, `TEXT_CHAR_*`, and two guessed enums, `CreatureType` (its first
+  member is commented "Giggler") and `WeaponType` ("partial list").
+- **A second palette read**: `GraphicsLoader.extractPalettes` reads graphic 562 at a
+  hardcoded 0x4FE, with the hardcoded `DEFAULT_PALETTE` as fallback, beside
+  `UITables`' `graphic232.palette552`; its only readers are `GameScreen`'s
+  `?? getPalette(0)` and `tools/extract-graphics.ts`.
+- **Image helpers in pairs**: `GraphicsLoader.createImageData`/`drawImage` and
+  `core/imageDecoder.imageToRGBA`/`drawImageToCanvas`, each the other's twin; only the
+  dead `ImageData` path below calls the first.
+- **The RGBA "legacy path"** of `src/renderer/csbwin/CanvasBlitter.ts`
+  (`RGBAViewportBuffer`, `createRGBAViewportBuffer`, `clearRGBA`, `flushRGBA`,
+  `tag0088b2ImageData`, `blt2Screen`, `bltRectangleToViewportIndex`) and the `ImageData`
+  path of `src/renderer/ViewportGraphics.ts` (`initializeWallBitmaps`,
+  `initializeFloorCeiling`, `bltShapeToViewport`, `mirrorBitmap`).
+- `Menu.ts`'s eight `MENU_PANEL_*` constants and `MENU_CHAR_WIDTH`; `ScrollingText`'s
+  module functions `quePrintLines` and `printLinefeed`; `DungeonState.setTimerWord8Table`;
+  `src/engine/roomTimers.ts`, a module whose one function returns `table[roomType]`.
+- **Leftover files**: `src/renderer/index.ts` (a barrel nothing imports),
+  `src/vite-env.d.ts` beside `src/types/vite-env.d.ts`, `tools/extract-graphics.ts`
+  (it reads `static/js/mediaindex.js`, which is gone) and `tools/check-graphic-22e.mjs`
+  (a heuristic scan the extraction has replaced).
+
+The 0x22e pattern search goes with `E8`, `dev.ts`'s migration with `E13`. Paying it
+deletes the rest; `tsc` finds anything that was not dead.
+
+### E18 ⏳ Hygiene and documentation drift
+
+- **Three import styles**: five files import `@/core` or `@/ui`, the rest by relative
+  path, and `main.ts`, `dev.ts` and `src/ui/` through barrels; `src/engine/index.ts`
+  re-exports 22 modules for those few importers. One style, and no barrel but where a
+  directory has a public face.
+- **Logging from the engine and the loaders**: 36 `console` calls outside `main.ts`, among
+  them `ViewportRenderer` announcing the 0x22e offset at each construction and `Game`
+  logging its start and stop; `main.ts` logs every move with `getPositionInfo()`.
+  Diagnostics go to the host's `trace` or the page's log.
+- **Comments that tell history**: about 40 "This used to…", "no longer", "until now" in
+  `src/`, against `CLAUDE.md` → "Write down the present". The rule and its reason stay;
+  the story goes to `git log`. Likewise `PLAN.md` → Phase 10 ("September 13th", "used
+  to", "now"), and imports placed after declarations (`TimerSystem.ts:1-18`).
+- **Documentation drift**: `CLAUDE.md` says `src/` is ~30k lines (it is ~56k), describes
+  `dev.ts` as dev-only scaffolding with a random party and missile scenarios (it is the
+  F5/F9 quick-save), omits `audio/`, `data/saves/` and `lib/` from the layout, and gives
+  `npm test` as ~6 s (`F13`). `doc/UI_MODULE_MAP.md` lists hooks and fields `UIState`
+  no longer has (`playSound`, `showAttackPanel`). `README.md` describes the project as it
+  was at its start: an unchecked "game logic", a `scrape:csbwin` script that does not
+  exist, a `LICENSE` that is `licence.txt`.
 
 ---
 
@@ -155,6 +549,125 @@ cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it mea
 that every table `drawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
 cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
 
+### C95 ⏳ `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers
+
+CSBWin's engine sets `d.CurrentPalette` in `SelectPaletteForLightLevel`
+(`doc/CSBwin-src/CSBCode.cpp:7242-7322`), which it calls where the light changes: a hand
+possession added or removed (`Character.cpp:1867`, `:1903`, `:1992`, `:2017`), a
+`TT_LIGHT` timer (`ProcessTimers`, `CSBCode.cpp:6517`), a level loaded (`LoadPartyLevel`,
+`:819`), the torches burning down (`NinetySecondUpdate`, `:7384`), a light timer set
+(`SetBrightnessTimer`, `Magic.cpp:839`) and the fusion (`Attack.cpp:2275`). The VBL handler
+and the monster AI read it (`CSBCode.cpp:1014`, `Monster.cpp:580`). The port computes the
+index in the renderer, `selectPaletteIndexForLightLevel` (`src/renderer/ui/Light.ts`), on
+every frame the screen presents, and hands it back to the engine as a side effect of
+choosing the palette (`GameScreen.getViewportPalette`, `:604-610`, the
+`onPaletteSelected` hook). So the monster AI (`MonsterAI.ts:1148`) sees the value of the
+last frame presented, not of the last light change, and headless it is always 0: no tool
+has ever run a monster's dark-level sight. `GameState.currentPalette`'s comment
+(`gameTypes.ts:350-355`) says the renderer sets it in CSBWin too, which it does not. The
+port's copy also clamps the index to the palette count, which CSBWin does not.
+
+Paying it means porting `SelectPaletteForLightLevel` into the engine over the party's
+possessions and `d.Brightness`, calling it at the call sites above (the `AttackSystem`
+comment at `:975` marks one), having the screen read `state.currentPalette`, and a tool
+that darkens a level and checks a monster's sight shrink.
+
+### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
+
+`KillCharacter` pairs the bones it drops with the champion's fingerprint through
+`expool.AddChampionBonesRecord` (`doc/CSBwin-src/Character.cpp:2646`), a record of
+`EXPOOL`, database 11, under the key `(EDT_ChampionBones << 24) | rn`
+(`data.cpp:1636-1675`, `CSB.h:1571`). `EXPOOL` is written with the other databases, so a
+CSBWin save carries the pairs, and the Vi Altar (`Timer.cpp:2750`, and `DropObject`'s
+test, `Mouse.cpp:903`) and the bones' name (`DescribeObject`, `Character.cpp:3563`;
+`DrawNameOfHeldObject`, `Code11f52.cpp:49`) read them back. The port keeps them in
+`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:111-160`),
+which only the port's runtime snapshot carries (`DungeonSnapshot.championBones`).
+`DungeonData.expool` travels as raw bytes and never sees them. So:
+
+- a CSBWin save with a dead champion's bones loads with no pair: the altar does not bring
+  the champion back, and the bones have no name;
+- the CSBWin file the port writes (every save's `raw`, and the `.dat` `P10` will make the
+  only save) holds no pair, so once the JSON wrapper goes, a save loses them, and CSBWin
+  loading a port save does too.
+
+The DSA global variables are the other `EXPOOL` records the port does not read (`G1`).
+Paying it means an `EXPOOL` module (`E13`) with CSBWin's `Read`, `Write` and `Locate` over
+the raw blocks, including `enlarge`, the bones records kept there with the key's RN taken
+through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
+save and a load. It must be paid before `P10` drops `runtime`.
+
+### C97 ⏳ `DrawViewport` runs outside CSBWin's three call sites
+
+CSBWin calls `DrawViewport` in three places: the main loop's tick
+(`doc/CSBwin-src/CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison
+door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:166`) always
+runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
+click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
+`mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
+strip scrolled or a flashed button changed (`main.ts:498-503`). Two things follow:
+
+- **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`drawTeleporter`)
+  draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
+  of VBLs, it changes at 60 Hz instead of 4 — the very symptom `ui/events.ts`'s mousemove
+  handler avoids by calling `refreshOverlay` instead.
+- **The view is drawn mid-pass.** A click's change shows before the tick's `DrawViewport`
+  would show it: one VBL early for a pick-up, which brings the tick on at once
+  (`d.clockTick = 1`), up to a tick early for a click that does not.
+
+`BytecodeInterpreter.viewportRandom` (`:2042`) is also a `static`, shared by every
+interpreter, the prison interior's and every tool's included. Paying it means `renderView`
+recomposes (`refreshOverlay`) everywhere but the three sites, the tick's draw becoming the
+only way `DrawViewport` runs in play, and `npm test -- --frames` telling whether a golden
+frame depended on the extra draws.
+
+### C98 ⏳ The tick comes from the wall clock, not from `d.vblCount`
+
+CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.Speed`
+(`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
+`d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
+`Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
+one (`src/engine/Game.ts:486-506`), while everything else in a pass counts VBLs: the
+message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
+magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
+a tick, and part company when the tab is in the background: the browser holds
+`setTimeout` to one call a second or fewer, and each call is then one VBL and one tick,
+so the game runs at a quarter of its pace and every VBL-counted thing at a sixtieth,
+fifteen times slower than the ticks around it. `tools/`
+reach the private `lastTickTime` through a cast (16 places) to make a tick due.
+
+Paying it means counting VBLs, `vblCount` and `speed` in `LoopState` (`d.Speed`'s 0 while
+asleep is already modelled), and pacing VBLs from the wall clock instead of ticks: run as
+many VBLs as the elapsed time holds, capped. Tools then step VBLs and need no cast.
+`d.Speed` stays at `SPEED_NORMAL`'s 15; CSBWin's speed menu is not ported.
+
+### C99 ⏳ `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported
+
+`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:346-395`) says so itself: "a
+behavioural approximation, not a transcription … reconstructed from observed output". The
+C++ (`doc/CSBwin-src/Graphics.cpp:1169-1316`) builds a temporary bitmap from the source
+read as a **linear stream of 16-pixel groups**, starting at group `P7` and wrapping to the
+source's start after `P6` groups, with the mask read one word per group, masked-out
+pixels given colour `P9`; then it blits that bitmap with `P9` transparent. `DrawTeleporter`
+passes `P6 = x2 + GraphicRandom(2)` and `P7 = GraphicRandom(32)` (`CSBCode.cpp:4292-4302`).
+The port reads the source and the mask as 2-D images wrapped in x and y separately, and
+takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2073-2110`),
+so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
+indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
+teleporter's pixels with the stream the C++ reads.
+
+### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
+
+`setCrtEnabled(true)` hides the game canvas and shows the WebGL one in its place
+(`src/main.ts:139-146`). `bindUIEvents` binds the adventure's handlers to both canvases,
+but the pre-game and end-of-game screens listen on the game canvas alone
+(`createIntroHost`, `src/renderer/intro/BootSequence.ts:138-143`, handed `gameCanvasEl` by
+`showEndOfGame`). With the effect on, the credits' menu and the restart's chooser and
+entrance see no click, only keys. The boot is spared by accident: the saved settings, CRT
+included, are applied in `wire`, after the intro. Paying it means one input surface for
+both canvases (the WebGL canvas over the game one with `pointer-events: none`, or every
+listener on their container), and the intro drawn with the effect when it is on.
+
 ---
 
 ## F — Verification debt
@@ -165,6 +678,38 @@ The table-extraction round-trip checks are a live phase, so they stay in `PLAN.m
 "Phase 15" rather than being copied here. The never-executed validation steps of phases 2,
 4 and 7 are folded into it. Step 5, the comparison against CSBWin screenshots, is postponed
 (see "Priority").
+
+### F12 ⏳ The tools' scaffolding is copied, and reaches privates through unchecked casts
+
+`tools/lib/game.ts` gives every tool the same `Game` and tables (`E1a`). What each tool
+builds around them is its own:
+
+- 35 tools define a champion-building function of their own, and 38 spell out
+  `addCharacterDefaults()`; 106 construct a `DungeonLoader` and 85 read
+  `dm-atari/dungeon.dat` themselves.
+- 19 tools build a `UIState` by hand and wire the hooks they expect to need, "as
+  `main.ts` wires it" (`E11`); 33 extract the UI tables again; 12 stub `document` and
+  `window` before importing a UI module (`E14`).
+- 45 tools make 90 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
+  and `lastInputTime`, 16; `gameTick`, 6; `actuators`, 6; `dsaSystem`, 2), into other
+  systems' (`wiggleEverything`, `stepOrDefer`, `climbDownIntoPit`, …), to pass partial
+  `UIState` literals (17), and onto `game.state` (12), which is public. `tsc` checks none
+  of them. A renamed private leaves the tool compiling, and a write to it then sets a new
+  property: a tool that pins `lastTickTime` would go on passing while testing nothing.
+  Some casts are stale: `game.state` is public, and `ctx.systems.actuators` exists.
+
+Paying it: `tools/lib` helpers for the stock dungeon, a test champion and a wired
+`UIState` (built however `E11` leaves the UI's construction); a narrow public seam for what the tools
+legitimately drive, a tick and the clock, which `C98` mostly supplies; then the casts go,
+one tool per commit, each tool's output byte-identical.
+
+### F13 ⏳ `npm test` runs its tools one at a time
+
+`tools/run-checks.mjs` spawns its 124 checks sequentially (`spawnSync`, `:240`), each a
+`tsx` start of 300 ms or more, so the gate takes over a minute where `CLAUDE.md` promises
+about 6 seconds. Most sessions run it several times. Paying it means a pool of workers the
+size of the machine, the output still printed in the list's order, and `CLAUDE.md`'s
+timings updated.
 
 ---
 
