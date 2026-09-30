@@ -17,8 +17,11 @@ import { portKeyAction } from './ui/Keyboard';
 export interface GameInputHost {
   readonly game: Game;
   readonly screen: GameScreen;
-  /** Draw the screen again after an input that changed it. */
-  renderView(): void;
+  /**
+   * Compose the screen again after an input that changed it. Never a `DrawViewport`: the
+   * view is the tick's, and an input that changes it brings the tick on (`d.clockTick = 1`).
+   */
+  refreshScreen(): void;
   onQuickSave(): void;
   onQuickLoad(): void;
 }
@@ -48,11 +51,11 @@ export class GameInput {
     host.game.setMouseEventHandlers({
       button: (num, x, y) => {
         host.screen.handleMouseButton(num, x, y);
-        host.renderView();
+        host.refreshScreen();
       },
       unclick: () => {
         host.screen.handleMouseUnclick();
-        host.renderView();
+        host.refreshScreen();
       },
     });
   }
@@ -61,10 +64,7 @@ export class GameInput {
     if (this.ended()) return;
     const screen = this.host.screen;
     screen.setHoverPoint({ x, y });
-    // Cursor tracking only — never a full `renderView()`. That would re-run
-    // `DrawViewport` (and its animated-texture randomness) on every pixel of
-    // mouse travel; CSBWin's own cursor moves independently of the dungeon
-    // redraw, which happens once per game tick, never on a mouse event.
+    // Cursor tracking only: CSBWin's cursor moves independently of the dungeon view.
     screen.refreshOverlay();
   }
 
@@ -81,13 +81,13 @@ export class GameInput {
     // drained a frame later.
     if (buttonMask !== 0 && screen.isSaveMenuOpen()) {
       screen.handleSaveMenuClick(x, y, buttonMask);
-      this.host.renderView();
+      this.host.refreshScreen();
       return;
     }
     if (buttonMask === 0) return;
     if (screen.isReincarnateScreenOpen()) {
       screen.handleReincarnateClick(x, y);
-      this.host.renderView();
+      this.host.refreshScreen();
       return;
     }
     // Queued, not handled: `Game.handleMouseEvents` takes it off the queue in its turn,
@@ -110,7 +110,7 @@ export class GameInput {
   mouseLeave(): void {
     if (this.ended()) return;
     this.host.screen.setHoverPoint(null);
-    this.host.renderView();
+    this.host.refreshScreen();
   }
 
   /** A key pressed: `key` is `KeyboardEvent.key`. Says whether the game took it. */
@@ -131,13 +131,13 @@ export class GameInput {
     if (screen.isSaveMenuOpen()) {
       if (modified) return false;
       screen.handleSaveMenuKey(key);
-      this.host.renderView();
+      this.host.refreshScreen();
       return true;
     }
     if (screen.isReincarnateScreenOpen()) {
       if (modified) return false;
       screen.handleReincarnateKey(key);
-      this.host.renderView();
+      this.host.refreshScreen();
       return true;
     }
     // The key tables first, `TAG0196da` (doc/CSBwin-src/CSBCode.cpp:8428): awake,
@@ -162,7 +162,7 @@ export class GameInput {
     // panel keys, which claim theirs whatever the game state, so the movement keys
     // below never see one.
     if (screen.handleUIKey(key)) {
-      this.host.renderView();
+      this.host.refreshScreen();
       return true;
     }
     const action = portKeyAction(key);

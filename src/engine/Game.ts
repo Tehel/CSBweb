@@ -459,7 +459,7 @@ export class Game implements MainLoop {
         // tick's `DrawViewport` until then (`paintHeld`).
         this.ctx.host.tag01b29a();
         if (putBackAsked) this.paintIsHeld = true;
-        else this.ctx.host.drawViewport();
+        else this.ctx.host.paint();
         // `if ((d.Time & (d.PartySleeping ? 15 : 63)) == 0) TenSecondUpdate();` (`:686-688`).
         if (isTenSecondTick(this.ctx.state.tickCount, this.ctx.party.state.sleeping)) tenSecondUpdate(this.ctx);
         // `if (d.partyMoveDisableTimer != 0) d.partyMoveDisableTimer--;` and the same for

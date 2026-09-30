@@ -122,10 +122,16 @@ export interface GameHost {
   /**
    * `DrawViewport(d.partyFacing, d.partyX, d.partyY); display();` from a script's tick,
    * `_ProcessTimersViewportAndSound` (`doc/CSBwin-src/Attack.cpp:2205-2206`), which runs
-   * none of the main loop's tick listeners. The main loop's tick calls it too, to paint
-   * what `tag01b29a` drew (`Game.gameTick`).
+   * none of the main loop's tick listeners. The main loop's tick draws its viewport
+   * through those listeners (`Game.onTick`).
    */
   drawViewport(): void;
+  /**
+   * The main loop's tick, once `tag01b29a` has drawn: the screen shown again with what it
+   * drew, over the viewport the tick's `DrawViewport` left (`Game.gameTick`). Not a
+   * `DrawViewport`.
+   */
+  paint(): void;
   /**
    * `TAG01b29a` (`doc/CSBwin-src/CSBCode.cpp:8799`), from the main loop's tick after
    * `d.Time++` (`:685`): the champions' flinch and the attack panel, both the UI's.
@@ -179,6 +185,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag0207cc: host.tag0207cc ?? (() => {}),
     showCredits: host.showCredits ?? (() => {}),
     drawViewport: host.drawViewport ?? (() => {}),
+    paint: host.paint ?? (() => {}),
     tag01b29a: host.tag01b29a ?? (() => {}),
     displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
     tag011366: host.tag011366 ?? (() => {}),

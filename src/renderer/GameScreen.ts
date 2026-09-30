@@ -130,9 +130,8 @@ export class GameScreen {
   private readonly uiPalette: number[];
   private readonly reportHover: (html: string) => void;
   private readonly messages: ScrollingText;
-  private lastRenderPosition: Position | null = null;
-  private lastRenderFacing: number = 0;
-  private lastRenderWord1868 = false;
+  /** A dungeon view has been drawn, so there is an adventure frame to compose again. */
+  private viewportDrawn = false;
   private bootFrameRenderer: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
@@ -345,19 +344,11 @@ export class GameScreen {
   }
 
   /**
-   * Recomposite the screen — cursor, hover highlights, every UI panel — over
-   * whatever the viewport buffer already holds, without calling `DrawViewport`
-   * again.
-   *
-   * `render()` always redraws the dungeon view itself, which in CSBWin happens once
-   * per game tick (`doc/CSBwin-src/CSBCode.cpp:638`) — never in response to the
-   * mouse. Nothing in CSBWin's own mouse handling calls `DrawViewport`; the cursor
-   * is a hardware/software sprite tracked independently of it. This is the
-   * equivalent for mousemove: it exists so the custom-drawn cursor can follow the
-   * pointer at input rate without also re-running the bytecode interpreter — and
-   * with it `GraphicRandom` and `viewportRandom` — on every pixel of
-   * mouse travel, which turned a teleporter's or a lightning door's shimmer into
-   * something that changed only when the mouse moved and far too fast otherwise.
+   * The screen composed again, cursor, hover highlights and every panel, over whatever
+   * the viewport already holds: what every redraw but `DrawViewport`'s does. CSBWin's
+   * mouse handling never calls `DrawViewport`, and its cursor moves independently of the
+   * view, so neither a click nor the pointer's travel runs the bytecode interpreter here,
+   * and with it `GraphicRandom` and `viewportRandom`.
    */
   refreshOverlay(): void {
     this.presentViewport();
@@ -417,22 +408,19 @@ export class GameScreen {
   }
 
   /**
-   * The screen for the party at `position`: the dungeon view, then the interface over it.
-   * `word1868` is the engine's `d.Word1868` (`GameState.word1868`).
+   * `DrawViewport(facing, x, y)` (doc/CSBwin-src/Viewport.cpp:6694) for the party at
+   * `position`, then the interface over it. `word1868` is the engine's `d.Word1868`
+   * (`GameState.word1868`). CSBWin calls it from the main loop's tick
+   * (`CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison door's
+   * interior (`renderPrisonInterior`), and the port nowhere else: `DrawViewport` runs
+   * `GraphicRandom` and the viewport's own random numbers, so a draw off the tick moves
+   * the teleporter's shimmer. Everything else composes the screen again with
+   * `refreshOverlay`.
    */
-  render(position: Position, facing: number, word1868: boolean): void {
-    const { x, y, z } = position;
-    this.lastRenderPosition = new Position(x, y, z);
-    this.lastRenderFacing = facing;
-    this.lastRenderWord1868 = word1868;
-
-    this.viewport.selectLevel(z);
-    // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:765), so nothing draws over "GAME
-    // FROZEN". `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the
-    // party sleeps (`:637`); `DisplaySleepScreen` holds the viewport.
-    if (this.isFrozen()) displayFrozenScreen(this.ui);
-    else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
-    else this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
+  drawViewport(position: Position, facing: number, word1868: boolean): void {
+    this.viewport.selectLevel(position.z);
+    this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
+    this.viewportDrawn = true;
     this.presentViewport();
   }
 
@@ -454,6 +442,11 @@ export class GameScreen {
     // doc/CSBwin-src/CSBCode.cpp:7493), so the freeze's flood covers it, and nothing draws
     // it again until the thaw's `TAG0207cc` shows it.
     const frozen = this.isFrozen();
+    // Frozen, no tick runs (doc/CSBwin-src/CSBCode.cpp:765), so nothing draws over "GAME
+    // FROZEN". Asleep, the tick draws no viewport (`:637`), and `DisplaySleepScreen` holds
+    // it. Both screens stay in the viewport until the next `DrawViewport`.
+    if (frozen) displayFrozenScreen(this.ui);
+    else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
     if (!inventoryOpen) {
       syncOpenChest(this.ui, null);
       this.ui.displayResurrectChestOrScroll = 0;
@@ -549,8 +542,7 @@ export class GameScreen {
       this.bootFrameRenderer();
       return;
     }
-    if (!this.lastRenderPosition) return;
-    this.render(this.lastRenderPosition, this.lastRenderFacing, this.lastRenderWord1868);
+    if (this.viewportDrawn) this.presentViewport();
   }
 
   private blitViewportToScreen(): void {
@@ -636,7 +628,7 @@ export class GameScreen {
   /**
    * Redraw hook for while a pre-game screen is up.
    *
-   * `ui.renderLastFrame()` normally re-runs the last adventure frame; the save/load screen
+   * `ui.renderLastFrame()` normally composes the last adventure frame again; the save/load screen
    * calls it whenever its list changes (`ui/SaveMenu.ts`). During the entrance screen there
    * is no adventure frame to re-run, so the boot sequence installs its own.
    */

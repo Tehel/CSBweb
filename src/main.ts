@@ -151,7 +151,7 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
                 stop();
                 glcanvas.style.display = 'none';
                 canvas.style.display = '';
-                renderView();
+                refreshScreen();
             }
             enabled = next;
             return enabled;
@@ -169,17 +169,26 @@ function isCrtEnabled(): boolean {
     return crtController?.isEnabled() ?? false;
 }
 
-// Render the 3D view
+/**
+ * `DrawViewport`, then the screen composed over it (`GameScreen.drawViewport`): the main
+ * loop's tick, a script's tick, and a game's first view, when it starts, is restarted or
+ * is loaded, which stands in for the tick `MainLoop` opens with (`tag000698`,
+ * doc/CSBwin-src/CSBCode.cpp:601). Every other redraw is `refreshScreen`'s.
+ */
 function renderView() {
     // Once `MainLoop` has returned the screen is `_ShowCredits`'s.
     if (!game || !screen || game.mainLoopHasReturned()) return;
 
     const party = game.ctx.party;
-    const pos = party.state.position;
-    const facing = party.state.facing;
-
     screen.setPartyState(party.state);
-    screen.render(pos, facing, game.ctx.state.word1868);
+    screen.drawViewport(party.state.position, party.state.facing, game.ctx.state.word1868);
+}
+
+/** The screen composed again over the viewport as it stands, without `DrawViewport`. */
+function refreshScreen() {
+    if (!game || !screen || game.mainLoopHasReturned()) return;
+    screen.setPartyState(game.ctx.party.state);
+    screen.refreshOverlay();
 }
 
 /**
@@ -280,9 +289,10 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         showCredits: (word11694) => {
             if (screen) showEndOfGame(game, screen, sound, messages, word11694).catch(reportError);
         },
-        // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself;
-        // the main loop's tick paints what `TAG01b29a` drew with it.
+        // A script's tick, `_ProcessTimersViewportAndSound`, draws the viewport itself.
         drawViewport: () => renderView(),
+        // The main loop's tick paints what `TAG01b29a` drew after its `DrawViewport`.
+        paint: () => refreshScreen(),
         // `TAG01b29a`, after the tick's `d.Time++`: the flinch and the attack panel.
         tag01b29a: () => screen?.attackPanelTick(),
         // `DisplayCharacterDamage`'s splat and figure, and `TAG011366` drawing over them.
@@ -299,7 +309,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     }, {
         // The second half of Reincarnate is done: the screen has handed the typed name
         // to the engine (the first half is the host's `openReincarnateScreen`).
-        onReincarnated: () => renderView(),
+        onReincarnated: () => refreshScreen(),
         // The save/load screen behind the disk icon. The UI owns the list and the
         // buttons; serializing and restoring the world is the engine's, so it comes
         // back through these three.
@@ -429,7 +439,7 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: Scr
     bindUIContext({
         screen,
         game,
-        renderView,
+        refreshScreen,
         onQuickSave: dev.quickSave,
         onQuickLoad: dev.quickLoad,
         setCrtEnabled,
@@ -452,7 +462,11 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: Scr
     // (doc/CSBwin-src/CSBCode.cpp:618-639).
     let mapPreviewAt = '';
     game.onTick(() => {
-        renderView();
+        // `if (d.SelectedCharacterOrdinal != 0) goto tag000730; if (d.PartySleeping != 0)
+        // goto tag000730;` (doc/CSBwin-src/CSBCode.cpp:636-637): no `DrawViewport` while an
+        // inventory is open or the party sleeps.
+        const { selectedCharacterIndex, sleeping } = game.ctx.party.state;
+        if (selectedCharacterIndex < 0 && !sleeping) renderView();
         const { x, y, z } = game.ctx.party.state.position;
         if (`${x},${y},${z}` !== mapPreviewAt) {
             mapPreviewAt = `${x},${y},${z}`;
@@ -468,7 +482,7 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: Scr
         if (game.paintHeld()) return;
         const scrolled = messages.takeChanged();
         const flashed = game.takeFlashChanged();
-        if (scrolled || flashed) renderView();
+        if (scrolled || flashed) refreshScreen();
     });
 }
 

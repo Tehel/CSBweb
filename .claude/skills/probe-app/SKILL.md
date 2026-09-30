@@ -17,7 +17,9 @@ node tools/probe-ui.mjs --stop
 ```
 
 Actions run in the order given; the bare argument is evaluated last, with `game`,
-`screen` and `renderView` in scope, and printed as JSON. `--help` lists them all.
+`screen` and `renderView` in scope, and printed as JSON. `renderView()` runs `DrawViewport`
+and composes the screen over it, which is what a staged scene needs; in play only the tick
+draws the view. `--help` lists them all.
 
 ## It is fast only if you let it be
 

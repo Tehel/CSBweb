@@ -68,11 +68,14 @@ async function main(): Promise<void> {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
 
   const level = Number(process.argv[2] ?? 1);
-  // The tick's `TAG01b29a` and the paint after it, as the host sees them.
+  // The tick's `TAG01b29a` and the paint after it, as the host sees them. The host's
+  // `drawViewport` is a script's tick's: the main loop's tick draws its viewport once,
+  // through `onTick`, and its paint is no second `DrawViewport`.
   const hostLog: string[] = [];
   const game = newGame(data, graphics, {
     tag01b29a: () => hostLog.push(`TAG01b29a d.Time ${game.ctx.state.tickCount} freezeLifeTimer ${game.ctx.party.state.freezeLifeTimer}`),
-    drawViewport: () => hostLog.push('paint'),
+    drawViewport: () => hostLog.push('a script tick\'s DrawViewport'),
+    paint: () => hostLog.push('paint'),
   });
   game.setRandomSeed(0x12345678);
   game.ctx.party.state.position = new Position(0, 0, level);
@@ -234,7 +237,7 @@ async function main(): Promise<void> {
   const plain = tickOrder(false);
   console.log(`a tick: ${plain.log.join(' | ')}; paint held ${plain.held}`);
   check(plain.log.join(' | ') === `DrawViewport d.Time ${plain.time} freezeLifeTimer 5 | TAG01b29a d.Time ${plain.time + 1} freezeLifeTimer 4 | paint`,
-    'TAG01b29a should run after DrawViewport, d.Time++ and d.freezeLifeTimer-- (CSBCode.cpp:638-685), and be painted in its tick');
+    'TAG01b29a should run after DrawViewport, d.Time++ and d.freezeLifeTimer-- (CSBCode.cpp:638-685), and be painted in its tick, with no second DrawViewport');
   check(!plain.held, 'a tick that asked for no put-back should not hold the paint');
   const flashed = tickOrder(true);
   console.log(`a flash, then its tick: ${flashed.log.join(' | ')}; paint held ${flashed.held}; ` +

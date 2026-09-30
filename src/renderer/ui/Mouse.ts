@@ -176,7 +176,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // pixel x 0, y 198 of the adventure list `Buttons17196`. `d.ClockRunning = 0`,
     // `gameFrozen = true` and `DiscardAllInput()` are the engine's; `TAG02076e`, the
     // lists and key tables saved and replaced by `Buttons17832` and `Byte18448`, and
-    // "GAME FROZEN" in the viewport (`GameScreen.render`) are the screen's.
+    // "GAME FROZEN" in the viewport (`GameScreen.presentViewport`) are the screen's.
     freeze(ui.ctx);
     tag02076e(ui);
     ui.modeBeforeFreeze = ui.uiMode;
@@ -320,7 +320,7 @@ export function tag02076e(ui: UIState): void {
  * opens the chest again on the next draw. The redraws, and `TAG002572`'s cursor, the
  * port does every frame once `shadedByTag02076e` is clear; `d.Word11750 = 0` is the dead
  * countdown in `DEBT.md` H. Asleep, it only redraws the sleep screen (`:9938-9942`),
- * which `GameScreen.render` draws every frame.
+ * which `GameScreen.presentViewport` draws every time it composes the screen.
  */
 export function tag0207cc(ui: UIState): void {
   const party = ui.partyState;

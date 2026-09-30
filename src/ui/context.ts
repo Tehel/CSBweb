@@ -4,7 +4,7 @@ import type { GameScreen } from '../renderer/GameScreen';
 export interface UIContext {
     screen: GameScreen;
     game: Game;
-    renderView: () => void;
+    refreshScreen: () => void;
     onQuickSave: () => void;
     onQuickLoad: () => void;
     setCrtEnabled: (enabled: boolean) => boolean;

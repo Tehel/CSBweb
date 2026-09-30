@@ -67,7 +67,7 @@ export function handleMapCanvasClick(e: MouseEvent): void {
         ...state,
         position: new Position(gx, gy, state.position.z),
     });
-    ctx.renderView();
+    ctx.refreshScreen();
     drawMapPreview(state.position.z);
     updateDebug(`Teleported to (${gx}, ${gy}, ${state.position.z})`);
 }

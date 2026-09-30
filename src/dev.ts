@@ -25,6 +25,7 @@ import { updateDebug } from './ui';
 /** Live handles into `main.ts`; read through getters so reassignment is visible here. */
 export interface DevHost {
     readonly game: Game | null;
+    /** `DrawViewport` and the screen over it: the loaded game's first view. */
     renderView(): void;
     /**
      * The portrait pixels of a champion carrying only `portraitGraphic`, for the save

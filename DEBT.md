@@ -90,11 +90,11 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C97 | `DrawViewport` runs outside CSBWin's three call sites | M | ⏳ |
 | C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
 | C99 | `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported | S | ⏳ |
 | C100 | With the CRT effect on, the end-of-game screens take no click | S | ⏳ |
 | C101 | The pass a returning script held finishes a VBL after the script | S | ⏳ |
+| C102 | `MainLoop` opens with a tick; the port's first comes 250 ms later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
@@ -128,7 +128,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C102 · D16 · E20 · F14 · G21 · X7. An ID recorded and paid in one commit has no
+Next free IDs: C103 · D16 · E20 · F14 · G21 · X7. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -158,7 +158,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:306`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:316`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -269,30 +269,6 @@ the raw blocks, including `enlarge`, the bones records kept there with the key's
 through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
 save and a load. It must be paid before `P10` drops `runtime`.
 
-### C97 ⏳ `DrawViewport` runs outside CSBWin's three call sites
-
-CSBWin calls `DrawViewport` in three places: the main loop's tick
-(`doc/CSBwin-src/CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison
-door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:173`) always
-runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
-click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
-`mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:464-469`). Two things follow:
-
-- **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
-  draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
-  of VBLs, it changes at 60 Hz instead of 4 — the very symptom `GameInput.mouseMove`
-  (`src/renderer/GameInput.ts`) avoids by calling `refreshOverlay` instead.
-- **The view is drawn mid-pass.** A click's change shows before the tick's `DrawViewport`
-  would show it: one VBL early for a pick-up, which brings the tick on at once
-  (`d.clockTick = 1`), up to a tick early for a click that does not.
-
-`viewportRandom` (`src/renderer/bytecode/ViewportDraw.ts:32`) is also module-level state, shared by every
-interpreter, the prison interior's and every tool's included. Paying it means `renderView`
-recomposes (`refreshOverlay`) everywhere but the three sites, the tick's draw becoming the
-only way `DrawViewport` runs in play, and `npm test -- --frames` telling whether a golden
-frame depended on the extra draws.
-
 ### C98 ⏳ The tick comes from the wall clock, not from `d.vblCount`
 
 CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.Speed`
@@ -345,6 +321,17 @@ since they never return. `tools/dump-mouse-queue.ts` reads `d.clockTick` as the 
 script leaves it and stops there. Paying it means `runFrame` finishing the held pass when
 the script ends (the rest of the `handleMouseEvents` loop, then the tick), with a check in
 `dump-mouse-queue` that the cast's tick runs, or is put off, in the script's last VBL.
+
+### C102 ⏳ `MainLoop` opens with a tick; the port's first comes 250 ms later
+
+`_MainLoop` goes straight to `tag000698` (`doc/CSBwin-src/CSBCode.cpp:586-601`), so the
+first thing a started, restarted or resumed game does is a tick: `ProcessTimers`,
+`DrawViewport`, `d.Time++`. `Game.start` sets `lastTickTime` to the wall clock
+(`src/engine/Game.ts:184`), so the port's first tick is due a quarter of a second later,
+and the page draws the game's first view itself instead (`renderView` in `start`,
+`showEndOfGame` and the loads, `src/main.ts`). Paying it means the loop's first pass
+ticking, as `d.clockTick = 1` makes one, and those three first views going; with `C98`
+it is the first VBL's tick rather than a clock reading.
 
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
