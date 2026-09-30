@@ -239,12 +239,12 @@ export function computeChampionLoad(ui: UIState, champion: Champion): { load: nu
  * one `Quickness` and `DetermineThrowingDistance` act on.
  */
 export function computeLoadWeight(ui: UIState, champion: Champion): number {
-  return ui.characterStats?.characterLoad(champion) ?? 0;
+  return ui.ctx.systems.characterStats.characterLoad(champion);
 }
 
 /** `MaxLoad` (`doc/CSBwin-src/Code11f52.cpp:4280`), in the engine. */
 export function computeMaxLoad(ui: UIState, champion: Champion): number {
-  return ui.characterStats?.maxLoad(champion) ?? 0;
+  return ui.ctx.systems.characterStats.maxLoad(champion);
 }
 
 export function getLoadColor(load: number, maxLoad: number): number {

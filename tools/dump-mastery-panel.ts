@@ -179,7 +179,9 @@ async function main(): Promise<void> {
   party.state.selectedCharacterIndex = 0;
 
   const dungeon = new DungeonState(data);
-  const ui: UIState = createUIState(graphics, dungeon, {
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
+  ctx.systems.characterStats = new CharacterStats(ctx);
+  const ui: UIState = createUIState(graphics, ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
@@ -187,7 +189,6 @@ async function main(): Promise<void> {
   ui.objectTables = objectTables;
   ui.fontData = font;
   ui.partyState = party.state;
-  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
 
   /** Draw the panel for the champion as it stands and hand back the screen buffer. */
   function renderPanel(): Uint8Array {
@@ -386,7 +387,7 @@ async function main(): Promise<void> {
     }
   }
   check(potionNameIndex >= 0, 'dungeon.dat holds a potion that is neither water nor an empty flask');
-  const potion = ui.dungeonState.getPotionRecord(potionId);
+  const potion = ui.ctx.dungeon.getPotionRecord(potionId);
   if (!potion) throw new Error('no potion record');
   const savedPower = potion.power;
   const potionName = getObjectName(ui, potionNameIndex);

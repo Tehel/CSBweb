@@ -7,7 +7,7 @@
  * translation of its C++ counterpart instead of another method on a god object.
  */
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
-import type { DungeonState } from '../../engine/DungeonState';
+import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
 import type { FeedParameters } from '../../engine/Feeding';
 import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
@@ -16,7 +16,6 @@ import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { KeyXlate, Rect, UIButton, UITables } from '../../data/tables/UITables';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
-import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, type ObjectID, type Position } from '../../core/types';
@@ -47,18 +46,16 @@ export type ObjectMoveHandler = (
 export interface UIState {
   /* ---- data sources ---- */
   readonly graphicsLoader: GraphicsLoader;
-  readonly dungeonState: DungeonState;
+  /**
+   * The game's `GameContext`, CSBWin's `d.`: the dungeon, the party, and the systems the
+   * interface calls as the C++ calls the engine (`ctx.systems.characterStats` for the
+   * load and weight figures the engine acts on, so both come out of the same code).
+   */
+  readonly ctx: GameContext;
   context: InterpreterContext | null;
   screenIndexBuffer: ScreenIndexBuffer | null;
   uiTables: UITables | null;
   objectTables: ObjectTables | null;
-  /**
-   * `GetObjectWeight` / `MaxLoad` and friends (`src/engine/CharacterStats.ts`). The UI
-   * shows the load figure the engine's `Quickness` and `DetermineThrowingDistance` act
-   * on, so both must come out of the same code — there used to be two implementations.
-   * Set once the object tables are extracted.
-   */
-  characterStats: CharacterStats | null;
   fontData: FontData | null;
   partyState: PartyState | null;
   uiMode: UIMode;
@@ -339,17 +336,16 @@ export function initializePlayState(ui: UIState): void {
 
 export function createUIState(
   graphicsLoader: GraphicsLoader,
-  dungeonState: DungeonState,
+  ctx: GameContext,
   hooks: Pick<UIState, 'getGraphicBitmap' | 'renderLastFrame'>,
 ): UIState {
   return {
     graphicsLoader,
-    dungeonState,
+    ctx,
     context: null,
     screenIndexBuffer: null,
     uiTables: null,
     objectTables: null,
-    characterStats: null,
     fontData: null,
     partyState: null,
     ...initialPlayState(),

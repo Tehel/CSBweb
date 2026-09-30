@@ -23,7 +23,7 @@ export type ItemDescriptionLine = { text: string; color: number };
 export function resolveObjectNameIndex(ui: UIState, value: ObjectID): number {
   if (value < 0 || !ui.objectTables) return -1;
   return NameIndex(
-    ui.dungeonState,
+    ui.ctx.dungeon,
     {
       objDescObjectType: ui.objectTables.objDescObjectType,
       byte640: ui.uiTables?.graphic232.byte640 ?? [],
@@ -36,20 +36,20 @@ export function resolveObjectNameIndex(ui: UIState, value: ObjectID): number {
 /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). -1 as `resolveObjectNameIndex`. */
 export function getBaseObjectNameIndex(ui: UIState, rn: ObjectID): number {
   if (rn < 0 || !ui.objectTables) return -1;
-  return GetBasicObjectType(ui.dungeonState, ui.objectTables.objDescObjectType, rn);
+  return GetBasicObjectType(ui.ctx.dungeon, ui.objectTables.objDescObjectType, rn);
 }
 
 /** `d.ObjDesc[rn.DescIndex()].attackClass`; 0, "no attacks", when there is no row. */
 export function getAttackClass(ui: UIState, rn: ObjectID): number {
   if (!ui.objectTables || rn < 0) return 0;
-  const descIndex = DescIndex(ui.dungeonState, rn);
+  const descIndex = DescIndex(ui.ctx.dungeon, rn);
   if (descIndex === -1) return 0;
   return ui.objectTables.objDescAttackClass[descIndex] ?? 0;
 }
 
 /** `RN::DescIndex` (`src/engine/objectIndex.ts`), with `null` for -1. */
 export function descIndexForObject(ui: UIState, rn: ObjectID): number | null {
-  const descIndex = DescIndex(ui.dungeonState, rn);
+  const descIndex = DescIndex(ui.ctx.dungeon, rn);
   return descIndex === -1 ? null : descIndex;
 }
 
@@ -81,11 +81,11 @@ export function getObjectName(ui: UIState, objectNameIndex: number): string {
  */
 export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameIndex: number): Champion | null {
   if (objectNameIndex !== OBJNI_BONES_A) return null;
-  const misc = ui.dungeonState.getMiscRecord(objectId);
+  const misc = ui.ctx.dungeon.getMiscRecord(objectId);
   if (!misc) return null;
   // `value = pBones->value(); if (value != 0)` — are these bones a champion's at all?
   if ((misc.specialState | 0) === 0) return null;
-  const fingerprint = ui.dungeonState.copyChampionBonesRecord(objectId);
+  const fingerprint = ui.ctx.dungeon.copyChampionBonesRecord(objectId);
   if (fingerprint === null || !ui.partyState) return null;
   const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
   if (chIdx === -1) return null;
@@ -108,7 +108,7 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
       if (selected >= 0 && ui.partyState) {
         const champ = ui.partyState.champions[selected];
         if (champ && determineMastery(ui, champ, 2) > 1) {
-          const potion = ui.dungeonState.getPotionRecord(objectId);
+          const potion = ui.ctx.dungeon.getPotionRecord(objectId);
           const prefix = 95 + Math.floor((potion?.power ?? 0) / 40);
           name = `${String.fromCharCode(prefix)} ${name}`;
         }
@@ -130,7 +130,7 @@ export function formatWeightText(weight: number): string {
  * `GetObjectWeight` / `TAG0091e6`, in the engine (`src/engine/CharacterStats.ts`).
  */
 export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set<number>): number {
-  return ui.characterStats?.getObjectWeight(rn, visited) ?? 0;
+  return ui.ctx.systems.characterStats.getObjectWeight(rn, visited);
 }
 
 export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
@@ -144,7 +144,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
 
   switch (category) {
     case DBType.WEAPON: {
-      const rec = ui.dungeonState.getWeaponRecord(objectId);
+      const rec = ui.ctx.dungeon.getWeaponRecord(objectId);
       if (objectNameIndex >= OBJNI_TORCH_A && objectNameIndex <= OBJNI_TORCH_D) {
         if ((rec?.charges ?? 0) === 0) {
           lines.push({ text: '(BURNT OUT)', color: 13 });
@@ -157,7 +157,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
       break;
     }
     case DBType.CLOTHING: {
-      const rec = ui.dungeonState.getClothingRecord(objectId);
+      const rec = ui.ctx.dungeon.getClothingRecord(objectId);
       descriptionMask = 0x0c;
       if (rec?.cursed) flags |= 0x8;
       if (rec?.broken) flags |= 0x4;
@@ -170,7 +170,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
       break;
     }
     case DBType.MISC: {
-      const rec = ui.dungeonState.getMiscRecord(objectId);
+      const rec = ui.ctx.dungeon.getMiscRecord(objectId);
       if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
         descriptionMask = 0;
         const state = rec?.specialState ?? 0;

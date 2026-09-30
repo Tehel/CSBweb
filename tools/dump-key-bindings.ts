@@ -104,13 +104,14 @@ async function main(): Promise<void> {
   setHandOwner(party.state, 0);
 
   const dungeon = new DungeonState(data);
-  const ui: UIState = createUIState(graphics, dungeon, {
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
+  ctx.systems.characterStats = new CharacterStats(ctx);
+  const ui: UIState = createUIState(graphics, ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  ui.characterStats = new CharacterStats(newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) }));
   ui.partyState = party.state;
 
   let attacks: Array<{ chIdx: number; attackType: number }> = [];

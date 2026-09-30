@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
-  const ui: UIState = createUIState(graphics, game.ctx.dungeon, {
+  const ui: UIState = createUIState(graphics, game.ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });

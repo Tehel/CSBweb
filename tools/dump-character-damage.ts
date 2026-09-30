@@ -23,7 +23,6 @@ import { resolve } from 'node:path';
 import { Direction, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Game } from '../src/engine/Game';
 import { Party } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -204,7 +203,7 @@ console.log('=== drawPartyStatus ===');
     })));
   }
   const cache = new Map();
-  const ui: UIState = createUIState(graphics, new DungeonState(data), {
+  const ui: UIState = createUIState(graphics, newGame(data!, graphics).ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
     renderLastFrame: () => {},
   });

@@ -23,7 +23,6 @@ import { resolve } from 'node:path';
 import { Direction, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
@@ -34,7 +33,7 @@ import {
 } from '../src/renderer/ui/Attack';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -58,7 +57,7 @@ async function main(): Promise<void> {
   }
 
   const cache = new Map();
-  const ui: UIState = createUIState(graphics, new DungeonState(data), {
+  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
     renderLastFrame: () => {},
   });

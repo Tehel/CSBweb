@@ -82,7 +82,7 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:840`), which only
   // its returns for no cursor owner and a monster in the way skip.
   ui.setClockTick?.(1);
-  if (!ui.dungeonState.removeObjectFromCell(target, hit.rn)) return false;
+  if (!ui.ctx.dungeon.removeObjectFromCell(target, hit.rn)) return false;
   ui.onObjectMove?.(target, hit.rn, false, false, ui.partyState.facing & 0x3);
 
   ui.partyState.objectInHand = hit.rn;
@@ -146,14 +146,14 @@ export function tryUseFrontWallItem(ui: UIState, x: number, y: number): boolean 
   if (objectNameIndex < 0) return false;
 
   if (objectNameIndex >= OBJNI_WATERSKIN && objectNameIndex <= OBJNI_WATER) {
-    const misc = ui.dungeonState.getMiscRecord(objectId as ObjectID);
+    const misc = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
     if (!misc) return false;
     misc.specialState = 3;
     return true;
   }
 
   if (objectNameIndex === OBJNI_EMPTY_FLASK) {
-    const potion = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+    const potion = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
     if (!potion) return false;
     potion.potionType = POTION_WATER_FLASK;
     return true;
@@ -205,7 +205,7 @@ export function isFrontCellStoneOrVisibleFalseWall(ui: UIState): boolean {
     facing === 1 ? pos.east :
     facing === 2 ? pos.south :
     pos.west;
-  const map = ui.dungeonState.getMap(target.z);
+  const map = ui.ctx.dungeon.getMap(target.z);
   if (!map) return true;
   if (target.x < 0 || target.y < 0 || target.x >= map.descriptor.width || target.y >= map.descriptor.height) return true;
   const cellFlag = map.cellFlags[target.x]?.[target.y];
@@ -260,15 +260,15 @@ export function getPickupCellForRelativePos(ui: UIState, relativeLocation: numbe
 
 export function isMonsterBlockingPickup(ui: UIState, relativeLocation: number, position: Position): boolean {
   if (!ui.partyState || relativeLocation < 2) return false;
-  const rn = ui.dungeonState.findFirstMonster(position);
+  const rn = ui.ctx.dungeon.findFirstMonster(position);
   if (rn === OBJECT_ID_EOF) return false;
-  const creature = ui.dungeonState.getCreatureRecord(rn);
+  const creature = ui.ctx.dungeon.getCreatureRecord(rn);
   if (!creature || isMonsterLevitating(ui, creature)) return false;
   const monsterCount = (creature.numMonM1 & 0x3) + 1;
   const absPos = (ui.partyState.facing + relativeLocation) & 0x3;
   // Take the positions from the render state, not from DB4 directly: once an ITEM16
   // is attached the live positions live there and `groupIndex` is the slot number.
-  const positions = ui.dungeonState.getMonsterRenderState(creature).positions;
+  const positions = ui.ctx.dungeon.getMonsterRenderState(creature).positions;
   return monsterOccupiesPosition(positions, absPos, monsterCount);
 }
 

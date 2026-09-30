@@ -17,7 +17,7 @@ export function selectPaletteIndexForLightLevel(ui: UIState): number {
   const { paletteBrightness, word1074 } = ui.uiTables.graphic232;
   if (!paletteBrightness || paletteBrightness.length === 0 || !word1074 || word1074.length === 0) return 0;
 
-  const map = ui.dungeonState.getMap(ui.partyState.position.z);
+  const map = ui.ctx.dungeon.getMap(ui.partyState.position.z);
   const experienceMultiplier = map?.descriptor.difficulty ?? 0;
   if (experienceMultiplier === 0) return 0;
 
@@ -101,7 +101,7 @@ export function collectTorchCharges(ui: UIState): number[] {
 }
 
 export function getTorchCharge(ui: UIState, objectId: number): number {
-  const weapon = ui.dungeonState.getWeaponRecord(objectId as ObjectID);
+  const weapon = ui.ctx.dungeon.getWeaponRecord(objectId as ObjectID);
   if (!weapon) return 0;
   return weapon.charges & 0xf;
 }

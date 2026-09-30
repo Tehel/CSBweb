@@ -41,7 +41,6 @@ import { CHARDESC_SIZE } from '../src/data/CsbwinSaveInfo';
 import { buildCsbwinRuntimeState } from '../src/data/CsbwinSaveGame';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
 import type { Champion } from '../src/engine/gameTypes';
 import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
@@ -49,7 +48,7 @@ import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawPartyStatus, getPortraitBitmap } from '../src/renderer/ui/Character';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
@@ -83,9 +82,8 @@ function main(): void {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(GRAPHICS))));
   const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
 
-  const dungeon = new DungeonState(data);
   const cache = new Map<string, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, dungeon, {
+  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
     // The real one, off `graphics.dat`: the fallback path has to find graphic 26.
     getGraphicBitmap: (graphicNum: number, format: ImageFormat = ImageFormat.IMG1) => {
       const key = `${graphicNum}-${format}`;

@@ -71,7 +71,7 @@ async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')>
 
 /** The interface over `g`, with the inventory click wired to the engine's pair as `main.ts` does. */
 function uiOver(g: Game): UIState {
-  const ui = createUIState(graphics, g.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, g.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
   ui.partyState = g.ctx.party.state;

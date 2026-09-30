@@ -390,7 +390,7 @@ function main(): void {
     const potions = game.ctx.dungeon.getData().databases.potions.records;
     const index = potions.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.potionType !== PotionType.EMPTY_FLASK);
     const potion = ((DBType.POTION << 10) | index) as ObjectID;
-    const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+    const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
     ui.objectTables = graphicsTablesOf(graphics).objects;
     ui.partyState = game.ctx.party.state;
     ui.applyFeeding = (chIdx, fp) => game.applyFeeding(chIdx, fp);

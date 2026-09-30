@@ -57,7 +57,7 @@ export function computeFeedParameters(
 
   if (nameIndex >= OBJNI_WATERSKIN && nameIndex <= OBJNI_WATER) {
     // A waterskin holds gulps in the misc record's `value`, and each drink spends one.
-    const rec = ui.dungeonState.getMiscRecord(objectId as ObjectID);
+    const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
     if ((rec?.specialState ?? 0) === 0) {
       fp.waterValue = 0;
       fp.emptyFlask = false;
@@ -72,7 +72,7 @@ export function computeFeedParameters(
   }
 
   if (category === DBType.POTION) {
-    const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+    const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
     if (!rec) return null;
     fp.emptyHand = false;
     fp.gulp = SOUND_GULP;
@@ -120,18 +120,18 @@ export function handleMouthPress(ui: UIState): void {
   } else if (fp.emptyFlask) {
     // A drained potion becomes an empty flask; a waterskin just loses one gulp.
     if (decodeObjectID(objectId as ObjectID).category === DBType.POTION) {
-      const rec = ui.dungeonState.getPotionRecord(objectId as ObjectID);
+      const rec = ui.ctx.dungeon.getPotionRecord(objectId as ObjectID);
       if (rec) rec.potionType = PotionType.EMPTY_FLASK;
     }
     if (fp.objectType >= OBJNI_WATERSKIN && fp.objectType <= OBJNI_WATER) {
-      const rec = ui.dungeonState.getMiscRecord(objectId as ObjectID);
+      const rec = ui.ctx.dungeon.getMiscRecord(objectId as ObjectID);
       if (rec) rec.specialState = Math.max(0, (rec.specialState ?? 0) - 1);
     }
   }
 
   if (fp.emptyHand) {
     ui.partyState.objectInHand = OBJECT_ID_NULL;
-    ui.dungeonState.deleteDBEntry(objectId as ObjectID);
+    ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
   }
 
   if (fp.gulp >= 0) ui.queueSound?.(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0);

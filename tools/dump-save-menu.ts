@@ -630,7 +630,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   party.magicCasterIndex = 0;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.partyState = party;
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
@@ -697,7 +697,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   party.champions[0]!.possessions[1] = chest;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.partyState = party;
   const draw = (): void => {

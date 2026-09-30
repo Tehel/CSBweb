@@ -10,8 +10,8 @@ each other.
 `Character.cpp` and `Magic.cpp` all reach into. Here it is one object that
 `GameScreen` owns and every UI function takes as its first argument:
 
-- **data sources**: `graphicsLoader`, `dungeonState`, `context` (the bytecode interpreter
-  context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState`,
+- **data sources**: `graphicsLoader`, `ctx` (the game's `GameContext`, CSBWin's `d.`:
+  the dungeon, the party and the systems), `context` (the bytecode interpreter context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState`,
   `uiMode`
 - **interaction state**: `pressingEye`, `hoverPoint`, `showAttackPanel`, the open chest,
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the

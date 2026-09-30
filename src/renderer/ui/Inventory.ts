@@ -287,7 +287,7 @@ export function syncOpenChest(ui: UIState, chestView: ChestViewSource | null): v
 }
 
 export function openChest(ui: UIState, chestId: ObjectID): void {
-  const chest = ui.dungeonState.getContainerRecord(chestId);
+  const chest = ui.ctx.dungeon.getContainerRecord(chestId);
   if (!chest) {
     ui.openChestId = null;
     ui.openChestContents = emptyChestContents();
@@ -300,13 +300,13 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
   let index = 0;
   while (cursor !== OBJECT_ID_EOF && cursor !== OBJECT_ID_NULL && index < contents.length) {
     contents[index++] = cursor;
-    cursor = ui.dungeonState.getDBRecordLink(cursor);
+    cursor = ui.ctx.dungeon.getDBRecordLink(cursor);
   }
   ui.openChestContents = contents;
 
   for (const item of contents) {
     if (item !== OBJECT_ID_NULL) {
-      ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+      ui.ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
     }
   }
   chest.containedObject = OBJECT_ID_EOF;
@@ -319,7 +319,7 @@ export function openChest(ui: UIState, chestId: ObjectID): void {
  */
 export function repackOpenChest(ui: UIState): void {
   if (ui.openChestId === null) return;
-  const chest = ui.dungeonState.getContainerRecord(ui.openChestId);
+  const chest = ui.ctx.dungeon.getContainerRecord(ui.openChestId);
   if (!chest) {
     ui.openChestId = null;
     ui.openChestContents = emptyChestContents();
@@ -330,11 +330,11 @@ export function repackOpenChest(ui: UIState): void {
   let previous: ObjectID | null = null;
   for (const item of ui.openChestContents) {
     if (item === OBJECT_ID_NULL) continue;
-    ui.dungeonState.setDBRecordLink(item, OBJECT_ID_EOF);
+    ui.ctx.dungeon.setDBRecordLink(item, OBJECT_ID_EOF);
     if (previous === null) {
       chest.containedObject = item;
     } else {
-      ui.dungeonState.setDBRecordLink(previous, item);
+      ui.ctx.dungeon.setDBRecordLink(previous, item);
     }
     previous = item;
   }
@@ -440,14 +440,14 @@ export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
     // (`doc/CSBwin-src/Character.cpp:3510-3514`): the DSA's answer counts only if it
     // names a scroll that exists.
     const candidate = filter.objectId | 0;
-    if (candidate >= 0 && ui.dungeonState.getScrollRecord(candidate as ObjectID)) {
+    if (candidate >= 0 && ui.ctx.dungeon.getScrollRecord(candidate as ObjectID)) {
       scrollId = candidate as ObjectID;
     }
   }
 
-  const scroll = ui.dungeonState.getScrollRecord(scrollId);
+  const scroll = ui.ctx.dungeon.getScrollRecord(scrollId);
   if (!scroll) return;
-  const text = ui.dungeonState.decodeScrollText(scroll, ui.objectTables.textDecode) ?? '';
+  const text = ui.ctx.dungeon.decodeScrollText(scroll, ui.objectTables.textDecode) ?? '';
 
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 23, g232.wRectPos926, 144, 8);

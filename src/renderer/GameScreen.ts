@@ -13,11 +13,9 @@
 
 import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { Champion, PartyState } from '../engine/gameTypes';
-import type { CharacterStats } from '../engine/CharacterStats';
 import type { CSBGraphicsLoader } from '../data/CSBGraphicsLoader';
 import type { ScrollingText } from './csbwin/ScrollingText';
-import type { DungeonState } from '../engine/DungeonState';
-import type { PartyFootprints } from '../engine/PartyFootprints';
+import type { GameContext } from '../engine/GameContext';
 import type { IndexedBitmap } from './csbwin/CanvasBlitter';
 import {
   clearIndex,
@@ -134,20 +132,18 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   onPaletteSelected(index: number): void;
 }
 
-/** What the screen reads: the graphics, the dungeon, and the engine's load figures. */
+/** What the screen reads: the graphics, and the game it shows. */
 export interface GameScreenDeps {
   graphicsLoader: GraphicsLoader;
   /** The game's one set of `graphics.dat` tables, the one its `GameTables` was built from. */
   tables: GraphicsTables;
-  dungeonState: DungeonState;
-  /** The party's trail, `d.PartyFootprints`, for the magic prints in the viewport. */
-  footprints: PartyFootprints;
-  csbGraphicsLoader?: CSBGraphicsLoader;
   /**
-   * The engine's `CharacterStats`, so the load and weight figures the eye panel prints
-   * come out of the same code the engine acts on.
+   * The game's `GameContext`, CSBWin's `d.`, which the interface holds as `ui.ctx`: the
+   * dungeon, the party's trail (`d.PartyFootprints`, for the magic prints in the
+   * viewport) and the systems.
    */
-  characterStats: CharacterStats;
+  ctx: GameContext;
+  csbGraphicsLoader?: CSBGraphicsLoader;
   /**
    * The message area, CSBWin's global `scrollingText` (`doc/CSBwin-src/CSBCode.cpp:1352`):
    * the one the engine writes through its host's `messages`.
@@ -174,12 +170,11 @@ export class GameScreen {
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
-    const ui = createUIState(graphicsLoader, deps.dungeonState, {
+    const ui = createUIState(graphicsLoader, deps.ctx, {
       getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
       renderLastFrame: () => this.renderLastFrame(),
     });
     this.ui = ui;
-    ui.characterStats = deps.characterStats;
     ui.queueSound = hooks.queueSound;
     ui.viewingFilter = hooks.viewingFilter;
     ui.onObjectMove = hooks.onObjectMove;
@@ -221,8 +216,8 @@ export class GameScreen {
     const palette552 = ui.uiTables.graphic232.palette552;
     this.viewport = new ViewportRenderer({
       graphicsLoader,
-      dungeonState: deps.dungeonState,
-      footprints: deps.footprints,
+      dungeonState: deps.ctx.dungeon,
+      footprints: deps.ctx.footprints,
       csbGraphicsLoader: deps.csbGraphicsLoader,
       viewportTables: deps.tables.viewport,
       objectTables: deps.tables.objects,

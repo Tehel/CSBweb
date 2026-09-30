@@ -20,7 +20,6 @@ import { resolve } from 'node:path';
 import { Direction, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
@@ -31,7 +30,7 @@ import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Character';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 
 /** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -72,7 +71,7 @@ async function main(): Promise<void> {
   const state = party.state;
 
   const bitmaps = new Map<number, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, new DungeonState(data), {
+  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
     getGraphicBitmap: (n: number) => {
       let bitmap = bitmaps.get(n);
       if (!bitmap) {

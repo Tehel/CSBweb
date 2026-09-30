@@ -79,7 +79,7 @@ function itemsAt(game: Game, cell: Position): ObjectID[] {
 
 function makeUI(game: Game, rn: ObjectID, facingAlcove: boolean): UIState {
   return {
-    dungeonState: game.ctx.dungeon,
+    ctx: game.ctx,
     partyState: game.ctx.party.state,
     context: {
       facingAlcove,
@@ -115,7 +115,7 @@ function bareUI(game: Game, facingAlcove: boolean): UIState {
   const roomData: SummarizeRoomData[] = [];
   roomData[17] = summaryAhead(game);
   return {
-    dungeonState: game.ctx.dungeon,
+    ctx: game.ctx,
     partyState: game.ctx.party.state,
     context: {
       facingAlcove,

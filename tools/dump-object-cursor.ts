@@ -26,7 +26,6 @@ import { resolve } from 'node:path';
 import { Direction, Position, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
 import { Party } from '../src/engine/Party';
 import {
   createPaletteIndexViewportBuffer,
@@ -39,7 +38,7 @@ import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 
 /** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -66,7 +65,7 @@ async function main(): Promise<void> {
 
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   const bitmaps = new Map<number, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, new DungeonState(data), {
+  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
     getGraphicBitmap: (n: number) => {
       let bitmap = bitmaps.get(n);
       if (!bitmap) {

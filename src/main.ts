@@ -287,10 +287,8 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
         tables: graphicsTables,
-        dungeonState: game.ctx.dungeon,
-        footprints: game.ctx.footprints,
+        ctx: game.ctx,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
-        characterStats: game.systems.characterStats,
         messages,
     }, {
         queueSound: (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z),

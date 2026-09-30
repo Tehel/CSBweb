@@ -67,11 +67,11 @@ export function itemHasChargesLeft(ui: UIState, chIdx: number): boolean {
   if (rn === OBJECT_ID_NULL) return true;
   switch (decodeObjectID(rn).category) {
     case DBType.WEAPON:
-      return (ui.dungeonState.getWeaponRecord(rn)?.charges ?? 0) !== 0;
+      return (ui.ctx.dungeon.getWeaponRecord(rn)?.charges ?? 0) !== 0;
     case DBType.CLOTHING:
-      return (ui.dungeonState.getClothingRecord(rn)?.charges ?? 0) !== 0;
+      return (ui.ctx.dungeon.getClothingRecord(rn)?.charges ?? 0) !== 0;
     case DBType.MISC:
-      return (ui.dungeonState.getMiscRecord(rn)?.specialState ?? 0) !== 0;
+      return (ui.ctx.dungeon.getMiscRecord(rn)?.specialState ?? 0) !== 0;
     default:
       return true;
   }

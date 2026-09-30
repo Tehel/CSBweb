@@ -279,7 +279,7 @@ async function main(): Promise<void> {
 
   // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
   let redraws = 0;
-  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
+  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
   ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.partyState = party;
   let castAt = -1;

@@ -83,7 +83,7 @@ function checkChooser(): void {
 
   const run = (mode: 'full' | 'loadOnly', bytes: Uint8Array) => {
     const game = freshGame();
-    const ui = UIStateModule.createUIState(graphics, game.ctx.dungeon, {
+    const ui = UIStateModule.createUIState(graphics, game.ctx, {
       getGraphicBitmap: () => null,
       renderLastFrame: () => {},
     });

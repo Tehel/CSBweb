@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 2 of 5 next |
+| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 3 of 5 next |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
@@ -144,10 +144,10 @@ New state-representation debt goes here, and jumps the queue.
 ### D15 ⏳ `UIState` is built in two phases
 
 `createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
-sources `null` — `uiTables`, `objectTables`, `characterStats`, `fontData`,
-`screenIndexBuffer`, `context` — and `GameScreen`'s constructor fills them in straight
-after (`src/renderer/GameScreen.ts:175-240`). None is ever `null` again, but every reader
-must ask: 165 `!ui.x` guards and 57 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
+sources `null` — `uiTables`, `objectTables`, `fontData`, `screenIndexBuffer`,
+`context` — and `GameScreen`'s constructor fills them in straight after
+(`src/renderer/GameScreen.ts:171-236`). None is ever `null` again, but every reader
+must ask: 165 `!ui.x` guards and 54 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
 optional fields too, so 35 calls are `ui.onX?.()`, and a hook left unwired is a click
 that silently does nothing. D3 made the engine's state required for the same reason. Paying
 it means a `UIState` built whole, from the tables (`GraphicsTables`, which the screen
@@ -165,8 +165,8 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 
 What CSBWin's interface code does to the game, it does by calling the engine's functions
 on `d.`. The port's goes: a `UIState` hook (`ui.onAddCharacterPossession?.(…)`), which
-`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:183-210`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:239-375`) onto a one-line `Game`
+`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:178-205`),
+each a lambda in `main.ts`'s `construct` (`src/main.ts:239-373`) onto a one-line `Game`
 facade, onto the system. Adding an engine call from the UI touches four files. And
 the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
 state directly where no hook exists — the object in hand
@@ -174,9 +174,7 @@ state directly where no hook exists — the object in hand
 (`ViewportPicking.ts:85`), a record freed (`Feeding.ts:134`), a potion emptied and a
 waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:305-340`).
 19 tools stand the UI up with `createUIState` and the subset of hooks they think they
-need, "wired as `main.ts` wires it", which nothing checks; three of them over a bare
-`DungeonState` with no game at all (`dump-marching-order`, `dump-attack-panel`,
-`dump-object-cursor`).
+need, "wired as `main.ts` wires it", which nothing checks.
 
 **The author chose shape A**: `UIState` holds the `GameContext`, and a UI module calls the
 system as the C++ calls the engine. `GameScreenHooks`, the `main.ts` lambdas and the
@@ -185,15 +183,16 @@ over the `Game` it already has. Under A the direct writes listed above are the C
 shape (CSBWin's interface writes `d.` too), so they stay, reached through `ui.ctx`. (The
 shape not taken, B, kept the hooks and built them all from a `Game` in one function.)
 
-Four steps remain, one commit each (step 1, the message area and `GameHost`'s own
-types, is in place: one `ScrollingText` the page hands to both sides, and the host's
-contract types in `GameHost.ts`):
+Three steps remain, one commit each. Steps 1 and 2 are in place: one `ScrollingText`
+the page hands to both sides, the host's contract types in `GameHost.ts`, and `UIState`
+holding the `GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it; the
+UI reads `ui.ctx.dungeon` and `ui.ctx.systems.characterStats`; `ui.partyState` stays as it
+is, `D15`). Every tool's UI stands over a game's context: the tools that had none build
+one with `newGame`, and the four over a bare `newContext` (`dump-hand-owner`,
+`dump-inventory-routing`, `dump-key-bindings`, `dump-mastery-panel`) put their
+`CharacterStats` in `ctx.systems`, so step 3, whose hooks they wire by hand, moves them
+to `newGame`.
 
-2. ⏳ **`UIState` holds the `GameContext`.** `createUIState` takes the context;
-   `GameScreenDeps` gives the screen the context in place of `dungeonState`,
-   `footprints` and `characterStats`; `ui.dungeonState` (36 reads) and `ui.characterStats`
-   become `ui.ctx.dungeon` and `ui.ctx.systems.characterStats`. `ui.partyState` stays as
-   it is (`D15`). The three tools without a game build one through `tools/lib/game.ts`.
 3. ⏳ **The object and inventory hooks go**: `onAddCharacterPossession`,
    `onRemoveCharacterPossession`, `onObjectMove`, `applyFeeding`, `viewingFilter`,
    `queueSound`, `setClockTick`. The UI modules (`Mouse`, `Objects`, `Feeding`,
@@ -228,15 +227,15 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:339`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:337`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
   migration from a `localStorage` key no build writes.
 - **Nothing below the page knows which game it runs.** The data set is a `main.ts`
-  module variable (`:57`), so neither a save nor the stores can say "DM" or "CSB", which is
+  module variable (`:58`), so neither a save nor the stores can say "DM" or "CSB", which is
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
-  through another `main.ts` global, `savedGameRead` (`:37`).
+  through another `main.ts` global, `savedGameRead` (`:38`).
 - **Some of it is written twice.** `EXTENDEDFEATURESBLOCK` is read by
   `SaveGameLoader.readExtendedFeatures` at bare offsets with bare masks
   (`extendedFlags & 0x20`, `flags & 0x80`), and by

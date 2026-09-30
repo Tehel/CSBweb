@@ -155,7 +155,7 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
  */
 function attackHandShaded(game: Game, chIdx: number): boolean {
   const graphics = sharedGraphics!;
-  const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.objectTables = graphicsTablesOf(graphics).objects;
   ui.partyState = game.ctx.party.state;

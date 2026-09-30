@@ -297,7 +297,7 @@ async function main(): Promise<void> {
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
   // and before 140 (doc/CSBwin-src/Mouse.cpp:1679-1680). Through the real dispatcher.
   const { handleMouseButton, handleMouseUnclick } = await importMouse();
-  const ui = createUIState(graphics, dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
+  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = uiTables;
   ui.partyState = party;
   game.setMouseEventHandlers({

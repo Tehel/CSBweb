@@ -98,7 +98,7 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
  */
 function makeUI(g: Game, objectTables: ObjectTables, uiTables: UITables): UIState {
   return {
-    dungeonState: g.ctx.dungeon,
+    ctx: g.ctx,
     partyState: g.ctx.party.state,
     objectTables,
     uiTables,

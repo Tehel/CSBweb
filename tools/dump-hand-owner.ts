@@ -142,16 +142,14 @@ async function main(): Promise<void> {
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6928)
   const dungeon = new DungeonState(data);
   const { handleClothingClick } = await importMouse();
-  const ui: UIState = createUIState(graphics, dungeon, {
+  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
+  ctx.systems.characterStats = new CharacterStats(ctx);
+  const ui: UIState = createUIState(graphics, ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  // Without this the UI's load and weight readouts silently return 0 — they delegate
-  // to the engine now (`src/engine/CharacterStats.ts`).
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
-  ui.characterStats = new CharacterStats(ctx);
   // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`, as `main.ts` wires them.
   const character = new CharacterSystem(ctx);
   ui.onRemoveCharacterPossession = (chIdx, slot) => character.removeCharacterPossession(chIdx, slot);
