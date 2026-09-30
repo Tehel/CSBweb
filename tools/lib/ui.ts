@@ -1,0 +1,53 @@
+/**
+ * How a tool builds the interface's state: whole, as `GameScreen` builds it.
+ *
+ * `newUIState` hands `createUIState` the game's tables and font from `graphics`, a blank
+ * 320x200 screen, and the interpreter context of a `ViewportRenderer` over `ctx` that has
+ * drawn no view yet (no room summary, no object buttons: what the screen has before its
+ * first frame). A tool replaces the screen or the context afterwards to draw into a
+ * buffer of its own or to stage a view. The hooks do nothing unless the tool passes its
+ * own; `onCreateSave` throws, as there is no world to serialize.
+ */
+import type { GraphicsLoader } from '../../src/data/GraphicsLoader';
+import type { GameContext } from '../../src/engine/GameContext';
+import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../../src/renderer/csbwin/CanvasBlitter';
+import { loadFontData } from '../../src/renderer/csbwin/TextRenderer';
+import { createUIState, type UIHooks, type UIState } from '../../src/renderer/ui/UIState';
+import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../../src/renderer/ViewportGraphics';
+import { ViewportRenderer } from '../../src/renderer/ViewportRenderer';
+import { graphicsTablesOf } from './game';
+
+export function newUIState(graphics: GraphicsLoader, ctx: GameContext, hooks: Partial<UIHooks> = {}): UIState {
+  const tables = graphicsTablesOf(graphics);
+  const getGraphicBitmap = hooks.getGraphicBitmap ?? (() => null);
+  const graphicCache = new Map<string, IndexedBitmap>();
+  const viewport = new ViewportRenderer({
+    graphicsLoader: graphics,
+    dungeonState: ctx.dungeon,
+    footprints: ctx.footprints,
+    viewportTables: tables.viewport,
+    objectTables: tables.objects,
+    palette552: tables.ui.graphic232.palette552,
+    graphicCache,
+    getGraphicBitmap: (graphicNum) => getGraphicBitmap(graphicNum),
+  });
+  return createUIState({
+    graphicsLoader: graphics,
+    ctx,
+    context: viewport.context,
+    screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
+    uiTables: tables.ui,
+    objectTables: tables.objects,
+    fontData: loadFontData(graphics),
+    graphicCache,
+  }, {
+    renderLastFrame: () => {},
+    onReincarnated: () => {},
+    onCreateSave: () => { throw new Error('no world to save in this tool'); },
+    onSaveWritten: () => {},
+    onRestoreSave: () => {},
+    onRestoreFailed: () => {},
+    ...hooks,
+    getGraphicBitmap,
+  });
+}

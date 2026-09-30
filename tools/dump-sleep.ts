@@ -39,10 +39,10 @@ import { addCharacterDefaults, createChampionFromPreset } from '../src/engine/Ad
 import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
-import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
+import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
 
@@ -112,13 +112,8 @@ async function main(): Promise<void> {
   game.systems.monsters.loadPartyLevel(2);
 
   // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
-  const ui: UIState = createUIState(graphics, game.ctx, {
-    getGraphicBitmap: () => null,
-    renderLastFrame: () => {},
-  });
-  ui.uiTables = uiTables;
+  const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party;
-  ui.fontData = loadFontData(graphics);
   Mouse.updateButtonLists(ui);
   const handled: number[] = [];
   game.setMouseEventHandlers({

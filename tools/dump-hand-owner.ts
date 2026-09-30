@@ -24,8 +24,9 @@ import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 /**
@@ -141,12 +142,7 @@ async function main(): Promise<void> {
   //         the object lands in the hand, then clicking again puts it back.
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6928)
   const { handleClothingClick } = await importMouse();
-  const ui: UIState = createUIState(graphics, game.ctx, {
-    getGraphicBitmap: () => null,
-    renderLastFrame: () => {},
-  });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
+  const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
 

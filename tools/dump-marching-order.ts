@@ -25,12 +25,11 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { PartyState } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Character';
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 
 /** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -71,7 +70,7 @@ async function main(): Promise<void> {
   const state = party.state;
 
   const bitmaps = new Map<number, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
+  const ui: UIState = newUIState(graphics, newGame(data, graphics).ctx, {
     getGraphicBitmap: (n: number) => {
       let bitmap = bitmaps.get(n);
       if (!bitmap) {
@@ -81,12 +80,8 @@ async function main(): Promise<void> {
       }
       return bitmap;
     },
-    renderLastFrame: () => {},
   });
-  ui.uiTables = uiTables;
   ui.partyState = state;
-  ui.fontData = loadFontData(graphics);
-  ui.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
 
   const mouse = await importMouse();
   mouse.updateButtonLists(ui);

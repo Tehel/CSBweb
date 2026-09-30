@@ -50,7 +50,6 @@ export const MASTERY_LABELS: string[] = [
 const ATTRIBUTE_LABELS = ['STRENGTH', 'DEXTERITY', 'WISDOM', 'VITALITY', 'ANTI-MAGIC', 'ANTI-FIRE'];
 
 export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
   blitBasicGraphicToViewport(ui, 30, g232.wRectPos950, 48, 12);
@@ -64,7 +63,6 @@ export function drawFoodWaterPanel(ui: UIState, champion: Champion): void {
 }
 
 export function drawAttributePanel(ui: UIState, champion: Champion): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData) return;
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 20, g232.wRectPos926, 144, 8);
 
@@ -140,7 +138,6 @@ export function drawAttributePanel(ui: UIState, champion: Champion): void {
 }
 
 export function drawVitalsAndLoad(ui: UIState, champion: Champion): void {
-  if (!ui.fontData || !ui.screenIndexBuffer) return;
 
   const attrs = champion.attributes;
   const health = attrs?.health ?? 0;
@@ -199,7 +196,6 @@ export function drawLifeForceLine(ui: UIState,
   max: number,
   color: number
 ): void {
-  if (!ui.fontData || !ui.screenIndexBuffer) return;
   drawTextLineIndex(
     ui.screenIndexBuffer,
     ui.fontData,
@@ -227,7 +223,6 @@ export function formatLifeValue(value: number): string {
 }
 
 export function computeChampionLoad(ui: UIState, champion: Champion): { load: number; maxLoad: number; color: number } | null {
-  if (!ui.objectTables) return null;
   const load = computeLoadWeight(ui, champion);
   const maxLoad = computeMaxLoad(ui, champion);
   const color = getLoadColor(load, maxLoad);
@@ -277,7 +272,6 @@ export function drawPositionSquare(
   champion: Champion | null,
   facing: number,
 ): void {
-  if (!ui.uiTables) return;
   fillRectIndex(dst, rect, ui.uiTables.graphic232.byte1386[chIdx] ?? 13);
   const indicator = ui.getGraphicBitmap(28);
   if (!indicator) return;
@@ -302,7 +296,6 @@ export function drawPositionSquare(
 }
 
 export function drawPartyStatus(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.partyState || !ui.fontData) return;
 
   const g232 = ui.uiTables.graphic232;
   const party = ui.partyState;
@@ -428,7 +421,7 @@ export function drawPartyStatus(ui: UIState): void {
  */
 function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inventoryOpen: boolean): void {
   const shown = ui.characterDamage[chIdx];
-  if (!shown || !ui.screenIndexBuffer || !ui.fontData) return;
+  if (!shown) return;
   if ((champion.attributes.health | 0) === 0 || shown.inventoryOpen !== inventoryOpen) {
     ui.characterDamage[chIdx] = null;
     return;
@@ -469,7 +462,6 @@ function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inv
 }
 
 export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {
-  if (!ui.screenIndexBuffer || !ui.partyState) return;
   const shields: number[] = [];
   const fireShield = ui.partyState.fireShield;
   const spellShield = ui.partyState.spellShield;
@@ -581,7 +573,6 @@ export function getPortraitSheet(ui: UIState): IndexedBitmap | null {
 }
 
 export function drawTopBarHandIcons(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.partyState) return;
   const iconSlots = ui.uiTables.graphic232.iconDisplay;
   const word612 = ui.uiTables.graphic232.word612;
   const selected = ui.partyState.selectedCharacterIndex | 0;
@@ -630,7 +621,7 @@ export function drawTopBarHandIcons(ui: UIState): void {
 
 export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): void {
   // `if (pcA3->HP() > 0)` (`doc/CSBwin-src/Character.cpp:920`).
-  if (!ui.uiTables || !ui.screenIndexBuffer || (champion.attributes.health | 0) <= 0) return;
+  if ((champion.attributes.health | 0) <= 0) return;
   const offsets = ui.uiTables.graphic232.word1526[chIdx];
   const masks = ui.uiTables.graphic232.word1502[chIdx];
   if (!offsets || !masks) return;
@@ -669,12 +660,11 @@ export function drawLifeBars(ui: UIState, chIdx: number, champion: Champion): vo
  * learns whose remains they picked up.
  */
 export function drawHeldObjectName(ui: UIState): void {
-  if (!ui.uiTables || !ui.fontData || !ui.screenIndexBuffer) return;
 
-  const objectNames = ui.objectTables?.objectNames;
+  const objectNames = ui.objectTables.objectNames;
   if (!objectNames || objectNames.length === 0) return;
 
-  const objectId = ui.partyState?.objectInHand ?? OBJECT_ID_NULL;
+  const objectId = ui.partyState.objectInHand;
   let label = '';
   if (objectId !== OBJECT_ID_NULL) {
     const nameIndex = resolveObjectNameIndex(ui, objectId);
@@ -688,7 +678,6 @@ export function drawHeldObjectName(ui: UIState): void {
 }
 
 export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boolean {
-  if (!ui.objectTables || !ui.uiTables) return true;
   const descIndex = descIndexForObject(ui, objectId as ObjectID);
   if (descIndex === null) return true;
   const carryMask = ui.objectTables.objDescWord4[descIndex] ?? 0;

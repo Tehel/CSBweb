@@ -12,7 +12,6 @@ import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import type { UIState } from './UIState';
 
 export function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, color: number): void {
-  if (!ui.screenIndexBuffer) return;
   const x1 = VIEWPORT_X + x0;
   const y1 = VIEWPORT_Y + y0;
   const rect = { x1, y1, x2: x1 + width, y2: y1 + 6 };
@@ -20,7 +19,6 @@ export function drawHorzBar(ui: UIState, x0: number, y0: number, width: number, 
 }
 
 export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rect, srcStride: number, transparentColor: number): void {
-  if (!ui.screenIndexBuffer) return;
   const graphic = ui.getGraphicBitmap(index);
   if (!graphic) return;
   const dst = offsetViewportRect(rect);
@@ -48,7 +46,7 @@ export function blitBasicGraphicToViewport(ui: UIState, index: number, rect: Rec
  * loop skips while the party sleeps (`:637`).
  */
 export function displaySleepScreen(ui: UIState): void {
-  const viewport = ui.context?.viewportIndexBuffer;
+  const viewport = ui.context.viewportIndexBuffer;
   if (!viewport) return;
   viewport.pixels.fill(0);
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 93, 65, 4, 0, 'WAKE UP');
@@ -61,7 +59,7 @@ export function displaySleepScreen(ui: UIState): void {
  * viewport again until the thaw.
  */
 export function displayFrozenScreen(ui: UIState): void {
-  const viewport = ui.context?.viewportIndexBuffer;
+  const viewport = ui.context.viewportIndexBuffer;
   if (!viewport) return;
   viewport.pixels.fill(0);
   if (ui.fontData) drawTextLineIndex(viewport, ui.fontData, 81, 69, 4, 0, 'GAME FROZEN');
@@ -77,7 +75,6 @@ export function offsetViewportRect(rect: Rect): Rect {
 }
 
 export function shadeRectIndex(ui: UIState, rect: Rect, color: number): void {
-  if (!ui.screenIndexBuffer) return;
   const width = ui.screenIndexBuffer.width;
   const height = ui.screenIndexBuffer.height;
   const x1 = Math.max(0, rect.x1 | 0);
@@ -120,7 +117,6 @@ function objectIconSource(
 }
 
 export function drawObjectIcon(ui: UIState, rect: { x1: number; y1: number; x2: number; y2: number }, objectNameIndex: number, word612: number[]): void {
-  if (!ui.screenIndexBuffer) return;
   const source = objectIconSource(ui, objectNameIndex, word612);
   if (!source) return;
   const { graphic, srcX, srcY } = source;
@@ -158,7 +154,6 @@ export function drawObjectIconMask(ui: UIState,
   word612: number[],
   colorMap: number[]
 ): void {
-  if (!ui.screenIndexBuffer) return;
   if (colorMap.length === 0) return;
   const source = objectIconSource(ui, objectNameIndex, word612);
   if (!source) return;
@@ -193,7 +188,6 @@ export function drawObjectIconAt(ui: UIState,
   transparentColor: number,
   overrideColor?: number
 ): void {
-  if (!ui.screenIndexBuffer) return;
   const source = objectIconSource(ui, objectNameIndex, word612);
   if (!source) return;
   const { graphic, srcX, srcY } = source;
@@ -227,7 +221,6 @@ export function drawObjectIconAt(ui: UIState,
  * `ScrollingText`; the renderer only paints its current rows.
  */
 export function drawMessageLines(ui: UIState, messages: ScrollingText): void {
-  if (!ui.fontData || !ui.screenIndexBuffer) return;
   messages.draw(ui.screenIndexBuffer, ui.fontData);
 }
 
@@ -243,7 +236,6 @@ export function drawFoodWaterBar(ui: UIState, value: number, y: number, color: n
 }
 
 export function drawMaskedBarRow(ui: UIState, xBase: number, y: number, mask: number, color: number): void {
-  if (!ui.screenIndexBuffer) return;
   if (mask === 0) return;
   const width = ui.screenIndexBuffer.width;
   const height = ui.screenIndexBuffer.height;
@@ -266,7 +258,6 @@ export function computeBarHeight(current: number, max: number, allowOverMax: boo
 }
 
 export function drawWoundedOutline(ui: UIState, rect: Rect): void {
-  if (!ui.screenIndexBuffer) return;
   const graphic = ui.getGraphicBitmap(34);
   if (!graphic) {
     drawRectOutlineIndex(ui.screenIndexBuffer, {
@@ -298,7 +289,6 @@ export function drawWoundedOutline(ui: UIState, rect: Rect): void {
 
 /** The unchanging screen chrome around the viewport (CSBWin `doc/CSBwin-src/CSBUI.cpp`). */
 export function drawStaticUIFrame(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
 
   const g232 = ui.uiTables.graphic232;
   fillRectIndex(ui.screenIndexBuffer, g232.wRectPos1780, 0);

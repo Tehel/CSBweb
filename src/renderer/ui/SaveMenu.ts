@@ -280,13 +280,11 @@ export function extendListPanel(ui: UIState): void {
 }
 
 function text(ui: UIState, s: string, x: number, y: number, color: number, background: number): void {
-  if (!ui.screenIndexBuffer || !ui.fontData) return;
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x + VIEWPORT_X, y + VIEWPORT_Y, color, background, s);
 }
 
 /** One half of the source toggle: inverted while it is the live one. */
 function drawSourceLabel(ui: UIState, label: string, x: number, active: boolean): void {
-  if (!ui.screenIndexBuffer) return;
   if (active) {
     const rect = labelRect(x, HEADER_Y, label.length);
     fillRectIndex(ui.screenIndexBuffer, rect, MENU_OPTION_COLOR);
@@ -308,7 +306,7 @@ function labelRect(x: number, y: number, chars: number): { x1: number; y1: numbe
 
 export function drawSaveMenu(ui: UIState): void {
   const state = ui.saveMenu;
-  if (!state || !ui.screenIndexBuffer) return;
+  if (!state) return;
 
   drawMenuBitmap(ui, false);
   extendListPanel(ui);
@@ -564,12 +562,12 @@ export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
   const state = ui.saveMenu;
   if (!state) return;
   if (state.mode === 'full') {
-    ui.onRestoreSave?.(bytes);
+    ui.onRestoreSave(bytes);
   } else {
     try {
-      ui.onRestoreSave?.(bytes);
+      ui.onRestoreSave(bytes);
     } catch (error) {
-      ui.onRestoreFailed?.(error);
+      ui.onRestoreFailed(error);
     }
   }
   closeSaveMenu(ui);
@@ -577,14 +575,13 @@ export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
 }
 
 async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
-  const built = ui.onCreateSave?.();
-  if (!built) throw new Error('NOTHING TO SAVE');
+  const built = ui.onCreateSave();
   const taken = new Set(state.entries.map((e) => e.name));
   const meta: SaveEntryMeta = { ...built.meta, name: uniqueName(built.meta.name, taken) };
   await currentStore(state).write(meta, built.bytes);
   // The clock has been stopped since the menu opened, so this still runs on the world
   // the bytes hold, and before the menu's `tag0207cc`, as in CSBWin.
-  ui.onSaveWritten?.();
+  ui.onSaveWritten();
   await refreshSaveMenu(ui);
   const at = state.entries.findIndex((e) => e.name === meta.name);
   if (at >= 0) state.selected = at;

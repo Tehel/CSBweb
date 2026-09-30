@@ -44,13 +44,13 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { MovementAction } from '../src/engine/gameTypes';
 import type { Champion } from '../src/engine/gameTypes';
-import { createUIState } from '../src/renderer/ui/UIState';
 import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../src/engine/Party';
 import { ensureSkills } from '../src/engine/skills';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -298,8 +298,7 @@ async function main(): Promise<void> {
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
   // and before 140 (doc/CSBwin-src/Mouse.cpp:1679-1680). Through the real dispatcher.
   const { handleMouseButton, handleMouseUnclick } = await importMouse();
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = uiTables;
+  const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   game.setMouseEventHandlers({
     button: (num, x, y) => handleMouseButton(ui, num, x, y),
@@ -453,7 +452,6 @@ async function main(): Promise<void> {
   // :4716-4717). The cast button sets it to `CastMagic`'s result, `CastSpell`'s with 3
   // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
   // handler: the UI's dispatcher, or for the viewport the call `src/ui/events.ts` makes.
-  ui.uiTables = uiTables;
   // The engine's `CastMagic` and `Attack`, the UI's calls, wrapped to read their results.
   const { magic, character } = game.systems;
   let castResult = -99;
@@ -563,6 +561,7 @@ async function main(): Promise<void> {
     if (decodeObjectID(rn).category >= DBType.WEAPON) floorItem = rn;
   }
   const unset = { x1: 255, y1: 0, x2: 0, y2: 0 };
+  const drawnView = ui.context;
   ui.context = {
     viewportObjectButtons: [{ x1: 10, y1: 10, x2: 30, y2: 30 }, unset, unset, unset, unset, unset],
     viewportObjectRNs: [floorItem, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF, OBJECT_ID_EOF],
@@ -571,7 +570,7 @@ async function main(): Promise<void> {
   const picked = party.objectInHand === floorItem;
   row('TAG01a148 (pick-up)', picked ? 'picked up' : 'left', pickFrames, '-', 'set');
   check(picked && pickFrames === 1, 'a pick-up makes a tick due (TAG01a148, d.clockTick = 1)');
-  ui.context = null;
+  ui.context = drawnView;
   party.objectInHand = OBJECT_ID_NULL;
 
   // The attack menu of an empty hand, opened on champion 0's button (116).

@@ -116,7 +116,6 @@ export function centeredText(
   color: number = MENU_OPTION_COLOR,
   background: number = MENU_PANEL_COLOR,
 ): void {
-  if (!ui.screenIndexBuffer || !ui.fontData) return;
   const left = x - text.length * 3;
   drawTextLineIndex(
     ui.screenIndexBuffer,
@@ -144,7 +143,6 @@ export function copyMenuRegion(
   dstY: number,
 ): void {
   const buf = ui.screenIndexBuffer;
-  if (!buf) return;
   const stride = buf.width;
   const temp = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {
@@ -173,7 +171,6 @@ export function copyMenuRegion(
  * any of the four option layouts.
  */
 export function drawMenuBitmap(ui: UIState, centred: boolean): void {
-  if (!ui.screenIndexBuffer) return;
   const graphic = ui.getGraphicBitmap(MENU_GRAPHIC);
   if (!graphic) return;
   const ox = menuOriginX(centred);
@@ -204,7 +201,6 @@ export function drawMenuBitmap(ui: UIState, centred: boolean): void {
  * out of `graphics.dat` item 0x231; the source origins are the literals in `_DoMenu`.
  */
 export function patchMenuLayout(ui: UIState, count: number, centred: boolean): void {
-  if (!ui.uiTables) return;
   const g231 = ui.uiTables.graphic231;
   const ox = menuOriginX(centred);
   const oy = menuOriginY();
@@ -251,7 +247,6 @@ export function drawMenuTitles(
   title2: string | null,
   centred: boolean,
 ): number {
-  if (!ui.screenIndexBuffer || !ui.fontData) return TITLE_Y;
   const ox = menuOriginX(centred);
   const oy = menuOriginY();
   const line = (text: string, y: number, color: number): void => {
@@ -322,7 +317,6 @@ export function doMenu(
  * is left-click only.
  */
 export function menuButtonList(ui: UIState, count: number, centred: boolean): UIButton[] {
-  if (!ui.uiTables) return [];
   const b = ui.uiTables.graphic231.buttons;
   const sets = centred
     ? [b.buttons18792, b.buttons18828, b.buttons18876, b.buttons18936]
@@ -364,7 +358,6 @@ export function menuButtonRect(buttons: UIButton[], id: number): MenuPress['rect
  */
 export function drawMenuPress(ui: UIState, press: MenuPress, nowMs: number): void {
   const buf = ui.screenIndexBuffer;
-  if (!buf) return;
   const elapsed = nowMs - press.startedMs;
   if (elapsed < 0 || elapsed >= MENU_PRESS_PHASE_MS * 2) return;
 

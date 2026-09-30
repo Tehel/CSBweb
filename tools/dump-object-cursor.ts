@@ -28,17 +28,16 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
 import {
-  createPaletteIndexViewportBuffer,
   reconvertThroughPalette,
   updateImageDataFromIndexWithViewportPalette,
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
-import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 
 /** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -65,7 +64,7 @@ async function main(): Promise<void> {
 
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   const bitmaps = new Map<number, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
+  const ui: UIState = newUIState(graphics, newGame(data, graphics).ctx, {
     getGraphicBitmap: (n: number) => {
       let bitmap = bitmaps.get(n);
       if (!bitmap) {
@@ -75,12 +74,8 @@ async function main(): Promise<void> {
       }
       return bitmap;
     },
-    renderLastFrame: () => {},
   });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
   ui.partyState = party.state;
-  ui.screenIndexBuffer = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   const mouse = await importMouse();
 
   // ---- A copper coin from the dungeon, in hand.

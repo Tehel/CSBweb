@@ -33,7 +33,6 @@ const SPELL_CONTROL_TABS: ReadonlyArray<ReadonlyArray<readonly [number, number, 
  * champion's whose `HP()` is not zero. No caster, no tabs (`chIdx != 3`'s return).
  */
 export function drawSpellControls(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
 
   const screen = ui.screenIndexBuffer;
   const chIdx = ui.partyState.magicCasterIndex;
@@ -55,7 +54,6 @@ export function drawSpellControls(ui: UIState): void {
 }
 
 export function drawSpellPanel(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
 
   const rect = ui.uiTables.graphic232.word12;
 
@@ -114,7 +112,6 @@ export function drawSpellPanel(ui: UIState): void {
  * the current step, from `D6W = 225`, each at `D6W += 14`.
  */
 export function drawSpellMenuCharacters(ui: UIState, step: number): void {
-  if (!ui.screenIndexBuffer || !ui.fontData) return;
   const y = 58;
   for (let i=0; i<6; i++) {
     const x = 225 + 14 * (i + 1);
@@ -128,7 +125,6 @@ export function drawSpellMenuCharacters(ui: UIState, step: number): void {
  * from `D6W = 232`, each at `D6W += 9`, blanks past its end.
  */
 export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
-  if (!ui.screenIndexBuffer || !ui.fontData) return;
   const y = 70;
   for (let i=0; i<4; i++) {
     const x = 232 + 9 * (i + 1);
@@ -146,7 +142,6 @@ export function drawMagicIncantation(ui: UIState, incantation: number[]): void {
  * pass is held inside it.
  */
 export function magicSelection(ui: UIState, button: number): void {
-  if (!ui.partyState || !ui.uiTables) return;
   const party = ui.partyState;
   if (button === 108) {
     const pcA0 = party.champions[party.magicCasterIndex];
@@ -196,7 +191,6 @@ function* magicSelectionScript(ui: UIState, button: number): LoopScript {
  * `CHARFLAG_statsChanged` has no counterpart: the panels are redrawn every frame.
  */
 export function tag01b990(ui: UIState, button: number): void {
-  if (!ui.partyState || !ui.uiTables) return;
   const party = ui.partyState;
   const pcA3 = party.champions[party.magicCasterIndex];
   if (!pcA3) return;
@@ -220,7 +214,6 @@ export function tag01b990(ui: UIState, button: number): void {
  * `byte33` goes. Its mana is not given back.
  */
 export function backspaceMagicSelection(ui: UIState): void {
-  if (!ui.partyState) return;
   const party = ui.partyState;
   const pcA3 = party.champions[party.magicCasterIndex];
   if (!pcA3 || pcA3.incantation.length === 0) return;
@@ -236,7 +229,6 @@ export function backspaceMagicSelection(ui: UIState): void {
  * is searched. A lower click is on the keypad.
  */
 export function handleMagicClick(ui: UIState, clickX: number, clickY: number): void {
-  if (!ui.uiTables || !ui.partyState) return;
   const party = ui.partyState;
 
   let D6 = -1;

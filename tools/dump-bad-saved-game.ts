@@ -39,6 +39,7 @@ import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+import { newUIState } from './lib/ui';
 
 const SAVE = 'static/gamefiles/saves/csbgame.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -50,7 +51,6 @@ const PRISON = 'static/gamefiles/csb/dungeon.dat';
  */
 async function importUI(): Promise<[
   typeof import('../src/renderer/ui/SaveMenu'),
-  typeof import('../src/renderer/ui/UIState'),
   typeof import('../src/renderer/intro/BootSequence'),
 ]> {
   const g = globalThis as Record<string, unknown>;
@@ -58,14 +58,12 @@ async function importUI(): Promise<[
   if (!g.window) g.window = g;
   return Promise.all([
     import('../src/renderer/ui/SaveMenu'),
-    import('../src/renderer/ui/UIState'),
     import('../src/renderer/intro/BootSequence'),
   ]);
 }
 
 let SaveMenu: Awaited<ReturnType<typeof importUI>>[0];
-let UIStateModule: Awaited<ReturnType<typeof importUI>>[1];
-let Boot: Awaited<ReturnType<typeof importUI>>[2];
+let Boot: Awaited<ReturnType<typeof importUI>>[1];
 
 const graphics = stockGraphics();
 
@@ -83,13 +81,11 @@ function checkChooser(): void {
 
   const run = (mode: 'full' | 'loadOnly', bytes: Uint8Array) => {
     const game = freshGame();
-    const ui = UIStateModule.createUIState(graphics, game.ctx, {
-      getGraphicBitmap: () => null,
-      renderLastFrame: () => {},
-    });
     const failures: unknown[] = [];
-    ui.onRestoreSave = (b) => applySaveBytes(game, b);
-    ui.onRestoreFailed = (error) => failures.push(error);
+    const ui = newUIState(graphics, game.ctx, {
+      onRestoreSave: (b) => applySaveBytes(game, b),
+      onRestoreFailed: (error) => { failures.push(error); },
+    });
     SaveMenu.openSaveMenu(ui, mode);
     let thrown: string | null = null;
     try {
@@ -311,7 +307,7 @@ function okCentre(): { x: number; y: number } {
 }
 
 async function main(): Promise<void> {
-  [SaveMenu, UIStateModule, Boot] = await importUI();
+  [SaveMenu, Boot] = await importUI();
   checkChooser();
   await checkTag01efee();
   await checkNewGameRead();

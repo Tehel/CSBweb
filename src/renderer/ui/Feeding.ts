@@ -30,7 +30,6 @@ export function computeFeedParameters(
   chIdx: number,
   objectId: ObjectID,
 ): FeedParameters | null {
-  if (!ui.objectTables || !ui.partyState) return null;
   const champ = ui.partyState.champions[chIdx];
   if (!champ) return null;
 
@@ -93,12 +92,11 @@ export function computeFeedParameters(
 }
 
 export function handleMouthPress(ui: UIState): void {
-  if (!ui.partyState || !ui.objectTables) return;
-  if ((ui.partyState.cursorOwner ?? -1) < 0) return;
+  if (ui.partyState.cursorOwner < 0) return;
   // `if (d.PotentialCharacterOrdinal != 0) RETURN;` — the mouth is inert while the
   // Hall of Champions menu is up (`doc/CSBwin-src/Character.cpp:4061`).
   if (ui.partyState.potentialChampionIndex >= 0) return;
-  const selected = ui.partyState.selectedCharacterIndex ?? -1;
+  const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return;
   const champ = ui.partyState.champions[selected] ?? null;
   if (!champ || (champ.attributes.health | 0) === 0) return;
@@ -137,7 +135,7 @@ export function handleMouthPress(ui: UIState): void {
 }
 
 export function getFoodValue(ui: UIState, nameIndex: number): number {
-  const values = ui.objectTables?.foodValue;
+  const values = ui.objectTables.foodValue;
   if (!values) return 0;
   const offset = nameIndex - OBJNI_APPLE;
   if (offset < 0 || offset >= values.length) return 0;
@@ -157,7 +155,6 @@ export function startMouthChewAnimation(ui: UIState): void {
 }
 
 export function drawMouthChewAnimation(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.objectTables) return;
   if (ui.mouthChewStartMs === null) return;
   const now = nowMs();
   if (now >= ui.mouthChewEndMs) return;

@@ -75,9 +75,10 @@ import {
   menuButtonRect,
   splitLongLine,
 } from '../src/renderer/ui/Menu';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -630,8 +631,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   party.magicCasterIndex = 0;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = graphicsTablesOf(graphics).ui;
+  const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
   // the buttons back has not run.
@@ -697,8 +697,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   party.champions[0]!.possessions[1] = chest;
   party.selectedCharacterIndex = 0;
 
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = graphicsTablesOf(graphics).ui;
+  const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   const draw = (): void => {
     Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, party.champions[0]!));

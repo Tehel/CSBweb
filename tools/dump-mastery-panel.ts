@@ -58,13 +58,14 @@ import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasB
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import type { FontData } from '../src/renderer/csbwin/TextRenderer';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
 import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inventory';
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
@@ -179,13 +180,7 @@ async function main(): Promise<void> {
   party.addChampion(champion);
   party.state.selectedCharacterIndex = 0;
 
-  const ui: UIState = createUIState(graphics, game.ctx, {
-    getGraphicBitmap: () => null,
-    renderLastFrame: () => {},
-  });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
-  ui.fontData = font;
+  const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party.state;
 
   /** Draw the panel for the champion as it stands and hand back the screen buffer. */

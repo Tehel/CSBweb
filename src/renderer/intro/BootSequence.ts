@@ -71,7 +71,6 @@ function createIntroHost(deps: HostDeps, palette: readonly number[]): AttachedHo
   const { canvas, gameScreen } = deps;
   const screen = gameScreen.getScreenBuffer();
   const uiTables = gameScreen.getUITables();
-  if (!uiTables) throw new Error('Screen not initialized');
   const globalPalette = [...palette];
 
   let queue: IntroEvent[] = [];
@@ -531,7 +530,6 @@ export type EndOfGame = PrisonDoorChoice | 'terminate';
  */
 export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
   const uiTables = deps.gameScreen.getUITables();
-  if (!uiTables) throw new Error('Screen not initialized');
   const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
   const { host, detach } = createIntroHost(deps, palette11978);
   if ((await showCredits(host, hooks)) === 'terminate') return 'terminate';

@@ -26,14 +26,14 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import {
   attackPanelTick, closeAttackMenu, drawAttackPanel, executeAttack, prepareAttack, takeAttackOption,
 } from '../src/renderer/ui/Attack';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -58,13 +58,9 @@ async function main(): Promise<void> {
 
   const cache = new Map();
   const game = newGame(data, graphics);
-  const ui: UIState = createUIState(graphics, game.ctx, {
+  const ui: UIState = newUIState(graphics, game.ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
-    renderLastFrame: () => {},
   });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
-  ui.fontData = loadFontData(graphics);
   ui.partyState = party.state;
   let damageToDisplay = 0;
   game.systems.attack.consumeAttackDamageToDisplay = () => {

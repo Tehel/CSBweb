@@ -13,7 +13,6 @@ import { getBaseObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 
 export function selectPaletteIndexForLightLevel(ui: UIState): number {
-  if (!ui.uiTables || !ui.partyState) return 0;
   const { paletteBrightness, word1074 } = ui.uiTables.graphic232;
   if (!paletteBrightness || paletteBrightness.length === 0 || !word1074 || word1074.length === 0) return 0;
 
@@ -22,7 +21,7 @@ export function selectPaletteIndexForLightLevel(ui: UIState): number {
   if (experienceMultiplier === 0) return 0;
 
   const torchLight = computeTorchLight(ui, word1074);
-  const totalLight = (ui.partyState.brightness ?? 0) + torchLight;
+  const totalLight = ui.partyState.brightness + torchLight;
 
   if (totalLight <= 0) return paletteBrightness.length - 1;
 
@@ -41,7 +40,6 @@ export function selectPaletteIndexForLightLevel(ui: UIState): number {
 }
 
 export function computeTorchLight(ui: UIState, word1074: number[]): number {
-  if (!ui.partyState) return 0;
   const charges = collectTorchCharges(ui);
 
   // CSBWin selection-sort: bring four brightest charges to the front.
@@ -74,7 +72,6 @@ export function computeTorchLight(ui: UIState, word1074: number[]): number {
 
 export function collectTorchCharges(ui: UIState): number[] {
   const charges = new Array(8).fill(0);
-  if (!ui.partyState) return charges;
 
   let outIndex = 0;
   for (let chIdx = 0; chIdx < 4; chIdx++) {

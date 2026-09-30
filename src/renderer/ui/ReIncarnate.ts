@@ -103,7 +103,7 @@ function cursorPosition(state: ReincarnateState): { x: number; y: number } {
 
 export function drawReincarnateScreen(ui: UIState): void {
   const state = ui.reincarnate;
-  if (!state || !ui.uiTables || !ui.screenIndexBuffer || !ui.fontData) return;
+  if (!state) return;
 
   // `FillRectangle(d.pViewportBMP, &rect_12, 12, 112)` (`:39-43`) — blank the strip the
   // champion's old name and title were drawn in.
@@ -212,7 +212,7 @@ export function gridCharacterAt(ui: UIState, x: number, y: number): number | nul
   // Everything past it shifts down one to close the gap.
   if (code >= 87) code--;
   if (code > 'Z'.charCodeAt(0)) {
-    const special = ui.uiTables?.graphic232.specialChars ?? [];
+    const special = ui.uiTables.graphic232.specialChars;
     return special[code - 'Z'.charCodeAt(0) - 1] ?? null;
   }
   return code;
@@ -287,11 +287,11 @@ function advanceToTitle(state: ReincarnateState): void {
  */
 function confirm(ui: UIState, state: ReincarnateState): void {
   const trimmed = state.name.replace(/ +$/, '');
-  const champions = ui.partyState?.champions ?? [];
+  const champions = ui.partyState.champions;
   for (let i = 0; i < champions.length - 1; i++) {
     if ((champions[i]?.name ?? '') === trimmed) return;
   }
   ui.reincarnate = null;
   ui.ctx.systems.hallOfChampions.reincarnateNamed(state.chIdx, trimmed, state.title);
-  ui.onReincarnated?.();
+  ui.onReincarnated();
 }

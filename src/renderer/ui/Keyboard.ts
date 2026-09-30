@@ -185,7 +185,7 @@ export function handleUIKey(ui: UIState, key: string): boolean {
 
 /** `d.PotentialCharacterOrdinal` — a champion only provisionally in the party. */
 function championPending(ui: UIState): boolean {
-  return (ui.partyState?.potentialChampionIndex ?? -1) >= 0;
+  return ui.partyState.potentialChampionIndex >= 0;
 }
 
 /**
@@ -196,7 +196,7 @@ function championPending(ui: UIState): boolean {
  */
 function attackKey(ui: UIState, chIdx: number, option: number): void {
   const party = ui.partyState;
-  if (!party || championPending(ui)) return;
+  if (championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
   if (ui.attackingCharacterOrdinal === chIdx + 1) {
     // The attack options are button ids 113-115, flashed and taken as a click's are.
@@ -209,7 +209,7 @@ function attackKey(ui: UIState, chIdx: number, option: number): void {
 /** Button ids 7-10 — the same toggle, and the same "replace" the click path gives. */
 function toggleInventory(ui: UIState, chIdx: number): void {
   const party = ui.partyState;
-  if (!party || championPending(ui)) return;
+  if (championPending(ui)) return;
   if (chIdx >= party.champions.length) return;
   handleInventoryToggle(ui, chIdx);
 }
@@ -217,7 +217,7 @@ function toggleInventory(ui: UIState, chIdx: number): void {
 /** Button id 100 — the rune keypad, live only once a caster is selected. */
 function magicButton(ui: UIState, buttonId: number): void {
   if (championPending(ui)) return;
-  if ((ui.partyState?.magicCasterIndex ?? -1) === -1) return;
+  if (ui.partyState.magicCasterIndex === -1) return;
   magicSelection(ui, buttonId);
 }
 
@@ -229,7 +229,7 @@ function magicButton(ui: UIState, buttonId: number): void {
  */
 function selectCaster(ui: UIState, chIdx: number): void {
   const party = ui.partyState;
-  if (!party || championPending(ui)) return;
+  if (championPending(ui)) return;
   const champion = party.champions[chIdx];
   // `SelectMagicCaster` refuses a champion whose `HP()` is 0 (`doc/CSBwin-src/Magic.cpp:724`).
   if (!champion || (champion.attributes.health | 0) === 0) return;

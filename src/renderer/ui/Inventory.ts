@@ -28,7 +28,6 @@ type ChestViewSource =
   | { id: ObjectID; source: 'hand'; slot: number };
 
 export function drawInventoryScreen(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.partyState) return;
   const selected = ui.partyState.selectedCharacterIndex | 0;
   if (selected < 0) return;
 
@@ -102,7 +101,7 @@ export function drawInventoryScreen(ui: UIState): void {
   // the Resurrect menu included, without touching `d.DisplayResurrectChestOrScroll`.
   // `QuitPressingEye` (`doc/CSBwin-src/CSBCode.cpp:7399`) calls `TAG0189d4` again.
   if (ui.pressingEye) {
-    const cursorObject = ui.partyState?.objectInHand ?? OBJECT_ID_NULL;
+    const cursorObject = ui.partyState.objectInHand;
     if (chestView) {
       // Held, only a chest on the cursor is a chest view (`getActiveChestView`).
       drawChestPanel(ui, chestView);
@@ -147,7 +146,6 @@ export function drawInventoryScreen(ui: UIState): void {
  * colour 12 so the eye or mouth shows through the frame.
  */
 export function drawMouthAndEyeBoxes(ui: UIState, champion: Champion): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
   const g232 = ui.uiTables.graphic232;
   // `BLT2Viewport(…, 16, 12)`: 16 *bytes* per source line, which is 32 pixels, and 12
   // is the transparent colour, not a height.
@@ -191,7 +189,6 @@ export function eyeBoxGraphic(champion: Champion): number {
  * Resurrect / Reincarnate / Cancel menu a provisionally added champion is waiting on.
  */
 export function drawResurrectMenu(ui: UIState): void {
-  if (!ui.uiTables) return;
   ui.displayResurrectChestOrScroll = 5;
   // CSBWin passes a *byte* width of 72 (`BLT2Viewport(…, 72, 6)`); this helper takes
   // pixels, as every other call here does.
@@ -199,7 +196,6 @@ export function drawResurrectMenu(ui: UIState): void {
 }
 
 export function drawInventoryBackground(ui: UIState): void {
-  if (!ui.screenIndexBuffer) return;
   const bg = ui.getGraphicBitmap(17);
   if (!bg) return;
   tag0088b2Index(
@@ -244,7 +240,7 @@ export function getChestSlotRect(iconSlots: { pixelX: number; pixelY: number }[]
 
 export function getOpenChestIconIndex(ui: UIState): number {
   if (ui.openChestIconIndex !== null) return ui.openChestIconIndex;
-  const names = ui.objectTables?.objectNames ?? [];
+  const names = ui.objectTables.objectNames;
   for (let i = 0; i < names.length; i++) {
     const name = (names[i] ?? '').trim().toUpperCase();
     if (name === 'OPEN CHEST') {
@@ -257,7 +253,6 @@ export function getOpenChestIconIndex(ui: UIState): number {
 }
 
 export function getActiveChestView(ui: UIState, champion: Champion): ChestViewSource | null {
-  if (!ui.partyState) return null;
 
   const cursorObject = ui.partyState.objectInHand;
   if (ui.pressingEye && cursorObject !== OBJECT_ID_NULL && isChestRecord(cursorObject)) {
@@ -344,7 +339,6 @@ export function repackOpenChest(ui: UIState): void {
 }
 
 export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 25, g232.wRectPos926, 144, 8);
   drawInspectArrow(ui, chestView.source === 'cursor');
@@ -362,14 +356,12 @@ export function drawChestPanel(ui: UIState, chestView: ChestViewSource): void {
 }
 
 export function drawInspectArrow(ui: UIState, fromEye: boolean): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
   const g232 = ui.uiTables.graphic232;
   const graphicIndex = fromEye ? 19 : 18;
   blitBasicGraphicToViewport(ui, graphicIndex, g232.wRectPos934, 16, 8);
 }
 
 export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.objectTables) return;
   if (decodeObjectID(objectId).category === DBType.SCROLL) {
     drawScrollPanel(ui, objectId);
     return;
@@ -412,7 +404,6 @@ export function drawObjectInfoPanel(ui: UIState, objectId: ObjectID): void {
 }
 
 export function drawEyeIcon(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer) return;
   const word612 = ui.uiTables.graphic232.word612;
   const icon = ui.pressingEye ? OBJNI_SPECIAL_E : OBJNI_SPECIAL_D;
   const rect = getEyeRect(ui);
@@ -421,7 +412,6 @@ export function drawEyeIcon(ui: UIState): void {
 }
 
 export function getEyeRect(ui: UIState): Rect | null {
-  if (!ui.uiTables) return null;
   const rect = ui.uiTables.graphic232.word1406;
   return {
     x1: rect.x1 + VIEWPORT_X + 1,
@@ -432,7 +422,6 @@ export function getEyeRect(ui: UIState): Rect | null {
 }
 
 export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.objectTables) return;
   let scrollId = objectId;
   const filter = applyViewingFilter(ui, objectId, 0);
   if (filter) {
@@ -520,7 +509,6 @@ export function bytesToString(bytes: number[], start: number, end: number): stri
 }
 
 export function drawScrollLine(ui: UIState, y: number, text: string): void {
-  if (!ui.fontData || !ui.screenIndexBuffer) return;
   const line = text.length > MAX_SCROLL_LINE_LENGTH ? text.slice(0, MAX_SCROLL_LINE_LENGTH) : text;
   const encoded = encodeScrollFontText(line);
   const x = VIEWPORT_X + 162 - Math.floor((line.length * 6) / 2);

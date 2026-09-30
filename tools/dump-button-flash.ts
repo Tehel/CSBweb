@@ -46,9 +46,9 @@ import { flashButton, flashedButton, setClockTick, waitForButtonFlash } from '..
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { createUIState } from '../src/renderer/ui/UIState';
 import type { Rect } from '../src/data/tables/UITables';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 const TURN_LEFT: Rect = { x1: 0xea, x2: 0x0105, y1: 0x7d, y2: 0x91 };
@@ -279,8 +279,7 @@ async function main(): Promise<void> {
 
   // ---- the spell panel: `_MagicSelection` holds the loop through its waits ---------------
   let redraws = 0;
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
-  ui.uiTables = graphicsTablesOf(graphics).ui;
+  const ui = newUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => { redraws++; } });
   ui.partyState = party;
   let castAt = -1;
   let frameNo = 0;

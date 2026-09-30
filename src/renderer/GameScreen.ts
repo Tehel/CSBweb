@@ -95,13 +95,13 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
  * What the interface asks of the page. Each is one of `UIState`'s hooks out, documented
  * there, except `onPaletteSelected`. The engine the interface reaches through `ui.ctx`.
  */
-export interface GameScreenHooks extends Required<Pick<UIState,
+export interface GameScreenHooks extends Pick<UIState,
   | 'onReincarnated'
   | 'onCreateSave'
   | 'onSaveWritten'
   | 'onRestoreSave'
   | 'onRestoreFailed'
->> {
+> {
   /**
    * The palette the light level picked, published as CSBWin's `d.CurrentPalette`: the
    * monster AI reads it to shorten how far a monster can see
@@ -148,16 +148,6 @@ export class GameScreen {
 
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
-    const ui = createUIState(graphicsLoader, deps.ctx, {
-      getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
-      renderLastFrame: () => this.renderLastFrame(),
-    });
-    this.ui = ui;
-    ui.onReincarnated = hooks.onReincarnated;
-    ui.onCreateSave = hooks.onCreateSave;
-    ui.onSaveWritten = hooks.onSaveWritten;
-    ui.onRestoreSave = hooks.onRestoreSave;
-    ui.onRestoreFailed = hooks.onRestoreFailed;
     this.onPaletteSelected = hooks.onPaletteSelected;
     this.messages = deps.messages;
 
@@ -167,8 +157,8 @@ export class GameScreen {
     this.screenCtx = screenCtx;
     this.screenImageData = screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    ui.uiTables = deps.tables.ui;
-    const palette552 = ui.uiTables.graphic232.palette552;
+    const palette552 = deps.tables.ui.graphic232.palette552;
+    const graphicCache = new Map<string, IndexedBitmap>();
     this.viewport = new ViewportRenderer({
       graphicsLoader,
       dungeonState: deps.ctx.dungeon,
@@ -177,20 +167,35 @@ export class GameScreen {
       viewportTables: deps.tables.viewport,
       objectTables: deps.tables.objects,
       palette552,
-      graphicCache: ui.graphicCache,
+      graphicCache,
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),
     });
-    ui.objectTables = this.viewport.objectTables;
     this.uiPalette = palette552[0].slice();
-    ui.fontData = loadFontData(graphicsLoader);
-
     this.screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
-    ui.screenIndexBuffer = this.screen;
+
+    const ui = createUIState({
+      graphicsLoader,
+      ctx: deps.ctx,
+      context: this.viewport.context,
+      screenIndexBuffer: this.screen,
+      uiTables: deps.tables.ui,
+      objectTables: this.viewport.objectTables,
+      fontData: loadFontData(graphicsLoader),
+      graphicCache,
+    }, {
+      getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
+      renderLastFrame: () => this.renderLastFrame(),
+      onReincarnated: hooks.onReincarnated,
+      onCreateSave: hooks.onCreateSave,
+      onSaveWritten: hooks.onSaveWritten,
+      onRestoreSave: hooks.onRestoreSave,
+      onRestoreFailed: hooks.onRestoreFailed,
+    });
+    this.ui = ui;
     updateButtonLists(ui);
-    ui.context = this.viewport.context;
   }
 
-  getUITables(): UITables | null {
+  getUITables(): UITables {
     return this.ui.uiTables;
   }
 
@@ -354,7 +359,7 @@ export class GameScreen {
     return tryUseFrontWallItem(this.ui, x, y);
   }
 
-  setPartyState(state: PartyState | null): void {
+  setPartyState(state: PartyState): void {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
     // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
     // `TAG0207cc` follows).
@@ -403,7 +408,7 @@ export class GameScreen {
 
   /** `DisplayCharacterDamage`'s blit — the host's `displayCharacterDamage`. */
   displayCharacterDamage(chIdx: number, damage: number): void {
-    const inventoryOpen = this.ui.partyState?.selectedCharacterIndex === chIdx;
+    const inventoryOpen = this.ui.partyState.selectedCharacterIndex === chIdx;
     this.ui.characterDamage[chIdx] = { damage, inventoryOpen };
   }
 
@@ -441,7 +446,7 @@ export class GameScreen {
   }
 
   isInventoryOpen(): boolean {
-    return (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    return this.ui.partyState.selectedCharacterIndex >= 0;
   }
 
   /**
@@ -459,14 +464,14 @@ export class GameScreen {
     // FROZEN". `if (d.PartySleeping != 0) goto tag000730;` — no `DrawViewport` while the
     // party sleeps (`:637`); `DisplaySleepScreen` holds the viewport.
     if (this.isFrozen()) displayFrozenScreen(this.ui);
-    else if (this.ui.partyState?.sleeping) displaySleepScreen(this.ui);
+    else if (this.ui.partyState.sleeping) displaySleepScreen(this.ui);
     else this.viewport.draw(position, facing, this.seeThroughWalls(), word1868);
     this.presentViewport();
   }
 
   /** `d.SeeThruWalls`, as `ViewportRenderer.draw` reads it. */
   private seeThroughWalls(): boolean {
-    return (this.ui.partyState?.seeThruWalls ?? 0) !== 0;
+    return this.ui.partyState.seeThruWalls !== 0;
   }
 
   private getGraphicBitmap(graphicNum: number, format: ImageFormat = ImageFormat.IMG1): IndexedBitmap | null {
@@ -477,7 +482,7 @@ export class GameScreen {
   private presentViewport(): void {
     clearIndex(this.screen, 0);
     drawStaticUIFrame(this.ui);
-    const inventoryOpen = (this.ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+    const inventoryOpen = this.ui.partyState.selectedCharacterIndex >= 0;
     // The inventory is drawn into the viewport bitmap (`TAG022a60(17, d.pViewportBMP)`,
     // doc/CSBwin-src/CSBCode.cpp:7493), so the freeze's flood covers it, and nothing draws
     // it again until the thaw's `TAG0207cc` shows it.
@@ -497,7 +502,7 @@ export class GameScreen {
       // until `TAG0207cc` shows it again. Drawing it would open the chest again that
       // `TAG02076e` repacked for the save.
       if (!isSaveMenuOpen(this.ui) && !frozen) drawInventoryScreen(this.ui);
-      if (this.ui.uiTables) shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
+      shadeRectIndex(this.ui, this.ui.uiTables.graphic232.word28, 0);
       // `_ReIncarnate` draws over the open inventory rather than replacing it: it
       // blanks the name strip and puts its keyboard where the eye panel was
       // (`doc/CSBwin-src/Code13ea4.cpp:39-50`). So it goes last, and only here.
@@ -508,7 +513,7 @@ export class GameScreen {
     drawSpellControls(this.ui);
     drawHeldObjectName(this.ui);
     drawMessageLines(this.ui, this.messages);
-    if ((this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) && this.ui.uiTables) {
+    if (this.ui.shadedByTag02076e || isSaveMenuOpen(this.ui)) {
       // `TAG02076e` shades the movement-arrow area, unless an inventory is open, then the
       // magic and weapon-ready areas (`doc/CSBwin-src/Character.cpp:5118-5132`), until
       // `TAG0207cc` redraws them (`tag02076e` lists the callers). The load-only save
@@ -606,7 +611,6 @@ export class GameScreen {
 
   /** The font, graphic 0x22d, for the pre-game screens' `TextOutToScreen`. */
   getFontData(): FontData {
-    if (!this.ui.fontData) throw new Error('Screen not initialized');
     return this.ui.fontData;
   }
 

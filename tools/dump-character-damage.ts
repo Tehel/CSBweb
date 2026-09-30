@@ -30,11 +30,11 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { addCharacterDefaults, assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { drawPartyStatus } from '../src/renderer/ui/Character';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -203,13 +203,9 @@ console.log('=== drawPartyStatus ===');
     })));
   }
   const cache = new Map();
-  const ui: UIState = createUIState(graphics, newGame(data!, graphics).ctx, {
+  const ui: UIState = newUIState(graphics, newGame(data!, graphics).ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
-    renderLastFrame: () => {},
   });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
-  ui.fontData = loadFontData(graphics);
   ui.partyState = party.state;
 
   // Canary: the two graphics are the sizes `DisplayCharacterDamage`'s rectangles are

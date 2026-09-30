@@ -41,12 +41,15 @@ export interface UIState {
    * load and weight figures the engine acts on, so both come out of the same code).
    */
   readonly ctx: GameContext;
-  context: InterpreterContext | null;
-  screenIndexBuffer: ScreenIndexBuffer | null;
-  uiTables: UITables | null;
-  objectTables: ObjectTables | null;
-  fontData: FontData | null;
-  partyState: PartyState | null;
+  /** The viewport's interpreter state, `ViewportRenderer.context`: what the view last drew. */
+  context: InterpreterContext;
+  /** `d.LogicalScreenBase`, the whole screen as palette indices. */
+  screenIndexBuffer: ScreenIndexBuffer;
+  readonly uiTables: UITables;
+  readonly objectTables: ObjectTables;
+  readonly fontData: FontData;
+  /** The party the screen last drew (`GameScreen.setPartyState`), `ctx.party.state` at first. */
+  partyState: PartyState;
   uiMode: UIMode;
   /**
    * The mode button 147 froze, which button 148 puts back with its lists and key tables:
@@ -180,22 +183,22 @@ export interface UIState {
    * (`HallOfChampions.reincarnateNamed`, `doc/CSBwin-src/Code13ea4.cpp:155-160`): the
    * page redraws the view the screen covered.
    */
-  onReincarnated?: () => void;
+  readonly onReincarnated: () => void;
   /**
    * Build the bytes of a new save and the row it will be listed as
    * (`src/engine/SaveGamePayload.ts`). A hook because serializing the world is the
    * engine's business, not the UI's.
    */
-  onCreateSave?: () => { meta: { name: string; savedAt: number; level: number; champions: string[] }; bytes: Uint8Array };
+  readonly onCreateSave: () => { meta: { name: string; savedAt: number; level: number; champions: string[] }; bytes: Uint8Array };
   /** The save `onCreateSave` built is written: `Game.saveWritten`. */
-  onSaveWritten?: () => void;
+  readonly onSaveWritten: () => void;
   /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
-  onRestoreSave?: (bytes: Uint8Array) => void;
+  readonly onRestoreSave: (bytes: Uint8Array) => void;
   /**
    * The load-only chooser's `onRestoreSave` threw: `_ReadEntireGame`'s read failed, and
    * its caller goes to `tag01efee` (`src/renderer/intro/BootSequence.ts`).
    */
-  onRestoreFailed?: (error: unknown) => void;
+  readonly onRestoreFailed: (error: unknown) => void;
 
   /* ---- back into the renderer ---- */
   getGraphicBitmap(graphicNum: number, format?: ImageFormat): IndexedBitmap | null;
@@ -255,20 +258,20 @@ export function initializePlayState(ui: UIState): void {
   Object.assign(ui, initialPlayState());
 }
 
-export function createUIState(
-  graphicsLoader: GraphicsLoader,
-  ctx: GameContext,
-  hooks: Pick<UIState, 'getGraphicBitmap' | 'renderLastFrame'>,
-): UIState {
+/** What the interface reads, all of it there before the first frame. */
+export type UISources = Pick<UIState,
+  | 'graphicsLoader' | 'ctx' | 'context' | 'screenIndexBuffer' | 'uiTables' | 'objectTables'
+  | 'fontData' | 'graphicCache'>;
+
+/** What the interface asks of the screen and of the page. */
+export type UIHooks = Pick<UIState,
+  | 'getGraphicBitmap' | 'renderLastFrame'
+  | 'onReincarnated' | 'onCreateSave' | 'onSaveWritten' | 'onRestoreSave' | 'onRestoreFailed'>;
+
+export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {
-    graphicsLoader,
-    ctx,
-    context: null,
-    screenIndexBuffer: null,
-    uiTables: null,
-    objectTables: null,
-    fontData: null,
-    partyState: null,
+    ...sources,
+    partyState: sources.ctx.party.state,
     ...initialPlayState(),
     saveMenu: null,
     hoverPoint: null,
@@ -280,7 +283,6 @@ export function createUIState(
     keyXlate2: null,
     keyXlate1: null,
 
-    graphicCache: new Map(),
     colouredObjectCursor: true,
     objectCursorFootprint: null,
     cursorArrowBitmap: null,
@@ -289,8 +291,7 @@ export function createUIState(
     portraitCache: new Map(),
     championPortraitCache: new WeakMap(),
 
-    getGraphicBitmap: hooks.getGraphicBitmap,
-    renderLastFrame: hooks.renderLastFrame,
+    ...hooks,
   };
 }
 

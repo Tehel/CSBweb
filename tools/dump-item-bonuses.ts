@@ -41,8 +41,9 @@ import {
 } from '../src/engine/attributes';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
@@ -71,9 +72,7 @@ async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')>
 
 /** The interface over `g`, whose inventory click calls the engine's pair. */
 function uiOver(g: Game): UIState {
-  const ui = createUIState(graphics, g.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
+  const ui = newUIState(graphics, g.ctx);
   ui.partyState = g.ctx.party.state;
   return ui;
 }

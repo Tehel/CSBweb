@@ -25,10 +25,11 @@ import { setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion, PartyState } from '../src/engine/gameTypes';
-import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
+import { UIMode, type UIState } from '../src/renderer/ui/UIState';
 import { CHARFLAG_ATTACK_DISABLE } from '../src/data/CsbwinCharacters';
 import type { LoopScript } from '../src/engine/LoopState';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 /**
@@ -103,12 +104,7 @@ async function main(): Promise<void> {
   party.addChampion(makeChampion(casters[1].index, 1));
   setHandOwner(party.state, 0);
 
-  const ui: UIState = createUIState(graphics, ctx, {
-    getGraphicBitmap: () => null,
-    renderLastFrame: () => {},
-  });
-  ui.uiTables = uiTables;
-  ui.objectTables = objectTables;
+  const ui: UIState = newUIState(graphics, ctx);
   ui.partyState = party.state;
 
   let attacks: Array<{ chIdx: number; attackType: number }> = [];

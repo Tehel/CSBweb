@@ -33,8 +33,8 @@ import { ensureSkills } from '../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { createUIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 
 function champion(name: string): Champion {
@@ -67,8 +67,7 @@ async function main(): Promise<void> {
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);
   const party = game.ctx.party.state;
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = uiTables;
+  const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   // The engine's `CastMagic`, the UI's call, wrapped to read its result.
   const magic = game.systems.magic;
@@ -197,7 +196,6 @@ async function main(): Promise<void> {
 
   // ---- 5. The runes and the incantation, against glyphs drawn at CSBWin's own pens.
   const font = loadFontData(graphics);
-  ui.fontData = font;
   const drawn = createPaletteIndexViewportBuffer(320, 200, 12);
   const expected = createPaletteIndexViewportBuffer(320, 200, 12);
   ui.screenIndexBuffer = drawn;

@@ -133,6 +133,12 @@ behaviour with an extra case explaining why it looks like an omission.
 
 ## Gotchas
 
+**Build a `UIState` through `tools/lib/ui.ts`.** `newUIState(graphics, ctx, hooks?)`
+builds it as `GameScreen` does: the tables and font, a blank 320x200 screen, and a fresh
+`ViewportRenderer`'s interpreter context, with every hook a no-op unless passed. Assign
+`partyState`, `screenIndexBuffer` or `context` afterwards to stage a party, a buffer or a
+view.
+
 **Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
 gives the game every table in `GameTables` — built as `main.ts` builds it, from the one
 `extractGraphicsTables` of that `graphics.dat` — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that

@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
 | C95 | `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers | S | ⏳ |
@@ -140,20 +139,6 @@ entry here, only its commit, so take the next ID from this line and move it on.
 ## D — State representation
 
 New state-representation debt goes here, and jumps the queue.
-
-### D15 ⏳ `UIState` is built in two phases
-
-`createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
-sources `null` — `uiTables`, `objectTables`, `fontData`, `screenIndexBuffer`,
-`context` — and `GameScreen`'s constructor fills them in straight after
-(`src/renderer/GameScreen.ts:149-191`). None is ever `null` again, but every reader
-must ask: 172 `!ui.x` guards and 60 `ui.x?.` reads in `src/renderer/`. The 5 hooks out to
-the page (the save stores' four and `onReincarnated`) are optional fields too, so 6 calls
-are `ui.onX?.()`, and a hook left unwired is a click that silently does nothing. D3 made
-the engine's state required for the same reason. Paying it means a `UIState` built whole,
-from the tables (`GraphicsTables`, which the screen is already handed), `ui.ctx` and the
-page's hooks; `partyState` stays nullable only if the screen must exist before a party
-does.
 
 ---
 
@@ -460,11 +445,11 @@ builds around them is its own:
 - 35 tools define a champion-building function of their own, and 38 spell out
   `addCharacterDefaults()`; 106 construct a `DungeonLoader` and 85 read
   `dm-atari/dungeon.dat` themselves.
-- 19 tools build a `UIState` by hand, filling in the fields `GameScreen` fills (`D15`),
-  and 5 stand in for an engine call the UI makes by assigning over the system's method
+- 5 tools stand in for an engine call the UI makes by assigning over the system's method
   (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
-  types as a stand-in or puts back; 33 extract the UI tables again; 12 stub `document` and
-  `window` before importing a UI module (`E14`).
+  types as a stand-in or puts back; 28 extract the UI tables again
+  (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them
+  into; 12 stub `document` and `window` before importing a UI module (`E14`).
 - 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
   and `lastInputTime`, 16; `gameTick`, 6), into other systems' (`DsaSystem`'s
   `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,
@@ -474,8 +459,8 @@ builds around them is its own:
   sets a new property: a tool that pins `lastTickTime` would go on passing while testing
   nothing.
 
-Paying it: `tools/lib` helpers for the stock dungeon, a test champion and a wired
-`UIState` (built however `D15` leaves the UI's construction); a narrow public seam for what the tools
+Paying it: `tools/lib` helpers for the stock dungeon and a test champion, beside
+`newUIState` (`tools/lib/ui.ts`), which the 17 partial `UIState` literals move to; a narrow public seam for what the tools
 legitimately drive, a tick and the clock, which `C98` mostly supplies; then the casts go,
 one tool per commit, each tool's output byte-identical.
 

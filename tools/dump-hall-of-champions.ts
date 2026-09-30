@@ -30,13 +30,12 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
-import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
-import { createUIState } from '../src/renderer/ui/UIState';
 import { ImageFormat } from '../src/core/imageDecoder';
 import { graphicsTablesOf, newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 import { check, fail, finish } from './lib/check';
 
 const DELTA_X = [0, 1, 0, -1];
@@ -155,11 +154,8 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
  */
 function attackHandShaded(game: Game, chIdx: number): boolean {
   const graphics = sharedGraphics!;
-  const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = graphicsTablesOf(graphics).ui;
-  ui.objectTables = graphicsTablesOf(graphics).objects;
+  const ui = newUIState(graphics, game.ctx);
   ui.partyState = game.ctx.party.state;
-  ui.screenIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
   drawAttackButton(ui, chIdx);
   const { pixels, width } = ui.screenIndexBuffer;
   const rect = attackButtonRect(chIdx);

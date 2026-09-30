@@ -44,11 +44,11 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Party } from '../src/engine/Party';
 import type { Champion } from '../src/engine/gameTypes';
 import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawPartyStatus, getPortraitBitmap } from '../src/renderer/ui/Character';
-import { createUIState, type UIState } from '../src/renderer/ui/UIState';
+import { type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
-import { graphicsTablesOf, newGame } from './lib/game';
+import { newGame } from './lib/game';
+import { newUIState } from './lib/ui';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
@@ -83,7 +83,7 @@ function main(): void {
   const data = new DungeonLoader().loadFromArray(new Uint8Array(readFileSync(resolve(DUNGEON))));
 
   const cache = new Map<string, IndexedBitmap>();
-  const ui: UIState = createUIState(graphics, newGame(data, graphics).ctx, {
+  const ui: UIState = newUIState(graphics, newGame(data, graphics).ctx, {
     // The real one, off `graphics.dat`: the fallback path has to find graphic 26.
     getGraphicBitmap: (graphicNum: number, format: ImageFormat = ImageFormat.IMG1) => {
       const key = `${graphicNum}-${format}`;
@@ -104,10 +104,7 @@ function main(): void {
         return null;
       }
     },
-    renderLastFrame: () => {},
   });
-  ui.uiTables = graphicsTablesOf(graphics).ui;
-  ui.fontData = loadFontData(graphics);
 
   /** Draw the whole status bar with `chIdx`'s inventory open, and hand back the screen. */
   function render(champions: Champion[], chIdx: number): Uint8Array {

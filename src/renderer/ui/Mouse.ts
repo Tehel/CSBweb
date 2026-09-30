@@ -51,10 +51,10 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
   // champion is only provisionally in the party, the portrait boxes, the inventory
   // buttons, the magic panel and the attack panel are all inert
   // (`doc/CSBwin-src/Mouse.cpp:1578-1650`).
-  const potential = (ui.partyState?.potentialChampionIndex ?? -1) >= 0;
-  const numChampions = ui.partyState?.champions.length ?? 0;
+  const potential = ui.partyState.potentialChampionIndex >= 0;
+  const numChampions = ui.partyState.champions.length;
   if (id === 100) {
-    if (!potential && (ui.partyState?.magicCasterIndex ?? -1) !== -1) {
+    if (!potential && ui.partyState.magicCasterIndex !== -1) {
       handleMagicClick(ui, x, y);
     }
     return;
@@ -68,7 +68,6 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     return;
   }
   if (id === 83) {
-    if (!ui.partyState) return;
     const owner = ui.partyState.cursorOwner;
     if (owner >= 0) handleInventoryToggle(ui, owner);
     return;
@@ -94,7 +93,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     return;
   }
   if (id >= 28 && id <= 65) {
-    if ((ui.partyState?.cursorOwner ?? -1) >= 0) {
+    if (ui.partyState.cursorOwner >= 0) {
       handleClothingClick(ui, id - 20);
     }
     return;
@@ -115,7 +114,7 @@ export function handleMouseButton(ui: UIState, id: number, x: number, y: number)
     // (`doc/CSBwin-src/Mouse.cpp:1683-1691`); the rest is the engine's. Refused, like the
     // disk, while a champion is only provisionally joined.
     if (!potential) {
-      if ((ui.partyState?.selectedCharacterIndex ?? -1) >= 0) handleInventoryToggle(ui, 4);
+      if (ui.partyState.selectedCharacterIndex >= 0) handleInventoryToggle(ui, 4);
       tag02076e(ui);
       ui.ctx.systems.mouse.sleep();
     }
@@ -167,20 +166,18 @@ export function handleMouseUnclick(ui: UIState): void {
 }
 
 export function isEyeClick(ui: UIState, x: number, y: number): boolean {
-  if (!ui.partyState || ui.partyState.selectedCharacterIndex < 0) return false;
+  if (ui.partyState.selectedCharacterIndex < 0) return false;
   const rect = getEyeRect(ui);
   if (!rect) return false;
   return x >= rect.x1 && x <= rect.x2 && y >= rect.y1 && y <= rect.y2;
 }
 
 export function handleEyePress(ui: UIState): void {
-  if (!ui.partyState) return;
   if (ui.partyState.selectedCharacterIndex < 0) return;
   ui.pressingEye = true;
 }
 
 export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
-  if (!ui.uiTables || !ui.partyState) return;
   if (ui.partyState.selectedCharacterIndex === button) {
     setHandOwner(ui.partyState, button);
     return;
@@ -204,14 +201,13 @@ export function handlePartyBlockClick(ui: UIState, button: number, x: number, y:
  * by whatever `TAG0189d4` last drew there. Button id 81.
  */
 export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
-  if (!ui.uiTables || !ui.partyState) return;
   const buttons = ui.uiTables.graphic231.buttons;
 
   if (ui.displayResurrectChestOrScroll === 4) {
     // An open chest in the weapon hand: the grid takes clothing clicks, but only from
     // someone holding the cursor (`d.HandChar != -1`).
-    if ((ui.partyState.cursorOwner ?? -1) < 0) return;
-    const selected = ui.partyState.selectedCharacterIndex ?? -1;
+    if (ui.partyState.cursorOwner < 0) return;
+    const selected = ui.partyState.selectedCharacterIndex;
     if (selected < 0) return;
     const champ = getPartyChampion(ui.partyState, selected);
     if (!champ || (champ.attributes.health | 0) === 0) return;
@@ -231,7 +227,6 @@ export function tag01a6ea(ui: UIState, clickX: number, clickY: number): void {
 }
 
 export function handleInventoryToggle(ui: UIState, button: number): void {
-  if (!ui.partyState) return;
   if (button !== 4) {
     if (button < 0 || button > 3) return;
     const champ = getPartyChampion(ui.partyState, button);
@@ -270,7 +265,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
  */
 export function tag02076e(ui: UIState): void {
   const party = ui.partyState;
-  if (!party || party.sleeping) return;
+  if (party.sleeping) return;
   // `WaitForButtonFlash(); //If any are active` (`:5113`).
   waitForButtonFlash(ui.ctx);
   if (party.selectedCharacterIndex >= 0 && ui.displayResurrectChestOrScroll === 4) repackOpenChest(ui);
@@ -292,7 +287,7 @@ export function tag02076e(ui: UIState): void {
  */
 export function tag0207cc(ui: UIState): void {
   const party = ui.partyState;
-  if (!party || party.sleeping) return;
+  if (party.sleeping) return;
   ui.shadedByTag02076e = false;
   const caster = party.magicCasterIndex;
   party.magicCasterIndex = -1;
@@ -307,14 +302,13 @@ export function tag0207cc(ui: UIState): void {
 }
 
 export function syncInventoryButtons(ui: UIState): void {
-  if (!ui.uiTables || ui.uiMode !== UIMode.Adventure) return;
+  if (ui.uiMode !== UIMode.Adventure) return;
   const buttons = ui.uiTables.graphic231.buttons;
-  const inventoryOpen = (ui.partyState?.selectedCharacterIndex ?? -1) >= 0;
+  const inventoryOpen = ui.partyState.selectedCharacterIndex >= 0;
   ui.secondaryButtons = inventoryOpen ? buttons.buttons17760 : buttons.buttons17304;
 }
 
 export function handleClothingClick(ui: UIState, button: number): void {
-  if (!ui.partyState || !ui.uiTables) return;
   // `HandleClothingClick` itself does not care who owns the cursor
   // (doc/CSBwin-src/CSBCode.cpp:6928); its callers decide.
   let chIdx = -1;
@@ -328,7 +322,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (!champ || (champ.attributes.health | 0) === 0) return;
     slot = button & 1;
   } else {
-    chIdx = ui.partyState.selectedCharacterIndex ?? -1;
+    chIdx = ui.partyState.selectedCharacterIndex;
     if (chIdx < 0) return;
     slot = button - 8;
   }
@@ -383,7 +377,6 @@ export function handleClothingClick(ui: UIState, button: number): void {
  * `Byte18428` (`CSBCode.cpp:7056-7059`).
  */
 export function updateButtonLists(ui: UIState): void {
-  if (!ui.uiTables) return;
   const buttons = ui.uiTables.graphic231.buttons;
   const keys = ui.uiTables.graphic231.keys;
   switch (ui.uiMode) {
@@ -446,7 +439,6 @@ function recolourRows(buffer: IndexedBitmap, rows: number, colorMap: number[]): 
  */
 export function tag0025a6(ui: UIState, p1: number): void {
   const party = ui.partyState;
-  if (!party || !ui.uiTables) return;
   const g232 = ui.uiTables.graphic232;
   const d7 = p1;
   if (ui.word23144 === 0) {
@@ -505,7 +497,7 @@ export function marchingOrderPointerMoved(ui: UIState, x: number, y: number): vo
 function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPaletteSwitching: boolean): void {
   const upper = ui.pointer23178;
   const lower = ui.pointer23182;
-  if (!upper || !lower || !ui.screenIndexBuffer) return;
+  if (!upper || !lower) return;
   const d6 = y - 20;
   const split = dynamicPaletteSwitching && d6 > 0 ? 16 - d6 : 16;
   const dst = ui.screenIndexBuffer;
@@ -525,7 +517,7 @@ function drawMarchingOrderCursor(ui: UIState, x: number, y: number, dynamicPalet
 
 export function drawCursorItem(ui: UIState, dynamicPaletteSwitching: boolean): void {
   ui.objectCursorFootprint = null;
-  if (!ui.screenIndexBuffer || !ui.uiTables || !ui.partyState || !ui.hoverPoint) return;
+  if (!ui.hoverPoint) return;
   if (ui.word23144 !== 0) {
     // `CreateCursorBitmap` asks before anything else (`doc/CSBwin-src/CSBCode.cpp:2234`).
     drawMarchingOrderCursor(ui, Math.floor(ui.hoverPoint.x), Math.floor(ui.hoverPoint.y), dynamicPaletteSwitching);
@@ -581,7 +573,6 @@ interface ObjectCursor {
  * level's viewport palette keeps: it is the cursor over the rows that palette shows.
  */
 function createObjectCursor(ui: UIState, objectNameIndex: number): ObjectCursor | null {
-  if (!ui.uiTables) return null;
   const g232 = ui.uiTables.graphic232;
   const icon = objectIconBitmap(ui, objectNameIndex, g232.word612);
   if (!icon) return null;
@@ -604,7 +595,6 @@ function createObjectCursor(ui: UIState, objectNameIndex: number): ObjectCursor 
  * screen row 29 or below come from `d.Pointer23190` instead.
  */
 function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: number, dynamicPaletteSwitching: boolean): void {
-  if (!ui.screenIndexBuffer) return;
   const d6 = y - 19;
   const split = dynamicPaletteSwitching && d6 > 0 ? 18 - d6 : 18;
   const dst = ui.screenIndexBuffer;
@@ -623,7 +613,7 @@ function drawObjectCursor(ui: UIState, cursor: ObjectCursor, x: number, y: numbe
 }
 
 export function drawEmptyCursor(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.hoverPoint) return;
+  if (!ui.hoverPoint) return;
   const x = Math.floor(ui.hoverPoint.x);
   const y = Math.floor(ui.hoverPoint.y);
   const useHand = shouldUseHandCursor(ui, x, y);
@@ -634,7 +624,7 @@ export function drawEmptyCursor(ui: UIState): void {
 }
 
 export function shouldUseHandCursor(ui: UIState, x: number, y: number): boolean {
-  const cursorOwner = ui.partyState?.cursorOwner ?? -1;
+  const cursorOwner = ui.partyState.cursorOwner;
   if (cursorOwner < 0) return false;
   return inCursorShapeZone(ui, x, y);
 }
@@ -649,8 +639,8 @@ function inCursorShapeZone(ui: UIState, x: number, y: number): boolean {
   if (x >= 274) return false;
 
   if (y <= 28) {
-    const numChar = ui.partyState?.champions.length ?? 0;
-    const selectedOrdinal = (ui.partyState?.selectedCharacterIndex ?? -1) + 1;
+    const numChar = ui.partyState.champions.length;
+    const selectedOrdinal = ui.partyState.selectedCharacterIndex + 1;
     const charIndex = Math.floor(x / 69);
     const pixelWithin = x - charIndex * 69;
     if (charIndex < numChar && pixelWithin <= 42) {
@@ -665,14 +655,12 @@ function inCursorShapeZone(ui: UIState, x: number, y: number): boolean {
 }
 
 export function getCursorArrowBitmap(ui: UIState): IndexedBitmap | null {
-  if (!ui.uiTables) return null;
   if (ui.cursorArrowBitmap) return ui.cursorArrowBitmap;
   ui.cursorArrowBitmap = decodeCursorBitmap(ui.uiTables.graphic232.cursorArrow);
   return ui.cursorArrowBitmap;
 }
 
 export function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
-  if (!ui.uiTables) return null;
   if (ui.cursorHandBitmap) return ui.cursorHandBitmap;
   ui.cursorHandBitmap = decodeCursorBitmap(ui.uiTables.graphic232.cursorHand);
   return ui.cursorHandBitmap;
@@ -680,7 +668,6 @@ export function getCursorHandBitmap(ui: UIState): IndexedBitmap | null {
 
 
 export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, y: number, transparentColor: number): void {
-  if (!ui.screenIndexBuffer) return;
   const dst = ui.screenIndexBuffer;
   const maxW = bitmap.width;
   const maxH = bitmap.height;
@@ -702,7 +689,7 @@ export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, 
 }
 
 export function drawHoverHighlights(ui: UIState) {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.hoverPoint) return;
+  if (!ui.hoverPoint) return;
   const { x, y } = ui.hoverPoint;
 
   const hovered: string[] = [];

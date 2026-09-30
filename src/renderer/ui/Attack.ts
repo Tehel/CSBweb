@@ -101,7 +101,7 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
       if (!itemHasChargesLeft(ui, chIdx)) continue;
     }
     required &= 0x7f;
-    const skill = (ui.uiTables?.graphic230.skillNumber[attackType] ?? 0) & 0xff;
+    const skill = (ui.uiTables.graphic230.skillNumber[attackType] ?? 0) & 0xff;
     const mastery = champ ? masteryOf(ui, champ, skill) : 0;
     if (mastery < required) continue;
     ui.possibleAttackTypes[count] = attackType;
@@ -114,7 +114,7 @@ export function getLegalAttackTypes(ui: UIState, chIdx: number, row: ArrayLike<n
 
 function masteryOf(ui: UIState, champ: Champion, skill: number): number {
   return determineMastery(champ, skill, {
-    partySleeping: ui.partyState?.sleeping ?? false,
+    partySleeping: ui.partyState.sleeping,
     getObjectNameIndex: (objectId: ObjectID) => {
       const value = resolveObjectNameIndex(ui, objectId);
       return value >= 0 ? value : null;
@@ -144,7 +144,7 @@ export function prepareAttack(ui: UIState, chIdx: number): void {
     if (attackClass === 0) return;
   }
 
-  const row = ui.uiTables?.graphic230.legalAttacks[attackClass];
+  const row = ui.uiTables.graphic230.legalAttacks[attackClass];
   if (!row) return;
 
   ui.attackingCharacterOrdinal = chIdx + 1;
@@ -240,17 +240,16 @@ export function attackMenuButton(ui: UIState, id: number): void {
  * region means "pick a champion" or "pick an attack" at different moments.
  */
 export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
-  if (!ui.partyState) return;
   const numCharacter = ui.partyState.champions.length;
 
   if (ui.attackingCharacterOrdinal !== 0) {
-    const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17892 ?? null, x, y, 2);
+    const id = searchButtonList(ui.uiTables.graphic231.buttons.buttons17892, x, y, 2);
     if (id !== 0) attackMenuButton(ui, id);
     return;
   }
 
   if (ui.word20252 !== 0) {
-    const id = searchButtonList(ui.uiTables?.graphic231.buttons.buttons17952 ?? null, x, y, 2);
+    const id = searchButtonList(ui.uiTables.graphic231.buttons.buttons17952, x, y, 2);
     if (id === 0) return;
     const chIdx = id - 116;
     if (chIdx >= 0 && chIdx < numCharacter) prepareAttack(ui, chIdx);
@@ -266,7 +265,7 @@ export function handleAttackAreaClick(ui: UIState, x: number, y: number): void {
  */
 export function attackPanelTick(ui: UIState): void {
   const party = ui.partyState;
-  if (!party || party.champions.length === 0) return;
+  if (party.champions.length === 0) return;
 
   // Asleep, or with a candidate at the mirror, nobody turns and the damage is kept for
   // the first tick after (`CSBCode.cpp:8808-8816`).
@@ -323,7 +322,6 @@ export function attackPanelTick(ui: UIState): void {
  * been resurrected, reincarnated or cancelled, or while the party sleeps.
  */
 export function drawAttackButton(ui: UIState, chIdx: number): void {
-  if (!ui.screenIndexBuffer || !ui.uiTables) return;
   const rect = attackButtonRect(chIdx);
   const champ = ui.partyState && getPartyChampion(ui.partyState, chIdx);
   const alive = !!champ && (champ.attributes.health | 0) !== 0;
@@ -353,8 +351,8 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
 
   // `Character.cpp:4875-4880`: busy, a candidate in the party, or asleep.
   const busy = (champ.charFlags & CHARFLAG_ATTACK_DISABLE) !== 0;
-  const candidate = (ui.partyState?.potentialChampionIndex ?? -1) >= 0;
-  if (busy || candidate || (ui.partyState?.sleeping ?? false)) {
+  const candidate = ui.partyState.potentialChampionIndex >= 0;
+  if (busy || candidate || (ui.partyState.sleeping)) {
     shadeRectIndex(ui, rect, 0);
   }
 }
@@ -367,7 +365,6 @@ export function drawAttackButton(ui: UIState, chIdx: number): void {
  * a weapon with one attack gets a short box and one with three a tall one.
  */
 export function drawAttackPanel(ui: UIState): void {
-  if (!ui.uiTables || !ui.screenIndexBuffer || !ui.fontData || !ui.partyState) return;
 
   fillRectIndex(ui.screenIndexBuffer, ui.uiTables.graphic232.word20, 0);
 
@@ -434,7 +431,7 @@ export function drawAttackPanel(ui: UIState): void {
 /** `GetAttackTypeName` — index -1/255 has no name. */
 function attackTypeName(ui: UIState, attackType: number): string {
   if (attackType < 0 || attackType === ATTACK_TYPE_NONE) return '';
-  return ui.uiTables?.graphic230.attackNames[attackType] ?? '';
+  return ui.uiTables.graphic230.attackNames[attackType] ?? '';
 }
 
 /**
@@ -445,7 +442,6 @@ function attackTypeName(ui: UIState, attackType: number): string {
  * -1 could not reach, -2 had no ammunition.
  */
 function drawAttackDamageFlash(ui: UIState): void {
-  if (!ui.screenIndexBuffer || !ui.fontData || !ui.uiTables) return;
   const damage = ui.attackFlashValue;
 
   if (damage < 0) {

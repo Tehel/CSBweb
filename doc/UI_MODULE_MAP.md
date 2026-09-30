@@ -8,11 +8,13 @@ each other.
 
 `src/renderer/ui/UIState.ts` — CSBWin keeps this in globals that `Mouse.cpp`, `CSBUI.cpp`,
 `Character.cpp` and `Magic.cpp` all reach into. Here it is one object that
-`GameScreen` owns and every UI function takes as its first argument:
+`GameScreen` owns and every UI function takes as its first argument. `createUIState`
+builds it whole, from its data sources and every hook, so none of them is ever missing:
 
 - **data sources**: `graphicsLoader`, `ctx` (the game's `GameContext`, CSBWin's `d.`:
-  the dungeon, the party and the systems), `context` (the bytecode interpreter context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState`,
-  `uiMode`
+  the dungeon, the party and the systems), `context` (the viewport's bytecode interpreter
+  context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState` (the
+  party the screen last drew, `ctx.party.state` until then), `uiMode`
 - **interaction state**: `pressingEye`, `hoverPoint`, `showAttackPanel`, the open chest,
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)

@@ -21,27 +21,27 @@ export type ItemDescriptionLine = { text: string; color: number };
  * facing. -1 for a negative value, which some callers pass for "no object".
  */
 export function resolveObjectNameIndex(ui: UIState, value: ObjectID): number {
-  if (value < 0 || !ui.objectTables) return -1;
+  if (value < 0) return -1;
   return NameIndex(
     ui.ctx.dungeon,
     {
       objDescObjectType: ui.objectTables.objDescObjectType,
-      byte640: ui.uiTables?.graphic232.byte640 ?? [],
+      byte640: ui.uiTables.graphic232.byte640,
     },
-    ui.partyState?.facing ?? 0,
+    ui.partyState.facing,
     value,
   );
 }
 
 /** `GetBasicObjectType` (`src/engine/objectIndex.ts`). -1 as `resolveObjectNameIndex`. */
 export function getBaseObjectNameIndex(ui: UIState, rn: ObjectID): number {
-  if (rn < 0 || !ui.objectTables) return -1;
+  if (rn < 0) return -1;
   return GetBasicObjectType(ui.ctx.dungeon, ui.objectTables.objDescObjectType, rn);
 }
 
 /** `d.ObjDesc[rn.DescIndex()].attackClass`; 0, "no attacks", when there is no row. */
 export function getAttackClass(ui: UIState, rn: ObjectID): number {
-  if (!ui.objectTables || rn < 0) return 0;
+  if (rn < 0) return 0;
   const descIndex = DescIndex(ui.ctx.dungeon, rn);
   if (descIndex === -1) return 0;
   return ui.objectTables.objDescAttackClass[descIndex] ?? 0;
@@ -58,7 +58,7 @@ export function isChestRecord(value: ObjectID): boolean {
 }
 
 export function getObjectName(ui: UIState, objectNameIndex: number): string {
-  const names = ui.objectTables?.objectNames ?? [];
+  const names = ui.objectTables.objectNames;
   if (objectNameIndex >= 0 && objectNameIndex < names.length) {
     return names[objectNameIndex] ?? '';
   }
@@ -86,7 +86,7 @@ export function getBonesChampion(ui: UIState, objectId: ObjectID, objectNameInde
   // `value = pBones->value(); if (value != 0)` — are these bones a champion's at all?
   if ((misc.specialState | 0) === 0) return null;
   const fingerprint = ui.ctx.dungeon.copyChampionBonesRecord(objectId);
-  if (fingerprint === null || !ui.partyState) return null;
+  if (fingerprint === null) return null;
   const chIdx = findChampionByFingerprint(ui.partyState, fingerprint);
   if (chIdx === -1) return null;
   return ui.partyState.champions[chIdx] ?? null;
@@ -104,7 +104,7 @@ export function getObjectDisplayName(ui: UIState, objectId: ObjectID, objectName
 
   if (category === DBType.POTION) {
     if (objectNameIndex !== OBJNI_WATER_FLASK && objectNameIndex !== OBJNI_EMPTY_FLASK) {
-      const selected = ui.partyState?.selectedCharacterIndex ?? -1;
+      const selected = ui.partyState.selectedCharacterIndex;
       if (selected >= 0 && ui.partyState) {
         const champ = ui.partyState.champions[selected];
         if (champ && determineMastery(ui, champ, 2) > 1) {
@@ -134,7 +134,6 @@ export function getObjectWeightForRecord(ui: UIState, rn: ObjectID, visited: Set
 }
 
 export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objectNameIndex: number): ItemDescriptionLine[] {
-  if (!ui.objectTables) return [];
   const lines: ItemDescriptionLine[] = [];
   const { category } = decodeObjectID(objectId);
   const phrases = ['CONSUMABLE', 'POISONED', 'BROKEN', 'CURSED', '', '', '', ''];
@@ -184,7 +183,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
       }
       if (objectNameIndex >= OBJNI_COMPASS_N && objectNameIndex <= OBJNI_COMPASS_W) {
         descriptionMask = 0;
-        const facing = ui.partyState?.facing ?? 0;
+        const facing = ui.partyState.facing;
         const directions = ['NORTH', 'EAST', 'SOUTH', 'WEST'];
         lines.push({ text: `PARTY FACING ${directions[facing & 3] ?? ''}`.trim(), color: 13 });
         break;
@@ -245,7 +244,7 @@ export function buildPhraseSummary(mask: number, phrases: string[], colors: numb
 }
 
 export function applyViewingFilter(ui: UIState, objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
-  const selected = ui.partyState?.selectedCharacterIndex ?? -1;
+  const selected = ui.partyState.selectedCharacterIndex;
   if (selected < 0) return null;
   return ui.ctx.systems.dsa.processViewingFilter({
     phraseMask,
@@ -255,7 +254,6 @@ export function applyViewingFilter(ui: UIState, objectId: ObjectID, phraseMask: 
 }
 
 export function drawItemDescriptionLine(ui: UIState, text: string, color: number, state: { x: number; y: number }): void {
-  if (!ui.fontData || !ui.screenIndexBuffer) return;
   let remaining = text;
   while (remaining.length > 0) {
     let line = remaining;
@@ -287,7 +285,7 @@ export function getInventoryPlaceholderIndex(champion: Champion, slot: number): 
 
 export function determineMastery(ui: UIState, champion: Champion, skill: number): number {
   return determineMasteryEngine(champion, skill, {
-    partySleeping: ui.partyState?.sleeping ?? false,
+    partySleeping: ui.partyState.sleeping,
     getObjectNameIndex: (objectId) => resolveObjectNameIndex(ui, objectId),
   });
 }
