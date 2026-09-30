@@ -113,7 +113,8 @@ item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill 
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
-data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
+data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
+            HintOracleLoader (CSB's `hcsb.hct`)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what

@@ -128,6 +128,8 @@ const CHECKS = [
   // Chaos Strikes Back's Atari-era saves, with no Extended Features block: loaded,
   // walked and run in a Game on CSB's graphics.dat.
   { tool: 'dump-atari-saves.ts' },
+  // Chaos Strikes Back's Hint Oracle data, hcsb.hct, decoded and its limits checked.
+  { tool: 'dump-hint-oracle.ts' },
   // Block 4 packed and held up against the real thing: every committed save's
   // character block, written again from the champions it yields, byte for byte.
   { tool: 'dump-character-block.ts' },
