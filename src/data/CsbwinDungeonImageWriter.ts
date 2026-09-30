@@ -27,6 +27,7 @@
  * `LE16` per field — a byte swap on the little-endian build CSBWin ships as. The cell
  * flags are bytes and have no order at all.
  */
+import { writeU16BE, writeU32LE } from '../core/bytes';
 import { DBType, encodeObjectID, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
@@ -42,18 +43,6 @@ export const LEVEL_DESCRIPTOR_SIZE = 16;
 
 /** `sizeof(DB11)` — `EXPOOL` blocks (`doc/CSBwin-src/CSB.h:1307-1315`). */
 export const EXPOOL_RECORD_SIZE = 256;
-
-function writeU16BE(buf: Uint8Array, off: number, value: number): void {
-    buf[off] = (value >> 8) & 0xff;
-    buf[off + 1] = value & 0xff;
-}
-
-function writeU32LE(buf: Uint8Array, off: number, value: number): void {
-    buf[off] = value & 0xff;
-    buf[off + 1] = (value >>> 8) & 0xff;
-    buf[off + 2] = (value >>> 16) & 0xff;
-    buf[off + 3] = (value >>> 24) & 0xff;
-}
 
 const bit = (b: boolean | undefined): number => (b ? 1 : 0);
 

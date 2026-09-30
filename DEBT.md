@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E10 | Code written twice | M | ⏳ |
 | E8 | One table set, extracted once, outside the renderer | L | ⏳ |
 | E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
@@ -203,45 +202,25 @@ comment as `GameTables` already does; (4) delete the pattern search. A second du
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
-`src/renderer/bytecode/BytecodeInterpreter.ts` is 3926 lines. The stack machine and its
+`src/renderer/bytecode/BytecodeInterpreter.ts` is 3866 lines. The stack machine and its
 opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
 the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
 
-- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2129`),
-  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2462`,
-  `drawMonsterAt`, `:2550`), the missiles (`drawMissilesAtPosition`, `:2668`),
-  `DrawClouds` (`:2814`), `drawCloudUnderParty`, `TAG005088` (`:2935`). About 1000
+- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2121`),
+  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2454`,
+  `drawMonsterAt`, `:2542`), the missiles (`drawMissilesAtPosition`, `:2660`),
+  `DrawClouds` (`:2806`), `drawCloudUnderParty`, `TAG005088` (`:2927`). About 1000
   lines.
 - **`CSBCode.cpp`**'s drawing: `DrawWallDecoration` (`drawWallDecorationGraphic`,
-  `:1550`), the extended wall and floor decorations, the wall text (`:1806`),
-  `DrawFloorDecorations` (`:1890`), `DrawDoor` and its ornament (`opStdDrawDoor`,
-  `:1315`, `drawDoorOrnament`), `DrawTeleporter` (`:2073`), the champion portrait. About
+  `:1555`), the extended wall and floor decorations, the wall text (`:1811`),
+  `DrawFloorDecorations` (`:1895`), `DrawDoor` and its ornament (`opStdDrawDoor`,
+  `:1317`, `drawDoorOrnament`), `DrawTeleporter` (`:2066`), the champion portrait. About
   700 lines.
-- **`Graphics.cpp`**'s `ShrinkBLT` (`shrinkBltIndexedBitmap`, `:3058`) and the mirror and
-  crop helpers, which `E10` merges with their twins.
 
 Paying it moves each group into a module named for its CSBWin file, as `E2` split
 `Game.ts`, over the `InterpreterContext` the interpreter already passes around; the
 interpreter keeps the machine. `C94` and `C99` both land in the code that moves: pay
 them first or after, not during.
-
-### E10 ⏳ Code written twice
-
-Each of these is one CSBWin routine, or one format detail, with two or three bodies:
-
-- **The byte writers**: `writeU16BE`, `writeU16LE`, `writeU32LE`, `writeU32BE` are private
-  functions in `SaveGameLoader.ts`, `CsbwinExtendedFeatures.ts` and
-  `CsbwinDungeonImageWriter.ts`; `src/core/bytes.ts` has only the readers.
-- **`EXTENDEDFEATURESBLOCK`, read twice**: `SaveGameLoader.readExtendedFeatures` reads the
-  fields at bare offsets with bare masks (`extendedFlags & 0x20`, `flags & 0x80`), and
-  `CsbwinExtendedFeatures.parseExtendedFeaturesBlock` reads the same struct with
-  `EF_FLAGS` and `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` and `EXPOOL_RECORD_SIZE` are
-  each declared twice.
-- **A save's name made unique**: `makeSaveFileName(savedAt, taken)`
-  (`src/engine/SaveGamePayload.ts:503`) and `SaveMenu.uniqueName` (`:594`), with different
-  suffix rules.
-
-One commit per bullet; the save ones may wait for `E13`.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
@@ -304,15 +283,27 @@ The code it will stand on is spread and knotted:
   module variable (`:57`), so neither a save nor the stores can say "DM" or "CSB", which is
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
   through another `main.ts` global, `savedGameRead` (`:37`).
+- **Some of it is written twice.** `EXTENDEDFEATURESBLOCK` is read by
+  `SaveGameLoader.readExtendedFeatures` at bare offsets with bare masks
+  (`extendedFlags & 0x20`, `flags & 0x80`), and by
+  `CsbwinExtendedFeatures.parseExtendedFeaturesBlock` with `EF_FLAGS` and
+  `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` is declared twice (`SaveGameLoader.ts:255`,
+  `CsbwinExtendedFeatures.ts:37`) and `EXPOOL_RECORD_SIZE` three times
+  (`SaveGameLoader.ts:277`, `DungeonLoader.ts:57`, `CsbwinDungeonImageWriter.ts:45`). A
+  save's name is made unique twice, with different suffix rules:
+  `makeSaveFileName(savedAt, taken)` (`src/engine/SaveGamePayload.ts:503`) and
+  `SaveMenu.uniqueName` (`src/renderer/ui/SaveMenu.ts:594`).
 - **CHARDESC's flag constants** (`CHARFLAG_ATTACK_DISABLE`, `CHARFLAG_MALE`) live in the
   save codec (`src/data/CsbwinCharacters.ts:37-40`), and the engine and the UI import them
   from there.
 
 Paying it, as `P10`'s first step: `data/` holds pure codecs, bytes to plain records and
 back (`SaveGameLoader` split into the stream, the blocks, and the prefix joined to
-`CsbwinExtendedFeatures`; an `EXPOOL` module, which `C96` needs); one owner builds a save
+`CsbwinExtendedFeatures`, one reader of the struct; an `EXPOOL` module, which `C96`
+needs, declaring its constants once); one owner builds a save
 from a game and applies one to it, knows the data set, and is what the menu and F5/F9
-call; the flag constants go beside `Champion.charFlags`.
+call, with one rule for a unique save name; the flag constants go beside
+`Champion.charFlags`.
 
 ### E14 ⏳ CSBWin's input path lives in the page's debug-chrome module
 
@@ -477,7 +468,7 @@ strip scrolled or a flashed button changed (`main.ts:500-505`). Two things follo
   would show it: one VBL early for a pick-up, which brings the tick on at once
   (`d.clockTick = 1`), up to a tick early for a click that does not.
 
-`BytecodeInterpreter.viewportRandom` (`:2042`) is also a `static`, shared by every
+`BytecodeInterpreter.viewportRandom` (`:2047`) is also a `static`, shared by every
 interpreter, the prison interior's and every tool's included. Paying it means `renderView`
 recomposes (`refreshOverlay`) everywhere but the three sites, the tick's draw becoming the
 only way `DrawViewport` runs in play, and `npm test -- --frames` telling whether a golden

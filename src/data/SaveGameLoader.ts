@@ -18,7 +18,17 @@ import {
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import type { PartyState } from '../engine/gameTypes';
-import { readI16BE, readU16BE, readU16LE, readU32BE, readU32LE } from '../core/bytes';
+import {
+  readI16BE,
+  readU16BE,
+  readU16LE,
+  readU32BE,
+  readU32LE,
+  writeU16BE,
+  writeU16LE,
+  writeU32BE,
+  writeU32LE,
+} from '../core/bytes';
 
 export interface SaveGameState {
   item16: Item16Record[];
@@ -268,28 +278,6 @@ const EXPOOL_RECORD_SIZE = 256;
 const EXPOOL_WORDS_PER_BLOCK = 64;
 const EDT_SPECIAL_LOCATIONS = 3;
 const ESL_SPECIAL_LOCATION_MAX = 15;
-
-function writeU16BE(buf: Uint8Array, off: number, value: number): void {
-  buf[off] = (value >> 8) & 0xff;
-  buf[off + 1] = value & 0xff;
-}
-
-function writeU16LE(buf: Uint8Array, off: number, value: number): void {
-  buf[off] = value & 0xff;
-  buf[off + 1] = (value >> 8) & 0xff;
-}
-
-function writeU32LE(buf: Uint8Array, off: number, value: number): void {
-  writeU16LE(buf, off, value & 0xffff);
-  writeU16LE(buf, off + 2, (value >>> 16) & 0xffff);
-}
-
-function writeU32BE(buf: Uint8Array, off: number, value: number): void {
-  buf[off] = (value >>> 24) & 0xff;
-  buf[off + 1] = (value >>> 16) & 0xff;
-  buf[off + 2] = (value >>> 8) & 0xff;
-  buf[off + 3] = value & 0xff;
-}
 
 function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
   let result = initialHash & 0xffff;

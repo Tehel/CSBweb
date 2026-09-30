@@ -31,7 +31,7 @@
  * bytes the reader would eat the first three bytes of GAMEBLOCK1.
  */
 import { formChecksum } from './CsbwinObjectIndex';
-import { readU16LE, readU32LE } from '../core/bytes';
+import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
 
 /** `strcpy(efb.sentinel, " Extended Features ")` — 19 characters and a terminator. */
 export const EXTENDED_SENTINEL = ' Extended Features ';
@@ -111,18 +111,6 @@ export interface ExtendedFeaturesBlock {
     csbGraphicsSignature2: number;
     /** `efb.hintKey[8]`, as bytes. */
     hintKey: Uint8Array;
-}
-
-function writeU16LE(buf: Uint8Array, off: number, value: number): void {
-    buf[off] = value & 0xff;
-    buf[off + 1] = (value >> 8) & 0xff;
-}
-
-function writeU32LE(buf: Uint8Array, off: number, value: number): void {
-    buf[off] = value & 0xff;
-    buf[off + 1] = (value >>> 8) & 0xff;
-    buf[off + 2] = (value >>> 16) & 0xff;
-    buf[off + 3] = (value >>> 24) & 0xff;
 }
 
 /** Read the 512-byte header. The caller has already verified its checksum. */
