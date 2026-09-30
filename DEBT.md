@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
+| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 1 of 5 next |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
@@ -119,6 +119,7 @@ In payoff order: the first row is the next item.
 | X2 | Extra: a mastery just gained shown in green | S | ⏸️ |
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
+| X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
@@ -131,7 +132,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C101 · D16 · E20 · F14 · G21 · X6. An ID recorded and paid in one commit has no
+Next free IDs: C101 · D16 · E20 · F14 · G21 · X7. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -171,32 +172,59 @@ the hooks are not a boundary: the UI modules import from 12 engine modules, and 
 state directly where no hook exists — the object in hand
 (`ViewportPicking.ts:88`, `Mouse.ts:361`, `:369`, `Feeding.ts:133`), the floor chain
 (`ViewportPicking.ts:85`), a record freed (`Feeding.ts:134`), a potion emptied and a
-waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:310-338`).
-19 tools stand the UI up with the subset of hooks they think they need, "wired as
-`main.ts` wires it", which nothing checks.
+waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:305-340`).
+19 tools stand the UI up with `createUIState` and the subset of hooks they think they
+need, "wired as `main.ts` wires it", which nothing checks; three of them over a bare
+`DungeonState` with no game at all (`dump-marching-order`, `dump-attack-panel`,
+`dump-object-cursor`).
 
 Two smaller seams go with it:
 
 - **The message area is a singleton the screen reads behind the engine's back.** The
   engine is handed its `MessageSink` (`GameHost.messages`), but `drawMessageLines` draws
-  the module-level `scrollingText` (`src/renderer/ui/Draw.ts:258`,
+  the module-level `scrollingText` (`src/renderer/ui/Draw.ts:231`,
   `ScrollingText.ts:461`): a tool or a second game that hands the engine another strip
   still sees the global drawn.
-- **`GameHost`'s contract types live in `ActuatorSystem.ts`** (`MessageSink`,
-  `CursorFilterHook`, `:74`), because their first user was there.
+- **`GameHost`'s contract types live in `ActuatorSystem.ts`** (`CursorFilterHook` `:61`,
+  `MessageSink` `:73`), because their first user was there.
 
-Paying it is the author's choice between two shapes, written into this entry before any
-code moves:
+**The author chose shape A**: `UIState` holds the `GameContext`, and a UI module calls the
+system as the C++ calls the engine. `GameScreenHooks`, the `main.ts` lambdas and the
+facades only the UI used go; the hooks that stay are the page's. A tool stands the UI up
+over the `Game` it already has. Under A the direct writes listed above are the C++'s own
+shape (CSBWin's interface writes `d.` too), so they stay, reached through `ui.ctx`. (The
+shape not taken, B, kept the hooks and built them all from a `Game` in one function.)
 
-- **A (recommended).** `UIState` holds the `GameContext`, and a UI module calls the system
-  as the C++ calls the engine. `GameScreenHooks`, the `main.ts` lambdas and the facades
-  only the UI used go; the hooks that stay are the page's (sound, the save stores, the
-  pause). A tool stands the UI up over the `Game` it already has.
-- **B.** The hooks stay, but one `src/` function builds them all from a `Game`, `main.ts`
-  and every tool use it, and the fields become required (`D15`).
+The split, one commit each:
 
-Either way the strip moves into the context or the screen, not a module global, and the
-`GameHost` types move to `GameHost.ts`.
+1. ⏳ **The two seams.** `MessageSink` and `CursorFilterHook` move to `GameHost.ts`. The
+   `scrollingText` global goes: the page builds one `ScrollingText`, hands it to the
+   engine as `GameHost.messages` and to the screen in `GameScreenDeps`, and
+   `drawMessageLines` draws the `UIState`'s.
+2. ⏳ **`UIState` holds the `GameContext`.** `createUIState` takes the context;
+   `GameScreenDeps` gives the screen the context in place of `dungeonState`,
+   `footprints` and `characterStats`; `ui.dungeonState` (36 reads) and `ui.characterStats`
+   become `ui.ctx.dungeon` and `ui.ctx.systems.characterStats`. `ui.partyState` stays as
+   it is (`D15`). The three tools without a game build one through `tools/lib/game.ts`.
+3. ⏳ **The object and inventory hooks go**: `onAddCharacterPossession`,
+   `onRemoveCharacterPossession`, `onObjectMove`, `applyFeeding`, `viewingFilter`,
+   `queueSound`, `setClockTick`. The UI modules (`Mouse`, `Objects`, `Feeding`,
+   `ViewportPicking`, `Keyboard`) call the systems; the tools stop wiring them.
+4. ⏳ **The loop's hooks go**: `isRunningScript`, `runScript`, `flashButton`,
+   `flashButtonScript`, `waitForButtonFlashScript`, `waitForButtonFlash`,
+   `flashedButton`, `onSleep`, `onWakeUp`, `onFreeze`, `onThaw`, `onSetPaused`, through
+   `ctx.systems.mainLoop` and `LoopState`'s functions.
+5. ⏳ **The panels' hooks go, and what is left is the page's**: `onSpellCast`,
+   `onChampionAttack`, `onConsumeAttackDamage`, `onResurrectReincarnateCancel`,
+   `onReincarnateNamed` (whose `renderView()` after the engine's call is the page's, and
+   stays a page hook). `GameScreenHooks` is then the save stores' four
+   (`onCreateSave`, `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`, whose owner is
+   `E13`'s), `onPaletteSelected` (`C95`'s), and whatever step 5 leaves of Reincarnate;
+   the `Game` facades whose only callers left are tools go, the tools calling the system
+   as the UI does. E11 closes; `D15` makes the remaining fields required.
+
+Each step is a refactor: every tool's whole output byte-identical, and
+`npm test -- --frames`, since each moves code under `src/renderer/`.
 
 ### E13 ⏳ The save pipeline straddles `data/` and `engine/`, and nothing owns it
 
@@ -679,9 +707,15 @@ a download.
 ### G20 ⏸️ The hint oracle
 
 CSBWin's HINT choice (`_StartHint`, `doc/CSBwin-src/Hint.cpp:6454`, a 7936-line file)
-reads `hcsb.hct` and `hcsb.dat`, deciphered with RC4 under the `hintKey` of a save's
-Extended Features block (`:5401-5628`, `SaveGame.cpp:382`), and answers questions about
-a CSB game in progress. It is not the game, so it waits; the author names it to start it.
+reads a CSB save and answers questions about where its party stands. It is not the
+game, so it waits; the author names it to start it.
+
+Its data is read: `parseHintOracle` (`src/data/HintOracleLoader.ts`) decodes
+`hcsb.hct`, and `hintsAtPosition` is `_TAG00799a_9`'s lookup
+(`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`, checked by `tools/dump-hint-oracle.ts`). What is
+left is the Oracle's own screen: `hcsb.dat`'s three items, the title menu, the pages,
+and the save chosen from CSBWin's menu. An `hcsb.hct` enciphered under a save's
+`hintKey` (RC4, `:5401-5405`) is not read; no save here has a key.
 
 ---
 
@@ -806,6 +840,35 @@ A `watch-*.ts` proves each step on the real 3D2D1D files: up and down through ma
 fake pits, a refused move into stone with its damage, and a gravity slide ending where
 `GravityMove` finds no axis. Whether 3D2D1D's six DSAs reach a gap in G1 or G2 is
 unchecked, and should be found out before step 1.
+
+### X6 ⏸️ The Hint Oracle's hints in the game, as the party moves
+
+CSB's Hint Oracle answers from a saved game, outside it: it lists the titles of the
+hints for the party's square and level, and shows a chosen one page by page, from a
+nudge to the answer. Its data is decoded already (`parseHintOracle` and
+`hintsAtPosition`, `src/data/HintOracleLoader.ts`; the format and the lookup in
+`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`): 210 hints, 492 pages, 3891 squares on levels
+0-9.
+
+The extra offers the same hints live, from the party's position in the running game.
+
+- **Loading.** `main.ts` fetches `${dataSet.dir}/hcsb.hct` next to `dungeon.dat`. Only the
+  `csb` set has one; without it the extra is absent, whatever the setting. The
+  coordinates are the CSB dungeon's (`partyLevel`, x, y), so the file means nothing
+  against another dungeon.
+- **The lookup.** On every square the party arrives on (a step, the stairs, a pit, a
+  teleporter), `hintsAtPosition(oracle, partyLevel, x, y)`, as the Oracle does from a
+  save. The level-wide records (x and y 0xff: a "CREATURES" hint on every level, and
+  one about the level as a whole on most) match every square of their level, so they
+  are shown apart from the square's own, or the indicator would never go out.
+- **Showing it.** A sign that the square has hints; a click lists their titles; a title
+  shows its first page, and each further page is asked for, as the Oracle does, so a
+  player takes only as much help as they want. Where it is drawn, on the canvas or
+  beside it, is the author's to decide before this is taken.
+
+A `tools/` check with the setting on: walk a CSB party onto a square with hints (level 0
+(3,23) offers CREATURES, THE MAZE and FULYA PIT, in that order), across a teleporter
+and down a pit, and check what the extra offers after each move.
 
 ---
 
