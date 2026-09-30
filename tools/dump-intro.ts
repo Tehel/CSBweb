@@ -487,7 +487,7 @@ function checkCursor(graphics: GraphicsLoader, ui: UITables): void {
 
 function checkSoundPitches(ui: UITables): void {
   console.log('\n=== StartSound\'s Timer-A argument ===');
-  const catalog = buildSoundCatalog(ui.graphic232.soundTable);
+  const catalog = buildSoundCatalog(ui.graphic232.sound1772);
   const doorRates = catalog[SoundIndex.DOOR]?.rates ?? ratesDefault;
   const latchRates = catalog[SoundIndex.SWITCH]?.rates ?? ratesDefault;
 

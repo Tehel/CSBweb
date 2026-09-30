@@ -48,7 +48,7 @@ export function computeFeedParameters(
   // without it is inedible, and a chest or a scroll is refused outright; other objects
   // fall through so a waterskin or a bones can still reach the branches below.
   const descIndex = descIndexForObject(ui, objectId as ObjectID);
-  const carryMask = descIndex !== null ? ui.objectTables.objDescCarryMask[descIndex] ?? 0 : 0;
+  const carryMask = descIndex !== null ? ui.objectTables.objDescWord4[descIndex] ?? 0 : 0;
   if ((carryMask & 1) === 0) {
     if (category === DBType.CHEST || category === DBType.SCROLL) return null;
   } else {

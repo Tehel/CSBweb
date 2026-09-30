@@ -28,15 +28,10 @@ import type {
 } from '../data/dungeonTypes';
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEquals } from '../core/types';
 import type { TextRecord } from '../data/dungeonTypes';
+import type { TextDecodeTables } from '../data/tables/ObjectTables';
 import { textStart } from '../data/CsbwinDungeonConversions';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
-
-export interface TextDecodeTables {
-    escape1: Uint8Array; // Byte10080[64]
-    escape2Wall: Uint8Array; // Byte10336[256]
-    escape2Other: Uint8Array; // Byte10016[256]
-}
 
 /**
  * DungeonState - manages dungeon data and queries
@@ -1027,10 +1022,10 @@ export class DungeonState {
 
             if (escapeCode !== 0) {
                 if (escapeCode === 30) {
-                    const table = typeOfText === 0 ? tables.escape2Wall : tables.escape2Other;
+                    const table = typeOfText === 0 ? tables.byte10336 : tables.byte10016;
                     this.appendEscapeString(out, table, 8, code, max);
                 } else {
-                    this.appendEscapeString(out, tables.escape1, 2, code, max);
+                    this.appendEscapeString(out, tables.byte10080, 2, code, max);
                 }
                 escapeCode = 0;
                 continue;

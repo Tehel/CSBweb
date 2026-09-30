@@ -193,7 +193,7 @@ async function main(): Promise<void> {
   const byWeight: [string, number, number][] = [];
   for (const [name, miscType] of MISC_LADDER) {
     weakling.possessions![1] = makeMisc(miscType);
-    const weight = objectTables.miscWeights[miscType] ?? 0;
+    const weight = objectTables.byte8946[miscType] ?? 0;
     const d = meanDistance(weakling, 1);
     byWeight.push([name, weight, d]);
     const zone = weight <= sixteenth ? 'adds weight'

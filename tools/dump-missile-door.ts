@@ -89,7 +89,7 @@ const objectType = (game: Game, rn: ObjectID): number => {
 };
 const fitsPouch = (game: Game, rn: ObjectID): boolean => {
   const di = DescIndex(game.ctx.dungeon, rn);
-  return di !== -1 && (objectTables.objDescCarryMask[di] & 0x100) !== 0;
+  return di !== -1 && (objectTables.objDescWord4[di] & 0x100) !== 0;
 };
 const isKey = (game: Game, rn: ObjectID): boolean =>
   decodeObjectID(rn).category === DBType.MISC && objectType(game, rn) >= OBJNI_FIRST_KEY && objectType(game, rn) <= OBJNI_LAST_KEY;

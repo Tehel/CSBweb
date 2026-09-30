@@ -8,7 +8,6 @@
  */
 import { OBJNI_OPEN_CHEST, OBJNI_SPECIAL_D, OBJNI_SPECIAL_E } from '../../core/objectNameIndex';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
-import { TextDecodeTables } from '../../engine/DungeonState';
 import { Champion, getChampionPossession } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
@@ -448,12 +447,7 @@ export function drawScrollPanel(ui: UIState, objectId: ObjectID): void {
 
   const scroll = ui.dungeonState.getScrollRecord(scrollId);
   if (!scroll) return;
-  const textTables: TextDecodeTables = {
-    escape1: ui.objectTables.textEscape1,
-    escape2Wall: ui.objectTables.textEscape2Wall,
-    escape2Other: ui.objectTables.textEscape2Other,
-  };
-  const text = ui.dungeonState.decodeScrollText(scroll, textTables) ?? '';
+  const text = ui.dungeonState.decodeScrollText(scroll, ui.objectTables.textDecode) ?? '';
 
   const g232 = ui.uiTables.graphic232;
   blitBasicGraphicToViewport(ui, 23, g232.wRectPos926, 144, 8);

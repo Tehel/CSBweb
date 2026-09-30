@@ -691,7 +691,7 @@ export function canPlaceInSlot(ui: UIState, objectId: number, slot: number): boo
   if (!ui.objectTables || !ui.uiTables) return true;
   const descIndex = descIndexForObject(ui, objectId as ObjectID);
   if (descIndex === null) return true;
-  const carryMask = ui.objectTables.objDescCarryMask[descIndex] ?? 0;
+  const carryMask = ui.objectTables.objDescWord4[descIndex] ?? 0;
   const slotMask = ui.uiTables.graphic232.carryLocation[slot] ?? 0;
   return (carryMask & slotMask) !== 0;
 }

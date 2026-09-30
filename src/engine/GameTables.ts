@@ -2,31 +2,27 @@
  * `GameTables` — every table the engine reads from `graphics.dat`, in one read-only set.
  *
  * CSBWin keeps them all in the one global `d.` (`doc/CSBwin-src/Data.h`), filled from
- * graphics `0x22e`, `0x22f`, `0x230` and `0x232` when the game starts. The port used to
- * hand each subsystem a bag of its own (`ActuatorTables`, `TimerTables`, …), grouped by
- * whoever read a table first and with every field optional; a tool built only the ones
- * it thought it needed. This is the one set, grouped by content and named as CSBWin names
- * them. Every field is required: `buildGameTables` fills them all, for the game and for
- * the tools alike (`DEBT.md` E1a).
+ * graphics `0x22e`, `0x22f`, `0x230` and `0x232` when the game starts. This is the one
+ * set, grouped by content. Every field is required: `buildGameTables` fills them all, for
+ * the game and for the tools alike.
  *
- * Fields the port had renamed keep CSBWin's name here (`byte1596`, not
- * `roomTimerFunctions`); the port's name is in the comment. The fields of a struct array
- * (`d.weapons[].weight`, `d.ClothingDesc[].uByte1`) keep the port's names, since CSBWin
- * gives them none worth keeping.
+ * A table has CSBWin's name, here and in the extractors (`src/data/tables/`), even where
+ * CSBWin names it after its address (`byte1596`); what it holds is in the comment. The
+ * fields of a struct array (`d.weapons[].weight`, `d.ClothingDesc[].uByte1`) keep the
+ * port's names, since CSBWin gives them none worth keeping.
  */
 import type { SpellDefinition } from '../data/spellTypes';
 import type { GraphicsTables } from '../data/tables/GraphicsTables';
-import type { WeaponDesc } from '../data/tables/ObjectTables';
+import type { TextDecodeTables, WeaponDesc } from '../data/tables/ObjectTables';
 import { type MonsterDesc } from '../data/tables/MonsterDesc';
 import type { Rect, SoundTableEntry } from '../data/tables/UITables';
-import type { TextDecodeTables } from './DungeonState';
 
 export interface GameTables {
   // --- Objects: `d.ObjDesc`, where a possession may go, and in what order it drops ---
 
   /** `d.ObjDesc[180].objectType()` — an object's name index (`Data.h:1085`). */
   readonly objDescObjectType: ArrayLike<number>;
-  /** `d.ObjDesc[180].word4` — the carry-location mask (the port's `objDescCarryMask`). */
+  /** `d.ObjDesc[180].word4` — the carry-location mask. */
   readonly objDescWord4: ArrayLike<number>;
   /** `d.CarryLocation[38]` (`Data.h:1427`). */
   readonly carryLocation: ArrayLike<number>;
@@ -47,7 +43,7 @@ export interface GameTables {
   readonly clothingArmour: ArrayLike<number>;
   /** `d.ClothingDesc[58].uByte2` — flags; bit 7 marks a shield. */
   readonly clothingFlags: ArrayLike<number>;
-  /** `d.Byte8946[54]` — the miscellaneous objects' weights (the port's `miscWeights`). */
+  /** `d.Byte8946[54]` — the miscellaneous objects' weights. */
   readonly byte8946: ArrayLike<number>;
 
   // --- Monsters ---
@@ -56,25 +52,22 @@ export interface GameTables {
   readonly monsterDesc: ArrayLike<MonsterDesc>;
   /** `d.MonsterDroppings[40]` — what a dying monster leaves behind (`Data.h:1074`). */
   readonly monsterDroppings: ArrayLike<number>;
-  /** `d.Byte10340[4]` — a group's facing byte without an `ITEM16` (the port's `facingReplication`). */
+  /** `d.Byte10340[4]` — a group's facing byte without an `ITEM16`. */
   readonly byte10340: ArrayLike<number>;
-  /** `d.uByte9672[8]` — the monster attack sounds (the port's `monsterAttackSounds`). */
+  /** `d.uByte9672[8]` — the monster attack sounds. */
   readonly uByte9672: ArrayLike<number>;
 
   // --- The dungeon ---
 
   /** `d.DoorCharacteristics[4]`, which each level indexes twice to form `DoorTOC` (`Data.h:1073`). */
   readonly doorCharacteristics: ArrayLike<number>;
-  /** `d.Byte1596[8]` — the room-type timer functions (the port's `roomTimerFunctions`). */
+  /** `d.Byte1596[8]` — the room-type timer functions. */
   readonly byte1596: ArrayLike<number>;
   /** `d.Byte7302[16]` — the extra records a new game gives each database (`Data.h:1099`). */
   readonly byte7302: ArrayLike<number>;
   /** `d.Word1074[16]` — the light table; entry 2 is an Illumulet's brightness and the LIGHT attack's step (`Data.h:1424`). */
   readonly word1074: number[];
-  /**
-   * `DecodeText`'s escape strings (`doc/CSBwin-src/CSBCode.cpp:5559-5574`): `d.Byte10080[64]`
-   * after code 29, `d.Byte10336[256]` (wall text) and `d.Byte10016[256]` (any other) after 30.
-   */
+  /** `d.Byte10080`, `d.Byte10336` and `d.Byte10016`, `DecodeText`'s escape strings. */
   readonly textDecode: TextDecodeTables;
 
   // --- The party: where a blow lands, how a shield covers it, the message colours ---
@@ -85,7 +78,7 @@ export interface GameTables {
   readonly byte586: ArrayLike<ArrayLike<number>>;
   /** `d.Byte1412[6]` — per-body-part shield weighting. */
   readonly byte1412: ArrayLike<number>;
-  /** `d.Byte1386[4]` — each champion's message colour (the port's `championMessageColors`). */
+  /** `d.Byte1386[4]` — each champion's message colour. */
   readonly byte1386: ArrayLike<number>;
 
   // --- Attacks and spells: graphic `0x230`, indexed by `ATTACKTYPE` (`Data.h:638-651`).
@@ -121,7 +114,7 @@ export interface GameTables {
 
   // --- Sound ---
 
-  /** `d.sound1772[22]` — `QueueSound`'s table (the port's `soundTable`, `Data.h:1402`). */
+  /** `d.sound1772[22]` — `QueueSound`'s table (`Data.h:1402`). */
   readonly sound1772: SoundTableEntry[];
 }
 
@@ -132,7 +125,7 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
   const g232 = ui.graphic232;
   return {
     objDescObjectType: objects.objDescObjectType,
-    objDescWord4: objects.objDescCarryMask,
+    objDescWord4: objects.objDescWord4,
     carryLocation: g232.carryLocation,
     byte640: g232.byte640,
     dropOrder: g232.dropOrder,
@@ -142,22 +135,18 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
     clothingWeights: objects.clothingWeights,
     clothingArmour: objects.clothingArmour,
     clothingFlags: objects.clothingFlags,
-    byte8946: objects.miscWeights,
+    byte8946: objects.byte8946,
 
     monsterDesc: objects.monsterDesc,
     monsterDroppings: objects.monsterDroppings,
-    byte10340: objects.facingReplication,
-    uByte9672: objects.monsterAttackSounds,
+    byte10340: objects.byte10340,
+    uByte9672: objects.uByte9672,
 
     doorCharacteristics: objects.doorCharacteristics,
     byte1596: g232.byte1596,
     byte7302: objects.byte7302,
     word1074: g232.word1074,
-    textDecode: {
-      escape1: objects.textEscape1,
-      escape2Wall: objects.textEscape2Wall,
-      escape2Other: objects.textEscape2Other,
-    },
+    textDecode: objects.textDecode,
 
     uByte590: g232.uByte590,
     byte586: g232.byte586,
@@ -176,6 +165,6 @@ export function buildGameTables(graphics: GraphicsTables): GameTables {
 
     moveButtons: ui.graphic231.moveButtons,
 
-    sound1772: g232.soundTable,
+    sound1772: g232.sound1772,
   };
 }

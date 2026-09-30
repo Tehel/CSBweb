@@ -167,7 +167,7 @@ async function main(): Promise<void> {
   if (heroes.length < 1) throw new Error('dungeon.dat carries no equipped preset hero');
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
-    objDescCarryMask: objectTables.objDescCarryMask,
+    objDescWord4: objectTables.objDescWord4,
   };
   const champion: Champion = createChampionFromPreset(
     heroes[0],

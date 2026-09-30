@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   for (let i = 0; i < 2; i++) {
     party.addChampion(createChampionFromPreset(heroes[i], i, assignPresetHeroPossessions(heroes[i].inventory, {
       carryLocation: uiTables.graphic232.carryLocation,
-      objDescCarryMask: objectTables.objDescCarryMask,
+      objDescWord4: objectTables.objDescWord4,
     })));
   }
 

@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
-    objDescCarryMask: objectTables.objDescCarryMask,
+    objDescWord4: objectTables.objDescWord4,
   };
   const heroes = data.presetHeroes ?? [];
   if (heroes.length < 3) throw new Error('dungeon.dat carries fewer than three preset heroes');

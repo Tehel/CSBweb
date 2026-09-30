@@ -23,7 +23,7 @@ const WIZARD_SUBSKILLS = ['Fire', 'Air', 'Earth', 'Water'];
 
 export interface AddCharacterTables {
   carryLocation: ArrayLike<number>;
-  objDescCarryMask: ArrayLike<number>;
+  objDescWord4: ArrayLike<number>;
 }
 
 /** One object lying in the mirror's cell, as the slot chooser needs to see it. */
@@ -121,7 +121,7 @@ export function assignAddCharacterPossessions(
     // those categories instead.
     if (item.category < DBType.WEAPON || item.category > DBType.MISC) continue;
 
-    const carryMask = getCarryMask(item, tables.objDescCarryMask) ?? 0;
+    const carryMask = getCarryMask(item, tables.objDescWord4) ?? 0;
     const neckLegal = (carryMask & getCarryLocation(tables.carryLocation, 10)) !== 0;
     let slot = -1;
     let toCase9 = false;

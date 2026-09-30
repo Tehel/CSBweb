@@ -27,6 +27,7 @@ import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { CreatureRecord } from '../../data/dungeonTypes';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
+import type { RectPos } from '../../data/tables/UITables';
 import {
   monsterHasAttackGraphic,
   monsterHasBackGraphic,
@@ -162,22 +163,6 @@ export interface InterpreterContext {
 
   // Monster attack animation state hook (used for sound triggers)
 
-}
-
-/**
- * Rectangle position - port from CSB.h RectPos union
- */
-export interface RectPos {
-  x1: number;
-  x2: number;
-  y1: number;
-  y2: number;
-  // Source clipping (from byte variant)
-  srcWidth?: number;
-  srcHeight?: number;
-  srcX?: number;
-  srcY?: number;
-  srcStride?: number;
 }
 
 /**
@@ -1827,11 +1812,7 @@ export class BytecodeInterpreter {
     const rec = dungeon.getTextRecord(textRN);
     if (!rec) return;
 
-    const textBytes = dungeon.decodeWallTextBytes(rec, {
-      escape1: tables.textEscape1,
-      escape2Other: tables.textEscape2Other,
-      escape2Wall: tables.textEscape2Wall,
-    });
+    const textBytes = dungeon.decodeWallTextBytes(rec, tables.textDecode);
     if (!textBytes) return;
 
     const font = getGraphic(120);

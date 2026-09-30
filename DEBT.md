@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E8 | One table set, extracted once, outside the renderer | L | ⚠️ step 3 of 4 next |
+| E8 | One table set, extracted once, outside the renderer | L | ⚠️ step 4 of 4 next |
 | E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
@@ -170,19 +170,10 @@ The extractors of every `graphics.dat` table live in `src/data/tables/`: `Object
 and its bit accessors, which the engine reads). `GraphicsTables.ts` reads them all once:
 `main.ts` calls it, and so does `tools/lib/game.ts` (`graphicsTablesOf`, per
 `graphics.dat`); `buildGameTables` builds the engine's set from the result, and the
-screen is handed the same object (`GameScreenDeps.tables`). What is left:
+screen is handed the same object (`GameScreenDeps.tables`). A table the engine and the
+renderer both read has CSBWin's name in both sets (`objDescWord4`, `byte10340`,
+`sound1772`, …), and each record type has one declaration. What is left:
 
-- **A table has two names.** The renderer's set keeps the port's names and the engine's
-  CSBWin's: `objDescCarryMask` / `objDescWord4`, `facingReplication` / `byte10340`,
-  `miscWeights` / `byte8946`, `monsterAttackSounds` / `uByte9672`. Two systems rename
-  again on the way in (`roomTimerFunctions` for `byte1596` in `ActuatorSystem` and
-  `DsaSystem`, `championMessageColors` for `byte1386`). A grep for one name misses the
-  readers of the other, and the UI adapts between the two, building a partial
-  `GameTables` to call the engine's `NameIndex` (`resolveObjectNameIndex`,
-  `src/renderer/ui/Objects.ts:23`). Two of the tables' record types are declared twice as
-  well: `RectPos` again in `src/renderer/bytecode/BytecodeInterpreter.ts:170`, and
-  `IndexedBitmap` in both `src/data/CSBGraphicsLoader.ts:45` and
-  `src/renderer/csbwin/CanvasBlitter.ts:92`.
 - **0x22e has a second layout path that never runs.** `extractViewportTables` reads the
   offsets from the item's packed tail and, when the wall rectangles are not where the
   tail says, searches the item for them by pattern (`findWallRectanglesOffset`) and
@@ -192,25 +183,24 @@ screen is handed the same object (`GameScreenDeps.tables`). What is left:
   and a search is a guess in all but name.
 
 Paying it, in steps: (1) ✅ the extractors in `src/data/tables/`; (2) ✅ extract once,
-into `GraphicsTables`, and hand the same object to the screen; (3) one name per table,
-CSBWin's, with the port's in the comment as `GameTables` already does, and one
-declaration per record type; (4) delete the pattern search. A second dungeon's `graphics.dat` then has one place where it can differ.
+into `GraphicsTables`, and hand the same object to the screen; (3) ✅ one name per table,
+CSBWin's, and one declaration per record type; (4) delete the pattern search. A second dungeon's `graphics.dat` then has one place where it can differ.
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
-`src/renderer/bytecode/BytecodeInterpreter.ts` is 3866 lines. The stack machine and its
+`src/renderer/bytecode/BytecodeInterpreter.ts` is 3847 lines. The stack machine and its
 opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
 the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
 
-- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2121`),
-  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2454`,
-  `drawMonsterAt`, `:2542`), the missiles (`drawMissilesAtPosition`, `:2660`),
-  `DrawClouds` (`:2806`), `drawCloudUnderParty`, `TAG005088` (`:2927`). About 1000
+- **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects` (`drawRoomObjects`, `:2102`),
+  `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster` (`drawMonster`, `:2435`,
+  `drawMonsterAt`, `:2523`), the missiles (`drawMissilesAtPosition`, `:2641`),
+  `DrawClouds` (`:2787`), `drawCloudUnderParty`, `TAG005088` (`:2908`). About 1000
   lines.
 - **`CSBCode.cpp`**'s drawing: `DrawWallDecoration` (`drawWallDecorationGraphic`,
-  `:1555`), the extended wall and floor decorations, the wall text (`:1811`),
-  `DrawFloorDecorations` (`:1895`), `DrawDoor` and its ornament (`opStdDrawDoor`,
-  `:1317`, `drawDoorOrnament`), `DrawTeleporter` (`:2066`), the champion portrait. About
+  `:1540`), the extended wall and floor decorations, the wall text (`:1796`),
+  `DrawFloorDecorations` (`:1876`), `DrawDoor` and its ornament (`opStdDrawDoor`,
+  `:1302`, `drawDoorOrnament`), `DrawTeleporter` (`:2047`), the champion portrait. About
   700 lines.
 
 Paying it moves each group into a module named for its CSBWin file, as `E2` split
@@ -430,7 +420,7 @@ that darkens a level and checks a monster's sight shrink.
 CSBWin save carries the pairs, and the Vi Altar (`Timer.cpp:2750`, and `DropObject`'s
 test, `Mouse.cpp:903`) and the bones' name (`DescribeObject`, `Character.cpp:3563`;
 `DrawNameOfHeldObject`, `Code11f52.cpp:49`) read them back. The port keeps them in
-`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:107-162`),
+`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:102-157`),
 which only the port's runtime snapshot carries (`DungeonSnapshot.championBones`).
 `DungeonData.expool` travels as raw bytes and never sees them. So:
 
@@ -492,7 +482,7 @@ many VBLs as the elapsed time holds, capped. Tools then step VBLs and need no ca
 
 ### C99 ⏳ `TAG008c98`, the teleporter's shimmer, is reconstructed rather than ported
 
-`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:309-349`) says so itself: "a
+`tag008c98Index` (`src/renderer/csbwin/CanvasBlitter.ts:307-347`) says so itself: "a
 behavioural approximation, not a transcription … reconstructed from observed output". The
 C++ (`doc/CSBwin-src/Graphics.cpp:1169-1316`) builds a temporary bitmap from the source
 read as a **linear stream of 16-pixel groups**, starting at group `P7` and wrapping to the
@@ -500,7 +490,7 @@ source's start after `P6` groups, with the mask read one word per group, masked-
 pixels given colour `P9`; then it blits that bitmap with `P9` transparent. `DrawTeleporter`
 passes `P6 = x2 + GraphicRandom(2)` and `P7 = GraphicRandom(32)` (`CSBCode.cpp:4292-4302`).
 The port reads the source and the mask as 2-D images wrapped in x and y separately, and
-takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2066-2102`),
+takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2047-2083`),
 so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
 indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
 teleporter's pixels with the stream the C++ reads.
@@ -816,7 +806,7 @@ Needed:
 - **Taking it the proper way.** The object comes off the floor through the same
   remove-from-cell path as a pickup by hand, so a pressure plate under it still fires.
 - **Putting it back.** Into the slot it left if that is empty and the object's carry
-  mask allows it there (`objDescCarryMask`). Otherwise into the first free slot that
+  mask allows it there (`objDescWord4`). Otherwise into the first free slot that
   allows it (quiver, then pack). The load is recomputed from the possessions (H). If the
   thrower is dead or has no room, the object stays on the floor, keeping its tag.
 - **Dropping tags.** A tag goes when the object is picked up by hand, and when its

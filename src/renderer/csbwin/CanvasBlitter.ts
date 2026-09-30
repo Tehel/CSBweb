@@ -9,7 +9,11 @@
  * Here we operate on pixel indices (0..15) for faithful transparency (index 10).
  */
 
+import type { IndexedBitmap } from '../../data/CSBGraphicsLoader';
 import type { Rect, RectPos } from '../../data/tables/UITables';
+
+/** The one bitmap record, declared with the loaders that make it; the blitters' readers import it from here. */
+export type { IndexedBitmap };
 
 export interface PaletteIndexViewportBuffer {
   width: number;
@@ -87,12 +91,6 @@ function clampInt(value: number, min: number, max: number): number {
   if (value < min) return min;
   if (value > max) return max;
   return value | 0;
-}
-
-export interface IndexedBitmap {
-  width: number;
-  height: number;
-  pixels: Uint8Array;
 }
 
 /**

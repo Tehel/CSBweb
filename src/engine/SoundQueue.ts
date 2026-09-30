@@ -27,14 +27,14 @@ import { TimerFunction, type TimerQueue } from './TimerQueue';
 
 export class SoundQueue {
   /**
-   * @param soundTable `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
+   * @param sound1772 `d.sound1772` — the sound table from `graphics.dat` item `0x232`.
    * @param host where a sample goes (`GameHost.playSound`).
    * @param state `state.tickCount` is `d.Time`, the clock a delayed sound is due by.
    * @param timers where a delayed sound's `TT_20` goes.
    */
   constructor(
     private readonly party: Party,
-    private readonly soundTable: ArrayLike<SoundTableEntry>,
+    private readonly sound1772: ArrayLike<SoundTableEntry>,
     private readonly host: Pick<GameHost, 'playSound'>,
     private readonly state: Pick<GameState, 'tickCount'>,
     private readonly timers: TimerQueue,
@@ -50,7 +50,7 @@ export class SoundQueue {
    * (`:1867-1878`). The host is handed that choice, not the distance (`:1894-1896`).
    */
   queueSound(ordinal: number, mapX: number, mapY: number, deltaTime: number, level: number): void {
-    const entry = this.soundTable[ordinal];
+    const entry = this.sound1772[ordinal];
     if (!entry) return;
 
     if (deltaTime !== 0 && level !== this.party.state.position.z) return;

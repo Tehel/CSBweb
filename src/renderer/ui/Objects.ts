@@ -166,7 +166,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
     case DBType.POTION: {
       const descIndex = descIndexForObject(ui, objectId);
       descriptionMask = 0x01;
-      if (descIndex !== null) flags = ui.objectTables.objDescCarryMask[descIndex] ?? 0;
+      if (descIndex !== null) flags = ui.objectTables.objDescWord4[descIndex] ?? 0;
       break;
     }
     case DBType.MISC: {
@@ -191,7 +191,7 @@ export function getObjectDescriptionLines(ui: UIState, objectId: ObjectID, objec
       }
       const descIndex = descIndexForObject(ui, objectId);
       descriptionMask = 0x09;
-      if (descIndex !== null) flags = ui.objectTables.objDescCarryMask[descIndex] ?? 0;
+      if (descIndex !== null) flags = ui.objectTables.objDescWord4[descIndex] ?? 0;
       break;
     }
     default:

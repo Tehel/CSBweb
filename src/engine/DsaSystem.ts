@@ -372,9 +372,9 @@ export class DsaSystem {
   private readonly timers: TimerQueue;
   private readonly random: CsbRandom;
   /** `d.Byte1596`, the room-type timer functions. */
-  private readonly roomTimerFunctions: ArrayLike<number>;
+  private readonly byte1596: ArrayLike<number>;
   /** `d.ObjDesc[].word4`. */
-  private readonly objDescCarryMask: ArrayLike<number>;
+  private readonly objDescWord4: ArrayLike<number>;
   private readonly carryLocation: ArrayLike<number>;
   private timerTypeModifier = [0, 1, 2];
   private parameters = new Int32Array(101);
@@ -394,8 +394,8 @@ export class DsaSystem {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
     this.random = ctx.random;
-    this.roomTimerFunctions = ctx.tables.byte1596;
-    this.objDescCarryMask = ctx.tables.objDescWord4;
+    this.byte1596 = ctx.tables.byte1596;
+    this.objDescWord4 = ctx.tables.objDescWord4;
     this.carryLocation = ctx.tables.carryLocation;
     this.monsterDesc = ctx.tables.monsterDesc;
   }
@@ -1989,7 +1989,7 @@ export class DsaSystem {
       if (roomType !== RoomType.STONE && roomType !== RoomType.FALSEWALL) {
         targetPos = 0;
       }
-      const mapping = this.roomTimerFunctions[roomType];
+      const mapping = this.byte1596[roomType];
       if (mapping === 0) {
         console.warn('Illegal DSA timer target', { level: locr.l, x: locr.x, y: locr.y });
         return;
@@ -2767,7 +2767,7 @@ export class DsaSystem {
     if (!this.isValidObjectId(objectId)) return null;
     const descIndex = DescIndex(this.dungeon, objectId);
     if (descIndex === -1) return null;
-    const mask = this.objDescCarryMask[descIndex];
+    const mask = this.objDescWord4[descIndex];
     return typeof mask === 'number' ? mask : null;
   }
 

@@ -41,7 +41,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Game } from '../src/engine/Game';
 import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursorAction, testThrow, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import type { UIState } from '../src/renderer/ui/UIState';
-import type { RectPos } from '../src/renderer/bytecode/BytecodeInterpreter';
+import type { RectPos } from '../src/data/tables/UITables';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { VIEWPORT_Y } from '../src/renderer/ViewportGraphics';

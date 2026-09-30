@@ -122,7 +122,7 @@ export interface UITables {
     wRectPos1796: WordRect;
     wRectPos1788: WordRect;
     wRectPos1780: WordRect;
-    soundTable: SoundTableEntry[];
+    sound1772: SoundTableEntry[];
     byte1596: number[];
     /** `d.uByte590[4]` — wound-location bitmasks for monster attacks. */
     uByte590: number[];
@@ -608,9 +608,9 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
   const wRectPos1780 = readWordRect(view, off); off += 8;
 
   // SOUND[22] (8 bytes each), Byte1596[8], Word1588
-  const soundTable: SoundTableEntry[] = [];
+  const sound1772: SoundTableEntry[] = [];
   for (let i = 0; i < 22; i++) {
-    soundTable.push({
+    sound1772.push({
       word0: view.getInt16(off + 0, false),
       byte2: raw[off + 2] ?? 0,
       byte3: raw[off + 3] ?? 0,
@@ -761,7 +761,7 @@ function parseGraphic232(raw: Uint8Array): UITables['graphic232'] {
     wRectPos1796,
     wRectPos1788,
     wRectPos1780,
-    soundTable,
+    sound1772,
     byte1596,
     dropOrder,
     word1526,

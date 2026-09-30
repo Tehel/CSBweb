@@ -52,7 +52,7 @@ export class HallOfChampions {
   private reincarnationSource: PresetHero | null = null;
 
   constructor(private readonly ctx: GameContext) {
-    this.addCharacterTables = { objDescCarryMask: ctx.tables.objDescWord4, carryLocation: ctx.tables.carryLocation };
+    this.addCharacterTables = { objDescWord4: ctx.tables.objDescWord4, carryLocation: ctx.tables.carryLocation };
   }
 
   /**

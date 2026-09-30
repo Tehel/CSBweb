@@ -74,7 +74,7 @@ export interface ObjectTables {
   monsterPositions: MonsterPositionTable; // d.s6982[3].s[11]
   monsterDesc: MonsterDesc[]; // d.MonsterDescriptor[27]
   monsterGraphics: MonsterGraphicDesc[]; // d.Item6414[27]
-  monsterAttackSounds: Uint8Array; // d.uByte9672[8]
+  uByte9672: Uint8Array; // d.uByte9672[8]
   /**
    * `d.DoorCharacteristics[4]` (doc/CSBwin-src/Data.h:1073). A level picks two of
    * these by its `doorType0Index`/`doorType1Index` to form `d.DoorTOC[2]`
@@ -91,7 +91,7 @@ export interface ObjectTables {
    * all four 2-bit fields, used as the facing byte for a group that has no `ITEM16`
    * and therefore faces one way as a whole (doc/CSBwin-src/Code11f52.cpp:229).
    */
-  facingReplication: Uint8Array;
+  byte10340: Uint8Array;
   missileGraphics: MissileGraphicDesc[]; // d.struct5688[14]
   smallOffsetIndices: Uint8Array; // d.smallOffsetIndicies[16][2] packed row-major
   smallOffsets: Int8Array; // d.smallOffsets[24]
@@ -114,7 +114,7 @@ export interface ObjectTables {
   cloudUnderPartyRect: RectPos; // d.Word2530, a byte RectPos: `DrawClouds`' cell 12
   objDescGraphicClass: Uint8Array; // d.ObjDesc[180].graphicClass
   objDescAttackClass: Int8Array; // d.ObjDesc[180].attackClass
-  objDescCarryMask: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
+  objDescWord4: Uint16Array; // d.ObjDesc[180].word4 (carry locations mask)
   objDescObjectType: Uint16Array; // d.ObjDesc[180].objectType (object name index)
   /**
    * `d.Byte7302[16]` (doc/CSBwin-src/Data.h:1099): the extra records a new game gives each
@@ -143,7 +143,7 @@ export interface ObjectTables {
    * (doc/CSBwin-src/Character.cpp:2415).
    */
   clothingFlags: Uint8Array;
-  miscWeights: Uint8Array; // d.Byte8946[54]
+  byte8946: Uint8Array; // d.Byte8946[54]
   foodValue: Int16Array; // d.FoodValue[8]
 
   // Wall decorations
@@ -182,10 +182,18 @@ export interface ObjectTables {
   floorColorMapMedium: Uint8Array; // d.MediumColorMapping[16]
   floorColorMapFar: Uint8Array; // d.FarColorMapping[16]
 
-  // Text escape tables (DecodeText, CSBCode.cpp:5559-5574)
-  textEscape1: Uint8Array; // d.Byte10080[64]
-  textEscape2Other: Uint8Array; // d.Byte10016[256]
-  textEscape2Wall: Uint8Array; // d.Byte10336[256]
+  /** `DecodeText`'s escape strings. */
+  textDecode: TextDecodeTables;
+}
+
+/**
+ * `DecodeText`'s escape strings (`doc/CSBwin-src/CSBCode.cpp:5559-5574`): `d.Byte10080`
+ * after code 29, `d.Byte10336` (wall text) or `d.Byte10016` (any other) after 30.
+ */
+export interface TextDecodeTables {
+  byte10080: Uint8Array; // d.Byte10080[64]
+  byte10336: Uint8Array; // d.Byte10336[256]
+  byte10016: Uint8Array; // d.Byte10016[256]
 }
 
 const GRAPHIC_OBJECT_NAMES = 0x22c; // 556
@@ -446,7 +454,7 @@ function readObjDescObjectType22f(raw: Uint8Array): Uint16Array {
   return out;
 }
 
-function readObjDescCarryMask22f(raw: Uint8Array): Uint16Array {
+function readObjDescWord4_22f(raw: Uint8Array): Uint16Array {
   const start = ABS_22F_START - ABS_OBJDESC;
   const count = 180;
   const stride = 6;
@@ -551,7 +559,7 @@ function readFoodValue22f(raw: Uint8Array): Int16Array {
   return out;
 }
 
-function readMiscWeights22f(raw: Uint8Array): Uint8Array {
+function readByte8946_22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_BYTE8946;
   const count = 54;
   const end = start + count;
@@ -618,7 +626,7 @@ function readMonsterDroppings22f(raw: Uint8Array): Int16Array {
   return out;
 }
 
-function readMonsterAttackSounds22f(raw: Uint8Array): Uint8Array {
+function readUByte9672_22f(raw: Uint8Array): Uint8Array {
   const start = ABS_22F_START - ABS_MONSTER_ATTACK_SOUND;
   const count = 8;
   const end = start + count;
@@ -794,8 +802,8 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const doorCharacteristics = readDoorCharacteristics22f(raw22f);
   const monsterDroppings = readMonsterDroppings22f(raw22f);
   // Byte10340[4] is at the very start of the graphic (ABS_22F_START itself).
-  const facingReplication = raw22f.slice(0, 4);
-  const monsterAttackSounds = readMonsterAttackSounds22f(raw22f);
+  const byte10340 = raw22f.slice(0, 4);
+  const uByte9672 = readUByte9672_22f(raw22f);
   const smallOffsetIndices = raw22e.slice(smallOffsetIndicesOffset, smallOffsetIndicesOffset + 16 * 2);
   const smallOffsets = Int8Array.from(
     raw22e.slice(smallOffsetsOffset, smallOffsetsOffset + 24).map((b) => (b >= 0x80 ? b - 0x100 : b))
@@ -817,7 +825,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const objDescGraphicClass = readObjDescGraphicClass22f(raw22f);
   const objDescAttackClass = readObjDescAttackClass22f(raw22f);
   const objDescObjectType = readObjDescObjectType22f(raw22f);
-  const objDescCarryMask = readObjDescCarryMask22f(raw22f);
+  const objDescWord4 = readObjDescWord4_22f(raw22f);
   const byte7302 = readByte7302_22f(raw22f);
   const objectNames = readObjectNames22c(raw22c);
   const weaponWeights = readWeaponWeights22f(raw22f);
@@ -825,7 +833,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
   const clothingArmour = readClothingBytes22f(raw22f, 1);
   const clothingFlags = readClothingBytes22f(raw22f, 2);
   const foodValue = readFoodValue22f(raw22f);
-  const miscWeights = readMiscWeights22f(raw22f);
+  const byte8946 = readByte8946_22f(raw22f);
   const weaponDesc = readWeaponDesc22f(raw22f);
   const wallDecorationRectSets = readDecorationDescSets(raw22e, wallDecorationPositionOffset, 8, 13, 'wallDecorationPosition[8][13]');
   const wallDecorationRectSetIndex = readWallDecorationRectSetIndex(raw22e, wallRectanglesOffset);
@@ -873,9 +881,11 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     throw new Error('graphics.dat item 0x22f too small for text escape tables');
   }
 
-  const textEscape2Wall = raw22f.slice(textEscape2WallOffset, textEscape2WallOffset + 256);
-  const textEscape1 = raw22f.slice(textEscape1Offset, textEscape1Offset + 64);
-  const textEscape2Other = raw22f.slice(textEscape2OtherOffset, textEscape2OtherOffset + 256);
+  const textDecode: TextDecodeTables = {
+    byte10080: raw22f.slice(textEscape1Offset, textEscape1Offset + 64),
+    byte10336: raw22f.slice(textEscape2WallOffset, textEscape2WallOffset + 256),
+    byte10016: raw22f.slice(textEscape2OtherOffset, textEscape2OtherOffset + 256),
+  };
 
   // Sanity checks: these should be tight for DM/CSB distributions.
   for (let i = 0; i < graphicClasses.length; i++) {
@@ -893,9 +903,9 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     monsterDesc,
     doorCharacteristics,
     monsterDroppings,
-    facingReplication,
+    byte10340,
     monsterGraphics,
-    monsterAttackSounds,
+    uByte9672,
     missileGraphics,
     smallOffsetIndices,
     smallOffsets,
@@ -915,7 +925,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     cloudUnderPartyRect,
     objDescGraphicClass,
     objDescAttackClass,
-    objDescCarryMask,
+    objDescWord4,
     objDescObjectType,
     byte7302,
     objectNames,
@@ -924,7 +934,7 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     clothingArmour,
     clothingFlags,
     foodValue,
-    miscWeights,
+    byte8946,
     weaponDesc,
     wallDecorationRectSets,
     wallDecorationRectSetIndex,
@@ -944,8 +954,6 @@ export function extractObjectTables(graphics: GraphicsLoader, wallRectanglesOffs
     relativeCellGraphicIncrement,
     floorColorMapMedium,
     floorColorMapFar,
-    textEscape1,
-    textEscape2Other,
-    textEscape2Wall,
+    textDecode,
   };
 }

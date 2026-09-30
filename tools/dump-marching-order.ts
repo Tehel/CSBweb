@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
-    objDescCarryMask: objectTables.objDescCarryMask,
+    objDescWord4: objectTables.objDescWord4,
   };
   const g232 = uiTables.graphic232;
 

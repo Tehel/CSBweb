@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
-    objDescCarryMask: objectTables.objDescCarryMask,
+    objDescWord4: objectTables.objDescWord4,
   };
 
   // The real champions from the Hall of Champions, with the possessions the mirrors

@@ -98,10 +98,10 @@ export class ActuatorSystem {
   private readonly dungeon: DungeonState;
   private readonly timers: TimerQueue;
   /** `d.Byte1596`, the room-type timer functions. */
-  private readonly roomTimerFunctions: ArrayLike<number>;
+  private readonly byte1596: ArrayLike<number>;
   private readonly objDescObjectType: ArrayLike<number>;
   /** Per-champion message colour, CSBWin `d.Byte1386[4]` (`doc/CSBwin-src/Data.h:1416`). */
-  private readonly championMessageColors: ArrayLike<number>;
+  private readonly byte1386: ArrayLike<number>;
   private delayedAction = -1;
   private delayedActionX = 0;
   private delayedActionY = 0;
@@ -111,14 +111,14 @@ export class ActuatorSystem {
   constructor(private readonly ctx: GameContext) {
     this.dungeon = ctx.dungeon;
     this.timers = ctx.timers;
-    this.roomTimerFunctions = ctx.tables.byte1596;
+    this.byte1596 = ctx.tables.byte1596;
     this.objDescObjectType = ctx.tables.objDescObjectType;
-    this.championMessageColors = ctx.tables.byte1386;
+    this.byte1386 = ctx.tables.byte1386;
   }
 
   /** CSBWin per-champion message colour `d.Byte1386[chIdx]`; 13 is the historical default. */
   getChampionMessageColor(chIdx: number): number {
-    return this.championMessageColors[chIdx] ?? 13;
+    return this.byte1386[chIdx] ?? 13;
   }
 
   triggerPressurePads(position: Position, facing: number, pressed: boolean, unchangedRoom = false): boolean {
@@ -565,7 +565,7 @@ export class ActuatorSystem {
       ? getActuatorTargetPos(actuator)
       : 0;
 
-    const timerFunction = this.roomTimerFunctions[targetRoomType];
+    const timerFunction = this.byte1596[targetRoomType];
     if (timerFunction === 0) {
       console.warn('Illegal actuator timer target', {
         source,

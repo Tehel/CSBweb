@@ -88,7 +88,7 @@ function main(): void {
   const heroes = extractPresetHeroes(data);
   check(heroes.length > 0, `the dungeon defines preset heroes (got ${heroes.length})`);
 
-  const tables = { carryLocation: new Array(16).fill(0), objDescCarryMask: new Array(256).fill(0) };
+  const tables = { carryLocation: new Array(16).fill(0), objDescWord4: new Array(256).fill(0) };
   console.log(['hero', ...NAMES.map((n) => n.slice(0, 4))].join('\t'));
   for (const hero of heroes.slice(0, 6)) {
     const champ = createChampionFromPreset(hero, 0, assignPresetHeroPossessions(hero.inventory, tables));
