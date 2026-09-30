@@ -137,7 +137,7 @@ function recruit(game: Game, name: string): boolean {
     hero.location.x - DELTA_X[facing], hero.location.y - DELTA_Y[facing], hero.location.map,
   );
   party.facing = facing as Direction;
-  game.handleWallClick();
+  game.systems.mouse.handleWallClick();
   if (party.potentialChampionIndex < 0) return false;
   game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   return party.champions.some((c) => c.name === name);
@@ -412,7 +412,7 @@ function playFromDungeonDat(): Game {
     thrower.possessions[slot] = OBJECT_ID_NULL;
     party.objectInHand = toThrow as ObjectID;
     party.cursorOwner = 0;
-    const thrown = game.throwObjectFromCursor(0);
+    const thrown = game.systems.mouse.throwObjectFromCursor(0);
     console.log(`  threw 0x${(toThrow as number).toString(16)}: ${thrown}`);
     check(thrown, 'the object left the cursor as a missile');
     // `d.Word11712 = 4; d.Word11714 = d.partyFacing;` (Mouse.cpp:753-754).

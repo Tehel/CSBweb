@@ -140,7 +140,7 @@ function main(): void {
     game.ctx.party.state.position = a.party;
     game.ctx.party.state.facing = a.facing;
     game.ctx.party.state.objectInHand = takeObject(game, wanted);
-    check(game.dropObjectFromCursor(4), `the object goes into the alcove at (${a.wall.x},${a.wall.y})`);
+    check(game.systems.mouse.dropObjectFromCursor(4), `the object goes into the alcove at (${a.wall.x},${a.wall.y})`);
     runTicks(game, 4);
     console.log([`(${a.wall.x},${a.wall.y})`, wanted, counters(game), actuatorIndices(game).join(','), ordinalAhead(game)].join('\t'));
     if (a !== ALCOVES[ALCOVES.length - 1]) check(ordinalAhead(game) === 0, `after (${a.wall.x},${a.wall.y}) alone the face is still bare`);

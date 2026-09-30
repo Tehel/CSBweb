@@ -35,6 +35,7 @@
  * champion buttons (`handleAttackAreaClick`) — so there is no click to synthesise.
  */
 import { selectMagicCaster } from '../../engine/Party';
+import { MovementAction } from '../../engine/gameTypes';
 import { attackMenuButton, prepareAttack } from './Attack';
 import { magicSelection } from './MagicPanel';
 import { handleInventoryToggle } from './Mouse';
@@ -55,6 +56,33 @@ const CASTER_KEYS = ['F1', 'F2', 'F3', 'F4'];
 const RUNE_BACK_KEY = '`';
 /** Magic button 108. */
 const CAST_KEY = 'Tab';
+
+/**
+ * What one of the port's own keys outside the panels does: a movement, or the quick-save
+ * and quick-load that F5 and F9 ask of the page.
+ */
+export type PortKeyAction = MovementAction | 'quickSave' | 'quickLoad';
+
+/**
+ * The port's own keys outside the panels, beside the arrows, Insert and Clr/Home the tables
+ * bind: K , J L M . move the party, F5 and F9 quick-save and quick-load. Letters are
+ * lower-case.
+ */
+const PORT_KEYS: Readonly<Record<string, PortKeyAction>> = {
+  k: MovementAction.MOVE_FORWARD,
+  ',': MovementAction.MOVE_BACKWARD,
+  j: MovementAction.TURN_LEFT,
+  l: MovementAction.TURN_RIGHT,
+  m: MovementAction.STRAFE_LEFT,
+  '.': MovementAction.STRAFE_RIGHT,
+  F5: 'quickSave',
+  F9: 'quickLoad',
+};
+
+/** What a `KeyboardEvent.key` does among `PORT_KEYS`, or null for a key it does not bind. */
+export function portKeyAction(key: string): PortKeyAction | null {
+  return PORT_KEYS[key.length === 1 ? key.toLowerCase() : key] ?? null;
+}
 
 /** Whether `k`, lower-cased, is one of the panel bindings. */
 function isUIKey(k: string): boolean {

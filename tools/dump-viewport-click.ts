@@ -256,7 +256,7 @@ function main(): void {
     queueSound(ordinal, mapX, mapY, deltaTime, level);
   };
   played.length = 0;
-  game.handleStoneClick();
+  game.systems.mouse.handleStoneClick();
   const item = game.ctx.tables.sound1772[4]?.word0;
   console.log('');
   console.log(['queued', 'played', 'ordinal 4 is item'].join('\t'));

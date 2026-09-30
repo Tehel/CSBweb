@@ -20,8 +20,9 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
 - **hooks out to the page** (`GameScreenHooks`): the save stores' four (`onCreateSave`,
-  `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`) and `onReincarnated`, the page's
-  redraw once the name-entry screen is answered. Everything the interface does to the
+  `onSaveWritten`, `onRestoreSave`, `onRestoreFailed`), `onReincarnated`, the page's
+  redraw once the name-entry screen is answered, and `reportHover`, the debug chrome's
+  report of the buttons under the pointer. Everything the interface does to the
   game it does as CSBWin's does to `d.`, through `ctx`: the systems (casting, attacking,
   the Hall of Champions, the possessions), `LoopState` (a script holding the loop, the
   button flashes, sleep and freeze) and the dungeon's records
@@ -34,10 +35,10 @@ A function that turns out not to need the state does not take it — the pure he
 
 | Module | CSBWin counterpart | Holds |
 | --- | --- | --- |
-| `ui/Mouse.ts` | `Mouse.cpp` | The button search a click is queued by, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, `TAG02076e` and `TAG0207cc`, the way in and out of the disk menu, the freeze, sleep and the Hall of Champions menu, the cursor and hover highlights |
-| `ui/Keyboard.ts` | `CSBUI.cpp` (`KEYXLATE`, `UIM_KEYDOWN`) | The panel key bindings — attack menus, attack options, inventories, runes, cast, caster. CSBWin has no keys of its own: `config.txt` binds a scancode to a screen point and a mouse button, and `UIM_KEYDOWN` clicks there. This binds the handlers those clicks reach |
+| `ui/Mouse.ts` | `Mouse.cpp` | The button search a click is queued by, the `word0` button dispatcher (including its `PotentialCharacterOrdinal` gates), clothing/party/inventory click handlers, `tag01a6ea` for the eye panel, `TAG02076e` and `TAG0207cc`, the way in and out of the disk menu, the freeze, sleep and the Hall of Champions menu, button 80's `HandleClickInViewport`, the cursor, and the buttons under the pointer for the debug chrome's hover report |
+| `ui/Keyboard.ts` | `CSBUI.cpp` (`KEYXLATE`, `UIM_KEYDOWN`) | The panel key bindings — attack menus, attack options, inventories, runes, cast, caster. CSBWin has no keys of its own: `config.txt` binds a scancode to a screen point and a mouse button, and `UIM_KEYDOWN` clicks there. This binds the handlers those clicks reach. Also the port's own keys outside the panels: K , J L M . to move, F5 and F9 to quick-save and quick-load (`portKeyAction`) |
 | `ui/HitTest.ts` | `Mouse.cpp` | `searchButtonList`, `pointInRect` — the leaf both Mouse and the panels depend on |
-| `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `Mouse.ts` and the host's key handler hand it every click and every key |
+| `ui/ReIncarnate.ts` | `Code13ea4.cpp` | The name-entry screen a reincarnated champion gets: the two fields, the letter grid, and the duplicate-name rule. The one **modal** screen in the UI — while `ui.reincarnate` is set, `GameInput` (`src/renderer/GameInput.ts`) hands it every click and every key |
 | `ui/Menu.ts` | `Menu.cpp` | `_DoMenu` and `_WaitForMenuSelect`: graphic 0, the four option layouts and their self-blits, `CenteredText`/`SplitLongLine`, the 210-213 button sets and the two-pass press animation. See `doc/CSBWIN_MENU_REFERENCE.md` |
 | `ui/SaveMenu.ts` | `SaveGame.cpp` (`_DisplayDiskMenu`), extended | The save/load screen behind the disk icon. Keeps `_DoMenu`'s art and animation and replaces the four-slot chooser with a scrolling list over `src/data/saves/`. **Modal** like `ReIncarnate.ts`, and clicks reach it straight from the DOM event so the folder picker keeps its user activation |
 | `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading, the Hall of Champions menu (`TAG0189a8`) |
@@ -74,9 +75,17 @@ the interface's hooks out as one object at construction (`GameScreenHooks`, as `
 the engine's). `presentViewport()` composites every panel over the viewport and converts the
 palette indices to RGBA through the UI palette and the light level's viewport palette. It
 also hosts the save menu and the Reincarnate screen. Its public methods —
-`searchMouseButtons`, `handleMouseButton`, `tryPickViewportObject`,
-`resolveViewportCursorAction`, … — are thin wrappers, because `src/ui/events.ts` and
-`main.ts` call the screen, not the UI modules. They delegate and do nothing else.
+`searchMouseButtons`, `handleMouseButton`, `translateKey`, `handleUIKey`, … — are thin
+wrappers, because the input path and `main.ts` call the screen, not the UI modules. They
+delegate and do nothing else.
+
+`src/renderer/GameInput.ts` is the input path. The page's listeners (`src/ui/events.ts`)
+hand it a screen point and a mouse button, or a key and its modifiers, and nothing else of
+the DOM; it routes them to a modal screen, to the game's mouse queue, to the panel keys or
+to the port's own keys, and hands the game the screen's dispatcher for the queued buttons
+(`install`). Nothing under `src/renderer/` imports `src/ui/`: the debug text it reports
+goes through hooks the page installs (`GameScreenHooks.reportHover`,
+`BootSequenceDeps.reportDebug`).
 
 `src/renderer/ViewportRenderer.ts` is the dungeon view and only that: the interpreter
 context and its tables, the wall / floor-ceiling / mirrored-bitmap caches, the viewport

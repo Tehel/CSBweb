@@ -120,7 +120,7 @@ function main(): void {
 
   const before = faceActuators(game);
   const seenBefore = ornamentAhead(game);
-  const touched = game.handleWallClick();
+  const touched = game.systems.mouse.handleWallClick();
   const after = faceActuators(game);
   const seenAfter = ornamentAhead(game);
 

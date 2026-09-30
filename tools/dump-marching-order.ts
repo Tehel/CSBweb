@@ -30,14 +30,7 @@ import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Characte
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
-
-/** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
-}
+import * as mouse from '../src/renderer/ui/Mouse';
 
 function positions(party: PartyState): string {
   return party.champions.map((c) => `${c.partyPosition}/${c.facing}`).join(' ');
@@ -83,11 +76,10 @@ async function main(): Promise<void> {
   });
   ui.partyState = state;
 
-  const mouse = await importMouse();
   mouse.updateButtonLists(ui);
 
   // ---- The four squares are buttons 125-128 of `Buttons17196`, in `wRectPos1454`'s
-  //      order, for the left button (mask 2, `src/ui/events.ts`).
+  //      order, for the left button (mask 2, `GameInput.mouseDown`).
   for (let i = 0; i < 4; i++) {
     const r = g232.wRectPos1454[i];
     const id = mouse.searchMouseButtons(ui, (r.x1 + r.x2) >> 1, (r.y1 + r.y2) >> 1, 2);

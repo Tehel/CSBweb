@@ -37,14 +37,7 @@ import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-
-/** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
-}
+import { handleClothingClick } from '../src/renderer/ui/Mouse';
 
 /** The box index of whichever champion's slot changed, or -1 / -2 for none / several. */
 function whoChanged(party: PartyState, before: Array<Array<number | null>>): number {
@@ -111,7 +104,6 @@ async function main(): Promise<void> {
   setHandOwner(party.state, 0);
   console.log('champions: ' + party.state.champions.map((c, i) => `${i}=${c.name}`).join(' ') + '\n');
 
-  const { handleClothingClick } = await importMouse();
   const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party.state;
 

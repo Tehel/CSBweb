@@ -38,14 +38,7 @@ import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
-
-/** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
-}
+import * as mouse from '../src/renderer/ui/Mouse';
 
 /** The copper coin's name index: an icon mostly of colour 9. */
 const COPPER_COIN = 125;
@@ -76,7 +69,6 @@ async function main(): Promise<void> {
     },
   });
   ui.partyState = party.state;
-  const mouse = await importMouse();
 
   // ---- A copper coin from the dungeon, in hand.
   check(objectTables.objectNames[COPPER_COIN] === 'COPPER COIN', `name index ${COPPER_COIN} should be the copper coin`);

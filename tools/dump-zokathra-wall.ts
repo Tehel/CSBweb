@@ -123,7 +123,7 @@ function main(): void {
     const spell = zokathra(game);
     check(basicType(game, spell) === OBJNI_ZOKATHRA_SPELL, 'canary: misc type 51 is the Zokathra spell');
     game.ctx.party.state.objectInHand = spell;
-    const fired = game.handleWallClick();
+    const fired = game.systems.mouse.handleWallClick();
     const after = actuatorIndices(game);
     const deleted = encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 535);
     console.log(`Zokathra: fired ${fired}, actuators ${after.join(',')}, ornament ordinal ${ordinalAhead(game)}, hand ${game.ctx.party.state.objectInHand}`);
@@ -136,7 +136,7 @@ function main(): void {
 
     const staff = emptyFirestaff(game);
     game.ctx.party.state.objectInHand = staff;
-    const swapped = game.handleWallClick();
+    const swapped = game.systems.mouse.handleWallClick();
     const hand = game.ctx.party.state.objectInHand;
     console.log(`Firestaff: fired ${swapped}, hand ${basicType(game, hand)}, square ${square(game).map((rn) => `${DBType[decodeObjectID(rn).category]}#${decodeObjectID(rn).index}`).join(',')}`);
     check(swapped, 'the empty Firestaff fires #146');
@@ -149,7 +149,7 @@ function main(): void {
     const game = makeGame();
     const staff = emptyFirestaff(game);
     game.ctx.party.state.objectInHand = staff;
-    const fired = game.handleWallClick();
+    const fired = game.systems.mouse.handleWallClick();
     check(!fired && game.ctx.party.state.objectInHand === staff, 'before the spell the Firestaff does nothing: #535 still follows #146');
   }
 
@@ -163,7 +163,7 @@ function main(): void {
     d.removeObjectFromCell(WALL, encodeObjectID(SOUTH_FACE, DBType.ACTUATOR, 146));
     check(square(game)[0] === first, 'set-up: #535 is first on the square');
     game.ctx.party.state.objectInHand = zokathra(game);
-    const fired = game.handleWallClick();
+    const fired = game.systems.mouse.handleWallClick();
     const rec = d.getActuatorRecord(first)!;
     console.log(`first on the square: fired ${fired}, actuators ${actuatorIndices(game).join(',')}, type ${getActuatorType(rec)}`);
     check(fired && game.ctx.party.state.objectInHand === OBJECT_ID_NULL, 'it fires and takes the spell');

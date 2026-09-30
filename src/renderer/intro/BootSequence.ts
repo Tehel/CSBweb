@@ -24,7 +24,6 @@
  * The launcher menu is deliberately absent. CSBWin needs it because one binary runs the
  * dungeon, the utility and the hint oracle; this one runs the dungeon.
  */
-import { updateDebug } from '../../ui';
 import type { GameScreen } from '../GameScreen';
 import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
 import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
@@ -54,6 +53,8 @@ export interface BootSequenceDeps {
   readNewGame: () => Promise<boolean>;
   /** Skip the title animation and the entrance and boot straight into the dungeon. */
   skip: boolean;
+  /** A line for the debug chrome's log: the boot's failure, before it enters anyway. */
+  reportDebug: (message: string) => void;
 }
 
 /* ----------------------------------------------------------------- the host ---- */
@@ -499,7 +500,7 @@ export async function runBootSequence(deps: BootSequenceDeps): Promise<PrisonDoo
   } catch (error) {
     if (error instanceof Die) throw error;
     console.error('Boot sequence failed; entering the dungeon anyway', error);
-    updateDebug(`Intro failed: ${error}`);
+    deps.reportDebug(`Intro failed: ${error}`);
     return read ?? enterAnyway(deps);
   } finally {
     detach();
@@ -528,7 +529,7 @@ export type EndOfGame = PrisonDoorChoice | 'terminate';
  * (`doc/CSBwin-src/WinScreen.cpp:1493-1498`), and `_GameSetup` fills `Palette11978` from
  * `d.Palette552[0]` (`CSBCode.cpp:10623`).
  */
-export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
+export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip' | 'reportDebug'>, hooks: ShowCreditsHooks): Promise<EndOfGame> {
   const uiTables = deps.gameScreen.getUITables();
   const palette11978 = uiTables.graphic232.palette552[0] ?? PALETTE_11914;
   const { host, detach } = createIntroHost(deps, palette11978);
@@ -548,7 +549,7 @@ export async function runShowCredits(deps: Omit<BootSequenceDeps, 'skip'>, hooks
  * with `d.PartyHasDied` set, so a failed read of `dungeon.dat` or a save goes back to the
  * entrance too.
  */
-async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip'>): Promise<PrisonDoorChoice> {
+async function gameSetupAfterRestart(host: IntroHost, deps: Omit<BootSequenceDeps, 'skip' | 'reportDebug'>): Promise<PrisonDoorChoice> {
   const readGame = readEntireGame(host, deps, true);
   const choice = (await readGame('resume')) ? 'resume' : await showPrisonDoor(host, prisonDoorButtons(host), readGame);
   await tag021028(host, deps.gameScreen, choice);

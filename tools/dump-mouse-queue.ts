@@ -55,14 +55,7 @@ import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { freeze, thaw } from '../src/engine/LoopState';
-
-/** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
-}
+import { handleMouseButton, handleMouseUnclick } from '../src/renderer/ui/Mouse';
 
 /** A plain champion: the disk icon wants a party, the eye a champion to look through. */
 function champion(): Champion {
@@ -297,7 +290,6 @@ async function main(): Promise<void> {
   // ---- 8: the disk icon waits for the eye to be let go ----------------------------
   // `if (d.PressingEye!=0) {lastTime=d.Time; RETURN_int(result);};` sits after button 81
   // and before 140 (doc/CSBwin-src/Mouse.cpp:1679-1680). Through the real dispatcher.
-  const { handleMouseButton, handleMouseUnclick } = await importMouse();
   const ui = newUIState(graphics, game.ctx);
   ui.partyState = party;
   game.setMouseEventHandlers({
@@ -376,8 +368,8 @@ async function main(): Promise<void> {
   game.setMouseEventHandlers({
     button: (num) => {
       if (num !== 80) return;
-      if (viewportArm === 'door') game.handleDoorSwitchClick();
-      else game.handleWallClick();
+      if (viewportArm === 'door') game.systems.mouse.handleDoorSwitchClick();
+      else game.systems.mouse.handleWallClick();
     },
     unclick: () => {},
   });
@@ -451,7 +443,8 @@ async function main(): Promise<void> {
   // `ExecuteAttack`'s result, and a pass leaves it alone (Character.cpp:4679-4682,
   // :4716-4717). The cast button sets it to `CastMagic`'s result, `CastSpell`'s with 3
   // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
-  // handler: the UI's dispatcher, or for the viewport the call `src/ui/events.ts` makes.
+  // handler: the UI's dispatcher, or for the viewport `HandleClickInViewport`'s calls
+  // (`src/renderer/ui/Mouse.ts`).
   // The engine's `CastMagic` and `Attack`, the UI's calls, wrapped to read their results.
   const { magic, character } = game.systems;
   let castResult = -99;
@@ -549,7 +542,7 @@ async function main(): Promise<void> {
 
   soloParty();
   party.objectInHand = looseItem();
-  const dropFrames = framesToTick(() => game.dropObjectFromCursor(0));
+  const dropFrames = framesToTick(() => game.systems.mouse.dropObjectFromCursor(0));
   const dropped = party.objectInHand === OBJECT_ID_NULL;
   row('DropObject', dropped ? 'dropped' : 'kept', dropFrames, '-', 'set');
   check(dropped && dropFrames === 1, 'a drop makes a tick due (DropObject, d.clockTick = 1)');

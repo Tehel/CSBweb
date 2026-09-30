@@ -45,18 +45,9 @@ import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, typ
 import { drawStaticUIFrame } from './ui/Draw';
 import { selectPaletteIndexForLightLevel } from './ui/Light';
 import {
-  EmptyHandedViewportTarget,
-  ViewportCursorAction,
-  hasCursorObject,
-  resolveEmptyHandedViewportClick,
-  resolveViewportCursorAction,
-  tryPickViewportObject,
-  tryUseFrontWallItem,
-} from './ui/ViewportPicking';
-import {
   drawCursorItem,
   marchingOrderPointerMoved,
-  drawHoverHighlights,
+  describeHoveredButtons,
   handleMouseButton,
   handleInventoryToggle,
   handleMouseUnclick,
@@ -108,6 +99,11 @@ export interface GameScreenHooks extends Pick<UIState,
    * (`doc/CSBwin-src/Monster.cpp:577-581`).
    */
   onPaletteSelected(index: number): void;
+  /**
+   * The debug chrome's hover report, once per frame the pointer is over the screen: the
+   * buttons under it (`describeHoveredButtons`).
+   */
+  reportHover(html: string): void;
 }
 
 /** What the screen reads: the graphics, and the game it shows. */
@@ -140,6 +136,7 @@ export class GameScreen {
   private readonly screen: ScreenIndexBuffer;
   private readonly uiPalette: number[];
   private readonly onPaletteSelected: (index: number) => void;
+  private readonly reportHover: (html: string) => void;
   private readonly messages: ScrollingText;
   private lastRenderPosition: Position | null = null;
   private lastRenderFacing: number = 0;
@@ -149,6 +146,7 @@ export class GameScreen {
   constructor(canvas: HTMLCanvasElement, deps: GameScreenDeps, hooks: GameScreenHooks) {
     const { graphicsLoader } = deps;
     this.onPaletteSelected = hooks.onPaletteSelected;
+    this.reportHover = hooks.reportHover;
     this.messages = deps.messages;
 
     this.canvas = canvas;
@@ -337,28 +335,6 @@ export class GameScreen {
     return bitmap ? Array.from(bitmap.pixels) : undefined;
   }
 
-  /* Viewport picking entry points; the work is in `ui/ViewportPicking.ts`. */
-
-  resolveEmptyHandedViewportClick(x: number, y: number): EmptyHandedViewportTarget | null {
-    return resolveEmptyHandedViewportClick(this.ui, x, y);
-  }
-
-  tryPickViewportObject(x: number, y: number): boolean {
-    return tryPickViewportObject(this.ui, x, y);
-  }
-
-  hasCursorObject(): boolean {
-    return hasCursorObject(this.ui);
-  }
-
-  resolveViewportCursorAction(x: number, y: number): ViewportCursorAction | null {
-    return resolveViewportCursorAction(this.ui, x, y);
-  }
-
-  tryUseFrontWallItem(x: number, y: number): boolean {
-    return tryUseFrontWallItem(this.ui, x, y);
-  }
-
   setPartyState(state: PartyState): void {
     // Another party is another game, loaded or begun, which CSBWin draws afresh: nothing
     // `TAG02076e` shaded survives it (a quick-load over a sleeping party, which no
@@ -527,7 +503,8 @@ export class GameScreen {
       // `I1 == 0`.
       drawSaveMenu(this.ui);
     }
-    drawHoverHighlights(this.ui);
+    const hovered = describeHoveredButtons(this.ui);
+    if (hovered !== null) this.reportHover(hovered);
     // The button flash's inversion (`vblFlashButn`), for as long as `d.Word11776` says it
     // stands. The cursor goes over it: the VBL takes the cursor off before a flash right
     // of `x = 192`, where every flashed button is (doc/CSBwin-src/CSBCode.cpp:883-884),

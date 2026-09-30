@@ -8,7 +8,7 @@
  * `_ResurrectReincarnateCancel` (`doc/CSBwin-src/CSBCode.cpp:6615`) is what commits or
  * undoes that, and none of it is visible on a golden frame.
  *
- * This drives the real click path — `Game.handleWallClick` on the real level-0 mirrors
+ * This drives the real click path — `MouseSystem.handleWallClick` on the real level-0 mirrors
  * of the shipped dungeon — so the actuator gate, the hero text and the objects on the
  * floor are all the ones the game ships with.
  *
@@ -188,7 +188,7 @@ function main(): void {
   console.log(`mirror at (${mirror.x},${mirror.y}) wall ${wall}, ${mirrorBefore.length} objects in the cell`);
 
   pairCalls.length = 0;
-  const clicked = game.handleWallClick();
+  const clicked = game.systems.mouse.handleWallClick();
   check(clicked === false, 'the portrait actuator reports no switch action (it only adds a champion)');
   console.log(`pair: ${JSON.stringify(pairCalls)}`);
   check(pairCalls.join() === 'TAG02076e inventory 0 champions 1',
@@ -287,7 +287,7 @@ function main(): void {
   check(portraitActuatorTypes(game, mirror, wall).includes(127),
     'and leaves the portrait actuator usable');
 
-  const readded = game.handleWallClick();
+  const readded = game.systems.mouse.handleWallClick();
   check(readded === false && party.champions.length === 1,
     'the same mirror can be clicked again after a Cancel');
 
@@ -322,7 +322,7 @@ function main(): void {
     'and nothing else left the cell');
   check(!portraitActuatorTypes(game, mirror, wall).includes(127),
     'the portrait actuator is disabled — the mirror is used up');
-  check(game.handleWallClick() === false && party.champions.length === 1,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 1,
     'clicking the dead mirror adds nobody');
   check(party.magicCasterIndex === 0, 'SelectMagicCaster(0) for the only champion');
   check(party.cursorOwner === 0, 'SetHandOwner(0) likewise');
@@ -346,7 +346,7 @@ function main(): void {
   console.log('=== Reincarnate (button 161), at a second mirror ===');
   const boris = heroByName(game, 'BORIS');
   standAtMirror(game, boris);
-  check(game.handleWallClick() === false && party.champions.length === 2,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 2,
     'BORIS joins provisionally at his own mirror');
   check(attackHandShaded(game, 0),
     "HALK's attack hand is shaded too: the test is d.PotentialCharacterOrdinal, not the champion");
@@ -438,7 +438,7 @@ function main(): void {
     const g = makeGame();
     g.ctx.rules.dmRules = true;
     standAtMirror(g, heroByName(g, 'BORIS'));
-    g.handleWallClick();
+    g.systems.mouse.handleWallClick();
     const zed = g.ctx.party.state.champions[0]!;
     const start = zed.attributes.stats.map((a) => attributeCurrent(a));
     const stats = { ...zed.attributes };
@@ -468,26 +468,26 @@ function main(): void {
   const wuTse = heroByName(game, 'WU TSE');
   standAtMirror(game, wuTse);
   party.objectInHand = party.champions[0]!.possessions![1] as ObjectID;
-  check(game.handleWallClick() === false && party.champions.length === 2,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 2,
     'a full cursor refuses the mirror (d.EmptyHanded)');
   party.objectInHand = OBJECT_ID_NULL;
 
-  check(game.handleWallClick() === false && party.champions.length === 3,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 3,
     'and an empty one accepts it');
   // Still standing at WU TSE's mirror, with his menu unanswered. Clicking again must
   // not stack a second provisional champion — `_ResurrectReincarnateCancel` only ever
   // reaches the last one.
-  check(game.handleWallClick() === false && party.champions.length === 3,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 3,
     'a mirror is refused while a menu is still unanswered');
   game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
 
   const azizi = heroByName(game, 'AZIZI');
   standAtMirror(game, azizi);
-  check(game.handleWallClick() === false && party.champions.length === 4, 'the fourth champion joins');
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 4, 'the fourth champion joins');
   game.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   const daroou = heroByName(game, 'DAROOU');
   standAtMirror(game, daroou);
-  check(game.handleWallClick() === false && party.champions.length === 4,
+  check(game.systems.mouse.handleWallClick() === false && party.champions.length === 4,
     'a fifth is refused (d.NumCharacter == 4)');
 
   const fingerprints = party.champions.map((c) => c.fingerprint);
@@ -654,7 +654,7 @@ function portraitSection(): void {
 
   // Taking the champion sets the actuator to type 0, which stops the ordinal but leaves
   // the decoration's `wallGraphicOrdinal` alone — the frame stays, the face goes.
-  probe.handleWallClick();
+  probe.systems.mouse.handleWallClick();
   probe.systems.hallOfChampions.resurrectReincarnateCancel(RESURRECT);
   const after = summarize(mirror.x, mirror.y, facing);
   const afterTaken = after.championPortraitOrdinal | 0;
@@ -682,7 +682,7 @@ function portraitSection(): void {
   if (turned) {
     const g = makeGame();
     const at = standAtMirror(g, turned);
-    g.handleWallClick();
+    g.systems.mouse.handleWallClick();
     const added = g.ctx.party.state.champions[0];
     console.log(`${turned.name}: party facing ${at.facing}, facing3 ${added?.damageFromDirection}`);
     check(added !== undefined && added.damageFromDirection === at.facing,

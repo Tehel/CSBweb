@@ -282,7 +282,7 @@ async function main(): Promise<void> {
 
   /* --------------------------------------- 6. ThrowByCharacter end to end -------- */
 
-  // The rewritten path in `Game.throwObjectFromCursor`: a real engine, a real party, a
+  // The rewritten path in `MouseSystem.throwObjectFromCursor`: a real engine, a real party, a
   // real object in the cursor, and a real missile record at the end of it. This is what
   // `estimateThrowRange/Damage/Decay` used to feed.
   console.log('=== ThrowByCharacter through the real engine ===');
@@ -309,7 +309,7 @@ async function main(): Promise<void> {
     party.objectInHand = encodeObjectID(0, DBType.WEAPON, db.records.length - 1);
 
     const before = data2.databases.missiles.records.length;
-    const ok = game.throwObjectFromCursor(0);
+    const ok = game.systems.mouse.throwObjectFromCursor(0);
     const after = data2.databases.missiles.records.length;
     if (!ok || after === before) return null;
     const rec = data2.databases.missiles.records[after - 1]!;

@@ -209,7 +209,7 @@ function main(): void {
     }
     if (!at) throw new Error('no door button in dungeon.dat');
     stand(game, at.party, at.facing);
-    const clicked = game.handleDoorSwitchClick();
+    const clicked = game.systems.mouse.handleDoorSwitchClick();
     row(`1. door button, party (${at.party.x},${at.party.y}) L${at.party.z}`, s);
     check(clicked, 'the click reaches the door button');
     check(json(s.queued) === json([[1, at.party.x, at.party.y, 1, at.party.z]]), 'the door button queues QueueSound(1, d.partyX, d.partyY, 1)');
@@ -237,7 +237,7 @@ function main(): void {
     }
     if (!at) throw new Error('no audible type-1 wall switch in dungeon.dat');
     stand(game, at.party, at.facing);
-    const fired = game.handleWallClick();
+    const fired = game.systems.mouse.handleWallClick();
     row(`2. wall switch, party (${at.party.x},${at.party.y}) L${at.party.z}`, s);
     check(fired, 'the click fires the switch');
     check(json(s.queued) === json([[1, at.party.x, at.party.y, 1, at.party.z]]), 'the wall switch queues QueueSound(1, d.partyX, d.partyY, 1)');

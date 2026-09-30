@@ -28,19 +28,7 @@ import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-
-/**
- * `ui/Mouse` reaches the debug chrome through `@/ui`, which touches `document` while its
- * modules load. Nothing this tool calls needs a DOM, so stub the two accessors those
- * module-scope lines use and import the click dispatcher dynamically, once the stub is
- * in place. Everything else here is a plain static import.
- */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
-}
+import { handleClothingClick } from '../src/renderer/ui/Mouse';
 
 function owner(party: PartyState): number {
   return party.cursorOwner ?? -1;
@@ -141,7 +129,6 @@ async function main(): Promise<void> {
   // ---- 5. The thing a player actually does: click a filled inventory slot and check
   //         the object lands in the hand, then clicking again puts it back.
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6928)
-  const { handleClothingClick } = await importMouse();
   const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;

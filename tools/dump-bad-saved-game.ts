@@ -40,30 +40,13 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { newUIState } from './lib/ui';
+import * as SaveMenu from '../src/renderer/ui/SaveMenu';
+import * as Boot from '../src/renderer/intro/BootSequence';
 
 const SAVE = 'static/gamefiles/saves/csbgame.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const PRISON = 'static/gamefiles/csb/dungeon.dat';
 
-/**
- * As in `tools/dump-save-menu.ts`: `ui/SaveMenu` reaches `ui/Mouse`, and `ui/Mouse` and the
- * boot sequence reach `@/ui`, which touches `document`.
- */
-async function importUI(): Promise<[
-  typeof import('../src/renderer/ui/SaveMenu'),
-  typeof import('../src/renderer/intro/BootSequence'),
-]> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return Promise.all([
-    import('../src/renderer/ui/SaveMenu'),
-    import('../src/renderer/intro/BootSequence'),
-  ]);
-}
-
-let SaveMenu: Awaited<ReturnType<typeof importUI>>[0];
-let Boot: Awaited<ReturnType<typeof importUI>>[1];
 
 const graphics = stockGraphics();
 
@@ -307,7 +290,6 @@ function okCentre(): { x: number; y: number } {
 }
 
 async function main(): Promise<void> {
-  [SaveMenu, Boot] = await importUI();
   checkChooser();
   await checkTag01efee();
   await checkNewGameRead();

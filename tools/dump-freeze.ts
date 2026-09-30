@@ -34,24 +34,9 @@ import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { wakeUp } from '../src/engine/LoopState';
 import { check, finish } from './lib/check';
-
-type UIModules = [
-  typeof import('../src/renderer/ui/Mouse'),
-  typeof import('../src/renderer/ui/Draw'),
-  typeof import('../src/renderer/ui/Keyboard'),
-];
-
-/** As in `tools/dump-sleep.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
-async function importUI(): Promise<UIModules> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return Promise.all([
-    import('../src/renderer/ui/Mouse'),
-    import('../src/renderer/ui/Draw'),
-    import('../src/renderer/ui/Keyboard'),
-  ]);
-}
+import * as Mouse from '../src/renderer/ui/Mouse';
+import * as Draw from '../src/renderer/ui/Draw';
+import * as Keyboard from '../src/renderer/ui/Keyboard';
 
 function champion(i: number): Champion {
   return {
@@ -69,7 +54,6 @@ function champion(i: number): Champion {
 }
 
 async function main(): Promise<void> {
-  const [Mouse, Draw, Keyboard] = await importUI();
   const loader = new DungeonLoader();
   loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
   const data = loader.getData();
@@ -117,7 +101,7 @@ async function main(): Promise<void> {
   party.position = new Position(6, 14, 2);
   game.systems.monsters.loadPartyLevel(2);
 
-  // The UI half, wired as `main.ts` and `ui/events.ts` wire it.
+  // The UI half, wired as `GameInput.install` wires it.
   const ui: UIState = newUIState(graphics, game.ctx);
   ui.partyState = party;
   Mouse.updateButtonLists(ui);

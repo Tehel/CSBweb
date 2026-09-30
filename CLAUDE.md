@@ -132,6 +132,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             RuntimeSave (the port's own quick-save), skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
+            GameInput (where a click or a key goes once the page has read it),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
             DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects

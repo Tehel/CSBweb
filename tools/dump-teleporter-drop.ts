@@ -5,7 +5,7 @@
  * object into the target cell — it calls `MoveObject(objD4, -1, 0, D6W, D5W, NULL,
  * NULL)`, the same function a walking party or monster goes through, so an object
  * landing on an active teleporter is immediately carried to the teleporter's
- * destination. `Game.dropObjectFromCursor` used to skip straight to
+ * destination. `MouseSystem.dropObjectFromCursor` used to skip straight to
  * `DungeonState.addObjectToCell` on the drop target, with no teleporter/pit
  * resolution at all — the classic "put the item on the plate and nothing happens"
  * bug, since a puzzle's payoff is exactly an object appearing somewhere else after
@@ -142,7 +142,7 @@ function main(): void {
   party.cursorOwner = 0;
   party.objectInHand = item.rn;
 
-  const dropped = game.dropObjectFromCursor(2); // "in front" of the party
+  const dropped = game.systems.mouse.dropObjectFromCursor(2); // "in front" of the party
   check(dropped, 'the drop is accepted');
   check(party.objectInHand === OBJECT_ID_NULL, 'the cursor is empty afterwards');
 

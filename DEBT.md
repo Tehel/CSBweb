@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
 | C95 | `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers | S | ⏳ |
 | C97 | `DrawViewport` runs outside CSBWin's three call sites | M | ⏳ |
@@ -165,7 +164,9 @@ The code it will stand on is spread and knotted:
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
-  migration from a `localStorage` key no build writes.
+  migration from a `localStorage` key no build writes, and it reports to the debug
+  chrome's log through `src/ui/`, which looks its elements up as it loads, so a tool
+  that imports it stubs `document` first (`tools/dump-save-menu.ts`).
 - **Nothing below the page knows which game it runs.** The data set is a `main.ts`
   module variable (`:58`), so neither a save nor the stores can say "DM" or "CSB", which is
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
@@ -192,35 +193,13 @@ from a game and applies one to it, knows the data set, and is what the menu and 
 call, with one rule for a unique save name; the flag constants go beside
 `Champion.charFlags`.
 
-### E14 ⏳ CSBWin's input path lives in the page's debug-chrome module
-
-`src/ui/events.ts` binds the debug buttons beside the canvas, and also holds the game's
-input path: `handleClickInViewport` (`:99`), which is `HandleClickInViewport`'s dispatch
-for button 80 (`Mouse.cpp:1031`); the `MouseEventHandlers` that `Game.handleMouseEvents`
-hands every other button to (`:131`); the modal routing for the save menu and
-Reincarnate; the consult of `TAG0196da`'s key tables; and the port's own movement keys
-(K , J L M . and F5 F9, `:241-335`), while the port's panel keys are in
-`src/renderer/ui/Keyboard.ts`. The page redesign would have to carry all of it across.
-
-The dependency also runs the other way: the renderer imports the DOM module.
-`src/renderer/ui/Mouse.ts` imports `updateHover` from `@/ui` for `drawHoverHighlights`,
-which `GameScreen.presentViewport` runs on every frame to write the hover report's HTML;
-`src/renderer/intro/BootSequence.ts` imports `updateDebug`. The `ui/` modules look their
-elements up when they are imported, so 12 tools stub `document` and `window` before
-importing a UI module.
-
-Paying it: the input path moves to `src/renderer/ui/` (button 80 beside `Mouse.ts`, one
-keymap for the port's own keys beside `Keyboard.ts`), `events.ts` keeps only DOM
-listeners that call it, and the renderer reports debug text through a hook the page
-installs, so nothing under `src/renderer/` imports `src/ui/`.
-
 ### E15 ⏳ The page shell
 
 What the redesign will replace, and what it should not carry across:
 
 - **Settings live in the DOM.** `readUISettings` reads each panel's `style.display` back
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
-  (`events.ts:12-22`, `settings.ts:63-75`). A `UIContext` module singleton
+  (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
 - **`main.ts` holds the page's features**: the 100-line CRT controller (`:62-164`), the
   end-of-game flow, and the save wiring (`E13`).
@@ -238,7 +217,7 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 ### E18 ⏳ Hygiene and documentation drift
 
-- **Three import styles**: five files import `@/core` or `@/ui`, the rest by relative
+- **Three import styles**: four files import `@/core` or `@/ui`, the rest by relative
   path, and `main.ts`, `dev.ts` and `src/ui/` through barrels; `src/engine/index.ts`
   re-exports 22 modules for those few importers. One style, and no barrel but where a
   directory has a public face.
@@ -349,8 +328,8 @@ strip scrolled or a flashed button changed (`main.ts:464-469`). Two things follo
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
-  of VBLs, it changes at 60 Hz instead of 4 — the very symptom `ui/events.ts`'s mousemove
-  handler avoids by calling `refreshOverlay` instead.
+  of VBLs, it changes at 60 Hz instead of 4 — the very symptom `GameInput.mouseMove`
+  (`src/renderer/GameInput.ts`) avoids by calling `refreshOverlay` instead.
 - **The view is drawn mid-pass.** A click's change shows before the tick's `DrawViewport`
   would show it: one VBL early for a pick-up, which brings the tick on at once
   (`d.clockTick = 1`), up to a tick early for a click that does not.
@@ -449,7 +428,7 @@ builds around them is its own:
   (`executeAttack`, `castSpellFromUi`, `consumeAttackDamageToDisplay`), which nothing
   types as a stand-in or puts back; 28 extract the UI tables again
   (`graphicsTablesOf(…).ui`) beside the `UIState` that `tools/lib/ui.ts` builds them
-  into; 12 stub `document` and `window` before importing a UI module (`E14`).
+  into; `dump-save-menu` stubs `document` and `window` to import `src/dev.ts` (`E13`).
 - 33 tools make 72 `as unknown as` casts: into `Game`'s private members (`lastTickTime`
   and `lastInputTime`, 16; `gameTick`, 6), into other systems' (`DsaSystem`'s
   `teleportParty` and `findCharacterSource`, `wiggleEverything`, `stepOrDefer`,

@@ -82,27 +82,13 @@ import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import * as SaveMenu from '../src/renderer/ui/SaveMenu';
+import * as Inventory from '../src/renderer/ui/Inventory';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const SAVES = 'static/gamefiles/saves';
 
-/**
- * As in `tools/dump-hand-owner.ts`: `ui/SaveMenu` reaches `ui/Mouse`, and `ui/Mouse`
- * reaches `@/ui`, which touches `document`.
- */
-async function importUI(): Promise<[
-  typeof import('../src/renderer/ui/SaveMenu'),
-  typeof import('../src/renderer/ui/Inventory'),
-]> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return Promise.all([import('../src/renderer/ui/SaveMenu'), import('../src/renderer/ui/Inventory')]);
-}
-
-let SaveMenu: Awaited<ReturnType<typeof importUI>>[0];
-let Inventory: Awaited<ReturnType<typeof importUI>>[1];
 
 /* ------------------------------------------------------------------------------- */
 
@@ -685,6 +671,11 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
 async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<void> {
   console.log('');
   console.log('=== the quick-save over an open chest ===');
+  // `src/dev.ts` is the page's, and reaches the debug chrome in `src/ui/`, whose modules look
+  // their elements up as they load: stub the two accessors those lines use first.
+  const g = globalThis as Record<string, unknown>;
+  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
+  if (!g.window) g.window = g;
   const { buildQuickSavePayload } = await import('../src/dev');
   const game = await loadGame();
   game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
@@ -797,7 +788,6 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
 /* ------------------------------------------------------------------------------- */
 
 async function main(): Promise<void> {
-  [SaveMenu, Inventory] = await importUI();
   const graphics = loadGraphics();
   checkButtonTables(graphics);
   checkLayout(graphics);

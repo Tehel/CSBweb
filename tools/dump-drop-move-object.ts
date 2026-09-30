@@ -4,7 +4,7 @@
  * `DropObject` puts the cursor's object down with `MoveObject(objD4, -1, 0, x, y)`
  * (`doc/CSBwin-src/Mouse.cpp:882`), and a thrown object whose flight ends is put down with
  * `MoveObject(obj, -2, 0, x, y)` (`ProcessObjectFromMissile`, `Timer.cpp:151-159`).
- * `Game.dropObjectFromCursor` and `TimerSystem.dropMissileObject` hand-rolled it, and
+ * `MouseSystem.dropObjectFromCursor` and `TimerSystem.dropMissileObject` hand-rolled it, and
  * differed from it in two ways:
  *
  *  1. They placed the object with `unchangedRoom` false. `MoveObject` places an object
@@ -153,7 +153,7 @@ function main(): void {
     const calls = spy(game);
     game.ctx.party.state.cursorOwner = 0;
     game.ctx.party.state.objectInHand = rn;
-    const dropped = game.dropObjectFromCursor(1);
+    const dropped = game.systems.mouse.dropObjectFromCursor(1);
     const landed = find(game, party, decodeObjectID(rn).index);
     console.log(`1. cursor drop at (${party.x},${party.y}) where the party stands: accepted ${dropped}, `
       + `there ${landed !== null}, pad calls ${JSON.stringify(calls.map((c) => [c.at.x, c.at.y, c.place, c.unchangedRoom]))}`);
@@ -170,7 +170,7 @@ function main(): void {
     const calls = spy(game);
     game.ctx.party.state.cursorOwner = 0;
     game.ctx.party.state.objectInHand = rn;
-    game.dropObjectFromCursor(2);
+    game.systems.mouse.dropObjectFromCursor(2);
     const landed = find(game, dest, decodeObjectID(rn).index);
     console.log(`2. cursor drop onto the teleporter at (${front.x},${front.y}), rotation 1: at (${dest.x},${dest.y}) `
       + `${landed !== null}, corner ${landed !== null ? decodeObjectID(landed).position : '-'}, `
@@ -232,7 +232,7 @@ function main(): void {
 
     game.ctx.party.state.cursorOwner = 0;
     game.ctx.party.state.objectInHand = rn;
-    game.dropObjectFromCursor(2);
+    game.systems.mouse.dropObjectFromCursor(2);
     const afterDrop = queued();
 
     padTimer = -1;

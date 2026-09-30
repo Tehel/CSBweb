@@ -25,7 +25,7 @@ export const BUILD_PARTY = `(()=>{
     party.position.y = hero.location.y - DELTA_Y[facing];
     party.position.z = hero.location.map;
     party.facing = facing;
-    game.handleWallClick();
+    game.systems.mouse.handleWallClick();
     game.systems.hallOfChampions.resurrectReincarnateCancel(160);
   }
   renderView();

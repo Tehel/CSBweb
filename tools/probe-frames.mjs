@@ -197,7 +197,7 @@ await evaluate(`(()=>{
   party.position.x = 14; party.position.y = 29; party.position.z = 4;
   party.facing = 3;
   party.brightness = 1000;   // level 4 is dark, and no one holds a torch: full magic light
-  const touched = game.handleWallClick();
+  const touched = game.systems.mouse.handleWallClick();
   renderView();
   return touched;
 })()`).then(t => console.log('  touched:', t));

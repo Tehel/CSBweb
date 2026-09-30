@@ -4403,7 +4403,7 @@ it is 0 and the PASS goes through to `TAG01b1c0`. The port skips the test for -1
   pair of tables.
 
 The port: `keyScanOf` and `translateKey` (`src/renderer/ui/Keyboard.ts`), queued by
-`src/ui/events.ts` before the port's own bindings, except F1-F4, which select the caster
+`GameInput.keyDown` (`src/renderer/GameInput.ts`) before the port's own bindings, except F1-F4, which select the caster
 (`DEBT.md` H). Evidence: `tools/dump-key-bindings.ts`.
 
 ## The freeze: button 147 in, button 148 out, no tick in between

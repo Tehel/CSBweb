@@ -50,6 +50,7 @@ import type { Rect } from '../src/data/tables/UITables';
 import { newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
+import { handleUIKey } from '../src/renderer/ui/Keyboard';
 
 const TURN_LEFT: Rect = { x1: 0xea, x2: 0x0105, y1: 0x7d, y2: 0x91 };
 const TURN_RIGHT: Rect = { x1: 0x123, x2: 0x13e, y1: 0x7d, y2: 0x91 };
@@ -376,11 +377,7 @@ async function main(): Promise<void> {
     "the first option's tick should draw it inverted, and the next VBL put it back");
   check(ui.attackingCharacterOrdinal === 0, 'the attack should close the menu');
 
-  // Champion 1's key column: W opens its menu, then each key of the column is a row. As in
-  // `tools/dump-freeze.ts`: `ui/Keyboard` reaches `@/ui`, which touches `document`.
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  const { handleUIKey } = await import('../src/renderer/ui/Keyboard');
+  // Champion 1's key column: W opens its menu, then each key of the column is a row.
   reset();
   const keyRow = (key: string): { inverted: Rect | null; ordinal: number } => {
     handleUIKey(ui, key);

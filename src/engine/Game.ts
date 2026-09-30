@@ -28,7 +28,7 @@ import { MonsterAttack } from './MonsterAttack';
 import { AttackSystem } from './AttackSystem';
 import { MagicSystem } from './MagicSystem';
 import { CharacterSystem } from './CharacterSystem';
-import { MouseSystem, type DropCursorOptions } from './MouseSystem';
+import { MouseSystem } from './MouseSystem';
 import { HallOfChampions } from './HallOfChampions';
 import { MOUSE_UNCLICK, type MouseQueueEntry } from './MouseQueue';
 import { createLoopFlags, flashButton, vblFlashButton, waitForButtonFlash, type LoopScript, type MainLoop } from './LoopState';
@@ -780,31 +780,6 @@ export class Game implements MainLoop {
      */
     onMove(callback: MovementCallback): void {
         this.onMoveCallbacks.push(callback);
-    }
-
-    /** A click on the wall ahead, `TouchWallF1` (`MouseSystem.handleWallClick`). */
-    handleWallClick(): boolean {
-        return this.systems.mouse.handleWallClick();
-    }
-
-    /** An empty-handed click on the bare stone ahead (`MouseSystem.handleStoneClick`). */
-    handleStoneClick(): void {
-        this.systems.mouse.handleStoneClick();
-    }
-
-    /** A click on a door's button (`MouseSystem.handleDoorSwitchClick`). */
-    handleDoorSwitchClick(): boolean {
-        return this.systems.mouse.handleDoorSwitchClick();
-    }
-
-    /** `DropObject` (`MouseSystem.dropObjectFromCursor`), for the UI and `tools/`. */
-    dropObjectFromCursor(relativePos: number, options?: DropCursorOptions): boolean {
-        return this.systems.mouse.dropObjectFromCursor(relativePos, options);
-    }
-
-    /** `ThrowObjectInHand` (`MouseSystem.throwObjectFromCursor`), for the UI and `tools/`. */
-    throwObjectFromCursor(leftOrRight: number): boolean {
-        return this.systems.mouse.throwObjectFromCursor(leftOrRight);
     }
 
     // Get position info for debugging

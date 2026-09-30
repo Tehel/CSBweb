@@ -15,7 +15,7 @@ import {
 } from './engine/SaveGamePayload';
 import { loadGlfx } from './lib/glfx-loader';
 import { GameScreen } from './renderer/GameScreen';
-import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug } from './ui';
+import { bindDataSetChooser, bindUIContext, drawMapPreview, handleCursorFilter, isDebugFeaturesEnabled, updateDebug, updateHover } from './ui';
 import { ScrollingText } from './renderer/csbwin/ScrollingText';
 import { UIMode } from './renderer/ui/UIState';
 import { createDevTools } from './dev';
@@ -331,6 +331,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         onPaletteSelected: (index) => {
             game.currentPalette = index;
         },
+        reportHover: updateHover,
     });
     return { game, screen, messages };
 }
@@ -416,6 +417,7 @@ async function runIntro(game: Game, screen: GameScreen, sound: SoundManager): Pr
         consumeSavedGameRead,
         readNewGame: () => readNewGame(game),
         skip: skipIntro,
+        reportDebug: updateDebug,
     });
 }
 

@@ -462,7 +462,7 @@ function main(): void {
         g.ctx.dungeon.removeObjectFromCell(altar.party, bones);
         g.ctx.party.state.objectInHand = bones;
         g.ctx.party.state.cursorOwner = 0;
-        const dropped = g.dropObjectFromCursor(4, { viAltar: true });
+        const dropped = g.systems.mouse.dropObjectFromCursor(4, { viAltar: true });
         check(dropped, 'the bones go into the alcove');
         check(bonesAt(g, altar.alcove).length === 1, 'and land in the alcove cell, not the party cell');
 
@@ -505,7 +505,7 @@ function main(): void {
       g.ctx.dungeon.getMiscRecord(inert)!.specialState = 0;
       g.ctx.party.state.objectInHand = inert;
       g.ctx.party.state.cursorOwner = 0;
-      const dropped = g.dropObjectFromCursor(4, { viAltar: true });
+      const dropped = g.systems.mouse.dropObjectFromCursor(4, { viAltar: true });
       check(dropped, 'inert bones still drop into the alcove like any other object');
       runTicks(g, 8);
       const c = g.ctx.party.state.champions[1]!;

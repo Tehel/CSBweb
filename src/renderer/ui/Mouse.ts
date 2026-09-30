@@ -23,7 +23,13 @@ import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
 import { freeze, setClockTick, thaw, waitForButtonFlash, wakeUp } from '../../engine/LoopState';
-import { updateHover } from '@/ui';
+import {
+  hasCursorObject,
+  resolveEmptyHandedViewportClick,
+  resolveViewportCursorAction,
+  tryPickViewportObject,
+  tryUseFrontWallItem,
+} from './ViewportPicking';
 
 export { decodeCursorBitmap };
 
@@ -37,8 +43,39 @@ export function searchMouseButtons(ui: UIState, x: number, y: number, buttons: n
   return searchButtonList(ui.secondaryButtons, x, y, buttons);
 }
 
+/**
+ * Button 80, `HandleClickInViewport` (doc/CSBwin-src/Mouse.cpp:1031), reached through
+ * `HandleMouseEvents` (`:1665-1670`): a drop, a throw, a wall, a door switch, an object
+ * picked up, or the sound of a hand on bare stone. The eye, when the inventory hides the
+ * viewport, is `handleMouseButton`'s.
+ */
+function handleClickInViewport(ui: UIState, x: number, y: number): void {
+  if (ui.partyState.selectedCharacterIndex >= 0) return;
+  const mouse = ui.ctx.systems.mouse;
+  const cursorAction = resolveViewportCursorAction(ui, x, y);
+  if (cursorAction) {
+    if (cursorAction.kind === 'drop') mouse.dropObjectFromCursor(cursorAction.pos, { viAltar: cursorAction.viAltar });
+    else if (cursorAction.kind === 'throw') mouse.throwObjectFromCursor(cursorAction.side);
+    else if (cursorAction.kind === 'wall') {
+      if (!tryUseFrontWallItem(ui, x, y)) {
+        mouse.handleWallClick();
+      }
+    }
+  } else if (!hasCursorObject(ui)) {
+    const target = resolveEmptyHandedViewportClick(ui, x, y);
+    if (target === 'doorSwitch') mouse.handleDoorSwitchClick();
+    else if (target === 'wall') mouse.handleWallClick();
+    else if (target === 'object') tryPickViewportObject(ui, x, y);
+    else if (target === 'stone') mouse.handleStoneClick();
+  }
+}
+
+/**
+ * Every button `Game.handleMouseEvents` does not handle itself: the turns and steps are
+ * the engine's, the rest are the interface's.
+ */
 export function handleMouseButton(ui: UIState, id: number, x: number, y: number): void {
-  // updateDebug(`handling click on ${id}`)
+  if (id === 80) handleClickInViewport(ui, x, y);
   if (id === 80 && isEyeClick(ui, x, y)) {
     handleEyePress(ui);
     return;
@@ -688,25 +725,22 @@ export function drawCursorBitmap(ui: UIState, bitmap: IndexedBitmap, x: number, 
   }
 }
 
-export function drawHoverHighlights(ui: UIState) {
-  if (!ui.hoverPoint) return;
+/**
+ * The debug chrome's hover report: every `graphics.dat` 0x231 button under the pointer,
+ * one per line, or null with no pointer over the screen.
+ */
+export function describeHoveredButtons(ui: UIState): string | null {
+  if (!ui.hoverPoint) return null;
   const { x, y } = ui.hoverPoint;
 
   const hovered: string[] = [];
-  for (const btn of ui.uiTables.graphic231.moveButtons) {
-    if (pointInRect(x, y, btn)) {
-      // drawRectOutlineIndex(ui.screenIndexBuffer, btn, 15);
-    }
-  }
-
   const buttonGroups = Object.values(ui.uiTables.graphic231.buttons);
   for (const group of buttonGroups) {
     for (const btn of group) {
       if (pointInRect(x, y, btn)) {
         hovered.push(`231: ${btn.name ?? '?'} - ${btn.button} - ${btn.word0}`);
-        // drawRectOutlineIndex(ui.screenIndexBuffer, btn, 9);
       }
     }
   }
-  updateHover(hovered.join("<br>"));
+  return hovered.join("<br>");
 }

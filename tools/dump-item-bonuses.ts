@@ -46,6 +46,7 @@ import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { handleClothingClick } from '../src/renderer/ui/Mouse';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
@@ -60,14 +61,6 @@ function makeGame(host?: Partial<GameHost>): Game {
   const game = newGame(data, graphics, host);
   game.setRandomSeed(0x12345678);
   return game;
-}
-
-/** `ui/Mouse.ts` reaches for the DOM when it loads; a stub is enough for a click. */
-async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Mouse');
 }
 
 /** The interface over `g`, whose inventory click calls the engine's pair. */
@@ -189,7 +182,6 @@ const table: Row[] = [
 ];
 
 async function main(): Promise<void> {
-  const { handleClothingClick } = await importMouse();
   const game = makeGame();
   const dungeon = game.ctx.dungeon;
   const nameIndex = (rn: ObjectID): number => NameIndex(
@@ -358,7 +350,7 @@ async function main(): Promise<void> {
       boris.location.x - [0, 1, 0, -1][facing]!, boris.location.y - [-1, 0, 1, 0][facing]!, boris.location.map,
     );
     party.facing = facing as Direction;
-    g.handleWallClick();
+    g.systems.mouse.handleWallClick();
     const recruit = party.champions[0];
     const luck = recruit?.attributes.stats[AttributeIndex.Luck];
     const foot = recruit?.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL && nameIndex(rn) === NI.OBJNI_RABBITS_FOOT) ?? -1;
@@ -482,7 +474,7 @@ async function main(): Promise<void> {
       zed.location.x - [0, 1, 0, -1][facing]!, zed.location.y - [-1, 0, 1, 0][facing]!, zed.location.map,
     );
     party.facing = facing as Direction;
-    g.handleWallClick();
+    g.systems.mouse.handleWallClick();
     const recruit = party.champions[0];
     const slot = recruit?.possessions.findIndex((rn) => rn !== OBJECT_ID_NULL
       && decodeObjectID(rn).category === DBType.WEAPON && typeNamed(NI.OBJNI_TORCH_A)?.type

@@ -31,19 +31,9 @@ import type { LoopScript } from '../src/engine/LoopState';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { newUIState } from './lib/ui';
 import { check, finish } from './lib/check';
-
-/**
- * `ui/Keyboard` reaches `ui/Mouse`, which reaches the debug chrome through `@/ui` and
- * touches `document` while its modules load. Nothing here needs a DOM, so stub the two
- * accessors those module-scope lines use and import it once the stub is in place —
- * the same dance `tools/dump-hand-owner.ts` does.
- */
-async function importKeyboard(): Promise<typeof import('../src/renderer/ui/Keyboard')> {
-  const g = globalThis as Record<string, unknown>;
-  if (!g.document) g.document = { getElementById: () => null, addEventListener: () => {} };
-  if (!g.window) g.window = g;
-  return import('../src/renderer/ui/Keyboard');
-}
+import { handleUIKey, keyScanOf, tableKeyButton, translateKey } from '../src/renderer/ui/Keyboard';
+import { attackPanelTick, closeAttackMenu, handleAttackAreaClick } from '../src/renderer/ui/Attack';
+import { updateButtonLists } from '../src/renderer/ui/Mouse';
 
 function runes(party: PartyState): string {
   const caster = party.magicCasterIndex >= 0 ? party.champions[party.magicCasterIndex] : null;
@@ -125,8 +115,6 @@ async function main(): Promise<void> {
     return 0;
   };
 
-  const { handleUIKey } = await importKeyboard();
-  const { attackPanelTick, closeAttackMenu, handleAttackAreaClick } = await import('../src/renderer/ui/Attack');
   let held = false;
   // A rune key's `_MagicSelection` holds the loop for its flashes (`magicSelectionScript`):
   // the VBLs go by, as a player's next key would wait for them, before the row is read.
@@ -239,7 +227,7 @@ async function main(): Promise<void> {
   press('Tab');
   check(casts.length === 0, 'Tab with an empty incantation should cast nothing');
 
-  // ---- 5. Case, and the keys the table does **not** claim: `ui/events.ts` routes those
+  // ---- 5. Case, and the keys the table does **not** claim: `GameInput.keyDown` routes those
   //         to movement, so a bound key leaking through would walk the party instead.
   check(press('Q'), "'Q' should be claimed the same as 'q'");
   check(ui.attackingCharacterOrdinal === 1, 'a capital should reach the same binding');
@@ -342,8 +330,6 @@ async function main(): Promise<void> {
   //         8428-8475), a row per entry, in each mode's pair (`updateButtonLists`). Every
   //         entry has a browser key, and none is bound twice in a pair, so the first match
   //         `translateKey` returns is what CSBWin queues.
-  const { keyScanOf, tableKeyButton, translateKey } = await importKeyboard();
-  const { updateButtonLists } = await import('../src/renderer/ui/Mouse');
   const keyOf = (keyscan: number): string | undefined =>
     TABLE_KEYS.find((key) => keyScanOf(key) === keyscan)
     ?? CTRL_LETTERS.map((letter) => `Ctrl-${letter}`).find((name) => keyScanOf(name.slice(5), true) === keyscan);
