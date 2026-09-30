@@ -1,4 +1,4 @@
-import type { Game } from '../engine';
+import type { Game } from '../engine/Game';
 import type { GameScreen } from '../renderer/GameScreen';
 
 export interface UIContext {

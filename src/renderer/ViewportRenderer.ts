@@ -31,8 +31,7 @@ import {
   VIEWPORT_WIDTH,
   VIEWPORT_HEIGHT,
 } from './ViewportGraphics';
-import { getOrSet, Position } from '@/core';
-import { OBJECT_ID_EOF } from '../core/types';
+import { getOrSet, OBJECT_ID_EOF, Position } from '../core/types';
 
 type IndexedBitmapSet = IndexedBitmap[]
 

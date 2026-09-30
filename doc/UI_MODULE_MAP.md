@@ -15,7 +15,8 @@ builds it whole, from its data sources and every hook, so none of them is ever m
   the dungeon, the party and the systems), `context` (the viewport's bytecode interpreter
   context), `screenIndexBuffer`, `uiTables`, `objectTables`, `fontData`, `partyState` (the
   party the screen last drew, `ctx.party.state` until then), `uiMode`
-- **interaction state**: `pressingEye`, `hoverPoint`, `showAttackPanel`, the open chest,
+- **interaction state**: `pressingEye`, `hoverPoint`, the attack menu
+  (`attackingCharacterOrdinal`, `possibleAttackTypes`, …), the open chest,
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet

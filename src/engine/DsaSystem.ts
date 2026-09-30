@@ -1256,7 +1256,7 @@ export class DsaSystem {
           default:
             if (!this.warnedOps.has(opcode)) {
               this.warnedOps.add(opcode);
-              console.warn('Unimplemented DSA opcode', opcode);
+              this.ctx.host.trace(`Unimplemented DSA opcode ${opcode}`);
             }
             break;
         }
@@ -1312,7 +1312,7 @@ export class DsaSystem {
         }
         const locr = locationRelFromInteger(location);
         if (!this.dungeon.isValidLocation(locr)) {
-          console.warn('Illegal location in DSA &DEL');
+          this.ctx.host.trace('Illegal location in DSA &DEL');
           break;
         }
         const pos = new Position(locr.x, locr.y, locr.l);
@@ -1863,7 +1863,7 @@ export class DsaSystem {
       default:
         if (!this.warnedOps.has(subcode)) {
           this.warnedOps.add(subcode);
-          console.warn('Unimplemented DSA & opcode', subcode);
+          this.ctx.host.trace(`Unimplemented DSA & opcode ${subcode}`);
         }
         break;
     }
@@ -1900,7 +1900,7 @@ export class DsaSystem {
     if (slave.localState !== 3) {
       return { rn: rnSlave, locr: { l: locrSlave.l, x, y, p: locrSlave.p } };
     }
-    console.warn('Slave DSA not implemented');
+    this.ctx.host.trace('Slave DSA not implemented');
     return { rn: rnSlave, locr: { l: locrSlave.l, x, y, p: locrSlave.p } };
   }
 
@@ -1913,7 +1913,7 @@ export class DsaSystem {
       case 2:
         return getActuatorParameterB(rec);
       default:
-        console.warn('Illegal DSA localState', dsa.localState);
+        this.ctx.host.trace(`Illegal DSA localState ${dsa.localState}`);
         return 0;
     }
   }
@@ -1930,7 +1930,7 @@ export class DsaSystem {
         setActuatorParameterB(rec, state);
         break;
       default:
-        console.warn('Illegal DSA localState', dsa.localState);
+        this.ctx.host.trace(`Illegal DSA localState ${dsa.localState}`);
         break;
     }
   }
@@ -1991,7 +1991,7 @@ export class DsaSystem {
       }
       const mapping = this.byte1596[roomType];
       if (mapping === 0) {
-        console.warn('Illegal DSA timer target', { level: locr.l, x: locr.x, y: locr.y });
+        this.ctx.host.trace(`Illegal DSA timer target (${locr.x},${locr.y}) L${locr.l}`);
         return;
       }
       functionType = mapping;
@@ -2979,7 +2979,7 @@ export class DsaSystem {
         }));
       }
       default:
-        console.warn('DSA &ADD unsupported object type', category);
+        this.ctx.host.trace(`DSA &ADD unsupported object type ${category}`);
         return null;
     }
   }

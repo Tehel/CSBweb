@@ -42,7 +42,7 @@ import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
-import { MovementAction } from '../src/engine';
+import { MovementAction } from '../src/engine/gameTypes';
 import { applySaveBytes, buildSavePayload, encodeSavePayload } from '../src/engine/SaveGamePayload';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';

@@ -6,8 +6,7 @@
  * engine special-cases so the comparisons stay readable and greppable against
  * the C++ source.
  *
- * Single source of truth: previously these were re-declared in ViewportRenderer,
- * Game, skills, DsaSystem and ActuatorSystem, which risked silent divergence.
+ * The one declaration of each: a copy elsewhere could drift from it silently.
  */
 
 export const OBJNI_COMPASS_N = 0;

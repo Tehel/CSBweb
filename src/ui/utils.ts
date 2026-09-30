@@ -1,4 +1,4 @@
-import type { DungeonData } from '../data';
+import type { DungeonData } from '../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../renderer/ViewportGraphics';
 
 export function getEventPosition(canvas: HTMLCanvasElement, e: MouseEvent): { x: number, y: number } {

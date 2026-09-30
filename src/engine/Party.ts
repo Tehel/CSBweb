@@ -245,12 +245,12 @@ export function ensureHandOwner(party: PartyState): void {
  * `d.CH16482[chIdx]` — CSBWin indexes its champion array by **party slot**, which is
  * the champion's box in the top bar and never moves.
  *
- * This used to match on `partyPosition` first. That is `CHARDESC.charPosition`, the
- * corner of the cell the champion stands in, and `setPartyFacing` rotates it — so
- * after the party turned, `setHandOwner(party, 1)` validated whichever champion had
- * drifted into corner 1 rather than the one in box 1. Every consumer of `cursorOwner`
- * and `magicCasterIndex` reads them as list indices (`party.champions[chIdx]`), and so
- * does CSBWin, so the list index is the one true meaning.
+ * Not `partyPosition`: that is `CHARDESC.charPosition`, the corner of the cell the
+ * champion stands in, and `setPartyFacing` rotates it, so after the party turned it
+ * would name whichever champion had drifted into the corner rather than the one in the
+ * box. Every consumer of `cursorOwner` and `magicCasterIndex` reads them as list indices
+ * (`party.champions[chIdx]`), and so does CSBWin, so the list index is the one true
+ * meaning.
  *
  * Exported because the UI needs the same lookup: every click that names a champion —
  * a portrait box, an inventory slot, a magic tab — names a *box*, and CSBWin resolves

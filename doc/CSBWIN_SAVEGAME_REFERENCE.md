@@ -384,6 +384,5 @@ the two formats, so the disk menu's LOAD and F9 both act on a `.dat`.
 into a real `Game` and the *live engine* is then asked where the party is, who it is,
 what its cell holds, and whether every cell flag in all fourteen maps is the save's.
 
-What a load still does **not** carry is listed under Phase 10 step 12 in `PLAN.md`: the
-timer queue (a gap the port's own quick-save shares), the DSA global variables in
-`EXPOOL`, and `d.Word11694`.
+What a load still does **not** carry is listed in `PLAN.md` → Phase 10 → "Deferred": the
+DSA global variables in `EXPOOL`, `d.Word11694` and `d.PartySleeping`.

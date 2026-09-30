@@ -376,12 +376,11 @@ export class TimerQueue {
    * into a table that is not first allocated as a new game's. A save that carries no
    * cursor gets the lowest free slot, which is the cursor unless the table has filled.
    *
-   * It used to mint new timers above the highest restored index instead, on the grounds
-   * that it "costs nothing but the numbering". It cost more than that: `LoadGame` is
-   * followed by `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and
-   * re-creates the movement timers of every monster group on the party's level, so each
-   * load abandoned one slot per re-created timer. A quick-save/quick-load cycle on a
-   * level with monsters grew the table by two slots every time, for ever.
+   * New timers are not minted above the highest restored index: `LoadGame` is followed
+   * by `reloadAfterSaveGame`, whose `processMonstersOnLevel` deletes and re-creates the
+   * movement timers of every monster group on the party's level, so each load would
+   * abandon one slot per re-created timer, and a save/load cycle on a level with
+   * monsters would grow the table for ever.
    */
   restore(entries: readonly TimerEntry[], nextSequence: number, maxTimers: number, firstAvailTimer?: number): void {
     this.queue = entries.map((entry) => ({ ...entry }));

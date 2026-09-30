@@ -30,12 +30,11 @@ export interface DecodedImage extends ImageDimensions {
  * Atari planar memory through 16-pixel groups and a running bit mask; this works in chunky
  * bytes, which is the only liberty taken. Every opcode, count and fall-through is the C++'s.
  *
- * This file used to hold a decoder written from the dmweb.free.fr format notes instead, and
- * three of its opcodes disagreed with CSBWin: `0xA` and `0xE` were "transparent pixels" where
- * CSBWin has a plain colour run, and `0xD` threw. Only one real image in either data set
- * exercises any of them — graphic 5, the credits scroll, which uses `0xA` four times — and it
- * came out with the whole picture sliding right from (78,55) on. Items 558..562 use the
- * others, but they are the tables `0x22e`..`0x232`, not images at all.
+ * The dmweb.free.fr format notes disagree with CSBWin on three opcodes, and CSBWin wins:
+ * `0xA` and `0xE` are plain colour runs, not "transparent pixels", and `0xD` is an opcode.
+ * Only one real image in either data set exercises any of them — graphic 5, the credits
+ * scroll, which uses `0xA` four times, and read the other way slides right from (78,55) on.
+ * Items 558..562 use the others, but they are the tables `0x22e`..`0x232`, not images.
  *
  * ## The format
  *

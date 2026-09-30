@@ -573,11 +573,9 @@ export class MissileEncounter {
    * Code11f52.cpp:2101-2121`) — the sound for a plain object's impact, when nothing
    * spawned a cloud. These `soundNum` values are **ordinals** into `d.sound1772`
    * (`graphic232`'s sound table), not raw SND item numbers — `queueSound` is what
-   * resolves an ordinal to the actual sample and its distance falloff. This used to
-   * call `playSound` with a hand-picked `SoundIndex` constant per branch, which
-   * silently substituted a *different* sample for the non-weapon, non-poison-bolt
-   * case (`SoundIndex.FIREBALL_EXPLODE`, ordinal 5's sound, instead of ordinal 4's) —
-   * so a dropped scroll or piece of food played an explosion.
+   * resolves an ordinal to the actual sample and its distance falloff. A `SoundIndex`
+   * picked per branch would not do: ordinal 4, a dropped scroll or piece of food, is
+   * not ordinal 5's explosion.
    */
   private playMissileImpactSound(projectile: ObjectID, position: Position): void {
     let soundNum: number;
@@ -597,9 +595,7 @@ export class MissileEncounter {
    * bolt or lightning bolt, `QueueSound(13, ...)` for anything else (skipping a
    * monster-death cloud, which is silent). Ordinals 5 and 20 both resolve to the
    * same SND item — a small blast is the same sample at a shorter falloff distance,
-   * not a different one — so this used to substitute `SoundIndex.SPELL_EXPLODE`
-   * (ordinal 13's sample) for the small case, turning a modest fireball into
-   * whatever ordinal 13 sounds like instead of a quieter version of its own blast.
+   * not ordinal 13's sample.
    */
   private playCloudSound(projectile: ObjectID, size: number, position: Position): void {
     if (projectile === RN_FIREBALL || projectile === RN_POISON || projectile === RN_LIGHTNING) {
@@ -651,9 +647,8 @@ export class MissileEncounter {
    * `CreateCloud` / `TAG00dea8` (`doc/CSBwin-src/Code11f52.cpp:1376`).
    *
    * The cloud is a DB15 record in the cell plus a `TT_25` timer that gives it its
-   * life. Without the timer — which is how this stood until now — the record sits in
-   * the cell at full size for the rest of the game, rendering a permanent puff and
-   * dealing no damage at all.
+   * life. Without the timer the record would sit in the cell at full size for the rest
+   * of the game, a permanent puff dealing no damage.
    *
    * A fireball or a lightning bolt also does its damage *here*, at the moment the
    * cloud appears, not on the timer.

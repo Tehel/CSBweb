@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E18 | Hygiene and documentation drift | S | ⏳ |
 | C95 | `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers | S | ⏳ |
 | C97 | `DrawViewport` runs outside CSBWin's three call sites | M | ⏳ |
 | C98 | The tick comes from the wall clock, not from `d.vblCount` | M | ⏳ |
@@ -160,7 +159,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:300`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:306`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -168,9 +167,9 @@ The code it will stand on is spread and knotted:
   chrome's log through `src/ui/`, which looks its elements up as it loads, so a tool
   that imports it stubs `document` first (`tools/dump-save-menu.ts`).
 - **Nothing below the page knows which game it runs.** The data set is a `main.ts`
-  module variable (`:58`), so neither a save nor the stores can say "DM" or "CSB", which is
+  module variable (`:63`), so neither a save nor the stores can say "DM" or "CSB", which is
   `P10`'s "a save knows its dungeon". The boot's chooser learns whether a save was read
-  through another `main.ts` global, `savedGameRead` (`:38`).
+  through another `main.ts` global, `savedGameRead` (`:42`).
 - **Some of it is written twice.** `EXTENDEDFEATURESBLOCK` is read by
   `SaveGameLoader.readExtendedFeatures` at bare offsets with bare masks
   (`extendedFlags & 0x20`, `flags & 0x80`), and by
@@ -179,7 +178,7 @@ The code it will stand on is spread and knotted:
   `CsbwinExtendedFeatures.ts:37`) and `EXPOOL_RECORD_SIZE` three times
   (`SaveGameLoader.ts:277`, `DungeonLoader.ts:57`, `CsbwinDungeonImageWriter.ts:45`). A
   save's name is made unique twice, with different suffix rules:
-  `makeSaveFileName(savedAt, taken)` (`src/engine/SaveGamePayload.ts:503`) and
+  `makeSaveFileName(savedAt, taken)` (`src/engine/SaveGamePayload.ts:502`) and
   `SaveMenu.uniqueName` (`src/renderer/ui/SaveMenu.ts:594`).
 - **CHARDESC's flag constants** (`CHARFLAG_ATTACK_DISABLE`, `CHARFLAG_MALE`) live in the
   save codec (`src/data/CsbwinCharacters.ts:37-40`), and the engine and the UI import them
@@ -201,7 +200,7 @@ What the redesign will replace, and what it should not carry across:
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
-- **`main.ts` holds the page's features**: the 100-line CRT controller (`:62-164`), the
+- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-170`), the
   end-of-game flow, and the save wiring (`E13`).
 - **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
   `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
@@ -214,28 +213,6 @@ What the redesign will replace, and what it should not carry across:
 
 Paying it is the redesign's first step: settings as a model the page renders, the CRT in a
 module of its own, a `publicDir` holding only what the page serves, and `server.js` gone.
-
-### E18 ⏳ Hygiene and documentation drift
-
-- **Three import styles**: four files import `@/core` or `@/ui`, the rest by relative
-  path, and `main.ts`, `dev.ts` and `src/ui/` through barrels; `src/engine/index.ts`
-  re-exports 22 modules for those few importers. One style, and no barrel but where a
-  directory has a public face.
-- **Logging from the engine and the loaders**: 36 `console` calls outside `main.ts`, among
-  them `ViewportRenderer` announcing the 0x22e offset at each construction and `Game`
-  logging its start and stop; `main.ts` logs every move with `getPositionInfo()`.
-  Diagnostics go to the host's `trace` or the page's log.
-- **Comments that tell history**: about 40 "This used to…", "no longer", "until now" in
-  `src/`, against `CLAUDE.md` → "Write down the present". The rule and its reason stay;
-  the story goes to `git log`. Likewise `PLAN.md` → Phase 10 ("September 13th", "used
-  to", "now"), and imports placed after declarations (`TimerSystem.ts:1-18`).
-- **Documentation drift**: `CLAUDE.md` says `src/` is ~30k lines (it is ~56k), describes
-  `dev.ts` as dev-only scaffolding with a random party and missile scenarios (it is the
-  F5/F9 quick-save), omits `audio/`, `data/saves/` and `lib/` from the layout, and gives
-  `npm test` as ~6 s (`F13`). `doc/UI_MODULE_MAP.md` lists hooks and fields `UIState`
-  no longer has (`playSound`, `showAttackPanel`). `README.md` describes the project as it
-  was at its start: an unchecked "game logic", a `scrape:csbwin` script that does not
-  exist, a `LICENSE` that is `licence.txt`.
 
 ---
 
@@ -320,11 +297,11 @@ save and a load. It must be paid before `P10` drops `runtime`.
 
 CSBWin calls `DrawViewport` in three places: the main loop's tick
 (`doc/CSBwin-src/CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison
-door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:167`) always
+door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:173`) always
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:464-469`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:467-472`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -346,7 +323,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:384-403`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:380-399`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds
@@ -383,8 +360,8 @@ returns, the pass goes on where it stopped. The next queue entries follow while
 `intResult & 1`, then `if (d.clockTick == 0)`, and a tick if one is due
 (`doc/CSBwin-src/CSBCode.cpp:747-765`), so `d.clockTick = CastMagic(0)` (`Magic.cpp:564`)
 is read in that VBL. The port runs it as a `LoopScript`: `Game.runFrame`'s script branch
-resumes it and returns (`src/engine/Game.ts:358-366`), and the rest of the pass waits for
-the next VBL's, which opens with `clockTickCleared = false` (`:374`). So the tick a cast or
+resumes it and returns (`src/engine/Game.ts:354-362`), and the rest of the pass waits for
+the next VBL's, which opens with `clockTickCleared = false` (`:370`). So the tick a cast or
 a rune makes due runs a VBL late, the next queued click waits a VBL, and a cast that returns
 0 (a failed cast, or `CastSpell`'s 3) no longer puts off a tick that was due: the next pass
 has cleared the put-off before it reads it. The fusion and the CSB win's wait are spared,
@@ -396,7 +373,7 @@ the script ends (the rest of the `handleMouseEvents` loop, then the tick), with 
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
 `setCrtEnabled(true)` hides the game canvas and shows the WebGL one in its place
-(`src/main.ts:140-147`). `bindUIEvents` binds the adventure's handlers to both canvases,
+(`src/main.ts:146-153`). `bindUIEvents` binds the adventure's handlers to both canvases,
 but the pre-game and end-of-game screens listen on the game canvas alone
 (`createIntroHost`, `src/renderer/intro/BootSequence.ts:138-143`, handed `gameCanvasEl` by
 `showEndOfGame`). With the effect on, the credits' menu and the restart's chooser and
@@ -446,10 +423,10 @@ one tool per commit, each tool's output byte-identical.
 ### F13 ⏳ `npm test` runs its tools one at a time
 
 `tools/run-checks.mjs` spawns its 124 checks sequentially (`spawnSync`, `:240`), each a
-`tsx` start of 300 ms or more, so the gate takes over a minute where `CLAUDE.md` promises
-about 6 seconds. Most sessions run it several times. Paying it means a pool of workers the
-size of the machine, the output still printed in the list's order, and `CLAUDE.md`'s
-timings updated.
+`tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
+and the runner's header give). Most sessions run it several times. Paying it means a pool
+of workers the size of the machine, the output still printed in the list's order, and
+those timings updated.
 
 ---
 
@@ -497,7 +474,7 @@ Not taken in order; the author names one to start it (see "Priority").
 
 ### G1 ⏸️ DSA gaps
 
-- **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are reported once each through
+- **Opcodes.** Unimplemented DSA opcodes and `&` subcodes are traced once each through
   `warnedOps` (`src/engine/DsaSystem.ts:1257`, `:1864`). Those warnings are the list.
   Slave DSAs are not implemented (`findMaster`, `:1896-1905`).
 - **`STKOP_Throw`** (`DSA.cpp:4558`) is one of the missing opcodes, so
@@ -664,7 +641,7 @@ CSBWin's fountain is a wall decoration, not an actuator: the renderer sets
 (`doc/CSBwin-src/CSBCode.cpp:3302-3308`), and a click on viewport button 5 with it set
 fills a waterskin or an empty flask held in the cursor, and does nothing else
 (`doc/CSBwin-src/Mouse.cpp:1194-1225`). The port has the same thing in
-`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:135`), which returns at once
+`tryUseFrontWallItem` (`src/renderer/ui/ViewportPicking.ts:134`), which returns at once
 when the hand is empty.
 
 The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one

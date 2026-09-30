@@ -18,7 +18,7 @@ import {
     makeSaveFileName,
     type SavePayload,
 } from './engine/SaveGamePayload';
-import type { Game } from './engine';
+import type { Game } from './engine/Game';
 import type { Champion } from './engine/gameTypes';
 import { updateDebug } from './ui';
 
@@ -48,7 +48,7 @@ export function buildQuickSavePayload(game: Game, host: DevHost): SavePayload {
     return buildSavePayload(game, { portraitOf: host.portraitOf });
 }
 
-/** Where the quick-save used to live, before F5/F9 joined the save list. */
+/** The quick-save's own `localStorage` key, from before F5/F9 wrote to the save list. */
 const LEGACY_QUICK_SAVE_KEY = 'dmweb_savegame_raw_v1';
 
 export interface DevTools {
@@ -64,10 +64,9 @@ export interface DevTools {
 
 export function createDevTools(host: DevHost): DevTools {
     /**
-     * The quick-save used to live under one `localStorage` key of its own. Anything
-     * still in it is moved into the browser store once, so a playtest saved before this
-     * change is not stranded, and the key is dropped either way — a payload too old to
-     * decode was never loadable anyway.
+     * Anything still under `LEGACY_QUICK_SAVE_KEY` is moved into the browser store once,
+     * so a playtest saved there is not stranded, and the key is dropped either way — a
+     * payload too old to decode was never loadable anyway.
      */
     let legacyMigrated = false;
     async function migrateLegacyQuickSave(): Promise<void> {
@@ -108,8 +107,7 @@ export function createDevTools(host: DevHost): DevTools {
 
     // F5 and F9 act on the saves the disk-icon menu lists, not on a slot of their own:
     // quick-save writes one more save to the current source, and quick-load takes the
-    // most recent one wherever it lives. The two used to disagree about what "the most
-    // recent save" meant.
+    // most recent one wherever it lives, so both mean the same "most recent save".
     async function quickSave(): Promise<void> {
         if (!host.game) return;
         await migrateLegacyQuickSave();

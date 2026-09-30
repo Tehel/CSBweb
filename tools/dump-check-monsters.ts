@@ -72,7 +72,7 @@ function measure(label: string, data: DungeonData, attached: ReadonlySet<number>
   const records = data.databases.creatures.records;
   const before = records.map((r) => JSON.stringify(r));
   const beforeFields = records.map(fields);
-  CheckMonsters(new DungeonState(data), monsterDesc);
+  CheckMonsters(new DungeonState(data), monsterDesc, (line) => console.warn(line));
   const changed = new Map<number, [Fields, Fields]>();
   records.forEach((r, i) => {
     if (JSON.stringify(r) === before[i]) return;
@@ -194,7 +194,7 @@ function checkBuilt(label: string, records: CreatureRecord[], indices: number[],
 
 {
   const { data, indices, carriedIndex } = builtWorld();
-  CheckMonsters(new DungeonState(data), monsterDesc);
+  CheckMonsters(new DungeonState(data), monsterDesc, (line) => console.warn(line));
   checkBuilt('CheckMonsters', data.databases.creatures.records, indices, carriedIndex);
 }
 {

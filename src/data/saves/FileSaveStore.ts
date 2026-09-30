@@ -248,11 +248,9 @@ async function readDmwebEntry(file: File, name: string): Promise<SaveEntry | nul
  * fine; the date has to come from the filesystem, because a CSBWin save carries no
  * wall-clock time at all — only `gb2.Time`, the virtual clock.
  *
- * **Loadable since the object indirect index was ported.** Listing one used to be as
- * far as this went: the row was marked with a `*` and LOAD stayed inert, because every
- * object reference in the file decoded to nonsense. `applySaveBytes` now routes these
- * bytes to `applyCsbwinSave`, and `tools/dump-csbwin-load.ts` restores all twelve
- * committed saves into a real `Game` and interrogates the result.
+ * `applySaveBytes` routes these bytes to `applyCsbwinSave`, and
+ * `tools/dump-csbwin-load.ts` restores all twelve committed saves into a real `Game` and
+ * interrogates the result.
  *
  * `readCsbwinSaveInfo` is still the gate: it returns null for a `.dat` that is not a
  * CSBWin save at all, so a stray file is dropped from the listing rather than offered.

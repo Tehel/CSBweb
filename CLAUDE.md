@@ -67,8 +67,8 @@ does. The HTML controls beside the canvas are dev/debug affordances only.
 ```bash
 npm run dev            # Vite dev server on :9000
 npm run build          # tsc && vite build
-npm test               # the gate: tsc + every asserting tool  (~6s)
-npm test -- --frames   # …and the golden frames               (~12s)
+npm test               # the gate: tsc + every asserting tool  (~80s, DEBT.md F13)
+npm test -- --frames   # …and the golden frames               (~30s more)
 ```
 
 **Build hygiene (non-negotiable):** `npm test` must pass before any commit. It runs
@@ -84,7 +84,7 @@ There is still **no test framework** (see `PLAN.md` Phase 15) — `npm test` is 
   cheapest way to prove a renderer or UI change kept every pixel. It starts its own dev
   server and headless Chrome, so it needs no setup (on Node 20 it turns on
   `--experimental-websocket` itself; `probe-ui.mjs` needs that flag, or Node 22). It is
-  out of the default run only because it costs a browser and ~7s. Run it before any renderer or UI commit. A frame is
+  out of the default run only because it costs a browser and ~30s. Run it before any renderer or UI commit. A frame is
   the 320x200 canvas read back as pixels, and the comparison is pixel-wise, so a baseline
   captured on one machine is checkable on another.
 - `tools/dump-*.ts` and `tools/watch-*.ts` stand the real engine up against the real game
@@ -107,14 +107,17 @@ show up on screen. Use it to find out what is wrong, then prove it in a `dump-*.
 holds. That can be a level as an ASCII map, one square's flags and objects, or where an
 item or monster is, read from `dungeon.dat` or a save. The `peek-dungeon` skill covers it.
 
-## Code layout (`src/`, ~30k LOC)
+## Code layout (`src/`, ~55k LOC)
 
 ```
+audio/      SoundManager (the samples, played through Web Audio) and soundsIndex
 core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
             HintOracleLoader (CSB's `hcsb.hct`)
+  saves/    The save stores behind the disk icon: BrowserSaveStore (IndexedDB),
+            FileSaveStore (a directory the player picks), and the registry of both
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
@@ -147,8 +150,8 @@ renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens
             MagicPanel, Feeding, Objects, Light, Draw, HitTest, ViewportPicking, all over
             a shared UIState. See doc/UI_MODULE_MAP.md.
 ui/         DOM-side debug chrome (settings, map preview, log)
-dev.ts      Dev-only scaffolding (random party, quick-save, missile scenarios/trace),
-            reached only via isDebugFeaturesEnabled()
+lib/        glfx (the CRT effect's WebGL) and its loader
+dev.ts      F5/F9: one more save to the current store, and the newest save loaded
 main.ts     Bootstrap and wiring
 ```
 
@@ -205,6 +208,11 @@ were three lines each is not.
 
 - Commits: **single short line, no JIRA prefix, no trailers** (e.g. `Pits on ceiling`).
   This overrides the global `JIRA-XXX` convention.
+- Imports name the module by relative path (`'../core/types'`). The only barrels are
+  `src/ui/index.ts` and `src/data/saves/index.ts`, the public faces of the debug chrome
+  and the save stores.
+- The engine and the loaders do not log: a diagnostic goes to `GameHost.trace`, which a
+  tool prints and the page leaves silent.
 - Deleting code that won't survive to the end state is expected — no need to preserve
   intermediate functionality for its own sake.
 - **Never `git push`.** Commit freely, but the remote is frequently out of range; pushing is

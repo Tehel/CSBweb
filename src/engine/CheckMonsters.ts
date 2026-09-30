@@ -23,6 +23,9 @@ import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 
+/** `UI_MessageBox(title, text, MESSAGE_OK)`'s two strings, as one line. */
+export type MessageBox = (line: string) => void;
+
 // CSBWin's two `static bool`s: each warning is shown once per process.
 let warning4Issued = false;
 let warning2Issued = false;
@@ -36,7 +39,9 @@ function FindNextMonster(dungeon: DungeonState, obj: ObjectID): ObjectID {
 }
 
 /** `CheckMonster` (`doc/CSBwin-src/SaveGame.cpp:1279-1340`). */
-export function CheckMonster(dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, obj: ObjectID): void {
+export function CheckMonster(
+  dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, obj: ObjectID, messageBox: MessageBox,
+): void {
   const pMonster = dungeon.getCreatureRecord(obj);
   if (!pMonster) return;
   const numMonster = pMonster.numMonM1 + 1;
@@ -48,7 +53,7 @@ export function CheckMonster(dungeon: DungeonState, monsterDesc: ArrayLike<Monst
       break;
     case 1: {
       if (numMonster > 2) {
-        if (!warning4Issued) console.warn('Too many monsters of size 2: Fixing...');
+        if (!warning4Issued) messageBox('Too many monsters of size 2: Fixing...');
         warning4Issued = true;
         pMonster.numMonM1 = 1;
         pMonster.groupIndex = 2;
@@ -64,7 +69,7 @@ export function CheckMonster(dungeon: DungeonState, monsterDesc: ArrayLike<Monst
     }
     case 2: {
       if (numMonster > 1) {
-        if (!warning2Issued) console.warn('Too many monsters of size 4: Fixing...');
+        if (!warning2Issued) messageBox('Too many monsters of size 4: Fixing...');
         warning2Issued = true;
         pMonster.numMonM1 = 0;
         pMonster.groupIndex = 255;
@@ -83,12 +88,12 @@ export function CheckMonster(dungeon: DungeonState, monsterDesc: ArrayLike<Monst
   }
   for (let poss = pMonster.possession; poss !== OBJECT_ID_EOF; poss = FindNextMonster(dungeon, poss)) {
     if (decodeObjectID(poss).category !== DBType.CREATURE) continue;
-    CheckMonster(dungeon, monsterDesc, poss);
+    CheckMonster(dungeon, monsterDesc, poss, messageBox);
   }
 }
 
 /** `CheckMonsters` (`doc/CSBwin-src/SaveGame.cpp:1342-1365`): every group on every level. */
-export function CheckMonsters(dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>): void {
+export function CheckMonsters(dungeon: DungeonState, monsterDesc: ArrayLike<MonsterDesc>, messageBox: MessageBox): void {
   const numLevel = dungeon.getData().maps.length;
   for (let level = 0; level < numLevel; level++) {
     const { width, height } = dungeon.getData().maps[level].descriptor;
@@ -96,7 +101,7 @@ export function CheckMonsters(dungeon: DungeonState, monsterDesc: ArrayLike<Mons
       for (let y = 0; y < height; y++) {
         const position = new Position(x, y, level);
         for (let obj = dungeon.findFirstMonster(position); obj !== OBJECT_ID_EOF; obj = FindNextMonster(dungeon, obj)) {
-          CheckMonster(dungeon, monsterDesc, obj);
+          CheckMonster(dungeon, monsterDesc, obj, messageBox);
         }
       }
     }

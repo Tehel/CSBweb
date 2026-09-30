@@ -259,7 +259,7 @@ export function buildCsbwinRuntimeState(
  */
 export function installCsbwinWorld(game: Game, world: CsbwinWorld): void {
     // Before `reloadAfterSaveGame` detaches the save's `ITEM16`s (`src/engine/CheckMonsters.ts`).
-    CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc);
+    CheckMonsters(new DungeonState(world.dungeon), game.ctx.tables.monsterDesc, (line) => game.ctx.host.trace(line));
     readRulesOptions(game.ctx.rules, world.save.extendedFeatures);
     game.installWorld(Object.assign(world.dungeon, {
         dsaLevelIndex: world.save.dsaLevelIndex,

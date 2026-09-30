@@ -95,8 +95,8 @@ function readSkills(block: Uint8Array, base: number): Skill[] {
  * `ConvertCharacters` rewrites all thirty through `ConvertListOfObjects` the moment an
  * original dungeon is read (`doc/CSBwin-src/SaveGame.cpp:2046-2064`), so from then on
  * that is what a champion carries. `objectIndex` translates them back into this port's
- * form; without it the slots read as categories 0 and 1 with indices far past those
- * databases, which is exactly what this reader used to report.
+ * form; read as packed RNs, the slots would be categories 0 and 1 with indices far past
+ * those databases.
  */
 function readPossessions(
   block: Uint8Array,
@@ -202,10 +202,10 @@ export function readCsbwinCharacter(
     partyPosition: readU8(block, base + 29) as ui8,
     attackType: readI8(block, base + 32),
     // `StrLen(pcA3->incantation)` (`doc/CSBwin-src/Magic.cpp:812`) — a C string, so the
-    // first zero ends it. This used to filter the zeros *out*, which resurrected the
-    // symbols a cast leaves behind it: `CastSpell` clears `incantation[0]` and nothing
-    // else (`:951`), so a champion who has just cast holds bytes like `00 69 6f 00` and
-    // was being restored with two runes pending that CSBWin does not see.
+    // first zero ends it. Dropping the zeros instead would bring back the symbols a cast
+    // leaves behind it: `CastSpell` clears `incantation[0]` and nothing else (`:951`), so
+    // a champion who has just cast holds bytes like `00 69 6f 00`, and has no runes
+    // pending in CSBWin.
     incantation: incantationPrefix(incantationBytes),
     // The four bytes as they stand, when the tail past the terminator is not zero —
     // dead to the game, but part of the file. The writer uses them only while they

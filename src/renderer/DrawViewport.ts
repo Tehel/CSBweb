@@ -13,7 +13,7 @@ import { GraphicRoomType, RoomType, SummarizeRoomData } from './bytecode/Types';
 import { BytecodePrograms } from './bytecode/BytecodePrograms';
 import type { DungeonState } from '../engine/DungeonState';
 import { summarizeRoomInfoCsbwin } from './csbwin/SummarizeRoomInfo';
-import { Position } from '@/core';
+import { Position } from '../core/types';
 
 /**
  * Relative X coordinates for each cell

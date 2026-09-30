@@ -39,7 +39,7 @@ import {
   VIEWPORT_Y,
   getCachedGraphicBitmap,
 } from './ViewportGraphics';
-import { Position } from '@/core';
+import { Position } from '../core/types';
 import { ViewportRenderer } from './ViewportRenderer';
 import { createUIState, initializePlayState, UIMode, type ScreenIndexBuffer, type UIState } from './ui/UIState';
 import { drawStaticUIFrame } from './ui/Draw';

@@ -16,10 +16,5 @@ export default defineConfig({
   server: {
     port: 9000,
     open: false
-  },
-  resolve: {
-    alias: {
-      '@': resolve(import.meta.dirname, './src')
-    }
   }
 });

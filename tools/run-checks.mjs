@@ -1,19 +1,17 @@
 // The project's check suite: `npm test`.
 //
 // There is still no test *framework* (PLAN.md Phase 15) — this is a runner over the
-// evidence the project already had, which until now could only be produced by
-// remembering nine filenames and running them one at a time. It runs the three gates
-// CLAUDE.md calls non-negotiable:
+// project's evidence. It runs the three gates CLAUDE.md calls non-negotiable:
 //
 //   1. `tsc --noEmit`            — the real build gate; `vite build` proves nothing.
 //   2. every asserting tools/*.ts — the regression suite for what the frames cannot see.
 //   3. `tools/check-frames.sh`   — the golden frames, only with `--frames` (it needs a
 //                                  dev server and a headless Chrome, which the script
-//                                  now starts for itself).
+//                                  starts for itself).
 //
 // Usage:
-//   npm test                # gates 1 and 2   (~10s)
-//   npm test -- --frames    # all three       (adds ~20s and needs google-chrome)
+//   npm test                # gates 1 and 2   (~80s, one tool at a time: DEBT.md F13)
+//   npm test -- --frames    # all three       (adds ~30s and needs google-chrome)
 //   npm test -- --only=ai   # just the tools whose name contains "ai"
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';

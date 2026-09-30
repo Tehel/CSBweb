@@ -344,7 +344,7 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
 3. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
    The rank letter is what the date replaces; the ordering rule is the same one
    (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.
-4. **No "SAVE AND QUIT"** — there is no credits screen to quit to yet.
+4. **No "SAVE AND QUIT"** — left to the save menu's rework (`PLAN.md` → Phase 10).
 5. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour.
 

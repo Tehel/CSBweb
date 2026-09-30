@@ -210,15 +210,11 @@ export class DungeonLoader {
      * Main parsing function
      */
     private parse(): DungeonData {
-        console.log('Parsing dungeon.dat...');
-
         // Parse header (44 bytes)
         const header = this.parseHeader();
-        console.log(`Dungeon: ${header.numMaps} maps, seed ${header.randomSeed}`);
 
         // Parse map descriptors
         const mapDescriptors = this.parseMapDescriptors(header.numMaps);
-        console.log(`Parsed ${mapDescriptors.length} map descriptors`);
 
         // Calculate offsets for all sections
         const offsets = this.calculateOffsets(header, mapDescriptors);
@@ -243,11 +239,9 @@ export class DungeonLoader {
         // Database 11 — `EXPOOL` — has no parser here. It is kept whole so the image can
         // be written back with it (`DungeonData.expool`).
         const expool = this.readExpool(offsets.databases[11], header.objectCounts[11]);
-        console.log(`Parsed databases: ${header.objectCounts.reduce((a, b) => a + b, 0)} total objects`);
 
         // Parse map data (tiles)
         const maps = this.parseMapData(offsets.mapData, mapDescriptors);
-        console.log(`Parsed ${maps.length} maps with tile data`);
 
         // Build level index
         const levelIndex = this.buildLevelIndex(mapDescriptors);
@@ -878,8 +872,8 @@ export class DungeonLoader {
             const nextObject = this.readRN();
             const containedObject = this.readRNOfRecord(nextObject);
             const word4 = this.file.readU16();
-            // `DB9::m_uByte6[2]` — the two bytes that close the record, which used to be
-            // skipped. Zero in every file here, but no more derivable than `FILL2`.
+            // `DB9::m_uByte6[2]` — the two bytes that close the record. Zero in every file
+            // here, but no more derivable than `FILL2`.
             const uByte6 = [this.file.readU8(), this.file.readU8()];
 
             records.push({

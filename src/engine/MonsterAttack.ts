@@ -134,9 +134,8 @@ export class MonsterAttack {
     const party = this.ctx.party.state;
     if (party.champions.length === 0) return false;
 
-    // `d.LastMonsterAttackTime = d.Time` — this is the real feed for the value that
-    // `AdjustSkills` scales experience against; it used to be set from the missile
-    // path as a stand-in (PLAN.md Phase 12).
+    // `d.LastMonsterAttackTime = d.Time`, the value `AdjustSkills` scales experience
+    // against.
     party.lastMonsterAttackTime = this.ctx.state.tickCount | 0;
 
     const slot = this.dungeon.getAttachedItem16(monster);

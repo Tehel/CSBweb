@@ -3,9 +3,13 @@
  * engine and the screen, runs the intro, wires the page to both, and starts the loop.
  */
 
-import { SoundManager } from './audio';
-import { CSBGraphicsLoader, GraphicsLoader, dataSetFor, emptyDungeonData } from './data';
-import { Game, buildGameTables, type GameTables } from './engine';
+import { SoundManager } from './audio/SoundManager';
+import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
+import { dataSetFor } from './data/DataSets';
+import { emptyDungeonData } from './data/DungeonLoader';
+import { GraphicsLoader } from './data/GraphicsLoader';
+import { Game } from './engine/Game';
+import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
 import {
     applySaveBytes,
@@ -44,7 +48,7 @@ function consumeSavedGameRead(): SavedGameRead {
     return read;
 }
 
-// Dev-only harness (PLAN.md Phase 14). Reached only via isDebugFeaturesEnabled().
+// F5 and F9, the quick-save keys (`dev.ts`).
 const dev = createDevTools({
     get game() { return game; },
     renderView,
@@ -55,7 +59,9 @@ const dev = createDevTools({
 });
 
 /** The game this page plays, chosen before anything is loaded (`?dungeon=<id>`). */
-const dataSet = dataSetFor(new URLSearchParams(window.location.search).get('dungeon'));
+const dataSetId = new URLSearchParams(window.location.search).get('dungeon');
+const dataSet = dataSetFor(dataSetId);
+if (dataSetId !== null && dataSet.id !== dataSetId) console.warn(`Unknown data set '${dataSetId}'; playing ${dataSet.id}`);
 const CRT_SCANLINES_SRC = '/QPN59-320x200-resized.png';
 const CRT_UPDATE_INTERVAL_MS = 1000 / 20;
 const gameCanvasEl = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -441,10 +447,7 @@ function wire(game: Game, screen: GameScreen, sound: SoundManager, messages: Scr
     });
 
     game.onMove((success) => {
-        const posInfo = game.getPositionInfo();
-        console.log(`Movement ${success ? 'SUCCESS' : 'BLOCKED'}:`, posInfo);
-
-        if (success) updateDebug(posInfo || 'Moved');
+        if (success) updateDebug(game.getPositionInfo() || 'Moved');
     });
 
     // A move draws nothing: it brings a tick on at once (`d.clockTick = 1`), and CSBWin

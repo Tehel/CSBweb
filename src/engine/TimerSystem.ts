@@ -1,16 +1,4 @@
 import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
-
-/**
- * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
- * door springs back off them.
- */
-const SOUND_DOOR_OPENING = 18;
-/** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
-const SOUND_DOOR_STRUGGLE = 4;
-/** The ordinal `ProcessTT_1` queues for each step a door moves (`QueueSound(2, …)`, Timer.cpp:1375). */
-const SOUND_DOOR_STEP = 2;
-/** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
-const SOUND_TELEPORT = 17;
 import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
@@ -58,6 +46,17 @@ import { MonsterDamageResult } from './MonsterDamage';
 import { monsterNonMaterial, monsterVerticalSize } from '../data/tables/MonsterDesc';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 
+/**
+ * `soundDOOROPENING` (doc/CSBwin-src/CSB.h:626) — what the party hears when a closing
+ * door springs back off them.
+ */
+const SOUND_DOOR_OPENING = 18;
+/** The ordinal `ProcessTT_1` queues when a door rebounds off a monster (`QueueSound(4, …)`). */
+const SOUND_DOOR_STRUGGLE = 4;
+/** The ordinal `ProcessTT_1` queues for each step a door moves (`QueueSound(2, …)`, Timer.cpp:1375). */
+const SOUND_DOOR_STEP = 2;
+/** `soundTELEPORT` (doc/CSBwin-src/CSB.h:625). */
+const SOUND_TELEPORT = 17;
 
 export type MissileDropTarget = { monster: ObjectID } | null;
 
@@ -98,10 +97,9 @@ export class TimerSystem {
       processed++;
       if (processed > 50000) {
         // A timer that re-queues itself at the tick it just ran on livelocks the pass,
-        // and everything behind it in the queue silently stops happening. This used to
-        // `break` without a word, which is how the level-3 monster stall below went
-        // unnoticed. Say which timer did it.
-        console.warn(
+        // and everything behind it in the queue silently stops happening, so the cap
+        // says which timer did it.
+        this.ctx.host.trace(
           `TimerSystem: timer pass at t=${currentTime} hit the 50000 cap; last timer ` +
           `fn=${timer.function} time=${timer.time} at (${timer.uByte6},${timer.uByte7}) ` +
           `L${timer.level}. Timers behind it did not run.`,
@@ -993,9 +991,7 @@ export class TimerSystem {
         // `chIndex = DB10A2->value()` (`doc/CSBwin-src/Timer.cpp:2789`). Bones with no
         // expool record were placed by the dungeon rather than by a death, and their
         // `value` — `DB10`'s bits 14-15, this port's `specialState`
-        // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index. This used to guess
-        // instead, resurrecting the one dead champion if there was exactly one and
-        // refusing outright if there were two.
+        // (`doc/CSBwin-src/CSB.h:1272`) — *is* the champion index.
         const record = this.dungeon.getMiscRecord(target);
         if (!record) return;
         chIdx = (record.specialState ?? 0) & 0x3;
@@ -1126,8 +1122,7 @@ export class TimerSystem {
   private spawnMonsterGenerator(timer: TimerEntry, actuator: ActuatorRecord, rn: ObjectID, target: Position): void {
     let countMinus1 = getActuatorDelay(actuator);
     if ((countMinus1 & 0x8) !== 0) {
-      // `STRandom(n)` yields 0..n-1 (doc/CSBwin-src/Timer.cpp:1776). This used to be
-      // an inclusive 0..n, one monster too many at the top of the range.
+      // `STRandom(n)` yields 0..n-1 (doc/CSBwin-src/Timer.cpp:1776), not 0..n.
       countMinus1 = this.random.below(countMinus1 & 0x7);
     } else {
       countMinus1 = (countMinus1 - 1) & 0xffff;

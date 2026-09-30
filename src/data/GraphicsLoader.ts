@@ -65,8 +65,6 @@ export class GraphicsLoader {
      * Main parsing function
      */
     private parse(): GraphicsData {
-        console.log('Parsing graphics.dat...');
-
         // Read header
         this.file.seek(0);
         const itemCount = this.file.readU16();
@@ -74,8 +72,6 @@ export class GraphicsLoader {
         if (itemCount === 0 || itemCount > 1000) {
             throw new Error(`Invalid graphics file: item count = ${itemCount}`);
         }
-
-        console.log(`Graphics file contains ${itemCount} items`);
 
         // Read compressed sizes (itemCount words)
         const compressedSizes: ui16[] = [];
@@ -98,10 +94,6 @@ export class GraphicsLoader {
                 decompressedSize: decompressedSizes[i]
             });
         }
-
-        // Calculate offsets (data starts after header + 2 size arrays)
-        const dataStartOffset = 2 + itemCount * 2 * 2;
-        console.log(`Graphics data starts at offset 0x${dataStartOffset.toString(16)}`);
 
         this.data = {
             itemCount,

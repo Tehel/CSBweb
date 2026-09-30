@@ -8,7 +8,7 @@
  * `SetMonsterFacingByte` (:176-248).
  *
  * This sits underneath almost everything else about monsters. Four callers want it:
- * the missile system (which had a 35-line stand-in for it until now), the monster AI
+ * the missile system, the monster AI
  * gate `InitialChecks` (`doc/CSBwin-src/Monster.cpp:2813`), the champion melee path
  * (`doc/CSBwin-src/Attack.cpp:503`), and cloud damage (`doc/CSBwin-src/Timer.cpp:524`).
  *

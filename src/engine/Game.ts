@@ -145,7 +145,7 @@ export class Game implements MainLoop {
         const ctx = createGameContext(dungeonData, tables, createGameHost(host));
         // `_ReadEntireGame`'s `CheckMonsters` (doc/CSBwin-src/SaveGame.cpp:1826), which a
         // new game's read runs and the loader cannot: it needs the monster table.
-        CheckMonsters(ctx.dungeon, tables.monsterDesc);
+        CheckMonsters(ctx.dungeon, tables.monsterDesc, (line) => ctx.host.trace(line));
         this.ctx = ctx;
         ctx.dungeon.makeMoreRoomInDB = (db) => makeMoreRoomInDB(ctx, db);
         Object.assign(ctx.systems, {
@@ -187,8 +187,6 @@ export class Game implements MainLoop {
         this.running = true;
         this.lastTickTime = Date.now();
 
-        console.log('Game started');
-
         // Start game loop
         this.gameLoop();
     }
@@ -203,8 +201,6 @@ export class Game implements MainLoop {
             clearTimeout(this.loopTimer);
             this.loopTimer = null;
         }
-
-        console.log('Game stopped');
     }
 
     /** Whether `MainLoop` has returned: the game is over, and the page's input is dead. */
@@ -244,7 +240,7 @@ export class Game implements MainLoop {
         try {
             data = new DungeonLoader().loadDungeonDat(bytes);
         } catch (error) {
-            console.error(`dungeon.dat failed its read: ${error}`);
+            this.ctx.host.trace(`dungeon.dat failed its read: ${error}`);
             return false;
         }
         this.readNewGame(data);

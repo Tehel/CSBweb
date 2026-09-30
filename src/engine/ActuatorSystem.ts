@@ -494,14 +494,6 @@ export class ActuatorSystem {
 
     const actionTime = (this.ctx.state.tickCount + getActuatorDelay(actuator)) >>> 0;
     if (isActuatorLocalActionOnly(actuator)) {
-      if (this.isDebugTimersEnabled()) {
-        console.log('[Actuator] local action', {
-          action,
-          source,
-          localType: getActuatorLocalActionType(actuator),
-          pos: mapPos,
-        });
-      }
       this.performLocalAction(getActuatorLocalActionType(actuator), source.x, source.y, source.z, mapPos);
       return;
     }
@@ -520,26 +512,12 @@ export class ActuatorSystem {
 
     const timerFunction = this.byte1596[targetRoomType];
     if (timerFunction === 0) {
-      console.warn('Illegal actuator timer target', {
-        source,
-        targetX,
-        targetY,
-        targetRoomType,
-      });
+      this.ctx.host.trace(
+        `Illegal actuator timer target (${targetX},${targetY}) L${source.z}, room type ${targetRoomType}`,
+      );
       return;
     }
 
-    if (this.isDebugTimersEnabled()) {
-      console.log('[Actuator] queue timer', {
-        action,
-        actionTime,
-        level: source.z,
-        targetX,
-        targetY,
-        targetPos,
-        timerFunction,
-      });
-    }
     this.timers.createTimer(timerFunction, targetX, targetY, targetPos, action, actionTime, source.z);
   }
 
@@ -675,10 +653,6 @@ export class ActuatorSystem {
   ): void {
     if (!champion || index < 0) return;
     adjustSkills(this.ctx, chIdx, index, delta, why, experienceMultiplier);
-  }
-
-  private isDebugTimersEnabled(): boolean {
-    return typeof globalThis !== 'undefined' && (globalThis as { __DM_DEBUG_TIMERS?: boolean }).__DM_DEBUG_TIMERS === true;
   }
 
   /**

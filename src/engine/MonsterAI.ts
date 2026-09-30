@@ -381,7 +381,7 @@ export class MonsterAI {
   private processATimer(frame: AiFrame, c: AiConst, fearFactor: number): void {
     const flipped = A_TO_B[c.timerFunction];
     if (flipped === undefined) {
-      console.warn(`MonsterAI: illegal monster AI timer ${c.timerFunction}`);
+      this.trace(`MonsterAI: illegal monster AI timer ${c.timerFunction}`);
       return;
     }
     frame.timer.function = flipped;
@@ -1396,7 +1396,7 @@ export class MonsterAI {
     if (altTime < timer.time) {
       const flipped = B_TO_A[timer.function];
       if (flipped === undefined) {
-        console.warn(`MonsterAI: illegal monster AI timer ${timer.function}`);
+        this.trace(`MonsterAI: illegal monster AI timer ${timer.function}`);
         return;
       }
       timer.function = flipped;
@@ -1565,7 +1565,7 @@ export class MonsterAI {
       }
       const perMember = MEMBER_B_TIMER[monIdx];
       if (perMember === undefined) {
-        console.warn(`MonsterAI: illegal monster index ${monIdx}`);
+        this.trace(`MonsterAI: illegal monster index ${monIdx}`);
         continue;
       }
       timer.function = perMember;

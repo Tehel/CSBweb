@@ -8,14 +8,13 @@
  * rather than projecting the click back into the dungeon.
  */
 import { OBJNI_BONES_A, OBJNI_EMPTY_FLASK, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
-import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, RoomType } from '../../core/types';
+import { OBJECT_ID_EOF, OBJECT_ID_NULL, ObjectID, Position, RoomType } from '../../core/types';
 import { CreatureRecord } from '../../data/dungeonTypes';
 import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { GraphicRoomType, RoomType as SummaryRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
 import { setClockTick } from '../../engine/LoopState';
-import { Position } from '@/core';
 
 const POTION_WATER_FLASK = 15;
 

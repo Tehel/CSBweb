@@ -151,11 +151,8 @@ export interface TextRecord {
      * before `ConvertToIndirectText` has run, an entry number in `indirectTextIndex`
      * after. `textStart` (`src/data/CsbwinDungeonConversions.ts`) is the one place that
      * tells the two apart; nothing else may read this and assume either.
-     *
-     * It used to be shadowed by a second field, `textIndex`, which the conversion set
-     * and left `textOffset` alone. That made a genuine save's text undecodable — a save
-     * arrives already converted, so `textIndex` was never set for one and the fallback
-     * read the entry number as a word offset.
+     * There is no second field for the converted form: a save arrives already
+     * converted, so one written only by the conversion would never be set for a save.
      */
     textOffset: ui16;           // +0x02 bits 15-3
     visible: boolean;           // bit 0
@@ -183,7 +180,7 @@ export interface ActuatorRecord {
 /**
  * CSBWin `DB4` (doc/CSBwin-src/CSB.h:1075-1139). Sixteen bytes.
  *
- * Two fields are dual-purpose and were previously split or misread here:
+ * Two fields are dual-purpose:
  *
  * - `uByte4` packs `monsterType()` in bits 0-4 and `alternateGraphics()` in bits
  *   5-7, so the type must be masked before it indexes `MonsterDescriptor[27]`.
@@ -196,8 +193,7 @@ export interface ActuatorRecord {
  *   0xff (doc/CSBwin-src/MoveObject.cpp:517-518).
  *
  * `numMonM1` is CSBWin's own spelling and, like CSBWin, holds the group size *minus
- * one*. It used to be stored here as a 1-based count while two of the three readers
- * treated it as `numMonM1`.
+ * one*: every reader adds the one.
  */
 export interface CreatureRecord {
     nextObject: ObjectID;       // +0x00
@@ -390,9 +386,9 @@ export const SMS_MIRROR = 0x40;
 /**
  * One CSBWin `TIMER` (`doc/CSBwin-src/CSB.h:1799-2052`), and the whole of it.
  *
- * It used to be the single `timerWord8` field, which is why no save of any kind — ours
- * or CSBWin's — restored *when* anything was due to happen: a door caught mid-close
- * stayed where it was, a fuse stopped burning, a pending actuator action was lost.
+ * Every field is kept, `time` and the target included: a save that restored only the
+ * action word would leave a door caught mid-close where it was, a fuse not burning and a
+ * pending actuator action lost.
  *
  * The struct is 10, 12 or 16 bytes depending on two Extended Features flags, and the
  * shorter forms are not truncations but earlier versions that CSBWin converts on load

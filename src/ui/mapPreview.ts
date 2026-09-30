@@ -1,4 +1,4 @@
-import { Position, RoomType, getRoomType } from '../core';
+import { Position, RoomType, getRoomType } from '../core/types';
 import { getUIContext, isDebugFeaturesEnabled } from './context';
 import { updateDebug } from './messages';
 import { getEventPosition, getMapPreviewLayout } from './utils';

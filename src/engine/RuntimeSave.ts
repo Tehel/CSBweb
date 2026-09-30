@@ -20,60 +20,10 @@ import type { TimerEntry } from './TimerQueue';
 /**
  * The quick-save payload.
  *
- * Version 2 added `dungeon.snapshot` and the `game` fields below it. Version 1
- * carried only the party, the tick count, the `ITEM16` pool, the timers and the
- * missile records, so restoring one reset the whole world — doors, moved objects,
- * fired actuators — while leaving the party's inventory alone.
- *
- * Version 3 replaced the champions' seven flat attribute numbers with CSBWin's
- * `(maximum, current, minimum)` triples (`ChampionAttributes.stats`).
- *
- * Version 4 is not a change to this structure at all — it is the *binary* half beside
- * it. `SaveGameLoader` used to read and write GAMEBLOCK1/2, `ITEM16` and the timers as
- * little-endian words, a self-consistent format that was not CSBWin's; those blocks are
- * big-endian in the file (`doc/CSBwin-src/CSBCode.cpp:9057`). Fixing that makes every
- * v3 payload unreadable, so the version moves with it.
- *
- * Version 5 adds `dungeon.snapshot.columnIndex` and the two header fields beside it.
- * Their absence was not a missing feature but a live corruption: `columnIndex` is
- * rewritten by every drop into an empty cell and every pick-up of a cell's last object
- * (`DungeonState.addObjectToCell`), so a v4 payload restored `objectList` against
- * whatever offsets play had left behind, and every cell's object chain was read from
- * the wrong place. A v4 save cannot be repaired — the index it needed was never
- * written — so it is refused like any other older format.
- *
- * Version 6 stores the timer table as CSBWin's array has it — by timer index, holes
- * included — and adds `timerQueue` (which of those timers are live, in the heap's array
- * order) and `timerSequence` (the stamp the next queued timer takes), so a restored queue
- * fires in the same order it would have. It came with loading genuine CSBWin save
- * files, whose timer blocks have that shape.
- *
- * Version 7 moves a timer's object reference into the byte pair `ConvertTimers` names
- * for its function (`doc/CSBwin-src/SaveGame.cpp:2027-2050`; see
- * `collapseTimerBytes`). A v6 payload kept the RN only on the live `TimerEntry.object`,
- * which has no byte in the file, so a restored missile came back without its object.
- *
- * Version 8 drops `Champion`'s `shieldHand` / `weaponHand` / `quiver`, which mirrored
- * possession slots 0, 1 and 8 (`DEBT.md` D1).
- *
- * Version 9 stores an empty possession slot as `RNnul` (0xffff), as CSBWin and the
- * save file do, where it had been `null` (`DEBT.md` D2a).
- *
- * Version 10 does the same for `PartyState.objectInHand`, now required (`DEBT.md` D2b).
- *
- * Version 11 drops `Champion.actionDisabledUntil`, the port's own busy tick: a busy
- * champion is `CHARFLAG_attackDisable` in `charFlags`, as CSBWin keeps it, which a v10
- * payload never set.
- *
- * Version 12 drops what nothing read: `game.elapsedTimeMs`, the wall clock since the
- * start, the party's `moving` and `turning`, and each champion's `experience` and four
- * role levels, which CSBWin keeps as the twenty `skills92` records alone.
- *
- * Version 13 drops `Champion.alive`: a champion is dead when their health is 0, the
- * only test CSBWin has.
- *
- * No bump has an upgrade path: `quickLoad` refuses an older save rather than
- * restoring a half-state.
+ * `RUNTIME_SAVE_VERSION` moves whenever this structure changes shape, or the binary half
+ * beside it does (`SaveGameLoader`'s blocks). No bump has an upgrade path: a payload of
+ * another version is never restored as a half-state, and `applySaveBytes` loads its `raw`
+ * CSBWin file instead, when it has one. `git log` on this line is the list of shapes.
  */
 export const RUNTIME_SAVE_VERSION = 13;
 

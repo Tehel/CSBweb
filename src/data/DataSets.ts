@@ -37,10 +37,7 @@ export const DATA_SETS: readonly DataSet[] = [
 
 export const DEFAULT_DATA_SET = DATA_SETS[0]!;
 
-/** The set `?dungeon=<id>` names, or the default when it names none. */
+/** The set `?dungeon=<id>` names, or the default when it names none or an unknown one. */
 export function dataSetFor(id: string | null): DataSet {
-    if (id === null) return DEFAULT_DATA_SET;
-    const set = DATA_SETS.find((s) => s.id === id);
-    if (!set) console.warn(`Unknown data set '${id}'; playing ${DEFAULT_DATA_SET.id}`);
-    return set ?? DEFAULT_DATA_SET;
+    return DATA_SETS.find((s) => s.id === id) ?? DEFAULT_DATA_SET;
 }

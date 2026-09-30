@@ -159,7 +159,7 @@ export class MonsterSystem {
     let index = pool.findIndex((slot) => slot.word0 < 0);
     if (index < 0) {
       if (pool.length >= ITEM16_HARD_MAX) {
-        console.warn('MonsterSystem: ITEM16 pool exhausted; monster left inactive');
+        this.trace('MonsterSystem: ITEM16 pool exhausted; monster left inactive');
         return null;
       }
       index = pool.length;

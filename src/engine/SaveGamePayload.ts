@@ -295,8 +295,7 @@ function buildBlock1FromGame(runtime: RuntimeSaveState): Block1 {
 }
 
 /**
- * `GAMEBLOCK2`, from the live game — the fifteen fields the writer used to leave at
- * zero as well as the six it already had.
+ * `GAMEBLOCK2`, from the live game: all twenty-one fields.
  *
  * `SaveGame` assigns each of these from a live counter immediately before it checksums
  * the block (`doc/CSBwin-src/SaveGame.cpp:1010-1031`); this is the same list in the same

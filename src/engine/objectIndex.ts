@@ -2,10 +2,8 @@
  * An object's place in CSBWin's object tables: `RN::DescIndex`, `GetBasicObjectType` and
  * `RN::NameIndex`.
  *
- * The one copy of each. The engine, the renderer and the UI used to carry five of
- * `DescIndex` and four of `GetBasicObjectType`, and they had drifted — a chest was always
- * description 1, the failure values disagreed, and only the UI had a `NameIndex`
- * (`DEBT.md` B1).
+ * The one copy of each, which the engine, the renderer and the UI all call: copies
+ * drift apart.
  *
  * - `DescIndex` picks an object's row in `d.ObjDesc[180]` from its database and its
  *   type field.

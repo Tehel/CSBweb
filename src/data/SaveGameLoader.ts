@@ -1286,11 +1286,9 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     const base = i * 16;
     const rec = save.item16[i];
     if (!rec) continue;
-    // Every field `parseItem16` reads. This used to write bytes 2, 3 and 12-15 only,
-    // so a record's `word0` — the group's object RN — and its whole middle, the
-    // per-monster state at 4-11, came back as zero. Nothing noticed because the
-    // quick-save's runtime half carries `dungeon.item16` as well and is applied after
-    // this one, but a save with only these blocks in it lost the monster groups.
+    // Every field `parseItem16` reads, `word0` (the group's object RN) and the
+    // per-monster state at 4-11 included: the runtime half of a save carries
+    // `dungeon.item16` too, but a save with only these blocks must keep its groups.
     writeU16BE(item16, base + 0, rec.word0);
     item16[base + 2] = rec.facings & 0xff;
     item16[base + 3] = rec.positions & 0xff;
@@ -1308,14 +1306,12 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
     item16[base + 15] = rec.singleMonsterStatus[3] ?? 0;
   }
 
-  // Block 4, from `buildCsbwinCharacterBlock` if the caller packed one. It used to be
-  // 3328 zero bytes unconditionally — no champions, no party state at all.
+  // Block 4, from `buildCsbwinCharacterBlock` if the caller packed one, and 3328 zero
+  // bytes otherwise.
   const character = new Uint8Array(CHARACTER_SIZE);
   if (save.characterBlock) character.set(save.characterBlock.subarray(0, CHARACTER_SIZE));
 
-  // The whole `TIMER`, in the form the header's flags declare. This used to write byte
-  // 8-9 and nothing else, so a file this project wrote said when nothing was due.
-  // `parseTimers` is the exact inverse; `tools/dump-savegame-blocks.ts` round-trips it.
+  // The whole `TIMER`, in the form the header's flags declare. `parseTimers` is the exact inverse; `tools/dump-savegame-blocks.ts` round-trips it.
   const timers = new Uint8Array(maxTimers * timerSize);
   const timerRecords = save.timers ?? [];
   // Which slots hold a live timer: `TIMER_SEARCH::FindNextTimer` walks the queue, so a

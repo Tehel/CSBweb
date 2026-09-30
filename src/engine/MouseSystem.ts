@@ -115,8 +115,8 @@ export class MouseSystem {
    * and must be **2** ("a dead champion's", `doc/CSBwin-src/CSB.h:1264`), and the
    * champion is found by fingerprint. Bones placed by the **dungeon** carry no
    * record; there `value` is itself the champion index and there is no `== 2` test
-   * at all — which is why this used to demand `value == 2` unconditionally and so
-   * ignored every dungeon-authored bones object except one aimed at champion 2.
+   * at all, or every dungeon-authored bones object but one aimed at champion 2 would be
+   * ignored.
    *
    * Both arms refuse a champion who is not dead, so the altar cannot be used to
    * resurrect the living.

@@ -3,9 +3,8 @@
  *
  * There is exactly one game in a page, so the stores are singletons. They live here
  * rather than inside the menu because two callers need them: the save/load screen, and
- * the quick-save keys. Those two used to be different features writing to different
- * places — F5 had a `localStorage` slot of its own — which meant "the most recent save"
- * meant one thing in the menu and another to F9. They are now the same saves.
+ * the quick-save keys, which act on the same saves, so "the most recent save" means one
+ * thing to both.
  */
 import { BrowserSaveStore } from './BrowserSaveStore';
 import { FileSaveStore } from './FileSaveStore';
