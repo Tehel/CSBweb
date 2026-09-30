@@ -858,15 +858,14 @@ export class DungeonState {
         return this.data.databases.creatures.records[index] ?? null;
     }
 
+    /**
+     * Word 8 of timer `index`, a missile's flight direction, read from the live queue as
+     * CSBWin reads `d.Timers[missile.timerIndex()]`. `null` for a slot the queue does not
+     * hold, where CSBWin would read what the slot kept; a missile in a cell always has its
+     * timer queued, so the renderer never asks for one.
+     */
     getTimerWord8(index: number): ui16 | null {
-        if (this.timerWord8Lookup) {
-            const fromQueue = this.timerWord8Lookup(index);
-            if (fromQueue !== null) return fromQueue;
-        }
-        const table = this.data.timerWord8Table;
-        if (!table) return null;
-        if (index < 0 || index >= table.length) return null;
-        return table[index] ?? null;
+        return this.timerWord8Lookup?.(index) ?? null;
     }
 
     /**

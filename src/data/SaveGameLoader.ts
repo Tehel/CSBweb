@@ -1198,9 +1198,6 @@ export function applySaveGameState(
   party?: PartyState
 ): void {
   dungeon.item16 = save.item16;
-  if (save.timers) {
-    dungeon.timerWord8Table = save.timers.map((rec) => rec.timerWord8 & 0xffff);
-  }
   if (save.missiles) {
     dungeon.databases.missiles.records = save.missiles.map((rec) => ({
       nextObject: rec.nextObject,

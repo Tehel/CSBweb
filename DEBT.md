@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
 | D12 | `Champion.alive` shadows `HP() != 0` | S | ⏳ |
-| D14 | `timerWord8Table`, a load-time copy behind the live timers | S | ⏳ |
 | E16 | A `die()` in play stops the loop without a word | S | ⏳ |
 | E12 | `Game` names each system a second time | M | ⏳ |
 | E10 | Code written twice | M | ⏳ |
@@ -162,21 +161,6 @@ is; it can only drift. Paying it means reading `health !== 0` everywhere, as CSB
 code does at each site (cite it where the port's reader is not a transcription), and
 removing the field. `tools/dump-champion-death.ts` and `dump-vi-altar.ts` cover the two
 writers.
-
-### D14 ⏳ `timerWord8Table`, a load-time copy behind the live timers
-
-A missile's flight direction is its timer's word 8, which CSBWin reads from the slot as it
-stands, `d.Timers[missile.timerIndex]`. `DungeonState.getTimerWord8`
-(`src/engine/DungeonState.ts:861`) asks the live `TimerQueue` first, through a lookup
-`TimerSystem` installs (`TimerSystem.ts:80`), and falls back on
-`DungeonData.timerWord8Table` (`src/data/dungeonTypes.ts:531`), a copy of every timer's
-word 8 that `applySaveGameState` takes when a save is restored
-(`src/data/SaveGameLoader.ts:1202`) and nothing updates. For a timer index the queue does
-not hold, the renderer's missile (`BytecodeInterpreter.ts:2728`) is drawn from the value
-at load time. Paying it means one
-source, the queue's slot as CSBWin reads it (`TimerQueue.getTimer` answers `null` for an
-empty slot where CSBWin reads whatever the slot kept), and removing the table from
-`DungeonData`, `DUNGEON_DATA_SOURCES` and the restore.
 
 ### D15 ⏳ `UIState` is built in two phases
 

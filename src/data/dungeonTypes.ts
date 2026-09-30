@@ -528,7 +528,6 @@ export interface DungeonData {
     objectList: ObjectID[];     // Object list by tile
     columnIndex: ui16[];        // Column index for object lookup
     levelIndex: ui16[];         // Level index for object lookup
-    timerWord8Table?: ui16[];   // Save-game timerWord8 table (by timer index)
     item16?: Item16Record[];    // Save-game runtime monster state
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
     dsaIndex?: DsaIndex;        // Extended-feature DSA programs (DSAIndex)

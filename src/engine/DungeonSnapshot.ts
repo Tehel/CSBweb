@@ -109,8 +109,6 @@ export const DUNGEON_DATA_SOURCES = {
     objectList: 'snapshot',
     columnIndex: 'snapshot',
     levelIndex: 'loaded',
-    // Derived by `applySaveGameState` from the timers `RuntimeSave` carries.
-    timerWord8Table: 'runtimeSave',
     item16: 'runtimeSave',
     expool: 'snapshot',
     dsaLevelIndex: 'snapshot',
