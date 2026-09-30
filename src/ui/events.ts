@@ -145,8 +145,8 @@ export function bindUIEvents(): void {
 
         smoothButton?.addEventListener('click', () => {
             const style = ctx.screen.getCanvasStyle();
-            style.imageRendering = style.imageRendering === 'smooth' ? 'pixelated' : 'smooth';
-            smoothButton.classList.toggle('is-pressed', style.imageRendering === 'smooth');
+            style.imageRendering = style.imageRendering === 'auto' ? 'pixelated' : 'auto';
+            smoothButton.classList.toggle('is-pressed', style.imageRendering === 'auto');
             saveUISettings(readUISettings());
         });
 

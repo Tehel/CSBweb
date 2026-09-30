@@ -32,6 +32,7 @@ export const DATA_SETS: readonly DataSet[] = [
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
     // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its 620 KB `dungeon.dat`
     // does not open with 33028 and does not parse, and nothing has examined its format.
+    { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false },
 ];
 
 export const DEFAULT_DATA_SET = DATA_SETS[0]!;

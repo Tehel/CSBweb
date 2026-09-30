@@ -1756,7 +1756,7 @@ Two things about it are unusual:
   `doc/CSBwin-src/Chaos.cpp:513`, padded to 11 characters and **0-based**, for the CSB
   editor's dialog. Do not confuse the two indexings.)
 - **The six master ranks begin with `` ` `` and `a`..`e`** (0x60, 0x61..0x65). In the DM
-  font, graphic `0x22d`, those codes hold rune glyphs — Lo, Um, On, Ee, Ux, Mon — so
+  font, graphic `0x22d`, those codes hold rune glyphs — Lo, Um, On, Ee, Pal, Mon — so
   "a MASTER" is the rune for Um followed by a space and MASTER, not a letter A.
   `TextOut_OneLine` indexes the font with the raw byte (`doc/CSBwin-src/Graphics.cpp:335`)
   and never changes case, so these lines must go through `drawTextLineIndexRaw`; the
