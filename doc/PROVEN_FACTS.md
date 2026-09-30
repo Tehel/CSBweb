@@ -318,9 +318,12 @@ is `RotateActuatorList` (`doc/CSBwin-src/Mouse.cpp:249-252`,
 `doc/CSBwin-src/Code11f52.cpp:3465`), which moves #601 last, so 55 is shown after it.
 CSBWin, reading the table as is, draws the pressed crack at eye level.
 
-The author, who played the Atari ST original on the same `graphics.dat`, is confident the
-original draws it where the Out crack was. How the original manages this was not
-established. So the port sets `Byte4100[55]` to 2 at load
+The Atari ST original draws it where the Out crack was, as the author remembers: the
+English 1.2 disk's `graphics.dat` (md5 `9ce2eaf7a9e78620e3f17594437caffa`,
+`static/gamefiles/dm-atari-1.2/`) holds **2** for `Byte4100[55]`, at byte 3201 of item
+`0x22e`, and its Crack Switch (In) front bitmap (graphic 232) differs from ours in 8
+pixels (`doc/ATARI_ST_DISK_REFERENCE.md` → "The 1.2 data files against `dm-atari/`"). The
+0 is the `graphics.dat` CSBWin ships. So the port sets `Byte4100[55]` to 2 at load
 (`correctCrackSwitchInPlacement` in `src/data/tables/ObjectTables.ts`), only when
 entry 50 is 2 and entry 55 is 0. No other entry, and no other code path, changes.
 `tools/dump-crack-switch.ts` asserts all of this, and golden frame `09-crack-switch` shows

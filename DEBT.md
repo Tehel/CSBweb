@@ -114,6 +114,7 @@ In payoff order: the first row is the next item.
 | X3 | Extra: thrown weapons gathered back when the party walks over them | M | ⏸️ |
 | X5 | Extra: 3D2D1D's vertical moves and gravity | L | ⏸️ |
 | X6 | Extra: the Hint Oracle's hints in the game, as the party moves | M | ⏸️ |
+| X7 | Extra: the FTL logo before the title | M | ⏸️ |
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
@@ -126,7 +127,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C103 · D16 · E21 · F14 · G21 · X7. An ID recorded and paid in one commit has no
+Next free IDs: C103 · D16 · E21 · F14 · G21 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -706,6 +707,30 @@ and down a pit, and check what the extra offers after each move.
 
 ---
 
+### X7 ⏸️ The FTL logo before the title
+
+The Atari ST disk booted into `SWOOSH.IMG`, which drew the FTL logo with a palette reveal
+and a noise "swoosh" before the game's own title animation. CSBWin never had it: it lives
+in the boot chain, not in the game program. Everything about it is in
+`doc/ATARI_ST_DISK_REFERENCE.md` → "`SWOOSH.IMG`", and `static/gamefiles/dm-atari-1.2/`
+holds the file and a PCM rendering of its sound.
+
+To do:
+
+- Read `swoosh.img` and decode its picture: a transcription of `swoosh.img:$0070`–`$01d4`
+  (the RLE codes, the run masks, the copy from the line above), with a `tools/` check that
+  it consumes exactly 2306 bytes and ends on the 64000th pixel.
+- Run its palette script from `$0b92` on the intro host (`src/renderer/intro/IntroHost.ts`),
+  30 VBLs, before `TitleSequence`, starting the sound at VBL 0.
+- The sound: ship `swoosh.wav` through `SoundManager`, or a recording of the real one (a
+  recording replaces the rendering's assumptions, listed in the doc). The generator
+  (`static/gamefiles/dm-atari-1.2/render-swoosh-wav.py`) becomes a `tools/` script if the
+  rendering is kept.
+- **The hold after VBL 30 is a placeholder.** On the ST it lasted until `START.PRG` had
+  loaded the game, which the disk does not time. It must be marked as such in the code.
+- Behind the extras' setting, off by default, so the boot and the golden frames are
+  unchanged with it off.
+
 ## H — Deliberate divergences (not debt)
 
 Recorded so that nobody "fixes" them.
@@ -852,8 +877,8 @@ Recorded so that nobody "fixes" them.
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
 - 🚫 **Crack Switch (In) placement.** `Byte4100[55]` is read as 2, not `graphics.dat`'s 0,
-  so a pressed crack switch stays low on the wall as in the Atari ST original:
-  `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
+  so a pressed crack switch stays low on the wall as in the Atari ST original, whose 1.2
+  `graphics.dat` holds 2: `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
 - 🚫 **The see-through door edge's last row.** `StdDrawSeeThruDoorEdge` reads graphic 41
   from pixel 128, so its last row runs 32 pixels past the graphic's end, into whatever
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)

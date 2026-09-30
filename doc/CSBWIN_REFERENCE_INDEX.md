@@ -31,6 +31,7 @@ This index links the CSBWin-sourced reference docs under `doc/`.
 - `doc/VIEWPORT_RENDERING.md` - Narrative rendering overview tied to CSBWin behavior.
 - `doc/PROVEN_FACTS.md` - Specific verified facts with source references.
 - `doc/UI_MODULE_MAP.md` - Which `src/renderer/ui/` module ports which CSBWin UI file.
+- `doc/ATARI_ST_DISK_REFERENCE.md` - Not CSBWin-sourced: the English 1.2 Atari ST disk. The boot chain, the FTL logo (`SWOOSH.IMG`: its picture codec, palette script and sound), and how the 1.2 `graphics.dat` and `dungeon.dat` differ from the ones we ship (the Crack Switch (In) among them).
 - `doc/3D2D1D.md` - The 3D2D1D dungeon: the vertical moves and gravity our CSBWin source hardwires off, the two `extendedFlags` bits the 2019 exe reads them from, and the two keys (`DEBT.md` X5).
 - `doc/MONSTER_BEHAVIOUR.md` - Plain-language account of monster decision-making: senses, moods, the turn as a decision tree, per-type differences, and what remains unexplained.
 - `doc/monster-behaviour.html` - The same text as a formatted, self-contained page. Open it straight from disk; no external fonts, scripts or stylesheets.
