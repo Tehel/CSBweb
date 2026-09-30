@@ -4835,6 +4835,6 @@ Windows package's, which is the same file) is 0x7d4 bytes there. The CSB Windows
 is 0x804, and its last 48 bytes are `missingButtons` word for word: `ENTER` (0xc8, x
 244-298, y 45-58), `RESUME` (0xc9, 244-298, 76-93) and the credits (0xca, 248-293,
 187-199), each on the left button, then a zero terminator. Both files have 563 items. Of
-the 35 tables `buildGameTables` extracts, CSB's differ from DM's in six: `monsterDesc`,
+the 35 tables `buildGameTables` holds, CSB's differ from DM's in six: `monsterDesc`,
 `spells`, `skillNumber`, `experienceForAttacking`, `byte20046` and `textDecode`.
 `tools/dump-data-sets.ts` checks both.

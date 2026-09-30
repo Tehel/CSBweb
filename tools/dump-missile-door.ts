@@ -29,15 +29,12 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { DescIndex } from '../src/engine/objectIndex';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { gameTablesOf } from './lib/game';
+import { gameTablesOf, graphicsTablesOf } from './lib/game';
 import { check, finish } from './lib/check';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+const objectTables = graphicsTablesOf(graphics).objects;
 
 /** A game whose `d.DoorCharacteristics` are all `doorToc`, so any door has that `DoorTOC`. */
 function makeGame(doorToc: number): Game {

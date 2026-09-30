@@ -34,9 +34,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { monsterNonMaterial, monsterVerticalSize } from '../src/data/tables/MonsterDesc';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -64,8 +62,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const level = Number(process.argv[2] ?? 2);
   const game = newGame(data, graphics);

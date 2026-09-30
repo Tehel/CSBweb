@@ -35,10 +35,8 @@ import { CharacterStats } from '../src/engine/CharacterStats';
 import { DungeonState } from '../src/engine/DungeonState';
 import type { Champion } from '../src/engine/gameTypes';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { AttackType } from '../src/engine/monsterTypes';
-import { newGame, newContext } from './lib/game';
+import { graphicsTablesOf, newContext, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -72,8 +70,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);
   const stats = new CharacterStats(newContext(data, graphics, { dungeon, random: new CsbRandom(0x12345678) }));

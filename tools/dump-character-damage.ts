@@ -32,13 +32,10 @@ import { addCharacterDefaults, assignPresetHeroPossessions, createChampionFromPr
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { drawPartyStatus } from '../src/renderer/ui/Character';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
-import { newGame, processTimersAt } from './lib/game';
+import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 
 function champion(i: number): Champion {
@@ -196,9 +193,8 @@ console.log("=== Game's tick ===");
 console.log('');
 console.log('=== drawPartyStatus ===');
 {
-  const uiTables = extractUITables(graphics);
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const uiTables = graphicsTablesOf(graphics).ui;
+  const objectTables = graphicsTablesOf(graphics).objects;
   const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   for (let i = 0; i < 2; i++) {

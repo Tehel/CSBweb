@@ -30,13 +30,11 @@ import { applyLimits } from '../src/core/intCast';
 import { DBType, OBJECT_ID_EOF } from '../src/core/types';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
-import { stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 
 const graphics = stockGraphics();
-const tables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+const tables = graphicsTablesOf(graphics).objects;
 
 const RAT = 4;
 const WORM = 15;

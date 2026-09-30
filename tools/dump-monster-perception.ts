@@ -31,11 +31,9 @@ import {
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { TimerQueue } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { monsterSightDistance } from '../src/data/tables/MonsterDesc';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, finish } from './lib/check';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
 
 const DIRS = ['N', 'E', 'S', 'W'];
@@ -48,8 +46,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);
   const level = Number(process.argv[2] ?? 2);

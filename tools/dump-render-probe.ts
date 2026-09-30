@@ -53,7 +53,6 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
-import { extractUITables } from '../src/data/tables/UITables';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import {
   RelativeXY,
@@ -66,7 +65,7 @@ import {
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import { ViewportRenderer } from '../src/renderer/ViewportRenderer';
 import { check, fail, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 import { writeIndexedPng } from './lib/png';
 
 const BASELINE = resolve('tools/reference/render-probe.tsv');
@@ -113,11 +112,13 @@ function main(): void {
   const dungeon = game.ctx.dungeon;
 
   const graphicCache = new Map<string, IndexedBitmap>();
-  const palette552 = extractUITables(graphics).graphic232.palette552;
+  const tables = graphicsTablesOf(graphics);
   const renderer = new ViewportRenderer({
     graphicsLoader: graphics,
     dungeonState: dungeon,
-    palette552,
+    viewportTables: tables.viewport,
+    objectTables: tables.objects,
+    palette552: tables.ui.graphic232.palette552,
     graphicCache,
     getGraphicBitmap: (graphicNum) => getCachedGraphicBitmap(graphics, graphicCache, graphicNum),
   });
@@ -177,7 +178,7 @@ function main(): void {
         tiles.push(Uint8Array.from(pixels));
       }
     }
-    if (png) writeSheet(`${OUTPUT}/render-probe-${pass}.png`, tiles, renderer.viewportPalettes?.[0] ?? palette552[0]);
+    if (png) writeSheet(`${OUTPUT}/render-probe-${pass}.png`, tiles, renderer.viewportPalettes?.[0] ?? tables.ui.graphic232.palette552[0]);
   }
   seeThruWalls(renderer, start, facing, doorIndex, warnings);
   console.warn = warn;

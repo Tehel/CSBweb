@@ -51,14 +51,13 @@ import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
-const viewportTables = extractViewportTables(graphics);
-const realTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+const viewportTables = graphicsTablesOf(graphics).viewport;
+const realTables = graphicsTablesOf(graphics).objects;
 
 // The test sizes its own cloud: d.Byte5696[0..1] (half-width, height) = 5, 12, and
 // d.Byte5758[1] = 171, which makes CSBWin's scale `171 * Larger(48, value+1) >> 8`

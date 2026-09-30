@@ -53,7 +53,6 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { MonsterDamageResult } from '../src/engine/MonsterDamage';
 import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import {
   monsterAbsorbsDaggersEtc,
   monsterHorizontalSize,
@@ -63,8 +62,7 @@ import {
   monsterWord2Bit4,
   type MonsterDesc,
 } from '../src/data/tables/MonsterDesc';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { emptyPossessions } from '../src/engine/gameTypes';
@@ -92,8 +90,7 @@ const loader = new DungeonLoader();
 loader.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/dungeon.dat'))));
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+const objectTables = graphicsTablesOf(graphics).objects;
 
 function makeGame(): Game {
   // A fresh copy of the dungeon each time: every scenario mutates it.

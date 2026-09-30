@@ -26,7 +26,8 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   reconvertThroughPalette,
 } from './csbwin/CanvasBlitter';
-import { extractUITables, type UIButton, type UITables } from '../data/tables/UITables';
+import type { GraphicsTables } from '../data/tables/GraphicsTables';
+import type { UIButton, UITables } from '../data/tables/UITables';
 import { loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {
@@ -135,6 +136,8 @@ export interface GameScreenHooks extends Required<Pick<UIState,
 /** What the screen reads: the graphics, the dungeon, and the engine's load figures. */
 export interface GameScreenDeps {
   graphicsLoader: GraphicsLoader;
+  /** The game's one set of `graphics.dat` tables, the one its `GameTables` was built from. */
+  tables: GraphicsTables;
   dungeonState: DungeonState;
   /** The party's trail, `d.PartyFootprints`, for the magic prints in the viewport. */
   footprints: PartyFootprints;
@@ -206,13 +209,15 @@ export class GameScreen {
     this.screenCtx = screenCtx;
     this.screenImageData = screenCtx.createImageData(SCREEN_WIDTH, SCREEN_HEIGHT);
 
-    ui.uiTables = extractUITables(graphicsLoader);
+    ui.uiTables = deps.tables.ui;
     const palette552 = ui.uiTables.graphic232.palette552;
     this.viewport = new ViewportRenderer({
       graphicsLoader,
       dungeonState: deps.dungeonState,
       footprints: deps.footprints,
       csbGraphicsLoader: deps.csbGraphicsLoader,
+      viewportTables: deps.tables.viewport,
+      objectTables: deps.tables.objects,
       palette552,
       graphicCache: ui.graphicCache,
       getGraphicBitmap: (graphicNum) => this.getGraphicBitmap(graphicNum),

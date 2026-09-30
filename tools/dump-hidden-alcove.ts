@@ -33,11 +33,9 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 const MAP = 5;
 const HIDDEN = new Position(13, 19, MAP);
@@ -50,7 +48,7 @@ const ALCOVES: Array<{ wall: Position; party: Position; facing: Direction; actua
   { wall: new Position(12, 23, MAP), party: new Position(12, 22, MAP), facing: Direction.SOUTH, actuator: 137 },
 ];
 
-const objectTables = extractObjectTables(stockGraphics(), extractViewportTables(stockGraphics()).wallRectanglesOffset);
+const objectTables = graphicsTablesOf(stockGraphics()).objects;
 
 function makeGame(): Game {
   const loader = new DungeonLoader();

@@ -25,14 +25,11 @@ import { Party, ensureHandOwner, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { CharacterStats } from '../src/engine/CharacterStats';
 import { CharacterSystem } from '../src/engine/CharacterSystem';
 import { CsbRandom } from '../src/core/random';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 /**
@@ -65,9 +62,8 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const uiTables = graphicsTablesOf(graphics).ui;
+  const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
     objDescCarryMask: objectTables.objDescCarryMask,

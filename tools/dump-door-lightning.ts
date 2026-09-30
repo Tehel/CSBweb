@@ -26,16 +26,14 @@
 import { readFileSync } from 'node:fs';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync('static/gamefiles/dm-atari/graphics.dat')));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+const objectTables = graphicsTablesOf(graphics).objects;
 
 console.log('doorCharacteristics:', Array.from(objectTables.doorCharacteristics).map((v) => `0x${(v & 0xffff).toString(16)}`));
 const lightningIndex = Array.from(objectTables.doorCharacteristics).findIndex((v) => (v & 0x400) !== 0);

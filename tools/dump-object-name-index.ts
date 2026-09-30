@@ -37,9 +37,8 @@ import { resolve } from 'node:path';
 
 import * as OBJNI from '../src/core/objectNameIndex';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 /**
  * The name `graphics.dat` must hold at each constant.
@@ -108,8 +107,7 @@ function main(): void {
   graphics.loadFromArray(
     new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))),
   );
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
   const names = objectTables.objectNames;
 
   console.log(`graphics.dat holds ${names.length} object names`);

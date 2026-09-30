@@ -26,18 +26,15 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { newGame, processTimersAt } from './lib/game';
+import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 import { rigTeleporter } from './lib/teleporter';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+const objectTables = graphicsTablesOf(graphics).objects;
 
 function makeGame(): Game {
   const loader = new DungeonLoader();

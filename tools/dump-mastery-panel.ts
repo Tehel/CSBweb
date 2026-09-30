@@ -60,9 +60,6 @@ import { ensureSkills, determineMastery } from '../src/engine/skills';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import type { FontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { MASTERY_LABELS, drawAttributePanel } from '../src/renderer/ui/Character';
@@ -70,7 +67,7 @@ import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inv
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
@@ -139,9 +136,8 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const uiTables = graphicsTablesOf(graphics).ui;
+  const objectTables = graphicsTablesOf(graphics).objects;
   const font = loadFontData(graphics);
 
   // ---------------------------------------------------------------- the label table

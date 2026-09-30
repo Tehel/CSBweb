@@ -37,9 +37,9 @@ import { resolve } from 'node:path';
 
 import { ImageFormat, decodeIMG } from '../src/core/imageDecoder';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractUITables } from '../src/data/tables/UITables';
 import { readPng } from './lib/png';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const DATA_SETS = ['static/gamefiles/dm-atari', 'static/gamefiles/conflux-3.5-b8'];
 const REFERENCE = 'tools/reference/csbwin-credits.png';
@@ -63,7 +63,7 @@ function checkAgainstReference(): void {
   const png = readPng(resolve(REFERENCE));
   const graphics = loadGraphics(DATA_SETS[0]);
   const image = graphics.getImage(CREDITS_GRAPHIC);
-  const palette = extractUITables(graphics).graphic232.palette328;
+  const palette = graphicsTablesOf(graphics).ui.graphic232.palette328;
 
   check(png.width === image.width && png.height === image.height,
     `the reference is ${image.width}x${image.height} (got ${png.width}x${png.height})`);

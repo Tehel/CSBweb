@@ -64,7 +64,6 @@ import {
 } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/data/tables/UITables';
 import {
   MENU_HEIGHT,
   MENU_PANEL_COLOR,
@@ -78,7 +77,7 @@ import {
 } from '../src/renderer/ui/Menu';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../src/renderer/ViewportGraphics';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -118,7 +117,7 @@ function makeDrawingUI(graphics: GraphicsLoader): UIState {
   const ui = {
     screenIndexBuffer: createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0),
     fontData: loadFontData(graphics),
-    uiTables: extractUITables(graphics),
+    uiTables: graphicsTablesOf(graphics).ui,
     getGraphicBitmap(graphicNum: number): IndexedBitmap | null {
       let bitmap = bitmaps.get(graphicNum);
       if (!bitmap) {
@@ -148,7 +147,7 @@ function pixelAt(ui: UIState, x: number, y: number): number {
  * `graphics.dat` item 0x231, so both are hostage to the parser's running offset.
  */
 function checkButtonTables(graphics: GraphicsLoader): void {
-  const buttons = extractUITables(graphics).graphic231.buttons;
+  const buttons = graphicsTablesOf(graphics).ui.graphic231.buttons;
 
   console.log('=== the inventory panel\'s secondary list, `buttons17760` ===');
   console.log(['id', 'x1', 'x2', 'y1', 'y2', 'button'].join('\t'));
@@ -225,7 +224,7 @@ function checkButtonTables(graphics: GraphicsLoader): void {
  * Graphic 0 and the self-blit rectangles `_DoMenu` patches it with, then the real draw.
  */
 function checkLayout(graphics: GraphicsLoader): void {
-  const g231 = extractUITables(graphics).graphic231;
+  const g231 = graphicsTablesOf(graphics).ui.graphic231;
   const image = graphics.getImage(0);
 
   console.log('');
@@ -632,7 +631,7 @@ async function checkEnterAndLeave(graphics: GraphicsLoader): Promise<void> {
   party.selectedCharacterIndex = 0;
 
   const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = extractUITables(graphics);
+  ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.partyState = party;
   // An attack has just been made: `TAG01b1c0` closed the menu, and the tick that brings
   // the buttons back has not run.
@@ -699,7 +698,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   party.selectedCharacterIndex = 0;
 
   const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = extractUITables(graphics);
+  ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.partyState = party;
   const draw = (): void => {
     Inventory.syncOpenChest(ui, Inventory.getActiveChestView(ui, party.champions[0]!));

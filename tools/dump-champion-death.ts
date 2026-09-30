@@ -47,10 +47,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord } from '../src/engine/objectIndex';
 import type { DatabaseRecord } from '../src/data/dungeonTypes';
 import { OBJNI_ILLUMULET_A, OBJNI_JEWEL_SYMAL_A, OBJNI_TORCH_A } from '../src/core/objectNameIndex';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions, getChampionPossession } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -90,9 +87,8 @@ function makeGame(championCount: number): Game {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
+  const objectTables = graphicsTablesOf(graphics).objects;
+  const uiTables = graphicsTablesOf(graphics).ui;
   dropOrder = uiTables.graphic232.dropOrder;
   objDescObjectType = objectTables.objDescObjectType;
   word1074 = uiTables.graphic232.word1074;

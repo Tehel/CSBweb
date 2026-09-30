@@ -31,15 +31,12 @@ import type { PresetHero } from '../src/data/dungeonTypes';
 import { Game } from '../src/engine/Game';
 import { attributeCurrent, attributeMaximum, attributeMinimum } from '../src/engine/attributes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import { attackButtonRect, drawAttackButton } from '../src/renderer/ui/Attack';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { ImageFormat } from '../src/core/imageDecoder';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
 const DELTA_X = [0, 1, 0, -1];
@@ -159,8 +156,8 @@ function portraitActuatorTypes(game: Game, mirror: Position, wall: number): numb
 function attackHandShaded(game: Game, chIdx: number): boolean {
   const graphics = sharedGraphics!;
   const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-  ui.uiTables = extractUITables(graphics);
-  ui.objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+  ui.uiTables = graphicsTablesOf(graphics).ui;
+  ui.objectTables = graphicsTablesOf(graphics).objects;
   ui.partyState = game.ctx.party.state;
   ui.screenIndexBuffer = createPaletteIndexViewportBuffer(320, 200, 0);
   drawAttackButton(ui, chIdx);
@@ -525,8 +522,7 @@ function edgeDecorationSection(): void {
     fail('graphics.dat was not retained; the edge-decoration section cannot run');
     return;
   }
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
   const sets = objectTables.wallDecorationRectSets;
 
   console.log('');
@@ -588,8 +584,8 @@ function portraitSection(): void {
     fail('graphics.dat was not retained; the portrait section cannot run');
     return;
   }
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const viewportTables = graphicsTablesOf(graphics).viewport;
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   console.log('');
   console.log('=== the portrait rectangle, extracted from graphics.dat item 0x22e ===');

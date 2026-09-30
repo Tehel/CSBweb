@@ -33,13 +33,12 @@ import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/data/tables/UITables';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import { MENU_TITLE1_COLOR, MENU_TITLE2_COLOR, doMenu, drawMenuPress, menuButtonList } from '../src/renderer/ui/Menu';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 const SAVE = 'static/gamefiles/saves/csbgame.dat';
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -131,7 +130,7 @@ interface Scripted {
 }
 
 function scriptedHost(events: IntroEvent[]): Scripted {
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
   const screen = createPaletteIndexViewportBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, 0);
   screen.pixels.fill(3);
   const r: Scripted = { log: [], shown: null, queue: [...events] } as unknown as Scripted;
@@ -207,7 +206,7 @@ function ink(pixels: Uint8Array, color: number): number {
 }
 
 async function checkTag01efee(): Promise<void> {
-  const ui = extractUITables(graphics);
+  const ui = graphicsTablesOf(graphics).ui;
   const ok = menuButtonList({ uiTables: ui } as unknown as UIState, 1, true)[0];
   check(ok !== undefined && ok.word0 === 210, 'the centred one-button set has its button, 210');
   if (!ok) return;
@@ -307,7 +306,7 @@ async function checkNewGameRead(): Promise<void> {
 
 /** The centre of the centred one-button set's OK. */
 function okCentre(): { x: number; y: number } {
-  const ok = menuButtonList({ uiTables: extractUITables(graphics) } as unknown as UIState, 1, true)[0]!;
+  const ok = menuButtonList({ uiTables: graphicsTablesOf(graphics).ui } as unknown as UIState, 1, true)[0]!;
   return { x: (ok.x1 + ok.x2) >> 1, y: (ok.y1 + ok.y2) >> 1 };
 }
 

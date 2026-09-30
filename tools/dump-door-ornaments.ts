@@ -23,16 +23,14 @@ import { resolve } from 'node:path';
 
 import { OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 const NEARNESS = ['F3', 'F2', 'F1'];
 
 function main(): void {
   const graphics = stockGraphics();
-  const tables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+  const tables = graphicsTablesOf(graphics).objects;
   const sets = tables.doorOrnamentRectSets;
 
   console.log('Byte5070 / Byte5058: x1 x2 y1 y2 widthBytes height');

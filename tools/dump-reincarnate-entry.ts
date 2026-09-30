@@ -28,7 +28,6 @@ import { resolve } from 'node:path';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractUITables } from '../src/data/tables/UITables';
 import type { UITables } from '../src/data/tables/UITables';
 import {
   gridCharacterAt,
@@ -38,6 +37,7 @@ import {
 } from '../src/renderer/ui/ReIncarnate';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 /**
  * Just enough `UIState` for the module: it reads `reincarnate`, `uiTables`,
@@ -79,7 +79,7 @@ const BACKSPACE = { x: 140, y: 151 };
 function main(): void {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
   const special = uiTables.graphic232.specialChars;
 
   /* ---------------------------------------- the tables it needs ------------------ */

@@ -18,10 +18,8 @@ import { MonsterSystem } from '../src/engine/MonsterSystem';
 import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
 import { CsbRandom } from '../src/core/random';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, fail, finish } from './lib/check';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
@@ -35,8 +33,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve(process.cwd(), GRAPHICS))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);
   const start = dungeon.getStartPosition();

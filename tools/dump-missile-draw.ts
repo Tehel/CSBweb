@@ -30,10 +30,8 @@ import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { BytecodeInterpreter, GetGraphicClass } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
-import { stockGraphics } from './lib/game';
+import { graphicsTablesOf, stockGraphics } from './lib/game';
 
 async function main(): Promise<void> {
   const loader = new DungeonLoader();
@@ -42,7 +40,7 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const dungeon = new DungeonState(data);
   const graphics = stockGraphics();
-  const tables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+  const tables = graphicsTablesOf(graphics).objects;
 
   // A real weapon record, retyped in memory to each of the 46 weapon types.
   const weaponRn = encodeObjectID(0, DBType.WEAPON, 0);

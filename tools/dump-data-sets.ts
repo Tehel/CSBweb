@@ -17,10 +17,9 @@ import { DATA_SETS, DEFAULT_DATA_SET, dataSetFor, type DataSet } from '../src/da
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
-import { extractUITables } from '../src/data/tables/UITables';
 import { MISSING_PRISON_DOOR_BUTTONS } from '../src/renderer/intro/PrisonDoor';
 import { check, finish } from './lib/check';
-import { gameTablesOf, newGame } from './lib/game';
+import { gameTablesOf, graphicsTablesOf, newGame } from './lib/game';
 
 /** A file of `set`, where the page's root is `static/`. */
 function fileOf(set: DataSet, name: string): string {
@@ -47,7 +46,7 @@ function main(): void {
     const tables = gameTablesOf(graphics);
     tablesOf.set(set.id, tables);
     const size231 = graphics.getRawGraphic(0x231).length;
-    const buttons = extractUITables(graphics).graphic231.buttons.buttons16932;
+    const buttons = graphicsTablesOf(graphics).ui.graphic231.buttons.buttons16932;
     console.log(`  dungeon.dat: ${dungeon.maps.length} maps; graphics.dat: ${graphics.getItemCount()} items, ` +
       `0x231 is 0x${size231.toString(16)} bytes, Buttons16932 from the file: ${buttons.length}`);
     check(size231 === 0x7d4 || size231 === 0x804, `${set.id}: 0x231 has one of the two sizes CSBWin asserts`);

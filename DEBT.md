@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E8 | One table set, extracted once, outside the renderer | L | ⚠️ step 2 of 4 next |
+| E8 | One table set, extracted once, outside the renderer | L | ⚠️ step 3 of 4 next |
 | E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
@@ -147,7 +147,7 @@ New state-representation debt goes here, and jumps the queue.
 `createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
 sources `null` — `uiTables`, `objectTables`, `characterStats`, `fontData`,
 `screenIndexBuffer`, `context` — and `GameScreen`'s constructor fills them in straight
-after (`src/renderer/GameScreen.ts:168-230`). None is ever `null` again, but every reader
+after (`src/renderer/GameScreen.ts:168-232`). None is ever `null` again, but every reader
 must ask: 165 `!ui.x` guards and 57 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
 optional fields too, so 35 calls are `ui.onX?.()`, and a hook left unwired is a click
 that silently does nothing. D3 made the engine's state required for the same reason. Paying
@@ -167,12 +167,11 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 The extractors of every `graphics.dat` table live in `src/data/tables/`: `ObjectTables.ts`
 (0x22f and the object half of 0x22e), `UITables.ts` (0x230-0x232, with `Rect` and
 `RectPos`), `ViewportTables.ts` (0x22e's rectangles) and `MonsterDesc.ts` (`MONSTERDESC`
-and its bit accessors, which the engine reads). What is left:
+and its bit accessors, which the engine reads). `GraphicsTables.ts` reads them all once:
+`main.ts` calls it, and so does `tools/lib/game.ts` (`graphicsTablesOf`, per
+`graphics.dat`); `buildGameTables` builds the engine's set from the result, and the
+screen is handed the same object (`GameScreenDeps.tables`). What is left:
 
-- **Every table is extracted three times.** `buildGameTables` runs `extractUITables`,
-  `extractViewportTables` and `extractObjectTables`; `ViewportRenderer`'s constructor runs
-  the last two again (`src/renderer/ViewportRenderer.ts:92-94`), and `GameScreen`'s runs
-  `extractUITables` again (`GameScreen.ts:209`). 33 tools call `extractUITables` too.
 - **A table has two names.** The renderer's set keeps the port's names and the engine's
   CSBWin's: `objDescCarryMask` / `objDescWord4`, `facingReplication` / `byte10340`,
   `miscWeights` / `byte8946`, `monsterAttackSounds` / `uByte9672`. Two systems rename
@@ -192,11 +191,10 @@ and its bit accessors, which the engine reads). What is left:
   sets, two distinct files (DM's, and CSB's that 3D2D1D shares), so the search is dead,
   and a search is a guess in all but name.
 
-Paying it, in steps: (1) ✅ the extractors in `src/data/tables/`; (2) extract once, where
-`main.ts` and `tools/lib/game.ts` build `GameTables`, and hand the same object to the
-screen, which stops extracting; (3) one name per table, CSBWin's, with the port's in the
-comment as `GameTables` already does, and one declaration per record type; (4) delete the
-pattern search. A second dungeon's `graphics.dat` then has one place where it can differ.
+Paying it, in steps: (1) ✅ the extractors in `src/data/tables/`; (2) ✅ extract once,
+into `GraphicsTables`, and hand the same object to the screen; (3) one name per table,
+CSBWin's, with the port's in the comment as `GameTables` already does, and one
+declaration per record type; (4) delete the pattern search. A second dungeon's `graphics.dat` then has one place where it can differ.
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
@@ -224,8 +222,8 @@ them first or after, not during.
 
 What CSBWin's interface code does to the game, it does by calling the engine's functions
 on `d.`. The port's goes: a `UIState` hook (`ui.onAddCharacterPossession?.(…)`), which
-`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:173-200`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:237-372`) onto a one-line `Game`
+`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:176-204`),
+each a lambda in `main.ts`'s `construct` (`src/main.ts:238-373`) onto a one-line `Game`
 facade, onto the system. Adding an engine call from the UI touches four files. And
 the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
 state directly where no hook exists — the object in hand
@@ -452,11 +450,11 @@ save and a load. It must be paid before `P10` drops `runtime`.
 
 CSBWin calls `DrawViewport` in three places: the main loop's tick
 (`doc/CSBwin-src/CSBCode.cpp:638`), a script's tick (`Attack.cpp:2205`) and the prison
-door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:166`) always
+door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:167`) always
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:500-505`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:502-507`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`drawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -510,7 +508,7 @@ teleporter's pixels with the stream the C++ reads.
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
 `setCrtEnabled(true)` hides the game canvas and shows the WebGL one in its place
-(`src/main.ts:139-146`). `bindUIEvents` binds the adventure's handlers to both canvases,
+(`src/main.ts:140-147`). `bindUIEvents` binds the adventure's handlers to both canvases,
 but the pre-game and end-of-game screens listen on the game canvas alone
 (`createIntroHost`, `src/renderer/intro/BootSequence.ts:138-143`, handed `gameCanvasEl` by
 `showEndOfGame`). With the effect on, the credits' menu and the restart's chooser and

@@ -41,19 +41,15 @@ import {
 } from '../src/engine/attributes';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-const viewportTables = extractViewportTables(graphics);
-const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-const uiTables = extractUITables(graphics);
+const objectTables = graphicsTablesOf(graphics).objects;
+const uiTables = graphicsTablesOf(graphics).ui;
 
 function makeGame(host?: Partial<GameHost>): Game {
   const loader = new DungeonLoader();

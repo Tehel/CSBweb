@@ -36,10 +36,8 @@ import {
   OBJDI_CHEST,
   type ObjectIndexTables,
 } from '../src/engine/objectIndex';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const DATABASE_OF: Array<[DBType, keyof Databases]> = [
   [DBType.DOOR, 'doors'],
@@ -70,9 +68,8 @@ async function main(): Promise<void> {
   graphics.loadFromArray(
     new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))),
   );
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
+  const objectTables = graphicsTablesOf(graphics).objects;
+  const uiTables = graphicsTablesOf(graphics).ui;
   const names = objectTables.objectNames;
   const tables: ObjectIndexTables = {
     objDescObjectType: objectTables.objDescObjectType,

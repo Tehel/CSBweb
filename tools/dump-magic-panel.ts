@@ -30,12 +30,11 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { ensureSkills } from '../src/engine/skills';
-import { extractUITables } from '../src/data/tables/UITables';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { createUIState } from '../src/renderer/ui/UIState';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 function champion(name: string): Champion {
@@ -61,7 +60,7 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
   const base = uiTables.graphic230.spellBaseMana;
   const scale = uiTables.graphic230.spellFirstRuneScale;
 

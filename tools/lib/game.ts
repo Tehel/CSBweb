@@ -3,7 +3,9 @@
  *
  * Tools used to hand `Game` the subset of tables they thought they needed, so a tool could
  * pass while the code it exercised read a table the tool had left out (`DEBT.md` E1a).
- * Now every tool gets every table. The set is built once per `GraphicsLoader`.
+ * Now every tool gets every table. The tables are extracted once per `GraphicsLoader`
+ * (`graphicsTablesOf`), and the tool's `GameTables` is built from that one extraction, as
+ * `main.ts` builds the game's.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -14,7 +16,9 @@ import { Game } from '../../src/engine/Game';
 import { createGameContext, type GameContext } from '../../src/engine/GameContext';
 import type { GameHost } from '../../src/engine/GameHost';
 import { buildGameTables, type GameTables } from '../../src/engine/GameTables';
+import { extractGraphicsTables, type GraphicsTables } from '../../src/data/tables/GraphicsTables';
 
+const extracted = new WeakMap<GraphicsLoader, GraphicsTables>();
 const built = new WeakMap<GraphicsLoader, GameTables>();
 let stock: GraphicsLoader | null = null;
 
@@ -27,11 +31,21 @@ export function stockGraphics(): GraphicsLoader {
   return stock;
 }
 
-/** `buildGameTables(graphics)`, remembered per loader. */
+/** `extractGraphicsTables(graphics)`, remembered per loader. */
+export function graphicsTablesOf(graphics: GraphicsLoader): GraphicsTables {
+  let tables = extracted.get(graphics);
+  if (!tables) {
+    tables = extractGraphicsTables(graphics);
+    extracted.set(graphics, tables);
+  }
+  return tables;
+}
+
+/** `buildGameTables` over `graphicsTablesOf(graphics)`, remembered per loader. */
 export function gameTablesOf(graphics: GraphicsLoader): GameTables {
   let tables = built.get(graphics);
   if (!tables) {
-    tables = buildGameTables(graphics);
+    tables = buildGameTables(graphicsTablesOf(graphics));
     built.set(graphics, tables);
   }
   return tables;

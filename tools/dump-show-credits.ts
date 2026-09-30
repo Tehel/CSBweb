@@ -47,7 +47,7 @@ import type { MessageSink } from '../src/engine/ActuatorSystem';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables, type UITables } from '../src/data/tables/UITables';
+import { type UITables } from '../src/data/tables/UITables';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import {
   darken,
@@ -67,7 +67,7 @@ import { setActuatorType } from '../src/data/actuatorHelpers';
 import { WON_GAME_VBLS } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 /** The hooks of a lost game: `_StartCSB` has turned palette switching off. */
 const LOST = { word11694: false, champions: [], palette11946: null };
@@ -253,7 +253,7 @@ async function checkScreen(): Promise<void> {
   console.log('');
   console.log('=== _ShowCredits(1), a lost game (Code1f9e6.cpp:66) ===');
   const graphics = stockGraphics();
-  const ui = extractUITables(graphics);
+  const ui = graphicsTablesOf(graphics).ui;
   const g = ui.graphic232;
   const theEnd = graphics.getImage(6);
   const credits = graphics.getImage(5);
@@ -396,7 +396,7 @@ async function checkRestart(): Promise<void> {
   console.log('');
   console.log('=== RESTART THIS GAME, with d.CanRestartFromSavegame (Code1f9e6.cpp:240-348) ===');
   const graphics = stockGraphics();
-  const ui = extractUITables(graphics);
+  const ui = graphicsTablesOf(graphics).ui;
   const g = ui.graphic232;
   const r116 = g.word116;
   const r124 = g.word124;
@@ -490,7 +490,7 @@ async function checkWon(): Promise<void> {
   console.log('');
   console.log('=== _ShowCredits(1), a won game (Code1f9e6.cpp:122-225) ===');
   const graphics = stockGraphics();
-  const ui = extractUITables(graphics);
+  const ui = graphicsTablesOf(graphics).ui;
   const g = ui.graphic232;
   const frame = graphics.getImage(GRAPHIC_CHAMPION_FRAME);
   const size = (r: { x1: number; x2: number; y1: number; y2: number }): string => `${r.x2 - r.x1 + 1}x${r.y2 - r.y1 + 1}`;

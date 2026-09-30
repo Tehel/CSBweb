@@ -6,6 +6,7 @@
 import { SoundManager } from './audio';
 import { CSBGraphicsLoader, GraphicsLoader, dataSetFor, emptyDungeonData } from './data';
 import { Game, buildGameTables, type GameTables } from './engine';
+import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
 import {
     applySaveBytes,
     buildSavePayload,
@@ -234,7 +235,7 @@ function createSoundManager(graphicsLoader: GraphicsLoader, tables: GameTables):
  * The engine and the screen, each handed what it asks of the other: the engine its
  * `GameHost`, the screen its `GameScreenHooks`.
  */
-function construct(files: GameFiles, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen } {
+function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: GameTables, sound: SoundManager): { game: Game; screen: GameScreen } {
     const playSound = (soundId: number, rateIdx?: number, highVolume?: number) => sound.playSound(soundId, rateIdx, highVolume);
     // The screen is built second, over the engine's dungeon, so the engine→UI notices
     // reach it through this variable.
@@ -283,6 +284,7 @@ function construct(files: GameFiles, tables: GameTables, sound: SoundManager): {
 
     screen = new GameScreen(gameCanvasEl, {
         graphicsLoader: files.graphicsLoader,
+        tables: graphicsTables,
         dungeonState: game.ctx.dungeon,
         footprints: game.ctx.footprints,
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
@@ -526,9 +528,12 @@ async function init() {
         bindDataSetChooser(dataSet);
         updateDebug('Loading Phase 1: Core modules...');
         const files = await loadGameFiles();
-        const tables = buildGameTables(files.graphicsLoader);
+        // Every graphics.dat table, read once: the engine's set is built from it, and the
+        // screen is handed the same object.
+        const graphicsTables = extractGraphicsTables(files.graphicsLoader);
+        const tables = buildGameTables(graphicsTables);
         const sound = createSoundManager(files.graphicsLoader, tables);
-        const built = construct(files, tables, sound);
+        const built = construct(files, graphicsTables, tables, sound);
         game = built.game;
         screen = built.screen;
         await createCrt();

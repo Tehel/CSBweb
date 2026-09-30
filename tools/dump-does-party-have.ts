@@ -22,10 +22,7 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { Party } from '../src/engine/Party';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 const OBJNI_CHEST = 0x90;
@@ -37,9 +34,8 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const uiTables = graphicsTablesOf(graphics).ui;
+  const objectTables = graphicsTablesOf(graphics).objects;
   const addTables: AddCharacterTables = {
     carryLocation: uiTables.graphic232.carryLocation,
     objDescCarryMask: objectTables.objDescCarryMask,

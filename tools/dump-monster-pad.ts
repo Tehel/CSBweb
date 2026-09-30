@@ -37,10 +37,8 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { monsterLevitating } from '../src/data/tables/MonsterDesc';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
 
@@ -49,8 +47,7 @@ const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1
 async function main(): Promise<void> {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const makeGame = async (): Promise<Game> => {
     const loader = new DungeonLoader();

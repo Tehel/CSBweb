@@ -35,12 +35,9 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttackType, MonsterType, StateOfFear } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { monsterInvincible, monsterNonMaterial } from '../src/data/tables/MonsterDesc';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { extractUITables } from '../src/data/tables/UITables';
 import { determineMastery } from '../src/engine/skills';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -74,9 +71,8 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
+  const objectTables = graphicsTablesOf(graphics).objects;
+  const uiTables = graphicsTablesOf(graphics).ui;
   const g230 = uiTables.graphic230;
 
   // Each case mutates the dungeon — a sword appended to the weapon database, a monster

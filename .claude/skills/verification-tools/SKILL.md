@@ -134,8 +134,8 @@ behaviour with an extra case explaining why it looks like an omission.
 ## Gotchas
 
 **Build a `Game` through `tools/lib/game.ts`.** `newGame(data, graphics, options?)`
-gives the game every table `buildGameTables` extracts — the same `GameTables` `main.ts`
-uses — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that
+gives the game every table in `GameTables` — built as `main.ts` builds it, from the one
+`extractGraphicsTables` of that `graphics.dat` — and `newContext(data, graphics, parts?)` gives a `GameContext` for a tool that
 stands one subsystem up without a `Game` (pass your own `dungeon`, `party`, `timers` or
 seeded `random` in `parts`; set `ctx.state.tickCount` for the clock). Subsystems call
 each other through `ctx.systems` (`DEBT.md` E1c), which such a context leaves empty: fill
@@ -151,7 +151,10 @@ measured nothing because of it (the armour test without the clothing tables;
 table goes into `GameTables` and `buildGameTables`, and every tool has it. A tool that
 needs a *different* table builds its game over a copy:
 `new Game(data, { ...gameTablesOf(graphics), doorCharacteristics: [...] })`
-(`dump-missile-door.ts`). Never mutate the shared set.
+(`dump-missile-door.ts`). A tool that reads the screen's tables (`UITables`,
+`ObjectTables`, `ViewportTables`) takes them from `graphicsTablesOf(graphics)`, the same
+extraction its `GameTables` came from, rather than calling an extractor itself. Never
+mutate the shared set.
 
 **Seed fixed, always.** `new CsbRandom(0x12345678)` (or `game.setRandomSeed(…)`). An
 unseeded run is not a test, and it spoils the refactor check below (`DEBT.md` F4).

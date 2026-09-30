@@ -34,14 +34,12 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 /** `ui/Mouse` reaches the debug chrome through `@/ui`; see `dump-hand-owner.ts`. */
 async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')> {
@@ -63,8 +61,8 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
-  const objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+  const uiTables = graphicsTablesOf(graphics).ui;
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const party = new Party(new Position(1, 1, 0), Direction.NORTH);
   const bitmaps = new Map<number, IndexedBitmap>();

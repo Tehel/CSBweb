@@ -46,10 +46,10 @@ import { Party } from '../src/engine/Party';
 import type { Champion } from '../src/engine/gameTypes';
 import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/data/tables/UITables';
 import { drawPartyStatus, getPortraitBitmap } from '../src/renderer/ui/Character';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const DUNGEON = 'static/gamefiles/dm-atari/dungeon.dat';
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
@@ -108,7 +108,7 @@ function main(): void {
     },
     renderLastFrame: () => {},
   });
-  ui.uiTables = extractUITables(graphics);
+  ui.uiTables = graphicsTablesOf(graphics).ui;
   ui.fontData = loadFontData(graphics);
 
   /** Draw the whole status bar with `chIdx`'s inventory open, and hand back the screen. */

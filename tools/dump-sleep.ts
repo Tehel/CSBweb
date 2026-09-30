@@ -40,10 +40,9 @@ import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { extractUITables } from '../src/data/tables/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
@@ -77,7 +76,7 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
   const lists = uiTables.graphic231.buttons;
 
   console.log('=== the button lists (graphics.dat 0x231) ===');

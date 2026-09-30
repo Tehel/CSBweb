@@ -22,8 +22,8 @@ import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
-import { extractViewportTables } from '../data/tables/ViewportTables';
-import { extractObjectTables, type ObjectTables } from '../data/tables/ObjectTables';
+import type { ViewportTables } from '../data/tables/ViewportTables';
+import type { ObjectTables } from '../data/tables/ObjectTables';
 import {
   initializeFloorCeilingIndexed,
   initializeDoorBitmapsIndexed,
@@ -56,6 +56,10 @@ export interface ViewportRendererDeps {
   /** `d.PartyFootprints`, whose magic prints `SummarizeRoomInfo` shows. */
   footprints?: PartyFootprints;
   csbGraphicsLoader?: CSBGraphicsLoader;
+  /** Graphic `0x22e`'s rectangles, from the game's one `GraphicsTables`. */
+  viewportTables: ViewportTables;
+  /** Graphic `0x22f` and the object half of `0x22e`, from the same set. */
+  objectTables: ObjectTables;
   /** `graphic232.palette552`: the viewport's palettes, one per light level. */
   palette552: number[][];
   /** The screen's graphics cache, which the interpreter shares with the interface. */
@@ -88,10 +92,8 @@ export class ViewportRenderer {
     this.graphicsLoader = deps.graphicsLoader;
     this.dungeonState = deps.dungeonState;
 
-    // Extract CSBWin viewport tables from graphics.dat item 0x22e
-    const viewportTables = extractViewportTables(this.graphicsLoader);
-    console.log(`Extracted wallRectangles[14] from 0x22e at offset 0x${viewportTables.wallRectanglesOffset.toString(16)}`);
-    this.objectTables = extractObjectTables(this.graphicsLoader, viewportTables.wallRectanglesOffset);
+    const { viewportTables } = deps;
+    this.objectTables = deps.objectTables;
     this.mirrorWallRectF2 = viewportTables.mirrorWallRectF2;
     this.mirrorWallRectF3 = viewportTables.mirrorWallRectF3;
     if (deps.palette552.length > 0) {

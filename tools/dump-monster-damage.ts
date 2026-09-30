@@ -27,10 +27,8 @@ import { TimerQueue, TimerFunction } from '../src/engine/TimerQueue';
 import type { MissileEncounter } from '../src/engine/MissileEncounter';
 import type { ActuatorSystem } from '../src/engine/ActuatorSystem';
 import { MonsterType, StateOfFear } from '../src/engine/monsterTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
-import { newContext } from './lib/game';
+import { graphicsTablesOf, newContext } from './lib/game';
 import { check, finish } from './lib/check';
 
 function objectsInCell(dungeon: DungeonState, pos: Position): string[] {
@@ -50,8 +48,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
 
   const dungeon = new DungeonState(data);
   const level = Number(process.argv[2] ?? 3);

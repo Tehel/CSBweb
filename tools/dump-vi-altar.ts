@@ -42,16 +42,13 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import type { ObjectTables } from '../src/data/tables/ObjectTables';
-import { extractUITables } from '../src/data/tables/UITables';
 import type { UITables } from '../src/data/tables/UITables';
 import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -83,9 +80,8 @@ function makeGame(): { game: Game; objectTables: ObjectTables; uiTables: UITable
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
+  const objectTables = graphicsTablesOf(graphics).objects;
+  const uiTables = graphicsTablesOf(graphics).ui;
 
   const game = newGame(data, graphics);
   game.setRandomSeed(0x12345678);

@@ -46,7 +46,7 @@ import {
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { decodeCursorBitmap, extractUITables, type UITables } from '../src/data/tables/UITables';
+import { decodeCursorBitmap, type UITables } from '../src/data/tables/UITables';
 import { searchButtonList } from '../src/renderer/ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from '../src/renderer/ViewportGraphics';
 import {
@@ -84,6 +84,7 @@ import {
   prisonCellFlags,
 } from '../src/renderer/intro/PrisonLevel';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 /** A palette index no entrance artwork uses, so the stubbed corridor is identifiable. */
@@ -511,7 +512,7 @@ function checkSoundPitches(ui: UITables): void {
 
 async function checkFade(): Promise<void> {
   console.log('\n=== _FadeToPalette ===');
-  const host = makeHost(loadGraphics(), extractUITables(loadGraphics()));
+  const host = makeHost(loadGraphics(), graphicsTablesOf(loadGraphics()).ui);
   host.globalPalette.fill(0x777);
   await fadeToPalette(host, PALETTE_11914);
   check(host.globalPalette.every((c) => c === 0), 'eight steps take 0x777 all the way to black');
@@ -534,7 +535,7 @@ async function checkFade(): Promise<void> {
 
 async function main(): Promise<void> {
   const graphics = loadGraphics();
-  const ui = extractUITables(graphics);
+  const ui = graphicsTablesOf(graphics).ui;
 
   checkRectangles(ui);
   checkButtons(ui);

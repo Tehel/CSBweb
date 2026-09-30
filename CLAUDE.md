@@ -115,7 +115,7 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
-            ViewportTables, MonsterDesc
+            ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,

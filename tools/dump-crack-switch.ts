@@ -28,13 +28,11 @@ import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
 import {
   WALL_ORNAMENT_CRACK_SWITCH_IN,
   WALL_ORNAMENT_CRACK_SWITCH_OUT,
-  extractObjectTables,
   readWallDecorationRectSetIndex,
 } from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
-import { newGame, stockGraphics } from './lib/game';
+import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 const PARTY = new Position(14, 29, 4);
 const FACING_WEST = 3;
@@ -45,7 +43,7 @@ const EAST_FACE = 1;
 const ornamentGraphic = (ornament: number): number => 121 + 2 * ornament;
 
 /** The renderer's tables, extracted as `main.ts` extracts them. */
-const objectTables = extractObjectTables(stockGraphics(), extractViewportTables(stockGraphics()).wallRectanglesOffset);
+const objectTables = graphicsTablesOf(stockGraphics()).objects;
 
 function makeGame(): Game {
   const loader = new DungeonLoader();
@@ -88,7 +86,7 @@ function ornamentAhead(game: Game): number {
 
 function main(): void {
   const graphics = stockGraphics();
-  const raw = readWallDecorationRectSetIndex(graphics.getRawGraphic(0x22e), extractViewportTables(graphics).wallRectanglesOffset);
+  const raw = readWallDecorationRectSetIndex(graphics.getRawGraphic(0x22e), graphicsTablesOf(graphics).viewport.wallRectanglesOffset);
   const fixed = objectTables.wallDecorationRectSetIndex;
 
   // --- the data -------------------------------------------------------------------

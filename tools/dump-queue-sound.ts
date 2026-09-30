@@ -87,13 +87,11 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Game } from '../src/engine/Game';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { TimerFunction, type TimerEntry } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { handleMouthPress } from '../src/renderer/ui/Feeding';
 import { createUIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';
-import { gameTablesOf, newGame, stockGraphics } from './lib/game';
+import { gameTablesOf, graphicsTablesOf, newGame, stockGraphics } from './lib/game';
 
 /** North, east, south, west: `DELTA_X` / `DELTA_Y`. */
 const DELTAS: ReadonlyArray<readonly [number, number]> = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -393,7 +391,7 @@ function main(): void {
     const index = potions.findIndex((r) => r.nextObject !== OBJECT_ID_NULL && r.potionType !== PotionType.EMPTY_FLASK);
     const potion = ((DBType.POTION << 10) | index) as ObjectID;
     const ui = createUIState(graphics, game.ctx.dungeon, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
-    ui.objectTables = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+    ui.objectTables = graphicsTablesOf(graphics).objects;
     ui.partyState = game.ctx.party.state;
     ui.applyFeeding = (chIdx, fp) => game.applyFeeding(chIdx, fp);
     ui.queueSound = (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z);

@@ -32,7 +32,6 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { AttributeIndex, setAttributeCurrent } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractUITables } from '../src/data/tables/UITables';
 import {
   BOX_GRAPHIC_MARKED,
   BOX_GRAPHIC_PLAIN,
@@ -42,6 +41,7 @@ import {
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+import { graphicsTablesOf } from './lib/game';
 
 /** A champion with nothing wrong: fed, watered, unpoisoned, no attribute drained. */
 function healthyChampion(): Champion {
@@ -64,7 +64,7 @@ const ATTRIBUTE_NAMES = ['Luck', 'Strength', 'Dexterity', 'Wisdom', 'Vitality', 
 function main(): void {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const g232 = extractUITables(graphics).graphic232;
+  const g232 = graphicsTablesOf(graphics).ui.graphic232;
 
   /* ---------------------------------------- the geometry ------------------------- */
 

@@ -1,9 +1,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { readI8, readU16BE } from '../src/core/bytes';
+import { graphicsTablesOf } from './lib/game';
 
 interface ToolOptions {
   graphics: string;
@@ -260,8 +259,7 @@ function main(): void {
   const clothing = parseClothingDesc(raw22f);
   const foodValue = parseFoodValue(raw22f);
 
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
+  const objectTables = graphicsTablesOf(graphics).objects;
   const graphicClasses = objectTables.graphicClasses;
 
   const objects = parseObjectDefinitions(raw22f, names, graphicClasses, weapons, clothing, foodValue);

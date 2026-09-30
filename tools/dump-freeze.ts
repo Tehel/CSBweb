@@ -30,9 +30,8 @@ import type { Champion } from '../src/engine/gameTypes';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { extractUITables } from '../src/data/tables/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 type UIModules = [
@@ -76,7 +75,7 @@ async function main(): Promise<void> {
   if (!data) throw new Error('dungeon.dat did not load');
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
   const lists = uiTables.graphic231.buttons;
   const keys = uiTables.graphic231.keys;
 

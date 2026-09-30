@@ -14,15 +14,11 @@
  * (`d.weapons[].weight`, `d.ClothingDesc[].uByte1`) keep the port's names, since CSBWin
  * gives them none worth keeping.
  */
-import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { SpellDefinition } from '../data/spellTypes';
-import {
-  extractObjectTables,
-  type WeaponDesc,
-} from '../data/tables/ObjectTables';
+import type { GraphicsTables } from '../data/tables/GraphicsTables';
+import type { WeaponDesc } from '../data/tables/ObjectTables';
 import { type MonsterDesc } from '../data/tables/MonsterDesc';
-import { extractUITables, type Rect, type SoundTableEntry } from '../data/tables/UITables';
-import { extractViewportTables } from '../data/tables/ViewportTables';
+import type { Rect, SoundTableEntry } from '../data/tables/UITables';
 import type { TextDecodeTables } from './DungeonState';
 
 export interface GameTables {
@@ -129,10 +125,9 @@ export interface GameTables {
   readonly sound1772: SoundTableEntry[];
 }
 
-/** Every table in `GameTables`, extracted from `graphics.dat`. */
-export function buildGameTables(graphics: GraphicsLoader): GameTables {
-  const ui = extractUITables(graphics);
-  const objects = extractObjectTables(graphics, extractViewportTables(graphics).wallRectanglesOffset);
+/** Every table in `GameTables`, from what `extractGraphicsTables` read of `graphics.dat`. */
+export function buildGameTables(graphics: GraphicsTables): GameTables {
+  const { ui, objects } = graphics;
   const g230 = ui.graphic230;
   const g232 = ui.graphic232;
   return {

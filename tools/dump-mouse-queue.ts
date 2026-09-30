@@ -49,9 +49,8 @@ import type { InterpreterContext } from '../src/renderer/bytecode/BytecodeInterp
 import { tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
 import { setHandOwner } from '../src/engine/Party';
 import { ensureSkills } from '../src/engine/skills';
-import { extractUITables } from '../src/data/tables/UITables';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { newGame } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
@@ -88,7 +87,7 @@ async function main(): Promise<void> {
 
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
-  const uiTables = extractUITables(graphics);
+  const uiTables = graphicsTablesOf(graphics).ui;
 
   const level = Number(process.argv[2] ?? 1);
   const game = newGame(data, graphics);

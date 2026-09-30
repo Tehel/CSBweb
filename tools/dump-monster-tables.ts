@@ -15,9 +15,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractUITables } from '../src/data/tables/UITables';
-import { extractViewportTables } from '../src/data/tables/ViewportTables';
-import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import {
   monsterBravery,
   monsterCanSeeInDark,
@@ -32,6 +29,7 @@ import {
 } from '../src/data/tables/MonsterDesc';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { check, finish } from './lib/check';
+import { graphicsTablesOf } from './lib/game';
 
 const DEFAULT_GRAPHICS = 'static/gamefiles/dm-atari/graphics.dat';
 
@@ -40,9 +38,8 @@ function main(): void {
   const graphics = new GraphicsLoader();
   graphics.loadFromArray(new Uint8Array(readFileSync(path)));
 
-  const viewportTables = extractViewportTables(graphics);
-  const objectTables = extractObjectTables(graphics, viewportTables.wallRectanglesOffset);
-  const uiTables = extractUITables(graphics);
+  const objectTables = graphicsTablesOf(graphics).objects;
+  const uiTables = graphicsTablesOf(graphics).ui;
   const g230 = uiTables.graphic230;
 
   console.log('=== MONSTERDESC[27] (graphics.dat 0x22f) ===');
