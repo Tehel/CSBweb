@@ -7,7 +7,7 @@
  */
 import { OBJNI_APPLE, OBJNI_DRAGON_STEAK, OBJNI_SPECIAL_G, OBJNI_SPECIAL_H, OBJNI_WATER, OBJNI_WATERSKIN } from '../../core/objectNameIndex';
 import { PotionType } from '../../core/constants';
-import { clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
+import { applyFeedParameters, clearFeedParameters, derivePotionFeeding, type FeedParameters } from '../../engine/Feeding';
 import { DBType, OBJECT_ID_NULL, ObjectID, decodeObjectID } from '../../core/types';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { drawObjectIconAt } from './Draw';
@@ -112,8 +112,7 @@ export function handleMouthPress(ui: UIState): void {
   // Where the Feeding Filter DSA would rewrite the block
   // (`doc/CSBwin-src/Character.cpp:4288-4344`). ⏳ Not ported: no dungeon we load
   // defines `ESL_FEEDINGFILTER`, and the DSA parameter marshalling is its own job.
-  const applied = ui.applyFeeding?.(selected, fp) ?? false;
-  if (!applied) return;
+  if (!applyFeedParameters(ui.ctx, selected, fp)) return;
 
   if (fp.chew) {
     startMouthChewAnimation(ui);
@@ -134,7 +133,7 @@ export function handleMouthPress(ui: UIState): void {
     ui.ctx.dungeon.deleteDBEntry(objectId as ObjectID);
   }
 
-  if (fp.gulp >= 0) ui.queueSound?.(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0);
+  if (fp.gulp >= 0) ui.ctx.sounds.queueSound(fp.gulp, ui.partyState.position.x, ui.partyState.position.y, 0, ui.ctx.party.state.position.z);
 }
 
 export function getFoodValue(ui: UIState, nameIndex: number): number {

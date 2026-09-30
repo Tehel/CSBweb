@@ -22,6 +22,7 @@ import { UIMode, UIState } from './UIState';
 import { getPartyChampion, selectMagicCaster, setHandOwner } from '../../engine/Party';
 import { getChampionPossession } from '../../engine/gameTypes';
 import { characterAtPosition } from '../../engine/AddCharacter';
+import { setClockTick } from '../../engine/LoopState';
 import { updateHover } from '@/ui';
 
 export { decodeCursorBitmap };
@@ -240,7 +241,7 @@ export function handleInventoryToggle(ui: UIState, button: number): void {
   // (`doc/CSBwin-src/CSBCode.cpp:7439-7441`). The port has no pressed mouth:
   // `handleMouthPress` feeds on the press.
   if (ui.pressingEye) return;
-  ui.setClockTick?.(1);
+  setClockTick(ui.ctx, 1);
   if (button === 4) {
     syncOpenChest(ui, null);
     ui.partyState.selectedCharacterIndex = -1;
@@ -354,9 +355,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
   // `RemoveCharacterPossession` and `AddCharacterPossession` are the engine's; a chest
   // slot is `d.rnChestContents`, which is ours, and all the pair does past slot 29 is
   // write it (`CharacterSystem.removeCharacterPossession`).
-  const remove = ui.onRemoveCharacterPossession;
-  const add = ui.onAddCharacterPossession;
-  if (!remove || !add) return;
+  const character = ui.ctx.systems.character;
   if (objectInHand !== OBJECT_ID_NULL) {
     ui.partyState.objectInHand = OBJECT_ID_NULL;
   }
@@ -364,7 +363,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = OBJECT_ID_NULL;
     } else {
-      remove(chIdx, slot);
+      character.removeCharacterPossession(chIdx, slot);
     }
     ui.partyState.objectInHand = slotObject;
   }
@@ -372,7 +371,7 @@ export function handleClothingClick(ui: UIState, button: number): void {
     if (isChestSlot) {
       ui.openChestContents[slot - 30] = objectInHand;
     } else {
-      add(chIdx, objectInHand, slot);
+      character.addCharacterPossession(chIdx, objectInHand, slot);
     }
   }
 }

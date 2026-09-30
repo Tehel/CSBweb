@@ -47,12 +47,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { DBType, Direction, OBJECT_ID_NULL, Position, TilePosition, encodeObjectID, type ObjectID } from '../src/core/types';
-import { CsbRandom } from '../src/core/random';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
-import { Party } from '../src/engine/Party';
-import { CharacterStats } from '../src/engine/CharacterStats';
+import { initialPartyState } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { Champion } from '../src/engine/gameTypes';
@@ -67,7 +64,7 @@ import { drawInventoryScreen, drawObjectInfoPanel } from '../src/renderer/ui/Inv
 import { getObjectDisplayName, getObjectName, resolveObjectNameIndex } from '../src/renderer/ui/Objects';
 import { OBJNI_EMPTY_FLASK, OBJNI_WATER_FLASK } from '../src/core/objectNameIndex';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 const SCREEN_W = 320;
@@ -174,14 +171,15 @@ async function main(): Promise<void> {
     0,
     assignPresetHeroPossessions(heroes[0].inventory, addTables),
   );
-  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  // The game's own party, so that the object panel reaches its systems.
+  const game = newGame(data, graphics);
+  game.setRandomSeed(0x12345678);
+  const party = game.ctx.party;
+  party.setState(initialPartyState(new Position(1, 1, 0), Direction.NORTH));
   party.addChampion(champion);
   party.state.selectedCharacterIndex = 0;
 
-  const dungeon = new DungeonState(data);
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
-  ctx.systems.characterStats = new CharacterStats(ctx);
-  const ui: UIState = createUIState(graphics, ctx, {
+  const ui: UIState = createUIState(graphics, game.ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });

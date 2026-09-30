@@ -357,7 +357,6 @@ async function main(): Promise<void> {
   party.magicCasterIndex = -1;
   ui.flashButton = (x1, x2, y1, y2) => game.flashButton(x1, x2, y1, y2);
   ui.onChampionAttack = (chIdx, attackType) => game.championAttack(chIdx, attackType);
-  ui.setClockTick = (value) => game.setClockTick(value);
   ui.isRunningScript = () => game.isRunningScript();
   ui.onConsumeAttackDamage = () => game.consumeAttackDamageToDisplay();
   game.setMouseEventHandlers({ button: (num, x, y) => { if (num === 111) handleAttackAreaClick(ui, x, y); }, unclick: () => {} });

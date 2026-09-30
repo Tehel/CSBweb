@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 3 of 5 next |
+| E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ A chosen; step 4 of 5 next |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
 | E18 | Hygiene and documentation drift | S | ⏳ |
@@ -146,9 +146,9 @@ New state-representation debt goes here, and jumps the queue.
 `createUIState` (`src/renderer/ui/UIState.ts`) makes the interface's state with its data
 sources `null` — `uiTables`, `objectTables`, `fontData`, `screenIndexBuffer`,
 `context` — and `GameScreen`'s constructor fills them in straight after
-(`src/renderer/GameScreen.ts:171-236`). None is ever `null` again, but every reader
-must ask: 165 `!ui.x` guards and 54 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
-optional fields too, so 35 calls are `ui.onX?.()`, and a hook left unwired is a click
+(`src/renderer/GameScreen.ts:164-222`). None is ever `null` again, but every reader
+must ask: 165 `!ui.x` guards and 54 `ui.x?.` reads in `src/renderer/`. The 21 hooks out are
+optional fields too, so 29 calls are `ui.onX?.()`, and a hook left unwired is a click
 that silently does nothing. D3 made the engine's state required for the same reason. Paying
 it means a `UIState` built whole, from the tables (`GraphicsTables`, which the screen
 is already handed) and whatever replaces the hooks (`E11`), which is why it comes after
@@ -164,15 +164,15 @@ of "How to work this list", point 3, apply, byte-identical tool output included.
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
 What CSBWin's interface code does to the game, it does by calling the engine's functions
-on `d.`. The port's goes: a `UIState` hook (`ui.onAddCharacterPossession?.(…)`), which
-`GameScreen` copied one by one out of 28 `GameScreenHooks` (`GameScreen.ts:178-205`),
-each a lambda in `main.ts`'s `construct` (`src/main.ts:239-373`) onto a one-line `Game`
-facade, onto the system. Adding an engine call from the UI touches four files. And
-the hooks are not a boundary: the UI modules import from 12 engine modules, and write engine
+on `d.`. Where a hook is left, the port's goes: a `UIState` hook (`ui.onSpellCast?.(…)`),
+which `GameScreen` copies one by one out of 21 `GameScreenHooks` (`GameScreen.ts:171-191`),
+each a lambda in `main.ts`'s `construct` (`src/main.ts:239-364`) onto a one-line `Game`
+facade, onto the system. Adding an engine call that way touches four files. And
+the hooks are not a boundary: the UI modules import from 11 engine modules, and write engine
 state directly where no hook exists — the object in hand
-(`ViewportPicking.ts:88`, `Mouse.ts:361`, `:369`, `Feeding.ts:133`), the floor chain
-(`ViewportPicking.ts:85`), a record freed (`Feeding.ts:134`), a potion emptied and a
-waterskin drunk (`Feeding.ts:120-130`), a chest's links (`Inventory.ts:305-340`).
+(`ViewportPicking.ts:89`, `Mouse.ts:360`, `:368`, `Feeding.ts:132`), the floor chain
+(`ViewportPicking.ts:86`), a record freed (`Feeding.ts:133`), a potion emptied and a
+waterskin drunk (`Feeding.ts:119-128`), a chest's links (`Inventory.ts:305-340`).
 19 tools stand the UI up with `createUIState` and the subset of hooks they think they
 need, "wired as `main.ts` wires it", which nothing checks.
 
@@ -183,20 +183,17 @@ over the `Game` it already has. Under A the direct writes listed above are the C
 shape (CSBWin's interface writes `d.` too), so they stay, reached through `ui.ctx`. (The
 shape not taken, B, kept the hooks and built them all from a `Game` in one function.)
 
-Three steps remain, one commit each. Steps 1 and 2 are in place: one `ScrollingText`
+Two steps remain, one commit each. Steps 1 to 3 are in place: one `ScrollingText`
 the page hands to both sides, the host's contract types in `GameHost.ts`, and `UIState`
-holding the `GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it; the
-UI reads `ui.ctx.dungeon` and `ui.ctx.systems.characterStats`; `ui.partyState` stays as it
-is, `D15`). Every tool's UI stands over a game's context: the tools that had none build
-one with `newGame`, and the four over a bare `newContext` (`dump-hand-owner`,
-`dump-inventory-routing`, `dump-key-bindings`, `dump-mastery-panel`) put their
-`CharacterStats` in `ctx.systems`, so step 3, whose hooks they wire by hand, moves them
-to `newGame`.
+holding the `GameContext` as `ui.ctx` (`createUIState` and `GameScreenDeps` take it;
+`ui.partyState` stays as it is, `D15`). The object and inventory calls go straight to the
+engine: `ui.ctx.systems.character`'s possession pair, `mouse.triggerObjectMove`,
+`dsa.processViewingFilter`, `applyFeedParameters(ui.ctx, …)`, `ui.ctx.sounds.queueSound`
+and `LoopState.setClockTick(ui.ctx, …)`. Every tool's UI stands over a `newGame`'s context
+but `dump-key-bindings`'s, over a bare `newContext` with its `CharacterStats` in
+`ctx.systems`: the UI it drives reaches no other system until step 4 takes its
+`isRunningScript` stub away.
 
-3. ⏳ **The object and inventory hooks go**: `onAddCharacterPossession`,
-   `onRemoveCharacterPossession`, `onObjectMove`, `applyFeeding`, `viewingFilter`,
-   `queueSound`, `setClockTick`. The UI modules (`Mouse`, `Objects`, `Feeding`,
-   `ViewportPicking`, `Keyboard`) call the systems; the tools stop wiring them.
 4. ⏳ **The loop's hooks go**: `isRunningScript`, `runScript`, `flashButton`,
    `flashButtonScript`, `waitForButtonFlashScript`, `waitForButtonFlash`,
    `flashedButton`, `onSleep`, `onWakeUp`, `onFreeze`, `onThaw`, `onSetPaused`, through
@@ -227,7 +224,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:337`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:327`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -411,7 +408,7 @@ door's interior (`CSBCode.cpp:9583`). The port's `renderView` (`src/main.ts:167`
 runs `ViewportRenderer.draw`, the whole `DrawViewport`, and 18 places call it: after every
 click and button-up the mouse queue hands the UI, every Reincarnate and save-menu event,
 `mouseleave`, a quick-load, the map preview's teleport, and every VBL in which the message
-strip scrolled or a flashed button changed (`main.ts:502-507`). Two things follow:
+strip scrolled or a flashed button changed (`main.ts:492-497`). Two things follow:
 
 - **`GraphicRandom` advances off the tick.** The teleporter's shimmer (`DrawTeleporter`)
   draws from it on every `DrawViewport`, so while a message scrolls, for a row's height
@@ -736,7 +733,7 @@ when the hand is empty.
 
 The extra: with an empty hand, the **cursor owner** drinks. That is the same drink as one
 gulp from a full waterskin: `waterValue = 800` and `SOUND_GULP` (`computeFeedParameters`,
-`src/renderer/ui/Feeding.ts:57-66`), applied through `applyFeeding`, so the water cap
+`src/renderer/ui/Feeding.ts:57-66`), applied through `applyFeedParameters`, so the water cap
 and the sound are CSBWin's own. A dead or absent cursor owner drinks nothing.
 
 ### X2 ⏸️ A mastery just gained shown in green

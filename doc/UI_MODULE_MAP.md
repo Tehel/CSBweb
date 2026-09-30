@@ -17,8 +17,10 @@ each other.
   the chew-animation clock, the two button lists, `reincarnate` (non-null while the
   name-entry screen is modal)
 - **bitmap caches**: `graphicCache`, cursor bitmaps, the portrait sheet
-- **hooks out**: `playSound`, `onObjectMove`, `onSpellCast`, `viewingFilter`,
-  `onResurrectReincarnateCancel`, `onReincarnateNamed`
+- **hooks out** (`GameScreenHooks`): the loop's (`isRunningScript`, `runScript`, the
+  button flashes, sleep and freeze), the panels' (`onSpellCast`, `onChampionAttack`,
+  `onResurrectReincarnateCancel`, `onReincarnateNamed`) and the save stores'. The object
+  and inventory calls go to the engine through `ctx` (`DEBT.md` E11)
 - **hooks back into the renderer**: `getGraphicBitmap`, `renderLastFrame`
 
 A function that turns out not to need the state does not take it — the pure helpers
@@ -36,7 +38,7 @@ A function that turns out not to need the state does not take it — the pure he
 | `ui/SaveMenu.ts` | `SaveGame.cpp` (`_DisplayDiskMenu`), extended | The save/load screen behind the disk icon. Keeps `_DoMenu`'s art and animation and replaces the four-slot chooser with a scrolling list over `src/data/saves/`. **Modal** like `ReIncarnate.ts`, and clicks reach it straight from the DOM event so the folder picker keeps its user activation |
 | `ui/Inventory.ts` | `CSBUI.cpp` | Inventory screen, slot rectangles, the open chest, the eye's object-info panel, scroll reading, the Hall of Champions menu (`TAG0189a8`) |
 | `ui/Character.ts` | `Character.cpp` | Portraits, hand icons, shield dots, the damage figure over a hurt champion's name (`DisplayCharacterDamage`'s blit), life/stamina/mana bars, attributes, food/water, carried load, possession slots |
-| `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it, through the `applyFeeding` hook |
+| `ui/Feeding.ts` | `Character.cpp` | The mouth button and the chew animation. Derives a `FEEDPARAMETERS` block (`_FeedCharacter`'s first half); `src/engine/Feeding.ts` applies it (`applyFeedParameters`) |
 | `ui/MagicPanel.ts` | `Magic.cpp` (UI half) | Rune keypad, the incantation being assembled, its mana cost |
 | `ui/Attack.ts` | `Character.cpp` (attack half), `CSBCode.cpp:8718-8862` | The attack buttons and the attack menu: legal options, the per-tick panel state, the damage flash |
 | `ui/Objects.ts` | `Objects.cpp`, `Code17818.cpp` | Name-index resolution, description phrases, weight, `DetermineMastery` |

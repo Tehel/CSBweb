@@ -95,9 +95,6 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
  * documented there, except `onPaletteSelected`.
  */
 export interface GameScreenHooks extends Required<Pick<UIState,
-  | 'queueSound'
-  | 'viewingFilter'
-  | 'onObjectMove'
   | 'onSpellCast'
   | 'onChampionAttack'
   | 'isRunningScript'
@@ -106,13 +103,9 @@ export interface GameScreenHooks extends Required<Pick<UIState,
   | 'flashButtonScript'
   | 'waitForButtonFlashScript'
   | 'onConsumeAttackDamage'
-  | 'applyFeeding'
-  | 'onRemoveCharacterPossession'
-  | 'onAddCharacterPossession'
   | 'onResurrectReincarnateCancel'
   | 'onReincarnateNamed'
   | 'onSleep'
-  | 'setClockTick'
   | 'onWakeUp'
   | 'onFreeze'
   | 'onThaw'
@@ -175,9 +168,6 @@ export class GameScreen {
       renderLastFrame: () => this.renderLastFrame(),
     });
     this.ui = ui;
-    ui.queueSound = hooks.queueSound;
-    ui.viewingFilter = hooks.viewingFilter;
-    ui.onObjectMove = hooks.onObjectMove;
     ui.onSpellCast = hooks.onSpellCast;
     ui.onChampionAttack = hooks.onChampionAttack;
     ui.isRunningScript = hooks.isRunningScript;
@@ -186,13 +176,9 @@ export class GameScreen {
     ui.flashButtonScript = hooks.flashButtonScript;
     ui.waitForButtonFlashScript = hooks.waitForButtonFlashScript;
     ui.onConsumeAttackDamage = hooks.onConsumeAttackDamage;
-    ui.applyFeeding = hooks.applyFeeding;
-    ui.onRemoveCharacterPossession = hooks.onRemoveCharacterPossession;
-    ui.onAddCharacterPossession = hooks.onAddCharacterPossession;
     ui.onResurrectReincarnateCancel = hooks.onResurrectReincarnateCancel;
     ui.onReincarnateNamed = hooks.onReincarnateNamed;
     ui.onSleep = hooks.onSleep;
-    ui.setClockTick = hooks.setClockTick;
     ui.onWakeUp = hooks.onWakeUp;
     ui.onFreeze = hooks.onFreeze;
     ui.onThaw = hooks.onThaw;

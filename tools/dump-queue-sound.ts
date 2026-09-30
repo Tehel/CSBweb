@@ -393,8 +393,6 @@ function main(): void {
     const ui = createUIState(graphics, game.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
     ui.objectTables = graphicsTablesOf(graphics).objects;
     ui.partyState = game.ctx.party.state;
-    ui.applyFeeding = (chIdx, fp) => game.applyFeeding(chIdx, fp);
-    ui.queueSound = (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z);
     const at = new Position(3, 3, 1);
     stand(game, at, 0);
     game.ctx.party.state.selectedCharacterIndex = 0;

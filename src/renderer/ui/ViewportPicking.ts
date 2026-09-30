@@ -14,6 +14,7 @@ import { VIEWPORT_HEIGHT, VIEWPORT_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../View
 import { GraphicRoomType, RoomType as SummaryRoomType } from '../bytecode/Types';
 import { resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
+import { setClockTick } from '../../engine/LoopState';
 import { Position } from '@/core';
 
 const POTION_WATER_FLASK = 15;
@@ -81,9 +82,9 @@ export function tryPickViewportObject(ui: UIState, x: number, y: number): boolea
   if (isMonsterBlockingPickup(ui, hit.relativeLocation, target)) return false;
   // `TAG01a148` ends with `d.clockTick = 1` (`doc/CSBwin-src/Mouse.cpp:840`), which only
   // its returns for no cursor owner and a monster in the way skip.
-  ui.setClockTick?.(1);
+  setClockTick(ui.ctx, 1);
   if (!ui.ctx.dungeon.removeObjectFromCell(target, hit.rn)) return false;
-  ui.onObjectMove?.(target, hit.rn, false, false, ui.partyState.facing & 0x3);
+  ui.ctx.systems.mouse.triggerObjectMove(target, hit.rn, false, false, ui.partyState.facing & 0x3);
 
   ui.partyState.objectInHand = hit.rn;
   return true;

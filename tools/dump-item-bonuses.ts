@@ -69,14 +69,12 @@ async function importMouse(): Promise<typeof import('../src/renderer/ui/Mouse')>
   return import('../src/renderer/ui/Mouse');
 }
 
-/** The interface over `g`, with the inventory click wired to the engine's pair as `main.ts` does. */
+/** The interface over `g`, whose inventory click calls the engine's pair. */
 function uiOver(g: Game): UIState {
   const ui = createUIState(graphics, g.ctx, { getGraphicBitmap: () => null, renderLastFrame: () => {} });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
   ui.partyState = g.ctx.party.state;
-  ui.onRemoveCharacterPossession = (chIdx, slot) => g.removeCharacterPossession(chIdx, slot);
-  ui.onAddCharacterPossession = (chIdx, object, slot) => g.addCharacterPossession(chIdx, object, slot);
   return ui;
 }
 

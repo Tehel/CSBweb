@@ -119,8 +119,9 @@ async function main(): Promise<void> {
     attacks.push({ chIdx, attackType });
     return 1;
   };
-  let clockTicks: number[] = [];
-  ui.setClockTick = (value: number) => { clockTicks.push(value); };
+  // `d.clockTick` as the handlers leave it (`LoopState.setClockTick`): a tick made due,
+  // one put off, or neither.
+  const clockTick = (): string => (ctx.loop.clockTickSet ? 'due' : ctx.loop.clockTickCleared ? 'put off' : 'untouched');
   let casts: Array<{ chIdx: number; incantation: number[] }> = [];
   // Stands in for `CastMagic`, which clears the runes of a cast it does not refuse;
   // `tools/dump-magic-panel.ts` drives the real one.
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
   check(attacks.length === 1 && attacks[0].chIdx === 1,
     "'w' with champion 2's menu open should perform their first attack");
   check(ui.attackingCharacterOrdinal === 0, 'performing an attack should close the menu');
-  check(clockTicks.join() === '1',
+  check(clockTick() === 'due',
     "and set d.clockTick to what it returned, as the click does (Character.cpp:4716-4717)");
   check(ui.word20250 === 1, 'closing the menu should leave the panel owing a redraw');
 
@@ -300,7 +301,8 @@ async function main(): Promise<void> {
   //         menu up, and `d.clockTick = intResult` (`:4717`) is not set. While the script
   //         holds the loop every panel key is claimed and dead: CSBWin's UI only queues.
   let held = false;
-  clockTicks = [];
+  ctx.loop.clockTickSet = false;
+  ctx.loop.clockTickCleared = false;
   ui.isRunningScript = () => held;
   ui.onChampionAttack = (chIdx: number, attackType: number) => {
     attacks.push({ chIdx, attackType });
@@ -315,7 +317,7 @@ async function main(): Promise<void> {
   row(ui, 'option', true);
   check(attacks.length === 1 && held, 'the click attacks, and the attack holds the loop');
   check(ui.attackingCharacterOrdinal === 1, 'the attack menu stays up: TAG01b1c0 does not run');
-  check(clockTicks.length === 0, 'd.clockTick is not set');
+  check(clockTick() === 'untouched', 'd.clockTick is not set');
   const heldKeys = ['q', 'w', 'a', 'x', '7', 'F2', '1', 'Tab'].map((key) => press(key));
   check(heldKeys.every((taken) => taken), 'every panel key is still claimed');
   check(attacks.length === 1 && ui.attackingCharacterOrdinal === 1 && party.state.selectedCharacterIndex === -1
@@ -329,7 +331,7 @@ async function main(): Promise<void> {
   };
   if (option) handleAttackAreaClick(ui, (option.x1 + option.x2) >> 1, (option.y1 + option.y2) >> 1);
   row(ui, 'option', true);
-  check(ui.attackingCharacterOrdinal === 0 && clockTicks.join() === '1',
+  check(ui.attackingCharacterOrdinal === 0 && clockTick() === 'due',
     'with no script, the same click closes the menu and makes a tick due');
 
   // ---- 9. The graphics.dat key tables `TAG0196da` searches (doc/CSBwin-src/CSBCode.cpp:

@@ -9,8 +9,6 @@
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
-import type { FeedParameters } from '../../engine/Feeding';
-import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/DsaSystem';
 import type { LoopScript } from '../../engine/LoopState';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
@@ -18,7 +16,7 @@ import type { KeyXlate, Rect, UIButton, UITables } from '../../data/tables/UITab
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';
-import { OBJECT_ID_NULL, type ObjectID, type Position } from '../../core/types';
+import { OBJECT_ID_NULL, type ObjectID } from '../../core/types';
 import type { ReincarnateState } from './ReIncarnate';
 import type { SaveMenuState } from './SaveMenu';
 
@@ -34,14 +32,6 @@ export enum UIMode {
 }
 
 export type ScreenIndexBuffer = ReturnType<typeof createPaletteIndexViewportBuffer>;
-
-export type ObjectMoveHandler = (
-  position: Position,
-  object: ObjectID,
-  place: boolean,
-  unchangedRoom: boolean,
-  facing: number,
-) => void;
 
 export interface UIState {
   /* ---- data sources ---- */
@@ -186,9 +176,6 @@ export interface UIState {
   championPortraitCache: WeakMap<object, IndexedBitmap>;
 
   /* ---- hooks out to the engine / host ---- */
-  /** `QueueSound(ordinal, mapX, mapY, deltaTime)`, the engine's `SoundQueue`. */
-  queueSound?: (ordinal: number, mapX: number, mapY: number, deltaTime: number) => void;
-  onObjectMove?: ObjectMoveHandler;
   onSpellCast?: (chIdx: number) => number | void;
   /** `Attack(chIdx, attackType)` — into `engine/AttackSystem`. */
   onChampionAttack?: (chIdx: number, attackType: number) => number;
@@ -211,21 +198,6 @@ export interface UIState {
   /** `d.attackDamageToDisplay`, read and cleared. */
   onConsumeAttackDamage?: () => number;
   /**
-   * Apply a `FEEDPARAMETERS` block to a champion — the engine half of
-   * `_FeedCharacter` (`doc/CSBwin-src/Character.cpp:4348`). Returns whether anything
-   * was applied. A hook because it reaches `KillCharacter`, `CurePoison`,
-   * `AdjustStamina` and the `TT_72` timer, none of which the UI owns.
-   */
-  applyFeeding?: (chIdx: number, fp: FeedParameters) => boolean;
-  /**
-   * `RemoveCharacterPossession` / `AddCharacterPossession`
-   * (`doc/CSBwin-src/Character.cpp:1822`, `:1936`), for the inventory click. Hooks
-   * because the pair lights torches and the party, opens scrolls and moves the stats,
-   * all of it the engine's (`CharacterSystem`).
-   */
-  onRemoveCharacterPossession?: (chIdx: number, slot: number) => ObjectID;
-  onAddCharacterPossession?: (chIdx: number, object: ObjectID, slot: number) => void;
-  /**
    * `_ResurrectReincarnateCancel(button)` (`doc/CSBwin-src/CSBCode.cpp:6615`) — a
    * button on the Hall of Champions menu. A hook because confirming reaches the
    * dungeon's object chains and the mirror's actuators, none of which the UI owns.
@@ -238,7 +210,6 @@ export interface UIState {
    * belongs to the engine.
    */
   onReincarnateNamed?: (chIdx: number, name: string, title: string) => void;
-  viewingFilter?: (options: ViewingFilterOptions) => ViewingFilterResult | null;
   /**
    * Stop and restart the clock around a modal menu. CSBWin needs no such hook: its menu
    * loop simply never returns to the main loop, and `d.Time++` lives there
@@ -248,8 +219,6 @@ export interface UIState {
   onSetPaused?: (paused: boolean) => void;
   /** Button 145 — `Game.sleep`, after the inventory has been hidden. */
   onSleep?: () => void;
-  /** `d.clockTick = value` from a handler the mouse queue runs — `Game.setClockTick`. */
-  setClockTick?: (value: number) => void;
   /** Button 146 — `Game.wakeUp` (`doc/CSBwin-src/CSBCode.cpp:7047`). */
   onWakeUp?: () => void;
   /** `WaitForButtonFlash` (`doc/CSBwin-src/CSBCode.cpp:8561`) — the engine's `waitForButtonFlash`. */

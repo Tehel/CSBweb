@@ -20,16 +20,12 @@ import { resolve } from 'node:path';
 import { DBType, Direction, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
-import { Party, ensureHandOwner, setHandOwner } from '../src/engine/Party';
+import { Party, ensureHandOwner, initialPartyState, setHandOwner } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
-import { CharacterStats } from '../src/engine/CharacterStats';
-import { CharacterSystem } from '../src/engine/CharacterSystem';
-import { CsbRandom } from '../src/core/random';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 /**
@@ -87,7 +83,11 @@ async function main(): Promise<void> {
 
   // ---- 1. `SetHandOwner(0)` when the party gets its first champion.
   //         (doc/CSBwin-src/Character.cpp:706-710)
-  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  // The game's own party, so that the inventory click in 5. reaches its systems.
+  const game = newGame(data, graphics);
+  game.setRandomSeed(0x12345678);
+  const party = game.ctx.party;
+  party.setState(initialPartyState(new Position(1, 1, 0), Direction.NORTH));
   row('empty party', party.state);
   check(owner(party.state) === -1, 'an empty party should own no cursor');
 
@@ -140,20 +140,13 @@ async function main(): Promise<void> {
   // ---- 5. The thing a player actually does: click a filled inventory slot and check
   //         the object lands in the hand, then clicking again puts it back.
   //         (`HandleClothingClick`, doc/CSBwin-src/CSBCode.cpp:6928)
-  const dungeon = new DungeonState(data);
   const { handleClothingClick } = await importMouse();
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
-  ctx.systems.characterStats = new CharacterStats(ctx);
-  const ui: UIState = createUIState(graphics, ctx, {
+  const ui: UIState = createUIState(graphics, game.ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`, as `main.ts` wires them.
-  const character = new CharacterSystem(ctx);
-  ui.onRemoveCharacterPossession = (chIdx, slot) => character.removeCharacterPossession(chIdx, slot);
-  ui.onAddCharacterPossession = (chIdx, object, slot) => character.addCharacterPossession(chIdx, object, slot);
   ui.partyState = party.state;
   party.state.selectedCharacterIndex = 0;
 

@@ -36,7 +36,7 @@ import { createLoopFlags, flashButton, flashButtonScript, freeze, setClockTick, 
 import { makeMoreRoomInDB } from './MakeMoreRoomInDB';
 import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
-import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
+import { DsaSystem } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
 import type { Rect } from '../data/tables/UITables';
 import { TICKS_PER_SECOND } from '../core/constants';
@@ -171,10 +171,6 @@ export class Game implements MainLoop {
             mainLoop: this,
         } satisfies GameSystems);
         this.systems = ctx.systems;
-    }
-
-    processViewingFilter(options: ViewingFilterOptions): ViewingFilterResult | null {
-        return this.systems.dsa.processViewingFilter(options);
     }
 
     /** Pin `d.RandomNumber`. For tools and, eventually, save-game restore. */
@@ -632,7 +628,7 @@ export class Game implements MainLoop {
         return result.success;
     }
 
-    /** The UI's object move, the floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`). */
+    /** The floor pick-up's `MoveObject` (`MouseSystem.triggerObjectMove`), for `tools/`. */
     triggerObjectMove(position: Position, object: ObjectID, place: boolean, unchangedRoom: boolean, facing: number): void {
         this.systems.mouse.triggerObjectMove(position, object, place, unchangedRoom, facing);
     }
@@ -662,7 +658,7 @@ export class Game implements MainLoop {
         thaw(this.ctx);
     }
 
-    /** `d.clockTick = value` from a UI handler (`LoopState.setClockTick`). */
+    /** `d.clockTick = value` (`LoopState.setClockTick`), for `tools/`. */
     setClockTick(value: number): void {
         setClockTick(this.ctx, value);
     }
@@ -802,17 +798,17 @@ export class Game implements MainLoop {
         this.systems.hallOfChampions.reincarnateNamed(chIdx, name, title);
     }
 
-    /** `RemoveCharacterPossession` (`CharacterSystem`), for the inventory click and `tools/`. */
+    /** `RemoveCharacterPossession` (`CharacterSystem`), for `tools/`. */
     removeCharacterPossession(chIdx: number, slot: number): ObjectID {
         return this.ctx.systems.character.removeCharacterPossession(chIdx, slot);
     }
 
-    /** `AddCharacterPossession` (`CharacterSystem`), for the inventory click and `tools/`. */
+    /** `AddCharacterPossession` (`CharacterSystem`), for `tools/`. */
     addCharacterPossession(chIdx: number, object: ObjectID, slot: number): void {
         this.ctx.systems.character.addCharacterPossession(chIdx, object, slot);
     }
 
-    /** The apply half of `_FeedCharacter` (`Feeding.applyFeedParameters`), for the UI and `tools/`. */
+    /** The apply half of `_FeedCharacter` (`Feeding.applyFeedParameters`), for `tools/`. */
     applyFeeding(chIdx: number, fp: FeedParameters): boolean {
         return applyFeedParameters(this.ctx, chIdx, fp);
     }

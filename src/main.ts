@@ -291,11 +291,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         csbGraphicsLoader: files.csbGraphicsLoader ?? undefined,
         messages,
     }, {
-        queueSound: (ordinal, mapX, mapY, deltaTime) => game.ctx.sounds.queueSound(ordinal, mapX, mapY, deltaTime, game.ctx.party.state.position.z),
-        viewingFilter: (options) => game.processViewingFilter(options),
-        onObjectMove: (position, object, place, unchangedRoom, facing) => {
-            game.triggerObjectMove(position, object, place, unchangedRoom, facing);
-        },
         onSpellCast: (chIdx) => game.castSpellFromUi(chIdx),
         // The attack menu: `Attack()` and `d.attackDamageToDisplay`.
         onChampionAttack: (chIdx, attackType) => game.championAttack(chIdx, attackType),
@@ -307,10 +302,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         flashButtonScript: (x1, x2, y1, y2) => game.flashButtonScript(x1, x2, y1, y2),
         waitForButtonFlashScript: () => game.waitForButtonFlashScript(),
         onConsumeAttackDamage: () => game.consumeAttackDamageToDisplay(),
-        applyFeeding: (chIdx, fp) => game.applyFeeding(chIdx, fp),
-        // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`.
-        onRemoveCharacterPossession: (chIdx, slot) => game.removeCharacterPossession(chIdx, slot),
-        onAddCharacterPossession: (chIdx, object, slot) => game.addCharacterPossession(chIdx, object, slot),
         onResurrectReincarnateCancel: (button) => {
             game.resurrectReincarnateCancel(button);
         },
@@ -322,7 +313,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         },
         // Buttons 145 and 146 (the host's `sleepChanged` is the engine's answer).
         onSleep: () => game.sleep(),
-        setClockTick: (value) => game.setClockTick(value),
         onWakeUp: () => game.wakeUp(),
         // Buttons 147 and 148 (the screen's halves are `handleMouseButton`'s).
         onFreeze: () => game.freeze(),

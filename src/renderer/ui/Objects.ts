@@ -245,10 +245,9 @@ export function buildPhraseSummary(mask: number, phrases: string[], colors: numb
 }
 
 export function applyViewingFilter(ui: UIState, objectId: ObjectID, phraseMask: number): ViewingFilterResult | null {
-  if (!ui.viewingFilter) return null;
   const selected = ui.partyState?.selectedCharacterIndex ?? -1;
   if (selected < 0) return null;
-  return ui.viewingFilter({
+  return ui.ctx.systems.dsa.processViewingFilter({
     phraseMask,
     objectId: objectId | 0,
     selectedCharacter: selected,

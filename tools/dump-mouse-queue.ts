@@ -453,7 +453,6 @@ async function main(): Promise<void> {
   // made 0 (Magic.cpp:564, :945-956). Each click goes through the queue to the real
   // handler: the UI's dispatcher, or for the viewport the call `src/ui/events.ts` makes.
   ui.uiTables = uiTables;
-  ui.setClockTick = (value) => game.setClockTick(value);
   let castResult = -99;
   ui.onSpellCast = (chIdx) => (castResult = game.castSpellFromUi(chIdx));
   let attackResult = -99;

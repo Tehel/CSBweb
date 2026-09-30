@@ -28,17 +28,13 @@ import { resolve } from 'node:path';
 import { Direction, OBJECT_ID_NULL, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { DungeonState } from '../src/engine/DungeonState';
-import { Party, setHandOwner, setPartyFacing } from '../src/engine/Party';
+import { initialPartyState, setHandOwner, setPartyFacing } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { getChampionPossession, type Champion, type PartyState } from '../src/engine/gameTypes';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
-import { CharacterStats } from '../src/engine/CharacterStats';
-import { CharacterSystem } from '../src/engine/CharacterSystem';
-import { CsbRandom } from '../src/core/random';
-import { graphicsTablesOf, newContext } from './lib/game';
+import { graphicsTablesOf, newGame } from './lib/game';
 import { check, finish } from './lib/check';
 
 /** As in `tools/dump-hand-owner.ts`: `ui/Mouse` reaches `@/ui`, which touches `document`. */
@@ -94,7 +90,11 @@ async function main(): Promise<void> {
   // Four real preset heroes, each carrying something, one per box.
   const heroes = (data.presetHeroes ?? []).filter((h) => (h.inventory?.length ?? 0) > 0);
   if (heroes.length < 4) throw new Error('dungeon.dat carries fewer than four equipped preset heroes');
-  const party = new Party(new Position(1, 1, 0), Direction.NORTH);
+  // The game's own party, so that the inventory click reaches its systems.
+  const game = newGame(data, graphics);
+  game.setRandomSeed(0x12345678);
+  const party = game.ctx.party;
+  party.setState(initialPartyState(new Position(1, 1, 0), Direction.NORTH));
   for (let box = 0; box < 4; box++) {
     const champ: Champion = createChampionFromPreset(
       heroes[box],
@@ -110,20 +110,13 @@ async function main(): Promise<void> {
   setHandOwner(party.state, 0);
   console.log('champions: ' + party.state.champions.map((c, i) => `${i}=${c.name}`).join(' ') + '\n');
 
-  const dungeon = new DungeonState(data);
   const { handleClothingClick } = await importMouse();
-  const ctx = newContext(data, graphics, { dungeon, party, random: new CsbRandom(0x12345678) });
-  ctx.systems.characterStats = new CharacterStats(ctx);
-  const ui: UIState = createUIState(graphics, ctx, {
+  const ui: UIState = createUIState(graphics, game.ctx, {
     getGraphicBitmap: () => null,
     renderLastFrame: () => {},
   });
   ui.uiTables = uiTables;
   ui.objectTables = objectTables;
-  // The inventory click's `RemoveCharacterPossession` / `AddCharacterPossession`, as `main.ts` wires them.
-  const character = new CharacterSystem(ctx);
-  ui.onRemoveCharacterPossession = (chIdx, slot) => character.removeCharacterPossession(chIdx, slot);
-  ui.onAddCharacterPossession = (chIdx, object, slot) => character.addCharacterPossession(chIdx, object, slot);
   ui.partyState = party.state;
 
   // Not every mirror hands its hero a weapon, so pick, per box, a slot that really

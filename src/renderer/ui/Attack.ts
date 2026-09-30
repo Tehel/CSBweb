@@ -35,6 +35,7 @@ import { getPartyChampion } from '../../engine/Party';
 import { getChampionPossession, SLOT_WEAPON_HAND, type Champion } from '../../engine/gameTypes';
 import { CHARFLAG_ATTACK_DISABLE } from '../../data/CsbwinCharacters';
 import { determineMastery } from '../../engine/skills';
+import { setClockTick } from '../../engine/LoopState';
 import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import { Rect } from '../../data/tables/UITables';
@@ -209,7 +210,7 @@ export function executeAttack(ui: UIState, option: number): number {
  */
 export function takeAttackOption(ui: UIState, option: number): void {
   const result = executeAttack(ui, option);
-  if (!ui.isRunningScript?.()) ui.setClockTick?.(result);
+  if (!ui.isRunningScript?.()) setClockTick(ui.ctx, result);
 }
 
 /**
