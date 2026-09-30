@@ -99,70 +99,6 @@ function readRectPosArray(buf: Uint8Array, off: number, count: number): RectPos[
   return out;
 }
 
-/**
- * Locate CSBWin `d.wallRectangles[14]` inside the decompressed `graphics.dat` item 0x22e.
- *
- * We avoid hardcoding offsets by searching for a block of 14 consecutive `RectPos` records
- * that contains a few strong invariants for DM/CSB:
- * - F0L1 and F0R1: 32×136 side walls at x=[0..31] and x=[192..223]
- * - Two 16×49 far-corner rectangles (x=[0..15] and x=[208..223]) for the 16×49 corner bitmap
- * - Presence of typical wall bitmap stride/height pairs for F1/F2/F3
- */
-function findWallRectanglesOffset(buf: Uint8Array): number {
-  const blockSize = 14 * 8;
-
-  const F0L1 = [0, 31, 0, 135, 16, 136, 0, 0];
-  const F0R1 = [192, 223, 0, 135, 16, 136, 0, 0];
-
-  for (let off = 0; off <= buf.length - blockSize; off++) {
-    let foundF0L1 = false;
-    let foundF0R1 = false;
-    let foundCornerLeft = false;
-    let foundCornerRight = false;
-    let foundF1 = false;
-    let foundF2 = false;
-    let foundF3 = false;
-
-    for (let i = 0; i < 14; i++) {
-      const roff = off + i * 8;
-      const r = readRectPosBytes(buf, roff);
-
-      // These tables are used with `d.UseByteCoordinates = 1` and target the viewport (224×136).
-      if (r.x2 < r.x1 || r.y2 < r.y1) {
-        foundF0L1 = false;
-        break;
-      }
-      if (r.x2 > 223 || r.y2 > 135) {
-        foundF0L1 = false;
-        break;
-      }
-
-      if (!foundF0L1 && hasExactRecord(buf, roff, F0L1)) foundF0L1 = true;
-      if (!foundF0R1 && hasExactRecord(buf, roff, F0R1)) foundF0R1 = true;
-
-      // Two 16×49 corner rectangles (destination width=16, u4=8 bytes/line, u5=49 scanlines).
-      if (r.u4 === 8 && r.u5 === 49 && (r.x2 - r.x1 + 1) === 16 && r.y2 - r.y1 + 1 === 49) {
-        if (r.x1 === 0 && r.x2 === 15) foundCornerLeft = true;
-        if (r.x1 === 208 && r.x2 === 223) foundCornerRight = true;
-      }
-
-      // Typical wall strides/heights in CSBWin allocations:
-      // - F3: 64 bytes/line × 51
-      // - F2: 72 bytes/line × 71
-      // - F1: 128 bytes/line × 111
-      if (r.u4 === 64 && r.u5 === 51) foundF3 = true;
-      if (r.u4 === 72 && r.u5 === 71) foundF2 = true;
-      if (r.u4 === 128 && r.u5 === 111) foundF1 = true;
-    }
-
-    if (foundF0L1 && foundF0R1 && foundCornerLeft && foundCornerRight && foundF1 && foundF2 && foundF3) {
-      return off;
-    }
-  }
-
-  return -1;
-}
-
 function parseGraphic22eTailOffsets(raw: Uint8Array): {
   teleporterRectanglesOffset: number;
   doorRectsF1R1Offset: number;
@@ -305,118 +241,22 @@ function parseGraphic22eTailOffsets(raw: Uint8Array): {
   };
 }
 
-function computeGraphic22eOffsetsFromWall(rawLength: number, wallRectanglesOffset: number): {
-  teleporterRectanglesOffset: number;
-  doorRectsF1R1Offset: number;
-  doorRectsF1Offset: number;
-  doorRectsF1L1Offset: number;
-  doorRectsF2R1Offset: number;
-  doorRectsF2Offset: number;
-  doorRectsF2L1Offset: number;
-  doorRectsF3R1Offset: number;
-  doorRectsF3Offset: number;
-  doorRectsF3L1Offset: number;
-  doorTrackTopRectOffset: number;
-  doorFrameRectOffset: number;
-  wallRectanglesOffset: number;
-  mirrorWallRectF2Offset: number;
-  mirrorWallRectF3Offset: number;
-  ceilingPitOffset: number;
-  floorPitRectOffset: number;
-  stairEdgeRectOffset: number;
-  stairFacingDownRectOffset: number;
-  stairFacingUpRectOffset: number;
-  byte2546Offset: number;
-  uByte2542Offset: number;
-  seeThruWallsRectOffset: number;
-} {
-  // Relative layout around `wallRectangles[14]` from `doc/CSBwin-src/Data.h` (packed):
-  // ... DoorTrackTopRect[7] (56) → DoorFrameRect[8] (64) → wallRectangles[14] (112) →
-  // Byte2962[4], Byte2958[4] (8) → CeilingPit[9] (72) → FloorPitRect[12] (96) →
-  // StairEdgeRect[8] (64) → StairFacingDownRect[11] (88) → StairFacingUpRect[11] (88) →
-  // Byte2546[4] (4) → uByte2542[4] (4) → SeeThruWallsRect (8) → Word2530[2] (4).
-
-  const doorFrameRectOffset = wallRectanglesOffset - 8 * 8;
-  const doorTrackTopRectOffset = doorFrameRectOffset - 7 * 8;
-
-  const doorRectsF3L1Offset = doorTrackTopRectOffset - 10 * 8;
-  const doorRectsF3Offset = doorRectsF3L1Offset - 10 * 8;
-  const doorRectsF3R1Offset = doorRectsF3Offset - 10 * 8;
-  const doorRectsF2L1Offset = doorRectsF3R1Offset - 10 * 8;
-  const doorRectsF2Offset = doorRectsF2L1Offset - 10 * 8;
-  const doorRectsF2R1Offset = doorRectsF2Offset - 10 * 8;
-  const doorRectsF1L1Offset = doorRectsF2R1Offset - 10 * 8;
-  const doorRectsF1Offset = doorRectsF1L1Offset - 10 * 8;
-  const doorRectsF1R1Offset = doorRectsF1Offset - 10 * 8;
-  const teleporterRectanglesOffset = doorRectsF1R1Offset - 12 * 8;
-
-  const afterWall = wallRectanglesOffset + 14 * 8;
-  const mirrorWallRectF2Offset = afterWall;
-  const mirrorWallRectF3Offset = afterWall + 4;
-  const ceilingPitOffset = afterWall + 8;
-  const floorPitRectOffset = ceilingPitOffset + 9 * 8;
-  const stairEdgeRectOffset = floorPitRectOffset + 12 * 8;
-  const stairFacingDownRectOffset = stairEdgeRectOffset + 8 * 8;
-  const stairFacingUpRectOffset = stairFacingDownRectOffset + 11 * 8;
-
-  const uByte2542Offset = rawLength - (4 /*Word2530*/ + 8 /*SeeThruWallsRect*/ + 4 /*uByte2542*/);
-  const byte2546Offset = uByte2542Offset - 4;
-  const seeThruWallsRectOffset = rawLength - (4 /*Word2530*/ + 8 /*SeeThruWallsRect*/);
-
-  return {
-    teleporterRectanglesOffset,
-    doorRectsF1R1Offset,
-    doorRectsF1Offset,
-    doorRectsF1L1Offset,
-    doorRectsF2R1Offset,
-    doorRectsF2Offset,
-    doorRectsF2L1Offset,
-    doorRectsF3R1Offset,
-    doorRectsF3Offset,
-    doorRectsF3L1Offset,
-    doorTrackTopRectOffset,
-    doorFrameRectOffset,
-    wallRectanglesOffset,
-    mirrorWallRectF2Offset,
-    mirrorWallRectF3Offset,
-    ceilingPitOffset,
-    floorPitRectOffset,
-    stairEdgeRectOffset,
-    stairFacingDownRectOffset,
-    stairFacingUpRectOffset,
-    byte2546Offset,
-    uByte2542Offset,
-    seeThruWallsRectOffset,
-  };
-}
-
 export function extractViewportTables(graphics: GraphicsLoader): ViewportTables {
   const raw = graphics.getRawGraphic(GRAPHIC_22E_INDEX);
-  const parsedTail = parseGraphic22eTailOffsets(raw);
+  const tail = parseGraphic22eTailOffsets(raw);
 
-  // Sanity-check: verify the wallRectangles block is where we expect it.
+  // A canary, not a search: `wallRectangles[10]` and `[11]` are F0L1 and F0R1, the
+  // 32x136 side walls, in every graphics.dat the project has. A file whose tail does not
+  // put them there has another layout, and the tables would be read from the wrong bytes.
   const F0L1 = [0, 31, 0, 135, 16, 136, 0, 0];
   const F0R1 = [192, 223, 0, 135, 16, 136, 0, 0];
-  let wallRectanglesOffset = parsedTail.wallRectanglesOffset;
+  const wallRectanglesOffset = tail.wallRectanglesOffset;
   if (
     !hasExactRecord(raw, wallRectanglesOffset + 10 * 8, F0L1) ||
     !hasExactRecord(raw, wallRectanglesOffset + 11 * 8, F0R1)
   ) {
-    // The packed-tail offset did not carry the expected F0L1/F0R1 records, so locate
-    // wallRectangles[14] by pattern search instead and trust the relative positions
-    // declared in CSBWin `doc/CSBwin-src/Data.h:1238`. This is a validation path, not a
-    // guess: it throws rather than inventing an offset.
-    const found = findWallRectanglesOffset(raw);
-    if (found < 0) {
-      throw new Error('Failed to locate wallRectangles[14] in graphics.dat item 0x22e');
-    }
-    wallRectanglesOffset = found;
+    throw new Error(`graphics.dat item 0x22e: no F0L1/F0R1 wall rectangles at 0x${wallRectanglesOffset.toString(16)}, where its tail puts them`);
   }
-
-  const tail =
-    wallRectanglesOffset === parsedTail.wallRectanglesOffset
-      ? parsedTail
-      : computeGraphic22eOffsetsFromWall(raw.length, wallRectanglesOffset);
 
   const wallRectangles = readRectPosArray(raw, wallRectanglesOffset, 14);
   const teleporterRectangles = readRectPosArray(raw, tail.teleporterRectanglesOffset, 12);

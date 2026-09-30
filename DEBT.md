@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E8 | One table set, extracted once, outside the renderer | L | ⚠️ step 4 of 4 next |
 | E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
@@ -151,9 +150,9 @@ after (`src/renderer/GameScreen.ts:168-232`). None is ever `null` again, but eve
 must ask: 165 `!ui.x` guards and 57 `ui.x?.` reads in `src/renderer/`. The 28 hooks out are
 optional fields too, so 35 calls are `ui.onX?.()`, and a hook left unwired is a click
 that silently does nothing. D3 made the engine's state required for the same reason. Paying
-it means a `UIState` built whole, from the tables (`E8`) and whatever replaces the hooks
-(`E11`), which is why it comes after both; `partyState` stays nullable only if the screen
-must exist before a party does.
+it means a `UIState` built whole, from the tables (`GraphicsTables`, which the screen
+is already handed) and whatever replaces the hooks (`E11`), which is why it comes after
+`E11`; `partyState` stays nullable only if the screen must exist before a party does.
 
 ---
 
@@ -161,30 +160,6 @@ must exist before a party does.
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included.
-
-### E8 ⚠️ One table set, extracted once, outside the renderer
-
-The extractors of every `graphics.dat` table live in `src/data/tables/`: `ObjectTables.ts`
-(0x22f and the object half of 0x22e), `UITables.ts` (0x230-0x232, with `Rect` and
-`RectPos`), `ViewportTables.ts` (0x22e's rectangles) and `MonsterDesc.ts` (`MONSTERDESC`
-and its bit accessors, which the engine reads). `GraphicsTables.ts` reads them all once:
-`main.ts` calls it, and so does `tools/lib/game.ts` (`graphicsTablesOf`, per
-`graphics.dat`); `buildGameTables` builds the engine's set from the result, and the
-screen is handed the same object (`GameScreenDeps.tables`). A table the engine and the
-renderer both read has CSBWin's name in both sets (`objDescWord4`, `byte10340`,
-`sound1772`, …), and each record type has one declaration. What is left:
-
-- **0x22e has a second layout path that never runs.** `extractViewportTables` reads the
-  offsets from the item's packed tail and, when the wall rectangles are not where the
-  tail says, searches the item for them by pattern (`findWallRectanglesOffset`) and
-  derives the rest from where it finds them (`src/data/tables/ViewportTables.ts:111`,
-  `:308`, chosen at `:395-420`). The tail gives 0x104c for the graphics of all four data
-  sets, two distinct files (DM's, and CSB's that 3D2D1D shares), so the search is dead,
-  and a search is a guess in all but name.
-
-Paying it, in steps: (1) ✅ the extractors in `src/data/tables/`; (2) ✅ extract once,
-into `GraphicsTables`, and hand the same object to the screen; (3) ✅ one name per table,
-CSBWin's, and one declaration per record type; (4) delete the pattern search. A second dungeon's `graphics.dat` then has one place where it can differ.
 
 ### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
 
