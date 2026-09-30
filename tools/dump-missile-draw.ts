@@ -28,7 +28,8 @@ import { RN_FIREBALL, RN_LIGHTNING } from '../src/core/spellRn';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
-import { BytecodeInterpreter, GetGraphicClass } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { drawMissilesAtPosition, GetGraphicClass } from '../src/renderer/bytecode/DrawRoomObjects';
+import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
@@ -105,8 +106,8 @@ async function main(): Promise<void> {
         return { width: w, height: md.height, pixels: new Uint8Array(w * md.height).fill(5) };
       },
     };
-    (new BytecodeInterpreter(context) as any).drawMissilesAtPosition(
-      view, tables, encodeObjectID(relativeLocation, DBType.MISSILE, 0), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1,
+    drawMissilesAtPosition(
+      new ViewportDraw(context), view, tables, encodeObjectID(relativeLocation, DBType.MISSILE, 0), relativeLocation, 0, 0, 0, relativeCell, relativeLocation, 1,
     );
     const { width, pixels } = viewportIndexBuffer;
     let x1 = 999, y1 = 999, x2 = -1, y2 = -1;

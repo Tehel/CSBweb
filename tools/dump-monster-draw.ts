@@ -27,8 +27,9 @@
  * Run: `npx tsx tools/dump-monster-draw.ts`
  */
 import { applyLimits } from '../src/core/intCast';
-import { DBType, OBJECT_ID_EOF } from '../src/core/types';
-import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
+import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
+import { DrawRoomObjects, mapColorValue } from '../src/renderer/bytecode/DrawRoomObjects';
+import { ViewportDraw } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, stockGraphics } from './lib/game';
@@ -84,13 +85,13 @@ function draw(group: Group, relativeCell: number, drawOrder: number): Sprite[] {
       getMonsterRenderState: () => ({ positions, facings, statuses: STATUSES }),
     },
   };
-  const interp = new BytecodeInterpreter(context) as any;
-  const blit = interp.draw.blitShapeToViewportIndexWithTransparent.bind(interp.draw);
-  interp.draw.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
+  const draw = new ViewportDraw(context);
+  const blit = draw.blitShapeToViewportIndexWithTransparent.bind(draw);
+  draw.blitShapeToViewportIndexWithTransparent = (src: any, rect: any, t: number) => {
     blits.push({ x1: rect.x1, x2: rect.x2, y2: rect.y2, w: src.width >> 1, graphic: lastGraphic });
     blit(src, rect, t);
   };
-  interp.drawRoomObjects(DBType.CREATURE << 10, 0, 0, 0, relativeCell, drawOrder);
+  DrawRoomObjects(draw, (DBType.CREATURE << 10) as ObjectID, 0, 0, 0, relativeCell, drawOrder);
 
   // The set entry each sprite was drawn at: x1 = x - w + 1 and x2 = x + w, each within
   // 0..223, and y2 = y, with every status offset zero. The cells beside the party read
@@ -182,10 +183,10 @@ function frontMirrored(type: number, relativeCell: number, status: number): bool
       getMonsterRenderState: () => ({ positions: 255, facings: 0xaa, statuses: new Uint8Array([status, 0, 0, 0]) }),
     },
   };
-  const interp = new BytecodeInterpreter(context) as any;
-  const unmirroredFirst = (map: Uint8Array | null) => (map ? interp.mapColorValue(map, left) : left);
-  interp.draw.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
-  interp.drawRoomObjects(DBType.CREATURE << 10, 0, 0, 0, relativeCell, ORDER_3421);
+  const draw = new ViewportDraw(context);
+  const unmirroredFirst = (map: Uint8Array | null) => (map ? mapColorValue(map, left!) : left);
+  draw.blitShapeToViewportIndexWithTransparent = (src: any) => { first = src.pixels[0]; };
+  DrawRoomObjects(draw, (DBType.CREATURE << 10) as ObjectID, 0, 0, 0, relativeCell, ORDER_3421);
   if (first === null) return null;
   const map = relativeCell >= 6 ? null : relativeCell >= 3 ? tables.monsterColorMapMedium : tables.monsterColorMapFar;
   return first !== unmirroredFirst(map);

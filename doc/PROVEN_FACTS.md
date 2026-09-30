@@ -1522,7 +1522,7 @@ lifespan are the same rule:
 | Monster death | 40 (`CT_DEATH`) | `value -= 40` while `value > 55` | 3-6 ticks |
 | Vi altar | 100 | `cloudType++`, sound 5, always reschedules | until its type leaves range |
 
-The renderer scales the puff by `value` (`BytecodeInterpreter`, the
+The renderer scales the puff by `value` (`DrawClouds` in `DrawRoomObjects.ts`, the
 `max(4, (cloudScale * max(48, value+1)) >> 8)` term), so the shrink *is* the animation:
 a death cloud made at 255 steps 255 → 215 → 175 → 135 → 95 → 55 and is gone, visibly
 dispersing. Measured with `tools/dump-clouds.ts`; a real monster killed on level 2 leaves

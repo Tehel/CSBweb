@@ -4,8 +4,8 @@
  * bitmaps they draw, and the blits into the viewport buffer. CSBWin's drawing functions
  * (`Viewport.cpp`, `CSBCode.cpp`, `Code51a4.cpp`) reach the same things as globals.
  *
- * `BytecodeInterpreter` builds one per redraw and exposes it as `draw`, so a tool that
- * replaces a blit helper replaces it on that one instance.
+ * `BytecodeInterpreter` builds one per redraw. A tool builds its own over a stub context
+ * and calls a drawing function with it, and can replace a blit helper on that instance.
  */
 
 import { CsbRandom } from '../../core/random';

@@ -133,7 +133,8 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, ViewportDraw (what the drawing shares with it),
-            DrawDecorations and DrawDoor (CSBCode.cpp's drawing), BytecodePrograms
+            DrawDecorations and DrawDoor (CSBCode.cpp's drawing), DrawRoomObjects
+            (Code51a4.cpp's: objects, monsters, missiles, clouds), BytecodePrograms
             (168 cell programs), Opcodes
   csbwin/   SummarizeRoomInfo, CanvasBlitter, TextRenderer, ScrollingText
   intro/    Everything before the party is in the dungeon: the title animation, the

@@ -45,12 +45,12 @@
  */
 import { readFileSync } from 'node:fs';
 
-import { DBType, OBJECT_ID_EOF } from '../src/core/types';
+import { DBType, OBJECT_ID_EOF, type ObjectID } from '../src/core/types';
 import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { DrawTeleporter, graphicRandomState } from '../src/renderer/bytecode/DrawDoor';
+import { DrawClouds, DrawRoomObjects } from '../src/renderer/bytecode/DrawRoomObjects';
 import { ViewportDraw, viewportRandom } from '../src/renderer/bytecode/ViewportDraw';
 import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';
@@ -89,7 +89,7 @@ const cloudBitmap = {
 // overridden here so the test places the cloud where it wants.
 const RELATIVE_CELL = 0;
 const REL_CELL = RELATIVE_CELL + 3;
-const cloudRn = (DBType.CLOUD << 10) | 0;
+const cloudRn = ((DBType.CLOUD << 10) | 0) as ObjectID;
 const cloud = { nextObject: OBJECT_ID_EOF, value: 0, cloudType: 0, bit7: true };
 
 interface Drawn { x1: number; y1: number; x2: number; y2: number; rows: number[][] }
@@ -109,7 +109,7 @@ function drawCloudAt(px: number, py: number, viewportSeed: number): Drawn {
     },
   };
   viewportRandom.setSeed(viewportSeed);
-  (new BytecodeInterpreter(context) as any).drawClouds(RELATIVE_CELL, cloudRn, 0, 0);
+  DrawClouds(new ViewportDraw(context), RELATIVE_CELL, cloudRn, 0, 0);
 
   const { width, pixels } = viewportIndexBuffer;
   let x1 = 999, y1 = 999, x2 = -1, y2 = -1;
@@ -275,7 +275,7 @@ function drawScene(sc: Scene): SceneResult {
     dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
   };
   viewportRandom.setSeed(sc.seed ?? seedFor(false, false));
-  (new BytecodeInterpreter(context) as any).drawClouds(sc.relCell - 3, cloudRn, 0, 0);
+  DrawClouds(new ViewportDraw(context), sc.relCell - 3, cloudRn, 0, 0);
   const { width, pixels } = viewportIndexBuffer;
   let x1 = 999, y1 = 999, x2 = -1, y2 = -1;
   for (let y = 0; y < 136; y++) {
@@ -398,7 +398,7 @@ for (const word1868 of [false, true]) {
     const seed = 0x2468ace;
     graphicRandomState.r = seed;
     // Position list 1: the cell's first position, at the cloud's (0) with facing 0.
-    (new BytecodeInterpreter(context) as any).drawRoomObjects(cloudRn, 0, 0, 0, relativeCell, 0x1);
+    DrawRoomObjects(new ViewportDraw(context), cloudRn, 0, 0, 0, relativeCell, 0x1);
     const after = graphicRandomState.r;
     // The one shimmer the cell owes, drawn directly from the same `GraphicRandom` state:
     // the cell's drawing must match it pixel for pixel, or be nothing at all.
@@ -436,9 +436,9 @@ for (const facing of [0, 1, 2, 3]) {
       getGraphicBitmap: (n: number) => fakeGraphic(n),
       dungeonState: { getDBRecordLink: () => OBJECT_ID_EOF, getCloudRecord: () => rec },
     };
-    const rn = (pos << 14) | (DBType.CLOUD << 10);
+    const rn = ((pos << 14) | (DBType.CLOUD << 10)) as ObjectID;
     // Relative cell 6 is CSBWin's 9: the wall straight ahead, where the altar stands.
-    (new BytecodeInterpreter(context) as any).drawRoomObjects(rn, facing, 0, 0, 6, 0);
+    DrawRoomObjects(new ViewportDraw(context), rn, facing, 0, 0, 6, 0);
     const lit = viewportIndexBuffer.pixels.some((p) => p !== 0);
     const atCurAbsPos = pos === ((facing + 2) & 3);
     const what = `facing ${facing}, type ${cloudType} at position ${pos}`;

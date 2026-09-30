@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 3 of 3 next |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
@@ -160,45 +159,6 @@ is already handed) and whatever replaces the hooks (`E11`), which is why it come
 
 New architecture debt goes here, and jumps the queue. Every E item is a refactor: the rules
 of "How to work this list", point 3, apply, byte-identical tool output included.
-
-### E9 ⏳ `BytecodeInterpreter.ts` holds three CSBWin files
-
-`src/renderer/bytecode/BytecodeInterpreter.ts` is 3035 lines. The stack machine and its
-opcodes (`executeOpcode`, the pointer resolution) are `Viewport.cpp`'s, and their size is
-the C++'s (the switch stays: H, "Not debt"). `CSBCode.cpp`'s drawing is out of it, in
-`DrawDecorations.ts` (`DrawWallDecoration` with the wall text and the champion portrait,
-`DrawFloorDecorations`) and `DrawDoor.ts` (`DrawDoor` with its ornament `TAG004b26`,
-`DrawDoorSwitch`, `DrawTeleporter` and `GraphicRandom`). What is left that is not the
-interpreter is **`Code51a4.cpp`**, the room's contents: `DrawRoomObjects`
-(`drawRoomObjects`, `:1338`), `drawObjectsAtPosition`, `drawSingleObject`, `DrawMonster`
-(`drawMonster`, `:1671`, `drawMonsterAt`, `:1759`), the missiles
-(`drawMissilesAtPosition`, `:1877`), `DrawClouds` (`:2023`), `drawCloudUnderParty`,
-`TAG005088` (`:2144`). About 1000 lines.
-
-Paying it moves that group into a module of its own, as `E2` split `Game.ts`, the
-module's header naming its CSBWin file; the interpreter keeps the machine: `interpret`,
-`executeOpcode`, every `op*` handler (a `Std*` handler pops its arguments and calls the
-moved function, as CSBWin's `case` calls `DrawDoor`), the `RECT_POINTERS` /
-`BITMAP_POINTERS` resolution and the derived graphics. `C94` and `C99` both land in the
-code that moves or has moved: pay them first or after, not during.
-
-The moved functions are free functions over `ViewportDraw`
-(`src/renderer/bytecode/ViewportDraw.ts`), as the `ui/` modules are over `UIState`, and
-reach state through it, not through `this`: it holds the `InterpreterContext`, the mirror
-and flip caches and the three blit helpers, with `viewportRandom` beside it. The
-interpreter builds one per redraw and exposes it as `draw`, where a tool replaces a blit
-helper (`tools/dump-monster-draw.ts:187`).
-
-One step remains, one commit, byte-identical in every tool's output and in the frames:
-
-3. **`Code51a4.cpp`'s drawing**, into `DrawRoomObjects.ts`: `DrawRoomObjects` and
-   everything under it (`drawObjectsAtPosition`, `drawSingleObject`,
-   `getDerivedObjectBitmap`, `DrawMonster`, the missiles, `DrawClouds`,
-   `drawCloudUnderParty`, `TAG005088`, `mapColorValue`, `decodeMonsterStatus`), the two
-   drawing-location tables, and `GetGraphicClass`. `dump-cloud-draw`, `dump-missile-draw`
-   and `dump-monster-draw` import the functions they now reach through `as any`. It
-   closes `E9`: `CLAUDE.md`'s layout line and `doc/PROVEN_FACTS.md`'s pointers name the
-   new module.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
@@ -375,9 +335,9 @@ port does not (`Champion.charFlags`, `src/engine/gameTypes.ts`).
 `DrawRoomObjects` calls `DrawClouds` for every cell it is given
 (`doc/CSBwin-src/Code51a4.cpp:2768-2769`), which reads it as `RelativeCellNumber + 3`: 0-2
 for the row four ahead (cells -3..-1), 13 and 14 for the cells beside the party (10, 11).
-The port's `drawRoomObjects` (`src/renderer/bytecode/BytecodeInterpreter.ts`) returns for
+The port's `DrawRoomObjects` (`src/renderer/bytecode/DrawRoomObjects.ts`) returns for
 cells below 0 and draws clouds only in cells 0-9 (`objectsDrawn`). Paying it means checking
-that every table `drawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
+that every table `DrawClouds` reads by `relCell` (`Byte5758`, `d.Word7042`) covers those
 cells, lifting the guard, and extending `tools/dump-cloud-draw.ts`.
 
 ### C95 ⏳ `d.CurrentPalette` is set by the screen, not by `SelectPaletteForLightLevel`'s callers
@@ -699,7 +659,7 @@ reading, and DM has none.
 `drawAsSize4()`, `Unique()` and `Poisoned()` on `drawAsSize4Monsters`
 (`CSB.h:1125-1132`). Both options are read from a save's `extendedFlags`
 (`SaveGame.cpp:394-400`, `false` by default). The port models neither: `CreatureRecord`
-holds the raw bits, the renderer's `drawRoomObjects` / `drawMonster` take both options as
+holds the raw bits, the renderer's `DrawRoomObjects` / `DrawMonster` take both options as
 false (every creature drawn, never `DrawSize4Index`), and `monster.drawAsSize4` is read ungated in
 `MissileEncounter.processMissileEncounter` (`MissileEncounter.ts:373`) and in `MonsterDamage`
 (`:504`, `:540`). Only `monsterUnique` (`MonsterSystem.ts:69`) applies a gate, as a
