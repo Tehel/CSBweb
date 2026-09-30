@@ -243,15 +243,6 @@ export class HallOfChampions {
       skill.experience = 0;
       skill.tempAdjust = 0;
     }
-    // `attributes.experience` and the four role levels are this port's own derived
-    // mirrors of `skills92[0..3]`, set by `createChampionFromPreset` and currently
-    // read by nothing. Zeroed with the skills so they cannot go stale behind the
-    // first consumer that picks them up.
-    champion.attributes.experience = 0;
-    champion.attributes.fighter = 0;
-    champion.attributes.ninja = 0;
-    champion.attributes.priest = 0;
-    champion.attributes.wizard = 0;
 
     const hero = this.reincarnationSource;
     const attributePenalty = hero?.reincarnateAttributePenalty ?? 2;

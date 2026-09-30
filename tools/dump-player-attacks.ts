@@ -58,7 +58,6 @@ function champion(i: number, name: string, fighterExp: number): Champion {
     attributes: {
       health: 200, maxHealth: 200, stamina: 200, maxStamina: 200, mana: 60, maxMana: 60,
       stats: makeAddCharacterAttributes([60, 90, 90, 50, 50, 20, 20]),
-      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     // Skill 4 is the fighter base; 5-11 are its subskills. `determineMastery` reads the

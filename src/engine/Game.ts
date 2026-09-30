@@ -10,7 +10,7 @@ import type { DungeonData } from '../data/dungeonTypes';
 import { DungeonLoader } from '../data/DungeonLoader';
 import { readRulesOptions } from '../data/CsbwinExtendedFeatures';
 import type { GameState, Champion, PartyState, MovementResult } from './gameTypes';
-import { GAME_TIMING, MovementAction } from './gameTypes';
+import { MovementAction } from './gameTypes';
 import { Party, ensureHandOwner } from './Party';
 import { applyFeedParameters, type FeedParameters } from './Feeding';
 import { DungeonState } from './DungeonState';
@@ -44,6 +44,7 @@ import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from '
 import { Position, type ObjectID } from '../core/types';
 import type { Rect } from '../renderer/csbwin/UITables';
 import { CsbRandom } from '../core/random';
+import { TICKS_PER_SECOND } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';
 import { CheckMonsters } from './CheckMonsters';
@@ -288,8 +289,6 @@ export class Game implements MainLoop {
         }
 
         this.running = true;
-        this.state.running = true;
-        this.state.startTime = Date.now();
         this.lastTickTime = Date.now();
 
         console.log('Game started');
@@ -303,7 +302,6 @@ export class Game implements MainLoop {
      */
     stop(): void {
         this.running = false;
-        this.state.running = false;
 
         if (this.animationFrameId !== null) {
             clearTimeout(this.animationFrameId);
@@ -460,7 +458,6 @@ export class Game implements MainLoop {
     runFrame(currentTime: number): void {
         // Nothing of the loop runs once `MainLoop` has returned: `ShowCredits` has the screen.
         if (this.mainLoopReturned) return;
-        this.state.currentTime = currentTime;
         this.paintIsHeld = false;
         if (this.script !== null) {
             // A script's `VBLDelay` (`wvbl`, doc/CSBwin-src/CSBCode.cpp:1137-1147): the VBLs
@@ -490,7 +487,7 @@ export class Game implements MainLoop {
         // `d.Speed = 0` while the party sleeps (doc/CSBwin-src/Mouse.cpp:1697), and the
         // VBL raises `clockTick` once `vblCount >= d.Speed` (`CSBCode.cpp:1066-1077`) —
         // so asleep, a tick is due on every VBL.
-        const tickInterval = this.party.state.sleeping ? 0 : 1000 / GAME_TIMING.TICKS_PER_SECOND;
+        const tickInterval = this.party.state.sleeping ? 0 : 1000 / TICKS_PER_SECOND;
 
         // Process game ticks
         // `if (d.ClockRunning == 0) goto tag0007b4;` (doc/CSBwin-src/CSBCode.cpp:765):
@@ -519,9 +516,6 @@ export class Game implements MainLoop {
      * Process one game tick (~4 times per second)
      */
     private gameTick(): void {
-        // Reset movement flags from previous tick
-        this.party.resetMovementFlags();
-
         // The top of a tick, then `ProcessTimers()` and `if (d.newPartyLevel != -1) goto
         // tag0006a4;` (doc/CSBwin-src/CSBCode.cpp:615-635): a timer that moved the party
         // to another level has it loaded, input discarded and the timers run again, all
@@ -1035,9 +1029,6 @@ export class Game implements MainLoop {
 
     // Get tick count
     getTickCount = () => this.state.tickCount;
-
-    // Get elapsed time in seconds
-    getElapsedTime = () => (this.state.currentTime - this.state.startTime) / 1000;
 
     /**
      * The DSA global variables, where a dungeon keeps its puzzle progress. Public so a

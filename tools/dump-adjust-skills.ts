@@ -36,7 +36,6 @@ function champion(i: number): Champion {
     attributes: {
       health: 999, maxHealth: 999, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: createEmptySkills(),

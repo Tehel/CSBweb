@@ -55,7 +55,6 @@ function champion(over: Partial<Champion['attributes']> & { strength?: number } 
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 0, maxMana: 0,
       stats: makeAddCharacterAttributes([50, strength, 50, 50, 50, 0, 0]),
-      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
       ...attrOver,
     },
     alive: true, incantation: [], food: 1500, water: 1500,

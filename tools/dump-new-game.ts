@@ -66,7 +66,6 @@ function champion(i: number): Champion {
     attributes: {
       health: 200, maxHealth: 200, stamina: 100, maxStamina: 100, mana: 50, maxMana: 50,
       stats: makeAddCharacterAttributes([60, 60, 50, 50, 50, 20, 20]),
-      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],
@@ -75,10 +74,10 @@ function champion(i: number): Champion {
   };
 }
 
-/** The runtime state, hashed without its two wall-clock fields and `GAMEBLOCK1`'s. */
+/** The runtime state, hashed without its wall-clock `savedAt` and `GAMEBLOCK1`. */
 function stateHash(game: Game): string {
   const json = JSON.stringify(game.getRuntimeSaveState(), (key, value) =>
-    key === 'savedAt' || key === 'elapsedTimeMs' || key === 'block1' ? 0 : value);
+    key === 'savedAt' || key === 'block1' ? 0 : value);
   return createHash('sha256').update(json).digest('hex').slice(0, 16);
 }
 
@@ -89,7 +88,7 @@ function differingParts(a: Game, b: Game): string[] {
   const out: string[] = [];
   for (const part of ['party', 'game', 'dungeon']) {
     for (const key of Object.keys({ ...sa[part], ...sb[part] })) {
-      if (key === 'elapsedTimeMs' || key === 'block1') continue;
+      if (key === 'block1') continue;
       if (JSON.stringify(sa[part]?.[key]) !== JSON.stringify(sb[part]?.[key])) out.push(`${part}.${key}`);
     }
   }

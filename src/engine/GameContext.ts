@@ -184,10 +184,7 @@ export function createGameContext(
   const random = new CsbRandom();
   const state: GameState = {
     dungeon: dungeonData,
-    running: false,
     paused: false,
-    startTime: Date.now(),
-    currentTime: Date.now(),
     tickCount: 0,
     gameWon: false,
     word1868: false,

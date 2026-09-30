@@ -89,7 +89,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| D13 | State fields nothing reads | S | ⏳ |
 | D12 | `Champion.alive` shadows `HP() != 0` | S | ⏳ |
 | D14 | `timerWord8Table`, a load-time copy behind the live timers | S | ⏳ |
 | E16 | A `die()` in play stops the loop without a word | S | ⏳ |
@@ -150,12 +149,12 @@ New state-representation debt goes here, and jumps the queue.
 ### D12 ⏳ `Champion.alive` shadows `HP() != 0`
 
 CSBWin has no "alive" flag: a champion is dead when `HP()` is 0, and every search for a
-living champion tests that. The port carries `Champion.alive` (`src/engine/gameTypes.ts:83`)
+living champion tests that. The port carries `Champion.alive` (`src/engine/gameTypes.ts:74`)
 beside the HP. Two writers keep it in step, `KillCharacter`
 (`src/engine/MonsterAttack.ts:661`) and `BringCharacterToLife`
 (`src/engine/CharacterSystem.ts:227`); a CSBWin load derives it from the HP
-(`src/data/CsbwinCharacters.ts:211`), and `AddCharacter` sets it
-(`src/engine/AddCharacter.ts:295`).
+(`src/data/CsbwinCharacters.ts:203`), and `AddCharacter` sets it
+(`src/engine/AddCharacter.ts:286`).
 32 places in `src/` and 41 in `tools/` read it, some together with the HP, as if either
 could be wrong: `champ.alive !== false && (champ.attributes.health | 0) !== 0`
 (`src/renderer/ui/Attack.ts:328`). No CHARDESC byte holds it, so it cannot be saved as it
@@ -163,31 +162,6 @@ is; it can only drift. Paying it means reading `health !== 0` everywhere, as CSB
 code does at each site (cite it where the port's reader is not a transcription), and
 removing the field. `tools/dump-champion-death.ts` and `dump-vi-altar.ts` cover the two
 writers.
-
-### D13 ⏳ State fields nothing reads
-
-Fields the port's types still carry from before the transcription, written but never
-read, or never written at all:
-
-- `ChampionAttributes.experience`, `fighter`, `ninja`, `priest`, `wizard`
-  (`src/engine/gameTypes.ts:61-68`, "simplified for MVP"). `AddCharacter` sets the four
-  levels from the hero text (`src/engine/AddCharacter.ts:289-293`), the CSBWin reader
-  sets all five to 0 (`src/data/CsbwinCharacters.ts:203-207`), Reincarnate zeroes them
-  (`src/engine/HallOfChampions.ts:246-254`, whose comment says nothing reads them), and
-  nothing does. The skills are `Champion.skills`, as `CHARDESC.skills92` holds them.
-- `PartyState.moving` and `turning` (`gameTypes.ts:277-278`). Nothing sets either to
-  true. `Party.resetMovementFlags` clears both at every tick (`Game.ts:523`), and every
-  place that builds a `PartyState` has to spell them out as `false`.
-- `GameState.running`, `startTime` and `currentTime` (`gameTypes.ts:329-334`), the
-  wall clock inside the engine's state. `running` repeats `Game.running`; the other two
-  feed `Game.getElapsedTime`, which nothing calls, and `RuntimeSaveState.game.elapsedTimeMs`
-  (`src/engine/RuntimeSave.ts:132`), which a restore reads only to set `startTime` again
-  (`:178`).
-- `GAME_TIMING` (`gameTypes.ts:284`) repeats `VBL_FREQUENCY` and `TICKS_PER_SECOND`
-  from `src/core/constants.ts`.
-
-Paying it removes them. `elapsedTimeMs` is in the runtime save's shape, so its removal
-waits for `P10` to drop the JSON wrapper or goes with a `RUNTIME_SAVE_VERSION` bump.
 
 ### D14 ⏳ `timerWord8Table`, a load-time copy behind the live timers
 
@@ -361,7 +335,7 @@ Either way the strip moves into the context or the screen, not a module global, 
 `GameContext.systems` holds every subsystem (`E1c`), and `Game` keeps a field for each
 too, often under another name: `game.timerSystem` is `ctx.systems.timer`,
 `monsterSystem` is `monsters`, `attackSystem` is `attack`, `timerQueue` is
-`ctx.timers`, `dungeonState` is `ctx.dungeon` (`src/engine/Game.ts:90-188`). Five public
+`ctx.timers`, `dungeonState` is `ctx.dungeon` (`src/engine/Game.ts:91-189`). Five public
 fields are read by nothing (`monsterPerception`, `monsterAI`, `character`, `mouse`,
 `hallOfChampions`), and two are private, which tools cast to reach (`actuators`, 6 casts;
 `dsaSystem`, 2), as they do the private `gameTick` (6). A grep for `ctx.systems.timer`
@@ -451,7 +425,7 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 ### E16 ⏳ A `die()` in play stops the loop without a word
 
-`Game.gameLoop` runs a frame and then schedules the next (`src/engine/Game.ts:444-453`),
+`Game.gameLoop` runs a frame and then schedules the next (`src/engine/Game.ts:442-451`),
 so an exception in the frame ends the game for good, with one line in the console. The
 engine throws where CSBWin calls `die()` — the timer table full (`TimerQueue.ts:270`,
 `die(45)`), `MissileTimer`'s placement, `_FusionSequence` with no monster ahead — and 57
@@ -530,7 +504,7 @@ choosing the palette (`GameScreen.getViewportPalette`, `:604-610`, the
 `onPaletteSelected` hook). So the monster AI (`MonsterAI.ts:1148`) sees the value of the
 last frame presented, not of the last light change, and headless it is always 0: no tool
 has ever run a monster's dark-level sight. `GameState.currentPalette`'s comment
-(`gameTypes.ts:350-355`) says the renderer sets it in CSBWin too, which it does not. The
+(`gameTypes.ts:323-328`) says the renderer sets it in CSBWin too, which it does not. The
 port's copy also clamps the index to the palette count, which CSBWin does not.
 
 Paying it means porting `SelectPaletteForLightLevel` into the engine over the party's
@@ -593,7 +567,7 @@ CSBWin's VBL handler counts VBLs and raises `d.clockTick` once `d.vblCount >= d.
 (`doc/CSBwin-src/CSBCode.cpp:1066-1077`); the tick resets the count and restores
 `d.Speed`, 15 VBLs at normal speed (`:612-617`, `CSBwin.cpp:180`). The port's
 `Game.runFrame` makes a tick due when 250 ms of `Date.now()` have passed since the last
-one (`src/engine/Game.ts:486-506`), while everything else in a pass counts VBLs: the
+one (`src/engine/Game.ts:483-503`), while everything else in a pass counts VBLs: the
 message strip's scroll, the button flash, a script's `VBLDelay` (the win's 300, the
 magic keypad's three). The two clocks drift apart with the timer's jitter, 14 to 16 VBLs
 a tick, and part company when the tab is in the background: the browser holds
@@ -760,7 +734,7 @@ uses CSBWin's defaults.
   `src/renderer/ui/Feeding.ts:112`.
 - `PortraitTranslateDisable`'s `QueueDSASwitchAction` (`CSBCode.cpp:6540-6612`). It fires
   only on a `DisableMessage`, which the shipped dungeon never carries
-  (`HallOfChampions.ts:346`).
+  (`HallOfChampions.ts:337`).
 - `ProcessMonsterDeleteFilter` (`Code11f52.cpp:926`). It counts each kill in `expool`'s
   statistics and, when the dungeon has an `ESL_DELETEMONSTERFILTER`, runs its type-47 DSA,
   which may set `deathCloud` and `dropResidue`. CSBWin calls it from `DamageMonster` with

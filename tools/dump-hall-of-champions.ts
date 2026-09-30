@@ -422,8 +422,6 @@ function main(): void {
 
   check(wizard.skills.every((s) => s.experience === 0 && s.tempAdjust === 0),
     'all twenty skills are wiped');
-  check(wizard.attributes.fighter === 0 && wizard.attributes.wizard === 0,
-    'and the four role levels with them');
 
   const scale = (v: number): number => Math.trunc((v * (16 - statPenalty)) / 16);
   console.log(['stat', 'before', 'after', 'expected'].join('\t'));

@@ -197,14 +197,6 @@ export function readCsbwinCharacter(
       mana: readI16BE(block, base + 60),
       maxMana: readI16BE(block, base + 62),
       stats: readAttributes(block, base),
-      // CSBWin keeps no single "experience" number — a champion's standing is the
-      // twenty `SKILL` records. This field is the port's own summary and is left at 0
-      // rather than invented; `determineMastery` reads the skills directly.
-      experience: 0,
-      fighter: 0,
-      ninja: 0,
-      priest: 0,
-      wizard: 0,
     },
     // CSBWin has no "alive" flag: a champion is dead when their health is gone
     // (`KillCharacter` zeroes it), and `causeOfDamage` at 282 says how.

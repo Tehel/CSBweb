@@ -41,7 +41,6 @@ function champion(i: number): Champion {
       health: 500, maxHealth: 500, stamina: 200, maxStamina: 200, mana: 0, maxMana: 0,
       // Low dexterity and luck, so the steal gets its tries.
       stats: makeAddCharacterAttributes([10, 60, 10, 50, 50, 20, 20]),
-      experience: 0, fighter: 0, ninja: 0, priest: 0, wizard: 0,
     },
     alive: true, incantation: [], food: 1500, water: 1500,
     skills: [],

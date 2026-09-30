@@ -43,8 +43,6 @@ export function initialPartyState(position: Position, facing: Direction): PartyS
         word11712: 0,
         word11714: 0,
         sleeping: false,
-        moving: false,
-        turning: false,
     };
 }
 
@@ -165,14 +163,6 @@ export class Party {
      */
     setFacing(newFacing: number): void {
         setPartyFacing(this.state, newFacing);
-    }
-
-    /**
-     * Reset movement flags (called after animation completes)
-     */
-    resetMovementFlags(): void {
-        this.state.moving = false;
-        this.state.turning = false;
     }
 
     /**

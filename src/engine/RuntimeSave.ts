@@ -65,10 +65,14 @@ import type { TimerEntry } from './TimerQueue';
  * champion is `CHARFLAG_attackDisable` in `charFlags`, as CSBWin keeps it, which a v10
  * payload never set.
  *
+ * Version 12 drops what nothing read: `game.elapsedTimeMs`, the wall clock since the
+ * start, the party's `moving` and `turning`, and each champion's `experience` and four
+ * role levels, which CSBWin keeps as the twenty `skills92` records alone.
+ *
  * No bump has an upgrade path: `quickLoad` refuses an older save rather than
  * restoring a half-state.
  */
-export const RUNTIME_SAVE_VERSION = 11;
+export const RUNTIME_SAVE_VERSION = 12;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;
@@ -76,7 +80,6 @@ export interface RuntimeSaveState {
     party: PartyState;
     game: {
         tickCount: number;
-        elapsedTimeMs: number;
         /** `d.RandomNumber`, so a reload continues the same stream. */
         randomSeed: number;
         /** `d.Word11694`. */
@@ -129,7 +132,6 @@ export function getRuntimeSaveState(ctx: GameContext): RuntimeSaveState {
         party: ctx.party.state,
         game: {
             tickCount: ctx.state.tickCount,
-            elapsedTimeMs: ctx.state.currentTime - ctx.state.startTime,
             randomSeed: ctx.random.getSeed(),
             gameWon: ctx.state.gameWon,
             footprints: ctx.footprints.capture(),
@@ -173,9 +175,6 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // Asleep, `d.Speed` was 0. Awake again, the top of the next tick puts it back with
     // `SetNewSpeed(d.Speed, …)` (`CSBCode.cpp:612-616`).
     if (wasSleeping) ctx.host.messages.setNewSpeed(0, VBL_PER_TICK, ctx.state.tickCount);
-    const now = Date.now();
-    ctx.state.currentTime = now;
-    ctx.state.startTime = now - save.game.elapsedTimeMs;
     ctx.random.setSeed(save.game.randomSeed);
     ctx.state.gameWon = save.game.gameWon;
     if (save.game.block1) {

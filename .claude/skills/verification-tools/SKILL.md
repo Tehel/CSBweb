@@ -165,9 +165,10 @@ tool twice on the old tree (a `git worktree` of `HEAD` in the scratchpad, with
 varies on its own.
 The other half is the saves: for every file in `static/gamefiles/saves`, a seeded
 `newGame` with `applyCsbwinSave`, then `getRuntimeSaveState()` hashed as JSON after the load
-and again after 600 `runFrame`s 250 ms apart, on both trees. Zero `savedAt` and
-`elapsedTimeMs` in the hash (a `JSON.stringify` replacer): both are wall-clock, and with
-them two runs of the same tree never agree.
+and again after 600 `runFrame`s 250 ms apart, on both trees. Zero `savedAt` in the hash
+(a `JSON.stringify` replacer): it is wall-clock, and with it two runs of the same tree
+never agree. A change that drops a field from the runtime save's shape drops it from the
+old tree's hash too, with the same replacer.
 
 **Never perturb `Math.random` at construction time.** `tools/probe-frames.mjs`
 overrides `Math.random` to make the golden frames reproducible; anything that draws

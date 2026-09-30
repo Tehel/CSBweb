@@ -66,8 +66,6 @@ export function handleMapCanvasClick(e: MouseEvent): void {
     ctx.game.setPartyState({
         ...state,
         position: new Position(gx, gy, state.position.z),
-        moving: false,
-        turning: false,
     });
     ctx.renderView();
     drawMapPreview(state.position.z);

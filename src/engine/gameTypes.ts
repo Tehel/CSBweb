@@ -57,15 +57,6 @@ export interface ChampionAttributes {
      * CSBWin's byte-wrap and its "above 240 means negative" rule.
      */
     stats: Attribute[];
-
-    // Experience
-    experience: ui16;
-
-    // Skills (simplified for MVP)
-    fighter: ui8;
-    ninja: ui8;
-    priest: ui8;
-    wizard: ui8;
 }
 
 export interface Skill {
@@ -272,19 +263,7 @@ export interface PartyState {
      */
     word11712: i16;
     word11714: i16;
-
-    // Movement state
-    moving: boolean;            // Is party currently moving?
-    turning: boolean;           // Is party currently turning?
 }
-
-/**
- * Game timing constants (from CSBWin)
- */
-export const GAME_TIMING = {
-    VBL_FREQUENCY: 60,          // 60 Hz VBL timer
-    TICKS_PER_SECOND: 4,        // ~4 game ticks per second
-} as const;
 
 /**
  * Movement action types
@@ -325,13 +304,7 @@ export interface MovementResult {
 export interface GameState {
     dungeon: DungeonData;       // Dungeon data (maps, objects, etc.)
 
-    // Game status
-    running: boolean;           // Is game running?
     paused: boolean;            // The save menu holds the clock (`UIState.onSetPaused`)
-
-    // Timing
-    startTime: number;          // Game start timestamp
-    currentTime: number;        // Current timestamp
     tickCount: ui16;            // Number of game ticks elapsed
 
     /**

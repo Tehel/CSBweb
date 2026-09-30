@@ -256,10 +256,6 @@ export function createChampionFromPreset(
   const maxHealth = hero.health;
   const maxStamina = hero.stamina;
   const maxMana = hero.mana;
-  const fighter = maxSkill(hero.fighter);
-  const ninja = maxSkill(hero.ninja);
-  const priest = maxSkill(hero.priest);
-  const wizard = maxSkill(hero.wizard);
   const slots = possessions ?? emptyPossessions();
   const skills = createSkillsFromSubskillLevels(getPresetSubskillLevels(hero));
 
@@ -286,11 +282,6 @@ export function createChampionFromPreset(
         hero.antiMagic,
         hero.antiFire,
       ]),
-      experience: 0,
-      fighter,
-      ninja,
-      priest,
-      wizard,
     },
     alive: true,
     // `if (D0W == 'M') pcA3->charFlags |= CHARFLAG_male;` — and a hero whose gender
@@ -305,14 +296,6 @@ export function createChampionFromPreset(
     partyPosition,
     facing: (partyPosition & 3) as Direction,
   };
-}
-
-function maxSkill(skills: Record<string, number>): number {
-  let max = 0;
-  for (const value of Object.values(skills)) {
-    if (value > max) max = value;
-  }
-  return max;
 }
 
 function getPresetSubskillLevels(hero: PresetHero): number[] {

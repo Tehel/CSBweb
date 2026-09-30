@@ -324,8 +324,8 @@ above 1023 cannot be expressed. All three are detailed under step 12.
 
 - ✅ **A quick-save carries the converted image** (September 14th).
   `src/engine/DungeonSnapshot.ts` captures `textWords`, `indirectTextIndex`,
-  `compressedText` and `expool`; `RUNTIME_SAVE_VERSION` went to 7 for it (it is 10 since
-  `DEBT.md` D2b) and an older payload is refused rather than half-restored. `expool` is the one of the four that can be
+  `compressedText` and `expool`, and a payload of an older `RUNTIME_SAVE_VERSION` is
+  refused rather than half-restored. `expool` is the one of the four that can be
   canaried — `dungeon.dat` has none and every save carries blocks of it — and the three
   text fields cannot, because this port's conversion of `dungeon.dat` reproduces the
   saves' arrays exactly; `tools/dump-save-roundtrip.ts` says so where it makes the claim.

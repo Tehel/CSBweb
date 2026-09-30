@@ -119,8 +119,6 @@ function buildPartyState(world: CsbwinWorld, dsaGlobalsUnused?: never): PartySta
         partyMoveDisableTimer: gb2.partyMoveDisableTimer,
         word11712: gb2.word11712,
         word11714: gb2.word11714,
-        moving: false,
-        turning: false,
     };
 }
 
@@ -217,7 +215,6 @@ export function buildCsbwinRuntimeState(
         game: {
             // `d.Time = d.Long11732 = b.gb2.Time` (`:1622`) — the game clock, in ticks.
             tickCount: gb2.time,
-            elapsedTimeMs: 0,
             // `d.RandomNumber = b.gb2.ranseed` (`:1624`), so the stream continues where
             // the saved game left it rather than being reseeded from the host clock.
             randomSeed: gb2.ranseed >>> 0,
