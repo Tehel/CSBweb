@@ -13,6 +13,8 @@ import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
 import {
   bltShapeToViewportIndex,
+  IDENTITY_COLOR_MAP,
+  shrinkBlt,
   tag0088b2Explicit,
   tag0088b2Index,
   tag008c98Index,
@@ -69,8 +71,6 @@ export function GetGraphicClass(
   if (descIndex === -1) return null;
   return tables.objDescGraphicClass[descIndex] ?? null;
 }
-
-const IDENTITY_COLOR_MAP = new Uint8Array([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]);
 
 /**
  * Execution context - simulates CSBWin's global state
@@ -1460,8 +1460,11 @@ export class BytecodeInterpreter {
       } else {
         const size = tables.doorOrnamentRectSets[set][2]; // `Byte5058[18*set]`
         const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
-        ornamentBitmap = this.shrinkBltIndexedBitmap(
-          this.cropBitmap(graphic, 2 * size.widthBytes, size.height),
+        const cropped = this.cropBitmap(graphic, 2 * size.widthBytes, size.height);
+        ornamentBitmap = shrinkBlt(
+          cropped,
+          cropped.width,
+          cropped.height,
           rect.x2 - rect.x1 + 1,
           rect.height,
           colorMap
@@ -2115,8 +2118,7 @@ export class BytecodeInterpreter {
     colorMap?: Uint8Array,
     mirror?: boolean
   ): IndexedBitmap {
-    const map = colorMap && colorMap.length >= 16 ? colorMap : IDENTITY_COLOR_MAP;
-    const scaled = this.shrinkBltIndexedBitmap(src, dstWidth, dstHeight, map);
+    const scaled = shrinkBlt(src, src.width, src.height, dstWidth, dstHeight, colorMap);
     return mirror ? this.getMirroredBitmap(scaled) : scaled;
   }
 
@@ -2636,7 +2638,7 @@ export class BytecodeInterpreter {
       dstByteWidth = (srcByteWidth * scaleFactor + (scaleFactor >> 1)) >> 5;
       dstHeight = (srcHeight * scaleFactor + (scaleFactor >> 1)) >> 5;
       transparentColor = this.mapColorValue(distancePalette, pI12.uByte10 & 15);
-      src = this.shrinkChunky(base, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
+      src = shrinkBlt(base, base.width, base.height, Math.max(1, dstByteWidth * 2), Math.max(1, dstHeight), distancePalette);
       // The last term can never hold, since `frontViewMirror` needs
       // `NonAttackingMirrorOK()`: a front view is not mirrored beyond the first row
       // (`:859-864`). The 68000 code in the comment above it tests `(word4 & 4) != 0`.
@@ -2786,7 +2788,7 @@ export class BytecodeInterpreter {
         height = Math.max(1, (md.height * scale + (scale >> 1)) >> 5);
         const dstWidth = widthBytes * 2;
         const colorMap = distanceFromUs >= 2 ? tables.colorMapFar : tables.colorMapMedium;
-        src = this.shrinkChunky(base, dstWidth, height, colorMap);
+        src = shrinkBlt(base, base.width, base.height, dstWidth, height, colorMap);
       }
 
       if (mirror) src = this.getMirroredBitmap(src);
@@ -2850,7 +2852,7 @@ export class BytecodeInterpreter {
         const scale = tables.cloudPositions7246[pw + 2] ?? 0;
         halfWidth = (md.widthBytes * scale + (scale >> 1)) >> 5;
         height = (md.height * scale + (scale >> 1)) >> 5;
-        if (relCell !== 9) base = this.shrinkChunky(base, 2 * halfWidth, height, IDENTITY_COLOR_MAP);
+        if (relCell !== 9) base = shrinkBlt(base, base.width, base.height, 2 * halfWidth, height, IDENTITY_COLOR_MAP);
         px = tables.cloudPositions7246[pw] ?? 0;
         py = tables.cloudPositions7246[pw + 1] ?? 0;
       } else {
@@ -2955,7 +2957,7 @@ export class BytecodeInterpreter {
       const src = getGraphic(Math.min(type, 2) + 348);
       if (!src) return null;
       const colorMap = type === 3 ? tables.cloudColorMap : IDENTITY_COLOR_MAP;
-      base = this.shrinkChunky(src, 2 * halfWidth, height, colorMap);
+      base = shrinkBlt(src, src.width, src.height, 2 * halfWidth, height, colorMap);
       cache?.set(key, base);
     }
     return { base, halfWidth, height };
@@ -2994,7 +2996,7 @@ export class BytecodeInterpreter {
     // `GetBasicGraphicAddress(n, 48, 32)` pads the buffer with a garbage row
     // (`doc/CSBwin-src/Graphics.cpp:2560-2570`), which the tiling never reaches: it wraps
     // within 90 groups, 30 rows. Recolouring at the graphic's own size keeps every row.
-    if (poison) src = this.shrinkChunky(src, src.width, src.height, tables.cloudColorMap);
+    if (poison) src = shrinkBlt(src, src.width, src.height, src.width, src.height, tables.cloudColorMap);
 
     const start = BytecodeInterpreter.viewportRandom.next() & 63; // P7
     const wrap = BytecodeInterpreter.viewportRandom.zeroTo3() + 87; // P6
@@ -3042,58 +3044,12 @@ export class BytecodeInterpreter {
       const dstHeight = distanceFromUs === 1 ? ((gc.height * 20 + 10) >> 5) : ((gc.height * 16 + 8) >> 5);
       const dstWidth = dstWidthBytes * 2;
       const colorMap = distanceFromUs === 1 ? tables.colorMapMedium : tables.colorMapFar;
-      const scaled = this.shrinkChunky(src, dstWidth, dstHeight, colorMap);
+      const scaled = shrinkBlt(src, src.width, src.height, dstWidth, dstHeight, colorMap);
       out = mirror ? this.getMirroredBitmap(scaled) : scaled;
     }
 
     cache?.set(key, out);
     return out;
-  }
-
-  private shrinkChunky(src: IndexedBitmap, dstWidth: number, dstHeight: number, colorMap: Uint8Array): IndexedBitmap {
-    const map = colorMap && colorMap.length >= 16 ? colorMap : IDENTITY_COLOR_MAP;
-    return this.shrinkBltIndexedBitmap(src, dstWidth, dstHeight, map);
-  }
-
-  private shrinkBltIndexedBitmap(
-    src: IndexedBitmap,
-    dstWidth: number,
-    dstHeight: number,
-    colorMap: Uint8Array
-  ): IndexedBitmap {
-    const out = new Uint8Array(dstWidth * dstHeight);
-    const srcW = src.width | 0;
-    const srcH = src.height | 0;
-    const srcPx = src.pixels;
-
-    if (dstWidth <= 0 || dstHeight <= 0 || srcW <= 0 || srcH <= 0) {
-      return { width: dstWidth, height: dstHeight, pixels: out };
-    }
-
-    const stepX = ((Math.floor(((srcW << 10) >>> 0) / dstWidth) & 0xffff) << 6) >>> 0;
-    const stepY = ((Math.floor(((srcH << 10) >>> 0) / dstHeight) & 0xffff) << 6) >>> 0;
-    const startX = ((stepX >>> 1) + 0x7fff) >>> 0;
-    let accY = ((stepY >>> 1) + 0x7fff) >>> 0;
-
-    for (let y = 0; y < dstHeight; y++) {
-      const srcY = accY >>> 16;
-      const rowY = srcY >= srcH ? srcH - 1 : srcY;
-      const srcRow = rowY * srcW;
-      const dstRow = y * dstWidth;
-      let accX = startX;
-
-      for (let x = 0; x < dstWidth; x++) {
-        const srcX = accX >>> 16;
-        const colX = srcX >= srcW ? srcW - 1 : srcX;
-        const v = srcPx[srcRow + colX] & 0x0f;
-        out[dstRow + x] = this.mapColorValue(colorMap, v);
-        accX = (accX + stepX) >>> 0;
-      }
-
-      accY = (accY + stepY) >>> 0;
-    }
-
-    return { width: dstWidth, height: dstHeight, pixels: out };
   }
 
   // ============================================================

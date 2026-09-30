@@ -68,7 +68,8 @@ default, so with it off the game is CSBWin's and the golden frames do not move.
    moves. Better still, and expected for any split of a module: every tool's full output is
    byte-identical before and after (only `dump-save-menu`, by one byte, and
    `dump-savegame`, by its payload's size, vary on their own: both carry the save's
-   wall-clock date), and the author's runtime saves hash the same after load and
+   wall-clock date, and `dump-new-game`, by the random game ids it prints), and the
+   author's runtime saves hash the same after load and
    after 600 ticks. A refactor that uncovers a divergence records it in tier C. If it is
    fixed at all, the fix goes in a **separate** commit, so every commit is either
    behaviour-neutral or a fix, never both.
@@ -228,13 +229,10 @@ them first or after, not during.
 
 Each of these is one CSBWin routine, or one format detail, with two or three bodies:
 
-- **`ShrinkBLT`** (`doc/CSBwin-src/Graphics.cpp:380`): `CanvasBlitter.shrinkBlt` for the
-  interface and the title, and `BytecodeInterpreter.shrinkBltIndexedBitmap` with the
-  colour map, the same stepping written twice with different integer idioms.
 - **`Mirror`**: `ViewportRenderer.mirrorIndexedBitmap` (`:349`),
-  `ViewportGraphics.mirrorIndexedBitmap` (`:207`) and
-  `BytecodeInterpreter.getMirroredBitmap` (`:3388`); crop, twice (`ViewportRenderer.ts:394`,
-  `BytecodeInterpreter.ts:2061`).
+  `ViewportGraphics.mirrorIndexedBitmap` (`:132`) and
+  `BytecodeInterpreter.getMirroredBitmap` (`:3344`); crop, twice (`ViewportRenderer.ts:394`,
+  `BytecodeInterpreter.ts:2064`).
 - **The object icon's lookup** (graphic `42 + group` over `word612`, the source cell from
   the offset): three copies in `src/renderer/ui/Draw.ts` (`drawObjectIcon`, `:104`,
   `drawObjectIconMask`, `:159`, `drawObjectIconAt`, `:205`).
@@ -253,8 +251,8 @@ Each of these is one CSBWin routine, or one format detail, with two or three bod
   (`src/engine/SaveGamePayload.ts:503`) and `SaveMenu.uniqueName` (`:594`), with different
   suffix rules.
 
-One commit per bullet. The first three move under `src/renderer/csbwin/` (the
-renderer's primitives); the save ones may wait for `E13`.
+One commit per bullet. The first two move under `src/renderer/csbwin/` (the
+renderer's primitives, where `shrinkBlt` already is); the save ones may wait for `E13`.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
@@ -526,7 +524,7 @@ source's start after `P6` groups, with the mask read one word per group, masked-
 pixels given colour `P9`; then it blits that bitmap with `P9` transparent. `DrawTeleporter`
 passes `P6 = x2 + GraphicRandom(2)` and `P7 = GraphicRandom(32)` (`CSBCode.cpp:4292-4302`).
 The port reads the source and the mask as 2-D images wrapped in x and y separately, and
-takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2073-2110`),
+takes `P6`/`P7` for pixel offsets (`drawTeleporter`, `BytecodeInterpreter.ts:2076-2112`),
 so its shimmer is not CSBWin's pattern. Paying it means transcribing the routine over the
 indexed buffers, and a tool (or a frame) that pins `GraphicRandom` and compares a
 teleporter's pixels with the stream the C++ reads.

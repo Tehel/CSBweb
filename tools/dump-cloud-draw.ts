@@ -50,7 +50,7 @@ import { applyLimits } from '../src/core/intCast';
 import { CsbRandom } from '../src/core/random';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
-import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, shrinkBlt } from '../src/renderer/csbwin/CanvasBlitter';
 import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
 import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
 import { check, finish } from './lib/check';
@@ -248,8 +248,7 @@ function fakeGraphic(id: number) {
   }
   return b;
 }
-const shrinkOracle = new BytecodeInterpreter({} as any) as any;
-const shrink = (src: any, w: number, h: number, map: Uint8Array) => shrinkOracle.shrinkBltIndexedBitmap(src, w, h, map);
+const shrink = (src: any, w: number, h: number, map: Uint8Array) => shrinkBlt(src, src.width, src.height, w, h, map);
 
 interface Scene {
   relCell: number; // CSBWin's RelativeCellNumber
