@@ -21,7 +21,7 @@ import type { DungeonState } from '../engine/DungeonState';
 import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
-import { createPaletteIndexViewportBuffer, tag0088b2Index } from './csbwin/CanvasBlitter';
+import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
 import { extractViewportTables } from './csbwin/ViewportTables';
 import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
 import {
@@ -325,37 +325,23 @@ export class ViewportRenderer {
     // - When `UseMirrorImages != 0`, F0L1/F0R1 are swapped by using mirrored copies of the opposite side.
     // - Other distances use mirrored copies of their own bitmaps.
     // - Corner bitmaps (index 5/6) are not swapped here.
-    const mirror = (b: IndexedBitmap) => this.mirrorIndexedBitmap(b);
-
     const out = normal.slice();
-    out[0] = mirror(normal[1]); // F0R1 becomes mirror of original F0L1
-    out[1] = mirror(normal[0]); // F0L1 becomes mirror of original F0R1
-    out[2] = mirror(normal[2]); // F1
+    out[0] = mirrorBitmap(normal[1]); // F0R1 becomes mirror of original F0L1
+    out[1] = mirrorBitmap(normal[0]); // F0L1 becomes mirror of original F0R1
+    out[2] = mirrorBitmap(normal[2]); // F1
 
     const wallRects = this.context.wallRectangles;
     if (wallRects && this.mirrorWallRectF2 && this.mirrorWallRectF3) {
       const derivedF3 = this.buildMirrorWallBitmap(normal[4], wallRects[0], this.mirrorWallRectF3, 11);
       const derivedF2 = this.buildMirrorWallBitmap(normal[3], wallRects[3], this.mirrorWallRectF2, 8);
-      out[4] = derivedF3 ?? mirror(normal[4]);
-      out[3] = derivedF2 ?? mirror(normal[3]);
+      out[4] = derivedF3 ?? mirrorBitmap(normal[4]);
+      out[3] = derivedF2 ?? mirrorBitmap(normal[3]);
     } else {
-      out[4] = mirror(normal[4]);
-      out[3] = mirror(normal[3]);
+      out[4] = mirrorBitmap(normal[4]);
+      out[3] = mirrorBitmap(normal[3]);
     }
     // out[5]/out[6] remain as-is (F3L2 + its mirror).
     return out;
-  }
-
-  private mirrorIndexedBitmap(source: IndexedBitmap): IndexedBitmap {
-    const { width, height, pixels } = source;
-    const out = new Uint8Array(width * height);
-    for (let y = 0; y < height; y++) {
-      const row = y * width;
-      for (let x = 0; x < width; x++) {
-        out[row + (width - 1 - x)] = pixels[row + x];
-      }
-    }
-    return { width, height, pixels: out };
   }
 
   private buildMirrorWallBitmap(
@@ -368,8 +354,8 @@ export class ViewportRenderer {
     const srcHeight = rect.srcHeight ?? source.height;
     if (srcWidth <= 0 || srcHeight <= 0) return null;
 
-    const cropped = this.cropIndexedBitmap(source, srcWidth, srcHeight);
-    const mirrored = this.mirrorIndexedBitmap(cropped);
+    const cropped = cropBitmap(source, srcWidth, srcHeight);
+    const mirrored = mirrorBitmap(cropped);
 
     const dstPixels = new Uint8Array(srcWidth * srcHeight);
     dstPixels.fill(10);
@@ -389,26 +375,6 @@ export class ViewportRenderer {
 
     tag0088b2Index(mirrored, dst, rectPos, -1);
     return dst;
-  }
-
-  private cropIndexedBitmap(source: IndexedBitmap, width: number, height: number): IndexedBitmap {
-    const srcW = source.width;
-    const srcH = source.height;
-    const outW = Math.max(0, width | 0);
-    const outH = Math.max(0, height | 0);
-    const outPixels = new Uint8Array(outW * outH);
-    if (outW === 0 || outH === 0) return { width: outW, height: outH, pixels: outPixels };
-
-    const copyW = Math.min(outW, srcW);
-    const copyH = Math.min(outH, srcH);
-    for (let y = 0; y < copyH; y++) {
-      const srcRow = y * srcW;
-      const dstRow = y * outW;
-      for (let x = 0; x < copyW; x++) {
-        outPixels[dstRow + x] = source.pixels[srcRow + x];
-      }
-    }
-    return { width: outW, height: outH, pixels: outPixels };
   }
 
   private buildFloorCeilingTemplate(

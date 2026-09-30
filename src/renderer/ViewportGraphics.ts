@@ -8,7 +8,7 @@
 
 import { GraphicsLoader } from '../data/GraphicsLoader';
 import { ImageFormat } from '../core/imageDecoder';
-import type { IndexedBitmap } from './csbwin/CanvasBlitter';
+import { mirrorBitmap, type IndexedBitmap } from './csbwin/CanvasBlitter';
 
 /**
  * Graphic `graphicNum` as palette indices, decoded once and kept in `cache`: the screen's
@@ -90,7 +90,7 @@ export function initializeWallBitmapsIndexed(
     });
   }
 
-  wallBitmaps.push(mirrorIndexedBitmap(wallBitmaps[5]));
+  wallBitmaps.push(mirrorBitmap(wallBitmaps[5]));
   return wallBitmaps;
 }
 
@@ -124,25 +124,9 @@ export function initializeDoorBitmapsIndexed(
   }
 
   // Mirror of slot [2] into slot [0] (used as "door facing right frame" in CSBWin)
-  doorBitmaps[0] = mirrorIndexedBitmap(doorBitmaps[2]);
+  doorBitmaps[0] = mirrorBitmap(doorBitmaps[2]);
 
   return doorBitmaps;
-}
-
-function mirrorIndexedBitmap(source: IndexedBitmap): IndexedBitmap {
-  const width = source.width;
-  const height = source.height;
-  const out = new Uint8Array(width * height);
-  const src = source.pixels;
-
-  for (let y = 0; y < height; y++) {
-    const row = y * width;
-    for (let x = 0; x < width; x++) {
-      out[row + (width - 1 - x)] = src[row + x];
-    }
-  }
-
-  return { width, height, pixels: out };
 }
 
 /**

@@ -13,7 +13,9 @@ import { Opcode } from './Opcodes';
 import { SummarizeRoomData } from './Types';
 import {
   bltShapeToViewportIndex,
+  cropBitmap,
   IDENTITY_COLOR_MAP,
+  mirrorBitmap,
   shrinkBlt,
   tag0088b2Explicit,
   tag0088b2Index,
@@ -1239,7 +1241,7 @@ export class BytecodeInterpreter {
     const destHeight = rawDestHeight > 0 ? rawDestHeight : (desc.y2 | 0) - (desc.y1 | 0) + 1;
     if (destWidth <= 0 || destHeight <= 0) return true;
 
-    let bitmap = this.cropBitmap(base, srcWidth, srcHeight);
+    let bitmap = cropBitmap(base, srcWidth, srcHeight);
     if (distanceIndex !== 3) {
       const colorMap = distanceIndex === 2 ? tables.colorMapMedium : tables.colorMapFar;
       bitmap = this.scaleIndexedBitmap(bitmap, destWidth, destHeight, colorMap);
@@ -1460,7 +1462,7 @@ export class BytecodeInterpreter {
       } else {
         const size = tables.doorOrnamentRectSets[set][2]; // `Byte5058[18*set]`
         const colorMap = nearness === 0 ? tables.doorOrnamentColorMapF3 : tables.doorOrnamentColorMapF2;
-        const cropped = this.cropBitmap(graphic, 2 * size.widthBytes, size.height);
+        const cropped = cropBitmap(graphic, 2 * size.widthBytes, size.height);
         ornamentBitmap = shrinkBlt(
           cropped,
           cropped.width,
@@ -1642,7 +1644,7 @@ export class BytecodeInterpreter {
       if (heightPixels > (pSrcSizeDescriptor.height | 0)) heightPixels = pSrcSizeDescriptor.height | 0;
     }
     widthPixels = widthBytes * 2;
-    const cropped = this.cropBitmap(src, widthPixels, heightPixels);
+    const cropped = cropBitmap(src, widthPixels, heightPixels);
 
     const scaled = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, desc.height | 0, colorMap, mirror);
 
@@ -1781,7 +1783,7 @@ export class BytecodeInterpreter {
     if (heightPixels > (pSrcSizeDescriptor.height | 0)) heightPixels = pSrcSizeDescriptor.height | 0;
     widthPixels = widthBytes * 2;
 
-    const cropped = this.cropBitmap(srcBitmap, widthPixels, heightPixels);
+    const cropped = cropBitmap(srcBitmap, widthPixels, heightPixels);
     const distanceBand = relativePosition <= 4 ? 0 : 1;
     const colorMap = distanceBand === 0 ? tables.floorColorMapFar : tables.floorColorMapMedium;
     let derived = this.scaleIndexedBitmap(cropped, finalBitmapWidth + 1, pWDP.height | 0, colorMap);
@@ -2061,18 +2063,6 @@ export class BytecodeInterpreter {
     return ((BytecodeInterpreter.graphicRandomState >>> 7) % maxExclusive) >>> 0;
   }
 
-  private cropBitmap(src: IndexedBitmap, width: number, height: number): IndexedBitmap {
-    const w = Math.min(width, src.width);
-    const h = Math.min(height, src.height);
-    const out = new Uint8Array(w * h);
-    for (let y = 0; y < h; y++) {
-      const srcRow = y * src.width;
-      const dstRow = y * w;
-      out.set(src.pixels.subarray(srcRow, srcRow + w), dstRow);
-    }
-    return { width: w, height: h, pixels: out };
-  }
-
   private drawTeleporter(teleporterRect: RectPos, wallRect: RectPos): void {
     const viewport = this.context.viewportIndexBuffer;
     const getGraphic = this.context.getGraphicBitmap;
@@ -2088,7 +2078,7 @@ export class BytecodeInterpreter {
         const widthBytes = Math.max(0, Math.floor((teleporterRect.srcWidth ?? 0) / 2));
         const height = teleporterRect.srcHeight ?? maskGraphic.height;
         const width = widthBytes * 2;
-        const cropped = this.cropBitmap(maskGraphic, width, height);
+        const cropped = cropBitmap(maskGraphic, width, height);
         mask = (teleporterRect.y2 & 0x80) !== 0 ? this.getMirroredBitmap(cropped) : cropped;
       }
     }
@@ -3345,13 +3335,7 @@ export class BytecodeInterpreter {
     const cached = this.mirrorCache.get(src);
     if (cached) return cached;
 
-    const { width, height, pixels } = src;
-    const out = new Uint8Array(width * height);
-    for (let y = 0; y < height; y++) {
-      const row = y * width;
-      for (let x = 0; x < width; x++) out[row + (width - 1 - x)] = pixels[row + x];
-    }
-    const mirrored = { width, height, pixels: out };
+    const mirrored = mirrorBitmap(src);
     this.mirrorCache.set(src, mirrored);
     return mirrored;
   }

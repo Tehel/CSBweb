@@ -163,6 +163,38 @@ export function shrinkBlt(
   return { width: dstWidth, height: dstHeight, pixels: out };
 }
 
+/**
+ * `Mirror` (`doc/CSBwin-src/CSBCode.cpp:4361`): the bitmap flipped left to right. CSBWin
+ * flips the buffer in place; this returns a new one.
+ */
+export function mirrorBitmap(src: IndexedBitmap): IndexedBitmap {
+  const { width, height, pixels } = src;
+  const out = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) out[row + (width - 1 - x)] = pixels[row + x];
+  }
+  return { width, height, pixels: out };
+}
+
+/**
+ * The top-left `width` x `height` of a bitmap, as CSBWin reads a graphic through a size
+ * descriptor narrower than the graphic. Past the source's edges the result holds colour 0,
+ * where CSBWin would read on; no data set asks for more than the graphic holds.
+ */
+export function cropBitmap(src: IndexedBitmap, width: number, height: number): IndexedBitmap {
+  const w = Math.max(0, width | 0);
+  const h = Math.max(0, height | 0);
+  const out = new Uint8Array(w * h);
+  const copyW = Math.min(w, src.width);
+  const copyH = Math.min(h, src.height);
+  for (let y = 0; y < copyH; y++) {
+    const srcRow = y * src.width;
+    out.set(src.pixels.subarray(srcRow, srcRow + copyW), y * w);
+  }
+  return { width: w, height: h, pixels: out };
+}
+
 function normalizeRectInclusive(rect: RectPos, dstWidth: number, dstHeight: number): RectPos | null {
   const x1 = clampInt(rect.x1, 0, dstWidth - 1);
   const y1 = clampInt(rect.y1, 0, dstHeight - 1);
