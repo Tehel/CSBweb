@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ |
+| E9 | `BytecodeInterpreter.ts` holds three CSBWin files | L | ⏳ step 1 of 3 next |
 | E11 | The interface reaches the engine through three layers of forwarding | L | ⏳ |
 | D15 | `UIState` is built in two phases | M | ⏳ |
 | E14 | CSBWin's input path lives in the page's debug-chrome module | M | ⏳ |
@@ -178,10 +178,44 @@ the C++'s (the switch stays: H, "Not debt"). The rest is not the interpreter:
   `:1302`, `drawDoorOrnament`), `DrawTeleporter` (`:2047`), the champion portrait. About
   700 lines.
 
-Paying it moves each group into a module named for its CSBWin file, as `E2` split
-`Game.ts`, over the `InterpreterContext` the interpreter already passes around; the
-interpreter keeps the machine. `C94` and `C99` both land in the code that moves: pay
-them first or after, not during.
+Paying it moves each group into a module of its own, as `E2` split `Game.ts`, each
+module's header naming its CSBWin file; the interpreter keeps the machine: `interpret`,
+`executeOpcode`, every `op*` handler (a `Std*` handler pops its arguments and calls the
+moved function, as CSBWin's `case` calls `DrawDoor`), the `RECT_POINTERS` /
+`BITMAP_POINTERS` resolution and the derived graphics. `C94` and `C99` both land in the
+code that moves: pay them first or after, not during.
+
+The moved functions are free functions over one shared object, as the `ui/` modules are
+over `UIState`. They reach state through it, not through `this`:
+
+- **`ViewportDraw`** (`src/renderer/bytecode/ViewportDraw.ts`): the `InterpreterContext`,
+  the mirror and flip caches (`getMirroredBitmap`, `getFlippedBitmapVertical`), the three
+  blit helpers (`blitShapeToViewportIndexWithTransparent`, `blitShapeBitmapToViewport`,
+  `scaleIndexedBitmap`), and `viewportRandom` (`Viewport.cpp:6697`, a module-level value
+  as the class-static is now). It is a class the interpreter builds and exposes as a
+  public readonly `draw`, so a tool that replaces a blit helper on one instance
+  (`tools/dump-monster-draw.ts:187`) replaces it on `interp.draw` instead.
+
+The steps, one commit each, each byte-identical in every tool's output and in the frames:
+
+1. **`ViewportDraw`.** Extract the shared object; the interpreter's methods call it.
+   `tools/dump-cloud-draw.ts` and `dump-door-lightning.ts` reach `viewportRandom` through
+   its new home.
+2. **`CSBCode.cpp`'s drawing**, into two modules. `DrawDecorations.ts`:
+   `DrawWallDecoration` with the wall text, the champion portrait and the extended wall
+   decorations it draws, `isAlcoveDecorationIndex`, and `DrawFloorDecorations` with the
+   extended floor decorations. `DrawDoor.ts`: `DrawDoor` (the body of `opStdDrawDoor`
+   below its pops), its ornament (`TAG004b26`), `DrawDoorSwitch`, `DrawTeleporter` and
+   `GraphicRandom` with its state (`tools/dump-graphic-random.ts` retargeted). This goes
+   before step 3 because `DrawRoomObjects` calls `DrawTeleporter` (the Fluxcage).
+3. **`Code51a4.cpp`'s drawing**, into `DrawRoomObjects.ts`: `DrawRoomObjects` and
+   everything under it (`drawObjectsAtPosition`, `drawSingleObject`,
+   `getDerivedObjectBitmap`, `DrawMonster`, the missiles, `DrawClouds`,
+   `drawCloudUnderParty`, `TAG005088`, `mapColorValue`, `decodeMonsterStatus`), the two
+   drawing-location tables, and `GetGraphicClass`. `dump-cloud-draw`, `dump-missile-draw`
+   and `dump-monster-draw` import the functions they now reach through `as any`. The last
+   step closes `E9`: `CLAUDE.md`'s layout line and `doc/PROVEN_FACTS.md`'s pointers name
+   the new modules.
 
 ### E11 ⏳ The interface reaches the engine through three layers of forwarding
 
@@ -429,7 +463,7 @@ strip scrolled or a flashed button changed (`main.ts:502-507`). Two things follo
   would show it: one VBL early for a pick-up, which brings the tick on at once
   (`d.clockTick = 1`), up to a tick early for a click that does not.
 
-`BytecodeInterpreter.viewportRandom` (`:2047`) is also a `static`, shared by every
+`BytecodeInterpreter.viewportRandom` (`:2028`) is also a `static`, shared by every
 interpreter, the prison interior's and every tool's included. Paying it means `renderView`
 recomposes (`refreshOverlay`) everywhere but the three sites, the tick's draw becoming the
 only way `DrawViewport` runs in play, and `npm test -- --frames` telling whether a golden
