@@ -55,8 +55,9 @@ The data files load: the graphics through
    own, and CSBWin's `_DisplayChaosStrikesBack` ports it.
 
 **How long the logo stays up is not established.** The palette script ends 30 VBLs after
-it starts. Whatever follows is `START.PRG` loading and unpacking the game from floppy,
-which the disk does not time.
+it starts. Whatever follows is `START.PRG` loading and unpacking the game, which the disk
+does not time. On the one recording available the logo is up about 3.5 s before the title
+("The sound as PCM, and a recording of the logo").
 
 ## `SWOOSH.IMG`
 
@@ -177,26 +178,34 @@ count of 50 Hz ticks, 0 ending the sound. The data:
 That is noise rising in pitch for 20 ticks (0.4 s), then decaying: the swoosh. Register 11,
 the envelope period's fine byte, is never written, so its value is whatever the ST held.
 
-### The sound as PCM
+### The sound as PCM, and a recording of the logo
 
 The port plays sampled sound only (`SoundManager` builds an `AudioBuffer` per sample), so
-the swoosh ships as a rendering, not as a chip. `static/gamefiles/dm-atari-1.2/swoosh.wav`
-(mono, 16-bit, 44.1 kHz, 0.8 s) is rendered offline from the bytes above by
-`render-swoosh-wav.py` beside it. **It is a placeholder**: it models the YM2149 from its
-documented behaviour, not from a measurement, and every assumption is one of these:
+the swoosh ships as a recording, not as a chip. The source is the YouTube video
+"DungeonMaster DMAA MSTE" by MrPetari (`https://www.youtube.com/watch?v=Iojq4NVtdHU`), an
+Atari Mega STE booting the game. Its audio track (Opus, 48 kHz) is silent from 12.75 s
+until the swoosh starts at 16.845 s.
 
-- A 2 MHz clock; the noise LFSR (17 bits, taps 0 and 3) steps at clock / (16 × period);
-  the envelope takes 32 steps over 256 × (256 × R12 + R11) clocks.
-- Register 11 is 0. At the two coarse values used it moves the ramps by under 8%.
-- A volume curve of 1.5 dB a step for the 32 envelope levels, an approximation of the
-  chip's DAC.
-- A `Dosound` wait of `n` is `n` ticks of 50 Hz, and the commands after it run on the tick
-  it ends.
+`static/gamefiles/dm-atari-1.2/swoosh.wav` (md5 `53ca1660791d0d9e1f6cf15b818d7932`) is
+16.835–17.845 s of that track: mono, 16-bit, 48 kHz, 1.01 s, the last 150 ms faded out and
+the peak scaled to −1 dBFS. It swells for about 0.4 s, rising in pitch as the noise period
+falls, and decays to near silence by 0.8 s.
 
-The result: noise swelling for 0.4 s as its pitch rises, peaking as the second envelope
-starts, then decaying to silence by 0.72 s. A recording of the real sound, from an ST or
-a cycle-accurate emulator such as Hatari running the disk, would replace it and settle
-every assumption above at once.
+The video, decoded frame by frame from the start (25 fps; seeking into it gives times up
+to a second off), agrees with the palette script:
+
+| Video | Screen | Script |
+| --- | --- | --- |
+| 16.56 s | Black: the picture is drawn, the palette is not | |
+| 16.72 s | The first of the trail | VBL 0 |
+| 17.12 s | The letters and the starburst | VBL 22 |
+| 17.20 s | The starburst gone | VBL 26 |
+| 17.28 s | The yellow glint | VBL 30 |
+
+The reveal takes 0.56 s, and the sound starts with it, as `$0002` calls `Dosound` just
+before the script. After the glint the logo stays up until the title's dark blue comes in
+at 20.80 s, with two grey screens in between (17.60–18.28 s and 19.56–20.52 s). What causes
+them is not established, so the recording does not give a hold time the port could copy.
 
 ## The 1.2 data files against `dm-atari/`
 

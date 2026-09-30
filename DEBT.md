@@ -713,7 +713,7 @@ The Atari ST disk booted into `SWOOSH.IMG`, which drew the FTL logo with a palet
 and a noise "swoosh" before the game's own title animation. CSBWin never had it: it lives
 in the boot chain, not in the game program. Everything about it is in
 `doc/ATARI_ST_DISK_REFERENCE.md` → "`SWOOSH.IMG`", and `static/gamefiles/dm-atari-1.2/`
-holds the file and a PCM rendering of its sound.
+holds the file and a recording of its sound.
 
 To do:
 
@@ -722,12 +722,9 @@ To do:
   it consumes exactly 2306 bytes and ends on the 64000th pixel.
 - Run its palette script from `$0b92` on the intro host (`src/renderer/intro/IntroHost.ts`),
   30 VBLs, before `TitleSequence`, starting the sound at VBL 0.
-- The sound: ship `swoosh.wav` through `SoundManager`, or a recording of the real one (a
-  recording replaces the rendering's assumptions, listed in the doc). The generator
-  (`static/gamefiles/dm-atari-1.2/render-swoosh-wav.py`) becomes a `tools/` script if the
-  rendering is kept.
-- **The hold after VBL 30 is a placeholder.** On the ST it lasted until `START.PRG` had
-  loaded the game, which the disk does not time. It must be marked as such in the code.
+- The sound: `swoosh.wav`, a recording of the real one, through `SoundManager`.
+- **The hold after VBL 30 is the author's arbitrary choice**, since neither the disk nor
+  the recording gives one. The code marks it as such.
 - Behind the extras' setting, off by default, so the boot and the golden frames are
   unchanged with it off.
 
