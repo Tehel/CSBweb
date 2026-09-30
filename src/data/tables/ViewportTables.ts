@@ -1,5 +1,5 @@
-import type { GraphicsLoader } from '../../data/GraphicsLoader';
-import type { RectPos } from './CanvasBlitter';
+import type { GraphicsLoader } from '../GraphicsLoader';
+import type { RectPos } from './UITables';
 
 export interface ViewportTables {
   // Core wall rectangles (CSBWin `d.wallRectangles[14]`)

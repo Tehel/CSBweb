@@ -28,8 +28,8 @@ import { resolve } from 'node:path';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Champion } from '../src/engine/gameTypes';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import type { UITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
+import type { UITables } from '../src/data/tables/UITables';
 import {
   gridCharacterAt,
   openReincarnateScreen,

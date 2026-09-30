@@ -6,7 +6,7 @@
  * and its `word0` is the button id the click dispatcher switches on
  * (`doc/CSBwin-src/Mouse.cpp`).
  */
-import { Rect, UIButton } from '../csbwin/UITables';
+import { Rect, UIButton } from '../../data/tables/UITables';
 
 export function searchButtonList(list: UIButton[] | null, x: number, y: number, buttons: number): number {
   if (!list || list.length === 0) return 0;

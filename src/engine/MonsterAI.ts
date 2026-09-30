@@ -36,7 +36,7 @@ import {
   type MoveProbeState,
   type TurnState,
 } from './MonsterPerception';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterDelayFromAttackToMove,
   monsterDelayFromMoveToAttack,
@@ -48,7 +48,7 @@ import {
   monsterWord20_0_3,
   monsterWord2Bit3,
   monsterWord2Bit4,
-} from '../renderer/csbwin/ObjectTables';
+} from '../data/tables/MonsterDesc';
 import { setPackedBits } from './MonsterSystem';
 import { ordinalOfMonsterAtPosition } from './monsterPosition';
 

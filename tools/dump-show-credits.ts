@@ -47,7 +47,7 @@ import type { MessageSink } from '../src/engine/ActuatorSystem';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables, type UITables } from '../src/data/tables/UITables';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import {
   darken,

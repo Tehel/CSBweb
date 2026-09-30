@@ -37,7 +37,7 @@ import { resolve } from 'node:path';
 
 import { ImageFormat, decodeIMG } from '../src/core/imageDecoder';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { readPng } from './lib/png';
 import { check, finish } from './lib/check';
 

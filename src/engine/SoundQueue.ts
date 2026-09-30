@@ -19,7 +19,7 @@
  * `SoundFilter`, which can hand the sound to a DSA instead
  * (`doc/CSBwin-src/Sound.cpp:670`), is **not ported** (`DEBT.md` G2).
  */
-import type { SoundTableEntry } from '../renderer/csbwin/UITables';
+import type { SoundTableEntry } from '../data/tables/UITables';
 import type { GameHost } from './GameHost';
 import type { GameState } from './gameTypes';
 import type { Party } from './Party';

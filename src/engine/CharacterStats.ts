@@ -24,7 +24,7 @@ import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { determineMastery } from './skills';
 import { OBJNI_BOOTS_OF_SPEED, OBJNI_ELVEN_BOOTS } from '../core/objectNameIndex';
-import type { WeaponDesc } from '../renderer/csbwin/ObjectTables';
+import type { WeaponDesc } from '../data/tables/ObjectTables';
 import { AttributeIndex, championAttribute } from './attributes';
 import { PotionType } from '../core/constants';
 

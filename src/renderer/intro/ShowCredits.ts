@@ -27,7 +27,7 @@
 import { fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
 import type { IndexedBitmap } from '../csbwin/CanvasBlitter';
-import type { UIButton } from '../csbwin/UITables';
+import type { UIButton } from '../../data/tables/UITables';
 import { MASTERY_LABELS, ROLE_LABELS } from '../ui/Character';
 import { searchButtonList } from '../ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../ViewportGraphics';

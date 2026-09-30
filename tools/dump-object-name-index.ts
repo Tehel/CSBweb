@@ -37,8 +37,8 @@ import { resolve } from 'node:path';
 
 import * as OBJNI from '../src/core/objectNameIndex';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
 
 /**

@@ -64,7 +64,7 @@ import {
 } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import {
   MENU_HEIGHT,
   MENU_PANEL_COLOR,

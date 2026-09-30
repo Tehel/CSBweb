@@ -25,7 +25,7 @@ import {
 } from '../core/spellRn';
 import type { MissileRecord } from '../data/dungeonTypes';
 import { ActuatorAction } from '../data/actuatorHelpers';
-import { monsterAbsorbsDaggersEtc, monsterFireResistance, monsterNonMaterial } from '../renderer/csbwin/ObjectTables';
+import { monsterAbsorbsDaggersEtc, monsterFireResistance, monsterNonMaterial } from '../data/tables/MonsterDesc';
 import { characterAtPosition } from './AddCharacter';
 import { CloudType } from './cloudTypes';
 import type { DungeonState } from './DungeonState';

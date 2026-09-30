@@ -17,7 +17,7 @@ import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer'
 import { blitBasicGraphicToViewport, computeBarHeight, drawFoodWaterBar, drawMaskedBarRow, drawObjectIcon } from './Draw';
 import { descIndexForObject, getBonesChampion, getInventoryPlaceholderIndex, getRoleMastery, resolveObjectNameIndex } from './Objects';
 import { UIState } from './UIState';
-import type { Rect } from '../csbwin/UITables';
+import type { Rect } from '../../data/tables/UITables';
 /** `d.Pointer16596` (`doc/CSBwin-src/CSBCode.cpp:363-366`), the four base skills. */
 export const ROLE_LABELS = ['FIGHTER', 'NINJA', 'PRIEST', 'WIZARD'];
 const CHAR_COLORS = [7, 11, 8, 14];

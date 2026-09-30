@@ -41,9 +41,9 @@ import {
 } from '../src/engine/attributes';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DescIndexOfRecord, NameIndex, OBJDI_CAPE, OBJDI_COMPASS, OBJDI_EYE_OF_TIME } from '../src/engine/objectIndex';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';

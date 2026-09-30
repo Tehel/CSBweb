@@ -15,10 +15,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import {
-  extractObjectTables,
   monsterBravery,
   monsterCanSeeInDark,
   monsterHorizontalSize,
@@ -29,7 +29,7 @@ import {
   monsterSightDistance,
   monsterSmellingDistance,
   monsterVerticalSize,
-} from '../src/renderer/csbwin/ObjectTables';
+} from '../src/data/tables/MonsterDesc';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { check, finish } from './lib/check';
 

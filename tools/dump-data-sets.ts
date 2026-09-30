@@ -17,7 +17,7 @@ import { DATA_SETS, DEFAULT_DATA_SET, dataSetFor, type DataSet } from '../src/da
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { GameTables } from '../src/engine/GameTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { MISSING_PRISON_DOOR_BUTTONS } from '../src/renderer/intro/PrisonDoor';
 import { check, finish } from './lib/check';
 import { gameTablesOf, newGame } from './lib/game';

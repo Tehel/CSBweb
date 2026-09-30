@@ -27,7 +27,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import type { PartyFootprints } from './PartyFootprints';
 import { PartyFootprints as Footprints } from './PartyFootprints';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterCanSeeInDark,
   monsterInvincible,
@@ -39,7 +39,7 @@ import {
   monsterSmellingDistance,
   monsterVerticalSize,
   monsterWord16_12_15,
-} from '../renderer/csbwin/ObjectTables';
+} from '../data/tables/MonsterDesc';
 import { setPackedBits } from './MonsterSystem';
 import { CloudType } from './cloudTypes';
 

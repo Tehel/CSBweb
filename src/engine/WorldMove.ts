@@ -13,7 +13,7 @@
  */
 import { decodeObjectID, encodeObjectID, DBType, Direction, isSamePosition, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
 import type { CreatureRecord, Item16Record, TeleporterRecord } from '../data/dungeonTypes';
-import { monsterHorizontalSize, monsterLevitating } from '../renderer/csbwin/ObjectTables';
+import { monsterHorizontalSize, monsterLevitating } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { MonsterDamageResult } from './MonsterDamage';

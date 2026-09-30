@@ -321,7 +321,7 @@ CSBWin, reading the table as is, draws the pressed crack at eye level.
 The author, who played the Atari ST original on the same `graphics.dat`, is confident the
 original draws it where the Out crack was. How the original manages this was not
 established. So the port sets `Byte4100[55]` to 2 at load
-(`correctCrackSwitchInPlacement` in `src/renderer/csbwin/ObjectTables.ts`), only when
+(`correctCrackSwitchInPlacement` in `src/data/tables/ObjectTables.ts`), only when
 entry 50 is 2 and entry 55 is 0. No other entry, and no other code path, changes.
 `tools/dump-crack-switch.ts` asserts all of this, and golden frame `09-crack-switch` shows
 the pressed switch. Do not "fix" it back to CSBWin.

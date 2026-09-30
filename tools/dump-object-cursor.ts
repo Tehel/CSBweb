@@ -34,9 +34,9 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { objectIconBitmap } from '../src/renderer/ui/Draw';
 import { resolveObjectNameIndex } from '../src/renderer/ui/Objects';

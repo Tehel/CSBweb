@@ -10,7 +10,7 @@ import {
   getActuatorValue,
   getActuatorWallGraphicOrdinal,
 } from '../../data/actuatorHelpers';
-import type { ObjectTables } from './ObjectTables';
+import type { ObjectTables } from '../../data/tables/ObjectTables';
 
 const RN_EOF = OBJECT_ID_EOF;
 const PORTRAIT_HIDE_PORTRAIT = 2;

@@ -33,7 +33,7 @@ import type { Game } from '../src/engine/Game';
 import { applySaveBytes } from '../src/engine/SaveGamePayload';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { PALETTE_11914, type IntroEvent, type IntroHost } from '../src/renderer/intro/IntroHost';
 import { MENU_TITLE1_COLOR, MENU_TITLE2_COLOR, doMenu, drawMenuPress, menuButtonList } from '../src/renderer/ui/Menu';
 import type { UIState } from '../src/renderer/ui/UIState';

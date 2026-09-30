@@ -46,7 +46,7 @@ import {
   type IndexedBitmap,
 } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { decodeCursorBitmap, extractUITables, type UITables } from '../src/renderer/csbwin/UITables';
+import { decodeCursorBitmap, extractUITables, type UITables } from '../src/data/tables/UITables';
 import { searchButtonList } from '../src/renderer/ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_HEIGHT, VIEWPORT_WIDTH } from '../src/renderer/ViewportGraphics';
 import {

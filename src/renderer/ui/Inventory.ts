@@ -14,7 +14,7 @@ import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex, drawTextLineIndexRaw } from '../csbwin/TextRenderer';
-import { Rect } from '../csbwin/UITables';
+import { Rect } from '../../data/tables/UITables';
 import { drawAttributePanel, drawFoodWaterPanel, drawVitalsAndLoad, getInventoryItemIndex } from './Character';
 import { blitBasicGraphicToViewport, drawObjectIcon, drawWoundedOutline } from './Draw';
 import { drawMouthChewAnimation } from './Feeding';

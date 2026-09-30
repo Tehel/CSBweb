@@ -44,11 +44,11 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { emptyPossessions, MovementAction, type Champion } from '../src/engine/gameTypes';
 import { flashButton, waitForButtonFlash } from '../src/engine/LoopState';
 import { createPaletteIndexViewportBuffer, vblFlashButn } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { handleAttackAreaClick, prepareAttack } from '../src/renderer/ui/Attack';
 import { handleMagicClick } from '../src/renderer/ui/MagicPanel';
 import { createUIState } from '../src/renderer/ui/UIState';
-import type { Rect } from '../src/renderer/csbwin/UITables';
+import type { Rect } from '../src/data/tables/UITables';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
 

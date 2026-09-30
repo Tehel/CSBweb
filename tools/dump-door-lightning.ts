@@ -26,8 +26,8 @@
 import { readFileSync } from 'node:fs';
 
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { check, finish } from './lib/check';

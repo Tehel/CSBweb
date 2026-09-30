@@ -46,7 +46,7 @@ import { Party } from '../src/engine/Party';
 import type { Champion } from '../src/engine/gameTypes';
 import { IndexedBitmap, createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { drawPartyStatus, getPortraitBitmap } from '../src/renderer/ui/Character';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { check, finish } from './lib/check';

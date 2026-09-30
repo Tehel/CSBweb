@@ -1,13 +1,20 @@
-import type { GraphicsLoader } from '../../data/GraphicsLoader';
-import type { SpellDefinition } from '../../data/spellTypes';
-
-import type { IndexedBitmap } from './CanvasBlitter';
+import type { GraphicsLoader } from '../GraphicsLoader';
+import type { IndexedBitmap } from '../CSBGraphicsLoader';
+import type { SpellDefinition } from '../spellTypes';
 
 export interface Rect {
   x1: number;
   x2: number;
   y1: number;
   y2: number;
+}
+
+export interface RectPos extends Rect {
+  srcX?: number;
+  srcY?: number;
+  srcStride?: number;
+  srcWidth?: number;
+  srcHeight?: number;
 }
 
 export interface WordRect extends Rect {

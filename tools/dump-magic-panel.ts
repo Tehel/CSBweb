@@ -30,7 +30,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
 import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { ensureSkills } from '../src/engine/skills';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { drawTextLineIndexRaw, loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { drawMagicIncantation, drawSpellMenuCharacters, handleMagicClick } from '../src/renderer/ui/MagicPanel';

@@ -53,7 +53,7 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import { BytecodeInterpreter } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { BytecodePrograms } from '../src/renderer/bytecode/BytecodePrograms';
 import { GraphicRoomType, RoomType, type SummarizeRoomData } from '../src/renderer/bytecode/Types';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import type { IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
 import {
   RelativeXY,

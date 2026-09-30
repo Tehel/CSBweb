@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { readI8, readU16BE } from '../src/core/bytes';
 
 interface ToolOptions {

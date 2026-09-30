@@ -30,8 +30,8 @@ import { selectMagicCaster, setHandOwner } from './Party';
 import { AttributeIndex, attributeCurrent, championAttribute, setAttributeCurrentWithinLimits } from './attributes';
 import { getPrimaryAndSecondaryDirection } from './MonsterPerception';
 import { adjustSkills, AdjustSkillsWhy, determineMastery } from './skills';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
-import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
+import { monsterWord14_12_15, monsterWord16_8_11, monsterWord2Bit4 } from '../data/tables/MonsterDesc';
 import { wakeUp } from './LoopState';
 import { TimerFunction } from './TimerQueue';
 

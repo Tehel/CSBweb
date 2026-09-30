@@ -26,7 +26,7 @@ import {
   updateImageDataFromIndexWithViewportPalette,
   reconvertThroughPalette,
 } from './csbwin/CanvasBlitter';
-import { extractUITables, type UIButton, type UITables } from './csbwin/UITables';
+import { extractUITables, type UIButton, type UITables } from '../data/tables/UITables';
 import { loadFontData, type FontData } from './csbwin/TextRenderer';
 import { ImageFormat } from '../core/imageDecoder';
 import {

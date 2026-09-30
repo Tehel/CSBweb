@@ -19,8 +19,8 @@
  */
 import { DBType, OBJECT_ID_EOF, Position, decodeObjectID } from '../core/types';
 import type { ObjectID } from '../core/types';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
-import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
+import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 
 // CSBWin's two `static bool`s: each warning is shown once per process.

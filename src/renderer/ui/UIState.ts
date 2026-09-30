@@ -14,8 +14,8 @@ import type { ViewingFilterOptions, ViewingFilterResult } from '../../engine/Dsa
 import type { LoopScript } from '../../engine/LoopState';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, createPaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
-import type { KeyXlate, Rect, UIButton, UITables } from '../csbwin/UITables';
-import type { ObjectTables } from '../csbwin/ObjectTables';
+import type { KeyXlate, Rect, UIButton, UITables } from '../../data/tables/UITables';
+import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { CharacterStats } from '../../engine/CharacterStats';
 import type { FontData } from '../csbwin/TextRenderer';
 import type { ImageFormat } from '../../core/imageDecoder';

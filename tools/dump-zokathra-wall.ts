@@ -33,9 +33,9 @@ import { DungeonLoader } from '../src/data/DungeonLoader';
 import type { Game } from '../src/engine/Game';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 

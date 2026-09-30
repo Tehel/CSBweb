@@ -26,7 +26,7 @@
  */
 import { updateDebug } from '../../ui';
 import type { GameScreen } from '../GameScreen';
-import { decodeCursorBitmap, type UIButton } from '../csbwin/UITables';
+import { decodeCursorBitmap, type UIButton } from '../../data/tables/UITables';
 import { MENU_PRESS_PHASE_MS, menuButtonRect, menuHitTest } from '../ui/Menu';
 import { fadeToPalette, PALETTE_11914, withCursor, type IntroEvent, type IntroHost } from './IntroHost';
 import { MISSING_PRISON_DOOR_BUTTONS, showPrisonDoor, type PrisonDoorChoice } from './PrisonDoor';

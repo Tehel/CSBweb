@@ -84,7 +84,7 @@ lower row. The layouts patch it:
 | 4 | self-blit `rect18600` = (102,62)-(122,97) from source (102,99) — copies the gap *up*, splitting the top frame in two | (59,77), (166,77), (59,114), (166,114) |
 
 All four rectangles are **(from data)**, `graphics.dat` item 0x231, already extracted as
-`graphic231.rect18576` … `rect18600` (`src/renderer/csbwin/UITables.ts`).
+`graphic231.rect18576` … `rect18600` (`src/data/tables/UITables.ts`).
 
 `_DoMenu` also stamps `"V2.0"` at (192,7), fg 2 on bg 1 (`Menu.cpp:272-280`).
 

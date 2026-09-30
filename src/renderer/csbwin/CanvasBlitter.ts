@@ -9,15 +9,7 @@
  * Here we operate on pixel indices (0..15) for faithful transparency (index 10).
  */
 
-import { Rect } from "./UITables";
-
-export interface RectPos extends Rect {
-  srcX?: number;
-  srcY?: number;
-  srcStride?: number;
-  srcWidth?: number;
-  srcHeight?: number;
-}
+import type { Rect, RectPos } from '../../data/tables/UITables';
 
 export interface PaletteIndexViewportBuffer {
   width: number;

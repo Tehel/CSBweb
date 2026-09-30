@@ -22,7 +22,7 @@ import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerEntry, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterAttackingMirrorOK,
   monsterDelayFromAttackToMove,
@@ -33,7 +33,7 @@ import {
   monsterNibble14,
   monsterNonAttackingMirrorOK,
   monsterWord4Bit10,
-} from '../renderer/csbwin/ObjectTables';
+} from '../data/tables/MonsterDesc';
 
 /** `d.MaxITEM16` starts at 60 (`doc/CSBwin-src/CSBCode.cpp:6195`). */
 const INITIAL_MAX_ITEM16 = 60;

@@ -28,14 +28,14 @@ import type { GameContext } from './GameContext';
 import { TimerFunction, type TimerQueue } from './TimerQueue';
 import { MonsterType, StateOfFear } from './monsterTypes';
 import { setPackedBits } from './MonsterSystem';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterBravery,
   monsterHorizontalSize,
   monsterInvincible,
   monsterPoisonResistance,
   monsterLeavesDroppings,
-} from '../renderer/csbwin/ObjectTables';
+} from '../data/tables/MonsterDesc';
 
 /** `MONSTER_DAMAGE_RESULT` (`doc/CSBwin-src/CSB.h:2928`). */
 export enum MonsterDamageResult {

@@ -53,11 +53,17 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { MonsterDamageResult } from '../src/engine/MonsterDamage';
 import type { AiConst, AiFrame } from '../src/engine/MonsterAI';
 import { TimerFunction } from '../src/engine/TimerQueue';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import {
-  extractObjectTables, monsterAbsorbsDaggersEtc, monsterHorizontalSize, monsterInvincible,
-  monsterNonMaterial, monsterWord2Bit3, monsterWord2Bit4, type MonsterDesc,
-} from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+  monsterAbsorbsDaggersEtc,
+  monsterHorizontalSize,
+  monsterInvincible,
+  monsterNonMaterial,
+  monsterWord2Bit3,
+  monsterWord2Bit4,
+  type MonsterDesc,
+} from '../src/data/tables/MonsterDesc';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { createMonsterAt } from './lib/createMonster';

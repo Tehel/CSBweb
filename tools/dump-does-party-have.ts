@@ -22,9 +22,9 @@ import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { Party } from '../src/engine/Party';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
 

@@ -18,7 +18,7 @@
  */
 
 import type { CreatureRecord } from '../data/dungeonTypes';
-import { monsterHorizontalSize, type MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import { monsterHorizontalSize, type MonsterDesc } from '../data/tables/MonsterDesc';
 import type { DungeonState } from './DungeonState';
 
 /**

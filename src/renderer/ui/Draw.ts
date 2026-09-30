@@ -4,7 +4,7 @@
  * Everything here writes palette indices into `ui.screenIndexBuffer`; the conversion to
  * RGBA happens once at present time, as in CSBWin.
  */
-import { Rect } from '../csbwin/UITables';
+import { Rect } from '../../data/tables/UITables';
 import { IndexedBitmap, createPaletteIndexViewportBuffer, drawRectOutlineIndex, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { scrollingText } from '../csbwin/ScrollingText';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';

@@ -30,9 +30,9 @@ import {
   WALL_ORNAMENT_CRACK_SWITCH_OUT,
   extractObjectTables,
   readWallDecorationRectSetIndex,
-} from '../src/renderer/csbwin/ObjectTables';
+} from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 

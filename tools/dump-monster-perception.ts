@@ -31,10 +31,11 @@ import {
 import { PartyFootprints } from '../src/engine/PartyFootprints';
 import { TimerQueue } from '../src/engine/TimerQueue';
 import { MonsterType } from '../src/engine/monsterTypes';
-import { extractObjectTables, monsterSightDistance } from '../src/renderer/csbwin/ObjectTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { monsterSightDistance } from '../src/data/tables/MonsterDesc';
 import { newContext } from './lib/game';
 import { check, finish } from './lib/check';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import type { PartyState } from '../src/engine/gameTypes';
 
 const DIRS = ['N', 'E', 'S', 'W'];

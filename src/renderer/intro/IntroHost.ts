@@ -18,7 +18,7 @@
  */
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from '../csbwin/CanvasBlitter';
 import type { FontData } from '../csbwin/TextRenderer';
-import type { UITables } from '../csbwin/UITables';
+import type { UITables } from '../../data/tables/UITables';
 
 /** One item off the input queue. `buttons` is CSBWin's mask: 2 = left, 1 = right. */
 export interface IntroEvent {

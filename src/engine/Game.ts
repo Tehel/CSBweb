@@ -38,7 +38,7 @@ import { smartDiscard } from './SmartDiscard';
 import { isNinetySecondTick, isTenSecondTick, ninetySecondUpdate, tenSecondUpdate } from './PeriodicUpdates';
 import { DsaSystem, type ViewingFilterOptions, type ViewingFilterResult } from './DsaSystem';
 import { Position, type ObjectID } from '../core/types';
-import type { Rect } from '../renderer/csbwin/UITables';
+import type { Rect } from '../data/tables/UITables';
 import { TICKS_PER_SECOND } from '../core/constants';
 
 import { CharacterStats } from './CharacterStats';

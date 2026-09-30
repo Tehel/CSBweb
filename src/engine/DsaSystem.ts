@@ -38,8 +38,8 @@ import type { TimerEntry, TimerQueue } from './TimerQueue';
 import type { MonsterSystem } from './MonsterSystem';
 import type { WorldMove } from './WorldMove';
 import type { CsbRandom } from '../core/random';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
-import { monsterHorizontalSize } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
+import { monsterHorizontalSize } from '../data/tables/MonsterDesc';
 
 export interface ViewingFilterOptions {
   phraseMask: number;

@@ -114,6 +114,8 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             (LZW/RLE/SND), imageDecoder (IMG1/IMG2), types (incl. withObjectPosition =
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor
+  tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
+            ViewportTables, MonsterDesc
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
             the engine asks of the page), GameTables (every graphics.dat table, one
             builder), DungeonState, Party, MovementSystem, TimerSystem, TimerQueue,
@@ -131,8 +133,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
             ViewportRenderer (the dungeon view only), DrawViewport, ViewportGraphics
   bytecode/ BytecodeInterpreter, BytecodePrograms (168 cell programs), Opcodes
-  csbwin/   Runtime table extraction: ViewportTables, UITables, ObjectTables,
-            SummarizeRoomInfo, CanvasBlitter, TextRenderer
+  csbwin/   SummarizeRoomInfo, CanvasBlitter, TextRenderer, ScrollingText
   intro/    Everything before the party is in the dungeon: the title animation, the
             dungeon entrance, the door animation, the credits scroll. And the end of
             the game (`ShowCredits`), on the same host. See

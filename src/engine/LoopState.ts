@@ -4,7 +4,7 @@
  * the context (`ctx.loop`) and not in `GameState`: none is saved, in CSBWin or in the
  * port's quick-save.
  */
-import type { Rect } from '../renderer/csbwin/UITables';
+import type { Rect } from '../data/tables/UITables';
 import type { GameContext } from './GameContext';
 
 export interface LoopFlags {

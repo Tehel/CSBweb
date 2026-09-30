@@ -16,7 +16,7 @@
  * `doc/CSBWIN_TITLE_SCREEN_REFERENCE.md`.
  */
 import { tag0088b2Index, type IndexedBitmap } from '../csbwin/CanvasBlitter';
-import type { UIButton } from '../csbwin/UITables';
+import type { UIButton } from '../../data/tables/UITables';
 import { searchButtonList } from '../ui/HitTest';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import {

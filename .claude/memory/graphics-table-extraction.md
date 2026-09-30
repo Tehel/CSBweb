@@ -8,11 +8,11 @@ metadata:
 Extracting a new table from `graphics.dat` is usually **mechanical, not research**,
 because the surrounding offsets are already proven.
 
-- **Graphic `0x230`** (`parseGraphic230` in `src/renderer/csbwin/UITables.ts`) and
+- **Graphic `0x230`** (`parseGraphic230` in `src/data/tables/UITables.ts`) and
   **`0x232`** step through the blob with an explicit cursor; tables not yet needed are
   skipped with arithmetic like `off += 44 * 7`. Those skips *are* the offsets — replace
   the skip with a read.
-- **Graphic `0x22f`** (`src/renderer/csbwin/ObjectTables.ts`) uses absolute addresses
+- **Graphic `0x22f`** (`src/data/tables/ObjectTables.ts`) uses absolute addresses
   from `doc/CSBwin-src/Data.h` subtracted from `ABS_22F_START` (10340). Higher declared
   address = earlier in the blob. Add an `ABS_*` constant from the `Data.h` comment and
   the read follows.

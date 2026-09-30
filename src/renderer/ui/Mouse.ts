@@ -8,7 +8,7 @@
  * to `handleMouseButton`, the dispatcher on the `word0` ids `searchButtonList` returns.
  */
 import { IndexedBitmap, createPaletteIndexViewportBuffer, tag0088b2Index } from '../csbwin/CanvasBlitter';
-import { decodeCursorBitmap } from '../csbwin/UITables';
+import { decodeCursorBitmap } from '../../data/tables/UITables';
 import { canPlaceInSlot, drawPositionSquare } from './Character';
 import { objectIconBitmap } from './Draw';
 import { handleMouthPress } from './Feeding';

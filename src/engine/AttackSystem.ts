@@ -46,12 +46,12 @@ import {
 } from '../core/spellRn';
 import { DELTA_X, DELTA_Y } from './MonsterPerception';
 import { AdjustSkillsWhy, determineMastery } from './skills';
-import type { MonsterDesc } from '../renderer/csbwin/ObjectTables';
+import type { MonsterDesc } from '../data/tables/MonsterDesc';
 import {
   monsterBravery,
   monsterNonMaterial,
   monsterWord16_8_11,
-} from '../renderer/csbwin/ObjectTables';
+} from '../data/tables/MonsterDesc';
 
 
 /** `testdelay` (`doc/CSBwin-src/Attack.cpp:19`): every `if (testdelay) VBLDelay(MS2VBL(testdelay))`. */

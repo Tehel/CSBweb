@@ -40,7 +40,7 @@ import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { Game } from '../src/engine/Game';
 import { resolveEmptyHandedViewportClick, findDropAreaHit, resolveViewportCursorAction, testThrow, tryPickViewportObject } from '../src/renderer/ui/ViewportPicking';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import type { UIState } from '../src/renderer/ui/UIState';
 import type { RectPos } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { newGame, stockGraphics } from './lib/game';

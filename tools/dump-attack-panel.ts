@@ -28,9 +28,9 @@ import { Party } from '../src/engine/Party';
 import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
 import {
   attackPanelTick, closeAttackMenu, drawAttackPanel, executeAttack, prepareAttack, takeAttackOption,

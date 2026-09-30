@@ -40,7 +40,7 @@ import { AttributeIndex } from '../src/engine/attributes';
 import { determineMastery } from '../src/engine/skills';
 import { tenSecondUpdate } from '../src/engine/PeriodicUpdates';
 import { createUIState, UIMode, type UIState } from '../src/renderer/ui/UIState';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
+import { extractUITables } from '../src/data/tables/UITables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
 import { ScrollingText } from '../src/renderer/csbwin/ScrollingText';
 import { newGame } from './lib/game';

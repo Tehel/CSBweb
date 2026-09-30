@@ -44,7 +44,7 @@ import {
 } from '../../data/saves';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
-import type { UIButton } from '../csbwin/UITables';
+import type { UIButton } from '../../data/tables/UITables';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { searchButtonList } from './HitTest';
 import {

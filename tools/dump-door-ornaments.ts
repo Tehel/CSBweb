@@ -23,8 +23,8 @@ import { resolve } from 'node:path';
 
 import { OBJECT_ID_EOF, Position, RoomType, decodeObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
 import { newGame, stockGraphics } from './lib/game';
 

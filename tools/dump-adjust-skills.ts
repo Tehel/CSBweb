@@ -25,7 +25,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import type { MessageSink } from '../src/engine/ActuatorSystem';
 import { adjustSkills, AdjustSkillsWhy, createEmptySkills, determineMastery } from '../src/engine/skills';
-import { monsterWord16_8_11 } from '../src/renderer/csbwin/ObjectTables';
+import { monsterWord16_8_11 } from '../src/data/tables/MonsterDesc';
 import { newGame, stockGraphics } from './lib/game';
 import { check, finish } from './lib/check';
 

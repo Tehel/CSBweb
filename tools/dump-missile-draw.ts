@@ -30,8 +30,8 @@ import { DungeonState } from '../src/engine/DungeonState';
 import { GetBasicObjectType } from '../src/engine/objectIndex';
 import { BytecodeInterpreter, GetGraphicClass } from '../src/renderer/bytecode/BytecodeInterpreter';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { check, finish } from './lib/check';
 import { stockGraphics } from './lib/game';
 

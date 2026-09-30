@@ -26,7 +26,7 @@ import {
 import type { DungeonState } from '../../engine/DungeonState';
 import type { PartyFootprints } from '../../engine/PartyFootprints';
 import type { CreatureRecord } from '../../data/dungeonTypes';
-import type { ObjectTables } from '../csbwin/ObjectTables';
+import type { ObjectTables } from '../../data/tables/ObjectTables';
 import {
   monsterHasAttackGraphic,
   monsterHasBackGraphic,
@@ -35,7 +35,7 @@ import {
   monsterNonAttackingMirrorOK,
   monsterWord4Bit7,
   monsterWord4Bit8,
-} from '../csbwin/ObjectTables';
+} from '../../data/tables/MonsterDesc';
 import { ordinalAtPositionBytes } from '../../engine/monsterPosition';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import { decodeObjectID, DBType, OBJECT_ID_EOF, Position, RoomType, type ObjectID } from '../../core/types';

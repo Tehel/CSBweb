@@ -18,11 +18,11 @@ import type { GraphicsLoader } from '../data/GraphicsLoader';
 import type { SpellDefinition } from '../data/spellTypes';
 import {
   extractObjectTables,
-  type MonsterDesc,
   type WeaponDesc,
-} from '../renderer/csbwin/ObjectTables';
-import { extractUITables, type Rect, type SoundTableEntry } from '../renderer/csbwin/UITables';
-import { extractViewportTables } from '../renderer/csbwin/ViewportTables';
+} from '../data/tables/ObjectTables';
+import { type MonsterDesc } from '../data/tables/MonsterDesc';
+import { extractUITables, type Rect, type SoundTableEntry } from '../data/tables/UITables';
+import { extractViewportTables } from '../data/tables/ViewportTables';
 import type { TextDecodeTables } from './DungeonState';
 
 export interface GameTables {

@@ -55,7 +55,7 @@ import {
 import { MISSILE_FILTER_TIMER_INDEX, TimerFunction, type TimerEntry, TimerQueue } from './TimerQueue';
 import { AttackType } from './monsterTypes';
 import { MonsterDamageResult } from './MonsterDamage';
-import { monsterNonMaterial, monsterVerticalSize } from '../renderer/csbwin/ObjectTables';
+import { monsterNonMaterial, monsterVerticalSize } from '../data/tables/MonsterDesc';
 import { constructPredefinedMissile, decodeMissileTimerWord8, encodeMissileTimerWord8, spellObjectId } from './missileHelpers';
 
 

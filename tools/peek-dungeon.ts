@@ -42,8 +42,8 @@ import { MonsterType } from '../src/engine/monsterTypes';
 import { NameIndex } from '../src/engine/objectIndex';
 import { decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
 import { TimerFunction } from '../src/engine/TimerQueue';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { gameTablesOf } from './lib/game';
 
 const USAGE = `usage: npx tsx tools/peek-dungeon.ts [--file F] [--graphics G] <command>

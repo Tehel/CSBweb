@@ -37,7 +37,7 @@ import { CHARFLAG_ATTACK_DISABLE } from '../../data/CsbwinCharacters';
 import { determineMastery } from '../../engine/skills';
 import { fillRectIndex, shrinkBlt, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
-import { Rect } from '../csbwin/UITables';
+import { Rect } from '../../data/tables/UITables';
 import { drawObjectIconMask, shadeRectIndex } from './Draw';
 import { searchButtonList } from './HitTest';
 import { getAttackClass, getBaseObjectNameIndex, resolveObjectNameIndex } from './Objects';

@@ -22,8 +22,8 @@ import type { PartyFootprints } from '../engine/PartyFootprints';
 import type { InterpreterContext } from './bytecode/BytecodeInterpreter';
 import type { IndexedBitmap, PaletteIndexViewportBuffer } from './csbwin/CanvasBlitter';
 import { createPaletteIndexViewportBuffer, cropBitmap, mirrorBitmap, tag0088b2Index } from './csbwin/CanvasBlitter';
-import { extractViewportTables } from './csbwin/ViewportTables';
-import { extractObjectTables, type ObjectTables } from './csbwin/ObjectTables';
+import { extractViewportTables } from '../data/tables/ViewportTables';
+import { extractObjectTables, type ObjectTables } from '../data/tables/ObjectTables';
 import {
   initializeFloorCeilingIndexed,
   initializeDoorBitmapsIndexed,

@@ -26,10 +26,10 @@ import { assignPresetHeroPossessions, createChampionFromPreset } from '../src/en
 import type { AddCharacterTables } from '../src/engine/AddCharacter';
 import type { PartyState } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer, type IndexedBitmap } from '../src/renderer/csbwin/CanvasBlitter';
-import { extractObjectTables } from '../src/renderer/csbwin/ObjectTables';
+import { extractObjectTables } from '../src/data/tables/ObjectTables';
 import { loadFontData } from '../src/renderer/csbwin/TextRenderer';
-import { extractUITables } from '../src/renderer/csbwin/UITables';
-import { extractViewportTables } from '../src/renderer/csbwin/ViewportTables';
+import { extractUITables } from '../src/data/tables/UITables';
+import { extractViewportTables } from '../src/data/tables/ViewportTables';
 import { createUIState, type UIState } from '../src/renderer/ui/UIState';
 import { drawPartyStatus, drawPositionSquare } from '../src/renderer/ui/Character';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../src/renderer/ViewportGraphics';

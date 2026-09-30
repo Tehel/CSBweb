@@ -31,7 +31,7 @@ import type { CreatureRecord, DungeonData } from '../src/data/dungeonTypes';
 import { CheckMonsters } from '../src/engine/CheckMonsters';
 import { DungeonState } from '../src/engine/DungeonState';
 import { buildGameTables } from '../src/engine/GameTables';
-import { monsterHorizontalSize } from '../src/renderer/csbwin/ObjectTables';
+import { monsterHorizontalSize } from '../src/data/tables/MonsterDesc';
 import { check, finish } from './lib/check';
 import { gameTablesOf, newGame, stockGraphics } from './lib/game';
 
