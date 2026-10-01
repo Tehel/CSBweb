@@ -30,7 +30,7 @@ import type { Champion } from '../src/engine/gameTypes';
 import type { SpellParameters } from '../src/engine/magicTypes';
 import { newGame } from './lib/game';
 import { check, finish } from './lib/check';
-import { emptyPossessions } from '../src/engine/gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions } from '../src/engine/gameTypes';
 
 /** Rune 0x69 alone: class 3, missile type 5, skill 1, `byte5` 16 in the Atari table. */
 const SPELL_RUNE = 0x69;
@@ -64,7 +64,9 @@ async function main(): Promise<void> {
   graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
 
   const printed: string[] = [];
+  const portraits: number[] = [];
   const game = newGame(data, graphics, {
+    drawCharacterState: (chIdx, charFlags) => { if ((charFlags & CHARFLAG_PORTRAIT_CHANGED) !== 0) portraits.push(chIdx); },
     messages: {
       printLinefeed: () => {},
       quePrintLines: (_color, text) => { printed.push(text); },
@@ -107,6 +109,12 @@ async function main(): Promise<void> {
   const plain = cast({});
   const hardSkill = cast({ skillRequired: 60 });
   const seeThru = cast({ missileType: 2 });
+  // Ya Ir, the party shield: `MarkAllPortraitsChanged` (`doc/CSBwin-src/Magic.cpp:1329`).
+  game.ctx.party.state.partyShield = 0;
+  portraits.length = 0;
+  const partyShield = cast({ missileType: 4 });
+  const partyShieldUp = game.ctx.party.state.partyShield;
+  const partyShieldPortraits = portraits.join(',');
   const deadAbort = cast({ action: 3 }, (c) => { c.attributes.health = 0; });
   const silentAbort = cast({ action: 1 });
   const unknownAction = cast({ action: 8 });
@@ -149,6 +157,8 @@ async function main(): Promise<void> {
   row('unfiltered', plain);
   row('skillRequired 60', hardSkill);
   row('missileType 2', seeThru);
+  row('missileType 4', partyShield);
+  console.log(`${''.padEnd(28)} d.PartyShield ${partyShieldUp}  portraits changed [${partyShieldPortraits}]`);
   row('action 3, dead caster', deadAbort);
   row('action 1', silentAbort);
   row('action 8', unknownAction);
@@ -169,6 +179,8 @@ async function main(): Promise<void> {
     `a filter's skillRequired should enter only the experience's middle term (+${hardSkill.experience} vs +${plain.experience})`);
   check(seeThru.result === 1 && seeThru.seeThruWalls === 1,
     "a filter's missileType 2 should make the class-3 spell see-through-walls");
+  check(partyShield.result === 1 && partyShieldUp > 0 && partyShieldPortraits === '0',
+    "the party shield draws every champion's box afresh (Magic.cpp:1329)");
   check(deadAbort.result === 0 && deadAbort.printed === 'THE SPELL FIZZLES.',
     `a filter's abort should print for a dead caster, as CSBWin checks the action first (${JSON.stringify(deadAbort.printed)})`);
   check(silentAbort.result === 0 && silentAbort.printed === '', 'action 1 should abort silently');

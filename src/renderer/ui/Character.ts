@@ -9,7 +9,7 @@
 import { ImageFormat } from '../../core/imageDecoder';
 import { OBJECT_ID_NULL, ObjectID } from '../../core/types';
 import { PORTRAIT_HEIGHT, PORTRAIT_WIDTH } from '../../data/CsbwinCharacters';
-import { getChampionPossession, Champion } from '../../engine/gameTypes';
+import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, Champion } from '../../engine/gameTypes';
 import { AttributeIndex, attributeCurrent, attributeMaximum } from '../../engine/attributes';
 import { VIEWPORT_X, VIEWPORT_Y } from '../ViewportGraphics';
 import { IndexedBitmap, PaletteIndexViewportBuffer, fillRectIndex, tag0088b2Index } from '../csbwin/CanvasBlitter';
@@ -423,7 +423,7 @@ export function drawPartyStatus(ui: UIState): void {
  * death (`KillCharacter` blits graphic 8 over the box), and opening or closing the
  * inventory, whose `CHARFLAG_portraitChanged` fills the box afresh. Those two are why a
  * readout drawn in the other mode, or on a dead champion, is dropped here. CSBWin's other
- * redraws of the name or the box before the `TT_12` are not modelled (`DEBT.md` C92).
+ * redraws of the name or the box are `drawCharacterState`'s.
  */
 function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inventoryOpen: boolean): void {
   const shown = ui.characterDamage[chIdx];
@@ -465,6 +465,24 @@ function drawCharacterDamage(ui: UIState, chIdx: number, champion: Champion, inv
     );
   }
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x, y, 15, 8, String(Math.min(damage, 9999)));
+}
+
+/**
+ * What `DrawCharacterState` (`doc/CSBwin-src/Character.cpp:1229`) draws over the damage
+ * shown, for the flags the engine hands the host. `CHARFLAG_portraitChanged` fills the
+ * whole box, x `69*chIdx` to +66 by y 0 to 28, and draws the portrait or the name back
+ * (`:1255-1307`). `CHARFLAG_cursor` fills the name's rectangle, x to +42 by y 0 to 6,
+ * when the champion's inventory is closed (`:1343-1355`); the five columns of graphic 15
+ * to its right are colour 10, which the blit leaves out. With the inventory open the
+ * name goes into the viewport (`:1322-1339`) and the figure over the portrait stays.
+ * Everything else those flags draw, the screen draws on every frame.
+ */
+export function drawCharacterState(ui: UIState, chIdx: number, charFlags: number): void {
+  const inventoryOpen = ui.partyState.selectedCharacterIndex === chIdx;
+  if ((charFlags & CHARFLAG_PORTRAIT_CHANGED) !== 0
+    || ((charFlags & CHARFLAG_CURSOR) !== 0 && !inventoryOpen)) {
+    ui.characterDamage[chIdx] = null;
+  }
 }
 
 export function drawShieldDots(ui: UIState, baseX: number, champion: Champion): void {

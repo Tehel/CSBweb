@@ -18,6 +18,7 @@ import { AttributeIndex, championAttribute } from './attributes';
 import type { DungeonState } from './DungeonState';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion, type PartyState } from './gameTypes';
+import { markAllPortraitsChanged } from './Party';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { setClockTick, waitForButtonFlash } from './LoopState';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
@@ -315,6 +316,7 @@ export class MagicSystem {
               shieldAdd = Math.trunc(shieldAdd / 4);
             }
             this.ctx.party.state.partyShield = this.ctx.party.state.partyShield + shieldAdd;
+            markAllPortraitsChanged(this.ctx.party.state, this.ctx.host);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_74, duration, shieldAdd);
             break;

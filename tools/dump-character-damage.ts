@@ -12,7 +12,10 @@
  *
  *   1. The engine: pending damage and wounds, the HP, the `TT_12`, the host's two calls,
  *      a kill, the recruit in a mirror, and the order inside `Game`'s tick.
- *   2. The screen: `drawPartyStatus` with the real graphics and font — what the readout
+ *   2. The redraws that go over the figure before its `TT_12`: `DrawCharacterState` with
+ *      `CHARFLAG_cursor` (`SetHandOwner`) or `CHARFLAG_portraitChanged` (a shield starting
+ *      or ending), each of which the engine hands the host.
+ *   3. The screen: `drawPartyStatus` with the real graphics and font — what the readout
  *      covers in each mode, and when it is dropped.
  *
  * Run: `npx tsx tools/dump-character-damage.ts`
@@ -20,18 +23,20 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { PotionType } from '../src/core/constants';
 import { Direction, Position } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
-import { Party } from '../src/engine/Party';
+import { applyFeedParameters, clearFeedParameters, derivePotionFeeding } from '../src/engine/Feeding';
+import { Party, setHandOwner } from '../src/engine/Party';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { addCharacterDefaults, assignPresetHeroPossessions, createChampionFromPreset } from '../src/engine/AddCharacter';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { CHARFLAG_CURSOR, CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { createPaletteIndexViewportBuffer } from '../src/renderer/csbwin/CanvasBlitter';
 import { getCachedGraphicBitmap } from '../src/renderer/ViewportGraphics';
-import { drawPartyStatus } from '../src/renderer/ui/Character';
+import { drawCharacterState, drawPartyStatus } from '../src/renderer/ui/Character';
 import { type UIState } from '../src/renderer/ui/UIState';
 import { graphicsTablesOf, newGame, processTimersAt } from './lib/game';
 import { newUIState } from './lib/ui';
@@ -59,11 +64,25 @@ if (!data) throw new Error('dungeon.dat did not load');
 const graphics = new GraphicsLoader();
 graphics.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-atari/graphics.dat'))));
 
-/** A game of `count` champions, with the host's two damage calls written to `calls`. */
-function makeGame(count: number, calls: string[]): Game {
+/** `DrawCharacterState`'s flags, by CSBWin's names. */
+function flagNames(charFlags: number): string {
+  const names: string[] = [];
+  if ((charFlags & CHARFLAG_CURSOR) !== 0) names.push('cursor');
+  if ((charFlags & CHARFLAG_PORTRAIT_CHANGED) !== 0) names.push('portraitChanged');
+  const rest = charFlags & ~(CHARFLAG_CURSOR | CHARFLAG_PORTRAIT_CHANGED);
+  if (rest !== 0) names.push(`0x${rest.toString(16)}`);
+  return names.join('|');
+}
+
+/**
+ * A game of `count` champions, with the host's two damage calls written to `calls` and
+ * its `drawCharacterState` calls to `draws`.
+ */
+function makeGame(count: number, calls: string[], draws: string[] = []): Game {
   const game = newGame(data!, graphics, {
     displayCharacterDamage: (chIdx, damage) => calls.push(`display ${chIdx} ${damage}`),
     tag011366: (chIdx) => calls.push(`tag011366 ${chIdx}`),
+    drawCharacterState: (chIdx, charFlags) => draws.push(`${chIdx} ${flagNames(charFlags)}`),
   });
   game.setRandomSeed(0x12345678);
   for (let i = 0; i < count; i++) game.systems.hallOfChampions.addChampion(champion(i));
@@ -188,7 +207,90 @@ console.log("=== Game's tick ===");
   check(calls.join(';') === 'display 0 9', 'and the same tick shows it');
 }
 
-/* ------------------------------------------------------------- 2. the screen ---- */
+/* ------------------------------------- 2. the redraws that go over the figure ---- */
+console.log('');
+console.log('=== DrawCharacterState: the name and the box drawn again ===');
+{
+  const draws: string[] = [];
+  const g = makeGame(3, [], draws);
+  const party = g.ctx.party.state;
+  const host = g.ctx.host;
+  console.log(`the first champion joining: [${draws.join('; ')}]`);
+  check(draws.join(';') === '0 cursor', "AddCharacter's SetHandOwner(0) draws the new owner's name (CSBCode.cpp:8422-8423)");
+
+  draws.length = 0;
+  setHandOwner(party, 1, host);
+  console.log(`SetHandOwner(1) from 0: [${draws.join('; ')}]`);
+  check(draws.join(';') === '0 cursor;1 cursor',
+    'SetHandOwner draws the old owner\'s name, then the new one\'s (CSBCode.cpp:8401-8407, :8422-8423)');
+
+  draws.length = 0;
+  setHandOwner(party, 1, host);
+  check(draws.length === 0, 'and nothing when the owner does not change (:8395)');
+
+  party.potentialChampionIndex = 2;
+  setHandOwner(party, 2, host);
+  console.log(`SetHandOwner(2), the recruit in a mirror: [${draws.join('; ')}], owner ${party.cursorOwner}`);
+  check(draws.join(';') === '1 cursor' && party.cursorOwner === 2,
+    'the recruit takes the cursor and is not drawn (:8421)');
+  party.potentialChampionIndex = -1;
+
+  draws.length = 0;
+  setHandOwner(party, -1, host);
+  check(draws.join(';') === '2 cursor' && party.cursorOwner === -1, 'SetHandOwner(-1) draws the old owner only (:8409-8413)');
+  setHandOwner(party, 0, host);
+
+  // The spell and fire shields: `MagicShield` starts one, its `TT_77` / `TT_78` ends it.
+  const all = '0 portraitChanged;1 portraitChanged;2 portraitChanged';
+  g.ctx.state.tickCount = 200;
+  for (const [isSpellShield, name, timer] of [[true, 'spell', 'TT_77'], [false, 'fire', 'TT_78']] as const) {
+    draws.length = 0;
+    g.systems.attack.applyMagicShield(party.champions[0]!, isSpellShield, 320, 0);
+    const up = isSpellShield ? party.spellShield : party.fireShield;
+    console.log(`MagicShield, ${name}: shield ${up}, [${draws.join('; ')}]`);
+    check(up === 10 && draws.join(';') === all, `a ${name} shield starting is MarkAllPortraitsChanged (Attack.cpp:1237)`);
+    draws.length = 0;
+    processTimersAt(g, 200 + 320);
+    const down = isSpellShield ? party.spellShield : party.fireShield;
+    console.log(`its ${timer}: shield ${down}, [${draws.join('; ')}]`);
+    check(down === 0 && draws.join(';') === all, `and its ${timer} too (CSBCode.cpp:6565-6571)`);
+    g.ctx.state.tickCount = 200;
+  }
+
+  // The party shield's end. Its start is `CastSpell`'s: `tools/dump-cast-spell.ts`.
+  party.partyShield = 12;
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_74, 50, 12);
+  draws.length = 0;
+  processTimersAt(g, 250);
+  console.log(`a party shield's TT_74: shield ${party.partyShield}, [${draws.join('; ')}]`);
+  check(party.partyShield === 0 && draws.join(';') === all, "a party shield's TT_74 is MarkAllPortraitsChanged (CSBCode.cpp:6550-6553)");
+
+  // A Ya potion: the drinker's own shield, and the `TT_72` that takes it back.
+  g.ctx.state.tickCount = 300;
+  const drinker = party.champions[1]!;
+  const fp = clearFeedParameters();
+  fp.characterIndex = 1;
+  derivePotionFeeding(fp, drinker, PotionType.YA_POTION, 100);
+  draws.length = 0;
+  applyFeedParameters(g.ctx, 1, fp);
+  console.log(`a Ya potion: shieldStrength ${drinker.shieldStrength} for ${fp.shieldDuration} ticks, [${draws.join('; ')}]`);
+  check(drinker.shieldStrength === fp.shieldStrengthAdjust && fp.shieldStrengthAdjust > 0 && draws.join(';') === '1 portraitChanged',
+    "a Ya potion draws the drinker's box afresh, and no other (Character.cpp:4393, :4492)");
+  draws.length = 0;
+  processTimersAt(g, 300 + fp.shieldDuration);
+  console.log(`its TT_72: shieldStrength ${drinker.shieldStrength}, [${draws.join('; ')}]`);
+  check(drinker.shieldStrength === 0 && draws.join(';') === '1 portraitChanged', 'and so does its TT_72 (CSBCode.cpp:6545-6547)');
+
+  // A potion with no shield in it draws nothing over the box.
+  const vi = clearFeedParameters();
+  vi.characterIndex = 1;
+  derivePotionFeeding(vi, drinker, PotionType.VI_POTION, 100);
+  draws.length = 0;
+  applyFeedParameters(g.ctx, 1, vi);
+  check(draws.length === 0, 'a Vi potion does not');
+}
+
+/* ------------------------------------------------------------- 3. the screen ---- */
 console.log('');
 console.log('=== drawPartyStatus ===');
 {
@@ -203,7 +305,10 @@ console.log('=== drawPartyStatus ===');
     })));
   }
   const cache = new Map();
-  const ui: UIState = newUIState(graphics, newGame(data!, graphics).ctx, {
+  // The host's `drawCharacterState` is the screen's, as `main.ts` wires it.
+  const ui: UIState = newUIState(graphics, newGame(data!, graphics, {
+    drawCharacterState: (chIdx, charFlags) => drawCharacterState(ui, chIdx, charFlags),
+  }).ctx, {
     getGraphicBitmap: (n, format) => getCachedGraphicBitmap(graphics, cache, n, format),
   });
   ui.partyState = party.state;
@@ -272,6 +377,46 @@ console.log('=== drawPartyStatus ===');
   const deadPlain = render();
   ui.characterDamage[1] = { damage: 3, inventoryOpen: false };
   check(diff(deadPlain, render()).x2 < 0 && ui.characterDamage[1] === null, 'a dead champion shows no figure');
+  dead.attributes.health = 50;
+
+  // `DrawCharacterState` with `CHARFLAG_cursor` fills the name's rectangle, x to +42, of
+  // a champion whose inventory is closed. Canary: graphic 15 has nothing to its right.
+  let opaque = 0;
+  for (let y = 0; y < g15.height; y++) for (let x = 43; x < g15.width; x++) if (g15.pixels[y * g15.width + x] !== 10) opaque++;
+  check(opaque === 0, "graphic 15's columns 43 to 47 are colour 10, so the name's rectangle covers all of it");
+
+  const shown = (): string => ui.characterDamage.map((d) => (d ? String(d.damage) : '-')).join(' ');
+  const figures = (inventoryOpen: boolean): void => {
+    ui.characterDamage[0] = { damage: 5, inventoryOpen: false };
+    ui.characterDamage[1] = { damage: 6, inventoryOpen };
+  };
+
+  // The hand changing owner, through the host: both names are drawn again.
+  setHandOwner(party.state, 0, ui.ctx.host);
+  figures(false);
+  setHandOwner(party.state, 1, ui.ctx.host);
+  console.log(`figures on 0 and 1, the hand passing from 0 to 1: shown [${shown()}]`);
+  check(shown() === '- - - -', "SetHandOwner's two redraws take the figure off the old owner's name and the new one's");
+  const noFigure = render();
+  figures(false);
+  setHandOwner(party.state, 1, ui.ctx.host);
+  check(shown() === '5 6 - -' && diff(noFigure, render()).fifteen > 0, 'a click on the owner already holding it redraws nothing');
+
+  // With champion 1's inventory open their name goes into the viewport: the figure over
+  // the portrait stays, and the other champion's goes.
+  party.state.selectedCharacterIndex = 1;
+  figures(true);
+  setHandOwner(party.state, 0, ui.ctx.host);
+  console.log(`champion 1's inventory open, the hand passing from 1 to 0: shown [${shown()}]`);
+  check(shown() === '- 6 - -', "CHARFLAG_cursor leaves the figure over an open inventory's portrait (Character.cpp:1322-1339)");
+
+  // `CHARFLAG_portraitChanged` fills the whole box, in either mode.
+  figures(true);
+  drawCharacterState(ui, 0, CHARFLAG_PORTRAIT_CHANGED);
+  drawCharacterState(ui, 1, CHARFLAG_PORTRAIT_CHANGED);
+  console.log(`CHARFLAG_portraitChanged on both: shown [${shown()}]`);
+  check(shown() === '- - - -', 'CHARFLAG_portraitChanged takes the figure off the name and off the portrait (Character.cpp:1255-1297)');
+  party.state.selectedCharacterIndex = -1;
 }
 
 finish();

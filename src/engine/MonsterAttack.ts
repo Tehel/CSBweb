@@ -699,11 +699,11 @@ export class MonsterAttack {
     if (living < 0) {
       // Nobody left. The tick ends the game once its timers have run (`Game.gameTick`).
       party.gameIsLost = true;
-      setHandOwner(party, -1);
+      setHandOwner(party, -1, this.ctx.host);
     } else {
       // Both indices are list slots, as `d.HandChar` and `d.MagicCaster` are in CSBWin,
       // and both get the *same* champion.
-      if (chIdx === (party.cursorOwner ?? -1)) setHandOwner(party, living);
+      if (chIdx === (party.cursorOwner ?? -1)) setHandOwner(party, living, this.ctx.host);
       if (chIdx === (party.magicCasterIndex ?? -1)) selectMagicCaster(party, living);
     }
 

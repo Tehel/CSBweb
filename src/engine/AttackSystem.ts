@@ -33,7 +33,7 @@ import { div, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
-import { getPartyChampion } from './Party';
+import { getPartyChampion, markAllPortraitsChanged } from './Party';
 import { MonsterDamageResult } from './MonsterDamage';
 import { TimerFunction } from './TimerQueue';
 import type { PartyAttackFilter } from './DsaSystem';
@@ -816,6 +816,7 @@ export class AttackSystem {
       party.fireShield = party.fireShield + add;
       this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
     }
+    markAllPortraitsChanged(party, this.ctx.host);
     return raised;
   }
 
@@ -977,7 +978,7 @@ export class AttackSystem {
     party.partyShield = 100;
     party.spellShield = 100;
     party.fireShield = 100;
-    // `MarkAllPortraitsChanged()`: the screen draws every portrait on every frame.
+    markAllPortraitsChanged(party, this.ctx.host);
     yield* mainLoop.processTimersViewportAndSound();
     const w4 = sw(party.position.x + DELTA_X[party.facing & 3]!);
     const w6 = sw(party.position.y + DELTA_Y[party.facing & 3]!);

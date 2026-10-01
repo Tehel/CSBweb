@@ -118,7 +118,7 @@ export function applyRuntimeSaveState(ctx: GameContext, save: RuntimeSaveState):
     // `d.HandChar = b.gb2.handChar` (doc/CSBwin-src/SaveGame.cpp:1636): the cursor
     // owner is part of the saved state. `setState` carries it, and this repairs the
     // states written before it was ever set.
-    ensureHandOwner(ctx.party.state);
+    ensureHandOwner(ctx.party.state, ctx.host);
 
     // `scrollingText.ResetTime(b.gb2.Time); d.Time = b.gb2.Time;`
     // (doc/CSBwin-src/SaveGame.cpp:1623-1624): CSBWin saves no message state, and the

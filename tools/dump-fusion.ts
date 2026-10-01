@@ -41,7 +41,7 @@ import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import { CloudType } from '../src/engine/cloudTypes';
 import type { Game } from '../src/engine/Game';
 import { createGameHost } from '../src/engine/GameHost';
-import { emptyPossessions, type Champion } from '../src/engine/gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED, emptyPossessions, type Champion } from '../src/engine/gameTypes';
 import { DELTA_X, DELTA_Y } from '../src/engine/MonsterPerception';
 import { AttackType, MonsterType } from '../src/engine/monsterTypes';
 import { TimerFunction } from '../src/engine/TimerQueue';
@@ -76,6 +76,8 @@ interface Arena {
   credits: boolean[];
   /** `showHideInventory` as the host was asked it: the argument, and the views drawn before. */
   inventory: Array<{ chIdx: number; views: number }>;
+  /** `drawCharacterState` with `CHARFLAG_portraitChanged`: the champion, and the views drawn before. */
+  portraits: Array<{ chIdx: number; views: number }>;
   /** `PrintLines` as the host was asked it, and the VBL it came in. */
   printed: Array<{ color: number; text: string; frame: number }>;
   /** The views drawn so far (`drawViewport`). */
@@ -100,6 +102,9 @@ function arena(withLordChaos: boolean): Arena {
   const hooks = { credits: [] as boolean[], drawn: (): void => {} };
   const game = newGame(data, stockGraphics(), {
     showCredits: (word11694) => hooks.credits.push(word11694),
+    drawCharacterState: (chIdx, charFlags) => {
+      if ((charFlags & CHARFLAG_PORTRAIT_CHANGED) !== 0) a.portraits.push({ chIdx, views: a.views });
+    },
     showHideInventory: (chIdx) => a.inventory.push({ chIdx, views: a.views }),
     messages: {
       ...createGameHost().messages,
@@ -125,7 +130,7 @@ function arena(withLordChaos: boolean): Arena {
   game.loadNewPartyLevel();
   if (withLordChaos) placeMonster(game, MonsterType.mon_LordChaos, CX, CY);
   const a: Arena = {
-    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
+    game, seedAfterCloud: null, credits: hooks.credits, inventory: [], portraits: [], printed: [], views: 0, drawn: hooks.drawn, frames: 0,
   };
   const encounter = game.ctx.systems.missileEncounter;
   const createCloud = encounter.createCloud.bind(encounter);
@@ -343,6 +348,8 @@ function checkBoxedIn(inventoryOpen: boolean, withoutB = false): void {
   const party = game.ctx.party.state;
   check(party.brightness === 200 && party.partyShield === 100 && party.spellShield === 100 && party.fireShield === 100,
     'd.Brightness is 200, and the three shields 100');
+  check(a.portraits.length === 1 && a.portraits[0]!.chIdx === 0 && a.portraits[0]!.views === 0,
+    'MarkAllPortraitsChanged draws the box afresh before the first view (Attack.cpp:2279)');
   check(lordChaos.hp[0]! > 9000 && lordChaos.hp[0]! <= 10000, 'his hit points are 10000, less the first fireball');
   check(!game.systems.attack.isCellFluxcage(CX, CY) && !game.systems.attack.isCellFluxcage(CX, CY + 1),
     'the Fluxcages on his square and the party\'s are gone');

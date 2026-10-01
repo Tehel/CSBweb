@@ -305,6 +305,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // `DisplayCharacterDamage`'s splat and figure, and `TAG011366` drawing over them.
         displayCharacterDamage: (chIdx, damage) => screen?.displayCharacterDamage(chIdx, damage),
         tag011366: (chIdx) => screen?.tag011366(chIdx),
+        drawCharacterState: (chIdx, charFlags) => screen?.drawCharacterState(chIdx, charFlags),
     });
 
     screen = new GameScreen(gameCanvasEl, {

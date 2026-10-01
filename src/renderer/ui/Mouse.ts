@@ -216,12 +216,12 @@ export function handleEyePress(ui: UIState): void {
 
 export function handlePartyBlockClick(ui: UIState, button: number, x: number, y: number): void {
   if (ui.partyState.selectedCharacterIndex === button) {
-    setHandOwner(ui.partyState, button);
+    setHandOwner(ui.partyState, button, ui.ctx.host);
     return;
   }
   const sub = searchButtonList(ui.uiTables.graphic231.buttons.buttons18216, x, y, 2);
   if (sub >= 16 && sub <= 19) {
-    setHandOwner(ui.partyState, sub - 16);
+    setHandOwner(ui.partyState, sub - 16, ui.ctx.host);
     return;
   }
   if (sub >= 20 && sub <= 27) {

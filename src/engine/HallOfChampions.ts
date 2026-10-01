@@ -68,7 +68,7 @@ export class HallOfChampions {
     champion.fingerprint = computeChampionFingerprint(party.state.champions, pos.z, pos.x, pos.y);
     if (!party.addChampion(champion)) return false;
     if (party.state.champions.length === 1) {
-      setHandOwner(party.state, 0);
+      setHandOwner(party.state, 0, this.ctx.host);
     }
     return true;
   }
@@ -124,7 +124,7 @@ export class HallOfChampions {
     // `d.PotentialCharacterOrdinal = LOCAL_2 + 1; d.NumCharacter++;` (`:704-705`).
     party.potentialChampionIndex = index;
     if (party.champions.length === 1) {
-      setHandOwner(party, 0);
+      setHandOwner(party, 0, this.ctx.host);
     }
 
     this.collectMirrorPossessions(index, possessions);
@@ -158,7 +158,7 @@ export class HallOfChampions {
       party.selectedCharacterIndex = -1;
       setClockTick(this.ctx, 1);
       if (party.champions.length === 1) {
-        setHandOwner(party, -1);
+        setHandOwner(party, -1, this.ctx.host);
       }
       party.champions.pop();
       this.ctx.host.tag0207cc(); // `:6657`
@@ -203,7 +203,7 @@ export class HallOfChampions {
 
     // `:6786-6793`
     if (party.champions.length === 1) {
-      setHandOwner(party, 0);
+      setHandOwner(party, 0, this.ctx.host);
       selectMagicCaster(party, 0);
     }
 

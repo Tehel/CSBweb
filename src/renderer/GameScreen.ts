@@ -78,7 +78,7 @@ import {
 } from './ui/SaveMenu';
 import { doMenu, drawMenuPress, menuButtonList, type MenuPress } from './ui/Menu';
 import { drawInventoryBackground, drawInventoryScreen, repackOpenChest, syncOpenChest } from './ui/Inventory';
-import { drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
+import { drawCharacterState, drawHeldObjectName, drawPartyStatus, getChampionPortrait } from './ui/Character';
 import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectIndex } from './ui/Draw';
 
 /**
@@ -373,6 +373,11 @@ export class GameScreen {
   /** `TAG011366`'s redraw — the host's `tag011366`: the damage shown is drawn over. */
   tag011366(chIdx: number): void {
     this.ui.characterDamage[chIdx] = null;
+  }
+
+  /** `DrawCharacterState`'s redraw of the name or the box — the host's `drawCharacterState`. */
+  drawCharacterState(chIdx: number, charFlags: number): void {
+    drawCharacterState(this.ui, chIdx, charFlags);
   }
 
   /** Buttons 147 to 148: `gameFrozen`, the screen's side of it. */

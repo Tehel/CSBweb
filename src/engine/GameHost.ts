@@ -149,6 +149,15 @@ export interface GameHost {
    */
   tag011366(chIdx: number): void;
   /**
+   * `DrawCharacterState(chIdx)` (`doc/CSBwin-src/Character.cpp:1229`) with `charFlags`
+   * just set, for the two redraws the screen's own drawing of every box on every frame
+   * cannot stand in for, because they go over the damage shown: `CHARFLAG_PORTRAIT_CHANGED`
+   * fills the whole box (`:1255-1307`), and `CHARFLAG_CURSOR` the name of a champion
+   * whose inventory is closed (`:1310-1356`). CSBWin draws at once wherever it sets
+   * either, so the engine calls this there and keeps no flag.
+   */
+  drawCharacterState(chIdx: number, charFlags: number): void;
+  /**
    * `die(errorNum, msg)` (`doc/CSBwin-src/CSBCode.cpp:86-112`) in play: a frame threw —
    * the engine throws where CSBWin calls `die` — and the loop has stopped
    * (`Game.gameLoop`). CSBWin shows the message and quits; the page reports it. Left out,
@@ -189,6 +198,7 @@ export function createGameHost(host: Partial<GameHost> = {}): GameHost {
     tag01b29a: host.tag01b29a ?? (() => {}),
     displayCharacterDamage: host.displayCharacterDamage ?? (() => {}),
     tag011366: host.tag011366 ?? (() => {}),
+    drawCharacterState: host.drawCharacterState ?? (() => {}),
     die: host.die ?? ((error) => { throw error; }),
   };
 }

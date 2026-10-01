@@ -101,7 +101,7 @@ async function main(): Promise<void> {
     champ.attributes.maxMana = 20;
     party.addChampion(champ);
   }
-  setHandOwner(party.state, 0);
+  setHandOwner(party.state, 0, game.ctx.host);
   console.log('champions: ' + party.state.champions.map((c, i) => `${i}=${c.name}`).join(' ') + '\n');
 
   const ui: UIState = newUIState(graphics, game.ctx);

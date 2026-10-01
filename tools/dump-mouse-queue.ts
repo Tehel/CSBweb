@@ -462,7 +462,7 @@ async function main(): Promise<void> {
   const soloParty = (): void => {
     reset();
     party.champions = [champion()];
-    setHandOwner(party, 0);
+    setHandOwner(party, 0, game.ctx.host);
     party.magicCasterIndex = 0;
     party.selectedCharacterIndex = -1;
     party.objectInHand = OBJECT_ID_NULL;

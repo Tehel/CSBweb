@@ -206,7 +206,7 @@ function main(): void {
   {
     const g = withParty(3);
     const party = g.ctx.party.state;
-    setHandOwner(party, 1);
+    setHandOwner(party, 1, g.ctx.host);
     selectMagicCaster(party, 1);
     check(party.cursorOwner === 1 && party.magicCasterIndex === 1, 'champion 1 holds both');
 
@@ -221,7 +221,7 @@ function main(): void {
     // Champion 0 dies while champion 2 holds the cursor: nothing should move.
     const g = withParty(3);
     const party = g.ctx.party.state;
-    setHandOwner(party, 2);
+    setHandOwner(party, 2, g.ctx.host);
     selectMagicCaster(party, 2);
     g.systems.monsterAttack.killCharacter(0);
     console.log(['a bystander dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
@@ -232,7 +232,7 @@ function main(): void {
   {
     const g = withParty(1);
     const party = g.ctx.party.state;
-    setHandOwner(party, 0);
+    setHandOwner(party, 0, g.ctx.host);
     selectMagicCaster(party, 0);
     g.systems.monsterAttack.killCharacter(0);
     console.log(['the last champion dies', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
@@ -245,7 +245,7 @@ function main(): void {
     const g = withParty(2);
     const party = g.ctx.party.state;
     party.potentialChampionIndex = 1;
-    setHandOwner(party, 0);
+    setHandOwner(party, 0, g.ctx.host);
     g.systems.monsterAttack.killCharacter(0);
     console.log(['only a mirror champion left', party.cursorOwner, party.magicCasterIndex, String(party.gameIsLost)].join('\t'));
     check(party.gameIsLost, 'a champion still in a mirror does not keep the game alive');

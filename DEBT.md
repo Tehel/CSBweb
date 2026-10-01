@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | C103 | A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
@@ -216,21 +215,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C92 ⏳ The damage figure outlives CSBWin's other redraws of the champion box
-
-`DisplayCharacterDamage` blits the loss into the screen, and it stays until something
-draws over it (`doc/PROVEN_FACTS.md` → "`DamageCharacter` only adds to
-`d.PendingDamage`"). The port redraws every frame from state, so `UIState.characterDamage`
-says the figure is still up, and `drawCharacterDamage` (`src/renderer/ui/Character.ts`)
-draws it. It is dropped at the `TT_12` (`TAG011366`), at death, and when the inventory
-opens or closes on that champion. `DrawCharacterState`'s other redraws before the `TT_12`
-also go over it in CSBWin and do not here: the name, on `CHARFLAG_cursor`, which
-`SetHandOwner` sets on the old and new owner (`doc/CSBwin-src/CSBCode.cpp:8390-8422`); and
-the whole box, on `CHARFLAG_portraitChanged`, which a shield starting or ending sets
-(`MarkAllPortraitsChanged`, `CSBCode.cpp:6545-6570`, `Magic.cpp:1329`). There the port's
-figure stays up to five ticks longer. Paying it means modelling those flags, which the
-port does not (`Champion.charFlags`, `src/engine/gameTypes.ts`).
 
 ### C94 ⏳ Clouds in the cells beside and four rows ahead of the party are not drawn
 

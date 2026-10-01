@@ -774,7 +774,7 @@ export class Game implements MainLoop {
      */
     setPartyState(state: PartyState): void {
         this.ctx.party.setState(state);
-        ensureHandOwner(this.ctx.party.state);
+        ensureHandOwner(this.ctx.party.state, this.ctx.host);
     }
 
     /**

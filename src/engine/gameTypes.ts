@@ -35,6 +35,18 @@ export function emptyPossessions(): ObjectID[] {
 export function getChampionPossession(champion: Champion, slot: number): ObjectID {
     return champion.possessions[slot] ?? OBJECT_ID_NULL;
 }
+
+/**
+ * `CHARFLAG_cursor` (`doc/CSBwin-src/CSB.h:2462`): `DrawCharacterState` draws the
+ * champion's name again, over the box's name rectangle when their inventory is closed
+ * (`doc/CSBwin-src/Character.cpp:1310-1356`).
+ */
+export const CHARFLAG_CURSOR = 0x0080;
+/**
+ * `CHARFLAG_portraitChanged` (`doc/CSBwin-src/CSB.h:2471`): `DrawCharacterState` fills
+ * the champion's whole box and draws it afresh (`doc/CSBwin-src/Character.cpp:1255-1307`).
+ */
+export const CHARFLAG_PORTRAIT_CHANGED = 0x1000;
 import type { DungeonData } from '../data/dungeonTypes';
 
 /**
@@ -111,8 +123,10 @@ export interface Champion {
      * `CHARDESC.charFlags` (`doc/CSBwin-src/CSB.h:2457-2481`). Bit 3 is
      * `CHARFLAG_attackDisable`, the champion's busy state (`CHARFLAG_ATTACK_DISABLE`),
      * and bit 4 `CHARFLAG_male`. 0xff80 are redraw flags CSBWin sets as the game runs
-     * and saves as they stand; this port redraws every frame and does not model them,
-     * so it carries whatever the file or `AddCharacter` gave it.
+     * and saves as they stand; this port redraws every frame and keeps none of them
+     * here, so it carries whatever the file or `AddCharacter` gave it. The two whose
+     * redraw goes over something a frame cannot work out again are handed to the host
+     * instead (`CHARFLAG_CURSOR`, `CHARFLAG_PORTRAIT_CHANGED`).
      */
     charFlags: i16;
     /**

@@ -3,14 +3,14 @@ import type { CsbRandom } from '../core/random';
 import { sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
-import { getChampionPossession, type PartyState } from './gameTypes';
+import { CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
 import { CHARFLAG_ATTACK_DISABLE } from '../data/CsbwinCharacters';
 import {
   RN_DISPELL_MISSILE, RN_FIREBALL, RN_LIGHTNING, RN_MONSTER_DEATH, RN_POISON_CLOUD, RN_FFE4,
   isMagicSpellRn,
 } from '../core/spellRn';
-import { findChampionByFingerprint } from './Party';
+import { findChampionByFingerprint, markAllPortraitsChanged } from './Party';
 import type {
   ActuatorRecord,
   MapData,
@@ -344,17 +344,21 @@ export class TimerSystem {
     const current = party.partyShield;
     const next = current - sw(timer.timerWord6);
     party.partyShield = next < 0 ? 0 : next;
+    markAllPortraitsChanged(party, this.ctx.host);
   }
 
   /**
    * `TT_72` (`doc/CSBwin-src/CSBCode.cpp:6520`) — a champion's own shield expires and
-   * the Ya potion's contribution comes back off.
+   * the Ya potion's contribution comes back off. Their box is drawn afresh
+   * (`CHARFLAG_portraitChanged`, `:6545-6547`).
    */
   private processChampionShieldTimer(timer: TimerEntry): void {
-    const champ = this.ctx.party.state.champions[timer.uByte5 & 0xff];
+    const chIdx = timer.uByte5 & 0xff;
+    const champ = this.ctx.party.state.champions[chIdx];
     if (!champ) return;
     // CSBWin stores the result through `uw()`, so it wraps rather than clamping.
     champ.shieldStrength = (champ.shieldStrength - sw(timer.timerWord6)) & 0xffff;
+    this.ctx.host.drawCharacterState(chIdx, CHARFLAG_PORTRAIT_CHANGED);
   }
 
   /**
@@ -434,6 +438,7 @@ export class TimerSystem {
     const current = party.spellShield;
     const next = current - sw(timer.timerWord6);
     party.spellShield = next < 0 ? 0 : next;
+    markAllPortraitsChanged(party, this.ctx.host);
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
@@ -441,6 +446,7 @@ export class TimerSystem {
     const current = party.fireShield;
     const next = current - sw(timer.timerWord6);
     party.fireShield = next < 0 ? 0 : next;
+    markAllPortraitsChanged(party, this.ctx.host);
   }
 
   private processMagicFootprintsTimer(): void {

@@ -3366,6 +3366,26 @@ five more ticks. `TT_12` runs `TAG011366` (`CSBCode.cpp:6477`, `Timer.cpp:2686`)
 `timerIndex = -1`, return if HP is 0, else `CharacterPortraitToStatusBox` with the
 inventory open or `CHARFLAG_cursor` and `DrawCharacterState` (the name) with it closed.
 
+Two of `DrawCharacterState`'s redraws go over the figure before then
+(`doc/CSBwin-src/Character.cpp:1229`). Wherever CSBWin sets either flag it calls
+`DrawCharacterState` in the same function, so neither is ever left pending:
+
+- `CHARFLAG_portraitChanged` fills the whole box, `x 69*chIdx..+66, y 0..28`, and draws
+  the portrait (inventory open) or the name (closed) back (`:1255-1297`). Set by
+  `MarkAllPortraitsChanged` for every champion (`CSBCode.cpp:6276-6284`), which is called
+  when a spell or fire shield starts (`MagicShield`, `Attack.cpp:1237`), when the party
+  shield does (`Magic.cpp:1329`), when any of the three ends (`TT_74`, `TT_77`, `TT_78`,
+  `CSBCode.cpp:6550-6571`) and in the fusion (`Attack.cpp:2279`); for one champion by a
+  Ya potion (`Character.cpp:4393`, drawn at `:4492`) and its `TT_72` (`CSBCode.cpp:6545-6547`);
+  by `ShowHideInventory` for the champion whose inventory closes and the one whose opens
+  (`:7464`, `:7506-7514`); and by `KillCharacter` (`Character.cpp:2597`).
+- `CHARFLAG_cursor`, with the champion's inventory closed, fills the name's rectangle,
+  `x 69*chIdx..+42, y 0..6`, and prints the name (`:1343-1355`). Graphic 15's columns 43
+  to 47 are colour 10, its mask, so that rectangle covers all of the figure. With the
+  inventory open the name goes into the viewport instead (`:1322-1339`) and the figure
+  over the portrait stays. Set by `SetHandOwner` on the old owner and on the new one,
+  the recruit in a mirror excepted (`CSBCode.cpp:8401-8407`, `:8421-8423`).
+
 Evidence: `tools/dump-character-damage.ts`.
 
 ## A wall bump hurts the two champions on the wall side, and is silent if nobody is hurt
