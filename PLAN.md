@@ -180,14 +180,16 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
   `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
 - **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
-  but it holds the dungeon (blocks 7-14). The check is on what play leaves alone in it,
-  looser than a byte comparison, since a player seldom knows which release a save came
-  from, and stricter than the number and size of the levels. A save of another dungeon
-  is refused, with the dungeon it looks like named when the port knows it ("switch to
-  it", or "not supported yet"): that takes a catalogue of known dungeons, which may list
-  dungeons the port cannot play. What the check reads is to be settled against the
-  committed saves, early and late ones, with a tool that shows each matching its own
-  dungeon and no other.
+  but it holds the dungeon (blocks 7-14). A dungeon's signature is a digest of its walls:
+  for each level its width and height, and one bit per cell, stone or anything else.
+  Nothing finer: a teleporter a release moved, or a cell whose type play changed, leaves
+  the signature alone, and a player seldom knows which release a save came from. The
+  digest is SHA-256, the one a browser and Node both have built in. A save of another
+  dungeon is refused, with the dungeon it looks like named when the port knows it
+  ("switch to it", or "not supported yet"): that takes a catalogue of known dungeons'
+  signatures, which may list dungeons the port cannot play. The evidence is a tool that
+  shows each committed save, early and late ones, matching its own dungeon and no
+  other.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
   open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The page
   counts it and the row carries it: a load takes the row's, a save writes the count. An
@@ -205,8 +207,8 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
-  another. Both are the player's, not debug features, and what they did is told to the
-  player.
+  another. Both are the player's, not debug features, and what they did is printed in
+  the message area.
 - **SAVE writes over the selected save**, or makes a new one from the list's "new save"
   row. **LOAD takes any save.** Either asks first when the save is of another
   playthrough than the running game's; the order of two saves of one playthrough is
@@ -242,8 +244,8 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
    JSON. The author's `.dmweb.json` files on disk are converted by hand, outside the
    engine.
 3. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
-   two confirmations, the last save used, the play time, and F5 and F9 reported to the
-   player.
+   two confirmations, the last save used, the play time, and F5 and F9 reported in the
+   message area.
 4. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
 5. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
 6. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
