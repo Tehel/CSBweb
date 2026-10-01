@@ -233,6 +233,18 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
     running game always has a playthrough, and its saves carry it; the row and the file
     that held 0 keep it. CSBWin takes the file's id as it is (`SaveGame.cpp:1610`), as
     the port does for any other id.
+- **No two playthroughs of a store are to share an id** (step 2g). CSBWin's draw is the
+  product of two 16-bit words from consecutive draws of one stream, and two games draw
+  the same id about once in 16 million pairs (measured once, over 4 million draws of
+  `drawRandomGameID`): 8 chances in 100,000 for a store of fifty playthroughs. Across
+  data sets nothing follows, since every comparison is a data set's. Within one, the
+  two share F5's slot, so one's quick-save is written over the other's; F9 loads
+  whichever of them saved last; neither confirmation is asked between them; and the
+  dialog lists them as one. The author's decision: whenever the port draws an id, a new
+  game's or one for a file that holds none, it draws again while a row of the data set
+  holds that id. CSBWin's formula stays. What is left is an imported file whose own id
+  is a local playthrough's, which nothing tells from a save of that playthrough, since
+  a party changes within one.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. The slot is the playthrough's newest quick-save in the data set
@@ -295,6 +307,12 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    - d. ⏳ **The two confirmations.**
    - e. ⏳ **The last save used.**
    - f. ⏳ **The play time.**
+   - g. ⏳ **A drawn id is no stored row's.** The draw is repeated while a row of the
+     data set holds the id. The engine draws a new game's with no store at hand
+     (`newGameBlock1`, `src/engine/GameContext.ts`), so `GameSaves` settles it once the
+     new game is read; the draw for a file that holds none is `GameSaves`' own already
+     (the load's, and from step 4 the import's and the upgrade's). Evidence: a store
+     holding the id a pinned stream draws first, and the game taking the next.
 3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
