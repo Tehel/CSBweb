@@ -32,7 +32,9 @@
  *    (`src/engine/GameSaves.ts`), which names the save and runs `SaveGame`'s tail: after
  *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
  *    runs. Run against a store in memory, which two games of two data sets then share:
- *    each lists its own set's saves, and F9 loads the newest of them.
+ *    each lists its own set's saves, and F9 loads the newest of them. And a file that
+ *    names no playthrough, loaded: its game joins the playthrough of a save of its data
+ *    set and party, or draws one.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
  *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
@@ -54,6 +56,7 @@ import {
   abbreviateChampions,
   formatSaveDate,
   formatSaveRow,
+  joinedPlaythrough,
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
@@ -419,6 +422,30 @@ function checkListLogic(): void {
   console.log(`  names: ${first}, ${second}, ${third}`);
   check(first.endsWith(SAVE_FILE_EXTENSION), `a save file ends in ${SAVE_FILE_EXTENSION}`);
   check(first !== second && second !== third, 'two saves in the same second get different names');
+
+  // A save that names no playthrough joins the newest save of its data set and its
+  // party that names one.
+  const party = ['DAROO', 'LEYLA'];
+  const nameless = entry({ name: 'nameless', champions: party });
+  const named = [
+    entry({ name: 'older', playthrough: 7, savedAt: 100, champions: party }),
+    entry({ name: 'newer', playthrough: 9, savedAt: 200, champions: party }),
+    entry({ name: 'nameless too', playthrough: 0, savedAt: 300, champions: party }),
+    entry({ name: 'one champion', playthrough: 11, savedAt: 400, champions: ['DAROO'] }),
+    entry({ name: 'another order', playthrough: 12, savedAt: 500, champions: ['LEYLA', 'DAROO'] }),
+    entry({ name: 'another set', playthrough: 13, savedAt: 600, dataSet: 'csb', champions: party }),
+  ];
+  const joins = (e: SaveEntry, rows: SaveEntry[]): number => joinedPlaythrough(e, rows);
+  console.log('');
+  console.log(`  a save of no playthrough, ${party.join('/')}: joins ${joins(nameless, named)} of ${named.map((e) => e.playthrough).join(', ')}; `
+    + `without the newer ${joins(nameless, named.filter((e) => e.name !== 'newer'))}; with neither ${joins(nameless, named.slice(2))}`);
+  check(joins(nameless, named) === 9 && joins(nameless, [...named].reverse()) === 9,
+    'a save of no playthrough joins the newest save of its party that names one, in whatever order the rows come');
+  check(joins(nameless, named.filter((e) => e.name !== 'newer')) === 7, 'the next newest without it');
+  check(joins(nameless, named.slice(2)) === 0,
+    'and none when the others name none, or are of another party, another order of it, or another data set');
+  check(joins(entry({ champions: ['DAROO'] }), named) === 11 && joins(entry({ dataSet: 'csb', champions: party }), named) === 13,
+    'each of those is joined by a save of its own party and set');
 }
 
 /* ------------------------------------------------------------- 5. the metadata ---- */
@@ -861,7 +888,7 @@ async function checkSaveCall(): Promise<void> {
     // A read through the owner, and what the boot's chooser then learns of it.
     const reader = await stage(false);
     check(reader.saves.consumeSavedGameRead() === 'cancelled', 'no read yet: the chooser was cancelled');
-    reader.saves.read(await menu.saves.file(first.id));
+    reader.saves.read(await menu.saves.open(first));
     const afterRead = reader.saves.consumeSavedGameRead();
     reader.saves.readFailed();
     const afterFailure = reader.saves.consumeSavedGameRead();
@@ -961,6 +988,65 @@ async function checkSaveCall(): Promise<void> {
     console.log(`  F9 in dm-windows: ${toldSince(beforeNone)}`);
     check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
       'F9 in a set with no save finds none (SaveGame.cpp:1585), and loads nothing');
+
+    // A file whose RandomGameID is 0, as an earlier build of the port wrote them: its
+    // game is given a playthrough at the load.
+    console.log('');
+    console.log('=== a save that names no playthrough ===');
+    const kept = memoryStore();
+    const idOf = (of: { game: Game }): number => of.game.ctx.state.block1.randomGameID;
+    const nameless = async (dataSet = DEFAULT_DATA_SET, name = 'DAROO', quick = false): Promise<SaveEntry> => {
+      const early = await stage(false, dataSet, kept, name);
+      early.game.ctx.state.block1.randomGameID = 0;
+      now += 60_000;
+      return early.saves.save('stopped', quick);
+    };
+    const load = async (row: SaveEntry, dataSet = DEFAULT_DATA_SET) => {
+      const loaded = await stage(false, dataSet, kept, 'WUUF');
+      loaded.saves.read(await loaded.saves.open(row));
+      return loaded;
+    };
+    const old = await nameless();
+    check(old.playthrough === 0, 'a file whose RandomGameID is 0 is a row of playthrough 0');
+
+    const alone = await load(old);
+    const again = await load(old);
+    const plain = await loadGame();
+    applySaveBytes(plain, await kept.read(old.id));
+    console.log(`  loaded with no save to join: ${idOf(alone) !== 0 ? 'a playthrough' : 'NONE'}; loaded again: ${idOf(again) !== 0 && idOf(again) !== idOf(alone) ? 'another' : 'THE SAME'}`);
+    check(plain.ctx.state.block1.randomGameID === 0 && idOf(alone) !== 0, 'with no save to join, the loaded game draws a playthrough, where the file alone gives 0');
+    check(idOf(again) !== 0 && idOf(again) !== idOf(alone), 'and a second load of the file draws another');
+    check(alone.game.ctx.random.getSeed() === plain.ctx.random.getSeed(),
+      'the draw is not the game\'s stream: d.RandomNumber is the file\'s, as after CSBWin\'s load');
+
+    now += 60_000;
+    const carried = await alone.saves.save('stopped', false);
+    const joiner = await load(old);
+    const stillOld = (await kept.list(null)).find((e) => e.id === old.id);
+    console.log(`  the loaded game saved, and the file loaded again: ${idOf(joiner) === idOf(alone) ? 'the saved game\'s playthrough' : 'ANOTHER'}; the old row's: ${stillOld?.playthrough}`);
+    check(carried.playthrough === idOf(alone), 'the loaded game\'s save carries the playthrough it was given');
+    check(idOf(joiner) === idOf(alone), 'and the file loaded again joins it: a save of the same data set and party names it');
+    check(stillOld?.playthrough === 0 && readCsbwinSaveInfo(await kept.read(old.id))?.randomGameID === 0,
+      'the old row and its file keep 0');
+    const named = await load(carried);
+    check(idOf(named) === carried.playthrough, 'a file that names a playthrough gives its own');
+
+    const otherParty = await load(await nameless(DEFAULT_DATA_SET, 'LEYLA'));
+    const csbRow = await nameless(csbSet);
+    const otherSet = await load(csbRow, csbSet);
+    console.log(`  another party's: ${idOf(otherParty) !== 0 && idOf(otherParty) !== idOf(alone) ? 'another playthrough' : 'THE SAME'}; `
+      + `the same party's in ${csbSet.id}: ${idOf(otherSet) !== 0 && idOf(otherSet) !== idOf(alone) ? 'another playthrough' : 'THE SAME'}`);
+    check(idOf(otherParty) !== 0 && idOf(otherParty) !== idOf(alone), 'a file of another party does not join it');
+    check(csbRow.champions.join() === 'DAROO' && idOf(otherSet) !== 0 && idOf(otherSet) !== idOf(alone),
+      'nor does the same party\'s in another data set');
+
+    // F9 goes through the same read.
+    const newest = await nameless(DEFAULT_DATA_SET, 'DAROO', true);
+    const f9Old = await stage(false, DEFAULT_DATA_SET, kept, 'WUUF');
+    await f9Old.saves.quickLoad();
+    console.log(`  F9 onto a newer file of no playthrough: ${reports[reports.length - 1] === `Quick-loaded ${newest.name}` ? 'loaded' : 'NOT LOADED'}, ${idOf(f9Old) === idOf(alone) ? 'the saved game\'s playthrough' : 'ANOTHER'}`);
+    check(reports[reports.length - 1] === `Quick-loaded ${newest.name}` && idOf(f9Old) === idOf(alone),
+      'F9 gives a file of no playthrough the one it joins too');
   } finally {
     Date.now = realNow;
   }

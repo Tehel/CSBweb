@@ -32,7 +32,7 @@
  * This port's loop keeps running, so the clock is stopped explicitly, with
  * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
-import type { SaveEntry } from '../../data/saves';
+import type { OpenedSave, SaveEntry } from '../../data/saves';
 import { formatSaveDetail, formatSaveRow } from '../../data/saves';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
@@ -461,7 +461,7 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
     state.busy = false;
     return;
   }
-  restoreChosenSave(ui, await ui.onReadSave(entry.id));
+  restoreChosenSave(ui, await ui.onReadSave(entry));
 }
 
 /**
@@ -474,14 +474,14 @@ async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
  * closes, and `onRestoreFailed` hands the failure to its caller
  * (`src/renderer/intro/BootSequence.ts`).
  */
-export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
+export function restoreChosenSave(ui: UIState, save: OpenedSave): void {
   const state = ui.saveMenu;
   if (!state) return;
   if (state.mode === 'full') {
-    ui.onRestoreSave(bytes);
+    ui.onRestoreSave(save);
   } else {
     try {
-      ui.onRestoreSave(bytes);
+      ui.onRestoreSave(save);
     } catch (error) {
       ui.onRestoreFailed(error);
     }

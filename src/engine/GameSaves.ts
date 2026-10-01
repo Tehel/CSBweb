@@ -16,9 +16,14 @@
  * list. Neither raises a dialog, so what either did, or why it did nothing, is a line in
  * the message area, and one for the console with the save's name.
  */
+import { CsbRandom } from '../core/random';
 import type { DataSet } from '../data/DataSets';
-import { SAVE_FILE_EXTENSION, readSaveFileFields, type SaveEntry, type SaveStore } from '../data/saves';
+import {
+    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields,
+    type OpenedSave, type SaveEntry, type SaveStore,
+} from '../data/saves';
 import type { Game } from './Game';
+import { drawRandomGameID } from './GameContext';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
 
@@ -67,6 +72,21 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
     return name;
 }
 
+/**
+ * A playthrough for a game loaded from a file that names none: drawn as a new game
+ * draws its own (`drawRandomGameID`), and never 0, which names none. The stream is
+ * this draw's own. The game's is the file's by then (`gb2.ranseed`), so it would give
+ * every load of one file the same id, and a load would leave it two draws further on
+ * than CSBWin's does.
+ */
+function drawPlaythrough(): number {
+    const random = new CsbRandom();
+    for (;;) {
+        const id = drawRandomGameID(random);
+        if (id !== 0) return id;
+    }
+}
+
 export class GameSaves {
     /** Set by `read` and `readFailed`, read and cleared by `consumeSavedGameRead`. */
     private lastRead: SavedGameRead = 'cancelled';
@@ -100,9 +120,17 @@ export class GameSaves {
         return this.store.list(this.dataSet.id);
     }
 
-    /** A listed save's file. */
-    file(id: string): Promise<Uint8Array> {
-        return this.store.read(id);
+    /**
+     * A listed save out of the store, to be read into the game (`read`). A row that
+     * names no playthrough is looked up among its data set's saves here, while the
+     * store can still be awaited (`joinedPlaythrough`).
+     */
+    async open(entry: SaveEntry): Promise<OpenedSave> {
+        const bytes = await this.store.read(entry.id);
+        const joins = entry.playthrough === 0
+            ? joinedPlaythrough(entry, await this.store.list(entry.dataSet))
+            : 0;
+        return { bytes, joins };
     }
 
     /**
@@ -144,16 +172,23 @@ export class GameSaves {
     }
 
     /**
-     * Restore a save's bytes into the running game, one of the port's saves or a genuine
+     * Restore an opened save into the running game, one of the port's saves or a genuine
      * CSBWin one (`applySaveBytes`). Throws `SaveFileError`, whose message is a line
      * for the menu's status.
+     *
+     * A file whose `RandomGameID` is 0 names no playthrough, so its game is given one
+     * here, which its saves then carry: the one the save joins (`OpenedSave.joins`), or
+     * a new one (`drawPlaythrough`). CSBWin takes the file's id as it is
+     * (`doc/CSBwin-src/SaveGame.cpp:1610`), and so does this for any other id.
      *
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
      * `ReadEntireGame`'s result and shows the door again when it did not
      * (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
      */
-    read(bytes: Uint8Array): void {
-        applySaveBytes(this.game, bytes);
+    read(save: OpenedSave): void {
+        applySaveBytes(this.game, save.bytes);
+        const { block1 } = this.game.ctx.state;
+        if (block1.randomGameID === 0) block1.randomGameID = save.joins || drawPlaythrough();
         this.lastRead = 'loaded';
     }
 
@@ -218,7 +253,7 @@ export class GameSaves {
                 this.log('Quick-load: no saved game found');
                 return;
             }
-            this.read(await this.file(latest.id));
+            this.read(await this.open(latest));
             this.tell('GAME LOADED');
             this.log(`Quick-loaded ${latest.name}`);
         } catch (error) {

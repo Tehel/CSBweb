@@ -149,10 +149,20 @@ function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQ
 }
 
 /**
+ * `d.RandomGameID` as a new game draws it: the product of the low words of two draws
+ * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`).
+ */
+export function drawRandomGameID(random: CsbRandom): number {
+    const d0 = random.next() & 0xffff;
+    const d1 = random.next() & 0xffff;
+    return (d0 * d1) >>> 0;
+}
+
+/**
  * `_ReadEntireGame`'s `d.` for a new game: the four words it sets first
  * (`doc/CSBwin-src/SaveGame.cpp:1467-1470`), `Word22592` then taken from a compressed
  * `dungeon.dat` and staying 13 for a plain one (`:2350-2358`, `DungeonData.word22592`),
- * and `d.RandomGameID`, the product of the low words of two draws (`:1523-1532`).
+ * and `d.RandomGameID` (`drawRandomGameID`).
  *
  * The empty world (`emptyDungeonData`) is what `d.Initialize()` leaves before any read,
  * and `d.Initialize()` draws nothing: it only seeds `d.RandomNumber`
@@ -160,14 +170,8 @@ function newGameTimerQueue(dungeonData: DungeonData, tables: GameTables): TimerQ
  * for the read.
  */
 function newGameBlock1(random: CsbRandom, dungeonData: DungeonData): Block1State {
-    let randomGameID = 0;
-    if (dungeonData.header.numMaps > 0) {
-        const d0 = random.next() & 0xffff;
-        const d1 = random.next() & 0xffff;
-        randomGameID = (d0 * d1) >>> 0;
-    }
     return {
-        randomGameID,
+        randomGameID: dungeonData.header.numMaps > 0 ? drawRandomGameID(random) : 0,
         word22592: dungeonData.word22592 ?? 13,
         word22594: 1,
         word22596: 2,

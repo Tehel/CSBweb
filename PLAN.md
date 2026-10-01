@@ -212,11 +212,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
 - **A file that holds 0 names no playthrough**, and a save of an earlier build holds 0, as
   the author's four `.dmweb.json` files do. The author's decision: a game loaded from
-  such a file is given a playthrough at the load. It joins the one of an existing save
-  that has an id, of the same dungeon (the row's data set) and the same party (the same
-  champions' names, in the same order), the newest when several do; with none, it draws
-  a new id, as a new game does. So a running game always has a playthrough, and its
-  saves carry it. The row and the file that held 0 keep it.
+  such a file is given a playthrough at the load (`GameSaves.read`). It joins the one of
+  an existing save that has an id, of the same dungeon (the row's data set) and the same
+  party (the same champions' names, in the same order), the newest when several do
+  (`joinedPlaythrough`, `src/data/saves/SaveStore.ts`); with none, it draws a new id, as
+  a new game does (`drawRandomGameID`), from a stream of its own, so that `d.RandomNumber`
+  stays the file's, and never 0. So a running game always has a playthrough, and its
+  saves carry it. The row and the file that held 0 keep it. CSBWin takes the file's id
+  as it is (`SaveGame.cpp:1610`), as the port does for any other id.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
@@ -259,7 +262,10 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    IndexedDB. The author's `.dmweb.json` files on disk are converted by hand, outside
    the engine; `tools/peek-dungeon.ts` reads one meanwhile.
 2. ⏳ **The playthrough**, one commit each:
-   - a. ⏳ **A game loaded from a file of playthrough 0 is given one.**
+   - a. ✅ **A game loaded from a file of playthrough 0 is given one**, by the menu's
+     LOAD, the boot's chooser and F9, which all read through `GameSaves.open` and
+     `read`. Evidence: `tools/dump-save-menu.ts`, "the list" (which save is joined) and
+     "a save that names no playthrough" (the loads).
    - b. ⏳ **F5's slot and F9's choice.**
    - c. ⏳ **SAVE over the selection**, or new from the list's "new save" row.
    - d. ⏳ **The two confirmations.**

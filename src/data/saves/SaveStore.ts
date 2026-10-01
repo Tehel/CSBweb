@@ -52,6 +52,33 @@ export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
     return { playthrough: info.randomGameID, level: info.level, champions: info.champions };
 }
 
+/**
+ * A listed save out of the store, to be read into the game: its file, and the
+ * playthrough its game joins when the file names none (`joinedPlaythrough`), 0 for none.
+ */
+export interface OpenedSave {
+    bytes: Uint8Array;
+    joins: number;
+}
+
+/**
+ * The playthrough a save that names none belongs to: that of the newest of `rows` that
+ * names one and is of the same data set and the same party, the same champions' names
+ * in the same order. 0 when no row is.
+ *
+ * A file holds `RandomGameID` 0 when an earlier build of the port wrote it, and a game
+ * loaded from it is given this playthrough, or a new one (`GameSaves.read`).
+ */
+export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
+    const sameParty = (row: SaveEntry): boolean =>
+        row.champions.length === entry.champions.length
+        && row.champions.every((name, i) => name === entry.champions[i]);
+    const found = sortSaveEntries(rows).find(
+        (row) => row.playthrough !== 0 && row.dataSet === entry.dataSet && sameParty(row),
+    );
+    return found ? found.playthrough : 0;
+}
+
 export interface SaveStore {
     /** One data set's rows, or every set's for `null`, newest first. */
     list(dataSet: string | null): Promise<SaveEntry[]>;

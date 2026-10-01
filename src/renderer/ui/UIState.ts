@@ -7,7 +7,7 @@
  * translation of its C++ counterpart instead of another method on a god object.
  */
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
-import type { SaveEntry } from '../../data/saves';
+import type { OpenedSave, SaveEntry } from '../../data/saves';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
@@ -187,16 +187,16 @@ export interface UIState {
   readonly onReincarnated: () => void;
   /** The saves the save/load screen lists, newest first (`GameSaves.list`). */
   readonly onListSaves: () => Promise<SaveEntry[]>;
-  /** A listed save's file (`GameSaves.file`). */
-  readonly onReadSave: (id: string) => Promise<Uint8Array>;
+  /** A listed save out of the store (`GameSaves.open`). */
+  readonly onReadSave: (entry: SaveEntry) => Promise<OpenedSave>;
   /**
    * Build a save and write it to the store; resolves to the row it was written as
    * (`GameSaves.save`, `src/engine/GameSaves.ts`). A hook because serializing the world
    * is the engine's business, not the UI's.
    */
   readonly onSaveGame: () => Promise<SaveEntry>;
-  /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
-  readonly onRestoreSave: (bytes: Uint8Array) => void;
+  /** Restore an opened save into the running game. Throws with a short message on refusal. */
+  readonly onRestoreSave: (save: OpenedSave) => void;
   /**
    * The load-only chooser's `onRestoreSave` threw: `_ReadEntireGame`'s read failed, and
    * its caller goes to `tag01efee` (`src/renderer/intro/BootSequence.ts`).

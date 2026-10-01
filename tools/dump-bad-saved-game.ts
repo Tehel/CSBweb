@@ -67,13 +67,13 @@ function checkChooser(): void {
     const game = freshGame();
     const failures: unknown[] = [];
     const ui = newUIState(graphics, game.ctx, {
-      onRestoreSave: (b) => applySaveBytes(game, b),
+      onRestoreSave: (save) => applySaveBytes(game, save.bytes),
       onRestoreFailed: (error) => { failures.push(error); },
     });
     SaveMenu.openSaveMenu(ui, mode);
     let thrown: string | null = null;
     try {
-      SaveMenu.restoreChosenSave(ui, bytes);
+      SaveMenu.restoreChosenSave(ui, { bytes, joins: 0 });
     } catch (error) {
       thrown = (error as Error).message;
     }

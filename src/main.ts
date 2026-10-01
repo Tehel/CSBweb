@@ -304,9 +304,9 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // buttons; the store, and serializing and restoring the world, are the
         // engine's, so they come back through these. The menu has stopped the clock.
         onListSaves: () => saves.list(),
-        onReadSave: (id) => saves.file(id),
+        onReadSave: (entry) => saves.open(entry),
         onSaveGame: () => saves.save('stopped', false),
-        onRestoreSave: (bytes) => saves.read(bytes),
+        onRestoreSave: (save) => saves.read(save),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {
             console.error('Saved game damaged:', error);
