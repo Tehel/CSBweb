@@ -10,9 +10,6 @@
  *
  * What a file does not hold, a load does not give back: `src/engine/CsbwinSaveGame.ts` →
  * "What is not restored", which `tools/dump-save-roundtrip.ts` holds to its list.
- *
- * A `.dmweb.json`, which earlier builds wrote, wraps such a file in JSON as `raw`.
- * `applySaveBytes` loads that file and ignores the rest.
  */
 import { saveSaveGameState, type Block1, type Block2, type SaveGameState } from '../data/SaveGameLoader';
 import { applyCsbwinSave } from './CsbwinSaveGame';
@@ -25,13 +22,6 @@ import type { Game } from './Game';
 import type { RuntimeSaveState } from './RuntimeSave';
 import type { Champion } from './gameTypes';
 import { OBJECT_ID_NULL } from '../core/types';
-
-export function decodeBase64ToBytes(data: string): Uint8Array {
-    const bin = atob(data);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
-    return out;
-}
 
 export interface SaveFileOptions {
     /**
@@ -328,51 +318,15 @@ function buildCharacterBlock(
 export class SaveFileError extends Error {}
 
 /**
- * Is this a `.dmweb.json`, or a CSBWin file?
- *
- * A `.dmweb.json` is `JSON.stringify` output, so its first non-whitespace byte is `{`.
- * A CSBWin save opens with the Extended Features block, and may open with an enciphered
- * one, which is why this asks the cheap, certain question about the wrapper rather than
- * trying to recognise the file.
- */
-function looksLikeJson(bytes: Uint8Array): boolean {
-    for (let i = 0; i < Math.min(bytes.length, 64); i++) {
-        const byte = bytes[i];
-        if (byte === 0x20 || byte === 0x09 || byte === 0x0a || byte === 0x0d) continue;
-        return byte === 0x7b; // '{'
-    }
-    return false;
-}
-
-/** The CSBWin file a `.dmweb.json` carries as `raw`, in base64. */
-function rawFileOf(bytes: Uint8Array): Uint8Array {
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(new TextDecoder().decode(bytes));
-    } catch {
-        throw new SaveFileError('NOT A DMWEB SAVE');
-    }
-    const raw = (parsed as { raw?: unknown } | null)?.raw;
-    if (typeof raw !== 'string') throw new SaveFileError('SAVE IS MISSING ITS BLOCK DATA');
-    try {
-        return decodeBase64ToBytes(raw);
-    } catch {
-        throw new SaveFileError('SAVE IS MISSING ITS BLOCK DATA');
-    }
-}
-
-/**
- * Restore whatever the store handed back: a CSBWin file, the port's or a genuine one, or
- * the one a `.dmweb.json` carries.
+ * Restore what the store handed back: a CSBWin file, the port's or a genuine one.
  *
  * The two menus and the quick-load all come through here. A failure becomes a
  * `SaveFileError`, because the menu's status line is the only place it can be shown,
  * and it wants a short line rather than a stack.
  */
 export function applySaveBytes(game: Game, bytes: Uint8Array): void {
-    const file = looksLikeJson(bytes) ? rawFileOf(bytes) : bytes;
     try {
-        applyCsbwinSave(game, file);
+        applyCsbwinSave(game, bytes);
     } catch (error) {
         throw new SaveFileError(`CSBWIN SAVE: ${(error as Error).message}`.toUpperCase());
     }

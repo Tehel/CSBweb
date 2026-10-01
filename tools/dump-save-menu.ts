@@ -20,10 +20,9 @@
  *    after the midpoint) and which this port reproduces rather than fixes.
  * 4. **The list logic** — ordering, the date format, what fits in 33 characters, when
  *    LOAD is inert. None of it is on screen until there are saves to list.
- * 5. **The metadata path.** A row's level and roster come from blocks 2 and 4 of the
- *    CSBWin file a save is, the port's or a genuine one, or, for a `.dmweb.json` an
- *    earlier build wrote, from its header, read out of the first 8 KB of the file. Both
- *    are asserted against real files.
+ * 5. **The metadata path.** A row's playthrough, level and roster come from blocks 1, 2
+ *    and 4 of the CSBWin file a save is, the port's or a genuine one. Asserted against
+ *    real files.
  * 6. **Entering and leaving.** The disk menu is bracketed by `TAG02076e` and `TAG0207cc`
  *    (`doc/CSBwin-src/SaveGame.cpp:860`, `:1274`). The first repacks a chest open in the
  *    inventory, which is what puts its objects in the save; the second shows the
@@ -32,7 +31,11 @@
  * 8. **The one save call.** The disk menu's SAVE and F5 both go through `GameSaves.save`
  *    (`src/engine/GameSaves.ts`), which names the save and runs `SaveGame`'s tail: after
  *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
- *    runs. Run against a store in memory.
+ *    runs. Run against a store in memory, which two games of two data sets then share:
+ *    each lists its own set's saves, and F9 loads the newest of them.
+ * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
+ *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
+ *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
  * 7. **The press animation.** `_WaitForMenuSelect` paints its second pass over its first
  *    and restores the screen only after both (`doc/CSBwin-src/Menu.cpp:121-179`). The
  *    save menu redraws the whole screen on every frame of the press, so the pixels of a
@@ -49,16 +52,15 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { readCsbwinSaveInfo } from '../src/data/CsbwinSaveInfo';
 import {
   abbreviateChampions,
-  extractHeaderFromPrefix,
   formatSaveDate,
   formatSaveRow,
-  pickLatestLoadable,
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
   type SaveStore,
 } from '../src/data/saves/SaveStore';
-import { DEFAULT_DATA_SET } from '../src/data/DataSets';
+import { upgradeSaveRecords } from '../src/data/saves/legacyRows';
+import { DEFAULT_DATA_SET, dataSetFor } from '../src/data/DataSets';
 import { Game } from '../src/engine/Game';
 import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import type { LoopScript } from '../src/engine/LoopState';
@@ -345,10 +347,12 @@ function entry(over: Partial<SaveEntry>): SaveEntry {
   return {
     id: 'x',
     name: 'x',
+    dataSet: DEFAULT_DATA_SET.id,
+    playthrough: 0,
+    quick: false,
     savedAt: 0,
     level: 0,
     champions: [],
-    loadable: true,
     ...over,
   };
 }
@@ -396,8 +400,6 @@ function checkListLogic(): void {
       savedAt: Date.UTC(2026, 8, 13, 12),
       level: 2,
       champions: ['HISSSSA', 'GOTHMOG', 'WUUF', 'ELIJA'],
-      loadable: false,
-      note: 'CSBWIN SAVE — NOT READABLE YET',
     }),
   ];
   for (const row of rows) {
@@ -406,37 +408,6 @@ function checkListLogic(): void {
     check(text.length <= SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars, `"${text}" fits in ${SaveMenu.SAVE_MENU_GEOMETRY.textMaxChars} characters`);
   }
   check(formatSaveRow(rows[0]).startsWith('2026-09-13 L14 '), 'a row leads with the date and the level');
-  check(formatSaveRow(rows[2]).startsWith('*'), 'a save that cannot be loaded is marked with a star');
-  check(!formatSaveRow(rows[0]).startsWith('*'), 'a loadable save is not marked');
-
-  /* ---- what F9 picks up ---- */
-
-  // The quick-load takes "the most recent save" to mean the most recent one *anywhere*,
-  // so that F9 does not answer differently depending on which source the menu was last
-  // showing. A store that cannot be listed simply does not take part.
-  const browserEntries = [
-    entry({ name: 'browser-old', savedAt: Date.UTC(2026, 0, 1) }),
-    entry({ name: 'browser-new', savedAt: Date.UTC(2026, 5, 1) }),
-  ];
-  const fileEntries = [
-    entry({ name: 'file-newest', savedAt: Date.UTC(2026, 8, 1) }),
-    // A genuine CSBWin save is the newest thing in the folder and must still be skipped:
-    // picking it would hand the player a refusal instead of a game.
-    entry({ name: 'csbgame.dat', savedAt: Date.UTC(2026, 8, 30), loadable: false }),
-  ];
-  const across = pickLatestLoadable([
-    { source: 'browser', entries: browserEntries },
-    { source: 'file', entries: fileEntries },
-  ]);
-  console.log('');
-  console.log(`  latest across both stores: ${across?.entry.name} (${across?.source})`);
-  check(across?.entry.name === 'file-newest', 'the latest save is found across stores, not within one');
-  check(across?.source === 'file', 'the picker reports which store to read it from');
-
-  const browserOnly = pickLatestLoadable([{ source: 'browser', entries: browserEntries }]);
-  check(browserOnly?.entry.name === 'browser-new', 'with one store, the latest in it wins');
-  check(pickLatestLoadable([]) === null, 'no stores yields null');
-  check(pickLatestLoadable([{ source: 'file', entries: [fileEntries[1]] }]) === null, 'a store holding only unloadable saves yields null');
 
   // The file name has to be unique, because unlike CSBWin this port does not overwrite
   // one of four fixed slots.
@@ -479,13 +450,12 @@ async function loadGame(host?: Partial<GameHost>): Promise<Game> {
 }
 
 /**
- * A real save, built from a real engine, then listed the way a store lists a `.dat`: from
- * blocks 2 and 4. And a `.dmweb.json`, which earlier builds wrote: listed from its header,
- * read out of the first few kilobytes only, and loaded from the file it wraps.
+ * A real save, built from a real engine, then read the way a row is: from blocks 1, 2
+ * and 4 of the file.
  */
 async function checkSaveFile(): Promise<void> {
   console.log('');
-  console.log('=== a real save, and the row a listing reads back ===');
+  console.log('=== a real save, and the row its file gives ===');
 
   const game = await loadGame();
   game.ctx.party.state.position = new Position(7, 11, 9);
@@ -493,60 +463,26 @@ async function checkSaveFile(): Promise<void> {
 
   const bytes = buildSaveFile(game);
   const info = readCsbwinSaveInfo(bytes);
+  const playthrough = game.ctx.state.block1.randomGameID;
   console.log(`  file            : ${bytes.length} bytes`);
-  console.log(`  listed          : ${info ? `level ${info.level}, ${info.champions.join('/')}` : 'NOT A SAVE'}`);
+  // The id is drawn afresh by every new game, so it is compared and not printed.
+  console.log(`  listed          : ${info ? `level ${info.level}, ${info.champions.join('/')}, ${info.randomGameID === playthrough ? 'the game\'s' : 'ANOTHER'} d.RandomGameID` : 'NOT A SAVE'}`);
   check(info?.level === 9, `the file's GAMEBLOCK2 gives the party's level (got ${info?.level})`);
   check(
     info?.champions.join('/') === 'DAROO/LEYLA',
     `and its block 4 the roster (got ${info?.champions.join('/')})`,
   );
+  check(info?.randomGameID === playthrough, 'and its GAMEBLOCK1 the game\'s d.RandomGameID');
 
-  // A `.dmweb.json`: the header first, then the state of the build that wrote it, then
-  // the file as `raw`. 8192 is what `FileSaveStore` slices.
-  const json = new TextEncoder().encode(JSON.stringify({
-    header: { format: 'dmweb-save', version: 14, savedAt: 1, level: 9, champions: ['DAROO', 'LEYLA'] },
-    runtime: { version: 14 },
-    raw: Buffer.from(bytes).toString('base64'),
-  }));
-  const prefix = new TextDecoder().decode(json.subarray(0, 8192));
-  const recovered = extractHeaderFromPrefix(prefix) as { level: number; champions: string[] } | null;
-  console.log(`  a .dmweb.json   : ${json.length} bytes; from its 8 KB prefix: ` +
-    `${recovered ? `level ${recovered.level}, ${recovered.champions.join('/')}` : 'NOT FOUND'}`);
-  check(recovered !== null, 'the header is inside the first 8 KB of the file');
-  check(recovered?.level === 9, 'the level read from the prefix matches the save');
-  check(recovered?.champions.join('/') === 'DAROO/LEYLA', 'the roster read from the prefix matches the save');
-  check(json.length > 8192, 'the save is bigger than the prefix, so the shortcut is doing real work');
-
-  // A brace inside a champion name must not end the scan early.
-  const tricky = extractHeaderFromPrefix('{"header":{"champions":["A}B","C\\"D"],"level":3},"runtime":{') as
-    | { level: number; champions: string[] }
-    | null;
-  check(tricky?.level === 3, 'the header scan is string-aware');
-  check(extractHeaderFromPrefix('{"runtime":{}}') === null, 'a file with no header yields null, not a throw');
-
-  // It loads the file it wraps, whatever else it holds.
-  const fresh = await loadGame();
-  applySaveBytes(fresh, json);
-  const loaded = fresh.ctx.party.state;
-  console.log(`  loaded          : level ${loaded.position.z}, ${loaded.champions.map((c) => c.name).join('/')}`);
-  check(loaded.position.z === 9 && loaded.champions.map((c) => c.name).join('/') === 'DAROO/LEYLA',
-    'a .dmweb.json loads the CSBWin file it carries as raw');
-
-  // And one with no file to load is refused in a line the menu can show.
-  for (const [what, text, expected] of [
-    ['not JSON', '{oops', 'NOT A DMWEB SAVE'],
-    ['no raw', '{"runtime":{"version":1}}', 'SAVE IS MISSING ITS BLOCK DATA'],
-    ['an empty raw', '{"runtime":{"version":1},"raw":""}', 'CSBWIN SAVE:'],
-  ] as const) {
-    let refused = '';
-    try {
-      applySaveBytes(await loadGame(), new TextEncoder().encode(text));
-    } catch (error) {
-      refused = error instanceof Error ? error.message : String(error);
-    }
-    console.log(`  ${what.padEnd(16)}: ${refused}`);
-    check(refused.startsWith(expected), `a .dmweb.json with ${what} is refused: ${expected}`);
+  // What is not a CSBWin file is refused in a line the menu can show.
+  let refused = '';
+  try {
+    applySaveBytes(await loadGame(), new TextEncoder().encode('{"raw":""}'));
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error);
   }
+  console.log(`  not a save      : ${refused}`);
+  check(refused.startsWith('CSBWIN SAVE:'), 'a file that is not a CSBWin save is refused: CSBWIN SAVE: ...');
 }
 
 /** The genuine CSBWin saves in the repository, listed the way the menu would list them. */
@@ -568,14 +504,13 @@ function checkCsbwinListing(): void {
     const info = readCsbwinSaveInfo(new Uint8Array(readFileSync(path)));
     check(info !== null, `${file}: blocks 2 and 4 read`);
     if (!info) continue;
-    const row = formatSaveRow({
+    const row = formatSaveRow(entry({
       id: file,
       name: file,
       savedAt: statSync(path).mtimeMs,
       level: info.level,
       champions: info.champions,
-      loadable: true,
-    });
+    }));
     console.log([file, JSON.stringify(row)].join('\t'));
     check(info.level >= 0 && info.level < 64, `${file}: level ${info.level} is plausible`);
     check(info.champions.length >= 1 && info.champions.length <= 4, `${file}: 1..4 champions`);
@@ -583,12 +518,10 @@ function checkCsbwinListing(): void {
       info.champions.every((n) => n.length > 0 && !n.includes('?')),
       `${file}: every champion name is printable ASCII`,
     );
-    // Unmarked since the object indirect index was ported: these files load.
-    // `tools/dump-csbwin-load.ts` restores each of them into a real `Game`.
-    check(!row.startsWith('*'), `${file}: listed as loadable`);
+    check(info.randomGameID !== 0, `${file}: a playthrough, d.RandomGameID ${info.randomGameID}`);
   }
 
-  // Not a save at all: the listing must drop it rather than show a row of nonsense.
+  // Not a save at all: it has no row, rather than a row of nonsense.
   check(readCsbwinSaveInfo(new Uint8Array(16)) === null, 'a file that is not a save reads back as null');
 }
 
@@ -695,29 +628,24 @@ function memoryStore(
   onList: () => void = () => {},
 ): SaveStore & { files: Map<string, Uint8Array> } {
   const files = new Map<string, Uint8Array>();
-  const entries: SaveEntry[] = [];
+  const entries = new Map<string, SaveEntry>();
   return {
-    kind: 'browser',
     files,
-    isSupported: () => true,
-    isReady: () => true,
-    connect: async () => true,
-    list: async () => {
+    list: async (dataSet) => {
       onList();
-      return sortSaveEntries(entries);
+      return sortSaveEntries([...entries.values()].filter((e) => dataSet === null || e.dataSet === dataSet));
     },
     read: async (id) => {
       const bytes = files.get(id);
       if (!bytes) throw new Error(`no save ${id}`);
       return bytes;
     },
-    write: async (meta, bytes) => {
+    write: async (written, bytes) => {
       onWrite();
       if (fail) throw new Error('the store is full');
-      files.set(meta.name, bytes);
-      entries.push({ id: meta.name, ...meta, loadable: true });
+      files.set(written.id, bytes);
+      entries.set(written.id, written);
     },
-    describe: () => 'MEMORY',
   };
 }
 
@@ -749,13 +677,13 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
 
   // F5's save, to a store in memory instead of the page's.
   const store = memoryStore();
-  const saves = new GameSaves(game, DEFAULT_DATA_SET, {
+  const saves = new GameSaves(game, DEFAULT_DATA_SET, store, {
     portraitOf: () => undefined,
     repackOpenChest: () => Inventory.repackOpenChest(ui),
   }, () => {});
-  const meta = await saves.save(store, 'running');
+  const row = await saves.save('running', true);
   const fresh = await loadGame();
-  applySaveBytes(fresh, await store.read(meta.name));
+  applySaveBytes(fresh, await store.read(row.id));
   const saved = chestContents(fresh, chest);
   console.log(`  quick-saved with the chest open, restored into a fresh game: the chest holds ${saved} of ${packed}`);
   check(saved === packed, 'the quick-save repacks the chest: the restored chest holds its objects');
@@ -844,10 +772,10 @@ function checkPressAnimation(graphics: GraphicsLoader): void {
 /* ------------------------------------------------------ 8. the one save call ---- */
 
 /**
- * `GameSaves.save` as the disk menu calls it (the clock stopped, the menu's own listing)
- * and as F5 does (the clock running, the store listed by the call). The tail is seen
- * through `d.CanRestartFromSavegame`, which a new game has at 0 and `SaveGame`'s tail
- * sets (`doc/CSBwin-src/SaveGame.cpp:1260`).
+ * `GameSaves.save` as the disk menu calls it (the clock stopped) and as F5 does (the
+ * clock running). The tail is seen through `d.CanRestartFromSavegame`, which a new game
+ * has at 0 and `SaveGame`'s tail sets (`doc/CSBwin-src/SaveGame.cpp:1260`). Then one
+ * store under two games of two data sets.
  */
 async function checkSaveCall(): Promise<void> {
   console.log('');
@@ -867,68 +795,78 @@ async function checkSaveCall(): Promise<void> {
     vblInterrupt: () => {},
   };
   const toldSince = (from: number): string => told.slice(from).join('').replace(/\n/g, '/');
-  const stage = async (fail: boolean) => {
+  const stage = async (fail: boolean, dataSet = DEFAULT_DATA_SET, shared?: ReturnType<typeof memoryStore>, name = 'DAROO') => {
     const game = await loadGame({ messages });
-    game.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+    game.systems.hallOfChampions.addChampion(healthyChampion(name));
     let tailAtWrite: boolean | null = null;
-    const store = memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
-    const saves = new GameSaves(game, DEFAULT_DATA_SET, { portraitOf: () => undefined, repackOpenChest: () => {} },
-      (message) => { reports.push(message); });
+    const store = shared ?? memoryStore(() => { tailAtWrite = game.canRestartFromSavegame(); }, fail);
+    const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+      (message: string) => { reports.push(message); });
     return { game, store, saves, tailAtWrite: (): boolean | null => tailAtWrite };
   };
   const attempt = async (save: Promise<unknown>): Promise<string> => save.then(() => 'written', (error: Error) => `refused (${error.message})`);
 
-  // Every save here is made in the same second, so only the rule tells their names apart.
+  // Every save here is made in the same second until the clock is moved, so only the
+  // rule tells their names apart.
   const realNow = Date.now;
-  Date.now = () => Date.UTC(2026, 8, 13, 14, 5, 6);
+  let now = Date.UTC(2026, 8, 13, 14, 5, 6);
+  Date.now = () => now;
   try {
     const menu = await stage(false);
-    const first = await menu.saves.save(menu.store, 'stopped', new Set());
+    const first = await menu.saves.save('stopped', false);
     console.log(`  clock stopped: tail run at the write ${menu.tailAtWrite()}, after it ${menu.game.canRestartFromSavegame()}`);
     check(menu.tailAtWrite() === false && menu.game.canRestartFromSavegame(),
       'the menu\'s save runs its tail once the file is written (SaveGame.cpp:1245-1260)');
-    const second = await menu.saves.save(menu.store, 'stopped', new Set([first.name]));
-    const third = await menu.saves.save(menu.store, 'running');
+    const second = await menu.saves.save('stopped', false);
+    const third = await menu.saves.save('running', true);
     console.log(`  names: ${first.name}, ${second.name}, ${third.name}`);
     check(first.name === makeSaveFileName(Date.now()), 'a save in an empty store takes the plain name');
-    check(second.name === makeSaveFileName(Date.now(), new Set([first.name])), 'the names the menu lists are not taken again');
-    check(third.name === makeSaveFileName(Date.now(), new Set([first.name, second.name])),
-      'without a listing the store is listed, and its names are not taken again');
+    check(second.name === makeSaveFileName(Date.now(), new Set([first.name]))
+      && third.name === makeSaveFileName(Date.now(), new Set([first.name, second.name])),
+      'the store is listed, and its names are not taken again');
     check(menu.store.files.size === 3, 'so three saves in one second are three files');
-    const listed = (await menu.store.list()).find((e) => e.name === first.name);
+    const listed = (await menu.saves.list()).find((e) => e.id === first.id);
     check(listed?.level === first.level && listed?.champions.join() === 'DAROO' && first.savedAt === Date.now(),
       'the row is the file\'s level and party, and the date of the save');
+    const playthrough = menu.game.ctx.state.block1.randomGameID;
+    console.log(`  the row: data set ${first.dataSet}, ${first.playthrough === playthrough ? 'the game\'s' : 'ANOTHER'} playthrough, quick ${first.quick}; F5's: quick ${third.quick}`);
+    check(first.dataSet === DEFAULT_DATA_SET.id, 'the row names the game\'s data set');
+    check([first, second, third].every((e) => e.playthrough === playthrough),
+      'and its playthrough, the game\'s d.RandomGameID, as the file holds it');
+    check(!first.quick && !second.quick && third.quick, 'and whether the save is F5\'s or the menu\'s');
 
     const menuFails = await stage(true);
-    const refused = await attempt(menuFails.saves.save(menuFails.store, 'stopped', new Set()));
+    const refused = await attempt(menuFails.saves.save('stopped', false));
     console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
     check(refused !== 'written' && !menuFails.game.canRestartFromSavegame(),
       'a failed write skips the tail, as SaveError jumps past it (SaveGame.cpp:1264)');
 
     const quick = await stage(false);
-    await quick.saves.save(quick.store, 'running');
+    await quick.saves.save('running', true);
     console.log(`  clock running: tail run at the write ${quick.tailAtWrite()}`);
     check(quick.tailAtWrite() === true, 'F5\'s save runs its tail before the write, on the world the file holds');
 
     const quickFails = await stage(true);
-    const refusedQuick = await attempt(quickFails.saves.save(quickFails.store, 'running'));
+    const refusedQuick = await attempt(quickFails.saves.save('running', true));
     console.log(`  clock running, the write fails: ${refusedQuick}, tail run ${quickFails.game.canRestartFromSavegame()}`);
     check(refusedQuick !== 'written' && quickFails.game.canRestartFromSavegame(), 'and has run it when the write fails');
 
     // F5 lists the store while the game runs on, and the file is made before that.
-    const hurt = await stage(false);
-    const champion = hurt.game.ctx.party.state.champions[0]!;
+    const slowGame = await loadGame({ messages });
+    slowGame.systems.hallOfChampions.addChampion(healthyChampion('DAROO'));
+    const champion = slowGame.ctx.party.state.champions[0]!;
     const atTheKey = champion.attributes.health;
     const slow = memoryStore(() => {}, false, () => { champion.attributes.health = 1; });
-    const late = await hurt.saves.save(slow, 'running');
-    const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.name)).characterBlock!, 0).champion.attributes.health;
+    const slowSaves = new GameSaves(slowGame, DEFAULT_DATA_SET, slow, { portraitOf: () => undefined, repackOpenChest: () => {} }, () => {});
+    const late = await slowSaves.save('running', true);
+    const held = readCsbwinCharacter(loadSaveGameState(await slow.read(late.id)).characterBlock!, 0).champion.attributes.health;
     console.log(`  clock running, a champion hurt while the store is listed: health ${atTheKey} at the key, ${held} in the file`);
     check(held === atTheKey, 'F5\'s file holds the party as it stood at the key, with the dungeon it was saved with');
 
     // A read through the owner, and what the boot's chooser then learns of it.
     const reader = await stage(false);
     check(reader.saves.consumeSavedGameRead() === 'cancelled', 'no read yet: the chooser was cancelled');
-    reader.saves.read(await menu.store.read(first.name));
+    reader.saves.read(await menu.saves.file(first.id));
     const afterRead = reader.saves.consumeSavedGameRead();
     reader.saves.readFailed();
     const afterFailure = reader.saves.consumeSavedGameRead();
@@ -971,16 +909,127 @@ async function checkSaveCall(): Promise<void> {
     check(reports.length === 4 && reports.slice(0, 3).every((report) => report.startsWith('Quick-save refused'))
       && reports[3]!.startsWith('Quick-load refused'), 'each refusal is a line for the console too');
 
-    // F5 with a party, where the page's store cannot be written: Node has no IndexedDB.
-    const unwritable = await stage(false);
+    // F5 with a party, where the store cannot be written.
+    const unwritable = await stage(true);
     const beforeFailure = told.length;
     await unwritable.saves.quickSave();
     console.log(`  F5 where the store cannot be written: ${toldSince(beforeFailure)} (${reports[4]})`);
     check(toldSince(beforeFailure) === '/15:UNABLE TO SAVE GAME!' && reports.length === 5 && reports[4] === 'Quick-save failed',
       'a write that fails is SaveError\'s line (SaveGame.cpp:1266), and its error is reported');
+
+    // One store, two data sets: a game lists, and F9 loads, its own set's saves.
+    console.log('');
+    console.log('=== one store, two data sets ===');
+    const shared = memoryStore();
+    const csbSet = dataSetFor('csb');
+    const dm = await stage(false, DEFAULT_DATA_SET, shared, 'DAROO');
+    const csb = await stage(false, csbSet, shared, 'LEYLA');
+    const dmOld = await dm.saves.save('stopped', false);
+    const csbSame = await csb.saves.save('stopped', false);
+    now += 60_000;
+    const dmNew = await dm.saves.quickSave().then(async () => (await dm.saves.list())[0]!);
+    now += 60_000;
+    const csbNew = await csb.saves.save('stopped', false);
+    const names = (entries: SaveEntry[]): string => entries.map((e) => e.name).join(', ');
+    const dmList = await dm.saves.list();
+    const csbList = await csb.saves.list();
+    console.log(`  ${DEFAULT_DATA_SET.id}: ${names(dmList)}`);
+    console.log(`  ${csbSet.id}: ${names(csbList)}`);
+    console.log(`  every set: ${(await shared.list(null)).length} rows`);
+    check(csbSet.id === 'csb' && dmList.length === 2 && dmList.every((e) => e.dataSet === DEFAULT_DATA_SET.id)
+      && dmList[0]!.id === dmNew.id && dmList[1]!.id === dmOld.id,
+      'a game lists its own data set\'s saves, newest first');
+    check(csbList.length === 2 && csbList.every((e) => e.dataSet === csbSet.id) && csbList[0]!.id === csbNew.id,
+      'and the other set\'s game lists the other set\'s');
+    check((await shared.list(null)).length === 4, 'the store lists every set\'s when asked for none');
+    check(csbSame.name !== dmOld.name && shared.files.size === 4,
+      'a name taken in one set is not taken again in another: a row\'s name is its key');
+    check(dmNew.quick && dm.game.ctx.state.block1.randomGameID !== csb.game.ctx.state.block1.randomGameID
+      && dmNew.playthrough === dm.game.ctx.state.block1.randomGameID && csbNew.playthrough === csb.game.ctx.state.block1.randomGameID,
+      'two new games are two playthroughs, each on its own saves');
+
+    // F9 in the first set's game: its newest save, though the store's newest is the other's.
+    const f9 = await stage(false, DEFAULT_DATA_SET, shared, 'WUUF');
+    const beforeLoad = told.length;
+    const reportsBefore = reports.length;
+    await f9.saves.quickLoad();
+    const loadedParty = f9.game.ctx.party.state.champions.map((c) => c.name).join('/');
+    console.log(`  F9 in ${DEFAULT_DATA_SET.id}: ${toldSince(beforeLoad)}, party ${loadedParty} (${reports.slice(reportsBefore).join(' | ')})`);
+    check(toldSince(beforeLoad) === '/15:GAME LOADED' && loadedParty === 'DAROO'
+      && reports[reports.length - 1] === `Quick-loaded ${dmNew.name}`,
+      'F9 loads the newest save of the game\'s data set, F5\'s here, and says so');
+
+    // And in a set with no save, none is found, whatever the others hold.
+    const empty = await stage(false, dataSetFor('dm-windows'), shared);
+    const beforeNone = told.length;
+    await empty.saves.quickLoad();
+    console.log(`  F9 in dm-windows: ${toldSince(beforeNone)}`);
+    check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
+      'F9 in a set with no save finds none (SaveGame.cpp:1585), and loads nothing');
   } finally {
     Date.now = realNow;
   }
+}
+
+/* ------------------------------------------------------- 9. the store's upgrade ---- */
+
+/**
+ * `upgradeSaveRecords` over version-1 rows: `{ id, name, savedAt, level, champions,
+ * bytes }`, the bytes a CSBWin file or a `.dmweb.json`, which is JSON around such a file
+ * as `raw`, in base64.
+ */
+async function checkUpgrade(): Promise<void> {
+  console.log('');
+  console.log('=== the store\'s upgrade (`upgradeSaveRecords`) ===');
+  const game = await loadGame();
+  game.ctx.party.state.position = new Position(7, 11, 9);
+  game.ctx.party.state.champions = [healthyChampion('DAROO'), healthyChampion('LEYLA')];
+  const file = buildSaveFile(game);
+  const playthrough = game.ctx.state.block1.randomGameID;
+  const buffer = (bytes: Uint8Array): ArrayBuffer => bytes.slice().buffer;
+  const json = (value: unknown): ArrayBuffer => buffer(new TextEncoder().encode(JSON.stringify(value)));
+  const wrapped = {
+    header: { format: 'dmweb-save', version: 14, savedAt: 1, level: 3, champions: ['OLD'] },
+    runtime: { version: 14 },
+    raw: Buffer.from(file).toString('base64'),
+  };
+  // What the row says of the level and the party is not what is kept: the file is read.
+  const v1 = (name: string, savedAt: number, bytes: unknown) => ({ id: name, name, savedAt, level: 3, champions: ['OLD'], bytes });
+  const old = [
+    v1('a.dat', 100, buffer(file)),
+    v1('b.dmweb.json', 200, json(wrapped)),
+    // The same save under both names: one row, the newer.
+    v1('c.dmweb.json', 300, json(wrapped)),
+    v1('c.dat', 250, buffer(file)),
+    // No CSBWin file in them: a JSON save with no `raw`, one whose `raw` is no save, bytes
+    // that are neither, and a row with no bytes.
+    v1('d.dmweb.json', 400, json({ header: wrapped.header, runtime: wrapped.runtime })),
+    v1('e.dmweb.json', 500, json({ raw: 'AAAA' })),
+    v1('f.dat', 600, buffer(new Uint8Array(64))),
+    v1('g.dat', 700, undefined),
+  ];
+  const rows = upgradeSaveRecords(old, DEFAULT_DATA_SET.id);
+  console.log(['id', 'name', 'data set', 'playthrough', 'quick', 'savedAt', 'level', 'champions', 'bytes'].join('\t'));
+  for (const row of rows) {
+    console.log([row.id, row.name, row.dataSet, row.playthrough === playthrough ? 'the file\'s' : 'ANOTHER', row.quick, row.savedAt, row.level, row.champions.join('/'), row.bytes.byteLength].join('\t'));
+  }
+  const sameFile = (bytes: ArrayBuffer): boolean => {
+    const got = new Uint8Array(bytes);
+    return got.length === file.length && got.every((b, i) => b === file[i]);
+  };
+  check(rows.map((r) => r.id).join() === 'a.dat,b.dat,c.dat', `the rows that hold a CSBWin file are kept, each named a .dat (got ${rows.map((r) => r.id).join()})`);
+  check(rows.every((r) => r.id === r.name), 'and keyed by that name');
+  check(rows.every((r) => sameFile(r.bytes)), 'a row\'s bytes are the CSBWin file alone, the JSON\'s `raw` decoded');
+  check(rows.every((r) => r.level === 9 && r.champions.join('/') === 'DAROO/LEYLA' && r.playthrough === playthrough),
+    'the level, the party and the playthrough are read from the file, not kept from the old row');
+  check(rows.every((r) => r.dataSet === DEFAULT_DATA_SET.id && !r.quick), 'every row is the default data set\'s, and none is a quick save');
+  check(rows.map((r) => r.savedAt).join() === '100,200,300', 'the date is the old row\'s, and of two rows that come to one name the newer is kept');
+  for (const row of rows) {
+    const fresh = await loadGame();
+    applySaveBytes(fresh, new Uint8Array(row.bytes));
+    check(fresh.ctx.party.state.position.z === 9 && fresh.ctx.party.state.champions.length === 2, `${row.id} loads`);
+  }
+  check(upgradeSaveRecords([null, 'x', {}], DEFAULT_DATA_SET.id).length === 0, 'what is not a row is dropped, not thrown on');
 }
 
 /* ------------------------------------------------------------------------------- */
@@ -997,6 +1046,7 @@ async function main(): Promise<void> {
   await checkQuickSaveOverOpenChest(graphics);
   checkPressAnimation(graphics);
   await checkSaveCall();
+  await checkUpgrade();
   finish();
 }
 

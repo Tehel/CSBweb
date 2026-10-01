@@ -6,9 +6,8 @@
  * four-slot chooser, which is a `char fNames[4][20]` on the stack shown as a four-button
  * menu (`doc/CSBwin-src/CSBCode.cpp:9744-9816`). Every divergence is listed in
  * `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port". In short: an
- * unbounded scrolling list, a browser/file source toggle, a date and roster per row
- * instead of a filename and a recency letter, no "save and quit", and Esc/right-click to
- * cancel.
+ * unbounded scrolling list of the data set's saves, a date and roster per row instead of
+ * a filename and a recency letter, no "save and quit", and Esc/right-click to cancel.
  *
  * ## The list panel
  *
@@ -29,21 +28,12 @@
  * `_WaitForMenuSelect` nulls `SecondaryButtonList` and both `pKeyXlate`s and replaces
  * `PrimaryButtonList`, so nothing outside the menu can be clicked, and it never returns
  * to the main loop, so `d.Time` stops. Here the click comes **straight from the DOM
- * event** rather than through the game's mouse queue — which is the same exclusivity,
- * and is also what keeps the browser's transient user activation alive for
- * `showDirectoryPicker`. This port's loop keeps running, so the clock is stopped
- * explicitly, with `ctx.state.paused` (`d.Time++` is the main loop's,
- * `doc/CSBwin-src/CSBCode.cpp:660`).
+ * event** rather than through the game's mouse queue, which is the same exclusivity.
+ * This port's loop keeps running, so the clock is stopped explicitly, with
+ * `ctx.state.paused` (`d.Time++` is the main loop's, `doc/CSBwin-src/CSBCode.cpp:660`).
  */
-import type { SaveEntry, SaveStore, SaveStoreKind } from '../../data/saves';
-import {
-  FileSaveStore,
-  formatSaveDetail,
-  formatSaveRow,
-  getSaveSource,
-  saveStore,
-  setSaveSource,
-} from '../../data/saves';
+import type { SaveEntry } from '../../data/saves';
+import { formatSaveDetail, formatSaveRow } from '../../data/saves';
 import { fillRectIndex } from '../csbwin/CanvasBlitter';
 import { drawTextLineIndex } from '../csbwin/TextRenderer';
 import type { UIButton } from '../../data/tables/UITables';
@@ -92,8 +82,6 @@ const BOTTOM_LABEL_Y = 114;
 /** Ids for the parts of the screen CSBWin has no button for. 210..213 stay CSBWin's. */
 const BTN_LOAD = 212;
 const BTN_SAVE = 213;
-const BTN_BROWSER = 900;
-const BTN_FILE = 901;
 const BTN_CANCEL = 902;
 const BTN_ROW0 = 910;
 
@@ -128,23 +116,19 @@ export type SaveMenuMode = 'full' | 'loadOnly';
 
 export interface SaveMenuState {
   mode: SaveMenuMode;
-  source: SaveStoreKind;
+  /** The running data set's saves, newest first (`UIState.onListSaves`). */
   entries: SaveEntry[];
   /** Index into `entries`, or -1. LOAD is inert while it is -1. */
   selected: number;
   scrollTop: number;
   /** An async list/read/write is in flight; every button is inert. */
   busy: boolean;
-  /** The status line: an error, a prompt, or where the current store points. */
+  /** The status line: an error, or what the last action did. */
   message: string;
   press: MenuPress | null;
   /** What the press animation will do when it finishes. */
   pending: 'load' | 'save' | null;
   frameHandle: number | null;
-}
-
-function currentStore(state: SaveMenuState): SaveStore {
-  return saveStore(state.source);
 }
 
 export function isSaveMenuOpen(ui: UIState): boolean {
@@ -165,8 +149,6 @@ export function openSaveMenu(ui: UIState, mode: SaveMenuMode = 'full'): void {
   ui.ctx.state.paused = true;
   ui.saveMenu = {
     mode,
-    // Whichever source was last chosen, here or by a quick-save.
-    source: getSaveSource(),
     entries: [],
     selected: -1,
     scrollTop: 0,
@@ -190,36 +172,17 @@ export function closeSaveMenu(ui: UIState): void {
 
 /* ------------------------------------------------------------------ the list ---- */
 
-/** Re-read the current store. Never throws — the failure becomes the status line. */
+/** List the saves again. Never throws — the failure becomes the status line. */
 export async function refreshSaveMenu(ui: UIState): Promise<void> {
   const state = ui.saveMenu;
   if (!state) return;
-  const store = currentStore(state);
   state.busy = true;
   state.message = '';
   ui.renderLastFrame();
   try {
-    if (!store.isSupported()) {
-      state.entries = [];
-      state.selected = -1;
-      state.message = store.describe();
-      return;
-    }
-    if (!store.isReady()) {
-      // The file store can often come back without a prompt, from the handle it
-      // remembered; if it cannot, the player has to click, and the status line says so.
-      const restored = store instanceof FileSaveStore ? await store.restore() : await store.connect();
-      if (!restored) {
-        state.entries = [];
-        state.selected = -1;
-        state.message = store.describe();
-        return;
-      }
-    }
-    state.entries = await store.list();
+    state.entries = await ui.onListSaves();
     state.selected = state.entries.length > 0 ? 0 : -1;
     state.scrollTop = 0;
-    state.message = store.describe();
   } catch (error) {
     state.entries = [];
     state.selected = -1;
@@ -241,12 +204,11 @@ function selectedEntry(state: SaveMenuState): SaveEntry | null {
 }
 
 function canLoad(state: SaveMenuState): boolean {
-  const entry = selectedEntry(state);
-  return !state.busy && entry !== null && entry.loadable;
+  return !state.busy && selectedEntry(state) !== null;
 }
 
 function canSave(state: SaveMenuState): boolean {
-  return !state.busy && state.mode === 'full' && currentStore(state).isReady();
+  return !state.busy && state.mode === 'full';
 }
 
 function clampScroll(state: SaveMenuState): void {
@@ -283,17 +245,6 @@ function text(ui: UIState, s: string, x: number, y: number, color: number, backg
   drawTextLineIndex(ui.screenIndexBuffer, ui.fontData, x + VIEWPORT_X, y + VIEWPORT_Y, color, background, s);
 }
 
-/** One half of the source toggle: inverted while it is the live one. */
-function drawSourceLabel(ui: UIState, label: string, x: number, active: boolean): void {
-  if (active) {
-    const rect = labelRect(x, HEADER_Y, label.length);
-    fillRectIndex(ui.screenIndexBuffer, rect, MENU_OPTION_COLOR);
-    text(ui, label, x, HEADER_Y, MENU_PANEL_COLOR, MENU_OPTION_COLOR);
-    return;
-  }
-  text(ui, label, x, HEADER_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
-}
-
 /** The clickable rectangle of a text label, in screen coordinates. */
 function labelRect(x: number, y: number, chars: number): { x1: number; y1: number; x2: number; y2: number } {
   return {
@@ -311,11 +262,7 @@ export function drawSaveMenu(ui: UIState): void {
   drawMenuBitmap(ui, false);
   extendListPanel(ui);
 
-  // Header: the source toggle on the left, CANCEL on the right. The chosen source is
-  // inverted rather than merely recoloured — colours 9 and 11 are close enough in this
-  // palette that a player could not tell which one was live.
-  drawSourceLabel(ui, 'BROWSER', TEXT_X, state.source === 'browser');
-  drawSourceLabel(ui, 'FILE', TEXT_X + 8 * 6, state.source === 'file');
+  // Header: CANCEL on the right.
   const cancelX = PANEL_INNER_X2 - 6 * 6;
   text(ui, 'CANCEL', cancelX, HEADER_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
 
@@ -350,16 +297,10 @@ export function drawSaveMenu(ui: UIState): void {
     ? 'WORKING . . .'
     : state.message || formatSaveDetail(selectedEntry(state), TEXT_MAX_CHARS);
   if (status) text(ui, status, TEXT_X, STATUS_Y, MENU_TITLE1_COLOR, MENU_PANEL_COLOR);
-  if (state.entries.length === 0 && !state.busy) {
-    // An empty list has to say so; the status line underneath says *why* when the store
-    // is not usable, and repeating that here would only crowd the panel.
-    const store = currentStore(state);
-    const hint = store.isReady()
-      ? 'NO SAVED GAMES HERE'
-      : store.isSupported()
-        ? 'CLICK FILE TO CHOOSE A FOLDER'
-        : '';
-    if (hint) text(ui, hint, TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
+  if (state.entries.length === 0 && !state.busy && !state.message) {
+    // An empty list has to say so; when the store could not be listed, the status line
+    // says why, and repeating that here would only crowd the panel.
+    text(ui, 'NO SAVED GAMES HERE', TEXT_X, ROW_FIRST_Y, MENU_OPTION_COLOR, MENU_PANEL_COLOR);
   }
 
   // The two real buttons. An unavailable one is left unlabelled, as CSBWin leaves an
@@ -384,8 +325,6 @@ function saveMenuButtons(ui: UIState, state: SaveMenuState): UIButton[] {
     buttons.push({ word0, x1: r.x1, x2: r.x2 + 1, y1: r.y1, y2: r.y2 + 1, button: 2, name });
   };
 
-  push(BTN_BROWSER, labelRect(TEXT_X, HEADER_Y, 7), 'saveMenu.browser');
-  push(BTN_FILE, labelRect(TEXT_X + 8 * 6, HEADER_Y, 4), 'saveMenu.file');
   push(BTN_CANCEL, labelRect(PANEL_INNER_X2 - 6 * 6, HEADER_Y, 6), 'saveMenu.cancel');
 
   const visible = Math.min(SAVE_MENU_ROWS, Math.max(0, state.entries.length - state.scrollTop));
@@ -413,9 +352,8 @@ function saveMenuButtons(ui: UIState, state: SaveMenuState): UIButton[] {
 
 /**
  * One iteration of `_WaitForMenuSelect`'s loop body. Called **straight from the DOM
- * mousedown handler**, not from the game's mouse queue: that is both the modality
- * CSBWin gets by swapping button lists, and the only way the folder picker still has
- * the transient user activation it requires.
+ * mousedown handler**, not from the game's mouse queue: that is the modality CSBWin gets
+ * by swapping button lists.
  */
 export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number): void {
   const state = ui.saveMenu;
@@ -432,28 +370,6 @@ export function saveMenuClick(ui: UIState, x: number, y: number, buttons: number
 
   if (id === BTN_CANCEL) {
     closeSaveMenu(ui);
-    return;
-  }
-  if (id === BTN_BROWSER || id === BTN_FILE) {
-    const source: SaveStoreKind = id === BTN_FILE ? 'file' : 'browser';
-    if (state.source !== source) {
-      state.source = source;
-      setSaveSource(source);
-      state.entries = [];
-      state.selected = -1;
-      state.scrollTop = 0;
-    }
-    // The click that chose FILE is the user gesture the picker needs, so ask for the
-    // folder now if the store is not already usable. `connect()` is the only call in
-    // this module that may raise a browser dialog.
-    const store = currentStore(state);
-    if (source === 'file' && store.isSupported() && !store.isReady()) {
-      state.busy = true;
-      void store.connect().then(() => refreshSaveMenu(ui));
-      ui.renderLastFrame();
-      return;
-    }
-    void refreshSaveMenu(ui);
     return;
   }
   if (id >= BTN_ROW0 && id < BTN_ROW0 + SAVE_MENU_ROWS) {
@@ -541,11 +457,11 @@ async function runPending(ui: UIState, action: 'load' | 'save'): Promise<void> {
 
 async function doLoad(ui: UIState, state: SaveMenuState): Promise<void> {
   const entry = selectedEntry(state);
-  if (!entry || !entry.loadable) {
+  if (!entry) {
     state.busy = false;
     return;
   }
-  restoreChosenSave(ui, await currentStore(state).read(entry.id));
+  restoreChosenSave(ui, await ui.onReadSave(entry.id));
 }
 
 /**
@@ -577,9 +493,9 @@ export function restoreChosenSave(ui: UIState, bytes: Uint8Array): void {
 async function doSave(ui: UIState, state: SaveMenuState): Promise<void> {
   // The clock has been stopped since the menu opened, so the save's tail still runs on
   // the world the file holds, and before the menu's `tag0207cc`, as in CSBWin.
-  const meta = await ui.onSaveGame(currentStore(state), new Set(state.entries.map((e) => e.name)));
+  const saved = await ui.onSaveGame();
   await refreshSaveMenu(ui);
-  const at = state.entries.findIndex((e) => e.name === meta.name);
+  const at = state.entries.findIndex((e) => e.id === saved.id);
   if (at >= 0) state.selected = at;
   state.message = 'GAME SAVED';
   ui.renderLastFrame();

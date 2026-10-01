@@ -1,35 +1,56 @@
 /**
- * The smallest IndexedDB wrapper that serves the two save stores.
+ * The smallest IndexedDB wrapper that serves the save store.
  *
  * IndexedDB rather than `localStorage`: a save carries the whole object list, every
  * database and the cell flags, so one is comfortably past a megabyte, and `localStorage`
- * is a synchronous ~5 MB budget for the whole origin. The same database also holds the directory handle the
- * file store remembers, because a `FileSystemDirectoryHandle` is structured-cloneable
- * and so can be stored but not stringified.
+ * is a synchronous ~5 MB budget for the whole origin.
  */
+import { DEFAULT_DATA_SET } from '../DataSets';
+import { upgradeSaveRecords } from './legacyRows';
 
 const DB_NAME = 'dmweb-saves';
-const DB_VERSION = 1;
+/**
+ * 2: a row is a `SaveRecord`, with its data set, its playthrough and its quick flag, and
+ * its bytes are a CSBWin file. 1 had neither the three fields nor that rule, and a second
+ * store for a directory handle.
+ */
+const DB_VERSION = 2;
 
-/** Our own saves: `{ id, name, savedAt, level, champions, bytes }`. */
+/** The saves, one `SaveRecord` each, keyed by `id`. */
 export const SAVES_STORE = 'saves';
-/** Single-key odds and ends — currently just the picked directory handle. */
-export const HANDLES_STORE = 'handles';
+/** Version 1's other store. */
+const HANDLES_STORE = 'handles';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+
+/**
+ * Version 1's rows made version 2's, in the upgrade's own transaction: all of them or,
+ * if anything fails, none, and the database stays at version 1.
+ *
+ * A version-1 row names no data set, and every one becomes the default set's.
+ */
+function upgradeFromVersion1(db: IDBDatabase, tx: IDBTransaction): void {
+    if (db.objectStoreNames.contains(HANDLES_STORE)) db.deleteObjectStore(HANDLES_STORE);
+    const saves = tx.objectStore(SAVES_STORE);
+    const all = saves.getAll();
+    all.onsuccess = () => {
+        saves.clear();
+        for (const record of upgradeSaveRecords(all.result, DEFAULT_DATA_SET.id)) saves.put(record);
+    };
+}
 
 export function openSaveDatabase(): Promise<IDBDatabase> {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+        if (typeof indexedDB === 'undefined') {
+            reject(new Error('NO BROWSER STORAGE'));
+            return;
+        }
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
+        request.onupgradeneeded = (event) => {
             const db = request.result;
-            if (!db.objectStoreNames.contains(SAVES_STORE)) {
-                db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
-            }
-            if (!db.objectStoreNames.contains(HANDLES_STORE)) {
-                db.createObjectStore(HANDLES_STORE);
-            }
+            if (event.oldVersion < 1) db.createObjectStore(SAVES_STORE, { keyPath: 'id' });
+            else if (request.transaction) upgradeFromVersion1(db, request.transaction);
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error('IndexedDB open failed'));
@@ -58,11 +79,10 @@ export async function idbGetAll<T>(store: string): Promise<T[]> {
     return promisify<T[]>(db.transaction(store, 'readonly').objectStore(store).getAll());
 }
 
-export async function idbPut(store: string, value: unknown, key?: IDBValidKey): Promise<void> {
+export async function idbPut(store: string, value: unknown): Promise<void> {
     const db = await openSaveDatabase();
     const tx = db.transaction(store, 'readwrite');
-    const request = key === undefined ? tx.objectStore(store).put(value) : tx.objectStore(store).put(value, key);
-    await promisify(request);
+    await promisify(tx.objectStore(store).put(value));
     await new Promise<void>((resolve, reject) => {
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error ?? new Error('IndexedDB write failed'));

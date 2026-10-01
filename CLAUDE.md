@@ -118,8 +118,9 @@ core/       BinaryFile (big-endian cursor), bytes (free byte reads), compression
             RN::pos), intCast (sw, div, ApplyLimits), objectNameIndex (OBJNI_* constants)
 data/       DungeonLoader, GraphicsLoader, CSBGraphicsLoader, SaveGameLoader, HeroExtractor,
             HintOracleLoader (CSB's `hcsb.hct`)
-  saves/    The save stores behind the disk icon: BrowserSaveStore (IndexedDB),
-            FileSaveStore (a directory the player picks), and the registry of both
+  saves/    The saves behind the disk icon: SaveStore (a save's row, the CSBWin file
+            beside what a list needs), BrowserSaveStore (IndexedDB, the one store),
+            legacyRows (the store's upgrade from its first version)
   tables/   Runtime table extraction from graphics.dat: ObjectTables, UITables,
             ViewportTables, MonsterDesc, and GraphicsTables (all of them, read once)
 engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), GameHost (what
@@ -137,7 +138,7 @@ engine/     Game, GameContext (what every subsystem shares, CSBWin's `d.`), Game
             room in a full one),
             RuntimeSave (the state a read restores), SaveGameFile (the CSBWin file a
             save is, written from the game and read back), GameSaves (a save built and
-            written to a store, or read back: the disk menu's, the boot's and F5/F9's),
+            written to the store, or read back: the disk menu's, the boot's and F5/F9's),
             skills, AddCharacter, objectIndex
             (the one DescIndex / GetBasicObjectType / NameIndex)
 renderer/   GameScreen (the 320x200 screen, host of the UI and its modal screens),
@@ -215,7 +216,7 @@ were three lines each is not.
   This overrides the global `JIRA-XXX` convention.
 - Imports name the module by relative path (`'../core/types'`). The only barrels are
   `src/ui/index.ts` and `src/data/saves/index.ts`, the public faces of the debug chrome
-  and the save stores.
+  and the save store.
 - The engine and the loaders do not log: a diagnostic goes to `GameHost.trace`, which a
   tool prints and the page leaves silent.
 - Deleting code that won't survive to the end state is expected — no need to preserve

@@ -43,7 +43,7 @@ import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { DungeonState } from '../src/engine/DungeonState';
 import { MonsterType } from '../src/engine/monsterTypes';
 import { NameIndex } from '../src/engine/objectIndex';
-import { decodeBase64ToBytes } from '../src/engine/SaveGameFile';
+import { decodeBase64ToBytes } from '../src/data/saves/legacyRows';
 import { TimerFunction } from '../src/engine/TimerQueue';
 import { gameTablesOf, graphicsTablesOf } from './lib/game';
 

@@ -30,8 +30,7 @@
  *     (`doc/CSBwin-src/SaveGame.cpp:1237-1245`, `Game.saveWritten`), so the two never part.
  *  7. **A save carries its world**: one of CSB's eleven levels, loaded into a game built
  *     over DM's fourteen, installs the file's world.
- *  8. **A `.dmweb.json`**, which earlier builds wrote, loads the CSBWin file it wraps.
- *  9. **The file alone.** A game played from `dungeon.dat`, one played on from
+ *  8. **The file alone.** A game played from `dungeon.dat`, one played on from
  *     `csbgame7.dat` and one on CSB's `mini.dat` are saved and loaded, and the **whole**
  *     state of the game left and the game loaded is compared, field by field. Every field that differs must be on
  *     the list `NOT_CARRIED`, which is `src/engine/CsbwinSaveGame.ts` → "What is not
@@ -220,7 +219,7 @@ function fileForm(records: RuntimeSaveState['dungeon']['timers']): unknown[] {
   return (records ?? []).map(({ timerWord6, timerWord8, ...bytes }) => { void timerWord6; void timerWord8; return bytes; });
 }
 
-/* ------------------------------------------------------ 9. the file alone --- */
+/* ------------------------------------------------------ 8. the file alone --- */
 
 interface Difference {
   /** The field, with every array index as `[]`. */
@@ -807,47 +806,7 @@ function main(): void {
       'the levels\' descriptors and tables, levelIndex, the header and the preset heroes are the saved world\'s');
   }
 
-  /* ---- 8. a .dmweb.json loads the file it wraps ---- */
-
-  // Earlier builds wrote a save as JSON: a header for the listing, the state of the build
-  // that wrote it, and `raw`, a whole CSBWin file in base64. Only `raw` is read
-  // (`applySaveBytes`), so such a save loads whatever build wrote it. Proved against a
-  // load of the same file straight through `applyCsbwinSave`.
-  console.log('\n=== a .dmweb.json ===');
-  {
-    const source = fromCsbwinSave('csbgame7.dat');
-    advance(source, 30);
-    const file = buildSaveFile(source);
-    const json = (raw: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify({
-      header: { format: 'dmweb-save', version: 13, savedAt: 0, level: 0, champions: [] },
-      runtime: { version: 13 },
-      raw,
-    }));
-    const viaJson = loadWorld();
-    let error = '';
-    try {
-      applySaveBytes(viaJson, json(Buffer.from(file).toString('base64')));
-    } catch (e) {
-      error = (e as Error).message;
-    }
-    const direct = loadWorld();
-    applyCsbwinSave(direct, file);
-    direct.savedGameRead();
-    const state = (g: Game): string => JSON.stringify(g.getRuntimeSaveState());
-    console.log(`with a raw file: ${error || `loaded, level ${viaJson.ctx.party.state.position.z}`}`);
-    check(!error && state(viaJson) === state(direct) && viaJson.canRestartFromSavegame(),
-      'a .dmweb.json loads its raw file, as the file itself does');
-    let refused = '';
-    try {
-      applySaveBytes(loadWorld(), json(undefined));
-    } catch (e) {
-      refused = (e as Error).message;
-    }
-    console.log(`with none: ${refused}`);
-    check(refused === 'SAVE IS MISSING ITS BLOCK DATA', 'one with no raw file is refused');
-  }
-
-  /* ---- 9. the file alone ---- */
+  /* ---- 8. the file alone ---- */
 
   checkTheFileAlone();
 

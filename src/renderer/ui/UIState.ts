@@ -7,7 +7,7 @@
  * translation of its C++ counterpart instead of another method on a god object.
  */
 import type { GraphicsLoader } from '../../data/GraphicsLoader';
-import type { SaveEntryMeta, SaveStore } from '../../data/saves';
+import type { SaveEntry } from '../../data/saves';
 import type { GameContext } from '../../engine/GameContext';
 import type { PartyState } from '../../engine/gameTypes';
 import type { InterpreterContext } from '../bytecode/BytecodeInterpreter';
@@ -185,13 +185,16 @@ export interface UIState {
    * page redraws the view the screen covered.
    */
   readonly onReincarnated: () => void;
+  /** The saves the save/load screen lists, newest first (`GameSaves.list`). */
+  readonly onListSaves: () => Promise<SaveEntry[]>;
+  /** A listed save's file (`GameSaves.file`). */
+  readonly onReadSave: (id: string) => Promise<Uint8Array>;
   /**
-   * Build a save and write it to `store`, under a name that is none of `taken`, the
-   * names the menu lists there; resolves to the row it was written as
+   * Build a save and write it to the store; resolves to the row it was written as
    * (`GameSaves.save`, `src/engine/GameSaves.ts`). A hook because serializing the world
    * is the engine's business, not the UI's.
    */
-  readonly onSaveGame: (store: SaveStore, taken: ReadonlySet<string>) => Promise<SaveEntryMeta>;
+  readonly onSaveGame: () => Promise<SaveEntry>;
   /** Restore a save's bytes into the running game. Throws with a short message on refusal. */
   readonly onRestoreSave: (bytes: Uint8Array) => void;
   /**
@@ -266,7 +269,7 @@ export type UISources = Pick<UIState,
 /** What the interface asks of the screen and of the page. */
 export type UIHooks = Pick<UIState,
   | 'getGraphicBitmap' | 'renderLastFrame'
-  | 'onReincarnated' | 'onSaveGame' | 'onRestoreSave' | 'onRestoreFailed'>;
+  | 'onReincarnated' | 'onListSaves' | 'onReadSave' | 'onSaveGame' | 'onRestoreSave' | 'onRestoreFailed'>;
 
 export function createUIState(sources: UISources, hooks: UIHooks): UIState {
   return {

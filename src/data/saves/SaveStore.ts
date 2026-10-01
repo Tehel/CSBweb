@@ -1,68 +1,64 @@
 /**
- * The two places a DMweb save can live, behind one interface.
+ * A save as the page keeps it: a row, the CSBWin file's bytes beside what a list needs.
  *
- * CSBWin has one filesystem and four fixed slots (`doc/CSBWIN_MENU_REFERENCE.md` → "The
- * four slots"). A browser has two stores and neither is the other's fallback: what the
- * page writes into IndexedDB nobody can copy or back up, and what it writes to disk it
- * can only reach through a directory the player picked by hand. So the menu offers both
- * and this is what they have in common.
+ * CSBWin has one directory and four fixed slots (`doc/CSBWIN_MENU_REFERENCE.md` → "The
+ * four slots"), and keeps a game's saves in that game's directory
+ * (`doc/CSBwin-src/CSBCode.cpp:9747-9756`). The page has one store, IndexedDB
+ * (`BrowserSaveStore`), for every data set, so a row names its own.
  *
- * **Nothing in this file touches the DOM** — the row formatting and ordering are pure so
- * that `tools/dump-save-menu.ts` can assert them headlessly. The two implementations
- * live next door.
+ * **Nothing in this file touches the DOM**: the rows, their order and their formatting
+ * are pure, so that `tools/dump-save-menu.ts` can assert them headlessly.
  */
+import { readCsbwinSaveInfo } from '../CsbwinSaveInfo';
 
-export type SaveStoreKind = 'browser' | 'file';
-
-/** One row of the list. */
+/** One row of the list: what a save is listed by, without its bytes. */
 export interface SaveEntry {
-    /** Store-specific key: an IndexedDB id, or a file name. */
+    /** The row's key in the store. */
     id: string;
-    /** What the player sees if they ever look at the store from outside. */
+    /** The file's name, a `.dat`. */
     name: string;
-    /** Milliseconds since the epoch. A file's `lastModified`, or the save's own header. */
-    savedAt: number;
-    /** The dungeon level the party stood on. */
-    level: number;
-    /** Champion names in party order. */
-    champions: string[];
+    /** The data set the game ran on, its `DataSet.id`. A list is asked for one set's rows. */
+    dataSet: string;
     /**
-     * Whether LOAD will act on this row. Genuine CSBWin `.dat` saves were listed with
-     * this false while their object references were undecodable; they load now
-     * (`src/engine/CsbwinSaveGame.ts`). What still sets it false is a save this build
-     * cannot restore, and the row is then marked with a `*` and carries a `note` saying
-     * why.
+     * The playthrough: the file's `d.RandomGameID`, drawn when a new game is read
+     * (`doc/CSBwin-src/SaveGame.cpp:1523-1532`) and kept in `GAMEBLOCK1` (`:1060`).
      */
-    loadable: boolean;
-    /** Why not, when `loadable` is false. Shown on the detail line. */
-    note?: string;
+    playthrough: number;
+    /** Whether F5 wrote it, rather than the menu's SAVE. */
+    quick: boolean;
+    /** Milliseconds since the epoch: the row's own, since a CSBWin file holds no date. */
+    savedAt: number;
+    /** The dungeon level the party stood on, from the file's `GAMEBLOCK2`. */
+    level: number;
+    /** Champion names in party order, from the file's block 4. */
+    champions: string[];
 }
 
-/** What a store needs to know to write a row it can list back. */
-export interface SaveEntryMeta {
-    name: string;
-    savedAt: number;
-    level: number;
-    champions: string[];
+/** A row as the store holds it: the entry, and the CSBWin file. */
+export interface SaveRecord extends SaveEntry {
+    bytes: ArrayBuffer;
+}
+
+/** What a row reads from its file. */
+export type SaveFileFields = Pick<SaveEntry, 'playthrough' | 'level' | 'champions'>;
+
+/**
+ * A file's part of its row, read from the file's own blocks (`readCsbwinSaveInfo`), as
+ * any `.dat` is listed. `null` for a file that is not a CSBWin save, which has no row.
+ */
+export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
+    const info = readCsbwinSaveInfo(bytes);
+    if (!info) return null;
+    return { playthrough: info.randomGameID, level: info.level, champions: info.champions };
 }
 
 export interface SaveStore {
-    readonly kind: SaveStoreKind;
-    /** Whether this browser has the APIs at all. */
-    isSupported(): boolean;
-    /** Whether `list`/`read`/`write` can run right now without asking for anything. */
-    isReady(): boolean;
-    /**
-     * Acquire whatever access is missing. **Must be called from a real user gesture** —
-     * `showDirectoryPicker` and `requestPermission` both demand transient activation,
-     * and the click that opened this menu is the only activation there is.
-     */
-    connect(): Promise<boolean>;
-    list(): Promise<SaveEntry[]>;
+    /** One data set's rows, or every set's for `null`, newest first. */
+    list(dataSet: string | null): Promise<SaveEntry[]>;
+    /** A row's CSBWin file. */
     read(id: string): Promise<Uint8Array>;
-    write(meta: SaveEntryMeta, bytes: Uint8Array): Promise<void>;
-    /** One short line for the menu: where this store points, or why it cannot. */
-    describe(): string;
+    /** Write a row, over the one of the same `id` if there is one. */
+    write(entry: SaveEntry, bytes: Uint8Array): Promise<void>;
 }
 
 /** `YYYY-MM-DD`, in the player's own timezone — the date they would call it. */
@@ -83,30 +79,6 @@ export function sortSaveEntries(entries: SaveEntry[]): SaveEntry[] {
     return [...entries].sort((a, b) => b.savedAt - a.savedAt || a.name.localeCompare(b.name));
 }
 
-/**
- * The newest loadable entry across several listings, and which listing it came from.
- *
- * This is what the quick-load acts on: "the most recent save" has to mean the most
- * recent one *anywhere*, or F9 would answer differently depending on which source the
- * menu happened to be showing. Entries that cannot be loaded are skipped rather than
- * picked and refused.
- *
- * Pure, and the ordering rule is `sortSaveEntries`'s, so the two cannot drift apart.
- */
-export function pickLatestLoadable<T>(
-    listings: ReadonlyArray<{ source: T; entries: SaveEntry[] }>,
-): { source: T; entry: SaveEntry } | null {
-    const all: Array<{ source: T; entry: SaveEntry }> = [];
-    for (const listing of listings) {
-        for (const entry of listing.entries) {
-            if (entry.loadable) all.push({ source: listing.source, entry });
-        }
-    }
-    if (all.length === 0) return null;
-    all.sort((a, b) => b.entry.savedAt - a.entry.savedAt || a.entry.name.localeCompare(b.entry.name));
-    return all[0];
-}
-
 /** Champion names cut to three characters, which is what fits four of them on a row. */
 export function abbreviateChampions(champions: string[], width = 3): string {
     return champions
@@ -116,84 +88,19 @@ export function abbreviateChampions(champions: string[], width = 3): string {
         .join(' ');
 }
 
-/**
- * One list row: `2026-09-13 L14 DAR SON LEY ESM`, clipped to the panel's 33 characters.
- * A `.dat` that cannot be loaded is marked with a leading `*`.
- */
+/** One list row: `2026-09-13 L14 DAR SON LEY ESM`, clipped to the panel's 33 characters. */
 export function formatSaveRow(entry: SaveEntry, maxChars = 33): string {
-    const mark = entry.loadable ? '' : '*';
     const level = `L${Math.max(0, entry.level | 0)}`;
-    const row = `${mark}${formatSaveDate(entry.savedAt)} ${level} ${abbreviateChampions(entry.champions)}`;
+    const row = `${formatSaveDate(entry.savedAt)} ${level} ${abbreviateChampions(entry.champions)}`;
     return row.length > maxChars ? row.slice(0, maxChars) : row;
 }
 
 /** The detail line above the list: the selected save's full roster. */
 export function formatSaveDetail(entry: SaveEntry | null, maxChars = 33): string {
     if (!entry) return '';
-    const text = entry.note ?? entry.champions.map((n) => n.trim().toUpperCase()).join(' ');
+    const text = entry.champions.map((n) => n.trim().toUpperCase()).join(' ');
     return text.length > maxChars ? text.slice(0, maxChars) : text;
 }
 
-/** The suffix a save carries on disk: a CSBWin file, which CSBWin opens. */
+/** The suffix of a save's name: a CSBWin file, which CSBWin opens. */
 export const SAVE_FILE_EXTENSION = '.dat';
-
-/**
- * The suffix of the saves earlier builds wrote: a CSBWin file wrapped in JSON, as `raw`,
- * behind a `header` for the listing. They still list and load (`applySaveBytes`).
- */
-export const JSON_SAVE_FILE_EXTENSION = '.dmweb.json';
-
-/** What a `.dmweb.json` says of itself at the front of its file, its `header`. */
-export interface SaveHeader {
-    format: 'dmweb-save';
-    version: number;
-    /** `Date.now()` at the moment of the save. */
-    savedAt: number;
-    /** The dungeon level the party stood on — `position.z`. */
-    level: number;
-    /** Champion names, in party order. */
-    champions: string[];
-}
-
-/**
- * Pull the `header` object out of the first few kilobytes of a `.dmweb.json`.
- *
- * `JSON.stringify` emits keys in insertion order and `header` was declared first, so it
- * is always at the front of the file. Listing a directory therefore reads a prefix per
- * save instead of the megabyte-plus behind it. The scan is
- * brace-balanced and string-aware so that a champion name full of punctuation could not
- * end the object early.
- */
-export function extractHeaderFromPrefix(text: string): unknown | null {
-    const key = '"header"';
-    const at = text.indexOf(key);
-    if (at < 0) return null;
-    let i = text.indexOf('{', at + key.length);
-    if (i < 0) return null;
-    const start = i;
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (; i < text.length; i++) {
-        const c = text[i];
-        if (inString) {
-            if (escaped) escaped = false;
-            else if (c === '\\') escaped = true;
-            else if (c === '"') inString = false;
-            continue;
-        }
-        if (c === '"') inString = true;
-        else if (c === '{') depth++;
-        else if (c === '}') {
-            depth--;
-            if (depth === 0) {
-                try {
-                    return JSON.parse(text.slice(start, i + 1));
-                } catch {
-                    return null;
-                }
-            }
-        }
-    }
-    return null;
-}

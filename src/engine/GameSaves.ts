@@ -1,27 +1,23 @@
 /**
- * The running game's saves: where a save is built from the game and written to a store,
- * and where a store's bytes are read back into it.
+ * The running game's saves: where a save is built from the game and written to the store,
+ * and where a save's bytes are read back into it.
  *
  * The file itself is `SaveGameFile.ts`'s to write and `CsbwinSaveGame.ts`'s to read: a
  * save is a CSBWin file. This is what calls them for the page: the disk menu's SAVE and LOAD
  * (`src/renderer/ui/SaveMenu.ts`), the boot's chooser (`src/renderer/intro/BootSequence.ts`),
  * and the F5 and F9 keys.
  *
+ * The store (`src/data/saves/`) holds every data set's saves, each row naming its own, and
+ * the game's are its data set's: what the menu and the chooser list, and what F9 picks
+ * from.
+ *
  * F5 and F9 do not exist in CSBWin, which has only the disk menu. They are a shortcut onto
- * that menu's stores (`src/data/saves/`): one more save to the current source, and the
- * most recent save from wherever it lives, so both mean the same "most recent save".
- * Neither raises a dialog, so what either did, or why it did nothing, is a line in the
- * message area, and one for the console with the save's name.
+ * that menu's list: one more save, marked as the key's, and the most recent save of the
+ * list. Neither raises a dialog, so what either did, or why it did nothing, is a line in
+ * the message area, and one for the console with the save's name.
  */
-import { readCsbwinSaveInfo } from '../data/CsbwinSaveInfo';
 import type { DataSet } from '../data/DataSets';
-import {
-    SAVE_FILE_EXTENSION,
-    findLatestSave,
-    writableSaveStore,
-    type SaveEntryMeta,
-    type SaveStore,
-} from '../data/saves';
+import { SAVE_FILE_EXTENSION, readSaveFileFields, type SaveEntry, type SaveStore } from '../data/saves';
 import type { Game } from './Game';
 import { SaveFileError, applySaveBytes, buildSaveFile } from './SaveGameFile';
 import type { Champion } from './gameTypes';
@@ -57,7 +53,7 @@ const SAVE_MESSAGE_COLOR = 15;
 /**
  * The name a new save gets. CSBWin has four fixed filenames and rotates a `.BAK`
  * (`doc/CSBwin-src/CSBCode.cpp:9744-9761`); this port saves as often as asked, so the
- * name has to be unique instead, among `taken`. Sortable, and readable in a file manager.
+ * name has to be unique instead, among `taken`. Sortable, and readable as a file's name.
  */
 export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = new Set()): string {
     const d = new Date(savedAt);
@@ -79,6 +75,8 @@ export class GameSaves {
         private readonly game: Game,
         /** The game the page plays, whose files the running game was read from. */
         readonly dataSet: DataSet,
+        /** Where the saves are kept, every data set's. */
+        private readonly store: SaveStore,
         private readonly screen: GameSavesScreen,
         /**
          * A line for the console on what F5 or F9 did, with the error when one failed:
@@ -97,10 +95,19 @@ export class GameSaves {
         messages.quePrintLines(SAVE_MESSAGE_COLOR, text);
     }
 
+    /** The data set's saves, newest first: the disk menu's list, and the boot's chooser's. */
+    list(): Promise<SaveEntry[]> {
+        return this.store.list(this.dataSet.id);
+    }
+
+    /** A listed save's file. */
+    file(id: string): Promise<Uint8Array> {
+        return this.store.read(id);
+    }
+
     /**
-     * Build a save and write it to `store`, under a name no save there has. `taken` is
-     * the names the store holds, for a caller that has listed it; without it the store
-     * is listed here.
+     * Build a save and write it to the store, as a row of the game's data set under a
+     * name no save there has, in any set: a row's name is its key. `quick` marks F5's.
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
@@ -116,28 +123,28 @@ export class GameSaves {
      *
      * The file's bytes are made at once, before anything is awaited: the game runs on
      * through the listing. The row beside them is read back from the file's own blocks,
-     * the level from `GAMEBLOCK2` and the names from block 4, as any `.dat` is listed
-     * (`readCsbwinSaveInfo`); the date is the store's, since a CSBWin file has none.
+     * the playthrough from `GAMEBLOCK1`, the level from `GAMEBLOCK2` and the names from
+     * block 4 (`readSaveFileFields`); the date is the row's, since a CSBWin file has none.
      */
-    async save(store: SaveStore, clock: SaveClock, taken?: ReadonlySet<string>): Promise<SaveEntryMeta> {
+    async save(clock: SaveClock, quick: boolean): Promise<SaveEntry> {
         if (clock === 'running') this.screen.repackOpenChest();
         const bytes = buildSaveFile(this.game, {
             portraitOf: (champion) => this.screen.portraitOf(champion),
         });
         const savedAt = Date.now();
-        const info = readCsbwinSaveInfo(bytes);
-        if (!info) throw new Error('the save file does not read back');
-        const { level, champions } = info;
+        const fields = readSaveFileFields(bytes);
+        if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
-        const names = taken ?? new Set((await store.list().catch(() => [])).map((entry) => entry.name));
-        const meta: SaveEntryMeta = { name: makeSaveFileName(savedAt, names), savedAt, level, champions };
-        await store.write(meta, bytes);
+        const taken = new Set((await this.store.list(null)).map((entry) => entry.name));
+        const name = makeSaveFileName(savedAt, taken);
+        const entry: SaveEntry = { id: name, name, dataSet: this.dataSet.id, quick, savedAt, ...fields };
+        await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
-        return meta;
+        return entry;
     }
 
     /**
-     * Restore a store's bytes into the running game, one of the port's saves or a genuine
+     * Restore a save's bytes into the running game, one of the port's saves or a genuine
      * CSBWin one (`applySaveBytes`). Throws `SaveFileError`, whose message is a line
      * for the menu's status.
      *
@@ -163,7 +170,7 @@ export class GameSaves {
     }
 
     /**
-     * F5: one more save to the current source. Not with an empty party, nor while a
+     * F5: one more save, marked as the key's. Not with an empty party, nor while a
      * champion is still being chosen: the disk icon does nothing then
      * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
      * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
@@ -181,12 +188,9 @@ export class GameSaves {
             return;
         }
         try {
-            // `writableSaveStore` falls back to the browser when the file source is
-            // chosen but not connected: F5 must never raise a folder picker over the game.
-            const store = writableSaveStore();
-            const { name } = await this.save(store, 'running');
+            const { name } = await this.save('running', true);
             this.tell('GAME SAVED');
-            this.log(`Quick-saved ${name} (${store.kind === 'file' ? 'disk' : 'browser'})`);
+            this.log(`Quick-saved ${name}`);
         } catch (error) {
             this.tell('UNABLE TO SAVE GAME!');
             this.log('Quick-save failed', error);
@@ -194,8 +198,8 @@ export class GameSaves {
     }
 
     /**
-     * F9: the most recent save, from wherever it lives. Not while a script holds the
-     * loop: it would run on in the loaded world.
+     * F9: the most recent save of the data set, F5's or the menu's. Not while a script
+     * holds the loop: it would run on in the loaded world.
      *
      * No save at all is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
      * (`doc/CSBwin-src/SaveGame.cpp:1585`), and a file that does not read is its
@@ -208,15 +212,15 @@ export class GameSaves {
             return;
         }
         try {
-            const latest = await findLatestSave();
+            const [latest] = await this.list();
             if (!latest) {
                 this.tell('CAN\'T FIND SAVED GAME!');
                 this.log('Quick-load: no saved game found');
                 return;
             }
-            this.read(await latest.store.read(latest.entry.id));
+            this.read(await this.file(latest.id));
             this.tell('GAME LOADED');
-            this.log(`Quick-loaded ${latest.entry.name}`);
+            this.log(`Quick-loaded ${latest.name}`);
         } catch (error) {
             this.tell(error instanceof SaveFileError ? error.message : 'UNABLE TO LOAD GAME!');
             this.log('Quick-load failed', error);

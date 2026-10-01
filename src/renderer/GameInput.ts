@@ -75,10 +75,7 @@ export class GameInput {
     const buttonMask = button === 2 ? 1 : button === 0 ? 2 : 0;
     // The save/load screen is modal, the way `_WaitForMenuSelect` is modal: it
     // replaces every button list while it runs, so nothing else may see the click
-    // (`doc/CSBWIN_MENU_REFERENCE.md`). Handling it here rather than through the
-    // game's mouse queue is also what keeps the browser's transient user
-    // activation alive — `showDirectoryPicker` refuses without it, and the queue is
-    // drained a frame later.
+    // (`doc/CSBWIN_MENU_REFERENCE.md`).
     if (buttonMask !== 0 && screen.isSaveMenuOpen()) {
       screen.handleSaveMenuClick(x, y, buttonMask);
       this.host.refreshScreen();

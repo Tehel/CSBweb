@@ -86,6 +86,8 @@ import { displayFrozenScreen, displaySleepScreen, drawMessageLines, shadeRectInd
  */
 export type GameScreenHooks = Pick<UIState,
   | 'onReincarnated'
+  | 'onListSaves'
+  | 'onReadSave'
   | 'onSaveGame'
   | 'onRestoreSave'
   | 'onRestoreFailed'
@@ -164,6 +166,8 @@ export class GameScreen {
       getGraphicBitmap: (graphicNum, format) => this.getGraphicBitmap(graphicNum, format),
       renderLastFrame: () => this.renderLastFrame(),
       onReincarnated: hooks.onReincarnated,
+      onListSaves: hooks.onListSaves,
+      onReadSave: hooks.onReadSave,
       onSaveGame: hooks.onSaveGame,
       onRestoreSave: hooks.onRestoreSave,
       onRestoreFailed: hooks.onRestoreFailed,
@@ -279,9 +283,8 @@ export class GameScreen {
 
   /**
    * A click while the save screen is up, taken **straight from the DOM event** rather
-   * than through the mouse queue. That is CSBWin's modality — `_WaitForMenuSelect`
-   * replaces every button list while it runs — and it is also what preserves the
-   * transient user activation `showDirectoryPicker` demands.
+   * than through the mouse queue. That is CSBWin's modality: `_WaitForMenuSelect`
+   * replaces every button list while it runs.
    */
   handleSaveMenuClick(x: number, y: number, buttons: number): void {
     saveMenuClick(this.ui, x, y, buttons);

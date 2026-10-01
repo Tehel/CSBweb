@@ -1,17 +1,14 @@
 /**
- * What can be told about a genuine CSBWin save file without loading it.
+ * What can be told about a CSBWin save file without loading it.
  *
- * The save/load menu lists whatever `.dat` files it finds beside our own saves, and it
- * needs a level and a roster for each row. Both come out of blocks 2 and 4, which
- * `loadSaveGameState` already unscrambles and checksums — this module only unpacks the
- * champion names out of the raw character block it hands back.
+ * A save's row holds its level, its roster and its playthrough, read from the file when
+ * the row is written (`src/data/saves/SaveStore.ts`). They come out of blocks 1, 2 and 4,
+ * which `loadSaveGameState` already unscrambles and checksums — this module only unpacks
+ * the champion names out of the raw character block it hands back.
  *
- * **These files load** (`src/engine/CsbwinSaveGame.ts`), but listing one must stay far
- * cheaper than loading it: a directory of saves is read on every menu open, and the
- * dungeon image behind each row is the best part of a megabyte. So this stops at blocks
- * 2 and 4 and never touches the image. The consequence is deliberate: a file whose
- * blocks unscramble but whose image is damaged is listed as loadable and fails on LOAD,
- * with the reason on the menu's status line.
+ * It stops at those blocks and never touches the image, the best part of a megabyte. The
+ * consequence is deliberate: a file whose blocks unscramble but whose image is damaged
+ * has a row and fails on LOAD, with the reason on the menu's status line.
  */
 import { loadSaveGameState } from './SaveGameLoader';
 
@@ -105,23 +102,25 @@ export interface CsbwinSaveInfo {
     champions: string[];
     /** `gb2.Time`, the virtual clock — not a wall-clock date; a CSBWin save carries none. */
     time: number;
+    /** `d.RandomGameID`, `GAMEBLOCK1`'s (`doc/CSBwin-src/SaveGame.cpp:1060`): the game the file is a save of. */
+    randomGameID: number;
 }
 
 /**
  * Read the listing fields, or `null` if the file is not a CSBWin save this port can
- * unscramble. Never throws: the menu calls it on every `.dat` it happens to find.
+ * unscramble. Never throws: the store's upgrade calls it on whatever its rows hold.
  */
 export function readCsbwinSaveInfo(bytes: Uint8Array): CsbwinSaveInfo | null {
     try {
         const state = loadSaveGameState(bytes);
-        const block2 = state.block2;
-        if (!block2) return null;
+        const { block1, block2 } = state;
+        if (!block1 || !block2) return null;
         const roster = state.characterBlock ? readCharacterNames(state.characterBlock) : [];
         const champions = roster
             .slice(0, Math.max(0, Math.min(4, block2.numCharacter)))
             .map((c) => c.name)
             .filter((n) => n.length > 0);
-        return { level: block2.partyLevel, champions, time: block2.time };
+        return { level: block2.partyLevel, champions, time: block2.time, randomGameID: block1.randomGameID >>> 0 };
     } catch {
         return null;
     }

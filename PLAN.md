@@ -148,10 +148,10 @@ DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
 #### The rework
 
-The rework stands on `GameSaves` (`src/engine/GameSaves.ts`), which is built with the game
-and its data set, and is where every save is built and written to a store (the disk
-menu's SAVE and F5) and where a store's bytes are read back into the game (LOAD, the
-boot's chooser and F9). Its scope, and after it the steps, one per commit.
+The rework stands on `GameSaves` (`src/engine/GameSaves.ts`), which is built with the
+game, its data set and the store, and is where every save is built and written to the
+store (the disk menu's SAVE and F5) and where a save's bytes are read back into the game
+(LOAD, the boot's chooser and F9). Its scope, and after it the steps, one per commit.
 
 **What a save is**
 
@@ -164,18 +164,18 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
   played games and holds everything that differs to it. F5 saves nothing where the disk
   icon does nothing: a champion still being chosen has no place in a file, and the key
   answers "CANNOT SAVE NOW". A
-  `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, still lists and
-  loads, through the file it carries as `raw`.
-- **Every save is a row of IndexedDB**: the file's bytes beside what the list needs. The
-  level, the champions' names and the playthrough (below) are read from the file's own
-  blocks when the row is written; the data set, the date, whether it is the quick slot,
-  and the play time are the row's own. Nothing is JSON, and no row holds anything a
-  `.dat` could not be listed without.
-- **No store on disk.** `FileSaveStore`, the menu's source toggle and what the registry
-  does for two stores go: `showDirectoryPicker` is Chromium's alone, and no tool uses the
-  store. **Export** downloads the selected save's bare `.dat`, which CSBWin opens.
-  **Import** is a `.dat` dropped on the canvas while the dialog is up; there is no file
-  picker.
+  `.dmweb.json`, the JSON wrapper earlier builds wrote around such a file, is not read:
+  the store's upgrade kept of each the file it carried as `raw`.
+- **Every save is a row of IndexedDB** (`SaveRecord`, `src/data/saves/SaveStore.ts`): the
+  file's bytes beside what the list needs. The level, the champions' names and the
+  playthrough (below) are read from the file's own blocks when the row is written; the
+  data set, the date and whether F5 wrote it are the row's own, and the play time will be
+  (step 2). Nothing is JSON, and no row holds anything a `.dat` could not be listed
+  without.
+- **No store on disk.** IndexedDB (`BrowserSaveStore`) is the one store: a directory on
+  disk needs `showDirectoryPicker`, which is Chromium's alone. **Export** downloads the
+  selected save's bare `.dat`, which CSBWin opens. **Import** is a `.dat` dropped on the
+  canvas while the dialog is up; there is no file picker.
 - **A save knows its dungeon.** A row carries its data set's id, and the list shows the
   running data set's saves only (`GameSaves.dataSet`). The filter is the list's
   parameter, not its rule: `DEBT.md` G17's source save is picked across sets (a DM save
@@ -210,6 +210,9 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
   Champions, so it names a game from its first step, whoever is in the party. Two new
   games differ: `CsbRandom` takes its seed from `Math.random` at its first draw
   (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
+  A save of an earlier build may hold 0, as the author's four `.dmweb.json` files do:
+  every game saved so shares playthrough 0, and so does a game played on from one. What
+  the list and the two confirmations make of playthrough 0 is step 2's to settle.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
@@ -240,16 +243,23 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
 
 **The steps**
 
-1. ⏳ **The row.** Data set, playthrough and quick-slot flag beside the bytes, the list
-   filtered by data set, the file store and the source toggle removed. The IndexedDB
-   upgrade turns each `.dmweb.json` row into its `raw`, once; after it nothing reads
-   JSON (`applySaveBytes`' `rawFileOf`, `extractHeaderFromPrefix` and
-   `JSON_SAVE_FILE_EXTENSION` go). The author's `.dmweb.json` files on disk are converted
-   by hand, outside the engine.
+1. ✅ **The row.** The data set, the playthrough and whether F5 wrote it, beside the
+   bytes. `GameSaves` lists its data set's rows, and F9 loads the newest of them. The
+   store's version-2 upgrade (`src/data/saves/legacyRows.ts`, run once by `idb.ts`) keeps
+   of each older row the CSBWin file alone, out of its `.dmweb.json` when it is one, and
+   reads the row again from that file. An older row names no data set, so every one
+   becomes the default set's; a row that holds no CSBWin file, which no build could
+   load, is dropped. Nothing else in `src/` reads JSON. Evidence:
+   `tools/dump-save-menu.ts`, "the one save call" and "the store's upgrade". The
+   IndexedDB half of the upgrade (`upgradeFromVersion1`) no tool runs, since Node has no
+   IndexedDB. The author's `.dmweb.json` files on disk are converted by hand, outside
+   the engine; `tools/peek-dungeon.ts` reads one meanwhile.
 2. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
    two confirmations, the last save used, and the play time.
 3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
-4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
+4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
+   then a `.dat` on disk has no way into the page, the committed saves included: the
+   store's rows are the only saves it loads.
 5. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
 
 #### The file
@@ -329,38 +339,29 @@ Evidence:
   party is, what it carries and what every cell holds), `tools/dump-csbwin-timers.ts`
   (two saves whose door timers differ in one byte: one door opens, the other shuts),
   `tools/dump-dungeon-conversions.ts` (the conversions against the saves' converted
-  form) and `tools/dump-save-roundtrip.ts` (the file the stores write, saved and loaded:
+  form) and `tools/dump-save-roundtrip.ts` (the file a save is, saved and loaded:
   five cycles that leave the timer table the same size, and three played games whose
   every difference after a load is on the list of what a file does not hold).
 
 #### The menu
 
 The disk icon opens a menu drawn in the 320×200 buffer (`src/renderer/ui/SaveMenu.ts`
-over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the saves of the
-browser store or of a directory on disk (`src/data/saves/`), newest first, each row with
-its date, level and party. LOAD acts on the selection; SAVE always makes a new file, a
-`.dat` named for its date. Both,
+over `Menu.ts`, a faithful `_DoMenu` / `_WaitForMenuSelect`), listing the running data
+set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row with
+its date, level and party. LOAD acts on the selection; SAVE always makes a new row, its
+file a `.dat` named for its date. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
-writes one more save to the current source (the browser when the file source is not
-connected, since a key must never raise a folder picker), and F9 loads the newest
-loadable save of every store that can be listed without prompting. Each key says what it
+writes one more save, marked as the key's, and F9 loads the newest save of the data
+set, F5's or the menu's. Each key says what it
 did on a line of the message area, in white: "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE
 NOW" with no party, with a champion still being chosen, or while a script holds the loop,
 and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"
 (`doc/CSBwin-src/SaveGame.cpp:1266`) and "CAN'T FIND SAVED GAME!" (`:1585`) for a write
 that failed and for no save at all; a file that does not read gives the line the menu's
 status would show. Each outcome is also a line for the console, with the save's name,
-and with the error behind a failure. The five places it
+and with the error behind a failure. The four places it
 diverges from CSBWin's menu are listed in `doc/CSBWIN_MENU_REFERENCE.md`. Evidence:
 `tools/dump-save-menu.ts` and the golden frame `tools/frames/06-savemenu.png`.
-
-What the file source can do: listing a directory needs `showDirectoryPicker`, which is
-Chromium-only and hands back a handle for a directory the player picks. There is no path
-access, so a directory cannot be opened by name or created outside a granted handle. The
-handle is kept in IndexedDB, so the pick happens once; the permission is not, and Chrome
-asks again with one click per page load. Both calls need transient user activation, which
-is why a click while the menu is up is handled straight from the DOM event rather than
-through the game's mouse queue.
 
 #### Deferred
 

@@ -8,6 +8,7 @@ import { CSBGraphicsLoader } from './data/CSBGraphicsLoader';
 import { dataSetFor } from './data/DataSets';
 import { emptyDungeonData } from './data/DungeonLoader';
 import { GraphicsLoader } from './data/GraphicsLoader';
+import { BrowserSaveStore } from './data/saves';
 import { Game } from './engine/Game';
 import { buildGameTables, type GameTables } from './engine/GameTables';
 import { extractGraphicsTables, type GraphicsTables } from './data/tables/GraphicsTables';
@@ -282,7 +283,7 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
     });
 
     // The game's saves: the disk menu's, the boot's chooser's, and F5 and F9's.
-    const saves = new GameSaves(game, dataSet, {
+    const saves = new GameSaves(game, dataSet, new BrowserSaveStore(), {
         // A save packs a `CHARDESC`, and that needs graphic 26 for the champions who
         // carry only a portrait index.
         portraitOf: (champion) => screen?.portraitPixelsFor(champion),
@@ -300,9 +301,11 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
         // to the engine (the first half is the host's `openReincarnateScreen`).
         onReincarnated: () => refreshScreen(),
         // The save/load screen behind the disk icon. The UI owns the list and the
-        // buttons; serializing and restoring the world is the engine's, so it comes
-        // back through these three. The menu has stopped the clock.
-        onSaveGame: (store, taken) => saves.save(store, 'stopped', taken),
+        // buttons; the store, and serializing and restoring the world, are the
+        // engine's, so they come back through these. The menu has stopped the clock.
+        onListSaves: () => saves.list(),
+        onReadSave: (id) => saves.file(id),
+        onSaveGame: () => saves.save('stopped', false),
         onRestoreSave: (bytes) => saves.read(bytes),
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {

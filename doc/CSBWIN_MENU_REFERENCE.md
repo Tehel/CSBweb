@@ -339,13 +339,12 @@ four-slot chooser. Recorded here so the difference is never mistaken for a porti
    "save as often as you like". The list panel is built by tiling graphic 0's own title
    panel downward over the full-width button frame — the same self-blit technique the
    1/2/4-option layouts use — so no new art is invented.
-2. **A browser/file source toggle.** CSBWin has one filesystem; a browser has two, and
-   neither is the other's fallback.
-3. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
+2. **Per-entry date, level and party**, where CSBWin shows a filename and a rank letter.
    The rank letter is what the date replaces; the ordering rule is the same one
    (`modifiedTime`), only shown directly and newest-first rather than oldest-letter-first.
-4. **No "SAVE AND QUIT"** — left to the save menu's rework (`PLAN.md` → Phase 10).
-5. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
+3. **No "SAVE AND QUIT"**: a page does not quit, and loading another game's save is how a
+   player leaves one (`PLAN.md` → Phase 10).
+4. **Esc and right-click cancel.** CSBWin's menus take no key at all. This is an
    addition, not a changed behaviour.
 
 The faithful `_DoMenu` / `_WaitForMenuSelect` port lives in `src/renderer/ui/Menu.ts` and
