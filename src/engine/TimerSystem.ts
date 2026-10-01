@@ -1,6 +1,6 @@
 import { decodeObjectID, encodeObjectID, DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, rnEquals, type LocationRel, type ObjectID } from '../core/types';
 import type { CsbRandom } from '../core/random';
-import { sw } from '../core/intCast';
+import { sb, sw } from '../core/intCast';
 import type { DungeonState } from './DungeonState';
 import type { GameContext } from './GameContext';
 import { CHARFLAG_PORTRAIT_CHANGED, getChampionPossession, type PartyState } from './gameTypes';
@@ -327,23 +327,25 @@ export class TimerSystem {
     }
   }
 
+  /**
+   * `TT_71`, `TT_73` and `TT_79` take one off an `i8` counter, and `TT_74`, `TT_77` and
+   * `TT_78` their word off an `i16` shield (`doc/CSBwin-src/CSBCode.cpp:6519`,
+   * `:6549-6572`). None has a floor: a timer that takes back more than is there leaves
+   * the counter below zero.
+   */
   private processInvisibleTimer(): void {
     const party = this.ctx.party.state;
-    const value = party.invisible - 1;
-    party.invisible = value < 0 ? 0 : value;
+    party.invisible = sb(party.invisible - 1);
   }
 
   private processSeeThruWallsTimer(): void {
     const party = this.ctx.party.state;
-    const value = party.seeThruWalls - 1;
-    party.seeThruWalls = value < 0 ? 0 : value;
+    party.seeThruWalls = sb(party.seeThruWalls - 1);
   }
 
   private processPartyShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
-    const current = party.partyShield;
-    const next = current - sw(timer.timerWord6);
-    party.partyShield = next < 0 ? 0 : next;
+    party.partyShield = sw(party.partyShield - sw(timer.timerWord6));
     markAllPortraitsChanged(party, this.ctx.host);
   }
 
@@ -435,24 +437,19 @@ export class TimerSystem {
 
   private processSpellShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
-    const current = party.spellShield;
-    const next = current - sw(timer.timerWord6);
-    party.spellShield = next < 0 ? 0 : next;
+    party.spellShield = sw(party.spellShield - sw(timer.timerWord6));
     markAllPortraitsChanged(party, this.ctx.host);
   }
 
   private processFireShieldTimer(timer: TimerEntry): void {
     const party = this.ctx.party.state;
-    const current = party.fireShield;
-    const next = current - sw(timer.timerWord6);
-    party.fireShield = next < 0 ? 0 : next;
+    party.fireShield = sw(party.fireShield - sw(timer.timerWord6));
     markAllPortraitsChanged(party, this.ctx.host);
   }
 
   private processMagicFootprintsTimer(): void {
     const party = this.ctx.party.state;
-    const value = party.magicFootprintsActive - 1;
-    party.magicFootprintsActive = value < 0 ? 0 : value;
+    party.magicFootprintsActive = sb(party.magicFootprintsActive - 1);
   }
 
   private processOpenRoom(timer: TimerEntry): void {

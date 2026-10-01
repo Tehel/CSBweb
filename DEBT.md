@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C105 | Six spell timers stop their counter at zero, where CSBWin's go below | S | ⏳ |
+| C106 | The armour of a body part leaves out its wound and the party's sleep | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -124,7 +124,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C106 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C107 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -215,25 +215,20 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C105 ⏳ Six spell timers stop their counter at zero, where CSBWin's go below
+### C106 ⏳ The armour of a body part leaves out its wound and the party's sleep
 
-`ProcessTimers` takes a spell's effect back with no floor: `d.Invisible--` (`TT_71`),
-`d.SeeThruWalls--` (`TT_73`), `d.MagicFootprintsActive--` (`TT_79`), all `i8`, and
-`d.PartyShield = sw(d.PartyShield - timerWord6)` (`TT_74`), the same for `d.SpellShield`
-(`TT_77`) and `d.FireShield` (`TT_78`), all `i16` (`doc/CSBwin-src/CSBCode.cpp:6519`,
-`:6549-6572`, `Data.h:768-772`, `:783`). The port's six handlers write `0` for a result
-below it (`processInvisibleTimer`, `processSeeThruWallsTimer`, `processPartyShieldTimer`,
-`processSpellShieldTimer`, `processFireShieldTimer`, `processMagicFootprintsTimer`,
-`src/engine/TimerSystem.ts`), and `PartyState` declares the three shields `ui16`
-(`src/engine/gameTypes.ts`). A counter goes below zero when a timer takes back more than
-is there: `_FusionSequence` sets the three shields to 100 (`Attack.cpp:2276-2278`) while
-the timers of the shields cast before it still hold their amounts, and a save can hold
-any pair. The readers take the value as it is: the dots test `> 0`
-(`Character.cpp:1266-1274`), and `DamageCharacter` subtracts `d.SpellShield` or
-`d.FireShield` from the blow and adds `d.PartyShield` to the armour (`:2768`, `:2775`,
-`:2456`), so a shield below zero adds to the damage. Paying it means removing the six
-floors, typing the fields as CSBWin's, checking each reader against CSBWin's test, and
-a check in `tools/dump-fusion.ts` or a timer tool.
+`TAG01680a` ends with two steps the port's `armourStrength` does not have
+(`src/engine/MonsterAttack.ts`). After the garment, a part that is wounded loses
+`STRandom0_3() + 8`, `if (pcA3->ouches & (1 << possessionIndex))`, and a sleeping party's
+total is halved, `if (d.PartySleeping) D7W >>= 1`, before `ApplyLimits(0, D7W >> 1, 100)`
+(`doc/CSBwin-src/Character.cpp:2478-2486`). The port returns the clamp straight after
+the garment. So a wounded part is as well protected as a whole one, a sleeping party as
+an awake one, and the random sequence is one draw short for every wounded part a blow
+could land on. CSBWin also casts each sum to `i16` (`:2454-2458`, `:2469`), where the
+port adds plain numbers. `doc/CSBWIN_MONSTERS_REFERENCE.md` → "Armour" lists two missing
+terms that are no longer missing (`DetermineThrowingDistance`, and the load in
+`Quickness`, to be checked) and not these two. Paying it means the two steps and the
+casts, a check in `tools/dump-character-damage.ts`, and that section rewritten.
 
 ### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
 

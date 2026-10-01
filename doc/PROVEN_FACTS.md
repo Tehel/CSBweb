@@ -5036,3 +5036,36 @@ reads each size from the file (`DEBT.md` H, "Word sizes from the file").
 `tools/dump-data-sets.ts` checks both: the French set's tables differ from 1.2's in
 `attackNames` and `textDecode` only, and in every set graphics 30-32 cover their
 rectangles.
+
+## The spell counters have no floor
+
+Six party-wide counters are raised by a spell and taken back by its timer, and nothing
+holds any of them at zero:
+
+| Counter | Type | Raised | Taken back |
+| --- | --- | --- | --- |
+| `d.Invisible` | `i8` (`doc/CSBwin-src/Data.h:783`) | `d.Invisible++` (`Magic.cpp:1319`) | `TT_71`: `d.Invisible--` (`CSBCode.cpp:6519`) |
+| `d.SeeThruWalls` | `i8` (`Data.h:768`) | `++` (`Magic.cpp:1314`, `Attack.cpp:2016`) | `TT_73`: `--` (`CSBCode.cpp:6549`) |
+| `d.MagicFootprintsActive` | `i8` (`Data.h:769`) | `++` (`Magic.cpp:1333`) | `TT_79`: `--` (`CSBCode.cpp:6572`) |
+| `d.PartyShield` | `i16` (`Data.h:770`) | `sw(d.PartyShield + timerWord6)` (`Magic.cpp:1328`) | `TT_74`: `sw(d.PartyShield - timerWord6)` (`CSBCode.cpp:6551`) |
+| `d.SpellShield` | `i16` (`Data.h:772`) | `sw(… + timerWord6)` (`Attack.cpp:1219`) | `TT_77`: `sw(… - timerWord6)` (`CSBCode.cpp:6566`) |
+| `d.FireShield` | `i16` (`Data.h:771`) | `sw(… + timerWord6)` (`Attack.cpp:1228`) | `TT_78`: `sw(… - timerWord6)` (`CSBCode.cpp:6569`) |
+
+A counter goes below zero when a timer takes back more than is there.
+`_FusionSequence` writes 100 over the three shields (`Attack.cpp:2276-2278`) while the
+timers of the shields cast before it still hold their amounts, and a save holds the
+counters and the timers apart: the six are in block 4's tail, the bytes signed
+(`readCsbwinPartyTail`, `src/data/CsbwinCharacters.ts`).
+
+The readers take the value as it stands:
+
+- the three `i8` counters are tested `!= 0` (`Monster.cpp:527`, `Code11f52.cpp:3238`,
+  `Viewport.cpp:2639`, `CSBCode.cpp:4171`), so one below zero is a spell still running;
+- the shield dots test `> 0` (`Character.cpp:1266-1274`), and a new shield is quartered
+  when the counter is `> 50` (`Magic.cpp:1324`, `Attack.cpp:1215`, `:1224`);
+- `DamageCharacter` takes the spell or the fire shield off the blow,
+  `sw(D7W - d.SpellShield)` (`Character.cpp:2768`, `:2775`), and `TAG01680a` adds
+  `d.PartyShield` to the armour (`:2456`), so a shield below zero adds to the damage.
+
+`tools/dump-character-damage.ts` checks the six timers, the wrap at each type's lowest
+value, the save's bytes, and the blow and the armour under a shield below zero.

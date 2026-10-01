@@ -23,7 +23,7 @@
  */
 import { getChampionPossession, type Champion, type PartyState, type Skill } from '../engine/gameTypes';
 import type { Attribute } from '../engine/attributes';
-import { OBJECT_ID_NULL, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type i8, type i16, type ui8, type ui16, type ObjectID } from '../core/types';
 import { CHARDESC_SIZE, decodeCharField, encodeCharField } from './CsbwinSaveInfo';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import { readI16BE, readI32BE, readI8, readU16BE, readU32BE, readU8 } from '../core/bytes';
@@ -259,11 +259,11 @@ export function isMale(charFlags: number): boolean {
  */
 export interface CsbwinPartyTail {
   brightness: i16;
-  seeThruWalls: number;
-  magicFootprintsActive: number;
-  partyShield: number;
-  fireShield: number;
-  spellShield: number;
+  seeThruWalls: i8;
+  magicFootprintsActive: i8;
+  partyShield: i16;
+  fireShield: i16;
+  spellShield: i16;
   numFootprintEnt: number;
   freezeLifeTimer: number;
   indexOfFirstMagicFootprint: number;
@@ -272,7 +272,7 @@ export interface CsbwinPartyTail {
   footprints: number[];
   /** `d.Byte13220[24]`, which parallels the footprint ring. */
   footprintAges: number[];
-  invisible: number;
+  invisible: i8;
 }
 
 const TAIL = 4 * CHARDESC_SIZE;
@@ -285,8 +285,8 @@ export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
   const footprintAges = Array.from(block.subarray(TAIL + 62, TAIL + 86));
   return {
     brightness: readI16BE(block, TAIL + 0),
-    seeThruWalls: readU8(block, TAIL + 2),
-    magicFootprintsActive: readU8(block, TAIL + 3),
+    seeThruWalls: readI8(block, TAIL + 2),
+    magicFootprintsActive: readI8(block, TAIL + 3),
     partyShield: readI16BE(block, TAIL + 4),
     fireShield: readI16BE(block, TAIL + 6),
     spellShield: readI16BE(block, TAIL + 8),
@@ -296,7 +296,7 @@ export function readCsbwinPartyTail(block: Uint8Array): CsbwinPartyTail {
     indexOfLastMagicFootprint: readU8(block, TAIL + 13),
     footprints,
     footprintAges,
-    invisible: readU8(block, TAIL + 86),
+    invisible: readI8(block, TAIL + 86),
   };
 }
 

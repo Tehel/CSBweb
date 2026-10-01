@@ -5,7 +5,7 @@
  * Reference: doc/CSBWIN_ARCHITECTURE.md
  */
 
-import { OBJECT_ID_NULL, type ui8, type ui16, type ui32, type i16, type i32, type Direction, type Position, type ObjectID } from '../core/types';
+import { OBJECT_ID_NULL, type i8, type ui8, type ui16, type ui32, type i16, type i32, type Direction, type Position, type ObjectID } from '../core/types';
 import type { Attribute } from './attributes';
 
 /**
@@ -234,17 +234,27 @@ export interface PartyState {
     pendingOuches: number[];
     /** `d.objectInHand` — the object on the cursor, `RNnul` when there is none. */
     objectInHand: ObjectID;
-    partyShield: ui16;          // d.PartyShield
-    fireShield: ui16;           // d.FireShield
-    spellShield: ui16;          // d.SpellShield
+    /**
+     * `d.PartyShield`, `d.FireShield` and `d.SpellShield` (`doc/CSBwin-src/Data.h:770-772`):
+     * what the spells running have added. Signed, and below zero once a timer has taken
+     * back more than was there; `DamageCharacter` uses the value as it stands.
+     */
+    partyShield: i16;
+    fireShield: i16;
+    spellShield: i16;
     brightness: i16;            // Global ambient light accumulator (CSBWin d.Brightness)
-    invisible: i16;             // Active invisibility counter
-    seeThruWalls: i16;          // Active see-thru-walls counter
+    /**
+     * `d.Invisible` and `d.SeeThruWalls` (`doc/CSBwin-src/Data.h:783`, `:768`): the spells
+     * still running. Each is a counter read as "not zero", and its timer takes one off
+     * with no floor.
+     */
+    invisible: i8;
+    seeThruWalls: i8;
     /**
      * `d.MagicFootprintsActive`: the YA BRO ROS timers still running. The trail it
      * marks, and the range's two indices, are `PartyFootprints`'s.
      */
-    magicFootprintsActive: i16;
+    magicFootprintsActive: i8;
     lastMonsterAttackTime: i32; // CSBWin d.LastMonsterAttackTime (ticks)
     /**
      * `d.PartySleeping` — set by the sleep icon, button 145, and cleared by `WakeUp`

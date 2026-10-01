@@ -538,9 +538,9 @@ export class MonsterAttack {
         dealt = margin <= 0 ? 0 : scaledMultiply(dealt, 6, margin);
       } else {
         if (kind === 5) {
-          dealt = this.attributeScaledReduction(champ, 5, dealt) - party.spellShield;
+          dealt = sw(this.attributeScaledReduction(champ, 5, dealt) - party.spellShield);
         } else if (kind === 1) {
-          dealt = this.attributeScaledReduction(champ, 6, dealt) - party.fireShield;
+          dealt = sw(this.attributeScaledReduction(champ, 6, dealt) - party.fireShield);
         } else if (kind === 2) {
           // `P4 == 2` halves the *armour*, not the damage
           // (`doc/CSBwin-src/Character.cpp:2780`) — a pit fall and a poison cloud both

@@ -10,7 +10,7 @@
  * `ctx.systems.magic`.
  */
 import type { SpellDefinition } from '../data/spellTypes';
-import { applyLimits, sw } from '../core/intCast';
+import { applyLimits, sb, sw } from '../core/intCast';
 import { OBJNI_EMPTY_FLASK } from '../core/objectNameIndex';
 import { DBType, encodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, type ObjectID } from '../core/types';
 import { MSG_COLOR_SPELL } from './ActuatorSystem';
@@ -299,14 +299,14 @@ export class MagicSystem {
             break;
           }
           case 2: {
-            this.ctx.party.state.seeThruWalls = this.ctx.party.state.seeThruWalls + 1;
+            this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
             d6 = Math.trunc(d6 / 2);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
             break;
           }
           case 3: {
-            this.ctx.party.state.invisible = this.ctx.party.state.invisible + 1;
+            this.ctx.party.state.invisible = sb(this.ctx.party.state.invisible + 1);
             this.queueUtilityTimer(TimerFunction.TT_71, d6, 0);
             break;
           }
@@ -315,14 +315,14 @@ export class MagicSystem {
             if (this.ctx.party.state.partyShield > 50) {
               shieldAdd = Math.trunc(shieldAdd / 4);
             }
-            this.ctx.party.state.partyShield = this.ctx.party.state.partyShield + shieldAdd;
+            this.ctx.party.state.partyShield = sw(this.ctx.party.state.partyShield + shieldAdd);
             markAllPortraitsChanged(this.ctx.party.state, this.ctx.host);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_74, duration, shieldAdd);
             break;
           }
           case 6: {
-            this.ctx.party.state.magicFootprintsActive = this.ctx.party.state.magicFootprintsActive + 1;
+            this.ctx.party.state.magicFootprintsActive = sb(this.ctx.party.state.magicFootprintsActive + 1);
             this.ctx.footprints.markMagicFootprints(spellPower);
             const duration = d6 * d6;
             this.queueUtilityTimer(TimerFunction.TT_79, duration, 0);

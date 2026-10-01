@@ -29,7 +29,7 @@
  * which a boxed-in Lord Chaos starts and which holds the main loop to the credits.
  */
 import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, RoomType, type ObjectID } from '../core/types';
-import { div, sw } from '../core/intCast';
+import { div, sb, sw } from '../core/intCast';
 import { nameIndexOf, type GameContext } from './GameContext';
 import { getChampionPossession, type Champion } from './gameTypes';
 import { selectPaletteForLightLevel } from './LightLevel';
@@ -809,11 +809,11 @@ export class AttackSystem {
     let add = Math.trunc(fullStrength / 32);
     if (isSpellShield) {
       if (party.spellShield > 50) add = Math.trunc(add / 4);
-      party.spellShield = party.spellShield + add;
+      party.spellShield = sw(party.spellShield + add);
       this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_77, fullStrength, add);
     } else {
       if (party.fireShield > 50) add = Math.trunc(add / 4);
-      party.fireShield = party.fireShield + add;
+      party.fireShield = sw(party.fireShield + add);
       this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_78, fullStrength, add);
     }
     markAllPortraitsChanged(party, this.ctx.host);
@@ -1390,7 +1390,7 @@ export class AttackSystem {
       case AttackType.atk_WINDOW: {
         const duration = sw(this.ctx.random.below(this.masteryOf(pChar, params.skillNumber) + 8) + 5);
         // `d.SeeThruWalls++` plus the `TT_73` timer (`doc/CSBwin-src/Attack.cpp:2016`).
-        this.ctx.party.state.seeThruWalls = this.ctx.party.state.seeThruWalls + 1;
+        this.ctx.party.state.seeThruWalls = sb(this.ctx.party.state.seeThruWalls + 1);
         this.ctx.systems.magic.queueUtilityTimer(TimerFunction.TT_73, duration, 0);
         params.dataType = AttackDataType.ADT_Window;
         this.callAttackFilter(filter, params, 1);

@@ -1,10 +1,13 @@
 /**
  * CSBWin's integer casts (`doc/CSBwin-src/CSBTypes.h:134-137`), for the places the C++
- * relies on 16-bit wrap-around.
+ * relies on 8- or 16-bit wrap-around.
  */
 
 /** C's integer division: truncates toward zero, where `Math.floor` would not. */
 export const div = (a: number, b: number): number => Math.trunc(a / b);
+
+/** `sb(x)` — `(i8)(x)`: truncate to 8 bits and sign-extend. */
+export const sb = (v: number): number => (v << 24) >> 24;
 
 /** `sw(x)` — `(i16)(x)`: truncate to 16 bits and sign-extend. */
 export const sw = (v: number): number => (v << 16) >> 16;

@@ -75,6 +75,9 @@ This document captures the casting pipeline and spell effects from the CSBWin C+
 - `TT_78` subtracts `timerWord6` from `d.FireShield` and marks portraits dirty (`doc/CSBwin-src/CSBCode.cpp:6569-6571`).
 - `TT_79` decrements `d.MagicFootprintsActive` (`doc/CSBwin-src/CSBCode.cpp:6572`).
 
+None of the six has a floor, and each counter is signed: `doc/PROVEN_FACTS.md` → "The
+spell counters have no floor".
+
 ## Missile launch path
 
 - `CharacterThrowsSpell()` checks mana, subtracts it, sets stats-changed, computes `decayRate` from `MaxMana/8`, and calls `LaunchObject()` (`doc/CSBwin-src/Magic.cpp:CharacterThrowsSpell`).

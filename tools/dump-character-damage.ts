@@ -25,6 +25,7 @@ import { resolve } from 'node:path';
 
 import { PotionType } from '../src/core/constants';
 import { Direction, Position } from '../src/core/types';
+import { CHARACTER_BLOCK_SIZE, readCsbwinPartyTail, writeCsbwinPartyTail } from '../src/data/CsbwinCharacters';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import { Game } from '../src/engine/Game';
@@ -264,6 +265,93 @@ console.log('=== DrawCharacterState: the name and the box drawn again ===');
   processTimersAt(g, 250);
   console.log(`a party shield's TT_74: shield ${party.partyShield}, [${draws.join('; ')}]`);
   check(party.partyShield === 0 && draws.join(';') === all, "a party shield's TT_74 is MarkAllPortraitsChanged (CSBCode.cpp:6550-6553)");
+
+  // No floor: a timer that takes back more than is there leaves the counter below zero
+  // (`CSBCode.cpp:6519`, `:6549-6572`). `_FusionSequence` writes 100 over what the spells
+  // had added (`Attack.cpp:2276-2278`), while their timers still hold their amounts.
+  g.ctx.state.tickCount = 260;
+  party.partyShield = 100;
+  party.spellShield = 100;
+  party.fireShield = 100;
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_74, 10, 130);
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_77, 10, 110);
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_78, 10, 125);
+  party.invisible = 0;
+  party.seeThruWalls = 0;
+  party.magicFootprintsActive = 0;
+  for (const fn of [TimerFunction.TT_71, TimerFunction.TT_73, TimerFunction.TT_79]) {
+    g.systems.magic.queueUtilityTimer(fn, 10, 0);
+  }
+  processTimersAt(g, 270);
+  console.log(`timers taking back more than is there: party ${party.partyShield}, spell ${party.spellShield}, `
+    + `fire ${party.fireShield}, invisible ${party.invisible}, see-through ${party.seeThruWalls}, `
+    + `footprints ${party.magicFootprintsActive}`);
+  check(party.partyShield === -30 && party.spellShield === -10 && party.fireShield === -25,
+    'TT_74, TT_77 and TT_78 take a shield below zero (CSBCode.cpp:6551, :6566, :6569)');
+  check(party.invisible === -1 && party.seeThruWalls === -1 && party.magicFootprintsActive === -1,
+    'TT_71, TT_73 and TT_79 take their counter below zero (CSBCode.cpp:6519, :6549, :6572)');
+
+  // The three counters are `i8` (`Data.h:768-769`, `:783`), and the shields `i16`.
+  party.invisible = -128;
+  party.spellShield = -32768;
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_71, 10, 0);
+  g.systems.magic.queueUtilityTimer(TimerFunction.TT_77, 10, 1);
+  processTimersAt(g, 280);
+  console.log(`at their type's lowest: invisible ${party.invisible}, spell ${party.spellShield}`);
+  check(party.invisible === 127 && party.spellShield === 32767, 'an i8 counter and an i16 shield wrap round');
+
+  // A save keeps them signed: block 4's tail holds the three counters as bytes and the
+  // shields as words (`Data.h:768-772`, `:783`).
+  {
+    const block = new Uint8Array(CHARACTER_BLOCK_SIZE);
+    writeCsbwinPartyTail(block, {
+      ...readCsbwinPartyTail(block),
+      invisible: -1, seeThruWalls: -2, magicFootprintsActive: -3, partyShield: -30, spellShield: -10, fireShield: -25,
+    });
+    const tail = readCsbwinPartyTail(block);
+    console.log(`through a save: party ${tail.partyShield}, spell ${tail.spellShield}, fire ${tail.fireShield}, `
+      + `invisible ${tail.invisible}, see-through ${tail.seeThruWalls}, footprints ${tail.magicFootprintsActive}`);
+    check(tail.invisible === -1 && tail.seeThruWalls === -2 && tail.magicFootprintsActive === -3
+      && tail.partyShield === -30 && tail.spellShield === -10 && tail.fireShield === -25,
+    'a counter below zero is read back below zero');
+  }
+
+  // `DamageCharacter` takes a shield as it stands: it subtracts the spell or the fire
+  // shield from the blow (`Character.cpp:2768`, `:2775`) and adds the party's to the
+  // armour (`:2456`).
+  for (const [kind, name] of [[5, 'spell'], [1, 'fire']] as const) {
+    const dealt = [0, -10].map((shield) => {
+      const probe = makeGame(1, []);
+      const state = probe.ctx.party.state;
+      if (kind === 5) state.spellShield = 10; else state.fireShield = 10;
+      probe.systems.magic.queueUtilityTimer(kind === 5 ? TimerFunction.TT_77 : TimerFunction.TT_78, 10, 10 - shield);
+      processTimersAt(probe, 10);
+      return probe.systems.monsterAttack.damageCharacter(0, 40, 0, kind);
+    });
+    console.log(`a ${name} blow of 40: ${dealt[0]} with the shield at 0, ${dealt[1]} with it at -10`);
+    check(dealt[1]! > dealt[0]!, `a ${name} shield below zero adds to the blow (Character.cpp:${kind === 5 ? 2768 : 2775})`);
+  }
+  {
+    const armour = [0, -30].map((shield) => {
+      const probe = makeGame(1, []);
+      probe.ctx.party.state.partyShield = 60;
+      probe.systems.magic.queueUtilityTimer(TimerFunction.TT_74, 10, 60 - shield);
+      processTimersAt(probe, 10);
+      // Vitality 1: the random term is `rand % 1`, so what is left is the shield's half.
+      const hero = probe.ctx.party.state.champions[0]!;
+      hero.attributes.stats = makeAddCharacterAttributes([60, 60, 1, 50, 50, 20, 20]);
+      hero.attackStatModifier = 80;
+      return probe.systems.monsterAttack.armourStrength(hero, 2, false);
+    });
+    console.log(`armour with 80 of the champion's own: ${armour[0]} with the party shield at 0, ${armour[1]} with it at -30`);
+    check(armour[0] === 40 && armour[1] === 25, 'a party shield below zero takes off the armour (Character.cpp:2454-2458, :2486)');
+  }
+  party.partyShield = 0;
+  party.spellShield = 0;
+  party.fireShield = 0;
+  party.invisible = 0;
+  party.seeThruWalls = 0;
+  party.magicFootprintsActive = 0;
 
   // A Ya potion: the drinker's own shield, and the `TT_72` that takes it back.
   g.ctx.state.tickCount = 300;
