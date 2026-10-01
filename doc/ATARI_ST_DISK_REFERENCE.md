@@ -2,7 +2,7 @@
 
 What the original Atari ST game disk holds that CSBWin does not: the boot chain, the FTL
 logo animation (`SWOOSH.IMG`) that ran before the title, and how the disk's data files
-differ from the `graphics.dat` and `dungeon.dat` this port ships in `dm-atari/`. The
+differ from the `graphics.dat` and `dungeon.dat` CSBWin ships (`dm-windows/`). The
 English 1.2 disk is the reference throughout; the French 1.3 disk, the same but
 translated, has its own section at the end.
 
@@ -30,9 +30,10 @@ a cluster, 16 root entries), and the root directory holds six files:
 | `START.PAK` | 95148 | 1988-02-24 | `60df1980…` | Presumably the packed game program. Not examined. |
 | `DUNGEON.DAT` | 33442 | 1988-03-01 | `050fb2cf…` | The 1.2 dungeon. |
 
-Three of them are in `static/gamefiles/dm-atari-1.2/`, under lower-case names:
-`graphics.dat`, `dungeon.dat` and `swoosh.img`, with the swoosh's sound as PCM (below).
-The data files load: the graphics through
+Three of them are in the repository under lower-case names: `graphics.dat` and
+`dungeon.dat` in `static/gamefiles/dm-atari-1.2/`, and `swoosh.img` in
+`static/gamefiles/swoosh/`, which every version shares, with the swoosh's sound as PCM
+(below). The data files load: the graphics through
 `GraphicsLoader` and `extractGraphicsTables`, the dungeon through `tools/peek-dungeon.ts
 --file`.
 
@@ -188,7 +189,7 @@ the swoosh ships as a recording, not as a chip. The source is the YouTube video
 Atari Mega STE booting the game. Its audio track (Opus, 48 kHz) is silent from 12.75 s
 until the swoosh starts at 16.845 s.
 
-`static/gamefiles/dm-atari-1.2/swoosh.wav` (md5 `53ca1660791d0d9e1f6cf15b818d7932`) is
+`static/gamefiles/swoosh/swoosh.wav` (md5 `53ca1660791d0d9e1f6cf15b818d7932`) is
 16.835–17.845 s of that track: mono, 16-bit, 48 kHz, 1.01 s, the last 150 ms faded out and
 the peak scaled to −1 dBFS. It swells for about 0.4 s, rising in pitch as the noise period
 falls, and decays to near silence by 0.8 s.
@@ -209,17 +210,16 @@ before the script. After the glint the logo stays up until the title's dark blue
 at 20.80 s, with two grey screens in between (17.60–18.28 s and 19.56–20.52 s). What causes
 them is not established, so the recording does not give a hold time the port could copy.
 
-## The 1.2 data files against `dm-atari/`
+## The 1.2 data files against CSBWin's
 
-`static/gamefiles/dm-atari/graphics.dat` (md5 `0b5e042f…`) is byte-identical to
-`dm-windows/graphics.dat`, the file CSBWin's DM distribution
-(`DM_Windows_x86-32_20171117.zip`) ships. It is not the 1.2 disk's. Which version it comes
-from is not established. Both have 563 items, and they differ in seven:
+`static/gamefiles/dm-windows/graphics.dat` (md5 `0b5e042f…`) is the file CSBWin's DM
+distribution (`DM_Windows_x86-32_20171117.zip`) ships. It is not the 1.2 disk's. Which
+version it comes from is not established. Both have 563 items, and they differ in seven:
 
-| Item | What it is | 1.2 disk | `dm-atari/` |
+| Item | What it is | 1.2 disk | CSBWin's |
 | --- | --- | --- | --- |
-| 5 | The credits scroll | The same text. From "Dennis Walker" down, the lines sit a few pixels apart horizontally. | |
-| `0xe8` (232) | Crack Switch (In), front view (`121 + 2*55 + 1`) | 8 pixels differ, x 11–14, y 2–4 | |
+| 5 | The credits scroll | The text as drawn | Four bytes differ, and from "Dennis Walker" down four lines of the text are corrupted ("Jaros" reads "Jeros") |
+| `0xe8` (232) | Crack Switch (In), front view (`121 + 2*55 + 1`) | The button pushed into the crack | 8 pixels differ, x 11–14, y 2–4: the crack is empty |
 | `0x18c` (396) | A 64x7 graphic, not identified | 261 pixels differ | |
 | `0x22c` | Object names | `BRO POTION`, `MA POTION` | `ANTIVEN POTION`, `MON POTION` |
 | `0x22e` | `Byte4100[55]`, Crack Switch (In)'s coordinate set (raw byte 3201) | **2** | **0** |
@@ -237,13 +237,17 @@ entry). `0x230`'s attack tables start at byte 64 (7 tables of 44 bytes, in `UITa
 order) and `Spells` at 1026 (8 bytes an entry).
 
 **The Crack Switch.** The 1.2 `graphics.dat` puts Crack Switch (In) in coordinate set 2,
-low on the wall, where Crack Switch (Out) is. That is the value `correctCrackSwitchInPlacement`
-writes (`doc/PROVEN_FACTS.md` → "Crack Switch (In) placement"). The misplaced crack is a
-property of the `graphics.dat` CSBWin ships, not of the original game.
+low on the wall, where Crack Switch (Out) is. The misplaced crack is a property of the
+`graphics.dat` CSBWin ships, not of the original game.
+
+**`dm-atari/graphics.dat` is CSBWin's file with 1.2's items 5, 232 and `0x22e`**: the
+credits, the pressed crack's button and the crack's placement, and no other change
+(`doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's with three items from the
+1.2 disk").
 
 `dungeon.dat` is the same size in both (33442 bytes, uncompressed) and differs in four
 bytes: bit 7 of `word2`, which CSBWin calls `important` (`doc/CSBwin-src/CSB.h:1148`), is
-set in the 1.2 file and clear in ours for four weapons: a sling (weapon #54, map 0 (16,7))
+set in the 1.2 file and clear in CSBWin's (`dm-atari/` and `dm-windows/`) for four weapons: a sling (weapon #54, map 0 (16,7))
 and three rocks (weapons #104, #105, #106, map 1).
 
 ## The French 1.3 disk
@@ -260,7 +264,7 @@ in `static/gamefiles/dm-atari-1.3-fr/`, and both load:
 | `dungeon.dat` | 33774 | 1988-05-20 | `dfd82fb7d44e4b5cc81add257655c966` |
 
 **Nothing but the language changes.** Every difference from 1.2 is text, in words or in
-pixels. What 1.2 changed against `dm-atari/` stays as 1.2 has it: `Byte4100[55]` is 2, and
+pixels. What 1.2 changed against CSBWin's files stays as 1.2 has it: `Byte4100[55]` is 2, and
 the credits scroll, graphic 232, graphic 396, the monster and object bytes, the attack
 values and the four `important` weapons are 1.2's.
 

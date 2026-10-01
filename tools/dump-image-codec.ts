@@ -13,20 +13,22 @@
  *   with a 16-bit count.
  * - `0xD` threw.
  *
- * Exactly one real image in either data set uses any of them — graphic 5, the credits
- * scroll, which has four `0xA` runs — and the whole picture slid right from (78,55) on,
- * wrapping at the bottom. Items 558..562 use the others but they are the tables
+ * Exactly one real image uses any of them — graphic 5, the credits scroll, which has four
+ * `0xA` runs in CSBWin's `graphics.dat` — and the whole picture slid right from (78,55)
+ * on, wrapping at the bottom. The Atari ST 1.2 disk's file, and so `dm-atari/`'s, has
+ * `0xB` in those four bytes (`doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is
+ * CSBWin's with three items from the 1.2 disk"), so the reference below is CSBWin's file. Items 558..562 use the others but they are the tables
  * `0x22e`..`0x232`, not images.
  *
  * So this tool checks three things:
  *
- * 1. **Against a real CSBWin screen.** `tools/reference/csbwin-credits.png` is graphic 5 as
- *    CSBWin renders it. This is the only ground truth in the project that did not come out
+ * 1. **Against a real CSBWin screen.** `tools/reference/csbwin-credits.png` is graphic 5 of
+ *    CSBWin's `graphics.dat` (`dm-windows/`) as CSBWin renders it. This is the only ground truth in the project that did not come out
  *    of our own code, which makes it the only check here that a symmetrical bug in both
  *    reader and writer could not satisfy.
  * 2. **Every opcode on its own**, on hand-built streams, so a regression names the opcode
  *    rather than an image.
- * 3. **Every image in both data sets decodes to exactly its own size.** A stream that stops
+ * 3. **Every image in each data set decodes to exactly its own size.** A stream that stops
  *    short or overruns means a count is wrong somewhere, and this catches it across 538
  *    images rather than the six the golden frames happen to show.
  *
@@ -41,7 +43,8 @@ import { readPng } from './lib/png';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf } from './lib/game';
 
-const DATA_SETS = ['static/gamefiles/dm-atari', 'static/gamefiles/conflux-3.5-b8'];
+/** CSBWin's own DM `graphics.dat` first: the reference screen is of it. */
+const DATA_SETS = ['static/gamefiles/dm-windows', 'static/gamefiles/dm-atari', 'static/gamefiles/conflux-3.5-b8'];
 const REFERENCE = 'tools/reference/csbwin-credits.png';
 const CREDITS_GRAPHIC = 5;
 

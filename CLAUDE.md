@@ -21,9 +21,10 @@ Corollaries:
   each other. Even CSBWin's own typos are preserved where they are identifiers
   (e.g. `TT_DESSAGE`).
 - Tables must be extracted at runtime from `graphics.dat` / `dungeon.dat`, never hardcoded.
-- Documented exceptions exist and are rare — see "Audio sample rates" and "Crack Switch
-  (In) placement" in `doc/PROVEN_FACTS.md`, the two places we knowingly diverge (listed
-  under `DEBT.md` H). Don't create new ones silently.
+- Documented exceptions exist and are rare — see "Audio sample rates" and
+  "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk" in
+  `doc/PROVEN_FACTS.md`, the two places we knowingly diverge (listed under `DEBT.md` H).
+  Don't create new ones silently.
 
 ## Where things are written down
 

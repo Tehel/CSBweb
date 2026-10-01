@@ -8,11 +8,13 @@
  * and `RotateActuatorList` (`doc/CSBwin-src/Code11f52.cpp:3465`) then brings the "In"
  * actuator last.
  *
- * `graphics.dat` gives the two ornaments different coordinate sets — 2 (low on the wall)
- * and 0 (eye level) — for bitmaps of the same size, so CSBWin draws the pressed crack
- * higher up the wall. `correctCrackSwitchInPlacement` is the port's one-byte correction
- * (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"). This tool proves that the
- * defect is in the data, that only that byte changes, and that the crack drawn after the
+ * CSBWin's `graphics.dat` (`dm-windows/`) gives the two ornaments different coordinate
+ * sets — 2 (low on the wall) and 0 (eye level) — for bitmaps of the same size, so CSBWin
+ * draws the pressed crack higher up the wall. The Atari ST 1.2 disk's holds 2 for both,
+ * and `dm-atari/graphics.dat` carries 1.2's item (`tools/dump-dm-atari-graphics.ts`,
+ * `doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk"). The port reads the table as it
+ * stands, as CSBWin does. This tool proves that the defect is in CSBWin's data only, that
+ * the port reads `dm-atari/`'s table unchanged, and that there the crack drawn after the
  * click lands where the one before it did.
  *
  * Run: `npx tsx tools/dump-crack-switch.ts`
@@ -23,16 +25,17 @@ import { resolve } from 'node:path';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID } from '../src/core/types';
 import type { ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
+import { GraphicsLoader } from '../src/data/GraphicsLoader';
 import type { Game } from '../src/engine/Game';
 import type { SummarizeRoomData } from '../src/renderer/bytecode/Types';
-import {
-  WALL_ORNAMENT_CRACK_SWITCH_IN,
-  WALL_ORNAMENT_CRACK_SWITCH_OUT,
-  readWallDecorationRectSetIndex,
-} from '../src/data/tables/ObjectTables';
+import { readWallDecorationRectSetIndex } from '../src/data/tables/ObjectTables';
 import { summarizeRoomInfoCsbwin } from '../src/renderer/csbwin/SummarizeRoomInfo';
 import { check, finish } from './lib/check';
 import { graphicsTablesOf, newGame, stockGraphics } from './lib/game';
+
+/** Wall ornaments 50 and 55: one crack switch, button out and button pushed in. */
+const WALL_ORNAMENT_CRACK_SWITCH_OUT = 50;
+const WALL_ORNAMENT_CRACK_SWITCH_IN = 55;
 
 const PARTY = new Position(14, 29, 4);
 const FACING_WEST = 3;
@@ -87,29 +90,36 @@ function ornamentAhead(game: Game): number {
 function main(): void {
   const graphics = stockGraphics();
   const raw = readWallDecorationRectSetIndex(graphics.getRawGraphic(0x22e), graphicsTablesOf(graphics).viewport.wallRectanglesOffset);
-  const fixed = objectTables.wallDecorationRectSetIndex;
+  const port = objectTables.wallDecorationRectSetIndex;
+  const csbwin = new GraphicsLoader();
+  csbwin.loadFromArray(new Uint8Array(readFileSync(resolve('static/gamefiles/dm-windows/graphics.dat'))));
+  const csbwinRaw = readWallDecorationRectSetIndex(csbwin.getRawGraphic(0x22e), graphicsTablesOf(csbwin).viewport.wallRectanglesOffset);
 
   // --- the data -------------------------------------------------------------------
   // Canaries that the 60 bytes are Byte4100: the three alcoves (1-3) share set 1, the
   // three amalgam ornaments (56-58) set 6, the Lord Order (59) set 7.
-  console.log(['ornament', 'raw set', 'port set', 'front bitmap', 'side bitmap'].join('\t'));
+  console.log(['ornament', 'CSBWin set', 'dm-atari set', 'port set', 'front bitmap', 'side bitmap'].join('\t'));
   for (const n of [WALL_ORNAMENT_CRACK_SWITCH_OUT, WALL_ORNAMENT_CRACK_SWITCH_IN]) {
     const side = graphics.getImage(ornamentGraphic(n));
     const front = graphics.getImage(ornamentGraphic(n) + 1);
-    console.log([n, raw[n], fixed[n], `${front.width}x${front.height}`, `${side.width}x${side.height}`].join('\t'));
+    console.log([n, csbwinRaw[n], raw[n], port[n], `${front.width}x${front.height}`, `${side.width}x${side.height}`].join('\t'));
   }
-  check([1, 2, 3].every((n) => raw[n] === 1) && [56, 57, 58].every((n) => raw[n] === 6) && raw[59] === 7,
-    'canary: alcoves in set 1, amalgams in set 6, Lord Order in set 7 — the bytes are Byte4100');
-  check(raw[WALL_ORNAMENT_CRACK_SWITCH_OUT] === 2, 'graphics.dat: Crack Switch (Out) is in set 2, low on the wall');
-  check(raw[WALL_ORNAMENT_CRACK_SWITCH_IN] === 0, 'graphics.dat: Crack Switch (In) is in set 0, at eye level — the defect');
+  for (const [name, table] of [['CSBWin', csbwinRaw], ['dm-atari', raw]] as const) {
+    check([1, 2, 3].every((n) => table[n] === 1) && [56, 57, 58].every((n) => table[n] === 6) && table[59] === 7,
+      `canary (${name}): alcoves in set 1, amalgams in set 6, Lord Order in set 7 — the bytes are Byte4100`);
+  }
+  check(csbwinRaw[WALL_ORNAMENT_CRACK_SWITCH_OUT] === 2, 'CSBWin\'s graphics.dat: Crack Switch (Out) is in set 2, low on the wall');
+  check(csbwinRaw[WALL_ORNAMENT_CRACK_SWITCH_IN] === 0, 'CSBWin\'s graphics.dat: Crack Switch (In) is in set 0, at eye level — the defect');
+  check(raw[WALL_ORNAMENT_CRACK_SWITCH_OUT] === 2 && raw[WALL_ORNAMENT_CRACK_SWITCH_IN] === 2,
+    'dm-atari\'s graphics.dat holds 1.2\'s byte: both cracks in set 2');
+  check([...raw.keys()].every((i) => raw[i] === port[i]), 'so the port reads dm-atari\'s table unchanged');
+  const csbwinPort = graphicsTablesOf(csbwin).objects.wallDecorationRectSetIndex;
+  check([...csbwinRaw.keys()].every((i) => csbwinRaw[i] === csbwinPort[i]), 'and CSBWin\'s unchanged too: no correction, as in CSBWin');
   for (const g of [0, 1]) {
     const a = graphics.getImage(ornamentGraphic(WALL_ORNAMENT_CRACK_SWITCH_OUT) + g);
     const b = graphics.getImage(ornamentGraphic(WALL_ORNAMENT_CRACK_SWITCH_IN) + g);
     check(a.width === b.width && a.height === b.height, `the ${g ? 'front' : 'side'} bitmaps of Out and In are the same size`);
   }
-  check(fixed[WALL_ORNAMENT_CRACK_SWITCH_IN] === 2, 'the port reads Crack Switch (In) in set 2, as its Out twin');
-  const changed = [...raw.keys()].filter((i) => raw[i] !== fixed[i]);
-  check(changed.length === 1 && changed[0] === WALL_ORNAMENT_CRACK_SWITCH_IN, `only entry 55 differs from graphics.dat (differs: ${changed.join(',')})`);
 
   // --- the wall, before and after the click ----------------------------------------
   const game = makeGame();
@@ -126,15 +136,15 @@ function main(): void {
 
   console.log('');
   console.log(['', 'face actuators', 'ornament seen', 'set'].join('\t'));
-  console.log(['before', before.map((rn) => decodeObjectID(rn).index).join(','), seenBefore, fixed[seenBefore]].join('\t'));
-  console.log(['after', after.map((rn) => decodeObjectID(rn).index).join(','), seenAfter, fixed[seenAfter]].join('\t'));
+  console.log(['before', before.map((rn) => decodeObjectID(rn).index).join(','), seenBefore, port[seenBefore]].join('\t'));
+  console.log(['after', after.map((rn) => decodeObjectID(rn).index).join(','), seenAfter, port[seenAfter]].join('\t'));
 
   check(before.length === 2, 'two actuators on the east face');
   check(seenBefore === WALL_ORNAMENT_CRACK_SWITCH_OUT, 'before the click the party sees Crack Switch (Out)');
   check(touched, 'the click touches the wall');
   check(after.length === 2 && after[0] === before[1] && after[1] === before[0], 'RotateActuatorList swaps the two actuators');
   check(seenAfter === WALL_ORNAMENT_CRACK_SWITCH_IN, 'after it the party sees Crack Switch (In)');
-  check(fixed[seenBefore] === fixed[seenAfter], 'and draws it with the same coordinate set: the crack does not move');
+  check(port[seenBefore] === port[seenAfter], 'and draws it with the same coordinate set: the crack does not move');
 
   finish();
 }

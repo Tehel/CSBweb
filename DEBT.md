@@ -738,8 +738,8 @@ and down a pit, and check what the extra offers after each move.
 The Atari ST disk booted into `SWOOSH.IMG`, which drew the FTL logo with a palette reveal
 and a noise "swoosh" before the game's own title animation. CSBWin never had it: it lives
 in the boot chain, not in the game program. Everything about it is in
-`doc/ATARI_ST_DISK_REFERENCE.md` → "`SWOOSH.IMG`", and `static/gamefiles/dm-atari-1.2/`
-holds the file and a recording of its sound.
+`doc/ATARI_ST_DISK_REFERENCE.md` → "`SWOOSH.IMG`", and `static/gamefiles/swoosh/`, which
+every version shares, holds the file and a recording of its sound.
 
 To do:
 
@@ -750,7 +750,8 @@ To do:
   30 VBLs, before `TitleSequence`, starting the sound at VBL 0.
 - The sound: `swoosh.wav`, a recording of the real one, through `SoundManager`.
 - **The hold after VBL 30 is the author's arbitrary choice**, since neither the disk nor
-  the recording gives one. The code marks it as such.
+  the recording gives one. The code marks it as such. Initial value will be to stay still 1s
+  after the end of the animation, then quickly fade to black and start the title animation.
 - Behind the extras' setting, off by default, so the boot and the golden frames are
   unchanged with it off.
 
@@ -906,9 +907,12 @@ Recorded so that nobody "fixes" them.
   CSBWin's saves store the words.
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
-- 🚫 **Crack Switch (In) placement.** `Byte4100[55]` is read as 2, not `graphics.dat`'s 0,
-  so a pressed crack switch stays low on the wall as in the Atari ST original, whose 1.2
-  `graphics.dat` holds 2: `doc/PROVEN_FACTS.md` → "Crack Switch (In) placement".
+- 🚫 **`dm-atari/graphics.dat` is not CSBWin's file.** It is CSBWin's with two items from
+  the Atari ST 1.2 disk: the credits scroll, which CSBWin's corrupts, and the pressed
+  crack switch, whose front view shows its button pushed in and whose `Byte4100[55]`
+  keeps it low on the wall, as in the original. `dm-windows/` keeps
+  CSBWin's file as it ships. `doc/PROVEN_FACTS.md` → "`dm-atari/graphics.dat` is CSBWin's
+  with three items from the 1.2 disk"; `tools/dump-dm-atari-graphics.ts` builds and checks it.
 - 🚫 **The see-through door edge's last row.** `StdDrawSeeThruDoorEdge` reads graphic 41
   from pixel 128, so its last row runs 32 pixels past the graphic's end, into whatever
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)

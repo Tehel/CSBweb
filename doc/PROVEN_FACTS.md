@@ -294,40 +294,62 @@ The door sound specifically was verified correct in DMweb: the divergence toward
 pitch has already been applied and matches the real game. (`NOTES.md` still carries an
 older entry saying doors sound wrong — that entry is stale.)
 
-## Crack Switch (In) placement (deliberate divergence from CSBWin)
+## `dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk (deliberate divergence from CSBWin)
 
-Each wall ornament is drawn through one of eight coordinate sets
-(`d.wallDecorationPosition[8][13]`), chosen per global ornament number by `d.Byte4100[60]`
-(`doc/CSBwin-src/Code390e.cpp:232-234`, used at `doc/CSBwin-src/CSBCode.cpp:3218-3220`).
-Both tables come from `graphics.dat` item `0x22e`. The stock DM Atari `graphics.dat`
-(md5 `0b5e042f2c7f2752bac78292cc6bb07e`) and the Conflux 3.5 one both hold:
+`static/gamefiles/dm-atari/graphics.dat` (md5 `6e1396f7abcfb1899e79d671390b41ce`) is the
+`graphics.dat` CSBWin's DM package ships (`dm-windows/`, md5
+`0b5e042f2c7f2752bac78292cc6bb07e`) with the compressed bytes of three items, 5, 232 and
+`0x22e`, taken from the English Atari ST 1.2 disk's (`dm-atari-1.2/`, md5
+`9ce2eaf7a9e78620e3f17594437caffa`), both size tables following. Each donated item
+differs from CSBWin's only where said below, and every other item is CSBWin's byte for
+byte. `tools/dump-dm-atari-graphics.ts` proves all of it and rebuilds the file
+(`--write`). `graphics.dat` carries no checksum, and CSBWin's graphics signature, an MD5 of
+the file (`doc/CSBwin-src/data.cpp:1943-1975`), is checked only against an expected value
+a save or a dungeon states (`doc/CSBwin-src/Graphics.cpp:1784-1805`); DM's state none, and
+the port writes none (`src/data/CsbwinExtendedFeatures.ts`).
+
+**Item 5, the credits scroll.** Decompressed, CSBWin's differs from 1.2's in four bytes
+(1398, 2283, 3096, 3983: 169 against 1.2's 185). They are the high nibbles of four
+opcodes, `0xA` in CSBWin's and `0xB` in 1.2's, and CSBWin's stream draws four lines of the
+text wrong from "Dennis Walker" down, then stops four pixels short of the picture; 1.2's
+fills it exactly (`tools/dump-image-codec.ts`). Golden frame `08-credits` shows 1.2's.
+
+**Item `0x22e`, `Byte4100[55]`: Crack Switch (In) placement.** Each wall ornament is drawn
+through one of eight coordinate sets (`d.wallDecorationPosition[8][13]`), chosen per global
+ornament number by `d.Byte4100[60]` (`doc/CSBwin-src/Code390e.cpp:232-234`, used at
+`doc/CSBwin-src/CSBCode.cpp:3218-3220`). Both tables come from item `0x22e`, and
+`Byte4100` starts at its byte 3146. CSBWin's file (and the Conflux 3.5 one) hold:
 
 | Ornament | `Byte4100` | Front view (relative position 12) | Bitmaps (side, front) |
 | --- | --- | --- | --- |
 | 50 Crack Switch (Out) | 2 | y 92–119, low on the wall | 16×19, 32×28 |
 | 55 Crack Switch (In) | 0 | y 36–63, eye level | 16×19, 32×28 |
 
-Names from `doc/CSBwin-src/AsciiDump.cpp:957` (50) and by the Out/In pairing of 49/54
-(`:951`, `:960`). The two bitmaps are the same crack, with the button out and pushed in.
+1.2's holds 2 for both, at byte 3201, and that is the item's only difference. Names from
+`doc/CSBwin-src/AsciiDump.cpp:957` (50) and by the Out/In pairing of 49/54 (`:951`, `:960`).
+The two bitmaps are the same crack, with the button out and pushed in.
 
 Where it shows: level 4, the east face of (13,29), seen from (14,29) facing west. Two
 once-only type-1 switches: #601 (ornament 55, local action 1) first, #163 (ornament 50,
 opens the grid at (13,28)) second. A wall shows its last actuator's ornament
 (`doc/CSBwin-src/Codea59a.cpp:136-139`), so 50 is shown until the click; local action 1
 is `RotateActuatorList` (`doc/CSBwin-src/Mouse.cpp:249-252`,
-`doc/CSBwin-src/Code11f52.cpp:3465`), which moves #601 last, so 55 is shown after it.
-CSBWin, reading the table as is, draws the pressed crack at eye level.
+`doc/CSBwin-src/Code11f52.cpp:3465`), which moves #601 last, so 55 is shown after it. With
+CSBWin's file the pressed crack jumps to eye level; with 1.2's, as on the Atari ST the
+author played, it stays where the Out crack was. The port reads the table as it stands,
+as CSBWin does, so the `dm-windows` set shows CSBWin's behaviour and `dm-atari` the
+original's. `tools/dump-crack-switch.ts` asserts both, and golden frame `09-crack-switch`
+shows the pressed switch. Do not put CSBWin's items back into `dm-atari/`.
 
-The Atari ST original draws it where the Out crack was, as the author remembers: the
-English 1.2 disk's `graphics.dat` (md5 `9ce2eaf7a9e78620e3f17594437caffa`,
-`static/gamefiles/dm-atari-1.2/`) holds **2** for `Byte4100[55]`, at byte 3201 of item
-`0x22e`, and its Crack Switch (In) front bitmap (graphic 232) differs from ours in 8
-pixels (`doc/ATARI_ST_DISK_REFERENCE.md` → "The 1.2 data files against `dm-atari/`"). The
-0 is the `graphics.dat` CSBWin ships. So the port sets `Byte4100[55]` to 2 at load
-(`correctCrackSwitchInPlacement` in `src/data/tables/ObjectTables.ts`), only when
-entry 50 is 2 and entry 55 is 0. No other entry, and no other code path, changes.
-`tools/dump-crack-switch.ts` asserts all of this, and golden frame `09-crack-switch` shows
-the pressed switch. Do not "fix" it back to CSBWin.
+**Graphic 232, Crack Switch (In)'s front view** (`121 + 2*55 + 1`, 32x28). 1.2 encodes it
+in 120 bytes to CSBWin's 108, both stored uncompressed, and the two decode to the same
+picture except in 8 pixels: (12,2), (13,2), (11,3) and (12–14,3), (12,4), (13,4). They are
+exactly the pixels where Crack Switch (Out)'s front view (graphic 222) draws its button.
+CSBWin's leaves them black, an empty crack; 1.2's draws the button in darker colours (1 and
+12, against 222's 2 and 1), pushed in. The side views (221, 231) are the same in both
+files. Every wall carrying ornament 55 draws this bitmap: in the stock dungeon level 4
+(13,29), level 8 (1,15) and (24,26), level 9 (11,26), each beside its ornament-50 twin.
+Golden frame `09-crack-switch` shows the button.
 
 ## The Timer-A values in `StartSound` are the sample rates
 

@@ -70,6 +70,7 @@ const CHECKS = [
   { tool: 'dump-viewport-click.ts' },
   { tool: 'dump-queue-sound.ts' },
   { tool: 'dump-crack-switch.ts' },
+  { tool: 'dump-dm-atari-graphics.ts' },
   { tool: 'dump-zokathra-wall.ts' },
   { tool: 'dump-hidden-alcove.ts' },
   { tool: 'dump-door-ornaments.ts' },

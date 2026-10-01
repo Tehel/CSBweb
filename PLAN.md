@@ -304,7 +304,7 @@ never carried out, because the project has **no test framework**.
    again without, which is the only standing evidence that the corridor behind the prison
    doors actually renders. The rest boot with `?intro=0` once more and stand the party on
    a fixed square (`FACE` in `tools/probe-frames.mjs`): a pressed crack switch
-   (`doc/PROVEN_FACTS.md`, "Crack Switch (In) placement"), two door ornaments, and a
+   (`doc/PROVEN_FACTS.md`, "`dm-atari/graphics.dat` is CSBWin's with three items from the 1.2 disk"), two door ornaments, and a
    mirror on each F2 edge wall, positions 7 and 9 of `DrawWallDecoration`. Still owed to
    make it a real test: comparing the palette-index buffer rather than the RGBA canvas it
    is converted to.
