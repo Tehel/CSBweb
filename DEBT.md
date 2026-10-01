@@ -699,8 +699,14 @@ Two steps:
 
 A `watch-*.ts` proves each step on the real 3D2D1D files: up and down through map 1's
 fake pits, a refused move into stone with its damage, and a gravity slide ending where
-`GravityMove` finds no axis. Whether 3D2D1D's six DSAs reach a gap in G1 or G2 is
-unchecked, and should be found out before step 1.
+`GravityMove` finds no axis. 3D2D1D's six DSAs use only MESSAGE, OVERRIDE,
+COPYTELEPORTER and GOSUB, and it has no party-move filter. A hand probe ran the 1D
+corridor's chain correctly in the engine (`doc/3D2D1D.md`), but no tool proves it yet.
+Playing the dungeon through also needs saving, which waits on G1's `DSA::Write`:
+`buildSavePayload` refuses any dungeon that defines a DSA.
+`static/gamefiles/3D2D1D/WALKTHROUGH.md` is a full route computed from CSBWin's rules
+by `tools/solve-3d2d1d.ts`, outside the engine. Once both steps are in, a tool that
+replays it through `Game` is the end-to-end proof.
 
 ### X6 ⏸️ The Hint Oracle's hints in the game, as the party moves
 

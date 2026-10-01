@@ -17,6 +17,8 @@
  *   cell <m> <x> <y> [r]  the square's neighbourhood (radius r, default 3), its flag byte
  *                         decoded, every object on it, and (from a save) its timers
  *   find <text>           every item, monster or text whose name or words contain <text>
+ *   dump <m>              every object on every square of the map, actuators, texts and
+ *                         doors included, with each square's flag byte decoded
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -45,7 +47,7 @@ import { TimerFunction } from '../src/engine/TimerQueue';
 import { gameTablesOf, graphicsTablesOf } from './lib/game';
 
 const USAGE = `usage: npx tsx tools/peek-dungeon.ts [--file F] [--graphics G] <command>
-  levels | map <m> | cell <m> <x> <y> [radius] | find <text>
+  levels | map <m> | cell <m> <x> <y> [radius] | find <text> | dump <m>
   --file      dungeon.dat, a CSBWin save, or a .dmweb.json (default: the DM Atari dungeon.dat)
   --graphics  graphics.dat for the object names (default: the DM Atari one)`;
 
@@ -457,6 +459,17 @@ function cmdCell(world: World, names: Namer, m: number, x: number, y: number, ra
   }
 }
 
+function cmdDump(world: World, names: Namer, m: number): void {
+  const d = mapOf(world, m).descriptor;
+  console.log(`map ${m}: level ${d.level}, ${d.width}x${d.height} at (${d.offsetX},${d.offsetY})`);
+  for (let y = 0; y < d.height; y++) for (let x = 0; x < d.width; x++) {
+    const flag = flagAt(world, m, x, y);
+    const lines: string[] = [];
+    for (const rn of squareObjects(world, m, x, y)) describe(world, names, rn, '  ', lines, (flag >> 5) & 7);
+    if (lines.length) console.log(`(${x},${y}) flag ${hex(flag, 2)}: ${describeFlag(flag)}\n${lines.join('\n')}`);
+  }
+}
+
 function cmdFind(world: World, names: Namer, text: string): void {
   const needle = text.toLowerCase();
   let hits = 0;
@@ -512,6 +525,7 @@ function main(): void {
     case 'levels': cmdLevels(world, names); break;
     case 'map': cmdMap(world, names, num(0, 'm')); break;
     case 'cell': cmdCell(world, names, num(0, 'm'), num(1, 'x'), num(2, 'y'), params[3] ? num(3, 'radius') : 3); break;
+    case 'dump': cmdDump(world, names, num(0, 'm')); break;
     case 'find':
       if (!params.length) throw new Error(`find: what?\n${USAGE}`);
       cmdFind(world, names, params.join(' '));
