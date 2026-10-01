@@ -32,7 +32,7 @@ import type {
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
-import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
+import { EXPOOL_RECORD_SIZE, Expool, specialLocationsFromExpool } from './CsbwinExpool';
 import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
@@ -234,8 +234,7 @@ export class DungeonLoader {
 
         // Parse all databases
         const databases = this.parseDatabases(offsets.databases, header.objectCounts);
-        // Database 11 — `EXPOOL` — has no parser here. It is kept whole so the image can
-        // be written back with it (`DungeonData.expool`).
+        // Database 11 — `EXPOOL` — is kept as its blocks (`DungeonData.expool`).
         const expool = this.readExpool(offsets.databases[11], header.objectCounts[11]);
 
         // Parse map data (tiles)
@@ -525,20 +524,29 @@ export class DungeonLoader {
     }
 
     /**
-     * Database 11 — `EXPOOL` — as raw bytes.
+     * Database 11 — `EXPOOL` — as its blocks (`src/data/CsbwinExpool.ts`).
      *
-     * `DB11` is a 256-byte block with a two-byte `size` and 63 `ui32`
-     * (`doc/CSBwin-src/CSB.h:1307-1315`), reached only through `EXPOOL::Locate`'s hash
-     * (`doc/CSBwin-src/data.cpp`). This port reads nothing out of it — the one consumer,
-     * `parseSpecialLocationsFromSaveData`, hashes its own copy straight out of the save
-     * file — so the block is kept byte for byte rather than modelled, which is what lets
-     * a save be written back carrying the EXPOOL it was read with.
+     * They are kept as the file has them, with one translation. A champion bones record
+     * is keyed by the bones' RN, which in an image with an object indirect index is a slot
+     * of it like every other RN, so the key is resolved as they are. A record whose slot
+     * names no object is dropped: the port numbers the slots afresh when it writes, and
+     * such a key could be given none.
      */
     private readExpool(offset: number, count: ui16): Uint8Array | null {
         if (!this.options.expool || count <= 0) return null;
         const bytes = new Uint8Array(count * EXPOOL_RECORD_SIZE);
         this.file.seek(offset);
         for (let i = 0; i < bytes.length; i++) bytes[i] = this.file.readU8();
+        const resolveRN = this.options.resolveRN;
+        if (resolveRN) {
+            new Expool({ expool: bytes, header: { objectCounts: [] } }).translateChampionBonesKeys((slot) => {
+                try {
+                    return resolveRN(slot) & 0x3fff;
+                } catch {
+                    return null;
+                }
+            });
+        }
         return bytes;
     }
 

@@ -67,6 +67,9 @@ const CHECKS = [
   { tool: 'dump-hall-of-champions.ts' },
   { tool: 'dump-dm-rules.ts' },
   { tool: 'dump-vi-altar.ts' },
+  // EXPOOL, where a death's bones record is kept: the pools of the genuine saves rebuilt
+  // byte for byte, and put through CSBWin's own save loop unchanged.
+  { tool: 'dump-expool.ts' },
   { tool: 'dump-viewport-click.ts' },
   { tool: 'dump-queue-sound.ts' },
   { tool: 'dump-crack-switch.ts' },

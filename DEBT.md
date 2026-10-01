@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | C107 | A damaged Extended Features block is an error, where CSBWin reads the file as one without a block | S | ⏳ |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
@@ -114,10 +113,10 @@ In payoff order: the first row is the next item.
 | H | Deliberate divergences | — | 🚫 |
 
 The rows above G1 are the active list. `P10` and `F3` are phases, whose status is
-`PLAN.md`'s; a session that takes `P10` works there, one step at a time. Two rows sit
-out of their tier's place on purpose: `C96` just above `P10`, because `P10` builds on
-it, and `E15` below `G17`, because it waits for the page redesign to start: a
-session that reaches it first asks the author, and takes the next row meanwhile. The F
+`PLAN.md`'s; a session that takes `P10` works there, one step at a time. One row sits
+out of its tier's place on purpose: `E15` below `G17`, because it waits for the page
+redesign to start: a session that reaches it first asks the author, and takes the next
+row meanwhile. The F
 rows are independent of the rest ("Priority", point 5), so they can be taken anywhere.
 The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
@@ -166,32 +165,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 ## C — Known divergences from CSBWin
 
 A divergence found along the way goes here, with the next free ID.
-
-### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
-
-`KillCharacter` pairs the bones it drops with the champion's fingerprint through
-`expool.AddChampionBonesRecord` (`doc/CSBwin-src/Character.cpp:2646`), a record of
-`EXPOOL`, database 11, under the key `(EDT_ChampionBones << 24) | rn`
-(`data.cpp:1636-1675`, `CSB.h:1571`). `EXPOOL` is written with the other databases, so a
-CSBWin save carries the pairs, and the Vi Altar (`Timer.cpp:2750`, and `DropObject`'s
-test, `Mouse.cpp:903`) and the bones' name (`DescribeObject`, `Character.cpp:3563`;
-`DrawNameOfHeldObject`, `Code11f52.cpp:49`) read them back. The port keeps them in
-`DungeonState.championBonesRecords`, a `Map` (`src/engine/DungeonState.ts:102-157`),
-which only the port's runtime snapshot carries (`DungeonSnapshot.championBones`).
-`DungeonData.expool` travels as raw bytes and never sees them. So:
-
-- a CSBWin save with a dead champion's bones loads with no pair: the altar does not bring
-  the champion back, and the bones have no name;
-- the CSBWin file the port writes (every save's `raw`, and the `.dat` `P10` will make the
-  only save) holds no pair, so once the JSON wrapper goes, a save loses them, and CSBWin
-  loading a port save does too.
-
-The DSA global variables are the other `EXPOOL` records the port does not read (`G1`).
-Paying it means CSBWin's `Read`, `Write` and `Locate` over the raw blocks, including
-`enlarge`, in `src/data/CsbwinExpool.ts` (which has `Locate`, for the special locations
-only); the bones records kept there, with the key's RN taken through the object index;
-the `Map` removed; and `tools/dump-vi-altar.ts` run through a save and a load. It must be
-paid before `P10` drops `runtime`.
 
 ### C107 ⏳ A damaged Extended Features block is an error, where CSBWin reads the file as one without a block
 

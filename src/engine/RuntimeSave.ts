@@ -24,7 +24,7 @@ import type { TimerEntry } from './TimerQueue';
  * another version is never restored as a half-state, and `applySaveBytes` loads its `raw`
  * CSBWin file instead, when it has one. `git log` on this line is the list of shapes.
  */
-export const RUNTIME_SAVE_VERSION = 13;
+export const RUNTIME_SAVE_VERSION = 14;
 
 export interface RuntimeSaveState {
     version: typeof RUNTIME_SAVE_VERSION;

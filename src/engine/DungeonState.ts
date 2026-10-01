@@ -30,6 +30,7 @@ import { DBType, decodeObjectID, OBJECT_ID_EOF, OBJECT_ID_NULL, RoomType, rnEqua
 import type { TextRecord } from '../data/dungeonTypes';
 import type { TextDecodeTables } from '../data/tables/ObjectTables';
 import { textStart } from '../data/CsbwinDungeonConversions';
+import { Expool } from '../data/CsbwinExpool';
 import type { DungeonSnapshot } from './DungeonSnapshot';
 import { applyDungeonSnapshot, captureDungeonSnapshot } from './DungeonSnapshot';
 
@@ -61,7 +62,6 @@ export class DungeonState {
      * (`engine/MakeMoreRoomInDB`). Without it a full database refuses the record.
      */
     makeMoreRoomInDB: ((db: DBType) => ObjectID) | null = null;
-    private championBonesRecords = new Map<number, number>();
     private timerWord8Lookup?: (index: number) => ui16 | null;
 
     constructor(data: DungeonData) {
@@ -70,11 +70,10 @@ export class DungeonState {
 
     /**
      * Take `data` as the world, as `_ReadEntireGame` reads a whole one, structure included
-     * (`Game.installWorld`). The bones records were the old world's.
+     * (`Game.installWorld`).
      */
     install(data: DungeonData): void {
         this.data = data;
-        this.championBonesRecords.clear();
     }
 
     /**
@@ -99,43 +98,22 @@ export class DungeonState {
         this.timerWord8Lookup = getWord8;
     }
 
+    /**
+     * The three below are `expool`'s (`src/data/CsbwinExpool.ts`). The record's key is the
+     * bones' RN without its position: CSBWin's is the RN's slot in the object indirect
+     * index, which a move within the cell does not change (`RN::pos`,
+     * `doc/CSBwin-src/CSBTypes.h:336-342`).
+     */
     addChampionBonesRecord(bones: ObjectID, fingerprint: number): void {
-        const key = this.getBonesRecordKey(bones);
-        if (key === null) return;
-        this.championBonesRecords.set(key, fingerprint & 0xffff);
-    }
-
-    checkChampionBonesRecord(bones: ObjectID): boolean {
-        const key = this.getBonesRecordKey(bones);
-        if (key === null) return false;
-        return this.championBonesRecords.has(key);
+        new Expool(this.data).addChampionBonesRecord(bones & 0x3fff, fingerprint);
     }
 
     copyChampionBonesRecord(bones: ObjectID): number | null {
-        const key = this.getBonesRecordKey(bones);
-        if (key === null) return null;
-        const value = this.championBonesRecords.get(key);
-        return value === undefined ? null : value;
+        return new Expool(this.data).copyChampionBonesRecord(bones & 0x3fff);
     }
 
     getChampionBonesRecord(bones: ObjectID): number | null {
-        const key = this.getBonesRecordKey(bones);
-        if (key === null) return null;
-        const value = this.championBonesRecords.get(key);
-        if (value === undefined) return null;
-        this.championBonesRecords.delete(key);
-        return value;
-    }
-
-    clearChampionBonesRecord(bones: ObjectID): void {
-        const key = this.getBonesRecordKey(bones);
-        if (key === null) return;
-        this.championBonesRecords.delete(key);
-    }
-
-    private getBonesRecordKey(bones: ObjectID): number | null {
-        if (bones === OBJECT_ID_EOF || bones === OBJECT_ID_NULL) return null;
-        return bones & 0x3fff;
+        return new Expool(this.data).getChampionBonesRecord(bones & 0x3fff);
     }
 
     /**
@@ -143,17 +121,11 @@ export class DungeonState {
      * See `src/engine/DungeonSnapshot.ts` for what counts as mutable and why.
      */
     captureSnapshot(): DungeonSnapshot {
-        const snapshot = captureDungeonSnapshot(this.data);
-        snapshot.championBones = [...this.championBonesRecords.entries()];
-        return snapshot;
+        return captureDungeonSnapshot(this.data);
     }
 
     applySnapshot(snapshot: DungeonSnapshot): void {
         applyDungeonSnapshot(this.data, snapshot);
-        this.championBonesRecords.clear();
-        for (const [key, fingerprint] of snapshot.championBones ?? []) {
-            this.championBonesRecords.set(key, fingerprint & 0xffff);
-        }
     }
 
     /**

@@ -20,14 +20,16 @@
  *   at the wrong offset, so objects vanish from the cells that hold them and surface in
  *   cells that do not. `levelIndex` really is structural: `DungeonLoader.buildLevelIndex`
  *   derives it from the map descriptors and nothing writes it.
- * - `textWords`, `indirectTextIndex`, `compressedText` and `expool` are carried although
- *   play never writes them. They are the *converted* form of an image, and which form a
- *   world holds depends on the file it came from (`src/data/CsbwinDungeonConversions.ts`).
- *   Without them a restored world is a hybrid: TEXT records from the snapshot, carrying
- *   entry numbers into the index `dungeon.dat` was converted into, and the `expool` of
- *   whatever dungeon the engine was built on, which this port cannot regenerate.
- *   Carrying them makes a quick-load self-consistent, and lets the binary writer take
- *   blocks 11-13 from a world whatever its provenance.
+ * - `textWords`, `indirectTextIndex` and `compressedText` are carried although play never
+ *   writes them. They are the *converted* form of an image, and which form a world holds
+ *   depends on the file it came from (`src/data/CsbwinDungeonConversions.ts`). Without
+ *   them a restored world is a hybrid: TEXT records from the snapshot, carrying entry
+ *   numbers into the index `dungeon.dat` was converted into. Carrying them makes a
+ *   quick-load self-consistent, and lets the binary writer take blocks 11-13 from a world
+ *   whatever its provenance.
+ * - `expool` is database 11, which play writes: a death puts the bones' record there
+ *   (`src/data/CsbwinExpool.ts`). The rest of it is the file's, and this port cannot
+ *   regenerate it.
  * - `dsaLevelIndex`, `dsaIndex`, `specialLocations`, `extendedWallDecorations` and
  *   `spellFilterLocation` are carried for the same reason. `dungeon.dat` has none of
  *   them; a CSBWin save's Extended Features block and `EXPOOL` do, and a CSBWin load
@@ -154,8 +156,6 @@ export interface DungeonSnapshot {
     databases: Partial<Record<DatabaseKey, DatabaseRecord[]>>;
     /** `DsaSystem`'s 100 global variables. */
     dsaGlobals?: number[];
-    /** The champion-bones map, as `[key, fingerprint]` pairs. */
-    championBones?: Array<[number, number]>;
     /**
      * `data.textWords`, base64 of big-endian words. After the load-time conversion this
      * is the compressed text, which is why it and `compressedText` normally hold the
@@ -166,8 +166,11 @@ export interface DungeonSnapshot {
     indirectTextIndex?: ui32[];
     /** `data.compressedText`, base64 of big-endian words. */
     compressedText?: string;
-    /** `data.expool` — database 11, base64, carried whole because nothing parses it. */
-    expool?: string;
+    /**
+     * `data.expool` — database 11, base64, or `null` for a world with no block, which a
+     * restore then removes: the champion bones records are in it.
+     */
+    expool?: string | null;
     /**
      * `data.dsaLevelIndex`, one base64 string of big-endian words per level. This and the
      * next four are what a CSBWin load writes. Each is `null` where the world has none,
@@ -310,7 +313,7 @@ export function captureDungeonSnapshot(data: DungeonData): DungeonSnapshot {
     if (data.textWords) snapshot.textWords = encodeWords(data.textWords);
     if (data.indirectTextIndex) snapshot.indirectTextIndex = [...data.indirectTextIndex];
     if (data.compressedText) snapshot.compressedText = encodeWords(data.compressedText);
-    if (data.expool) snapshot.expool = encodeBytes(data.expool);
+    snapshot.expool = data.expool ? encodeBytes(data.expool) : null;
 
     snapshot.dsaLevelIndex = data.dsaLevelIndex ? data.dsaLevelIndex.map(encodeWords) : null;
     snapshot.dsaIndex = data.dsaIndex ? encodeDsaIndex(data.dsaIndex) : null;
@@ -376,7 +379,8 @@ export function applyDungeonSnapshot(data: DungeonData, snapshot: DungeonSnapsho
     if (snapshot.compressedText !== undefined) {
         data.compressedText = decodeWords(snapshot.compressedText);
     }
-    if (snapshot.expool !== undefined) data.expool = decodeBytes(snapshot.expool);
+    if (snapshot.expool === null) delete data.expool;
+    else if (snapshot.expool !== undefined) data.expool = decodeBytes(snapshot.expool);
 
     // The same holds for the five a CSBWin load writes, and `null` is a world that had
     // none.

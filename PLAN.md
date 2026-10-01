@@ -145,8 +145,8 @@ DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
 #### The rework: what is already decided
 
-The author sets the rest of its scope when it starts. `DEBT.md` C96 (the bones records in
-`EXPOOL`) comes first. The rework stands on `GameSaves` (`src/engine/GameSaves.ts`), which
+The author sets the rest of its scope when it starts. The rework stands on `GameSaves`
+(`src/engine/GameSaves.ts`), which
 is built with the game and its data set, and is where every save is built and written to
 a store (the disk menu's SAVE and F5, under one rule for a unique name) and where a
 store's bytes are read back into the game (LOAD, the boot's chooser and F9).
@@ -285,6 +285,14 @@ through the game's mouse queue.
   (`DEBT.md` G4).
 - **`d.Word11694` (`gameWon`) and `d.PartySleeping` are not restored**; neither is in
   `GAMEBLOCK2` where the reader looks.
+- **`EXPOOL` holds the bones records and what the file had, no more.** CSBWin's `Setup`
+  gives every loaded game the pool's directory block (`doc/CSBwin-src/SaveGame.cpp:2773`),
+  and `SaveGame` puts the 24 overlay palette records there at every save (`:1152-1164`).
+  The port makes the block at the first record it writes, a death's bones
+  (`src/data/CsbwinExpool.ts`), and writes no palette record, so its save of a game
+  started on `dungeon.dat` has no `EXPOOL`, or the bones' alone. CSBWin loads either:
+  `Setup` makes the block, and with no palette record it keeps the palette it has
+  (`:1763-1789`).
 - **A record index above 1023 cannot be expressed.** `dataIndexMap` is 16 bits and the
   port's RN index field is 10; CSBWin allows 64000. The largest index in any committed
   save is 682, and `CsbwinObjectIndex.resolve` throws rather than alias.

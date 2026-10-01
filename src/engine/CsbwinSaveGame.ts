@@ -30,8 +30,8 @@
  *
  * - **The DSA global variables.** CSBWin reads them out of `EXPOOL` under
  *   `(EDT_Database << 24) | (EDBT_GlobalVariables << 16) | i`, sixteen `ui32` per record
- *   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`), and `locateExpoolRecord` finds a record's
- *   first word but does not hand back the run. No committed save needs it: the shipped
+ *   (`doc/CSBwin-src/SaveGame.cpp:1746-1763`), and nothing here asks `Expool.locate`
+ *   (`src/data/CsbwinExpool.ts`) for them. No committed save needs it: the shipped
  *   DM dungeon defines no DSAs at all — `numDSA` is 0 and there are no special-location
  *   records in any of the twelve — so the live game's globals are kept rather than
  *   cleared.

@@ -28,7 +28,7 @@
  * flags are bytes and have no order at all.
  */
 import { writeU16BE, writeU32LE } from '../core/bytes';
-import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
+import { EXPOOL_RECORD_SIZE, Expool } from './CsbwinExpool';
 import { DBType, encodeObjectID, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
@@ -291,10 +291,12 @@ export function databaseRecordSize(db: number, options: DatabaseWriteOptions = {
  *
  * Three of the sixteen have no record parser:
  *
- * - **11, `EXPOOL`.** Written from `dungeon.expool`, the bytes the loader kept whole.
- *   Note that `SaveGame` deposits the 100 DSA global variables and the 24 overlay
- *   palette records into EXPOOL immediately before the image (`:1141-1162`); this port
- *   maintains neither, so a save it writes carries the EXPOOL it read.
+ * - **11, `EXPOOL`.** Written from `dungeon.expool`, the blocks the world holds, with
+ *   the key of each champion bones record put through `encode`: it is the bones' RN
+ *   (`src/data/CsbwinExpool.ts`). Note that `SaveGame` deposits the 100 DSA global
+ *   variables and the 24 overlay palette records into EXPOOL immediately before the
+ *   image (`:1141-1162`); this port maintains neither, so a save it writes carries the
+ *   ones it read.
  * - **12 and 13**, which `CSB.h` marks `//Not used`. Empty in every file here.
  *
  * `encode` is the same translation block 10 takes; every `link`, and every secondary RN
@@ -332,7 +334,16 @@ export function buildDatabase(
                 `${declared} records (${declared * EXPOOL_RECORD_SIZE} bytes)`,
             );
         }
-        return expool.slice();
+        const written = { expool: expool.slice(), header: { objectCounts: [] } };
+        new Expool(written).translateChampionBonesKeys((rn) => {
+            try {
+                return encode(rn);
+            } catch {
+                // A record left by bones whose database no longer holds them.
+                return null;
+            }
+        });
+        return written.expool;
     }
     if (size === 0 || declared === 0) {
         if (declared !== 0) {

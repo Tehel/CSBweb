@@ -528,13 +528,13 @@ export interface DungeonData {
     dsaLevelIndex?: number[][]; // Extended-feature DSA mapping [level][selector]
     dsaIndex?: DsaIndex;        // Extended-feature DSA programs (DSAIndex)
     /**
-     * Database 11 — `EXPOOL` — exactly as it sits in the file: `objectCounts[11]`
-     * blocks of 256 bytes (`DB11`, `doc/CSBwin-src/CSB.h:1307-1315`). This port has no
-     * parser for it and reads nothing out of it here; `parseSpecialLocationsFromSaveData`
-     * hashes its own copy straight out of the save. It is kept whole so a save can be
-     * written back with the EXPOOL it was read with — including the DSA global variables
-     * and the 24 overlay palette records `SaveGame` deposits there just before the image
-     * (`doc/CSBwin-src/SaveGame.cpp:1141-1162`), which this port does not maintain.
+     * Database 11 — `EXPOOL` — as `objectCounts[11]` blocks of 256 bytes, the file's own
+     * big-endian (`DB11`, `doc/CSBwin-src/CSB.h:1280-1288`), which `Expool`
+     * (`src/data/CsbwinExpool.ts`) reads and writes in place. The champion bones records
+     * are the ones play writes; the special locations are read out of it at the load,
+     * below. The DSA global variables and the 24 overlay palette records `SaveGame`
+     * deposits there just before the image (`doc/CSBwin-src/SaveGame.cpp:1141-1162`) are
+     * carried as the file had them, and this port does not maintain them.
      */
     expool?: Uint8Array;
     specialLocations?: Record<number, number>; // EXPOOL special locations (EDT_SpecialLocations)

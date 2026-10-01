@@ -1311,6 +1311,65 @@ of 0 — `AddCharacter`'s for a champion recruited at level 0, (0, 0)
 (`Character.cpp:513-516`) — pairs the bones like any other. Evidence:
 `tools/dump-vi-altar.ts` section 1b (2 checks fail before the fix).
 
+## `EXPOOL` is a directory block, free lists by record length, and 32 hash chains
+
+`EXPOOL`, database 11, is an array of 256-byte `DB11` blocks
+(`doc/CSBwin-src/CSB.h:1280-1288`) which `class EXPOOL` addresses as one array of
+longwords, `m`, 64 to a block (`doc/CSBwin-src/data.cpp:1507-1675`). In a file every
+longword is big-endian (`DB11::swap`, `data.cpp:1458-1467`), and a block's first is its
+link, always `RNeof`, over its `size`.
+
+- **Block 0 is the directory**, made by `Setup` with `size` 0 when the database has no
+  block (`:1507-1522`), which `ReadDatabases` calls last (`doc/CSBwin-src/SaveGame.cpp:2773`).
+  `m[n]`, for `n` from 2 to 31, heads the free list of the records of `n` longwords, and
+  `m[32]` to `m[63]` head the hash chains, a key's being `32 + ((key * 0xbb40e62d) >> 27)`.
+  A head with bit 31 set names a second table of 64 heads, indexed by the hash's next six
+  bits; `Write`, `Read` and `Locate` all follow one, and nothing in the source makes one.
+- **Every other block holds records of one length**, its `size`: `enlarge(size)` appends
+  a block and cuts it into `63 / size` records, each a link, the key, and `size - 2`
+  longwords of data (`:1610-1633`).
+- **`Write(key, record, size)`** takes the first free record of `size + 2` longwords,
+  after an `enlarge` if there is none, and puts it at the head of the key's chain
+  (`:1530-1547`). It replaces nothing: two records may share a key, and the newer is the
+  one found. `size` is 29 at most.
+- **`Read`** returns the key's first record and hands its longwords back to the head of
+  their free list (`:1549-1575`); **`Locate`** leaves the record where it is
+  (`:1582-1608`). Both return the record's length, or -1.
+
+`SaveGame` `Read`s and `Write`s 24 palette records of 16 longwords, keys
+`(EDT_Palette << 24) + i`, into the pool at every save (`SaveGame.cpp:1152-1164`), so
+every CSBWin save has them. `src/data/CsbwinExpool.ts` is the port, over the file's bytes.
+Evidence: `tools/dump-expool.ts`. Seven of the fourteen committed saves hold those 24
+records and nothing else, and 24 writes into an empty pool give their 2304 bytes exactly:
+the directory, the eight blocks of three records, every link and chain. Twelve hold them
+among others, and CSBWin's loop run over each leaves its bytes as they were.
+
+## A champion bones record is keyed by the bones' slot in the object indirect index
+
+`AddChampionBonesRecord` writes one longword, `fingerprint & 0xffff`, under the key
+`(EDT_ChampionBones << 24) | bonesObject.ConvertToInteger()`
+(`doc/CSBwin-src/data.cpp:1636-1643`, `CSB.h:1571`), and `ConvertToInteger` is the RN's
+`indirectIndex` (`doc/CSBwin-src/CSBTypes.h:371`): the slot, not a packed RN, and in a
+save the file's own numbering (see "An RN in a save file is an indirect index"). A slot
+keeps its number when the object moves within its cell, since the position is in
+`dataTypeMap` (`CSBTypes.h:336-342`).
+
+`ProcessTT_ViAltar` takes the record with `GetChampionBonesRecord`, a `Read`
+(`doc/CSBwin-src/Timer.cpp:2750`); `DropObject`, `DescribeObject` and
+`DrawNameOfHeldObject` copy it with `CopyChampionBonesRecord`, a `Locate`
+(`Mouse.cpp:903`, `Character.cpp:3563`, `Code11f52.cpp:49`). Each wants a record of
+exactly one longword.
+
+The port keys the record by the bones' packed RN without its position, which is what a
+slot is here. `DungeonLoader.readExpool` resolves each bones key through the file's index
+as it does every RN of the image, and drops a record whose slot the file has freed;
+`buildDatabase` encodes each through the index the file is written with
+(`Expool.translateChampionBonesKeys`). Evidence: `tools/dump-vi-altar.ts` section 7 saves
+a game with bones on the floor, finds the record in the file's own pool under the bones'
+slot (1679, where the port's RN is `0x2808`), and resurrects from it in a game that loads
+the file. Four of the committed saves (`csbgame3`, `4`, `6` and `7`) have a block of
+three-longword records, the length of a bones record, with every record free.
+
 ## `KillCharacter` is the only way a champion's hit points reach zero
 
 Nothing in CSBWin assigns `HP(0)` outside `KillCharacter` (`doc/CSBwin-src/Character.cpp:2526`).

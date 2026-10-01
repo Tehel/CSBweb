@@ -11,9 +11,11 @@ This document captures verified save/extended data behaviors from the CSBWin C++
 
 - `ReadDatabases` reads the 44-byte `DUNGEONDATINDEX`, map descriptors, object list, and text data before database records; when `indirectText` is set (extended features flag `IndirectText`), it reads `NumWordsInTextArray * 4` bytes of indirect index, then a 32-bit compressed text size and `size * 2` bytes before the database section (`doc/CSBwin-src/SaveGame.cpp`).
 
-## EXPOOL hash lookup
+## EXPOOL
 
 - `EXPOOL::Locate` hashes keys with `key * 0xbb40e62d`, probes `m[hashi]`/`m[p+1]` for matches, and gets record size from the owning `DB11` block (`size` stored in the block header; record length is `size-2` ui32 words) (`doc/CSBwin-src/data.cpp`).
+- The whole structure (the directory block, the free lists, `Write`, `Read` and `enlarge`) is in `doc/PROVEN_FACTS.md` → "`EXPOOL` is a directory block, free lists by record length, and 32 hash chains", and `src/data/CsbwinExpool.ts` is its port. `DungeonData.expool` holds the blocks as the file has them.
+- The port writes one kind of record, a champion's bones (`doc/PROVEN_FACTS.md` → "A champion bones record is keyed by the bones' slot in the object indirect index"), and reads the special locations. Every other record a file carries is written back as it was read.
 
 ## Byte order: the file is big-endian, the CSB header is not
 

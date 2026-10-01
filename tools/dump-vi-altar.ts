@@ -29,6 +29,12 @@
  * `CharacterAtPosition` skipping the dead (`Code11f52.cpp:4062`) is load-bearing
  * rather than a detail.
  *
+ * And the pair has to outlast the game that made it. The record is one of `EXPOOL`'s,
+ * database 11, keyed by the bones' RN (`doc/CSBwin-src/data.cpp:1636-1643`), and an RN
+ * in a file is a slot of that file's object indirect index. So the last case saves a
+ * game with bones on the floor and reads the file's own pool: the record is there, under
+ * the bones' slot, and a game that loads the file resurrects from it.
+ *
  * Run: `npx tsx tools/dump-vi-altar.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -48,10 +54,17 @@ import { getObjectDisplayName, resolveObjectNameIndex } from '../src/renderer/ui
 import type { UIState } from '../src/renderer/ui/UIState';
 import { OBJNI_BONES_A } from '../src/core/objectNameIndex';
 import { getActuatorWallGraphicOrdinal } from '../src/data/actuatorHelpers';
+import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { EXPOOL_RECORD_SIZE, Expool } from '../src/data/CsbwinExpool';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
+import { applySavePayload, buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
 import { graphicsTablesOf, newGame } from './lib/game';
 import { check, fail, finish } from './lib/check';
 import { emptyPossessions } from '../src/engine/gameTypes';
 import { addCharacterDefaults } from '../src/engine/AddCharacter';
+
+/** `EDT_ChampionBones` (`doc/CSBwin-src/CSB.h:1571`). */
+const EDT_CHAMPION_BONES = 9;
 
 /** `if (decorationIndex == 2) d.OrnateAlcoveGraphicIndex = D5W` (`Code390e.cpp:218`). */
 const ORNATE_ALCOVE_DECORATION = 2;
@@ -512,6 +525,102 @@ function main(): void {
       console.log(`HERO1 alive after 8 ticks: ${c.attributes.health !== 0}, bones in alcove: ${bonesAt(g, altar.alcove).length}`);
       check(c.attributes.health === 0, 'but they raise nobody');
       check(bonesAt(g, altar.alcove).length === 1, 'and they stay in the alcove');
+    }
+  }
+
+  /* ---------------------------------------- 7. through a save and a load --------- */
+
+  console.log('');
+  console.log('=== the bones of a death, through a save and a load ===');
+  {
+    const { game: g } = makeGame();
+    const altar = findViAltars(g).find((a) => a.alcove.z === 0);
+    if (!altar) {
+      fail('no Altar of Vi on level 0');
+    } else {
+      const victim = 2;
+      g.ctx.party.state.position = altar.party;
+      g.ctx.party.state.facing = altar.facing as Champion['facing'] & number;
+      g.systems.monsters.loadPartyLevel(altar.party.z);
+
+      // A game with no death has no EXPOOL to save, and its save takes away the one a
+      // game it is loaded into has.
+      const noDeath = buildSavePayload(g);
+      g.systems.monsterAttack.killCharacter(victim);
+      const bones = bonesAt(g, altar.party)[0];
+      const fingerprint = g.ctx.party.state.champions[victim]!.fingerprint;
+      const payload = buildSavePayload(g);
+      const file = decodeBase64ToBytes(payload.raw);
+
+      // What the file holds, read from its own bytes.
+      const parsed = loadCsbwinWorld(file);
+      const layout = parsed.save.imageLayout;
+      const index = parsed.save.objectIndex;
+      if (bones === undefined || !layout || !index) {
+        fail('the death left no bones, or the file no image');
+      } else {
+        const start = layout.databases[DBType.EXPOOL]!;
+        const blocks = layout.objectCounts[DBType.EXPOOL] ?? 0;
+        const filePool = new Expool({
+          expool: file.slice(start, start + blocks * EXPOOL_RECORD_SIZE),
+          header: { objectCounts: [] },
+        });
+        const slots = filePool.keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).map((key) => key & 0xffff);
+        const slot = slots[0] ?? 0;
+        const named = slots.length === 1 ? index.resolve(slot) : OBJECT_ID_EOF;
+        console.log(['', 'value'].join('\t'));
+        console.log(['EXPOOL blocks in the file', blocks].join('\t'));
+        console.log(["the bones' RN in the game", `0x${(bones & 0x3fff).toString(16)}`].join('\t'));
+        console.log(["the record's key in the file", slot].join('\t'));
+        console.log(['which the file resolves to', `0x${(named & 0x3fff).toString(16)}`].join('\t'));
+        console.log(["the record, and the champion's fingerprint", `${filePool.copyChampionBonesRecord(slot)}, ${fingerprint}`].join('\t'));
+        check(blocks === 2, 'the file has an EXPOOL: the directory and a block of bones records');
+        check(slots.length === 1, 'holding one bones record');
+        check(slot !== (bones & 0x3fff), "whose key is not the port's RN");
+        check((named & 0x3fff) === (bones & 0x3fff), "but the bones' slot in the file's object index");
+        check(filePool.copyChampionBonesRecord(slot) === fingerprint, "and the record is the champion's fingerprint");
+
+        const routes: Array<[string, (next: Game) => void]> = [
+          ['the CSBWin file alone', (next) => { applyCsbwinSave(next, file); }],
+          ["the port's save", (next) => { applySavePayload(next, payload); }],
+        ];
+        console.log('');
+        console.log(['loaded from', 'bones records', 'pair', `HERO${victim} alive after the altar`, 'bones records left'].join('\t'));
+        for (const [name, load] of routes) {
+          // A game with a death of its own, whose record the loaded world does not have.
+          const { game: next } = makeGame();
+          next.systems.monsterAttack.killCharacter(0);
+          load(next);
+          const bonesRecords = (): number =>
+            new Expool(next.ctx.state.dungeon).keys().filter((key) => key >>> 24 === EDT_CHAMPION_BONES).length;
+          const loaded = bonesAt(next, altar.party)[0];
+          if (loaded === undefined) {
+            fail(`${name}: the bones are not on the floor of the loaded game`);
+            continue;
+          }
+          const recordsLoaded = bonesRecords();
+          const pair = next.ctx.dungeon.copyChampionBonesRecord(loaded);
+          check(recordsLoaded === 1, `${name}: the loaded game has the file's one bones record`);
+          check(pair === fingerprint, `${name}: and it pairs the bones with the champion`);
+
+          next.ctx.dungeon.removeObjectFromCell(altar.party, loaded);
+          next.ctx.party.state.objectInHand = loaded;
+          next.ctx.party.state.cursorOwner = 0;
+          check(next.systems.mouse.dropObjectFromCursor(4, { viAltar: true }), `${name}: the bones go into the alcove`);
+          runTicks(next, 8);
+          const alive = next.ctx.party.state.champions[victim]!.attributes.health !== 0;
+          console.log([name, recordsLoaded, pair, alive, bonesRecords()].join('\t'));
+          check(alive, `${name}: and the altar brings the champion back`);
+          check(bonesAt(next, altar.alcove).length === 0, `${name}: with the bones consumed`);
+          check(bonesRecords() === 0, `${name}: and their record with them`);
+
+          // The same game, taken back to before anyone died.
+          applySavePayload(next, noDeath);
+          check(next.ctx.state.dungeon.expool === undefined && next.ctx.state.dungeon.header.objectCounts[DBType.EXPOOL] === 0,
+            `${name}: a save with no EXPOOL leaves the game none`);
+          check(buildSavePayload(next).raw.length > 0, `${name}: and the game saves again`);
+        }
+      }
     }
   }
 
