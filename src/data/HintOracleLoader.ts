@@ -18,10 +18,10 @@
  * A hint's pages are one chunk, `pageCount` strings each closed by a NUL, and the
  * `pageCount - 1` chunk lengths after it are 0.
  *
- * CSBWin deciphers the file with RC4 when the save's `hintKey` is set (`:5401-5405`).
- * Every save this project has carries a zero key (`doc/PROVEN_FACTS.md` → "The Extended
- * Features header a live game writes"), so only a plain file is read here; an enciphered
- * one fails the header check.
+ * CSBWin deciphers the file with `RC4.cpp`'s cipher when the save's `hintKey` is set
+ * (`:5401-5405`). Every save this project has carries a zero key (`doc/PROVEN_FACTS.md` →
+ * "The Extended Features header a live game writes"), so only a plain file is read here;
+ * an enciphered one fails the header check.
  */
 import { readU16BE } from '../core/bytes';
 import { LZWexpand, RLEexpand } from '../core/compression';

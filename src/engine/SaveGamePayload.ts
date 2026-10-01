@@ -424,7 +424,7 @@ export function applySavePayload(game: Game, payload: SavePayload): void {
  *
  * A `SavePayload` is `JSON.stringify` output, so its first non-whitespace byte is `{`.
  * A CSBWin save opens with the Extended Features block — and may open with an
- * RC4-obfuscated one, which is why this asks the cheap, certain question about *our*
+ * enciphered one, which is why this asks the cheap, certain question about *our*
  * format rather than trying to recognise theirs.
  */
 function looksLikeJson(bytes: Uint8Array): boolean {

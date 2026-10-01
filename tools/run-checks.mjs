@@ -174,6 +174,10 @@ const CHECKS = [
   // A dungeon.dat behind an Extended Features block, the DM Windows package's: read in the
   // block's shape it is DM's dungeon converted, and a new game takes the block's rules.
   { tool: 'dump-extended-dungeon.ts' },
+  // What `ReadExtendedFeatures` does when the sentinel is not there: the "simple"
+  // encipherment's stream, RC4.cpp's own and not RC4's, checked against the compiled C++
+  // and against Conflux's dungeon.dat, an enciphered file.
+  { tool: 'dump-extended-features-read.ts' },
   // The other half of that argument: a genuine save re-serialised in full — all sixteen
   // blocks, image and closing checksum — and read back by this port's own reader. It is
   // what covers the words the block-by-block comparisons have to hold out, by showing

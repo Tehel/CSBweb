@@ -33,8 +33,9 @@ export const DATA_SETS: readonly DataSet[] = [
     { id: 'dm-atari-1.3-fr', name: 'Dungeon Master ST 1.3 French', dir: '/gamefiles/dm-atari-1.3-fr', csbGraphics: false },
     { id: 'kids-dungeon', name: 'Kids dungeon 24', dir: '/gamefiles/kids-dungeon-24', csbGraphics: false },
     { id: 'csb', name: 'Chaos Strikes Back', dir: '/gamefiles/csb', csbGraphics: false },
-    // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its 620 KB `dungeon.dat`
-    // does not open with 33028 and does not parse, and nothing has examined its format.
+    // Conflux (`static/gamefiles/conflux-3.5-b8/`) is not a set: its `dungeon.dat` is an
+    // enciphered file, which the port reads the Extended Features block of and no more
+    // (`DEBT.md` G4).
     { id: '3d2d1d', name: '3D2D1D', dir: '/gamefiles/3D2D1D', csbGraphics: false },
 ];
 

@@ -122,7 +122,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C110 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C111 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -226,7 +226,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 130 checks sequentially (`spawnSync`, `:246`), each a
+`tools/run-checks.mjs` spawns its 132 checks sequentially (`spawnSync`, `:253`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -376,9 +376,13 @@ party.
 No shipped DM hero touches any of these.
 
 **Two file matters.** `SimpleEncryption` (`EF_FLAGS` 0x04) puts the whole file, a save or
-a `dungeon.dat`, behind RC4 with the key `{1,0}`, and CSBWin sets it only when it reads a
-file already enciphered (`doc/CSBwin-src/SaveGame.cpp:326-338`); `readExtendedFeatures`
-deciphers the 512-byte header and no more (`C107` has its test of the flag), and the writer never sets it. And `MakeBigActuators` reads each actuator's type before
+a `dungeon.dat`, behind `RC4.cpp`'s cipher (`doc/PROVEN_FACTS.md` → "The "simple"
+encipherment is `RC4.cpp`'s own cipher"), and CSBWin sets it only when it reads a file
+already enciphered (`doc/CSBwin-src/SaveGame.cpp:326-338`); `readExtendedFeatures`
+deciphers the 512-byte header and no more (`C107` has its test of the flag), so an
+enciphered file fails at the object maps, and the writer never sets it. Conflux 3.5's
+`dungeon.dat` is such a file, and the canary for reading one
+(`tools/dump-extended-features-read.ts`). And `MakeBigActuators` reads each actuator's type before
 the byte swap, so CSBWin takes bits 8-14 of `word2` for it where the port takes the type
 (`doc/PROVEN_FACTS.md` → "`MakeBigActuators` runs before the byte swap");
 `tools/dump-dungeon-conversions.ts` fails if a dungeon has a type-47 actuator under either
@@ -416,7 +420,7 @@ Its data is read: `parseHintOracle` (`src/data/HintOracleLoader.ts`) decodes
 (`doc/CSBWIN_HINT_ORACLE_REFERENCE.md`, checked by `tools/dump-hint-oracle.ts`). What is
 left is the Oracle's own screen: `hcsb.dat`'s three items, the title menu, the pages,
 and the save chosen from CSBWin's menu. An `hcsb.hct` enciphered under a save's
-`hintKey` (RC4, `:5401-5405`) is not read; no save here has a key.
+`hintKey` (`RC4.cpp`'s cipher, `:5401-5405`) is not read; no save here has a key.
 
 ### G21 ⏸️ `Translation.txt`: the messages the executable prints, translated
 

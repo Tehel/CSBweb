@@ -3017,6 +3017,36 @@ be drawn (`Codea59a.cpp:134-137`). The port runs it at the end of `DungeonLoader
 gated on `DungeonImageOptions.expandedPortraits`, which `loadCsbwinWorld` takes from the
 save's block (`tools/dump-extend-portraits.ts`).
 
+## The "simple" encipherment is `RC4.cpp`'s own cipher, with a key of one byte
+
+`RC4.cpp` opens with "This is NOT the RC4 encryption algorithm!!!! Only the key
+preparation is from RC4" (`doc/CSBwin-src/RC4.cpp:1-3`), and it is so:
+
+- `RC4_prepare_key` (`:20-48`) fills 8192 bytes of state with `(unsigned char)counter`,
+  runs RC4's key schedule over the first 256, then for each byte from 256 up takes one
+  step of RC4's output over the first 256 and XORs that byte into `state[counter]`.
+- `swap_byte` is the XOR swap (`:14`), so an entry swapped with itself becomes 0: the
+  first 256 bytes are not a permutation (32 of them are 0 under the simple key).
+- `RC4_encipher(buffer, len, position)` (`:52-55`) XORs the buffer with
+  `state[(position + i) % 8192]`: the state is the stream, and it repeats every 8192
+  bytes of the file.
+
+A file is behind it when `SimpleEncryption` (`EF_FLAGS` 0x04) is in its Extended
+Features block. The key is `simple[0] = 1; simple[1] = 0; RC4_prepare_key(simple, 1)`:
+one byte, the second never read (`doc/CSBwin-src/SaveGame.cpp:325-329`, and `SaveGame`'s
+at `:915-918`). `ReadExtendedFeatures` deciphers the 512 bytes it has read at position 0
+when they do not open with the sentinel, and marks the file enciphered if they then do
+and carry the flag (`:323-338`); from there `READ` deciphers every buffer by its position
+in the file (`doc/CSBwin-src/system.cpp:303-313`), and `WRITE` enciphers the same way
+(`:316-329`). The whole file is enciphered, the block included.
+
+`rc4PrepareKey` and `rc4Encipher` (`src/data/CsbwinExtendedFeatures.ts`) are the two
+functions. `tools/dump-extended-features-read.ts` checks the stream against `RC4.cpp`
+compiled as it stands, and against Conflux 3.5's `dungeon.dat`
+(`static/gamefiles/conflux-3.5-b8/`), which is such a file: deciphered, it opens with the
+sentinel, its `flags` are 0xff, the block's checksum matches, and so do the two object
+maps' behind it, 59775 bytes read by their position.
+
 ## `CheckMonsters` overwrites a save's attached groups, and the game's start puts them back
 
 `CheckMonsters` (`doc/CSBwin-src/SaveGame.cpp:1342-1365`) walks every cell of every level

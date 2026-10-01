@@ -143,29 +143,63 @@ export function parseExtendedFeaturesBlock(block: Uint8Array): ExtendedFeaturesB
     };
 }
 
-function rc4Simple(buf: Uint8Array, key: Uint8Array): Uint8Array {
-    const out = new Uint8Array(buf.length);
-    const s = new Uint8Array(256);
-    for (let i = 0; i < 256; i++) s[i] = i;
-    let j = 0;
-    for (let i = 0; i < 256; i++) {
-        j = (j + s[i] + key[i % key.length]) & 0xff;
-        const tmp = s[i];
-        s[i] = s[j];
-        s[j] = tmp;
+/** `SIZE` (`doc/CSBwin-src/RC4.cpp:5`): the length of the stream, which then repeats. */
+const RC4_SIZE = 8192;
+
+/**
+ * `RC4_prepare_key` (`doc/CSBwin-src/RC4.cpp:20-48`): the stream `RC4_encipher` XORs a
+ * buffer with, which CSBWin keeps in a static `rc4_key` and this returns.
+ *
+ * It is not RC4, as the file's own first lines warn: only the key schedule is. The
+ * stream is the state itself. Its first 256 bytes are the schedule's permutation, as the
+ * second loop's swaps leave it, and each byte after them is `(unsigned char)counter`
+ * XORed with one byte of RC4's output.
+ *
+ * `swap_byte` is the XOR swap (`:14`), so an entry swapped with itself becomes 0.
+ */
+export function rc4PrepareKey(keyData: Uint8Array, keyDataLen: number): Uint8Array {
+    const state = new Uint8Array(RC4_SIZE);
+    for (let counter = 0; counter < RC4_SIZE; counter++) state[counter] = counter & 0xff;
+    const swapByte = (a: number, b: number): void => {
+        state[a] ^= state[b];
+        state[b] ^= state[a];
+        state[a] ^= state[b];
+    };
+    let index1 = 0;
+    let index2 = 0;
+    for (let counter = 0; counter < 256; counter++) {
+        index2 = (keyData[index1] + state[counter] + index2) % 256;
+        swapByte(counter, index2);
+        index1 = (index1 + 1) % keyDataLen;
     }
-    let i = 0;
-    j = 0;
-    for (let k = 0; k < buf.length; k++) {
-        i = (i + 1) & 0xff;
-        j = (j + s[i]) & 0xff;
-        const tmp = s[i];
-        s[i] = s[j];
-        s[j] = tmp;
-        const idx = (s[i] + s[j]) & 0xff;
-        out[k] = buf[k] ^ s[idx];
+    // "Create a few more random numbers."
+    let x = 0;
+    let y = 0;
+    for (let counter = 256; counter < RC4_SIZE; counter++) {
+        x = (x + 1) % 256;
+        y = (state[x] + y) % 256;
+        swapByte(x, y);
+        const xorIndex = (state[x] + state[y]) % 256;
+        state[counter] ^= state[xorIndex];
     }
-    return out;
+    return state;
+}
+
+/**
+ * `RC4_encipher` (`doc/CSBwin-src/RC4.cpp:52-55`): XOR `buffer` in place with the stream
+ * from `position`, the buffer's place in its file. Its own inverse.
+ */
+export function rc4Encipher(state: Uint8Array, buffer: Uint8Array, position: number): void {
+    for (let i = 0; i < buffer.length; i++) buffer[i] ^= state[(position + i) % RC4_SIZE];
+}
+
+/**
+ * The stream of the "simple" encipherment: `simple[0] = 1; simple[1] = 0;
+ * RC4_prepare_key(simple, 1)`, a key of one byte
+ * (`doc/CSBwin-src/SaveGame.cpp:325-329`, `:915-918`).
+ */
+export function simpleEncipherKey(): Uint8Array {
+    return rc4PrepareKey(new Uint8Array([1, 0]), 1);
 }
 
 function hasExtendedSentinel(buf: Uint8Array): boolean {
@@ -334,7 +368,8 @@ export function readExtendedFeatures(data: Uint8Array): {
 
     if (!hasExtendedSentinel(block)) {
         // ⚠️ CSBWin also wants `SimpleEncryption` in the deciphered `flags` (`DEBT.md` C107).
-        const decoded = rc4Simple(block, new Uint8Array([1, 0]));
+        const decoded = block.slice();
+        rc4Encipher(simpleEncipherKey(), decoded, 0);
         if (!hasExtendedSentinel(decoded)) return noBlock;
         parsed = decoded;
     }

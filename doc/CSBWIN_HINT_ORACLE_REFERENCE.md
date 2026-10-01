@@ -34,8 +34,8 @@ CSBWin opens them by the names `"0hcsb.hct"` and `"0hcsb.dat"` (`Hint.cpp:554-55
 
 ## Enciphering
 
-When the save's `hintKey` is not zero, CSBWin reads `hcsb.hct` through RC4 under that
-eight-byte key (`SETENCIPHERED`, `Hint.cpp:5401-5405`, `:5625-5629`). The key comes from
+When the save's `hintKey` is not zero, CSBWin reads `hcsb.hct` through `RC4.cpp`'s cipher under
+that eight-byte key (`SETENCIPHERED`, `Hint.cpp:5401-5405`, `:5625-5629`). The key comes from
 the save's Extended Features block (`memcpy(hintKey, efb.hintKey, 8)`,
 `doc/CSBwin-src/SaveGame.cpp:382`). Every save this project has carries a zero key
 (`doc/PROVEN_FACTS.md` → "The Extended Features header a live game writes"), and the
