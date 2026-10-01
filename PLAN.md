@@ -210,9 +210,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   Champions, so it names a game from its first step, whoever is in the party. Two new
   games differ: `CsbRandom` takes its seed from `Math.random` at its first draw
   (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
-  A save of an earlier build may hold 0, as the author's four `.dmweb.json` files do:
-  every game saved so shares playthrough 0, and so does a game played on from one. What
-  the list and the two confirmations make of playthrough 0 is step 2's to settle.
+- **A file that holds 0 names no playthrough**, and a save of an earlier build holds 0, as
+  the author's four `.dmweb.json` files do. The author's decision: a game loaded from
+  such a file is given a playthrough at the load. It joins the one of an existing save
+  that has an id, of the same dungeon (the row's data set) and the same party (the same
+  champions' names, in the same order), the newest when several do; with none, it draws
+  a new id, as a new game does. So a running game always has a playthrough, and its
+  saves carry it. The row and the file that held 0 keep it.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
   at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
@@ -254,8 +258,13 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    IndexedDB half of the upgrade (`upgradeFromVersion1`) no tool runs, since Node has no
    IndexedDB. The author's `.dmweb.json` files on disk are converted by hand, outside
    the engine; `tools/peek-dungeon.ts` reads one meanwhile.
-2. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
-   two confirmations, the last save used, and the play time.
+2. ⏳ **The playthrough**, one commit each:
+   - a. ⏳ **A game loaded from a file of playthrough 0 is given one.**
+   - b. ⏳ **F5's slot and F9's choice.**
+   - c. ⏳ **SAVE over the selection**, or new from the list's "new save" row.
+   - d. ⏳ **The two confirmations.**
+   - e. ⏳ **The last save used.**
+   - f. ⏳ **The play time.**
 3. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
 4. ⏳ **Export and import**, with the dungeon check and the catalogue behind it. Until
    then a `.dat` on disk has no way into the page, the committed saves included: the
