@@ -9,13 +9,17 @@
 // screenshot of the page. The page around the canvas is DOM debug chrome (buttons, a
 // slider, a scrollbar, the log panel), all of it drawn with the host's fonts and widget
 // theme, so a full-page shot could only ever be compared on the machine that took it. The
-// canvas is written solely by `putImageData` (the CRT effect is a separate GL canvas, and
-// it is off unless switched on), which makes the read-back exact and host-independent.
+// canvas is written solely by `putImageData` (the CRT effect is a separate GL canvas, fed
+// from a copy, and it is off unless switched on), which makes the read-back exact and
+// host-independent.
 // `compare-frames.mjs` then compares decoded *pixels*, so the PNG encoder does not enter
 // into it either.
 //
 // `Math.random` is seeded and localStorage cleared on every load, so the frames are
 // identical run to run.
+//
+// A few things are asserted on the spot rather than compared as frames, all about the CRT
+// effect, which no frame shows: see `check` below. A failure there exits 1.
 //
 // Usage:
 //   bash tools/check-frames.sh                     # normally: it starts both daemons
@@ -73,12 +77,22 @@ const CAPTURE_CANVAS = `(() => {
   return { width: c.width, height: c.height, data: btoa(s) };
 })()`;
 
+/** Writes the frame, and returns its pixels for the checks made on the spot. */
 const shot = async (name) => {
   const cap = await evaluate(CAPTURE_CANVAS);
   const rgba = Buffer.from(cap.data, 'base64');
   writeFileSync(`${process.argv[2]}/${name}.png`, encodePng(cap.width, cap.height, rgba));
   console.log('  wrote', name + '.png', `(${cap.width}x${cap.height})`);
+  return cap.data;
 };
+const canvasPixels = async () => (await evaluate(CAPTURE_CANVAS)).data;
+const failures = [];
+const check = (ok, what) => { console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${what}`); if (!ok) failures.push(what); };
+// The CRT effect is glfx's WebGL canvas, `#game-canvas_gl` (`createCrtController`,
+// `src/main.ts`): absent where Chrome gives no WebGL context. Nothing about the effect can
+// be checked then, and that fails the run rather than pass it unseen.
+const crtEffect = () => evaluate(`(()=>{const gl=document.getElementById('game-canvas_gl');
+  return !gl ? 'unavailable' : getComputedStyle(gl).display === 'none' ? 'off' : 'on';})()`);
 const key = (k) => evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true})),1`);
 const click = (sel) => evaluate(`document.querySelector(${JSON.stringify(sel)}).click(),1`);
 // button: 0 = left (DM mask 2), 2 = right (DM mask 1)
@@ -130,7 +144,17 @@ await wait(600);
 console.log('state: party built');       await shot('02-party');
 // Right-click a party block (DM mask 1, button id 7) opens that champion's inventory.
 await canvasClick(15, 15, 2);  await wait(700);
-console.log('state: inventory');         await shot('03-inventory');
+console.log('state: inventory');
+const inventory = await shot('03-inventory');
+// The effect is shown the game canvas and paints nothing on it. Its scanlines go on a copy:
+// painted on the canvas itself, they would darken a screen with every pass, and a screen
+// that does not repaint (the entrance, the credits) would be black in seconds.
+await click('#btn-crt'); await wait(500);
+const crtInPlay = await crtEffect();
+check(crtInPlay !== 'unavailable', 'the CRT effect exists (without it this Chrome gives glfx no WebGL context, and nothing below is checked)');
+check(crtInPlay === 'on', 'the CRT button turns the effect on');
+check(await canvasPixels() === inventory, 'CRT effect on: the game canvas keeps its pixels');
+await click('#btn-crt'); await wait(200);
 // Take an item out of the inventory. (41,66) is button id 30, body slot 2, which the Hall
 // of Champions fills for HALK with object 39027; selecting moves it out of the grid and
 // into the cursor, so this frame differs from 03 by the vacated slot.
@@ -236,3 +260,7 @@ console.log('state: F2 front-right wall'); await shot('14-edge-decoration-right'
 console.log('--- console errors ---');
 console.log(logs.length ? logs.join('\n') : '(none)');
 ws.close();
+if (failures.length) {
+  console.log(`--- ${failures.length} check(s) failed ---\n${failures.join('\n')}`);
+  process.exit(1);
+}

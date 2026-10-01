@@ -104,17 +104,25 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
 
     lines = new Image();
     lines.src = CRT_SCANLINES_SRC;
-    texture = glcanvas.texture(canvas);
+    // What the effect is given: the game canvas with the scanlines over it, composed on a
+    // canvas of its own. Only the game paints the game canvas: scanlines painted there
+    // would darken it with every pass, and a screen that does not repaint (the entrance,
+    // the credits) would be black in seconds.
+    const composed = document.createElement('canvas');
+    composed.width = canvas.width;
+    composed.height = canvas.height;
+    texture = glcanvas.texture(composed);
 
     const draw = (): void => {
-        const ctx = canvas.getContext('2d');
+        const ctx = composed.getContext('2d');
         if (!ctx || !glcanvas || !texture || !lines) return;
         const w = canvas.width;
         const h = canvas.height;
+        ctx.drawImage(canvas, 0, 0);
         if (lines.complete && lines.naturalWidth > 0) {
             ctx.drawImage(lines, 0, 0, w, h);
         }
-        texture.loadContentsOf(canvas);
+        texture.loadContentsOf(composed);
 
         const hw = w / 2;
         const hh = h / 2;
@@ -151,7 +159,6 @@ function createCrtController(canvas: HTMLCanvasElement): CrtController {
                 stop();
                 glcanvas.style.display = 'none';
                 canvas.style.display = '';
-                refreshScreen();
             }
             enabled = next;
             return enabled;

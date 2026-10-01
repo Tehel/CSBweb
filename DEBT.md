@@ -129,7 +129,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C104 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C105 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---
@@ -159,7 +159,7 @@ The code it will stand on is spread and knotted:
   stream, the Extended Features prefix reader (whose writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), the `EXPOOL` lookups, and the block codecs of all sixteen
   blocks, reader and writer.
-- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:316`) and `dev.ts`'s
+- **A save is built in three places**: `main.ts`'s `onCreateSave` (`:323`) and `dev.ts`'s
   quick-save each build the payload and spell out the same `SaveEntryMeta` literal, and
   the save's tail (`saveWritten`) runs before the write in one and after it in the other.
   `dev.ts` is not development scaffolding any more: it is the F5/F9 feature, with a
@@ -200,7 +200,7 @@ What the redesign will replace, and what it should not carry across:
   to know what to save (`src/ui/settings.ts`), and the element lookups are written twice
   (`events.ts:11-21`, `settings.ts:63-75`). A `UIContext` module singleton
   (`src/ui/context.ts`) is how the panels reach the game.
-- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-170`), the
+- **`main.ts` holds the page's features**: the 100-line CRT controller (`:68-177`), the
   end-of-game flow, and the save wiring (`E13`).
 - **`static/` is Vite's `publicDir`** (`vite.config.mts`), so a build copies all of it:
   `CSBwin.exe` and the three zips, Conflux, the author's saves, the manuals and the
@@ -312,7 +312,7 @@ view itself instead (`renderView` in `start`, `showEndOfGame` and the loads,
 ### C100 ⏳ With the CRT effect on, the end-of-game screens take no click
 
 `setCrtEnabled(true)` hides the game canvas and shows the WebGL one in its place
-(`src/main.ts:146-153`). `bindUIEvents` binds the adventure's handlers to both canvases,
+(`src/main.ts:154-161`). `bindUIEvents` binds the adventure's handlers to both canvases,
 but the pre-game and end-of-game screens listen on the game canvas alone
 (`createIntroHost`, `src/renderer/intro/BootSequence.ts:138-143`, handed `gameCanvasEl` by
 `showEndOfGame`). With the effect on, the credits' menu and the restart's chooser and
