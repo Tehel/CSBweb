@@ -25,8 +25,8 @@ any verified fact into `doc/`; then delete the phase's body and add its line to
 The goal is a complete, faithful game on `dm-atari`. The work, in order:
 
 1. **Rework the save menu** (Phase 10), and with it saves that know their
-   dungeon. The author sets the rest of its scope when it starts. `DEBT.md`'s index lists
-   it as `P10`, ahead of the G rows.
+   dungeon: its scope and its steps are there. `DEBT.md`'s index lists it as `P10`, ahead
+   of the G rows.
 2. **`DEBT.md`'s other active rows**: the unported CSBWin features the default dungeon and
    Chaos Strikes Back reach. `DEBT.md` says how
    to work an item. **One item per commit, a few per session**, then `/clear`. Its index is
@@ -143,15 +143,16 @@ Goal: read and write a save file CSBWin itself can load. **Reading and writing a
 what is left is the rework of the save menu. What the file cannot carry for a dungeon with
 DSAs or an enciphered file is postponed with them (`DEBT.md` G1, G4).
 
-#### The rework: what is already decided
+#### The rework
 
-The author sets the rest of its scope when it starts. The rework stands on `GameSaves`
-(`src/engine/GameSaves.ts`), which
-is built with the game and its data set, and is where every save is built and written to
-a store (the disk menu's SAVE and F5, under one rule for a unique name) and where a
-store's bytes are read back into the game (LOAD, the boot's chooser and F9).
+The rework stands on `GameSaves` (`src/engine/GameSaves.ts`), which is built with the game
+and its data set, and is where every save is built and written to a store (the disk
+menu's SAVE and F5) and where a store's bytes are read back into the game (LOAD, the
+boot's chooser and F9). Its scope, and after it the steps, one per commit.
 
-- **A save is a CSBWin `.dat` file, and the JSON wrapper goes.** A `.dmweb.json`
+**What a save is**
+
+- **A CSBWin `.dat` file, and the JSON wrapper goes.** A `.dmweb.json`
   (`src/engine/SaveGamePayload.ts`) pairs `runtime`, the port's own state in the shape of
   the build that wrote it, with `raw`, the whole CSBWin file the port writes. Only `raw`'s
   format is stable: `runtime` is refused at any other version, and `applySaveBytes` then
@@ -159,19 +160,93 @@ store's bytes are read back into the game (LOAD, the boot's chooser and F9).
   strand saves. First, whatever only `runtime` carries has to be found a place in the
   file, or shown to follow from it: `src/engine/CsbwinSaveGame.ts` → "What is not
   restored" is where to start, and `tools/dump-save-roundtrip.ts` is how to prove the file
-  alone gives the game back. Both stores already list a genuine `.dat` from its own blocks
-  (`src/data/saves/`).
-- **A save knows its dungeon.** A save's header names its date, level and party, not its
-  game (`SaveHeader`, `src/data/saves/SaveStore.ts`), and both stores list every save
-  together, so a DM save could be offered to a CSB game and restored into the wrong
-  tables. CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT` to
-  `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the wrong
-  graphics with the signatures an Extended Features block may carry
+  alone gives the game back.
+- **Every save is a row of IndexedDB**: the file's bytes beside what the list needs. The
+  level, the champions' names and the playthrough (below) are read from the file's own
+  blocks when the row is written; the data set, the date, whether it is the quick slot,
+  and the play time are the row's own. Nothing is JSON, and no row holds anything a
+  `.dat` could not be listed without.
+- **No store on disk.** `FileSaveStore`, the menu's source toggle and what the registry
+  does for two stores go: `showDirectoryPicker` is Chromium's alone, and no tool uses the
+  store. **Export** downloads the selected save's bare `.dat`, which CSBWin opens.
+  **Import** is a `.dat` dropped on the canvas while the dialog is up; there is no file
+  picker.
+- **A save knows its dungeon.** A row carries its data set's id, and the list shows the
+  running data set's saves only (`GameSaves.dataSet`). The filter is the list's
+  parameter, not its rule: `DEBT.md` G17's source save is picked across sets (a DM save
+  feeds a CSB game). CSBWin keeps a game's saves in that game's directory (`CSBGAME.DAT`
+  to `CSBGAME4.DAT`, `doc/CSBwin-src/CSBCode.cpp:9747-9756`), and guards against the
+  wrong graphics with the signatures an Extended Features block may carry
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
-  `Graphics.cpp:1784-1815`), which the port neither checks nor writes. Needed: saves
-  stored and listed per data set (`GameSaves.dataSet` is the running game's), a genuine `.dat` accepted in
-  the set whose files it was made from, and `DEBT.md` G17's source save picked across sets
-  (a DM save feeds a CSB game).
+  `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
+- **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
+  but it holds the dungeon (blocks 7-14). The check is on what play leaves alone in it,
+  looser than a byte comparison, since a player seldom knows which release a save came
+  from, and stricter than the number and size of the levels. A save of another dungeon
+  is refused, with the dungeon it looks like named when the port knows it ("switch to
+  it", or "not supported yet"): that takes a catalogue of known dungeons, which may list
+  dungeons the port cannot play. What the check reads is to be settled against the
+  committed saves, early and late ones, with a tool that shows each matching its own
+  dungeon and no other.
+- **Play time is the player's**: wall-clock time in the game, the frozen game and the
+  open dialog left out. The file's `d.Time` is not it (sleep runs it fast). The page
+  counts it and the row carries it: a load takes the row's, a save writes the count. An
+  export loses it and an import starts at 0.
+
+**A playthrough**
+
+- **`d.RandomGameID` names it**: drawn when a new game is read
+  (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), kept in `GAMEBLOCK1` (offset 308, written at
+  `:1060`), carried by the port as `block1.randomGameID`, and what CSBWin itself tests
+  for "THAT'S NOT THE SAME GAME" (`:1605-1606`). It is drawn before the Hall of
+  Champions, so it names a game from its first step, whoever is in the party. Two new
+  games differ: `CsbRandom` takes its seed from `Math.random` at its first draw
+  (`src/core/random.ts`), as CSBWin seeds from the system time (`CSBCode.cpp:350`).
+- **F5 has a slot of its own**, one per playthrough, written over at each press. It never
+  touches a save made from the dialog, which is what is left when a quick-save was made
+  at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
+  another. Both are the player's, not debug features, and what they did is told to the
+  player.
+- **SAVE writes over the selected save**, or makes a new one from the list's "new save"
+  row. **LOAD takes any save.** Either asks first when the save is of another
+  playthrough than the running game's; the order of two saves of one playthrough is
+  never checked, since loading an old save and saving over a newer one is ordinary play.
+- **The last save used**, loaded or written, is remembered per data set and is the
+  dialog's selection when it opens.
+
+**The dialog**
+
+- Its own layout over nearly the whole 320×200 buffer, in the game's style (graphic 0's
+  pieces, `_DoMenu`'s colours and font): not one of `_DoMenu`'s four layouts.
+- **A two-level list**: a playthrough, named by the champions of its newest save, and
+  under it, folded or not, its saves. The running playthrough is first and unfolded;
+  playthroughs and saves are newest first; the list scrolls.
+- **A preview** of the selected save beside the list: the champions' names without their
+  titles, the level, the play time, the date.
+- **LOAD, SAVE, EXPORT**, and a drop for the import. No delete, no quit and no "SAVE AND
+  QUIT": loading another playthrough's save is how a player leaves a game.
+- **"GAME LOADED, READY TO PLAY." goes**, and "ASCII DUMP" with it (`DEBT.md` G14): a
+  loaded game is played at once. It is CSBWin's `_TAG021028` menu
+  (`doc/CSBwin-src/CSBCode.cpp:10493-10537`), so its absence is one more entry of
+  `doc/CSBWIN_MENU_REFERENCE.md` → "Deliberate divergences in this port".
+
+**The steps**
+
+1. ⏳ **The `.dat` alone.** `GameSaves` writes and reads the CSBWin file; `runtime`, the
+   header and `SAVE_PAYLOAD_VERSION` go; `tools/dump-save-roundtrip.ts` proves the file
+   gives the game back. A `.dmweb.json` already in a store still loads, through its
+   `raw`, until step 2.
+2. ⏳ **The row.** Data set, playthrough and quick-slot flag beside the bytes, the list
+   filtered by data set, the file store and the source toggle removed. The IndexedDB
+   upgrade turns each `.dmweb.json` row into its `raw`, once; after it nothing reads
+   JSON. The author's `.dmweb.json` files on disk are converted by hand, outside the
+   engine.
+3. ⏳ **The playthrough.** F5's slot and F9's choice, SAVE over the selection or new, the
+   two confirmations, the last save used, the play time, and F5 and F9 reported to the
+   player.
+4. ⏳ **The dialog**: the layout, the folding list, the scrolling, the preview.
+5. ⏳ **Export and import**, with the dungeon check and the catalogue behind it.
+6. ⏳ **"GAME LOADED, READY TO PLAY." removed.** Independent of the others.
 
 #### The file
 
@@ -296,10 +371,10 @@ through the game's mouse queue.
 - **A record index above 1023 cannot be expressed.** `dataIndexMap` is 16 bits and the
   port's RN index field is 10; CSBWin allows 64000. The largest index in any committed
   save is 682, and `CsbwinObjectIndex.resolve` throws rather than alias.
-- **The menu:** no `<input type=file>` or download fallback for Firefox and Safari (the
-  file source says `NEEDS A CHROMIUM BROWSER`); no delete (`BrowserSaveStore.remove` has
-  no caller); no `SAVE AND QUIT`; and the golden frame shows an empty list, since the
-  frame script clears IndexedDB (`dump-save-menu.ts` proves the rows).
+- **The menu:** no delete (`BrowserSaveStore.remove` has no caller), no file picker for
+  an import and no `SAVE AND QUIT`, none of them in the rework's scope; and the golden
+  frame shows an empty list, since the frame script clears IndexedDB
+  (`dump-save-menu.ts` proves the rows).
 
 ### Phase 15 — Verification
 
