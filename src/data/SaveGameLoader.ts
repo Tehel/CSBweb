@@ -1,11 +1,12 @@
 /**
- * Minimal save-game loader focused on Item16 and timer tables.
- *
- * This follows CSBWin `ReadUnscrambleBlock` and `UnscrambleStream` logic
- * and expects the standard (non-extended-features) save-game layout.
+ * The block codecs of a CSBWin save, reader and writer: GAMEBLOCK1 and GAMEBLOCK2,
+ * `ITEM16`, the characters, the timers and the timer queue, scrambled as
+ * `CsbwinSaveStream.ts` does it, and where the dungeon image behind them sits
+ * (`loadSaveGameState`, `saveSaveGameState`). Block 0, the Extended Features prefix, is
+ * `CsbwinExtendedFeatures.ts`'s.
  */
 
-import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
+import type { DungeonData, Item16Record, TimerRecord, DsaIndex, MissileRecord } from './dungeonTypes';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { MakeBigActuators } from './CsbwinDungeonConversions';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
@@ -17,13 +18,8 @@ import {
   scrambleAndWrite,
   unscrambleStream,
 } from './CsbwinSaveStream';
-import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
-import {
-  EXTENDED_FEATURES_SIZE,
-  buildExtendedFeaturesPrefix,
-  parseExtendedFeaturesBlock,
-} from './CsbwinExtendedFeatures';
+import { buildExtendedFeaturesPrefix, readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import type { PartyState } from '../engine/gameTypes';
@@ -260,7 +256,6 @@ export function emptyBlock2(): Block2 {
 
 const BLOCK2_SIZE = 128;
 const CHARACTER_SIZE = 3328;
-const EXTENDED_SENTINEL = ' Extended Features ';
 
 /*
  * The save file's own byte order.
@@ -274,335 +269,12 @@ const EXTENDED_SENTINEL = ' Extended Features ';
  * `BO()`s every field afterwards (`doc/CSBwin-src/SaveGame.cpp:455-478`) — three
  * statements of the same fact.
  *
- * The one part of the file that is *not* big-endian is the CSB "Extended Features"
- * header, which is a PC-era addition written in native order:
- * `SwapExtendedFeaturesBlock` swaps it only `#ifdef _bigEndian`
- * (`doc/CSBwin-src/SaveGame.cpp:275-293`), so on the shipping build it is a no-op and
- * the block stays little-endian. That is why `readU16LE`/`readU32LE` are used here for
- * exactly that block, and nothing else.
+ * What is *not* big-endian is CSBWin's own additions, written in the PC's native order:
+ * the "Extended Features" header (`CsbwinExtendedFeatures.ts`), GAMEBLOCK1's
+ * `SaveOption` and `totalMoveCount` (`Block1`), and the indirect-text index
+ * (`DungeonImageLayout`). `readU16LE`/`readU32LE` are used here for those, and nothing
+ * else.
  */
-
-function rc4Simple(buf: Uint8Array, key: Uint8Array): Uint8Array {
-  const out = new Uint8Array(buf.length);
-  const s = new Uint8Array(256);
-  for (let i = 0; i < 256; i++) s[i] = i;
-  let j = 0;
-  for (let i = 0; i < 256; i++) {
-    j = (j + s[i] + key[i % key.length]) & 0xff;
-    const tmp = s[i];
-    s[i] = s[j];
-    s[j] = tmp;
-  }
-  let i = 0;
-  j = 0;
-  for (let k = 0; k < buf.length; k++) {
-    i = (i + 1) & 0xff;
-    j = (j + s[i]) & 0xff;
-    const tmp = s[i];
-    s[i] = s[j];
-    s[j] = tmp;
-    const idx = (s[i] + s[j]) & 0xff;
-    out[k] = buf[k] ^ s[idx];
-  }
-  return out;
-}
-
-function hasExtendedSentinel(buf: Uint8Array): boolean {
-  if (buf.length < EXTENDED_SENTINEL.length) return false;
-  for (let i = 0; i < EXTENDED_SENTINEL.length; i++) {
-    if (buf[i] !== EXTENDED_SENTINEL.charCodeAt(i)) return false;
-  }
-  return true;
-}
-
-class RcsReader {
-  private checksum = 0xffff;
-  private offset: number;
-
-  constructor(private data: Uint8Array, startOffset: number) {
-    this.offset = startOffset;
-  }
-
-  getOffset(): number {
-    return this.offset;
-  }
-
-  resetChecksum(): void {
-    this.checksum = 0xffff;
-  }
-
-  finalizeChecksum(): number {
-    const out = this.checksum >>> 0;
-    this.checksum = 0xffff;
-    return out;
-  }
-
-  readBytes(count: number): Uint8Array {
-    const end = this.offset + count;
-    if (end > this.data.length) throw new Error('savegame truncated while reading DSA data');
-    const buf = this.data.subarray(this.offset, end);
-    for (let i = 0; i < buf.length; i++) {
-      // Plain `*` loses precision here (see `GraphicRandom`'s
-      // comment for why): `Math.imul` gives the exact 32-bit-wraparound product
-      // `ui32(0xbb40e62d)` means in C.
-      this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + buf[i]) >>> 0;
-    }
-    this.offset = end;
-    return buf;
-  }
-
-  readU8(): number {
-    return this.readBytes(1)[0] ?? 0;
-  }
-
-  readU16(): number {
-    const b = this.readBytes(2);
-    return (b[0] ?? 0) | ((b[1] ?? 0) << 8);
-  }
-
-  readU32(): number {
-    const b = this.readBytes(4);
-    return ((b[0] ?? 0) | ((b[1] ?? 0) << 8) | ((b[2] ?? 0) << 16) | ((b[3] ?? 0) << 24)) >>> 0;
-  }
-}
-
-function decodeCString(bytes: Uint8Array): string {
-  let end = bytes.length;
-  for (let i = 0; i < bytes.length; i++) {
-    if (bytes[i] === 0) {
-      end = i;
-      break;
-    }
-  }
-  let out = '';
-  for (let i = 0; i < end; i++) {
-    out += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return out;
-}
-
-function readU16Array(bytes: Uint8Array, count: number): number[] {
-  const out: number[] = new Array(count);
-  let off = 0;
-  for (let i = 0; i < count; i++) {
-    out[i] = (bytes[off] ?? 0) | ((bytes[off + 1] ?? 0) << 8);
-    off += 2;
-  }
-  return out;
-}
-
-function readDsa(rcs: RcsReader): DsaDefinition {
-  const description = decodeCString(rcs.readBytes(80));
-  const state = rcs.readU16();
-  const localState = rcs.readU8();
-  const groupId = rcs.readU8();
-  const numStates = rcs.readU32();
-  const firstDisplayedState = rcs.readU32();
-  const numNonEmptyStates = rcs.readU32();
-  const states: Array<{ actions: Array<{ column: number; program: Uint16Array }> } | null> =
-    Array.from({ length: numStates }, () => null);
-
-  for (let i = 0; i < numNonEmptyStates; i++) {
-    const stateNum = rcs.readU32();
-    if (stateNum >= numStates) throw new Error('savegame DSA state out of range');
-    const numActions = rcs.readU32();
-    if (numActions > 12) throw new Error('savegame DSA actions > 12');
-    const actions: Array<{ column: number; program: Uint16Array }> = [];
-    for (let j = 0; j < numActions; j++) {
-      const column = rcs.readU32();
-      const numPgmWords = rcs.readU32();
-      let program = new Uint16Array();
-      if (numPgmWords > 0) {
-        const bytes = rcs.readBytes(numPgmWords * 2);
-        program = Uint16Array.from(readU16Array(bytes, numPgmWords));
-      }
-      actions.push({ column, program });
-    }
-    states[stateNum] = { actions };
-  }
-
-  return {
-    description,
-    state,
-    localState,
-    groupId,
-    numStates,
-    firstDisplayedState,
-    states,
-  };
-}
-
-/**
- * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
- * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
- * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
- * file opens with no block.
- */
-export function readExtendedFeatures(data: Uint8Array): {
-  offset: number;
-  sequencedTimers: boolean;
-  extendedTimers: boolean;
-  extendedWallDecorations: boolean;
-  bigActuators: boolean;
-  expandedPortraits: boolean;
-  indirectText: boolean;
-  /** `EXTENDEDFEATURESBLOCK.version` (offset 36). `'B'` and up store new-style scrolls. */
-  version: number;
-  /** `EXTENDEDFEATURESBLOCK.cellFlagArraySize` (offset 48). */
-  cellFlagArraySize: number;
-  /**
-   * The object indirect index, present whenever the block is (`dataMapLength` is 0 in
-   * a file written before the feature existed, and then there is nothing to resolve).
-   */
-  objectIndex?: CsbwinObjectIndex;
-  spellFilterLocation?: number;
-  dsaLevelIndex?: number[][];
-  dsaIndex?: DsaIndex;
-  /** The parsed 512-byte header, absent when the file carries no prefix. */
-  header?: ExtendedFeaturesBlock;
-  /** The game-information bytes, as written. */
-  gameInfo?: Uint8Array;
-  /** The DSA section verbatim, when there is one. */
-  dsaBlock?: Uint8Array;
-} {
-  if (data.length < EXTENDED_FEATURES_SIZE) {
-    return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
-  }
-
-  let block = data.subarray(0, EXTENDED_FEATURES_SIZE);
-  let parsed = block;
-
-  if (!hasExtendedSentinel(block)) {
-    const decoded = rc4Simple(block, new Uint8Array([1, 0]));
-    if (hasExtendedSentinel(decoded)) {
-      parsed = decoded;
-    } else {
-      return { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
-    }
-  }
-
-  // Offsets are `EXTENDEDFEATURESBLOCK` (`doc/CSBwin-src/CSB.h:463-511`), which is a
-  // plain naturally-aligned struct: sentinel[20] 0, dataMapLength 20, the three
-  // checksums 24/28/32, version 36, flags 37, numDSA 38, editingOptions 40,
-  // gameInfoSize 44, cellFlagArraySize 48, graphicsSignature1/2 52/56,
-  // spellFilterLocation 60, extendedFlags 64, overlayOrdinal 68.
-  const dataMapLength = readU32LE(parsed, 20);
-  const typeMapChecksum = readU32LE(parsed, 24);
-  const indexMapChecksum = readU32LE(parsed, 28);
-  const version = parsed[36] ?? 0;
-  const flags = parsed[37] ?? 0;
-  const numDSA = readU16LE(parsed, 38);
-  // `gameInfoSize` is `ui32` in the struct but the whole chain treats it as signed:
-  // the global is `i32` (`doc/CSBwin-src/Data.h:118`), and the writer sets
-  // `efb.gameInfoSize = gameInfoSize - 1` whenever `gameInfo != NULL`
-  // (`doc/CSBwin-src/SaveGame.cpp:977-978`), so an empty-but-allocated game info
-  // writes **-1**. `WriteGameInfo` then returns before writing anything for a
-  // non-positive size, so -1 occupies no bytes in the file and must advance nothing.
-  // A real save in `static/gamefiles/saves/` does exactly this; read unsigned, the
-  // 4294967295 walked the read head off the end of the file.
-  const gameInfoSizeRaw = readU32LE(parsed, 44) | 0;
-  const gameInfoSize = gameInfoSizeRaw > 0 ? gameInfoSizeRaw : 0;
-  const cellFlagArraySize = readU32LE(parsed, 48);
-  const spellFilterLocation = readU32LE(parsed, 60);
-  const extendedFlags = readU32LE(parsed, 64);
-
-  const sequencedTimers = (extendedFlags & 0x20) !== 0;
-  const extendedTimers = (extendedFlags & 0x80) !== 0;
-  const extendedWallDecorations = (extendedFlags & 0x10) !== 0;
-  const bigActuators = (flags & 0x80) !== 0;
-  const expandedPortraits = (flags & 0x20) !== 0;
-  const indirectText = (flags & 0x08) !== 0;
-
-  // `ReadExtendedFeatures` verifies the block against its own checksum before it
-  // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:344-353`): the stored
-  // value is lifted out, the field zeroed, and `FormChecksum` run over all 512 bytes.
-  // Worth doing here for the same reason CSBWin does it — the offsets below are only
-  // as trustworthy as the block they are read from.
-  const checked = parsed.slice();
-  const storedChecksum = readU32LE(checked, 32);
-  checked[32] = checked[33] = checked[34] = checked[35] = 0;
-  if (formChecksum(checked) !== (storedChecksum >>> 0)) {
-    throw new Error('extended features block checksum mismatch');
-  }
-
-  // The two maps that make every object reference in the file meaningful. See
-  // `CsbwinObjectIndex.ts`: an RN in a CSBWin save is a slot number in this index, not
-  // the packed `[pos:2][db:4][idx:10]` of `dungeon.dat`.
-  const objectIndex =
-    dataMapLength > 0
-      ? readObjectIndirectIndex(
-          data,
-          EXTENDED_FEATURES_SIZE,
-          dataMapLength,
-          typeMapChecksum,
-          indexMapChecksum,
-        )
-      : undefined;
-
-  let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
-  const dsaStart = offset;
-
-  let dsaLevelIndex: number[][] | undefined;
-  let dsaIndex: DsaIndex | undefined;
-  let dsaBlock: Uint8Array | undefined;
-
-  if (numDSA > 0) {
-    const rcs = new RcsReader(data, offset);
-    rcs.resetChecksum();
-    dsaIndex = { entries: new Array<DsaDefinition | null>(256).fill(null) };
-    for (let i = 0; i < numDSA; i++) {
-      const dsaNum = rcs.readU32();
-      if (dsaNum > 255) throw new Error('savegame DSA number > 255');
-      if (dsaIndex.entries[dsaNum]) throw new Error('savegame duplicate DSA');
-      dsaIndex.entries[dsaNum] = readDsa(rcs);
-    }
-    const computed = rcs.finalizeChecksum();
-    const fileChecksum = readU32LE(data, rcs.getOffset());
-    rcs.readBytes(4);
-    if ((computed >>> 0) !== (fileChecksum >>> 0)) {
-      throw new Error('savegame DSA checksum mismatch');
-    }
-    offset = rcs.getOffset();
-    // Kept verbatim so the writer can put them back; this port re-serializes no DSA.
-    dsaBlock = data.slice(dsaStart, offset);
-  }
-
-  const gameInfo = data.slice(offset, offset + gameInfoSize);
-  offset += gameInfoSize;
-
-  if ((flags & 0x01) !== 0) {
-    dsaLevelIndex = Array.from({ length: 64 }, () => new Array<number>(32).fill(0xffff));
-    while (offset + 3 <= data.length) {
-      const level = data[offset] ?? 0;
-      const selector = data[offset + 1] ?? 0;
-      const index = data[offset + 2] ?? 0;
-      offset += 3;
-      if (level > 63) break;
-      if (selector < 32) {
-        dsaLevelIndex[level][selector] = index;
-      }
-    }
-  }
-
-  return {
-    offset,
-    sequencedTimers,
-    extendedTimers,
-    extendedWallDecorations,
-    bigActuators,
-    expandedPortraits,
-    indirectText,
-    version,
-    cellFlagArraySize,
-    objectIndex,
-    spellFilterLocation,
-    dsaLevelIndex,
-    dsaIndex,
-    header: parseExtendedFeaturesBlock(parsed),
-    gameInfo,
-    dsaBlock,
-  };
-}
 
 /**
  * Where each section of the dungeon image sits, relative to `startOffset`.

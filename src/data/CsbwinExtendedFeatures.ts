@@ -29,8 +29,14 @@
  * (`doc/CSBwin-src/SaveGame.cpp:800-801`), and `ReadDSALevelIndex` loops until it reads a
  * triple whose first byte is above 63 (`:421-430`) — consuming it. Without those three
  * bytes the reader would eat the first three bytes of GAMEBLOCK1.
+ *
+ * A `dungeon.dat` may open with the same prefix (`DungeonLoader.loadDungeonDat`). This
+ * module is its one reader, `readExtendedFeatures`, and its one writer,
+ * `buildExtendedFeaturesPrefix`.
  */
-import { formChecksum } from './CsbwinObjectIndex';
+import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
+import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
+import type { DsaDefinition, DsaIndex } from './dungeonTypes';
 import { readU16LE, readU32LE, writeU16LE, writeU32LE } from '../core/bytes';
 
 /** `strcpy(efb.sentinel, " Extended Features ")` — 19 characters and a terminator. */
@@ -134,6 +140,306 @@ export function parseExtendedFeaturesBlock(block: Uint8Array): ExtendedFeaturesB
         csbGraphicsSignature1: readU32LE(block, 88),
         csbGraphicsSignature2: readU32LE(block, 92),
         hintKey: block.slice(96, 104),
+    };
+}
+
+function rc4Simple(buf: Uint8Array, key: Uint8Array): Uint8Array {
+    const out = new Uint8Array(buf.length);
+    const s = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) s[i] = i;
+    let j = 0;
+    for (let i = 0; i < 256; i++) {
+        j = (j + s[i] + key[i % key.length]) & 0xff;
+        const tmp = s[i];
+        s[i] = s[j];
+        s[j] = tmp;
+    }
+    let i = 0;
+    j = 0;
+    for (let k = 0; k < buf.length; k++) {
+        i = (i + 1) & 0xff;
+        j = (j + s[i]) & 0xff;
+        const tmp = s[i];
+        s[i] = s[j];
+        s[j] = tmp;
+        const idx = (s[i] + s[j]) & 0xff;
+        out[k] = buf[k] ^ s[idx];
+    }
+    return out;
+}
+
+function hasExtendedSentinel(buf: Uint8Array): boolean {
+    if (buf.length < EXTENDED_SENTINEL.length) return false;
+    for (let i = 0; i < EXTENDED_SENTINEL.length; i++) {
+        if (buf[i] !== EXTENDED_SENTINEL.charCodeAt(i)) return false;
+    }
+    return true;
+}
+
+class RcsReader {
+    private checksum = 0xffff;
+    private offset: number;
+
+    constructor(private data: Uint8Array, startOffset: number) {
+        this.offset = startOffset;
+    }
+
+    getOffset(): number {
+        return this.offset;
+    }
+
+    resetChecksum(): void {
+        this.checksum = 0xffff;
+    }
+
+    finalizeChecksum(): number {
+        const out = this.checksum >>> 0;
+        this.checksum = 0xffff;
+        return out;
+    }
+
+    readBytes(count: number): Uint8Array {
+        const end = this.offset + count;
+        if (end > this.data.length) throw new Error('savegame truncated while reading DSA data');
+        const buf = this.data.subarray(this.offset, end);
+        for (let i = 0; i < buf.length; i++) {
+            // Plain `*` loses precision here (see `GraphicRandom`'s
+            // comment for why): `Math.imul` gives the exact 32-bit-wraparound product
+            // `ui32(0xbb40e62d)` means in C.
+            this.checksum = (Math.imul(this.checksum, 0xbb40e62d) + 11 + buf[i]) >>> 0;
+        }
+        this.offset = end;
+        return buf;
+    }
+
+    readU8(): number {
+        return this.readBytes(1)[0] ?? 0;
+    }
+
+    readU16(): number {
+        const b = this.readBytes(2);
+        return (b[0] ?? 0) | ((b[1] ?? 0) << 8);
+    }
+
+    readU32(): number {
+        const b = this.readBytes(4);
+        return ((b[0] ?? 0) | ((b[1] ?? 0) << 8) | ((b[2] ?? 0) << 16) | ((b[3] ?? 0) << 24)) >>> 0;
+    }
+}
+
+function decodeCString(bytes: Uint8Array): string {
+    let end = bytes.length;
+    for (let i = 0; i < bytes.length; i++) {
+        if (bytes[i] === 0) {
+            end = i;
+            break;
+        }
+    }
+    let out = '';
+    for (let i = 0; i < end; i++) {
+        out += String.fromCharCode(bytes[i] ?? 0);
+    }
+    return out;
+}
+
+function readU16Array(bytes: Uint8Array, count: number): number[] {
+    const out: number[] = new Array(count);
+    let off = 0;
+    for (let i = 0; i < count; i++) {
+        out[i] = (bytes[off] ?? 0) | ((bytes[off + 1] ?? 0) << 8);
+        off += 2;
+    }
+    return out;
+}
+
+function readDsa(rcs: RcsReader): DsaDefinition {
+    const description = decodeCString(rcs.readBytes(80));
+    const state = rcs.readU16();
+    const localState = rcs.readU8();
+    const groupId = rcs.readU8();
+    const numStates = rcs.readU32();
+    const firstDisplayedState = rcs.readU32();
+    const numNonEmptyStates = rcs.readU32();
+    const states: Array<{ actions: Array<{ column: number; program: Uint16Array }> } | null> =
+        Array.from({ length: numStates }, () => null);
+
+    for (let i = 0; i < numNonEmptyStates; i++) {
+        const stateNum = rcs.readU32();
+        if (stateNum >= numStates) throw new Error('savegame DSA state out of range');
+        const numActions = rcs.readU32();
+        if (numActions > 12) throw new Error('savegame DSA actions > 12');
+        const actions: Array<{ column: number; program: Uint16Array }> = [];
+        for (let j = 0; j < numActions; j++) {
+            const column = rcs.readU32();
+            const numPgmWords = rcs.readU32();
+            let program = new Uint16Array();
+            if (numPgmWords > 0) {
+                const bytes = rcs.readBytes(numPgmWords * 2);
+                program = Uint16Array.from(readU16Array(bytes, numPgmWords));
+            }
+            actions.push({ column, program });
+        }
+        states[stateNum] = { actions };
+    }
+
+    return {
+        description,
+        state,
+        localState,
+        groupId,
+        numStates,
+        firstDisplayedState,
+        states,
+    };
+}
+
+/**
+ * `ReadExtendedFeatures` (`doc/CSBwin-src/SaveGame.cpp:298-432`) over the front of a file,
+ * a save's or a `dungeon.dat`'s: the block, the object maps, the DSAs, the game
+ * information and the DSA level index. `offset` is `ExtendedFeaturesSize`, 0 when the
+ * file opens with no block.
+ */
+export function readExtendedFeatures(data: Uint8Array): {
+    offset: number;
+    sequencedTimers: boolean;
+    extendedTimers: boolean;
+    extendedWallDecorations: boolean;
+    bigActuators: boolean;
+    expandedPortraits: boolean;
+    indirectText: boolean;
+    /** `EXTENDEDFEATURESBLOCK.version`. `'B'` and up store new-style scrolls. */
+    version: number;
+    /** `EXTENDEDFEATURESBLOCK.cellFlagArraySize`. */
+    cellFlagArraySize: number;
+    /**
+     * The object indirect index, present whenever the block is (`dataMapLength` is 0 in
+     * a file written before the feature existed, and then there is nothing to resolve).
+     */
+    objectIndex?: CsbwinObjectIndex;
+    spellFilterLocation?: number;
+    dsaLevelIndex?: number[][];
+    dsaIndex?: DsaIndex;
+    /** The parsed 512-byte header, absent when the file carries no prefix. */
+    header?: ExtendedFeaturesBlock;
+    /** The game-information bytes, as written. */
+    gameInfo?: Uint8Array;
+    /** The DSA section verbatim, when there is one. */
+    dsaBlock?: Uint8Array;
+} {
+    const noBlock = { offset: 0, sequencedTimers: false, extendedTimers: false, extendedWallDecorations: false, bigActuators: false, expandedPortraits: false, indirectText: false, version: 0, cellFlagArraySize: 0 };
+    if (data.length < EXTENDED_FEATURES_SIZE) return noBlock;
+
+    const block = data.subarray(0, EXTENDED_FEATURES_SIZE);
+    let parsed = block;
+
+    if (!hasExtendedSentinel(block)) {
+        // ⚠️ CSBWin also wants `SimpleEncryption` in the deciphered `flags` (`DEBT.md` C107).
+        const decoded = rc4Simple(block, new Uint8Array([1, 0]));
+        if (!hasExtendedSentinel(decoded)) return noBlock;
+        parsed = decoded;
+    }
+
+    // `ReadExtendedFeatures` verifies the block against its own checksum before it
+    // believes a single field of it (`doc/CSBwin-src/SaveGame.cpp:345-353`): the stored
+    // value is lifted out, the field zeroed, and `FormChecksum` run over all 512 bytes.
+    // Worth doing here for the same reason CSBWin does it — the offsets below are only
+    // as trustworthy as the block they are read from.
+    // ⚠️ CSBWin then reads the file as one with no block, where this throws (`DEBT.md` C107).
+    const checked = parsed.slice();
+    const storedChecksum = readU32LE(checked, 32);
+    checked[32] = checked[33] = checked[34] = checked[35] = 0;
+    if (formChecksum(checked) !== (storedChecksum >>> 0)) {
+        throw new Error('extended features block checksum mismatch');
+    }
+
+    const header = parseExtendedFeaturesBlock(parsed);
+    // The three fields `ExtendedFeaturesBlock` leaves out, which describe the two maps
+    // behind the block: `dataMapLength` at 20, and the maps' checksums at 24 and 28.
+    const dataMapLength = readU32LE(parsed, 20);
+    const typeMapChecksum = readU32LE(parsed, 24);
+    const indexMapChecksum = readU32LE(parsed, 28);
+    // A `gameInfoSize` of -1 is a game information allocated but empty, which
+    // `WriteGameInfo` writes no byte of (`doc/CSBwin-src/SaveGame.cpp:265-270`): it
+    // advances nothing.
+    const gameInfoSize = Math.max(0, header.gameInfoSize);
+    const { flags, extendedFlags, numDSA } = header;
+
+    // The two maps that make every object reference in the file meaningful. See
+    // `CsbwinObjectIndex.ts`: an RN in a CSBWin save is a slot number in this index, not
+    // the packed `[pos:2][db:4][idx:10]` of `dungeon.dat`.
+    const objectIndex =
+        dataMapLength > 0
+            ? readObjectIndirectIndex(
+                data,
+                EXTENDED_FEATURES_SIZE,
+                dataMapLength,
+                typeMapChecksum,
+                indexMapChecksum,
+            )
+            : undefined;
+
+    let offset = EXTENDED_FEATURES_SIZE + dataMapLength + dataMapLength * 2;
+    const dsaStart = offset;
+
+    let dsaLevelIndex: number[][] | undefined;
+    let dsaIndex: DsaIndex | undefined;
+    let dsaBlock: Uint8Array | undefined;
+
+    if (numDSA > 0) {
+        const rcs = new RcsReader(data, offset);
+        rcs.resetChecksum();
+        dsaIndex = { entries: new Array<DsaDefinition | null>(256).fill(null) };
+        for (let i = 0; i < numDSA; i++) {
+            const dsaNum = rcs.readU32();
+            if (dsaNum > 255) throw new Error('savegame DSA number > 255');
+            if (dsaIndex.entries[dsaNum]) throw new Error('savegame duplicate DSA');
+            dsaIndex.entries[dsaNum] = readDsa(rcs);
+        }
+        const computed = rcs.finalizeChecksum();
+        const fileChecksum = readU32LE(data, rcs.getOffset());
+        rcs.readBytes(4);
+        if ((computed >>> 0) !== (fileChecksum >>> 0)) {
+            throw new Error('savegame DSA checksum mismatch');
+        }
+        offset = rcs.getOffset();
+        // Kept verbatim so the writer can put them back; this port re-serializes no DSA.
+        dsaBlock = data.slice(dsaStart, offset);
+    }
+
+    const gameInfo = data.slice(offset, offset + gameInfoSize);
+    offset += gameInfoSize;
+
+    if ((flags & EF_FLAGS.LevelDSAInfoPresent) !== 0) {
+        dsaLevelIndex = Array.from({ length: 64 }, () => new Array<number>(32).fill(0xffff));
+        while (offset + 3 <= data.length) {
+            const level = data[offset] ?? 0;
+            const selector = data[offset + 1] ?? 0;
+            const index = data[offset + 2] ?? 0;
+            offset += 3;
+            if (level > 63) break;
+            if (selector < 32) {
+                dsaLevelIndex[level][selector] = index;
+            }
+        }
+    }
+
+    return {
+        offset,
+        sequencedTimers: (extendedFlags & EF_EXTENDED_FLAGS.SequencedTimers) !== 0,
+        extendedTimers: (extendedFlags & EF_EXTENDED_FLAGS.ExtendedTimers) !== 0,
+        extendedWallDecorations: (extendedFlags & EF_EXTENDED_FLAGS.ExtendedWallDecorations) !== 0,
+        bigActuators: (flags & EF_FLAGS.BigActuators) !== 0,
+        expandedPortraits: (flags & EF_FLAGS.ExpandedPortraits) !== 0,
+        indirectText: (flags & EF_FLAGS.IndirectText) !== 0,
+        version: header.version,
+        cellFlagArraySize: header.cellFlagArraySize,
+        objectIndex,
+        spellFilterLocation: header.spellFilterLocation,
+        dsaLevelIndex,
+        dsaIndex,
+        header,
+        gameInfo,
+        dsaBlock,
     };
 }
 

@@ -35,10 +35,10 @@ big-endian word.
 
 The exception is the CSB-era **"Extended Features" block, which is little-endian** —
 `SwapExtendedFeaturesBlock` has a body only `#ifdef _bigEndian`
-(`doc/CSBwin-src/SaveGame.cpp:275-293`), so on the shipping build it does nothing and
-the block keeps native PC order. A save file is therefore mixed-endian, and
-`SaveGameLoader` reads it that way: `readU16LE`/`readU32LE` for that one header,
-`readU16BE` everywhere else.
+(`doc/CSBwin-src/SaveGame.cpp:183-200`), so on the shipping build it does nothing and
+the block keeps native PC order. A save file is therefore mixed-endian, and the port
+reads it that way: `readU16LE`/`readU32LE` for that one header
+(`src/data/CsbwinExtendedFeatures.ts`), `readU16BE` everywhere else.
 
 ## GAMEBLOCK1 (512 bytes)
 
@@ -286,7 +286,7 @@ writes one. Of what it emits:
   so a world in memory is always save-shaped rather than `dungeon.dat`-shaped.
   `PLAN.md` Phase 10 has the detail.
 
-`readExtendedFeatures` reads block 0 in full, and blocks 7-14 are now fully **read** —
+`readExtendedFeatures` (`src/data/CsbwinExtendedFeatures.ts`) reads block 0 in full, and blocks 7-14 are now fully **read** —
 `src/data/CsbwinDungeonImage.ts` parses the image into a real `DungeonData`. An earlier
 revision of this file claimed the two functions that reach into
 the image, `parseSpecialLocationsFromSaveData` and `parseMissileRecordsFromSaveData`,

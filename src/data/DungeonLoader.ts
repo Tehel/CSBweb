@@ -33,7 +33,7 @@ import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
-import { readExtendedFeatures } from './SaveGameLoader';
+import { readExtendedFeatures } from './CsbwinExtendedFeatures';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
