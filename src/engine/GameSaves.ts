@@ -8,18 +8,19 @@
  * and the F5 and F9 keys.
  *
  * The store (`src/data/saves/`) holds every data set's saves, each row naming its own, and
- * the game's are its data set's: what the menu and the chooser list, and what F9 picks
- * from.
+ * the game's are its data set's: what the menu and the chooser list. Among them, those of
+ * the game's playthrough (`d.RandomGameID`) are what F5 and F9 work on.
  *
- * F5 and F9 do not exist in CSBWin, which has only the disk menu. They are a shortcut onto
- * that menu's list: one more save, marked as the key's, and the most recent save of the
- * list. Neither raises a dialog, so what either did, or why it did nothing, is a line in
- * the message area, and one for the console with the save's name.
+ * F5 and F9 do not exist in CSBWin, which has only the disk menu. F5 writes the
+ * playthrough's quick-save, one slot written over at each press, and never a save the
+ * menu made; F9 loads the playthrough's newest save, the slot or the menu's. Neither
+ * raises a dialog, so what either did, or why it did nothing, is a line in the message
+ * area, and one for the console with the save's name.
  */
 import { CsbRandom } from '../core/random';
 import type { DataSet } from '../data/DataSets';
 import {
-    SAVE_FILE_EXTENSION, joinedPlaythrough, readSaveFileFields,
+    SAVE_FILE_EXTENSION, joinedPlaythrough, quickSlot, readSaveFileFields,
     type OpenedSave, type SaveEntry, type SaveStore,
 } from '../data/saves';
 import type { Game } from './Game';
@@ -134,8 +135,11 @@ export class GameSaves {
     }
 
     /**
-     * Build a save and write it to the store, as a row of the game's data set under a
-     * name no save there has, in any set: a row's name is its key. `quick` marks F5's.
+     * Build a save and write it to the store, as a row of the game's data set. The
+     * menu's is a new row, under a name no save has in any set: a row's name is its key.
+     * F5's (`quick`) is written over the playthrough's slot (`quickSlot`), which keeps
+     * its key and its name and takes the new file and its date; the first press makes
+     * the slot, as a new row.
      *
      * With the clock stopped, the save's tail (`Game.saveWritten`) runs once the file is
      * written, and a write that fails skips it, as CSBWin's `SaveError` jumps past it
@@ -163,9 +167,11 @@ export class GameSaves {
         const fields = readSaveFileFields(bytes);
         if (!fields) throw new Error('the save file does not read back');
         if (clock === 'running') this.game.saveWritten();
-        const taken = new Set((await this.store.list(null)).map((entry) => entry.name));
-        const name = makeSaveFileName(savedAt, taken);
-        const entry: SaveEntry = { id: name, name, dataSet: this.dataSet.id, quick, savedAt, ...fields };
+        const rows = await this.store.list(null);
+        const slot = quick ? quickSlot(rows, this.dataSet.id, fields.playthrough) : undefined;
+        const name = slot ? slot.name : makeSaveFileName(savedAt, new Set(rows.map((row) => row.name)));
+        const id = slot ? slot.id : name;
+        const entry: SaveEntry = { id, name, dataSet: this.dataSet.id, quick, savedAt, ...fields };
         await this.store.write(entry, bytes);
         if (clock === 'stopped') this.game.saveWritten();
         return entry;
@@ -205,8 +211,8 @@ export class GameSaves {
     }
 
     /**
-     * F5: one more save, marked as the key's. Not with an empty party, nor while a
-     * champion is still being chosen: the disk icon does nothing then
+     * F5: the playthrough's quick-save, written over the last. Not with an empty party,
+     * nor while a champion is still being chosen: the disk icon does nothing then
      * (`doc/CSBwin-src/Mouse.cpp:1716-1718`), and a file has no place for
      * `d.PotentialCharacterOrdinal`, so the candidate would load as a member. Nor while a
      * script holds the loop, which a save could not resume. The icon is silent then; a
@@ -233,12 +239,14 @@ export class GameSaves {
     }
 
     /**
-     * F9: the most recent save of the data set, F5's or the menu's. Not while a script
-     * holds the loop: it would run on in the loaded world.
+     * F9: the newest save of the game's playthrough, F5's or the menu's. Not while a
+     * script holds the loop: it would run on in the loaded world.
      *
-     * No save at all is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
-     * (`doc/CSBwin-src/SaveGame.cpp:1585`), and a file that does not read is its
-     * `SaveFileError`'s line, the one the disk menu shows.
+     * A playthrough with no save is `_ReadEntireGame`'s "CAN'T FIND SAVED GAME!"
+     * (`doc/CSBwin-src/SaveGame.cpp:1585`), whatever the data set's other playthroughs
+     * hold: a new game not saved yet, or a game loaded from a file that names no
+     * playthrough, which is no save of the one the load gave it. A file that does not
+     * read is its `SaveFileError`'s line, the one the disk menu shows.
      */
     async quickLoad(): Promise<void> {
         if (this.game.isRunningScript()) {
@@ -247,7 +255,8 @@ export class GameSaves {
             return;
         }
         try {
-            const [latest] = await this.list();
+            const playthrough = this.game.ctx.state.block1.randomGameID;
+            const latest = (await this.list()).find((entry) => entry.playthrough === playthrough);
             if (!latest) {
                 this.tell('CAN\'T FIND SAVED GAME!');
                 this.log('Quick-load: no saved game found');

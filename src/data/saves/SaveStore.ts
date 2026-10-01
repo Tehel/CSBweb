@@ -79,6 +79,22 @@ export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
     return found ? found.playthrough : 0;
 }
 
+/**
+ * F5's slot: the quick-save of a playthrough in a data set, which the key writes over.
+ * The newest, where a store holds several: an earlier build made a row at each press,
+ * and the older ones stay as they are.
+ *
+ * Playthrough 0 has no slot. Only a new game whose draw came out 0 runs under it
+ * (`GameSaves.read` gives a loaded one another), and the rows that hold 0 are files of
+ * an earlier build, of any game, which its F5 must not write over.
+ */
+export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: number): SaveEntry | undefined {
+    if (playthrough === 0) return undefined;
+    return sortSaveEntries(rows).find(
+        (row) => row.quick && row.dataSet === dataSet && row.playthrough === playthrough,
+    );
+}
+
 export interface SaveStore {
     /** One data set's rows, or every set's for `null`, newest first. */
     list(dataSet: string | null): Promise<SaveEntry[]>;

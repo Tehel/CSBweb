@@ -222,8 +222,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
   as it is (`SaveGame.cpp:1610`), as the port does for any other id.
 - **F5 has a slot of its own**, one per playthrough, written over at each press. It never
   touches a save made from the dialog, which is what is left when a quick-save was made
-  at the wrong moment. **F9 loads the playthrough's newest save**, the quick slot or
-  another. Both are the player's, not debug features, and what they did is printed in
+  at the wrong moment. The slot is the playthrough's newest quick-save in the data set
+  (`quickSlot`, `src/data/saves/SaveStore.ts`); a press writes its file and its date
+  there, under the row's key and name, and the first press makes the row. Playthrough 0
+  has no slot, so its F5 makes a row at each press: the rows that hold 0 are earlier
+  builds' files, of any game. **F9 loads the playthrough's newest save**, the quick slot
+  or another, and finds none in a playthrough not saved yet: a new game, or a game
+  loaded from a file that names no playthrough, which is no save of the one the load
+  gave it. Both are the player's, not debug features, and what they did is printed in
   the message area.
 - **SAVE writes over the selected save**, or makes a new one from the list's "new save"
   row. **LOAD takes any save.** Either asks first when the save is of another
@@ -251,7 +257,7 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
 **The steps**
 
 1. ✅ **The row.** The data set, the playthrough and whether F5 wrote it, beside the
-   bytes. `GameSaves` lists its data set's rows, and F9 loads the newest of them. The
+   bytes. `GameSaves` lists its data set's rows. The
    store's version-2 upgrade (`src/data/saves/legacyRows.ts`, run once by `idb.ts`) keeps
    of each older row the CSBWin file alone, out of its `.dmweb.json` when it is one, and
    reads the row again from that file. An older row names no data set, so every one
@@ -263,10 +269,14 @@ store (the disk menu's SAVE and F5) and where a save's bytes are read back into 
    the engine; `tools/peek-dungeon.ts` reads one meanwhile.
 2. ⏳ **The playthrough**, one commit each:
    - a. ✅ **A game loaded from a file of playthrough 0 is given one**, by the menu's
-     LOAD, the boot's chooser and F9, which all read through `GameSaves.open` and
-     `read`. Evidence: `tools/dump-save-menu.ts`, "the list" (which save is joined) and
-     "a save that names no playthrough" (the loads).
-   - b. ⏳ **F5's slot and F9's choice.**
+     LOAD and the boot's chooser, which read through `GameSaves.open` and `read`.
+     Evidence: `tools/dump-save-menu.ts`, "the list" (which save is joined) and "a save
+     that names no playthrough" (the loads).
+   - b. ✅ **F5's slot and F9's choice.** Evidence: `tools/dump-save-menu.ts`, "the list"
+     (which row is the slot), "the one save call" (a second F5 writes over the first,
+     and SAVE does not), "one store, two data sets" (F9 in its playthrough, and in one
+     with no save) and "a save that names no playthrough" (neither key takes such a
+     file).
    - c. ⏳ **SAVE over the selection**, or new from the list's "new save" row.
    - d. ⏳ **The two confirmations.**
    - e. ⏳ **The last save used.**
@@ -366,8 +376,8 @@ set's saves (`GameSaves.list`, over `src/data/saves/`), newest first, each row w
 its date, level and party. LOAD acts on the selection; SAVE always makes a new row, its
 file a `.dat` named for its date. Both,
 and the two keys, go through `GameSaves` (`src/engine/GameSaves.ts`). F5
-writes one more save, marked as the key's, and F9 loads the newest save of the data
-set, F5's or the menu's. Each key says what it
+writes its playthrough's quick-save, over the last, and F9 loads the newest save of its
+playthrough, F5's or the menu's. Each key says what it
 did on a line of the message area, in white: "GAME SAVED" or "GAME LOADED"; "CANNOT SAVE
 NOW" with no party, with a champion still being chosen, or while a script holds the loop,
 and "CANNOT LOAD NOW" for that last; CSBWin's own "UNABLE TO SAVE GAME!"

@@ -32,7 +32,8 @@
  *    (`src/engine/GameSaves.ts`), which names the save and runs `SaveGame`'s tail: after
  *    the write for the menu, whose clock is stopped, and before it for F5, whose clock
  *    runs. Run against a store in memory, which two games of two data sets then share:
- *    each lists its own set's saves, and F9 loads the newest of them. And a file that
+ *    each lists its own set's saves. F5 writes over its playthrough's quick-save, and
+ *    F9 loads its playthrough's newest save. And a file that
  *    names no playthrough, loaded: its game joins the playthrough of a save of its data
  *    set and party, or draws one.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
@@ -57,6 +58,7 @@ import {
   formatSaveDate,
   formatSaveRow,
   joinedPlaythrough,
+  quickSlot,
   SAVE_FILE_EXTENSION,
   sortSaveEntries,
   type SaveEntry,
@@ -446,6 +448,23 @@ function checkListLogic(): void {
     'and none when the others name none, or are of another party, another order of it, or another data set');
   check(joins(entry({ champions: ['DAROO'] }), named) === 11 && joins(entry({ dataSet: 'csb', champions: party }), named) === 13,
     'each of those is joined by a save of its own party and set');
+
+  // F5's slot: the playthrough's quick-save in the data set.
+  const slots = [
+    entry({ name: 'menu', playthrough: 7, savedAt: 900 }),
+    entry({ name: 'quick, older', playthrough: 7, quick: true, savedAt: 100 }),
+    entry({ name: 'quick, newer', playthrough: 7, quick: true, savedAt: 200 }),
+    entry({ name: 'quick, another playthrough', playthrough: 9, quick: true, savedAt: 300 }),
+    entry({ name: 'quick, another set', playthrough: 7, quick: true, dataSet: 'csb', savedAt: 400 }),
+    entry({ name: 'quick, no playthrough', playthrough: 0, quick: true, savedAt: 500 }),
+  ];
+  const slot = (dataSet: string, playthrough: number): string => quickSlot(slots, dataSet, playthrough)?.name ?? 'none';
+  console.log(`  F5's slot: playthrough 7 "${slot(DEFAULT_DATA_SET.id, 7)}", 9 "${slot(DEFAULT_DATA_SET.id, 9)}", 7 in csb "${slot('csb', 7)}", 8 "${slot(DEFAULT_DATA_SET.id, 8)}", 0 "${slot(DEFAULT_DATA_SET.id, 0)}"`);
+  check(slot(DEFAULT_DATA_SET.id, 7) === 'quick, newer', 'F5\'s slot is the playthrough\'s newest quick-save, never the menu\'s save');
+  check(slot(DEFAULT_DATA_SET.id, 9) === 'quick, another playthrough' && slot('csb', 7) === 'quick, another set',
+    'each playthrough has its own, in its own data set');
+  check(slot(DEFAULT_DATA_SET.id, 8) === 'none' && slot(DEFAULT_DATA_SET.id, 0) === 'none',
+    'a playthrough not quick-saved yet has none, and playthrough 0 never has one');
 }
 
 /* ------------------------------------------------------------- 5. the metadata ---- */
@@ -857,6 +876,22 @@ async function checkSaveCall(): Promise<void> {
       'and its playthrough, the game\'s d.RandomGameID, as the file holds it');
     check(!first.quick && !second.quick && third.quick, 'and whether the save is F5\'s or the menu\'s');
 
+    // A second F5 writes over the first: the playthrough has one slot.
+    now += 60_000;
+    const fourth = await menu.saves.save('running', true);
+    const afterSlot = await menu.saves.list();
+    console.log(`  F5 again, a minute later: ${fourth.id === third.id ? 'the same row' : 'ANOTHER ROW'}, ${menu.store.files.size} files, listed ${afterSlot[0]?.id === third.id ? 'first' : 'NOT FIRST'}`);
+    check(fourth.id === third.id && fourth.name === third.name && menu.store.files.size === 3,
+      'F5 writes over the playthrough\'s quick-save, under its key and its name');
+    check(fourth.savedAt === now && afterSlot[0]?.id === third.id && afterSlot[0]?.savedAt === now,
+      'which takes the new save\'s date, and is listed first');
+    check(afterSlot.filter((e) => !e.quick).map((e) => e.id).sort().join() === [first.id, second.id].sort().join()
+      && afterSlot.filter((e) => !e.quick).every((e) => e.savedAt < now),
+      'and the menu\'s saves are as they were');
+    const fifth = await menu.saves.save('stopped', false);
+    check(fifth.id !== third.id && menu.store.files.size === 4, 'the menu\'s SAVE still makes a row of its own');
+    now -= 60_000;
+
     const menuFails = await stage(true);
     const refused = await attempt(menuFails.saves.save('stopped', false));
     console.log(`  clock stopped, the write fails: ${refused}, tail run ${menuFails.game.canRestartFromSavegame()}`);
@@ -970,24 +1005,41 @@ async function checkSaveCall(): Promise<void> {
       && dmNew.playthrough === dm.game.ctx.state.block1.randomGameID && csbNew.playthrough === csb.game.ctx.state.block1.randomGameID,
       'two new games are two playthroughs, each on its own saves');
 
-    // F9 in the first set's game: its newest save, though the store's newest is the other's.
-    const f9 = await stage(false, DEFAULT_DATA_SET, shared, 'WUUF');
+    // F9 in the first set's game: its playthrough's newest save, though the store's
+    // newest is the other set's. The party is changed first, to see it come back.
+    dm.game.ctx.party.state.champions[0]!.name = 'CHANGED';
     const beforeLoad = told.length;
     const reportsBefore = reports.length;
-    await f9.saves.quickLoad();
-    const loadedParty = f9.game.ctx.party.state.champions.map((c) => c.name).join('/');
+    await dm.saves.quickLoad();
+    const loadedParty = dm.game.ctx.party.state.champions.map((c) => c.name).join('/');
     console.log(`  F9 in ${DEFAULT_DATA_SET.id}: ${toldSince(beforeLoad)}, party ${loadedParty} (${reports.slice(reportsBefore).join(' | ')})`);
     check(toldSince(beforeLoad) === '/15:GAME LOADED' && loadedParty === 'DAROO'
       && reports[reports.length - 1] === `Quick-loaded ${dmNew.name}`,
-      'F9 loads the newest save of the game\'s data set, F5\'s here, and says so');
+      'F9 loads the newest save of the game\'s playthrough, F5\'s here, and says so');
 
-    // And in a set with no save, none is found, whatever the others hold.
+    // The menu's save, once it is the newer of the playthrough's.
+    now += 60_000;
+    const dmMenu = await dm.saves.save('stopped', false);
+    await dm.saves.quickLoad();
+    check(reports[reports.length - 1] === `Quick-loaded ${dmMenu.name}`, 'and the menu\'s save when that is the newer');
+
+    // Another playthrough of the same set has no save of its own to load, and neither
+    // has a set with no save at all.
+    const stranger = await stage(false, DEFAULT_DATA_SET, shared, 'WUUF');
     const empty = await stage(false, dataSetFor('dm-windows'), shared);
     const beforeNone = told.length;
+    await stranger.saves.quickLoad();
     await empty.saves.quickLoad();
-    console.log(`  F9 in dm-windows: ${toldSince(beforeNone)}`);
-    check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
-      'F9 in a set with no save finds none (SaveGame.cpp:1585), and loads nothing');
+    console.log(`  F9 in another playthrough of ${DEFAULT_DATA_SET.id}, then in dm-windows: ${toldSince(beforeNone)}`);
+    check(toldSince(beforeNone) === '/15:CAN\'T FIND SAVED GAME!/15:CAN\'T FIND SAVED GAME!'
+      && stranger.game.ctx.party.state.champions[0]!.name === 'WUUF' && empty.game.ctx.party.state.champions[0]!.name === 'DAROO',
+      'F9 in a playthrough with no save finds none (SaveGame.cpp:1585), whatever the others hold, and loads nothing');
+
+    // Each playthrough's F5 has its own slot.
+    const strangerQuick = await stranger.saves.save('running', true);
+    const dmQuick = await dm.saves.save('running', true);
+    check(strangerQuick.id !== dmNew.id && dmQuick.id === dmNew.id && shared.files.size === 6,
+      'and each playthrough\'s F5 writes its own slot');
 
     // A file whose RandomGameID is 0, as an earlier build of the port wrote them: its
     // game is given a playthrough at the load.
@@ -1040,13 +1092,22 @@ async function checkSaveCall(): Promise<void> {
     check(csbRow.champions.join() === 'DAROO' && idOf(otherSet) !== 0 && idOf(otherSet) !== idOf(alone),
       'nor does the same party\'s in another data set');
 
-    // F9 goes through the same read.
+    // F9 is the playthrough's, so it takes no file that names none: not the one its
+    // game was loaded from, nor a newer one.
     const newest = await nameless(DEFAULT_DATA_SET, 'DAROO', true);
-    const f9Old = await stage(false, DEFAULT_DATA_SET, kept, 'WUUF');
-    await f9Old.saves.quickLoad();
-    console.log(`  F9 onto a newer file of no playthrough: ${reports[reports.length - 1] === `Quick-loaded ${newest.name}` ? 'loaded' : 'NOT LOADED'}, ${idOf(f9Old) === idOf(alone) ? 'the saved game\'s playthrough' : 'ANOTHER'}`);
-    check(reports[reports.length - 1] === `Quick-loaded ${newest.name}` && idOf(f9Old) === idOf(alone),
-      'F9 gives a file of no playthrough the one it joins too');
+    const beforeAgain = told.length;
+    await again.saves.quickLoad();
+    await alone.saves.quickLoad();
+    console.log(`  F9 in a game loaded from it and not saved: ${toldSince(beforeAgain).split('/')[1]}; in the one that saved: ${reports[reports.length - 1] === `Quick-loaded ${carried.name}` ? 'its save' : 'ANOTHER'}`);
+    check(toldSince(beforeAgain) === '/15:CAN\'T FIND SAVED GAME!/15:GAME LOADED',
+      'F9 in a game loaded from such a file and not saved since finds no save of its playthrough');
+    check(newest.quick && newest.savedAt > carried.savedAt && reports[reports.length - 1] === `Quick-loaded ${carried.name}`,
+      'and in the game that saved, loads that save, not the newer file that names none');
+
+    // Nor does F5 write over a quick-save that names none.
+    const quickOver = await alone.saves.save('running', true);
+    check(quickOver.id !== newest.id && (await kept.list(null)).find((e) => e.id === newest.id)?.playthrough === 0,
+      'F5 makes its own slot beside a quick-save that names no playthrough');
   } finally {
     Date.now = realNow;
   }
