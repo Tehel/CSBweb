@@ -28,6 +28,7 @@
  * flags are bytes and have no order at all.
  */
 import { writeU16BE, writeU32LE } from '../core/bytes';
+import { EXPOOL_RECORD_SIZE } from './CsbwinExpool';
 import { DBType, encodeObjectID, OBJECT_ID_NULL } from '../core/types';
 import type {
     ActuatorRecord, ClothingRecord, CloudRecord, ContainerRecord, CreatureRecord, DatabaseRecord,
@@ -40,9 +41,6 @@ export const DUNGEON_IMAGE_HEADER_SIZE = 44;
 
 /** `sizeof(LEVELDESC)`. */
 export const LEVEL_DESCRIPTOR_SIZE = 16;
-
-/** `sizeof(DB11)` — `EXPOOL` blocks (`doc/CSBwin-src/CSB.h:1307-1315`). */
-export const EXPOOL_RECORD_SIZE = 256;
 
 const bit = (b: boolean | undefined): number => (b ? 1 : 0);
 

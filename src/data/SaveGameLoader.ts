@@ -8,6 +8,7 @@
 import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, MissileRecord } from './dungeonTypes';
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { MakeBigActuators } from './CsbwinDungeonConversions';
+import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
 import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import {
@@ -273,11 +274,6 @@ const EXTENDED_SENTINEL = ' Extended Features ';
  * the block stays little-endian. That is why `readU16LE`/`readU32LE` are used here for
  * exactly that block, and nothing else.
  */
-
-const EXPOOL_RECORD_SIZE = 256;
-const EXPOOL_WORDS_PER_BLOCK = 64;
-const EDT_SPECIAL_LOCATIONS = 3;
-const ESL_SPECIAL_LOCATION_MAX = 15;
 
 function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
   let result = initialHash & 0xffff;
@@ -753,21 +749,6 @@ function parseSpecialLocationsFromSaveData(
   return specialLocationsFromExpool(data.subarray(expoolStart, expoolStart + expoolCount * EXPOOL_RECORD_SIZE));
 }
 
-/** The `EDT_SpecialLocations` entries of an `EXPOOL` database, given as its raw blocks. */
-export function specialLocationsFromExpool(bytes: Uint8Array): Record<number, number> | null {
-  const expool = new Uint32Array((bytes.length / EXPOOL_RECORD_SIZE) * EXPOOL_WORDS_PER_BLOCK);
-  if (expool.length === 0) return null;
-  for (let i = 0; i < expool.length; i++) expool[i] = readU32BE(bytes, i * 4);
-
-  const locations: Record<number, number> = {};
-  for (let esl = 0; esl <= ESL_SPECIAL_LOCATION_MAX; esl++) {
-    const key = ((EDT_SPECIAL_LOCATIONS << 24) | esl) >>> 0;
-    const record = locateExpoolRecord(expool, key);
-    if (record !== null) locations[key] = record;
-  }
-  return Object.keys(locations).length === 0 ? null : locations;
-}
-
 function parseMissileRecordsFromSaveData(
   data: Uint8Array,
   layout: DungeonImageLayout,
@@ -802,32 +783,6 @@ function parseMissileRecordsFromSaveData(
   return records;
 }
 
-function locateExpoolRecord(expool: Uint32Array, key: number): number | null {
-  const hash = Math.imul(key, 0xbb40e62d) >>> 0;
-  let hashi = 32 + (hash >>> 27);
-  if ((expool[hashi] & 0x80000000) !== 0) {
-    hashi = ((expool[hashi] & 0x7fffffff) + ((hash >>> 21) & 0x3f)) >>> 0;
-  }
-
-  let guard = 0;
-  while (expool[hashi] !== 0) {
-    if (guard++ > expool.length) break;
-    const p = expool[hashi] >>> 0;
-    if (p + 1 >= expool.length) return null;
-    if ((expool[p + 1] >>> 0) === (key >>> 0)) {
-      const blockStart = p & 0xffffffc0;
-      if (blockStart >= expool.length) return null;
-      const size = expool[blockStart] & 0xffff;
-      if (size < 3) return null;
-      if (p + 2 >= expool.length) return null;
-      return expool[p + 2] >>> 0;
-    }
-    hashi = expool[hashi] >>> 0;
-    if (hashi >= expool.length) return null;
-  }
-
-  return null;
-}
 function unscramble(buf: Uint8Array, initialHash: number, numWords: number): number {
   let d7 = initialHash & 0xffff;
   let d6 = numWords & 0xffff;

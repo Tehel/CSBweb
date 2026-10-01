@@ -32,7 +32,8 @@ import type {
 import { ExpandData } from '../core/compression';
 import { readU16BE, readU32BE } from '../core/bytes';
 import { extractPresetHeroes } from './HeroExtractor';
-import { readExtendedFeatures, specialLocationsFromExpool } from './SaveGameLoader';
+import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
+import { readExtendedFeatures } from './SaveGameLoader';
 import { CheckCelltypes, ExtendPortraits, convertOriginalDungeon } from './CsbwinDungeonConversions';
 import {
     DUNGEON_HEADER_SIZE,
@@ -52,9 +53,6 @@ import {
  */
 /** The first word of a compressed `dungeon.dat` (`doc/CSBwin-src/SaveGame.cpp:2351`). */
 const DUNGEON_COMPRESSED_SIGNATURE = 33028;
-
-/** `EXPOOL` blocks are 256 bytes each (`doc/CSBwin-src/SaveGame.cpp`, EXPOOL records). */
-const EXPOOL_RECORD_SIZE = 256;
 
 export interface DungeonImageOptions {
     /** ACTUATOR records carry a trailing word (`MakeBigActuators` appends two bytes). */

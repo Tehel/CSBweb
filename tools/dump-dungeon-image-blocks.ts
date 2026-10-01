@@ -52,9 +52,9 @@ import { join, resolve } from 'node:path';
 
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { loadCsbwinWorld } from '../src/data/CsbwinDungeonImage';
+import { EXPOOL_RECORD_SIZE } from '../src/data/CsbwinExpool';
 import {
   DUNGEON_IMAGE_HEADER_SIZE,
-  EXPOOL_RECORD_SIZE,
   LEVEL_DESCRIPTOR_SIZE,
   buildDungeonImageSections,
   buildImageChecksum,
