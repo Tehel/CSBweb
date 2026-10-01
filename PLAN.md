@@ -180,14 +180,15 @@ boot's chooser and F9). Its scope, and after it the steps, one per commit.
   (`expectedGraphicSignature1/2`, `SaveGame.cpp:378-379`, checked at
   `Graphics.cpp:1784-1815`), which the port neither checks nor writes.
 - **An import is checked against the dungeon.** A `.dat` holds no name of its dungeon,
-  but it holds the dungeon (blocks 7-14). A dungeon's signature is a digest of its walls:
-  for each level its width and height, and one bit per cell, stone or anything else.
+  but it holds the dungeon (blocks 7-14). A dungeon's signature is one digest per level, of
+  its walls: the level's width and height, and one bit per cell, stone or anything else.
   Nothing finer: a teleporter a release moved, or a cell whose type play changed, leaves
   the signature alone, and a player seldom knows which release a save came from. The
-  digest is SHA-256, the one a browser and Node both have built in. A save of another
-  dungeon is refused, with the dungeon it looks like named when the port knows it
-  ("switch to it", or "not supported yet"): that takes a catalogue of known dungeons'
-  signatures, which may list dungeons the port cannot play. The evidence is a tool that
+  digest is SHA-256, the one a browser and Node both have built in. A save is its
+  dungeon's when every level matches. A save of another dungeon is refused, with the
+  dungeon it looks like named when the port knows it ("switch to it", or "not supported
+  yet"), which is the known dungeon most of its levels match: that takes a catalogue of
+  known dungeons' signatures, which may list dungeons the port cannot play. The evidence is a tool that
   shows each committed save, early and late ones, matching its own dungeon and no
   other.
 - **Play time is the player's**: wall-clock time in the game, the frozen game and the
