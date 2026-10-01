@@ -36,7 +36,8 @@
  *    F9 loads its playthrough's newest save. SAVE over a listed save writes that row.
  *    And a file that
  *    names no playthrough, loaded: its game joins the playthrough of a save of its data
- *    set and party, or draws one.
+ *    set and party, or draws one. And a drawn playthrough, a new game's or such a
+ *    file's, is drawn again while a save of the data set holds it.
  * 9. **The store's upgrade.** The rows of the store's first version, a CSBWin file or a
  *    `.dmweb.json` around one, made today's (`src/data/saves/legacyRows.ts`). The page
  *    runs it once, inside IndexedDB's upgrade; here it runs over rows built by hand.
@@ -56,6 +57,7 @@
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
+import { CsbRandom } from '../src/core/random';
 import { DBType, OBJECT_ID_EOF, OBJECT_ID_NULL, Position, decodeObjectID, type ObjectID } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
@@ -78,6 +80,7 @@ import type { GameHost, MessageSink } from '../src/engine/GameHost';
 import type { LoopScript } from '../src/engine/LoopState';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
+import { drawRandomGameID } from '../src/engine/GameContext';
 import { GameSaves, makeSaveFileName } from '../src/engine/GameSaves';
 import { applySaveBytes, buildSaveFile } from '../src/engine/SaveGameFile';
 import { loadSaveGameState } from '../src/data/SaveGameLoader';
@@ -1152,6 +1155,70 @@ async function checkSaveCall(): Promise<void> {
     const quickOver = await alone.saves.save('running', 'quick');
     check(quickOver.id !== newest.id && (await kept.list(null)).find((e) => e.id === newest.id)?.playthrough === 0,
       'F5 makes its own slot beside a quick-save that names no playthrough');
+
+    // A drawn id is no stored save's. With the host's `rand()` pinned, every stream is
+    // the same one, so every draw gives the same first id.
+    console.log('');
+    console.log('=== a drawn playthrough is no stored save\'s ===');
+    const SEED = 0x2468ace0;
+    const stream = new CsbRandom(SEED);
+    const firstId = drawRandomGameID(stream);
+    const secondId = drawRandomGameID(stream);
+    const afterSecond = stream.getSeed();
+    const thirdId = drawRandomGameID(stream);
+    const hex = (id: number): string => id.toString(16);
+    console.log(`  the stream of seed ${hex(SEED)} draws ${hex(firstId)}, ${hex(secondId)}, ${hex(thirdId)}`);
+    const drawn = memoryStore();
+    /** A new game as the page reads one: `dungeon.dat`, then the store's say on its id. */
+    const fresh = async (store: SaveStore, dataSet = DEFAULT_DATA_SET) => {
+      const game = await loadGame({ messages });
+      const before = game.ctx.state.block1.randomGameID;
+      const saves = new GameSaves(game, dataSet, store, { portraitOf: () => undefined, repackOpenChest: () => {} },
+        (message: string) => { reports.push(message); });
+      await saves.newGameRead();
+      return { game, saves, before };
+    };
+    const saved = async (of: { game: Game; saves: GameSaves }, name: string): Promise<SaveEntry> => {
+      of.game.systems.hallOfChampions.addChampion(healthyChampion(name));
+      return of.saves.save('stopped', 'new');
+    };
+    const random = Math.random;
+    Math.random = () => SEED / 0x100000000;
+    try {
+      const one = await fresh(drawn);
+      check(one.before === firstId && idOf(one) === firstId, 'a new game keeps the id it drew when no save holds it');
+      await saved(one, 'DAROO');
+
+      const two = await fresh(drawn);
+      console.log(`  a new game, a save holding ${hex(firstId)}: drew ${hex(two.before)}, plays under ${hex(idOf(two))}`);
+      check(two.before === firstId && idOf(two) === secondId, 'a new game that drew a stored save\'s id takes the next of its stream');
+      check(two.game.ctx.random.getSeed() === afterSecond, 'which is the game\'s own stream, two draws further on');
+      await saved(two, 'DAROO');
+
+      const three = await fresh(drawn);
+      const elsewhere = await fresh(drawn, csbSet);
+      console.log(`  and with one holding ${hex(secondId)} too: ${hex(idOf(three))}; in ${csbSet.id}, which has no save: ${hex(idOf(elsewhere))}`);
+      check(idOf(three) === thirdId, 'and the one after while a save holds that');
+      check(idOf(elsewhere) === firstId, 'another data set\'s saves do not count: every comparison is a data set\'s');
+
+      const reportsBefore = reports.length;
+      const unlisted = await fresh(memoryStore(() => {}, false, () => { throw new Error('no store'); }));
+      check(idOf(unlisted) === firstId && reports.length === reportsBefore + 1 && reports[reports.length - 1]!.startsWith('New game:'),
+        'a store that cannot be listed leaves the id as drawn, and says so on the console');
+
+      // A file that names no playthrough, of a party no save is of: its draw is held to
+      // the same rows.
+      const earlier = await fresh(drawn);
+      earlier.game.ctx.state.block1.randomGameID = 0;
+      const unnamed = await saved(earlier, 'LEYLA');
+      const loaded = await fresh(memoryStore());
+      loaded.saves.read(await earlier.saves.open(unnamed));
+      console.log(`  a file of no playthrough and of another party, loaded: ${hex(idOf(loaded))}`);
+      check(unnamed.playthrough === 0 && idOf(loaded) === thirdId,
+        'a file that names no playthrough is given the first id its stream draws that no save holds');
+    } finally {
+      Math.random = random;
+    }
   } finally {
     Date.now = realNow;
   }

@@ -201,14 +201,18 @@ async function loadGameFiles(): Promise<GameFiles> {
 /**
  * `_ReadEntireGame` for a new game (doc/CSBwin-src/SaveGame.cpp:1480-1494): the data set's
  * `dungeon.dat`, read into the running game. A file that will not open is `die(50)`
- * (`:1480-1486`); one that fails its read is `false`, for the boot's `tag01efee`.
+ * (`:1480-1486`); one that fails its read is `false`, for the boot's `tag01efee`. The
+ * game's playthrough is then held against the store's (`GameSaves.newGameRead`).
  */
-async function readNewGame(game: Game): Promise<boolean> {
+async function readNewGame(game: Game, saves: GameSaves): Promise<boolean> {
     const name = `${dataSet.dir}/dungeon.dat`;
     const response = await fetch(name).catch(() => null);
     if (!response?.ok) throw new Die(50, `Cannot open dungeon file '${name}'`);
     const read = game.readDungeonDat(new Uint8Array(await response.arrayBuffer()));
-    if (read) console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
+    if (read) {
+        console.log(`✓ Read ${name}: ${game.ctx.dungeon.getData().maps.length} levels`);
+        await saves.newGameRead();
+    }
     return read;
 }
 
@@ -335,7 +339,7 @@ async function showEndOfGame(game: Game, screen: GameScreen, saves: GameSaves, s
             gameScreen: screen,
             playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
             consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-            readNewGame: () => readNewGame(game),
+            readNewGame: () => readNewGame(game, saves),
         },
         {
             queueDyingSound: () => game.ctx.sounds.queueSound(SOUND_DYING, x, y, 0, z),
@@ -394,7 +398,7 @@ async function runIntro(game: Game, screen: GameScreen, saves: GameSaves, sound:
         gameScreen: screen,
         playSound: (soundId, rateIdx) => sound.playSound(soundId, rateIdx),
         consumeSavedGameRead: () => saves.consumeSavedGameRead(),
-        readNewGame: () => readNewGame(game),
+        readNewGame: () => readNewGame(game, saves),
         skip: skipIntro,
     });
 }

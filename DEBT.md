@@ -749,14 +749,17 @@ Recorded so that nobody "fixes" them.
   means every `decodeObjectID` / `encodeObjectID` / `withObjectPosition` and hand-written
   mask reading the map instead (about 240 places in 37 files), and working out how
   CSBWin's saves store the words.
-- 🚫 **A drawn `RandomGameID` is never 0.** CSBWin keeps the product of its two draws
-  whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and it is 0 when either low
-  word is, about one new game in 32768. The author's decision: the port draws the next
-  pair instead (`drawRandomGameID`, `src/engine/GameContext.ts`), which in that case
-  leaves the stream two draws further on than CSBWin's. 0 is what a save of an earlier
-  build holds for no playthrough at all (`PLAN.md` → Phase 10, "A playthrough"), and the
-  rule stays once no stored save holds it. `tools/dump-new-game.ts` checks it on a stream
-  whose first pair gives 0.
+- 🚫 **A drawn `RandomGameID` is never 0, nor a stored save's.** CSBWin keeps the
+  product of its two draws whatever it is (`doc/CSBwin-src/SaveGame.cpp:1523-1532`), and
+  it is 0 when either low word is, about one new game in 32768. The author's decision:
+  the port draws the next pair instead (`drawRandomGameID`, `src/engine/GameContext.ts`),
+  which in that case leaves the stream two draws further on than CSBWin's. 0 is what a
+  save of an earlier build holds for no playthrough at all (`PLAN.md` → Phase 10, "A
+  playthrough"), and the rule stays once no stored save holds it. `tools/dump-new-game.ts`
+  checks it on a stream whose first pair gives 0. The same goes for an id a save of the
+  data set already holds, about one pair of games in 16 million: the page draws the next
+  pair once the new game is read (`GameSaves.newGameRead`, `src/engine/GameSaves.ts`),
+  checked by `tools/dump-save-menu.ts` on a store that holds a pinned stream's first ids.
 - 🚫 **Audio sample rates**, a documented exception to faithfulness:
   `doc/PROVEN_FACTS.md` → "Audio sample rates".
 - 🚫 **`dm-atari/graphics.dat` is not CSBWin's file.** It is CSBWin's with two items from

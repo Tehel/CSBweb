@@ -80,13 +80,17 @@ export function makeSaveFileName(savedAt: number, taken: ReadonlySet<string> = n
 }
 
 /**
- * A playthrough for a game loaded from a file that names none: drawn as a new game
- * draws its own (`drawRandomGameID`, never 0), from a stream of this draw's own. The
- * game's is the file's by then (`gb2.ranseed`), so it would give every load of one file
- * the same id, and a load would leave it two draws further on than CSBWin's does.
+ * A playthrough that is no save's among `rows`: drawn as a new game draws its own
+ * (`drawRandomGameID`, never 0), and again while a row holds the id. Two games draw the
+ * same id about once in 16 million pairs, and two playthroughs of one data set that
+ * shared it would share F5's slot, F9's choice and the menu's question (`PLAN.md` →
+ * Phase 10, "A playthrough").
  */
-function drawPlaythrough(): number {
-    return drawRandomGameID(new CsbRandom());
+export function drawPlaythrough(random: CsbRandom, rows: SaveEntry[]): number {
+    for (;;) {
+        const id = drawRandomGameID(random);
+        if (!rows.some((row) => row.playthrough === id)) return id;
+    }
 }
 
 export class GameSaves {
@@ -102,7 +106,8 @@ export class GameSaves {
         private readonly screen: GameSavesScreen,
         /**
          * A line for the console on what F5 or F9 did, with the error when one failed:
-         * the message area says only that it did.
+         * the message area says only that it did. And on a store that could not be
+         * listed for a new game.
          */
         private readonly log: (message: string, error?: unknown) => void,
     ) {}
@@ -123,16 +128,39 @@ export class GameSaves {
     }
 
     /**
+     * A new game has been read (`Game.readNewGame`), which drew its `d.RandomGameID`
+     * with no store at hand: it is drawn again, from the game's stream, while a save of
+     * the data set holds it (`drawPlaythrough`). The page awaits this before the game
+     * runs, so the stream is the new game's, two draws on for each id refused.
+     *
+     * A store that cannot be listed leaves the id as drawn: the game is no less new.
+     */
+    async newGameRead(): Promise<void> {
+        const { block1 } = this.game.ctx.state;
+        try {
+            const rows = await this.list();
+            if (rows.some((row) => row.playthrough === block1.randomGameID)) {
+                block1.randomGameID = drawPlaythrough(this.game.ctx.random, rows);
+            }
+        } catch (error) {
+            this.log('New game: the saves could not be listed', error);
+        }
+    }
+
+    /**
      * A listed save out of the store, to be read into the game (`read`). A row that
-     * names no playthrough is looked up among its data set's saves here, while the
-     * store can still be awaited (`joinedPlaythrough`).
+     * names no playthrough is given one here, while the store can still be awaited: the
+     * one it joins among its data set's saves (`joinedPlaythrough`), or one that none of
+     * them holds (`drawPlaythrough`), from a stream of this draw's own. The game's is
+     * the file's once it is read (`gb2.ranseed`), so it would give every load of one
+     * file the same id, and a load would leave it two draws further on than CSBWin's
+     * does.
      */
     async open(entry: SaveEntry): Promise<OpenedSave> {
         const bytes = await this.store.read(entry.id);
-        const joins = entry.playthrough === 0
-            ? joinedPlaythrough(entry, await this.store.list(entry.dataSet))
-            : 0;
-        return { bytes, joins };
+        if (entry.playthrough !== 0) return { bytes, joins: 0 };
+        const rows = await this.store.list(entry.dataSet);
+        return { bytes, joins: joinedPlaythrough(entry, rows) || drawPlaythrough(new CsbRandom(), rows) };
     }
 
     /**
@@ -189,8 +217,8 @@ export class GameSaves {
      * for the menu's status.
      *
      * A file whose `RandomGameID` is 0 names no playthrough, so its game is given one
-     * here, which its saves then carry: the one the save joins (`OpenedSave.joins`), or
-     * a new one (`drawPlaythrough`). CSBWin takes the file's id as it is
+     * here, which its saves then carry: the one `open` found for it
+     * (`OpenedSave.joins`). CSBWin takes the file's id as it is
      * (`doc/CSBwin-src/SaveGame.cpp:1610`), and so does this for any other id.
      *
      * The entrance's Resume needs to know whether a save came back: CSBWin loops on
@@ -200,7 +228,7 @@ export class GameSaves {
     read(save: OpenedSave): void {
         applySaveBytes(this.game, save.bytes);
         const { block1 } = this.game.ctx.state;
-        if (block1.randomGameID === 0) block1.randomGameID = save.joins || drawPlaythrough();
+        if (block1.randomGameID === 0) block1.randomGameID = save.joins;
         this.lastRead = 'loaded';
     }
 

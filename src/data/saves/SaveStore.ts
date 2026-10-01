@@ -54,7 +54,8 @@ export function readSaveFileFields(bytes: Uint8Array): SaveFileFields | null {
 
 /**
  * A listed save out of the store, to be read into the game: its file, and the
- * playthrough its game joins when the file names none (`joinedPlaythrough`), 0 for none.
+ * playthrough its game takes when the file names none (`GameSaves.open`), 0 for a file
+ * that names its own.
  */
 export interface OpenedSave {
     bytes: Uint8Array;
@@ -67,7 +68,7 @@ export interface OpenedSave {
  * in the same order. 0 when no row is.
  *
  * A file holds `RandomGameID` 0 when an earlier build of the port wrote it, and a game
- * loaded from it is given this playthrough, or a new one (`GameSaves.read`).
+ * loaded from it is given this playthrough, or a new one (`GameSaves.open`).
  */
 export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
     const sameParty = (row: SaveEntry): boolean =>
@@ -85,7 +86,7 @@ export function joinedPlaythrough(entry: SaveEntry, rows: SaveEntry[]): number {
  * and the older ones stay as they are.
  *
  * Playthrough 0 has no slot. No game with a party runs under it: a new game never draws
- * 0 (`drawRandomGameID`) and `GameSaves.read` gives a loaded one another. The rows that
+ * 0 (`drawRandomGameID`) and `GameSaves.open` gives a loaded one another. The rows that
  * hold 0 are files of an earlier build, of any game, which no F5 may write over.
  */
 export function quickSlot(rows: SaveEntry[], dataSet: string, playthrough: number): SaveEntry | undefined {
