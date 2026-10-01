@@ -11,7 +11,7 @@ import { OBJECT_ID_EOF, type ObjectID } from '../../core/types';
 import type { CSBGraphicsLoader, ExtendedFloorDecoration } from '../../data/CSBGraphicsLoader';
 import type { ObjectTables } from '../../data/tables/ObjectTables';
 import type { RectPos } from '../../data/tables/UITables';
-import { bltShapeToViewportIndex, cropBitmap, tag0088b2Index } from '../csbwin/CanvasBlitter';
+import { bltShapeToViewportIndex, cropBitmap, tag0088b2Explicit, tag0088b2Index } from '../csbwin/CanvasBlitter';
 import type { ViewportDraw } from './ViewportDraw';
 
 /**
@@ -376,10 +376,12 @@ export function drawWallText(draw: ViewportDraw, textRN: ObjectID, relativePosit
     const y2 = tables.wallTextLineY2[lineIdx] ?? 60;
     let x = 112 - 4 * lineLen;
 
+    // `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)`
+    // (`doc/CSBwin-src/CSBCode.cpp:3278-3285`), with no check of `code` against the
+    // font's 36 glyphs: a code past them reads on into the rows below.
     for (let i = 0; i < lineLen; i++) {
       const code = textBytes[lineStart + i] ?? 0;
-      const rect = { x1: x, y1: y2 - 7, x2: x + 7, y2, srcX: 8 * code, srcY: 0, srcWidth: 8, srcHeight: 8 };
-      bltShapeToViewportIndex(font, viewport, rect);
+      tag0088b2Explicit(font.pixels, viewport.pixels, { x1: x, y1: y2 - 7, x2: x + 7, y2 }, 8 * code, 0, 144, 112, 10);
       x += 8;
     }
 

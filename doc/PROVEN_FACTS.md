@@ -3677,6 +3677,26 @@ other three (`CSB.h:1125-1132`) — read from a save's extended-features block
 creature records in `dm-atari/dungeon.dat` sets any of bits 11-14. Evidence:
 `tools/dump-monster-move.ts` case 4.
 
+## A wall text's glyph is read from graphic 120 with no check of its code
+
+`DrawWallDecoration` draws a text's words only on the wall in front of the party
+(`relativePosition == 12`, `doc/CSBwin-src/CSBCode.cpp:3245-3290`). A line is the bytes
+up to one of 128 or more, 18 at most (`:3268-3271`), at `x1 = 112 - 4*length`,
+`y2 = d.Byte4196[line]` (48, 59, 75, 86), `y1 = y2 - 7`, each glyph 8 pixels on. Each
+byte is one `TAG0088b2(font, viewport, &rect, 8*code, 0, 144, 112, 10)` (`:3278-3285`)
+from graphic 120, 288x8: 36 glyphs. `TAG0088b2` addresses its source as
+`src + srcY*srcByteWidth + srcX/2` (`doc/CSBwin-src/Graphics.cpp:559`), and nothing checks
+`code`, so a code of 36 or more reads on into the rows below: glyph `code - 36` one row
+up, its last row read from past the graphic's end. Nothing checks the line count against
+`Byte4196[4]` either.
+
+No data here reaches either: the 58 wall texts of `dm-atari` and of `dm-atari-1.3-fr`
+have four lines at most, 14 and 15 glyphs a line at most, and no code past 35. The French
+set's two texts that decode to a 50 are a scroll's and a teleporter square's message
+(`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk").
+
+Evidence: `tools/dump-wall-text.ts`.
+
 ## A cloud's flip and mirror are two viewport coin flips; a missile's are not random at all
 
 `DrawClouds` (`doc/CSBwin-src/Code51a4.cpp:257-260`) sets `w_142 = STRandomBool() != 0`

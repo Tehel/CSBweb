@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C103 | A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows | S | ⏳ |
 | E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
@@ -215,16 +214,6 @@ module of its own, a `publicDir` holding only what the page serves, and `server.
 
 A divergence found along the way goes here, with the next free ID.
 
-### C103 ⏳ A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows
-
-`DrawWallDecoration` blits each wall-text byte from graphic 120 at source x `8*code`, with
-144 bytes a line and no range check (`doc/CSBwin-src/CSBCode.cpp:3276-3285`). The font is
-288 pixels wide, 36 glyphs, so a code of 36 or more reads on into the rows below.
-`tag0088b2Index` clips the copy to the bitmap's width, so the port draws nothing there. Only
-the French 1.3 data reaches this: `TEXT #44` and `#118` hold escape 29/26, which is 50
-(`doc/ATARI_ST_DISK_REFERENCE.md` → "The French 1.3 disk"). Paying it means drawing the glyph
-with `tag0088b2Explicit`, which addresses the source as CSBWin does.
-
 ### C96 ⏳ Champion bones records live outside `EXPOOL`, so no CSBWin file carries them
 
 `KillCharacter` pairs the bones it drops with the champion's fingerprint through
@@ -291,7 +280,7 @@ one tool per commit, each tool's output byte-identical.
 
 ### F13 ⏳ `npm test` runs its tools one at a time
 
-`tools/run-checks.mjs` spawns its 129 checks sequentially (`spawnSync`, `:244`), each a
+`tools/run-checks.mjs` spawns its 130 checks sequentially (`spawnSync`, `:246`), each a
 `tsx` start of 300 ms or more, so the gate takes over a minute (the ~80 s `CLAUDE.md`
 and the runner's header give). Most sessions run it several times. Paying it means a pool
 of workers the size of the machine, the output still printed in the list's order, and
@@ -843,6 +832,12 @@ Recorded so that nobody "fixes" them.
   CSBWin's memory holds there. `tag0088b2Explicit` (`src/renderer/csbwin/CanvasBlitter.ts`)
   writes nothing for them: `doc/PROVEN_FACTS.md` → "See-Thru-Walls is a counter read as
   a boolean".
+- 🚫 **A wall-text glyph's rows past graphic 120.** `DrawWallDecoration` reads a code of
+  36 or more on into the font's lower rows, and its last row from whatever follows the
+  graphic in CSBWin's memory. The port draws the rows the graphic has and writes nothing
+  for the rest (`drawWallText`, `src/renderer/bytecode/DrawDecorations.ts`). No wall text
+  in the data here has such a code: `doc/PROVEN_FACTS.md` → "A wall text's glyph is read
+  from graphic 120 with no check of its code".
 - **Not debt** (listed so it is not raised again):
   - Table names like `byte20090`, `word1074` and `uByte590` are CSBWin's own
     (`d.Byte20090`…), kept greppable by rule.

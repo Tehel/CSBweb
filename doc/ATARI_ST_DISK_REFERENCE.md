@@ -305,8 +305,9 @@ and 30–35 in wall text, 120, 121 and 122–127 in the rest, replacing `Byte100
 The texts use string 7 (the apostrophe, 31 texts) and string 1 (`!`, in `TEXT #118`). Two
 texts are wrong in the file. `TEXT #44` ("… LE JOYAU·ET SEUL …") and `TEXT #118` ("… JE
 L'AI·JE N'AI …") put escape 29/26 where a comma is meant: `Byte10080[26]`, which every
-text type shares, is 50, a `2` in the main font and past the wall font's 36 glyphs
-(`DEBT.md` C103). `TEXT #118` is the wall text at map 0 (9,1) that ends the game when the
-Firestaff comes back unfused. Its lines run to 27 glyphs, and `DrawWallDecoration` draws 18
-of a line at most (`doc/CSBwin-src/CSBCode.cpp:3271`); no other text in either file has a
-wall line over 18.
+text type shares, is 50, a `2` in the main font and past the wall font's 36 glyphs.
+Neither is drawn in the wall font: `TEXT #44` is a scroll's (`SCROLL #31`, map 13
+(23,4)), and `TEXT #118` is on the teleporter square at map 0 (9,1), where the party is
+sent when the Firestaff comes back unfused, and is printed in the message area. Both
+show the `2`. No text on a wall, in either file, has a code past the wall font, a line
+over 18 glyphs or more than four lines (`tools/dump-wall-text.ts`).

@@ -209,6 +209,7 @@ const CHECKS = [
   { tool: 'dump-teleporter-shimmer.ts' },
   { tool: 'dump-door-lightning.ts' },
   { tool: 'dump-cloud-draw.ts' },
+  { tool: 'dump-wall-text.ts' },
   { tool: 'dump-missile-draw.ts' },
   { tool: 'dump-monster-draw.ts' },
   { tool: 'dump-render-probe.ts' },
