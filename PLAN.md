@@ -374,6 +374,15 @@ through the game's mouse queue.
 - **A record index above 1023 cannot be expressed.** `dataIndexMap` is 16 bits and the
   port's RN index field is 10; CSBWin allows 64000. The largest index in any committed
   save is 682, and `CsbwinObjectIndex.resolve` throws rather than alias.
+- ⏸️ **An unknown dungeon played from its save**, a later option on the import's refusal,
+  of use to someone iterating on a dungeon of their own. A save is its dungeon's whole
+  world and already loads into any running game (`installCsbwinWorld`), so what is
+  missing is what the file does not hold: the graphics and the tables read from
+  `graphics.dat`, which the player would pick from the known dungeons' (the signatures
+  an Extended Features block may carry, `SaveGame.cpp:378-379`, could suggest one); a
+  `dungeon.dat` for "RESTART THIS GAME", so a lost game can only load a save; and a data
+  set to list its saves under, which its signature can stand for. A dungeon with DSAs
+  waits for `DEBT.md` G1: `buildSavePayload` refuses to save one.
 - **The menu:** no delete (`BrowserSaveStore.remove` has no caller), no file picker for
   an import and no `SAVE AND QUIT`, none of them in the rework's scope; and the golden
   frame shows an empty list, since the frame script clears IndexedDB
