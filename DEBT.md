@@ -121,7 +121,7 @@ The ⏸️ rows are postponed (see "Priority") and are never "the first row".
 
 Size: **S** well under a session · **M** about one session · **L** several sessions.
 
-Next free IDs: C111 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
+Next free IDs: C112 · D16 · E21 · F14 · G22 · X8. An ID recorded and paid in one commit has no
 entry here, only its commit, so take the next ID from this line and move it on.
 
 ---

@@ -10,6 +10,12 @@
  * `AdjustSkills` (`Magic.cpp:222`, `:245`) and the facing reset (`Code17818.cpp:420`)
  * that a monster had just attacked.
  *
+ * And a save carries it signed. `GAMEBLOCK2.LastMonsterAttackTime` is an `i32`
+ * (`doc/CSBwin-src/SaveGame.cpp:125`), and a game no monster has attacked holds the
+ * start value, -200 (`CSBCode.cpp:353`), which the file writes as `ff ff ff 38`. Read
+ * unsigned it is 4294967096, later than any `d.Time`, and `AdjustSkills` then takes
+ * every skill gain for one made under attack: doubled, and never halved.
+ *
  * Run: `npx tsx tools/dump-last-monster-attack.ts`
  */
 import { readFileSync } from 'node:fs';
@@ -18,7 +24,9 @@ import { resolve } from 'node:path';
 import { Position, RoomType } from '../src/core/types';
 import { DungeonLoader } from '../src/data/DungeonLoader';
 import { GraphicsLoader } from '../src/data/GraphicsLoader';
+import { applyCsbwinSave } from '../src/engine/CsbwinSaveGame';
 import { Game } from '../src/engine/Game';
+import { buildSavePayload, decodeBase64ToBytes } from '../src/engine/SaveGamePayload';
 import { makeAddCharacterAttributes } from '../src/engine/attributes';
 import type { Champion } from '../src/engine/gameTypes';
 import { newGame, processTimersAt } from './lib/game';
@@ -92,6 +100,21 @@ function main(): void {
   check(health() < health0, 'the fireball reached the party and hurt it');
   check(party.lastMonsterAttackTime === before,
     `a missile does not stamp LastMonsterAttackTime (${before} -> ${party.lastMonsterAttackTime})`);
+
+  // A genuine CSBWin save of a game no monster has attacked, and the port's own file of
+  // one: both hold -200, and both read it back.
+  const saved = makeGame();
+  applyCsbwinSave(saved, new Uint8Array(readFileSync(resolve('static/gamefiles/saves/csbgame4-door-opening.dat'))));
+  const fromSave = saved.ctx.party.state.lastMonsterAttackTime;
+  const own = makeGame();
+  applyCsbwinSave(own, decodeBase64ToBytes(buildSavePayload(game).raw));
+  const fromOwn = own.ctx.party.state.lastMonsterAttackTime;
+  console.log(`csbgame4-door-opening.dat: d.Time ${saved.ctx.state.tickCount}, lastMonsterAttackTime ${fromSave}; ` +
+    `the port's own file: ${fromOwn}`);
+  check(fromSave === -200, `a CSBWin save of a game no monster has attacked reads -200 (${fromSave})`);
+  check(fromSave < saved.ctx.state.tickCount - 150,
+    'so AdjustSkills takes its last attack for more than 150 ticks old');
+  check(before === -200 && fromOwn === -200, `and the port's own file gives -200 back (${fromOwn})`);
 
   finish();
 }

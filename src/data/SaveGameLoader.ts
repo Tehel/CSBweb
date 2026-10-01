@@ -23,6 +23,7 @@ import { buildImageChecksum } from './CsbwinDungeonImageWriter';
 import type { ExtendedFeaturesBlock } from './CsbwinExtendedFeatures';
 import {
   readI16BE,
+  readI32BE,
   readU16BE,
   readU16LE,
   readU32BE,
@@ -229,6 +230,10 @@ export interface Block2 {
   firstAvailTimer: number;
   maxTimers: number;
   item16QueLen: number;
+  /**
+   * `gb2.LastMonsterAttackTime` (offset 32), an `i32`: -200 until a monster first
+   * attacks (`doc/CSBwin-src/CSBCode.cpp:353`).
+   */
   lastMonsterAttackTime: number;
   lastPartyMoveTime: number;
   /** `gb2.partyMoveDisableTimer` (offset 40) — `PartyState.partyMoveDisableTimer`. */
@@ -459,7 +464,8 @@ function parseBlock1(buf: Uint8Array): Block1 {
  *
  * `handChar` and `MagicCaster` are stored as `i16` and CSBWin assigns them straight to
  * `d.HandChar` / `d.MagicCaster`, where -1 means "nobody" — so they are sign-extended
- * here rather than read as unsigned.
+ * here rather than read as unsigned. So is `LastMonsterAttackTime`, the one `i32` of the
+ * block that goes below zero.
  */
 function parseBlock2(buf: Uint8Array): Block2 {
   return {
@@ -477,7 +483,7 @@ function parseBlock2(buf: Uint8Array): Block2 {
     firstAvailTimer: readI16BE(buf, 26),
     maxTimers: readU16BE(buf, 28),
     item16QueLen: readI16BE(buf, 30),
-    lastMonsterAttackTime: readU32BE(buf, 32),
+    lastMonsterAttackTime: readI32BE(buf, 32),
     lastPartyMoveTime: readU32BE(buf, 36),
     partyMoveDisableTimer: readI16BE(buf, 40),
     word11712: readI16BE(buf, 42),

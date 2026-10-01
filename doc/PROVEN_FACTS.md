@@ -4212,7 +4212,9 @@ attack is chosen. A missile reaching the party does not set it. Its readers are 
 (`Magic.cpp:219-247`: skills 4-11 earn half when the last attack is more than 150 ticks old,
 and skills 4 and up earn double when it is less than 25 ticks old)
 and the per-champion facing reset in the tick (`Code17818.cpp:420-428`: a champion turned away
-from the party's facing turns back once 60 ticks pass without one). Evidence:
+from the party's facing turns back once 60 ticks pass without one). A save carries it as
+an `i32` (`GAMEBLOCK2`, `SaveGame.cpp:125`), so a game no monster has attacked writes -200 as
+`ff ff ff 38`: seven of the fourteen committed saves and CSB's `mini.dat` hold it. Evidence:
 `tools/dump-last-monster-attack.ts`.
 
 ## `TIMER_SEARCH` walks the queue backwards, and `SetTimer` mostly keeps the old timer

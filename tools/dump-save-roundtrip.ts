@@ -355,7 +355,7 @@ function main(): void {
       `${file}: gb2.FirstAvailTimer is the free cursor`);
     check(block2.item16QueLen === live.systems.monsters.getItem16QueLen(),
       `${file}: gb2.ITEM16QueLen is the number of slots in use`);
-    check(block2.lastMonsterAttackTime === (party.lastMonsterAttackTime >>> 0),
+    check(block2.lastMonsterAttackTime === party.lastMonsterAttackTime,
       `${file}: gb2.LastMonsterAttackTime is d.LastMonsterAttackTime`);
     check(block2.lastPartyMoveTime === (state.game.footprints.lastPartyMoveTime >>> 0),
       `${file}: gb2.LastPartyMoveTime is d.LastPartyMoveTime`);
