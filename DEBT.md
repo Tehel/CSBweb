@@ -90,7 +90,6 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| C102 | `MainLoop` opens with a tick; the port's first comes 15 VBLs later | S | ⏳ |
 | C92 | The damage figure outlives CSBWin's other redraws of the champion box | S | ⏳ |
 | C94 | Clouds in the cells beside and four rows ahead of the party are not drawn | S | ⏳ |
 | C103 | A wall-text glyph past the font's 36 draws nothing, where CSBWin's reads on into the next rows | S | ⏳ |
@@ -277,17 +276,6 @@ Paying it means an `EXPOOL` module (`E13`) with CSBWin's `Read`, `Write` and `Lo
 the raw blocks, including `enlarge`, the bones records kept there with the key's RN taken
 through the object index, the `Map` removed, and `tools/dump-vi-altar.ts` run through a
 save and a load. It must be paid before `P10` drops `runtime`.
-
-### C102 ⏳ `MainLoop` opens with a tick; the port's first comes 15 VBLs later
-
-`_MainLoop` goes straight to `tag000698` (`doc/CSBwin-src/CSBCode.cpp:586-601`), so the
-first thing a started, restarted or resumed game does is a tick: `ProcessTimers`,
-`DrawViewport`, `d.Time++`. The port's loop starts with `d.clockTick` clear
-(`createLoopFlags`, `src/engine/LoopState.ts`), so its first tick falls due when the VBL
-count reaches `d.Speed`, a quarter of a second later, and the page draws the game's first
-view itself instead (`renderView` in `start`, `showEndOfGame` and the loads,
-`src/main.ts`). Paying it means `d.clockTick` set when the loop starts (`Game.start`,
-`resumeMainLoop`), so that its first pass ticks, and those three first views going.
 
 ---
 

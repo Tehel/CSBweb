@@ -10,8 +10,11 @@ The port has no per-animation-frame render. `DrawViewport` (`renderView` in `src
 
 - once per main-loop tick, from `game.onTick` in `wire()`, skipped while an inventory is
   open or the party sleeps (`CSBCode.cpp:636-637`);
-- a script's tick, through `GameHost.drawViewport`;
-- a game's first view (start, restart, a load), standing in for `MainLoop`'s opening tick.
+- a script's tick, through `GameHost.drawViewport`.
+
+A game's first view (start, restart, a load) is the tick `MainLoop` opens with:
+`Game.start`, `resumeMainLoop` and `applyRuntimeSaveState` make one due, and the page
+draws nothing itself.
 
 Everything else — clicks, keys, the message scroll, the button flash, the tick's paint
 after `TAG01b29a` (`GameHost.paint`) — is `refreshScreen`, which composes the screen over

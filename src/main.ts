@@ -51,7 +51,6 @@ function consumeSavedGameRead(): SavedGameRead {
 // F5 and F9, the quick-save keys (`dev.ts`).
 const dev = createDevTools({
     get game() { return game; },
-    renderView,
     // F5 packs a `CHARDESC` like any other save, and that needs graphic 26 for the
     // champions who carry only a portrait index.
     portraitOf: (champion) => screen?.portraitPixelsFor(champion),
@@ -179,9 +178,9 @@ function isCrtEnabled(): boolean {
 
 /**
  * `DrawViewport`, then the screen composed over it (`GameScreen.drawViewport`): the main
- * loop's tick, a script's tick, and a game's first view, when it starts, is restarted or
- * is loaded, which stands in for the tick `MainLoop` opens with (`tag000698`,
- * doc/CSBwin-src/CSBCode.cpp:601). Every other redraw is `refreshScreen`'s.
+ * loop's tick and a script's tick. A game's first view is the tick `MainLoop` opens with
+ * (`tag000698`, doc/CSBwin-src/CSBCode.cpp:601; `Game.start`). Every other redraw is
+ * `refreshScreen`'s.
  */
 function renderView() {
     // Once `MainLoop` has returned the screen is `_ShowCredits`'s.
@@ -345,7 +344,6 @@ function construct(files: GameFiles, graphicsTables: GraphicsTables, tables: Gam
             // came back: CSBWin loops on `ReadEntireGame`'s result and re-shows the
             // door when it did not (`doc/CSBwin-src/CSBCode.cpp:10634-10641`).
             savedGameRead = 'loaded';
-            renderView();
         },
         // The boot's chooser only: its read failed, and `tag01efee` follows.
         onRestoreFailed: (error) => {
@@ -393,7 +391,6 @@ async function showEndOfGame(game: Game, screen: GameScreen, sound: SoundManager
     screen.initializePlayState();
     game.resumeMainLoop();
     game.start();
-    renderView();
     drawMapPreview(game.ctx.party.state.position.z);
 }
 
@@ -505,8 +502,6 @@ function start(game: Game): void {
     // The game is read, new or resumed: where CSBWin's boot forces DM rules.
     game.forceDMRulesAtBoot();
 
-    // Initial render
-    renderView();
     drawMapPreview(game.ctx.party.state.position.z);
 }
 

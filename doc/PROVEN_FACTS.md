@@ -3458,6 +3458,19 @@ due and runs in the first pass that can. The port counts VBLs the same way
 (`vblInterrupt`, `src/engine/LoopState.ts`), and the page runs as many VBLs as the wall
 clock holds (`Game.gameLoop`). Evidence: `tools/dump-vbl-clock.ts`.
 
+## `MainLoop` opens with a tick
+
+`_MainLoop`'s first statement is `tag000698`, the top of a tick
+(`doc/CSBwin-src/CSBCode.cpp:586-601`): a game that starts, or that `_StartCSB` restarts
+after the credits (`:11320-11327`), runs `ProcessTimers`, `DrawViewport` and `d.Time++`
+before it reads any input, and that `DrawViewport` is the game's first view. The count
+starts there (`d.vblCount = 0`, `:617`), so the second tick is `d.Speed` VBLs on. The
+port's tick belongs to a pass, so `d.clockTick` is set where `MainLoop` would be entered
+(`Game.start`, `Game.resumeMainLoop`) and the first VBL's pass ticks. A game read in play,
+which only the port has (the save menu's LOAD, F9), is followed by the same tick
+(`Game.applyRuntimeSaveState`), and the page draws no first view of its own. Evidence:
+`tools/dump-vbl-clock.ts`.
+
 ## A refused move throws away all queued input, and postpones a due tick by one VBL
 
 When `MoveParty`'s inhibit flag `D5W` is set — terrain, or with champions a monster in the

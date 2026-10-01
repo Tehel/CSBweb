@@ -9,6 +9,10 @@
  * - The handler runs on every VBL: frozen, the tick due waits (`:765`) and runs in the
  *   first pass after the thaw; held in a script's `VBLDelay`, the count goes on, and the
  *   pass the script held ticks in the VBL the script ends (`:747-765`).
+ * - `_MainLoop` goes straight to `tag000698`, the top of a tick (`:586-601`): a started
+ *   game ticks in its first VBL, and so does one restarted after the credits
+ *   (`Game.resumeMainLoop`, `:11320-11327`) or read in play, which only the port has. The
+ *   count starts from that tick.
  * - The page paces VBLs from the wall clock (`Game.gameLoop`): a call runs as many as the
  *   time since the last holds, up to a second's worth, so a timer held to one call a
  *   second, as a background tab's is, keeps the game at its pace, and a longer gap is not
@@ -99,6 +103,31 @@ function checkHeldTicks(): void {
   check(after.join() === '15', 'and the count starts again from that tick');
 }
 
+function checkTheFirstTick(): void {
+  console.log('');
+  console.log('=== MainLoop opens with a tick (CSBCode.cpp:586-601) ===');
+  const started = freshGame();
+  started.game.start();
+  started.game.stop();
+  const first = tickingVbls(started.game, started.ticks, 20);
+  console.log(`started: ticks in VBLs ${first.join(' ')}`);
+  check(first.join() === '1,16', "a started game's first pass ticks, and the next tick is 15 VBLs on");
+
+  const restarted = freshGame();
+  tickingVbls(restarted.game, restarted.ticks, 22);
+  restarted.game.resumeMainLoop();
+  const again = tickingVbls(restarted.game, restarted.ticks, 20);
+  console.log(`restarted 7 VBLs after a tick: ticks in VBLs ${again.join(' ')}`);
+  check(again.join() === '1,16', 'MainLoop called again after the credits opens with a tick too');
+
+  const read = freshGame();
+  tickingVbls(read.game, read.ticks, 22);
+  read.game.applyRuntimeSaveState(read.game.getRuntimeSaveState());
+  const loaded = tickingVbls(read.game, read.ticks, 20);
+  console.log(`a game read 7 VBLs after a tick: ticks in VBLs ${loaded.join(' ')}`);
+  check(loaded.join() === '1,16', 'a game read in play ticks in the next pass, as the MainLoop that follows a read does');
+}
+
 function checkThePace(): void {
   console.log('');
   console.log('=== the page paces VBLs from the wall clock (Game.gameLoop) ===');
@@ -125,7 +154,7 @@ function checkThePace(): void {
       return { vbls: vbls() - v, ticks: ticks() - t, delay: pending!.delay };
     };
     game.start();
-    check(pending !== null && vbls() === 0, 'start runs no VBL, and asks for a call');
+    check(pending !== null && vbls() === 0 && ticks() === 0, 'start runs no VBL, and asks for a call');
 
     const steady = [5, 30, 16, 17, 1, 40, 12, 20, 25, 2].map(call);
     const steadyVbls = steady.reduce((sum, c) => sum + c.vbls, 0);
@@ -154,5 +183,6 @@ function checkThePace(): void {
 
 checkTheCount();
 checkHeldTicks();
+checkTheFirstTick();
 checkThePace();
 finish();

@@ -697,7 +697,7 @@ async function checkQuickSaveOverOpenChest(graphics: GraphicsLoader): Promise<vo
   check(ui.openChestId === chest && chestContents(game, chest) === 0, 'the open chest\'s objects are out of its chain');
 
   // Wired as `main.ts` wires it.
-  const payload = buildQuickSavePayload(game, { game, renderView: () => {}, repackOpenChest: () => Inventory.repackOpenChest(ui) });
+  const payload = buildQuickSavePayload(game, { game, repackOpenChest: () => Inventory.repackOpenChest(ui) });
   const fresh = await loadGame();
   applySaveBytes(fresh, encodeSavePayload(payload));
   const saved = chestContents(fresh, chest);

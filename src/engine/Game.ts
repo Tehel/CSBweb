@@ -192,6 +192,11 @@ export class Game implements MainLoop {
         this.running = true;
         this.vblClockStart = Date.now();
         this.vblsPaced = 0;
+        // `_MainLoop` goes straight to `tag000698`, the top of a tick
+        // (doc/CSBwin-src/CSBCode.cpp:586-601): the first thing a started game does is
+        // `ProcessTimers`, `DrawViewport`, `d.Time++`. The port's tick is a pass's, so one
+        // is made due, and the first VBL's pass runs it and draws the game's first view.
+        this.ctx.loop.clockTick = true;
 
         // Start game loop
         this.gameLoop();
@@ -307,10 +312,12 @@ export class Game implements MainLoop {
      * `_StartCSB` calls `MainLoop` again once `ShowCredits` returns from a restart
      * (doc/CSBwin-src/CSBCode.cpp:11320-11327). The loop's state is `d`'s, which
      * `d.Initialize()` has reset (`Code1f9e6.cpp:309`), and the input goes
-     * (`DiscardAllInput`, `:321`). The page starts the loop (`start`).
+     * (`DiscardAllInput`, `:321`). `MainLoop` opens with a tick (`CSBCode.cpp:586-601`),
+     * so one is due. The page starts the loop (`start`).
      */
     resumeMainLoop(): void {
         Object.assign(this.ctx.loop, createLoopFlags());
+        this.ctx.loop.clockTick = true;
         this.script = null;
         this.ctx.mouseQueue.discardAllInput();
         this.mainLoopReturned = false;
@@ -844,11 +851,14 @@ export class Game implements MainLoop {
      * reset: `HandleMouseEvents(_16_, -999887)` — `lastTime = 0`
      * (doc/CSBwin-src/SaveGame.cpp:1661, `Mouse.cpp:1372-1376`). Every game read comes
      * through here, and `_GameSetup` follows each `ReadEntireGame` with
-     * `SmartDiscard(true)` (`CSBCode.cpp:10635-10636`).
+     * `SmartDiscard(true)` (`CSBCode.cpp:10635-10636`). `MainLoop` follows every read and
+     * opens with a tick (`:586-601`), so one is made due: a game read in play, which only
+     * the port has, ticks in the next pass, and that tick draws its first view.
      */
     applyRuntimeSaveState(save: RuntimeSaveState): void {
         applyRuntimeSaveState(this.ctx, save);
         this.lastInputTime = 0;
         smartDiscard(this.ctx, true);
+        this.ctx.loop.clockTick = true;
     }
 }

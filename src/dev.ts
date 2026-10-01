@@ -25,8 +25,6 @@ import { updateDebug } from './ui';
 /** Live handles into `main.ts`; read through getters so reassignment is visible here. */
 export interface DevHost {
     readonly game: Game | null;
-    /** `DrawViewport` and the screen over it: the loaded game's first view. */
-    renderView(): void;
     /**
      * The portrait pixels of a champion carrying only `portraitGraphic`, for the save
      * writer — the screen's, since only it holds graphic 26. See
@@ -150,7 +148,6 @@ export function createDevTools(host: DevHost): DevTools {
             // An older format's `runtime` is never restored; its `raw`, a whole CSBWin
             // file, is loaded instead where it has one (`applySaveBytes`).
             applySaveBytes(host.game, await latest.store.read(latest.entry.id));
-            host.renderView();
             updateDebug(`Quick-loaded ${latest.entry.name}`);
         } catch (error) {
             if (error instanceof SavePayloadError) {
