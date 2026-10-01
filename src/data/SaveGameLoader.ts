@@ -9,6 +9,14 @@ import type { DungeonData, Item16Record, TimerRecord, DsaIndex, DsaDefinition, M
 import { DBType, OBJECT_ID_NULL, type ObjectID } from '../core/types';
 import { MakeBigActuators } from './CsbwinDungeonConversions';
 import { EXPOOL_RECORD_SIZE, specialLocationsFromExpool } from './CsbwinExpool';
+import {
+  BLOCK1_SIZE,
+  genChecksum,
+  readUnscrambleBlock,
+  scramble,
+  scrambleAndWrite,
+  unscrambleStream,
+} from './CsbwinSaveStream';
 import { formChecksum, readObjectIndirectIndex } from './CsbwinObjectIndex';
 import type { CsbwinObjectIndex } from './CsbwinObjectIndex';
 import {
@@ -250,7 +258,6 @@ export function emptyBlock2(): Block2 {
   };
 }
 
-const BLOCK1_SIZE = 512;
 const BLOCK2_SIZE = 128;
 const CHARACTER_SIZE = 3328;
 const EXTENDED_SENTINEL = ' Extended Features ';
@@ -263,7 +270,7 @@ const EXTENDED_SENTINEL = ' Extended Features ';
  * by reading each word through `LE16()`, which on the little-endian build it ships
  * as is a byte swap (`doc/CSBwin-src/CSBTypes.h:146`). So `Unscramble`'s hash
  * arithmetic runs on `LE16(wordGear(A3))` (`doc/CSBwin-src/CSBCode.cpp:9057-9061`),
- * `ReadUnscrambleBlock` sums `LE16(wordGear(...))` (`:9083-9098`), and `swapBlock2`
+ * `ReadUnscrambleBlock` sums `LE16(wordGear(...))` (`:9167-9196`), and `swapBlock2`
  * `BO()`s every field afterwards (`doc/CSBwin-src/SaveGame.cpp:455-478`) — three
  * statements of the same fact.
  *
@@ -274,41 +281,6 @@ const EXTENDED_SENTINEL = ' Extended Features ';
  * the block stays little-endian. That is why `readU16LE`/`readU32LE` are used here for
  * exactly that block, and nothing else.
  */
-
-function genChecksum(buf: Uint8Array, initialHash: number, numWords: number): number {
-  let result = initialHash & 0xffff;
-  let hash = initialHash & 0xffff;
-  let count = numWords & 0xffff;
-  let off = 0;
-  while (count !== 0) {
-    const word = readU16BE(buf, off);
-    result = (result + word) & 0xffff;
-    result = (result + (word ^ hash)) & 0xffff;
-    hash = (hash + count) & 0xffff;
-    off += 2;
-    count = (count - 1) & 0xffff;
-  }
-  return result & 0xffff;
-}
-
-function scramble(buf: Uint8Array, initialHash: number, numWords: number): number {
-  let d7 = initialHash & 0xffff;
-  let d6 = numWords & 0xffff;
-  let d5 = initialHash & 0xffff;
-  let off = 0;
-  while (d6 !== 0) {
-    const plain = readU16BE(buf, off);
-    const word = plain ^ d7;
-    d5 = (d5 + word) & 0xffff;
-    buf[off] = (word >> 8) & 0xff;
-    buf[off + 1] = word & 0xff;
-    d5 = (d5 + plain) & 0xffff;
-    off += 2;
-    d7 = (d7 + d6) & 0xffff;
-    d6 = (d6 - 1) & 0xffff;
-  }
-  return d5 & 0xffff;
-}
 
 function rc4Simple(buf: Uint8Array, key: Uint8Array): Uint8Array {
   const out = new Uint8Array(buf.length);
@@ -781,77 +753,6 @@ function parseMissileRecordsFromSaveData(
     });
   }
   return records;
-}
-
-function unscramble(buf: Uint8Array, initialHash: number, numWords: number): number {
-  let d7 = initialHash & 0xffff;
-  let d6 = numWords & 0xffff;
-  let d5 = initialHash & 0xffff;
-  let off = 0;
-  while (d6 !== 0) {
-    const word = readU16BE(buf, off);
-    d5 = (d5 + word) & 0xffff;
-    const xored = word ^ d7;
-    buf[off] = (xored >> 8) & 0xff;
-    buf[off + 1] = xored & 0xff;
-    d5 = (d5 + xored) & 0xffff;
-    off += 2;
-    d7 = (d7 + d6) & 0xffff;
-    d6 = (d6 - 1) & 0xffff;
-  }
-  return d5 & 0xffff;
-}
-
-function readUnscrambleBlock(data: Uint8Array, offset: number): { buf: Uint8Array; next: number } {
-  const end = offset + BLOCK1_SIZE;
-  if (end > data.length) throw new Error('savegame block1 truncated');
-  const buf = data.slice(offset, end);
-
-  let d6 = 0;
-  let pos = 0;
-  for (let i = 0; i < 32; i++) {
-    d6 = (d6 + readU16BE(buf, pos)) & 0xffff;
-    pos += 2;
-    d6 ^= readU16BE(buf, pos);
-    pos += 2;
-    d6 = (d6 - readU16BE(buf, pos)) & 0xffff;
-    pos += 2;
-    d6 ^= readU16BE(buf, pos);
-    pos += 2;
-  }
-
-  const hash = readU16BE(buf, 58);
-  unscramble(buf.subarray(256), hash, 128);
-
-  let d5 = 0;
-  pos = 256;
-  for (let i = 0; i < 128; i++) {
-    d5 = (d5 + readU16BE(buf, pos)) & 0xffff;
-    pos += 2;
-  }
-
-  if ((d6 & 0xffff) !== (d5 & 0xffff)) {
-    throw new Error('savegame block1 checksum mismatch');
-  }
-
-  return { buf, next: end };
-}
-
-function unscrambleStream(
-  data: Uint8Array,
-  offset: number,
-  size: number,
-  initialHash: number,
-  checksum: number
-): { buf: Uint8Array; next: number } {
-  const end = offset + size;
-  if (end > data.length) throw new Error('savegame stream truncated');
-  const buf = data.slice(offset, end);
-  const computed = unscramble(buf, initialHash, size / 2);
-  if (computed !== (checksum & 0xffff)) {
-    throw new Error('savegame stream checksum mismatch');
-  }
-  return { buf, next: end };
 }
 
 function parseBlock1Hashes(buf: Uint8Array): Block1Hashes {
@@ -1352,35 +1253,7 @@ export function saveSaveGameState(save: SaveGameState): Uint8Array {
   writeU16BE(block1Plain, 378, b1.word22592);
   block1Plain.set(b1.byte22808.subarray(0, 132), 380);
 
-  // `ScrambleAndWrite` (`doc/CSBwin-src/SaveGame.cpp:706-750`): `D5` sums the second
-  // half's words, the first 127 words are zeroed and folded into `D6` by turns of add,
-  // xor, subtract and xor, and word 127 is `D5 ^ D6` — so the reader's fold over all
-  // 128 words ends at `D5`. The second half is then scrambled with word 29 as its hash.
-  let d5 = 0;
-  for (let i = 256; i < BLOCK1_SIZE; i += 2) d5 = (d5 + readU16BE(block1Plain, i)) & 0xffff;
-  let d6 = 0;
-  let pos = 0;
-  for (let d7 = 32; ; ) {
-    writeU16BE(block1Plain, pos, 0);
-    d6 = (d6 + readU16BE(block1Plain, pos)) & 0xffff;
-    pos += 2;
-    writeU16BE(block1Plain, pos, 0);
-    d6 ^= readU16BE(block1Plain, pos);
-    pos += 2;
-    writeU16BE(block1Plain, pos, 0);
-    d6 = (d6 - readU16BE(block1Plain, pos)) & 0xffff;
-    pos += 2;
-    d7--;
-    if (d7 !== 0) {
-      writeU16BE(block1Plain, pos, 0);
-      d6 ^= readU16BE(block1Plain, pos);
-      pos += 2;
-      continue;
-    }
-    writeU16BE(block1Plain, pos, d5 ^ d6);
-    break;
-  }
-  scramble(block1Plain.subarray(256), readU16BE(block1Plain, 58), 128);
+  scrambleAndWrite(block1Plain);
 
   scramble(block2, block2Hash, BLOCK2_SIZE / 2);
   scramble(item16, item16Hash, item16.length / 2);

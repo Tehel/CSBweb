@@ -90,7 +90,7 @@ In payoff order: the first row is the next item.
 
 | ID | Item | Size | Status |
 | --- | --- | --- | --- |
-| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step; four steps, in its entry |
+| E13 | The save pipeline straddles `data/` and `engine/`, and nothing owns it | L | ⏳ `P10`'s first step; three steps, in its entry |
 | C96 | Champion bones records live outside `EXPOOL`, so no CSBWin file carries them | M | ⏳ before `P10` drops the JSON |
 | P10 | The save menu rework, with saves that know their dungeon | L | in `PLAN.md` → Phase 10 |
 | G17 | A new Chaos Strikes Back game: the prison and "MAKE NEW ADVENTURE" | M | ⏳ |
@@ -148,9 +148,9 @@ The code it will stand on is spread and knotted:
   `engine/Game`, `RuntimeSave`, `DungeonSnapshot`, `DungeonState` and `CheckMonsters` to
   install a world into a running game; `src/engine/SaveGamePayload.ts` imports six
   `data/Csbwin*` codecs; `src/data/saves/FileSaveStore.ts` imports `engine/SaveGamePayload`.
-- **`SaveGameLoader.ts` is three modules.** 1434 lines whose header still says "Minimal
-  save-game loader focused on Item16 and timer tables": the scramble, checksum and RC4
-  stream, the Extended Features prefix reader (whose writer and struct parser are in
+- **`SaveGameLoader.ts` is two modules.** 1307 lines whose header still says "Minimal
+  save-game loader focused on Item16 and timer tables": the Extended Features prefix
+  reader, with its RC4 and its DSA reader (the prefix's writer and struct parser are in
   `CsbwinExtendedFeatures.ts`), and the block codecs of all sixteen blocks, reader and
   writer.
 - **A save is built in three places**: `main.ts`'s `onCreateSave` (`:324`) and `dev.ts`'s
@@ -168,39 +168,35 @@ The code it will stand on is spread and knotted:
   `SaveGameLoader.readExtendedFeatures` at bare offsets with bare masks
   (`extendedFlags & 0x20`, `flags & 0x80`), and by
   `CsbwinExtendedFeatures.parseExtendedFeaturesBlock` with `EF_FLAGS` and
-  `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` is declared twice (`SaveGameLoader.ts:256`,
+  `EF_EXTENDED_FLAGS`. `EXTENDED_SENTINEL` is declared twice (`SaveGameLoader.ts:263`,
   `CsbwinExtendedFeatures.ts:37`). A save's name is made unique twice: `makeSaveFileName(savedAt, taken)`
   (`src/engine/SaveGamePayload.ts:502`) and `SaveMenu.uniqueName`
   (`src/renderer/ui/SaveMenu.ts:593`), which cuts the name at its first dot. The two give
   the same name for every name the first makes.
 
 Paying it, as `P10`'s first step: `data/` holds pure codecs, bytes to plain records and
-back (`SaveGameLoader` split into the stream, the blocks, and the prefix joined to
+back (`SaveGameLoader` left with the blocks, its prefix reader joined to
 `CsbwinExtendedFeatures`, one reader of the struct); one owner builds a save
 from a game and applies one to it, knows the data set, and is what the menu and F5/F9
 call, with one rule for a unique save name.
 
-**The split.** Four steps, one a commit, in this order: each is a refactor, proven as
+**The split.** Three steps, one a commit, in this order: each is a refactor, proven as
 "How to work this list", point 3, says. The first step listed is the next one, and a
 step that is done is deleted from this list along with the bullets above that it paid.
 
-1. **`src/data/CsbwinSaveStream.ts`** (S). What the file is wrapped in, with no knowledge
-   of a block's fields: `genChecksum`, `scramble`, `unscramble`, `unscrambleStream`,
-   `readUnscrambleBlock`, and `ScrambleAndWrite`'s fold over `GAMEBLOCK1`, which
-   `saveSaveGameState` spells inline (`SaveGameLoader.ts:1355-1383`).
-2. **The prefix has one reader** (S). `readExtendedFeatures` moves into
+1. **The prefix has one reader** (S). `readExtendedFeatures` moves into
    `CsbwinExtendedFeatures.ts` with `rc4Simple`, `RcsReader` and `readDsa`, takes every
    field from `parseExtendedFeaturesBlock` and every flag from `EF_FLAGS` and
    `EF_EXTENDED_FLAGS`, and `EXTENDED_SENTINEL` is declared once. `DungeonLoader` imports
    it from there. `SaveGameLoader.ts` is then the block codecs alone, and its header
    says so.
-3. **Nothing in `data/` installs anything** (M). `CsbwinSaveGame.ts` moves to
+2. **Nothing in `data/` installs anything** (M). `CsbwinSaveGame.ts` moves to
    `src/engine/` (eleven tools import it). `applySaveGameState` moves beside its one
    caller, `RuntimeSave.applyRuntimeSaveState`, without its `party` arm, which no caller
    passes. `SAVE_FILE_EXTENSION` and `SaveHeader` move to `src/data/saves/`, which
    `FileSaveStore` reads them from. What `data/` then imports from `engine/` is
    `gameTypes` and `attributes`, the records the character codec packs, and nothing else.
-4. **The owner** (M). One module in `src/engine/`, built with the game, the data set
+3. **The owner** (M). One module in `src/engine/`, built with the game, the data set
    (`DataSet`, `src/data/DataSets.ts`) and the two things only the screen has
    (`portraitOf`, `repackOpenChest`). It holds what `SaveGamePayload.ts` and
    `CsbwinSaveGame.ts` do, one function that builds a save and writes it to a store (the
